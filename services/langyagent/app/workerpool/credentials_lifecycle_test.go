@@ -271,6 +271,56 @@ func TestReap_OverAgeWorkerIsNeverRetiredMidTurn(t *testing.T) {
 		"a turn holding the retired worker is re-dispatched, never run on it")
 }
 
+// A warm that reuses a live worker never runs the key the control plane minted
+// for it, so that key is revoked rather than left valid until it expires.
+func TestAcquireWarm_RevokesItsUnusedKeyWhenItReusesAWorker(t *testing.T) {
+	creds := spawnableCreds()
+
+	t.Run("a different key id is revoked, the worker's own is not", func(t *testing.T) {
+		rev := &recordingRevoker{}
+		p := newLifecyclePool(t, rev)
+		t.Cleanup(p.Shutdown)
+		p.workerMaxAge = time.Hour
+
+		w := &Worker{
+			conversationID: "conv-warm", credSig: sigOf(creds),
+			apiKeyID: creds.LangwatchAPIKeyID, langwatchEndpoint: "http://cp",
+			spawnedAt: time.Now().Add(-2 * time.Hour), lastSeen: time.Now(),
+		}
+		p.mu.Lock()
+		p.workers["conv-warm"] = w
+		p.mu.Unlock()
+
+		warmCreds := creds
+		warmCreds.LangwatchAPIKeyID = "key-b"
+		got, err := p.AcquireWarm(context.Background(), "conv-warm", warmCreds)
+		require.NoError(t, err)
+		assert.Same(t, w, got, "a warm reuses the live worker even when it is over age")
+		assert.Equal(t, []string{"key-b"}, rev.eventually(t, 1), "the warm's unused key is revoked")
+	})
+
+	t.Run("the same key id revokes nothing", func(t *testing.T) {
+		rev := &recordingRevoker{}
+		p := newLifecyclePool(t, rev)
+		t.Cleanup(p.Shutdown)
+
+		w := &Worker{
+			conversationID: "conv-warm-same", credSig: sigOf(creds),
+			apiKeyID: creds.LangwatchAPIKeyID, langwatchEndpoint: "http://cp",
+			spawnedAt: time.Now(), lastSeen: time.Now(),
+		}
+		p.mu.Lock()
+		p.workers["conv-warm-same"] = w
+		p.mu.Unlock()
+
+		got, err := p.AcquireWarm(context.Background(), "conv-warm-same", creds)
+		require.NoError(t, err)
+		assert.Same(t, w, got)
+		time.Sleep(50 * time.Millisecond)
+		assert.Empty(t, rev.revoked(), "the worker's own key is still in use and must not be revoked")
+	})
+}
+
 // A keyed re-dispatch of a turn the over-age worker already completed (an
 // outbox retry after a lost answer) must reach that worker, which remembers the
 // turn. A fresh replacement would remember nothing and run the turn twice.

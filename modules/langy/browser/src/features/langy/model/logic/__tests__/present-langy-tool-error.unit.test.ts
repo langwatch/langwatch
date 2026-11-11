@@ -3,9 +3,15 @@
  * @see specs/langy/langy-cli-tool-envelope.feature
  *      "A failure keeps its structure all the way to the card"
  */
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
 import { describe, expect, it } from "vitest";
 
-import { presentLangyToolError } from "../langy-tool-failure.ts";
+import { CLI_MISSING_KEY_LINES, presentLangyToolError } from "../langy-tool-failure.ts";
+
+const here = path.dirname(fileURLToPath(import.meta.url));
 
 const failureDocument = (error: Record<string, unknown>) => JSON.stringify({ ok: false, error });
 
@@ -578,6 +584,20 @@ describe("presentLangyToolError", () => {
 
       expect(presentation.message).toBe("Analytics storage is temporarily unavailable.");
       expect(presentation.code).toBe("clickhouse_unavailable");
+    });
+  });
+
+  // The lines are copied from the CLI, so a reword there must fail this gate.
+  describe("given the CLI's missing-key lines", () => {
+    /** @scenario "A missing key printed as plain text on the developer's own machine keeps the CLI's own words" */
+    it("matches the lines the CLI prints in its source", () => {
+      const cliSource = fs.readFileSync(
+        path.resolve(here, "../../../../../../../../../sdks/typescript/src/cli/utils/apiKey.ts"),
+        "utf8",
+      );
+      for (const line of CLI_MISSING_KEY_LINES) {
+        expect(cliSource, line).toContain(JSON.stringify(line));
+      }
     });
   });
 });

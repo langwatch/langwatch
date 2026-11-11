@@ -424,10 +424,18 @@ func (p *Pool) HasLiveWorker(conversationID string, sig domain.CredentialSignatu
 // this way: a manager that is SIGKILLed (OOM, eviction, force-delete) runs no
 // cleanup at all, so revocation can never be the guarantee — only the fast path.
 func (p *Pool) revokeKeyOf(w *Worker, reason string) {
-	if p.revoker == nil || w == nil || w.apiKeyID == "" {
+	if w == nil {
 		return
 	}
-	apiKeyID, projectID, endpoint, conversationID := w.apiKeyID, w.projectID, w.langwatchEndpoint, w.conversationID
+	p.revokeKey(w.apiKeyID, w.projectID, w.langwatchEndpoint, w.conversationID, reason)
+}
+
+// revokeKey is revokeKeyOf for a key that is not yet on a worker, such as the
+// one a warm minted and then left unused.
+func (p *Pool) revokeKey(apiKeyID, projectID, endpoint, conversationID, reason string) {
+	if p.revoker == nil || apiKeyID == "" {
+		return
+	}
 	go func() {
 		defer clog.HandlePanic(p.baseCtx, false)
 		ctx, cancel := context.WithTimeout(p.baseCtx, revokeTimeout)
@@ -502,6 +510,10 @@ func (p *Pool) acquire(ctx context.Context, conversationID, turnID string, creds
 			// or not) must reach it so ClaimTurn answers ClaimAlreadyHandled. A
 			// replacement would start with no memory of that turn and run it twice.
 			if !forTurn || !creds.Spawnable() || !w.retireIfOverAge(p.workerMaxAge, turnID) {
+				// A warm that reuses the worker leaves its own minted key unused, so it is revoked here.
+				if !forTurn && creds.LangwatchAPIKeyID != "" && creds.LangwatchAPIKeyID != w.apiKeyID {
+					p.revokeKey(creds.LangwatchAPIKeyID, creds.ProjectID, creds.LangwatchEndpoint, conversationID, "warm reused an existing worker")
+				}
 				p.mu.Unlock()
 				return w, nil
 			}
@@ -517,6 +529,10 @@ func (p *Pool) acquire(ctx context.Context, conversationID, turnID string, creds
 		// next real turn carries the authoritative credentials and does the
 		// replacement below.
 		if !forTurn {
+			// Same reuse as above: the warm's minted key goes unused, so it is revoked.
+			if creds.LangwatchAPIKeyID != "" && creds.LangwatchAPIKeyID != w.apiKeyID {
+				p.revokeKey(creds.LangwatchAPIKeyID, creds.ProjectID, creds.LangwatchEndpoint, conversationID, "warm reused an existing worker")
+			}
 			p.mu.Unlock()
 			return w, nil
 		}

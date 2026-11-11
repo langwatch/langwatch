@@ -383,7 +383,7 @@ function githubAppNotInstalled({
  * apiKey.ts: `missingCredentialsLines` and `checkOrgApiKey`). A whole output line must equal
  * one, so a tool that only echoes it (a grep hit, a printed log) is not reclassified.
  */
-const CLI_MISSING_KEY_LINES = [
+export const CLI_MISSING_KEY_LINES = [
   "Error: you're not logged in, and LANGWATCH_API_KEY is not set.",
   "Error: LANGWATCH_API_KEY not found.",
 ];
