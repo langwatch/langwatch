@@ -11,12 +11,11 @@ import {
 
 import { SECRET_IN_SITUATION_MESSAGE } from "./use-case-editor.ts";
 
-/** One row per name, and one more per conflict; a repeat of a default adds nothing. */
+/** One row per name and kind: repeats of a duplicate fold into the one row. */
 function listedDeclarations(declarations: readonly InlineDeclaration[]): InlineDeclaration[] {
   const seen = new Set<string>();
   return declarations.filter((declaration) => {
-    const { name, status, defaultValue } = declaration;
-    const key = `${status.kind}:${name}:${status.kind === "duplicate" ? defaultValue : ""}`;
+    const key = `${declaration.status.kind}:${declaration.name}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -24,7 +23,7 @@ function listedDeclarations(declarations: readonly InlineDeclaration[]): InlineD
 }
 
 const CONFLICT_BADGE = {
-  duplicate: { label: "declared twice", colorPalette: "orange" },
+  duplicate: { label: "repeated", colorPalette: "orange" },
   stored: { label: "stored wins", colorPalette: "orange" },
   secret: { label: "secret", colorPalette: "red" },
   over_limit: { label: "over limit", colorPalette: "orange" },
@@ -39,7 +38,7 @@ function InlineParameterDetail({ declaration }: { declaration: InlineDeclaration
     case "duplicate":
       return (
         <Text color="fg.muted">
-          {name} is declared twice; the first default, {status.usedDefault}, is used
+          {name} is declared more than once; the first default, {status.usedDefault}, is used
         </Text>
       );
     case "stored":

@@ -56,11 +56,11 @@ export type ParameterDeclaringAgent = {
 };
 
 /** A scenario of the run, as far as its parameters go. */
-type ParameterDeclaringScenario = {
+export type ParameterDeclaringScenario = {
   id: string;
   parameters: unknown;
   /** Read for `{ key: value }` declarations written inline. */
-  situation?: string;
+  situation: string;
 };
 
 /**
@@ -80,7 +80,7 @@ function scenarioDeclaredParameters({
       (scenario) =>
         declaredScenarioParameters({
           parameters: scenario.parameters,
-          situation: scenario.situation ?? "",
+          situation: scenario.situation,
         }).definitions,
     );
 

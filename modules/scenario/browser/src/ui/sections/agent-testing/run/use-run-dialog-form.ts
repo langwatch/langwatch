@@ -16,8 +16,9 @@ import { useAllPromptsForProject } from "../../../../behavior/prompts/use-all-pr
 import { useFilteredAgents } from "../../../../behavior/scenarios/use-filtered-scenario-targets.ts";
 import { useScenarios } from "../../../../behavior/scenarios/use-scenarios.ts";
 import {
-  unionParameterDefinitions,
   type DeclaredParameter,
+  type ParameterDeclaringScenario,
+  unionParameterDefinitions,
 } from "../../../../behavior/suites/use-run-suite.ts";
 import { useTestSuites } from "../../../../behavior/suites/use-test-suites.ts";
 import {
@@ -302,7 +303,7 @@ function useDeclaredParameters({
   targetAgentIds,
 }: {
   scenarioIds: string[];
-  allScenarios: readonly { id: string; parameters: unknown; situation?: string }[] | undefined;
+  allScenarios: readonly ParameterDeclaringScenario[] | undefined;
   agents: readonly RunDialogAgent[];
   /** The ids of the agents the run goes against, sorted. */
   targetAgentIds: readonly string[];
@@ -480,7 +481,7 @@ function useRunDialogParameters({
   areChoicesLoaded,
 }: {
   subject: RunDialogSubject | null;
-  allScenarios: readonly { id: string; parameters: unknown; situation?: string }[] | undefined;
+  allScenarios: readonly ParameterDeclaringScenario[] | undefined;
   agents: readonly RunDialogAgent[];
   /** The ids of the agents the run goes against, sorted. */
   targetAgentIds: readonly string[];

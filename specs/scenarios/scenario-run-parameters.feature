@@ -279,7 +279,7 @@ Feature: Scenario run parameters
   Scenario: The editor warns when a name is declared twice inline with another default
     Given the scenario editor is open
     When the situation reads "{ plan: free } now, { plan: pro } later"
-    Then the editor warns "plan is declared twice; the first default, free, is used"
+    Then the editor warns "plan is declared more than once; the first default, free, is used"
 
   @integration
   Scenario: The editor refuses an inline declaration naming a stored secret

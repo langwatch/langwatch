@@ -1045,7 +1045,7 @@ describe("the scenario dialog", () => {
       await writeSituation(user, "{ plan: free } now, { plan: pro } later");
 
       expect(screen.getByTestId("inline-parameter-duplicate-plan")).toHaveTextContent(
-        "plan is declared twice; the first default, free, is used",
+        "plan is declared more than once; the first default, free, is used",
       );
       expect(
         screen.getAllByTestId("situation-declaration").map((mark) => mark.dataset.status),
