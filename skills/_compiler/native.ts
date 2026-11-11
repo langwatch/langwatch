@@ -21,11 +21,20 @@ const skillsRoot = path.resolve(__dirname, "..");
 const DEFAULT_OUT = path.join(skillsRoot, "_compiled", "native");
 
 /**
- * Setup partials the in-product agent must not be given: it already has
- * credentials, endpoint and CLI on PATH, so these are instructions to ignore
- * something, priced at every token spent reading them regardless.
+ * Setup partials the in-product agent must not be given: it already has credentials,
+ * endpoint and CLI on PATH. The login ones would also have it tell a signed-in
+ * user to log in or set a key; the public skills keep them all.
  */
-const LANGY_EXCLUDED_PARTIALS = ["cli-setup", "projects-and-api-keys"];
+const LANGY_EXCLUDED_PARTIALS = [
+  "cli-setup",
+  "projects-and-api-keys",
+  "cli-login",
+  "cli-login-intro",
+  "cli-login-troubleshooting",
+  "coding-agent-cost-login",
+  "context-sweet-spot-login",
+  "provider-cost-comparison-login",
+];
 
 export function renderSkill(skill: PublishedSkill): string {
   if (!fs.existsSync(skill.src)) {

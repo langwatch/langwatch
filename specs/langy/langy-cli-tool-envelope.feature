@@ -175,12 +175,33 @@ Feature: Langy recognises its own CLI behind a shell tool call
       Then the card says Langy hit an internal error
       And it never says the reader lacks access
       And it never tells the reader to sign in or set a key
+      And opening the failed step never shows the CLI's sign-in steps
 
     @unit
     Scenario: A missing key on the developer's own machine keeps the CLI's own words
       When a tool call in the shared local folder fails because no API key is set
       Then the card says what the CLI said
       And it keeps the CLI's next steps
+
+    # Text mode prints the CLI's missing-key lines with no JSON and no code.
+    @unit
+    Scenario: Langy's own missing key printed as plain text reads as an internal error
+      When Langy's tool call fails and the CLI printed only its missing-key text
+      Then the card says Langy hit an internal error
+      And it never tells the reader to sign in or set a key
+      And opening the failed step never shows the CLI's sign-in steps
+
+    @unit
+    Scenario: A missing key printed as plain text on the developer's own machine keeps the CLI's own words
+      When a tool call in the shared local folder fails and the CLI printed only its not-logged-in text
+      Then the card shows the CLI's own sign-in instructions
+
+    # A blank key is no key: the manager asks the control plane to mint one
+    # rather than boot a CLI that would tell the reader to log in.
+    @unit
+    Scenario: Langy never starts its CLI with a blank key
+      When a worker must be spawned and the session key is only whitespace
+      Then the manager refuses the spawn and says credentials are required
 
     @unit
     Scenario: A refusal on the same status for a different reason keeps its own words

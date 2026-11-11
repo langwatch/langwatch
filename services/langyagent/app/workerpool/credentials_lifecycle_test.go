@@ -89,6 +89,26 @@ func TestAcquire_RefusesSpawnWithoutSessionKey(t *testing.T) {
 		"a keyless spawn must ask the control plane to mint and retry, got: %v", err)
 }
 
+// A whitespace-only key is no key: spawning on it would boot a CLI that tells the
+// user to log in, so it takes the same mint-and-retry path as an absent one.
+//
+// @scenario "Langy never starts its CLI with a blank key"
+func TestAcquire_RefusesSpawnWithBlankSessionKey(t *testing.T) {
+	p := newLifecyclePool(t, nil)
+	t.Cleanup(p.Shutdown)
+
+	_, err := p.Acquire(context.Background(), "conv-blank-key", domain.Credentials{
+		LangwatchAPIKey:   " \t\n",
+		LLMVirtualKey:     "vk",
+		GatewayBaseURL:    "http://gw",
+		LangwatchEndpoint: "http://cp",
+	})
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, domain.ErrCredentialsRequired,
+		"a blank-key spawn must ask the control plane to mint and retry, got: %v", err)
+}
+
 // A keyless request must not consume a worker slot it was never going to fill —
 // the refusal is checked before the capacity reservation.
 func TestAcquire_KeylessSpawnDoesNotConsumeCapacity(t *testing.T) {

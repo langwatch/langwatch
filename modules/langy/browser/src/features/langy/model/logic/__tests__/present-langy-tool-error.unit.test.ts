@@ -137,6 +137,11 @@ describe("presentLangyToolError", () => {
       expect(presentation.tips).toBeUndefined();
       expect(presentation.docsUrl).toBeUndefined();
     });
+
+    /** @scenario "Langy's own refused credential reads as an internal error" */
+    it("keeps the CLI's own words off the card", () => {
+      expect(present(failure).raw).toBeUndefined();
+    });
   });
 
   describe("given a missing key on the developer's own machine", () => {
@@ -161,6 +166,78 @@ describe("presentLangyToolError", () => {
         expect(presentation.tips).toEqual(["Run `langwatch login` to authenticate"]);
       },
     );
+  });
+
+  describe("given the CLI's text-mode not-logged-in block and no JSON", () => {
+    // Verbatim from sdks/typescript/src/cli/utils/apiKey.ts, headline in chalk red.
+    const cliText = [
+      "\u001b[31mError: you're not logged in, and LANGWATCH_API_KEY is not set.\u001b[39m",
+      "",
+      "Sign in with your browser, interactively:",
+      "  langwatch login",
+      "",
+      "If you have an API key already, either of these works:",
+      "  langwatch login --api-key <key>",
+      "  echo 'LANGWATCH_API_KEY=<key>' >> .env",
+    ].join("\n");
+
+    /** @scenario "Langy's own missing key printed as plain text reads as an internal error" */
+    it("reads a sandbox tool's text as Langy's own missing key", () => {
+      const presentation = presentLangyToolError({
+        title: "Running a command",
+        toolName: "bash",
+        errorText: cliText,
+      });
+      const shown = [presentation.message, presentation.detail, ...(presentation.tips ?? [])].join(
+        " ",
+      );
+
+      expect(presentation.code).toBe("missing_api_key");
+      expect(presentation.message).toBe(
+        "Langy hit an internal error and couldn't complete this step.",
+      );
+      expect(shown).not.toMatch(/log ?in|sign in|api key/i);
+      expect(presentation.tips).toBeUndefined();
+      expect(presentation.raw).toBeUndefined();
+    });
+
+    /** @scenario "Langy's own missing key printed as plain text reads as an internal error" */
+    it("reads the org-key check's text the same way", () => {
+      // Verbatim from checkOrgApiKey in apiKey.ts.
+      const orgKeyText = [
+        "\u001b[31mError: LANGWATCH_API_KEY not found.\u001b[39m",
+        "This command needs an organization-capable API key. Create one at:",
+        "  https://app.langwatch.ai/settings/api-keys",
+        "Then add it to your .env file:",
+        "  echo 'LANGWATCH_API_KEY=<your-key>' >> .env",
+      ].join("\n");
+      const presentation = presentLangyToolError({
+        title: "Running a command",
+        toolName: "bash",
+        errorText: orgKeyText,
+      });
+
+      expect(presentation.code).toBe("missing_api_key");
+      expect(presentation.message).toBe(
+        "Langy hit an internal error and couldn't complete this step.",
+      );
+      expect(presentation.raw).toBeUndefined();
+    });
+
+    /** @scenario "A missing key printed as plain text on the developer's own machine keeps the CLI's own words" */
+    it("keeps the CLI's own sign-in words for a local tool", () => {
+      const presentation = presentLangyToolError({
+        title: "Running a command",
+        toolName: "local_bash",
+        errorText: cliText,
+      });
+
+      expect(presentation.code).toBeUndefined();
+      expect(presentation.detail).toBe(
+        "Error: you're not logged in, and LANGWATCH_API_KEY is not set.",
+      );
+      expect(presentation.raw).toContain("langwatch login");
+    });
   });
 
   // The failure the user hit: a free-plan scenario limit, rendered as

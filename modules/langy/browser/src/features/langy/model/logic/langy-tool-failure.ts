@@ -215,6 +215,18 @@ const credentialFault = ({
 };
 
 /**
+ * Whether a failure is Langy's own sandbox credential. Its tool output is the CLI telling
+ * the reader to log in, so the receipt shows Langy's copy in its place.
+ */
+export const isSandboxCredentialFault = ({
+  presentation,
+  toolName,
+}: {
+  presentation: LangyToolErrorPresentation;
+  toolName: string | undefined;
+}): boolean => credentialFault({ code: presentation.code, toolName }) === "sandbox";
+
+/**
  * Whether the reader has to act, so the failure keeps its card. A credential failure
  * keeps it on a local tool and folds in the sandbox; an access-denial code, a terminal
  * github-not-connected, 401 or 403 keep it. A terminal not-found folds.
@@ -367,6 +379,37 @@ function githubAppNotInstalled({
 }
 
 /**
+ * The lines the CLI prints in text mode when it has no key (sdks/typescript/src/cli/utils/
+ * apiKey.ts: `missingCredentialsLines` and `checkOrgApiKey`). Matched exactly, never a
+ * loose "login" pattern: other tools say "log in" for their own reasons.
+ */
+const CLI_MISSING_KEY_LINES = [
+  "Error: you're not logged in, and LANGWATCH_API_KEY is not set.",
+  "Error: LANGWATCH_API_KEY not found.",
+];
+
+/** Text mode carries no code, so the sandbox CLI's own line stands in for `missing_api_key`. */
+function sandboxMissingKeyFromText({
+  toolName,
+  raw,
+}: {
+  toolName: string | undefined;
+  raw: string | undefined;
+}): LangWatchHandledErrorShape | null {
+  if (!raw || !CLI_MISSING_KEY_LINES.some((line) => raw.includes(line))) return null;
+  if (toolName?.startsWith(LOCAL_TOOL_PREFIX)) return null;
+  return {
+    code: "missing_api_key",
+    kind: "missing_api_key",
+    message: "",
+    httpStatus: 0,
+    meta: {},
+    isHandled: true,
+    retryable: false,
+  };
+}
+
+/**
  * Level 3. No document, so no code — but there is usually TEXT, and the text is the
  * only thing left that knows anything. Showing it beats "This step couldn't be
  * completed", which tells the reader nothing and tells support less.
@@ -410,6 +453,8 @@ function buildDomainPresentation({
   const logsUrl = safeHttpUrl(domain.logsUrl) ?? safeHttpUrl(trace?.logsUrl);
   const docsUrl = safeHttpUrl(domain.docUrl);
   const { message, detail, limit, remediationApplies } = describeFailure({ domain, toolName });
+  // The CLI's own text for Langy's key tells the reader to log in, so it never reaches them.
+  const keepsRaw = credentialFault({ code: domain.code, toolName }) !== "sandbox";
 
   return {
     title: `${title} failed`,
@@ -429,7 +474,7 @@ function buildDomainPresentation({
     ...(traceId ? { traceId } : {}),
     ...(traceUrl ? { traceUrl } : {}),
     ...(logsUrl ? { logsUrl } : {}),
-    ...(raw ? { raw } : {}),
+    ...(raw && keepsRaw ? { raw } : {}),
   };
 }
 
@@ -454,7 +499,8 @@ export function presentLangyToolError({
 }): LangyToolErrorPresentation {
   const raw = rawFailureText(errorText);
   const structured = readStructuredError(errorText);
-  const domain = structured.kind === "error" ? structured.error : null;
+  const domain =
+    structured.kind === "error" ? structured.error : sandboxMissingKeyFromText({ toolName, raw });
 
   const notInstalled = githubAppNotInstalled({ toolName, raw });
   if (notInstalled) return notInstalled;
