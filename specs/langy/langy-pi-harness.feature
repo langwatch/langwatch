@@ -24,6 +24,14 @@ Feature: Langy runs a conversation on the pi worker
     And the manager's explicit settings win over the catalog where both name the same field
     And the entry still routes through the mediated gateway URL, never the catalog's own endpoint
 
+  @regression
+  Scenario: OpenAI models use catalogue reasoning capabilities without losing unknown-model defaults
+    Given the manager configures an OpenAI Responses model without an explicit reasoning override
+    When the worker generates the model registry
+    Then known models use the catalogue reasoning capability
+    And unknown OpenAI models retain the existing reasoning default
+    And explicit reasoning settings are preserved
+
   # pi's catalog lags Anthropic releases (claude-*-5-5 shipped after it), and
   # every Claude from 4.6 on rejects the legacy thinking shape with a 400.
   @unit
@@ -37,7 +45,8 @@ Feature: Langy runs a conversation on the pi worker
   Scenario: A model pi's catalog does not know is written from config alone
     Given the manager configures a model id pi's catalog does not list for that API dialect
     When the wrapper generates the model registry
-    Then the entry is exactly the manager's config
+    Then explicitly configured fields are exactly the manager's config
+    And an OpenAI Responses model with no reasoning setting retains the provider default
 
   # The model config passes unknown keys through so a new compat flag needs no
   # wrapper change. Routing and credential keys must not travel that path: they
