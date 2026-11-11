@@ -8,6 +8,7 @@ import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
 
 import { isAccessHeld, type LwqlCatalogue } from "../rules/lwql-catalogue.rules.ts";
 import { heldLwqlGates, type LwqlGate } from "../rules/lwql-gate.rules.ts";
+import type { LangWatchQLViewDedup } from "../rules/lwql-view-dedup-shape.rules.ts";
 
 /**
  * What a column's numbers are measured in.
@@ -15,12 +16,6 @@ import { heldLwqlGates, type LwqlGate } from "../rules/lwql-gate.rules.ts";
 export const LWQL_COLUMN_UNITS = ["ms", "USD", "tokens", "tokens/s"] as const;
 
 export type LangWatchQLColumnUnit = (typeof LWQL_COLUMN_UNITS)[number];
-
-/**
- * How a view collapses its source's rows to one per logical record.
- * @see ../views.ts — how each is rendered, and the measurement that chose the default
- */
-export type LangWatchQLDedupStrategy = "in-tuple" | "final" | "latest-in-order" | "none";
 
 /**
  * One exposed column.
@@ -114,42 +109,6 @@ interface LangWatchQLViewJoin {
    * default `TenantId`, so its row policy filters the column it carries.
    */
   readonly tenantColumn?: string;
-}
-
-/** What identifies one row of a view, and how the source's versions collapse to it. */
-interface LangWatchQLViewDedup {
-  /**
-   * The source table's `ORDER BY` — the key its engine collapses on.
-   */
-  readonly keyColumns: readonly string[];
-  /**
-   * The strategy this dataset needs, when the shipped default is wrong for it.
-   */
-  readonly strategy?: LangWatchQLDedupStrategy;
-  /**
-   * The engine's version column: `argMax`/`max` over this picks the survivor.
-   */
-  readonly versionColumn?: string;
-  /**
-   * Under `latest-in-order`: columns compared after the version when two versions tie, so a
-   * replay's row (a newer `Version`) wins where `FINAL` would keep the last insert (ADR-006).
-   */
-  readonly tieBreakColumns?: readonly string[];
-  /**
-   * Under `latest-in-order`: source columns no version of a row changes, grouped beside the sort
-   * key so a caller's range on them reaches the table's partition and primary key (ADR-006).
-   */
-  readonly stableColumns?: readonly string[];
-  /**
-   * Set when the source is an `AggregatingMergeTree`, whose rows for one key are
-   * *summed together* rather than one superseding the others.
-   */
-  readonly aggregating?: boolean;
-  /**
-   * An in-tuple dataset's column that never falls from one version of a row to the next, so a
-   * read bounded below on it may dedup from that bound alone (analytics ADR-005).
-   */
-  readonly floorColumn?: string;
 }
 
 /**

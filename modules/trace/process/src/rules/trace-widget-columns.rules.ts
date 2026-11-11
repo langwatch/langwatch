@@ -43,7 +43,7 @@ export type TraceAnalyticsMetadataColumns = Record<
 >;
 
 /** Every metadata column name, in the order the fold writes them. */
-export const TRACE_ANALYTICS_METADATA_COLUMN_NAMES = Object.keys(
+const TRACE_ANALYTICS_METADATA_COLUMN_NAMES = Object.keys(
   TRACE_ANALYTICS_METADATA_KEYS,
 ) as (keyof TraceAnalyticsMetadataColumns)[];
 

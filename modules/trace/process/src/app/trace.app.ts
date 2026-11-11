@@ -1618,8 +1618,8 @@ export class TraceModule implements TraceApi, CollectorApp {
   }
 
   async getSpanAnalyticsFloor(): Promise<SpanAnalyticsFloor> {
-    if (!this.#spanAnalyticsFloor) return { from: null };
-    return spanAnalyticsFloorOf(await this.#spanAnalyticsFloor.findReplayStep());
+    const records = this.#spanAnalyticsFloor ? await this.#spanAnalyticsFloor.findReplayStep() : [];
+    return spanAnalyticsFloorOf(records);
   }
 
   async renderSpanMessages(input: {

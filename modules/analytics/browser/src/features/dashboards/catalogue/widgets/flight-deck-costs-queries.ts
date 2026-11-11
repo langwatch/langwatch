@@ -314,10 +314,9 @@ ORDER BY bucket`;
 const LOOKBACK = `OccurredAt >= subtractDays(${START}, 90) AND OccurredAt < ${END}`;
 
 /**
- * When each prompt version was first seen: a trace's managed prompt version (a plain `traces`
- * column), else the version its metadata names (`trace_metrics`), never the map (analytics
- * ADR-004). The id set holds only traces that send a metadata version, as 64-bit hashes: a
- * set of id strings outgrew the memory limit on 2M traces a month.
+ * When each prompt version was first seen: a trace's managed prompt version, else its metadata's
+ * (`trace_metrics`), never the map (analytics ADR-004). The id set holds 64-bit hashes of the
+ * traces that send a metadata version: id strings outgrew the memory limit on 2M traces a month.
  */
 const PROMPT_VERSIONS_FIRST_SEEN = `SELECT LastUsedPromptVersionId AS name, min(OccurredAt) AS first_at
     FROM traces

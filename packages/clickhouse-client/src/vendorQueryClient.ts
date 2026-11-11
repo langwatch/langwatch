@@ -22,6 +22,7 @@ export interface VendorStatements {
   insert(params: {
     table: string;
     values: readonly Readonly<Record<string, unknown>>[];
+    columns?: readonly [string, ...string[]];
     format: "JSONEachRow";
     clickhouse_settings?: Settings;
   }): Promise<unknown>;
@@ -61,6 +62,7 @@ export function vendorQueryClient({
       await vendor.insert({
         table: request.table,
         values: request.rows,
+        ...(request.columns === undefined ? {} : { columns: request.columns }),
         format: "JSONEachRow",
         ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
       });

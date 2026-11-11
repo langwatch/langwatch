@@ -1,17 +1,17 @@
+import { LWQL_VIEW_CATALOG, TENANT_COLUMN } from "../../../rules/lwql-view-catalog.rules.ts";
 /**
  * What provisioning LangWatchQL views involves beyond the view statements:
  * grants, row policies, and run order.
  * @see ./langwatch-ql-view-statements.service.ts — the views
  * @see ./langwatch-ql-access-model.service.ts — the access model applied over them
  */
-import { LWQL_VIEW_CATALOG, TENANT_COLUMN } from "../../../rules/lwql-view-catalog.rules.ts";
+import type { LangWatchQLDedupStrategy } from "../../../rules/lwql-view-dedup-shape.rules.ts";
 import type {
   LangWatchQLNames,
   LangWatchQLTable,
 } from "../../../services/langwatch-ql-access-model.service.ts";
 import {
   LangWatchQLCatalogShapesService,
-  type LangWatchQLDedupStrategy,
   type LangWatchQLViewDefinition,
 } from "../../../services/langwatch-ql-catalog-shapes.service.ts";
 import { LangWatchQLViewStatementsService } from "./langwatch-ql-view-statements.service.ts";

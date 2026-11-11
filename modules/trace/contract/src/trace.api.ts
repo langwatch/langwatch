@@ -3,7 +3,6 @@ import type { InstantEvalRunReference } from "@langwatch/instant-eval-contract";
 import { moduleApi } from "@langwatch/module";
 
 import type { ConversationView } from "./conversation/conversation-steps.ts";
-import type { SpanAnalyticsFloor } from "./features/analytics/span-analytics-floor.ts";
 import type {
   TraceAttributedRecency,
   TraceAttributedSpendComparison,
@@ -163,6 +162,16 @@ export interface TraceRenderedSpanMessages {
 export interface TraceUsageCount {
   readonly traces: number;
   readonly spans: number;
+}
+
+/**
+ * Where the span widgets' history starts: `span_analytics` holds every span from `from` on, the
+ * instant its replay step recorded (analytics ADR-006); null when it is whole. `rebuilding` while
+ * no replay has recorded a start, when older span history may still be missing.
+ */
+export interface SpanAnalyticsFloor {
+  readonly from: string | null;
+  readonly rebuilding: boolean;
 }
 
 /** Public Trace operations shared by process peers after boot composition. */

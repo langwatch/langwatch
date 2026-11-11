@@ -67,6 +67,7 @@ function insertParams(request: InsertRequest): Record<string, unknown> {
   return {
     table: request.table,
     values: request.rows,
+    ...(request.columns === undefined ? {} : { columns: request.columns }),
     format: "JSONEachRow",
     clickhouse_settings: insertSettings(request.settings),
   };

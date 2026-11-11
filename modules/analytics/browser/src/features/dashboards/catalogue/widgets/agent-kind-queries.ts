@@ -186,10 +186,9 @@ GROUP BY unit
 LIMIT 200`;
 
 /**
- * A trace's prompt or config version is the one its metadata names (`trace_metrics`), else its
- * managed prompt version (a plain `traces` column), never the map (analytics ADR-004). The id
- * set holds only traces that send a metadata version, as 64-bit hashes: a set of id strings
- * outgrew the memory limit on 2M traces a month.
+ * A trace's version is its metadata's (`trace_metrics`), else its managed prompt version, never
+ * the map (analytics ADR-004). The id set holds 64-bit hashes of the traces that send a metadata
+ * version: id strings outgrew the memory limit on 2M traces a month.
  */
 const METADATA_VERSIONED = `SELECT cityHash64(TraceId)
         FROM trace_metrics

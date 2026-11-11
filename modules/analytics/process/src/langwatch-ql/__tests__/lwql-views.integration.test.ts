@@ -14,12 +14,10 @@ import {
   LangWatchQLViewStatementsService,
 } from "../../features/provisioning/services/langwatch-ql-view-statements.service.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
+import type { LangWatchQLDedupStrategy } from "../../rules/lwql-view-dedup-shape.rules.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import { LangWatchQLAccessModelService } from "../../services/langwatch-ql-access-model.service.ts";
-import {
-  LangWatchQLCatalogShapesService,
-  type LangWatchQLDedupStrategy,
-} from "../../services/langwatch-ql-catalog-shapes.service.ts";
+import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
 import {
   CLICKHOUSE_ERROR_CODE,
   DEDUP_FIXTURE,
