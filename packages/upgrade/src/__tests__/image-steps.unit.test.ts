@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { ManifestLoadError } from "../manifest/manifest.ts";
 import { imageSteps } from "../gate/image-tree.ts";
 
 describe("imageSteps", () => {
@@ -22,6 +23,24 @@ describe("imageSteps", () => {
         "prisma:20260101000000_add_thing",
         "clickhouse:00042",
       ]);
+    });
+  });
+
+  describe("given two goose files sharing a numeric prefix", () => {
+    it("refuses, naming the shared id and both files, before any step reaches the ledger", () => {
+      const build = () =>
+        imageSteps({
+          release: "3.22.0",
+          tree: {
+            prismaFolders: [],
+            gooseFiles: ["00125_a.sql", "00125_b.sql"],
+            codeSteps: [],
+          },
+        });
+      expect(build).toThrow(ManifestLoadError);
+      expect(build).toThrow(
+        "two migrations share step id clickhouse:00125: 00125_a.sql, 00125_b.sql; renumber one",
+      );
     });
   });
 
