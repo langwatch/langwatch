@@ -1,9 +1,8 @@
 /** @vitest-environment node */
 
 /**
- * A burst of single-row async inserts against a real server, through an insert lane that is full:
- * inserts that may share a statement go as one and every row lands; inserts that may not are
- * each a statement, and those the wait queue cannot hold are shed. ADR-187.
+ * A burst of single-row async inserts through a full insert lane, against a real server: shared
+ * statements land every row, lone ones shed what the wait queue cannot hold. ADR-187.
  * Spec: specs/clickhouse/single-client-access.feature
  */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
