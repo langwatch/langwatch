@@ -8,9 +8,11 @@ import {
   LangWatchQLGranularityTooFineError,
   LangWatchQLInvalidQueryError,
   LangWatchQLNotPermittedError,
+  LangWatchQLNotProvisionedError,
   LangWatchQLParameterInvalidError,
   LangWatchQLParameterMissingError,
   LangWatchQLReservedParameterSuppliedError,
+  LangWatchQLUnavailableError,
   LangWatchQLUnknownIdentifierError,
   type LangWatchQLProtections,
 } from "@langwatch/analytics-contract";
@@ -437,5 +439,62 @@ describe("given the caller's own parameter values are refused on the workbench p
 
     expect(lines.filter((line) => line.level === 50)).toHaveLength(1);
     expect(meter.valueOf(FAILURE_METRIC, { origin: "built_in" })).toBe(1);
+  });
+});
+
+describe("given the placement gate refuses a deployment", () => {
+  /** @scenario "A not-provisioned refusal is neither reported nor counted" */
+  it("writes no line and raises no count for not-provisioned on either path", () => {
+    const { lines, service } = reporter();
+
+    service.reportFailure({
+      projectId: "project-1",
+      sql: STOCK_SQL,
+      error: new LangWatchQLNotProvisionedError(),
+    });
+    service.reportBuiltInFailure({
+      projectId: "project-1",
+      source: "traces",
+      error: new LangWatchQLNotProvisionedError(),
+    });
+
+    expect(lines.filter((line) => line.level === 50)).toHaveLength(0);
+    expect(meter.valueOf(FAILURE_METRIC)).toBe(0);
+  });
+
+  /** @scenario "An unavailable refusal is still reported" */
+  it("still reports unavailable as one built-in failure on each path", () => {
+    const { lines, service } = reporter();
+
+    service.reportFailure({
+      projectId: "project-1",
+      sql: STOCK_SQL,
+      error: new LangWatchQLUnavailableError(),
+    });
+    service.reportBuiltInFailure({
+      projectId: "project-1",
+      source: "traces",
+      error: new LangWatchQLUnavailableError(),
+    });
+
+    expect(lines.filter((line) => line.level === 50)).toHaveLength(2);
+    expect(payloadOf(lines.findLine("error", FAILURE_MESSAGE))).toMatchObject({
+      errorCode: "lwql_unavailable",
+    });
+    expect(meter.valueOf(FAILURE_METRIC, { origin: "built_in" })).toBe(2);
+  });
+
+  /** @scenario "An unavailable refusal is still reported" */
+  it("counts an unavailable user-written statement once and writes no error line", () => {
+    const { lines, service } = reporter();
+
+    service.reportFailure({
+      projectId: "project-1",
+      sql: USER_SQL,
+      error: new LangWatchQLUnavailableError(),
+    });
+
+    expect(lines.filter((line) => line.level === 50)).toHaveLength(0);
+    expect(meter.valueOf(FAILURE_METRIC, { origin: "user_written" })).toBe(1);
   });
 });

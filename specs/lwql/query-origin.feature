@@ -7,9 +7,10 @@ Feature: A failed LangWatchQL query is told apart by who wrote it
   A statement is built in when its sha256 hash is on the generated, grow-only list of stock
   statements. The origin is never sent by a caller and never decided by the error code.
   The one thing that is decided apart from the text is whether a statement failed at all: a
-  refusal of the caller's own access, or of the parameter values the caller sent, is not a
-  failure of the statement (see its rule below). Access is read from the violations and the view
-  lists, never from the error code alone; parameter values from the refusal's code.
+  refusal of the caller's own access, or of the parameter values the caller sent, or a
+  deployment LangWatchQL is not provisioned on, is not a failure of the statement (see their
+  rules below). Access is read from the violations and the view lists, never from the error
+  code alone; parameter values and a not-provisioned deployment from the refusal's code.
 
   Rule: The built-in list is generated from the stock statements and only ever grows
 
@@ -172,6 +173,28 @@ Feature: A failed LangWatchQL query is told apart by who wrote it
       Given a stock statement is sent with an accepted project scope and its time window
       When the statement fails for a reason of its own, such as a column the view lacks
       Then one built-in failure is reported
+
+  Rule: A deployment LangWatchQL is not provisioned on is stable state, not a failed statement
+
+    The placement gate already logs it, and the source presence probe meets it on every check,
+    so reporting it would bury the real built-in failures. An unavailable executor is not stable
+    state: it is reported under the statement's own origin.
+
+    @unit
+    Scenario: A not-provisioned refusal is neither reported nor counted
+      Given a built-in statement is refused because LangWatchQL is not provisioned on the server
+        that holds the organisation's data
+      When the failure reaches either report path, the workbench door or the server-written one
+      Then no error-level record is written
+      And the failure count does not rise
+
+    @unit
+    Scenario: An unavailable refusal is still reported
+      Given a statement is refused because the LangWatchQL executor is unavailable
+      When the failure reaches either report path
+      Then one built-in failure is reported and counted
+      And on the workbench path a user-written statement counts once under user_written
+      And no error-level record is written for it
 
   Rule: A reserved parameter name is refused before the report
 
