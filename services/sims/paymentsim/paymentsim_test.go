@@ -425,6 +425,36 @@ func TestDecimalUsageBillsToTheCent(t *testing.T) {
 	if inv["billing_reason"] != "subscription_cycle" || inv["total"].(float64) != 6400+112 {
 		t.Fatalf("renewal invoice %v", inv)
 	}
+	metered := 0
+	for _, l := range inv["lines"].(map[string]any)["data"].([]any) {
+		line := l.(map[string]any)
+		if line["price"].(map[string]any)["id"] == "price_1T8nfzIMsTw08cudahMR8H7U" {
+			metered++
+			if line["amount"].(float64) != 112 {
+				t.Fatalf("metered line %v", line)
+			}
+		}
+	}
+	if metered != 1 {
+		t.Fatalf("want one metered line, got %d in %v", metered, inv["lines"])
+	}
+}
+
+// @scenario "Half a cent of decimal usage rounds up"
+func TestMeteredAmountRoundsHalfCentUp(t *testing.T) {
+	cents := func(n int64) *Price { return &Price{BillingScheme: "per_unit", UnitAmount: &n} }
+	for _, c := range []struct {
+		unit int64
+		used float64
+		want int64
+	}{
+		{100, 0.005, 1}, {100, 1.005, 101}, {100, 1.125, 113}, {100, 0.285, 29}, {100, 2.675, 268},
+		{100, 1.1234, 112}, {100, 0.0049, 0}, {3200, 2, 6400}, {1, 9007199254740991, 9007199254740991},
+	} {
+		if got := meteredAmount(cents(c.unit), c.used); got != c.want {
+			t.Errorf("%d cents x %v units = %d, want %d", c.unit, c.used, got, c.want)
+		}
+	}
 }
 
 // @scenario "A repeated meter event identifier is refused"

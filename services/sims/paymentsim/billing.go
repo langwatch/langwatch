@@ -102,13 +102,21 @@ func addDecimal(a, b float64) float64 {
 }
 
 // meteredAmount prices decimal usage: a per-unit price bills it exactly, rounded to
-// the cent; tiers bill whole units.
+// the cent with half a cent rounding up; tiers bill whole units. The product is
+// multiplied as decimals, since in floating point 100 x 1.005 is 100.49999.
 func meteredAmount(p *Price, used float64) int64 {
 	if p.BillingScheme != "tiered" {
 		if p.UnitAmount == nil {
 			return 0
 		}
-		return int64(math.Round(float64(*p.UnitAmount) * used))
+		amount, _ := new(big.Rat).SetString(strconv.FormatFloat(used, 'g', -1, 64))
+		amount.Mul(amount, new(big.Rat).SetInt64(*p.UnitAmount))
+		half := big.NewRat(1, 2)
+		if amount.Sign() < 0 {
+			half.Neg(half)
+		}
+		amount.Add(amount, half)
+		return new(big.Int).Quo(amount.Num(), amount.Denom()).Int64()
 	}
 	return amountFor(p, int64(math.Round(used)))
 }

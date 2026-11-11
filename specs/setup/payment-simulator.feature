@@ -136,6 +136,12 @@ Feature: paymentsim, a local stand-in for Stripe
       Then the renewal invoice line for that price is 112 cents
 
     @unit
+    Scenario: Half a cent of decimal usage rounds up
+      Given a metered price of 100 cents per unit
+      When the period's usage totals 1.005 units
+      Then the line for that price is 101 cents, never 100
+
+    @unit
     Scenario: A repeated meter event identifier is refused
       When a meter event reuses an identifier
       Then paymentsim answers 400 with code resource_already_exists
