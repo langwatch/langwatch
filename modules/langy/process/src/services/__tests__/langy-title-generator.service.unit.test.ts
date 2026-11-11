@@ -154,7 +154,7 @@ describe("given a conversation the customer never named", () => {
       expect(completions[0]?.model).toBe(LANGY_TITLE_GENERATION.MODEL);
       expect(generated).toEqual({
         outcome: "generated",
-        title: "A Title",
+        title: "A title",
         model: LANGY_TITLE_GENERATION.MODEL,
       });
     });
