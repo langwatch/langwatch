@@ -2,8 +2,9 @@ import { isProduction } from "../../../config.ts";
 import { canonicalUrl, docsUrl, sitePath } from "../../../lib/site-path.ts";
 import { docsRoot } from "../../../paths.ts";
 import type { Operation } from "../../api-reference/model.ts";
-import { pageDates, readDocsConfig } from "../../navigation/compile.ts";
+import { pageCommitDatesAt, readDocsConfig } from "../../navigation/compile.ts";
 import { firstSlug, type Organization, ownsSlug, type Section } from "../../navigation/model.ts";
+import { SOCIAL_CARD_SIZE, socialCardAlt, socialCardFor, socialCardPath } from "./social-cards.ts";
 
 /**
  * Where the web fonts live: dev serves them at this path, a build renames each to Vite's hashed
@@ -18,9 +19,6 @@ const ABOVE_THE_FOLD_FONTS = [
   `${FONT_SOURCE}/Sentient-Regular.woff2`,
   `${FONT_SOURCE}/Sentient-Medium.woff2`,
 ];
-
-/** The social card: shared links fetch it by this address, so it keeps its authored name. */
-export const SOCIAL_IMAGE = "/images/coding-agents/optimized/session-detail-1560.webp";
 
 /* Absolute links to the agent discovery files, the same on every page. */
 const DISCOVERY_LINKS = [
@@ -37,17 +35,23 @@ export type HeadSettings = {
   tagManager: string;
   /** Last commit dates by slug; empty unless docs.json shows timestamps. */
   dates: ReadonlyMap<string, string>;
+  /** First commit dates by slug, with `dates`. */
+  published?: ReadonlyMap<string, string>;
 };
 
 /** Head settings from the authored docs.json, read per call so development sees edits. */
 export function headSettings({ root = docsRoot }: { root?: string } = {}): HeadSettings {
   const config = readDocsConfig({ docsRoot: root });
   const organization = config.seo?.organization;
+  const commits = config.metadata?.timestamp
+    ? pageCommitDatesAt({ docsRoot: root })
+    : { modified: new Map<string, string>(), published: new Map<string, string>() };
   return {
     description: config.description ?? "",
     organization: organization ? { logo: "", sameAs: [], ...organization } : null,
     tagManager: config.integrations?.gtm?.tagId ?? "",
-    dates: config.metadata?.timestamp ? pageDates({ docsRoot: root }) : new Map(),
+    dates: commits.modified,
+    published: commits.published,
   };
 }
 
@@ -190,6 +194,7 @@ function pageData({
   title,
   description,
   modified,
+  published,
   image,
   article,
   settings,
@@ -198,6 +203,7 @@ function pageData({
   title: string;
   description: string;
   modified: string | undefined;
+  published: string | undefined;
   image: string;
   article: boolean;
   settings: HeadSettings;
@@ -215,6 +221,7 @@ function pageData({
     ...(description ? { description } : {}),
     inLanguage: "en",
     image,
+    ...(published ? { datePublished: published } : {}),
     ...(modified ? { dateModified: modified } : {}),
     ...(article && publisher ? { author: publisher, publisher } : {}),
     isPartOf: {
@@ -245,7 +252,10 @@ export function pageHead({
   const url = canonicalUrl({ slug });
   const description = trimDescription({ text: authored || settings.description });
   const modified = settings.dates.get(slug);
-  const image = docsUrl({ path: SOCIAL_IMAGE });
+  const published = settings.published?.get(slug);
+  const card = socialCardFor({ slug });
+  const image = docsUrl({ path: socialCardPath({ card }) });
+  const alt = escapeAttribute(socialCardAlt({ card }));
   const article = slug !== "introduction";
   const handle = twitterHandle({ organization: settings.organization });
   const tags = [
@@ -259,6 +269,9 @@ export function pageHead({
         `<link rel="preload" href="${sitePath({ path })}" as="font" type="font/woff2" crossorigin>`,
     ),
     `<meta property="og:type" content="${article ? "article" : "website"}">`,
+    ...(article && published
+      ? [`<meta property="article:published_time" content="${escapeAttribute(published)}">`]
+      : []),
     ...(article && modified
       ? [`<meta property="article:modified_time" content="${escapeAttribute(modified)}">`]
       : []),
@@ -266,11 +279,14 @@ export function pageHead({
     `<meta property="og:title" content="${escapeAttribute(documentTitle({ title }))}">`,
     `<meta property="og:url" content="${escapeAttribute(url)}">`,
     `<meta property="og:image" content="${image}">`,
-    '<meta property="og:image:alt" content="A coding-agent session in LangWatch">',
+    `<meta property="og:image:width" content="${SOCIAL_CARD_SIZE.width}">`,
+    `<meta property="og:image:height" content="${SOCIAL_CARD_SIZE.height}">`,
+    `<meta property="og:image:alt" content="${alt}">`,
     '<meta name="twitter:card" content="summary_large_image">',
     ...(handle ? [`<meta name="twitter:site" content="${escapeAttribute(handle)}">`] : []),
     `<meta name="twitter:title" content="${escapeAttribute(documentTitle({ title }))}">`,
     `<meta name="twitter:image" content="${image}">`,
+    `<meta name="twitter:image:alt" content="${alt}">`,
   ];
   if (description) {
     for (const attribute of [
@@ -281,7 +297,16 @@ export function pageHead({
       tags.push(`<meta ${attribute} content="${escapeAttribute(description)}">`);
     }
   }
-  const data = pageData({ url, title, description, modified, image, article, settings });
+  const data = pageData({
+    url,
+    title,
+    description,
+    modified,
+    published,
+    image,
+    article,
+    settings,
+  });
   tags.push(jsonLd({ data }));
   if (production && settings.tagManager)
     tags.push(`<meta name="docs-gtm" content="${escapeAttribute(settings.tagManager)}">`);

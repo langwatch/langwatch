@@ -255,9 +255,11 @@ export class LangWatchQLSelfProvisioningService {
       dedup: SHIPPED_LWQL_DEDUP,
     });
     if (mode === "rendered") return [...structural, ...engineTables, ...views];
+    // A config-defined collection belongs to its file: no statement may write it.
+    const configDefined = server.configDefined?.includes(definition.namedCollection.collection);
     return [
       ...structural,
-      ...accessModelDefinition.renderNamedCollectionDdl(definition),
+      ...(configDefined ? [] : accessModelDefinition.renderNamedCollectionDdl(definition)),
       ...engineTables,
       ...views,
       ...accessModelDefinition.renderDdl(definition),

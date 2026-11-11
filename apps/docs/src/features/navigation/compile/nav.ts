@@ -12,7 +12,7 @@ import { readReleases } from "../../releases/compile.ts";
 import { localHref, parseInline } from "../model/inline.ts";
 import { contextualOptions } from "../model/nav.ts";
 import type { Announcement, Nav, NavItem, PageMeta } from "../model/nav.ts";
-import { pageLastModified } from "./last-modified.ts";
+import { type PageCommitDates, pageCommitDates } from "./last-modified.ts";
 
 const ACRONYMS = new Set([
   "api",
@@ -375,9 +375,9 @@ function announcementOf({
   };
 }
 
-const datesByCommit = new Map<string, Map<string, string>>();
-/** Last commit dates per page, read once per docs checkout and commit; none outside git. */
-export function pageDates({ docsRoot }: { docsRoot: string }): ReadonlyMap<string, string> {
+const datesByCommit = new Map<string, PageCommitDates>();
+/** First and last commit dates per page, read once per checkout and commit; none outside git. */
+export function pageCommitDatesAt({ docsRoot }: { docsRoot: string }): PageCommitDates {
   let head = "";
   try {
     head = execFileSync("git", ["rev-parse", "HEAD"], {
@@ -386,15 +386,20 @@ export function pageDates({ docsRoot }: { docsRoot: string }): ReadonlyMap<strin
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
   } catch {
-    return new Map();
+    return { published: new Map(), modified: new Map() };
   }
   const key = `${docsRoot}\0${head}`;
   let dates = datesByCommit.get(key);
   if (!dates) {
-    dates = pageLastModified({ docsRoot });
+    dates = pageCommitDates({ docsRoot });
     datesByCommit.set(key, dates);
   }
   return dates;
+}
+
+/** Last commit dates per page; see `pageCommitDatesAt`. */
+export function pageDates({ docsRoot }: { docsRoot: string }): ReadonlyMap<string, string> {
+  return pageCommitDatesAt({ docsRoot }).modified;
 }
 
 /** Slug to `openapi:` reference for every configured API page. */

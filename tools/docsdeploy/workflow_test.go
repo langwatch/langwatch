@@ -108,3 +108,22 @@ func TestDeployUploadsByNameInOrderAndNeverDeletesHashedFiles(t *testing.T) {
 		t.Error("llms.txt and the other text files are not uploaded as UTF-8")
 	}
 }
+
+// @scenario "A deploy tells IndexNow which pages it changed"
+func TestDeployReadsTheLiveSitemapFirstAndPingsIndexNowLast(t *testing.T) {
+	job := deployJob(t)
+	read := strings.Index(job, "- name: Read the live sitemap\n")
+	upload := strings.Index(job, "- name: Upload the content-hashed files\n")
+	invalidate := strings.Index(job, "- name: Invalidate the distribution\n")
+	ping := strings.Index(job, "- name: Tell IndexNow what changed\n")
+	if read < 0 || read > upload {
+		t.Error("the live sitemap must be read before anything is uploaded")
+	}
+	if ping < invalidate {
+		t.Error("IndexNow must hear of the pages after the distribution serves them")
+	}
+	body := steps(job)["Tell IndexNow what changed"]
+	if !strings.Contains(body, "go run ./cmd/docsdeploy indexnow") || !strings.Contains(body, "::warning::") {
+		t.Errorf("the IndexNow step must run docsdeploy and only warn on a refusal:\n%s", body)
+	}
+}

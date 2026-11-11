@@ -157,9 +157,10 @@ async function readLwqlCollectionState({
     }
   };
   const [collections, tables] = await Promise.all([
-    read("SELECT name FROM system.named_collections WHERE has({names:Array(String)}, name)", {
-      names: [...candidates],
-    }),
+    read(
+      "SELECT name, source FROM system.named_collections WHERE has({names:Array(String)}, name)",
+      { names: [...candidates] },
+    ),
     read(
       "SELECT name, engine_full FROM system.tables " +
         "WHERE database = {database:String} AND engine = 'PostgreSQL'",
@@ -172,7 +173,13 @@ async function readLwqlCollectionState({
     const binding = postgresEngineCollection(engineFull);
     if (binding.bound) bound[String(row.name)] = binding.collection;
   }
-  return { available: collections.map((row) => String(row.name)), bound };
+  return {
+    available: collections.map((row) => String(row.name)),
+    bound,
+    configDefined: collections
+      .filter((row) => String(row.source) === "CONFIG")
+      .map((row) => String(row.name)),
+  };
 }
 
 /**

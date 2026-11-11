@@ -23,7 +23,11 @@ import {
   LWQL_CLICKHOUSE_EVENT_TABLES,
   LWQL_TRACES_CATALOGUE,
 } from "./lwql-catalogue.rules.ts";
-import { contentFilteredMapSql } from "./lwql-content-gating.rules.ts";
+import {
+  contentFilteredMapSql,
+  plainKeyedMapSql,
+  plainStringMapSql,
+} from "./lwql-content-gating.rules.ts";
 import {
   catalogueColumnGates,
   type UngatedViewDefinition,
@@ -369,21 +373,21 @@ const SPANS: UngatedViewDefinition = {
     },
     {
       name: "SpanAttributes",
-      // Not the source's `Map(LowCardinality(String), String)`: `mapFilter`
-      // returns a plain-keyed map, and the catalog publishes what the view
-      // returns rather than what the table stores.
+      // Not the source's `Map(LowCardinality(String), String)`: the view casts to
+      // one type every server version returns (plainStringMapSql).
       type: "Map(String, String)",
       description:
         "Span attributes, with every captured-content key removed. Content is reachable only through CapturedInput and CapturedOutput.",
       sourceColumns: ["SpanAttributes"],
-      expression: (source) => contentFilteredMapSql(source("SpanAttributes")),
+      expression: (source) => plainStringMapSql(contentFilteredMapSql(source("SpanAttributes"))),
     },
     {
       name: "ResourceAttributes",
       type: "Map(String, String)",
       description: "Resource attributes, with every captured-content key removed.",
       sourceColumns: ["ResourceAttributes"],
-      expression: (source) => contentFilteredMapSql(source("ResourceAttributes")),
+      expression: (source) =>
+        plainStringMapSql(contentFilteredMapSql(source("ResourceAttributes"))),
     },
     {
       name: "CapturedInput",
@@ -874,6 +878,71 @@ const TRACE_METRICS: UngatedViewDefinition = {
       type: "Bool",
       description: "Whether any span of the trace ended in an error status.",
       sourceColumns: ["HasError"],
+    },
+    // The metadata keys the stock widgets read, copied out of `Attributes` by ClickHouse (goose
+    // 00126, tasks#1117), so a widget reads them without the map.
+    {
+      name: "MetadataOutputAction",
+      type: "String",
+      description:
+        "What the user did with the output, such as accepted or edited, from the trace's metadata.output_action. Empty when the trace sent none.",
+      sourceColumns: ["MetadataOutputAction"],
+    },
+    {
+      name: "MetadataOutcome",
+      type: "String",
+      description:
+        "How the conversation ended, such as resolved or handover, from the trace's metadata.outcome. Empty when the trace sent none.",
+      sourceColumns: ["MetadataOutcome"],
+    },
+    {
+      name: "MetadataSentToReview",
+      type: "String",
+      description:
+        "Whether the output went to a person for review, as the text 'true' or 'false', from the trace's metadata.sent_to_review. Empty when the trace sent none.",
+      sourceColumns: ["MetadataSentToReview"],
+    },
+    {
+      name: "MetadataDocumentType",
+      type: "String",
+      description:
+        "The kind of document the trace handled, from the trace's metadata.document_type. Empty when the trace sent none.",
+      sourceColumns: ["MetadataDocumentType"],
+    },
+    {
+      name: "MetadataFlow",
+      type: "String",
+      description:
+        "The flow of the application that ran the trace, from the trace's metadata.flow. Empty when the trace sent none.",
+      sourceColumns: ["MetadataFlow"],
+    },
+    {
+      name: "MetadataLanguage",
+      type: "String",
+      description:
+        "The language of the conversation, from the trace's metadata.language. Empty when the trace sent none.",
+      sourceColumns: ["MetadataLanguage"],
+    },
+    {
+      name: "MetadataSegment",
+      type: "String",
+      description:
+        "The customer segment the trace counts under, from the trace's metadata.segment. Empty when the trace sent none.",
+      sourceColumns: ["MetadataSegment"],
+    },
+    {
+      name: "MetadataTeam",
+      type: "String",
+      description:
+        "The team the trace counts under, from the trace's metadata.team. Empty when the trace sent none.",
+      sourceColumns: ["MetadataTeam"],
+    },
+    {
+      name: "MetadataTopic",
+      type: "String",
+      description:
+        "The topic the application gave the trace, from the trace's metadata.topic. Empty when the trace sent none.",
+      sourceColumns: ["MetadataTopic"],
     },
     // `HasAnnotation`, `EarliestSpanStartMs` and `Attributes` are withheld: the first would answer
     // "annotated?" two ways against the authoritative `annotations` table, the second is fold
@@ -1609,7 +1678,11 @@ const CODING_AGENT_SESSIONS: UngatedViewDefinition = {
       type: "Map(String, UInt32)",
       description: "Calls per tool.",
       sourceColumns: ["ToolCounts"],
-      expression: (source) => contentFilteredMapSql(source("ToolCounts")),
+      expression: (source) =>
+        plainKeyedMapSql({
+          mapSql: contentFilteredMapSql(source("ToolCounts")),
+          valueType: "UInt32",
+        }),
     },
     {
       name: "ToolDurationMs",
@@ -1617,7 +1690,11 @@ const CODING_AGENT_SESSIONS: UngatedViewDefinition = {
       unit: "ms",
       description: "Milliseconds spent per tool.",
       sourceColumns: ["ToolDurationMs"],
-      expression: (source) => contentFilteredMapSql(source("ToolDurationMs")),
+      expression: (source) =>
+        plainKeyedMapSql({
+          mapSql: contentFilteredMapSql(source("ToolDurationMs")),
+          valueType: "UInt64",
+        }),
     },
     {
       name: "FilesTouched",
@@ -1772,7 +1849,11 @@ const CODING_AGENT_SESSIONS: UngatedViewDefinition = {
       type: "Map(String, UInt32)",
       description: "Compactions by trigger kind.",
       sourceColumns: ["CompactionTriggers"],
-      expression: (source) => contentFilteredMapSql(source("CompactionTriggers")),
+      expression: (source) =>
+        plainKeyedMapSql({
+          mapSql: contentFilteredMapSql(source("CompactionTriggers")),
+          valueType: "UInt32",
+        }),
     },
     {
       name: "CompactionTokensBefore",
@@ -1819,7 +1900,11 @@ const CODING_AGENT_SESSIONS: UngatedViewDefinition = {
       type: "Map(String, UInt32)",
       description: "Failures by error class.",
       sourceColumns: ["ErrorTypes"],
-      expression: (source) => contentFilteredMapSql(source("ErrorTypes")),
+      expression: (source) =>
+        plainKeyedMapSql({
+          mapSql: contentFilteredMapSql(source("ErrorTypes")),
+          valueType: "UInt32",
+        }),
     },
     {
       name: "ApiErrors",
@@ -2605,6 +2690,15 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
       LastEventOccurredAt: "omit",
       AppliedEventIds: "omit",
       EarliestSpanStartMs: "omit",
+      MetadataOutputAction: "inherit",
+      MetadataOutcome: "inherit",
+      MetadataSentToReview: "inherit",
+      MetadataDocumentType: "inherit",
+      MetadataFlow: "inherit",
+      MetadataLanguage: "inherit",
+      MetadataSegment: "inherit",
+      MetadataTeam: "inherit",
+      MetadataTopic: "inherit",
     },
   }),
   trace_metrics_by_minute: defineTableCatalogue({

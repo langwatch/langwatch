@@ -84,7 +84,8 @@ describe("saving a privacy rule at several scopes", () => {
 
       await user.click(screen.getByRole("button", { name: "Pick web-app and mobile-app" }));
       // Any concrete choice away from Inherit is enough to enable Save.
-      await user.click(screen.getByRole("radio", { name: /^Strict/ }));
+      await user.click(screen.getByLabelText("PII redaction"));
+      await user.click(await screen.findByRole("option", { name: /^Strict/ }));
       await user.click(screen.getByRole("button", { name: "Save" }));
 
       expect(onSave).toHaveBeenCalledTimes(1);

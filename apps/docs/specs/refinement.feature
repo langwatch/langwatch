@@ -16,9 +16,30 @@ Feature: Actionable documentation and restrained reading surfaces
     Given a generated documentation page
     Then its md, claude and agent exports contain the same page source
     And robots, humans, agents and sitemap metadata are available
+    And the IndexNow key is served at indexnow.txt, for the deploy to name when it submits changed pages
     And canonical, sitemap and llms.txt addresses name https://langwatch.ai/docs, where the docs are served
     And the sitemap dates each page by its last commit when the full history is available
     And llms-full.txt holds every page's Markdown in reading order, after the agent guidance
+  @unit
+  Scenario: Split the documentation into one file per section
+    Given llms-full.txt is too large for an agent to read whole
+    When the discovery files are generated
+    Then each top-level section's pages are one file under llms-full/, in reading order, after the agent guidance
+    And llms.txt names every section file, with its page count, before the page directory
+    And a page reached only through its section file still counts as listed in llms.txt
+  @unit
+  Scenario: Split a section too large to read whole by its groups
+    Given a section whose pages come to more than about 100k tokens
+    When the discovery files are generated
+    Then the section is one file per navigation group under llms-full/<section>/, split again while a group is still over
+    And llms.txt names each of those files, with its page count, instead of the section file
+    And a section under the budget stays one file
+  @unit
+  Scenario: List the API reference once per resource
+    Given the API reference holds one page per operation
+    When llms.txt is generated
+    Then each API resource is one entry, linking its overview and giving its page count
+    And its operations are left to the API reference section file
   @unit
   Scenario: Describe every page to search engines
     Given an API page whose page and operation both lack a description

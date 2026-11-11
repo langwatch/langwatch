@@ -404,14 +404,41 @@ describe("given Instant Evals are off for a self-serve organization", () => {
     act(() => result.current.onInstantEvalRoute(payload));
     act(() => result.current.enableInstantEvals());
     act(() =>
-      lastCall(mutations.enable).options.onError?.(
-        handledError({ code: "instant_eval_opt_in_not_offered" }),
-      ),
+      lastCall(mutations.enable).options.onError?.(handledError({ code: "permission_denied" })),
     );
 
     expect(toast).toHaveBeenCalledWith(expect.objectContaining({ type: "warning" }));
     expect(mutations.estimate.mutate).not.toHaveBeenCalled();
     expect(result.current.refusal).toEqual({ kind: "opt_in" });
+    expect(mutations.invalidateAccess).toHaveBeenCalled();
+  });
+
+  /** @scenario "A stale Enable says why the hosted model is off and stops offering Enable" */
+  it("warns, asks access again and turns the popover into the own model one when not offered", () => {
+    const { result } = renderHook(() =>
+      useInstantEvalRoute({ isInstantEvalAvailable: false, optInOffer: "enable" }),
+    );
+    act(() => result.current.onInstantEvalRoute(payload));
+    act(() => result.current.enableInstantEvals());
+    act(() =>
+      lastCall(mutations.enable).options.onError?.(
+        handledError({
+          code: "instant_eval_opt_in_not_offered",
+          meta: { deployment: "hosted_off" },
+        }),
+      ),
+    );
+
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "warning",
+        title: "LangWatch's hosted model is off for this organization",
+      }),
+    );
+    expect(mutations.invalidateAccess).toHaveBeenCalled();
+    expect(mutations.estimate.mutate).not.toHaveBeenCalled();
+    expect(result.current.refusal).toEqual({ kind: "unreleased" });
+    expect(useFilterStore.getState().queryText).toBe(CHIP_QUERY);
   });
 
   /** @scenario "Enable switches the organization on and the judgement goes ahead" */

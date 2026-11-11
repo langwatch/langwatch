@@ -154,11 +154,11 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then none is present, because dictionaries are not subject to row policies
 
   @integration
-  Scenario: Key hash is auditable in the query log without exposing the raw key
+  Scenario: The query log names the tenant without the raw key or its hash
     Given the restricted identity ran a query carrying tenant-a's key-hash context
     When the server's query log is inspected for that query
-    Then the log entry carries the key hash
-    And the raw API key appears nowhere in the log entry
+    Then the log entry's comment names tenant-a's project
+    And neither the key hash nor the raw API key appears anywhere in the log entry
 
   @integration
   Scenario: Revoking a key hash from the key map takes effect within the stated revocation bound
@@ -1306,6 +1306,13 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And they answer after every reader connection is ended, so no pool keeps the old password
     And a worker still on the old password rebuilds nothing
 
+  @integration
+  Scenario: An sql-mode deploy rotates the reader password while engine tables use the collection
+    Given an sql-mode install whose engine tables read through the app's named collection
+    When the reader's password changes and a second deploy converges
+    Then the deploy writes the collection in place, never dropping one the tables use
+    And the engine tables answer on the new password
+
   @e2e
   Scenario: A three-replica deployment reconverges LangWatchQL after provisioning failed during a ClickHouse outage
     Given a three-replica rendered-mode install whose PostgreSQL engine tables are missing
@@ -1376,8 +1383,8 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 # AC "empty/garbage key context yields zero rows, never all rows"
 #   → Scenario: Empty key context yields zero rows, never all rows
 #   → Scenario: Garbage key context yields zero rows, never all rows
-# AC "key-hash appears in query_log without exposing the raw key"
-#   → Scenario: Key hash is auditable in the query log without exposing the raw key
+# AC "key-hash appears in query_log without exposing the raw key" (ADR-200: the project, not the hash)
+#   → Scenario: The query log names the tenant without the raw key or its hash
 # AC "key-map refresh has a bounded revocation lag"
 #   → Scenario: Revoking a key hash from the key map takes effect within the stated revocation bound
 # (supporting invariants of the same proof: baseline read, key-map hygiene, multi-statement)

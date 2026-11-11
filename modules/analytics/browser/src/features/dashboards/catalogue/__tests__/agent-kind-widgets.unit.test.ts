@@ -17,6 +17,19 @@ function built(id: string) {
 
 const UNIT_WIDGETS = ["att-share", "att-table", "att-change", "cost-by-segment"];
 
+/** The view each unit-grouped query reads: those needing a prompt version stay on `traces`. */
+const UNIT_QUERY_VIEWS: Record<string, Record<string, "traces" | "trace_metrics">> = {
+  "att-share": { units: "trace_metrics", totals: "trace_metrics" },
+  "att-table": { units: "trace_metrics", passRates: "trace_metrics" },
+  "att-change": { units: "traces" },
+  "cost-by-segment": { units: "trace_metrics", totals: "trace_metrics" },
+};
+
+const UNIT_EXPRESSION = {
+  traces: "JSONExtractString(Attributes['langwatch.labels'], 1)",
+  trace_metrics: "unit_key = 'langwatch.labels', Labels[1]",
+} as const;
+
 describe("given the By customer widgets", () => {
   /** @scenario "AC80 By customer: the board groups by the first key the traces carry" */
   it("picks the first grouping key any trace carries, in the seed's order", () => {
@@ -32,11 +45,16 @@ describe("given the By customer widgets", () => {
     ]);
     for (const id of UNIT_WIDGETS) {
       const { sql } = built(id);
-      const grouped = Object.values(sql).filter((text) => text.includes("AS unit_key"));
-      expect(grouped.length, id).toBeGreaterThan(0);
-      for (const text of grouped) {
-        expect(text, id).toContain("multiIf(");
-        expect(text, id).toContain("JSONExtractString(Attributes['langwatch.labels'], 1)");
+      const grouped = Object.entries(sql).filter(([, text]) => text.includes("AS unit_key"));
+      const views = UNIT_QUERY_VIEWS[id] ?? {};
+      expect(grouped.map(([name]) => name).toSorted(), id).toEqual(Object.keys(views).toSorted());
+      for (const [name, text] of grouped) {
+        const view = views[name];
+        if (!view) throw new Error(`${id}/${name} has no expected view`);
+        expect(text, `${id}/${name}`).toContain("multiIf(");
+        expect(text, `${id}/${name}`).toMatch(new RegExp(`\\bFROM ${view}\\b`));
+        expect(text, `${id}/${name}`).toContain(UNIT_EXPRESSION[view]);
+        expect(/\bFROM traces\b/.test(text), `${id}/${name}`).toBe(view === "traces");
       }
     }
   });
@@ -60,7 +78,7 @@ describe("given the By customer widgets", () => {
   /** @scenario "AC81 By customer: conversations by customer with each one's share" */
   it("ranks six customers by conversations, with their share and the count of the rest", () => {
     const { code, sql } = built("att-share");
-    expect(sql.units).toContain("uniqExact(if(Attributes['langwatch.thread.id'] != ''");
+    expect(sql.units).toContain("uniqExact(coalesce(nullIf(ConversationId, ''), TraceId))");
     expect(sql.units).toContain("ORDER BY conversations DESC");
     expect(sql.totals).toContain("AS units");
     expect(code).toContain("units.data.slice(0, 6)");
@@ -133,8 +151,8 @@ describe("given the Field accuracy widgets", () => {
   /** @scenario "AC88 Field accuracy: share sent to human review" */
   it("reads sent_to_review or a hand-over outcome and names the type sent most", () => {
     const { code, sql } = built("ext-human-review");
-    expect(sql.summary).toContain("Attributes['metadata.sent_to_review'] = 'true'");
-    expect(sql.summary).toContain("Attributes['metadata.outcome'] = 'handover'");
+    expect(sql.summary).toContain("MetadataSentToReview = 'true'");
+    expect(sql.summary).toContain("MetadataOutcome = 'handover'");
     expect(sql.byUnit).toContain("ORDER BY documents >= 30 DESC");
     expect(code).toContain("reports sent_to_review or an outcome");
   });
@@ -144,7 +162,7 @@ describe("given the Outputs users keep widget", () => {
   /** @scenario "AC89 Outputs users keep: drop-off after generation" */
   it("counts outputs by reported action and names the biggest drop", () => {
     const { code, sql } = built("gen-dropoff");
-    expect(sql.main).toContain("Attributes['metadata.output_action'] IN ('accepted', 'edited')");
+    expect(sql.main).toContain("MetadataOutputAction IN ('accepted', 'edited')");
     expect(code).toContain('"biggest drop, at "');
   });
 });

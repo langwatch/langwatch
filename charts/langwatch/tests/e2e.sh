@@ -429,6 +429,7 @@ deploy_sql_mode_and_metrics_key() {
     --set workers.replicaCount=1 \
     --set app.extraEnvs[0].name=LWQL_ACCESS_MODEL_MODE \
     --set app.extraEnvs[0].value=sql \
+    --set-string clickhouse.env.DEFAULT_USER_ACCESS_MANAGEMENT=true \
     --set app.resources.requests.memory=512Mi \
     --set app.resources.limits.memory=2Gi \
     --set app.telemetry.metrics.enabled=true \
@@ -894,6 +895,7 @@ test_lwql_replicas_sql_refused() {
     --set-string 'clickhouse.podAnnotations.langwatch\.com/lwql-access-catalog=e2e-upgrade' \
     --set app.extraEnvs[0].name=LWQL_ACCESS_MODEL_MODE \
     --set app.extraEnvs[0].value=sql \
+    --set-string clickhouse.env.DEFAULT_USER_ACCESS_MANAGEMENT=true \
     --set app.resources.requests.memory=512Mi \
     --set app.resources.limits.memory=2Gi \
     --wait --timeout "${TIMEOUT}s"
@@ -1212,6 +1214,147 @@ test_lwql_single_node_upgrade_converges() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# SUITE: LangWatchQL tenant isolation on the deployed stack (ADR-200)
+# Two projects in two organisations, each with its own traces and key: each key
+# counts only its own traces, and a key naming the other project is refused.
+# Organisation B copies the seeded rows with new ids, naming only unique columns.
+# ─────────────────────────────────────────────────────────────────────────────
+LWQL_E2E_ORG_B="e2e-lwql-isolation-org-b"
+LWQL_E2E_TEAM_B="e2e-lwql-isolation-team-b"
+LWQL_E2E_PROJECT_A="local-dev-project"
+LWQL_E2E_PROJECT_B="e2e-lwql-isolation-project-b"
+
+# lwql_post <app-pod> <key> <json-body>: echoes the body, then the status on its own line.
+lwql_post() {
+  local pod="$1" key="$2" body="$3"
+  kc exec "$pod" -- curl -s -w '\n%{http_code}' -X POST http://localhost:5560/api/v1/query \
+    -H 'Content-Type: application/json' -H "X-Auth-Token: $key" -d "$body"
+}
+
+# lwql_project_key <pg-pod> <project-id>: the legacy key a live project holds, or nothing.
+lwql_project_key() {
+  printf 'SELECT "apiKey" FROM "Project" WHERE id = %s AND "archivedAt" IS NULL;\n' "'$2'" |
+    kc exec -i "$1" -- sh -c 'PGPASSWORD=e2etest psql -U postgres -d langwatch -tA -q'
+}
+
+# lwql_trace_count <app-pod> <key>: the key's own LangWatchQL count of traces, or "none".
+lwql_trace_count() {
+  local reply n
+  reply=$(lwql_post "$1" "$2" '{"sql":"SELECT count() AS n FROM traces"}')
+  n=$(sed '$d' <<<"$reply" | sed -n 's/.*"n":"\{0,1\}\([0-9][0-9]*\).*/\1/p' | head -1)
+  echo "${n:-none}"
+}
+
+# send_e2e_traces <app-pod> <key> <prefix> <count>: one collector POST per trace, stamped now
+# (a fixed past instant would be born outside the retention window).
+send_e2e_traces() {
+  local pod="$1" key="$2" prefix="$3" count="$4" i code started_at
+  started_at=$(( $(date +%s) * 1000 ))
+  for i in $(seq 1 "$count"); do
+    code=$(kc exec "$pod" -- curl -s -o /dev/null -w '%{http_code}' \
+      -X POST http://localhost:5560/api/collector \
+      -H 'Content-Type: application/json' -H "X-Auth-Token: $key" \
+      -d "{\"trace_id\":\"${prefix}-${i}\",\"spans\":[{\"type\":\"llm\",\"span_id\":\"${prefix}-span-${i}\",\"trace_id\":\"${prefix}-${i}\",\"name\":\"lwql-isolation\",\"model\":\"gpt-5-mini\",\"input\":{\"type\":\"text\",\"value\":\"hello\"},\"output\":{\"type\":\"text\",\"value\":\"hello back\"},\"timestamps\":{\"started_at\":${started_at},\"finished_at\":$((started_at + 1000))}}]}")
+    assert_eq "Collector accepted ${prefix}-${i}" "$code" "200"
+  done
+}
+
+# @scenario "On a deployed stack, each project's key reads only its own rows"
+test_lwql_tenant_isolation() {
+  sep; info "Suite: LangWatchQL tenant isolation (two projects, two organisations)"
+
+  local app_pod pg_pod ch_pod
+  app_pod=$(ready_pod "app.kubernetes.io/name=${RELEASE}-app")
+  pg_pod=$(ready_pod "app.kubernetes.io/component=postgresql")
+  ch_pod=$(kc get pods -l "app.kubernetes.io/name=${RELEASE}-clickhouse" -o name | sed 's|^pod/||' | head -1)
+  # Generated per run in the legacy project-key shape (`sk-lw-`, no `_`), so no key is ever
+  # written into the repository.
+  local key_a key_b
+  key_a="sk-lw-e2elwqla$(openssl rand -hex 16)"
+  key_b="sk-lw-e2elwqlb$(openssl rand -hex 16)"
+
+  info "Seeding organisation A (the static seed)..."
+  local seed_out
+  seed_out=$(kc exec "$app_pod" -- \
+    sh -c "cd /app/apps/tasks && HOME=/tmp LANGWATCH_API_KEY=$key_a pnpm --silent task storage-seed" 2>&1) ||
+    { tail -40 <<<"$seed_out" >&2; fail "storage-seed did not seed organisation A"; }
+  # A seed that ran nothing still exits 0, so check the row it must have written.
+  [[ -n "$(lwql_project_key "$pg_pod" "$LWQL_E2E_PROJECT_A")" ]] ||
+    { tail -40 <<<"$seed_out" >&2; fail "storage-seed exited 0 but wrote no ${LWQL_E2E_PROJECT_A}"; }
+  pass "Organisation A seeded"
+
+  info "Copying it as organisation B with its own ids and key..."
+  kc exec -i "$pg_pod" -- sh -c 'PGPASSWORD=e2etest psql -U postgres -d langwatch -v ON_ERROR_STOP=1 -q' <<SQL \
+    || fail "Organisation B could not be created"
+BEGIN;
+CREATE TEMP TABLE e2e_org AS SELECT * FROM "Organization" WHERE id = 'local-dev-organization';
+UPDATE e2e_org SET id = '${LWQL_E2E_ORG_B}', slug = '${LWQL_E2E_ORG_B}', "ssoDomain" = NULL, "stripeCustomerId" = NULL;
+INSERT INTO "Organization" SELECT * FROM e2e_org ON CONFLICT DO NOTHING;
+CREATE TEMP TABLE e2e_license AS SELECT * FROM "OrganizationLicense" WHERE "organizationId" = 'local-dev-organization';
+UPDATE e2e_license SET "organizationId" = '${LWQL_E2E_ORG_B}';
+INSERT INTO "OrganizationLicense" SELECT * FROM e2e_license ON CONFLICT DO NOTHING;
+CREATE TEMP TABLE e2e_team AS SELECT * FROM "Team" WHERE id = 'local-dev-team';
+UPDATE e2e_team SET id = '${LWQL_E2E_TEAM_B}', slug = '${LWQL_E2E_TEAM_B}', "organizationId" = '${LWQL_E2E_ORG_B}';
+INSERT INTO "Team" SELECT * FROM e2e_team ON CONFLICT DO NOTHING;
+CREATE TEMP TABLE e2e_project AS SELECT * FROM "Project" WHERE id = '${LWQL_E2E_PROJECT_A}';
+UPDATE e2e_project SET id = '${LWQL_E2E_PROJECT_B}', slug = '${LWQL_E2E_PROJECT_B}', "apiKey" = '${key_b}', "teamId" = '${LWQL_E2E_TEAM_B}', "lwqlKey" = gen_random_uuid()::text;
+INSERT INTO "Project" SELECT * FROM e2e_project ON CONFLICT DO NOTHING;
+COMMIT;
+SQL
+  pass "Organisation B created with project ${LWQL_E2E_PROJECT_B}"
+
+  # B was written straight to Postgres, so no event fills its key-map row and the
+  # watch only refills daily; the provision task's backfill writes it now.
+  local backfill_out
+  backfill_out=$(kc exec "$app_pod" -- sh -c 'cd /app/apps/tasks && pnpm run task lwql-provision' 2>&1) ||
+    { tail -40 <<<"$backfill_out" >&2; fail "lwql:provision did not backfill project B's key-map row"; }
+
+  # Send with the keys the projects hold: a seed that kept another key must not read as a
+  # collector fault, and an archived or missing project fails here, by name.
+  local held_a held_b
+  held_a=$(lwql_project_key "$pg_pod" "$LWQL_E2E_PROJECT_A")
+  held_b=$(lwql_project_key "$pg_pod" "$LWQL_E2E_PROJECT_B")
+  if [[ -z "$held_a" ]]; then
+    # Name what Postgres holds, so the next run says why instead of only that.
+    printf 'SELECT id, "archivedAt" IS NOT NULL AS archived, left("apiKey", 8) AS key FROM "Project";\n' |
+      kc exec -i "$pg_pod" -- sh -c 'PGPASSWORD=e2etest psql -U postgres -d langwatch' >&2 || true
+    kc get pods -l app.kubernetes.io/component=postgresql -o name >&2 || true
+    fail "Project ${LWQL_E2E_PROJECT_A} has no live key"
+  fi
+  [[ -n "$held_b" ]] || fail "Project ${LWQL_E2E_PROJECT_B} has no live key"
+  [[ "$held_a" == "$key_a" ]] || warn "The seed kept another key on ${LWQL_E2E_PROJECT_A}; using it"
+  [[ "$held_b" == "$key_b" ]] || warn "Organisation B's copy holds another key; using it"
+  key_a="$held_a"; key_b="$held_b"
+
+  send_e2e_traces "$app_pod" "$key_a" "e2e-lwql-a" 2
+  send_e2e_traces "$app_pod" "$key_b" "e2e-lwql-b" 3
+
+  # Ingestion is asynchronous, so wait for both counts rather than sleeping.
+  local count_a="none" count_b="none" waited=0
+  while (( waited < 300 )); do
+    count_a=$(lwql_trace_count "$app_pod" "$key_a")
+    count_b=$(lwql_trace_count "$app_pod" "$key_b")
+    [[ "$count_a" == "2" && "$count_b" == "3" ]] && break
+    sleep 10; waited=$((waited + 10))
+  done
+  assert_eq "Project B has a key-map row" \
+    "$(ch_query "$ch_pod" "SELECT count() > 0 FROM langwatch.lwql_api_key_tenant_map WHERE TenantId = '${LWQL_E2E_PROJECT_B}'")" "1"
+  assert_eq "Project A's key counts only its own traces" "$count_a" "2"
+  assert_eq "Project B's key counts only its own traces" "$count_b" "3"
+
+  local reply code
+  reply=$(lwql_post "$app_pod" "$key_a" \
+    "{\"sql\":\"SELECT count() AS n FROM traces\",\"projectId\":\"${LWQL_E2E_PROJECT_B}\"}")
+  code=$(tail -n 1 <<<"$reply")
+  assert_eq "Project A's key naming project B is refused as not found" "$code" "404"
+  if sed '$d' <<<"$reply" | grep -q 'project_not_found'; then
+    pass "Project A's key naming project B is refused with project_not_found"
+  else
+    fail "Project A's key naming project B: expected project_not_found, got $(sed '$d' <<<"$reply")"
+  fi
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # SUITE: Workers health check
 # Runs after deploy_app_and_workers and verifies the pod reaches Ready.
 # The worker serves one HTTP listener (the metrics port, 2999): /metrics behind
@@ -1381,7 +1524,7 @@ metadata:
 spec:
   containers:
     - name: rustfs
-      image: rustfs/rustfs:latest
+      image: rustfs/rustfs:1.0.4
       args: ["server", "/data"]
       env:
         - name: RUSTFS_ROOT_USER
@@ -1554,6 +1697,7 @@ main() {
   test_app
   test_workers
   test_lwql
+  test_lwql_tenant_isolation
   deploy_sql_mode_and_metrics_key
   test_lwql_sql_mode_single_node
   test_metrics_plain_key

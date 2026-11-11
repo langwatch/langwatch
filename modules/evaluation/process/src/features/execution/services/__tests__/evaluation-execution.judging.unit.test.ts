@@ -52,10 +52,12 @@ function buildService({
   judge = judgedTrue,
   decisionModel = { kind: "langwatch" },
   isRouted = false,
+  isHostedOff = false,
 }: {
   judge?: Judge;
   decisionModel?: DecisionModelResolution;
   isRouted?: boolean;
+  isHostedOff?: boolean;
 } = {}) {
   const calls: InstantEvalJudgeCall[] = [];
   const judgeSpy = vi.fn<Judge>(async (input) => {
@@ -72,6 +74,7 @@ function buildService({
     .fn<ModelProviderApi["resolveDecisionModel"]>()
     .mockResolvedValue(decisionModel);
   const isRoutedSpy = vi.fn(async (_input: { projectId: string }) => isRouted);
+  const isHostedOffSpy = vi.fn(async (_input: { projectId: string }) => isHostedOff);
 
   const service = EvaluationExecutionService.create({
     runs: { findTraceEvaluations: async () => [] },
@@ -100,7 +103,7 @@ function buildService({
     decisionModels: createApiFixture<ModelProviderApi>({
       resolveDecisionModel: resolveDecisionModel,
     }),
-    judgeRouting: { isRouted: isRoutedSpy },
+    judgeRouting: { isRouted: isRoutedSpy, isHostedOff: isHostedOffSpy },
     installEnvironment: {},
   });
 
@@ -112,6 +115,7 @@ function buildService({
     evaluate,
     resolveDecisionModel,
     isRouted: isRoutedSpy,
+    isHostedOff: isHostedOffSpy,
   };
 }
 
@@ -522,6 +526,62 @@ describe("EvaluationExecutionService with the judge router", () => {
       expect(isRouted).not.toHaveBeenCalled();
       expect(calls[0]).not.toHaveProperty("route");
       expect(calls[0]?.decisionModel).toMatchObject({ model: "openai/decisions:gpt-6-luna" });
+    });
+  });
+});
+
+describe("EvaluationExecutionService for an organization LangWatch switched its hosted model off for", () => {
+  describe("given a judge on Instant Evals in a project whose column is Evals Preview", () => {
+    /** @scenario "An LLM judge on Evals Preview is an error for an organization with hosted switched off" */
+    it("is an error saying no decision model is set up, and the judge is never called", async () => {
+      const { service, judge, isRouted, isHostedOff } = buildService({
+        isHostedOff: true,
+        isRouted: true,
+      });
+
+      const result = await service.executeForTrace({
+        projectId: PROJECT_ID,
+        traceId: "trace-1",
+        evaluatorType: "langevals/llm_boolean",
+        settings: BOOLEAN_SETTINGS,
+        mappings: null,
+      });
+
+      expect(judge).not.toHaveBeenCalled();
+      expect(isRouted).not.toHaveBeenCalled();
+      expect(isHostedOff).toHaveBeenCalledWith({ projectId: PROJECT_ID });
+      expect(result.status).toBe("error");
+      const error = result.status === "error" ? result.error : "";
+      expect(error).toContain("classifier_not_configured");
+      expect(error).toContain("Settings > Model Providers");
+    });
+  });
+
+  describe("given a judge on Instant Evals in a project whose column is its own decision model", () => {
+    it("runs on the own model and never reads the hosted switch", async () => {
+      const { service, calls, isHostedOff } = buildService({
+        isHostedOff: true,
+        decisionModel: {
+          kind: "own",
+          model: "inception/decisions:mercury-decide",
+          wire: "jev",
+          providerModel: "mercury-decide",
+          endpoint: "https://api.inceptionlabs.ai/v1/decisions",
+          authHeader: "bearer",
+          apiKey: "customer-key",
+        },
+      });
+
+      await service.executeForTrace({
+        projectId: PROJECT_ID,
+        traceId: "trace-1",
+        evaluatorType: "langevals/llm_boolean",
+        settings: BOOLEAN_SETTINGS,
+        mappings: null,
+      });
+
+      expect(calls[0]?.decisionModel?.model).toBe("inception/decisions:mercury-decide");
+      expect(isHostedOff).not.toHaveBeenCalled();
     });
   });
 });
