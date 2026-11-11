@@ -2,6 +2,7 @@ import {
   DATA_PRIVACY_PRESIDIO_TIMEOUT_MS,
   EMPTY_AUDIENCE,
   type PiiLevel,
+  type PiiRedactionSpendPricedEventData,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
 import {
@@ -40,6 +41,7 @@ import {
   PiiRedactionModelService,
 } from "../pii-redaction-model.service.ts";
 import { PiiRedactionPolicyService } from "../pii-redaction-policy.service.ts";
+import { PiiRedactionSpendService } from "../pii-redaction-spend.service.ts";
 import { PresidioRedactionService } from "../presidio-redaction.service.ts";
 
 const PROJECT_ID = dataPrivacyTestGraph.projectId;
@@ -201,6 +203,13 @@ function setup({
 
   const fallbacks: PiiRedactionModelFallbackReason[] = [];
   const usage: { level: "info" | "warn"; fields: PiiRedactionModelUsage; message: string }[] = [];
+  const priced: PiiRedactionSpendPricedEventData[] = [];
+  const spend = PiiRedactionSpendService.create({
+    featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
+    recordSpendPriced: async (fact) => {
+      priced.push(fact);
+    },
+  });
 
   const analysis = PiiAnalysisService.create({
     presidio: PresidioRedactionService.create({
@@ -217,6 +226,7 @@ function setup({
       }),
       featureFlags,
       scopes: DataPrivacyProjectScopeService.create({ repository }),
+      spend,
       metrics: { modelFellBack: (reason) => fallbacks.push(reason) },
       log: {
         info: (fields, message) => usage.push({ level: "info", fields, message }),
@@ -242,6 +252,7 @@ function setup({
     sent,
     fallbacks,
     usage,
+    priced,
   };
 }
 
@@ -584,6 +595,122 @@ describe("PiiRedactionModelService", () => {
 
       expect(sent(memoryModel)).toHaveLength(0);
       expect(flagReads).toHaveLength(0);
+    });
+  });
+
+  describe("when the model answers a batch, for billing", () => {
+    /** @scenario "An answered batch is priced at the published rate per character" */
+    it("records one priced fact for the organization and the project", async () => {
+      const { analysis, memoryModel, priced } = setup();
+      memoryModel.answerWith(anonymized("call <PERSON>"));
+
+      await analysis.clearPresidio(strictBatch());
+
+      expect(priced).toEqual([
+        expect.objectContaining({
+          organizationId: ORGANIZATION_ID,
+          projectId: PROJECT_ID,
+          characters: 8,
+          texts: 1,
+          priceNanoUsd: 4_000,
+        }),
+      ]);
+    });
+
+    /** @scenario "A batch the model did not answer is not priced" */
+    it("records nothing when the model refuses and Presidio answers", async () => {
+      const { analysis, presidio, priced } = setup();
+      presidio.answerWith(anonymized("call <PERSON>"));
+
+      await analysis.clearPresidio(strictBatch());
+
+      expect(priced).toEqual([]);
+    });
+
+    /** @scenario "A batch the model did not answer is not priced" */
+    it("records nothing when the model times out, nor while the model is skipped after", async () => {
+      const abortingModel: PresidioChannel = {
+        detect: (input: PiiDetectionRequest) =>
+          input.texts.length === 0
+            ? Promise.resolve({ kind: "detected", results: [] })
+            : new Promise((_resolve, reject) => {
+                input.signal.addEventListener("abort", () =>
+                  reject(Object.assign(new Error("aborted"), { name: "AbortError" })),
+                );
+              }),
+      };
+      const { analysis, presidio, priced, fallbacks } = setup({
+        model: abortingModel,
+        modelTimeoutMs: 5,
+      });
+      presidio.answerWith(anonymized("call <PERSON>"));
+      presidio.answerWith(anonymized("call <PERSON>"));
+
+      await analysis.clearPresidio(strictBatch());
+      await analysis.clearPresidio(strictBatch());
+
+      expect(fallbacks).toEqual(["timeout", "breaker_open"]);
+      expect(priced).toEqual([]);
+    });
+
+    /** @scenario "A batch the model did not answer is not priced" */
+    it("records nothing for a batch too long for the model", async () => {
+      const { analysis, presidio, priced } = setup();
+      presidio.answerWith(anonymized("x"));
+
+      await analysis.clearPresidio({ ...strictBatch(), texts: ["x".repeat(8_001)] });
+
+      expect(priced).toEqual([]);
+    });
+
+    /** @scenario "An organization that is not allowlisted is never priced" */
+    it("records nothing for an organization not allowlisted", async () => {
+      const { analysis, presidio, priced } = setup({ allowlisted: false });
+      presidio.answerWith(anonymized("call <PERSON>"));
+
+      await analysis.clearPresidio(strictBatch());
+
+      expect(priced).toEqual([]);
+    });
+
+    describe("given spans redacted through the whole span pass", () => {
+      async function redactSpans(spans: OtlpSpan[]) {
+        const { analysis, memoryModel, priced } = setup();
+        const service = OtlpSpanPiiRedactionService.create({
+          transport: analysis,
+          isLangevalsConfigured: async () => true,
+          isProduction: true,
+          nativePolicyEnforced: true,
+          piiRedactionMaxAttributeLength: 400_000,
+          dataPrivacy: { getResolvedForProject: async () => policyAt({ level: "strict" }) },
+        });
+        for (const span of spans) {
+          memoryModel.answerWith(anonymized("call <PERSON>"));
+          await service.redactSpan({
+            span,
+            resource: null,
+            piiRedactionLevel: "STRICT",
+            tenantId: createTenantId(PROJECT_ID),
+          });
+        }
+        return priced.map((fact) => fact.requestId);
+      }
+
+      /** @scenario "The same span redacted twice is one request" */
+      it("gives a span redacted twice the same request id", async () => {
+        const [first, again] = await redactSpans([spanWith("call Ana"), spanWith("call Ana")]);
+
+        expect(again).toBe(first);
+      });
+
+      /** @scenario "Two spans with the same text are two requests" */
+      it("gives two spans with the same text different request ids", async () => {
+        const other = { ...spanWith("call Ana"), spanId: "span-2" };
+
+        const [first, second] = await redactSpans([spanWith("call Ana"), other]);
+
+        expect(second).not.toBe(first);
+      });
     });
   });
 

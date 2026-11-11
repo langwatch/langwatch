@@ -18,13 +18,17 @@ import {
   type ResolvedDataPrivacy,
   type SpanContentDropResult,
 } from "@langwatch/data-privacy-contract";
-import { createTenantId } from "@langwatch/eventing";
+import { createTenantId, type EventingCommands } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OtlpResource, OtlpSpan } from "@langwatch/otlp/trace-request";
 import type { FeatureSetup } from "@langwatch/process";
 
 import type { DataPrivacyChannels } from "../channels/data-privacy.channels.ts";
 import { googleApplicationCredentials } from "../channels/google-dlp.channel.ts";
+import {
+  buildPiiRedactionSpendPipeline,
+  type PiiRedactionSpendPipeline,
+} from "../eventing/pii-redaction-spend.pipeline.ts";
 import type { DataPrivacyRepositories } from "../repositories/data-privacy.repositories.ts";
 import { PII_REDACTION_MODEL_TIMEOUT_MS } from "../rules/pii-redaction-model.rules.ts";
 import { ContentDropPolicyService } from "../services/content-drop-policy.service.ts";
@@ -40,6 +44,7 @@ import { PiiAnalysisMetricsOtelService } from "../services/pii-analysis-metrics-
 import { PiiAnalysisService } from "../services/pii-analysis.service.ts";
 import { PiiRedactionModelService } from "../services/pii-redaction-model.service.ts";
 import { DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH } from "../services/pii-redaction-policy.service.ts";
+import { PiiRedactionSpendService } from "../services/pii-redaction-spend.service.ts";
 import { PresidioRedactionService } from "../services/presidio-redaction.service.ts";
 
 /** A project's place in the organization chain, plus the name it renders under. */
@@ -111,6 +116,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
   #contentDrop: ContentDropPolicyService;
   #spanContentDrop: OtlpSpanContentDropService;
   #googleCredentials: GoogleCredentialsUse;
+  readonly #spendCommands: { current: EventingCommands<PiiRedactionSpendPipeline> | undefined };
 
   private constructor(services: {
     privacy: DataPrivacyService;
@@ -120,6 +126,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
     contentDrop: ContentDropPolicyService;
     spanContentDrop: OtlpSpanContentDropService;
     googleCredentials: GoogleCredentialsUse;
+    spendCommands: { current: EventingCommands<PiiRedactionSpendPipeline> | undefined };
   }) {
     this.#privacy = services.privacy;
     this.#redaction = services.redaction;
@@ -128,6 +135,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
     this.#contentDrop = services.contentDrop;
     this.#spanContentDrop = services.spanContentDrop;
     this.#googleCredentials = services.googleCredentials;
+    this.#spendCommands = services.spendCommands;
   }
 
   static async create({
@@ -152,6 +160,19 @@ export class DataPrivacyModule implements DataPrivacyApi {
     const projectScopes = DataPrivacyProjectScopeService.create({
       repository: repositories.projectScopes,
     });
+    // Bound by the eventing connect, which runs after construction and before any redaction.
+    const spendCommands: { current: EventingCommands<PiiRedactionSpendPipeline> | undefined } = {
+      current: void 0,
+    };
+    const spend = PiiRedactionSpendService.create({
+      featureFlags: dependencies.featureFlags,
+      recordSpendPriced: async (fact) => {
+        if (!spendCommands.current) {
+          throw new Error("the PII redaction spend pipeline is not connected");
+        }
+        await spendCommands.current.recordSpendPriced.send(fact);
+      },
+    });
     const analysis = PiiAnalysisService.create({
       presidio,
       model: PiiRedactionModelService.create({
@@ -165,6 +186,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
         }),
         featureFlags: dependencies.featureFlags,
         scopes: projectScopes,
+        spend,
         metrics,
       }),
       dlp: GoogleDlpRedactionService.create({
@@ -207,7 +229,17 @@ export class DataPrivacyModule implements DataPrivacyApi {
         nativePolicyEnforced: config.enforcement !== "off",
       }),
       googleCredentials,
+      spendCommands,
     });
+  }
+
+  spendPipeline(): PiiRedactionSpendPipeline {
+    return buildPiiRedactionSpendPipeline();
+  }
+
+  /** Binds the spend pipeline's own senders; every priced model call goes through them. */
+  connectSpendCommands(commands: EventingCommands<PiiRedactionSpendPipeline>): void {
+    this.#spendCommands.current = commands;
   }
 
   intoGoogleApplicationCredentials<Out>(build: (credential: string | undefined) => Out): Out {

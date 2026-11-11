@@ -266,7 +266,10 @@ export class OtlpSpanPiiRedactionService {
       return true;
     }
 
-    const results = await this.policy.clearBatch(entries, options);
+    const results = await this.policy.clearBatch(entries, {
+      ...options,
+      recordKey: `${span.traceId}:${span.spanId}`,
+    });
 
     for (let i = 0; i < entries.length; i++) {
       const redacted = results[i];

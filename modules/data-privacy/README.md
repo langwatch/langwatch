@@ -21,7 +21,7 @@ Data privacy: per-scope rules and the PII redaction level a project runs at.
 | Postgres table                 | `DataPrivacyPolicy`                                                                                                                                                                                                                        | `process/src/repositories/prisma/prisma.data-privacy.repository.ts:15`           |
 | Postgres, accessed not claimed | `Department`, `Group`, `Organization`, `OrganizationUser`, `Project`, `Team`                                                                                                                                                               | `process/src/repositories/prisma/prisma.data-privacy-directory.repository.ts:17` |
 | Stores required                |                                                                                                                                                                                                                                            | `process/src/channels/http/http.data-privacy.channels.ts:18`                     |
-| Secrets                        | `googleApplicationCredentials` (GOOGLE_APPLICATION_CREDENTIALS)                                                                                                                                                                            | `process/src/app/data-privacy.app.ts:104`                                        |
+| Secrets                        | `googleApplicationCredentials` (GOOGLE_APPLICATION_CREDENTIALS)                                                                                                                                                                            | `process/src/app/data-privacy.app.ts:109`                                        |
 | Config                         | `googleDlpDisabled` (LANGWATCH_DISABLE_GOOGLE_DLP), `enforcement` (LANGWATCH_DATA_PRIVACY_ENFORCEMENT), `nodeEnvironment` (NODE_ENV), `langevalsEndpoint` (LANGEVALS_ENDPOINT), `piiRedactionModelEndpoint` (PII_REDACTION_MODEL_ENDPOINT) | `contract/src/data-privacy.config.ts:11`                                         |
 
 Anything else data-privacy needs belongs to another module and is reached through its `*Api`.
@@ -46,6 +46,13 @@ the `release_pii_redaction_model_enabled` flag only, on a deployment that sets
 `PII_REDACTION_MODEL_ENDPOINT`: the Lambda alias ARN (`arn:aws:lambda:...:live`) or an HTTP address.
 Any problem with the model sends the batch to Presidio, then Google DLP, as for every other
 organization.
+
+- **Billing.** Every batch the model answers is priced at 0.00005 dollars per 100 characters and
+  recorded once, as a `gateway_spend` row of request type `pii_redaction`; a fallback is never
+  priced. Organizations with `release_pii_redaction_model_free` are recorded at zero. Billing
+  reports the month on `langwatch_pii_redaction_usd` only once Stripe holds that meter
+  ([ADR-201](../../dev/docs/adr/201-pii-redaction-model-call-is-metered.md),
+  `specs/pii-redaction-billing.feature`).
 
 - **Strict only.** Only a batch whose project's resolved privacy policy is `strict` can reach the
   model. A custom level, even one that selects every analysis-service entity, and a batch whose
