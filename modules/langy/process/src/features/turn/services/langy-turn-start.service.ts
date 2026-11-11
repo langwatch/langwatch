@@ -260,7 +260,15 @@ export class LangyTurnStartService {
         isRetry: input.isRetry,
         turnContext: input.turnContext,
         readOnly,
-        ...(input.unattended ? { unattended: input.unattended } : {}),
+        ...(input.unattended
+          ? {
+              unattended: input.unattended,
+              holdKey: LANGY_TURN_SHARED.heldKeyName({
+                userId: request.userId,
+                idempotencyKey: input.idempotencyKey,
+              }),
+            }
+          : {}),
         ...runtime,
         credentials,
         turnModel,

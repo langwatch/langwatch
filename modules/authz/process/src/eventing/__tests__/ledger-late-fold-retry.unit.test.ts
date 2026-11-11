@@ -31,7 +31,6 @@ const ORG_ID = "org_late_fold";
 const ACTOR: LedgerActor = { type: "user", id: "user_admin" };
 const T0 = Date.parse("2026-11-01T00:00:00.000Z");
 
-// Well past the adapter's 10s convergence window.
 /** Folds seen in production: past the window, and up to the slowest worst case (~48 s). */
 const FOLD_LAGS_MS = [25_000, 48_000];
 const WINDOW_MS = 10_000;
@@ -77,7 +76,7 @@ class LaggingFoldDispatcher extends AuthzGrantsCommandDispatcher {
   private foldLater(event: Parameters<AuthzGrantProjection["map"]>[0]): void {
     const projection = AuthzGrantProjection.create(this.store);
     setTimeout(() => {
-      void this.store.append(projection.map(event), {} as never);
+      void this.store.append(projection.map(event));
     }, this.lagMs);
   }
 
@@ -136,10 +135,9 @@ function ledger(foldLagMs: number) {
 /** Tracks a promise without awaiting it, so the test can ask "settled yet?". */
 function track<T>(promise: Promise<T>) {
   const state: { settled: boolean; value?: T; error?: unknown } = { settled: false };
-  promise.then(
-    (value) => Object.assign(state, { settled: true, value }),
-    (error: unknown) => Object.assign(state, { settled: true, error }),
-  );
+  promise
+    .then((value) => Object.assign(state, { settled: true, value }))
+    .catch((error: unknown) => Object.assign(state, { settled: true, error }));
   return state;
 }
 
@@ -178,12 +176,17 @@ describe.each(FOLD_LAGS_MS)(
     });
 
     describe("when a skipping attach is retried for an identity an earlier attempt appended", () => {
-      it("returns at once as a duplicate once the earlier append has landed", async () => {
-        const { writer, memory } = ledger(lag);
+      let writer: ReturnType<typeof ledger>["writer"];
+      let memory: ReturnType<typeof ledger>["memory"];
 
+      beforeEach(async () => {
+        ({ writer, memory } = ledger(lag));
         const first = track(writer.attachBindings(attach("rb_first")));
         await elapse(WINDOW_MS + 500);
         expect(first.error).toBeInstanceOf(AuthzGrantNotConfirmedError);
+      });
+
+      it("returns at once as a duplicate once the earlier append has landed", async () => {
         await elapse(lag);
         expect(memory.grants.map((row) => row.id)).toEqual(["rb_first"]);
 
@@ -195,12 +198,6 @@ describe.each(FOLD_LAGS_MS)(
       });
 
       it("is confirmed by the earlier attempt once that one lands inside the retry's window", async () => {
-        const { writer, memory } = ledger(lag);
-
-        const first = track(writer.attachBindings(attach("rb_first")));
-        await elapse(WINDOW_MS + 500);
-        expect(first.error).toBeInstanceOf(AuthzGrantNotConfirmedError);
-
         // Called 7 s before the first append lands, so that lands inside the retry's own window
         // while the retry's own append lands a full fold later.
         await elapse(lag - 7_000 - (WINDOW_MS + 500));

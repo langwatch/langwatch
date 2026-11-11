@@ -52,7 +52,10 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
   }
 
   async activate(input: { id: string }): Promise<ApiKeyRow> {
-    return this.#write(input.id, (key) => ({ ...key, revokedAt: null }));
+    return this.#write(input.id, (key) => {
+      if (key.revocationCause !== null) throw new ApiKeyAlreadyRevokedError(input.id);
+      return { ...key, revokedAt: null };
+    });
   }
 
   async findByLookupId(input: { lookupId: string }): Promise<ApiKeyRow | null> {

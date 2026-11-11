@@ -260,20 +260,41 @@ describe("an unattended Langy turn", () => {
       );
     });
 
-    it("holds the key under the turn's id and revokes it by that name when the turn is abandoned", async () => {
+    /** @scenario "An unattended turn holds its key under the run and releases it on revoke" */
+    it("holds the key under the run's name and revokes it by that name when the turn is abandoned", async () => {
       const fixture = makeFixture();
       fixture.acceptTurn.mockRejectedValueOnce(new Error("the turn could not be recorded"));
 
-      await expect(fixture.start(unattendedTurn)).rejects.toThrow();
+      await expect(fixture.start(unattendedTurn)).rejects.toThrow("could not be recorded");
 
-      expect(fixture.mint).toHaveBeenCalledWith(expect.objectContaining({ holdKey: "turn-1" }));
+      expect(fixture.mint).toHaveBeenCalledWith(
+        expect.objectContaining({ holdKey: expect.stringMatching(/^langyhold_/) }),
+      );
       expect(fixture.revoke).toHaveBeenCalledWith({
         apiKeyId: "key-1",
         projectId: "project-1",
-        holdKey: "turn-1",
+        holdKey: expect.stringMatching(/^langyhold_/),
       });
     });
 
+    it("holds the same key for a retry whose brief changed", async () => {
+      const fixture = makeFixture();
+      const reworded = {
+        ...unattendedTurn,
+        messages: [
+          { role: "user" as const, parts: [{ type: "text" as const, text: "A new brief." }] },
+        ],
+      };
+
+      await fixture.start(unattendedTurn);
+      await fixture.start(reworded);
+
+      const [first, second] = fixture.mint.mock.calls.map(([input]) => input.holdKey);
+      expect(first).toBeDefined();
+      expect(second).toBe(first);
+    });
+
+    /** @scenario "A held key's refusal reaches the caller with the pace it asked for" */
     it("lets a held key's refusal reach the caller with the pace it asked for", async () => {
       const refusal = new AuthzGrantNotConfirmedError({ retryable: true, retryAfterMs: 40_000 });
       const fixture = makeFixture({
@@ -429,7 +450,9 @@ describe("a turn in a run conversation", () => {
       const fixture = makeFixture({ existing: RUN_CONVERSATION });
       fixture.acceptTurn.mockRejectedValueOnce(new Error("the turn could not be recorded"));
 
-      await expect(fixture.start(replyIn("conversation-1"))).rejects.toThrow();
+      await expect(fixture.start(replyIn("conversation-1"))).rejects.toThrow(
+        "could not be recorded",
+      );
 
       expect(fixture.mint).toHaveBeenCalledWith(
         expect.not.objectContaining({ holdKey: expect.anything() }),

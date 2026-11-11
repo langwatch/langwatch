@@ -15,14 +15,9 @@ import {
   runKeyCacheKey,
   runKeyLifetimeMs,
 } from "../rules/run-key.rules.ts";
-import type { DisabledApiKey } from "./api-key-lifecycle.service.ts";
-import type { ApiKeyService } from "./api-key.service.ts";
-import { mintSharedKey } from "./shared-key-mint.ts";
+import { mintSharedKey, type SharedKeyWriter } from "./shared-key-mint.service.ts";
 
 type HeldRunKey = { token: string; expiresAtMs: number };
-type RunKeyWriter = Pick<ApiKeyService, "writeDisabled" | "reopenDisabled"> & {
-  grantAndActivate(key: DisabledApiKey): Promise<{ token: string }>;
-};
 
 /**
  * The one place a run's key is minted (ARCHITECTURE.md §10): the starter's or the starting key's,
@@ -31,7 +26,7 @@ type RunKeyWriter = Pick<ApiKeyService, "writeDisabled" | "reopenDisabled"> & {
  */
 export class RunKeyMintService {
   static create(options: {
-    apiKeys: RunKeyWriter;
+    apiKeys: SharedKeyWriter;
     authz: Pick<AuthzApi, "getScope" | "effectivePermissions">;
     held: SharedCredentialStore;
   }): RunKeyMintService {
@@ -43,7 +38,7 @@ export class RunKeyMintService {
 
   private constructor(
     private readonly options: {
-      apiKeys: RunKeyWriter;
+      apiKeys: SharedKeyWriter;
       authz: Pick<AuthzApi, "getScope" | "effectivePermissions">;
       held: SharedCredentialStore;
     },

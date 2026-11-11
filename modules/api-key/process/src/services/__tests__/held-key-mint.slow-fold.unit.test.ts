@@ -1,13 +1,9 @@
 /**
- * A held key whose grants fold slower than one try's read-your-writes window still ends as one
- * key: each retry re-grants the same key, and what an earlier try appended is what confirms it.
- *
- * The authz ledger stands in as a fake of its `AuthzApi` contract, not the real
- * `EventingAuthzLedgerAdapter`: that adapter and its memory repositories are private to
- * `@langwatch/authz-process`, which exports only its module, and package-boundaries forbids
- * reaching into another package's source. The fake keeps the adapter's rules that matter here:
- * every write appends, a fold lands it later, a 10 s poll confirms only what has landed, and a
- * skipping attach answers an identity already landed instead of appending it again.
+ * A held key whose grants fold slower than one try's window still ends as one key: each retry
+ * re-grants the same key, confirmed by what an earlier try appended. The ledger is a fake of
+ * `AuthzApi` because the real adapter is private to `@langwatch/authz-process`.
+ * @see modules/api-key/specs/api-key.feature
+ * @scenario "A held key's grants that land after a slow fold still let the caller proceed"
  */
 import type { CreateHeldApiKeyInput } from "@langwatch/api-key-contract";
 import { AuthzGrantNotConfirmedError, type AuthzApi } from "@langwatch/authz-contract";

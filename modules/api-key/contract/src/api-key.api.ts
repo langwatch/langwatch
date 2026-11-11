@@ -114,15 +114,15 @@ export type CliSessionKeyRevocation = Readonly<{
 /** A key for `createHeld`: the create input, named by what holds it, always with an expiry. */
 export type CreateHeldApiKeyInput = {
   holdKey: string;
-  key: CreateApiKeyInput & { expiresAt: Date };
+  key: CreateApiKeyInput & { expiresAt: NonNullable<CreateApiKeyInput["expiresAt"]> };
 };
 
 export interface ApiKeyApi {
   create(input: CreateApiKeyInput): Promise<{ token: string; apiKey: ApiKey }>;
   /**
-   * `create` for a caller that is retried: the key is written once per `holdKey` and every retry
+   * `create` for a caller that is retried: the key is written once per `holdKey`, and a retry
    * grants that same key again. Throws a retryable `AuthzGrantNotConfirmedError` (with
-   * `retryAfterMs`) while its grants have not landed. `created` is true for the call that wrote it.
+   * `retryAfterMs`) until its grants land. `created` marks the call that activated the key.
    */
   createHeld(
     input: CreateHeldApiKeyInput,

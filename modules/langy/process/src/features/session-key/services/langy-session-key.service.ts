@@ -44,7 +44,8 @@ type LangySessionKeyMintInput = {
   /**
    * Names the run this key serves: a retry with the same name gets the same key and its pending
    * grant, so a grant that folds slowly is waited on across retries instead of being minted again.
-   * Revoke it with the same `holdKey`, so the next mint is a fresh key, not the revoked one.
+   * A turn that revokes a held key passes the same `holdKey` to `revoke`, so the next mint is a
+   * fresh key; a revoke elsewhere is caught by the held key's liveness check instead.
    */
   holdKey?: string;
 };

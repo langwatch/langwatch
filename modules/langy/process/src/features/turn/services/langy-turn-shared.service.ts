@@ -180,6 +180,17 @@ export class LangyTurnSharedService {
     return { turnId: `langyturn_${digest}`, messageId: `langymsg_${digest}` };
   }
 
+  /** Names an unattended run's held key by who and which run, never by the brief's text. */
+  heldKeyName(input: { userId: string; idempotencyKey: string }): string {
+    const digest = createHash("sha256")
+      .update(input.userId)
+      .update("\u0000")
+      .update(input.idempotencyKey)
+      .digest("hex")
+      .slice(0, 32);
+    return `langyhold_${digest}`;
+  }
+
   composeLangyTurnPrompt({
     viewer,
     contextBlock,

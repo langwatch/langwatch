@@ -64,6 +64,7 @@ export class LangyTurnPreparationService {
     /** Keeps the unattended ceiling: an allowlisted key, no GitHub token, no UI action. */
     readOnly: boolean;
     unattended?: Pick<NonNullable<StartConversationTurnInput["unattended"]>, "title">;
+    holdKey?: string;
     worker: NonNullable<LangyTurnServiceDependencies["worker"]>;
     accessStore: LangyTurnServiceDependencies["accessStore"];
     handoffStore: LangyTurnServiceDependencies["handoffStore"];
@@ -256,21 +257,17 @@ export class LangyTurnPreparationService {
     // A read-only turn never borrows a running worker's key, which may hold writes.
     if (!args.readOnly && (await probeWorker())) return;
 
-    // The turn id is fixed by the run's idempotency key, so an unattended run's retry finds its
-    // key still waiting on its grant instead of minting another. A read-only turn that continues
-    // a run conversation is a person's, and is not retried that way.
-    const holdKey = args.unattended ? args.turnId : undefined;
     const minted = await this.deps.sessionKeys.mint({
       session: args.session,
       projectId: args.projectId,
       organizationId: args.credentials.organizationId,
       ...(args.readOnly ? { ceiling: "unattended" as const } : {}),
-      ...(holdKey ? { holdKey } : {}),
+      ...(args.holdKey ? { holdKey: args.holdKey } : {}),
       conversation: { id: args.conversation.id, turnId: args.turnId },
     });
     args.credentials.langwatchApiKey = minted.token;
     args.credentials.langwatchApiKeyId = minted.apiKeyId;
-    args.attempt.retainSessionKey(minted.apiKeyId, holdKey);
+    args.attempt.retainSessionKey(minted.apiKeyId, args.holdKey);
   }
 
   private buildPreparedTurn(

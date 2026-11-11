@@ -345,3 +345,45 @@ Feature: API key lifecycle
     When the run key is minted again
     Then a new key is written and returned
     And the old pending key stays revoked, never activated
+
+  # A caller that is retried (a Langy turn for an insights run) holds its key under a name: the
+  # retry reuses the key and its pending grant instead of minting another while the fold is slow.
+  @unit
+  Scenario: A held key is written once and handed to a retry with its pending grant
+    Given a held key was written and its grants have not landed
+    When the same caller asks for the key held under the same name again
+    Then no second key is written
+    And the first attempt's key is granted again and returned once its grants land
+    And only the call that activated the key reports it as created
+
+  @unit
+  Scenario: A held key's grants that land after a slow fold still let the caller proceed
+    Given the grants fold 48 seconds after they are appended
+    When the caller retries at the pace the refusal names, up to four attempts
+    Then the caller gets the key and one key exists
+
+  @unit
+  Scenario: A held key is never handed to another person
+    Given a key is held under a name for one person
+    When another person asks for a key under the same name
+    Then a new key is written for that person
+
+  @unit
+  Scenario: A held key that was revoked or has lapsed is minted over
+    Given a key held under a name was revoked, or has less than a minute of life left
+    When the key is asked for under the same name
+    Then a new key is written and returned
+
+  @unit
+  Scenario: A held key revoked before it is activated stays revoked
+    Given a held key was written and its grants landed
+    And the key was revoked before its activation
+    When the key is activated
+    Then it stays revoked
+    And the caller is told to retry, which mints a new key
+
+  @unit
+  Scenario: A released held key is minted fresh
+    Given a key is held under a name
+    When its held entry is released and the key is asked for again
+    Then a new key is written and returned

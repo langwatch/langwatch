@@ -1,9 +1,12 @@
 import type { CreateHeldApiKeyInput } from "@langwatch/api-key-contract";
 import { AuthzGrantNotConfirmedError } from "@langwatch/authz-contract";
 import { MemorySharedCredentialStore } from "@langwatch/secrets/shared-credential";
+import { Temporal, nowInstant } from "@langwatch/time";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ApiKeyRow } from "../../repositories/api-key.repository.ts";
+import { MemoryApiKeyDatabase } from "../../repositories/memory/memory.api-key.database.ts";
+import { MemoryApiKeyRepository } from "../../repositories/memory/memory.api-key.repository.ts";
 import type { DisabledApiKey } from "../api-key-lifecycle.service.ts";
 import { HELD_KEY_GRANT_RETRY_AFTER_MS, HeldKeyMintService } from "../held-key-mint.service.ts";
 
@@ -23,44 +26,75 @@ const keyInput = (userId = "user-1"): CreateHeldApiKeyInput["key"] => ({
   expiresAt: new Date("2026-10-01T16:00:00.000Z"),
 });
 
-/** In-memory key writer whose grant lands once the fake clock reaches `landsAtMs`. */
-function createFixture({ landsAtMs }: { landsAtMs: number }) {
+/** Key writer over the memory repository; its grant lands once the clock reaches `landsAtMs`. */
+function createFixture({
+  landsAtMs,
+  beforeActivate,
+}: {
+  landsAtMs: number;
+  beforeActivate?: (row: ApiKeyRow) => void;
+}) {
   const start = Date.now();
-  const rows = new Map<string, { revokedAt: Date | null }>();
-  const disabled = (id: string, token: string): DisabledApiKey => ({
+  const memory = MemoryApiKeyDatabase.create();
+  const repository = MemoryApiKeyRepository.create({ memory });
+  const disabled = (
+    id: string,
+    token: string,
+    input: CreateHeldApiKeyInput["key"],
+  ): DisabledApiKey => ({
     id,
     token,
     organizationId: "org-1",
-    bindings: keyInput().bindings,
-    permissions: keyInput().permissions,
+    bindings: input.bindings,
+    permissions: input.permissions,
     actor: { type: "user", id: "user-1" },
     caller: { type: "system" },
   });
   const apiKeys = {
-    writeDisabled: async () => {
-      const key = disabled(`key-${rows.size + 1}`, `token-${rows.size + 1}`);
-      rows.set(key.id, { revokedAt: null });
-      return key;
+    writeDisabled: async (input: CreateHeldApiKeyInput["key"]) => {
+      const row = await repository.create({
+        name: input.name,
+        description: null,
+        lookupId: `lookup-${Math.random()}`,
+        hashedSecret: "hash",
+        permissionMode: "restricted",
+        userId: input.userId ?? null,
+        createdByUserId: input.userId ?? null,
+        organizationId: "org-1",
+        expiresAt: Temporal.Instant.fromEpochMilliseconds(input.expiresAt.getTime()),
+        ingestSourceType: null,
+        ingestionTemplateId: null,
+        startsDisabled: true,
+        grants: [],
+      });
+      return disabled(row.id, `token-${row.id}`, input);
     },
-    reopenDisabled: async ({ id, token }: { id: string; token: string }) => disabled(id, token),
+    reopenDisabled: async ({
+      id,
+      token,
+      input,
+    }: {
+      id: string;
+      token: string;
+      input: CreateHeldApiKeyInput["key"];
+    }) => disabled(id, token, input),
     grantAndActivate: async (key: DisabledApiKey) => {
       // The real grant waits out the authz fold before it gives up.
       await vi.advanceTimersByTimeAsync(GRANT_WAIT_MS);
       if (Date.now() - start < landsAtMs) throw new AuthzGrantNotConfirmedError();
+      const row = await repository.findById({ id: key.id });
+      if (row) beforeActivate?.(row);
+      await repository.activate({ id: key.id });
       return { token: key.token };
     },
   };
-  const keys = {
-    findById: async ({ id }: { id: string }) => {
-      const row = rows.get(id);
-      return row ? ({ revokedAt: row.revokedAt, expiresAt: null } as unknown as ApiKeyRow) : null;
-    },
-  };
   return {
-    rows,
+    repository,
+    memory,
+    rows: () => memory.keys(),
     service: HeldKeyMintService.create({
       apiKeys,
-      keys,
+      keys: repository,
       held: MemorySharedCredentialStore.create(),
     }),
   };
@@ -80,6 +114,14 @@ async function attempts(run: () => ReturnType<Service["createHeld"]>) {
   }
 }
 
+/**
+ * @see modules/api-key/specs/api-key.feature
+ * @scenario "A held key is written once and handed to a retry with its pending grant"
+ * @scenario "A held key is never handed to another person"
+ * @scenario "A held key that was revoked or has lapsed is minted over"
+ * @scenario "A held key revoked before it is activated stays revoked"
+ * @scenario "A released held key is minted fresh"
+ */
 describe("HeldKeyMintService", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -110,13 +152,13 @@ describe("HeldKeyMintService", () => {
   it("reuses the held key on a retry: one key exists, with the same id", async () => {
     const { service, rows } = createFixture({ landsAtMs: 45_000 });
     await service.createHeld({ holdKey: "run-1", key: keyInput() }).catch(() => undefined);
-    expect(rows.size).toBe(1);
+    expect(rows()).toHaveLength(1);
 
     const second = await attempts(() => service.createHeld({ holdKey: "run-1", key: keyInput() }));
 
-    expect(rows.size).toBe(1);
+    expect(rows()).toHaveLength(1);
     // The first try only wrote the key; the retry that activated it is the one mint.
-    expect(second).toMatchObject({ apiKeyId: "key-1", created: true });
+    expect(second).toMatchObject({ apiKeyId: rows()[0]?.id, created: true });
   });
 
   it("reports the call that activated the key as the one that created it", async () => {
@@ -130,14 +172,50 @@ describe("HeldKeyMintService", () => {
   });
 
   it("mints a fresh key when the held one was revoked", async () => {
-    const { service, rows } = createFixture({ landsAtMs: 0 });
+    const { service, rows, repository } = createFixture({ landsAtMs: 0 });
     const first = await service.createHeld({ holdKey: "run-1", key: keyInput() });
-    rows.set(first.apiKeyId, { revokedAt: new Date() });
+    await repository.update({ id: first.apiKeyId, revokedAt: nowInstant() });
 
     const next = await service.createHeld({ holdKey: "run-1", key: keyInput() });
 
     expect(next.apiKeyId).not.toBe(first.apiKeyId);
-    expect(rows.size).toBe(2);
+    expect(rows()).toHaveLength(2);
+  });
+
+  it("mints a fresh key when the held one has too little life left to serve the caller", async () => {
+    const { service } = createFixture({ landsAtMs: 0 });
+    const soon = { ...keyInput(), expiresAt: new Date(Date.now() + 30_000) };
+    const first = await service.createHeld({ holdKey: "run-1", key: soon });
+
+    const next = await service.createHeld({ holdKey: "run-1", key: keyInput() });
+
+    expect(next.apiKeyId).not.toBe(first.apiKeyId);
+  });
+
+  it("mints over a key revoked after it was activated, on the retry", async () => {
+    const { service, rows, repository } = createFixture({ landsAtMs: 0 });
+    const first = await service.createHeld({ holdKey: "run-1", key: keyInput() });
+    await repository.revoke({ id: first.apiKeyId, organizationId: "org-1", cause: "user" });
+
+    const next = await attempts(() => service.createHeld({ holdKey: "run-1", key: keyInput() }));
+
+    expect(next.apiKeyId).not.toBe(first.apiKeyId);
+    expect(rows()).toHaveLength(2);
+  });
+
+  it("never undoes a revoke that lands before the key is activated", async () => {
+    const { service, rows, memory } = createFixture({
+      landsAtMs: 0,
+      beforeActivate: (row) => memory.replaceKey({ ...row, revocationCause: "user" }),
+    });
+
+    const error = await service
+      .createHeld({ holdKey: "run-1", key: keyInput() })
+      .catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({ retryable: true });
+    expect(rows()[0]).toMatchObject({ revocationCause: "user" });
+    expect(rows()[0]?.revokedAt).not.toBeNull();
   });
 
   it("mints a fresh key after the held entry is released", async () => {

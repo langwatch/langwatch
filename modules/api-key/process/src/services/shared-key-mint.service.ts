@@ -1,4 +1,4 @@
-import type { CreateApiKeyInput } from "@langwatch/api-key-contract";
+import { ApiKeyAlreadyRevokedError, type CreateApiKeyInput } from "@langwatch/api-key-contract";
 import { AuthzGrantNotConfirmedError } from "@langwatch/authz-contract";
 import {
   SharedCredentialPendingError,
@@ -13,7 +13,8 @@ import { z } from "zod";
 import type { DisabledApiKey } from "./api-key-lifecycle.service.ts";
 import type { ApiKeyService } from "./api-key.service.ts";
 
-type SharedKeyWriter = Pick<ApiKeyService, "writeDisabled" | "reopenDisabled"> & {
+/** The key writes a mint needs: write disabled, reopen, then grant and activate. */
+export type SharedKeyWriter = Pick<ApiKeyService, "writeDisabled" | "reopenDisabled"> & {
   grantAndActivate(key: DisabledApiKey): Promise<{ token: string }>;
 };
 
@@ -45,10 +46,9 @@ function parseJson(value: string): unknown {
 }
 
 /**
- * Mints a key once across every server (`mintOnce`): the claimant writes the key, shares it sealed
- * while its grants fold, then shares it active; every other server waits for that same token. A
- * key whose grants have not landed is granted again by the next attempt, never written anew.
- * `written` says whether this call activated the key, so a caller counts each key once, not its reuses.
+ * Mints a key once across every server (`mintOnce`): the claimant writes it, shares it sealed
+ * while its grants fold, then shares it active. A key whose grants have not landed is granted
+ * again by the next attempt, never written anew. `written` marks the call that activated it.
  */
 export async function mintSharedKey(input: {
   apiKeys: SharedKeyWriter;
@@ -64,6 +64,8 @@ export async function mintSharedKey(input: {
   reusable: (shared: { expiresAtMs: number }) => boolean;
   /** Whether the key's row is still live: a key retired elsewhere is minted over. */
   isLive?: (apiKeyId: string) => Promise<boolean>;
+  /** Whether a pending key is still only disabled; one revoked since is minted over. */
+  isPending?: (apiKeyId: string) => Promise<boolean>;
   /** Told to a caller whose grant has not landed, so its retry waits for the fold. */
   retryAfterMs?: number;
 }): Promise<{ token: string; apiKeyId: string; expiresAtMs: number; written: boolean }> {
@@ -85,14 +87,17 @@ export async function mintSharedKey(input: {
         );
       },
       mint: async ({ earlier, hold }) => {
-        const [pending] = sharedKeys(earlier).filter(
-          (shared) => !shared.active && ours(shared) && input.reusable(shared),
-        );
+        const pending = await firstPending({
+          candidates: sharedKeys(earlier).filter(
+            (shared) => !shared.active && ours(shared) && input.reusable(shared),
+          ),
+          isPending: input.isPending,
+        });
         const { shared, key } = pending
           ? await reopen({ apiKeys, pending, input })
           : await write({ apiKeys, hold, input });
         await apiKeys.grantAndActivate(key);
-        // Counted where the key goes live, so a key written by one try and activated by a later one is one mint.
+        // Counted where the key goes live: a key written by one try, activated by another, is one.
         written = true;
         const ttlMs = shared.expiresAtMs - nowInstant().epochMilliseconds;
         return { value: JSON.stringify({ ...shared, active: true }), ttlMs };
@@ -104,6 +109,7 @@ export async function mintSharedKey(input: {
   } catch (error) {
     if (
       error instanceof SharedCredentialPendingError ||
+      ApiKeyAlreadyRevokedError.is(error) ||
       (AuthzGrantNotConfirmedError.is(error) && !error.retryable)
     ) {
       throw new AuthzGrantNotConfirmedError({
@@ -113,6 +119,19 @@ export async function mintSharedKey(input: {
     }
     throw error;
   }
+}
+
+async function firstPending({
+  candidates,
+  isPending,
+}: {
+  candidates: SharedKey[];
+  isPending: Mint["isPending"];
+}): Promise<SharedKey | undefined> {
+  for (const candidate of candidates) {
+    if (!isPending || (await isPending(candidate.apiKeyId))) return candidate;
+  }
+  return undefined;
 }
 
 type Mint = Parameters<typeof mintSharedKey>[0];

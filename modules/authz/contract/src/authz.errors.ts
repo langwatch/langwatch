@@ -297,7 +297,12 @@ export class AuthzGrantNotConfirmedError extends HandledError {
     super(
       "authz_grant_not_confirmed",
       "Your access change is still processing. Refresh to check its status before trying again.",
-      { httpStatus: 503, fault: "platform", retryable },
+      {
+        httpStatus: 503,
+        fault: "platform",
+        retryable,
+        ...(retryAfterMs === undefined ? {} : { meta: { retryAfterMs } }),
+      },
     );
     this.name = "AuthzGrantNotConfirmedError";
     this.retryAfterMs = retryAfterMs;

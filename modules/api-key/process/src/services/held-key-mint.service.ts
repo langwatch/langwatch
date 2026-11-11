@@ -5,8 +5,7 @@ import type { SharedCredentialStore } from "@langwatch/secrets/shared-credential
 import { Temporal, nowInstant } from "@langwatch/time";
 
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
-import type { ApiKeyService } from "./api-key.service.ts";
-import { mintSharedKey } from "./shared-key-mint.ts";
+import { mintSharedKey, type SharedKeyWriter } from "./shared-key-mint.service.ts";
 
 /**
  * How long a retry should wait after a held key's grant did not land. A try can wait twice (the
@@ -15,22 +14,18 @@ import { mintSharedKey } from "./shared-key-mint.ts";
  */
 export const HELD_KEY_GRANT_RETRY_AFTER_MS = 40_000;
 
-type HeldKeyWriter = Pick<ApiKeyService, "writeDisabled" | "reopenDisabled"> & {
-  grantAndActivate(key: Parameters<ApiKeyService["grantAndActivate"]>[0]): Promise<{
-    token: string;
-  }>;
-};
+/** A held key with less life left than this is minted over, never handed out about to lapse. */
+const HELD_KEY_MIN_REMAINING_MS = 60_000;
 
 /**
- * `create` for a caller that is retried: the key is written once per `holdKey`, shared sealed
- * before its grants fold, and every retry grants that same key again instead of writing another
- * (the run-key pattern, ARCHITECTURE.md §7/§10). A key whose grants have not landed throws a
- * retryable `AuthzGrantNotConfirmedError` carrying the pace to retry at.
+ * `create` for a caller that is retried: the key is written once per `holdKey` and every retry
+ * grants that same key again. A grant that has not landed throws a retryable
+ * `AuthzGrantNotConfirmedError` carrying the pace to retry at.
  */
 export class HeldKeyMintService {
   static create(options: {
-    apiKeys: HeldKeyWriter;
-    keys: Pick<ApiKeyRepository, "findById">;
+    apiKeys: SharedKeyWriter;
+    keys: Pick<ApiKeyRepository, "findLivenessById" | "findById">;
     held: SharedCredentialStore;
   }): HeldKeyMintService {
     return new HeldKeyMintService(options);
@@ -38,8 +33,8 @@ export class HeldKeyMintService {
 
   private constructor(
     private readonly options: {
-      apiKeys: HeldKeyWriter;
-      keys: Pick<ApiKeyRepository, "findById">;
+      apiKeys: SharedKeyWriter;
+      keys: Pick<ApiKeyRepository, "findLivenessById" | "findById">;
       held: SharedCredentialStore;
     },
   ) {}
@@ -60,15 +55,20 @@ export class HeldKeyMintService {
       identity: identityOf(key),
       newExpiresAt: () => Temporal.Instant.fromEpochMilliseconds(key.expiresAt.getTime()),
       keyFor: () => key,
-      reusable: ({ expiresAtMs }) => expiresAtMs > nowInstant().epochMilliseconds,
+      reusable: ({ expiresAtMs }) =>
+        expiresAtMs - nowInstant().epochMilliseconds >= HELD_KEY_MIN_REMAINING_MS,
       isLive: async (apiKeyId) => {
-        const row = await keys.findById({ id: apiKeyId });
+        const row = await keys.findLivenessById({ id: apiKeyId });
         return (
           row !== null &&
           row.revokedAt === null &&
-          (row.expiresAt === null ||
-            row.expiresAt.epochMilliseconds > nowInstant().epochMilliseconds)
+          (row.expiresAt === null || Temporal.Instant.compare(row.expiresAt, nowInstant()) > 0)
         );
+      },
+      // A row written disabled has no revocation cause; one with a cause was revoked on purpose.
+      isPending: async (apiKeyId) => {
+        const row = await keys.findById({ id: apiKeyId });
+        return row !== null && row.revocationCause === null;
       },
       retryAfterMs: HELD_KEY_GRANT_RETRY_AFTER_MS,
     });

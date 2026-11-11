@@ -933,21 +933,29 @@ describe("given a turn that does not end with an answer", () => {
 
   /** @scenario "A run that cannot start is retried, then recorded on the last attempt" */
   it("throws a start failure for the retry with no outcome, then records it on the last attempt", async () => {
-    installed.world.langy.startError = new Error("langy is down");
+    installed.world.langy.startError = Object.assign(new Error("langy is down"), {
+      code: "langy_down",
+    });
     const { payload } = await request();
 
-    await expect(installed.carryOut(payload, { attempt: 1 })).rejects.toThrow("langy is down");
-    await expect(installed.carryOut(payload, { attempt: 2 })).rejects.toThrow("langy is down");
+    await expect(installed.carryOut(payload, { attempt: 1 })).rejects.toMatchObject({
+      code: "langy_down",
+    });
+    await expect(installed.carryOut(payload, { attempt: 2 })).rejects.toMatchObject({
+      code: "langy_down",
+    });
 
     expect(await installed.runEventsOf()).toEqual([RUN_REQUESTED]);
     expect(await runsOf()).toEqual([]);
 
-    await expect(installed.carryOut(payload, { attempt: 3 })).rejects.toThrow("langy is down");
+    await expect(installed.carryOut(payload, { attempt: 3 })).rejects.toMatchObject({
+      code: "langy_down",
+    });
     expect(await runsOf()).toEqual([]);
 
     await expect(
       installed.carryOut(payload, { attempt: INSIGHT_DAILY_RUN_MAX_ATTEMPTS }),
-    ).rejects.toThrow("langy is down");
+    ).rejects.toMatchObject({ code: "langy_down" });
 
     expect(await lastRunOf()).toMatchObject({
       outcome: "failed",

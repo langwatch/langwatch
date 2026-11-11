@@ -126,7 +126,7 @@ async function readyOf(
   values: string[],
   isReady: (value: string) => boolean | Promise<boolean> = always,
 ): Promise<string[]> {
-  const verdicts = await Promise.all(values.map(isReady));
+  const verdicts = await Promise.all(values.map(async (value) => isReady(value)));
   return values.filter((_, index) => verdicts[index]);
 }
 
