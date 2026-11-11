@@ -1120,14 +1120,21 @@ function registerSimulationRunTools(server: McpServer): void {
 function registerEvaluatorTools(server: McpServer): void {
   server.tool(
     "platform_create_evaluator",
-    `Create an evaluator on the LangWatch platform. Useful for setting up LLM-as-judge and other evaluators to use in evaluation notebooks. Call discover_schema({ category: 'evaluators' }) first to see available evaluator types and their settings.`,
+    `Create an evaluator on the LangWatch platform: a built-in one (LLM-as-judge and others), a custom Python code evaluator, or one that wraps a workflow. For a built-in one, call discover_schema({ category: 'evaluators' }) first to see available evaluator types and their settings.`,
     {
       name: z.string().describe("Evaluator name"),
+      type: z
+        .enum(["evaluator", "code", "workflow"])
+        .optional()
+        .describe(
+          'The kind of evaluator: "evaluator" (default, a built-in type), "code" (a custom Python evaluator) or "workflow" (wraps workflowId).',
+        ),
       config: z
         .record(z.string(), z.unknown())
         .describe(
-          'Evaluator config object. Must include "evaluatorType" (e.g. "langevals/llm_boolean") and optional "settings" overrides.',
+          'For a built-in evaluator: "evaluatorType" (e.g. "langevals/llm_boolean") and optional "settings" overrides. For type "code": "code" (a Python class Code with __call__) and "inputs" ([{ identifier, type }]). For type "workflow": {}.',
         ),
+      workflowId: z.string().optional().describe('The workflow a "workflow" evaluator wraps.'),
     },
     withToolLogging("platform_create_evaluator", async (params) => {
       requireApiKey();

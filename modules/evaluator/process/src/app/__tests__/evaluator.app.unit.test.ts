@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  */
-import { newEvaluatorId } from "@langwatch/evaluator-contract";
+import { codeEvaluatorOutputFields, newEvaluatorId } from "@langwatch/evaluator-contract";
 import { ModelNotConfiguredError, type ModelProviderApi } from "@langwatch/model-provider-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -335,6 +335,73 @@ describe("EvaluatorModule", () => {
           config: { evaluatorType: "ragas/faithfulness" },
         }),
       ).rejects.toThrow("the model provider registry is unreachable");
+    });
+  });
+
+  describe("when the public API creates a code evaluator", () => {
+    const program = {
+      code: "class Code:\n    def __call__(self, output: str):\n        return {}\n",
+      inputs: [{ identifier: "output", type: "str" }],
+    };
+    const apiKey = { type: "api_key", id: "project-key-1" } as const;
+
+    /** @scenario A code evaluator created through the API is stored like one the editor saved */
+    it("stores it as the editor does, with the fixed result fields and a first version", async () => {
+      const { app, modelProviders } = harness();
+      const resolveModelForFeature = vi.spyOn(modelProviders, "resolveModelForFeature");
+
+      const created = await app.createWithResolvedDefaults({
+        projectId: "project-1",
+        name: "Exact",
+        type: "code",
+        config: program,
+        caller: apiKey,
+      });
+
+      expect(created).toMatchObject({
+        type: "code",
+        config: { ...program, outputs: codeEvaluatorOutputFields.map((field) => ({ ...field })) },
+      });
+      expect(resolveModelForFeature).not.toHaveBeenCalled();
+      const { versions } = await app.listVersions({
+        projectId: "project-1",
+        evaluatorId: created.id,
+      });
+      expect(versions.map((row) => [row.version, row.authorKind])).toEqual([[1, "api_key"]]);
+    });
+
+    /** @scenario A code evaluator created through the API is stored like one the editor saved */
+    it("still refuses a config that carries no program", async () => {
+      const { app, repository } = harness();
+      const create = vi.spyOn(repository, "create");
+
+      await expect(
+        app.createWithResolvedDefaults({
+          projectId: "project-1",
+          name: "Broken",
+          type: "code",
+          config: { inputs: program.inputs },
+        }),
+      ).rejects.toMatchObject({ code: "evaluator_config_invalid" });
+      expect(create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the public API creates a workflow evaluator", () => {
+    it("links it to the workflow without resolving a model", async () => {
+      const { app, modelProviders } = harness();
+      const resolveModelForFeature = vi.spyOn(modelProviders, "resolveModelForFeature");
+
+      const created = await app.createWithResolvedDefaults({
+        projectId: "project-1",
+        name: "Judge",
+        type: "workflow",
+        config: {},
+        workflowId: "workflow-1",
+      });
+
+      expect(created).toMatchObject({ type: "workflow", workflowId: "workflow-1" });
+      expect(resolveModelForFeature).not.toHaveBeenCalled();
     });
   });
 

@@ -29,6 +29,7 @@ import {
   type EvaluatorServerConfig,
   type EvaluatorResultAugmentationInput,
   type EvaluatorSyncFromSourceResult,
+  type EvaluatorType,
   type EvaluatorUpdateInput,
   type EvaluatorWithFields,
   type EvaluatorWorkflowFields,
@@ -42,6 +43,7 @@ import {
   type EvaluatorVersionSelector,
   type RemoveEvaluatorLabelInput,
   parseEvaluatorAddress,
+  withCodeEvaluatorOutputFields,
 } from "@langwatch/evaluator-contract";
 import { preconditionMatchInputSchema } from "@langwatch/evaluator-contract/evaluation-types";
 import { ValidationError } from "@langwatch/handled-error";
@@ -503,18 +505,32 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
   }
 
   /**
-   * Creates an evaluator against the project's resolved models: the public API
-   * names a config but no model, so `evaluator.create_default` is what it runs
-   * on. The embeddings model is optional where the default model is not.
+   * Creates an evaluator for the public API. A built-in one runs on the project's
+   * resolved models, the embeddings model optional where the default is not; a code
+   * or workflow one needs no model and is stored exactly as the editor stores it.
    */
   async createWithResolvedDefaults(input: {
     projectId: string;
     name: string;
+    type?: EvaluatorType;
     config: EvaluatorConfig;
+    workflowId?: string;
     id?: string;
     caller?: EvaluatorCaller;
   }): Promise<Evaluator> {
     await this.#dependencies.creationCaps.assertCreationAllowed({ projectId: input.projectId });
+    const type = input.type ?? "evaluator";
+    if (type !== "evaluator") {
+      return this.#createGuarded({
+        id: input.id ?? newEvaluatorId(),
+        projectId: input.projectId,
+        name: input.name,
+        type,
+        config: type === "code" ? withCodeEvaluatorOutputFields(input.config) : input.config,
+        ...(input.workflowId !== void 0 && { workflowId: input.workflowId }),
+        caller: input.caller,
+      });
+    }
     const [resolvedDefault, resolvedEmbedding] = await Promise.all([
       this.#dependencies.modelProviders.resolveModelForFeature({
         projectId: input.projectId,

@@ -1,3 +1,7 @@
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import chalk from "chalk";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
@@ -300,6 +304,73 @@ describe("createEvaluatorCommand()", () => {
       await expect(
         createEvaluatorCommand("My Eval", { type: "langevals/llm_boolean" }),
       ).rejects.toThrow(ProcessExitError);
+    });
+  });
+
+  describe("when a custom code evaluator is created from a file", () => {
+    const program = "class Code:\n    def __call__(self, output: str, expected_output: str):\n";
+    let codeFile: string;
+
+    beforeEach(() => {
+      codeFile = join(mkdtempSync(join(tmpdir(), "lw-code-eval-")), "check.py");
+      writeFileSync(codeFile, program);
+    });
+
+    /** @scenario The CLI creates a code evaluator from a Python file */
+    it("sends type code with the file's program and the declared inputs", async () => {
+      mockCreate.mockResolvedValue(makeEvaluator({ name: "Exact", type: "code" }));
+
+      await createEvaluatorCommand("Exact", {
+        code: codeFile,
+        input: ["output", "expected_output:str"],
+      });
+
+      expect(mockCreate).toHaveBeenCalledWith({
+        name: "Exact",
+        type: "code",
+        config: {
+          code: program,
+          inputs: [
+            { identifier: "output", type: "str" },
+            { identifier: "expected_output", type: "str" },
+          ],
+        },
+      });
+    });
+
+    /** @scenario The CLI creates a code evaluator from a Python file */
+    it("refuses without any input, before calling the API", async () => {
+      await expect(createEvaluatorCommand("Exact", { code: codeFile })).rejects.toThrow(
+        ProcessExitError,
+      );
+
+      expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    it("refuses a file it cannot read, before calling the API", async () => {
+      await expect(
+        createEvaluatorCommand("Exact", { code: `${codeFile}.missing`, input: ["output"] }),
+      ).rejects.toThrow(ProcessExitError);
+
+      expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    it("refuses both --type and --code together, before calling the API", async () => {
+      await expect(
+        createEvaluatorCommand("Exact", {
+          type: "langevals/exact_match",
+          code: codeFile,
+          input: ["output"],
+        }),
+      ).rejects.toThrow(ProcessExitError);
+
+      expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    it("refuses neither --type nor --code, before calling the API", async () => {
+      await expect(createEvaluatorCommand("Exact", {})).rejects.toThrow(ProcessExitError);
+
+      expect(mockCreate).not.toHaveBeenCalled();
     });
   });
 });
