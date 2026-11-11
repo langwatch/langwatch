@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -543,9 +544,9 @@ func (s *Server) createMeterEvent(_ *http.Request, p params) (any, error) {
 	if payload == nil {
 		return nil, missingParam("payload")
 	}
-	value, err := strconv.ParseInt(payload.str("value"), 10, 64)
-	if err != nil {
-		return nil, invalid("payload[value]", "The value %q in payload[value] must be a whole number.", payload.str("value"))
+	value, err := strconv.ParseFloat(payload.str("value"), 64)
+	if err != nil || math.IsInf(value, 0) || math.IsNaN(value) {
+		return nil, invalid("payload[value]", "The value in the event payload must be a number. Received %q.", payload.str("value"))
 	}
 	now := s.now()
 	ts := now.Unix()

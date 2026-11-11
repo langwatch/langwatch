@@ -3,8 +3,11 @@ package paymentsim
 import (
 	"encoding/json"
 	"fmt"
+	"math"
+	"math/big"
 	"net/http"
 	"reflect"
+	"strconv"
 	"time"
 )
 
@@ -79,17 +82,38 @@ func orZero(n *int64) int64 {
 }
 
 // usage sums a customer's meter events for eventName in [from, to).
-func (s *Server) usage(eventName, customer string, from, to int64) int64 {
-	var total int64
+func (s *Server) usage(eventName, customer string, from, to int64) float64 {
+	var total float64
 	for _, e := range s.st.meterEvents {
 		if e.EventName == eventName && e.Customer == customer && e.Timestamp >= from && e.Timestamp < to {
-			total += e.Value
+			total = addDecimal(total, e.Value)
 		}
 	}
 	return total
 }
 
-func (s *Server) meteredUsage(p *Price, customer string, from, to int64) int64 {
+// addDecimal adds two meter values as the decimals they were sent as, the way
+// Stripe sums them: 0.0001 + 1.1233 is 1.1234, not its float neighbour.
+func addDecimal(a, b float64) float64 {
+	x, _ := new(big.Rat).SetString(strconv.FormatFloat(a, 'g', -1, 64))
+	y, _ := new(big.Rat).SetString(strconv.FormatFloat(b, 'g', -1, 64))
+	sum, _ := x.Add(x, y).Float64()
+	return sum
+}
+
+// meteredAmount prices decimal usage: a per-unit price bills it exactly, rounded to
+// the cent; tiers bill whole units.
+func meteredAmount(p *Price, used float64) int64 {
+	if p.BillingScheme != "tiered" {
+		if p.UnitAmount == nil {
+			return 0
+		}
+		return int64(math.Round(float64(*p.UnitAmount) * used))
+	}
+	return amountFor(p, int64(math.Round(used)))
+}
+
+func (s *Server) meteredUsage(p *Price, customer string, from, to int64) float64 {
 	if p.Recurring == nil || p.Recurring.Meter == nil {
 		return 0
 	}
@@ -217,12 +241,14 @@ func (s *Server) billPeriod(sub *Subscription, reason string, start, end, usedFr
 	inv := s.draftInvoice(sub.Customer, sub.Currency, sub.CollectionMethod, sub.DaysUntilDue, map[string]string{})
 	inv.BillingReason, inv.Subscription, inv.PeriodStart, inv.PeriodEnd = reason, ptr(sub.ID), start, end
 	for _, it := range sub.Items.Data {
-		qty, period := orZero(it.Quantity), Period{Start: start, End: end}
-		if isMetered(it.Price) {
-			qty, period = s.meteredUsage(s.st.price(it.Price.ID), sub.Customer, usedFrom, usedTo), Period{Start: usedFrom, End: usedTo}
-		}
 		full := s.st.price(it.Price.ID)
-		s.addLine(inv, &Line{Amount: amountFor(full, qty), Price: it.Price, Quantity: ptr(qty), Period: period, Subscription: ptr(sub.ID), Type: "subscription"})
+		qty, period := orZero(it.Quantity), Period{Start: start, End: end}
+		amount := amountFor(full, qty)
+		if isMetered(it.Price) {
+			used := s.meteredUsage(full, sub.Customer, usedFrom, usedTo)
+			qty, amount, period = int64(math.Round(used)), meteredAmount(full, used), Period{Start: usedFrom, End: usedTo}
+		}
+		s.addLine(inv, &Line{Amount: amount, Price: it.Price, Quantity: ptr(qty), Period: period, Subscription: ptr(sub.ID), Type: "subscription"})
 	}
 	sub.LatestInvoice = ptr(inv.ID)
 	s.finalize(inv)

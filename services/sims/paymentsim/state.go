@@ -245,11 +245,11 @@ type Meter struct {
 
 // meterEvent is one accepted meter event.
 type meterEvent struct {
-	EventName  string `json:"event_name"`
-	Identifier string `json:"identifier"`
-	Customer   string `json:"customer"`
-	Value      int64  `json:"value"`
-	Timestamp  int64  `json:"timestamp"`
+	EventName  string  `json:"event_name"`
+	Identifier string  `json:"identifier"`
+	Customer   string  `json:"customer"`
+	Value      float64 `json:"value"`
+	Timestamp  int64   `json:"timestamp"`
 }
 
 // idem is one remembered idempotent answer.
@@ -463,8 +463,9 @@ type catalogFile struct {
 
 // catalogMeterEvents names the event each catalog meter counts; the file holds ids only.
 var catalogMeterEvents = map[string]string{
-	"BILLABLE_EVENTS":  "langwatch_billable_events",
-	"INSTANT_EVAL_USD": "langwatch_instant_eval_usd",
+	"BILLABLE_EVENTS":   "langwatch_billable_events",
+	"INSTANT_EVAL_USD":  "langwatch_instant_eval_usd",
+	"PII_REDACTION_USD": "langwatch_pii_redaction_usd",
 }
 
 // catalogMetered are priced per unit yet metered; the file does not say so.

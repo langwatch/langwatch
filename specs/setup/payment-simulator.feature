@@ -120,6 +120,22 @@ Feature: paymentsim, a local stand-in for Stripe
       Then the control API's usage totals give their exact sum and count
 
     @unit
+    Scenario: A meter event value may be a decimal, as in Stripe
+      When billing sends meter events of 0.0001 and 1.1233 for a customer
+      Then the control API's usage total and the event summary give exactly 1.1234
+
+    @unit
+    Scenario: A meter event value that is not a number is refused
+      When a meter event carries the value "0,0001"
+      Then paymentsim answers 400 saying the value must be a number
+
+    @unit
+    Scenario: Decimal usage on a per-unit price bills to the cent
+      Given a metered price of 100 cents per unit
+      When the period's usage totals 1.1234 units
+      Then the renewal invoice line for that price is 112 cents
+
+    @unit
     Scenario: A repeated meter event identifier is refused
       When a meter event reuses an identifier
       Then paymentsim answers 400 with code resource_already_exists

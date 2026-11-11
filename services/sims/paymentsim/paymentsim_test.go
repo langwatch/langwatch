@@ -383,6 +383,50 @@ func TestCancelAtPeriodEnd(t *testing.T) {
 	}
 }
 
+// @scenario "A meter event value may be a decimal, as in Stripe"
+// @scenario "A meter event value that is not a number is refused"
+func TestMeterDecimalValues(t *testing.T) {
+	g := newRig(t)
+	for i, v := range []string{"0.0001", "1.1233"} {
+		status, out := g.stripe(http.MethodPost, "/v1/billing/meter_events", "event_name=langwatch_billable_events&payload[stripe_customer_id]=cus_d&payload[value]="+v+"&identifier=d"+strconv.Itoa(i))
+		if status != http.StatusOK {
+			t.Fatalf("value %s: %d %v", v, status, out)
+		}
+	}
+	_, usage := g.control(http.MethodGet, "/_sim/api/usage?customer=cus_d", "")
+	if v := usage["totals"].([]any)[0].(map[string]any)["value"].(float64); v != 1.1234 {
+		t.Fatalf("usage total %v", v)
+	}
+	start := epoch.Unix() - 3600
+	_, sums := g.stripe(http.MethodGet, "/v1/billing/meters/"+eventsMtr+"/event_summaries", "customer=cus_d&start_time="+strconv.FormatInt(start, 10)+"&end_time="+strconv.FormatInt(start+7200, 10))
+	if v := sums["data"].([]any)[0].(map[string]any)["aggregated_value"].(float64); v != 1.1234 {
+		t.Fatalf("aggregated %v", v)
+	}
+	status, out := g.stripe(http.MethodPost, "/v1/billing/meter_events", "event_name=langwatch_billable_events&payload[stripe_customer_id]=cus_d&payload[value]=0,0001&identifier=comma")
+	if status != http.StatusBadRequest || !strings.Contains(out["error"].(map[string]any)["message"].(string), "must be a number") {
+		t.Fatalf("comma value answered %d %v", status, out)
+	}
+}
+
+// @scenario "Decimal usage on a per-unit price bills to the cent"
+func TestDecimalUsageBillsToTheCent(t *testing.T) {
+	g := newRig(t)
+	g.control(http.MethodPost, "/_sim/api/prices", `{"id":"price_1T8nfzIMsTw08cudahMR8H7U","product":"prod_U09JyXm95Yad65","currency":"usd","interval":"month","usage_type":"metered","meter":"`+eventsMtr+`","unit_amount":100}`)
+	cus, subID := g.subscribe(2)
+	for i, v := range []string{"0.0001", "1.1233"} {
+		if status, out := g.stripe(http.MethodPost, "/v1/billing/meter_events", "event_name=langwatch_billable_events&payload[stripe_customer_id]="+cus+"&payload[value]="+v+"&identifier=c"+strconv.Itoa(i)); status != http.StatusOK {
+			t.Fatalf("%d %v", status, out)
+		}
+	}
+	g.control(http.MethodPost, "/_sim/api/clock/advance", `{"seconds":2764800}`)
+	_, list := g.stripe(http.MethodGet, "/v1/invoices", "subscription="+subID+"&limit=1")
+	inv := list["data"].([]any)[0].(map[string]any)
+	// 2 seats x 3200 + 1.1234 units x 100, to the cent
+	if inv["billing_reason"] != "subscription_cycle" || inv["total"].(float64) != 6400+112 {
+		t.Fatalf("renewal invoice %v", inv)
+	}
+}
+
 // @scenario "A repeated meter event identifier is refused"
 // @scenario "Event summaries need minute-aligned windows"
 func TestMeterRules(t *testing.T) {
