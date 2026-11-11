@@ -58,6 +58,12 @@ export interface NurturingMilestonesRepository {
   ): Promise<NurturingOrganizationCounts[]>;
 }
 
+/** The admin an organization's row names, which an account's erasure takes back. */
+export interface NurturingOrganizationAdminRepository {
+  /** Clears the user as admin of every organization naming them; none named is a no-op. */
+  forgetAdmin(input: Readonly<{ adminUserId: string }>): Promise<void>;
+}
+
 /** The organization's latest trace, the one fact of it a person joining later must be told. */
 export interface NurturingTraceMilestonesRepository {
   /** Moves the time forward only; a late trace or an organization never learned changes nothing. */

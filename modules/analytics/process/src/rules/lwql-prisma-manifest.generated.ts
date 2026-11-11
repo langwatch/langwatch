@@ -1979,6 +1979,15 @@ export interface LwqlPrismaRows {
     readonly appendedAt: "DateTime";
     readonly createdAt: "DateTime";
   };
+  readonly NurturingPersonalProject: {
+    readonly projectId: "String";
+    readonly organizationId: "String";
+    readonly ownerUserId: "String";
+  };
+  readonly NurturingTracedProject: {
+    readonly projectId: "String";
+    readonly organizationId: "String";
+  };
   readonly BillingMeterCheckpoint: {
     readonly id: "String";
     readonly organizationId: "String";

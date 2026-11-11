@@ -18,6 +18,8 @@ export interface NurturingOrganizationMemberRepository {
       at: number;
     }>,
   ): Promise<void>;
+  /** Deletes every membership of an erased account, in every organization. */
+  forgetMember(input: Readonly<{ userId: string }>): Promise<void>;
   /** Every membership, of any organization, of the people with one in `organizationId`. */
   findMembershipsOfMembers(
     input: Readonly<{ organizationId: string }>,

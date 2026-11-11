@@ -5,6 +5,9 @@ import {
   MONTH_TRACE_IDS_LISTED_EVENT_TYPE,
   monthTraceIdsListedEventDataSchema,
   TRACE_FAILED_EVENT_TYPE,
+  PROJECT_TRACED_EVENT_TYPE,
+  PROJECT_TRACED_EVENT_VERSION,
+  projectTracedEventDataSchema,
   TRACE_RECEIVED_EVENT_TYPE,
   traceFailedEventDataSchema,
   traceReceivedEventDataSchema,
@@ -20,6 +23,7 @@ export const RECORD_FIRST_TRACE_COMMAND_TYPE = "lw.trace.record_first_trace" as 
 export const RECORD_TRACE_RECEIVED_COMMAND_TYPE = "lw.trace.record_trace_received" as const;
 export const RECORD_MONTH_TRACE_IDS_COMMAND_TYPE = "lw.trace.record_month_trace_ids" as const;
 export const RECORD_TRACE_FAILED_COMMAND_TYPE = "lw.trace.record_trace_failed" as const;
+export const RECORD_PROJECT_TRACED_COMMAND_TYPE = "lw.trace.record_project_traced" as const;
 
 export const recordFirstTraceCommandDataSchema = firstTraceRecordedEventDataSchema;
 export type RecordFirstTraceCommandData = z.infer<typeof recordFirstTraceCommandDataSchema>;
@@ -32,6 +36,8 @@ export type RecordMonthTraceIdsCommandData = z.infer<typeof recordMonthTraceIdsC
 
 export const recordTraceFailedCommandDataSchema = traceFailedEventDataSchema;
 export type RecordTraceFailedCommandData = z.infer<typeof recordTraceFailedCommandDataSchema>;
+export const recordProjectTracedCommandDataSchema = projectTracedEventDataSchema;
+export type RecordProjectTracedCommandData = z.infer<typeof recordProjectTracedCommandDataSchema>;
 
 const event = <Type extends string, Data extends z.ZodTypeAny>(type: Type, data: Data) =>
   z.object({
@@ -61,3 +67,10 @@ export const traceFailedEventSchema = event(
   recordTraceFailedCommandDataSchema,
 );
 export type TraceFailedEvent = z.infer<typeof traceFailedEventSchema>;
+export const projectTracedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(PROJECT_TRACED_EVENT_TYPE),
+  version: z.literal(PROJECT_TRACED_EVENT_VERSION),
+  data: recordProjectTracedCommandDataSchema,
+});
+export type ProjectTracedEvent = z.infer<typeof projectTracedEventSchema>;

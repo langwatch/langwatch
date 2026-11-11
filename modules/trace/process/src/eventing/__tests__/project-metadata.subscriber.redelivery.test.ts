@@ -36,7 +36,8 @@ function makeProjectStore(initial: { firstMessage: boolean; integrated: boolean 
         writes.push(data);
         Object.assign(project, data);
       },
-      resolveOrgAdmin: async () => ({ userId: "user-1" }),
+      resolveOrgAdmin: async () => ({ userId: "user-1", organizationId: "org-1" }),
+      findOrganizationId: async () => "org-1",
     },
   };
 }
@@ -94,6 +95,23 @@ describe("given a project receiving its first real trace", () => {
       expect(
         recordSignal.mock.calls.filter(([signal]) => signal.recorded === "traceReceived"),
       ).toHaveLength(1);
+    });
+
+    /** @scenario "A redelivered first trace records the project as traced once" */
+    it("records the project as traced once, keyed by the project", async () => {
+      expect(
+        recordSignal.mock.calls.filter(([signal]) => signal.recorded === "projectTraced"),
+      ).toEqual([
+        [
+          {
+            recorded: "projectTraced",
+            tenantId: TENANT_ID,
+            projectId: TENANT_ID,
+            organizationId: "org-1",
+            occurredAt: event.occurredAt,
+          },
+        ],
+      ]);
     });
 
     it("writes the metadata once, because the second delivery finds it set", async () => {

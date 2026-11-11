@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { PrismaRepository } from "@langwatch/prisma-client";
+import { PrismaRepository, skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type {
@@ -58,6 +58,14 @@ export class PrismaNurturingOrganizationMemberRepository
         "leftAt" = GREATEST(known."leftAt", EXCLUDED."leftAt"),
         "returnedAt" = GREATEST(known."returnedAt", EXCLUDED."returnedAt")
     `;
+  }
+
+  async forgetMember({ userId }: Readonly<{ userId: string }>): Promise<void> {
+    await this.#database.$executeRaw`${skipTenantCheck({
+      // An erased account is a member of no organization: its rows go by user, in every one.
+      SKIP_TENANT_CHECK: true,
+    })}
+      DELETE FROM "NurturingOrganizationMember" WHERE "userId" = ${userId}`;
   }
 
   async findMembershipsOfMembers({

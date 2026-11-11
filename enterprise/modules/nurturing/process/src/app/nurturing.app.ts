@@ -7,6 +7,7 @@ import {
   type NurturingSignal,
 } from "@langwatch/enterprise-nurturing-contract";
 import type { EventingCommands } from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { nowInstant } from "@langwatch/time";
@@ -20,6 +21,8 @@ import { NurturingDeliveryService } from "../services/nurturing-delivery.service
 import { NurturingMemberFactsService } from "../services/nurturing-member-facts.service.ts";
 import { NurturingMilestonesService } from "../services/nurturing-milestones.service.ts";
 import { NurturingOrganizationUsageService } from "../services/nurturing-organization-usage.service.ts";
+import { NurturingProjectFactsService } from "../services/nurturing-project-facts.service.ts";
+import { NurturingUserErasureService } from "../services/nurturing-user-erasure.service.ts";
 import { NurturingService } from "../services/nurturing.service.ts";
 
 type NurturingSetup = FeatureSetup<
@@ -95,6 +98,16 @@ export class NurturingModule implements NurturingApi {
           clock: { nowMs: () => nowInstant().epochMilliseconds },
         })
       : void 0;
+    const projectFacts = NurturingProjectFactsService.create({
+      personalProjects: repositories.personalProjects,
+      tracedProjects: repositories.tracedProjects,
+      logger: createLogger("langwatch:nurturing:project-facts"),
+    });
+    const userErasure = NurturingUserErasureService.create({
+      personalProjects: repositories.personalProjects,
+      organizations: repositories.milestones,
+      members: repositories.members,
+    });
     return new NurturingModule(
       buildNurturingPipeline({
         deliver: (input) => delivery.deliver(input),
@@ -104,6 +117,9 @@ export class NurturingModule implements NurturingApi {
         evaluationsCompleted: (input) => milestones.evaluationsCompleted(input),
         simulationRunsFinished: (input) => milestones.simulationRunsFinished(input),
         codingSessionsStored: (input) => codingMilestones.sessionsStored(input),
+        recordPersonalOwner: (input) => projectFacts.recordPersonalOwner(input),
+        recordTracedProject: (input) => projectFacts.recordTracedProject(input),
+        forgetErasedUser: (input) => userErasure.forgetUser(input),
       }),
       organizationUsage,
     );

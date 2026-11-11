@@ -36,7 +36,10 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   lw.organization.invite_accepted or auth's lw.auth.sso_auto_added, a leave by
   lw.organization.member_removed or member_disabled, a return by member_enabled. Each keeps its
   latest time, so a redelivery or a late fact changes nothing; "joined last" is the latest join
-  time in the copy. A member who joined before the copy existed is not in it. A failed identify is reported and swallowed, as the
+  time in the copy. A member who joined before the copy existed is not in it. User's
+  lw.user.erased deletes every membership of the account (with the other rows naming it,
+  project-facts-copies.feature); a member fact delivered after the erasure writes a row again.
+  A failed identify is reported and swallowed, as the
   other sinks' failures are; the group call stands. A project's first trace syncs as later ones do. The
   signup day comes from its own copy of
   lw.organization.created. It reads no other module's table, and keeps no copy for projects or
@@ -280,6 +283,13 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     When nurturing takes them, in any order and any number of times
     Then the person is a current member when their latest join or return is after their latest leave
     And their latest organization is their current membership with the latest join
+
+  @unit
+  Scenario: An erased account leaves nurturing's member copy
+    Given nurturing's member copy holds user-1 in two organizations and user-2 in one
+    When user records user-1 erased, delivered twice
+    Then no membership names user-1, and user-2's stays
+    And neither Customer.io nor PostHog receives a request
 
   @unit
   Scenario: Each member of the organization gets its traits as person attributes

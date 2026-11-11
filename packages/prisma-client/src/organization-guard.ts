@@ -335,6 +335,14 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   NurturingProject: {
     extraBound: ({ clause }) => typeof clauseField(clause, "projectId") === "string",
   },
+  // Nurturing's copies of personal owners and traced projects: by the organization, which the
+  // base predicate admits, or by the project id, which belongs to exactly one organization.
+  NurturingPersonalProject: {
+    extraBound: ({ clause }) => typeof clauseField(clause, "projectId") === "string",
+  },
+  NurturingTracedProject: {
+    extraBound: ({ clause }) => typeof clauseField(clause, "projectId") === "string",
+  },
 };
 
 /**

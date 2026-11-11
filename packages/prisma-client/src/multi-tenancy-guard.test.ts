@@ -1569,7 +1569,7 @@ describe("guardOrganizationId — OrganizationUser", () => {
   });
 });
 
-describe("guardOrganizationId — nurturing's trace window sweep and member copy", () => {
+describe("guardOrganizationId: nurturing's trace window sweep and member copy", () => {
   const runOrganizationGuard = (params: GuardParams) =>
     guardOrganizationId(
       params,

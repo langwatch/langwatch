@@ -5196,6 +5196,22 @@ model NurturingProjectCountedTrace {
   @@index([day])
 }
 
+/// Nurturing's copy of each personal project's owner, from organization's and project's facts.
+/// The first owner recorded stays: a personal project's owner never changes.
+model NurturingPersonalProject {
+  projectId      String @id
+  organizationId String
+  ownerUserId    String
+}
+
+/// Nurturing's copy of each project that received a real trace, from trace's and project's facts.
+model NurturingTracedProject {
+  projectId      String @id
+  organizationId String
+
+  @@index([organizationId])
+}
+
 model BillingMeterCheckpoint {
   id                   String   @id @default(cuid())
   organizationId       String

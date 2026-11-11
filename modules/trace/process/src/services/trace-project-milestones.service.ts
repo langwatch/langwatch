@@ -6,6 +6,7 @@ import type {
   RecordTraceFailedCommandData,
   RecordTraceReceivedCommandData,
   RecordMonthTraceIdsCommandData,
+  RecordProjectTracedCommandData,
 } from "../eventing/trace-project-milestones.events.ts";
 
 type Sender<Data> = Pick<EventingCommandSender<Data>, "send">;
@@ -15,6 +16,7 @@ type TraceProjectMilestonesSenders = Readonly<{
   recordTraceReceived: Sender<RecordTraceReceivedCommandData>;
   recordMonthTraceIds: Sender<RecordMonthTraceIdsCommandData>;
   recordTraceFailed: Sender<RecordTraceFailedCommandData>;
+  recordProjectTraced: Sender<RecordProjectTracedCommandData>;
 }>;
 
 /** Records a project's trace milestones on trace's own pipeline; unbound, each refuses by name. */
@@ -45,6 +47,10 @@ export class TraceProjectMilestonesService {
 
   async recordTraceFailed(data: RecordTraceFailedCommandData): Promise<void> {
     await this.#connected().recordTraceFailed.send(data);
+  }
+
+  async recordProjectTraced(data: RecordProjectTracedCommandData): Promise<void> {
+    await this.#connected().recordProjectTraced.send(data);
   }
 
   #connected(): TraceProjectMilestonesSenders {

@@ -59,7 +59,10 @@ interface TraceProcessingPeers {
   >;
   featureFlags: FeatureFlagApi;
   modelProviders: Pick<ModelProviderApi, "listCosts">;
-  projects: Pick<ProjectApi, "findById" | "updateMetadata" | "resolveOrgAdmin">;
+  projects: Pick<
+    ProjectApi,
+    "findById" | "updateMetadata" | "resolveOrgAdmin" | "findOrganizationId"
+  >;
 }
 
 export interface TraceProcessingPipelineInput {

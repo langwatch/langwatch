@@ -40,6 +40,12 @@ export class MemoryNurturingOrganizationMemberRepository implements NurturingOrg
     this.#memberships.set(key, { ...known, [column]: Math.max(known[column] ?? at, at) });
   }
 
+  async forgetMember({ userId }: Readonly<{ userId: string }>): Promise<void> {
+    for (const [key, membership] of this.#memberships) {
+      if (membership.userId === userId) this.#memberships.delete(key);
+    }
+  }
+
   async findMembershipsOfMembers({
     organizationId,
   }: Readonly<{ organizationId: string }>): Promise<NurturingMembership[]> {

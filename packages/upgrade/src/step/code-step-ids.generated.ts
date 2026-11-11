@@ -46,6 +46,7 @@ export type CodeStepId =
   | "ops:fill-event-log-id-index"
   | "organization:record-presence-settings"
   | "project:record-created-facts"
+  | "project:list-personal-owner-and-first-message-facts"
   | "prompt:seed-tags-for-untagged-organizations"
   | "scenario:close-stalled-runs"
   | "scenario:fill-id-indexes"
