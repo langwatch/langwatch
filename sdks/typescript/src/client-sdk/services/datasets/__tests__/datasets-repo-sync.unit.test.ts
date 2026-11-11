@@ -9,7 +9,6 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { LangWatch } from "@/client-sdk";
 
-
 const ENDPOINT = "http://langwatch.test";
 
 const COLUMNS = [
