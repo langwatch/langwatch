@@ -406,7 +406,7 @@ var (
 		"specs/traces-v2/metrics.feature",
 		// Reason: left legacyInert when the blank-key refusal and the worker age
 		// cap were bound to Go tests. The older mint and revoke scenarios describe
-		// control-plane behaviour and stay untagged.
+		// what the control plane does and stay untagged.
 		"specs/langy/langy-session-key-lifecycle.feature",
 		"specs/features/analytics-cli.feature",
 		"specs/traces-v2/trace-drawer-shell.feature",
