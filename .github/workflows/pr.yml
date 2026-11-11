@@ -231,9 +231,8 @@ jobs:
             states=$(gh api --paginate "repos/$GITHUB_REPOSITORY/commits/$SHA/check-runs?per_page=100" \
               --jq '.check_runs[] | select(.name != "review") | if .status != "completed" then "pending" elif (.conclusion | IN("success", "skipped", "neutral")) then "ok" else "failed" end' | sort -u)
             if grep -qx failed <<<"$states"; then
-              echo "::notice::another check failed; no review for $SHA"
-              echo "proceed=false" >>"$GITHUB_OUTPUT"
-              exit 0
+              echo "::error::another check failed; fix it and push"
+              exit 1
             fi
             if ! grep -qx pending <<<"$states"; then
               echo "proceed=true" >>"$GITHUB_OUTPUT"

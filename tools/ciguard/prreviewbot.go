@@ -166,6 +166,10 @@ func prReviewBotWaitsForChecks(workflow *ciscan.Workflow) []string {
 			"%s step %q does not read the head commit's check-runs", PRReviewBotWorkflow, prReviewBotWaitStep))
 	}
 
+	if waits >= 0 {
+		problems = append(problems, prReviewBotFailureBranch(job.Steps[waits].Run)...)
+	}
+
 	for i := range job.Steps {
 		step := job.Steps[i]
 		if step.Uses != "" && !strings.Contains(step.If, prReviewBotProceedClause) {
@@ -175,6 +179,39 @@ func prReviewBotWaitsForChecks(workflow *ciscan.Workflow) []string {
 	}
 
 	return problems
+}
+
+// prReviewBotFailureMessage is what the wait step prints when another check
+// failed; it marks the start of the failure branch.
+const prReviewBotFailureMessage = "another check failed; fix it and push"
+
+// prReviewBotBranchEnd finds the `fi` closing the failure branch.
+var prReviewBotBranchEnd = regexp.MustCompile(`(?m)^\s*fi\b`)
+
+// prReviewBotNonZeroExit matches an `exit` with a non-zero status.
+var prReviewBotNonZeroExit = regexp.MustCompile(`\bexit [1-9]`)
+
+// prReviewBotFailureBranch checks the wait step cannot end green when another
+// check failed: a green-skipped `review` satisfies the required check, so a red
+// PR would look reviewed. The branch from the failure message to its `fi` must
+// exit non-zero and never `exit 0`.
+func prReviewBotFailureBranch(run string) []string {
+	_, rest, found := strings.Cut(run, prReviewBotFailureMessage)
+	if !found {
+		return []string{fmt.Sprintf(
+			"%s step %q does not print %q when another check failed",
+			PRReviewBotWorkflow, prReviewBotWaitStep, prReviewBotFailureMessage)}
+	}
+	if end := prReviewBotBranchEnd.FindStringIndex(rest); end != nil {
+		rest = rest[:end[0]]
+	}
+	if strings.Contains(rest, "exit 0") || !prReviewBotNonZeroExit.MatchString(rest) {
+		return []string{fmt.Sprintf(
+			"%s step %q can end green when another check failed (the failure branch must exit non-zero)",
+			PRReviewBotWorkflow, prReviewBotWaitStep)}
+	}
+
+	return nil
 }
 
 // prReviewBotTriggers checks the pull_request trigger fires on exactly the

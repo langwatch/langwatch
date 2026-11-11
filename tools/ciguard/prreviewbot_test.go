@@ -25,6 +25,16 @@ const prWorkflowPermissionsBlock = `permissions:
   contents: read
 `
 
+// prReviewBotWaitStep is the review job's wait step with its failure branch.
+const prReviewBotWaitStep = `      - id: wait-for-checks
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/check-runs"
+          if grep -qx failed <<<"$states"; then
+            echo "::error::another check failed; fix it and push"
+            exit 1
+          fi
+`
+
 // goodPRReviewBotWorkflow mirrors the review job of .github/workflows/pr.yml as
 // it stands when every invariant holds. Individual tests mutate one clause of
 // it at a time so each failure mode is isolated.
@@ -52,9 +62,7 @@ jobs:
       github.event.pull_request.draft == false
     runs-on: ubuntu-latest
 ` + prReviewBotPermissionsBlock + `    steps:
-      - id: wait-for-checks
-        run: gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/check-runs"
-      - if: steps.wait-for-checks.outputs.proceed == 'true'
+` + prReviewBotWaitStep + `      - if: steps.wait-for-checks.outputs.proceed == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
@@ -250,7 +258,7 @@ func TestPRReviewBotTriggersOnReadyForReview(t *testing.T) {
 
 // @scenario "The review waits for every other check on the head commit"
 func TestPRReviewBotWaitsForTheOtherChecks(t *testing.T) {
-	broken := strings.Replace(goodPRReviewBotWorkflow, "      - id: wait-for-checks\n        run: gh api \"repos/$GITHUB_REPOSITORY/commits/$SHA/check-runs\"\n", "", 1)
+	broken := strings.Replace(goodPRReviewBotWorkflow, prReviewBotWaitStep, "", 1)
 	root := writePRReviewBotWorkflow(t, broken)
 
 	problems, err := ciguard.PRReviewBot(root)
@@ -269,6 +277,30 @@ func TestPRReviewBotWaitReadsTheCheckRuns(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, problems)
 	assert.Contains(t, strings.Join(problems, "\n"), "does not read the head commit's check-runs")
+}
+
+// @scenario "a failed check fails the review job"
+func TestPRReviewBotWaitFailsTheJobWhenACheckFailed(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow, "            exit 1\n", "            exit 0\n", 1)
+	root := writePRReviewBotWorkflow(t, broken)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), "can end green when another check failed")
+}
+
+// @scenario "a failed check fails the review job"
+func TestPRReviewBotWaitPrintsTheFailureMessage(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow, "another check failed; fix it and push", "failed", 1)
+	root := writePRReviewBotWorkflow(t, broken)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), "does not print")
 }
 
 // @scenario "The review does not start when another check failed"

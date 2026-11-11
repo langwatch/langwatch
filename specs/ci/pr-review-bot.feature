@@ -71,6 +71,14 @@ Feature: PR Review Bot workflow
     Then the review steps are skipped
     And no review is posted to the PR
 
+  @unit
+  Scenario: a failed check fails the review job
+    Given CI passed and another workflow's check on the head commit failed
+    When the wait step reads the check runs
+    Then the wait step prints "another check failed; fix it and push"
+    And the wait step exits non-zero
+    And the review job ends red, never green-skipped
+
   # ============================================================================
   # Gating: Dependabot PRs
   # ============================================================================
