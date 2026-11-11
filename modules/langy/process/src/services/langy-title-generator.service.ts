@@ -71,9 +71,7 @@ export class LangyTitleGeneratorService {
   }
 
   /**
-   * Every failure but an unconfigured model throws, so the process outbox retries it. A title
-   * model stepped over from Codex is the other exception: if the cheap default fails too, the
-   * title stays unchanged, since retrying cannot change the outcome.
+   * Every failure but an unconfigured model throws, so the process outbox retries it.
    */
   async generate(input: {
     projectId: string;
@@ -89,10 +87,8 @@ export class LangyTitleGeneratorService {
       return UNCHANGED;
     }
 
-    let steppedOverCodex = false;
     try {
       const model = await this.titleModel(projectId);
-      steppedOverCodex = model.steppedOverCodex;
       const { text } = await this.deps.models.generateText({
         projectId,
         featureKey: LANGY_TITLE_FEATURE_KEY,
@@ -106,18 +102,6 @@ export class LangyTitleGeneratorService {
 
       return title ? { outcome: "generated", title, model: model.name } : UNCHANGED;
     } catch (error) {
-      if (steppedOverCodex) {
-        logger.warn(
-          {
-            projectId,
-            conversationId,
-            reason: error instanceof Error ? error.message : String(error),
-          },
-          "cheap default model failed after stepping over Codex for Langy titles; leaving title unchanged",
-        );
-
-        return UNCHANGED;
-      }
       if (!isModelNotConfigured(error)) throw error;
       logger.warn(
         { projectId, conversationId },
@@ -132,11 +116,7 @@ export class LangyTitleGeneratorService {
    * The project's model for titles, else the cheap default so titles work out of the box.
    * A Codex model is stepped over the same way: this process cannot execute Codex models.
    */
-  private async titleModel(projectId: string): Promise<{
-    name: string;
-    fallback: boolean;
-    steppedOverCodex: boolean;
-  }> {
+  private async titleModel(projectId: string): Promise<{ name: string; fallback: boolean }> {
     try {
       const resolved = await this.deps.models.resolveModelForFeature({
         projectId,
@@ -144,14 +124,14 @@ export class LangyTitleGeneratorService {
       });
 
       if (isCodexModel(resolved.model)) {
-        return { name: LANGY_TITLE_GENERATION.MODEL, fallback: true, steppedOverCodex: true };
+        return { name: LANGY_TITLE_GENERATION.MODEL, fallback: true };
       }
 
-      return { name: resolved.model, fallback: false, steppedOverCodex: false };
+      return { name: resolved.model, fallback: false };
     } catch (error) {
       if (!isModelNotConfigured(error)) throw error;
 
-      return { name: LANGY_TITLE_GENERATION.MODEL, fallback: true, steppedOverCodex: false };
+      return { name: LANGY_TITLE_GENERATION.MODEL, fallback: true };
     }
   }
 }

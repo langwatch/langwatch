@@ -1,8 +1,9 @@
 import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
-import type {
-  ModelDefaultResolveInput,
-  ModelProviderApi,
-  ModelProviderTextGenerationInput,
+import {
+  ModelNotConfiguredError,
+  type ModelDefaultResolveInput,
+  type ModelProviderApi,
+  type ModelProviderTextGenerationInput,
 } from "@langwatch/model-provider-contract";
 /**
  * @vitest-environment node
@@ -141,6 +142,7 @@ describe("given a conversation the customer never named", () => {
   describe("when the title model resolves to a Codex model", () => {
     const records = [{ role: "user" as const, content: "hello" }];
 
+    /** @scenario "A Codex title model falls back to the cheap default" */
     it("generates the title with the cheap default model instead", async () => {
       const { service, completions } = generatorOver({
         records,
@@ -157,11 +159,28 @@ describe("given a conversation the customer never named", () => {
       });
     });
 
-    it("leaves the title unchanged without throwing when the cheap default also fails", async () => {
+    /** @scenario "A Codex title model whose cheap default fails is retried" */
+    it("raises a cheap-default provider blip so the outbox retries it", async () => {
       const { service } = generatorOver({
         records,
         resolvedModel: "openai_codex/gpt-5.6-terra",
         generateFailure: new Error("provider down"),
+      });
+
+      await expect(service.generate(call)).rejects.toThrow("provider down");
+    });
+
+    /** @scenario "A Codex title model with no cheap default is not retried" */
+    it("leaves the title unchanged when the cheap default cannot be asked either", async () => {
+      const { service } = generatorOver({
+        records,
+        resolvedModel: "openai_codex/gpt-5.6-terra",
+        generateFailure: new ModelNotConfiguredError({
+          featureKey: "langy.conversation_title",
+          role: "FAST",
+          featureDisplayName: "Langy chat titles",
+          projectId: PROJECT_ID,
+        }),
       });
 
       await expect(service.generate(call)).resolves.toEqual({ outcome: "unchanged" });
