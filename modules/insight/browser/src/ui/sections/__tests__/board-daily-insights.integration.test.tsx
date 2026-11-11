@@ -1030,8 +1030,8 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
       },
     );
 
-    /** @scenario "The deadline read never answers: the spinner still ends at expiry" */
-    it("ends the spinner at expiry and says nothing, and a later hint shows the run only in the dropdown", async () => {
+    /** @scenario "The deadline read is replaced by a later hint's read" */
+    it("ends the spinner at expiry and says nothing, and a later hint's read then gives the verdict", async () => {
       let read: InsightDailyRunSetting | Promise<InsightDailyRunSetting> = ON;
       const board = openBoard({
         setting: () => read,
@@ -1054,9 +1054,13 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
       read = RUNNING;
       await board.readHint();
       expect(await waiting.findByText("A run is going.")).toBeInTheDocument();
+      // The hint's read replaces the one that never answered, so the owed verdict follows it.
+      await waitFor(() => expect(board.host.queries).toHaveLength(1));
+      await board.readHint();
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(board.host.queries).toEqual([{ langyConversation: "conversation-7" }]);
       expect(board.host.failures).toEqual([]);
       expect(board.host.notices).toEqual([]);
-      expect(board.host.queries).toEqual([]);
     });
 
     /** Opens a board whose deadline read is held until `answer` is called, with `shown`. */

@@ -1245,12 +1245,12 @@ Feature: The daily insights run
       And the member is not told the run could not be started
 
     @integration
-    Scenario: The deadline read never answers: the spinner still ends at expiry
+    Scenario: The deadline read is replaced by a later hint's read
       Given a board that is on, and the member chose Run now
       And the board has read no run for as long as a run can last
       When the deadline fires its read and that read never answers
       Then the spinner ends at expiry, and no failure, no notice and no Langy panel is shown
-      And a run is shown only in the dropdown, when a later hint brings it
+      And when a later hint's read replaces it and shows the run, Langy opens once on the run
 
     @integration
     Scenario: The deadline says the run could not be started when its last read finds none

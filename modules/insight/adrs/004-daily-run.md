@@ -234,8 +234,8 @@ shows neither within `INSIGHT_DAILY_RUN_EXPIRY_MS` is lost. The spinner ends at 
 read, and the browser reads the board once more. That read gives the verdict, and the verdict has no timer of its own:
 if it shows the requested run the wait ends as for any other read, opening Langy or telling
 how the run ended; if it shows none, or fails, the browser says the run could not be started;
-if it never answers, nothing is said and no panel opens, and a run shows only in the dropdown
-once a later hint brings it. An answer after the page is gone, the request is turned off or a
+if it never answers, nothing is said and no panel opens until a later hint's read, which
+replaces the stalled one, answers it: a run it shows then opens as above. An answer after the page is gone, the request is turned off or a
 newer request was made acts on nothing. While a run is in flight the
 dropdown offers to open it instead.
 
