@@ -309,6 +309,7 @@ describe("ttlReconciler", () => {
         "metric_series",
         "metric_time_rollups",
         "stored_spans",
+        "span_analytics",
         "trace_summaries",
         "trace_analytics",
         "trace_analytics_rollup",

@@ -79,6 +79,7 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
     const expectedTables = [
       "event_log",
       "stored_spans",
+      "span_analytics",
       "stored_log_records",
       "log_records",
       "metric_data_points",
