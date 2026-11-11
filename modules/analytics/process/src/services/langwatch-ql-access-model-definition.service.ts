@@ -134,7 +134,10 @@ export class LangWatchQLAccessModelDefinitionService {
 
   private constructor() {}
 
-  /** The tenant setting starts empty (zero rows, never all rows); everything else is `CONST`. */
+  /**
+   * The tenant setting starts empty (zero rows, never all rows), and the query log's comment is
+   * the executor's to set; everything else is `CONST`.
+   */
   profileSettings({
     names,
     limits = DEFAULT_LWQL_RESOURCE_LIMITS,
@@ -146,6 +149,7 @@ export class LangWatchQLAccessModelDefinitionService {
       quoted ? { name, value, quoted, constraint: "const" } : { name, value, constraint: "const" };
     return [
       { name: names.tenantSetting, value: "", quoted: true, constraint: "changeable_in_readonly" },
+      { name: "log_comment", value: "", quoted: true, constraint: "changeable_in_readonly" },
       constant("readonly", 1),
       constant("max_execution_time", limits.maxExecutionTimeSeconds),
       constant("max_memory_usage", limits.maxMemoryUsageBytes),
@@ -157,6 +161,12 @@ export class LangWatchQLAccessModelDefinitionService {
       constant("max_result_rows", limits.maxResultRows),
       constant("max_result_bytes", limits.maxResultBytes),
       constant("result_overflow_mode", "throw", true),
+      // The capability rides in each statement's SETTINGS clause; query_log never keeps it.
+      constant("log_query_settings", 0),
+      // Opt-in: no server default may turn a cache or introspection on for this identity.
+      constant("use_query_cache", 0),
+      constant("use_query_condition_cache", 0),
+      constant("allow_introspection_functions", 0),
     ];
   }
 
@@ -221,14 +231,16 @@ export class LangWatchQLAccessModelDefinitionService {
         `lwql provisioning: named collection port must be an integer, got ${namedCollection.port}`,
       );
     }
+    const values =
+      `host=${clickHouseLiteral(namedCollection.host)}, ` +
+      `port=${namedCollection.port}, ` +
+      `database=${clickHouseLiteral(namedCollection.database)}, ` +
+      `user=${clickHouseLiteral(namedCollection.user)}, ` +
+      `password=${clickHouseLiteral(namedCollection.password)}`;
+    // Never DROP: 26.8 refuses it while an engine table uses the collection (769), as ALTER is not.
     return [
-      `DROP NAMED COLLECTION IF EXISTS ${namedCollection.collection}`,
-      `CREATE NAMED COLLECTION ${namedCollection.collection} AS ` +
-        `host=${clickHouseLiteral(namedCollection.host)}, ` +
-        `port=${namedCollection.port}, ` +
-        `database=${clickHouseLiteral(namedCollection.database)}, ` +
-        `user=${clickHouseLiteral(namedCollection.user)}, ` +
-        `password=${clickHouseLiteral(namedCollection.password)}`,
+      `CREATE NAMED COLLECTION IF NOT EXISTS ${namedCollection.collection} AS ${values}`,
+      `ALTER NAMED COLLECTION ${namedCollection.collection} SET ${values}`,
     ];
   }
 

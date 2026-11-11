@@ -32,6 +32,11 @@ export interface InstantEvalPlanReader {
   isEnterprisePlan(organizationId: string): Promise<boolean>;
 }
 
+/** Whether LangWatch switched its hosted model off for the organization, whatever else says. */
+export interface InstantEvalHostedSwitchReader {
+  isHostedOff(input: { projectId: string; organizationId: string }): Promise<boolean>;
+}
+
 /** Whether the project's Instant Evals column is its own decision model, ready to run. */
 export interface InstantEvalOwnModelReader {
   runsOnOwnModel(input: { projectId: string }): Promise<boolean>;
@@ -46,6 +51,7 @@ export class InstantEvalAccessService {
   private readonly judge: Pick<InstantEvalJudgeChannel, "isAvailableForOrganization">;
   private readonly hostedPlans: InstantEvalPlanReader | null;
   private readonly ownModels: InstantEvalOwnModelReader | null;
+  private readonly hostedSwitch: InstantEvalHostedSwitchReader;
 
   private constructor(options: {
     flags: InstantEvalFlagReader;
@@ -56,6 +62,7 @@ export class InstantEvalAccessService {
     judge: Pick<InstantEvalJudgeChannel, "isAvailableForOrganization">;
     hostedPlans: InstantEvalPlanReader | null;
     ownModels: InstantEvalOwnModelReader | null;
+    hostedSwitch: InstantEvalHostedSwitchReader;
   }) {
     this.flags = options.flags;
     this.projects = options.projects;
@@ -65,6 +72,7 @@ export class InstantEvalAccessService {
     this.judge = options.judge;
     this.hostedPlans = options.hostedPlans;
     this.ownModels = options.ownModels;
+    this.hostedSwitch = options.hostedSwitch;
   }
 
   static create({
@@ -76,6 +84,7 @@ export class InstantEvalAccessService {
     judge = {},
     hostedPlans,
     ownModels = null,
+    hostedSwitch,
   }: {
     flags: InstantEvalFlagReader;
     projects: InstantEvalProjectReader;
@@ -100,6 +109,8 @@ export class InstantEvalAccessService {
      * The resolver answers "own" only under the own-model flag with a usable key (ADR-182).
      */
     ownModels?: InstantEvalOwnModelReader | null;
+    /** Required, so a forgotten wiring fails to compile instead of reaching the hosted model. */
+    hostedSwitch: InstantEvalHostedSwitchReader;
   }): InstantEvalAccessService {
     return new InstantEvalAccessService({
       flags,
@@ -110,6 +121,7 @@ export class InstantEvalAccessService {
       judge,
       hostedPlans,
       ownModels,
+      hostedSwitch,
     });
   }
 
@@ -146,9 +158,9 @@ export class InstantEvalAccessService {
   }
 
   /**
-   * Hosted: the flag for an enterprise organization, its own switch otherwise, so a switch thrown
-   * before an upgrade no longer counts. Judging through Connect: the license alone, never the
-   * flag. Elsewhere, a checkout judging with its own key, the flag.
+   * Never where LangWatch switched hosted off. Hosted: the flag for an enterprise organization, its
+   * own switch otherwise, so a switch thrown before an upgrade no longer counts. Judging through
+   * Connect: the license alone, never the flag. Elsewhere, a checkout with its own key, the flag.
    */
   private async releasedFor({
     projectId,
@@ -157,6 +169,12 @@ export class InstantEvalAccessService {
     projectId: string;
     organizationId: string | undefined;
   }): Promise<boolean> {
+    if (
+      organizationId !== undefined &&
+      (await this.hostedSwitch.isHostedOff({ projectId, organizationId }))
+    ) {
+      return false;
+    }
     if (this.hostedPlans) {
       if (organizationId === undefined) return false;
       if (await this.hostedPlans.isEnterprisePlan(organizationId)) {

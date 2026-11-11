@@ -87,7 +87,7 @@ export class LangWatchQLExecutionService {
   }: LangWatchQLExecutionInput): Promise<LangWatchQLQueryResult> {
     const { database, views } = this.deps;
     const { validation, granularity, memberWindows } = run;
-    const execution = await this.runRestricted(run);
+    const execution = await this.runRestricted({ ...run, projects });
     const hydrationStartedMs = this.deps.stopwatch();
     const answer = await this.deps.extraction.hydrate({
       projects: hydratableProjects({ projects, memberWindows }),
@@ -157,6 +157,7 @@ export class LangWatchQLExecutionService {
   /** The statement as the database runs it, refused when its rows outgrow `maxResultBytes`. */
   private async runRestricted({
     executor,
+    projects,
     sql,
     validation,
     granularity,
@@ -165,7 +166,7 @@ export class LangWatchQLExecutionService {
     timeWindow,
   }: Omit<
     LangWatchQLExecutionInput,
-    "projects" | "protections" | "signal"
+    "protections" | "signal" | "telemetry"
   >): Promise<LangWatchQLExecutionResult> {
     const { database, views, limits } = this.deps;
     // The resolved record plus the step this run was bucketed at, when the
@@ -189,6 +190,7 @@ export class LangWatchQLExecutionService {
       // granularity merge, so passing it drops `period_granularity_seconds`.
       ...(Object.keys(executionParameters).length > 0 ? { parameters: executionParameters } : {}),
       tenantCapability,
+      projectIds: projects.map(({ id }) => id),
     });
     // Refused rather than cut: a body that looks whole but is missing its tail is the worse
     // failure for an analytics caller. The row count is already bounded by the LIMIT above.
