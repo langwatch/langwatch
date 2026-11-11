@@ -22,9 +22,10 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   the batch fails and the queue retries it, until the copy lands, for five minutes of real time
   from when any worker first saw the project uncopied (the measured lag is seconds). That first
   sighting is a row nurturing keeps, so every worker shares the window and a restart does not open
-  a new one. Past the window the trace is dropped and the project is cached in a bounded
-  per-process set, so its later batches are dropped at once with no read and no retry. The copy
-  landing deletes the row and the process's cached drop, so the project's later traces count. A placed project whose organization has no creation copy belongs to an
+  a new one. Past the window the trace is dropped and the drop is cached in a bounded per-process
+  set for ten minutes, so its later batches are dropped at once with no read and no retry; once the
+  cached drop is older, the copy is read again. The copy landing deletes the row and that worker's
+  cached drop, so the project's later traces count; another worker counts them once its cache expires. A placed project whose organization has no creation copy belongs to an
   organization created before the copy existed: its traces are dropped at once, as such
   organizations get no trace traits. Nothing else is read. Rows are kept 30 days: inside its
   counting window no organization has an older one, so a sync deletes old rows only past it. No span body reaches nurturing, and the rows are not rebuilt by a projection replay.
@@ -200,8 +201,9 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     When its trace batch is still uncopied once the retry window from first seen has passed
     Then the batch is dropped without failing, and no count is written
     And a later batch of the project is dropped at once, with no read, no retry and no failure
-    And once the project's copy lands, its first-seen row and cached drop are deleted
+    And once the project's copy lands, its first-seen row and that worker's cached drop are deleted
     And its next trace counts
+    And on another worker, once its cached drop is older than ten minutes, the copy is read again and its next trace counts
 
   @unit @integration
   Scenario: The retry window is real time from first seen, shared by every worker and kept across a restart

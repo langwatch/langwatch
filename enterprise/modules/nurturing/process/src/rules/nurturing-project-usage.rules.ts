@@ -37,6 +37,9 @@ export function isTraceCounted({
  */
 export const UNCOPIED_PROJECT_RETRY_WINDOW_MS = 5 * 60 * 1000;
 
+/** How long a worker trusts its cached drop of a project before reading its placement copy again. */
+export const UNCOPIED_PROJECT_DROP_CACHE_TTL_MS = 10 * 60 * 1000;
+
 /** What a batch of a project nurturing has no placement copy of does: fail to be retried, or drop. */
 export type UncopiedProjectOutcome = "retry" | "drop";
 

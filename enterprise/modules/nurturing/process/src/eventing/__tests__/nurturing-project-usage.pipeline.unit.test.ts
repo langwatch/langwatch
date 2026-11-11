@@ -40,6 +40,7 @@ import { MemoryNurturingUncopiedProjectRepository } from "../../repositories/mem
 import type { NurturingProjectUsageOwner } from "../../repositories/nurturing-project-usage.repository.ts";
 import {
   TRACE_COUNTING_WINDOW_MS,
+  UNCOPIED_PROJECT_DROP_CACHE_TTL_MS,
   UNCOPIED_PROJECT_RETRY_WINDOW_MS,
 } from "../../rules/nurturing-project-usage.rules.ts";
 import { NurturingOrganizationUsageService } from "../../services/nurturing-organization-usage.service.ts";
@@ -99,10 +100,13 @@ function countingOver({
     advance: (ms: number) => {
       now += ms;
     },
-    /** The copies' subscribers catch up, the placement's forgetting the project as uncopied. */
-    landCopies: async () => {
+    /**
+     * The copies' subscribers catch up, the placement's forgetting the project as uncopied; on
+     * another worker, this one's cached drop is left as it was.
+     */
+    landCopies: async ({ onThisWorker = true }: { onThisWorker?: boolean } = {}) => {
       await placements.recordProject({ projectId: "project-1", organizationId: "org-1" });
-      await uncopiedProjects.copyLanded({ projectId: "project-1" });
+      if (onThisWorker) await uncopiedProjects.copyLanded({ projectId: "project-1" });
       await organizationsCreated.recordOrganizationCreated({ organizationId: "org-1", createdAt });
     },
   };
@@ -384,6 +388,7 @@ describe("the trace syncs", () => {
         sent.push(...calls);
       },
       clock: { nowMs: () => OCCURRED_AT + 60_000 },
+      logger: { warn: () => {} },
     });
     const { firstTrace } = nurturingTraceUsageSyncSubscribers((input) =>
       usage.tracesChanged(input),
@@ -702,6 +707,31 @@ describe("the trace-day count", () => {
 
     await counting.landCopies();
     await subscriber.handleBatch([itemOf(OK, "trace-3", NOON + 2000)]);
+    expect((await days()).map((day) => day.traceCount)).toEqual([1]);
+  });
+
+  /** @scenario "A project with no copy after the retries is dropped, and its later batches at once" */
+  it("reads a dropped project's copy again once its cached drop is older than the TTL, and counts it", async () => {
+    const counting = countingOver({ createdAt: NOON - 86_400_000, copied: false });
+    const subscriber = nurturingTraceDaySubscriber(counting);
+    const days = () =>
+      counting.traceDays.findForProjects({ projectIds: ["project-1"], afterDay: "" });
+    await expect(subscriber.handleBatch([itemOf(OK, "trace-1")])).rejects.toThrow(
+      "has not landed yet",
+    );
+    counting.advance(UNCOPIED_PROJECT_RETRY_WINDOW_MS);
+    await subscriber.handleBatch([itemOf(OK, "trace-1")]);
+    await counting.landCopies({ onThisWorker: false });
+    const placementReads = vi.spyOn(counting.placements, "getPlacement");
+
+    counting.advance(UNCOPIED_PROJECT_DROP_CACHE_TTL_MS - 1);
+    await subscriber.handleBatch([itemOf(OK, "trace-2", NOON + 1000)]);
+    expect(placementReads).not.toHaveBeenCalled();
+    expect(await days()).toEqual([]);
+
+    counting.advance(1);
+    await subscriber.handleBatch([itemOf(OK, "trace-3", NOON + 2000)]);
+    expect(placementReads).toHaveBeenCalledTimes(1);
     expect((await days()).map((day) => day.traceCount)).toEqual([1]);
   });
 

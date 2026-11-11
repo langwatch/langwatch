@@ -2,6 +2,7 @@
 import type { NurturingUncopiedProjectRepository } from "../repositories/nurturing-uncopied-project.repository.ts";
 import {
   retriesUncopiedProject,
+  UNCOPIED_PROJECT_DROP_CACHE_TTL_MS,
   type UncopiedProjectOutcome,
 } from "../rules/nurturing-project-usage.rules.ts";
 
@@ -15,8 +16,8 @@ type UncopiedProjectsDependencies = Readonly<{
 
 /**
  * Projects nurturing sees traces of with no placement copy. Each retries within one window from
- * when any worker first saw it (a shared row), then drops; a dropped project is cached in a bounded
- * per-process LRU set, so its later batches drop with no read. A landed copy forgets the project.
+ * when any worker first saw it (a shared row), then drops; a drop is cached in a bounded per-process
+ * LRU for a TTL, so later batches drop with no read and a copy another worker wrote is still seen.
  */
 export class NurturingUncopiedProjectsService {
   static create({
@@ -27,7 +28,8 @@ export class NurturingUncopiedProjectsService {
     return new NurturingUncopiedProjectsService(uncopiedProjects, clock, maxEntries);
   }
 
-  readonly #dropped = new Set<string>();
+  /** Each dropped project and when it was dropped, least recently used first. */
+  readonly #dropped = new Map<string, number>();
 
   private constructor(
     private readonly uncopiedProjects: NurturingUncopiedProjectRepository,
@@ -35,10 +37,13 @@ export class NurturingUncopiedProjectsService {
     private readonly maxEntries: number,
   ) {}
 
-  /** Whether this process already dropped the project; a hit counts as its latest use. */
+  /** Whether this process dropped the project within the TTL; a hit counts as its latest use. */
   isDropped({ projectId }: Readonly<{ projectId: string }>): boolean {
-    if (!this.#dropped.delete(projectId)) return false;
-    this.#dropped.add(projectId);
+    const droppedAt = this.#dropped.get(projectId);
+    if (droppedAt === undefined) return false;
+    this.#dropped.delete(projectId);
+    if (this.clock.nowMs() - droppedAt >= UNCOPIED_PROJECT_DROP_CACHE_TTL_MS) return false;
+    this.#dropped.set(projectId, droppedAt);
     return true;
   }
 
@@ -48,10 +53,10 @@ export class NurturingUncopiedProjectsService {
     const firstSeenAt = await this.uncopiedProjects.firstSeenAt({ projectId, seenAt: now });
     if (retriesUncopiedProject({ firstSeenAt, now })) return "retry";
     if (this.#dropped.size >= this.maxEntries) {
-      const oldest = this.#dropped.values().next().value;
+      const oldest = this.#dropped.keys().next().value;
       if (oldest !== undefined) this.#dropped.delete(oldest);
     }
-    this.#dropped.add(projectId);
+    this.#dropped.set(projectId, now);
     return "drop";
   }
 

@@ -7,10 +7,6 @@ import type { CioBatchCall } from "@langwatch/enterprise-nurturing-contract";
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 
-const logger = vi.hoisted(() => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() }));
-
-vi.mock("@langwatch/observability", () => ({ createLogger: () => logger }));
-
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingOrganizationCreatedRepository } from "../../repositories/memory/memory.nurturing-organization-created.repository.ts";
 import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
@@ -28,6 +24,9 @@ import type {
   NurturingTraceDay,
 } from "../../rules/nurturing-trace-day.rules.ts";
 import { NurturingOrganizationUsageService } from "../nurturing-organization-usage.service.ts";
+
+/** The service's logger, to read what it reported. */
+const logger = { warn: vi.fn() };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const NOW = Date.UTC(2026, 10, 20, 12);
@@ -86,6 +85,7 @@ async function serviceOver({
       sent.push(calls);
     },
     clock: { nowMs: () => NOW },
+    logger,
   });
   return { service, projectUsage, traceDays, sent };
 }

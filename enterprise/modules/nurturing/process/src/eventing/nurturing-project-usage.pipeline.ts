@@ -591,7 +591,7 @@ function nurturingProjectUsageHost({
   copies: NurturingUsageCopies;
   sync: NurturingUsageSync | undefined;
 }>) {
-  const { placements, copyLanded, organizationsCreated, members } = copies;
+  const { placements, organizationsCreated, members } = copies;
   // The copies always register, as nurturing's other copies do: a channel configured later
   // then finds the projects, organizations and members created before it.
   const copied = definePipeline({
@@ -599,10 +599,7 @@ function nurturingProjectUsageHost({
     aggregate: defineAggregate({ type: "nurturing_project_usage_view" }),
   })
     .withEvents([])
-    .withPeerSubscriber(
-      "projectPlacement",
-      nurturingProjectPlacementSubscriber({ placements, copyLanded }),
-    )
+    .withPeerSubscriber("projectPlacement", nurturingProjectPlacementSubscriber(copies))
     .withPeerSubscriber(
       "organizationCreated",
       nurturingOrganizationCreatedSubscriber(organizationsCreated),

@@ -3,7 +3,6 @@ import type {
   CioBatchCall,
   CioOrganizationUsageTraits,
 } from "@langwatch/enterprise-nurturing-contract";
-import { createLogger } from "@langwatch/observability";
 
 import type { NurturingMilestonesRepository } from "../repositories/nurturing-milestones.repository.ts";
 import type { NurturingOrganizationCreatedRepository } from "../repositories/nurturing-organization-created.repository.ts";
@@ -20,8 +19,6 @@ import {
   windowStartDayOf,
 } from "../rules/nurturing-project-usage.rules.ts";
 import { traceCountsOf } from "../rules/nurturing-trace-day.rules.ts";
-
-const nurturingLogger = createLogger("langwatch:nurturing");
 
 /** Members read and identified per request, so a large organization never opens a burst. */
 const MEMBER_BATCH_SIZE = 100;
@@ -42,6 +39,7 @@ type OrganizationUsageDependencies = Readonly<{
   /** Rejects when Customer.io did not take the call, so the subscriber's job retries. */
   sendBatch: (calls: CioBatchCall[]) => Promise<void>;
   clock: Readonly<{ nowMs: () => number }>;
+  logger: Readonly<{ warn(payload: Readonly<Record<string, unknown>>, message: string): void }>;
 }>;
 
 /** An organization as nurturing's own copies place and date it. */
@@ -129,7 +127,7 @@ export class NurturingOrganizationUsageService {
       await this.mirrorOntoMembers({ organizationId, traits });
     } catch (error) {
       // The group call stands, and the next sync mirrors again, as the other sinks' failures.
-      nurturingLogger.warn(
+      this.dependencies.logger.warn(
         { error, organizationId },
         "an organization's usage could not be mirrored onto its members",
       );

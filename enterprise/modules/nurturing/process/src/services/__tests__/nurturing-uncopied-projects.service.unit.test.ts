@@ -7,7 +7,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { MemoryNurturingUncopiedProjectRepository } from "../../repositories/memory/memory.nurturing-uncopied-project.repository.ts";
 import type { NurturingUncopiedProjectRepository } from "../../repositories/nurturing-uncopied-project.repository.ts";
-import { UNCOPIED_PROJECT_RETRY_WINDOW_MS } from "../../rules/nurturing-project-usage.rules.ts";
+import {
+  UNCOPIED_PROJECT_DROP_CACHE_TTL_MS,
+  UNCOPIED_PROJECT_RETRY_WINDOW_MS,
+} from "../../rules/nurturing-project-usage.rules.ts";
 import { NurturingUncopiedProjectsService } from "../nurturing-uncopied-projects.service.ts";
 
 const FIRST_SEEN = Date.UTC(2026, 10, 11, 12);
@@ -103,6 +106,27 @@ describe("given a project nurturing has no placement copy of", () => {
 
       expect(worker.isDropped({ projectId: "a" })).toBe(true);
       expect(uncopiedProjects.firstSeenAt).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when its cached drop is older than the TTL", () => {
+    /** @scenario "A project with no copy after the retries is dropped, and its later batches at once" */
+    it("is a miss, however often it was hit, so the project is read again", async () => {
+      const clock = fakeClock();
+      const worker = workerOver({
+        uncopiedProjects: MemoryNurturingUncopiedProjectRepository.create(),
+        clock,
+      });
+      await worker.outcomeOf({ projectId: "a" });
+      clock.advance(UNCOPIED_PROJECT_RETRY_WINDOW_MS);
+      await worker.outcomeOf({ projectId: "a" });
+
+      clock.advance(UNCOPIED_PROJECT_DROP_CACHE_TTL_MS - 1);
+      expect(worker.isDropped({ projectId: "a" })).toBe(true);
+      clock.advance(1);
+      expect(worker.isDropped({ projectId: "a" })).toBe(false);
+      await expect(worker.outcomeOf({ projectId: "a" })).resolves.toBe("drop");
+      expect(worker.isDropped({ projectId: "a" })).toBe(true);
     });
   });
 

@@ -108,6 +108,7 @@ export class NurturingModule implements NurturingApi {
           members: repositories.members,
           sendBatch: (calls) => customerIo.batchOrThrow(calls),
           clock: { nowMs: () => nowInstant().epochMilliseconds },
+          logger: createLogger("langwatch:nurturing"),
         })
       : void 0;
     const projectFacts = NurturingProjectFactsService.create({

@@ -28,17 +28,25 @@ export class PrismaNurturingUncopiedProjectRepository
     projectId,
     seenAt,
   }: Readonly<{ projectId: string; seenAt: number }>): Promise<number> {
+    const stored = await this.#storedFirstSeenAt({ projectId });
+    if (stored !== undefined) return stored;
     // ON CONFLICT DO NOTHING: a concurrent first sighting keeps the row another worker wrote.
     await this.prisma.nurturingUncopiedProject.createMany({
       data: [{ projectId, firstSeenAt: new Date(seenAt) }],
       skipDuplicates: true,
     });
+    // Forgotten between the statements: its copy landed, so this sighting is the first.
+    return (await this.#storedFirstSeenAt({ projectId })) ?? seenAt;
+  }
+
+  async #storedFirstSeenAt({
+    projectId,
+  }: Readonly<{ projectId: string }>): Promise<number | undefined> {
     const row = await this.prisma.nurturingUncopiedProject.findUnique({
       where: { projectId },
       select: { firstSeenAt: true },
     });
-    // Forgotten between the two statements: its copy landed, so this sighting is the first.
-    return row?.firstSeenAt.getTime() ?? seenAt;
+    return row?.firstSeenAt.getTime();
   }
 
   async forget({ projectId }: Readonly<{ projectId: string }>): Promise<void> {
