@@ -105,21 +105,6 @@ describe.skipIf(!databaseUrl)("given project's and organization's tables", () =>
     });
   });
 
-  describe("when an organization's projects are listed", () => {
-    /** @scenario "The organization's projects are read through its teams" */
-    it("answers every project of its teams, archived included", async () => {
-      const projectIds = await repository.findProjectIds({ organizationId });
-
-      expect(projectIds.toSorted()).toEqual([archivedProjectId, projectId].toSorted());
-    });
-
-    it("answers none for an organization they do not hold", async () => {
-      await expect(
-        repository.findProjectIds({ organizationId: `${namespace}-absent` }),
-      ).resolves.toEqual([]);
-    });
-  });
-
   describe("when an organization's creation is read", () => {
     /** @scenario "Nurturing reads an organization's creation through its share" */
     it("answers when its owners created it", async () => {

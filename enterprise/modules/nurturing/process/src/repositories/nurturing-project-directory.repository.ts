@@ -23,8 +23,6 @@ export interface NurturingProjectDirectoryRepository {
   getOrganizationCreatedAt(
     input: Readonly<{ organizationId: string }>,
   ): Promise<Readonly<{ organizationCreatedAt: number | null }>>;
-  /** Every project of the organization, archived ones included, through its teams. */
-  findProjectIds(input: Readonly<{ organizationId: string }>): Promise<string[]>;
   /** True when any project of the organization, archived ones included, received a real trace. */
   hasTracedProject(input: Readonly<{ organizationId: string }>): Promise<boolean>;
 }

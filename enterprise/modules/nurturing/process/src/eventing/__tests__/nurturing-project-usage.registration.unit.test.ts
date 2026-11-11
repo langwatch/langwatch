@@ -3,12 +3,12 @@
  * @vitest-environment node
  * @see enterprise/modules/nurturing/specs/project-usage.feature
  */
-import { createTenantId } from "@langwatch/eventing";
+import { createTenantId, InMemoryProcessStore } from "@langwatch/eventing";
 import { PROJECT_CREATED_EVENT_TYPE } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { NurturingModule } from "../../app/nurturing.app.ts";
-import type { CustomerIoChannel } from "../../channels/customer-io.channel.ts";
+import type { NurturingModule } from "../../app/nurturing.app.ts";
 import { MemoryNurturingOrganizationCreatedRepository } from "../../repositories/memory/memory.nurturing-organization-created.repository.ts";
 import { MemoryNurturingProjectPlacementRepository } from "../../repositories/memory/memory.nurturing-project-placement.repository.ts";
 import { MemoryNurturingRepositories } from "../../repositories/memory/memory.nurturing.repositories.ts";
@@ -19,23 +19,17 @@ import {
   nurturingProjectUsageEventing,
 } from "../nurturing-project-usage.pipeline.ts";
 
-type Setup = Parameters<typeof NurturingModule.create>[0];
-type EventingSetupOf = Parameters<typeof nurturingProjectUsageEventing.build>[0];
-
-/** The usage pipeline's lanes as the module wires them, with or without a Customer.io channel. */
-async function usageLanesWith(customerIo: CustomerIoChannel | undefined): Promise<string[]> {
-  const repositories = MemoryNurturingRepositories.create();
-  // Neither dependency is called while the module is only being created.
-  const app = await NurturingModule.create({
-    channels: { customerIo, posthog: undefined },
-    dependencies: {},
-    repositories,
-    resources: { own: () => {} },
-  } as unknown as Setup);
+/** The usage pipeline's lanes as the module declares them, for an app that syncs or one that does not. */
+function usageLanesWith(syncsOrganizationUsage: boolean): string[] {
+  const app = createApiFixture<NurturingModule>({
+    syncsOrganizationUsage: () => syncsOrganizationUsage,
+  });
   const pipeline = nurturingProjectUsageEventing.build({
-    repositories,
+    participation: "consume",
+    repositories: MemoryNurturingRepositories.create(),
     app,
-  } as unknown as EventingSetupOf);
+    processStore: InMemoryProcessStore.createForTesting(),
+  });
   return (pipeline.globalProjections ?? []).map(({ name }) => name);
 }
 
@@ -52,15 +46,15 @@ const contextAt = (occurredAt: number) => ({
 
 describe("the usage pipeline's registration", () => {
   /** @scenario "Without a Customer.io channel nothing is counted" */
-  it("registers no fold and no subscriber without a Customer.io channel", async () => {
-    const lanes = await usageLanesWith(undefined);
+  it("registers no fold and no subscriber without a Customer.io channel", () => {
+    const lanes = usageLanesWith(false);
 
     expect(lanes).not.toContain(lane("traceDayCount"));
     expect(lanes).toEqual([]);
   });
 
-  it("registers the trace-day count and the placement copies with a channel", async () => {
-    const lanes = await usageLanesWith({} as CustomerIoChannel);
+  it("registers the trace-day count and the placement copies with a channel", () => {
+    const lanes = usageLanesWith(true);
 
     expect(lanes).toEqual(
       expect.arrayContaining([
@@ -84,7 +78,7 @@ describe("the placement copies", () => {
       occurredAt: 1_000,
     };
 
-    if (!("handle" in subscriber)) throw new Error("placement handles one fact at a time");
+    if (!subscriber.handle) throw new Error("placement handles one fact at a time");
     await subscriber.handle(data, contextAt(1_000));
     await subscriber.handle(data, contextAt(1_000));
 
@@ -126,7 +120,7 @@ describe("the placement copies", () => {
       occurredAt,
     });
 
-    if (!("handle" in subscriber)) throw new Error("creation handles one fact at a time");
+    if (!subscriber.handle) throw new Error("creation handles one fact at a time");
     await subscriber.handle(created(2_000), contextAt(2_000));
     await subscriber.handle(created(5_000), contextAt(5_000));
 

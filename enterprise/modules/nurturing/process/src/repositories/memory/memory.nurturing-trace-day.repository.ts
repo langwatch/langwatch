@@ -2,12 +2,6 @@
 import type { NurturingTraceDay } from "../../rules/nurturing-trace-day.rules.ts";
 import type { NurturingTraceDayRepository } from "../nurturing-trace-day.repository.ts";
 
-function latest(a: number | null, b: number | null): number | null {
-  if (a === null) return b;
-  if (b === null) return a;
-  return Math.max(a, b);
-}
-
 /** Nurturing's trace-day rows in memory, incremented as the Postgres upsert increments them. */
 export class MemoryNurturingTraceDayRepository implements NurturingTraceDayRepository {
   static create(): MemoryNurturingTraceDayRepository {
@@ -22,6 +16,13 @@ export class MemoryNurturingTraceDayRepository implements NurturingTraceDayRepos
     for (const increment of increments) {
       const key = JSON.stringify([increment.projectId, increment.day]);
       const known = this.#days.get(key);
+      const lastTimes = [known?.lastTraceAt ?? null, increment.lastTraceAt].filter(
+        (t) => t !== null,
+      );
+      const lastFailedTimes = [
+        known?.lastFailedTraceAt ?? null,
+        increment.lastFailedTraceAt,
+      ].filter((t) => t !== null);
       this.#days.set(
         key,
         known
@@ -29,8 +30,8 @@ export class MemoryNurturingTraceDayRepository implements NurturingTraceDayRepos
               ...known,
               traceCount: known.traceCount + increment.traceCount,
               errorCount: known.errorCount + increment.errorCount,
-              lastTraceAt: latest(known.lastTraceAt, increment.lastTraceAt),
-              lastFailedTraceAt: latest(known.lastFailedTraceAt, increment.lastFailedTraceAt),
+              lastTraceAt: lastTimes.length === 0 ? null : Math.max(...lastTimes),
+              lastFailedTraceAt: lastFailedTimes.length === 0 ? null : Math.max(...lastFailedTimes),
             }
           : increment,
       );
