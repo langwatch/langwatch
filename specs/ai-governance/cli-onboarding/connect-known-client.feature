@@ -35,6 +35,23 @@ Feature: A known app connects a project through the device flow and is named on 
     Then the page reads "Laze was not connected. You can close this tab."
 
   @bdd @cli-onboarding @known-client @integration
+  Scenario: an organization with no projects asks for one without the CLI wording
+    Given a signed-in user on /cli/auth with a pending project_api_key device code
+    And the device code was requested with client "laze"
+    And the user's organization has no projects
+    When the user confirms the code
+    Then the page reads "Create a project in this organization first, then pick it here."
+    And no copy on the page mentions the CLI, a terminal or .env
+
+  @bdd @cli-onboarding @known-client @integration
+  Scenario: an expired Laze code sends the person back to Laze
+    Given a project_api_key device code requested with client "laze" that has expired
+    When the approval page looks the code up
+    Then the lookup answers 410 expired with client "laze"
+    And the page reads "This code expired. Go back to Laze and press Connect with LangWatch again."
+    And the page never tells the person to run langwatch login
+
+  @bdd @cli-onboarding @known-client @integration
   Scenario: the lookup answers the client the device code was requested with
     Given a project_api_key device code requested with client "laze"
     When the approval page looks the code up

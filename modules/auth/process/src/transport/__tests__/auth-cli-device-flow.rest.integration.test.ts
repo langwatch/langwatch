@@ -1396,6 +1396,33 @@ describe("given a known app connecting a project", () => {
     });
   });
 
+  describe("when a Laze device code has expired", () => {
+    /** @scenario an expired Laze code sends the person back to Laze */
+    it("answers 410 expired naming the client", async () => {
+      const world = deviceFlowWorld();
+      const api = mount(world);
+      const now = Date.now();
+      await world.store.set({
+        key: deviceCodeKey("laze-device"),
+        value: JSON.stringify({
+          device_code: "laze-device",
+          user_code: "LAZE-OLD1",
+          status: "pending",
+          created_at: now - 700_000,
+          expires_at: now - 100_000,
+          credential_type: "project_api_key",
+          client: "laze",
+        }),
+      });
+      await world.store.set({ key: userCodeKey("LAZE-OLD1"), value: "laze-device" });
+
+      const looked = await api.get("/api/auth/cli/lookup?user_code=LAZE-OLD1");
+
+      expect(looked.status).toBe(410);
+      await expect(looked.json()).resolves.toMatchObject({ error: "expired", client: "laze" });
+    });
+  });
+
   describe("when a device code was stored before the client field existed", () => {
     /** @scenario a device code stored before the client field reads as no client */
     it("answers client null on lookup", async () => {

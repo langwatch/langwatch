@@ -600,6 +600,13 @@ function LookupStatus({ userCode, lookup }: { userCode: string; lookup: DeviceCo
       </HStack>
     );
   }
+  if (lookup.kind === "expired" && lookup.client === "laze") {
+    return (
+      <StatusCard palette="orange" icon={Clock3} title="Code expired">
+        This code expired. Go back to Laze and press Connect with LangWatch again.
+      </StatusCard>
+    );
+  }
   if (lookup.kind === "expired") {
     return (
       <StatusCard palette="orange" icon={Clock3} title="Code expired">

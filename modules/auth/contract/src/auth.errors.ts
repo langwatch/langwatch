@@ -129,7 +129,15 @@ export class SessionMaxLifetimeTooShortError extends HandledError {
 }
 
 /** The two-field body RFC 8628 device-grant clients parse from every refusal. */
-export type CliDeviceFlowRefusal = Readonly<{ error: string; error_description: string }>;
+/**
+ * `client` names the known app behind an expired code, so the approval page can send the
+ * person back to it.
+ */
+export type CliDeviceFlowRefusal = Readonly<{
+  error: string;
+  error_description: string;
+  client?: string;
+}>;
 
 /**
  * A device-grant refusal at the status the flow names, carrying the RFC 8628

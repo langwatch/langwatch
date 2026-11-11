@@ -22,7 +22,7 @@ export type DeviceCodeLookupState =
       client: CliDeviceClient | null;
     }
   | { kind: "error"; message: string }
-  | { kind: "expired" };
+  | { kind: "expired"; client: CliDeviceClient | null };
 
 function lookupStateFrom({
   result,
@@ -33,7 +33,7 @@ function lookupStateFrom({
 }): DeviceCodeLookupState {
   switch (result.outcome) {
     case "expired":
-      return { kind: "expired" };
+      return { kind: "expired", client: result.client };
     case "unknown":
       return {
         kind: "error",

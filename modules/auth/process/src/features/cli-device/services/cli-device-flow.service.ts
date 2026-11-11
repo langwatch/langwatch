@@ -239,7 +239,14 @@ async function lookupDeviceFlow({
   });
 
   if (expired(record)) {
-    throw refused("expired", "Code has expired — restart `langwatch login`", 410);
+    throw new CliDeviceFlowRefusedError({
+      refusal: {
+        error: "expired",
+        error_description: "Code has expired — restart `langwatch login`",
+        ...(record.client ? { client: record.client } : {}),
+      },
+      httpStatus: 410,
+    });
   }
 
   return answer({

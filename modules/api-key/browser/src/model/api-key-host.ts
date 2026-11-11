@@ -83,11 +83,11 @@ export type ApiKeyFailureNotice = {
 // (SDK key, .env).
 export type CliCredentialType = "device_session" | "project_api_key";
 
-// Device code lookup result: four cases (pending, expired, unknown, failed) not one nullable;
-// screen needs different messages for each.
 /** A known app that connects a project through the device flow. */
 export type CliDeviceClient = "laze";
 
+// Device code lookup result: four cases (pending, expired, unknown, failed) not one nullable;
+// screen needs different messages for each.
 export type CliDeviceCodeLookup =
   | {
       outcome: "pending";
@@ -100,7 +100,7 @@ export type CliDeviceCodeLookup =
       /** The known app connecting a project, named on the page; null for the CLI. */
       client: CliDeviceClient | null;
     }
-  | { outcome: "expired" }
+  | { outcome: "expired"; client: CliDeviceClient | null }
   | { outcome: "unknown" }
   | { outcome: "failed"; message: string };
 

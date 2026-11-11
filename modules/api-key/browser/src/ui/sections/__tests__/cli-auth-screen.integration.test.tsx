@@ -531,6 +531,41 @@ describe("given Laze asked to connect a project", () => {
     });
   });
 
+  describe("when the organization has no projects yet", () => {
+    /** @scenario an organization with no projects asks for one without the CLI wording */
+    it("asks for a project first and never mentions the CLI, a terminal or .env", async () => {
+      const user = userEvent.setup();
+      renderWithApiKeyHost(
+        <CliAuthScreen />,
+        hostFor({ lookup: lazeLookup, organizations: [{ id: "org-1", name: "ACME", teams: [] }] }),
+      );
+      await confirmCode(user);
+
+      expect(await screen.findByText("No projects yet")).toBeInTheDocument();
+      expect(
+        screen.getByText("Create a project in this organization first, then pick it here."),
+      ).toBeInTheDocument();
+      expect(document.body.textContent).not.toMatch(cliWording);
+    });
+  });
+
+  describe("when the code has expired", () => {
+    /** @scenario an expired Laze code sends the person back to Laze */
+    it("tells the person to connect again from Laze, not to run langwatch login", async () => {
+      renderWithApiKeyHost(
+        <CliAuthScreen />,
+        hostFor({ lookup: { outcome: "expired", client: "laze" } }),
+      );
+
+      expect(
+        await screen.findByText(
+          "This code expired. Go back to Laze and press Connect with LangWatch again.",
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/langwatch login/)).toBeNull();
+    });
+  });
+
   describe("when the person denies it", () => {
     /** @scenario denying tells the person Laze was not connected */
     it("says Laze was not connected", async () => {
@@ -634,7 +669,10 @@ describe("given a code nothing recognises", () => {
 describe("given a code past its deadline", () => {
   /** @scenario an expired code sends the reader back to their terminal */
   it("says to run langwatch login again rather than showing a generic failure", async () => {
-    renderWithApiKeyHost(<CliAuthScreen />, hostFor({ lookup: { outcome: "expired" } }));
+    renderWithApiKeyHost(
+      <CliAuthScreen />,
+      hostFor({ lookup: { outcome: "expired", client: null } }),
+    );
     expect(await screen.findByText("Code expired")).toBeInTheDocument();
     expect(screen.queryByText("Something went wrong")).toBeNull();
   });
