@@ -164,6 +164,14 @@ langWatchQLKeyCapFor(input: { appFunctions: readonly LangWatchQLAppFunctionCall[
 executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
 ```
 
+#### `reportBuiltInQueryFailure`
+
+A statement the server itself wrote failed: reported as built in, with no statement hash, under its fixed `source` label. A caller's own access refusal is not reported.
+
+```typescript
+reportBuiltInQueryFailure(input: { projectId: string; source: string; error: unknown }): void;
+```
+
 #### `assertProjectsReadable`
 
 Proves each project exists and holds `analytics:view` for the member, so a widget never stores a project its writer could not read.
@@ -352,7 +360,7 @@ type Response = z.infer<typeof queryReferenceSchema>; // ../contract/src/feature
 
 ### `analytics.lwql`
 
-Contract `../contract/src/features/lwql/analytics-lwql.trpc.ts:122`, router `src/transport/analytics-lwql.trpc.ts:82`.
+Contract `../contract/src/features/lwql/analytics-lwql.trpc.ts:122`, router `src/transport/analytics-lwql.trpc.ts:83`.
 
 | Procedure                         | Kind     | Gate                        | Input                    | Output                          |
 | --------------------------------- | -------- | --------------------------- | ------------------------ | ------------------------------- |
@@ -486,11 +494,11 @@ Declared at `src/eventing/analytics-lwql-reconvergence.pipeline.ts:57`.
 
 | Kind   | Leaf                              | Environment variable                      | Declared at                              |
 | ------ | --------------------------------- | ----------------------------------------- | ---------------------------------------- |
-| secret | `lwqlClickHousePassword`          | `LWQL_CLICKHOUSE_PASSWORD`                | `src/app/analytics.app.ts:485`           |
-| secret | `lwqlPostgresReaderPassword`      | `LWQL_POSTGRES_READER_PASSWORD`           | `src/app/analytics.app.ts:486`           |
-| secret | `queryHashKey`                    | `API_KEY_PEPPER`                          | `src/app/analytics.app.ts:487`           |
-| secret | `queryHashKeyFallback`            | `CREDENTIALS_SECRET`                      | `src/app/analytics.app.ts:488`           |
-| secret | `queryHashKeyLastFallback`        | `NEXTAUTH_SECRET`                         | `src/app/analytics.app.ts:489`           |
+| secret | `lwqlClickHousePassword`          | `LWQL_CLICKHOUSE_PASSWORD`                | `src/app/analytics.app.ts:499`           |
+| secret | `lwqlPostgresReaderPassword`      | `LWQL_POSTGRES_READER_PASSWORD`           | `src/app/analytics.app.ts:500`           |
+| secret | `queryHashKey`                    | `API_KEY_PEPPER`                          | `src/app/analytics.app.ts:501`           |
+| secret | `queryHashKeyFallback`            | `CREDENTIALS_SECRET`                      | `src/app/analytics.app.ts:502`           |
+| secret | `queryHashKeyLastFallback`        | `NEXTAUTH_SECRET`                         | `src/app/analytics.app.ts:503`           |
 | config | `langwatchQl.url`                 | `LWQL_CLICKHOUSE_URL`                     | `../contract/src/analytics.config.ts:11` |
 | config | `langwatchQl.username`            | `LWQL_CLICKHOUSE_USER`                    | `../contract/src/analytics.config.ts:12` |
 | config | `langwatchQl.database`            | `LWQL_DATABASE`                           | `../contract/src/analytics.config.ts:13` |

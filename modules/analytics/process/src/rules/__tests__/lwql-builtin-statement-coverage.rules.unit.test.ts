@@ -8,8 +8,14 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { mergeCoverageCommits } from "../lwql-builtin-statement-coverage.rules.ts";
-import { LWQL_BUILTIN_STATEMENT_HASHES } from "../lwql-builtin-statements.generated.ts";
+import {
+  mergeCoverageCommits,
+  renderBuiltinStatements,
+} from "../lwql-builtin-statement-coverage.rules.ts";
+import {
+  LWQL_BUILTIN_STATEMENT_COVERAGE,
+  LWQL_BUILTIN_STATEMENT_HASHES,
+} from "../lwql-builtin-statements.generated.ts";
 
 const PINNED: readonly string[] = JSON.parse(
   readFileSync(
@@ -70,6 +76,23 @@ describe("given the pinned baseline of hashes", () => {
     expect(PINNED.length).toBeGreaterThan(0);
     expect(hashesMissingFromList({ pinned: PINNED, list: LWQL_BUILTIN_STATEMENT_HASHES })).toEqual(
       [],
+    );
+  });
+});
+
+describe("given the committed built-in statement list", () => {
+  /** @scenario "The list says what it covers" */
+  it("equals a render of the commits and hashes it holds", () => {
+    const committed = readFileSync(
+      fileURLToPath(new URL("../lwql-builtin-statements.generated.ts", import.meta.url)),
+      "utf8",
+    );
+
+    expect(committed, "regenerate with `pnpm generate:lwql-builtin-statements`").toBe(
+      renderBuiltinStatements({
+        commits: LWQL_BUILTIN_STATEMENT_COVERAGE.commits,
+        hashes: LWQL_BUILTIN_STATEMENT_HASHES,
+      }),
     );
   });
 });
