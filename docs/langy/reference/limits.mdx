@@ -14,6 +14,7 @@ The table lists each limit's current value; the **Kind** column marks which ones
 | GitHub pull requests per day           | 20                             | Hardcoded       | `LANGY_GITHUB_PRS_PER_DAY` (a code constant, not an env var)     |
 | Max concurrent workers                 | 20 (default)                   | Configurable    | `LANGY_MAX_WORKERS`                                              |
 | Idle worker reap                       | 10 minutes (600000 ms default) | Configurable    | `LANGY_WORKER_IDLE_MS`                                           |
+| Max worker age                         | 5 hours (18000000 ms default)  | Configurable    | `LANGY_WORKER_MAX_AGE_MS`                                        |
 | Per-session LangWatch API key lifetime | Short-lived, auto-expiring     | Fixed by design | Minted per chat, owned by the requesting user                    |
 | GitHub installation token lifetime     | 1 hour                         | Fixed by GitHub | Minted per turn, cached in Redis just under 1 hour, self-expires |
 
@@ -29,7 +30,7 @@ Langy runs one isolated worker per conversation. `LANGY_MAX_WORKERS` caps how ma
 
 ### Idle worker reap
 
-A worker with no activity for longer than `LANGY_WORKER_IDLE_MS` (default 600000 ms, 10 minutes) is reaped. Its clone and per-worker home are deleted, so no sensitive data stays at rest worker-side. A later turn in the same conversation spawns a fresh worker. See [Sandbox](/langy/security/sandbox).
+A worker with no activity for longer than `LANGY_WORKER_IDLE_MS` (default 600000 ms, 10 minutes) is reaped. Its clone and per-worker home are deleted, so no sensitive data stays at rest worker-side. A later turn in the same conversation spawns a fresh worker. A worker older than `LANGY_WORKER_MAX_AGE_MS` (default 5 hours) is replaced between turns, never during one, so its session key never expires mid-conversation; the next turn gets a fresh worker and key and resumes the session. See [Sandbox](/langy/security/sandbox).
 
 ### Per-session LangWatch API key
 
