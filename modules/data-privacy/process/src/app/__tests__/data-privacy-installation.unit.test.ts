@@ -1,9 +1,9 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
+import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import {
-  DataPrivacyApi,
   PII_REDACTION_SPEND_AGGREGATE_TYPE,
   PII_REDACTION_SPEND_PIPELINE_NAME,
-} from "@langwatch/data-privacy-contract";
+} from "@langwatch/data-privacy-contract/pii-redaction-spend";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";

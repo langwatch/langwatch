@@ -6,7 +6,7 @@
 import {
   PII_REDACTION_REQUEST_TYPE,
   type PiiRedactionSpendPricedEventData,
-} from "@langwatch/data-privacy-contract";
+} from "@langwatch/data-privacy-contract/pii-redaction-spend";
 import type { GatewayPricedSpend } from "@langwatch/gateway-contract";
 
 const NANO_USD_PER_USD = 1_000_000_000;

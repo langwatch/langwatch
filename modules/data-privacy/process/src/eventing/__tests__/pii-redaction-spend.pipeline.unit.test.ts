@@ -7,7 +7,7 @@ import {
   PII_REDACTION_SPEND_AGGREGATE_TYPE,
   PII_REDACTION_SPEND_PRICED_EVENT_TYPE,
   type PiiRedactionSpendPricedEventData,
-} from "@langwatch/data-privacy-contract";
+} from "@langwatch/data-privacy-contract/pii-redaction-spend";
 import { createTenantId, EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { describe, expect, it } from "vitest";

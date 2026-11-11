@@ -2,9 +2,9 @@ import {
   DATA_PRIVACY_PRESIDIO_TIMEOUT_MS,
   EMPTY_AUDIENCE,
   type PiiLevel,
-  type PiiRedactionSpendPricedEventData,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
+import { type PiiRedactionSpendPricedEventData } from "@langwatch/data-privacy-contract/pii-redaction-spend";
 import {
   LangevalsPiiDetectionError,
   type PiiDetectionOutcome,

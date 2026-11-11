@@ -12,7 +12,7 @@ import {
   PII_REDACTION_SPEND_PRICED_EVENT_TYPE,
   type PiiRedactionSpendPricedEventData,
   piiRedactionSpendPricedEventDataSchema,
-} from "@langwatch/data-privacy-contract";
+} from "@langwatch/data-privacy-contract/pii-redaction-spend";
 import {
   createTenantId,
   defineAggregate,

@@ -1,4 +1,4 @@
-import { PII_REDACTION_REQUEST_TYPE } from "@langwatch/data-privacy-contract";
+import { PII_REDACTION_REQUEST_TYPE } from "@langwatch/data-privacy-contract/pii-redaction-spend";
 import type { ProcessManagerApplier } from "@langwatch/eventing";
 import { z } from "zod";
 

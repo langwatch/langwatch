@@ -7,7 +7,7 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { PiiRedactionSpendPricedEventData } from "@langwatch/data-privacy-contract";
+import type { PiiRedactionSpendPricedEventData } from "@langwatch/data-privacy-contract/pii-redaction-spend";
 import { createTenantId } from "@langwatch/eventing";
 import type { ProjectWithTeam } from "@langwatch/project-contract";
 import { nanoid } from "nanoid";

@@ -9,7 +9,7 @@ import {
   PII_REDACTION_RATE_VERSION,
   PII_REDACTION_SPEND_MODEL,
   type PiiRedactionSpendPricedEventData,
-} from "@langwatch/data-privacy-contract";
+} from "@langwatch/data-privacy-contract/pii-redaction-spend";
 
 import { batchCharactersOf } from "./pii-redaction-model.rules.ts";
 

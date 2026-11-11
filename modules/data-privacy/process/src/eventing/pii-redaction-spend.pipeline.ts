@@ -2,7 +2,7 @@ import {
   PII_REDACTION_SPEND_AGGREGATE_TYPE,
   PII_REDACTION_SPEND_PIPELINE_NAME,
   type PiiRedactionSpendPricedEventData,
-} from "@langwatch/data-privacy-contract";
+} from "@langwatch/data-privacy-contract/pii-redaction-spend";
 /**
  * data-privacy's priced PII redaction model calls, one per answered batch, on the organization's
  * aggregate (ADR-201). Gateway's peer subscriber writes each as one spend row.

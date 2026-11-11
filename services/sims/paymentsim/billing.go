@@ -93,7 +93,7 @@ func (s *Server) usage(eventName, customer string, from, to int64) float64 {
 }
 
 // addDecimal adds two meter values as the decimals they were sent as, the way
-// Stripe sums them: 0.0001 + 1.1233 is 1.1234, not its float neighbour.
+// Stripe sums them: 0.0001 + 1.1233 is 1.1234, not its float neighbor.
 func addDecimal(a, b float64) float64 {
 	x, _ := new(big.Rat).SetString(strconv.FormatFloat(a, 'g', -1, 64))
 	y, _ := new(big.Rat).SetString(strconv.FormatFloat(b, 'g', -1, 64))

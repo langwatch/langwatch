@@ -6,7 +6,7 @@
 import {
   PII_REDACTION_SPEND_PRICED_EVENT_TYPE,
   piiRedactionSpendPricedEventDataSchema,
-} from "@langwatch/data-privacy-contract";
+} from "@langwatch/data-privacy-contract/pii-redaction-spend";
 import {
   defineAggregate,
   defineEventingModule,

@@ -2,7 +2,7 @@
  * Prices one answered PII redaction model call and records it as a priced fact (ADR-201).
  * Spec: modules/data-privacy/specs/pii-redaction-billing.feature
  */
-import type { PiiRedactionSpendPricedEventData } from "@langwatch/data-privacy-contract";
+import type { PiiRedactionSpendPricedEventData } from "@langwatch/data-privacy-contract/pii-redaction-spend";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";

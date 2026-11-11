@@ -3,7 +3,7 @@
  * (ADR-201), looking up the team through gateway's own project dependency.
  * Spec: modules/data-privacy/specs/pii-redaction-billing.feature
  */
-import type { PiiRedactionSpendPricedEventData } from "@langwatch/data-privacy-contract";
+import type { PiiRedactionSpendPricedEventData } from "@langwatch/data-privacy-contract/pii-redaction-spend";
 import type { GatewayPricedSpend, GatewayPricedSpendResult } from "@langwatch/gateway-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";

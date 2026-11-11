@@ -4,7 +4,7 @@
  * @see modules/data-privacy/specs/pii-redaction-billing.feature
  */
 
-import { PII_REDACTION_REQUEST_TYPE } from "@langwatch/data-privacy-contract";
+import { PII_REDACTION_REQUEST_TYPE } from "@langwatch/data-privacy-contract/pii-redaction-spend";
 import { createLogger } from "@langwatch/observability";
 
 import type { BillableEventsTotalResult } from "../rules/billing-month.rules.ts";
