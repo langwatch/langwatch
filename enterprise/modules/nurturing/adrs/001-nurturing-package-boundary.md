@@ -76,8 +76,8 @@ personal project (`Project.ownerUserId`) and whether an organization ever traced
 (`Project.firstMessage`). R40 allows a copy only when a ruling names a reason.
 
 **Ruling (2026-11-11).** Nurturing is to be event driven end to end: what it knows about
-another module comes from that module's facts, not from reading its table. That ruling is the
-reason R40 asks for.
+another module comes from that module's facts, not from reading its table
+(https://github.com/langwatch/tasks/issues/1131). That ruling is the reason R40 asks for.
 
 **Decision.** Nurturing owns two copy tables, written only by its peer subscribers:
 
