@@ -74,17 +74,19 @@ function showRequestedRun({
 
 type RequestedRun = NonNullable<ReturnType<typeof requestedRunOf>>;
 type RunRequest = { requestId: string; requestedAt: number };
+type ReadResult = { data?: InsightDailyRunSetting | undefined; isError: boolean };
 
 /** The run the deadline's read shows for the request; a failed read shows none. */
 function readRequestedRun({
   readOnce,
   request,
 }: {
-  readOnce: () => Promise<{ data?: InsightDailyRunSetting | undefined }>;
+  readOnce: () => Promise<ReadResult>;
   request: RunRequest;
 }): Promise<RequestedRun | undefined> {
-  return readOnce().then(({ data }) =>
-    data ? requestedRunOf({ setting: data, ...request }) : undefined,
+  // A failed read resolves with the data cached before it, which says nothing of this read.
+  return readOnce().then(({ data, isError }) =>
+    data && !isError ? requestedRunOf({ setting: data, ...request }) : undefined,
   );
 }
 
@@ -104,7 +106,7 @@ function useRequestedRunDeadline({
   /** What the server answered Run now with. */
   request: RunRequest | undefined;
   isAwaitingRun: boolean;
-  readOnce: () => Promise<{ data?: InsightDailyRunSetting | undefined }>;
+  readOnce: () => Promise<ReadResult>;
   /** Ends the spinner. */
   onExpired: () => void;
   onFound: (requested: RequestedRun) => void;
@@ -128,7 +130,6 @@ function useRequestedRunDeadline({
   });
   useEffect(() => cancelVerdict, []);
   useEffect(() => {
-    if (request && verdictOwedTo.current !== request) cancelVerdict();
     if (!isAwaitingRun || !request) return;
     const deadline = setTimeout(() => {
       verdictOwedTo.current = request;
@@ -160,7 +161,7 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
     host.isEnabled() === true &&
     host.hasPermission("analytics:view");
   const scope = { projectId, board: { kind: board.kind, id: board.id } };
-  // The run's start and outcome reach the read as hints; no timer asks (ADR-004).
+  // The run's start and outcome reach the read as hints; the only timer is the expiry deadline.
   const query = insightApi.insights.getBoardDailyRun.useQuery(scope, { enabled: available });
   const utils = insightApi.useUtils();
   const configure = insightApi.insights.configureBoardDailyRun.useMutation();

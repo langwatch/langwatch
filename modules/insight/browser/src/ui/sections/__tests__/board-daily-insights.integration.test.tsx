@@ -49,8 +49,11 @@ const RUNNING: InsightDailyRunSetting = {
   runInFlight: { runId: "request-1", conversationId: "conversation-7", startedAt: NOW },
 };
 /** What the server answers Run now with: the request's id, and when its clock recorded it. */
-function runNowAnswer({ requestedAt = nowInstant().epochMilliseconds } = {}) {
-  return Promise.resolve({ requestId: "request-1", requestedAt });
+function runNowAnswer({
+  requestId = "request-1",
+  requestedAt = nowInstant().epochMilliseconds,
+} = {}) {
+  return Promise.resolve({ requestId, requestedAt });
 }
 
 /** A read that fails for good: this status is not retried, so the answer lands at once. */
@@ -155,7 +158,7 @@ function openBoard({
   witness?: boolean;
 } = {}) {
   const calls: UiProcedureCall[] = [];
-  const { host, readHint, swapHost } = renderWithInsightHost({
+  const { host, readHint, swapHost, unmount } = renderWithInsightHost({
     element: <Board widgets={widgets} {...board} />,
     host: new StubInsightHost(options),
     answer: (call) => {
@@ -173,6 +176,7 @@ function openBoard({
     host,
     readHint,
     swapHost,
+    unmount,
     calls,
     reads: () => sent(READ),
     writes: () => [...sent(CONFIGURE), ...sent(TURN_OFF), ...sent(RUN_NOW)],
@@ -515,6 +519,7 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
       expect(board.writes()).toEqual([]);
     });
 
+    /** @scenario "Run now is offered only on a board a run can read" */
     it("offers no Run now to a member who may not ask Langy", async () => {
       const board = openBoard({ setting: ON });
 
@@ -715,37 +720,6 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
     });
   });
 
-  describe("when the run they asked for shows neither a start nor an outcome", () => {
-    /** @scenario "Run now asks for a run and opens Langy on it" */
-    it("follows it for as long as a run can last, then says it could not be started", async () => {
-      vi.useFakeTimers({ shouldAdvanceTime: true });
-      try {
-        const board = openBoard({
-          setting: ON,
-          host: ASKER,
-          write: () => runNowAnswer(),
-        });
-        const dropdown = await openDropdown(board.user);
-        await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
-        await waitFor(() => expect(board.sent(RUN_NOW)).toHaveLength(1));
-
-        await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS - 60_000);
-        expect(board.host.failures).toEqual([]);
-        // No timer reads before the deadline: the board opened with one read, a hint asks the rest.
-        expect(board.reads()).toHaveLength(1);
-        await vi.advanceTimersByTimeAsync(60_000);
-
-        await waitFor(() => expect(board.host.failures).toHaveLength(1));
-        expect(board.host.failures[0]?.fallbackTitle).toBe("Couldn't start the run");
-        const again = await openDropdown(board.user);
-        expect(again.getByRole("button", { name: "Run now" })).toBeInTheDocument();
-        expect(board.host.queries).toEqual([]);
-      } finally {
-        vi.useRealTimers();
-      }
-    });
-  });
-
   describe("when they turn the run off while waiting for the run they asked for", () => {
     async function turnedOffMidWait(board: ReturnType<typeof openBoard>) {
       await chooseRunNow(board);
@@ -827,6 +801,33 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
       } finally {
         vi.useRealTimers();
       }
+    });
+
+    /** @scenario "Turning the run off before Run now answers ends the wait" */
+    it("shows no failure when the server then refuses Run now", async () => {
+      let refuseRunNow: (() => void) | undefined;
+      const board = openBoard({
+        setting: ON,
+        host: ASKER,
+        write: (call) =>
+          call.path === RUN_NOW
+            ? new Promise(
+                (_, reject) =>
+                  (refuseRunNow = () => reject(new UiProcedureRefusal("forbidden", 403))),
+              )
+            : Promise.resolve(null),
+      });
+      await chooseRunNow(board);
+      const dropdown = await openDropdown(board.user);
+      await board.user.click(dropdown.getByLabelText("Turn off daily insights"));
+      await waitFor(() => expect(board.sent(TURN_OFF)).toHaveLength(1));
+      await waitFor(() => expect(quietControl()).toBeInTheDocument());
+
+      refuseRunNow?.();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(board.host.failures).toEqual([]);
+      expect(board.host.queries).toEqual([]);
     });
 
     /** @scenario "Turning the run off before Run now answers ends the wait" */
@@ -1058,14 +1059,17 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
       expect(board.host.queries).toEqual([]);
     });
 
-    /** Opens a board whose deadline read is held until `answer` is called, with RUNNING. */
-    async function pastTheDeadlineWithReadHeld(write: (call: UiProcedureCall) => Promise<unknown>) {
+    /** Opens a board whose deadline read is held until `answer` is called, with `shown`. */
+    async function pastTheDeadlineWithReadHeld(
+      write: (call: UiProcedureCall) => Promise<unknown>,
+      shown: InsightDailyRunSetting,
+    ) {
       let isHeld = false;
       let answer: () => void = () => void 0;
       const board = openBoard({
         setting: () =>
           isHeld
-            ? new Promise<InsightDailyRunSetting>((resolve) => (answer = () => resolve(RUNNING)))
+            ? new Promise<InsightDailyRunSetting>((resolve) => (answer = () => resolve(shown)))
             : ON,
         host: ASKER,
         write,
@@ -1077,42 +1081,71 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
       return { board, answer: () => answer() };
     }
 
+    /** What the read shows when the owed verdict would be found, and when it would be lost. */
+    const STALE_VERDICTS: [string, InsightDailyRunSetting][] = [
+      ["a run", RUNNING],
+      ["no run", ON],
+    ];
+
     /** @scenario "Turning the run off after the deadline fired drops the verdict its read owes" */
-    it("opens nothing, says nothing and starts no failure when the read answers after the turn-off", async () => {
-      const { board, answer } = await pastTheDeadlineWithReadHeld((call) =>
-        call.path === TURN_OFF ? Promise.resolve(undefined) : runNowAnswer(),
-      );
-      const dropdown = await openDropdown(board.user);
-      await board.user.click(dropdown.getByLabelText("Turn off daily insights"));
-      await waitFor(() => expect(board.sent(TURN_OFF)).toHaveLength(1));
+    it.each(STALE_VERDICTS)(
+      "shows nothing when the read answers %s after the turn-off",
+      async (_name, shown) => {
+        const { board, answer } = await pastTheDeadlineWithReadHeld(
+          (call) => (call.path === TURN_OFF ? Promise.resolve(undefined) : runNowAnswer()),
+          shown,
+        );
+        const dropdown = await openDropdown(board.user);
+        await board.user.click(dropdown.getByLabelText("Turn off daily insights"));
+        await waitFor(() => expect(board.sent(TURN_OFF)).toHaveLength(1));
 
-      answer();
-      await vi.advanceTimersByTimeAsync(1_000);
+        answer();
+        await vi.advanceTimersByTimeAsync(1_000);
 
-      expect(board.host.queries).toEqual([]);
-      expect(board.host.notices).toEqual([]);
-      expect(board.host.failures).toEqual([]);
-    });
+        expect(board.host.queries).toEqual([]);
+        expect(board.host.notices).toEqual([]);
+        expect(board.host.failures).toEqual([]);
+      },
+    );
+
+    /** @scenario "Leaving the board after the deadline fired drops the verdict its read owes" */
+    it.each(STALE_VERDICTS)(
+      "shows nothing when the read answers %s after the board is left",
+      async (_name, shown) => {
+        const { board, answer } = await pastTheDeadlineWithReadHeld(() => runNowAnswer(), shown);
+
+        board.unmount();
+        answer();
+        await vi.advanceTimersByTimeAsync(1_000);
+
+        expect(board.host.queries).toEqual([]);
+        expect(board.host.notices).toEqual([]);
+        expect(board.host.failures).toEqual([]);
+      },
+    );
 
     /** @scenario "A second Run now drops the verdict the earlier deadline read owes" */
-    it("shows nothing for the old request when its read answers after a second click", async () => {
-      let runNowCalls = 0;
-      const { board, answer } = await pastTheDeadlineWithReadHeld((call) => {
-        if (call.path !== RUN_NOW) return Promise.resolve(undefined);
-        runNowCalls += 1;
-        return runNowCalls === 1 ? runNowAnswer() : new Promise(() => void 0);
-      });
-      const dropdown = await openDropdown(board.user);
-      await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
-      await waitFor(() => expect(board.sent(RUN_NOW)).toHaveLength(2));
+    it.each(STALE_VERDICTS)(
+      "shows nothing for the old request when its read answers %s after a second click",
+      async (_name, shown) => {
+        let runNowCalls = 0;
+        const { board, answer } = await pastTheDeadlineWithReadHeld((call) => {
+          if (call.path !== RUN_NOW) return Promise.resolve(undefined);
+          runNowCalls += 1;
+          return runNowAnswer({ requestId: `request-${runNowCalls}` });
+        }, shown);
+        const dropdown = await openDropdown(board.user);
+        await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
+        await waitFor(() => expect(board.sent(RUN_NOW)).toHaveLength(2));
 
-      answer();
-      await vi.advanceTimersByTimeAsync(1_000);
+        answer();
+        await vi.advanceTimersByTimeAsync(1_000);
 
-      expect(board.host.queries).toEqual([]);
-      expect(board.host.notices).toEqual([]);
-      expect(board.host.failures).toEqual([]);
-    });
+        expect(board.host.queries).toEqual([]);
+        expect(board.host.notices).toEqual([]);
+        expect(board.host.failures).toEqual([]);
+      },
+    );
 
     /** @scenario "The deadline says the run could not be started when its last read finds none" */
     it("says so once, after one more read, and offers Run now again", async () => {

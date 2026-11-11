@@ -210,8 +210,9 @@ with that id to show, with no standing poll: `run_started` and `run_settled` hin
 board's read, which is read again. A hint is published off the committed event, not after
 the schedule row is folded, so it can outrun the row: the read it brought back may show no
 run. No timer reads again for that. The next hint's read finds the run, `run_settled` at the
-latest, so Langy may open late and never early. This is not one of
-the timer exceptions in ARCHITECTURE.md's "No timer polling", and the browser adds none. In flight, it opens Langy on the run's conversation; settled first, it
+latest, so Langy may open late and never early. The only timer is the one-shot expiry
+deadline below: it fires one read per request and never repeats, so it is not one of the
+timer exceptions in ARCHITECTURE.md's "No timer polling". In flight, it opens Langy on the run's conversation; settled first, it
 ends the wait, opening Langy if the run has a conversation and otherwise telling the
 person how it ended or why it did not start, from `lastRun`.
 
@@ -230,7 +231,7 @@ run that never reached Langy leaves the wait to its deadline. Run now answers
 run's start, so the browser's clock never enters the comparison. A scheduled run that
 settled before the request is shown as the last run, and the wait goes on. A run that
 shows neither within `INSIGHT_DAILY_RUN_EXPIRY_MS` is lost. The spinner ends at that instant, whatever the board
-read, and the browser reads the board once more. That read gives the verdict, with no timer:
+read, and the browser reads the board once more. That read gives the verdict, and the verdict has no timer of its own:
 if it shows the requested run the wait ends as for any other read, opening Langy or telling
 how the run ended; if it shows none, or fails, the browser says the run could not be started;
 if it never answers, nothing is said and no panel opens, and a run shows only in the dropdown

@@ -1164,6 +1164,7 @@ Feature: The daily insights run
       And a From LangWatch board does not, since a run on it always ends skipped with template_board
       And a board with no widgets does not, since a run on it always ends skipped with board_empty
       And a board whose widgets have not loaded does not, until they have
+      And a member who may not ask Langy is offered no Run now
 
     @integration
     Scenario: Run now asks for a run and opens Langy on it
@@ -1274,6 +1275,13 @@ Feature: The daily insights run
       Then no Langy panel opens, no notice is shown and no failure is shown
 
     @integration
+    Scenario: Leaving the board after the deadline fired drops the verdict its read owes
+      Given a board that is on, and the member chose Run now
+      And the deadline fired and its read has not answered
+      When they leave the board and then that read answers with the run
+      Then no Langy panel opens, no notice is shown and no failure is shown
+
+    @integration
     Scenario: A second Run now drops the verdict the earlier deadline read owes
       Given a board that is on, and the member chose Run now
       And the deadline fired and its read has not answered
@@ -1314,6 +1322,7 @@ Feature: The daily insights run
       Given a board that is on, and the member chose Run now
       When they turn the run off before the server answers Run now
       Then no Langy panel opens, no notice and no failure is shown when Run now answers, when the run shows, or at the deadline
+      And if the server then refuses Run now, no failure is shown for it either
 
     @integration
     Scenario: Starting a run still shows after the last widget is deleted
