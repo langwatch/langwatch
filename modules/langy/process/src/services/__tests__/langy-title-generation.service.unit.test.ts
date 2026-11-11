@@ -2,7 +2,6 @@ import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
 import {
   ModelNotConfiguredError,
   type ModelProviderApi,
-  type ModelProviderExecution,
   type ModelProviderResolution,
 } from "@langwatch/model-provider-contract";
 /**
@@ -15,6 +14,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { LangyMessageRecord, LangyTrustedMessageReader } from "../langy-message.service.ts";
 import { LangyTitleGeneratorService } from "../langy-title-generator.service.ts";
+import { executionProvider } from "./execution-provider.fixture.ts";
 
 const records: LangyMessageRecord[] = [
   { id: "msg_1", role: "user", content: "instrument my traces with langwatch" },
@@ -32,33 +32,6 @@ const RESOLVED: ModelProviderResolution = {
     description: "Names each Langy conversation from its messages.",
   },
 };
-
-function executionProvider(input: { provider: string; enabled: boolean }): ModelProviderExecution {
-  return {
-    id: `mp_${input.provider}`,
-    organizationId: "org_1",
-    provider: input.provider,
-    name: input.provider,
-    enabled: input.enabled,
-    routingHandle: null,
-    scopes: [],
-    customKeys: null,
-    customModels: [],
-    customEmbeddingsModels: [],
-    extraHeaders: [],
-    rateLimitRpm: null,
-    rateLimitTpm: null,
-    rateLimitRpd: null,
-    fallbackPriorityGlobal: null,
-    providerConfig: null,
-    createdAt: new Date(0),
-    updatedAt: new Date(0),
-    models: null,
-    embeddingsModels: null,
-    isSystem: false,
-    embeddingsUnsupported: false,
-  };
-}
 
 function messages(rows = records): LangyTrustedMessageReader {
   return { getRecordsByConversation: async () => rows };

@@ -74,7 +74,8 @@ export class LangyTitleGeneratorService {
   }
 
   /**
-   * Every failure but an unconfigured model throws, so the process outbox retries it.
+   * Two exits leave the title unchanged without throwing: no model configured, and a fallback
+   * model whose provider is not connected. Every other failure throws so the outbox retries it.
    */
   async generate(input: {
     projectId: string;
@@ -92,9 +93,24 @@ export class LangyTitleGeneratorService {
 
     try {
       const model = await this.titleModel(projectId);
+      if (model.steppedOverCodexModel) {
+        logger.info(
+          {
+            projectId,
+            conversationId,
+            configuredModel: model.steppedOverCodexModel,
+            substitutedModel: model.name,
+          },
+          "Langy title model is a Codex model this process cannot run; using the cheap default instead",
+        );
+      }
       if (model.fallback && !(await this.providerAvailable({ projectId, model: model.name }))) {
         logger.warn(
-          { projectId, conversationId },
+          {
+            projectId,
+            conversationId,
+            reason: model.steppedOverCodexModel ? "codex_stepped_over" : "no_model_configured",
+          },
           "cheap default model's provider is not available for Langy titles; leaving title unchanged",
         );
 
@@ -116,7 +132,7 @@ export class LangyTitleGeneratorService {
       if (!isModelNotConfigured(error)) throw error;
       logger.warn(
         { projectId, conversationId },
-        "no cheap model configured for Langy titles — leaving title unchanged",
+        "no cheap model configured for Langy titles; leaving title unchanged",
       );
 
       return UNCHANGED;
@@ -135,7 +151,11 @@ export class LangyTitleGeneratorService {
    * The project's model for titles, else the cheap default so titles work out of the box.
    * A Codex model is stepped over the same way: this process cannot execute Codex models.
    */
-  private async titleModel(projectId: string): Promise<{ name: string; fallback: boolean }> {
+  private async titleModel(projectId: string): Promise<{
+    name: string;
+    fallback: boolean;
+    steppedOverCodexModel?: string;
+  }> {
     try {
       const resolved = await this.deps.models.resolveModelForFeature({
         projectId,
@@ -143,7 +163,11 @@ export class LangyTitleGeneratorService {
       });
 
       if (isCodexModel(resolved.model)) {
-        return { name: LANGY_TITLE_GENERATION.MODEL, fallback: true };
+        return {
+          name: LANGY_TITLE_GENERATION.MODEL,
+          fallback: true,
+          steppedOverCodexModel: resolved.model,
+        };
       }
 
       return { name: resolved.model, fallback: false };

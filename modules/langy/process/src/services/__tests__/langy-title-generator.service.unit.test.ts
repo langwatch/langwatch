@@ -1,8 +1,8 @@
 import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
 import {
   type ModelDefaultResolveInput,
-  type ModelProviderExecution,
   type ModelProviderApi,
+  type ModelProviderExecution,
   type ModelProviderTextGenerationInput,
 } from "@langwatch/model-provider-contract";
 /**
@@ -15,6 +15,7 @@ import { describe, expect, it } from "vitest";
 
 import type { LangyTrustedMessageReader } from "../langy-message.service.ts";
 import { LangyTitleGeneratorService } from "../langy-title-generator.service.ts";
+import { executionProvider } from "./execution-provider.fixture.ts";
 
 const PROJECT_ID = "project-1";
 const CONVERSATION_ID = "conversation-1";
@@ -25,33 +26,6 @@ function messagesOf(records: { role: "user" | "assistant"; content: string }[]) 
       records.map((record, index) => ({ id: `message-${index}`, ...record })),
   };
   return reader;
-}
-
-function executionProvider(input: { provider: string; enabled: boolean }): ModelProviderExecution {
-  return {
-    id: `mp_${input.provider}`,
-    organizationId: "org_1",
-    provider: input.provider,
-    name: input.provider,
-    enabled: input.enabled,
-    routingHandle: null,
-    scopes: [],
-    customKeys: null,
-    customModels: [],
-    customEmbeddingsModels: [],
-    extraHeaders: [],
-    rateLimitRpm: null,
-    rateLimitTpm: null,
-    rateLimitRpd: null,
-    fallbackPriorityGlobal: null,
-    providerConfig: null,
-    createdAt: new Date(0),
-    updatedAt: new Date(0),
-    models: null,
-    embeddingsModels: null,
-    isSystem: false,
-    embeddingsUnsupported: false,
-  };
 }
 
 /** model-provider, answering one text and recording what it was asked. */
