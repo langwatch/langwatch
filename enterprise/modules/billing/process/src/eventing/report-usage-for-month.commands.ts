@@ -25,9 +25,14 @@ import {
   INSTANT_EVAL_USD_EVENT_NAME,
 } from "../rules/instant-eval-meter.rules.ts";
 import { meterEventTimestampSeconds } from "../rules/meter-event-timestamp.rules.ts";
+import {
+  PII_REDACTION_USD_EVENT_NAME,
+  piiRedactionMeterIdentifier,
+} from "../rules/pii-redaction-meter.rules.ts";
 import { type NotUsageBilledReason, usageBilledOf } from "../rules/usage-billed.rules.ts";
 import type { BillingErrorReporter } from "../services/billing-error-reporter.service.ts";
 import type { InstantEvalSpendQueryService } from "../services/instant-eval-spend-query.service.ts";
+import type { PiiRedactionSpendQueryService } from "../services/pii-redaction-spend-query.service.ts";
 import type { UsageReportingService } from "../services/usage-reporting.service.ts";
 
 const logger = createLogger("langwatch:billing-reporting:report-usage-for-month");
@@ -96,6 +101,10 @@ export interface ReportUsageForMonthCommandDeps {
    * skip that usage for good; the first report after the mapping carries it.
    */
   isInstantEvalMeterProvisioned: () => boolean;
+  /** The PII redaction meter's total, read off the gateway spend ledger (ADR-201). */
+  queryPiiRedactionSpendTotal: PiiRedactionSpendQueryService["queryPiiRedactionSpendTotal"];
+  /** Whether Stripe holds the PII redaction meter in this mode; creating it starts charging. */
+  isPiiRedactionMeterProvisioned: () => boolean;
   selfDispatch: (data: ReportUsageForMonthCommandData) => Promise<void>;
   /** Shared organization-read cache; see `billing-organization-cache.repository.ts`. */
   organizationCache: BillingOrganizationCacheRepository;
@@ -234,6 +243,16 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
           deps.queryInstantEvalSpendTotal({ organizationId, billingMonth }),
         toValue: instantEvalMeterUnitsToUsd,
         identifier: instantEvalMeterIdentifier,
+      },
+      {
+        eventName: PII_REDACTION_USD_EVENT_NAME,
+        isProvisioned: deps.isPiiRedactionMeterProvisioned,
+        followsCountedEvent: false,
+        ceiling: async () => null,
+        queryTotal: ({ organizationId, billingMonth }) =>
+          deps.queryPiiRedactionSpendTotal({ organizationId, billingMonth }),
+        toValue: instantEvalMeterUnitsToUsd,
+        identifier: piiRedactionMeterIdentifier,
       },
     ];
   }

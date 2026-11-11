@@ -19,6 +19,7 @@ const {
   mockSelfDispatch,
   mockCaptureException,
   mockQueryInstantEvalSpendTotal,
+  mockQueryPiiRedactionSpendTotal,
   mockConnectedUsageCeiling,
   mockLogger,
 } = vi.hoisted(() => {
@@ -26,6 +27,7 @@ const {
   const selfDispatchFn = vi.fn();
   const captureExceptionFn = vi.fn();
   const queryInstantEvalSpendTotalFn = vi.fn();
+  const queryPiiRedactionSpendTotalFn = vi.fn();
 
   const createMockLogger = (): Record<string, unknown> => ({
     info: vi.fn(),
@@ -62,6 +64,7 @@ const {
     mockSelfDispatch: selfDispatchFn,
     mockCaptureException: captureExceptionFn,
     mockQueryInstantEvalSpendTotal: queryInstantEvalSpendTotalFn,
+    mockQueryPiiRedactionSpendTotal: queryPiiRedactionSpendTotalFn,
     mockConnectedUsageCeiling: connectedUsageCeilingFn,
     mockLogger: loggerInstance,
   };
@@ -98,6 +101,8 @@ let countedTotal: number | undefined;
 let countedEventId: string | undefined;
 /** Whether the catalogue maps an Instant Evals meter in the mode under test. */
 let instantEvalMeterProvisioned = true;
+/** Whether the catalogue maps the PII redaction meter in the mode under test. */
+let piiRedactionMeterProvisioned = true;
 
 function makeCommand(
   organizationId = "org-1",
@@ -171,6 +176,8 @@ async function createHandler() {
     }),
     queryInstantEvalSpendTotal: mockQueryInstantEvalSpendTotal,
     isInstantEvalMeterProvisioned: () => instantEvalMeterProvisioned,
+    queryPiiRedactionSpendTotal: mockQueryPiiRedactionSpendTotal,
+    isPiiRedactionMeterProvisioned: () => piiRedactionMeterProvisioned,
     selfDispatch: mockSelfDispatch,
     organizationCache: missingOrganizationCache,
     errorReporter: errorReporter as any,
@@ -188,9 +195,11 @@ describe("ReportUsageForMonthCommand", () => {
     countedTotal = undefined;
     countedEventId = undefined;
     instantEvalMeterProvisioned = true;
+    piiRedactionMeterProvisioned = true;
     // No spend ledger unless a test says otherwise, so the Instant Evals
     // meter stays out of the way of every assertion about the events one.
     mockQueryInstantEvalSpendTotal.mockResolvedValue({ outcome: "unavailable" });
+    mockQueryPiiRedactionSpendTotal.mockResolvedValue({ outcome: "unavailable" });
   });
 
   // ========================================================================
@@ -660,6 +669,139 @@ describe("ReportUsageForMonthCommand", () => {
         billingMonth: "2026-02",
         lastReportedTotal: 15_000,
       });
+    });
+  });
+
+  describe("given billable events, Instant Eval spend and PII redaction spend in one month", () => {
+    /** @scenario "The PII redaction meter keeps its own checkpoint" */
+    /** @scenario "The meter is named langwatch_pii_redaction_usd" */
+    it("reports PII redaction on its own meter, checkpoint and identifier, leaving the others unchanged", async () => {
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
+      countedTotal = 150;
+      mockQueryInstantEvalSpendTotal.mockResolvedValue({ outcome: "counted", total: 12_345 });
+      mockQueryPiiRedactionSpendTotal.mockResolvedValue({ outcome: "counted", total: 123_456 });
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).toHaveBeenCalledTimes(3);
+      const sent = mockReportUsageDelta.mock.calls.map(([input]) => input.events[0]);
+      expect(sent).toEqual([
+        expect.objectContaining({
+          eventName: "langwatch_billable_events",
+          identifier: "org-1:2026-02:from:0:to:150",
+        }),
+        expect.objectContaining({
+          eventName: "langwatch_instant_eval_usd",
+          identifier: "org-1:2026-02:langwatch_instant_eval_usd:from:0:to:12345",
+        }),
+        expect.objectContaining({
+          eventName: "langwatch_pii_redaction_usd",
+          identifier: "org-1:2026-02:langwatch_pii_redaction_usd:from:0:to:123456",
+          value: 12.3456,
+        }),
+      ]);
+      expect(mockBillingCheckpoints.confirm).toHaveBeenCalledWith({
+        meter: "langwatch_pii_redaction_usd",
+        organizationId: "org-1",
+        billingMonth: "2026-02",
+        lastReportedTotal: 123_456,
+      });
+    });
+  });
+
+  describe("given a Stripe mode whose catalogue maps no PII redaction meter", () => {
+    /** @scenario "The PII redaction meter is reported only once Stripe holds it" */
+    it("sends no PII redaction event and leaves its checkpoint alone", async () => {
+      piiRedactionMeterProvisioned = false;
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
+      mockQueryPiiRedactionSpendTotal.mockResolvedValue({ outcome: "counted", total: 5_000 });
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockQueryPiiRedactionSpendTotal).not.toHaveBeenCalled();
+      expect(mockReportUsageDelta).not.toHaveBeenCalled();
+      expect(mockBillingCheckpoints.writeIntent).not.toHaveBeenCalledWith(
+        expect.objectContaining({ meter: "langwatch_pii_redaction_usd" }),
+      );
+    });
+
+    it("carries the month from zero on the first report after the meter is mapped", async () => {
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
+      mockQueryPiiRedactionSpendTotal.mockResolvedValue({ outcome: "counted", total: 5_000 });
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      const handler = await createHandler();
+
+      piiRedactionMeterProvisioned = false;
+      await handler.handle(makeCommand());
+      piiRedactionMeterProvisioned = true;
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).toHaveBeenCalledTimes(1);
+      expect(mockReportUsageDelta.mock.calls[0]?.[0].events[0]).toMatchObject({
+        eventName: "langwatch_pii_redaction_usd",
+        identifier: "org-1:2026-02:langwatch_pii_redaction_usd:from:0:to:5000",
+        value: 0.5,
+      });
+    });
+  });
+
+  describe("given the PII redaction checkpoint reported 1.0000 dollars and the month is now 1.5000", () => {
+    /** @scenario "A second report sends only the delta since the checkpoint" */
+    it("sends 0.5000 under an identifier naming the meter, the month and both totals", async () => {
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockBillingCheckpoints.findCheckpoint.mockImplementation(
+        async ({ meter }: { meter: string }) =>
+          meter === "langwatch_pii_redaction_usd"
+            ? { lastReportedTotal: 10_000, pendingReportedTotal: null, consecutiveFailures: 0 }
+            : null,
+      );
+      mockQueryPiiRedactionSpendTotal.mockResolvedValue({ outcome: "counted", total: 15_000 });
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).toHaveBeenCalledTimes(1);
+      expect(mockReportUsageDelta.mock.calls[0]?.[0].events[0]).toMatchObject({
+        eventName: "langwatch_pii_redaction_usd",
+        identifier: "org-1:2026-02:langwatch_pii_redaction_usd:from:10000:to:15000",
+        value: 0.5,
+      });
+    });
+  });
+
+  describe("given an organization with no active subscription and PII redaction spend", () => {
+    /** @scenario "An organization that is not usage billed reports nothing" */
+    it("reads no spend and sends nothing", async () => {
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(
+        usageBilledOrg({ hasSubscription: false }),
+      );
+      mockQueryPiiRedactionSpendTotal.mockResolvedValue({ outcome: "counted", total: 5_000 });
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a month with no PII redaction spend", () => {
+    it("sends no PII redaction event", async () => {
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
+      mockQueryPiiRedactionSpendTotal.mockResolvedValue({ outcome: "counted", total: 0 });
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).not.toHaveBeenCalled();
     });
   });
 

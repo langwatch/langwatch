@@ -89,6 +89,7 @@ import { CustomerService } from "../services/customer.service.ts";
 import { DeveloperSeatService } from "../services/developer-seat.service.ts";
 import { InstantEvalSpendQueryService } from "../services/instant-eval-spend-query.service.ts";
 import { OrganizationPricingService } from "../services/organization-pricing.service.ts";
+import { PiiRedactionSpendQueryService } from "../services/pii-redaction-spend-query.service.ts";
 import { PlanLimitAlertService } from "../services/plan-limit-alert.service.ts";
 import { SaaSPlanProviderService } from "../services/plan-provider.service.ts";
 import { ResourceLimitAlertService } from "../services/resource-limit-alert.service.ts";
@@ -926,6 +927,14 @@ export class BillingModule
       sumSpendNanoUsdByRequestType: (input) =>
         repositories.gatewaySpend.sumSpendNanoUsdByRequestType(input),
     });
+    const piiRedactionSpend = PiiRedactionSpendQueryService.create({
+      isSpendSourceAvailable: () => repositories.gatewaySpend.isSpendSourceAvailable(),
+      listProjectIds: ({ organizationId }) => projects.findProjectIds(organizationId),
+      sumSpendNanoUsdByRequestType: (input) =>
+        repositories.gatewaySpend.sumSpendNanoUsdByRequestType(input),
+    });
+    const meters = () =>
+      BillingPriceCatalogue.create(getStripeEnvironmentFromNodeEnv(nodeEnvironment)).meters;
     const ceiling = ConnectedUsageCeilingService.create({
       licensing: peers.licensing,
       gateway: repositories.gatewaySpend,
@@ -939,9 +948,9 @@ export class BillingModule
       billingCheckpoints: repositories.checkpoints,
       getUsageReportingService: () => (reporter ??= usageReporting?.()),
       queryInstantEvalSpendTotal: (input) => instantEvalSpend.queryInstantEvalSpendTotal(input),
-      isInstantEvalMeterProvisioned: () =>
-        BillingPriceCatalogue.create(getStripeEnvironmentFromNodeEnv(nodeEnvironment)).meters
-          .INSTANT_EVAL_USD !== undefined,
+      isInstantEvalMeterProvisioned: () => meters().INSTANT_EVAL_USD !== undefined,
+      queryPiiRedactionSpendTotal: (input) => piiRedactionSpend.queryPiiRedactionSpendTotal(input),
+      isPiiRedactionMeterProvisioned: () => meters().PII_REDACTION_USD !== undefined,
       organizationCache: repositories.organizationCache,
       errorReporter: BillingErrorReporterService.create(),
       connectedUsageCeiling: async (input) => {

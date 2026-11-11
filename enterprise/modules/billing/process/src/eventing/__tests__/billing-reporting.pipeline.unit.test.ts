@@ -45,6 +45,8 @@ function rollUp(
     getUsageReportingService: () => void 0,
     queryInstantEvalSpendTotal: async () => ({ outcome: "unavailable" }),
     isInstantEvalMeterProvisioned: () => true,
+    queryPiiRedactionSpendTotal: async () => ({ outcome: "unavailable" }),
+    isPiiRedactionMeterProvisioned: () => true,
     organizationCache: repositories.organizationCache,
     errorReporter: BillingErrorReporterService.create(),
     connectedUsageCeiling: async () => null,

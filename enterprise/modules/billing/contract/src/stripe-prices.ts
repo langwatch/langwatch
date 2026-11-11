@@ -68,18 +68,25 @@ export type StripePriceMapping = Record<
   Partial<Record<StripeEnvironment, string>> | undefined
 >;
 
-export const STRIPE_METER_NAMES = ["BILLABLE_EVENTS", "INSTANT_EVAL_USD"] as const;
+export const STRIPE_METER_NAMES = [
+  "BILLABLE_EVENTS",
+  "INSTANT_EVAL_USD",
+  "PII_REDACTION_USD",
+] as const;
 export type StripeMeterName = (typeof STRIPE_METER_NAMES)[number];
 
 /** Meters that may be absent from the catalog in a given Stripe mode. */
-export const OPTIONAL_STRIPE_METER_NAMES: readonly StripeMeterName[] = ["INSTANT_EVAL_USD"];
+export const OPTIONAL_STRIPE_METER_NAMES: readonly StripeMeterName[] = [
+  "INSTANT_EVAL_USD",
+  "PII_REDACTION_USD",
+];
 
 export type StripeMeterMapping = Record<
   StripeMeterName,
   Record<StripeEnvironment, string> | undefined
 >;
 export type StripeMeterMap = Partial<Record<StripeMeterName, string>> &
-  Record<Exclude<StripeMeterName, "INSTANT_EVAL_USD">, string>;
+  Record<Exclude<StripeMeterName, "INSTANT_EVAL_USD" | "PII_REDACTION_USD">, string>;
 
 export type StripePricesFile = {
   schemaVersion: number;

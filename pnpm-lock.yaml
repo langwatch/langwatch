@@ -2721,6 +2721,9 @@ importers:
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../../../packages/clickhouse-client
+      '@langwatch/data-privacy-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/data-privacy/contract
       '@langwatch/enterprise-billing-contract':
         specifier: workspace:*
         version: link:../contract
