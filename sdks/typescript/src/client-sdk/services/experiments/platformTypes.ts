@@ -32,8 +32,8 @@ export type ExperimentRunSummary = {
     failed: number;
     /** Cells where the evaluator crashed and gave no verdict; absent on older servers. */
     errored?: number;
-    /** Share of verdicts that passed, in percent; absent when the evaluator gave none. */
-    passRate?: number;
+    /** 0 when the evaluator gave no verdict at all; check passed + failed before showing it. */
+    passRate: number;
     avgScore?: number;
   }[];
   totalPassed?: number;

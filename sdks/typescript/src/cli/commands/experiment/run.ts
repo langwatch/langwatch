@@ -197,7 +197,7 @@ function printRunStatus({
     const errored = evaluator.errored ? `, ${chalk.red(`${evaluator.errored} errored`)}` : "";
     // A pass rate over no verdicts would read as "all failed"; say what happened instead.
     const rate =
-      evaluator.passRate === undefined ? "no verdicts" : `${evaluator.passRate.toFixed(1)}%`;
+      evaluator.passed + evaluator.failed > 0 ? `${evaluator.passRate.toFixed(1)}%` : "no verdicts";
     console.log(
       `    ${chalk.gray(`${evaluator.name}:`)} ${evaluator.passed} passed, ${failed}` +
         `${errored} (${rate})`,

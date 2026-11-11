@@ -11,8 +11,8 @@ export type ExperimentRunEvaluatorTally = {
   failed: number;
   /** Cells where the evaluator crashed and gave no verdict; a gate counts them as failures. */
   errored: number;
-  /** Share of verdicts that passed, in percent; absent when the evaluator gave none. */
-  passRate?: number;
+  /** 0 with no verdicts, kept for released SDKs that format it unguarded; check passed + failed. */
+  passRate: number;
   avgScore?: number;
 };
 
@@ -54,7 +54,7 @@ export function summariseEvaluatorVerdicts({
       passed,
       failed,
       errored,
-      ...(passed + failed > 0 ? { passRate: (passed / (passed + failed)) * 100 } : {}),
+      passRate: passed + failed > 0 ? (passed / (passed + failed)) * 100 : 0,
       ...(scores.length > 0
         ? { avgScore: scores.reduce((sum, score) => sum + score, 0) / scores.length }
         : {}),

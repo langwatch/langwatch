@@ -97,7 +97,7 @@ class EvaluatorStats:
     name: str
     passed: int
     failed: int
-    # Share of verdicts that passed, in percent; 0 when the evaluator gave none.
+    # 0 when the evaluator gave no verdict; check passed + failed before showing it.
     pass_rate: float
     avg_score: Optional[float] = None
     # Cells where the evaluator crashed and gave no verdict; 0 on older servers.

@@ -9932,8 +9932,8 @@ export interface operations {
                                 failed: number;
                                 /** @description Cells where the evaluator crashed and gave no verdict */
                                 errored?: number;
-                                /** @description Percentage of verdicts that passed; absent when the evaluator gave none */
-                                passRate?: number;
+                                /** @description Percentage of verdicts that passed; 0 when passed and failed are both 0 */
+                                passRate: number;
                                 avgScore?: number;
                             }[];
                             totalPassed?: number;

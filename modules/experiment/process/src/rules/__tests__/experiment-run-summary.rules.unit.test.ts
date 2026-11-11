@@ -80,7 +80,7 @@ describe("summariseEvaluatorVerdicts", () => {
 
       expect(summary.evaluators[0]).toMatchObject({ passed: 0, failed: 0 });
       expect(summary.evaluators[0]?.avgScore).toBeCloseTo(0.6);
-      expect(summary.evaluators[0]).not.toHaveProperty("passRate");
+      expect(summary.evaluators[0]?.passRate).toBe(0);
     });
   });
 

@@ -46,7 +46,7 @@ Feature: A completed run's summary carries its evaluator verdicts
     Given a run whose evaluator "faithfulness" returned scores 0.4 and 0.8 with no pass or fail
     When the run completes
     Then the summary lists "faithfulness" with 0 passed, 0 failed and an average score of 0.6
-    And "faithfulness" carries no pass rate, so it does not read as every evaluation failing
+    And its pass rate stays 0 for released clients, so 0 passed and 0 failed mark no verdicts
 
   @unit
   Scenario: A comparison evaluator keeps no verdicts and is left out

@@ -30,10 +30,11 @@ CRASHED_VERDICT = [
         "passed": 0,
         "failed": 0,
         "errored": 3,
+        "passRate": 0,
     }
 ]
 SCORE_ONLY_VERDICT = [
-    {"evaluatorId": "ev_1", "name": "faithfulness", "passed": 0, "failed": 0, "avgScore": 0.6}
+    {"evaluatorId": "ev_1", "name": "faithfulness", "passed": 0, "failed": 0, "passRate": 0, "avgScore": 0.6}
 ]
 
 

@@ -190,7 +190,7 @@ describe("runExperimentCommand()", () => {
       { evaluatorId: "ev_1", name: "exact_match", passed: 3, failed: 0, passRate: 100 },
     ];
     const crashedVerdict = [
-      { evaluatorId: "ev_1", name: "exact_match", passed: 0, failed: 0, errored: 3 },
+      { evaluatorId: "ev_1", name: "exact_match", passed: 0, failed: 0, errored: 3, passRate: 0 },
     ];
     const completedWith = (summary: Record<string, unknown>) => ({
       runId: "run_123",

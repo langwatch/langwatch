@@ -302,8 +302,7 @@ const executionSummarySchemaDefinition = z.object({
           .describe("Cells where the evaluator crashed and gave no verdict"),
         passRate: z
           .number()
-          .optional()
-          .describe("Percentage of verdicts that passed; absent when the evaluator gave none"),
+          .describe("Percentage of verdicts that passed; 0 when passed and failed are both 0"),
         avgScore: z.number().optional(),
       }),
     )

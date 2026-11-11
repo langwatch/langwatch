@@ -137,7 +137,7 @@ describe("ExperimentsFacade parity with the Python SDK", () => {
     /** @scenario "Opting in fails the job when an evaluator crashed on every row" */
     it("exits 1 with failOnEvaluatorFailures when the evaluator only errored", async () => {
       const crashed = [
-        { evaluatorId: "ev_1", name: "exact_match", passed: 0, failed: 0, errored: 3 },
+        { evaluatorId: "ev_1", name: "exact_match", passed: 0, failed: 0, errored: 3, passRate: 0 },
       ];
       const code = await exitCodeFor(
         { failedCells: 0, evaluators: crashed },
@@ -149,7 +149,7 @@ describe("ExperimentsFacade parity with the Python SDK", () => {
     /** @scenario "By default a crashed evaluator leaves the job green" */
     it("does not exit by default when the evaluator only errored", async () => {
       const crashed = [
-        { evaluatorId: "ev_1", name: "exact_match", passed: 0, failed: 0, errored: 3 },
+        { evaluatorId: "ev_1", name: "exact_match", passed: 0, failed: 0, errored: 3, passRate: 0 },
       ];
       expect(await exitCodeFor({ failedCells: 0, evaluators: crashed })).toBeUndefined();
     });
@@ -158,7 +158,14 @@ describe("ExperimentsFacade parity with the Python SDK", () => {
     it("prints no verdicts for an evaluator that only scored", async () => {
       const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
       const scoreOnly = [
-        { evaluatorId: "ev_1", name: "faithfulness", passed: 0, failed: 0, avgScore: 0.6 },
+        {
+          evaluatorId: "ev_1",
+          name: "faithfulness",
+          passed: 0,
+          failed: 0,
+          passRate: 0,
+          avgScore: 0.6,
+        },
       ];
       await exitCodeFor({ failedCells: 0, evaluators: scoreOnly }, { exitOnFailure: false });
       const printed = log.mock.calls.map((call) => String(call[0])).join("\n");
