@@ -1267,6 +1267,20 @@ Feature: The daily insights run
       And the message goes through the page as it is by then
 
     @integration
+    Scenario: Turning the run off after the deadline fired drops the verdict its read owes
+      Given a board that is on, and the member chose Run now
+      And the deadline fired and its read has not answered
+      When they turn the run off and then that read answers
+      Then no Langy panel opens, no notice is shown and no failure is shown
+
+    @integration
+    Scenario: A second Run now drops the verdict the earlier deadline read owes
+      Given a board that is on, and the member chose Run now
+      And the deadline fired and its read has not answered
+      When they choose Run now again and then the earlier read answers
+      Then nothing is shown for the earlier request
+
+    @integration
     Scenario: The deadline says so once when its last read fails
       Given a board that is on, and the member chose Run now
       And the board has read no run for as long as a run can last

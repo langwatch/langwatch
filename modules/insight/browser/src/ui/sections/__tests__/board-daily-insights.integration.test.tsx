@@ -1058,6 +1058,62 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
       expect(board.host.queries).toEqual([]);
     });
 
+    /** Opens a board whose deadline read is held until `answer` is called, with RUNNING. */
+    async function pastTheDeadlineWithReadHeld(write: Parameters<typeof openBoard>[0]["write"]) {
+      let isHeld = false;
+      let answer: () => void = () => void 0;
+      const board = openBoard({
+        setting: () =>
+          isHeld
+            ? new Promise<InsightDailyRunSetting>((resolve) => (answer = () => resolve(RUNNING)))
+            : ON,
+        host: ASKER,
+        write,
+      });
+      await aMinuteBeforeTheDeadline(board);
+      isHeld = true;
+      await vi.advanceTimersByTimeAsync(60_000);
+      await waitFor(() => expect(board.reads()).toHaveLength(READS_BEFORE_DEADLINE + 1));
+      return { board, answer: () => answer() };
+    }
+
+    /** @scenario "Turning the run off after the deadline fired drops the verdict its read owes" */
+    it("opens nothing, says nothing and starts no failure when the read answers after the turn-off", async () => {
+      const { board, answer } = await pastTheDeadlineWithReadHeld((call) =>
+        call.path === TURN_OFF ? Promise.resolve(undefined) : runNowAnswer(),
+      );
+      const dropdown = await openDropdown(board.user);
+      await board.user.click(dropdown.getByLabelText("Turn off daily insights"));
+      await waitFor(() => expect(board.sent(TURN_OFF)).toHaveLength(1));
+
+      answer();
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      expect(board.host.queries).toEqual([]);
+      expect(board.host.notices).toEqual([]);
+      expect(board.host.failures).toEqual([]);
+    });
+
+    /** @scenario "A second Run now drops the verdict the earlier deadline read owes" */
+    it("shows nothing for the old request when its read answers after a second click", async () => {
+      let runNowCalls = 0;
+      const { board, answer } = await pastTheDeadlineWithReadHeld((call) => {
+        if (call.path !== RUN_NOW) return Promise.resolve(undefined);
+        runNowCalls += 1;
+        return runNowCalls === 1 ? runNowAnswer() : new Promise(() => void 0);
+      });
+      const dropdown = await openDropdown(board.user);
+      await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
+      await waitFor(() => expect(board.sent(RUN_NOW)).toHaveLength(2));
+
+      answer();
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      expect(board.host.queries).toEqual([]);
+      expect(board.host.notices).toEqual([]);
+      expect(board.host.failures).toEqual([]);
+    });
+
     /** @scenario "The deadline says the run could not be started when its last read finds none" */
     it("says so once, after one more read, and offers Run now again", async () => {
       const board = openBoard({ setting: ON, host: ASKER, write: () => runNowAnswer() });

@@ -258,13 +258,16 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
     mayRunNow: host.hasPermission("langy:create"),
     /** True from Run now until its run shows, it is turned off, or a run's expiry passes. */
     isStartingRun: runNowRequest.isPending || isAwaitingRun,
-    runNow: () =>
+    runNow: () => {
+      // A verdict owed to the earlier request must not land on this one.
+      cancelVerdict();
       runNowRequest.mutate(
         { projectId, board, maxInsights: settings.maxInsights },
         {
           onError: (error) => host.failed({ error, fallbackTitle: RUN_NOT_STARTED }),
         },
-      ),
+      );
+    },
     openInLangy: (conversationId: string) => openInLangy({ host, conversationId }),
   };
 }
