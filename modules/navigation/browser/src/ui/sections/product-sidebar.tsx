@@ -33,7 +33,7 @@ import {
   type SectionNavItemData,
 } from "../../model/section-nav-items.ts";
 import {
-  isSettingsMenuItemActive,
+  isSettingsMenuItemActiveAmong,
   OPS_ATTENTION_HREF,
   type SettingsMenuGroup,
 } from "../../model/settings-menu.ts";
@@ -183,7 +183,9 @@ function DetourMenuBody({
   showExpanded: boolean;
   badgeFor?: (href: string) => number | undefined;
 }) {
-  const pathname = useNavigationHost().pathname();
+  const host = useNavigationHost();
+  const pathname = host.pathname();
+  const search = host.search();
 
   return (
     <>
@@ -200,7 +202,12 @@ function DetourMenuBody({
               icon={item.icon}
               label={item.label}
               href={item.href}
-              isActive={isSettingsMenuItemActive({ item, pathname })}
+              isActive={isSettingsMenuItemActiveAmong({
+                item,
+                siblings: group.items,
+                pathname,
+                search,
+              })}
               showLabel={showExpanded}
               badgeNumber={badgeFor?.(item.href)}
               isLocked={item.isLocked}
