@@ -72,12 +72,26 @@ function showRequestedRun({
   }
 }
 
+type RequestedRun = NonNullable<ReturnType<typeof requestedRunOf>>;
+type RunRequest = { requestId: string; requestedAt: number };
+
+/** The run the deadline's read shows for the request; a failed read shows none. */
+function readRequestedRun({
+  readOnce,
+  request,
+}: {
+  readOnce: () => Promise<{ data?: InsightDailyRunSetting | undefined }>;
+  request: RunRequest;
+}): Promise<RequestedRun | undefined> {
+  return readOnce().then(({ data }) =>
+    data ? requestedRunOf({ setting: data, ...request }) : undefined,
+  );
+}
+
 /**
- * One deadline, not a poll: past a run's expiry the server holds the run as lost. The spinner ends
- * there at once, and the one read the deadline fires gives the verdict when it answers: a run it
- * shows is opened, none or a failed read says the run could not be started, and a read that never
- * answers says nothing (ADR-004). The verdict has no timer; it dies with the page, a newer
- * request, or `cancelVerdict`.
+ * One deadline, not a poll: the spinner ends at the run's expiry, and the one read it fires gives
+ * the verdict when it answers: a run opens, none or a failed read says the run could not be
+ * started, no answer says nothing (ADR-004). A verdict owed dies with `cancelVerdict`.
  */
 function useRequestedRunDeadline({
   request,
@@ -88,12 +102,12 @@ function useRequestedRunDeadline({
   onLost,
 }: {
   /** What the server answered Run now with. */
-  request: { requestId: string; requestedAt: number } | undefined;
+  request: RunRequest | undefined;
   isAwaitingRun: boolean;
   readOnce: () => Promise<{ data?: InsightDailyRunSetting | undefined }>;
   /** Ends the spinner. */
   onExpired: () => void;
-  onFound: (requested: NonNullable<ReturnType<typeof requestedRunOf>>) => void;
+  onFound: (requested: RequestedRun) => void;
   onLost: () => void;
 }): { cancelVerdict: () => void } {
   // The host is rebuilt on each change of the URL's query: it reaches the deadline, never moves it.
@@ -102,26 +116,30 @@ function useRequestedRunDeadline({
   const showRun = useEffectEvent(onFound);
   const sayLost = useEffectEvent(onLost);
   /** The request whose verdict is still owed; ending the spinner clears the request, not this. */
-  const verdictOwedTo = useRef<object | undefined>(undefined);
-  useEffect(() => () => void (verdictOwedTo.current = undefined), []);
+  const verdictOwedTo = useRef<RunRequest | undefined>(undefined);
+  const cancelVerdict = () => {
+    verdictOwedTo.current = undefined;
+  };
+  const deliverVerdict = useEffectEvent((owedTo: RunRequest, requested?: RequestedRun) => {
+    if (verdictOwedTo.current !== owedTo) return;
+    cancelVerdict();
+    if (requested) showRun(requested);
+    else sayLost();
+  });
+  useEffect(() => cancelVerdict, []);
   useEffect(() => {
-    if (request && verdictOwedTo.current !== request) verdictOwedTo.current = undefined;
+    if (request && verdictOwedTo.current !== request) cancelVerdict();
     if (!isAwaitingRun || !request) return;
     const deadline = setTimeout(() => {
       verdictOwedTo.current = request;
       endWait();
-      void readLastTime().then(({ data }) => {
-        if (verdictOwedTo.current !== request) return;
-        verdictOwedTo.current = undefined;
-        // A failed read hands back what the board last read, which shows no run either.
-        const requested = data ? requestedRunOf({ setting: data, ...request }) : undefined;
-        if (requested) showRun(requested);
-        else sayLost();
-      });
+      void readRequestedRun({ readOnce: readLastTime, request }).then((requested) =>
+        deliverVerdict(request, requested),
+      );
     }, INSIGHT_DAILY_RUN_EXPIRY_MS);
     return () => clearTimeout(deadline);
   }, [isAwaitingRun, request]);
-  return { cancelVerdict: () => void (verdictOwedTo.current = undefined) };
+  return { cancelVerdict };
 }
 
 type Write = {

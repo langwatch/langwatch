@@ -731,7 +731,7 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
 
         await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS - 60_000);
         expect(board.host.failures).toEqual([]);
-        // No timer reads before the deadline: the board opened with one read, and a hint asks the rest.
+        // No timer reads before the deadline: the board opened with one read, a hint asks the rest.
         expect(board.reads()).toHaveLength(1);
         await vi.advanceTimersByTimeAsync(60_000);
 
@@ -970,7 +970,7 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
   });
 
   describe("when the board has read no run for as long as a run can last", () => {
-    /** The read the board opened with: Run now asks none, and no timer reads before the deadline. */
+    /** The read the board opened with: no timer reads before the deadline. */
     const READS_BEFORE_DEADLINE = 1;
 
     beforeEach(() => void vi.useFakeTimers({ shouldAdvanceTime: true }));
