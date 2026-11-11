@@ -53,6 +53,7 @@ describe("unionParameterDefinitions", () => {
     {
       id: "case_1",
       parameters: [{ name: "model", defaultValue: "gpt-5" }],
+      situation: "",
     },
   ];
   const agent = {
