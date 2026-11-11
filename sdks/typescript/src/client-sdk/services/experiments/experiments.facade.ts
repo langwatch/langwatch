@@ -22,12 +22,12 @@ import {
 import type {
   ExperimentConcurrencyOptions,
   ExperimentRunResult,
-  RunExperimentOptions,
   RunWithResultsOptions,
   ExperimentRunWithResults,
   ExperimentRunSummary,
 } from "./platformTypes";
 import { printSummary } from "./printSummary";
+import { failedEvaluationsOf } from "./run-gate";
 import { pollExperimentRun, rebaseUrlToEndpoint, fetchResultsWithRetry } from "./run-status";
 import type { ExperimentInitOptions } from "./types";
 
@@ -83,10 +83,11 @@ export class ExperimentsFacade {
    * Run a platform-configured experiment (Experiments Workbench). Prints a
    * summary and exits with code 1 on failure, unless `exitOnFailure: false`.
    * @param slug - The slug of the experiment (found in the experiment URL)
+   * @param options - Optional inputs (data, datasetId, parameters, rowIndices), overrides and polling
    */
   async run(
     slug: string,
-    options?: RunExperimentOptions & ExperimentConcurrencyOptions,
+    options?: RunWithResultsOptions & ExperimentConcurrencyOptions,
   ): Promise<ExperimentRunResult> {
     this.config.logger.info(`Running platform experiment: ${slug}`);
     const result = await this.runWithPolling(slug, options);
@@ -156,15 +157,19 @@ export class ExperimentsFacade {
    */
   private async runWithPolling(
     slug: string,
-    options: RunExperimentOptions & ExperimentConcurrencyOptions = {},
+    options: RunWithResultsOptions & ExperimentConcurrencyOptions = {},
   ): Promise<ExperimentRunResult> {
     const pollInterval = options.pollInterval ?? DEFAULT_POLL_INTERVAL;
     const timeout = options.timeout ?? DEFAULT_TIMEOUT;
 
     // Start the run
     const startResponse = await this.startRun(slug, {
-      concurrency: options.concurrency,
+      data: options.data,
+      datasetId: options.datasetId,
       datasetVersion: options.datasetVersion,
+      parameters: options.parameters,
+      rowIndices: options.rowIndices,
+      concurrency: options.concurrency,
     });
     const { runId } = startResponse;
 
@@ -244,9 +249,9 @@ export class ExperimentsFacade {
    */
   private async startRun(
     slug: string,
-    { concurrency, datasetVersion }: { concurrency?: number; datasetVersion?: number } = {},
+    inputs: Parameters<typeof toRunStartRequest>[0] = {},
   ): Promise<ExperimentRunStartResponse> {
-    const body = toRunStartRequest({ concurrency, datasetVersion });
+    const body = toRunStartRequest(inputs);
     let response;
     try {
       response = await this.config.langwatchApiClient.POST("/api/v1/experiments/{slug}/run", {
@@ -363,7 +368,9 @@ export class ExperimentsFacade {
       duration,
       runUrl,
       summary,
-      printSummary: (exitOnFailure = true) => {
+      printSummary: (options = true) => {
+        const { exitOnFailure = true, failOnEvaluatorFailures = false } =
+          typeof options === "boolean" ? { exitOnFailure: options } : options;
         printSummary({
           runId,
           status,
@@ -375,7 +382,10 @@ export class ExperimentsFacade {
           summary,
         });
 
-        if (exitOnFailure && totalFailed > 0) {
+        // The default gate is unchanged. Failed evaluations fail the job only when asked:
+        // failing on them by default would turn existing green CI red.
+        const evaluationsFailed = failOnEvaluatorFailures && failedEvaluationsOf(summary) > 0;
+        if (exitOnFailure && (totalFailed > 0 || evaluationsFailed)) {
           process.exit(1);
         }
       },

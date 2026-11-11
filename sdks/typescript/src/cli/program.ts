@@ -1710,6 +1710,10 @@ function registerExperimentCommands(program: Command): void {
       .command("run <slug>")
       .description("Start an experiment run by slug")
       .option("--wait", "Wait for the experiment to complete before returning")
+      .option(
+        "--fail-on-evaluator-failures",
+        "With --wait, exit 1 when an evaluation fails or a cell errors (the summary still prints)",
+      )
       .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
       .option(
         "--concurrency <n>",
@@ -1723,7 +1727,13 @@ function registerExperimentCommands(program: Command): void {
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (
       slug: string,
-      options: { wait?: boolean; param?: string[]; concurrency?: string; datasetVersion?: number },
+      options: {
+        wait?: boolean;
+        failOnEvaluatorFailures?: boolean;
+        param?: string[];
+        concurrency?: string;
+        datasetVersion?: number;
+      },
     ) => {
       const { runExperimentCommand: impl } = await import("./commands/experiment/run.js");
       return impl(slug, options);

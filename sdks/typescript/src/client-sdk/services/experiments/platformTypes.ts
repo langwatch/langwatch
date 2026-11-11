@@ -153,6 +153,16 @@ export type ExperimentRunWithResults = {
 };
 
 /**
+ * How `printSummary` decides whether to fail the process.
+ */
+export type PrintSummaryOptions = {
+  /** Call process.exit(1) on failure. Default true. */
+  exitOnFailure?: boolean;
+  /** Also fail when an evaluator returned a failing verdict. Default false. */
+  failOnEvaluatorFailures?: boolean;
+};
+
+/**
  * Final result of a platform experiment run
  */
 export type ExperimentRunResult = {
@@ -165,10 +175,11 @@ export type ExperimentRunResult = {
   runUrl: string;
   summary: ExperimentRunSummary;
   /**
-   * Print a CI-friendly summary of the results
-   * @param exitOnFailure - If true (default), calls process.exit(1) when there are failures
+   * Print a CI-friendly summary of the results. Exits 1 when a cell errored; pass
+   * `{ failOnEvaluatorFailures: true }` to also exit 1 when an evaluation failed.
+   * @param options - `exitOnFailure` (default true), or the options object
    */
-  printSummary: (exitOnFailure?: boolean) => void;
+  printSummary: (options?: boolean | PrintSummaryOptions) => void;
   /**
    * Human-readable string representation
    */

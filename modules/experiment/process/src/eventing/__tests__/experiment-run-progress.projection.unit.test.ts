@@ -334,9 +334,35 @@ describe("the run's progress fold as main's poller JSON", () => {
         failedCells: 1,
         duration: 3_000,
         timestamps: { startedAt: 1_000, finishedAt: 4_000 },
+        // No verdict arrived: each scoring evaluator is listed with zero counts.
+        evaluators: [
+          { evaluatorId: "exact", name: "exact_match", passed: 0, failed: 0, passRate: 0 },
+          { evaluatorId: "saved", name: "llm_boolean", passed: 0, failed: 0, passRate: 0 },
+        ],
         runUrl: "https://app/run_1",
       });
       expect(state.recentEvents.at(-1)?.frame.type).toBe("done");
+    });
+
+    /** @scenario "A completed run tallies each evaluator's verdicts" */
+    it("tallies the verdicts the run kept per evaluator, with no run-wide totals", () => {
+      const state = progressAfter([
+        started({ ...plan, experimentSlug: "exp-one" }),
+        evaluatorResult({ targetId: "target_a", evaluatorId: "exact", score: 1, passed: true }),
+        evaluatorResult({ targetId: "target_b", evaluatorId: "exact", score: 0, passed: false }),
+        cellFinished({ ordinal: 0, phase: 1 }),
+        cellFinished({ ordinal: 1, phase: 1 }),
+        cellFinished({ ordinal: 2, phase: 2 }),
+        completed({ outcome: "finished" }),
+      ]);
+
+      expect(state.summary).not.toHaveProperty("totalFailed");
+      expect(state.summary).toMatchObject({
+        evaluators: [
+          { evaluatorId: "exact", passed: 1, failed: 1, passRate: 50, avgScore: 0.5 },
+          { evaluatorId: "saved", passed: 0, failed: 0 },
+        ],
+      });
     });
 
     it("stays completed when a start or completion is redelivered", () => {

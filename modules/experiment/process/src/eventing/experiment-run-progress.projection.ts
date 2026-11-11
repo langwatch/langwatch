@@ -9,6 +9,7 @@ import type { ExperimentRunProgressState } from "../repositories/experiment-run-
 import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../rules/experiment-run-event-types.rules.ts";
 import { appendRunFrames, findRunEventFrames } from "../rules/experiment-run-frames.rules.ts";
 import { foldEvaluatorsOf, runCellKey } from "../rules/experiment-run-plan.rules.ts";
+import { summariseEvaluatorVerdicts } from "../rules/experiment-run-summary.rules.ts";
 import { hasFinished, markFinished } from "../rules/experiment-run-window.rules.ts";
 import { runAwaitsStart } from "../rules/experiment-workflow-evaluation.rules.ts";
 import {
@@ -274,6 +275,11 @@ export class ExperimentRunProgressFoldProjection
       duration: finishedAt - state.startedAt,
       timestamps: { startedAt: state.startedAt, finishedAt },
     };
+    // The verdict tallies a CI job gates on; the streamed `done` frame keeps main's shape.
+    const verdicts = summariseEvaluatorVerdicts({
+      evaluators: state.evaluators,
+      evaluatorScores: state.evaluatorScores,
+    });
     return this.streamed({
       event,
       summary,
@@ -281,7 +287,11 @@ export class ExperimentRunProgressFoldProjection
         ...state,
         status: "completed",
         finishedAt,
-        summary: { ...summary, ...(state.runUrl ? { runUrl: state.runUrl } : {}) },
+        summary: {
+          ...summary,
+          ...verdicts,
+          ...(state.runUrl ? { runUrl: state.runUrl } : {}),
+        },
       },
     });
   }

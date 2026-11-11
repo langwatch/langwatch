@@ -217,7 +217,11 @@ class ExperimentRunResult:
 
         return pd.DataFrame()
 
-    def print_summary(self, exit_on_failure: Optional[bool] = None) -> None:
+    def print_summary(
+        self,
+        exit_on_failure: Optional[bool] = None,
+        fail_on_evaluator_failures: bool = False,
+    ) -> None:
         """
         Print a CI-friendly summary and optionally exit with code 1 on failure.
 
@@ -225,14 +229,22 @@ class ExperimentRunResult:
             exit_on_failure: If True, calls sys.exit(1) when there are failures.
                            If False, never exits.
                            If None (default), auto-detects: exits in scripts/CI, doesn't exit in notebooks.
+            fail_on_evaluator_failures: If True, also exit 1 when an evaluator returned a
+                           failing verdict. Off by default, so existing CI keeps its exit code.
         """
         _print_summary(self)
 
         # Auto-detect: don't exit in notebooks, exit in scripts/CI
         should_exit = exit_on_failure if exit_on_failure is not None else not _is_notebook()
 
-        if should_exit and self.failed > 0:
+        evaluations_failed = fail_on_evaluator_failures and self.failed_evaluations > 0
+        if should_exit and (self.failed > 0 or evaluations_failed):
             sys.exit(1)
+
+    @property
+    def failed_evaluations(self) -> int:
+        """Failing evaluator verdicts across the run, summed from the per-evaluator tallies."""
+        return sum(evaluator.failed for evaluator in self.summary.evaluators)
 
     def __repr__(self) -> str:
         status_icon = {"completed": "OK", "failed": "FAIL", "stopped": "STOPPED"}.get(

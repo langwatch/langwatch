@@ -1,6 +1,8 @@
 import chalk from "chalk";
 
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
+import type { ExperimentRunSummary } from "@/client-sdk/services/experiments/platformTypes";
+import { failedEvaluationsOf } from "@/client-sdk/services/experiments/run-gate";
 
 import { resolveCredentials } from "../../utils/apiKey";
 import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
@@ -11,9 +13,24 @@ import { failSpinner } from "../../utils/spinnerError";
 
 export const runExperimentCommand = async (
   slug: string,
-  options: { wait?: boolean; param?: string[]; concurrency?: string; datasetVersion?: number },
+  options: {
+    wait?: boolean;
+    param?: string[];
+    concurrency?: string;
+    datasetVersion?: number;
+    failOnEvaluatorFailures?: boolean;
+  },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
+
+  if (options.failOnEvaluatorFailures && !options.wait) {
+    reportCommandError({
+      error: commandValidationError(
+        "--fail-on-evaluator-failures needs --wait: only a waited run has results to gate on",
+      ),
+    });
+    process.exit(1);
+  }
 
   const parameters = parseRunParameterFlags({ pairs: options.param });
   const concurrency = parseConcurrencyFlag({ value: options.concurrency });
@@ -67,7 +84,17 @@ export const runExperimentCommand = async (
     }
 
     if (status.status === "completed") {
-      pollSpinner.succeed(`Experiment completed! ${status.progress}/${status.total} cells`);
+      const failures = countRunFailures(status.summary);
+      if (failures.any) {
+        pollSpinner.warn(
+          `Experiment completed with failures: ${failures.evaluations} failed evaluation(s), ` +
+            `${failures.cells} errored cell(s)`,
+        );
+        // Opt-in, like `scenario run --wait`: the document still prints, then the job fails.
+        if (options.failOnEvaluatorFailures) process.exitCode = 1;
+      } else {
+        pollSpinner.succeed(`Experiment completed! ${status.progress}/${status.total} cells`);
+      }
     } else {
       pollSpinner.warn(`Experiment ${status.status}`);
     }
@@ -81,6 +108,18 @@ export const runExperimentCommand = async (
     process.exit(1);
   }
 };
+
+/**
+ * What a completed run failed on: evaluations that returned a failing verdict, and
+ * cells that errored. Either fails a `--wait --fail-on-evaluator-failures` run.
+ */
+export function countRunFailures(
+  summary: ExperimentRunSummary | undefined,
+): { evaluations: number; cells: number; any: boolean } {
+  const evaluations = failedEvaluationsOf(summary);
+  const cells = summary?.failedCells ?? 0;
+  return { evaluations, cells, any: evaluations > 0 || cells > 0 };
+}
 
 function parseConcurrencyFlag({ value }: { value: string | undefined }): number | undefined {
   if (value === undefined) return undefined;
@@ -116,6 +155,13 @@ function printRunStatus({
   if (status.summary.failedCells) {
     console.log(
       `    ${chalk.gray("Failed:")}         ${chalk.red(String(status.summary.failedCells))}`,
+    );
+  }
+  for (const evaluator of status.summary.evaluators ?? []) {
+    const failed = evaluator.failed > 0 ? chalk.red(`${evaluator.failed} failed`) : "0 failed";
+    console.log(
+      `    ${chalk.gray(`${evaluator.name}:`)} ${evaluator.passed} passed, ${failed}` +
+        ` (${evaluator.passRate.toFixed(1)}%)`,
     );
   }
   if (status.summary.duration) {
