@@ -1059,7 +1059,7 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
     });
 
     /** Opens a board whose deadline read is held until `answer` is called, with RUNNING. */
-    async function pastTheDeadlineWithReadHeld(write: Parameters<typeof openBoard>[0]["write"]) {
+    async function pastTheDeadlineWithReadHeld(write: (call: UiProcedureCall) => Promise<unknown>) {
       let isHeld = false;
       let answer: () => void = () => void 0;
       const board = openBoard({
