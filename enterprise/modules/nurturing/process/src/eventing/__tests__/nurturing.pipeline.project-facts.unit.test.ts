@@ -258,7 +258,7 @@ describe("nurturing's copy of each personal project's owner", () => {
   describe("when a second personal team fact for the same team names a new project id", () => {
     /** @scenario "A second personal team fact leaves the first owner row unchanged" */
     it("leaves the first row and writes an inert row for the id no project took", async () => {
-      const { personalProjects, deliverFact } = nurturingOverCopies();
+      const { personalProjects, deliverFact, sinkRequests } = nurturingOverCopies();
 
       await deliverFact(personalTeamCreated({ projectId: "project-p1", userId: "user-1" }));
       await deliverFact(personalTeamCreated({ projectId: "project-p1-again", userId: "user-1" }));
@@ -269,6 +269,7 @@ describe("nurturing's copy of each personal project's owner", () => {
       await expect(
         personalProjects.findOwnerUserIds({ projectId: "project-p1-again" }),
       ).resolves.toEqual(["user-1"]);
+      await expect(sinkRequests()).resolves.toEqual(NO_REQUESTS);
     });
   });
 
