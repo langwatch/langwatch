@@ -1,6 +1,7 @@
 import type { Authorization } from "@langwatch/authorization";
 import {
   type AuthorizedClickHouse,
+  COALESCABLE_ASYNC_INSERT_SETTINGS,
   DEFAULT_PARTITION_WINDOW_MS,
   type IdBoundOptions,
   RESOLVER_RECENT_WINDOW_MS,
@@ -89,12 +90,9 @@ import {
 
 const TABLE_NAME = "stored_spans" as const;
 
-/**
- * Settings for every `stored_spans` insert.
- */
+/** Settings for every `stored_spans` insert: one that may share a statement (ADR-187). */
 const SPAN_INSERT_SETTINGS = {
-  async_insert: 1,
-  wait_for_async_insert: 1,
+  ...COALESCABLE_ASYNC_INSERT_SETTINGS,
   input_format_json_throw_on_bad_escape_sequence: 0,
 } as const;
 

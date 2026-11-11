@@ -1,12 +1,15 @@
 /** Spec: modules/entitlement/specs/usage.feature (trace usage). */
 import {
   ClickHouseQueryClient,
+  coalesceKeyOf,
+  type InsertRequest,
   routingDriver,
   type ClickHouseConnection,
   type RoutableStatementClient,
   TenantGuard,
 } from "@langwatch/clickhouse-client";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
 import { TraceCountClickHouseRepository } from "../clickhouse.trace-count.repository.ts";
@@ -73,6 +76,25 @@ describe("TraceCountClickHouseRepository", () => {
           TraceId: "trace_2",
         },
       ]);
+    });
+
+    it("sends an insert that may share a statement while it waits for a slot (ADR-187)", async () => {
+      const sent: InsertRequest[] = [];
+      const counts = TraceCountClickHouseRepository.create(
+        clickHouseQueryClientDouble({
+          insert: async (request: InsertRequest) => {
+            sent.push(request);
+          },
+        }),
+      );
+
+      await counts.insert({
+        organizationId: ORGANIZATION,
+        rows: [{ projectId: "project_1", traceId: "trace_1", month: "2026-10" }],
+      });
+
+      expect(sent).toHaveLength(1);
+      expect(coalesceKeyOf(sent[0]!)).not.toBeNull();
     });
 
     it("writes nothing for an empty list", async () => {

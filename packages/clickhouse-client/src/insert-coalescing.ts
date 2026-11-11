@@ -4,6 +4,16 @@
  */
 import type { InsertRequest } from "./query.ts";
 
+/**
+ * Settings of an async insert that waits for its flush and may share a statement (ADR-187).
+ * Async deduplication off is the server's default under the pinned 25.10 profile.
+ */
+export const COALESCABLE_ASYNC_INSERT_SETTINGS = Object.freeze({
+  async_insert: 1,
+  wait_for_async_insert: 1,
+  async_insert_deduplicate: 0,
+} as const);
+
 /** Rows one coalesced statement carries at most; an insert that is larger travels alone. */
 export const DEFAULT_INSERT_COALESCE_MAX_ROWS = 5_000;
 

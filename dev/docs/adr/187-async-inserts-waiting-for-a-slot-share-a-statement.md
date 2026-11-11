@@ -97,7 +97,10 @@ The event log's appends, which set the async settings themselves and now
 turn async deduplication off (the server's default today; the log collapses
 repeats by idempotency key), no longer shed under bursts the server can
 absorb. Writers that rely on the server profile's async default, and set
-nothing, are unchanged until they say so. No infrastructure setting changes. A coalesced statement's result is shared by
+nothing, are unchanged until they say so. A writer says so by spreading
+`COALESCABLE_ASYNC_INSERT_SETTINGS` from the query client package, the one copy
+of these settings; the event log, spans, the trace analytics rollup and the
+billable-event and trace-usage meters do. No infrastructure setting changes. A coalesced statement's result is shared by
 its members; the routing driver discards it. Shed counts and lane statistics
 keep their meaning: one shed per refused caller, one in-flight per statement.
 

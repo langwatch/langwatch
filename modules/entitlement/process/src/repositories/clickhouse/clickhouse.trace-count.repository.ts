@@ -1,4 +1,7 @@
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import {
+  COALESCABLE_ASYNC_INSERT_SETTINGS,
+  type ClickHouseQueryClient,
+} from "@langwatch/clickhouse-client";
 import { Temporal } from "@langwatch/time";
 
 import { TraceCountRepository, type TraceUsageRow } from "../trace-count.repository.ts";
@@ -53,7 +56,7 @@ export class TraceCountClickHouseRepository extends TraceCountRepository {
         Month: `${row.month}-01`,
         TraceId: row.traceId,
       })),
-      settings: { async_insert: 1, wait_for_async_insert: 1 },
+      settings: COALESCABLE_ASYNC_INSERT_SETTINGS,
     });
   }
 

@@ -7,7 +7,7 @@ import type { LimiterStats } from "@langwatch/limiter";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { ClickHouseQueryClient } from "../client.ts";
-import { coalesceKeyOf } from "../insert-coalescing.ts";
+import { COALESCABLE_ASYNC_INSERT_SETTINGS, coalesceKeyOf } from "../insert-coalescing.ts";
 import {
   ClickHouseManagedClientTelemetry,
   ClickHouseOverloadErrorFactory,
@@ -302,6 +302,53 @@ describe("given the insert lane has used every slot it may hold", () => {
       expect(holding.inserts).toHaveLength(LANE_CAP);
       await drain(holding);
       await Promise.all(holders);
+    });
+  });
+});
+
+describe("given a burst of single-row async inserts while the insert lane is full", () => {
+  const BURST = 40;
+  const burst = (client: ClickHouseQueryClient, settings: InsertRequest["settings"]) =>
+    Array.from({ length: BURST }, (_, n) =>
+      outcome(client.insert(asyncInsert("stored_spans", [row(n)], { settings }))),
+    );
+
+  describe("when they carry the shareable async settings plus a writer's own", () => {
+    /** @scenario async inserts waiting for a slot go as one statement */
+    it("sends them as one statement and sheds none", async () => {
+      const holding = holdingDriver();
+      const { client, telemetry } = clientOver(holding);
+      const holders = await saturateInsertLane(client);
+
+      const writes = burst(client, {
+        ...COALESCABLE_ASYNC_INSERT_SETTINGS,
+        input_format_json_throw_on_bad_escape_sequence: 0,
+      });
+      await drain(holding, BURST);
+      await Promise.all(holders);
+
+      const outcomes = await Promise.all(writes);
+      expect(holding.inserts.slice(LANE_CAP)).toHaveLength(1);
+      expect(telemetry.shed).toEqual([]);
+      expect(outcomes).toEqual(Array.from({ length: BURST }, () => "written"));
+    });
+  });
+
+  describe("when they leave async deduplication unsaid", () => {
+    /** @scenario only inserts that can share a statement share one */
+    it("sends each alone, and sheds those the wait queue cannot hold", async () => {
+      const holding = holdingDriver();
+      const { client, telemetry } = clientOver(holding);
+      const holders = await saturateInsertLane(client);
+
+      const writes = burst(client, { async_insert: 1, wait_for_async_insert: 1 });
+      await drain(holding, BURST);
+      await Promise.all(holders);
+
+      const refused = (await Promise.all(writes)).filter((each) => each !== "written");
+      expect(holding.inserts.slice(LANE_CAP)).toHaveLength(BURST - refused.length);
+      expect(refused.length).toBeGreaterThan(0);
+      expect(telemetry.shed).toHaveLength(refused.length);
     });
   });
 });

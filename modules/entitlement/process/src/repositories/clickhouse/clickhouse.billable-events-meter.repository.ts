@@ -1,4 +1,7 @@
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import {
+  COALESCABLE_ASYNC_INSERT_SETTINGS,
+  type ClickHouseQueryClient,
+} from "@langwatch/clickhouse-client";
 import { Temporal, toDate, toEpochMs } from "@langwatch/time";
 
 import {
@@ -51,7 +54,7 @@ export class BillableEventsMeterClickHouseRepository extends BillableEventsMeter
           ),
         },
       ],
-      settings: { async_insert: 1, wait_for_async_insert: 1 },
+      settings: COALESCABLE_ASYNC_INSERT_SETTINGS,
     });
   }
 

@@ -1,3 +1,4 @@
+import { COALESCABLE_ASYNC_INSERT_SETTINGS } from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
 
 import { ConfigurationError, EventNotFoundError } from "../../../services/errorHandling.ts";
@@ -774,11 +775,7 @@ export class EventingClickHouseEventRepository implements EventRepository {
       table: "event_log",
       values: rows,
       format: "JSONEachRow",
-      clickhouse_settings: {
-        async_insert: 1,
-        wait_for_async_insert: 1,
-        async_insert_deduplicate: 0,
-      },
+      clickhouse_settings: COALESCABLE_ASYNC_INSERT_SETTINGS,
       ...(tenantIds === undefined ? {} : { tenantIds }),
     });
   }

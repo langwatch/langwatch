@@ -1,11 +1,14 @@
 import {
   ClickHouseQueryClient,
+  coalesceKeyOf,
+  type InsertRequest,
   routingDriver,
   type ClickHouseConnection,
   type RoutableStatementClient,
   TenantGuard,
 } from "@langwatch/clickhouse-client";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
 import { BillableEventsMeterClickHouseRepository } from "../clickhouse.billable-events-meter.repository.ts";
@@ -96,6 +99,37 @@ describe("BillableEventsMeterClickHouseRepository.countByDay", () => {
 
       await expect(meter.countByDay({ ...READ, projectIds: [] })).resolves.toEqual([]);
       expect(statements).toHaveLength(0);
+    });
+  });
+});
+
+describe("BillableEventsMeterClickHouseRepository.insert", () => {
+  describe("when an event is metered while every insert slot is taken", () => {
+    it("sends an insert that may share a statement (ADR-187)", async () => {
+      const sent: InsertRequest[] = [];
+      const meter = BillableEventsMeterClickHouseRepository.create(
+        clickHouseQueryClientDouble({
+          insert: async (request: InsertRequest) => {
+            sent.push(request);
+          },
+        }),
+      );
+
+      await meter.insert({
+        organizationId: "org_1",
+        record: {
+          organizationId: "org_1",
+          tenantId: "project_1",
+          eventId: "event_1",
+          eventType: "span",
+          deduplicationKey: "key_1",
+          eventTimestamp: 1_700_000_000_000,
+        },
+      });
+
+      expect(sent).toHaveLength(1);
+      expect(sent[0]?.table).toBe("billable_events");
+      expect(coalesceKeyOf(sent[0]!)).not.toBeNull();
     });
   });
 });

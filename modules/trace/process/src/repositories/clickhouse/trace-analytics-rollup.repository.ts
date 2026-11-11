@@ -1,3 +1,4 @@
+import { COALESCABLE_ASYNC_INSERT_SETTINGS } from "@langwatch/clickhouse-client";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { toDate } from "@langwatch/time";
@@ -93,7 +94,7 @@ export class TraceAnalyticsRollupClickHouseRepository extends TraceAnalyticsRoll
         table: TABLE_NAME,
         values: [toClickHouseRecord(row, retentionDays)],
         format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        clickhouse_settings: COALESCABLE_ASYNC_INSERT_SETTINGS,
       });
     } catch (error) {
       logger.warn(
@@ -144,7 +145,7 @@ export class TraceAnalyticsRollupClickHouseRepository extends TraceAnalyticsRoll
         table: TABLE_NAME,
         values: rows.map((row) => toClickHouseRecord(row, retentionDays)),
         format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        clickhouse_settings: COALESCABLE_ASYNC_INSERT_SETTINGS,
       });
     } catch (error) {
       logger.warn(
