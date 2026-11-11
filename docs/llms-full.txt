@@ -66162,7 +66162,7 @@ clickhouse:
       schedule: "0 * * * *" # Incremental every hour
 ```
 
-Or use the `cold-storage-s3.yaml` overlay which enables both cold storage and backups:
+The `cold-storage-s3.yaml` overlay turns on backups and cold storage together. Use it only if you also want cold storage:
 
 ```bash
 helm install langwatch langwatch/langwatch \
@@ -66230,7 +66230,7 @@ kubectl exec -n langwatch langwatch-clickhouse-0 -- \
 
 ## ClickHouse Cold Storage
 
-Cold storage is separate from backups, it's a tiered storage strategy that automatically moves older data from local SSD to S3 for cost savings.
+Cold storage is separate from backups, and optional. It moves older data from local disk to S3, which costs less to store but is slower to query. It is off by default, and most installs keep all their data on local disk.
 
 ### How It Works
 
@@ -66258,18 +66258,6 @@ clickhouse:
   weekly partition boundaries for more efficient data management. The default of 49 days means data
   stays on fast local storage for ~7 weeks before moving to S3.
 </Note>
-
-### Cost Savings
-
-Cold storage can reduce storage costs significantly:
-
-| Storage Type         | Approximate Cost  | Speed           |
-| -------------------- | ----------------- | --------------- |
-| gp3 SSD (hot)        | ~$0.08/GB/month   | Fast            |
-| S3 Standard (cold)   | ~$0.023/GB/month  | Slower (cached) |
-| S3 Infrequent Access | ~$0.0125/GB/month | Slower          |
-
-For a deployment with 150 GB/month of trace data, cold storage can save ~$500/year.
 
 ## S3 Dataset Backups
 
@@ -67338,11 +67326,10 @@ For production with replicated ClickHouse.
 ```bash
 helm install langwatch langwatch/langwatch \
   -f examples/overlays/size-ha.yaml \
-  -f examples/overlays/access-ingress.yaml \
-  -f examples/overlays/cold-storage-s3.yaml \
-  --set clickhouse.objectStorage.bucket=my-langwatch-data \
-  --set clickhouse.objectStorage.region=us-east-1
+  -f examples/overlays/access-ingress.yaml
 ```
+
+Add ClickHouse backups to an object store as in [Backups](/self-hosting/configuration/backups).
 
 Both production overlays turn off the local-filesystem volume for stored objects, because more than one replica cannot share it. Set `app.dataplane.enabled: true` with an S3 or Azure Blob bucket, or stored objects (audio, images and documents) land on the pods' ephemeral disk and are lost on restart. Both commands also need the Secrets from [Provide the Secrets](/self-hosting/deployment/kubernetes-helm#1-provide-the-secrets), or `--set autogen.enabled=true` for a test install.
 
@@ -67361,7 +67348,7 @@ How much trace data each profile can take. Each profile accepts spans faster tha
 - Per day, per month and disk follow the processing rate, which is what the install keeps up with all day.
 - Treat these as ceilings and plan to run at about 70% of them. Long prompts and completions lower them.
 - Per day and per month assume the same rate around the clock. Size for your busiest hour.
-- Disk is an estimate at about 1 KB per span. `size-prod.yaml` gives ClickHouse 100Gi, which fills in under two days at full rate: give it more storage or turn on [cold storage](#clickhouse-cold-storage-s3).
+- Disk is an estimate at about 1 KB per span. `size-prod.yaml` gives ClickHouse 100Gi, which fills in under two days at full rate: give it more storage.
 - `size-dev.yaml` ships Redis at 256Mi. Raise `redis.master.resources.limits.memory` to 512Mi to reach its rate.
 - `size-minimal.yaml` is held back by ClickHouse memory. Setting `clickhouse.memory` to 2Gi roughly doubles its processing rate.
 
@@ -67445,13 +67432,13 @@ spec:
 - ~1 KB per span (compressed, varies with payload size)
 - 100K traces/day with avg 5 spans = ~500 MB/day = ~15 GB/month
 - 1M traces/day with avg 5 spans = ~5 GB/day = ~150 GB/month
-- Plan for 3-6 months of hot data before cold storage kicks in
+- Size the disk for all the data you keep: it stays on local disk unless you turn on cold storage
 
-### ClickHouse cold storage (S3)
+### ClickHouse cold storage (S3, optional)
 
-- Enable with `clickhouse.cold.enabled: true`
-- Default TTL: 49 days (data older than this moves to S3). We recommend multiples of 7 to align with ClickHouse's weekly partition boundaries
-- S3 cost is typically 10-20x cheaper than SSD storage
+- Off by default, and not needed: local disk is the simpler setup to run
+- Opt in with `clickhouse.cold.enabled: true`, plus `clickhouse.objectStorage.bucket` and its `region` or `endpoint` if disk cost matters more than query speed on older data
+- Data older than `clickhouse.cold.defaultTtlDays` (49) then moves to S3. Keep it a multiple of 7, to match ClickHouse's weekly partitions
 
 ### PostgreSQL
 
@@ -72128,7 +72115,6 @@ Choose the deployment method that fits your environment.
 
 - **ClickHouse replaces Elasticsearch** as the primary data store, delivering faster analytical queries and lower operational overhead.
 - **Event-sourcing architecture** ensures reliable, ordered processing of traces, evaluations, and experiment runs.
-- **S3 cold storage tiering** moves older data to object storage automatically, reducing ClickHouse disk costs.
 - **Native ClickHouse backup/restore** simplifies disaster recovery without third-party tooling.
 - **Auto-tuned ClickHouse** via the `clickhouse-serverless` subchart adapts resource allocation to your workload.
 - **Composable Helm chart overlays** let you customize deployments without forking the chart.
@@ -73316,9 +73302,11 @@ export ELASTICSEARCH_API_KEY="your-api-key"
   data as it arrives during migration.
 </Warning>
 
-LangWatch uses TTL rules to manage data retention and tiered storage in ClickHouse. By default, data older than 49 days is moved to cold storage (or dropped if cold storage isn't configured). When you migrate historical data from Elasticsearch, much of it is older than 49 days, so ClickHouse tries to expire or offload it the moment it lands.
+LangWatch uses TTL rules to manage data retention and tiered storage in ClickHouse. With cold storage on, data older than 49 days moves to S3. Separately, [data retention](/platform/data-retention) deletes data past its retention period, which defaults to 49 days. When you migrate historical data from Elasticsearch, much of it is older than 49 days, so ClickHouse tries to offload or delete it the moment it lands.
 
-**Before starting the migration**, set the TTL to a very high value so all migrated data stays in hot storage:
+**To keep history older than 49 days**, set a longer retention policy before you import. That needs an Enterprise license: without one the deployment keeps the 49-day default, and older history is deleted as it lands.
+
+**With cold storage on**, also raise its TTL before starting the migration, so migrated data stays in hot storage:
 
 A per-table variable such as `CLICKHOUSE_COLD_STORAGE_SPANS_TTL_DAYS` takes precedence over the default. If you set any of them on the app or workers, raise or remove them too, then check the effective TTL with `SHOW CREATE TABLE` before you import history.
 

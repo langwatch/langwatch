@@ -170,9 +170,11 @@ export ELASTICSEARCH_API_KEY="your-api-key"
   data as it arrives during migration.
 </Warning>
 
-LangWatch uses TTL rules to manage data retention and tiered storage in ClickHouse. By default, data older than 49 days is moved to cold storage (or dropped if cold storage isn't configured). When you migrate historical data from Elasticsearch, much of it is older than 49 days, so ClickHouse tries to expire or offload it the moment it lands.
+LangWatch uses TTL rules to manage data retention and tiered storage in ClickHouse. With cold storage on, data older than 49 days moves to S3. Separately, [data retention](/platform/data-retention) deletes data past its retention period, which defaults to 49 days. When you migrate historical data from Elasticsearch, much of it is older than 49 days, so ClickHouse tries to offload or delete it the moment it lands.
 
-**Before starting the migration**, set the TTL to a very high value so all migrated data stays in hot storage:
+**To keep history older than 49 days**, set a longer retention policy before you import. That needs an Enterprise license: without one the deployment keeps the 49-day default, and older history is deleted as it lands.
+
+**With cold storage on**, also raise its TTL before starting the migration, so migrated data stays in hot storage:
 
 A per-table variable such as `CLICKHOUSE_COLD_STORAGE_SPANS_TTL_DAYS` takes precedence over the default. If you set any of them on the app or workers, raise or remove them too, then check the effective TTL with `SHOW CREATE TABLE` before you import history.
 
