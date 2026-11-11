@@ -77,6 +77,11 @@
       "cells": ["C1", "C3"],
       "note": "heavy creates the dataset by REST with no rows yet; rows in Postgres need a row door (REST rows route)"
     },
+    "dataset:fill-empty-slugs": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs a Dataset row stored with slug '' as releases before the slug rule wrote it; the REST and tRPC doors refuse an empty slug, so it needs SQL at the old schema"
+    },
     "dataset:create-first-versions": {
       "status": "pending",
       "seed": "product-seeds:dataset",
@@ -134,6 +139,12 @@
       "note": "no headless door on the old image: SQL, flagged"
     },
     "governance:record-coding-assistant-billing": {
+      "status": "pending",
+      "seed": "tenancy-sql:governance",
+      "cells": ["C2"],
+      "note": "codingAgents router only reads on the old image: SQL, flagged"
+    },
+    "governance:record-coding-assistant-ingest-source-billing": {
       "status": "pending",
       "seed": "tenancy-sql:governance",
       "cells": ["C2"],
@@ -242,6 +253,12 @@
       "status": "seeded",
       "seed": "heavy:otlp",
       "note": "about 300k spans through the OTLP door",
+      "cells": ["C1", "C3"]
+    },
+    "trace:track-analytics-metadata-columns-materialisation": {
+      "status": "seeded",
+      "seed": "heavy:otlp",
+      "note": "the same spans fold trace_analytics rows whose metadata columns the mutation stores",
       "cells": ["C1", "C3"]
     },
     "upcast:entitlement:lw.usage.month_counted": {

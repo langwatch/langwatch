@@ -49,6 +49,8 @@ import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service.
 import { LangWatchQLCompletenessService } from "./langwatch-ql-completeness.service.ts";
 import { LangWatchQLExecutionService } from "./langwatch-ql-execution.service.ts";
 import { LangWatchQLExtractionService } from "./langwatch-ql-extraction.service.ts";
+import type { LangWatchQLPlacementGateService } from "./langwatch-ql-placement-gate.service.ts";
+import type { LangWatchQLRunTelemetryService } from "./langwatch-ql-run-telemetry.service.ts";
 import { LangWatchQLSchemaService } from "./langwatch-ql-schema.service.ts";
 import { LangWatchQLTimeWindowService } from "./langwatch-ql-time-window.service.ts";
 import { LangWatchQLValidationErrorService } from "./langwatch-ql-validation-errors.service.ts";
@@ -71,6 +73,8 @@ export interface LangWatchQLServiceDependencies {
    * with weaker guarantees.
    */
   readonly executor: LangWatchQLExecutorRepository | null;
+  /** Every run passes this before the executor (ADR-200): placement, then provisioning. */
+  readonly placement: Pick<LangWatchQLPlacementGateService, "admit">;
   /** Database the LangWatchQL views live in, and what unqualified names resolve to. */
   readonly database: string;
   readonly views?: readonly LangWatchQLViewDefinition[];
@@ -91,6 +95,8 @@ export interface LangWatchQLServiceDependencies {
   readonly judging?: Pick<InstantEvalApi, "judgeQuery" | "getJudgeLimits">;
   /** Milliseconds on a monotonic clock, for the elapsed time hydration and judging add. */
   readonly stopwatch?: () => number;
+  /** Counts each answered run: the instance the app's doors count refused runs on. */
+  readonly runTelemetry: Pick<LangWatchQLRunTelemetryService, "recordAnswered" | "fieldsFor">;
 }
 
 export class LangWatchQLService {
@@ -117,6 +123,7 @@ export class LangWatchQLService {
         hydration: deps.hydration,
         judging: deps.judging,
       }),
+      runTelemetry: deps.runTelemetry,
     });
   }
 
@@ -360,6 +367,7 @@ export class LangWatchQLService {
 
       throw new LangWatchQLUnavailableError();
     }
+    await this.deps.placement.admit({ projectIds: [project.id] });
 
     const composed = langWatchQLPassSql({ sql, pass: wrapper });
     const executionParameters = { ...validation.boundParameters, ...composed.parameters };
@@ -367,6 +375,7 @@ export class LangWatchQLService {
       sql: composed.sql,
       ...(Object.keys(executionParameters).length > 0 ? { parameters: executionParameters } : {}),
       tenantCapability: lwqlCapability.tenantCapability({ secret: project.lwqlKey }),
+      projectIds: [project.id],
     });
 
     return {
@@ -392,6 +401,7 @@ export class LangWatchQLService {
     memberWindows,
     isInstantEvalsEnabled,
     signal,
+    telemetry,
   }: LangWatchQLProjectSetExecuteInput &
     LangWatchQLEvalGate &
     LangWatchQLMemberScope): Promise<LangWatchQLQueryResult> {
@@ -428,6 +438,7 @@ export class LangWatchQLService {
 
       throw new LangWatchQLUnavailableError();
     }
+    await this.deps.placement.admit({ projectIds });
 
     const tenantCapability = lwqlCapability.tenantCapabilitySet({
       secrets: projects.map((project) => project.lwqlKey),
@@ -446,11 +457,13 @@ export class LangWatchQLService {
       ...(memberWindows ? { memberWindows } : {}),
       ...(followedWindow ? { timeWindow: followedWindow } : {}),
       ...(signal ? { signal } : {}),
+      telemetry,
     });
     // After the main query, never beside it: a refused or failed query costs no second read.
     const completeness = await lwqlCompleteness.assess({
       executor,
       tenantCapability,
+      projectIds,
       validation,
       database: this.deps.database,
       views: this.views,

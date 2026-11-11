@@ -7,8 +7,9 @@ import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import type { GithubApi } from "@langwatch/github-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp } from "@langwatch/process";
-import { memoryStores } from "@langwatch/process-stores";
+import { memoryStores, resolvedSecrets } from "@langwatch/process-stores";
 import type { Project, ProjectApi } from "@langwatch/project-contract";
+import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 /**
  * @vitest-environment node
  * The organization rollup, booted the way a process boots coding-agent: its
@@ -65,9 +66,14 @@ function installation() {
   const audits: RecordAuditLogCommand[] = [];
   const projects = [project("project-shared"), project("project-other")];
 
-  const process = createApp({ role: "api" })
+  const resolver = SecretsResolver.over(SecretsChain.start({ environment: {} }));
+  const process = createApp({
+    role: "api",
+    secrets: (owner, declared) => resolver.scopeTo(owner, declared),
+  })
     .withModules([codingAgentProcessModule])
     .withStores(memoryStores())
+    .withSecrets(resolvedSecrets({}))
     .withConfig({ "coding-agent": { foldCacheTtlSeconds: 300 } })
     .provide({
       project: createApiFixture<ProjectApi>({

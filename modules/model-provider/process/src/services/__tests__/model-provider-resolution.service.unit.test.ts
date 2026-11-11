@@ -16,6 +16,7 @@ const LANGY = "langy.chat";
 const CODEX_MODEL = "openai_codex/gpt-5.6-terra";
 const TOPIC_CLUSTERING = "analytics.topic_clustering_llm";
 const TRACE_SEARCH = "traces.ai_search";
+const SCENARIO_JUDGE = "scenarios.judge";
 
 const feature = (key: string, role: string) => ({
   key,
@@ -54,7 +55,7 @@ function resolverWith(options: {
       defaultFeatures: () => [
         feature(LANGY, "LANGY"),
         feature(PLAYGROUND, "DEFAULT"),
-        feature("scenarios.judge", "DEFAULT"),
+        feature(SCENARIO_JUDGE, "JUDGE"),
         feature(TOPIC_CLUSTERING, "FAST"),
         feature(TRACE_SEARCH, "FAST"),
       ],
@@ -332,6 +333,97 @@ describe("ModelProviderResolutionService.resolve", () => {
       const resolver = resolverWith({ configs: [] });
 
       await expect(resolve(resolver, LANGY)).rejects.toBeInstanceOf(ModelNotConfiguredError);
+    });
+  });
+
+  describe("given the scenario judge, which reads the Judge column", () => {
+    /** @scenario "A Judge pick resolves as the scenario judge model" */
+    it("takes a Judge pick at a wider scope over the project's Default", async () => {
+      const resolver = resolverWith({
+        configs: [
+          config({
+            scopeType: "ORGANIZATION",
+            scopeId: "organization-1",
+            config: { JUDGE: "org-judge" },
+          }),
+          config({
+            scopeType: "PROJECT",
+            scopeId: "project-1",
+            config: { DEFAULT: "project-default" },
+          }),
+        ],
+      });
+
+      await expect(resolve(resolver, SCENARIO_JUDGE)).resolves.toMatchObject({
+        model: "org-judge",
+        source: "role_default",
+        scope: "organization",
+      });
+    });
+
+    /** @scenario "An unset Judge column resolves to the Default model" */
+    it("reads the Default column when Judge is unset at every scope", async () => {
+      const resolver = resolverWith({
+        configs: [
+          config({
+            scopeType: "ORGANIZATION",
+            scopeId: "organization-1",
+            config: { DEFAULT: "org-default" },
+          }),
+        ],
+      });
+
+      await expect(resolve(resolver, SCENARIO_JUDGE)).resolves.toMatchObject({
+        model: "org-default",
+        scope: "organization",
+      });
+    });
+
+    /** @scenario "A saved scenario judge override keeps winning" */
+    it("keeps a pinned scenario judge override over the Default", async () => {
+      const resolver = resolverWith({
+        configs: [
+          config({
+            scopeType: "PROJECT",
+            scopeId: "project-1",
+            config: { DEFAULT: "project-default", [SCENARIO_JUDGE]: "pinned-judge" },
+          }),
+        ],
+      });
+
+      await expect(resolve(resolver, SCENARIO_JUDGE)).resolves.toMatchObject({
+        model: "pinned-judge",
+        source: "feature_override",
+      });
+    });
+
+    it("refuses as not configured when neither Judge nor Default is set", async () => {
+      const resolver = resolverWith({ configs: [] });
+
+      await expect(resolve(resolver, SCENARIO_JUDGE)).rejects.toBeInstanceOf(
+        ModelNotConfiguredError,
+      );
+    });
+
+    it("offers the Default as the alternate when the project's Judge fails", async () => {
+      const resolver = resolverWith({
+        configs: [
+          config({
+            scopeType: "PROJECT",
+            scopeId: "project-1",
+            config: { JUDGE: "project-judge" },
+          }),
+          config({ scopeType: "TEAM", scopeId: "team-1", config: { DEFAULT: "team-default" } }),
+        ],
+      });
+
+      await expect(
+        resolver.findAlternate({
+          projectId: "project-1",
+          featureKey: SCENARIO_JUDGE,
+          skipFromScope: "project",
+        }),
+      ).resolves.toMatchObject({ model: "team-default", scope: "team" });
     });
   });
 

@@ -15,6 +15,7 @@ import {
   recordSeedControl,
   selectRows,
   startLangWatchQLClickHouse,
+  UNMAPPED_KEY_HASH,
 } from "./lwql-clickhouse-harness.ts";
 
 const viewProvisioning = LangWatchQLViewProvisioningService.create();
@@ -315,7 +316,7 @@ describe("given the coding-agent views provisioned over the shipped migrations",
 
   describe("when the key-hash context matches no project", () => {
     it("returns zero rows from both coding-agent views, never an error", async () => {
-      const noProject = await harness.restrictedClient({ keyHash: "not-a-real-key-hash" });
+      const noProject = await harness.restrictedClient({ keyHash: UNMAPPED_KEY_HASH });
 
       expect(
         await selectRows(noProject, `SELECT SessionId FROM ${database}.coding_sessions`),

@@ -4,6 +4,11 @@
  * and error handling. See {@link specs/data-retention/retention-policy-configuration.feature}
  */
 
+import {
+  UiHostServicesContextProvider,
+  type UiHostServices,
+} from "@langwatch/browser-host/capabilities";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -165,11 +170,32 @@ class TestRetentionHost extends DataRetentionHostApi {
   }
 }
 
-function renderScreen(host: TestRetentionHost) {
-  return renderWithDesignSystem(
+function renderScreen(host: TestRetentionHost, { isSaaS }: { isSaaS?: boolean } = {}) {
+  const screenUnderTest = (
     <DataRetentionHostProvider value={host}>
       <DataRetentionScreen />
-    </DataRetentionHostProvider>,
+    </DataRetentionHostProvider>
+  );
+  if (isSaaS === undefined) return renderWithDesignSystem(screenUnderTest);
+  const services: UiHostServices = {
+    ...createUiHostServicesFromHost({
+      route: () => ({ params: {}, query: {} }),
+      navigate: () => {},
+    }),
+    deployment: {
+      isDevelopment: false,
+      isSaaS,
+      appBaseUrl: "http://localhost",
+      hasNlpService: true,
+      hasLangevals: true,
+      hasEmailProvider: false,
+      hasCloudOps: false,
+    },
+  };
+  return renderWithDesignSystem(
+    <UiHostServicesContextProvider value={services}>
+      {screenUnderTest}
+    </UiHostServicesContextProvider>,
   );
 }
 
@@ -198,11 +224,35 @@ describe("given the retention policies page", () => {
 
   describe("when the organization's plan does not unlock configurable retention", () => {
     /** @scenario A free plan sees the policies and is offered no way to change them */
-    it("says so and offers no way to add a policy", () => {
+    it("says so on Cloud and offers no way to add a policy", () => {
       snapshotRef.current.canConfigureRetention = false;
-      renderScreen(new TestRetentionHost());
+      renderScreen(new TestRetentionHost(), { isSaaS: true });
 
       expect(screen.getByText("Configurable retention is a paid-plan feature")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Add retention policy" }),
+      ).not.toBeInTheDocument();
+    });
+
+    /**
+     * @scenario A self-hosted admin without a license is led to the License page from data retention
+     * @scenario "Each Enterprise page names its feature in the shared lock"
+     */
+    it("leads a self-hosted admin to the License page and offers no way to add a policy", () => {
+      snapshotRef.current.canConfigureRetention = false;
+      renderScreen(new TestRetentionHost({}, new Set(["organization:manage"])), { isSaaS: false });
+
+      expect(
+        screen.getByText("Data retention is part of LangWatch Enterprise"),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Activate a license" })).toHaveAttribute(
+        "href",
+        "/settings/license",
+      );
+      expect(screen.getByRole("link", { name: "Get a license" })).toHaveAttribute(
+        "href",
+        "/settings/license",
+      );
       expect(
         screen.queryByRole("button", { name: "Add retention policy" }),
       ).not.toBeInTheDocument();

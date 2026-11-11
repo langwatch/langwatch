@@ -2,7 +2,11 @@
  * Schemas for signed-out front door responses. Deliberately small for
  * unauthenticated users; routing decisions live in identity's routingDecisionSchema.
  */
-import { SIGNIN_ROUTING_REASON_CODES, signInMethodSchema } from "@langwatch/identity-contract";
+import {
+  SIGNIN_ROUTING_REASON_CODES,
+  signInIdpKindSchema,
+  signInMethodSchema,
+} from "@langwatch/identity-contract";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
@@ -105,3 +109,19 @@ const signUpEnrollmentSchemaDefinition = z
 export interface SignUpEnrollmentSchema extends Named<typeof signUpEnrollmentSchemaDefinition> {}
 export const signUpEnrollmentSchema: SignUpEnrollmentSchema = signUpEnrollmentSchemaDefinition;
 export type SignUpEnrollment = z.infer<typeof signUpEnrollmentSchema>;
+
+/**
+ * A sign-in started from this browser that never came back: the provider showed its own page
+ * instead. Names the provider to dial again and its kind, never an address or an organization.
+ */
+const unfinishedSignInSchemaDefinition = z
+  .object({
+    unfinished: z
+      .object({ providerId: z.string(), idp: signInIdpKindSchema.nullable() })
+      .strict()
+      .nullable(),
+  })
+  .strict();
+export interface UnfinishedSignInSchema extends Named<typeof unfinishedSignInSchemaDefinition> {}
+export const unfinishedSignInSchema: UnfinishedSignInSchema = unfinishedSignInSchemaDefinition;
+export type UnfinishedSignIn = z.infer<typeof unfinishedSignInSchema>;

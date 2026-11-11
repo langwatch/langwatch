@@ -76,6 +76,21 @@ export class ApiKeyAlreadyRevokedError extends HandledError {
   }
 }
 
+/** An expired key keeps its expiry through a rotation, so a new secret for it would be dead. */
+export class ApiKeyExpiredError extends HandledError {
+  declare readonly code: "api_key_expired";
+
+  constructor(id: string) {
+    super("api_key_expired", "API Key has expired", {
+      meta: { apiKeyId: id },
+      httpStatus: 409,
+      fault: "customer",
+      ...remediation("api_key_expired"),
+    });
+    this.name = "ApiKeyExpiredError";
+  }
+}
+
 export class ApiKeyReservedNameError extends HandledError {
   declare readonly code: "api_key_reserved_name";
 

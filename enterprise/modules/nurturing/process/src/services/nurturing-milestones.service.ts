@@ -16,6 +16,7 @@ import {
   seededAtRead,
   simulationRunFinishedSignal,
 } from "../rules/nurturing-owner-signals.rules.ts";
+import { NurturingClaimReleaseService } from "./nurturing-claim-release.service.ts";
 
 /** How long a counted evaluation or run is remembered against a redelivered event. */
 const COUNTED_WINDOW_SECONDS = 7 * 24 * 60 * 60;
@@ -60,20 +61,11 @@ async function claimedOnly<Item>({
   );
   const rejected = results.flatMap((result) => (result.status === "rejected" ? [result] : []));
   if (rejected.length === 0) return taken;
-  const released = await releasedAll({ keys: taken.map(keyOf), claims });
+  const released = await NurturingClaimReleaseService.create(claims).releasedAll(taken.map(keyOf));
   throw new AggregateError(
     [...rejected.map((result) => result.reason), ...released],
     "nurturing could not claim every item in the batch",
   );
-}
-
-/** Gives every claim back; the reasons a release failed, so the batch error carries them. */
-async function releasedAll({
-  keys,
-  claims,
-}: Readonly<{ keys: readonly string[]; claims: NurturingClaimRepository }>): Promise<unknown[]> {
-  const results = await Promise.allSettled(keys.map((key) => claims.release(key)));
-  return results.flatMap((result) => (result.status === "rejected" ? [result.reason] : []));
 }
 
 /** Items grouped by a key, the groups in order of their first item. */
@@ -210,10 +202,9 @@ export class NurturingMilestonesService {
       try {
         signals = await signalsFor(project);
       } catch (error) {
-        const released = await releasedAll({
-          keys: project.map(claimKeyOf),
-          claims: this.dependencies.claims,
-        });
+        const released = await NurturingClaimReleaseService.create(
+          this.dependencies.claims,
+        ).releasedAll(project.map(claimKeyOf));
         countFailures.push(error, ...released);
         continue;
       }

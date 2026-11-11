@@ -824,7 +824,7 @@ Declared at `src/eventing/scim.pipeline.ts:39`.
 | secret | `tokenPepper`                 | `CREDENTIALS_SECRET`          | `../contract/src/scim-token-pepper.ts:10` |
 | secret | `tokenPepperFallback`         | `NEXTAUTH_SECRET`             | `../contract/src/scim-token-pepper.ts:11` |
 | secret | `tokenPepperPrevious`         | `CREDENTIALS_SECRET_PREVIOUS` | `../contract/src/scim-token-pepper.ts:13` |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`       | `src/app/scim.app.ts:243`                 |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`       | `src/app/scim.app.ts:244`                 |
 | config | `provenOffboarding`           | `SCIM_V2_GRANTS`              | `../contract/src/scim.config.ts:19`       |
 | config | `publicBaseUrl`               | `BASE_HOST`                   | `../contract/src/scim.config.ts:20`       |
 

@@ -499,6 +499,43 @@
       ]
     },
     {
+      "name": "UserErasure",
+      "tableName": "UserErasure",
+      "documentation": "One row per erased account, holding only its creation time: no id, name or address. It keeps\nthe install's first-created account knowable after an erasure deletes that row.\nSpec: modules/user/specs/user.feature",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "accountCreatedAt",
+          "columnName": "accountCreatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "erasedAt",
+          "columnName": "erasedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
       "name": "User",
       "tableName": "User",
       "documentation": "",
@@ -3543,6 +3580,415 @@
           "isList": false,
           "isOptional": false,
           "documentation": "A new generation for each membership lifetime. Stamped USER grant facts\nmust match the current active membership before they can be projected;\nremoving and rejoining therefore cannot revive a delayed old attach."
+        },
+        {
+          "name": "fullSeatSince",
+          "columnName": "fullSeatSince",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "When this membership started holding the full seat it holds now; null means createdAt.\nAnchors the 30-day seat hold (specs/licensing/seat-rotation.feature)."
+        },
+        {
+          "name": "seatPendingSince",
+          "columnName": "seatPendingSince",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Set when admission wrote this membership disabled because no seat was free: the person\nis waiting for one. Cleared when the membership is enabled."
+        }
+      ]
+    },
+    {
+      "name": "SeatHold",
+      "tableName": "SeatHold",
+      "documentation": "A full seat still counted after the person who took it stopped holding it (removed,\ndisabled or demoted), until 30 days after they took it (specs/licensing/seat-rotation.feature).\nOne per organization and person; a return within the hold takes the seat back.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "userId",
+          "columnName": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "email",
+          "columnName": "email",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Display copy for the Users list, kept because a removed person has no membership row."
+        },
+        {
+          "name": "name",
+          "columnName": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "seatTakenAt",
+          "columnName": "seatTakenAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "When the person took the seat this hold keeps."
+        },
+        {
+          "name": "heldUntil",
+          "columnName": "heldUntil",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "seatTakenAt plus 30 days; expired holds are ignored by every count and deleted hourly."
+        },
+        {
+          "name": "reason",
+          "columnName": "reason",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "REMOVED | DISABLED | DEMOTED"
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "SeatRequest",
+      "tableName": "SeatRequest",
+      "documentation": "A person asked for a full seat the organization had no room for (modules/organization/specs/\nseat-requests.feature). One row per organization and address; reopening reuses the row.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "email",
+          "columnName": "email",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Lowercased address of the person asking."
+        },
+        {
+          "name": "userId",
+          "columnName": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Null when only the address is known (a sign-in the identity provider refused)."
+        },
+        {
+          "name": "name",
+          "columnName": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "status",
+          "columnName": "status",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "OPEN | APPROVED | DECLINED"
+        },
+        {
+          "name": "source",
+          "columnName": "source",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "pending | lite | idp_refused: how the person was left when the request opened."
+        },
+        {
+          "name": "idpRefused",
+          "columnName": "idpRefused",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The identity provider also refused this person's sign-in."
+        },
+        {
+          "name": "idpKind",
+          "columnName": "idpKind",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "okta | entra | google | onelogin | jumpcloud | ping | auth0 | oidc | saml"
+        },
+        {
+          "name": "salesNotifiedAt",
+          "columnName": "salesNotifiedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "When sales were told about this request; reset when it reopens."
+        },
+        {
+          "name": "openedAt",
+          "columnName": "openedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "resolvedAt",
+          "columnName": "resolvedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "resolvedByUserId",
+          "columnName": "resolvedByUserId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "seatPendingSince",
+          "columnName": "seatPendingSince",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Set when an approval claims the request, cleared once its seat is given; an approval\nstill pending long after is one whose seat never landed, and is reopened."
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "OrganizationSeatLease",
+      "tableName": "OrganizationSeatLease",
+      "documentation": "Held by the one seat-taking write running on an organization (seat-requests.feature). A\nrow past expiresAt is free to take; a holder deletes its own row when its write is done.",
+      "primaryKey": [
+        "organizationId"
+      ],
+      "fields": [
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "holder",
+          "columnName": "holder",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Random per hold, so a release deletes only its own lease."
+        },
+        {
+          "name": "expiresAt",
+          "columnName": "expiresAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "OrganizationAccessNotice",
+      "tableName": "OrganizationAccessNotice",
+      "documentation": "The mail log for seat requests and refused sign-ins: at most one row per organization,\nkind, address and UTC day, each mailed at once.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "kind",
+          "columnName": "kind",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "seat_request | idp_refused"
+        },
+        {
+          "name": "email",
+          "columnName": "email",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "name",
+          "columnName": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "idp",
+          "columnName": "idp",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "dayKey",
+          "columnName": "dayKey",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "UTC day the notice was recorded on, YYYY-MM-DD."
+        },
+        {
+          "name": "idpRefused",
+          "columnName": "idpRefused",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Whether the seat request it announces was also refused by the identity provider."
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "mailedAt",
+          "columnName": "mailedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Set once the notice was handed to the mailer; null if a send never started."
         }
       ]
     },
@@ -18625,6 +19071,150 @@
           "documentation": ""
         },
         {
+          "name": "seatsKept",
+          "columnName": "seatsKept",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Seats paid for this period that stay usable after a seat decrease, until seatsKeptUntil."
+        },
+        {
+          "name": "seatsKeptUntil",
+          "columnName": "seatsKeptUntil",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "seatLineQuantity",
+          "columnName": "seatLineQuantity",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The seat quantity the last finished seat change set the seat line to; provider events never write it."
+        },
+        {
+          "name": "seatLineQuantityAt",
+          "columnName": "seatLineQuantityAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "seatLineWriteQuantities",
+          "columnName": "seatLineWriteQuantities",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": true,
+          "isOptional": false,
+          "documentation": "A Stripe seat line write recorded before it is sent and cleared once it is known to have\nfinished under the lease; one left behind is settled by the seat line repair.\nEvery seat quantity written while this record was pending."
+        },
+        {
+          "name": "seatLineWriteSince",
+          "columnName": "seatLineWriteSince",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The first write still pending; a later holder's write keeps it."
+        },
+        {
+          "name": "seatLineWriteAt",
+          "columnName": "seatLineWriteAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The latest write sent; the repair waits a grace window after it."
+        },
+        {
+          "name": "seatLineWriteAttempts",
+          "columnName": "seatLineWriteAttempts",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "seatLineWriteFlaggedAt",
+          "columnName": "seatLineWriteFlaggedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "seatRepairQuantity",
+          "columnName": "seatRepairQuantity",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The seat quantity Stripe should bill if a seat change stops after lifting the seat line; null once settled."
+        },
+        {
+          "name": "seatRepairLiftedQuantity",
+          "columnName": "seatRepairLiftedQuantity",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The quantity the change lifted the line to; the repair moves the line back only while Stripe still bills it."
+        },
+        {
+          "name": "seatRepairSince",
+          "columnName": "seatRepairSince",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "seatRepairAttempts",
+          "columnName": "seatRepairAttempts",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "seatRepairFlaggedAt",
+          "columnName": "seatRepairFlaggedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Set once the seat line repair has failed often enough that Ops should look at it."
+        },
+        {
+          "name": "seatLineLeaseToken",
+          "columnName": "seatLineLeaseToken",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The lease a seat change or seat line repair holds while it reads and moves the seat line."
+        },
+        {
+          "name": "seatLineLeaseUntil",
+          "columnName": "seatLineLeaseUntil",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
           "name": "organization",
           "columnName": "organization",
           "type": "Organization",
@@ -20162,6 +20752,42 @@
           "name": "codingLastActiveDay",
           "columnName": "codingLastActiveDay",
           "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "codingTerminalTypes",
+          "columnName": "codingTerminalTypes",
+          "type": "String",
+          "kind": "scalar",
+          "isList": true,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "codingRepositoryKeys",
+          "columnName": "codingRepositoryKeys",
+          "type": "String",
+          "kind": "scalar",
+          "isList": true,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "codingFirstDays",
+          "columnName": "codingFirstDays",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": true,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "lastTraceAt",
+          "columnName": "lastTraceAt",
+          "type": "DateTime",
           "kind": "scalar",
           "isList": false,
           "isOptional": true,
@@ -26304,6 +26930,79 @@
           "isList": false,
           "isOptional": false,
           "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "LicenseRenewalClaim",
+      "tableName": "LicenseRenewalClaim",
+      "documentation": "One renewed licence per paid Stripe invoice of a self-serve licence\nsubscription (specs/licensing/self-serving-license-purchase.feature). A\nredelivered invoice event finds the row and mints nothing. A claim never\ndelivered is taken over once `claimedAt` is older than the claim lease.",
+      "primaryKey": [
+        "stripeInvoiceId"
+      ],
+      "fields": [
+        {
+          "name": "stripeInvoiceId",
+          "columnName": "stripeInvoiceId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "stripeSubscriptionId",
+          "columnName": "stripeSubscriptionId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "claimToken",
+          "columnName": "claimToken",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Fences completion and release to the delivery that holds the claim."
+        },
+        {
+          "name": "claimedAt",
+          "columnName": "claimedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "issuedLicense",
+          "columnName": "issuedLicense",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The signed licence between minting and mailing, so a retry mails it again instead of minting another; cleared once delivered."
+        },
+        {
+          "name": "deliveredAt",
+          "columnName": "deliveredAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "licenseId",
+          "columnName": "licenseId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The `licenseId` inside the delivered licence."
         }
       ]
     },

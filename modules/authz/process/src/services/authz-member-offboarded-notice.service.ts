@@ -24,7 +24,12 @@ export class AuthzMemberOffboardedNoticeService {
   }
 
   async memberOffboarded(
-    input: Readonly<{ organizationId: string; userId: string; offboardedByUserId: string | null }>,
+    input: Readonly<{
+      organizationId: string;
+      userId: string;
+      offboardedByUserId: string | null;
+      heldFullSeat?: boolean;
+    }>,
   ): Promise<void> {
     const sender = this.#sender;
     if (!sender) throw new Error("authz_member_offboarded is not registered in this process");

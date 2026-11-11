@@ -15,11 +15,17 @@ export class TestUserApi implements UserApi {
 
   constructor(private readonly overrides: Partial<UserApi> = {}) {}
 
+  findSignedInSince: UserApi["findSignedInSince"] = (input) =>
+    this.overrides.findSignedInSince?.(input) ?? this.unimplemented("findSignedInSince");
+
   hasAccountOnDomain: UserApi["hasAccountOnDomain"] = (input) =>
     this.overrides.hasAccountOnDomain?.(input) ?? this.unimplemented("hasAccountOnDomain");
 
   hasAnyAccount: UserApi["hasAnyAccount"] = () =>
     this.overrides.hasAnyAccount?.() ?? this.unimplemented("hasAnyAccount");
+
+  isFirstCreatedAccount: UserApi["isFirstCreatedAccount"] = (input) =>
+    this.overrides.isFirstCreatedAccount?.(input) ?? this.unimplemented("isFirstCreatedAccount");
 
   findById: UserApi["findById"] = (input) =>
     this.overrides.findById?.(input) ?? this.unimplemented("findById");

@@ -126,3 +126,35 @@ export interface PromptCreatedEventDataSchema extends Named<
 export const promptCreatedEventDataSchema: PromptCreatedEventDataSchema =
   promptCreatedEventDataSchemaDefinition;
 export type PromptCreatedEventData = z.infer<typeof promptCreatedEventDataSchema>;
+
+export const PROMPT_VERSION_SAVED_EVENT_TYPE = "lw.prompt.version_saved" as const;
+
+/** A prompt got a new version after its first (update, restore, sync or copy push); ids only. */
+const promptVersionSavedEventDataSchemaDefinition = z.object({
+  promptId: z.string(),
+  projectId: z.string(),
+  versionId: z.string(),
+  authorId: z.string().optional(),
+  occurredAt: z.number().int().nonnegative(),
+});
+export interface PromptVersionSavedEventDataSchema extends Named<
+  typeof promptVersionSavedEventDataSchemaDefinition
+> {}
+export const promptVersionSavedEventDataSchema: PromptVersionSavedEventDataSchema =
+  promptVersionSavedEventDataSchemaDefinition;
+export type PromptVersionSavedEventData = z.infer<typeof promptVersionSavedEventDataSchema>;
+
+export const PROMPT_DELETED_EVENT_TYPE = "lw.prompt.deleted" as const;
+
+/** A prompt was removed from its project; ids only. */
+const promptDeletedEventDataSchemaDefinition = z.object({
+  promptId: z.string(),
+  projectId: z.string(),
+  occurredAt: z.number().int().nonnegative(),
+});
+export interface PromptDeletedEventDataSchema extends Named<
+  typeof promptDeletedEventDataSchemaDefinition
+> {}
+export const promptDeletedEventDataSchema: PromptDeletedEventDataSchema =
+  promptDeletedEventDataSchemaDefinition;
+export type PromptDeletedEventData = z.infer<typeof promptDeletedEventDataSchema>;

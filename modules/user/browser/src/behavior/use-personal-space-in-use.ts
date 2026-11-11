@@ -10,7 +10,7 @@ import { useCurrentUser, useOrganizationTeamProject } from "./personal-workspace
 export function usePersonalSpaceInUse(): boolean | null {
   const currentUser = useCurrentUser();
   const { organization } = useOrganizationTeamProject();
-  const orgId = organization?.id ?? "org_unknown";
+  const orgId = organization?.id ?? "";
   const userId = currentUser?.id;
 
   const keys = api.personalVirtualKeys.list.useQuery(

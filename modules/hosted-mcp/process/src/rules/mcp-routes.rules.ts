@@ -30,6 +30,12 @@ const OAUTH_HANDSHAKE_POLICY: AccessPolicy = publicEndpoint(
 
 const MCP_HEALTH_POLICY: AccessPolicy = publicEndpoint("MCP liveness probe; reads no project data");
 
+const MCP_DOCS_POLICY: AccessPolicy = publicEndpoint(
+  "Docs-only MCP for anyone, signed in or not: serves only the tools that read the public " +
+    "LangWatch and Scenario docs under https://langwatch.ai/docs/ and /scenario/; reads no " +
+    "project data and keeps no session",
+);
+
 const ROUTE_VERBS: readonly {
   path: string;
   methods: readonly string[];
@@ -37,6 +43,7 @@ const ROUTE_VERBS: readonly {
 }[] = [
   { path: "/mcp", methods: ["POST", "GET", "DELETE"], policy: BEARER_SESSION_POLICY },
   { path: "/mcp/health", methods: ["GET"], policy: MCP_HEALTH_POLICY },
+  { path: "/mcp/docs", methods: ["POST"], policy: MCP_DOCS_POLICY },
   { path: "/sse", methods: ["POST", "GET", "DELETE"], policy: BEARER_SESSION_POLICY },
   { path: PROTECTED_RESOURCE_METADATA_PATH, methods: ["GET"], policy: OAUTH_HANDSHAKE_POLICY },
   {
@@ -100,6 +107,8 @@ export function hostedMcpRoutePolicies(): readonly {
 export const MCP_ROOT_PATHS: readonly string[] = [
   "/mcp",
   "/mcp/health",
+  // The docs-only endpoint that takes no credential; langwatch.ai/docs/mcp forwards here.
+  "/mcp/docs",
   // The retired SSE transport's URL, kept so configurations that still name it reach the
   // Streamable HTTP transport.
   "/sse",

@@ -23,6 +23,7 @@ function process(role: "api" | "worker", googleCredentials?: string) {
         enforcement: undefined,
         nodeEnvironment: undefined,
         langevalsEndpoint: undefined,
+        piiRedactionModelEndpoint: undefined,
       },
     })
     .provide({

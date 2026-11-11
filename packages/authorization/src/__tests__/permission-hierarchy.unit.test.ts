@@ -39,6 +39,25 @@ describe("given a bag of granted permissions", () => {
     });
   });
 
+  describe("when the bag holds organization:manage but not organization:delete", () => {
+    /** @scenario "Deleting the organization is never implied by managing it" */
+    it.concurrent("refuses organization:delete — deleting the org is an explicit grant only", () => {
+      expect(satisfies(["organization:manage"], "organization:delete")).toBe(false);
+    });
+
+    /** @scenario "Deleting the organization is never implied by managing it" */
+    it.concurrent("still satisfies view on the organization", () => {
+      expect(satisfies(["organization:manage"], "organization:view")).toBe(true);
+    });
+
+    /** @scenario "Deleting the organization is never implied by managing it" */
+    it.concurrent("satisfies organization:delete when it is granted directly", () => {
+      expect(satisfies(["organization:manage", "organization:delete"], "organization:delete")).toBe(
+        true,
+      );
+    });
+  });
+
   describe("when the bag holds only view on the requested resource", () => {
     /** @scenario "A view grant never satisfies manage" */
     it.concurrent("refuses manage — the implication runs one way only", () => {

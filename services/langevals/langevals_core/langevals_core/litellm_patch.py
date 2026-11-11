@@ -12,6 +12,7 @@ import json
 
 from langevals_core.model_pricing import register_langwatch_model_pricing
 from langevals_core.request_env import current_request_env
+from langevals_core.usage_ledger import record_usage
 
 # Necessary for running DSPy on AWS lambdas
 os.environ["DSP_CACHEDIR"] = mkdtemp()
@@ -767,10 +768,13 @@ def patch_litellm():
             return await acomplete_with_auto_tool_choice(args, kwargs)
 
     def patched_completion(*args, **kwargs):
+        requested_model = kwargs.get("model")
         kwargs = patch_litellm_params(kwargs)
         while True:
             try:
-                return complete(args, kwargs)
+                response = complete(args, kwargs)
+                record_usage(requested_model, response)
+                return response
             except Exception as exception:
                 adjusted = adjusted_after_refusal(kwargs, exception)
                 if adjusted is None:
@@ -783,10 +787,13 @@ def patch_litellm():
     litellm.completion = patched_completion
 
     async def patched_acompletion(*args, **kwargs):
+        requested_model = kwargs.get("model")
         kwargs = patch_litellm_params(kwargs)
         while True:
             try:
-                return await acomplete(args, kwargs)
+                response = await acomplete(args, kwargs)
+                record_usage(requested_model, response)
+                return response
             except Exception as exception:
                 adjusted = adjusted_after_refusal(kwargs, exception)
                 if adjusted is None:
@@ -799,8 +806,11 @@ def patch_litellm():
     litellm.acompletion = patched_acompletion
 
     def patched_embedding(*args, **kwargs):
+        requested_model = kwargs.get("model")
         kwargs = patch_litellm_embedding_params(kwargs)
-        return originals["embedding"](*args, **kwargs)
+        response = originals["embedding"](*args, **kwargs)
+        record_usage(requested_model, response)
+        return response
 
     litellm.embedding = patched_embedding
 

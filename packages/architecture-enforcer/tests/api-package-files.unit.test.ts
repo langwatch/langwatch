@@ -62,6 +62,7 @@ const TARGET_FILES = new Set([
   "rest/browser-session.ts",
   "rest/byte-stream.ts",
   "rest/cli-token-identity.ts",
+  "rest/client-fault-telemetry.ts",
   "rest/confirmation.ts",
   "rest/credential-census.ts",
   "rest/credential.ts",

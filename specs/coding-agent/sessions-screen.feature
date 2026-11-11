@@ -163,10 +163,9 @@ Rule: A session is named by its generated title, else by its first prompt
     When the user reads its row
     Then the row names it as an untitled session
 
-  # pi declares no prompt and no title attribute anywhere in its schema, so
-  # every pi session reaches this fallback, not just the ones that went
-  # unnamed. The risk is a fallback that reaches for the nearest string it can
-  # find and prints a span name or a session id at a human.
+  # A pi run carries its prompt only with content capture on, so a session sent
+  # without it reaches this fallback. The risk is a fallback that reaches for the
+  # nearest string it can find and prints a span name or a session id at a human.
 
   @integration
   Scenario: A pi session falls back to untitled rather than to a span name
