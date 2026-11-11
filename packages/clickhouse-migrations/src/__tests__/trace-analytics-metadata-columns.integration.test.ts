@@ -1,6 +1,6 @@
 /**
  * @vitest-environment node
- * Goose 00125's nine trace_analytics metadata columns on a real server: its mutation fills rows
+ * Goose 00126's nine trace_analytics metadata columns on a real server: its mutation fills rows
  * written before it, insert fills the rest. @see specs/lwql/stock-widgets-on-trace-metrics.feature
  */
 import { randomUUID } from "node:crypto";
@@ -38,7 +38,7 @@ const COLUMNS: Record<string, string> = {
 const NAMES = Object.keys(COLUMNS);
 
 const TENANT = `metadata-columns-${randomUUID()}`;
-const SCRATCH = `trace_analytics_before_00125_${process.pid}`;
+const SCRATCH = `trace_analytics_before_00126_${process.pid}`;
 /** Today, so the table's retention TTL never drops the rows mid-test. */
 const OCCURRED_AT = new Date().toISOString().slice(0, 23).replace("T", " ");
 
@@ -123,10 +123,10 @@ describe("given trace_analytics rows with and without the nine metadata keys", (
     await client?.close();
   });
 
-  describe("when the rows were written before 00125 and its statements then ran", () => {
+  describe("when the rows were written before 00126 and its statements then ran", () => {
     /** @scenario "The migration fills the metadata columns for existing rows" */
     it("stores each key's value in its column, and empty text for a missing key", async () => {
-      // trace_analytics as it stood before 00125: the shipped table less the nine columns.
+      // trace_analytics as it stood before 00126: the shipped table less the nine columns.
       await client.command({ query: `DROP TABLE IF EXISTS ${SCRATCH}` });
       await client.command({ query: `CREATE TABLE ${SCRATCH} AS trace_analytics` });
       await client.command({
@@ -159,7 +159,7 @@ describe("given trace_analytics rows with and without the nine metadata keys", (
     });
   });
 
-  describe("when the rows are written after 00125", () => {
+  describe("when the rows are written after 00126", () => {
     /** @scenario "The migration fills the metadata columns for existing rows" */
     it("computes each column from the row's own Attributes on insert", async () => {
       await client.insert({

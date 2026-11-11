@@ -29,7 +29,7 @@ class MemoryMaterialisation {
 export class MemoryTraceIndexMaterialisationRepository extends TraceIndexMaterialisationRepository {
   readonly #index = new MemoryMaterialisation();
   readonly #metadataColumns = new MemoryMaterialisation();
-  /** One part written before goose 00125 until a test says the columns are on disk. */
+  /** One part written before goose 00126 until a test says the columns are on disk. */
   #partsMissingMetadataColumns = 1;
 
   static create(): MemoryTraceIndexMaterialisationRepository {
