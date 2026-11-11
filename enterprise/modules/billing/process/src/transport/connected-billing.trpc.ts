@@ -23,13 +23,13 @@ import {
 export const operatorContext = defineMiddlewareContext("opsOperator", opsOperatorSchema.nullable());
 
 /** Staff hold ops:view at the platform; anyone else is answered not-found. */
-const STAFF = { at: "platform", hiddenWithout: "ops:view" } as const;
+export const STAFF = { at: "platform", hiddenWithout: "ops:view" } as const;
 
 /**
  * The impersonator where there is one: debugging a customer stays operator work. An impersonator
  * with no id is nobody billing can ask, so the call is refused, never run as the customer.
  */
-function getStaff(operator: OpsOperator | null): BillingStaff {
+export function getStaff(operator: OpsOperator | null): BillingStaff {
   if (!operator) throw new AdminSurfaceHiddenError();
   const { impersonator } = operator;
   if (!impersonator) return { id: operator.id, email: operator.email };

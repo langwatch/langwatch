@@ -7,6 +7,7 @@
 import { defineBrowserModule } from "@langwatch/browser";
 import {
   ContactSalesToken,
+  CouponsSectionToken,
   LicenseBillingSectionToken,
   SeatProrationPreviewToken,
 } from "@langwatch/enterprise-billing-client";
@@ -21,6 +22,10 @@ export const billingWeb = defineBrowserModule("billing")
   // The license drawer's Billing section, for the Admin that hosts that drawer.
   .lends(LicenseBillingSectionToken, {
     load: () => import("./features/connected-billing/ui/sections/license-billing-section.tsx"),
+  })
+  // The Cloud admin console's Coupons page body, for the ops screen that places it.
+  .lends(CouponsSectionToken, {
+    load: () => import("./features/coupons/ui/sections/coupons-section.tsx"),
   })
   .withScreens({
     // Placed by the application's settings table until a settings anchor

@@ -3,7 +3,7 @@
  * explicitly; message is always customer-safe.
  */
 
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 export { OrganizationNotFoundError } from "@langwatch/organization-contract";
 
 /** Billing requires an email; 422 validates the account field, not auth. */
@@ -304,5 +304,55 @@ export class BillingProviderUnavailableError extends HandledError {
       ...options,
     });
     this.name = "BillingProviderUnavailableError";
+  }
+}
+
+/**
+ * A coupon the operator asked for that the Growth checkout could not use; nothing
+ * reached Stripe.
+ */
+export class BillingCouponInvalidError extends HandledError {
+  declare readonly code: "billing_coupon_invalid";
+
+  constructor(fieldErrors: Readonly<Record<string, readonly string[]>>) {
+    super("billing_coupon_invalid", "The coupon details are not valid", {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { fieldErrors },
+      ...remediation("billing_coupon_invalid"),
+    });
+    this.name = "BillingCouponInvalidError";
+  }
+}
+
+/** Stripe holds one active promotion code per name; this one is taken. */
+export class BillingCouponCodeTakenError extends HandledError {
+  declare readonly code: "billing_coupon_code_taken";
+
+  constructor(code: string) {
+    super("billing_coupon_code_taken", `An active code ${code} already exists`, {
+      httpStatus: 409,
+      fault: "customer",
+      meta: { code },
+      ...remediation("billing_coupon_code_taken"),
+    });
+    this.name = "BillingCouponCodeTakenError";
+  }
+}
+
+/**
+ * Coupons are LangWatch Cloud's, over its payment provider; off Cloud or without the
+ * key they refuse.
+ */
+export class BillingCouponsUnavailableError extends HandledError {
+  declare readonly code: "billing_coupons_unavailable";
+
+  constructor() {
+    super("billing_coupons_unavailable", "Coupons are only available on LangWatch Cloud", {
+      httpStatus: 503,
+      fault: "platform",
+      ...remediation("billing_coupons_unavailable"),
+    });
+    this.name = "BillingCouponsUnavailableError";
   }
 }

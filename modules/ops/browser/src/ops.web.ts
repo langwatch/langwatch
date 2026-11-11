@@ -150,6 +150,13 @@ export const opsWeb = defineBrowserModule("ops")
         default: (await import("./ui/sections/ops/admin-screens.tsx")).CloudSeatUseScreen,
       }),
     },
+    // Billing lends the page body; ops places it beside Subscriptions and Licenses.
+    "pages/ops/cloud/coupons": {
+      requires: "ops:view",
+      load: async () => ({
+        default: (await import("./ui/sections/ops/admin-screens.tsx")).CloudCouponsScreen,
+      }),
+    },
   })
   .withDrawers({
     opsGroupDetail: {

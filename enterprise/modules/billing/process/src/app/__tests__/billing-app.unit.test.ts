@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { billingProcessModule } from "../../billing.module.ts";
 import { MemoryBillingWebhookHostChannel } from "../../channels/memory/memory.billing-webhook-host.channel.ts";
 import { MemoryConnectedInvoicingChannel } from "../../channels/memory/memory.connected-invoicing.channel.ts";
+import { MemoryStripeCouponsChannel } from "../../channels/memory/memory.stripe-coupons.channel.ts";
 import { MemoryStripeCustomersChannel } from "../../channels/memory/memory.stripe-customers.channel.ts";
 import { MemoryStripeInvoicesChannel } from "../../channels/memory/memory.stripe-invoices.channel.ts";
 import { MemoryStripeMetersChannel } from "../../channels/memory/memory.stripe-meters.channel.ts";
@@ -117,6 +118,7 @@ function stripeTwins({ webhookSecret }: { webhookSecret: string | undefined }) {
     subscriptions: MemoryStripeSubscriptionsChannel.create(),
     invoices: MemoryStripeInvoicesChannel.create(),
     prices: MemoryStripePricesChannel.create(),
+    coupons: MemoryStripeCouponsChannel.create(),
     meters: MemoryStripeMetersChannel.create(),
     connectedInvoicing: MemoryConnectedInvoicingChannel.create(),
   };
@@ -502,6 +504,49 @@ describe("the subscription door BillingModule serves", () => {
         code: "not_found",
         httpStatus: 404,
       });
+    });
+  });
+});
+
+describe("the coupons BillingModule serves", () => {
+  describe("given a self-hosted deployment", () => {
+    it("refuses coupons by name", async () => {
+      const { app } = billingApp({ isSaas: false, withStripe: true });
+
+      await expect(app.listCoupons(STAFF)).rejects.toMatchObject({
+        code: "billing_coupons_unavailable",
+      });
+    });
+  });
+
+  describe("given LangWatch Cloud with no payment provider key", () => {
+    it("refuses coupons by name", async () => {
+      const { app } = billingApp({ isSaas: true, withStripe: false });
+
+      await expect(
+        app.createCoupon({ percentOff: 50, duration: "once", code: "WELCOME50" }, STAFF),
+      ).rejects.toMatchObject({ code: "billing_coupons_unavailable" });
+    });
+  });
+
+  describe("given LangWatch Cloud with the key", () => {
+    it("creates the coupon on the test mode's Growth Seats and records who did it", async () => {
+      const { app, audited, stripe } = billingApp({ isSaas: true, withStripe: true });
+
+      const coupon = await app.createCoupon(
+        { percentOff: 50, duration: "once", code: "WELCOME50" },
+        STAFF,
+      );
+
+      expect(stripe?.channels.coupons.coupons[0]?.products).toEqual(["prod_Twquw4VLPAoYC1"]);
+      expect(audited).toEqual([
+        expect.objectContaining({
+          userId: STAFF.id,
+          action: "billingCoupons.create",
+          targetKind: "coupon",
+          targetId: coupon.id,
+        }),
+      ]);
     });
   });
 });

@@ -36,3 +36,9 @@ export const LicenseBillingSectionToken =
 export const ContactSalesToken = uiTokens("billing").component<ContactSalesProps>("contactSales");
 export const SeatProrationPreviewToken =
   uiTokens("billing").component<SeatProrationPreviewProps>("seatProrationPreview");
+
+/** The Cloud admin console's Coupons page body; it reads and writes Stripe coupons itself. */
+export type CouponsSectionProps = Record<string, never>;
+
+export const CouponsSectionToken =
+  uiTokens("billing").component<CouponsSectionProps>("couponsSection");

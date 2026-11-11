@@ -961,6 +961,21 @@ const registry = {
     tips: ["An update interrupted this reply; resend the message"],
   },
 
+  // ---- billing coupons (Cloud admin console) ----
+  billing_coupon_invalid: {
+    tips: ["Read meta.fieldErrors; each key names the field to correct before creating again"],
+  },
+  billing_coupon_code_taken: {
+    tips: [
+      "Deactivate the existing code on the Coupons page first, or pick another code; Stripe holds one active code per name",
+    ],
+  },
+  billing_coupons_unavailable: {
+    tips: [
+      "Coupons are managed from the LangWatch Cloud admin console, which needs the Stripe secret key",
+    ],
+  },
+
   // ---- licensing ----
   license_signing_key_not_pem: {
     tips: [

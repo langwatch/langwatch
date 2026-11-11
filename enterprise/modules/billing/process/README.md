@@ -6,7 +6,7 @@ The server half of [billing](../README.md). Billing: subscriptions, invoices and
 
 ## Installation
 
-`defineProcessModule("billing").withRepositories(billingRepositories).withChannels(billingChannels).withApi(BillingModule).withTransports(connectedBillingTrpcTransport, billingStripeWebhookRest, currencyTrpcTransport, subscriptionTrpcTransport).withEventing(connectedBillingEventing).withEventing(billingReportingEventing).withEventing(billingLifecycleEventing).withEventing(seatLineRepairEventing).withMigrations(…).withTasks(…)`, `src/billing.module.ts:44`.
+`defineProcessModule("billing").withRepositories(billingRepositories).withChannels(billingChannels).withApi(BillingModule).withTransports(connectedBillingTrpcTransport, billingCouponsTrpcTransport, billingStripeWebhookRest, currencyTrpcTransport, subscriptionTrpcTransport).withEventing(connectedBillingEventing).withEventing(billingReportingEventing).withEventing(billingLifecycleEventing).withEventing(seatLineRepairEventing).withMigrations(…).withTasks(…)`, `src/billing.module.ts:45`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 What the billing module answers other modules: invoice billing for a connected self-hosted customer (ADR-156 section 7). Every operation refuses off LangWatch Cloud, and where no payment provider is configured. The admin console operations trust the platform door (Q43): staff only, writes need ops:manage.
 
-Peers call these through the token, declared at `../contract/src/billing.api.ts:35`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/billing.api.ts:41`; nothing else in this package is public.
 
 #### `getConnectedBillingOverview`
 
@@ -50,6 +50,30 @@ renewConnectedTerm(input: ConnectedRenewRequest, staff: BillingStaff): Promise<C
 
 ```typescript
 completeConnectedRenewalIfDue(input: { organizationId: string }, staff: BillingStaff): Promise<RenewalCompletion>;
+```
+
+#### `listCoupons`
+
+Every Stripe coupon with its promotion codes, newest first, each code judged against the Growth checkout. Cloud only, with the payment provider's key.
+
+```typescript
+listCoupons(staff: BillingStaff): Promise<CouponList>;
+```
+
+#### `createCoupon`
+
+A percentage coupon on the Growth products and its one promotion code, or neither.
+
+```typescript
+createCoupon(input: CreateCouponRequest, staff: BillingStaff): Promise<CouponView>;
+```
+
+#### `deactivatePromotionCode`
+
+Retires a promotion code so a new coupon may take its name.
+
+```typescript
+deactivatePromotionCode(input: PromotionCodeTarget, staff: BillingStaff): Promise<PromotionCodeTarget>;
 ```
 
 #### `markConnectedInvoicePaidOutOfBand`
@@ -143,6 +167,44 @@ interface Response {
 ```
 
 ## tRPC transport
+
+### `billingCoupons`
+
+Contract `../contract/src/billing-coupons.trpc.ts:17`, router `src/transport/billing-coupons.trpc.ts:14`.
+
+| Procedure                       | Kind     | Gate                             | Input                       | Output                      |
+| ------------------------------- | -------- | -------------------------------- | --------------------------- | --------------------------- |
+| `billingCoupons.list`           | query    | Platform permission `ops:view`   | inline                      | `couponListSchema`          |
+| `billingCoupons.create`         | mutation | Platform permission `ops:manage` | `createCouponRequestSchema` | `couponViewSchema`          |
+| `billingCoupons.deactivateCode` | mutation | Platform permission `ops:manage` | `promotionCodeTargetSchema` | `promotionCodeTargetSchema` |
+
+```typescript
+// billingCoupons.list
+// Input: inline, ../contract/src/billing-coupons.trpc.ts:19
+type Input = Record<string, unknown>;
+type Output = z.infer<typeof couponListSchema>; // ../contract/src/billing-coupons.schemas.ts:91
+
+// billingCoupons.create
+// Input: createCouponRequestSchema, ../contract/src/billing-coupons.schemas.ts:112
+interface Input {
+  percentOff: number;
+  duration: "once" | "repeating" | "forever";
+  durationInMonths?: number;
+  name?: string;
+  code: string;
+  includeEvents?: boolean;
+  maxRedemptions?: number;
+  expiresAt?: string;
+}
+type Output = z.infer<typeof couponViewSchema>; // ../contract/src/billing-coupons.schemas.ts:86
+
+// billingCoupons.deactivateCode
+// Input: promotionCodeTargetSchema, ../contract/src/billing-coupons.schemas.ts:120
+interface Input {
+  promotionCodeId: string;
+}
+type Output = z.infer<typeof promotionCodeTargetSchema>; // ../contract/src/billing-coupons.schemas.ts:120
+```
 
 ### `connectedBilling`
 
@@ -413,12 +475,12 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                                | Environment variable                           | Declared at                            |
 | ------ | ----------------------------------- | ---------------------------------------------- | -------------------------------------- |
-| secret | `stripeSecretKey`                   | `STRIPE_SECRET_KEY`                            | `src/app/billing.app.ts:195`           |
-| secret | `stripeWebhookSecret`               | `STRIPE_WEBHOOK_SECRET`                        | `src/app/billing.app.ts:196`           |
-| secret | `internalSlackPlanLimitWebhook`     | `SLACK_PLAN_LIMIT_CHANNEL`                     | `src/app/billing.app.ts:197`           |
-| secret | `internalSlackSubscriptionsWebhook` | `SLACK_CHANNEL_SUBSCRIPTIONS`                  | `src/app/billing.app.ts:198`           |
-| secret | `internalSlackSelfHostedWebhook`    | `SLACK_CHANNEL_SELF_HOSTED`                    | `src/app/billing.app.ts:199`           |
-| secret | `internalSlackSignupsWebhook`       | ≈ `billingSecrets.internalSlackSignupsWebhook` | `src/app/billing.app.ts:200`           |
+| secret | `stripeSecretKey`                   | `STRIPE_SECRET_KEY`                            | `src/app/billing.app.ts:202`           |
+| secret | `stripeWebhookSecret`               | `STRIPE_WEBHOOK_SECRET`                        | `src/app/billing.app.ts:203`           |
+| secret | `internalSlackPlanLimitWebhook`     | `SLACK_PLAN_LIMIT_CHANNEL`                     | `src/app/billing.app.ts:204`           |
+| secret | `internalSlackSubscriptionsWebhook` | `SLACK_CHANNEL_SUBSCRIPTIONS`                  | `src/app/billing.app.ts:205`           |
+| secret | `internalSlackSelfHostedWebhook`    | `SLACK_CHANNEL_SELF_HOSTED`                    | `src/app/billing.app.ts:206`           |
+| secret | `internalSlackSignupsWebhook`       | ≈ `billingSecrets.internalSlackSignupsWebhook` | `src/app/billing.app.ts:207`           |
 | config | `licensePaymentLinkId`              | `STRIPE_LICENSE_PAYMENT_LINK_ID`               | `../contract/src/billing.config.ts:13` |
 | config | `licensePaymentUrl`                 | `STRIPE_LICENSE_PAYMENT_LINK_URL`              | `../contract/src/billing.config.ts:15` |
 | config | `hubspotPortalId`                   | `HUBSPOT_PORTAL_ID`                            | `../contract/src/billing.config.ts:23` |
