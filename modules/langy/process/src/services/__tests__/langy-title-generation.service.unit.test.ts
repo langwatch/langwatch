@@ -33,6 +33,33 @@ const RESOLVED: ModelProviderResolution = {
   },
 };
 
+function executionProvider(input: { provider: string; enabled: boolean }): ModelProviderExecution {
+  return {
+    id: `mp_${input.provider}`,
+    organizationId: "org_1",
+    provider: input.provider,
+    name: input.provider,
+    enabled: input.enabled,
+    routingHandle: null,
+    scopes: [],
+    customKeys: null,
+    customModels: [],
+    customEmbeddingsModels: [],
+    extraHeaders: [],
+    rateLimitRpm: null,
+    rateLimitTpm: null,
+    rateLimitRpd: null,
+    fallbackPriorityGlobal: null,
+    providerConfig: null,
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+    models: null,
+    embeddingsModels: null,
+    isSystem: false,
+    embeddingsUnsupported: false,
+  };
+}
+
 function messages(rows = records): LangyTrustedMessageReader {
   return { getRecordsByConversation: async () => rows };
 }
@@ -53,8 +80,9 @@ function modelProviders(
   const generateText = vi.fn(answers.generateText ?? (async () => ({ text: "A title" })));
   const api = createApiFixture<ModelProviderApi>({
     resolveModelForFeature: answers.resolveModelForFeature ?? (async () => RESOLVED),
-    getExecutionProviders: async () =>
-      ({ openai: { enabled: true } }) as Record<string, ModelProviderExecution>,
+    getExecutionProviders: async () => ({
+      openai: executionProvider({ provider: "openai", enabled: true }),
+    }),
     generateText,
   });
   return { api, generateText };

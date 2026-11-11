@@ -27,13 +27,40 @@ function messagesOf(records: { role: "user" | "assistant"; content: string }[]) 
   return reader;
 }
 
+function executionProvider(input: { provider: string; enabled: boolean }): ModelProviderExecution {
+  return {
+    id: `mp_${input.provider}`,
+    organizationId: "org_1",
+    provider: input.provider,
+    name: input.provider,
+    enabled: input.enabled,
+    routingHandle: null,
+    scopes: [],
+    customKeys: null,
+    customModels: [],
+    customEmbeddingsModels: [],
+    extraHeaders: [],
+    rateLimitRpm: null,
+    rateLimitTpm: null,
+    rateLimitRpd: null,
+    fallbackPriorityGlobal: null,
+    providerConfig: null,
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+    models: null,
+    embeddingsModels: null,
+    isSystem: false,
+    embeddingsUnsupported: false,
+  };
+}
+
 /** model-provider, answering one text and recording what it was asked. */
 function generatorOver(input: {
   records: { role: "user" | "assistant"; content: string }[];
   text?: string;
   resolvedModel?: string;
   generateFailure?: Error;
-  providers?: Record<string, { enabled: boolean }>;
+  providers?: Record<string, ModelProviderExecution>;
 }) {
   const resolved: ModelDefaultResolveInput[] = [];
   const completions: ModelProviderTextGenerationInput[] = [];
@@ -53,7 +80,7 @@ function generatorOver(input: {
       };
     },
     getExecutionProviders: async () =>
-      (input.providers ?? { openai: { enabled: true } }) as Record<string, ModelProviderExecution>,
+      input.providers ?? { openai: executionProvider({ provider: "openai", enabled: true }) },
     generateText: async (request) => {
       completions.push(request);
       if (input.generateFailure) throw input.generateFailure;
