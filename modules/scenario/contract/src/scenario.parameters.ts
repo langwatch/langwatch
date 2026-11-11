@@ -313,11 +313,30 @@ function readInlineDeclarations(text: string): {
  */
 export function extractInlineRunParameters({ text }: { text: string }): InlineRunParameters {
   const { template, matches } = readInlineDeclarations(text);
+  return { template, definitions: firstPerName(matches.map(({ definition }) => definition)) };
+}
+
+function firstPerName(
+  definitions: readonly ScenarioParameterDefinition[],
+): ScenarioParameterDefinition[] {
   const byName = new Map<string, ScenarioParameterDefinition>();
-  for (const { definition } of matches) {
+  for (const definition of definitions) {
     if (!byName.has(definition.name)) byName.set(definition.name, definition);
   }
-  return { template, definitions: [...byName.values()] };
+  return [...byName.values()];
+}
+
+/** The inline names a run declares: those no stored one has, as many as fit beside the stored. */
+function inlineWithinLimit({
+  inline,
+  stored,
+}: {
+  inline: readonly ScenarioParameterDefinition[];
+  stored: readonly ScenarioParameterDefinition[];
+}): ScenarioParameterDefinition[] {
+  const storedNames = new Set(stored.map((definition) => definition.name));
+  const room = Math.max(0, MAX_SCENARIO_PARAMETER_DEFINITIONS - stored.length);
+  return inline.filter((definition) => !storedNames.has(definition.name)).slice(0, room);
 }
 
 /** How a run reads one inline declaration, given what else the scenario declares. */
@@ -328,7 +347,9 @@ export type InlineDeclarationStatus =
   /** A stored parameter has the name; its declaration wins. */
   | { kind: "stored"; storedDefault: ScenarioParameterValue | undefined }
   /** A stored secret has the name; the run refuses it (`scenario_secret_parameter_in_text`). */
-  | { kind: "secret" };
+  | { kind: "secret" }
+  /** Past `MAX_SCENARIO_PARAMETER_DEFINITIONS`, stored counted first; the run ignores it. */
+  | { kind: "over_limit" };
 
 /** One inline declaration in a situation: its place in the text and how a run reads it. */
 export type InlineDeclaration = {
@@ -341,7 +362,7 @@ export type InlineDeclaration = {
 
 /**
  * Every inline declaration in a situation, in order, each with its conflict
- * against the stored parameters or an earlier declaration of the same name.
+ * against the stored parameters, the parameter limit or an earlier declaration.
  * Same reader as `extractInlineRunParameters`: what an editor marks, a run declares.
  */
 export function inlineDeclarationsOf({
@@ -353,8 +374,15 @@ export function inlineDeclarationsOf({
   parameters: readonly ScenarioParameterDefinition[];
 }): InlineDeclaration[] {
   const stored = new Map(parameters.map((definition) => [definition.name, definition]));
+  const { matches } = readInlineDeclarations(text);
+  const withinLimit = new Set(
+    inlineWithinLimit({
+      inline: firstPerName(matches.map(({ definition }) => definition)),
+      stored: parameters,
+    }).map(({ name }) => name),
+  );
   const firstDefaults = new Map<string, string>();
-  return readInlineDeclarations(text).matches.map(({ definition, defaultValue, start, end }) => {
+  return matches.map(({ definition, defaultValue, start, end }) => {
     const { name } = definition;
     const first = firstDefaults.get(name);
     if (first === undefined) firstDefaults.set(name, defaultValue);
@@ -363,23 +391,31 @@ export function inlineDeclarationsOf({
       defaultValue,
       start,
       end,
-      status: inlineStatus({ stored: stored.get(name), first, defaultValue }),
+      status: inlineStatus({
+        stored: stored.get(name),
+        overLimit: !withinLimit.has(name),
+        first,
+        defaultValue,
+      }),
     };
   });
 }
 
-/** A stored secret outranks a stored parameter, which outranks an earlier inline default. */
+/** Secret outranks stored, stored outranks over the limit, which outranks a duplicate. */
 function inlineStatus({
   stored,
+  overLimit,
   first,
   defaultValue,
 }: {
   stored: ScenarioParameterDefinition | undefined;
+  overLimit: boolean;
   first: string | undefined;
   defaultValue: string;
 }): InlineDeclarationStatus {
   if (stored?.secret === true) return { kind: "secret" };
   if (stored) return { kind: "stored", storedDefault: stored.defaultValue };
+  if (overLimit) return { kind: "over_limit" };
   if (first !== undefined && first !== defaultValue) {
     return { kind: "duplicate", usedDefault: first };
   }
@@ -387,9 +423,9 @@ function inlineStatus({
 }
 
 /**
- * The parameters a scenario declares, stored and inline, and the situation
- * to render. A stored declaration wins over an inline one of the same name,
- * so a secret never gains a default from the text.
+ * Stored and inline declarations, and the situation to render. A stored one
+ * wins over an inline one of the same name, so no secret gains a default from
+ * the text; inline names past the stored limit stay undeclared (refused as missing).
  */
 export function declaredScenarioParameters({
   parameters,
@@ -400,12 +436,8 @@ export function declaredScenarioParameters({
 }): { definitions: ScenarioParameterDefinition[]; situation: string } {
   const stored = parseScenarioParameterDefinitions(parameters);
   const inline = extractInlineRunParameters({ text: situation });
-  const storedNames = new Set(stored.map((definition) => definition.name));
   return {
-    definitions: [
-      ...stored,
-      ...inline.definitions.filter((definition) => !storedNames.has(definition.name)),
-    ],
+    definitions: [...stored, ...inlineWithinLimit({ inline: inline.definitions, stored })],
     situation: inline.template,
   };
 }

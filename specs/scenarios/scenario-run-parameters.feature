@@ -160,6 +160,23 @@ Feature: Scenario run parameters
     Then the run resolves "tone" to "calm"
 
   @unit
+  Scenario: A stored parameter with no default does not take the inline default
+    Given a scenario declaring "tone" with no default
+    And its situation reads "The customer is { tone: angry }"
+    When the run supplies no value for "tone"
+    Then the run is refused with "scenario_parameter_missing"
+    And the refusal names "tone" and the situation
+    But a run that supplies "tone" as "calm" reads "The customer is calm"
+
+  @unit
+  Scenario: Inline declarations past the scenario's parameter limit are not declared
+    Given a scenario declaring nineteen parameters
+    And its situation reads "A { tone: calm } customer in { region: eu-central }"
+    When the parameters the scenario declares are read
+    Then "tone" is declared and "region" is not
+    And a run with no value for "region" is refused with "scenario_parameter_missing" naming "region"
+
+  @unit
   Scenario: An inline declaration naming a secret parameter is refused
     Given a scenario declaring the secret parameter "api_token"
     And its situation reads "Use { api_token: abc123 } to sign in"
@@ -214,6 +231,14 @@ Feature: Scenario run parameters
     When it is read for inline declarations
     Then both declarations are flagged as a secret
 
+  @unit
+  Scenario: An inline name past the scenario's parameter limit is flagged as ignored
+    Given a scenario declaring nineteen parameters
+    And its situation reads "A { tone: calm } customer in { region: eu-central }"
+    When it is read for inline declarations
+    Then "tone" is declared
+    And "region" is flagged as over the limit
+
   @integration
   Scenario: The editor highlights the inline declarations in the situation
     Given the scenario editor is open
@@ -235,6 +260,20 @@ Feature: Scenario run parameters
     When the situation reads "A { plan: free } customer"
     Then the parameters line still reads "plan=pro"
     And "plan" from the situation is listed as overridden by the stored parameter with "pro"
+
+  @integration
+  Scenario: The editor warns that a stored parameter with no default ignores the inline default
+    Given the scenario editor is open on a scenario declaring "plan" with no default
+    When the situation reads "A { plan: free } customer"
+    Then the parameters line still reads "plan="
+    And "plan" from the situation is listed as overridden, saying "free" is not used and a run must give a value
+
+  @integration
+  Scenario: The editor shows an inline declaration past the parameter limit as ignored
+    Given the scenario editor is open on a scenario declaring nineteen parameters
+    When the situation reads "A { tone: calm } customer in { region: eu-central }"
+    Then "tone" is listed as declared from the situation
+    And "region" is listed as over the limit with "Over the 20-parameter limit, so this declaration is ignored"
 
   @integration
   Scenario: The editor warns when a name is declared twice inline with another default

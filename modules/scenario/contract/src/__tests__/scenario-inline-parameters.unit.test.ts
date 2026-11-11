@@ -13,6 +13,7 @@ import {
   declaredScenarioParameters,
   extractInlineRunParameters,
   inlineDeclarationsOf,
+  MAX_SCENARIO_PARAMETER_DEFINITIONS,
 } from "../scenario.parameters.ts";
 import type { ScenarioRunConfig } from "../scenario.ts";
 
@@ -141,7 +142,29 @@ describe("declaredScenarioParameters", () => {
       expect(result.situation).toBe("The customer is {{ params.tone }} in {{ params.region }}");
     });
   });
+
+  describe("given stored and inline declarations past the parameter limit", () => {
+    /** @scenario "Inline declarations past the scenario's parameter limit are not declared" */
+    it("declares inline names only up to the limit, keeping every stored one", () => {
+      const stored = nineteenStoredParameters();
+
+      const result = declaredScenarioParameters({
+        parameters: stored,
+        situation: "A { tone: calm } customer in { region: eu-central }",
+      });
+
+      expect(result.definitions).toHaveLength(MAX_SCENARIO_PARAMETER_DEFINITIONS);
+      expect(result.definitions).toEqual([...stored, { name: "tone", defaultValue: "calm" }]);
+    });
+  });
 });
+
+function nineteenStoredParameters() {
+  return Array.from({ length: MAX_SCENARIO_PARAMETER_DEFINITIONS - 1 }, (_, index) => ({
+    name: `stored_${index}`,
+    defaultValue: "x",
+  }));
+}
 
 describe("a run of a scenario with inline declarations", () => {
   describe("when the run supplies no value", () => {
@@ -188,6 +211,47 @@ describe("a run of a scenario with inline declarations", () => {
       });
 
       expect(result.parameters).toEqual({ tone: "calm" });
+    });
+  });
+
+  describe("when a stored parameter with no default has the inline name", () => {
+    const config = scenario({
+      parameters: [{ name: "tone" }],
+      situation: "The customer is { tone: angry }",
+    });
+
+    /** @scenario "A stored parameter with no default does not take the inline default" */
+    it("refuses a run with no value as missing, naming the parameter and the situation", async () => {
+      await expect(resolveRunParameters({ scenarios: [config] })).rejects.toMatchObject({
+        code: "scenario_parameter_missing",
+        meta: { names: ["tone"], field: "situation" },
+      });
+    });
+
+    /** @scenario "A stored parameter with no default does not take the inline default" */
+    it("renders the value the run supplies", async () => {
+      const result = await situationHandedOn({ config, values: { tone: "calm" } });
+
+      expect(result.situation).toBe("The customer is calm");
+    });
+  });
+
+  describe("when an inline name falls past the parameter limit", () => {
+    /** @scenario "Inline declarations past the scenario's parameter limit are not declared" */
+    it("refuses a run with no value for it as missing", async () => {
+      await expect(
+        resolveRunParameters({
+          scenarios: [
+            scenario({
+              parameters: nineteenStoredParameters(),
+              situation: "A { tone: calm } customer in { region: eu-central }",
+            }),
+          ],
+        }),
+      ).rejects.toMatchObject({
+        code: "scenario_parameter_missing",
+        meta: { names: ["region"], field: "situation" },
+      });
     });
   });
 
@@ -299,6 +363,16 @@ describe("inlineDeclarationsOf", () => {
 
       expect(declaration?.status).toEqual({ kind: "stored", storedDefault: "pro" });
     });
+
+    /** @scenario "A stored parameter with no default does not take the inline default" */
+    it("flags it as stored with no default when the stored one has none", () => {
+      const [declaration] = inlineDeclarationsOf({
+        text: "A { plan: free } customer",
+        parameters: [{ name: "plan" }],
+      });
+
+      expect(declaration?.status).toEqual({ kind: "stored", storedDefault: undefined });
+    });
   });
 
   describe("given a stored secret with the inline name", () => {
@@ -310,6 +384,29 @@ describe("inlineDeclarationsOf", () => {
       });
 
       expect(declarations.map(({ status }) => status.kind)).toEqual(["secret", "secret"]);
+    });
+  });
+
+  describe("given inline names past the parameter limit", () => {
+    /** @scenario "An inline name past the scenario's parameter limit is flagged as ignored" */
+    it("flags only the names the run leaves undeclared, every place they are written", () => {
+      const text =
+        "A { tone: calm } customer in { region: eu-central }, still { region: eu-central }";
+
+      const declarations = inlineDeclarationsOf({ text, parameters: nineteenStoredParameters() });
+
+      expect(declarations.map(({ name, status }) => [name, status.kind])).toEqual([
+        ["tone", "declared"],
+        ["region", "over_limit"],
+        ["region", "over_limit"],
+      ]);
+      expect(
+        declarations.filter(({ status }) => status.kind !== "over_limit").map(({ name }) => name),
+      ).toEqual(
+        declaredScenarioParameters({ parameters: nineteenStoredParameters(), situation: text })
+          .definitions.slice(MAX_SCENARIO_PARAMETER_DEFINITIONS - 1)
+          .map(({ name }) => name),
+      );
     });
   });
 });

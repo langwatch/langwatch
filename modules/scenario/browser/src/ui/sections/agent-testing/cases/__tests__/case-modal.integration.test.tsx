@@ -1004,6 +1004,39 @@ describe("the scenario dialog", () => {
       expect(screen.getByTestId("situation-declaration")).toHaveAttribute("data-status", "stored");
     });
 
+    /** @scenario "The editor warns that a stored parameter with no default ignores the inline default" */
+    it("keeps the stored line and says the inline default is not used", async () => {
+      const user = userEvent.setup();
+      openStored([{ name: "plan" }]);
+
+      await writeSituation(user, "A { plan: free } customer");
+
+      expect(screen.getByLabelText("Parameters")).toHaveValue("plan=");
+      expect(screen.getByTestId("inline-parameter-stored-plan")).toHaveTextContent(
+        "Stored parameter wins with no default, so free is not used; a run must give a value",
+      );
+    });
+
+    /** @scenario "The editor shows an inline declaration past the parameter limit as ignored" */
+    it("lists the name past the limit as ignored and the one before it as declared", async () => {
+      const user = userEvent.setup();
+      openStored(
+        Array.from({ length: 19 }, (_, index) => ({ name: `stored_${index}`, defaultValue: "x" })),
+      );
+
+      await writeSituation(user, "A { tone: calm } customer in { region: eu-central }");
+
+      expect(screen.getByTestId("inline-parameter-declared-tone")).toHaveTextContent("calm");
+      const region = screen.getByTestId("inline-parameter-over_limit-region");
+      expect(region).toHaveTextContent(
+        "Over the 20-parameter limit, so this declaration is ignored",
+      );
+      expect(region).toHaveTextContent("over limit");
+      expect(
+        screen.getAllByTestId("situation-declaration").map((mark) => mark.dataset.status),
+      ).toEqual(["declared", "over_limit"]);
+    });
+
     /** @scenario "The editor warns when a name is declared twice inline with another default" */
     it("warns on the second default and names the first as used", async () => {
       const user = userEvent.setup();

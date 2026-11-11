@@ -4,7 +4,10 @@
  */
 
 import { Badge, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import type { InlineDeclaration } from "@langwatch/scenario-contract";
+import {
+  type InlineDeclaration,
+  MAX_SCENARIO_PARAMETER_DEFINITIONS,
+} from "@langwatch/scenario-contract";
 
 import { SECRET_IN_SITUATION_MESSAGE } from "./use-case-editor.ts";
 
@@ -24,6 +27,7 @@ const CONFLICT_BADGE = {
   duplicate: { label: "declared twice", colorPalette: "orange" },
   stored: { label: "stored wins", colorPalette: "orange" },
   secret: { label: "secret", colorPalette: "red" },
+  over_limit: { label: "over limit", colorPalette: "orange" },
 } as const;
 
 /** What the row says next to the name. A secret's value is never shown. */
@@ -43,8 +47,15 @@ function InlineParameterDetail({ declaration }: { declaration: InlineDeclaration
         <Text color="fg.muted">
           Stored parameter wins
           {status.storedDefault === undefined
-            ? ", with no default; a run must give a value"
+            ? ` with no default, so ${defaultValue} is not used; a run must give a value`
             : `, default ${String(status.storedDefault)}`}
+        </Text>
+      );
+    case "over_limit":
+      return (
+        <Text color="fg.muted">
+          Over the {MAX_SCENARIO_PARAMETER_DEFINITIONS}-parameter limit, so this declaration is
+          ignored
         </Text>
       );
     case "declared":

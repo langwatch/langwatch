@@ -19,6 +19,7 @@ const COLOR: Record<InlineDeclarationStatus["kind"], string> = {
   duplicate: "var(--chakra-colors-orange-fg)",
   stored: "var(--chakra-colors-orange-fg)",
   secret: "var(--chakra-colors-red-fg)",
+  over_limit: "var(--chakra-colors-orange-fg)",
 };
 
 /** The situation cut into plain runs and tinted declarations, in order. */

@@ -70,8 +70,10 @@ This declares `plan` with the default `free` and `region` with the default `eu-c
 
 - The value is text, up to the closing `}` on the same line. Spaces around it are trimmed.
 - Write the declaration once and use `{{ params.NAME }}` elsewhere, or repeat it: every place shows the one value of the run, and the first default wins.
-- A parameter declared in the **Parameters** dialog with the same name keeps that declaration and its default.
+- A parameter declared in the **Parameters** dialog with the same name keeps that declaration and its default. When that declaration has no default, the inline default is not used either: the run must set a value, or it is refused with `scenario_parameter_missing`.
+- Declarations in the situation count towards the limit of 20 parameters on one scenario, after the ones in the **Parameters** dialog. A name declared past the limit is not a parameter: the editor marks it "over limit", and a run that reaches it is refused with `scenario_parameter_missing`.
 - Other braces stay as text: `{}`, `{ no colon }` and JSON such as `{"order_id": "123"}` are not declarations.
+- A situation that holds a declaration is rendered as a Liquid template, the same as a scenario with declared parameters. Every other `{{ }}` or `{% %}` in the situation and the criteria must then be valid Liquid and read a declared parameter, or the run is refused.
 - Do not put the declaration inside `{{ }}`. `{{ plan: free }}` is not a valid template.
 - A situation written before this feature that has text like `{ word: something }` now declares a parameter `word`. Quote it or reword it if you meant it as text.
 
@@ -156,7 +158,7 @@ Secret parameters stay scenario-declared. An agent does not declare a secret par
 
 The situation and the criteria read a value as `{{ params.NAME }}`, as in the example above. Both render before the run starts, so the simulated user acts on the value and the judge scores against the same value.
 
-A scenario with no declared parameters is not a template. Its text does not render, so `{{` or `{%` in prose stays exactly as written. Declaring a parameter turns the scenario text into a template.
+A scenario with no declared parameters is not a template. Its text does not render, so `{{` or `{%` in prose stays exactly as written. Declaring a parameter, in the **Parameters** dialog or in the situation, turns the scenario text into a template.
 
 ## Use the values in the target
 
