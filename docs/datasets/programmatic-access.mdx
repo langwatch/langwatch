@@ -367,7 +367,7 @@ console.log(`Updated: ${record.id}`);
 Keep a dataset in step with rows held elsewhere, such as files in a Git repository. Name the column
 that identifies a row. A row that already holds an entry's key is updated in place, and the columns
 the entry leaves out keep their values. An entry with a new key is added. A row the entry would not
-change is not written, so a second run with the same rows writes nothing.
+change is not written, so a second run with the same rows changes no row.
 
 The SDK refuses, before writing anything, an entry without the key, two entries with the same key,
 or a key that more than one existing row holds.
