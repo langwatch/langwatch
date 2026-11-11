@@ -5,7 +5,7 @@ import type { SharedCredentialStore } from "@langwatch/secrets/shared-credential
 import { Temporal, nowInstant } from "@langwatch/time";
 
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
-import { mintSharedKey, type SharedKeyWriter } from "./shared-key-mint.service.ts";
+import { mintSharedKey, stillDisabled, type SharedKeyWriter } from "./shared-key-mint.service.ts";
 
 /**
  * How long a retry should wait after a held key's grant did not land. A try can wait twice (the
@@ -65,11 +65,7 @@ export class HeldKeyMintService {
           (row.expiresAt === null || Temporal.Instant.compare(row.expiresAt, nowInstant()) > 0)
         );
       },
-      // A row written disabled has no revocation cause; one with a cause was revoked on purpose.
-      isPending: async (apiKeyId) => {
-        const row = await keys.findById({ id: apiKeyId });
-        return row !== null && row.revocationCause === null;
-      },
+      isPending: stillDisabled(keys),
       retryAfterMs: HELD_KEY_GRANT_RETRY_AFTER_MS,
     });
     return { token: shared.token, apiKeyId: shared.apiKeyId, created: shared.written };

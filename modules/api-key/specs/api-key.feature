@@ -346,6 +346,13 @@ Feature: API key lifecycle
     Then a new key is written and returned
     And the old pending key stays revoked, never activated
 
+  @unit
+  Scenario: A pending run key that was revoked is replaced, never activated
+    Given a run key mint failed with "authz_grant_not_confirmed" after the key was activated
+    And the pending key was then revoked
+    When the run key is minted again
+    Then a new key is written and returned
+
   # A caller that is retried (a Langy turn for an insights run) holds its key under a name: the
   # retry reuses the key and its pending grant instead of minting another while the fold is slow.
   @unit

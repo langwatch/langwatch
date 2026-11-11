@@ -210,6 +210,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
     });
     const runKeys = RunKeyMintService.create({
       apiKeys: service,
+      keys: setup.repositories.apiKeys,
       authz: authorization,
       held: setup.repositories.runKeys,
     });

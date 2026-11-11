@@ -9,13 +9,14 @@ import { type AuthzApi, type AuthzPrincipalRef } from "@langwatch/authz-contract
 import type { SharedCredentialStore } from "@langwatch/secrets/shared-credential";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
 
+import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
 import {
   isRunKeyReusable,
   missingRunPermissions,
   runKeyCacheKey,
   runKeyLifetimeMs,
 } from "../rules/run-key.rules.ts";
-import { mintSharedKey, type SharedKeyWriter } from "./shared-key-mint.service.ts";
+import { mintSharedKey, stillDisabled, type SharedKeyWriter } from "./shared-key-mint.service.ts";
 
 type HeldRunKey = { token: string; expiresAtMs: number };
 
@@ -27,6 +28,7 @@ type HeldRunKey = { token: string; expiresAtMs: number };
 export class RunKeyMintService {
   static create(options: {
     apiKeys: SharedKeyWriter;
+    keys: Pick<ApiKeyRepository, "findById">;
     authz: Pick<AuthzApi, "getScope" | "effectivePermissions">;
     held: SharedCredentialStore;
   }): RunKeyMintService {
@@ -39,6 +41,7 @@ export class RunKeyMintService {
   private constructor(
     private readonly options: {
       apiKeys: SharedKeyWriter;
+      keys: Pick<ApiKeyRepository, "findById">;
       authz: Pick<AuthzApi, "getScope" | "effectivePermissions">;
       held: SharedCredentialStore;
     },
@@ -98,6 +101,7 @@ export class RunKeyMintService {
     const shared = await mintSharedKey({
       apiKeys: this.options.apiKeys,
       store: this.options.held,
+      isPending: stillDisabled(this.options.keys),
       address: { tenantId: input.projectId, contentKey: input.cacheKey },
       newExpiresAt: () => nowInstant().add({ milliseconds: runKeyLifetimeMs(minRemainingMs) }),
       keyFor: (expiresAt) => createInput({ input, expiresAt }),

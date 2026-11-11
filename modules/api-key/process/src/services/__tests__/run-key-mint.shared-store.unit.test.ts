@@ -126,8 +126,9 @@ function createServers() {
     deleteRole: vi.fn().mockResolvedValue(undefined),
   });
   const server = () => {
+    const repository = MemoryApiKeyRepository.create({ memory: database });
     const apiKeys = ApiKeyService.create({
-      repository: MemoryApiKeyRepository.create({ memory: database }),
+      repository,
       answers: MemoryApiKeyAnswerCacheRepository.create(),
       authz,
       grants,
@@ -150,7 +151,10 @@ function createServers() {
       prefix: "api-key:run-key:",
     });
 
-    return { apiKeys, runKeys: RunKeyMintService.create({ apiKeys, authz, held }) };
+    return {
+      apiKeys,
+      runKeys: RunKeyMintService.create({ apiKeys, keys: repository, authz, held }),
+    };
   };
 
   return { database, fold, first: server(), second: server() };

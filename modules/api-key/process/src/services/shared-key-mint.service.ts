@@ -10,6 +10,7 @@ import {
 import { Temporal, nowInstant, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
+import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
 import type { DisabledApiKey } from "./api-key-lifecycle.service.ts";
 import type { ApiKeyService } from "./api-key.service.ts";
 
@@ -119,6 +120,14 @@ export async function mintSharedKey(input: {
     }
     throw error;
   }
+}
+
+/** Whether a pending key is still only disabled; one revoked on purpose (a cause) is not. */
+export function stillDisabled(keys: Pick<ApiKeyRepository, "findById">) {
+  return async (apiKeyId: string): Promise<boolean> => {
+    const row = await keys.findById({ id: apiKeyId });
+    return row !== null && row.revocationCause === null;
+  };
 }
 
 async function firstPending({
