@@ -14,6 +14,9 @@ import {
 } from "../../../../behavior/use-dashboard-auto-refresh.ts";
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { DashboardRefreshedAtContext } from "../../../../ui/sections/use-dashboard-auto-refresh.ts";
+import { useBlockPickerAddress } from "../../behavior/use-block-picker-address.ts";
+import { useBoardReader } from "../../behavior/use-board-access.ts";
+import { useBoardFromTemplate } from "../../behavior/use-board-from-template.ts";
 import { useBoardPeriod, useBoardRange } from "../../behavior/use-board-period.ts";
 import { useDashboardViewed } from "../../behavior/use-dashboard-viewed.ts";
 import { useEmptyWidgets } from "../../behavior/use-empty-widgets.ts";
@@ -28,6 +31,7 @@ import { BoardPage } from "../blocks/board-page.tsx";
 import { BoardPeriodControl } from "../blocks/board-period-control.tsx";
 import { EmptyWidgetsBanner } from "../blocks/empty-widgets-banner.tsx";
 import { LimitFailedWidgetsBanner } from "../blocks/limit-failed-widgets-banner.tsx";
+import { BlockPickerDialog } from "./block-picker-dialog.tsx";
 import { CuratedWidgetsGrid } from "./curated-widgets-grid.tsx";
 import { DashboardsGate } from "./dashboards-gate.tsx";
 
@@ -61,6 +65,13 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
   const empty = useEmptyWidgets();
   const emptyWidgetNames = empty.emptyNames({ widgets: board.widgets, keyOf: ({ key }) => key });
   const limitFailedWidgets = useLimitFailedWidgets();
+  // Whoever may create dashboards picks a widget for a new one; the rest ask Langy.
+  const { mayCreate } = useBoardReader();
+  const { createWithWidget } = useBoardFromTemplate();
+  const picker = useBlockPickerAddress();
+  const openPicker = () => {
+    if (!picker.isOpen) picker.open();
+  };
 
   return (
     <BoardPage
@@ -90,7 +101,11 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
         />
       }
     >
-      <BoardLangy board={subject} period={period} />
+      <BoardLangy
+        board={subject}
+        period={period}
+        {...(mayCreate ? { onOpenPicker: openPicker } : {})}
+      />
       <DashboardRefetchIntervalContext.Provider value={autoRefresh.refetchInterval}>
         <DashboardRefreshedAtContext.Provider value={autoRefresh.refreshedAt}>
           <VStack align="stretch" gap={4}>
@@ -129,6 +144,23 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
           </VStack>
         </DashboardRefreshedAtContext.Provider>
       </DashboardRefetchIntervalContext.Provider>
+      {mayCreate && picker.isOpen && !saved.isLoading && (
+        <BlockPickerDialog
+          board={subject}
+          period={period}
+          allowBuildYourOwn={false}
+          seedsLangyAfterAdd={false}
+          onAddWidgets={(question) =>
+            createWithWidget({
+              question,
+              templateId: board.templateId,
+              existingNames: saved.boards.map(({ name }) => name),
+            })
+          }
+          onSkip={picker.close}
+          onClose={picker.close}
+        />
+      )}
     </BoardPage>
   );
 }

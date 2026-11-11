@@ -7,6 +7,7 @@
 import {
   bucketOf,
   END,
+  firstTraceMetricsRow,
   inPeriod,
   inPeriodAndPrevious,
   MIDPOINT,
@@ -39,6 +40,8 @@ export const UNIT_KEYS = [
   { attribute: "langwatch.labels", one: "label", many: "labels", things: "conversations" },
 ] as const;
 
+type UnitAttribute = (typeof UNIT_KEYS)[number]["attribute"];
+
 const LABELS = "langwatch.labels";
 
 /** The deterministic check that fails a reply which repeats an earlier sentence. */
@@ -70,6 +73,43 @@ const UNIT = `if(unit_key = '${LABELS}', JSONExtractString(Attributes['${LABELS}
 const CONVERSATION = `if(Attributes['langwatch.thread.id'] != '', Attributes['langwatch.thread.id'],
   TraceId)`;
 
+/**
+ * The same choice of unit over `trace_metrics`, whose typed columns hold each key (tasks#1117):
+ * the widgets that need no prompt version read there instead of the heavier `traces`.
+ */
+const METRICS_UNIT_COLUMNS: Readonly<Record<UnitAttribute, string>> = {
+  "langwatch.customer_id": "ifNull(CustomerId, '')",
+  "metadata.document_type": "MetadataDocumentType",
+  "metadata.language": "MetadataLanguage",
+  "metadata.team": "MetadataTeam",
+  "metadata.flow": "MetadataFlow",
+  "metadata.segment": "MetadataSegment",
+  "metadata.topic": "MetadataTopic",
+  [LABELS]: "Labels[1]",
+};
+
+const metricsCarries = (attribute: UnitAttribute) =>
+  attribute === LABELS
+    ? `countIf(notEmpty(Labels)) > 0, '${attribute}'`
+    : `countIf(${METRICS_UNIT_COLUMNS[attribute]} != '') > 0, '${attribute}'`;
+
+const METRICS_UNIT_KEY = `(
+  SELECT multiIf(
+    ${UNIT_KEYS.map(({ attribute }) => metricsCarries(attribute)).join(",\n    ")},
+    '')
+  FROM trace_metrics
+  WHERE ${inPeriod("OccurredAt")}
+) AS unit_key`;
+
+const metricsUnitOf = ({ attribute }: { attribute: UnitAttribute }) =>
+  `unit_key = '${attribute}', ${METRICS_UNIT_COLUMNS[attribute]}`;
+
+const METRICS_UNIT = `multiIf(
+    ${UNIT_KEYS.map(metricsUnitOf).join(",\n    ")},
+    '')`;
+
+const METRICS_CONVERSATION = "coalesce(nullIf(ConversationId, ''), TraceId)";
+
 /** The prompt or config version a trace ran on: its managed prompt, else its metadata. */
 const VERSION = `coalesce(nullIf(Attributes['metadata.prompt_version'], ''),
   LastUsedPromptVersionId, '')`;
@@ -89,39 +129,61 @@ WHERE e.OccurredAt >= ${PREVIOUS_START}
   AND e.Passed IS NOT NULL
   AND e.IsGuardrail = false`;
 
-export const UNIT_VOLUME_SQL = `WITH ${UNIT_KEY}
-SELECT unit_key, ${UNIT} AS unit,
-  uniqExact(${CONVERSATION}) AS conversations,
+/**
+ * The verdicts joined to each trace's first `trace_metrics` row, so the unit is picked as
+ * UNIT_VOLUME_SQL picks it (att-table joins the two by unit) and a moved trace joins once.
+ */
+const JUDGED_METRICS_TRACES = `FROM evaluation_metrics AS e
+INNER JOIN (
+  SELECT TraceId, ${METRICS_UNIT} AS unit, OccurredAt AS at
+  FROM trace_metrics
+  WHERE ${inPeriodAndPrevious("OccurredAt")}
+    AND ${firstTraceMetricsRow()}
+) AS t ON t.TraceId = e.TraceId
+WHERE e.OccurredAt >= ${PREVIOUS_START}
+  AND e.Passed IS NOT NULL
+  AND e.IsGuardrail = false`;
+
+export const UNIT_VOLUME_SQL = `WITH ${METRICS_UNIT_KEY}
+SELECT unit_key, ${METRICS_UNIT} AS unit,
+  uniqExact(${METRICS_CONVERSATION}) AS conversations,
   sum(TotalCost) AS cost
-FROM traces
+FROM trace_metrics
 WHERE ${inPeriod("OccurredAt")}
+  AND ${firstTraceMetricsRow()}
 GROUP BY unit
 ORDER BY conversations DESC
 LIMIT 8`;
 
-export const UNIT_TOTALS_SQL = `WITH ${UNIT_KEY}
-SELECT uniqExact(${CONVERSATION}) AS conversations,
-  uniqExact(${UNIT}) AS units,
+/**
+ * `conversations` is the share denominator, so it counts (unit, conversation) pairs: a thread
+ * whose traces fall in two units counts once in each unit row, and so twice here too.
+ */
+export const UNIT_TOTALS_SQL = `WITH ${METRICS_UNIT_KEY}
+SELECT uniqExact((${METRICS_UNIT}, ${METRICS_CONVERSATION})) AS conversations,
+  uniqExact(${METRICS_UNIT}) AS units,
   sum(TotalCost) AS cost
-FROM traces
-WHERE ${inPeriod("OccurredAt")}`;
-
-export const UNIT_COST_SQL = `WITH ${UNIT_KEY}
-SELECT unit_key, ${UNIT} AS unit, sum(TotalCost) AS cost
-FROM traces
+FROM trace_metrics
 WHERE ${inPeriod("OccurredAt")}
+  AND ${firstTraceMetricsRow()}`;
+
+export const UNIT_COST_SQL = `WITH ${METRICS_UNIT_KEY}
+SELECT unit_key, ${METRICS_UNIT} AS unit, sum(TotalCost) AS cost
+FROM trace_metrics
+WHERE ${inPeriod("OccurredAt")}
+  AND ${firstTraceMetricsRow()}
 GROUP BY unit
 ORDER BY cost DESC
 LIMIT 6`;
 
 /** Each unit's judged answers in the period and in the equally long window before it. */
-export const UNIT_PASS_RATES_SQL = `WITH ${UNIT_KEY}
+export const UNIT_PASS_RATES_SQL = `WITH ${METRICS_UNIT_KEY}
 SELECT t.unit AS unit,
   countIf(e.Passed = 1 AND t.at >= ${START}) AS passed,
   countIf(t.at >= ${START}) AS judged,
   countIf(e.Passed = 1 AND t.at < ${START}) AS passed_before,
   countIf(t.at < ${START}) AS judged_before
-${JUDGED_TRACES}
+${JUDGED_METRICS_TRACES}
 GROUP BY unit
 LIMIT 200`;
 
@@ -261,33 +323,33 @@ GROUP BY unit, field
 LIMIT 500`;
 
 /** Sent to a person: the metadata flag, or the hand-over outcome. */
-const SENT_TO_REVIEW = `(Attributes['metadata.sent_to_review'] = 'true'
-    OR Attributes['metadata.outcome'] = 'handover')`;
-const REPORTS_REVIEW = `(Attributes['metadata.sent_to_review'] != ''
-    OR Attributes['metadata.outcome'] != '')`;
+const SENT_TO_REVIEW = "(MetadataSentToReview = 'true' OR MetadataOutcome = 'handover')";
+const REPORTS_REVIEW = "(MetadataSentToReview != '' OR MetadataOutcome != '')";
 
 export const REVIEW_TREND_SQL = `SELECT ${bucketOf("OccurredAt")} AS bucket,
-  countIf(${REPORTS_REVIEW}) AS documents,
-  countIf(${SENT_TO_REVIEW}) AS sent
-FROM traces
+  uniqExactIf(TraceId, ${REPORTS_REVIEW}) AS documents,
+  uniqExactIf(TraceId, ${SENT_TO_REVIEW}) AS sent
+FROM trace_metrics
 WHERE ${inPeriod("OccurredAt")}
+  AND ${firstTraceMetricsRow()}
 GROUP BY bucket
 ORDER BY bucket`;
 
-export const REVIEW_SUMMARY_SQL = `SELECT count() AS traces,
-  countIf(${REPORTS_REVIEW}) AS documents,
-  countIf(${SENT_TO_REVIEW}) AS sent,
-  countIf(${REPORTS_REVIEW} AND OccurredAt < ${MIDPOINT}) AS documents_first,
-  countIf(${SENT_TO_REVIEW} AND OccurredAt < ${MIDPOINT}) AS sent_first
-FROM traces
-WHERE ${inPeriod("OccurredAt")}`;
+export const REVIEW_SUMMARY_SQL = `SELECT uniqExact(TraceId) AS traces,
+  uniqExactIf(TraceId, ${REPORTS_REVIEW}) AS documents,
+  uniqExactIf(TraceId, ${SENT_TO_REVIEW}) AS sent,
+  uniqExactIf(TraceId, ${REPORTS_REVIEW} AND OccurredAt < ${MIDPOINT}) AS documents_first,
+  uniqExactIf(TraceId, ${SENT_TO_REVIEW} AND OccurredAt < ${MIDPOINT}) AS sent_first
+FROM trace_metrics
+WHERE ${inPeriod("OccurredAt")}
+  AND ${firstTraceMetricsRow()}`;
 
 /** The unit sent most, by share of its own documents; a unit under 30 documents ranks last. */
-export const REVIEW_BY_UNIT_SQL = `WITH ${UNIT_KEY}
-SELECT unit_key, ${UNIT} AS unit,
-  countIf(${REPORTS_REVIEW}) AS documents,
-  countIf(${SENT_TO_REVIEW}) AS sent
-FROM traces
+export const REVIEW_BY_UNIT_SQL = `WITH ${METRICS_UNIT_KEY}
+SELECT unit_key, ${METRICS_UNIT} AS unit,
+  uniqExactIf(TraceId, ${REPORTS_REVIEW}) AS documents,
+  uniqExactIf(TraceId, ${SENT_TO_REVIEW}) AS sent
+FROM trace_metrics
 WHERE ${inPeriod("OccurredAt")}
 GROUP BY unit
 HAVING documents > 0
@@ -295,11 +357,11 @@ ORDER BY documents >= 30 DESC, sent / documents DESC
 LIMIT 1`;
 
 /** What users did with each output, as the app reports it in `output_action`. */
-export const OUTPUT_ACTIONS_SQL = `SELECT count() AS traces,
-  countIf(Attributes['metadata.output_action'] != '') AS generated,
-  countIf(Attributes['metadata.output_action'] IN ('accepted', 'edited')) AS used,
-  countIf(Attributes['metadata.output_action'] = 'accepted') AS accepted
-FROM traces
+export const OUTPUT_ACTIONS_SQL = `SELECT uniqExact(TraceId) AS traces,
+  uniqExactIf(TraceId, MetadataOutputAction != '') AS generated,
+  uniqExactIf(TraceId, MetadataOutputAction IN ('accepted', 'edited')) AS used,
+  uniqExactIf(TraceId, MetadataOutputAction = 'accepted') AS accepted
+FROM trace_metrics
 WHERE ${inPeriod("OccurredAt")}`;
 
 /** Per guardrail: traces checked, and answers flagged but not blocked now and the period before. */

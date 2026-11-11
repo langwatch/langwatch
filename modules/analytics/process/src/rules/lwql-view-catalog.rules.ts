@@ -879,6 +879,71 @@ const TRACE_METRICS: UngatedViewDefinition = {
       description: "Whether any span of the trace ended in an error status.",
       sourceColumns: ["HasError"],
     },
+    // The metadata keys the stock widgets read, copied out of `Attributes` by ClickHouse (goose
+    // 00125, tasks#1117), so a widget reads them without the map.
+    {
+      name: "MetadataOutputAction",
+      type: "String",
+      description:
+        "What the user did with the output, such as accepted or edited, from the trace's metadata.output_action. Empty when the trace sent none.",
+      sourceColumns: ["MetadataOutputAction"],
+    },
+    {
+      name: "MetadataOutcome",
+      type: "String",
+      description:
+        "How the conversation ended, such as resolved or handover, from the trace's metadata.outcome. Empty when the trace sent none.",
+      sourceColumns: ["MetadataOutcome"],
+    },
+    {
+      name: "MetadataSentToReview",
+      type: "String",
+      description:
+        "Whether the output went to a person for review, as the text 'true' or 'false', from the trace's metadata.sent_to_review. Empty when the trace sent none.",
+      sourceColumns: ["MetadataSentToReview"],
+    },
+    {
+      name: "MetadataDocumentType",
+      type: "String",
+      description:
+        "The kind of document the trace handled, from the trace's metadata.document_type. Empty when the trace sent none.",
+      sourceColumns: ["MetadataDocumentType"],
+    },
+    {
+      name: "MetadataFlow",
+      type: "String",
+      description:
+        "The flow of the application that ran the trace, from the trace's metadata.flow. Empty when the trace sent none.",
+      sourceColumns: ["MetadataFlow"],
+    },
+    {
+      name: "MetadataLanguage",
+      type: "String",
+      description:
+        "The language of the conversation, from the trace's metadata.language. Empty when the trace sent none.",
+      sourceColumns: ["MetadataLanguage"],
+    },
+    {
+      name: "MetadataSegment",
+      type: "String",
+      description:
+        "The customer segment the trace counts under, from the trace's metadata.segment. Empty when the trace sent none.",
+      sourceColumns: ["MetadataSegment"],
+    },
+    {
+      name: "MetadataTeam",
+      type: "String",
+      description:
+        "The team the trace counts under, from the trace's metadata.team. Empty when the trace sent none.",
+      sourceColumns: ["MetadataTeam"],
+    },
+    {
+      name: "MetadataTopic",
+      type: "String",
+      description:
+        "The topic the application gave the trace, from the trace's metadata.topic. Empty when the trace sent none.",
+      sourceColumns: ["MetadataTopic"],
+    },
     // `HasAnnotation`, `EarliestSpanStartMs` and `Attributes` are withheld: the first would answer
     // "annotated?" two ways against the authoritative `annotations` table, the second is fold
     // working state (migration 00061) not a trace fact, and the third's silent trim can't tell a
@@ -2625,6 +2690,15 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
       LastEventOccurredAt: "omit",
       AppliedEventIds: "omit",
       EarliestSpanStartMs: "omit",
+      MetadataOutputAction: "inherit",
+      MetadataOutcome: "inherit",
+      MetadataSentToReview: "inherit",
+      MetadataDocumentType: "inherit",
+      MetadataFlow: "inherit",
+      MetadataLanguage: "inherit",
+      MetadataSegment: "inherit",
+      MetadataTeam: "inherit",
+      MetadataTopic: "inherit",
     },
   }),
   trace_metrics_by_minute: defineTableCatalogue({
