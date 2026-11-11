@@ -58,6 +58,13 @@ Feature: The package-suites weights are refreshed by a command
       Then the script is dropped rather than carried forward
 
     @unit
+    Scenario: A measured script its package no longer defines is dropped
+      Given a sampled run measured a script
+      And that package's package.json no longer defines the script
+      When the weights are computed
+      Then the script is dropped, so the written file names only scripts the gate runs
+
+    @unit
     Scenario: A package's weight is the median of its runs, kept per script
       Given a package whose unit and integration scripts were measured in three runs
       When the weights are computed

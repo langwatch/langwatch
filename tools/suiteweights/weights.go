@@ -3,6 +3,7 @@ package suiteweights
 import (
 	"cmp"
 	"fmt"
+	"maps"
 	"math"
 	"slices"
 	"strconv"
@@ -15,8 +16,9 @@ type ScriptKey struct{ Package, Script string }
 // Weigh turns the measurements of several runs into one weight per script:
 // the median of its measured seconds. A replay from the Nx cache counts only
 // when no run executed that script for real. A script no run executed keeps its
-// `previous` (committed) weight, if its package was measured in some run and
-// still `defined` the script (a renamed or removed one must not live on).
+// `previous` (committed) weight if its package was measured in some run. Only
+// scripts the package still `defined` are returned, measured or committed: a
+// renamed or removed one must not live on in the file.
 func Weigh(runs [][]Measurement, previous map[ScriptKey]float64, defined func(ScriptKey) bool) map[ScriptKey]float64 {
 	ran, replayed := byScript(runs)
 	measured := map[string]bool{}
@@ -32,10 +34,11 @@ func Weigh(runs [][]Measurement, previous map[ScriptKey]float64, defined func(Sc
 		}
 	}
 	for key, seconds := range previous {
-		if _, ranForReal := ran[key]; measured[key.Package] && !ranForReal && defined(key) {
+		if _, ranForReal := ran[key]; measured[key.Package] && !ranForReal {
 			weights[key] = seconds
 		}
 	}
+	maps.DeleteFunc(weights, func(key ScriptKey, _ float64) bool { return !defined(key) })
 	return weights
 }
 

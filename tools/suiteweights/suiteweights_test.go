@@ -93,6 +93,17 @@ func TestWeighDropsAScriptItsPackageNoLongerDefines(t *testing.T) {
 	assert.NotContains(t, weights, k("@x/app", "test:browser"))
 }
 
+// @scenario "A measured script its package no longer defines is dropped"
+func TestWeighDropsAMeasuredScriptItsPackageNoLongerDefines(t *testing.T) {
+	defined := func(key ScriptKey) bool { return key == k("@x/app", "test") }
+
+	weights := Weigh([][]Measurement{
+		{m("@x/app", "test", 40, false), m("@x/app", "test:browser", 70, false), m("@x/gone", "test", 20, true)},
+	}, nil, defined)
+
+	assert.Equal(t, map[ScriptKey]float64{k("@x/app", "test"): 40}, weights)
+}
+
 // @scenario "A package's weight is the median of its runs, kept per script"
 func TestWeighKeepsTheMedianOfEachScriptApart(t *testing.T) {
 	weights := Weigh([][]Measurement{
