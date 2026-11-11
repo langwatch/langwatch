@@ -1093,10 +1093,10 @@ func (p *Pool) teardown(w *Worker, reason string) {
 	conversationID := w.conversationID
 	p.telemetry.WorkerKilled(p.baseCtx, reason)
 	closeAgentOf(w)
-	// The key's lifetime is the worker's. kill() is the funnel for EVERY
-	// deliberate death — capability change, idle reap, shutdown — so revoking here
-	// covers all three at once. Self-exit and crash are the other path, handled in
-	// the exit goroutine below.
+	// The key's lifetime is the worker's. teardown is the funnel for EVERY
+	// deliberate death (capability change, idle reap, max-age retirement,
+	// shutdown), so revoking here covers them all. Self-exit and crash are the
+	// other path, handled in the exit goroutine below.
 	p.revokeKeyOf(w, reason)
 	// Same lifetime rule for the telemetry-relay registration: the routing token
 	// and the relay's retained credentials die with the worker. Idempotent, so
