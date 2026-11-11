@@ -45798,7 +45798,7 @@ LIMIT 1000
 ```
 
 ```bash
-langwatch query --sql-file export.sql --page-by keyset --format jsonl --out export.jsonl
+langwatch query --sql-file export.sql --projects <project id> --page-by keyset --format jsonl --out export.jsonl
 ```
 
 From the REST API, page with `LIMIT` and `OFFSET` and an `ORDER BY`. In a `UNION`, give every branch its own `LIMIT`, or the query is refused with `LIMIT_REQUIRED_PER_BRANCH`.
@@ -45922,7 +45922,7 @@ You can send the same statement from REST, the CLI or MCP, and each one needs th
     | Tool | What it does |
     | --- | --- |
     | `discover_schema` | With `category: "lwql"`, returns the views, columns and functions as markdown |
-    | `run_query` | Runs a statement, with optional `parameters`, and renders up to 50 rows as a table with the real row count, the time it took and any diagnostics |
+    | `run_query` | Runs a statement, with optional `parameters` and `projects` (project ids or `"all"`, needed when the key reaches several projects), and renders up to 50 rows as a table with the real row count, the time it took and any diagnostics |
 
     Ask your agent a question such as "which model cost the most last week" and it can look up the schema, write the statement and run it.
 
@@ -46074,11 +46074,12 @@ langwatch query --sql-file export.sql --projects <project id> --format jsonl --o
 
 The query endpoint has no cursor of its own, so a result larger than one
 response pages through a predicate you write. Declare the two cursor parameters,
-order by the same two columns, and `--page-by keyset` rebinds them between pages
-without changing a character of your statement.
+order by two columns, alias those columns to `after_ts` and `after_id`, and
+`--page-by keyset` rebinds the parameters between pages without changing a
+character of your statement.
 
 ```sql
-SELECT TraceId, OccurredAt, CapturedInput, CapturedOutput
+SELECT OccurredAt AS after_ts, TraceId AS after_id, CapturedInput, CapturedOutput
 FROM langwatch.traces
 WHERE OccurredAt >= subtractDays(now(), 7)
   AND (OccurredAt, TraceId) > ({after_ts:DateTime64(3)}, {after_id:String})

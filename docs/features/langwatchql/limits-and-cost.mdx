@@ -49,7 +49,7 @@ LIMIT 1000
 ```
 
 ```bash
-langwatch query --sql-file export.sql --page-by keyset --format jsonl --out export.jsonl
+langwatch query --sql-file export.sql --projects <project id> --page-by keyset --format jsonl --out export.jsonl
 ```
 
 From the REST API, page with `LIMIT` and `OFFSET` and an `ORDER BY`. In a `UNION`, give every branch its own `LIMIT`, or the query is refused with `LIMIT_REQUIRED_PER_BRANCH`.

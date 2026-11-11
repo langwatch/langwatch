@@ -69,7 +69,7 @@ You can send the same statement from REST, the CLI or MCP, and each one needs th
     | Tool | What it does |
     | --- | --- |
     | `discover_schema` | With `category: "lwql"`, returns the views, columns and functions as markdown |
-    | `run_query` | Runs a statement, with optional `parameters`, and renders up to 50 rows as a table with the real row count, the time it took and any diagnostics |
+    | `run_query` | Runs a statement, with optional `parameters` and `projects` (project ids or `"all"`, needed when the key reaches several projects), and renders up to 50 rows as a table with the real row count, the time it took and any diagnostics |
 
     Ask your agent a question such as "which model cost the most last week" and it can look up the schema, write the statement and run it.
   </Tab>
