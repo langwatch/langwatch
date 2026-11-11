@@ -5135,31 +5135,22 @@ model NurturingProjectUsageView {
   @@id([projectId, owner])
 }
 
-/// Nurturing's own trace counts: a peer fold over trace's span_received (ARCHITECTURE §9), a root
-/// span being one trace, one row per project and UTC day of append time. Kept 30 days.
+/// Nurturing's own trace counts from trace's span_received (ARCHITECTURE §9), a root span being
+/// one trace, one row per project and UTC day of append time, incremented in place (a redelivery
+/// may count twice). Kept 30 days.
 model NurturingProjectTraceDay {
   projectId         String
-  /// UTC `YYYY-MM-DD` of the spans' append time.
+  /// UTC `YYYY-MM-DD` of the root spans' append time.
   day               String
-  /// The day's counts as the fold folded them (NurturingTraceDayState).
-  folded            Json
-  /// The event ids of the last delivery folded in, so a redelivery folds once.
-  appliedEventIds   String[] @default([])
-  /// A row of another version is left out of every read.
-  projectionVersion String
-  /// Event-derived, so a replayed row equals the row it rebuilds.
-  updatedAt         DateTime
+  traceCount        Int       @default(0)
+  /// Root spans with an error status.
+  errorCount        Int       @default(0)
+  /// Append time of the newest root span.
+  lastTraceAt       DateTime?
+  /// Append time of the newest erroring root span.
+  lastFailedTraceAt DateTime?
 
   @@id([projectId, day])
-}
-
-/// Nurturing's seed of a project's trace days from trace's rollup, taken once: the days before the
-/// fold's first trace, summed with the fold's rows. The row marks the project seeded.
-model NurturingProjectTraceSeed {
-  projectId String   @id
-  /// The rollup's days before the cutoff (NurturingTraceDayState[]).
-  days      Json
-  seededAt  DateTime
 }
 
 model BillingMeterCheckpoint {

@@ -1,5 +1,5 @@
 import { nowInstant, Temporal } from "@langwatch/time";
-import type { TraceAttributeMatch, TraceUsageDay } from "@langwatch/trace-contract";
+import type { TraceAttributeMatch } from "@langwatch/trace-contract";
 
 import { TraceUsageCountRepository } from "../trace-usage-count.repository.ts";
 
@@ -13,19 +13,9 @@ type CountedTrace = {
   attributes?: Readonly<Record<string, string>>;
 };
 
-/** One rollup row: a minute bucket of a project's spans. */
-type RollupBucket = {
-  tenantId: string;
-  bucketStartMs: number;
-  traceCount: number;
-  errorCount: number;
-  cost: number;
-};
-
 /** In-memory twin of the trace count reads, exact over the rows a test records. */
 export class MemoryTraceUsageCountRepository extends TraceUsageCountRepository {
   readonly #traces: CountedTrace[] = [];
-  readonly #buckets: RollupBucket[] = [];
 
   static create(): MemoryTraceUsageCountRepository {
     return new MemoryTraceUsageCountRepository();
@@ -38,48 +28,6 @@ export class MemoryTraceUsageCountRepository extends TraceUsageCountRepository {
   /** Seeds one trace summary row; `createdAt` uses the window's own DateTime64(3) spelling. */
   record(trace: CountedTrace): void {
     this.#traces.push(trace);
-  }
-
-  /** Seeds one rollup bucket, as the rollup projection appends it. */
-  recordBucket(bucket: RollupBucket): void {
-    this.#buckets.push(bucket);
-  }
-
-  async findTraceUsageByDay(input: {
-    organizationId: string;
-    projectIds: readonly string[];
-    sinceMs: number;
-    untilMs?: number;
-  }): Promise<TraceUsageDay[]> {
-    const days = new Map<string, TraceUsageDay>();
-    const untilMs = input.untilMs ?? Number.POSITIVE_INFINITY;
-    for (const bucket of this.#buckets) {
-      const { bucketStartMs } = bucket;
-      if (
-        !input.projectIds.includes(bucket.tenantId) ||
-        bucketStartMs < input.sinceMs ||
-        bucketStartMs >= untilMs
-      ) {
-        continue;
-      }
-      const day = Temporal.Instant.fromEpochMilliseconds(bucket.bucketStartMs)
-        .toString()
-        .slice(0, 10);
-      const known = days.get(day);
-      const failedAt = bucket.errorCount > 0 ? bucket.bucketStartMs : null;
-      days.set(day, {
-        day,
-        traceCount: (known?.traceCount ?? 0) + bucket.traceCount,
-        errorCount: (known?.errorCount ?? 0) + bucket.errorCount,
-        totalCost: (known?.totalCost ?? 0) + bucket.cost,
-        lastTraceAt: Math.max(known?.lastTraceAt ?? 0, bucket.bucketStartMs),
-        lastFailedTraceAt:
-          failedAt === null
-            ? (known?.lastFailedTraceAt ?? null)
-            : Math.max(known?.lastFailedTraceAt ?? 0, failedAt),
-      });
-    }
-    return [...days.values()].toSorted((a, b) => a.day.localeCompare(b.day));
   }
 
   async findTraceIdsFirstSeen(input: {

@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Nurturing's own per-project usage (§9): one peer fold per owner pipeline (prompt, evaluator,
- * scenario, simulation run), a row per project each, and a fold over trace's span_received that
- * counts root spans per project and UTC day. Evaluations add a day per project a day. Each change
- * syncs the organization as one Customer.io group call. See ADR 001 (nurturing), amendment.
+ * scenario, simulation run), a row per project each, and a subscriber on trace's span_received
+ * that adds its root spans to their project's UTC day with one Postgres upsert per batch.
+ * Evaluations add a day per project a day. Each change syncs the organization as one Customer.io
+ * group call. See ADR 001 (nurturing), amendment.
  * Spec: enterprise/modules/nurturing/specs/project-usage.feature
  */
 import {
@@ -23,8 +24,10 @@ import {
   type Event,
   type EventingSetup,
   type PeerEvent,
+  type PeerBatchSubscriberDefinition,
   type PeerFoldProjectionDeclaration,
   type PeerFoldSubscriberSpec,
+  type PeerSubscriberContext,
   throttledWindow,
 } from "@langwatch/eventing";
 import {
@@ -57,9 +60,8 @@ import {
   type NurturingProjectUsageOwner,
   type NurturingProjectUsageRepository,
 } from "../repositories/nurturing-project-usage.repository.ts";
-import {
-  NURTURING_TRACE_DAY_PROJECTION_VERSION,
-  type NurturingTraceDayRepository,
+import type {
+  NurturingTraceDayRepository,
 } from "../repositories/nurturing-trace-day.repository.ts";
 import type { NurturingRepositories } from "../repositories/nurturing.repositories.ts";
 import {
@@ -70,10 +72,8 @@ import {
 } from "../rules/nurturing-project-usage.rules.ts";
 import { utcDayOf } from "../rules/nurturing-time.rules.ts";
 import {
-  emptyTraceDay,
-  foldTraceDay,
-  type NurturingTraceDayState,
-  traceDayKey,
+  type NurturingTraceSpan,
+  traceDayIncrementsOf,
 } from "../rules/nurturing-trace-day.rules.ts";
 
 /** Hosts nurturing's peer folds and subscribers over the owners' facts; no event of its own. */
@@ -92,9 +92,9 @@ export const TRACE_USAGE_SYNC_WINDOW_MS = 15 * 60_000;
 const EVALUATION_DAY_DEDUP_TTL_MS = 24 * 60 * 60_000;
 
 /**
- * Every fold here is keyed across many owner aggregates (a project, or a project's day): a re-fold
- * loads one aggregate's log, so it would rebuild the row from that one alone. Their applies
- * commute (sets, sums, maxima), so an event older than the row's newest is folded on as it comes.
+ * Every fold here is keyed across many owner aggregates (a project): a re-fold loads one
+ * aggregate's log, so it would rebuild the row from that one alone. Their applies commute (sets,
+ * sums, maxima), so an event older than the row's newest is folded on as it comes.
  */
 const KEYED_FOLD_OPTIONS = { refoldOnOutOfOrder: false } as const;
 
@@ -208,59 +208,63 @@ export function nurturingProjectUsagePeerFold<Owner extends NurturingProjectUsag
   };
 }
 
-/** What the trace-day fold reads of a span: whether it is a root, and its status; no body. */
+/** What the trace-day count reads of a span: whether it is a root, and its status; no body. */
 const traceSpanDataSchema = z.object({
   span: spanReceivedEventDataSchema.shape.span.pick({ parentSpanId: true, status: true }),
 });
 
+type NurturingTraceSpanData = z.output<typeof traceSpanDataSchema>;
+
 /** OTLP's `STATUS_CODE_ERROR`: the status trace's rollup counts a failed trace by. */
 const OTLP_STATUS_CODE_ERROR = 2;
 
-/** trace's span fact, as the trace-day fold reads it. */
-export const nurturingTraceDayPeerEvents = [
-  { type: SPAN_RECEIVED_EVENT_TYPE, data: traceSpanDataSchema },
-] as const;
-
-/** A span fact as the trace-day fold receives it. */
-export type NurturingTraceSpanEvent = PeerEvent<typeof nurturingTraceDayPeerEvents>;
-
-/** A root span: one per trace, the only span the trace-day fold counts. */
-export function isRootSpan(event: NurturingTraceSpanEvent): boolean {
-  return !event.data.span.parentSpanId;
+/** A root span: one per trace, the only span the trace-day count takes. */
+export function isRootSpan(data: NurturingTraceSpanData): boolean {
+  return !data.span.parentSpanId;
 }
 
-/** The row a span counts on: its project (the tenant) and the UTC day it was appended. */
-export function traceDayKeyOf(event: NurturingTraceSpanEvent): string {
-  return traceDayKey({ projectId: String(event.tenantId), day: utcDayOf(event.createdAt) });
-}
-
-/** One project's traces per UTC day: a root span is a trace, as trace's rollup counts it. */
-export function nurturingTraceDayPeerFold(
-  traceDays: NurturingTraceDayRepository,
-): PeerFoldProjectionDeclaration<NurturingTraceDayState, typeof nurturingTraceDayPeerEvents> {
+/** A root span as its count takes it: its project (the tenant), append day, and failure. */
+export function traceSpanOf(
+  data: NurturingTraceSpanData,
+  context: Pick<PeerSubscriberContext, "tenantId" | "createdAt">,
+): NurturingTraceSpan {
   return {
-    events: nurturingTraceDayPeerEvents,
-    fold: {
-      name: "traceDays",
-      version: NURTURING_TRACE_DAY_PROJECTION_VERSION,
-      eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
-      init: emptyTraceDay,
-      apply: (state, event) =>
-        foldTraceDay(state, {
-          projectId: String(event.tenantId),
-          day: utcDayOf(event.createdAt),
-          // Still checked: a replay hands apply every span, the enqueue filter only live ones.
-          isRoot: isRootSpan(event),
-          isError: event.data.span.status.code === OTLP_STATUS_CODE_ERROR,
-          appendedAt: event.createdAt,
-          occurredAt: event.occurredAt,
-        }),
-      key: traceDayKeyOf,
-      store: traceDays.store,
-      LastEventOccurredAtKey: "LastEventOccurredAt",
-      // A child span changes no count: it mints no job, so a trace is one job and one write.
-      options: { ...KEYED_FOLD_OPTIONS, enqueue: { filter: isRootSpan } },
+    projectId: String(context.tenantId),
+    day: utcDayOf(context.createdAt),
+    isError: data.span.status.code === OTLP_STATUS_CODE_ERROR,
+    appendedAt: context.createdAt,
+  };
+}
+
+/** Most root spans of one project and day the queue drains into one batch, one upsert. */
+const TRACE_DAY_COALESCE_MAX_BATCH = 500;
+
+/** The queue group of a span: its project and UTC day, the row its count lands on. */
+export function traceDayGroupOf(event: Event): string {
+  return JSON.stringify([String(event.tenantId), utcDayOf(event.createdAt)]);
+}
+
+/**
+ * One project's traces per UTC day: root spans of one project and day are coalesced, and each
+ * batch adds its counts to the day in one Postgres upsert. Not idempotent: a redelivered batch,
+ * or a retry after the write committed, counts its traces again. A subscriber, not a fold, so
+ * the rows are not rebuilt by a projection replay. Child spans mint no job.
+ */
+export function nurturingTraceDaySubscriber(
+  traceDays: NurturingTraceDayRepository,
+): PeerBatchSubscriberDefinition<typeof traceSpanDataSchema> {
+  return {
+    eventType: SPAN_RECEIVED_EVENT_TYPE,
+    data: traceSpanDataSchema,
+    options: {
+      enqueue: { filter: isRootSpan },
+      groupKeyFn: traceDayGroupOf,
+      coalesceMaxBatch: TRACE_DAY_COALESCE_MAX_BATCH,
     },
+    handleBatch: (items) =>
+      traceDays.addTraceDays(
+        traceDayIncrementsOf(items.map(({ data, context }) => traceSpanOf(data, context))),
+      ),
   };
 }
 
@@ -326,9 +330,9 @@ function nurturingProjectUsageHost({
         nurturingProjectUsagePeerFold({ owner: "simulation", store }),
         subscribers,
       )
-      .withPeerFoldProjection(nurturingTraceDayPeerFold(traceDays))
+      .withPeerSubscriber("traceDayCount", nurturingTraceDaySubscriber(traceDays))
       // Throttled, not debounced: an organization tracing without pause still syncs once per
-      // window, 15 minutes after the window's first trace, when its spans are folded.
+      // window, 15 minutes after the window's first trace, when its root spans are counted.
       .withPeerSubscriber("traceUsageSync", {
         eventType: TRACE_RECEIVED_EVENT_TYPE,
         data: traceSyncDataSchema,

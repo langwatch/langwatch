@@ -3,17 +3,19 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   Nurturing folds the owners' prompt, evaluator, scenario and simulation-run events into its own
   table (peer folds, ARCHITECTURE §9). A peer fold re-folds from one owner's event log, so there
   are four folds, one per owner pipeline, each keeping its own row per project. Evaluations add
-  their UTC day to one more row per project, at most once a day. Traces are counted by a fifth
-  peer fold over trace's span_received, which queues root spans only: a root span is one trace,
-  a root span with an error status one failed trace, as trace's own rollup counts them, on one
-  row per project and UTC day of append time, kept 30 days. No span body reaches nurturing. Each
-  project is seeded once from trace's rollup with the traces before the fold's first one. A span carries no price, so the
-  window's cost is read from trace's rollup at most once per organization and UTC day. When a
-  project's usage changes, or its organization traced (throttled to once per 15 minutes),
-  nurturing places it in its organization through the owners' shares, sums the organization's
-  projects and sends their traits to Customer.io as one group call on the admin. It never pulls
-  owner state on a schedule, and sends counts and times only, never content. flagged_count waits
-  on its definition.
+  their UTC day to one more row per project, at most once a day. Traces are counted by a peer
+  subscriber on trace's span_received, which queues root spans only: a root span is one trace, a
+  root span with an error status one failed trace, as trace's own rollup counts them. Root spans
+  of one project and day are batched, and each batch adds its counts to that day's row with one
+  Postgres upsert; rows are kept 30 days. The increment is not idempotent: a redelivered batch
+  may count its traces twice. No span body reaches nurturing, and the rows are not rebuilt by a
+  projection replay.
+  Nurturing reads no trace data: trace counts start at the count's deploy, and no cost is sent (a
+  span carries no price). When a project's usage changes, or its organization traced (throttled
+  to once per 15 minutes), nurturing places it in its organization through the owners' shares,
+  sums the organization's projects and sends their traits to Customer.io as one group call on
+  the admin. It never pulls owner state on a schedule, and sends counts and times only, never
+  content. flagged_count waits on its definition.
 
   @unit
   Scenario: Every owner event becomes the fact its fold counts
@@ -58,54 +60,48 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
 
   @unit @integration
   Scenario: A trace is its root span, counted on its project's day
-    Given spans of a project's traces appended on one UTC day
-    When the trace-day fold takes them
-    Then each root span adds one trace to the project's row for that day, and a child span none
-    And a span appended on the next UTC day counts on the next day's row
+    Given root spans of a project's traces appended on one UTC day
+    When the trace-day count takes them
+    Then each adds one trace to the project's row for that day
+    And a root span appended on the next UTC day counts on the next day's row
 
   @unit
   Scenario: Only a root span mints a trace-day job
     Given a trace's root span and its child spans
     When trace appends them
-    Then only the root span is queued to the trace-day fold, so a trace is one job and one write
+    Then only the root span is queued to the trace-day count, so a child span costs no job
 
   @unit
   Scenario: A failed trace is a root span with an error status
-    Given a root span and a child span with an error status, and a root span without one
-    When the trace-day fold takes them
+    Given a root span with an error status and a root span without one
+    When the trace-day count takes them
     Then the day counts 2 traces and 1 failed trace, and the failed one's time
 
   @unit
-  Scenario: Spans arriving out of order count the same
+  Scenario: Traces arriving out of order count the same
     Given two traces' root spans of one project and day, the older arriving after the newer
-    When the trace-day fold takes them
-    Then both are counted, and the row is never re-folded from one trace's log
+    When the trace-day count takes them
+    Then both are counted, and the row keeps the newer one's time
+
+  @unit @integration
+  Scenario: Root spans of one project and day are written as one increment
+    Given root spans of one project queued on one UTC day
+    When the queue drains them as one batch
+    Then the day's row gets one upsert adding their trace and failed-trace counts
+    And two writers adding to one day at once lose no count
 
   @unit
-  Scenario: A redelivered span counts once
-    Given a root span folded into its project's day
-    When the same span is delivered again
-    Then the day still counts it once
+  Scenario: A redelivered batch may count its traces twice
+    Given a batch of root spans added to its project's day
+    When the same batch is delivered again, or retried after its write committed
+    Then its traces are counted again
+    And this is accepted: the counts steer emails, and an exact dedupe costs a row per trace
 
   @unit
   Scenario: Folds keyed across aggregates never re-fold from one aggregate's log
-    Given a fold whose row sums many owner aggregates, a project or a project's day
+    Given a fold whose row sums many owner aggregates, a project
     When an event older than the row's newest arrives
     Then it is folded on as it comes, since a re-fold would rebuild the row from one aggregate
-
-  @unit @integration
-  Scenario: A project that traced before the fold started is seeded once from trace's rollup
-    Given a project with traces in the 30-day window that the trace-day fold never saw
-    When its organization first syncs
-    Then trace's per-day rollup of the project is read once and kept as the project's seed
-    And its days are summed with the fold's, and later syncs read the kept seed, not the rollup
-
-  @unit
-  Scenario: The fold's first day counts traces before and after the fold started, each once
-    Given a project's first trace the fold saw was appended at 10:30:20 on a day
-    And the rollup holds 2 of that day's traces before 10:30 and the 3 the fold counted
-    When the project is seeded
-    Then the seed takes the rollup's minutes before 10:30 only, and the day counts 5 traces
 
   @unit
   Scenario: Traces sync an organization at most once per 15 minutes
@@ -126,23 +122,10 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     Then that day's row is deleted
 
   @unit
-  Scenario: The window's cost is read from trace once per organization and UTC day
-    Given an organization that traced within the window
-    When it syncs twice in one UTC day
-    Then trace's per-day rollup is read for its cost on the first sync only
-    And a refused group call gives the day's read back, so the retry reads it again
-
-  @unit
-  Scenario: A sync that read no cost leaves total_cost as Customer.io has it
-    Given the organization's cost was already read this UTC day
-    When the traits are built
-    Then total_cost is left out and every count is sent
-
-  @unit
   Scenario: The organization's traits sum its projects
-    Given an organization with two projects with usage, its trace counts and its cost
+    Given an organization with two projects with usage and its trace counts
     When the traits are built
-    Then prompt, evaluator, scenario, simulation set, trace and error counts and total cost are summed
+    Then prompt, evaluator, scenario, simulation set, trace and error counts are summed
     And last_trace_date and last_failed_trace_at are the newest trace and failed trace in Unix seconds
     And active_last_7_days, back_since_day_0, has_scenario_run and window_end_date are set
 
@@ -184,7 +167,7 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   Scenario: A project placed in no organization sends nothing
     Given a project its owners place in no organization
     When the project's usage changes or it traces
-    Then Customer.io receives nothing and trace's cost is not read
+    Then Customer.io receives nothing
 
   @integration
   Scenario: Each owner's fold keeps its own row per project

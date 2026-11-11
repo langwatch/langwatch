@@ -1,5 +1,5 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import type { TraceAttributeMatch, TraceUsageDay } from "@langwatch/trace-contract";
+import type { TraceAttributeMatch } from "@langwatch/trace-contract";
 
 import { TraceUsageCountRepository } from "../trace-usage-count.repository.ts";
 
@@ -9,17 +9,9 @@ type HitRow = { hit: number };
 const FIRST_SEEN_LOOKBACK_MS = 31 * 24 * 60 * 60 * 1_000;
 
 type TraceIdRow = { traceId: string };
-type UsageDayRow = {
-  day: string;
-  traceCount: string | number;
-  errorCount: string | number;
-  totalCost: string | number;
-  lastTraceAt: string | number;
-  lastFailedTraceAt: string | number;
-};
 type AttributeCountRow = { value: string; count: string | number };
 
-/** ClickHouse reads of per-project trace counts over `trace_summaries` and its rollup. */
+/** ClickHouse reads of per-project trace counts over `trace_summaries`. */
 export class TraceUsageCountClickHouseRepository extends TraceUsageCountRepository {
   readonly #clickhouse: ClickHouseQueryClient;
 
@@ -87,62 +79,6 @@ export class TraceUsageCountClickHouseRepository extends TraceUsageCountReposito
     });
 
     return Number.parseInt(String(result.rows[0]?.total ?? "0"), 10);
-  }
-
-  /**
-   * One query over the per-minute rollup for the organization's projects, grouped by UTC day: at
-   * most 1,440 buckets per project, model and span type a day, never a per-trace scan.
-   */
-  async findTraceUsageByDay(input: {
-    organizationId: string;
-    projectIds: readonly string[];
-    sinceMs: number;
-    untilMs?: number;
-  }): Promise<TraceUsageDay[]> {
-    const [first] = input.projectIds;
-    const until =
-      input.untilMs === undefined
-        ? ""
-        : "AND BucketStart < fromUnixTimestamp64Milli({until:Int64})";
-    if (first === undefined) return [];
-    const result = await this.#clickhouse.query<UsageDayRow>({
-      tenantId: first,
-      organizationId: input.organizationId,
-      tenantIds: input.projectIds,
-      table: "trace_analytics_rollup",
-      sql: `
-        SELECT
-          toString(toDate(BucketStart, 'UTC')) AS day,
-          toString(sum(TraceCount)) AS traceCount,
-          toString(sum(ErrorCount)) AS errorCount,
-          sum(CostSum) AS totalCost,
-          toString(toUnixTimestamp64Milli(max(BucketStart))) AS lastTraceAt,
-          toString(toUnixTimestamp64Milli(maxIf(BucketStart, ErrorCount > 0))) AS lastFailedTraceAt
-        FROM trace_analytics_rollup
-        WHERE TenantId IN ({projectIds:Array(String)})
-          AND BucketStart >= fromUnixTimestamp64Milli({since:Int64})
-          ${until}
-        GROUP BY day
-        ORDER BY day
-      `,
-      params: {
-        projectIds: [...input.projectIds],
-        since: input.sinceMs,
-        ...(input.untilMs !== undefined && { until: input.untilMs }),
-      },
-    });
-    return result.rows.map((row) => {
-      // maxIf over no failed bucket answers the epoch, which no real trace has.
-      const lastFailedTraceAt = Number(row.lastFailedTraceAt);
-      return {
-        day: row.day,
-        traceCount: Number(row.traceCount),
-        errorCount: Number(row.errorCount),
-        totalCost: Number(row.totalCost),
-        lastTraceAt: Number(row.lastTraceAt),
-        lastFailedTraceAt: lastFailedTraceAt > 0 ? lastFailedTraceAt : null,
-      };
-    });
   }
 
   async hasTraceWithAttribute(input: {

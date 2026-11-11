@@ -150,8 +150,6 @@ export interface CioOrgTraits {
   trace_count?: number;
   /** Traces over the last 30 days whose root span has an error status. */
   error_count?: number;
-  /** USD over the same 30 days, read from trace once per UTC day; absent from other syncs. */
-  total_cost?: number;
   /** Unix seconds; absent when no trace in the window failed. */
   last_failed_trace_at?: number;
   /** Whether any project ran a scenario. */

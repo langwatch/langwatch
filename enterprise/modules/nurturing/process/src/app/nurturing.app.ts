@@ -10,7 +10,6 @@ import type { EventingCommands } from "@langwatch/eventing";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { nowInstant } from "@langwatch/time";
-import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
 
 import type { NurturingChannels } from "../channels/nurturing.channels.ts";
@@ -33,12 +32,7 @@ type NurturingSetup = FeatureSetup<
 /** Owners tell nurturing; no module names it as a peer, so it can never close a cycle (§9). */
 export class NurturingModule implements NurturingApi {
   static readonly contract = NurturingApi;
-  static readonly dependencies = {
-    users: UserApi,
-    organizations: OrganizationApi,
-    /** Trace's once-a-day cost read (a span has no price); trace names no nurturing, no cycle. */
-    traces: TraceApi,
-  };
+  static readonly dependencies = { users: UserApi, organizations: OrganizationApi };
   static readonly config = nurturingConfig;
   static readonly secrets = nurturingSecrets;
 
@@ -93,8 +87,6 @@ export class NurturingModule implements NurturingApi {
       ? NurturingOrganizationUsageService.create({
           projectUsage: repositories.projectUsage,
           traceDays: repositories.traceDays,
-          traces: dependencies.traces,
-          claims: repositories.claims,
           projects: repositories.projects,
           milestones: repositories.milestones,
           sendBatch: (calls) => customerIo.batchOrThrow(calls),

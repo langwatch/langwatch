@@ -11,7 +11,7 @@ Traces: ingestion and canonicalisation of spans, the projections built from them
 | Classification | core (`modules/catalogue.json`)                                                                 |
 | Subjects       | trace, trace-ingestion                                                                          |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)     |
-| Api token      | `TraceApi` = `moduleApi<TraceApi>()("trace")`, `contract/src/trace.api.ts:988` (144 operations) |
+| Api token      | `TraceApi` = `moduleApi<TraceApi>()("trace")`, `contract/src/trace.api.ts:977` (143 operations) |
 | Other token    | `CollectorApi`, `process/src/transport/collector.rest.ts:99`                                    |
 | Other token    | `TrackedEventApi`, `process/src/transport/tracked-event.rest.ts:36`                             |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                      |
@@ -51,6 +51,6 @@ Anything else trace needs belongs to another module and is reached through its `
 
 ## Who depends on trace
 
-[analytics](../analytics/README.md), [annotation](../annotation/README.md), [automation](../automation/README.md), [coding-agent](../coding-agent/README.md), [evaluation](../evaluation/README.md), [experiment](../experiment/README.md), [gateway](../gateway/README.md), [governance](../../enterprise/modules/governance/README.md), [instant-eval](../instant-eval/README.md), [log](../log/README.md), [metric](../metric/README.md), [nurturing](../../enterprise/modules/nurturing/README.md), [ops](../ops/README.md), [scenario](../scenario/README.md), [topic](../topic/README.md) (as a peer).
+[analytics](../analytics/README.md), [annotation](../annotation/README.md), [automation](../automation/README.md), [coding-agent](../coding-agent/README.md), [evaluation](../evaluation/README.md), [experiment](../experiment/README.md), [gateway](../gateway/README.md), [governance](../../enterprise/modules/governance/README.md), [instant-eval](../instant-eval/README.md), [log](../log/README.md), [metric](../metric/README.md), [ops](../ops/README.md), [scenario](../scenario/README.md), [topic](../topic/README.md) (as a peer).
 
 <!-- readme:generated:end -->

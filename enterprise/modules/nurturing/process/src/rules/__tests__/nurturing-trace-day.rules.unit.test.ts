@@ -6,13 +6,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  addTrace,
   emptyTraceDay,
-  foldTraceDay,
-  type NurturingTraceDayState,
+  type NurturingTraceDay,
   type NurturingTraceSpan,
-  seedCutoffOf,
-  seedDaysOf,
   traceCountsOf,
+  traceDayIncrementsOf,
 } from "../nurturing-trace-day.rules.ts";
 
 const AT = Date.UTC(2026, 10, 19, 12);
@@ -20,46 +19,34 @@ const AT = Date.UTC(2026, 10, 19, 12);
 const span = (overrides: Partial<NurturingTraceSpan> = {}): NurturingTraceSpan => ({
   projectId: "project-1",
   day: "2026-11-19",
-  isRoot: true,
   isError: false,
   appendedAt: AT,
-  occurredAt: AT,
   ...overrides,
 });
 
-const foldAll = (spans: readonly NurturingTraceSpan[]) =>
-  spans.reduce(foldTraceDay, emptyTraceDay());
+const addAll = (spans: readonly NurturingTraceSpan[]) => spans.reduce(addTrace, emptyTraceDay());
 
-describe("foldTraceDay()", () => {
+describe("addTrace()", () => {
   /** @scenario "A trace is its root span, counted on its project's day" */
-  it("counts root spans as traces and leaves child spans out", () => {
-    const state = foldAll([
-      span(),
-      span({ isRoot: false, appendedAt: AT + 3000 }),
-      span({ appendedAt: AT + 1000 }),
-    ]);
-
-    expect(state).toEqual({
+  it("adds one trace per root span, keeping the newest time", () => {
+    expect(addAll([span(), span({ appendedAt: AT + 1000 })])).toEqual({
       projectId: "project-1",
       day: "2026-11-19",
       traceCount: 2,
       errorCount: 0,
       lastTraceAt: AT + 1000,
-      firstTraceAt: AT,
       lastFailedTraceAt: null,
-      LastEventOccurredAt: AT,
     });
   });
 
   /** @scenario "A failed trace is a root span with an error status" */
-  it("counts an erroring root span as a failed trace, and an erroring child as nothing", () => {
-    const state = foldAll([
+  it("counts an erroring root span as a failed trace too", () => {
+    const day = addAll([
       span({ isError: true, appendedAt: AT + 2000 }),
-      span({ isRoot: false, isError: true, appendedAt: AT + 5000 }),
       span({ appendedAt: AT + 4000 }),
     ]);
 
-    expect(state).toMatchObject({
+    expect(day).toMatchObject({
       traceCount: 2,
       errorCount: 1,
       lastTraceAt: AT + 4000,
@@ -67,19 +54,44 @@ describe("foldTraceDay()", () => {
     });
   });
 
-  /** @scenario "Spans arriving out of order count the same" */
-  it("answers the same counts whatever order the spans arrive in", () => {
+  /** @scenario "Traces arriving out of order count the same" */
+  it("answers the same counts whatever order the traces arrive in", () => {
     const spans = [
-      span({ appendedAt: AT + 2000, occurredAt: AT + 2000 }),
-      span({ isError: true, appendedAt: AT, occurredAt: AT }),
+      span({ appendedAt: AT + 2000 }),
+      span({ isError: true, appendedAt: AT }),
     ];
 
-    expect(foldAll(spans)).toEqual(foldAll(spans.toReversed()));
+    expect(addAll(spans)).toEqual(addAll(spans.toReversed()));
+  });
+});
+
+describe("traceDayIncrementsOf()", () => {
+  /** @scenario "Root spans of one project and day are written as one increment" */
+  it("sums a batch's root spans into one increment per project and day", () => {
+    const increments = traceDayIncrementsOf([
+      span(),
+      span({ isError: true, appendedAt: AT + 1000 }),
+      span({ day: "2026-11-20", appendedAt: AT + 86_400_000 }),
+      span({ projectId: "project-2" }),
+    ]);
+
+    expect(increments).toEqual([
+      {
+        projectId: "project-1",
+        day: "2026-11-19",
+        traceCount: 2,
+        errorCount: 1,
+        lastTraceAt: AT + 1000,
+        lastFailedTraceAt: AT + 1000,
+      },
+      expect.objectContaining({ projectId: "project-1", day: "2026-11-20", traceCount: 1 }),
+      expect.objectContaining({ projectId: "project-2", day: "2026-11-19", traceCount: 1 }),
+    ]);
   });
 });
 
 describe("traceCountsOf()", () => {
-  const day = (overrides: Partial<NurturingTraceDayState>): NurturingTraceDayState => ({
+  const day = (overrides: Partial<NurturingTraceDay>): NurturingTraceDay => ({
     ...emptyTraceDay(),
     projectId: "project-1",
     traceCount: 1,
@@ -116,51 +128,5 @@ describe("traceCountsOf()", () => {
       lastFailedTraceAt: null,
       activeDays: [],
     });
-  });
-});
-
-describe("seedCutoffOf()", () => {
-  /** @scenario "The fold's first day counts traces before and after the fold started, each once" */
-  it("ends the seed at the minute of the project's first folded trace", () => {
-    const folded = [
-      { ...emptyTraceDay(), day: "2026-11-20", firstTraceAt: AT + 95_000 },
-      { ...emptyTraceDay(), day: "2026-11-21", firstTraceAt: AT + 86_400_000 },
-    ];
-
-    expect(seedCutoffOf({ folded, now: AT + 2 * 86_400_000 })).toBe(AT + 60_000);
-  });
-
-  it("seeds up to now for a project the fold has not seen", () => {
-    expect(seedCutoffOf({ folded: [], now: AT + 61_500 })).toBe(AT + 60_000);
-  });
-});
-
-describe("seedDaysOf()", () => {
-  it("turns the rollup's days into the project's seed rows", () => {
-    expect(
-      seedDaysOf({
-        projectId: "project-1",
-        days: [
-          {
-            day: "2026-11-19",
-            traceCount: 2,
-            errorCount: 1,
-            totalCost: 0.5,
-            lastTraceAt: AT,
-            lastFailedTraceAt: AT - 1,
-          },
-        ],
-      }),
-    ).toEqual([
-      {
-        ...emptyTraceDay(),
-        projectId: "project-1",
-        day: "2026-11-19",
-        traceCount: 2,
-        errorCount: 1,
-        lastTraceAt: AT,
-        lastFailedTraceAt: AT - 1,
-      },
-    ]);
   });
 });

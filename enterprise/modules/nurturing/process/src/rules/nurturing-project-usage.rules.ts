@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { CioOrgTraits } from "@langwatch/enterprise-nurturing-contract";
 import { Temporal } from "@langwatch/time";
-import type { TraceUsageDay } from "@langwatch/trace-contract";
 import { z } from "zod";
 
 import { unixSecondsOf } from "./nurturing-customer-io-timestamp.rules.ts";
@@ -10,7 +9,7 @@ import type { NurturingTraceCounts } from "./nurturing-trace-day.rules.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** How far back traces, errors, cost and active days are counted. */
+/** How far back traces, errors and active days are counted. */
 export const PROJECT_USAGE_WINDOW_MS = 30 * DAY_MS;
 
 /** The free window the per-email journey speaks of, from the organization's creation. */
@@ -50,11 +49,6 @@ export type NurturingProjectUsageFact = Readonly<{ occurredAt: number }> &
 /** The UTC day the window starts after: a day after it is fully inside the window. */
 export function windowStartDayOf(now: number): string {
   return utcDayOf(now - PROJECT_USAGE_WINDOW_MS);
-}
-
-/** The window's cost, as trace's rollup answers it per day, USD. */
-export function totalCostOf(days: readonly TraceUsageDay[]): number {
-  return days.reduce((sum, day) => sum + day.totalCost, 0);
 }
 
 /** The days after signup whose activity is a trait, `active_day_<n>`. */
@@ -174,16 +168,14 @@ export function foldProjectUsage(
   }
 }
 
-/** The trace traits, from nurturing's own trace days; cost only when this sync read it. */
+/** The trace traits, from nurturing's own trace days. */
 function traceTraits({
   traces,
-  totalCost,
   otherActiveDays,
   now,
   organizationCreatedAt,
 }: Readonly<{
   traces: NurturingTraceCounts;
-  totalCost: number | null;
   /** The projects' prompt-version, scenario-run and evaluation days. */
   otherActiveDays: readonly string[];
   now: number;
@@ -199,7 +191,6 @@ function traceTraits({
   return {
     trace_count: traces.traceCount,
     error_count: traces.errorCount,
-    ...(totalCost !== null && { total_cost: Math.round(totalCost * 100) / 100 }),
     ...(lastTraceAt !== null && { last_trace_date: unixSecondsOf(lastTraceAt) }),
     ...(lastFailedTraceAt !== null && { last_failed_trace_at: unixSecondsOf(lastFailedTraceAt) }),
     active_last_7_days: lastTraceDay !== null && lastTraceDay >= utcDayOf(now - 6 * DAY_MS),
@@ -212,20 +203,17 @@ function traceTraits({
 }
 
 /**
- * The organization's per-email traits from its projects' usage and trace days at `now`. Cost is
- * read from trace once a day: `totalCost: null` leaves total_cost out, so Customer.io keeps the
- * value it last had. Counts and times only, never content; flagged_count waits on its definition.
+ * The organization's per-email traits from its projects' usage and trace days at `now`. Counts and
+ * times only, never content; flagged_count waits on its definition.
  */
 export function organizationUsageTraits({
   projects,
   traces,
-  totalCost,
   now,
   organizationCreatedAt,
 }: Readonly<{
   projects: readonly NurturingProjectUsageState[];
   traces: NurturingTraceCounts;
-  totalCost: number | null;
   now: number;
   organizationCreatedAt: number | null;
 }>): Partial<CioOrgTraits> {
@@ -243,7 +231,6 @@ export function organizationUsageTraits({
     }),
     ...traceTraits({
       traces,
-      totalCost,
       otherActiveDays: projects.flatMap((project) => project.activeDays),
       now,
       organizationCreatedAt,

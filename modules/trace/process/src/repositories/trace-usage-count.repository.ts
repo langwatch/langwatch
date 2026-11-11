@@ -1,6 +1,6 @@
-import type { TraceAttributeMatch, TraceUsageDay } from "@langwatch/trace-contract";
+import type { TraceAttributeMatch } from "@langwatch/trace-contract";
 
-/** Per-project trace counts read from the trace_summaries and trace_analytics_rollup tables. */
+/** Per-project trace counts read from the trace_summaries projection. */
 export abstract class TraceUsageCountRepository {
   /**
    * One page of the trace ids whose summary was first written in `[fromMs, toMs)`, in id order
@@ -14,13 +14,6 @@ export abstract class TraceUsageCountRepository {
     limit: number;
   }): Promise<string[]>;
   abstract countTracesInLastDay(input: { tenantId: string }): Promise<number>;
-  /** An organization's projects' traces from `sinceMs` to `untilMs`, per UTC day, ascending. */
-  abstract findTraceUsageByDay(input: {
-    organizationId: string;
-    projectIds: readonly string[];
-    sinceMs: number;
-    untilMs?: number;
-  }): Promise<TraceUsageDay[]>;
   abstract hasTraceWithAttribute(input: {
     tenantId: string;
     sinceMs: number;

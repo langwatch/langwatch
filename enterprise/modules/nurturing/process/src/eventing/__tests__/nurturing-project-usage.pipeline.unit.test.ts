@@ -28,11 +28,9 @@ import {
   evaluationDayKeyOf,
   type NurturingProjectUsagePeerEvent,
   nurturingProjectUsagePeerFold,
-  nurturingTraceDayPeerFold,
-  type NurturingTraceSpanEvent,
+  nurturingTraceDaySubscriber,
   projectIdOf,
   projectUsageFactOf,
-  traceDayKeyOf,
   traceSyncKeyOf,
 } from "../nurturing-project-usage.pipeline.ts";
 
@@ -250,69 +248,96 @@ describe("each owner's peer fold", () => {
   });
 });
 
-describe("the trace-day fold", () => {
+describe("the trace-day count", () => {
   const NOON = Date.UTC(2026, 10, 20, 12);
   const OK = 1;
   const ERROR = 2;
 
-  /** trace's span fact: only the root marker and the status are parsed, never the span body. */
-  function spanEvent({
-    parentSpanId,
-    code,
-    createdAt = NOON,
-  }: Readonly<{
-    parentSpanId: string | null;
-    code: typeof OK | typeof ERROR;
-    createdAt?: number;
-  }>): NurturingTraceSpanEvent {
-    return {
-      ...envelope(SPAN_RECEIVED_EVENT_TYPE),
-      type: SPAN_RECEIVED_EVENT_TYPE,
-      createdAt,
-      data: { span: { parentSpanId, status: { message: null, code } } },
-    };
-  }
-
-  const { fold } = nurturingTraceDayPeerFold(MemoryNurturingTraceDayRepository.create());
-
-  /** @scenario "A trace is its root span, counted on its project's day" */
-  it("keys a span on its project and the UTC day it was appended", () => {
-    const evening = spanEvent({ parentSpanId: null, code: OK, createdAt: NOON + 11 * 3_600_000 });
-    const nextDay = spanEvent({ parentSpanId: null, code: OK, createdAt: NOON + 12 * 3_600_000 });
-
-    expect(traceDayKeyOf(evening)).toBe("project-1:2026-11-20");
-    expect(traceDayKeyOf(nextDay)).toBe("project-1:2026-11-21");
-    expect(fold.key?.(evening)).toBe(traceDayKeyOf(evening));
+  /** trace's span fact as the subscriber gets it: only the root marker and the status. */
+  const spanData = (parentSpanId: string | null, code: typeof OK | typeof ERROR) => ({
+    span: { parentSpanId, status: { message: null, code } },
   });
 
-  /** @scenario "A failed trace is a root span with an error status" */
-  it("counts a root span as a trace, an erroring root as a failed one, and a child as none", () => {
-    const state = [
-      spanEvent({ parentSpanId: null, code: OK }),
-      spanEvent({ parentSpanId: "", code: ERROR }),
-      spanEvent({ parentSpanId: "root-span", code: ERROR }),
-    ].reduce((folded, event) => fold.apply(folded, event), fold.init());
+  /** One delivery: the span's project (tenant), its trace (aggregate) and append time. */
+  const itemOf = (code: typeof OK | typeof ERROR, traceId: string, createdAt = NOON) => ({
+    data: spanData(null, code),
+    context: {
+      tenantId: createTenantId("project-1"),
+      aggregateId: traceId,
+      createdAt,
+      occurredAt: createdAt,
+      eventId: `${traceId}-${createdAt}`,
+    },
+  });
 
-    expect(state).toMatchObject({
-      projectId: "project-1",
-      day: "2026-11-20",
-      traceCount: 2,
-      errorCount: 1,
-      lastFailedTraceAt: NOON,
+  function harness() {
+    const traceDays = MemoryNurturingTraceDayRepository.create();
+    const subscriber = nurturingTraceDaySubscriber(traceDays);
+    const days = () => traceDays.findForProjects({ projectIds: ["project-1"], afterDay: "" });
+    return { subscriber, days };
+  }
+
+  /** @scenario "A trace is its root span, counted on its project's day" */
+  it("counts a root span on its project and the UTC day it was appended", async () => {
+    const { subscriber, days } = harness();
+
+    await subscriber.handleBatch([itemOf(OK, "trace-1", NOON + 11 * 3_600_000)]);
+    await subscriber.handleBatch([itemOf(OK, "trace-2", NOON + 12 * 3_600_000)]);
+
+    expect((await days()).map((day) => [day.day, day.traceCount]).toSorted()).toEqual([
+      ["2026-11-20", 1],
+      ["2026-11-21", 1],
+    ]);
+  });
+
+  /** @scenario "Root spans of one project and day are written as one increment" */
+  it("queues a project's day as one group and adds a batch's traces together", async () => {
+    const { subscriber, days } = harness();
+    const group = subscriber.options?.groupKeyFn;
+    const event = (createdAt: number) => ({
+      ...envelope(SPAN_RECEIVED_EVENT_TYPE),
+      createdAt,
     });
+
+    expect(group?.(event(NOON) as Event)).toBe(group?.(event(NOON + 1000) as Event));
+    expect(group?.(event(NOON) as Event)).not.toBe(group?.(event(NOON + 86_400_000) as Event));
+    expect(subscriber.options?.coalesceMaxBatch).toBeGreaterThan(1);
+
+    await subscriber.handleBatch([itemOf(OK, "trace-1"), itemOf(ERROR, "trace-2")]);
+
+    expect(await days()).toEqual([
+      expect.objectContaining({ traceCount: 2, errorCount: 1, lastFailedTraceAt: NOON }),
+    ]);
   });
 
   /** @scenario "Only a root span mints a trace-day job" */
-  it("admits root spans to the fold's queue and declines child spans", () => {
-    const filter = fold.options?.enqueue?.filter;
+  it("admits root spans to its queue and declines child spans", () => {
+    const filter = harness().subscriber.options?.enqueue?.filter;
 
-    expect(filter?.(spanEvent({ parentSpanId: null, code: OK }))).toBe(true);
-    expect(filter?.(spanEvent({ parentSpanId: "", code: ERROR }))).toBe(true);
-    expect(filter?.(spanEvent({ parentSpanId: "root-span", code: OK }))).toBe(false);
+    expect(filter?.(spanData(null, OK))).toBe(true);
+    expect(filter?.(spanData("", ERROR))).toBe(true);
+    expect(filter?.(spanData("root-span", OK))).toBe(false);
   });
 
-  /** @scenario "Spans arriving out of order count the same" */
-  it("declines to re-fold an out-of-order span from one trace's log", () => {
-    expect(fold.options).toMatchObject({ refoldOnOutOfOrder: false });
+  /** @scenario "A redelivered batch may count its traces twice" */
+  it("counts a redelivered root span again: the increment is not idempotent", async () => {
+    const { subscriber, days } = harness();
+
+    await subscriber.handleBatch([itemOf(OK, "trace-1")]);
+    await subscriber.handleBatch([itemOf(OK, "trace-1")]);
+
+    expect((await days())[0]?.traceCount).toBe(2);
+  });
+
+  /** @scenario "Traces arriving out of order count the same" */
+  it("counts an older trace that arrives after a newer one", async () => {
+    const { subscriber, days } = harness();
+
+    await subscriber.handleBatch([itemOf(OK, "trace-2", NOON + 1000)]);
+    await subscriber.handleBatch([itemOf(OK, "trace-1", NOON)]);
+
+    expect(await days()).toEqual([
+      expect.objectContaining({ traceCount: 2, lastTraceAt: NOON + 1000 }),
+    ]);
   });
 });

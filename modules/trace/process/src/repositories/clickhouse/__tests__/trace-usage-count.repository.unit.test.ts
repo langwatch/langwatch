@@ -1,8 +1,5 @@
-/**
- * Spec: modules/trace/specs/trace-month-trace-ids.feature
- * Spec: modules/trace/specs/trace-usage-by-day.feature
- */
-import { type QueryRequest, TenantGuard } from "@langwatch/clickhouse-client";
+/** Spec: modules/trace/specs/trace-month-trace-ids.feature */
+import type { QueryRequest } from "@langwatch/clickhouse-client";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
@@ -166,108 +163,5 @@ describe("MemoryTraceUsageCountRepository", () => {
     await expect(
       repository.hasTraceWithAttribute({ ...input, tenantId: "project-3" }),
     ).resolves.toBe(false);
-  });
-});
-
-describe("TraceUsageCountClickHouseRepository usage by day", () => {
-  const input = {
-    organizationId: "org-1",
-    projectIds: ["project-1", "project-2"],
-    sinceMs: 1_000,
-  };
-
-  /** @scenario "An organization's traces are read per day from the rollup in one query" */
-  it("reads the organization's projects from the rollup in one query bound to them", async () => {
-    const { queries, repository } = createRepository([
-      {
-        day: "2026-11-19",
-        traceCount: "3",
-        errorCount: "1",
-        totalCost: 0.5,
-        lastTraceAt: "1763560800000",
-        lastFailedTraceAt: "1763557200000",
-      },
-      {
-        day: "2026-11-20",
-        traceCount: "2",
-        errorCount: "0",
-        totalCost: 0,
-        lastTraceAt: "1763647200000",
-        lastFailedTraceAt: "0",
-      },
-    ]);
-
-    await expect(repository.findTraceUsageByDay(input)).resolves.toEqual([
-      {
-        day: "2026-11-19",
-        traceCount: 3,
-        errorCount: 1,
-        totalCost: 0.5,
-        lastTraceAt: 1763560800000,
-        lastFailedTraceAt: 1763557200000,
-      },
-      {
-        day: "2026-11-20",
-        traceCount: 2,
-        errorCount: 0,
-        totalCost: 0,
-        lastTraceAt: 1763647200000,
-        lastFailedTraceAt: null,
-      },
-    ]);
-    expect(queries).toHaveLength(1);
-    expect(queries[0]).toMatchObject({
-      tenantId: "project-1",
-      organizationId: "org-1",
-      tenantIds: ["project-1", "project-2"],
-      table: "trace_analytics_rollup",
-      params: { projectIds: ["project-1", "project-2"], since: 1_000 },
-    });
-    const [query] = queries;
-    expect(query).toBeDefined();
-    if (!query) return;
-    expect(query.sql).toContain("WHERE TenantId IN ({projectIds:Array(String)})");
-    // The client runs this guard on every read: a form it refuses would never reach ClickHouse.
-    expect(() => new TenantGuard().assert(query)).not.toThrow();
-  });
-
-  it("keeps only the minutes before untilMs when it is given", async () => {
-    const { queries, repository } = createRepository([]);
-
-    await repository.findTraceUsageByDay({ ...input, untilMs: 2_000 });
-
-    expect(queries[0]?.sql).toContain("AND BucketStart < fromUnixTimestamp64Milli({until:Int64})");
-    expect(queries[0]?.params).toMatchObject({ since: 1_000, until: 2_000 });
-  });
-
-  it("asks nothing for an organization with no project", async () => {
-    const { queries, repository } = createRepository([]);
-
-    const noProjects = { ...input, projectIds: [] };
-
-    await expect(repository.findTraceUsageByDay(noProjects)).resolves.toEqual([]);
-    expect(queries).toEqual([]);
-  });
-
-  /** @scenario "An organization's traces are read per day from the rollup in one query" */
-  it("sums the memory twin's buckets per UTC day of the listed projects", async () => {
-    const memory = MemoryTraceUsageCountRepository.create();
-    const day = Date.UTC(2026, 10, 19);
-    const bucket = { traceCount: 1, errorCount: 0, cost: 0.25 };
-    memory.recordBucket({ ...bucket, tenantId: "project-1", bucketStartMs: day + 60_000 });
-    const failed = { ...bucket, errorCount: 1 };
-    memory.recordBucket({ ...failed, tenantId: "project-2", bucketStartMs: day + 120_000 });
-    memory.recordBucket({ ...bucket, tenantId: "project-9", bucketStartMs: day + 60_000 });
-
-    await expect(memory.findTraceUsageByDay(input)).resolves.toEqual([
-      {
-        day: "2026-11-19",
-        traceCount: 2,
-        errorCount: 1,
-        totalCost: 0.5,
-        lastTraceAt: day + 120_000,
-        lastFailedTraceAt: day + 120_000,
-      },
-    ]);
   });
 });

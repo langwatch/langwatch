@@ -20872,7 +20872,7 @@
     {
       "name": "NurturingProjectTraceDay",
       "tableName": "NurturingProjectTraceDay",
-      "documentation": "Nurturing's own trace counts: a peer fold over trace's span_received (ARCHITECTURE §9), a root\nspan being one trace, one row per project and UTC day of append time. Kept 30 days.",
+      "documentation": "Nurturing's own trace counts from trace's span_received (ARCHITECTURE §9), a root span being\none trace, one row per project and UTC day of append time, incremented in place (a redelivery\nmay count twice). Kept 30 days.",
       "primaryKey": [
         "projectId",
         "day"
@@ -20894,80 +20894,43 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": false,
-          "documentation": "UTC `YYYY-MM-DD` of the spans' append time."
+          "documentation": "UTC `YYYY-MM-DD` of the root spans' append time."
         },
         {
-          "name": "folded",
-          "columnName": "folded",
-          "type": "Json",
-          "kind": "scalar",
-          "isList": false,
-          "isOptional": false,
-          "documentation": "The day's counts as the fold folded them (NurturingTraceDayState)."
-        },
-        {
-          "name": "appliedEventIds",
-          "columnName": "appliedEventIds",
-          "type": "String",
-          "kind": "scalar",
-          "isList": true,
-          "isOptional": false,
-          "documentation": "The event ids of the last delivery folded in, so a redelivery folds once."
-        },
-        {
-          "name": "projectionVersion",
-          "columnName": "projectionVersion",
-          "type": "String",
-          "kind": "scalar",
-          "isList": false,
-          "isOptional": false,
-          "documentation": "A row of another version is left out of every read."
-        },
-        {
-          "name": "updatedAt",
-          "columnName": "updatedAt",
-          "type": "DateTime",
-          "kind": "scalar",
-          "isList": false,
-          "isOptional": false,
-          "documentation": "Event-derived, so a replayed row equals the row it rebuilds."
-        }
-      ]
-    },
-    {
-      "name": "NurturingProjectTraceSeed",
-      "tableName": "NurturingProjectTraceSeed",
-      "documentation": "Nurturing's seed of a project's trace days from trace's rollup, taken once: the days before the\nfold's first trace, summed with the fold's rows. The row marks the project seeded.",
-      "primaryKey": [
-        "projectId"
-      ],
-      "fields": [
-        {
-          "name": "projectId",
-          "columnName": "projectId",
-          "type": "String",
+          "name": "traceCount",
+          "columnName": "traceCount",
+          "type": "Int",
           "kind": "scalar",
           "isList": false,
           "isOptional": false,
           "documentation": ""
         },
         {
-          "name": "days",
-          "columnName": "days",
-          "type": "Json",
+          "name": "errorCount",
+          "columnName": "errorCount",
+          "type": "Int",
           "kind": "scalar",
           "isList": false,
           "isOptional": false,
-          "documentation": "The rollup's days before the cutoff (NurturingTraceDayState[])."
+          "documentation": "Root spans with an error status."
         },
         {
-          "name": "seededAt",
-          "columnName": "seededAt",
+          "name": "lastTraceAt",
+          "columnName": "lastTraceAt",
           "type": "DateTime",
           "kind": "scalar",
           "isList": false,
-          "isOptional": false,
-          "documentation": ""
+          "isOptional": true,
+          "documentation": "Append time of the newest root span."
+        },
+        {
+          "name": "lastFailedTraceAt",
+          "columnName": "lastFailedTraceAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Append time of the newest erroring root span."
         }
       ]
     },

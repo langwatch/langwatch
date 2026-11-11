@@ -1955,15 +1955,10 @@ export interface LwqlPrismaRows {
   readonly NurturingProjectTraceDay: {
     readonly projectId: "String";
     readonly day: "String";
-    readonly folded: "Json";
-    readonly appliedEventIds: "String[]";
-    readonly projectionVersion: "String";
-    readonly updatedAt: "DateTime";
-  };
-  readonly NurturingProjectTraceSeed: {
-    readonly projectId: "String";
-    readonly days: "Json";
-    readonly seededAt: "DateTime";
+    readonly traceCount: "Int";
+    readonly errorCount: "Int";
+    readonly lastTraceAt: "DateTime?";
+    readonly lastFailedTraceAt: "DateTime?";
   };
   readonly BillingMeterCheckpoint: {
     readonly id: "String";

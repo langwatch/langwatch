@@ -44,52 +44,44 @@ scenario and simulation-run events (a peer fold re-folds from one owner's log, s
 one fold per owner pipeline) into `NurturingProjectUsageView`, one row per project
 and owner. Evaluations only mark active days, so a throttled subscriber on
 `lw.evaluation.lifecycle_completed` adds at most one day per project a day to an
-`evaluation` row. A fifth folds trace's `lw.obs.trace.span_received` into
-`NurturingProjectTraceDay`, one row per project and UTC day of append time: a root
-span is one trace and a root span with an error status one failed trace, as
-`trace_analytics_rollup` counts them. It parses only the span's parent id and
-status, never its body, and its enqueue filter queues root spans only, so a trace
-is one fold job and one row write. Rows older than the 30-day window are deleted when the
-organization syncs.
+`evaluation` row. Traces are not folded: a peer subscriber on trace's
+`lw.obs.trace.span_received` counts them in Postgres, as Drew asked ("postgres
+native incrementer projection"). A root span is one trace and a root span with
+an error status one failed trace, as `trace_analytics_rollup` counts them. It
+parses only the span's parent id and status, never its body, and its enqueue
+filter queues root spans only. Its jobs are grouped by project and UTC day of
+append time and coalesced up to 500 per batch, so each batch is one upsert on
+`NurturingProjectTraceDay` (one row per project and day, native counts) adding
+its counts and keeping the newest times. The increment is not idempotent: a
+redelivered batch, or a retry after the write committed, counts its traces
+again. That is accepted: the counts steer emails, and exact dedupe would cost
+one stored row per trace. Rows older than the 30-day window are deleted when
+the organization syncs.
 
-The fold counts from its deploy, so each project is seeded once, on its
-organization's first sync, from trace's rollup through
-`TraceApi.findTraceUsageByDay({ untilMs })`: the window's minutes before the
-minute its first folded trace was appended (or up to now when the fold has not
-seen it), kept in `NurturingProjectTraceSeed`, whose row marks the project seeded.
-The seed and the fold are summed; the cut-off makes them disjoint, except at
-these known edges:
+The count starts at its deploy: nurturing reads no trace data, so an
+organization's trace counts start at zero then, not from its history. The trace
+rows are written by a subscriber, which is never replayed, so they are not
+rebuilt by a projection replay: rows lost or wrong stay so (until they age out
+of the 30 days), and there is no way to backfill them from trace's event log.
 
-- Cut-off "now": a project the fold has not seen yet is seeded up to now, so a
-  trace already in the rollup but still queued for the fold counts twice.
-- The seed buckets a trace by its span time (the rollup's minute) and the fold by
-  its append time, so a trace whose span starts before the cut-off minute but is
-  appended after it falls in both.
-- A trace in flight across the cut-off minute: its spans can land on both sides.
+A projection version bump of the four folds needs a data migration or replay
+first: the folds have no re-fold path, so a row of another version makes them
+throw.
 
-`traceDays` must not be replayed after seeding unless `NurturingProjectTraceSeed`
-is truncated first: a replay re-folds traces the seed already counted, and would
-double count them. A projection version bump has the same constraint, and needs a
-data migration or replay first: the folds have no re-fold path, so a row of
-another version makes them throw.
-
-These folds are keyed across many owner aggregates (a project, a project's day),
-so they set `refoldOnOutOfOrder: false`: the executor's out-of-order re-fold loads
-one aggregate's log and would rebuild the whole row from that aggregate alone.
+These folds are keyed across many owner aggregates (a project), so they set
+`refoldOnOutOfOrder: false`: the executor's out-of-order re-fold loads one
+aggregate's log and would rebuild the whole row from that aggregate alone.
 Their applies are sets, sums and maxima, so folding an older event on as it comes
 is exact. A redelivery is a no-op through the row's applied event ids.
 
-A span carries no price, so `total_cost` is read from trace's rollup through
-`TraceApi.findTraceUsageByDay` at most once per organization and UTC day (a Redis
-claim); every other trait comes from nurturing's own rows. Nurturing therefore
-still depends on `TraceApi` (no cycle: no module depends on nurturing).
+A span carries no price, so `total_cost` is not sent: nurturing reads no trace
+data, and every count comes from nurturing's own rows.
 
 Each change sums the organization's projects, listed through the owners' shares,
 and sends one group call; trace's `lw.trace.trace_received`, throttled per
 organization to once per 15 minutes, starts the sync after traces. The daily pull
 from the owners' Apis (#9382 before this change) is the thing still refused:
-"We're event driven so we don't do that." The cost read is not that pull: an owner
-fact starts it, never a schedule.
+"We're event driven so we don't do that."
 
 ## Public surfaces and transports
 

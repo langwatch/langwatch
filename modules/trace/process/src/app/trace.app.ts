@@ -149,7 +149,6 @@ import {
   type TraceModelSpendWindow,
   type TraceSpendSummary,
   type TraceUsageCount,
-  type TraceUsageDay,
   type EvaluationTraceEvent,
   type EvaluationTraceSpan,
   type TracesForProjectResult,
@@ -3162,15 +3161,6 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   countTracesInLastDay(input: { projectId: string }): Promise<number> {
     return this.#usageCountRead().countTracesInLastDay({ tenantId: input.projectId });
-  }
-
-  findTraceUsageByDay(input: {
-    organizationId: string;
-    projectIds: readonly string[];
-    sinceMs: number;
-    untilMs?: number;
-  }): Promise<TraceUsageDay[]> {
-    return this.#usageCountRead().findTraceUsageByDay(input);
   }
 
   hasTraceWithAttribute(input: {

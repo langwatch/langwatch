@@ -1,36 +1,28 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { TraceUsageDay } from "@langwatch/trace-contract";
-import { z } from "zod";
 
 /**
  * One project's traces on one UTC day of append time, as nurturing counts them from trace's
  * span_received facts: a trace is its root span, as trace's own rollup counts it.
  */
-export const nurturingTraceDayStateSchema = z.object({
-  projectId: z.string(),
-  /** UTC `YYYY-MM-DD` of the spans' append time. */
-  day: z.string(),
-  traceCount: z.number(),
+export type NurturingTraceDay = Readonly<{
+  projectId: string;
+  /** UTC `YYYY-MM-DD` of the root spans' append time. */
+  day: string;
+  traceCount: number;
   /** Root spans with an error status. */
-  errorCount: z.number(),
+  errorCount: number;
   /** Append time of the newest root span, epoch ms. */
-  lastTraceAt: z.number().nullable(),
-  /** Append time of the oldest root span folded, epoch ms: where the rollup seed ends. */
-  firstTraceAt: z.number().nullable().default(null),
+  lastTraceAt: number | null;
   /** Append time of the newest erroring root span, epoch ms. */
-  lastFailedTraceAt: z.number().nullable(),
-  LastEventOccurredAt: z.number(),
-});
-export type NurturingTraceDayState = z.infer<typeof nurturingTraceDayStateSchema>;
+  lastFailedTraceAt: number | null;
+}>;
 
-/** A span as the fold counts it: never its body, only whether it is a root and failed. */
+/** A root span as nurturing counts it: its project, day and status; never its body. */
 export type NurturingTraceSpan = Readonly<{
   projectId: string;
   day: string;
-  isRoot: boolean;
   isError: boolean;
   appendedAt: number;
-  occurredAt: number;
 }>;
 
 /** An organization's traces within the window, summed over its projects' days. */
@@ -43,46 +35,47 @@ export type NurturingTraceCounts = Readonly<{
   activeDays: readonly string[];
 }>;
 
-export function emptyTraceDay(): NurturingTraceDayState {
+export function emptyTraceDay(): NurturingTraceDay {
   return {
     projectId: "",
     day: "",
     traceCount: 0,
     errorCount: 0,
     lastTraceAt: null,
-    firstTraceAt: null,
     lastFailedTraceAt: null,
-    LastEventOccurredAt: 0,
   };
 }
 
 const latest = (known: number | null, at: number) => Math.max(known ?? at, at);
 
 /**
- * Adds one span to its project's day: a root span is one trace, a failed root one failed trace;
- * any other span changes no count. Sums and maxima only, so the order spans arrive in is moot.
+ * Adds one trace to its project's day: one more trace, one more failed trace when it errored,
+ * and the newest times. Sums and maxima only, so the order traces arrive in is moot.
  */
-export function foldTraceDay(
-  state: NurturingTraceDayState,
-  span: NurturingTraceSpan,
-): NurturingTraceDayState {
-  const base = {
-    ...state,
+export function addTrace(day: NurturingTraceDay, span: NurturingTraceSpan): NurturingTraceDay {
+  return {
     projectId: span.projectId,
     day: span.day,
-    LastEventOccurredAt: Math.max(state.LastEventOccurredAt, span.occurredAt),
+    traceCount: day.traceCount + 1,
+    lastTraceAt: latest(day.lastTraceAt, span.appendedAt),
+    errorCount: day.errorCount + (span.isError ? 1 : 0),
+    lastFailedTraceAt: span.isError
+      ? latest(day.lastFailedTraceAt, span.appendedAt)
+      : day.lastFailedTraceAt,
   };
-  if (!span.isRoot) return base;
-  return {
-    ...base,
-    traceCount: state.traceCount + 1,
-    lastTraceAt: latest(state.lastTraceAt, span.appendedAt),
-    firstTraceAt: Math.min(state.firstTraceAt ?? span.appendedAt, span.appendedAt),
-    ...(span.isError && {
-      errorCount: state.errorCount + 1,
-      lastFailedTraceAt: latest(state.lastFailedTraceAt, span.appendedAt),
-    }),
-  };
+}
+
+/**
+ * A batch of root spans as the increments of their project's days: one per project and day, so
+ * the repository writes each day once with its counts added.
+ */
+export function traceDayIncrementsOf(spans: readonly NurturingTraceSpan[]): NurturingTraceDay[] {
+  const days = new Map<string, NurturingTraceDay>();
+  for (const span of spans) {
+    const key = JSON.stringify([span.projectId, span.day]);
+    days.set(key, addTrace(days.get(key) ?? emptyTraceDay(), span));
+  }
+  return [...days.values()];
 }
 
 /** The days after `windowStartDay`, summed into the organization's trace counts. */
@@ -90,7 +83,7 @@ export function traceCountsOf({
   days,
   windowStartDay,
 }: Readonly<{
-  days: readonly NurturingTraceDayState[];
+  days: readonly NurturingTraceDay[];
   windowStartDay: string;
 }>): NurturingTraceCounts {
   const inWindow = days.filter((day) => day.day > windowStartDay && day.traceCount > 0);
@@ -102,49 +95,4 @@ export function traceCountsOf({
     lastFailedTraceAt: latestOf(inWindow.flatMap((day) => day.lastFailedTraceAt ?? [])),
     activeDays: [...new Set(inWindow.map((day) => day.day))].toSorted(),
   };
-}
-
-/** The fold's key: one row per project and UTC day. */
-export function traceDayKey({
-  projectId,
-  day,
-}: Readonly<{ projectId: string; day: string }>): string {
-  return `${projectId}:${day}`;
-}
-
-/** The project and day a fold key names; the day, `YYYY-MM-DD`, never holds a colon. */
-export function traceDayOfKey(key: string): Readonly<{ projectId: string; day: string }> {
-  const split = key.lastIndexOf(":");
-  return { projectId: key.slice(0, split), day: key.slice(split + 1) };
-}
-
-const MINUTE_MS = 60_000;
-
-/**
- * Where a project's seed from trace's rollup ends: the minute its first folded trace was appended
- * in, so the rollup's minutes before it are the traces the fold never saw, and the fold counts
- * every one after. A project the fold has not seen yet is seeded up to `now`.
- */
-export function seedCutoffOf({
-  folded,
-  now,
-}: Readonly<{ folded: readonly NurturingTraceDayState[]; now: number }>): number {
-  const first = Math.min(...folded.flatMap((day) => day.firstTraceAt ?? []), now);
-  return first - (first % MINUTE_MS);
-}
-
-/** trace's rollup days of one project, as seed rows summed with the fold's own. */
-export function seedDaysOf({
-  projectId,
-  days,
-}: Readonly<{ projectId: string; days: readonly TraceUsageDay[] }>): NurturingTraceDayState[] {
-  return days.map((day) => ({
-    ...emptyTraceDay(),
-    projectId,
-    day: day.day,
-    traceCount: day.traceCount,
-    errorCount: day.errorCount,
-    lastTraceAt: day.traceCount > 0 ? day.lastTraceAt : null,
-    lastFailedTraceAt: day.lastFailedTraceAt,
-  }));
 }

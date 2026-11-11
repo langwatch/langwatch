@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Every owner tells nurturing through a subscriber on its own pipeline (§9); nurturing names no peer.
 
-Peers call these through the token, declared at `../contract/src/nurturing-types.ts:248`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/nurturing-types.ts:246`; nothing else in this package is public.
 
 #### `recordSignal`
 
@@ -40,17 +40,17 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `nurturing_project_usage` (aggregate `nurturing_project_usage_view`)
 
-Declared at `src/eventing/nurturing-project-usage.pipeline.ts:308`.
+Declared at `src/eventing/nurturing-project-usage.pipeline.ts:309`.
 
 | Kind                 | Name                                                              | Handles                                                                                         | Declared at                                            |
 | -------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| peer subscriber      | `traceUsageSync`                                                  | `lw.trace.trace_received` from [trace](../../../../modules/trace/README.md)                     | `src/eventing/nurturing-project-usage.pipeline.ts:332` |
-| peer subscriber      | `evaluationActiveDay`                                             | `lw.evaluation.lifecycle_completed` from [evaluation](../../../../modules/evaluation/README.md) | `src/eventing/nurturing-project-usage.pipeline.ts:339` |
-| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "prompt", store })`     | –                                                                                               | `src/eventing/nurturing-project-usage.pipeline.ts:313` |
-| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "evaluator", store })`  | –                                                                                               | `src/eventing/nurturing-project-usage.pipeline.ts:317` |
-| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "scenario", store })`   | –                                                                                               | `src/eventing/nurturing-project-usage.pipeline.ts:321` |
-| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "simulation", store })` | –                                                                                               | `src/eventing/nurturing-project-usage.pipeline.ts:325` |
-| peer fold projection | `≈ nurturingTraceDayPeerFold(traceDays)`                          | –                                                                                               | `src/eventing/nurturing-project-usage.pipeline.ts:329` |
+| peer subscriber      | `traceDayCount`                                                   | `lw.obs.trace.span_received` from [trace](../../../../modules/trace/README.md)                  | `src/eventing/nurturing-project-usage.pipeline.ts:330` |
+| peer subscriber      | `traceUsageSync`                                                  | `lw.trace.trace_received` from [trace](../../../../modules/trace/README.md)                     | `src/eventing/nurturing-project-usage.pipeline.ts:333` |
+| peer subscriber      | `evaluationActiveDay`                                             | `lw.evaluation.lifecycle_completed` from [evaluation](../../../../modules/evaluation/README.md) | `src/eventing/nurturing-project-usage.pipeline.ts:340` |
+| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "prompt", store })`     | –                                                                                               | `src/eventing/nurturing-project-usage.pipeline.ts:314` |
+| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "evaluator", store })`  | –                                                                                               | `src/eventing/nurturing-project-usage.pipeline.ts:318` |
+| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "scenario", store })`   | –                                                                                               | `src/eventing/nurturing-project-usage.pipeline.ts:322` |
+| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "simulation", store })` | –                                                                                               | `src/eventing/nurturing-project-usage.pipeline.ts:326` |
 
 ### Pipeline `nurturing` (aggregate `nurturing_signal`)
 
@@ -100,7 +100,7 @@ Declared at `src/eventing/nurturing.pipeline.ts:283`. Events: `nurturingSignalRe
 
 | Kind   | Leaf                | Environment variable   | Declared at                              |
 | ------ | ------------------- | ---------------------- | ---------------------------------------- |
-| secret | `–`                 | `CUSTOMER_IO_API_KEY`  | `src/app/nurturing.app.ts:43`            |
+| secret | `–`                 | `CUSTOMER_IO_API_KEY`  | `src/app/nurturing.app.ts:37`            |
 | config | `customerIoRegion`  | `CUSTOMER_IO_REGION`   | `../contract/src/nurturing.config.ts:8`  |
 | config | `customerIoBaseUrl` | `CUSTOMER_IO_BASE_URL` | `../contract/src/nurturing.config.ts:10` |
 | config | `posthogKey`        | `POSTHOG_KEY`          | `../contract/src/nurturing.config.ts:11` |
