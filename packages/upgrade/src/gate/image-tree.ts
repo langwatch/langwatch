@@ -3,7 +3,11 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadReleaseBaseline, type ReleaseBaseline } from "../manifest/baseline.ts";
-import { ManifestLoadError, type ManifestStep, type ReleaseManifest } from "../manifest/manifest.ts";
+import {
+  ManifestLoadError,
+  type ManifestStep,
+  type ReleaseManifest,
+} from "../manifest/manifest.ts";
 import {
   gooseStepId,
   isPrismaMigrationFolder,
@@ -202,7 +206,7 @@ export function stampTreeRelease({
  * Refuses a tree where two files map to one step id (two goose files with the same numeric
  * prefix): the ledger registers ids in a single upsert, which Postgres rejects on a repeated id.
  */
-function assertUniqueStepIds({ tree }: { tree: ReleaseTreeSteps }): void {
+export function assertUniqueStepIds({ tree }: { tree: ReleaseTreeSteps }): void {
   const filesById = new Map<string, string[]>();
   for (const file of tree.gooseFiles) {
     const id = gooseStepId({ file });
@@ -212,7 +216,7 @@ function assertUniqueStepIds({ tree }: { tree: ReleaseTreeSteps }): void {
     if (files.length > 1) {
       throw new ManifestLoadError({
         code: "duplicate_step",
-        message: `two migrations share step id ${id}: ${files.join(", ")}; renumber one`,
+        message: `two migrations share step id ${id}: ${files.join(", ")}; renumber the one that has not been applied yet`,
       });
     }
   }
@@ -226,7 +230,6 @@ export function imageSteps({
   release: string;
   tree?: ReleaseTreeSteps;
 }) {
-  assertUniqueStepIds({ tree });
   return stampRelease({
     release,
     previous: null,

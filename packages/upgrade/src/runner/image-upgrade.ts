@@ -24,6 +24,7 @@ import { nowInstant } from "@langwatch/time";
 
 import { TASKS_APP_DIRECTORY } from "../gate/first-install-upgrade.ts";
 import {
+  assertUniqueStepIds,
   IMAGE_MIGRATION_DIRECTORIES,
   imagePrismaFolders,
   imageRelease,
@@ -536,8 +537,10 @@ export async function withImageUpgradeRunner<Result>({
   inputs: ImageUpgradeInputs;
   use: (composed: ImageUpgradeRunner) => Promise<Result>;
 }): Promise<Result> {
-  const releases = loadReleases();
+  // Before loadReleases so a shared prefix is named with its files, not a manifest parse error.
   const tree = readImageTree({ codeSteps: inputs.steps.map(codeStepOf) });
+  assertUniqueStepIds({ tree });
+  const releases = loadReleases();
   const release = imageRelease({ manifests: releases.manifests, tree });
   const { targets } = clickhouseTargets(inputs);
   const sharedUrl = targets.find((target) => target.name === "shared")?.url;

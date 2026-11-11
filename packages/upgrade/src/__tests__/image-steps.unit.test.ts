@@ -4,8 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { ManifestLoadError } from "../manifest/manifest.ts";
-import { imageSteps } from "../gate/image-tree.ts";
+import { assertUniqueStepIds, imageSteps } from "../gate/image-tree.ts";
 
 describe("imageSteps", () => {
   describe("given a tree of one Prisma folder and one goose file", () => {
@@ -27,20 +26,22 @@ describe("imageSteps", () => {
   });
 
   describe("given two goose files sharing a numeric prefix", () => {
-    it("refuses, naming the shared id and both files, before any step reaches the ledger", () => {
-      const build = () =>
-        imageSteps({
-          release: "3.22.0",
-          tree: {
-            prismaFolders: [],
-            gooseFiles: ["00125_a.sql", "00125_b.sql"],
-            codeSteps: [],
-          },
-        });
-      expect(build).toThrow(ManifestLoadError);
-      expect(build).toThrow(
-        "two migrations share step id clickhouse:00125: 00125_a.sql, 00125_b.sql; renumber one",
+    const tree = {
+      prismaFolders: [],
+      gooseFiles: ["00125_a.sql", "00125_b.sql"],
+      codeSteps: [],
+    };
+
+    /** @scenario "Two goose files sharing a numeric prefix are refused before the upgrade registers steps" */
+    it("refuses with duplicate_step before any step reaches the ledger", () => {
+      expect(() => assertUniqueStepIds({ tree })).toThrow(
+        expect.objectContaining({ code: "duplicate_step" }),
       );
+    });
+
+    /** @scenario "Listing the image steps of a tree with a shared prefix does not throw" */
+    it("still lists the steps, so the boot path stays up", () => {
+      expect(() => imageSteps({ release: "3.22.0", tree })).not.toThrow();
     });
   });
 
