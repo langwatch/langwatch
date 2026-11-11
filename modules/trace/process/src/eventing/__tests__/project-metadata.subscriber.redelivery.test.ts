@@ -93,6 +93,7 @@ describe("given a project receiving its first real trace", () => {
         sdkFramework: "unknown",
         organizationCreatedAt: ORGANIZATION_CREATED_AT,
         onboardingVariant: "classic",
+        organizationId: "org-1",
       });
       expect(
         recordSignal.mock.calls.filter(([signal]) => signal.recorded === "firstTrace"),

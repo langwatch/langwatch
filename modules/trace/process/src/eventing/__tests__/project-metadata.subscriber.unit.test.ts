@@ -248,7 +248,37 @@ describe("createProjectMetadataHandler()", () => {
         projectId: tenantId,
         sdkLanguage: "python",
         sdkFramework: "openai",
+        organizationId: "org-1",
       });
+    });
+
+    /** @scenario "A project's first trace's fact names the admin's organization" */
+    it("names the admin's organization on the first-trace record", async () => {
+      const subscriber = createProjectMetadataHandler(deps);
+
+      await subscriber(createEvent(tenantId), createContext(tenantId, createFoldState()));
+
+      expect(mockRecordSignal).toHaveBeenCalledWith(
+        expect.objectContaining({ recorded: "firstTrace", organizationId: "org-1" }),
+      );
+    });
+
+    /** @scenario "A project's first trace's fact names the admin's organization" */
+    it("records the first trace with no organization when the lookup names none", async () => {
+      mockProjects.resolveOrgAdmin.mockResolvedValue({
+        userId: "admin-user-1",
+        organizationId: null,
+        firstMessage: false,
+      });
+      const subscriber = createProjectMetadataHandler(deps);
+
+      await subscriber(createEvent(tenantId), createContext(tenantId, createFoldState()));
+
+      const [firstTrace] = mockRecordSignal.mock.calls
+        .map(([milestone]) => milestone)
+        .filter((milestone) => milestone.recorded === "firstTrace");
+      expect(firstTrace).toBeDefined();
+      expect(firstTrace).not.toHaveProperty("organizationId");
     });
 
     /** @scenario Recording never fails the trace that caused it */

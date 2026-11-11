@@ -76,7 +76,7 @@ async function trackFirstTraceIntegrated({
   attrs: Record<string, string>;
   admin: OrgAdminResolution;
 }): Promise<void> {
-  const { userId, organizationCreatedAt, onboardingVariant } = admin;
+  const { userId, organizationId, organizationCreatedAt, onboardingVariant } = admin;
   if (!userId) return;
 
   try {
@@ -89,6 +89,7 @@ async function trackFirstTraceIntegrated({
       occurredAt: source.occurredAt,
       organizationCreatedAt: organizationCreatedAt?.epochMilliseconds,
       onboardingVariant,
+      ...(organizationId && { organizationId }),
     });
   } catch (error) {
     logger.error({ tenantId, error }, "Failed to record the first trace (non-fatal)");

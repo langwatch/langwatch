@@ -1,3 +1,4 @@
+import type { CioBatchCall } from "@langwatch/enterprise-nurturing-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
@@ -29,6 +30,7 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingOrganizationCreatedRepository } from "../../repositories/memory/memory.nurturing-organization-created.repository.ts";
 import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
 import { MemoryNurturingProjectPlacementRepository } from "../../repositories/memory/memory.nurturing-project-placement.repository.ts";
@@ -40,6 +42,7 @@ import {
   TRACE_COUNTING_WINDOW_MS,
   UNCOPIED_PROJECT_RETRY_WINDOW_MS,
 } from "../../rules/nurturing-project-usage.rules.ts";
+import { NurturingOrganizationUsageService } from "../../services/nurturing-organization-usage.service.ts";
 import { NurturingUncopiedProjectsService } from "../../services/nurturing-uncopied-projects.service.ts";
 import {
   evaluationDayKeyOf,
@@ -354,6 +357,67 @@ describe("the trace syncs", () => {
     await firstTrace.handle(firstTrace.data.parse(firstTraceData), context);
 
     expect(synced).toEqual(["project-1"]);
+  });
+
+  /** @scenario "Traces sync an organization at most once per 15 minutes" */
+  it("syncs an organization once for three projects' first traces inside one window", async () => {
+    const projectIds = ["project-1", "project-2", "project-3"];
+    const members = MemoryNurturingOrganizationMemberRepository.create();
+    await members.recordMembershipChange({
+      organizationId: "org-1",
+      userId: "member-1",
+      change: "joined",
+      at: OCCURRED_AT,
+    });
+    const milestones = MemoryNurturingMilestonesRepository.create();
+    await milestones.recordOrganization({
+      organizationId: "org-1",
+      adminUserId: "admin-1",
+      seeded: false,
+    });
+    const sent: CioBatchCall[] = [];
+    const usage = NurturingOrganizationUsageService.create({
+      projectUsage: MemoryNurturingProjectUsageRepository.create(),
+      traceDays: MemoryNurturingTraceDayRepository.create(),
+      placements: MemoryNurturingProjectPlacementRepository.create({
+        placed: new Map(projectIds.map((projectId) => [projectId, "org-1"])),
+      }),
+      organizationsCreated: MemoryNurturingOrganizationCreatedRepository.create({
+        createdAt: new Map([["org-1", OCCURRED_AT]]),
+      }),
+      milestones,
+      members,
+      sendBatch: async (calls) => {
+        sent.push(...calls);
+      },
+      clock: { nowMs: () => OCCURRED_AT + 60_000 },
+    });
+    const { firstTrace } = nurturingTraceUsageSyncSubscribers((input) =>
+      usage.tracesChanged(input),
+    );
+    const dedup = firstTrace.options?.deduplication;
+    if (!dedup || dedup === "aggregate") throw new Error("the first-trace sync throttles on a key");
+    if (!firstTrace.handle) throw new Error("the first-trace sync handles one fact at a time");
+    const firstTraces: Event[] = projectIds.map((projectId) => ({
+      ...envelope(FIRST_TRACE_RECORDED_EVENT_TYPE),
+      id: `first-trace-${projectId}`,
+      aggregateId: projectId,
+      tenantId: createTenantId(projectId),
+      type: FIRST_TRACE_RECORDED_EVENT_TYPE,
+      data: { ...firstTraceData, tenantId: projectId, projectId, organizationId: "org-1" },
+    }));
+
+    // The queue keeps one job per dedup id inside the window, its latest send.
+    const jobs = new Map(firstTraces.map((event) => [dedup.makeId(event), event]));
+    for (const job of jobs.values()) {
+      await firstTrace.handle(firstTrace.data.parse(job.data), context);
+    }
+
+    expect(jobs.size).toBe(1);
+    expect(sent.map(({ type, userId }) => [type, userId])).toEqual([
+      ["group", "admin-1"],
+      ["identify", "member-1"],
+    ]);
   });
 
   /** @scenario "A project's first trace syncs its organization too" */

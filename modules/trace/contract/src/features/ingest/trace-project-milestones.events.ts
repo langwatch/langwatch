@@ -18,6 +18,8 @@ const firstTraceRecordedEventDataSchemaDefinition = z.object({
   organizationCreatedAt: z.number().int().nonnegative().nullish(),
   /** Which onboarding the organization went through; a string, so no new dependency. */
   onboardingVariant: z.string().nullish(),
+  /** The admin's organization, so a reader can throttle per organization; absent on older facts. */
+  organizationId: z.string().min(1).optional(),
 });
 export interface FirstTraceRecordedEventDataSchema extends Named<
   typeof firstTraceRecordedEventDataSchemaDefinition

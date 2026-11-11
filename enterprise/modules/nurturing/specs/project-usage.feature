@@ -218,6 +218,7 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   Scenario: Traces sync an organization at most once per 15 minutes
     Given traces arrive in two projects of one organization within 15 minutes
     Then they share one sync, one group call
+    And three projects' first traces in one organization share one sync, one group call and its member identifies
     And a trace fact from before facts named their organization syncs on its project instead
 
   @unit
