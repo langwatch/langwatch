@@ -1,6 +1,6 @@
 /**
  * Postgres dates read through LangWatchQL as the dates Postgres holds, against a real Postgres
- * and ClickHouse: before langwatch/tasks#958 each read as the latest date ClickHouse holds.
+ * and ClickHouse: before langwatch/tasks#958 every one of them read as a date in the year 2299.
  * @see specs/lwql/postgres-catalog.feature
  * @vitest-environment node
  */
@@ -33,6 +33,12 @@ const POSTGRES_VIEWS = LangWatchQLCatalogShapesService.create().postgresViews(LW
 
 /** A creation date with a millisecond part, before the share date the filter case uses. */
 const PROJECT_CREATED_AT = "2026-03-14 09:26:53.589";
+
+/**
+ * Where a mis-scaled read saturates: the DateTime64 maximum, 2299-12-31 before ClickHouse 26.x
+ * widened the range and 9999-12-31 from then on.
+ */
+const SATURATED_DATE = /^(2299|9999)-12-31/;
 
 const isScalarDate = (type: string) => type.includes("DateTime64") && !type.startsWith("Array");
 
@@ -120,7 +126,7 @@ describe("given every Postgres-backed view mapped into ClickHouse over seeded ro
           const values = fromClickHouse.map((row) => row.value);
           expect(values, `${view.name}.${column.name}`).toEqual(fromPostgres);
           expect(
-            values.some((value) => value.startsWith("2299")),
+            values.some((value) => SATURATED_DATE.test(value)),
             `${view.name}`,
           ).toBe(false);
           compared += values.length;
@@ -192,8 +198,7 @@ describe("given every Postgres-backed view mapped into ClickHouse over seeded ro
         tenantA,
         `SELECT toString(CreatedAt) AS value FROM ${database}.projects`,
       );
-      // 26.8 saturates the misread at its latest date; 25.10 read a date in 2299.
-      expect(broken, "the old scale did not reproduce the bug").toBe("9999-12-31 23:59:59.000");
+      expect(broken, "the old scale did not reproduce the bug").toMatch(SATURATED_DATE);
 
       await harness.applyAsAdmin(current);
       await provisionViews([projects]);

@@ -145,7 +145,7 @@ describe("when a guide plays videos", () => {
       html: page({ article: `<p>${"word ".repeat(200)}</p>${video({ poster: "/docs/d.webp" })}` }),
     });
     const fallback = /<noscript>([\s\S]*?)<\/noscript>/.exec(html)?.[1] ?? "";
-    expect(fallback).toContain("video[data-docs-poster]{display:none}");
+    expect(fallback).toContain("video[data-docs-poster]{display:none!important}");
     expect(fallback).toContain(video({ poster: "/docs/d.webp" }));
   });
 

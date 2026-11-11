@@ -95,12 +95,14 @@ function sortTopLevel(input: string): string[] {
   return parts.map((part) => part.trim()).filter((part) => part.length > 0);
 }
 
-/**
- * A `Map(...)` column, whatever its key/value types. A filtered map keeps its source's type:
- * 26.8's `mapFilter` returns its input's key and value types, LowCardinality included.
- */
+/** A `Map(...)` column, whatever its key/value types. */
 function isMapType(type: string): boolean {
   return type.startsWith("Map(");
+}
+
+/** The type a filtered map is exposed as. */
+function filteredMapType(type: string): string {
+  return type.replace(/LowCardinality\(String\)/g, "String");
 }
 
 /** How an aggregate-function state column is finalised for reading. */
@@ -225,7 +227,7 @@ function projectColumn({
           `aggregating, so its state cannot be finalised`,
       );
     }
-    const finalized = state.finalized;
+    const finalized = filteredMapType(state.finalized);
     const value = (source: (name: string) => string): string => {
       const combined = `${state.combinator}(${source(sourceColumn)})`;
       // A SimpleAggregateFunction's plain function reports its own state type in
@@ -237,15 +239,17 @@ function projectColumn({
       return {
         type: finalized,
         aggregate: true,
-        expression: (source) => contentFilteredMapSql(value(source)),
+        expression: (source) => `CAST(${contentFilteredMapSql(value(source))} AS ${finalized})`,
       };
     }
     return { type: finalized, aggregate: true, expression: value };
   }
   if (isMapType(type)) {
+    // Cast, as mapFilter keeps a LowCardinality key from 26.x and drops it before.
+    const plain = filteredMapType(type);
     return {
-      type,
-      expression: (source) => contentFilteredMapSql(source(sourceColumn)),
+      type: plain,
+      expression: (source) => `CAST(${contentFilteredMapSql(source(sourceColumn))} AS ${plain})`,
     };
   }
   return { type };

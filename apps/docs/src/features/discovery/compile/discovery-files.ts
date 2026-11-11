@@ -1,6 +1,6 @@
 import { canonicalUrl, docsUrl, publicSlug } from "../../../lib/site-path.ts";
 import { flatPages, type NavItem, type Section, sectionId } from "../../navigation/model.ts";
-import { agentCard, agentSkillsIndex, skillFile } from "./agent-discovery.ts";
+import { agentCard, agentSkillsIndex, skillFile, skillUrl } from "./agent-discovery.ts";
 import type { AgentSkill } from "./agent-discovery.ts";
 import { INDEX_LINE } from "./markdown-export.ts";
 
@@ -237,6 +237,73 @@ export function llmsSectionFiles({
   return files;
 }
 
+const DOCS_SKILL_DESCRIPTION =
+  "Use when building, testing or monitoring LLM applications and AI agents with LangWatch: tracing, agent simulations, evaluations, prompt management and the AI Gateway. Read the LangWatch documentation as Markdown before answering.";
+
+/** The docs-wide skill at /skill.md, an address agents learned from the previous docs host:
+    what LangWatch is, where the Markdown lives and which installable skills the docs publish. */
+function docsSkill({ skills }: { skills: AgentSkill[] }) {
+  const listed = skills.map(
+    (skill) => `- [${skill.name}](${skillUrl({ name: skill.name })}): ${skill.description}`,
+  );
+  return [
+    "---",
+    "name: langwatch",
+    /* Quoted: an unquoted ": " would start a nested mapping and break the frontmatter. */
+    `description: ${JSON.stringify(DOCS_SKILL_DESCRIPTION)}`,
+    "---",
+    "",
+    "# LangWatch documentation",
+    "",
+    DIRECTORY_SUMMARY,
+    "",
+    "## Reading the docs",
+    "",
+    `- ${docsUrl({ path: "/llms.txt" })} lists every page with a one-line description, and the one file per section.`,
+    `- Every page has a Markdown twin: its address without a trailing slash, plus \`.md\` (the docs home is ${docsUrl({ path: "/index.md" })}). Or ask for the page with \`Accept: text/markdown\`.`,
+    `- ${docsUrl({ path: "/llms-full.txt" })} is the whole documentation in one file, too large to read whole.`,
+    "",
+    ...(listed.length > 0 ? ["## Installable skills", "", ...listed, ""] : []),
+    "## Reporting a problem",
+    "",
+    "If anything in these docs is wrong, confusing, or fails when you try it, ask your user for permission and run `npx langwatch report --user-approved`.",
+    "",
+  ].join("\n");
+}
+
+/* The anonymous docs MCP: the hosted MCP's /mcp/docs, which the docs distribution forwards
+   langwatch.ai/docs/mcp to. Its tools are the docs tools in mcp/typescript (registerDocsTools). */
+const DOCS_MCP_TOOLS = [
+  {
+    name: "fetch_langwatch_docs",
+    description:
+      "Fetches the LangWatch docs: the index when given no URL, then any page's Markdown.",
+  },
+  {
+    name: "fetch_scenario_docs",
+    description:
+      "Fetches the Scenario agent-testing docs: the index when given no URL, then any page's Markdown.",
+  },
+];
+
+/** The server card at /.well-known/mcp/server-card.json, where the previous docs host had one,
+    in the same flat shape it served, so readers of that card keep working. */
+function docsMcpServerCard() {
+  const name = "LangWatch Docs MCP";
+  return {
+    name,
+    description: "Read the LangWatch and Scenario documentation as Markdown",
+    version: "1.0.0",
+    /* What the server's own initialize answers (mcp/typescript create-mcp-server.ts). */
+    serverInfo: { name: "LangWatch" },
+    url: docsUrl({ path: "/mcp" }),
+    transport: "http",
+    capabilities: { tools: true },
+    authentication: "none",
+    tools: DOCS_MCP_TOOLS,
+  };
+}
+
 /** The AI crawlers robots.txt allows by name; the agent readiness budgets list the same ones. */
 export const AI_CRAWLERS = [
   "GPTBot",
@@ -297,11 +364,16 @@ export function discoveryFiles({
     const loc = `<loc>${canonicalUrl({ slug }).replaceAll("&", "&amp;")}</loc>`;
     return `<url>${loc}${date ? `<lastmod>${date}</lastmod>` : ""}</url>`;
   });
+  const directory = llmsDirectory({ nav, sizes });
   return {
     ...Object.fromEntries(skills.map((skill) => [skillFile({ name: skill.name }), skill.contents])),
     ".well-known/agent-skills/index.json": `${JSON.stringify(agentSkillsIndex({ skills }))}\n`,
     ".well-known/agent-card.json": `${JSON.stringify(agentCard({ skills, description: DIRECTORY_SUMMARY }))}\n`,
-    "llms.txt": llmsDirectory({ nav, sizes }),
+    "llms.txt": directory,
+    /* The previous docs host answered here too, and agents and link checkers kept the address. */
+    ".well-known/llms.txt": directory,
+    "skill.md": docsSkill({ skills }),
+    ".well-known/mcp/server-card.json": `${JSON.stringify(docsMcpServerCard())}\n`,
     "robots.txt": robots(),
     "indexnow.txt": `${INDEXNOW_KEY}\n`,
     "humans.txt": `Reasoning Engine B.V.\nBuilt in Amsterdam.\nSource: https://github.com/langwatch/langwatch\nDocumentation contributions: https://github.com/langwatch/langwatch/issues\n`,

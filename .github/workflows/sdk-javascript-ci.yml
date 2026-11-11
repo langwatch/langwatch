@@ -201,7 +201,7 @@ jobs:
 
     services:
       clickhouse:
-        image: clickhouse/clickhouse-server:25.10.2.65
+        image: clickhouse/clickhouse-server:26.8.34.13
         ports:
           - 8123:8123
         env:
