@@ -46,6 +46,13 @@ Feature: Voice agents: the pod that Twilio dials claims the call
     And the run keeps its call SID
 
   @unit
+  Scenario: A pending call cannot be put again with a different nonce
+    Given a pending call with a call SID
+    When a different nonce is put for the same run
+    Then the put is refused as pending
+    And the run keeps its first call's SID
+
+  @unit
   Scenario: A cancel reports the state the run was in
     Given runs that are pending, claimed with a call SID, and unknown
     When each is cancelled

@@ -33,7 +33,7 @@ export class MemoryPendingVoiceCallRepository implements PendingVoiceCallReposit
   }): Promise<PendingVoiceCallPutResult> {
     const { call, ttlSeconds } = input;
     const state = this.live(call.scenarioRunId)?.state;
-    if (state === "cancelled" || state === "claimed") {
+    if (state === "cancelled" || state === "claimed" || state === "pending") {
       return { stored: false, reason: state } as const;
     }
     this.runs.set(call.scenarioRunId, {

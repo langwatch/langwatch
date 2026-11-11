@@ -62,6 +62,21 @@ describe("MemoryPendingVoiceCallRepository", () => {
       ).resolves.toEqual({ claimed: false, reason: "unknown" });
     });
 
+    /** @scenario "A pending call cannot be put again with a different nonce" */
+    it("refuses a different nonce for the same run and keeps the first call intact", async () => {
+      const { repository } = createClock();
+      const first = freshPendingVoiceCall();
+      await repository.put({ call: first, ttlSeconds: 60 });
+
+      const second = { ...freshPendingVoiceCall(), scenarioRunId: first.scenarioRunId };
+      const put = await repository.put({ call: second, ttlSeconds: 60 });
+
+      expect(put).toEqual({ stored: false, reason: "pending" });
+      await expect(
+        repository.peek({ scenarioRunId: first.scenarioRunId, nonce: first.nonce }),
+      ).resolves.toEqual({ found: true, call: first });
+    });
+
     /** @scenario "A cancelled run is never claimed" */
     it("refuses a claim after the run is cancelled", async () => {
       const { repository } = createClock();
