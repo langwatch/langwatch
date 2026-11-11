@@ -277,6 +277,7 @@ describe("an unattended Langy turn", () => {
       });
     });
 
+    /** @scenario "An unattended turn holds its key under the run and releases it on revoke" */
     it("holds the same key for a retry whose brief changed", async () => {
       const fixture = makeFixture();
       const reworded = {

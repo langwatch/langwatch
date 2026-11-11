@@ -114,14 +114,6 @@ async function attempts(run: () => ReturnType<Service["createHeld"]>) {
   }
 }
 
-/**
- * @see modules/api-key/specs/api-key.feature
- * @scenario "A held key is written once and handed to a retry with its pending grant"
- * @scenario "A held key is never handed to another person"
- * @scenario "A held key that was revoked or has lapsed is minted over"
- * @scenario "A held key revoked before it is activated stays revoked"
- * @scenario "A released held key is minted fresh"
- */
 describe("HeldKeyMintService", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -149,6 +141,7 @@ describe("HeldKeyMintService", () => {
     expect(error).toMatchObject({ retryable: true, retryAfterMs: HELD_KEY_GRANT_RETRY_AFTER_MS });
   });
 
+  /** @scenario "A held key is written once and handed to a retry with its pending grant" */
   it("reuses the held key on a retry: one key exists, with the same id", async () => {
     const { service, rows } = createFixture({ landsAtMs: 45_000 });
     await service.createHeld({ holdKey: "run-1", key: keyInput() }).catch(() => undefined);
@@ -171,6 +164,7 @@ describe("HeldKeyMintService", () => {
     expect(again).toEqual({ ...first, created: false });
   });
 
+  /** @scenario "A held key that was revoked or has lapsed is minted over" */
   it("mints a fresh key when the held one was revoked", async () => {
     const { service, rows, repository } = createFixture({ landsAtMs: 0 });
     const first = await service.createHeld({ holdKey: "run-1", key: keyInput() });
@@ -203,6 +197,7 @@ describe("HeldKeyMintService", () => {
     expect(rows()).toHaveLength(2);
   });
 
+  /** @scenario "A held key revoked before it is activated stays revoked" */
   it("never undoes a revoke that lands before the key is activated", async () => {
     const { service, rows, memory } = createFixture({
       landsAtMs: 0,
@@ -218,6 +213,7 @@ describe("HeldKeyMintService", () => {
     expect(rows()[0]?.revokedAt).not.toBeNull();
   });
 
+  /** @scenario "A released held key is minted fresh" */
   it("mints a fresh key after the held entry is released", async () => {
     const { service } = createFixture({ landsAtMs: 0 });
     const first = await service.createHeld({ holdKey: "run-1", key: keyInput() });
@@ -228,6 +224,7 @@ describe("HeldKeyMintService", () => {
     expect(next.apiKeyId).not.toBe(first.apiKeyId);
   });
 
+  /** @scenario "A held key is never handed to another person" */
   it("never hands one user's held key to another user", async () => {
     const { service } = createFixture({ landsAtMs: 0 });
     const first = await service.createHeld({ holdKey: "run-1", key: keyInput("user-1") });

@@ -3,7 +3,6 @@
  * re-grants the same key, confirmed by what an earlier try appended. The ledger is a fake of
  * `AuthzApi` because the real adapter is private to `@langwatch/authz-process`.
  * @see modules/api-key/specs/api-key.feature
- * @scenario "A held key's grants that land after a slow fold still let the caller proceed"
  */
 import type { CreateHeldApiKeyInput } from "@langwatch/api-key-contract";
 import { AuthzGrantNotConfirmedError, type AuthzApi } from "@langwatch/authz-contract";
@@ -181,6 +180,7 @@ describe("HeldKeyMintService over a ledger that folds slower than one try", () =
     "given the role and the attach each land %i ms after their append",
     (foldMs) => {
       describe("when the outbox retries at the pace each refusal names", () => {
+        /** @scenario "A held key's grants that land after a slow fold still let the caller proceed" */
         it("confirms a retry's re-grant from the role and attach the earlier attempt landed", async () => {
           const { service, memory, ledger } = createFixture(foldMs);
 
