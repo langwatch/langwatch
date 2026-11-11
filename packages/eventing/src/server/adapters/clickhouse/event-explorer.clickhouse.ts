@@ -135,6 +135,7 @@ export class EventingClickHouseEventExplorer {
       queryParams.queryPattern = `%${trimmedQuery}%`;
     }
 
+    // UInt64 times are cast to text: unquoted 64-bit JSON integers would arrive as numbers.
     const { rows } = await this.clickhouse.query<{
       aggregateId: string;
       aggregateType: string;
@@ -149,14 +150,14 @@ export class EventingClickHouseEventExplorer {
           AggregateType AS aggregateType,
           TenantId AS tenantId,
           count() AS eventCount,
-          max(EventTimestamp) AS lastEventTime
+          toString(max(EventTimestamp)) AS lastEventTime
         FROM event_log
         WHERE 1=1
           ${timeBoundFilter}
           ${tenantFilter}
           ${aggregateFilter}
         GROUP BY AggregateId, AggregateType, TenantId
-        ORDER BY lastEventTime DESC
+        ORDER BY max(EventTimestamp) DESC
         LIMIT 50
       `,
       params: queryParams,
@@ -190,7 +191,7 @@ export class EventingClickHouseEventExplorer {
         SELECT
           EventId AS eventId,
           EventType AS eventType,
-          EventTimestamp AS eventTimestamp,
+          toString(EventTimestamp) AS eventTimestamp,
           EventPayload AS payload
         FROM event_log
         WHERE TenantId = {tenantId:String}
