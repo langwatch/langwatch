@@ -175,6 +175,8 @@ interface DatasetUpsertInput {
   columnTypes?: DatasetColumns;
   datasetRecords?: UpsertDatasetInput["datasetRecords"];
   columnRenames?: UpsertDatasetInput["columnRenames"];
+  /** Refuse `datasetRecords` above the plan's batch bound, as an append does. */
+  enforceBatchBound?: boolean;
 }
 
 export class DatasetModule implements DatasetApi {
@@ -330,6 +332,9 @@ export class DatasetModule implements DatasetApi {
    * backs up to existing row, or refuse.
    */
   async upsertDataset(input: DatasetUpsertInput & EditedBy): Promise<Dataset> {
+    if (input.enforceBatchBound && input.datasetRecords?.length) {
+      await this.#requestBounds.assertBatchSize(input.projectId, input.datasetRecords.length);
+    }
     const target = input.datasetId ?? input.slugOrId;
     if (target === undefined) {
       const created = await this.#upsertDataset(input);

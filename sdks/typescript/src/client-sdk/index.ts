@@ -24,6 +24,7 @@ export type {
   DatasetRecordResponse,
   UpsertRecordsOptions,
   UpsertRecordsResult,
+  DatasetValidationCode,
 } from "./services/datasets";
 export {
   DatasetError,

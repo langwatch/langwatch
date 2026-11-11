@@ -17,7 +17,7 @@ import pytest
 
 from langwatch.dataset.dataset_api_service import DatasetApiService
 from langwatch.dataset.dataset_facade import DatasetsFacade
-from langwatch.dataset.errors import DatasetUpsertKeyError
+from langwatch.dataset.errors import DatasetNotFoundError, DatasetUpsertKeyError
 
 pytestmark = pytest.mark.unit
 
@@ -126,7 +126,7 @@ COLUMNS = [
 
 
 class TestCreateDatasetWithRecords:
-    """create_dataset(records=...)"""
+    """create_dataset(entries=...)"""
 
     # @scenario "The SDKs create a dataset with its columns and rows in one call"
     def test_sends_columns_and_entries_in_one_request(self):
@@ -136,7 +136,7 @@ class TestCreateDatasetWithRecords:
             {"case_id": "c-2", "input": "bye", "expected_output": "goodbye"},
         ]
 
-        info = _facade(server).create_dataset("QA cases", columns=COLUMNS, records=rows)
+        info = _facade(server).create_dataset("QA cases", columns=COLUMNS, entries=rows)
 
         assert info.slug == "qa-cases"
         assert server.requests == ["POST /api/v1/dataset"]
@@ -274,6 +274,18 @@ class TestUpsertRecords:
         assert refused.value.code == "duplicate_upsert_key"
         assert server.requests == []
 
+    def test_refuses_two_equal_object_keys_written_in_another_order(self):
+        server = self._server()
+
+        with pytest.raises(DatasetUpsertKeyError) as refused:
+            _facade(server).upsert_records(
+                "qa-cases",
+                entries=[{"case_id": {"a": 1, "b": 2}}, {"case_id": {"b": 2, "a": 1}}],
+                key="case_id",
+            )
+
+        assert refused.value.code == "duplicate_upsert_key"
+
     # @scenario "Upserting by a key column refuses an entry without the key"
     def test_refuses_an_entry_without_the_key(self):
         server = self._server()
@@ -285,3 +297,35 @@ class TestUpsertRecords:
 
         assert refused.value.code == "missing_upsert_key"
         assert server.requests == []
+
+    # @scenario "Upserting more new keys than one batch carries sends one batch create per 1000 rows"
+    def test_creates_new_keys_in_batches_of_a_thousand(self):
+        server = self._server()
+        entries = [{"case_id": f"n-{index}", "input": "x"} for index in range(2500)]
+
+        result = _facade(server).upsert_records(
+            "qa-cases", entries=entries, key="case_id"
+        )
+
+        creates = [b for b in server.bodies if "entries" in b]
+        assert [len(b["entries"]) for b in creates] == [1000, 1000, 500]
+        assert len(result.created) == 2500
+
+    # @scenario "Upserting a value that differs only in its JSON type updates the row"
+    def test_updates_a_row_whose_value_changes_json_type(self):
+        server = FakeDatasetServer(rows=[{"case_id": "c-1", "input": False}])
+
+        result = _facade(server).upsert_records(
+            "qa-cases", entries=[{"case_id": "c-1", "input": 0}], key="case_id"
+        )
+
+        assert server.writes() == ["PATCH /api/v1/dataset/qa-cases/records/rec_0"]
+        assert result.unchanged == 0
+        assert server.rows[0]["entry"]["input"] == 0
+
+    # @scenario "Upserting no entries still refuses a dataset that does not exist"
+    def test_refuses_an_unknown_dataset_with_no_entries(self):
+        server = self._server()
+
+        with pytest.raises(DatasetNotFoundError):
+            _facade(server).upsert_records("missing", entries=[], key="case_id")

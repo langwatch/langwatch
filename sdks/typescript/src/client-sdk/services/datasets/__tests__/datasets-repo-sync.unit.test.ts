@@ -70,6 +70,7 @@ function serveDataset(entries: Record<string, unknown>[]) {
     http.post(recordsPath, async ({ request }) => {
       const body = (await request.json()) as { entries: Record<string, unknown>[] };
       state.requests.push(`POST /api/v1/dataset/${DATASET.slug}/records`);
+      state.bodies.push(body);
       const created = body.entries.map((entry) => {
         const row = { id: `rec_${state.rows.length}`, entry: { ...entry } };
         state.rows.push(row);
@@ -222,6 +223,19 @@ describe("Feature: Keeping a dataset in sync with files held in a repository", (
       expect(fake.state.requests).toEqual([]);
     });
 
+    it("refuses two equal object keys written in another order, as rows are matched", async () => {
+      const fake = serveDataset(TWO_ROWS);
+
+      await expect(
+        langwatch.datasets.upsertRecords(
+          "qa-cases",
+          [{ case_id: { a: 1, b: 2 } }, { case_id: { b: 2, a: 1 } }],
+          { key: "case_id" },
+        ),
+      ).rejects.toMatchObject({ code: "duplicate_upsert_key" });
+      expect(fake.state.requests).toEqual([]);
+    });
+
     /** @scenario "Upserting by a key column refuses an entry without the key" */
     it("refuses an entry without the key, before any request", async () => {
       const fake = serveDataset(TWO_ROWS);
@@ -230,6 +244,62 @@ describe("Feature: Keeping a dataset in sync with files held in a repository", (
         langwatch.datasets.upsertRecords("qa-cases", [{ input: "no key" }], { key: "case_id" }),
       ).rejects.toMatchObject({ code: "missing_upsert_key" });
       expect(fake.state.requests).toEqual([]);
+    });
+
+    it("refuses a key whose value would not reach the wire, before any request", async () => {
+      const fake = serveDataset(TWO_ROWS);
+
+      await expect(
+        langwatch.datasets.upsertRecords("qa-cases", [{ case_id: undefined, input: "x" }], {
+          key: "case_id",
+        }),
+      ).rejects.toMatchObject({ code: "missing_upsert_key" });
+      expect(fake.state.requests).toEqual([]);
+    });
+
+    /** @scenario "Upserting more new keys than one batch carries sends one batch create per 1000 rows" */
+    it("creates new keys in batches of a thousand", async () => {
+      const fake = serveDataset(TWO_ROWS);
+      const entries = Array.from({ length: 2500 }, (_, index) => ({ case_id: `n-${index}` }));
+
+      const result = await langwatch.datasets.upsertRecords("qa-cases", entries, {
+        key: "case_id",
+      });
+
+      const creates = fake.state.requests.filter((request) => request.startsWith("POST "));
+      expect(creates).toHaveLength(3);
+      expect(
+        fake.state.bodies.map((body) => (body as { entries: unknown[] }).entries.length),
+      ).toEqual([1000, 1000, 500]);
+      expect(result.created).toHaveLength(2500);
+    });
+
+    /** @scenario "Upserting a value that differs only in its JSON type updates the row" */
+    it("updates a row whose value changes JSON type", async () => {
+      const fake = serveDataset([{ case_id: "c-1", input: false }]);
+
+      const result = await langwatch.datasets.upsertRecords(
+        "qa-cases",
+        [{ case_id: "c-1", input: 0 }],
+        { key: "case_id" },
+      );
+
+      expect(fake.writes()).toEqual(["PATCH /api/v1/dataset/qa-cases/records/rec_0"]);
+      expect(result.unchanged).toBe(0);
+    });
+
+    /** @scenario "Upserting no entries still refuses a dataset that does not exist" */
+    it("refuses an unknown dataset even with no entries", async () => {
+      serveDataset(TWO_ROWS);
+      server.use(
+        http.get(`${ENDPOINT}/api/v1/dataset/missing/records`, () =>
+          HttpResponse.json({ error: "Not Found" }, { status: 404 }),
+        ),
+      );
+
+      await expect(
+        langwatch.datasets.upsertRecords("missing", [], { key: "case_id" }),
+      ).rejects.toMatchObject({ name: "DatasetNotFoundError" });
     });
   });
 });

@@ -39,7 +39,19 @@ const datasetRestCreateSchemaDefinition = z
     name: z.string().min(1, "name is required"),
     columnTypes: z.array(columnTypeSchema).optional().default([]),
     entries: z
-      .array(z.record(z.string(), z.any()))
+      .array(
+        z
+          .object({
+            id: z
+              .string()
+              .min(1)
+              .optional()
+              .describe(
+                "Leave it out: record ids are unique across projects, so the platform picks them.",
+              ),
+          })
+          .catchall(z.any()),
+      )
       .max(DATASET_BATCH_MAX, `Maximum batch size is ${DATASET_BATCH_MAX} entries`)
       .optional()
       .describe(

@@ -40,6 +40,7 @@ import {
   type UpsertRecordsOptions,
   type UpsertRecordsResult,
 } from "./types";
+import { keyOf, stableJson } from "./upsert-keys";
 
 type ApiColumnType = NonNullable<
   operations["postApiDataset"]["requestBody"]["content"]["application/json"]["columnTypes"]
@@ -81,20 +82,6 @@ function toApiColumnTypes(
 
 /** Rows sent per batch create by an upsert: the smallest batch any plan accepts. */
 const CREATE_BATCH_SIZE = 1000;
-
-/** A value as JSON with object keys sorted, so equal values compare equal whatever their order. */
-function stableJson(value: unknown): string {
-  return JSON.stringify(value, (_key, inner: unknown) =>
-    inner && typeof inner === "object" && !Array.isArray(inner)
-      ? Object.fromEntries(Object.entries(inner).toSorted(([a], [b]) => a.localeCompare(b)))
-      : inner,
-  );
-}
-
-/** A key column's value as a comparable string, so 1 and "1" stay different keys. */
-function keyOf(value: unknown): string {
-  return stableJson(value);
-}
 
 function sameEntry(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
   return stableJson(a) === stableJson(b);
@@ -504,9 +491,13 @@ export class DatasetService {
     { key }: UpsertRecordsOptions,
   ): Promise<UpsertRecordsResult> {
     const result: UpsertRecordsResult = { created: [], updated: [], unchanged: 0 };
-    if (entries.length === 0) return result;
+    if (entries.length === 0) {
+      // Still a read, so a mistyped slug answers DatasetNotFoundError.
+      await this.listRecords(slugOrId, { page: 1, limit: 1 });
+      return result;
+    }
 
-    const existing = new Map<string, DatasetEntry[]>();
+    const existing = new Map<string | undefined, DatasetEntry[]>();
     for (const row of (await this.getDataset(slugOrId)).entries) {
       if (!(key in row.entry)) continue;
       const rowKey = keyOf(row.entry[key]);

@@ -6,26 +6,40 @@ from typing import Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..types import UNSET, Unset
+
 T = TypeVar("T", bound="PostApiDatasetBodyEntriesItem")
 
 
 @_attrs_define
 class PostApiDatasetBodyEntriesItem:
-    """ """
+    """
+    Attributes:
+        id (str | Unset): Leave it out: record ids are unique across projects, so the platform picks them.
+    """
 
+    id: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        id = self.id
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
+        field_dict.update({})
+        if id is not UNSET:
+            field_dict["id"] = id
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        post_api_dataset_body_entries_item = cls()
+        id = d.pop("id", UNSET)
+
+        post_api_dataset_body_entries_item = cls(
+            id=id,
+        )
 
         post_api_dataset_body_entries_item.additional_properties = d
         return post_api_dataset_body_entries_item

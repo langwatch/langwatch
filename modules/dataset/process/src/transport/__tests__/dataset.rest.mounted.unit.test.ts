@@ -322,6 +322,7 @@ describe("the mounted dataset REST family", () => {
         name: "QA",
         columnTypes,
         datasetRecords: entries,
+        enforceBatchBound: true,
         editedBy: { kind: "user", id: "user-1" },
       });
       expect(stub.batchCreateRecords).not.toHaveBeenCalled();
@@ -338,7 +339,7 @@ describe("the mounted dataset REST family", () => {
       });
 
       expect(response.status).toBe(422);
-      expect(JSON.stringify(await response.json())).toContain("expected");
+      await expect(response.json()).resolves.toMatchObject({ code: "validation_error" });
       expect(stub.upsertDataset).not.toHaveBeenCalled();
     });
 

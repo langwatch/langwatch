@@ -8918,9 +8918,12 @@ export interface operations {
                         type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                     }[];
                     /** @description The dataset's first rows, written with it in one call. Each key must be a column in `columnTypes`. */
-                    entries?: {
+                    entries?: ({
+                        /** @description Leave it out: record ids are unique across projects, so the platform picks them. */
+                        id?: string;
+                    } & {
                         [key: string]: unknown;
-                    }[];
+                    })[];
                 };
             };
         };

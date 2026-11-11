@@ -204,7 +204,9 @@ export function createDatasetRest(): Readonly<{
           projectId: scope.id,
           name: input.name,
           columnTypes: input.columnTypes,
-          ...(input.entries && input.entries.length > 0 ? { datasetRecords: input.entries } : {}),
+          ...(input.entries && input.entries.length > 0
+            ? { datasetRecords: input.entries, enforceBatchBound: true }
+            : {}),
           editedBy: datasetAuthorOf({ actor }),
         });
 

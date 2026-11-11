@@ -20,6 +20,7 @@ import {
   type UpsertRecordsOptions,
   type UpsertRecordsResult,
 } from "./types";
+import { assertUpsertableKeys } from "./upsert-keys";
 
 type DatasetsFacadeConfig = {
   langwatchApiClient: LangwatchApiClient;
@@ -150,23 +151,7 @@ export class DatasetsFacade {
     if (!key) {
       throw new DatasetValidationError("key must name the column that identifies a row");
     }
-    const seen = new Set<string>();
-    for (const entry of entries) {
-      if (!(key in entry)) {
-        throw new DatasetValidationError(
-          `Every entry must hold the key column "${key}"`,
-          "missing_upsert_key",
-        );
-      }
-      const value = JSON.stringify(entry[key]);
-      if (seen.has(value)) {
-        throw new DatasetValidationError(
-          `Two entries share the key ${key} = ${value}`,
-          "duplicate_upsert_key",
-        );
-      }
-      seen.add(value);
-    }
+    assertUpsertableKeys(entries, key);
     return this.#datasetService.upsertRecords(slugOrId, entries, options);
   };
 
