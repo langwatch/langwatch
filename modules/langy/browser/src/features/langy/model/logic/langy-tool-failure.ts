@@ -172,6 +172,9 @@ const ACCESS_DENIAL_CODES = new Set([
  */
 const ACCESS_REMOVED_REASONS = new Set(["owner-ceiling", "no-membership", "membership-disabled"]);
 
+/** The denial reasons that mean the reader's seat does not include this; a grant cannot lift it. */
+const SEAT_LIMIT_REASONS = new Set(["developer-restricted", "lite-member-restricted"]);
+
 /** owner-ceiling is also a role change: it speaks of one action, never the whole project. */
 function removedAccessMessage({ reason, needed }: { reason: string; needed: string | undefined }) {
   if (reason !== "owner-ceiling") return "You no longer have access to this project.";
@@ -331,6 +334,14 @@ function describeFailure({
       return {
         message: removedAccessMessage({ reason, needed }),
         detail: "Ask whoever manages access for your team if you need it back.",
+        remediationApplies: false,
+      };
+    }
+    // The server's sentence already names the seat, so it stays; a grant cannot lift a seat limit.
+    if (typeof reason === "string" && SEAT_LIMIT_REASONS.has(reason)) {
+      return {
+        message: domain.message,
+        detail: "Ask whoever manages seats for your team if you need it.",
         remediationApplies: false,
       };
     }

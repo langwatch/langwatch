@@ -78,15 +78,17 @@ describe("presentLangyToolError", () => {
       code = "permission_denied",
       denialReason,
       permission = "scenarios:manage",
+      message = "Permission denied",
     }: {
       code?: string;
       denialReason?: string;
       permission?: string;
+      message?: string;
     }) =>
       present(
         failureDocument({
           code,
-          message: "Permission denied",
+          message,
           httpStatus: 403,
           meta: { permission, denialReason },
           isHandled: true,
@@ -127,6 +129,16 @@ describe("presentLangyToolError", () => {
       expect(denied({ denialReason: "owner-ceiling", permission: "agents:deploy" }).message).toBe(
         "This action isn't available to you any more in this project.",
       );
+    });
+
+    /** @scenario "A seat limit keeps the platform's own sentence" */
+    it.each([
+      ["developer-restricted", "This is outside your Developer seat"],
+      ["lite-member-restricted", "This feature is not available for your account"],
+    ])("keeps the server's seat sentence for %s", (denialReason, sentence) => {
+      const presentation = denied({ denialReason, message: sentence });
+      expect(presentation.message).toBe(sentence);
+      expect(presentation.detail).toBe("Ask whoever manages seats for your team if you need it.");
     });
   });
 
