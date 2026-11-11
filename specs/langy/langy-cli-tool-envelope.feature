@@ -117,7 +117,8 @@ Feature: Langy recognises its own CLI behind a shell tool call
     @unit
     Scenario: A reader who lost access is told so
       When Langy's tool call is refused because the reader's access was removed or reduced mid-conversation
-      Then the card says they can no longer do it in this project, naming the action when it is known
+      Then a removed membership says they no longer have access to this project
+      And a reduced permission says only that action is no longer available, named when it has plain words
       And it tells the reader who to ask
 
     # The sandbox's `gh` has no login when the GitHub App is not installed, and

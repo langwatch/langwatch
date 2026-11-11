@@ -77,16 +77,18 @@ describe("presentLangyToolError", () => {
     const denied = ({
       code = "permission_denied",
       denialReason,
+      permission = "scenarios:manage",
     }: {
       code?: string;
       denialReason?: string;
+      permission?: string;
     }) =>
       present(
         failureDocument({
           code,
           message: "Permission denied",
           httpStatus: 403,
-          meta: { permission: "scenarios:manage", denialReason },
+          meta: { permission, denialReason },
           isHandled: true,
         }),
       );
@@ -117,6 +119,13 @@ describe("presentLangyToolError", () => {
     it("names the one permission lost when the owner's access was reduced", () => {
       expect(denied({ denialReason: "owner-ceiling" }).message).toBe(
         "You can no longer manage scenarios in this project.",
+      );
+    });
+
+    /** @scenario "A reader who lost access is told so" */
+    it("keeps a reduced access to one action when the action has no plain words", () => {
+      expect(denied({ denialReason: "owner-ceiling", permission: "agents:deploy" }).message).toBe(
+        "This action isn't available to you any more in this project.",
       );
     });
   });

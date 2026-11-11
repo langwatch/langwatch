@@ -171,6 +171,13 @@ const ACCESS_DENIAL_CODES = new Set([
  */
 const ACCESS_REMOVED_REASONS = new Set(["owner-ceiling", "no-membership", "membership-disabled"]);
 
+/** owner-ceiling is also a role change: it speaks of one action, never the whole project. */
+function removedAccessMessage({ reason, needed }: { reason: string; needed: string | undefined }) {
+  if (reason !== "owner-ceiling") return "You no longer have access to this project.";
+  if (needed) return `You can no longer ${needed} in this project.`;
+  return "This action isn't available to you any more in this project.";
+}
+
 /**
  * The codes that mean a CLI credential was missing or refused. In the sandbox that is
  * Langy's own key: an internal failure, never the reader's to sign in to.
@@ -320,12 +327,8 @@ function describeFailure({
     const needed = humanPermission(domain.meta.permission);
     const reason = domain.meta.denialReason;
     if (typeof reason === "string" && ACCESS_REMOVED_REASONS.has(reason)) {
-      // owner-ceiling is also a role change, so it names the one permission lost.
       return {
-        message:
-          reason === "owner-ceiling" && needed
-            ? `You can no longer ${needed} in this project.`
-            : "You no longer have access to this project.",
+        message: removedAccessMessage({ reason, needed }),
         detail: "Ask whoever manages access for your team if you need it back.",
         remediationApplies: false,
       };
