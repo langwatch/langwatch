@@ -196,6 +196,13 @@ export const langyTrpcTransport: TrpcRouterDeclaration<LangyApi, typeof langyTrp
       app.getModelsAllowed({ ...input, caller: callerOf(actor, person) }),
     )
 
+    .procedure("setModelsAllowed")
+    .withMiddlewareContext(sessionPersonContext)
+    .withPermission("langy:manage")
+    .handle(({ app, input, actor }, person) =>
+      app.setModelsAllowed({ ...input, caller: callerOf(actor, person) }),
+    )
+
     .procedure("recordFeedback")
     .withMiddlewareContext(sessionPersonContext)
     .withPermission("langy:create")

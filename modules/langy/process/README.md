@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The portable, callable Langy capability shared by process transports.
 
-Peers call these through the token, declared at `../contract/src/langy.api.ts:299`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/langy.api.ts:300`; nothing else in this package is public.
 
 #### `ingestInternalTurnResult`
 
@@ -444,6 +444,12 @@ warmPanelWorker(input: LangyPanelCall<typeof langyWarmWorkerInputSchema>): Promi
 
 ```typescript
 getModelsAllowed(input: LangyPanelCall<typeof langyProjectInputSchema>): Promise<{ modelsAllowed: string[] | null }>;
+```
+
+#### `setModelsAllowed`
+
+```typescript
+setModelsAllowed(input: LangyPanelCall<typeof langySetModelsAllowedInputSchema>): Promise<{ modelsAllowed: string[] | null }>;
 ```
 
 #### `recordFeedback`
@@ -959,7 +965,7 @@ type Response = unknown;
 
 ### `langy`
 
-Contract `../contract/src/langy.trpc.ts:58`, router `src/transport/langy.trpc.ts:33`.
+Contract `../contract/src/langy.trpc.ts:59`, router `src/transport/langy.trpc.ts:33`.
 
 | Procedure                        | Kind         | Gate                      | Input                                     | Output                                |
 | -------------------------------- | ------------ | ------------------------- | ----------------------------------------- | ------------------------------------- |
@@ -986,6 +992,7 @@ Contract `../contract/src/langy.trpc.ts:58`, router `src/transport/langy.trpc.ts
 | `langy.renewLocalControlRequest` | mutation     | Permission `langy:create` | `langyPanelConversationInputSchema`       | `langyControlRequestRenewedSchema`    |
 | `langy.warmWorker`               | mutation     | Permission `langy:create` | `langyWarmWorkerInputSchema`              | `langyWarmedWorkerSchema`             |
 | `langy.modelsAllowed`            | query        | Permission `langy:view`   | `langyProjectInputSchema`                 | `langyModelsAllowedSchema`            |
+| `langy.setModelsAllowed`         | mutation     | Permission `langy:manage` | `langySetModelsAllowedInputSchema`        | `langyModelsAllowedSchema`            |
 | `langy.recordFeedback`           | mutation     | Permission `langy:create` | `langyRecordFeedbackInputSchema`          | –                                     |
 | `langy.feedbackPromptShown`      | mutation     | Permission `langy:create` | `langyFeedbackPromptShownInputSchema`     | –                                     |
 | `langy.onConversationUpdate`     | subscription | Permission `langy:view`   | `langyProjectInputSchema`                 | `langyConversationUpdateFrameSchema`  |
@@ -993,7 +1000,7 @@ Contract `../contract/src/langy.trpc.ts:58`, router `src/transport/langy.trpc.ts
 
 ```typescript
 // langy.list
-// Input: langyListInputSchema, ../contract/src/langy-trpc.schemas.ts:83
+// Input: langyListInputSchema, ../contract/src/langy-trpc.schemas.ts:97
 interface Input {
   projectId: string;
   limit?: number;
@@ -1006,7 +1013,7 @@ interface Input {
 type Output = z.infer<typeof langyConversationListPageDtoSchema>; // ../contract/src/langy.dtos.ts:131
 
 // langy.conversationEventsAfter
-// Input: langyEventsAfterInputSchema, ../contract/src/langy-trpc.schemas.ts:94
+// Input: langyEventsAfterInputSchema, ../contract/src/langy-trpc.schemas.ts:108
 interface Input {
   projectId: string;
   conversationId: string;
@@ -1018,12 +1025,12 @@ interface Input {
 type Output = z.infer<typeof langyConversationEventPageDtoSchema>; // ../contract/src/langy.dtos.ts:144
 
 // langy.detail
-// Input: langyPanelConversationInputSchema, ../contract/src/langy-trpc.schemas.ts:74
+// Input: langyPanelConversationInputSchema, ../contract/src/langy-trpc.schemas.ts:88
 interface Input {
   projectId: string;
   conversationId: string;
 }
-// Output: inline, ../contract/src/langy.trpc.ts:70
+// Output: inline, ../contract/src/langy.trpc.ts:71
 type Output = {
   id: string;
   title: string | null;
@@ -1036,18 +1043,18 @@ type Output = {
 } | null;
 
 // langy.messages
-type Input = z.infer<typeof langyPanelConversationInputSchema>; // ../contract/src/langy-trpc.schemas.ts:74
+type Input = z.infer<typeof langyPanelConversationInputSchema>; // ../contract/src/langy-trpc.schemas.ts:88
 type Output = z.infer<typeof langyConversationMessagesDtoSchema>; // ../contract/src/langy.dtos.ts:189
 
 // langy.deleteConversation
-type Input = z.infer<typeof langyPanelConversationInputSchema>; // ../contract/src/langy-trpc.schemas.ts:74
+type Input = z.infer<typeof langyPanelConversationInputSchema>; // ../contract/src/langy-trpc.schemas.ts:88
 // Output: langyConversationDeletedSchema, ../contract/src/langy.dtos.ts:198
 interface Output {
   success: boolean;
 }
 
 // langy.renameConversation
-// Input: langyRenameInputSchema, ../contract/src/langy-trpc.schemas.ts:102
+// Input: langyRenameInputSchema, ../contract/src/langy-trpc.schemas.ts:116
 interface Input {
   projectId: string;
   conversationId: string;
@@ -1066,7 +1073,7 @@ interface Output {
 }
 
 // langy.forkConversation
-// Input: langyForkInputSchema, ../contract/src/langy-trpc.schemas.ts:109
+// Input: langyForkInputSchema, ../contract/src/langy-trpc.schemas.ts:123
 interface Input {
   projectId: string;
   conversationId: string;
@@ -1074,7 +1081,7 @@ interface Input {
 type Output = z.infer<typeof langyConversationDetailSchema>; // ../contract/src/langy.dtos.ts:62
 
 // langy.createConversation
-type Input = z.infer<typeof langyPanelCreateConversationInputSchema>; // ../contract/src/langy-trpc.schemas.ts:134
+type Input = z.infer<typeof langyPanelCreateConversationInputSchema>; // ../contract/src/langy-trpc.schemas.ts:148
 // Output: langyTurnStartedSchema, ../contract/src/langy.dtos.ts:206
 interface Output {
   conversationId: string;
@@ -1082,11 +1089,11 @@ interface Output {
 }
 
 // langy.continueConversation
-type Input = z.infer<typeof langyContinueConversationInputSchema>; // ../contract/src/langy-trpc.schemas.ts:144
+type Input = z.infer<typeof langyContinueConversationInputSchema>; // ../contract/src/langy-trpc.schemas.ts:158
 type Output = z.infer<typeof langyTurnStartedSchema>; // ../contract/src/langy.dtos.ts:206
 
 // langy.stopTurn
-// Input: langyStopTurnPanelInputSchema, ../contract/src/langy-trpc.schemas.ts:155
+// Input: langyStopTurnPanelInputSchema, ../contract/src/langy-trpc.schemas.ts:169
 interface Input {
   projectId: string;
   conversationId: string;
@@ -1098,7 +1105,7 @@ interface Output {
 }
 
 // langy.claimUiAction
-// Input: langyClaimUiActionInputSchema, ../contract/src/langy-trpc.schemas.ts:166
+// Input: langyClaimUiActionInputSchema, ../contract/src/langy-trpc.schemas.ts:180
 interface Input {
   projectId: string;
   conversationId: string;
@@ -1110,7 +1117,7 @@ interface Output {
 }
 
 // langy.completeUiAction
-// Input: langyCompleteUiActionInputSchema, ../contract/src/langy-trpc.schemas.ts:180
+// Input: langyCompleteUiActionInputSchema, ../contract/src/langy-trpc.schemas.ts:194
 interface Input {
   projectId: string;
   conversationId: string;
@@ -1125,20 +1132,20 @@ interface Output {
 }
 
 // langy.answerLocalPermission
-// Input: langyAnswerLocalPermissionInputSchema, ../contract/src/langy-trpc.schemas.ts:192
+// Input: langyAnswerLocalPermissionInputSchema, ../contract/src/langy-trpc.schemas.ts:206
 interface Input {
   projectId: string;
   conversationId: string;
   waitId: string;
   decision: "allow_once" | "allow_pattern" | "deny";
 }
-// Output: langyLocalAnsweredSchema, ../contract/src/langy-trpc.schemas.ts:290
+// Output: langyLocalAnsweredSchema, ../contract/src/langy-trpc.schemas.ts:304
 interface Output {
   answered: true;
 }
 
 // langy.answerQuestion
-// Input: langyAnswerQuestionInputSchema, ../contract/src/langy-trpc.schemas.ts:213
+// Input: langyAnswerQuestionInputSchema, ../contract/src/langy-trpc.schemas.ts:227
 interface Input {
   projectId: string;
   conversationId: string;
@@ -1149,29 +1156,29 @@ interface Input {
     other?: string;
   }[];
 }
-type Output = z.infer<typeof langyLocalAnsweredSchema>; // ../contract/src/langy-trpc.schemas.ts:290
+type Output = z.infer<typeof langyLocalAnsweredSchema>; // ../contract/src/langy-trpc.schemas.ts:304
 
 // langy.setLocalPolicy
-// Input: langySetLocalPolicyInputSchema, ../contract/src/langy-trpc.schemas.ts:224
+// Input: langySetLocalPolicyInputSchema, ../contract/src/langy-trpc.schemas.ts:238
 interface Input {
   projectId: string;
   conversationId: string;
   skipPermissions: boolean;
 }
-// Output: langyLocalPolicySchema, ../contract/src/langy-trpc.schemas.ts:293
+// Output: langyLocalPolicySchema, ../contract/src/langy-trpc.schemas.ts:307
 interface Output {
   skipPermissions: boolean;
 }
 
 // langy.disconnectLocalWorkspace
-type Input = z.infer<typeof langyPanelConversationInputSchema>; // ../contract/src/langy-trpc.schemas.ts:74
-// Output: langyLocalDisconnectedSchema, ../contract/src/langy-trpc.schemas.ts:299
+type Input = z.infer<typeof langyPanelConversationInputSchema>; // ../contract/src/langy-trpc.schemas.ts:88
+// Output: langyLocalDisconnectedSchema, ../contract/src/langy-trpc.schemas.ts:313
 interface Output {
   disconnected: boolean;
 }
 
 // langy.setCodeAccessPreference
-// Input: langySetCodeAccessPreferenceInputSchema, ../contract/src/langy-trpc.schemas.ts:234
+// Input: langySetCodeAccessPreferenceInputSchema, ../contract/src/langy-trpc.schemas.ts:248
 interface Input {
   projectId: string;
   preference: "github" | null;
@@ -1182,14 +1189,14 @@ interface Output {
 }
 
 // langy.getCodeAccessPreference
-// Input: langyProjectInputSchema, ../contract/src/langy-trpc.schemas.ts:64
+// Input: langyProjectInputSchema, ../contract/src/langy-trpc.schemas.ts:78
 interface Input {
   projectId: string;
 }
 type Output = z.infer<typeof langyCodeAccessPreferenceSchema>; // ../contract/src/features/local-control/langy.local-control-http.ts:240
 
 // langy.localRecord
-type Input = z.infer<typeof langyPanelConversationInputSchema>; // ../contract/src/langy-trpc.schemas.ts:74
+type Input = z.infer<typeof langyPanelConversationInputSchema>; // ../contract/src/langy-trpc.schemas.ts:88
 // Output: langyLocalRecordSchema, ../contract/src/features/local-control/langy.local-control-http.ts:203
 interface Output {
   waits: {
@@ -1201,7 +1208,7 @@ interface Output {
 }
 
 // langy.getLocalWorkspace
-type Input = z.infer<typeof langyPanelConversationInputSchema>; // ../contract/src/langy-trpc.schemas.ts:74
+type Input = z.infer<typeof langyPanelConversationInputSchema>; // ../contract/src/langy-trpc.schemas.ts:88
 // Output: langyLocalWorkspaceStatusSchema, ../contract/src/features/local-control/langy.local-control-http.ts:230
 interface Output {
   connected: boolean;
@@ -1214,14 +1221,14 @@ interface Output {
 }
 
 // langy.renewLocalControlRequest
-type Input = z.infer<typeof langyPanelConversationInputSchema>; // ../contract/src/langy-trpc.schemas.ts:74
-// Output: langyControlRequestRenewedSchema, ../contract/src/langy-trpc.schemas.ts:305
+type Input = z.infer<typeof langyPanelConversationInputSchema>; // ../contract/src/langy-trpc.schemas.ts:88
+// Output: langyControlRequestRenewedSchema, ../contract/src/langy-trpc.schemas.ts:319
 interface Output {
   expiresAt: string;
 }
 
 // langy.warmWorker
-// Input: langyWarmWorkerInputSchema, ../contract/src/langy-trpc.schemas.ts:245
+// Input: langyWarmWorkerInputSchema, ../contract/src/langy-trpc.schemas.ts:259
 interface Input {
   projectId: string;
   conversationId?: string;
@@ -1234,14 +1241,22 @@ interface Output {
 }
 
 // langy.modelsAllowed
-type Input = z.infer<typeof langyProjectInputSchema>; // ../contract/src/langy-trpc.schemas.ts:64
+type Input = z.infer<typeof langyProjectInputSchema>; // ../contract/src/langy-trpc.schemas.ts:78
 // Output: langyModelsAllowedSchema, ../contract/src/langy.dtos.ts:245
 interface Output {
   modelsAllowed: string[] | null;
 }
 
+// langy.setModelsAllowed
+// Input: langySetModelsAllowedInputSchema, ../contract/src/langy-trpc.schemas.ts:41
+interface Input {
+  projectId: string;
+  modelsAllowed: string[];
+}
+type Output = z.infer<typeof langyModelsAllowedSchema>; // ../contract/src/langy.dtos.ts:245
+
 // langy.recordFeedback
-// Input: langyRecordFeedbackInputSchema, ../contract/src/langy-trpc.schemas.ts:262
+// Input: langyRecordFeedbackInputSchema, ../contract/src/langy-trpc.schemas.ts:276
 interface Input {
   projectId: string;
   conversationId?: string;
@@ -1254,14 +1269,14 @@ interface Input {
 }
 
 // langy.feedbackPromptShown
-// Input: langyFeedbackPromptShownInputSchema, ../contract/src/langy-trpc.schemas.ts:272
+// Input: langyFeedbackPromptShownInputSchema, ../contract/src/langy-trpc.schemas.ts:286
 interface Input {
   projectId: string;
   conversationId: string;
 }
 
 // langy.onConversationUpdate
-type Input = z.infer<typeof langyProjectInputSchema>; // ../contract/src/langy-trpc.schemas.ts:64
+type Input = z.infer<typeof langyProjectInputSchema>; // ../contract/src/langy-trpc.schemas.ts:78
 // Output: langyConversationUpdateFrameSchema, ../contract/src/langy.dtos.ts:256
 interface Output {
   event: unknown;
@@ -1269,7 +1284,7 @@ interface Output {
 }
 
 // langy.onTurnStream
-// Input: langyTurnStreamInputSchema, ../contract/src/langy-trpc.schemas.ts:283
+// Input: langyTurnStreamInputSchema, ../contract/src/langy-trpc.schemas.ts:297
 interface Input {
   projectId: string;
   conversationId: string;
@@ -1280,7 +1295,7 @@ type Output = z.infer<typeof langyStreamEntrySchema>; // ../contract/src/langy.s
 
 ### `langyEgress`
 
-Contract `../contract/src/langy.trpc.ts:192`, router `src/transport/langy.trpc.ts:228`.
+Contract `../contract/src/langy.trpc.ts:198`, router `src/transport/langy.trpc.ts:235`.
 
 | Procedure         | Kind     | Gate                      | Input                       | Output                   |
 | ----------------- | -------- | ------------------------- | --------------------------- | ------------------------ |
@@ -1289,28 +1304,28 @@ Contract `../contract/src/langy.trpc.ts:192`, router `src/transport/langy.trpc.t
 
 ```typescript
 // langyEgress.get
-// Input: langyEgressGetInputSchema, ../contract/src/langy-trpc.schemas.ts:47
+// Input: langyEgressGetInputSchema, ../contract/src/langy-trpc.schemas.ts:61
 interface Input {
   projectId: string;
 }
-// Output: langyEgressStateSchema, ../contract/src/langy-trpc.schemas.ts:39
+// Output: langyEgressStateSchema, ../contract/src/langy-trpc.schemas.ts:53
 interface Output {
   allowlist: string[];
   enforcing: boolean;
 }
 
 // langyEgress.set
-// Input: langyEgressSetInputSchema, ../contract/src/langy-trpc.schemas.ts:58
+// Input: langyEgressSetInputSchema, ../contract/src/langy-trpc.schemas.ts:72
 interface Input {
   projectId: string;
   allowlist: string[];
 }
-type Output = z.infer<typeof langyEgressStateSchema>; // ../contract/src/langy-trpc.schemas.ts:39
+type Output = z.infer<typeof langyEgressStateSchema>; // ../contract/src/langy-trpc.schemas.ts:53
 ```
 
 ### `setupSkills`
 
-Contract `../contract/src/langy.trpc.ts:208`, router `src/transport/setup-skills.trpc.ts:10`.
+Contract `../contract/src/langy.trpc.ts:214`, router `src/transport/setup-skills.trpc.ts:10`.
 
 | Procedure               | Kind  | Gate                      | Input  | Output |
 | ----------------------- | ----- | ------------------------- | ------ | ------ |
@@ -1318,12 +1333,12 @@ Contract `../contract/src/langy.trpc.ts:208`, router `src/transport/setup-skills
 
 ```typescript
 // setupSkills.getPrompt
-// Input: inline, ../contract/src/langy.trpc.ts:210
+// Input: inline, ../contract/src/langy.trpc.ts:216
 interface Input {
   projectId: string;
   skill: string;
 }
-// Output: inline, ../contract/src/langy.trpc.ts:211
+// Output: inline, ../contract/src/langy.trpc.ts:217
 interface Output {
   body: string;
 }
@@ -1361,7 +1376,7 @@ Declared at `src/eventing/langy-maintenance.pipeline.ts:30`.
 
 | Kind   | Leaf                 | Environment variable        | Declared at                          |
 | ------ | -------------------- | --------------------------- | ------------------------------------ |
-| secret | `–`                  | `LANGY_INTERNAL_SECRET`     | `src/app/langy.app.ts:294`           |
+| secret | `–`                  | `LANGY_INTERNAL_SECRET`     | `src/app/langy.app.ts:297`           |
 | config | `agentUrl`           | `LANGY_AGENT_URL`           | `../contract/src/langy.config.ts:18` |
 | config | `workerCallbackUrl`  | `LANGY_WORKER_CALLBACK_URL` | `../contract/src/langy.config.ts:19` |
 | config | `workerGatewayUrl`   | `LANGY_WORKER_GATEWAY_URL`  | `../contract/src/langy.config.ts:20` |

@@ -17,6 +17,9 @@ const tips: Record<string, readonly string[]> = {
   ],
   langy_model_not_configured: ["Pick a model in the project's model settings, then retry"],
   langy_model_not_allowed: ["Choose one of the models configured for this project and retry"],
+  langy_virtual_key_missing: [
+    "Contact support: the project's Langy key was revoked while its secret remains",
+  ],
   langy_egress_misconfigured: [
     "Ask a workspace admin to review the project's outbound network policy — Langy refuses to run rather than leak",
   ],

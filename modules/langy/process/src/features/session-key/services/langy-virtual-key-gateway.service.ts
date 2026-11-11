@@ -8,7 +8,7 @@ const LANGY_VK_DESCRIPTION = "Auto-provisioned virtual key for the Langy in-prod
 
 interface LangyVirtualKeyGatewayServiceOptions {
   secrets: Pick<SecretApi, "getValues" | "createReserved">;
-  gateway: Pick<GatewayApi, "createVirtualKey">;
+  gateway: Pick<GatewayApi, "createVirtualKey" | "setLangyModelsAllowed">;
 }
 
 /**
@@ -48,5 +48,16 @@ export class LangyVirtualKeyGatewayService implements LangyVirtualKeyService {
     });
 
     return value;
+  }
+
+  async setModelsAllowed(input: {
+    projectId: string;
+    organizationId: string;
+    modelsAllowed: readonly string[] | null;
+    actorUserId: string;
+  }): Promise<{ written: number }> {
+    const { virtualKeyIds } = await this.options.gateway.setLangyModelsAllowed(input);
+
+    return { written: virtualKeyIds.length };
   }
 }

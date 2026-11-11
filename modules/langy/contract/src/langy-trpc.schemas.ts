@@ -26,6 +26,20 @@ export const langyModelOverrideSchema = z
   )
   .max(200);
 
+/**
+ * The `setModelsAllowed` input: the models Langy may run on in the project, each in the same
+ * shape the composer sends. An empty list allows every model.
+ */
+const langySetModelsAllowedInputSchemaDefinition = z.object({
+  projectId: z.string(),
+  modelsAllowed: z.array(z.string().trim().pipe(langyModelOverrideSchema)).max(500),
+});
+export interface LangySetModelsAllowedInputSchema extends Named<
+  typeof langySetModelsAllowedInputSchemaDefinition
+> {}
+export const langySetModelsAllowedInputSchema: LangySetModelsAllowedInputSchema =
+  langySetModelsAllowedInputSchemaDefinition;
+
 /** A caller-chosen conversation id the create path may adopt, gated at the wire. */
 export const langyAdoptableConversationIdSchema = z
   .string()

@@ -381,6 +381,13 @@ type GatewayVirtualKeyOperations = Readonly<{
     organizationId: string;
     services: readonly string[];
   }): Promise<void>;
+  /** Writes the models a project's LANGY keys may serve, nothing else. Safe to repeat. */
+  setLangyModelsAllowedInternal(input: {
+    organizationId: string;
+    projectId: string;
+    modelsAllowed: readonly string[] | null;
+    actorUserId: string;
+  }): Promise<{ virtualKeyIds: string[] }>;
   /** Records the license a CONNECT key serves. Safe to repeat. */
   setLicenseFactsInternal(input: {
     id: string;
@@ -2213,6 +2220,15 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
 
   updateVirtualKey(input: GatewayVirtualKeyUpdateInput): Promise<GatewayVirtualKeyRecord> {
     return this.#dependencies.virtualKeys.update(input);
+  }
+
+  setLangyModelsAllowed(input: {
+    organizationId: string;
+    projectId: string;
+    modelsAllowed: readonly string[] | null;
+    actorUserId: string;
+  }): Promise<{ virtualKeyIds: string[] }> {
+    return this.#dependencies.virtualKeys.setLangyModelsAllowedInternal(input);
   }
 
   rotateVirtualKey(input: GatewayVirtualKeyRotateInput): Promise<GatewayMintedVirtualKey> {

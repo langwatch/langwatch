@@ -5131,6 +5131,11 @@ const presentations = {
     describe: () =>
       "The model chosen for Langy has no provider connected in this project. Pick another model, or connect its provider in model settings.",
   },
+  langy_virtual_key_missing: {
+    title: "Langy's key for this project is missing",
+    describe: () =>
+      "Nothing was saved, so Langy keeps its previous models. Contact support to restore Langy's key.",
+  },
   langy_codex_plan_limit: {
     // fault: provider. The limit belongs to the customer's OpenAI plan, not to
     // anything LangWatch meters — so the copy must not read like our own

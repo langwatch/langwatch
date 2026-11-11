@@ -66,6 +66,7 @@ import type {
   langyRenameInputSchema,
   langySetCodeAccessPreferenceInputSchema,
   langySetLocalPolicyInputSchema,
+  langySetModelsAllowedInputSchema,
   langyStopTurnPanelInputSchema,
   langyTurnStreamInputSchema,
   langyWarmWorkerInputSchema,
@@ -454,6 +455,9 @@ export interface LangyApi {
   ): Promise<{ conversationId: string | null; warmed: boolean }>;
   getModelsAllowed(
     input: LangyPanelCall<typeof langyProjectInputSchema>,
+  ): Promise<{ modelsAllowed: string[] | null }>;
+  setModelsAllowed(
+    input: LangyPanelCall<typeof langySetModelsAllowedInputSchema>,
   ): Promise<{ modelsAllowed: string[] | null }>;
   recordFeedback(input: LangyPanelCall<typeof langyRecordFeedbackInputSchema>): Promise<void>;
   markFeedbackPromptShown(

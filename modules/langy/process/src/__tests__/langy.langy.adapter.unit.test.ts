@@ -96,7 +96,7 @@ function composition(
     commands: commands(),
     credentials: {
       sessionKeys: { mint: vi.fn(), revokeManaged: vi.fn() },
-      virtualKeys: { provision: vi.fn() },
+      virtualKeys: { provision: vi.fn(), setModelsAllowed: vi.fn() },
       github: { enabled: false, findTurnTokens: vi.fn() },
       runtime: {
         workerCallbackUrl: "https://langwatch.test/callback",

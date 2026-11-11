@@ -567,6 +567,10 @@
       "types": "./dist/components/scope/provider-model-selector.d.ts",
       "default": "./src/components/scope/provider-model-selector.tsx"
     },
+    "./provider-model-multi-selector": {
+      "types": "./dist/components/scope/provider-model-multi-selector.d.ts",
+      "default": "./src/components/scope/provider-model-multi-selector.tsx"
+    },
     "./history-icon": {
       "types": "./dist/components/icons/history-icon.d.ts",
       "default": "./src/components/icons/history-icon.tsx"

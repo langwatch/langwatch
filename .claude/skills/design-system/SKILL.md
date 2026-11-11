@@ -19,18 +19,18 @@ bullet; ADR-001, `packages/design-system/adrs/001-design-system-boundary.md`, as
    module never hand-rolls one. A missing need (a variant, a prop) is added to
    the design-system component first, with its story, never as a local copy:
 
-   | Need                               | Use                                                                         |
-   | ---------------------------------- | --------------------------------------------------------------------------- |
-   | Page or section notice             | `Banner` + `BannerAction` (`/banner`)                                       |
-   | Form or task message, load failure | `Alert` (`/primitives`), `status` + `size="sm"` when dense                  |
-   | Something just happened            | `toaster` (`/toaster`)                                                      |
-   | Dialog, confirm                    | `Dialog` (`/dialog`), `/confirm-dialog`, `/delete-confirmation-dialog`      |
-   | Drawer                             | `Drawer` (`/drawer`)                                                        |
-   | Card, tile, footer buttons         | `Card`, `CardGrid` (`/card`), `/resource-tile`, `ActionRow` (`/action-row`) |
-   | Empty or no-access state           | `EmptyState` (`/primitives`), `/no-data-info-block`, `/restricted-access`   |
-   | Menu, popover                      | `/menu`, `/popover`                                                         |
-   | Picker                             | `/select`, `/option-list`, `/scope-chip-picker`, `/provider-model-selector` |
-   | Table, list page                   | `/list-table`, `/list-page`, `/pagination`                                  |
+   | Need                               | Use                                                                                                           |
+   | ---------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+   | Page or section notice             | `Banner` + `BannerAction` (`/banner`)                                                                         |
+   | Form or task message, load failure | `Alert` (`/primitives`), `status` + `size="sm"` when dense                                                    |
+   | Something just happened            | `toaster` (`/toaster`)                                                                                        |
+   | Dialog, confirm                    | `Dialog` (`/dialog`), `/confirm-dialog`, `/delete-confirmation-dialog`                                        |
+   | Drawer                             | `Drawer` (`/drawer`)                                                                                          |
+   | Card, tile, footer buttons         | `Card`, `CardGrid` (`/card`), `/resource-tile`, `ActionRow` (`/action-row`)                                   |
+   | Empty or no-access state           | `EmptyState` (`/primitives`), `/no-data-info-block`, `/restricted-access`                                     |
+   | Menu, popover                      | `/menu`, `/popover`                                                                                           |
+   | Picker                             | `/select`, `/option-list`, `/scope-chip-picker`, `/provider-model-selector`, `/provider-model-multi-selector` |
+   | Table, list page                   | `/list-table`, `/list-page`, `/pagination`                                                                    |
 
    `Drawer`, `Dialog` and `Card` are **callable shapes with closed props** (no style prop, so a
    restyle does not compile). Teach and write only those; their props, size and padding scales
