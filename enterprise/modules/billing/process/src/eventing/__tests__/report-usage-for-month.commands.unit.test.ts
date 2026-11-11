@@ -675,6 +675,7 @@ describe("ReportUsageForMonthCommand", () => {
   describe("given billable events, Instant Eval spend and PII redaction spend in one month", () => {
     /** @scenario "The PII redaction meter keeps its own checkpoint" */
     /** @scenario "The meter is named langwatch_pii_redaction_usd" */
+    /** @scenario "The value is the month's price in dollars to four places" */
     it("reports PII redaction on its own meter, checkpoint and identifier, leaving the others unchanged", async () => {
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
       mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
