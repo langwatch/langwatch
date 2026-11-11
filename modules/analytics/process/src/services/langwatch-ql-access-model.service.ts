@@ -221,6 +221,7 @@ export class LangWatchQLAccessModelService {
     return (
       `CREATE SETTINGS PROFILE OR REPLACE ${names.settingsProfile}\n` +
       `  SETTINGS ${names.tenantSetting} = '' CHANGEABLE_IN_READONLY,\n` +
+      `           log_comment = '' CHANGEABLE_IN_READONLY,\n` +
       `           readonly = 1 CONST,\n` +
       `           max_execution_time = ${limits.maxExecutionTimeSeconds} CONST,\n` +
       `           max_memory_usage = ${limits.maxMemoryUsageBytes} CONST,\n` +
@@ -231,7 +232,11 @@ export class LangWatchQLAccessModelService {
       `           read_overflow_mode = 'throw' CONST,\n` +
       `           max_result_rows = ${limits.maxResultRows} CONST,\n` +
       `           max_result_bytes = ${limits.maxResultBytes} CONST,\n` +
-      `           result_overflow_mode = 'throw' CONST`
+      `           result_overflow_mode = 'throw' CONST,\n` +
+      `           log_query_settings = 0 CONST,\n` +
+      `           use_query_cache = 0 CONST,\n` +
+      `           use_query_condition_cache = 0 CONST,\n` +
+      `           allow_introspection_functions = 0 CONST`
     );
   }
 

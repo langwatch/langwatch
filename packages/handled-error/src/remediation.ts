@@ -214,6 +214,12 @@ const registry = {
       "Ask an administrator to enable the SQL workbench for this project",
     ],
   },
+  lwql_not_provisioned: {
+    tips: [
+      "This organisation's data is on a server LangWatchQL is not provisioned on; retrying will not help",
+      "On a self-hosted install, let the deploy provision the LangWatchQL access model, then retry",
+    ],
+  },
   custom_chart_playground_not_enabled: {
     tips: [
       "Dashboard widgets need both Dashboards and LangWatchQL enabled for this project; retrying will not help",
@@ -1007,6 +1013,7 @@ const registry = {
   instant_eval_opt_in_not_offered: {
     tips: [
       "Read `meta.deployment`; an enterprise organization is switched on by LangWatch rather than from the search bar, and a self-hosted install gets Instant Evals from a license that names them, or from its operator's RELEASE_INSTANT_EVALS flag when it judges with its own JEV_API_KEY",
+      "When `meta.deployment` is `hosted_off`, LangWatch's hosted model is off for the organization; set an own decision model as the INSTANT_EVALS default model instead",
       "Contact support@langwatch.ai to switch them on, or to add them to the license",
     ],
     docsPath: "/features/instant-evals/limits-and-cost",

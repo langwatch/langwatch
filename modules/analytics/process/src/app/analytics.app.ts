@@ -59,6 +59,7 @@ import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ValidationError } from "@langwatch/handled-error";
+import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { InProcessTenantStatementLimiter } from "@langwatch/limiter";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
@@ -94,7 +95,6 @@ import type {
   AnalyticsRepositories,
   LangWatchQlSupply,
 } from "../repositories/analytics.repositories.ts";
-import type { EvaluationAnalyticsClickHouseClient } from "../repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
 import { ClickHouseLangWatchQLExecutorRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
 import { LwqlKeyMapClickHouseRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-key-map.repository.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
@@ -111,7 +111,7 @@ import { langWatchQLJudgementCalls } from "../rules/langwatch-ql-judgement-quest
 import { keyRunTelemetry } from "../rules/langwatch-ql-key-caller.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
 import { langWatchQLQueryHashKey } from "../rules/langwatch-ql-run-telemetry.rules.ts";
-import { dashboardsEnabled, instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
+import { dashboardsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
 import { buildQueryReference } from "../rules/query-reference.rules.ts";
 import { LoggingAnalyticsTripwireService } from "../services/analytics-tripwire.service.ts";
 import { AnalyticsService as AnalyticsServiceClass } from "../services/analytics.service.ts";
@@ -124,6 +124,10 @@ import {
   LWQL_CONNECTION_DEFAULTS,
 } from "../services/langwatch-ql-connection.service.ts";
 import { LwqlKeyMapService } from "../services/langwatch-ql-key-map.service.ts";
+import {
+  type LangWatchQLPlacementTarget,
+  LangWatchQLPlacementGateService,
+} from "../services/langwatch-ql-placement-gate.service.ts";
 import {
   LangWatchQLQueryScopeService,
   type LangWatchQLQueryScope,
@@ -215,6 +219,8 @@ interface AnalyticsAppDependencies {
   dataPrivacy: DataPrivacyApi;
   /** The SAME project peer the rollout gate and the run-caller's identity read. */
   projects: ProjectApi;
+  /** Instant Evals' answer to whether a project may call an eval function (ADR-182). */
+  instantEvals: Pick<InstantEvalApi, "isEnabled">;
   /** The per-project window every LangWatchQL execution is counted against. */
   lwqlBounds: LangWatchQLBoundsService;
   /** The peer every app-function value is read and rendered through. */
@@ -264,6 +270,35 @@ const LWQL_UNAVAILABLE: LwqlProvisioningOperations = {
   convergeAppOwned: () => Promise.resolve(),
   fillProjectKeys: () => Promise.resolve({ inserted: 0, blankKeys: 0 }),
 };
+
+/** The gate's provisioning read: who owns the access model on the admin target (ADR-200). */
+function lwqlAccessModelProbe({
+  admin,
+  connection,
+}: {
+  admin: LangWatchQlSupply["admin"];
+  connection: LangWatchQLConnection | null;
+}): { configured: boolean; probeOwner(): Promise<LwqlAccessModelOwner> } {
+  if (!admin.configured || !connection) {
+    return { configured: false, probeOwner: () => Promise.resolve("none") };
+  }
+  const names = LangWatchQLProductionProvisioningService.create().names({ connection });
+  const repository = ClickHouseLangWatchQLProvisioningRepository.create({
+    statements: admin.statements,
+  });
+  return { configured: true, probeOwner: () => repository.probeOwner({ names }) };
+}
+
+/** The server LangWatchQL queries, by origin, for the placement gate to compare (ADR-200). */
+function lwqlTargetOf({
+  connection,
+}: {
+  connection: LangWatchQLConnection | null;
+}): LangWatchQLPlacementTarget {
+  return connection
+    ? { configured: true, origin: new URL(connection.url).origin }
+    : { configured: false };
+}
 
 /** The reconvergence watch's operations and the key-map fill, over the admin seam (ADR-159). */
 function lwqlProvisioningOperations({
@@ -455,9 +490,7 @@ export class AnalyticsModule
   } as const;
 
   static async create(setup: AnalyticsSetup): Promise<AnalyticsModule> {
-    const { sessions, langWatchQl, evaluations } = setup.repositories;
-    const resolveClient = (tenantId: string): Promise<EvaluationAnalyticsClickHouseClient> =>
-      sessions.resolve(tenantId);
+    const { langWatchQl, evaluations } = setup.repositories;
     // Data retention owns the default retention days; a second claim refuses the process.
     const evaluationRepository = evaluations.open({
       defaultRetentionDays: () => setup.dependencies.retention.getPlatformDefaultRetentionDays(),
@@ -534,6 +567,12 @@ export class AnalyticsModule
     });
     const langWatchQL = LangWatchQLServiceClass.create({
       executor: connection ? ClickHouseLangWatchQLExecutorRepository.create({ connection }) : null,
+      placement: LangWatchQLPlacementGateService.create({
+        placement: setup.repositories.lwqlPlacement,
+        target: lwqlTargetOf({ connection }),
+        accessModel: lwqlAccessModelProbe({ admin, connection }),
+        answers: setup.repositories.lwqlAccessModelAnswer,
+      }),
       database: connection?.database ?? DEFAULT_LWQL_DATABASE,
       hydration,
       judging: setup.channels.judge,
@@ -551,6 +590,7 @@ export class AnalyticsModule
         authz: setup.dependencies.authz,
         dataPrivacy: setup.dependencies.dataPrivacy,
         projects: setup.dependencies.projects,
+        instantEvals: setup.channels.judge,
         lwqlBounds: LangWatchQLBoundsService.create({
           entitlement: setup.dependencies.plans,
           projects: setup.dependencies.projects,
@@ -561,10 +601,17 @@ export class AnalyticsModule
         recency: setup.repositories.recency,
         lwqlProvisioning,
         lwqlKeyMap: LwqlKeyMapService.create({
-          repository: LwqlKeyMapClickHouseRepository.create({ resolveClient }),
           projects: setup.dependencies.projects,
           ...(admin.configured && connection
-            ? { target: { connection, sourceDatabase: admin.target.database } }
+            ? {
+                target: {
+                  connection,
+                  sourceDatabase: admin.target.database,
+                  repository: LwqlKeyMapClickHouseRepository.create({
+                    statements: admin.statements,
+                  }),
+                },
+              }
             : {}),
         }),
         ...(lwqlConfig.aggregateMaxMembers === undefined
@@ -963,7 +1010,7 @@ export class AnalyticsModule
 
     // Resolved before the engine validates, because whether an eval function
     // may be called is part of that verdict — and only for a statement that
-    // names one, since the answer costs a project read and a flag evaluation.
+    // names one, since the answer costs a call into Instant Evals.
     const isInstantEvalsEnabled =
       statementMightCallEvalFunction(input.sql) &&
       (await this.#isInstantEvalsEnabled(input.project.id));
@@ -995,13 +1042,12 @@ export class AnalyticsModule
     return this.#dependencies.langWatchQL.executePass(input);
   }
 
-  /** This project's eval-function rollout, the answer a member's own statement reads. */
+  /**
+   * Whether a member's own statement may call an eval function: Instant Evals' answer, so an own
+   * decision model or an opted-in organization counts, not the release flag alone.
+   */
   #isInstantEvalsEnabled(projectId: string): Promise<boolean> {
-    return instantEvalsEnabled({
-      featureFlags: this.#dependencies.featureFlags,
-      projectId,
-      projects: this.#dependencies.projects,
-    });
+    return this.#dependencies.instantEvals.isEnabled({ projectId });
   }
 
   upsertEvaluationAnalytics(input: AnalyticsEvaluationUpsertInput): Promise<void> {

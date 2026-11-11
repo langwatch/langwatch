@@ -9839,6 +9839,8 @@ export interface operations {
                         status: "running";
                         /** @description Number of cells this run will execute */
                         total: number;
+                        /** @description Cells this run executes at once: the request's `concurrency`, else the server default */
+                        concurrency?: number;
                         /** @description Link to the run in the LangWatch app */
                         runUrl?: string;
                     };
@@ -9893,6 +9895,8 @@ export interface operations {
                         progress: number;
                         /** @description Cells in the run */
                         total: number;
+                        /** @description Cells the run executes at once, as it was fixed when the run started */
+                        concurrency?: number;
                         /** @description Unix milliseconds */
                         startedAt?: number;
                         /** @description Unix milliseconds; set once the run is no longer running */

@@ -249,9 +249,16 @@ export class ExperimentWorkbenchPipelineRunService {
   }
 
   async #recordStart({ run }: { run: PipelineRunStart }): Promise<void> {
-    const { tenantId, runId, experimentId, total, occurredAt } = run.start;
+    const { tenantId, runId, experimentId, total, occurredAt, plan } = run.start;
     await this.runs.folds.recordRunStart({
-      start: { projectId: tenantId, runId, experimentId, total, startedAt: occurredAt },
+      start: {
+        projectId: tenantId,
+        runId,
+        experimentId,
+        total,
+        ...(plan ? { concurrency: plan.concurrency } : {}),
+        startedAt: occurredAt,
+      },
     });
   }
 

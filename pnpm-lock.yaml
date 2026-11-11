@@ -7271,6 +7271,9 @@ importers:
 
   modules/data-privacy/process:
     dependencies:
+      '@aws-sdk/client-lambda':
+        specifier: 'catalog:'
+        version: 3.1121.0
       '@google-cloud/dlp':
         specifier: ^6.7.0
         version: 6.7.0(supports-color@10.2.2)
@@ -7280,6 +7283,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
+      '@langwatch/aws-client':
+        specifier: workspace:*
+        version: link:../../../packages/aws-client
       '@langwatch/data-privacy-contract':
         specifier: workspace:*
         version: link:../contract
@@ -16837,6 +16843,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
+      '@langwatch/aws-client':
+        specifier: workspace:*
+        version: link:../../../packages/aws-client
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract

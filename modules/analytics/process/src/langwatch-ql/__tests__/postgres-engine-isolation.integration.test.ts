@@ -1,10 +1,14 @@
 /**
  * Isolation proof, part 2: PG-resident data reached via engine tables stays row-policed.
  * @see specs/lwql/api.feature
+ * @see specs/lwql/isolation.feature
  * @vitest-environment node
  */
 
-import type { ClickHouseClient } from "@clickhouse/client";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { DEFAULT_POSTGRES_ENGINE_POOL_SIZE } from "../../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
@@ -23,6 +27,7 @@ import {
   expectZeroRowsWithControl,
   type LangWatchQLClickHouseHarness,
   type LangWatchQLPostgresHarness,
+  LWQL_CLICKHOUSE_TEST_IMAGE,
   LWQL_TEST_POSTGRES_CONNECTION_LIMIT,
   lwqlTestNamedCollection,
   mapPostgresIntoClickHouse,
@@ -38,6 +43,7 @@ import {
   startLangWatchQLClickHouse,
   startLangWatchQLPostgres,
   statementsLoggedSince,
+  UNMAPPED_KEY_HASH,
 } from "./lwql-clickhouse-harness.ts";
 
 const postgresViews = LangWatchQLPostgresViewsService.create();
@@ -48,6 +54,11 @@ const catalogShapes = LangWatchQLCatalogShapesService.create();
 /** The PostgreSQL-resident half of the shipped catalog, provisioned whole. */
 const POSTGRES_VIEWS = catalogShapes.postgresViews(LWQL_VIEW_CATALOG);
 
+/** Where operators read the LangWatchQL access model (ADR-200: the boundary is documented). */
+const ACCESS_MODEL_DOCS = fileURLToPath(
+  new URL("../../../../../../charts/langwatch/README.md", import.meta.url),
+);
+
 describe("given the PostgreSQL-resident catalog mapped into ClickHouse through the server-side named collection", () => {
   let harness: LangWatchQLClickHouseHarness;
   let postgres: LangWatchQLPostgresHarness;
@@ -57,7 +68,10 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
 
   beforeAll(async () => {
     postgres = await startLangWatchQLPostgres();
-    harness = await startLangWatchQLClickHouse({ suite: "pgengine" });
+    harness = await startLangWatchQLClickHouse({
+      suite: "pgengine",
+      image: LWQL_CLICKHOUSE_TEST_IMAGE,
+    });
     database = harness.names.database;
     await mapPostgresIntoClickHouse({ harness, postgres });
     // The LangWatchQL views over the engine tables — the objects a caller names.
@@ -218,7 +232,7 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
     it("returns zero rows from the mapped table", async () => {
       await expectZeroRowsWithControl({
         harness,
-        keyHash: "not-a-real-key-hash",
+        keyHash: UNMAPPED_KEY_HASH,
         table: PG_MAPPED_TABLE,
         tenantColumn: PG_MAPPED_TENANT_COLUMN,
         context: "garbage key against the mapped table",
@@ -486,7 +500,7 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
     it("scans the whole approved view on PostgreSQL even for a key that can match no row", async () => {
       const before = await postgres.readLog();
       const client = await harness.restrictedClient({
-        keyHash: "not-a-real-key-hash",
+        keyHash: UNMAPPED_KEY_HASH,
       });
       const rows = await selectRows(client, `SELECT count() FROM ${database}.${PG_MAPPED_TABLE}`);
       expect(rows).toHaveLength(1);
@@ -583,7 +597,7 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
 
       const withoutPredicate = await measure(PG_MAPPED_TABLE, harness.tenantA.keyHash);
       const withPredicate = await measure(PG_MAPPED_VIEW, harness.tenantA.keyHash);
-      const unknownKey = await measure(PG_MAPPED_VIEW, "not-a-real-key-hash");
+      const unknownKey = await measure(PG_MAPPED_VIEW, UNMAPPED_KEY_HASH);
 
       // Control: the unpredicated read must actually have cost something, or
       // "fewer" below is a comparison between two zeroes.
@@ -948,5 +962,59 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
         await deleteBoardSeed();
       }
     }, 60_000);
+  });
+
+  describe("when a user granted the source tables has no row policy", () => {
+    /** @scenario "A user with no row policy is the boundary, and it is documented" */
+    it("reads every tenant's rows, and the access-model docs say only the restricted identity is isolated", async () => {
+      const user = `${harness.names.restrictedUser}_no_policy`;
+      const password = "no-policy-reader-password";
+      await harness.applyAsAdmin([
+        `DROP USER IF EXISTS ${user}`,
+        `CREATE USER ${user} IDENTIFIED WITH plaintext_password BY '${password}'`,
+        `GRANT SELECT ON ${harness.factDatabase}.* TO ${user}`,
+        `GRANT SELECT ON ${database}.${PG_MAPPED_TABLE} TO ${user}`,
+      ]);
+      const reader = createClient({
+        url: harness.container.getHttpUrl(),
+        username: user,
+        password,
+      });
+      try {
+        const facts = await recordSeedControl({
+          harness,
+          table: "traces",
+          tenantColumn: "TenantId",
+        });
+        const mapped = await recordSeedControl({
+          harness,
+          table: PG_MAPPED_TABLE,
+          tenantColumn: PG_MAPPED_TENANT_COLUMN,
+        });
+        const countOf = async (client: ClickHouseClient, table: string) =>
+          Number(
+            (await selectRows<{ n: string }>(client, `SELECT count() AS n FROM ${table}`))[0]?.n,
+          );
+        const traces = `${harness.factDatabase}.traces`;
+        const mappedTable = `${database}.${PG_MAPPED_TABLE}`;
+
+        expect(facts.tenantB, "tenant B must have source rows to read").toBeGreaterThan(0);
+        expect(mapped.tenantB, "tenant B must have mapped rows to read").toBeGreaterThan(0);
+        // Every tenant's rows, the seeded two among them: the admin's own count of the table.
+        expect(await countOf(reader, traces)).toBe(await countOf(harness.admin, traces));
+        expect(await countOf(reader, traces)).toBeGreaterThanOrEqual(facts.tenantA + facts.tenantB);
+        expect(await countOf(reader, mappedTable)).toBe(await countOf(harness.admin, mappedTable));
+        expect(await countOf(reader, mappedTable)).toBeGreaterThanOrEqual(
+          mapped.tenantA + mapped.tenantB,
+        );
+      } finally {
+        await reader.close();
+      }
+
+      const accessModelDocs = readFileSync(ACCESS_MODEL_DOCS, "utf8");
+      expect(accessModelDocs).toContain(
+        "Only the restricted `langwatch_lwql` identity is isolated by tenant",
+      );
+    });
   });
 });

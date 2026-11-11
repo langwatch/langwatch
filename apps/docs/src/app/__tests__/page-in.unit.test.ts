@@ -36,4 +36,32 @@ describe("the opening fade of a page", () => {
     expect(Number(/opacity: ([\d.]+)/.exec(frames)?.[1])).toBeGreaterThan(0);
     expect(css).not.toContain("#content[data-docs-entering]");
   });
+
+  /** @scenario "Fade a page's opening blocks in without holding them back" */
+  it("plays only on a page swapped in place, never on a full load", () => {
+    const start = css.lastIndexOf("@media", css.indexOf("#content :is(.docs-page-header"));
+    const selectors = [...block({ start }).matchAll(/^\s+([^{}\n]+)\{/gm)].map((match) =>
+      (match[1] ?? "").trim(),
+    );
+    expect(selectors.length).toBeGreaterThan(1);
+    for (const selector of selectors) expect(selector).toMatch(/^:root\[data-docs-navigated\] /);
+  });
+});
+
+describe("a followed link's page", () => {
+  /** @scenario "Answer a followed link at once while the next page loads" */
+  it("dims the current page after a beat, so a prefetched swap never shows it", () => {
+    const dim = block({ start: css.indexOf(".docs-layout[data-docs-loading] #content") });
+    expect(Number(/opacity: ([\d.]+)/.exec(dim)?.[1])).toBeLessThan(1);
+    expect(Number(/transition: opacity \d+ms \S+ (\d+)ms/.exec(dim)?.[1])).toBeGreaterThan(0);
+  });
+
+  /** @scenario "Answer a followed link at once while the next page loads" */
+  it("keeps the beat but drops the fade for a reduced-motion request", () => {
+    const at = css.indexOf(
+      "@media (prefers-reduced-motion: reduce) {\n  .docs-layout[data-docs-loading]",
+    );
+    expect(at).toBeGreaterThan(-1);
+    expect(block({ start: at })).toMatch(/transition: opacity 0s \S+ [1-9]\d*ms/);
+  });
 });

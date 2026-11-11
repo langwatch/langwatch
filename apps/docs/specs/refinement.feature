@@ -16,9 +16,30 @@ Feature: Actionable documentation and restrained reading surfaces
     Given a generated documentation page
     Then its md, claude and agent exports contain the same page source
     And robots, humans, agents and sitemap metadata are available
+    And the IndexNow key is served at indexnow.txt, for the deploy to name when it submits changed pages
     And canonical, sitemap and llms.txt addresses name https://langwatch.ai/docs, where the docs are served
     And the sitemap dates each page by its last commit when the full history is available
     And llms-full.txt holds every page's Markdown in reading order, after the agent guidance
+  @unit
+  Scenario: Split the documentation into one file per section
+    Given llms-full.txt is too large for an agent to read whole
+    When the discovery files are generated
+    Then each top-level section's pages are one file under llms-full/, in reading order, after the agent guidance
+    And llms.txt names every section file, with its page count, before the page directory
+    And a page reached only through its section file still counts as listed in llms.txt
+  @unit
+  Scenario: Split a section too large to read whole by its groups
+    Given a section whose pages come to more than about 100k tokens
+    When the discovery files are generated
+    Then the section is one file per navigation group under llms-full/<section>/, split again while a group is still over
+    And llms.txt names each of those files, with its page count, instead of the section file
+    And a section under the budget stays one file
+  @unit
+  Scenario: List the API reference once per resource
+    Given the API reference holds one page per operation
+    When llms.txt is generated
+    Then each API resource is one entry, linking its overview and giving its page count
+    And its operations are left to the API reference section file
   @unit
   Scenario: Describe every page to search engines
     Given an API page whose page and operation both lack a description
@@ -80,10 +101,25 @@ Feature: Actionable documentation and restrained reading surfaces
     Then its groups show TypeScript, with the matching panel and filename, before any island loads
   @unit
   Scenario: Fade a page's opening blocks in without holding them back
-    When a page loads or is swapped in place
+    When a page is swapped in place
     Then its header and first content blocks rise in with a short stagger of at most 400ms
     And only opacity and transform change, starting visible enough to count as painted
     And readers who ask for reduced motion see no animation
+    But a page opened by a full load shows its content at once, with no rise
+
+  @unit
+  Scenario: Reserve a heading's link icon room on touch screens
+    Given a touch screen, where a heading shows its link icon after its text
+    Then the heading reserves the icon's room at its end
+    And the icon's margins cancel that room, so the heading breaks its lines as if the icon had no width
+
+  @unit
+  Scenario: Answer a followed link at once while the next page loads
+    When a reader follows an internal documentation link
+    Then the current page dims while the next one is fetched
+    And a page already fetched swaps in before the dimming shows
+    And the dimming clears if the swap gives way to a full load
+    And with reduced motion the page dims after the same beat, without a fade
   @unit
   Scenario: Open and close every disclosure with a short height and fade
     Given a page has accordions, expandable fields, sidebar groups and native disclosures
