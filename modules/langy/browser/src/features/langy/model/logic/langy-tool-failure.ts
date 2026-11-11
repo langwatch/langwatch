@@ -167,7 +167,8 @@ const ACCESS_DENIAL_CODES = new Set([
 ]);
 
 /**
- * The denial reasons that mean the reader's own access was removed or reduced since the key was minted.
+ * The denial reasons that mean the reader's own access was removed or reduced since the key
+ * was minted.
  */
 const ACCESS_REMOVED_REASONS = new Set(["owner-ceiling", "no-membership", "membership-disabled"]);
 
