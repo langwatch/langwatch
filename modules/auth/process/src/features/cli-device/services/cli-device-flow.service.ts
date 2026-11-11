@@ -193,9 +193,18 @@ async function startDeviceFlow({
     throw refused("invalid_request", parsed.error.issues[0]?.message ?? "invalid body", 400);
   }
 
+  if (parsed.data.client && parsed.data.credential_type !== "project_api_key") {
+    throw refused(
+      "invalid_request",
+      "client is only valid with credential_type project_api_key",
+      400,
+    );
+  }
+
   const record = await flow.sessions().startDeviceCode({
     credentialType: parsed.data.credential_type,
     management: parsed.data.management,
+    client: parsed.data.client,
   });
   const verificationUri = verificationUriOf(flow);
 
@@ -245,6 +254,8 @@ async function lookupDeviceFlow({
     // The approval screen adds management access to the key's default
     // permissions when the CLI asked for it with `--management`.
     management: record.management === true,
+    // The known app connecting a project, which the approval page names; null for the CLI.
+    client: record.client ?? null,
   });
 }
 

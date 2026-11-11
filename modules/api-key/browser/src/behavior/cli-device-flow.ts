@@ -17,6 +17,8 @@ type LookupBody = {
   credential_type: "device_session" | "project_api_key";
   /** Absent from deployments that predate `--management`. */
   management?: boolean;
+  /** Absent from deployments that predate known clients. */
+  client?: string | null;
 };
 
 type ErrorBody = { error?: string; error_description?: string };
@@ -52,6 +54,7 @@ export async function lookupCliDeviceCode(userCode: string): Promise<CliDeviceCo
     expiresAt: body.expires_at,
     credentialType: body.credential_type,
     management: body.management === true,
+    client: body.client === "laze" ? "laze" : null,
   };
 }
 

@@ -18,6 +18,10 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { MemoryCliDeviceSettlementChannel } from "../../channels/memory/memory.cli-device-settlement.channel.ts";
+import {
+  deviceCodeKey,
+  userCodeKey,
+} from "../../features/cli-device/rules/cli-device-session.rules.ts";
 import type { CliDeviceDirectory } from "../../features/cli-device/services/cli-device-directory.service.ts";
 import {
   CliDeviceFlowService,
@@ -1319,6 +1323,105 @@ describe("given a CLI starting a device login", () => {
 });
 
 // --------------------------------------------------------------------------
+
+describe("given a known app connecting a project", () => {
+  describe("when Laze asks for a project-key device code and the person approves it", () => {
+    /** @scenario the lookup answers the client the device code was requested with */
+    it("tells the approval page it is Laze, then answers a project session with its organization", async () => {
+      const world = deviceFlowWorld();
+      world.project = liveProject();
+      const api = mount(world);
+      const started = await api.post("/api/auth/cli/device-code", {
+        credential_type: "project_api_key",
+        client: "laze",
+      });
+
+      expect(started.status).toBe(200);
+
+      const grant = deviceGrantSchema.parse(await started.json());
+      const looked = await api.get(
+        `/api/auth/cli/lookup?user_code=${encodeURIComponent(grant.user_code)}`,
+      );
+
+      await expect(looked.json()).resolves.toMatchObject({
+        credential_type: "project_api_key",
+        client: "laze",
+      });
+
+      await api.post("/api/auth/cli/approve", {
+        user_code: grant.user_code,
+        organization_id: ORGANIZATION_ID,
+        project_id: "project-shared",
+      });
+      const exchanged = await api.post("/api/auth/cli/exchange", {
+        device_code: grant.device_code,
+      });
+      const session = (await exchanged.json()) as Record<string, unknown>;
+
+      expect(exchanged.status).toBe(200);
+      expect(session.kind).toBe("project_session");
+      expect(session.project).toEqual({ id: "project-shared", slug: "shared", name: "Shared" });
+      expect(session.organization).toMatchObject({ id: ORGANIZATION_ID });
+    });
+  });
+
+  describe("when the client is not one LangWatch knows", () => {
+    /** @scenario an unknown client value is refused */
+    it("refuses the device code with invalid_request", async () => {
+      const api = mount(deviceFlowWorld());
+      const started = await api.post("/api/auth/cli/device-code", {
+        credential_type: "project_api_key",
+        client: "acme",
+      });
+
+      expect(started.status).toBe(400);
+      await expect(started.json()).resolves.toMatchObject({ error: "invalid_request" });
+    });
+  });
+
+  describe("when a client asks for a device session", () => {
+    /** @scenario a client on a device session login is refused */
+    it("refuses the device code with invalid_request, explicit or by default", async () => {
+      const api = mount(deviceFlowWorld());
+
+      for (const body of [
+        { credential_type: "device_session", client: "laze" },
+        { client: "laze" },
+      ]) {
+        const started = await api.post("/api/auth/cli/device-code", body);
+
+        expect(started.status).toBe(400);
+        await expect(started.json()).resolves.toMatchObject({ error: "invalid_request" });
+      }
+    });
+  });
+
+  describe("when a device code was stored before the client field existed", () => {
+    /** @scenario a device code stored before the client field reads as no client */
+    it("answers client null on lookup", async () => {
+      const world = deviceFlowWorld();
+      const api = mount(world);
+      const now = Date.now();
+      await world.store.set({
+        key: deviceCodeKey("old-device"),
+        value: JSON.stringify({
+          device_code: "old-device",
+          user_code: "OLDC-ODE1",
+          status: "pending",
+          created_at: now,
+          expires_at: now + 600_000,
+          credential_type: "project_api_key",
+        }),
+      });
+      await world.store.set({ key: userCodeKey("OLDC-ODE1"), value: "old-device" });
+
+      const looked = await api.get("/api/auth/cli/lookup?user_code=OLDC-ODE1");
+
+      expect(looked.status).toBe(200);
+      await expect(looked.json()).resolves.toMatchObject({ client: null });
+    });
+  });
+});
 
 /** The grant's substrate, in memory, with no expiry sweeping of its own. */
 class InMemoryDeviceSessionStore implements CliDeviceSessionRepository {

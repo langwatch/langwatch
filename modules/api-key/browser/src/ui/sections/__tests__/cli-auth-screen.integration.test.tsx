@@ -283,6 +283,7 @@ describe("given the CLI asked for management access", () => {
     expiresAt: Date.now() + 600_000,
     credentialType: "device_session" as const,
     management: true,
+    client: null,
   };
 
   describe("when an organization admin approves", () => {
@@ -442,6 +443,7 @@ describe("given the CLI asked for a project API key", () => {
     expiresAt: Date.now() + 600_000,
     credentialType: "project_api_key" as const,
     management: false,
+    client: null,
   };
 
   describe("when the organization has shared projects", () => {
@@ -478,6 +480,74 @@ describe("given the CLI asked for a project API key", () => {
   });
 });
 
+describe("given Laze asked to connect a project", () => {
+  const lazeLookup = {
+    outcome: "pending" as const,
+    userCode: "WDJB-MJHT",
+    status: "pending",
+    expiresAt: Date.now() + 600_000,
+    credentialType: "project_api_key" as const,
+    management: false,
+    client: "laze" as const,
+  };
+  const cliWording = /\bCLI\b|terminal|\.env/;
+
+  describe("when the page opens", () => {
+    /** @scenario the approval page names Laze and says what Laze gets */
+    it("names Laze in the heading and the code step, and never the CLI", async () => {
+      const user = userEvent.setup();
+      renderWithApiKeyHost(<CliAuthScreen />, hostFor({ lookup: lazeLookup }));
+
+      expect(await screen.findByText("Connect Laze to LangWatch")).toBeInTheDocument();
+      expect(
+        screen.getByText("Laze will send its agents' traces to the project you pick."),
+      ).toBeInTheDocument();
+      expect(screen.getByText(/Confirm this matches the code shown in Laze\./)).toBeInTheDocument();
+      expect(document.body.textContent).not.toMatch(cliWording);
+
+      await confirmCode(user);
+
+      expect(await screen.findByRole("button", { name: "Connect project" })).toBeInTheDocument();
+      expect(document.body.textContent).not.toMatch(cliWording);
+    });
+  });
+
+  describe("when the person approves a project", () => {
+    /** @scenario approving connects the picked project and tells the person to go back to Laze */
+    it("sends the picked project and says Laze is connected to it", async () => {
+      const user = userEvent.setup();
+      const host = hostFor({ lookup: lazeLookup });
+      renderWithApiKeyHost(<CliAuthScreen />, host);
+      await confirmCode(user);
+      await user.click(await screen.findByTestId("pick-personal"));
+      await user.click(screen.getByRole("button", { name: "Connect project" }));
+
+      await waitFor(() => expect(host.approvals).toHaveLength(1));
+      expect(host.approvals[0]!.projectId).toBe("proj-personal");
+      expect(await screen.findByText("Laze is connected")).toBeInTheDocument();
+      expect(screen.getByText("Personal Workspace")).toBeInTheDocument();
+      expect(screen.getByText(/You can close this tab and go back to Laze\./)).toBeInTheDocument();
+      expect(document.body.textContent).not.toMatch(cliWording);
+    });
+  });
+
+  describe("when the person denies it", () => {
+    /** @scenario denying tells the person Laze was not connected */
+    it("says Laze was not connected", async () => {
+      const user = userEvent.setup();
+      const host = hostFor({ lookup: lazeLookup });
+      renderWithApiKeyHost(<CliAuthScreen />, host);
+      await user.click(await screen.findByRole("button", { name: "Deny" }));
+
+      await waitFor(() => expect(host.denials).toEqual(["WDJB-MJHT"]));
+      expect(
+        await screen.findByText("Laze was not connected. You can close this tab."),
+      ).toBeInTheDocument();
+      expect(document.body.textContent).not.toMatch(cliWording);
+    });
+  });
+});
+
 describe("given a second login is opened in the same tab", () => {
   /** @scenario a new device code starts the confirmation over */
   it("returns to the confirmation step with no trace of the old flow", async () => {
@@ -500,6 +570,7 @@ describe("given a second login is opened in the same tab", () => {
         expiresAt: Date.now() + 600_000,
         credentialType: "device_session",
         management: false,
+        client: null,
       },
     });
     rerender(

@@ -41,6 +41,7 @@ import {
   type ApiKeySessionStatus,
   type CliCredentialType,
   type CliDeviceApproval,
+  type CliDeviceClient,
 } from "../../model/api-key-host.ts";
 import type { CliAuthProjectOption, CliAuthTeamOption } from "../../model/cli-auth-projects.ts";
 import {
@@ -61,9 +62,10 @@ type ActionState =
       organizationName: string;
       credentialType: CliCredentialType;
       projectName?: string;
+      client: CliDeviceClient | null;
     }
   | { kind: "error"; message: string }
-  | { kind: "denied" };
+  | { kind: "denied"; client: CliDeviceClient | null };
 
 /**
  * The `user_code` the address carries. A repeated query key is fine: the
@@ -115,12 +117,14 @@ async function approveDeviceLogin({
   organizationName,
   credentialType,
   projectName,
+  client,
 }: {
   host: ApiKeyHostApi;
   approval: CliDeviceApproval;
   organizationName: string | undefined;
   credentialType: CliCredentialType;
   projectName: string | undefined;
+  client: CliDeviceClient | null;
 }): Promise<ActionState> {
   const result = await host.approveDeviceCode(approval);
   if (result.outcome === "failed") return { kind: "error", message: result.message };
@@ -130,6 +134,7 @@ async function approveDeviceLogin({
     organizationName: organizationName ?? "your organization",
     credentialType,
     projectName,
+    client,
   };
 }
 
@@ -140,16 +145,18 @@ async function approveDeviceLogin({
 async function denyDeviceLogin({
   host,
   userCode,
+  client,
   setAction,
 }: {
   host: ApiKeyHostApi;
   userCode: string | null;
+  client: CliDeviceClient | null;
   setAction: (action: ActionState) => void;
 }): Promise<void> {
   if (!userCode) return;
   setAction({ kind: "submitting" });
   await host.denyDeviceCode(userCode);
-  setAction({ kind: "denied" });
+  setAction({ kind: "denied", client });
 }
 
 /** Redirects to sign-in, or through onboarding for a reader with no organization yet. */
@@ -301,6 +308,43 @@ function accessLoadState({
   };
 }
 
+/** The page heading: a known app connecting a project is named, otherwise the CLI is. */
+function screenHeadingFor({
+  requiresProject,
+  client,
+}: {
+  requiresProject: boolean;
+  client: CliDeviceClient | null;
+}): { title: string; subTitle: string } {
+  if (client === "laze") {
+    return {
+      title: "Connect Laze to LangWatch",
+      subTitle: "Laze will send its agents' traces to the project you pick.",
+    };
+  }
+  if (requiresProject) {
+    return {
+      title: "Connect a project to the CLI",
+      subTitle: "The CLI is requesting a project SDK API key",
+    };
+  }
+  return {
+    title: "Authorize the LangWatch CLI",
+    subTitle: "Signs in this device for AI-tool wrappers and governance commands",
+  };
+}
+
+function primaryActionLabelFor({
+  requiresProject,
+  client,
+}: {
+  requiresProject: boolean;
+  client: CliDeviceClient | null;
+}): string {
+  if (client === "laze") return "Connect project";
+  return requiresProject ? "Send API key" : "Approve";
+}
+
 export default function CliAuthScreen() {
   const host = useApiKeyHost();
   const reading = host.route();
@@ -338,6 +382,8 @@ export default function CliAuthScreen() {
   const credentialType: CliCredentialType =
     lookup.kind === "ready" ? lookup.credentialType : "device_session";
   const requiresProject = credentialType === "project_api_key";
+  // A known app connecting a project (Laze) is named on the page instead of the CLI.
+  const client = lookup.kind === "ready" && requiresProject ? lookup.client : null;
   // `langwatch login --management` asked for management access on the key.
   const requestsManagement = lookup.kind === "ready" && !requiresProject && lookup.management;
 
@@ -410,11 +456,12 @@ export default function CliAuthScreen() {
         projectName: requiresProject
           ? offeredProjects.find((p) => p.id === selectedProjectId)?.name
           : undefined,
+        client,
       }),
     );
   };
 
-  const handleDeny = () => denyDeviceLogin({ host, userCode, setAction });
+  const handleDeny = () => denyDeviceLogin({ host, userCode, client, setAction });
 
   if (sessionStatus === "loading" || (sessionStatus === "unauthenticated" && userCode)) {
     return <CliAuthContainer title="Authorize the LangWatch CLI" loading />;
@@ -423,14 +470,7 @@ export default function CliAuthScreen() {
   const isSubmitting = action.kind === "submitting";
 
   return (
-    <CliAuthContainer
-      title={requiresProject ? "Connect a project to the CLI" : "Authorize the LangWatch CLI"}
-      subTitle={
-        requiresProject
-          ? "The CLI is requesting a project SDK API key"
-          : "Signs in this device for AI-tool wrappers and governance commands"
-      }
-    >
+    <CliAuthContainer {...screenHeadingFor({ requiresProject, client })}>
       <VStack align="stretch" gap={6}>
         <LookupStatus userCode={userCode} lookup={lookup} />
 
@@ -438,6 +478,7 @@ export default function CliAuthScreen() {
           <CodeConfirmation
             userCode={userCode}
             requiresProject={requiresProject}
+            client={client}
             expiryText={expiryTextFor(lookup)}
             isSubmitting={isSubmitting}
             onConfirm={() => setConfirmedUserCode(userCode)}
@@ -462,6 +503,7 @@ export default function CliAuthScreen() {
                 selectedProjectId={selectedProjectId}
                 onSelect={target.setSelectedProjectId}
                 isPersonalFallback={target.isPersonalFallback}
+                client={client}
               />
             )}
 
@@ -511,7 +553,7 @@ export default function CliAuthScreen() {
                 loading={isSubmitting}
                 disabled={isSelectionIncomplete}
               >
-                {requiresProject ? "Send API key" : "Approve"}
+                {primaryActionLabelFor({ requiresProject, client })}
               </Button>
               <DenyButton isSubmitting={isSubmitting} onDeny={() => void handleDeny()} />
             </Stack>
@@ -579,6 +621,7 @@ function LookupStatus({ userCode, lookup }: { userCode: string; lookup: DeviceCo
 function CodeConfirmation({
   userCode,
   requiresProject,
+  client,
   expiryText,
   isSubmitting,
   onConfirm,
@@ -586,6 +629,7 @@ function CodeConfirmation({
 }: {
   userCode: string;
   requiresProject: boolean;
+  client: CliDeviceClient | null;
   expiryText: string | null;
   isSubmitting: boolean;
   onConfirm: () => void;
@@ -593,11 +637,13 @@ function CodeConfirmation({
 }) {
   return (
     <>
-      <Text textStyle="sm" color="fg.muted" lineHeight="tall">
-        {requiresProject
-          ? "Pick a project, its API key flows back to your terminal automatically, with no copy-paste."
-          : "Approving signs in this device for AI-tool wrappers (Claude, Codex, etc.) and governance commands."}
-      </Text>
+      {client === null && (
+        <Text textStyle="sm" color="fg.muted" lineHeight="tall">
+          {requiresProject
+            ? "Pick a project, its API key flows back to your terminal automatically, with no copy-paste."
+            : "Approving signs in this device for AI-tool wrappers (Claude, Codex, etc.) and governance commands."}
+        </Text>
+      )}
       <Box
         bg="bg.subtle"
         borderWidth="1px"
@@ -614,7 +660,9 @@ function CodeConfirmation({
         {userCode}
       </Box>
       <Text textStyle="xs" color="fg.muted" textAlign="center">
-        Confirm this matches the code shown in your terminal.
+        {client === "laze"
+          ? "Confirm this matches the code shown in Laze."
+          : "Confirm this matches the code shown in your terminal."}
         {expiryText ? (
           <>
             <br />
@@ -674,6 +722,7 @@ function ProjectPicker({
   selectedProjectId,
   onSelect,
   isPersonalFallback,
+  client,
 }: {
   host: ApiKeyHostApi;
   organizationId: string | null;
@@ -683,6 +732,7 @@ function ProjectPicker({
   onSelect: (projectId: string | null) => void;
   /** No shared project exists, so the reader's personal one was preselected. */
   isPersonalFallback: boolean;
+  client: CliDeviceClient | null;
 }) {
   return (
     <Box>
@@ -707,8 +757,9 @@ function ProjectPicker({
       </HStack>
       {offeredProjects.length === 0 ? (
         <StatusCard palette="orange" icon={CircleAlert} title="No projects yet">
-          Create a project in this organization first, then pick it here; the key flows back to your
-          terminal automatically.
+          {client === "laze"
+            ? "Create a project in this organization first, then pick it here."
+            : "Create a project in this organization first, then pick it here; the key flows back to your terminal automatically."}
         </StatusCard>
       ) : (
         <>
@@ -906,6 +957,13 @@ function ManagementGrantList({ held }: { held: CliKeyManagementPermission[] }) {
 
 /** How the flow ended: approved for a project or a session, or denied. */
 function ActionOutcome({ action }: { action: ActionState }) {
+  if (action.kind === "denied" && action.client === "laze") {
+    return (
+      <StatusCard palette="blue" icon={Info} title="Not connected">
+        Laze was not connected. You can close this tab.
+      </StatusCard>
+    );
+  }
   if (action.kind === "denied") {
     return (
       <StatusCard palette="blue" icon={Info} title="Authorization denied">
@@ -914,6 +972,14 @@ function ActionOutcome({ action }: { action: ActionState }) {
     );
   }
   if (action.kind !== "success") return null;
+  if (action.client === "laze") {
+    return (
+      <StatusCard palette="green" icon={CheckCircle2} title="Laze is connected">
+        Laze will send its agents' traces to <strong>{action.projectName ?? "your project"}</strong>{" "}
+        ({action.organizationName}). You can close this tab and go back to Laze.
+      </StatusCard>
+    );
+  }
   if (action.credentialType === "project_api_key") {
     return (
       <StatusCard palette="green" icon={CheckCircle2} title="API key approved">
