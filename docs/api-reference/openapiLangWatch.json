@@ -54045,6 +54045,10 @@
                               "failed": {
                                 "type": "number"
                               },
+                              "errored": {
+                                "description": "Cells where the evaluator crashed and gave no verdict",
+                                "type": "number"
+                              },
                               "passRate": {
                                 "type": "number"
                               },

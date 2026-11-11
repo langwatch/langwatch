@@ -99,6 +99,8 @@ class EvaluatorStats:
     failed: int
     pass_rate: float
     avg_score: Optional[float] = None
+    # Cells where the evaluator crashed and gave no verdict; 0 on older servers.
+    errored: int = 0
 
 
 @dataclass
@@ -243,8 +245,12 @@ class ExperimentRunResult:
 
     @property
     def failed_evaluations(self) -> int:
-        """Failing evaluator verdicts across the run, summed from the per-evaluator tallies."""
-        return sum(evaluator.failed for evaluator in self.summary.evaluators)
+        """Failed plus errored evaluations across the run, from the per-evaluator tallies.
+
+        A crashed evaluator checked nothing, so it counts against the opt-in gate: an
+        evaluator that errors on every row must not leave CI green.
+        """
+        return sum(e.failed + e.errored for e in self.summary.evaluators)
 
     def __repr__(self) -> str:
         status_icon = {"completed": "OK", "failed": "FAIL", "stopped": "STOPPED"}.get(
@@ -279,6 +285,7 @@ class ExperimentRunResult:
                 "pass_rate": e.pass_rate,
                 "passed": e.passed,
                 "failed": e.failed,
+                "errored": e.errored,
                 "avg_score": e.avg_score,
             })
 
@@ -637,6 +644,7 @@ def _build_result(
                 failed=e.get("failed", 0),
                 pass_rate=e.get("passRate", 0),
                 avg_score=e.get("avgScore"),
+                errored=e.get("errored", 0),
             )
         )
 
@@ -700,7 +708,13 @@ def _print_summary(result: ExperimentRunResult) -> None:
         print("─" * 60)
         print("  EVALUATORS:")
         for evaluator in summary.evaluators:
-            print(f"    {evaluator.name}: {evaluator.pass_rate:.1f}% pass rate")
+            # A pass rate over no verdicts would read as "all failed"; say what happened.
+            if evaluator.passed + evaluator.failed > 0:
+                print(f"    {evaluator.name}: {evaluator.pass_rate:.1f}% pass rate")
+            else:
+                print(f"    {evaluator.name}: no verdicts")
+            if evaluator.errored:
+                print(f"      Errored: {evaluator.errored}")
             if evaluator.avg_score is not None:
                 print(f"      Avg score: {evaluator.avg_score:.2f}")
 

@@ -23,6 +23,16 @@ FAILING_VERDICT = [
 PASSING_VERDICT = [
     {"evaluatorId": "ev_1", "name": "exact_match", "passed": 3, "failed": 0, "passRate": 100}
 ]
+CRASHED_VERDICT = [
+    {
+        "evaluatorId": "ev_1",
+        "name": "exact_match",
+        "passed": 0,
+        "failed": 0,
+        "errored": 3,
+        "passRate": 0,
+    }
+]
 
 
 def _exit_code(
@@ -67,3 +77,23 @@ def test_turning_exit_off_wins_over_the_opt_in():
     summary = {**BASE_SUMMARY, "failedCells": 1, "evaluators": FAILING_VERDICT}
     code = _exit_code(summary, exit_on_failure=False, fail_on_evaluator_failures=True)
     assert code == 0
+
+
+def test_opting_in_fails_the_job_when_an_evaluator_crashed_on_every_row():
+    summary = {**BASE_SUMMARY, "evaluators": CRASHED_VERDICT}
+    assert _exit_code(summary, fail_on_evaluator_failures=True) == 1
+
+
+def test_by_default_a_crashed_evaluator_leaves_the_job_green():
+    assert _exit_code({**BASE_SUMMARY, "evaluators": CRASHED_VERDICT}) == 0
+
+
+def test_a_crashed_evaluator_prints_no_verdicts_instead_of_a_zero_pass_rate(capsys):
+    result = _build_result(
+        "run_1", "completed", {**BASE_SUMMARY, "evaluators": CRASHED_VERDICT}, "https://app/run_1"
+    )
+    result.print_summary(exit_on_failure=False)
+    printed = capsys.readouterr().out
+    assert "exact_match: no verdicts" in printed
+    assert "Errored: 3" in printed
+    assert "0.0% pass rate" not in printed

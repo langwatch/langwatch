@@ -30,6 +30,9 @@ export type ExperimentRunSummary = {
     name: string;
     passed: number;
     failed: number;
+    /** Cells where the evaluator crashed and gave no verdict; absent on older servers. */
+    errored?: number;
+    /** 0 when the evaluator gave no verdict at all; read `errored` to tell a crash apart. */
     passRate: number;
     avgScore?: number;
   }[];

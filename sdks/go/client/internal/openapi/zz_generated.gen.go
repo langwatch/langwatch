@@ -168818,7 +168818,10 @@ type GetApiExperimentsRunsByRunIdResponse struct {
 			// Duration Wall-clock milliseconds
 			Duration   float32 `json:"duration"`
 			Evaluators *[]struct {
-				AvgScore    *float32 `json:"avgScore,omitempty"`
+				AvgScore *float32 `json:"avgScore,omitempty"`
+
+				// Errored Cells where the evaluator crashed and gave no verdict
+				Errored     *float32 `json:"errored,omitempty"`
 				EvaluatorId string   `json:"evaluatorId"`
 				Failed      float32  `json:"failed"`
 				Name        string   `json:"name"`
@@ -202048,7 +202051,10 @@ func ParseGetApiExperimentsRunsByRunIdResponse(rsp *http.Response) (*GetApiExper
 				// Duration Wall-clock milliseconds
 				Duration   float32 `json:"duration"`
 				Evaluators *[]struct {
-					AvgScore    *float32 `json:"avgScore,omitempty"`
+					AvgScore *float32 `json:"avgScore,omitempty"`
+
+					// Errored Cells where the evaluator crashed and gave no verdict
+					Errored     *float32 `json:"errored,omitempty"`
 					EvaluatorId string   `json:"evaluatorId"`
 					Failed      float32  `json:"failed"`
 					Name        string   `json:"name"`

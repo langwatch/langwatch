@@ -28,10 +28,42 @@ describe("summariseEvaluatorVerdicts", () => {
           name: "exact_match",
           passed: 2,
           failed: 1,
+          errored: 0,
           passRate: (2 / 3) * 100,
           avgScore: 2 / 3,
         },
       ]);
+    });
+  });
+
+  describe("given an evaluator that crashed on some cells", () => {
+    /** @scenario "An evaluator that crashes counts as errored, not passed" */
+    it("counts the crashes as errored and keeps the verdict it did give", () => {
+      const summary = summariseEvaluatorVerdicts({
+        evaluators: { ev_1: scoring("faithfulness") },
+        evaluatorScores: {
+          "0:target_1": { ev_1: { name: "faithfulness", errored: true } },
+          "1:target_1": { ev_1: { name: "faithfulness", errored: true } },
+          "2:target_1": { ev_1: { name: "faithfulness", passed: true } },
+        },
+      });
+
+      expect(summary?.evaluators[0]).toMatchObject({ passed: 1, failed: 0, errored: 2 });
+    });
+  });
+
+  describe("given an evaluator that crashed on every cell", () => {
+    /** @scenario "An evaluator that crashes on every cell is not reported as passing" */
+    it("reports no passes and every cell errored", () => {
+      const summary = summariseEvaluatorVerdicts({
+        evaluators: { ev_1: scoring("faithfulness") },
+        evaluatorScores: {
+          "0:target_1": { ev_1: { name: "faithfulness", errored: true } },
+          "1:target_1": { ev_1: { name: "faithfulness", errored: true } },
+        },
+      });
+
+      expect(summary?.evaluators[0]).toMatchObject({ passed: 0, failed: 0, errored: 2 });
     });
   });
 

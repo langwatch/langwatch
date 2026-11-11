@@ -2,7 +2,7 @@ import chalk from "chalk";
 
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
 import type { ExperimentRunSummary } from "@/client-sdk/services/experiments/platformTypes";
-import { failedEvaluationsOf } from "@/client-sdk/services/experiments/run-gate";
+import { evaluatorFailuresOf } from "@/client-sdk/services/experiments/run-gate";
 
 import { resolveCredentials } from "../../utils/apiKey";
 import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
@@ -88,7 +88,7 @@ export const runExperimentCommand = async (
       if (failures.any) {
         pollSpinner.warn(
           `Experiment completed with failures: ${failures.evaluations} failed evaluation(s), ` +
-            `${failures.cells} errored cell(s)`,
+            `${failures.evaluatorErrors} evaluator error(s), ${failures.cells} errored cell(s)`,
         );
         // Opt-in, like `scenario run --wait`: the document still prints, then the job fails.
         if (options.failOnEvaluatorFailures) process.exitCode = 1;
@@ -110,15 +110,24 @@ export const runExperimentCommand = async (
 };
 
 /**
- * What a completed run failed on: evaluations that returned a failing verdict, and
- * cells that errored. Either fails a `--wait --fail-on-evaluator-failures` run.
+ * What a completed run failed on: evaluations that returned a failing verdict,
+ * evaluators that crashed instead of judging, and cells that errored. Any of them
+ * fails a `--wait --fail-on-evaluator-failures` run.
  */
-export function countRunFailures(
-  summary: ExperimentRunSummary | undefined,
-): { evaluations: number; cells: number; any: boolean } {
-  const evaluations = failedEvaluationsOf(summary);
+export function countRunFailures(summary: ExperimentRunSummary | undefined): {
+  evaluations: number;
+  evaluatorErrors: number;
+  cells: number;
+  any: boolean;
+} {
+  const { failed: evaluations, errored: evaluatorErrors } = evaluatorFailuresOf(summary);
   const cells = summary?.failedCells ?? 0;
-  return { evaluations, cells, any: evaluations > 0 || cells > 0 };
+  return {
+    evaluations,
+    evaluatorErrors,
+    cells,
+    any: evaluations > 0 || evaluatorErrors > 0 || cells > 0,
+  };
 }
 
 function parseConcurrencyFlag({ value }: { value: string | undefined }): number | undefined {
@@ -159,9 +168,15 @@ function printRunStatus({
   }
   for (const evaluator of status.summary.evaluators ?? []) {
     const failed = evaluator.failed > 0 ? chalk.red(`${evaluator.failed} failed`) : "0 failed";
+    const errored = evaluator.errored ? `, ${chalk.red(`${evaluator.errored} errored`)}` : "";
+    // A pass rate over no verdicts would read as "all failed"; say what happened instead.
+    const rate =
+      evaluator.passed + evaluator.failed > 0
+        ? `${evaluator.passRate.toFixed(1)}%`
+        : "no verdicts";
     console.log(
       `    ${chalk.gray(`${evaluator.name}:`)} ${evaluator.passed} passed, ${failed}` +
-        ` (${evaluator.passRate.toFixed(1)}%)`,
+        `${errored} (${rate})`,
     );
   }
   if (status.summary.duration) {

@@ -40,6 +40,8 @@ const experimentRunEvaluatorScoreSchema = z.object({
   score: z.number().optional(),
   label: z.string().optional(),
   passed: z.boolean().optional(),
+  /** The evaluator crashed on this cell, so it gave no verdict. */
+  errored: z.boolean().optional(),
 });
 
 /** What the fold needs to know of an evaluator when its verdict arrives. */

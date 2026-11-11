@@ -24,6 +24,24 @@ Feature: A completed run's summary carries its evaluator verdicts
     And the summary carries no totalPassed, totalFailed or passRate
 
   @unit
+  Scenario: An evaluator that crashes counts as errored, not passed
+    Given a run whose evaluator "faithfulness" errored on 2 cells and passed on 1
+    When the run completes
+    Then the summary lists "faithfulness" with 1 passed, 0 failed and 2 errored
+
+  @unit
+  Scenario: An evaluator that crashes on every cell is not reported as passing
+    Given a run whose evaluator "faithfulness" errored on every cell
+    When the run completes
+    Then the summary lists "faithfulness" with 0 passed, 0 failed and 2 errored
+
+  @unit
+  Scenario: A skipped evaluator counts as neither errored nor a verdict
+    Given a run whose evaluator "faithfulness" was skipped on 1 cell
+    When the verdict folds
+    Then no verdict and no error is kept for that cell
+
+  @unit
   Scenario: A score without a verdict counts towards the average only
     Given a run whose evaluator "faithfulness" returned scores 0.4 and 0.8 with no pass or fail
     When the run completes

@@ -9930,6 +9930,8 @@ export interface operations {
                                 name: string;
                                 passed: number;
                                 failed: number;
+                                /** @description Cells where the evaluator crashed and gave no verdict */
+                                errored?: number;
                                 passRate: number;
                                 avgScore?: number;
                             }[];

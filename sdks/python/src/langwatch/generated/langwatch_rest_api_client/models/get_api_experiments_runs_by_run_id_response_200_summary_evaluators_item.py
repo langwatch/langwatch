@@ -19,6 +19,7 @@ class GetApiExperimentsRunsByRunIdResponse200SummaryEvaluatorsItem:
         passed (float):
         failed (float):
         pass_rate (float):
+        errored (float | Unset): Cells where the evaluator crashed and gave no verdict
         avg_score (float | Unset):
     """
 
@@ -27,6 +28,7 @@ class GetApiExperimentsRunsByRunIdResponse200SummaryEvaluatorsItem:
     passed: float
     failed: float
     pass_rate: float
+    errored: float | Unset = UNSET
     avg_score: float | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
@@ -39,6 +41,8 @@ class GetApiExperimentsRunsByRunIdResponse200SummaryEvaluatorsItem:
         failed = self.failed
 
         pass_rate = self.pass_rate
+
+        errored = self.errored
 
         avg_score = self.avg_score
 
@@ -53,6 +57,8 @@ class GetApiExperimentsRunsByRunIdResponse200SummaryEvaluatorsItem:
                 "passRate": pass_rate,
             }
         )
+        if errored is not UNSET:
+            field_dict["errored"] = errored
         if avg_score is not UNSET:
             field_dict["avgScore"] = avg_score
 
@@ -71,6 +77,8 @@ class GetApiExperimentsRunsByRunIdResponse200SummaryEvaluatorsItem:
 
         pass_rate = d.pop("passRate")
 
+        errored = d.pop("errored", UNSET)
+
         avg_score = d.pop("avgScore", UNSET)
 
         get_api_experiments_runs_by_run_id_response_200_summary_evaluators_item = cls(
@@ -79,6 +87,7 @@ class GetApiExperimentsRunsByRunIdResponse200SummaryEvaluatorsItem:
             passed=passed,
             failed=failed,
             pass_rate=pass_rate,
+            errored=errored,
             avg_score=avg_score,
         )
 

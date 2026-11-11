@@ -253,15 +253,27 @@ describe("the run's progress fold", () => {
       });
     });
 
-    it("never keeps a comparison's own verdict, an error, or an unknown evaluator", () => {
+    /** @scenario "A skipped evaluator counts as neither errored nor a verdict" */
+    it("never keeps a comparison's own verdict, a skip, or an unknown evaluator", () => {
       const state = progressAfter([
         started(plan),
         evaluatorResult({ evaluatorId: "judge", label: "target_a" }),
-        evaluatorResult({ evaluatorId: "exact", status: "error" }),
+        evaluatorResult({ evaluatorId: "exact", status: "skipped" }),
         evaluatorResult({ evaluatorId: "gone", score: 1 }),
       ]);
 
       expect(state.evaluatorScores).toEqual({});
+    });
+
+    it("keeps an errored evaluator as errored, with no verdict", () => {
+      const state = progressAfter([
+        started(plan),
+        evaluatorResult({ evaluatorId: "exact", status: "error", score: 1, passed: true }),
+      ]);
+
+      expect(state.evaluatorScores["0:target_a"]).toEqual({
+        exact: { name: "exact_match", errored: true },
+      });
     });
   });
 
@@ -336,8 +348,22 @@ describe("the run's progress fold as main's poller JSON", () => {
         timestamps: { startedAt: 1_000, finishedAt: 4_000 },
         // No verdict arrived: each scoring evaluator is listed with zero counts.
         evaluators: [
-          { evaluatorId: "exact", name: "exact_match", passed: 0, failed: 0, passRate: 0 },
-          { evaluatorId: "saved", name: "llm_boolean", passed: 0, failed: 0, passRate: 0 },
+          {
+            evaluatorId: "exact",
+            name: "exact_match",
+            passed: 0,
+            failed: 0,
+            errored: 0,
+            passRate: 0,
+          },
+          {
+            evaluatorId: "saved",
+            name: "llm_boolean",
+            passed: 0,
+            failed: 0,
+            errored: 0,
+            passRate: 0,
+          },
         ],
         runUrl: "https://app/run_1",
       });

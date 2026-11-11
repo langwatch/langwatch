@@ -9,6 +9,9 @@ export type ExperimentRunEvaluatorTally = {
   name: string;
   passed: number;
   failed: number;
+  /** Cells where the evaluator crashed and gave no verdict; a gate counts them as failures. */
+  errored: number;
+  /** 0 when the evaluator gave no verdict at all; read `errored` to tell a crash apart. */
   passRate: number;
   avgScore?: number;
 };
@@ -30,7 +33,7 @@ function passRateOf({ passed, failed }: { passed: number; failed: number }): num
 /**
  * Rolls each cell's evaluator verdicts up into per-evaluator tallies a CI job can gate
  * on. Only explicit verdicts count: a score with no `passed` adds to the average, not
- * to either count. Comparison evaluators keep no verdicts, so they never appear.
+ * to either count. A crashed evaluator counts as errored, never as passed. Comparison evaluators keep no verdicts, so they never appear.
  * A run with no evaluators answers none, so the summary keeps its cell counts only.
  */
 export function summariseEvaluatorVerdicts({
@@ -51,12 +54,14 @@ export function summariseEvaluatorVerdicts({
     });
     const passed = verdicts.filter((verdict) => verdict.passed === true).length;
     const failed = verdicts.filter((verdict) => verdict.passed === false).length;
+    const errored = verdicts.filter((verdict) => verdict.errored === true).length;
     const scores = verdicts.flatMap((verdict) => (verdict.score != null ? [verdict.score] : []));
     return {
       evaluatorId,
       name: verdicts[0]?.name ?? evaluator.fallbackName,
       passed,
       failed,
+      errored,
       passRate: passRateOf({ passed, failed }) ?? 0,
       ...(scores.length > 0
         ? { avgScore: scores.reduce((sum, score) => sum + score, 0) / scores.length }

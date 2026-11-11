@@ -1712,7 +1712,7 @@ function registerExperimentCommands(program: Command): void {
       .option("--wait", "Wait for the experiment to complete before returning")
       .option(
         "--fail-on-evaluator-failures",
-        "With --wait, exit 1 when an evaluation fails or a cell errors (the summary still prints)",
+        "With --wait, exit 1 when an evaluation fails or errors, or a cell errors (the summary still prints)",
       )
       .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
       .option(

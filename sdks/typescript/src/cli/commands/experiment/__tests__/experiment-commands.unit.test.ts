@@ -189,6 +189,9 @@ describe("runExperimentCommand()", () => {
     const passingVerdict = [
       { evaluatorId: "ev_1", name: "exact_match", passed: 3, failed: 0, passRate: 100 },
     ];
+    const crashedVerdict = [
+      { evaluatorId: "ev_1", name: "exact_match", passed: 0, failed: 0, errored: 3, passRate: 0 },
+    ];
     const completedWith = (summary: Record<string, unknown>) => ({
       runId: "run_123",
       status: "completed",
@@ -242,6 +245,30 @@ describe("runExperimentCommand()", () => {
       await runExperimentCommand("quality-check", { wait: true, failOnEvaluatorFailures: true });
 
       expect(process.exitCode).toBe(1);
+    });
+
+    /** @scenario "The CLI opt-in fails a waited run whose evaluator crashed" */
+    it("fails the job when an evaluator errored on every row and opted in", async () => {
+      mockGetRunStatus.mockResolvedValue(
+        completedWith({ failedCells: 0, evaluators: crashedVerdict }),
+      );
+
+      await runExperimentCommand("quality-check", { wait: true, failOnEvaluatorFailures: true });
+
+      expect(process.exitCode).toBe(1);
+    });
+
+    it("shows a crashed evaluator's errors and no pass rate in the table summary", async () => {
+      mockGetRunStatus.mockResolvedValue(
+        completedWith({ failedCells: 0, evaluators: crashedVerdict }),
+      );
+      const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+
+      const result = await runExperimentCommand("quality-check", { wait: true });
+      result?.table?.();
+
+      const printed = log.mock.calls.map((call) => String(call[0])).join("\n");
+      expect(printed).toMatch(/exact_match:.*0 passed, 0 failed, .*3 errored.*\(no verdicts\)/);
     });
 
     /** @scenario "The CLI opt-in leaves a clean run green" */

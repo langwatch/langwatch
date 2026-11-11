@@ -51,6 +51,7 @@ describe("ExperimentsFacade parity with the Python SDK", () => {
   });
 
   describe("when run() is given input overrides", () => {
+    /** @scenario "run() sends every input override in the start request" */
     it("sends data, parameters and row indices in the start body, as runWithResults does", async () => {
       mockFetch
         .mockResolvedValueOnce(jsonResponse({ runId: "run_1", status: "running", total: 3 }))
@@ -125,6 +126,27 @@ describe("ExperimentsFacade parity with the Python SDK", () => {
       expect(code).toBeUndefined();
     });
 
+    /** @scenario "Opting in fails the job when an evaluator crashed on every row" */
+    it("exits 1 with failOnEvaluatorFailures when the evaluator only errored", async () => {
+      const crashed = [
+        { evaluatorId: "ev_1", name: "exact_match", passed: 0, failed: 0, errored: 3, passRate: 0 },
+      ];
+      const code = await exitCodeFor(
+        { failedCells: 0, evaluators: crashed },
+        { failOnEvaluatorFailures: true },
+      );
+      expect(code).toBe(1);
+    });
+
+    /** @scenario "By default a crashed evaluator leaves the job green" */
+    it("does not exit by default when the evaluator only errored", async () => {
+      const crashed = [
+        { evaluatorId: "ev_1", name: "exact_match", passed: 0, failed: 0, errored: 3, passRate: 0 },
+      ];
+      expect(await exitCodeFor({ failedCells: 0, evaluators: crashed })).toBeUndefined();
+    });
+
+    /** @scenario "Turning exit off wins over the opt-in" */
     it("never exits with exitOnFailure false, even when opted in", async () => {
       const code = await exitCodeFor(
         { failedCells: 1, evaluators: failingVerdict },

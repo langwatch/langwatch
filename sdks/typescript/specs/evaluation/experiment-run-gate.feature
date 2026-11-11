@@ -8,6 +8,7 @@ Feature: CI exit gate for platform experiment runs
   #   Python  result.print_summary(fail_on_evaluator_failures=True)
   #   TS      result.printSummary({ failOnEvaluatorFailures: true })
   #   CLI     langwatch experiment run <slug> --wait --fail-on-evaluator-failures
+  # The opt-in counts a crashed evaluator as a failure: it checked nothing.
   # The gate reads the per-evaluator tallies in the run summary
   # (modules/experiment/specs/experiment-run-summary-verdicts.feature).
 
@@ -44,6 +45,18 @@ Feature: CI exit gate for platform experiment runs
     Then the process does not exit
 
   @unit
+  Scenario: Opting in fails the job when an evaluator crashed on every row
+    Given a completed run with no errored cell and an evaluator that errored on every row
+    When the summary is printed with fail on evaluator failures
+    Then the process exits with code 1
+
+  @unit
+  Scenario: By default a crashed evaluator leaves the job green
+    Given a completed run with no errored cell and an evaluator that errored on every row
+    When the summary is printed with the default options
+    Then the process does not exit
+
+  @unit
   Scenario: Opting in against a server without tallies keeps the cell gate
     Given a completed run whose summary carries cell counts only
     When the summary is printed with fail on evaluator failures
@@ -71,6 +84,12 @@ Feature: CI exit gate for platform experiment runs
   @unit
   Scenario: The CLI opt-in also fails a waited run on an errored cell
     Given a completed run with 1 errored cell and no failed evaluation
+    When I run "langwatch experiment run quality-check --wait --fail-on-evaluator-failures"
+    Then the command exits with code 1
+
+  @unit
+  Scenario: The CLI opt-in fails a waited run whose evaluator crashed
+    Given a completed run with no errored cell and an evaluator that errored on every row
     When I run "langwatch experiment run quality-check --wait --fail-on-evaluator-failures"
     Then the command exits with code 1
 
