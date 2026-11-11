@@ -5,8 +5,8 @@
  * that adds its root spans to their project's UTC day with one Postgres upsert per batch.
  * Evaluations add a day per project a day. Each change syncs the organization as one Customer.io
  * group call, placed by nurturing's own copy of project and organization creation. Without a
- * Customer.io channel nothing reads these rows, so nothing here is registered. See ADR 001
- * (nurturing), amendment.
+ * Customer.io channel nothing reads these rows, so nothing here is registered. Why event
+ * driven: https://github.com/langwatch/tasks/issues/1131.
  * Spec: enterprise/modules/nurturing/specs/project-usage.feature
  */
 import {
