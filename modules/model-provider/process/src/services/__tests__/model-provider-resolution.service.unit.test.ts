@@ -201,7 +201,7 @@ describe("ModelProviderResolutionService.resolve", () => {
       expect(failure).toBeInstanceOf(ModelNotConfiguredError);
       expect(failure).toMatchObject({
         featureKey: "scenarios.judge",
-        role: "DEFAULT",
+        role: "JUDGE",
         projectId: "project-1",
       });
     });

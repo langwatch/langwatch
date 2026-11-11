@@ -644,7 +644,7 @@ describe("prefetchWithFixture, when selecting the user-simulator and judge model
       /**
        * @scenario "Defaults resolve to the smart Default model when the scenario has no override"
        */
-      it("resolves the simulator and judge from their DEFAULT-role feature keys", async () => {
+      it("resolves the simulator and judge from their own feature keys (simulator DEFAULT role, judge JUDGE role)", async () => {
         const deps = createMockDeps({
           agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
           modelParamsProvider: echoingProvider(),
