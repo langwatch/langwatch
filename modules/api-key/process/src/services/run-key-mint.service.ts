@@ -9,7 +9,6 @@ import { type AuthzApi, type AuthzPrincipalRef } from "@langwatch/authz-contract
 import type { SharedCredentialStore } from "@langwatch/secrets/shared-credential";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
 
-import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
 import {
   isRunKeyReusable,
   missingRunPermissions,
