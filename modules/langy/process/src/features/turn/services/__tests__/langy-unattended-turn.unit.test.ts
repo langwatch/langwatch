@@ -135,6 +135,7 @@ function makeFixture({
   admission?: "claimed" | "replay";
 } = {}) {
   const dispatch = vi.fn<LangyWorker["dispatch"]>(async () => "accepted");
+  let claims = 0;
   const acceptTurn = vi.fn(
     async (_input: Parameters<LangyConversationService["acceptTurn"]>[0]) => ({ turnId: "turn-1" }),
   );
@@ -192,6 +193,7 @@ function makeFixture({
     skillGates: { resolveDisabled: vi.fn(async () => []) },
     metrics: { count: vi.fn() },
     admission: {
+      // A new turn id per claim, as a changed brief gets one, so a hold key cannot hide on it.
       claim: vi.fn(async () =>
         admission === "replay"
           ? { kind: "replay" as const, conversationId: "conversation-1", turnId: "turn-1" }
@@ -199,7 +201,7 @@ function makeFixture({
               kind: "claimed" as const,
               claimToken: "claim-1",
               conversationId: "conversation-1",
-              turnId: "turn-1",
+              turnId: `turn-${++claims}`,
             },
       ),
       commit: vi.fn(async () => undefined),
@@ -295,6 +297,10 @@ describe("an unattended Langy turn", () => {
       const [first, second] = fixture.mint.mock.calls.map(([input]) => input.holdKey);
       expect(first).toBeDefined();
       expect(second).toBe(first);
+      expect(fixture.acceptTurn.mock.calls.map(([input]) => input.turnId)).toEqual([
+        "turn-1",
+        "turn-2",
+      ]);
     });
 
     /** @scenario "A held key's refusal reaches the caller with the pace it asked for" */
