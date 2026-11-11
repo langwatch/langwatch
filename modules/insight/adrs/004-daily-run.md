@@ -208,18 +208,10 @@ caller to show; an operator's request asks no setting. The request answers its
 names `runId` on both `runInFlight` and `lastRun`. The browser then waits for the run
 with that id to show, with no standing poll: `run_started` and `run_settled` hint the
 board's read, which is read again. A hint is published off the committed event, not after
-the schedule row is folded, so it can outrun the row: a read a hint brought back without
-the run is read again after each of `REQUESTED_RUN_REREAD_DELAYS_MS` in turn (2, 4, 8 and
-16 seconds, about 30 in all), and stops once the run shows, the delays run out or the
-request ends. A read that fails counts as answered, so it takes the next delay and does
-not end the re-reads early. The read Run now asks once the request is in starts the same
-re-reads, since a hint that lands while it is unanswered merges into it and could not
-start them itself. The limit is 4 re-reads per chain, not per wait: a hint that lands with
-no re-read in flight starts the delays over, so the reads of one wait grow with the hints
-that reach the tab. A hint that lands on a re-read in flight merges with it into one refetch
-of one read, so the browser cannot tell them apart and counts the answer as that re-read. On
-a chain's last re-read that ends the chain, and the run is then found by a later hint's read
-or the deadline's. In flight, it opens Langy on the run's conversation; settled first, it
+the schedule row is folded, so it can outrun the row: the read it brought back may show no
+run. No timer reads again for that. The next hint's read finds the run, `run_settled` at the
+latest, so Langy may open late and never early. This is not one of
+the timer exceptions in ARCHITECTURE.md's "No timer polling", and the browser adds none. In flight, it opens Langy on the run's conversation; settled first, it
 ends the wait, opening Langy if the run has a conversation and otherwise telling the
 person how it ended or why it did not start, from `lastRun`.
 
@@ -237,17 +229,19 @@ run that never reached Langy leaves the wait to its deadline. Run now answers
 `requestedAt`, the time the server recorded the request on the clock that stamps a
 run's start, so the browser's clock never enters the comparison. A scheduled run that
 settled before the request is shown as the last run, and the wait goes on. A run that
-shows neither within `INSIGHT_DAILY_RUN_EXPIRY_MS` is lost, and the browser reads the
-board once more, as its cached read can be behind. If that read shows the run, the wait
-ends as for any other read. If it shows none, fails, or has not answered within
-`REQUESTED_RUN_LAST_READ_MS`, the browser says the run could not be started and the
-request ends, so an answer after that changes nothing. While a run is in flight the
+shows neither within `INSIGHT_DAILY_RUN_EXPIRY_MS` is lost. The spinner ends at that instant, whatever the board
+read, and the browser reads the board once more. That read gives the verdict, with no timer:
+if it shows the requested run the wait ends as for any other read, opening Langy or telling
+how the run ended; if it shows none, or fails, the browser says the run could not be started;
+if it never answers, nothing is said and no panel opens, and a run shows only in the dropdown
+once a later hint brings it. An answer after the page is gone, the request is turned off or a
+newer request was made acts on nothing. While a run is in flight the
 dropdown offers to open it instead.
 
 The deadline counts from the answer to the request, and nothing but the end of the wait
 moves it: the page's host is rebuilt on each change of the URL's query, and the notice goes
 through the host of that moment. Turning the run off ends the wait at once, also when the
-write is then refused, so a board switched off opens no panel and says nothing more. Losing
+write is then refused and when it is sent before Run now has answered, so a board switched off opens no panel and says nothing more. Losing
 the last widget does not end the wait: the offer of Run now goes, "Starting a run." stays.
 
 **The row names the run in flight.** `run_started` writes `runInFlightId`,

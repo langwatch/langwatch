@@ -18,10 +18,6 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  REQUESTED_RUN_LAST_READ_MS,
-  REQUESTED_RUN_REREAD_DELAYS_MS,
-} from "../../../behavior/use-board-daily-insights.ts";
 import { OFF_REASON_WORDS, SKIP_REASON_WORDS } from "../../../model/daily-run.ts";
 import {
   insightEntry,
@@ -193,11 +189,11 @@ async function openDropdown(user: ReturnType<typeof userEvent.setup>) {
   return within(await screen.findByRole("dialog"));
 }
 
-/** Chooses Run now and waits for the read it asks: the board's second. */
+/** Chooses Run now and waits for the server to take it; the board then waits on hints. */
 async function chooseRunNow(board: ReturnType<typeof openBoard>) {
   const dropdown = await openDropdown(board.user);
   await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
-  await waitFor(() => expect(board.reads()).toHaveLength(2));
+  await waitFor(() => expect(board.sent(RUN_NOW)).toHaveLength(1));
 }
 
 describe("given a board with widgets and a member who never answered for it", () => {
@@ -557,8 +553,7 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
 
       await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
       await waitFor(() => expect(board.sent(RUN_NOW)).toHaveLength(1));
-      // The read is asked again once the request is in; it names no run yet, so Langy waits.
-      await waitFor(() => expect(board.reads()).toHaveLength(2));
+      expect(board.reads()).toHaveLength(1);
       expect(board.host.queries).toEqual([]);
       hasStarted = true;
       await board.readHint();
@@ -579,7 +574,7 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
 
   describe("when the start's hint reaches the board before the worker stored the run", () => {
     /** @scenario "Run now opens Langy when the start's hint arrives before its run is stored" */
-    it("reads the board again until the run shows, and opens Langy on it without waiting for its outcome", async () => {
+    it("keeps waiting on that read, and opens Langy on the run once a later hint's read shows it", async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
       try {
         let isStored = false;
@@ -588,163 +583,22 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
           host: ASKER,
           write: () => runNowAnswer(),
         });
-        const dropdown = await openDropdown(board.user);
-        await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
-        await waitFor(() => expect(board.reads()).toHaveLength(2));
-        const [first, second, third] = REQUESTED_RUN_REREAD_DELAYS_MS;
+        await chooseRunNow(board);
 
         await board.readHint();
-        expect(board.reads()).toHaveLength(3);
-        await vi.advanceTimersByTimeAsync(first);
-        await waitFor(() => expect(board.reads()).toHaveLength(4));
-        await vi.advanceTimersByTimeAsync(second);
-        await waitFor(() => expect(board.reads()).toHaveLength(5));
+        await vi.advanceTimersByTimeAsync(60_000);
+        expect(board.reads()).toHaveLength(2);
         expect(board.host.queries).toEqual([]);
         isStored = true;
-        await vi.advanceTimersByTimeAsync(third);
-
-        await waitFor(() =>
-          expect(board.host.queries).toEqual([{ langyConversation: "conversation-7" }]),
-        );
-        expect(board.reads()).toHaveLength(6);
-        await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS);
-        expect(board.reads()).toHaveLength(6);
-        expect(board.host.failures).toEqual([]);
-      } finally {
-        vi.useRealTimers();
-      }
-    });
-
-    /** @scenario "Run now opens Langy when the start's hint arrives before its run is stored" */
-    it("reads the board again also when the hint lands while Run now's own read is in flight", async () => {
-      vi.useFakeTimers({ shouldAdvanceTime: true });
-      try {
-        let read = ON;
-        let answerHeldReads: (() => void) | undefined;
-        let held: Promise<void> | undefined;
-        const board = openBoard({
-          setting: () => (held ? held.then(() => read) : read),
-          host: ASKER,
-          write: () => runNowAnswer(),
-        });
-        const dropdown = await openDropdown(board.user);
-        held = new Promise((resolve) => (answerHeldReads = resolve));
-        await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
-        await waitFor(() => expect(board.reads()).toHaveLength(2));
-
-        // The hint's read takes over the one Run now asked, which is still unanswered.
-        const hint = board.readHint();
-        await waitFor(() => expect(board.reads()).toHaveLength(3));
-        held = undefined;
-        answerHeldReads?.();
-        await hint;
-        const [first, second] = REQUESTED_RUN_REREAD_DELAYS_MS;
-        await vi.advanceTimersByTimeAsync(first);
-        await waitFor(() => expect(board.reads()).toHaveLength(4));
-        read = RUNNING;
-        await vi.advanceTimersByTimeAsync(second);
-
-        await waitFor(() =>
-          expect(board.host.queries).toEqual([{ langyConversation: "conversation-7" }]),
-        );
-        expect(board.reads()).toHaveLength(5);
-        expect(board.host.failures).toEqual([]);
-      } finally {
-        vi.useRealTimers();
-      }
-    });
-
-    /** @scenario "Run now opens Langy when the start's hint arrives before its run is stored" */
-    it("stops reading the board again after 4 re-reads when the run never shows", async () => {
-      vi.useFakeTimers({ shouldAdvanceTime: true });
-      try {
-        const board = openBoard({
-          setting: ON,
-          host: ASKER,
-          write: () => runNowAnswer(),
-        });
-        const dropdown = await openDropdown(board.user);
-        await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
-        await waitFor(() => expect(board.reads()).toHaveLength(2));
-
         await board.readHint();
+
+        await waitFor(() =>
+          expect(board.host.queries).toEqual([{ langyConversation: "conversation-7" }]),
+        );
         expect(board.reads()).toHaveLength(3);
-        for (const [step, delay] of REQUESTED_RUN_REREAD_DELAYS_MS.entries()) {
-          await vi.advanceTimersByTimeAsync(delay);
-          await waitFor(() => expect(board.reads()).toHaveLength(4 + step));
-        }
-
-        await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS - 60_000);
-        expect(board.reads()).toHaveLength(7);
-        expect(board.host.queries).toEqual([]);
-      } finally {
-        vi.useRealTimers();
-      }
-    });
-
-    /** @scenario "The limit on re-reads holds per chain, and a hint starts a new chain" */
-    it("reads again after each delay once more when a later hint lands with no re-read in flight", async () => {
-      vi.useFakeTimers({ shouldAdvanceTime: true });
-      try {
-        const board = openBoard({ setting: ON, host: ASKER, write: () => runNowAnswer() });
-        await chooseRunNow(board);
-        await board.readHint();
-        for (const [step, delay] of REQUESTED_RUN_REREAD_DELAYS_MS.entries()) {
-          await vi.advanceTimersByTimeAsync(delay);
-          await waitFor(() => expect(board.reads()).toHaveLength(4 + step));
-        }
-
-        await board.readHint();
-        expect(board.reads()).toHaveLength(8);
-        for (const [step, delay] of REQUESTED_RUN_REREAD_DELAYS_MS.entries()) {
-          await vi.advanceTimersByTimeAsync(delay);
-          await waitFor(() => expect(board.reads()).toHaveLength(9 + step));
-        }
-        await vi.advanceTimersByTimeAsync(60_000);
-        expect(board.reads()).toHaveLength(12);
-      } finally {
-        vi.useRealTimers();
-      }
-    });
-
-    /** @scenario "A hint that lands on a re-read in flight counts as that re-read" */
-    it("ends the chain when a hint lands on its last re-read, and a later hint still opens Langy", async () => {
-      vi.useFakeTimers({ shouldAdvanceTime: true });
-      try {
-        let read = ON;
-        let answerHeldReads: (() => void) | undefined;
-        let held: Promise<void> | undefined;
-        const board = openBoard({
-          setting: () => (held ? held.then(() => read) : read),
-          host: ASKER,
-          write: () => runNowAnswer(),
-        });
-        await chooseRunNow(board);
-        await board.readHint();
-        const delays = [...REQUESTED_RUN_REREAD_DELAYS_MS];
-        const last = delays.pop() ?? 0;
-        for (const [step, delay] of delays.entries()) {
-          await vi.advanceTimersByTimeAsync(delay);
-          await waitFor(() => expect(board.reads()).toHaveLength(4 + step));
-        }
-        held = new Promise((resolve) => (answerHeldReads = resolve));
-        await vi.advanceTimersByTimeAsync(last);
-        await waitFor(() => expect(board.reads()).toHaveLength(7));
-
-        const hint = board.readHint();
-        await waitFor(() => expect(board.reads()).toHaveLength(8));
-        held = undefined;
-        answerHeldReads?.();
-        await hint;
-        await vi.advanceTimersByTimeAsync(60_000);
-        expect(board.reads()).toHaveLength(8);
-        expect(board.host.queries).toEqual([]);
-
-        read = RUNNING;
-        await board.readHint();
-        await waitFor(() =>
-          expect(board.host.queries).toEqual([{ langyConversation: "conversation-7" }]),
-        );
+        await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS);
+        expect(board.reads()).toHaveLength(3);
+        expect(board.host.failures).toEqual([]);
       } finally {
         vi.useRealTimers();
       }
@@ -766,7 +620,8 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
       const dropdown = await openDropdown(board.user);
 
       await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
-      await waitFor(() => expect(board.reads()).toHaveLength(2));
+      await waitFor(() => expect(board.sent(RUN_NOW)).toHaveLength(1));
+      await board.readHint();
       const waiting = await openDropdown(board.user);
       // The scheduled run shows as the last run, and the board still waits for its own.
       expect(await waiting.findByText(`Ran ${RAN_AT} · nothing new`)).toBeInTheDocument();
@@ -796,7 +651,7 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
       });
       const dropdown = await openDropdown(board.user);
       await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
-      await waitFor(() => expect(board.reads()).toHaveLength(2));
+      await waitFor(() => expect(board.sent(RUN_NOW)).toHaveLength(1));
 
       // Another tab's request, or the schedule's wake, holds the run the process starts.
       const startedAt = requestedAt + 1_000;
@@ -828,7 +683,7 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
       });
       const dropdown = await openDropdown(board.user);
       await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
-      await waitFor(() => expect(board.reads()).toHaveLength(2));
+      await waitFor(() => expect(board.sent(RUN_NOW)).toHaveLength(1));
 
       // The worker records the lost run's timeout, with no conversation, before it starts ours.
       const lost = ranToday({
@@ -872,12 +727,12 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
         });
         const dropdown = await openDropdown(board.user);
         await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
-        await waitFor(() => expect(board.reads()).toHaveLength(2));
+        await waitFor(() => expect(board.sent(RUN_NOW)).toHaveLength(1));
 
         await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS - 60_000);
         expect(board.host.failures).toEqual([]);
-        // Run now's read starts the 4 re-reads a hint starts; no timer asks after them.
-        expect(board.reads()).toHaveLength(2 + REQUESTED_RUN_REREAD_DELAYS_MS.length);
+        // No timer reads before the deadline: the board opened with one read, and a hint asks the rest.
+        expect(board.reads()).toHaveLength(1);
         await vi.advanceTimersByTimeAsync(60_000);
 
         await waitFor(() => expect(board.host.failures).toHaveLength(1));
@@ -919,9 +774,7 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
 
           read = late;
           await board.readHint();
-          await vi.advanceTimersByTimeAsync(
-            INSIGHT_DAILY_RUN_EXPIRY_MS + REQUESTED_RUN_LAST_READ_MS,
-          );
+          await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS);
 
           expect(board.host.queries).toEqual([]);
           expect(board.host.notices).toEqual([]);
@@ -942,6 +795,71 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
       const dropdown = await openDropdown(board.user);
       expect(dropdown.queryByText("Starting a run.")).toBeNull();
       expect(dropdown.getByRole("button", { name: "Run now" })).toBeInTheDocument();
+    });
+
+    /** @scenario "Turning the run off ends the wait even when the write is refused" */
+    it("opens nothing and starts no failure for the run, though the server refuses the turn-off", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        let read = ON;
+        const board = openBoard({
+          setting: () => read,
+          host: ASKER,
+          write: (call) =>
+            call.path === TURN_OFF
+              ? Promise.reject(new UiProcedureRefusal("forbidden", 403))
+              : runNowAnswer(),
+        });
+        await chooseRunNow(board);
+        const dropdown = await openDropdown(board.user);
+        await board.user.click(dropdown.getByLabelText("Turn off daily insights"));
+        await waitFor(() => expect(board.host.failures).toHaveLength(1));
+
+        read = RUNNING;
+        await board.readHint();
+        await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS);
+
+        expect(board.host.queries).toEqual([]);
+        expect(board.host.notices).toEqual([]);
+        expect(board.host.failures.map((failure) => failure.fallbackTitle)).toEqual([
+          "Couldn't turn off daily insights",
+        ]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    /** @scenario "Turning the run off before Run now answers ends the wait" */
+    it("opens nothing and says nothing when Run now answers after the turn-off was sent", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        let read = ON;
+        let answerRunNow: (() => void) | undefined;
+        const board = openBoard({
+          setting: () => read,
+          host: ASKER,
+          write: (call) =>
+            call.path === RUN_NOW
+              ? new Promise((resolve) => (answerRunNow = () => resolve(runNowAnswer())))
+              : Promise.resolve(null),
+        });
+        await chooseRunNow(board);
+        const dropdown = await openDropdown(board.user);
+        await board.user.click(dropdown.getByLabelText("Turn off daily insights"));
+        await waitFor(() => expect(board.sent(TURN_OFF)).toHaveLength(1));
+        await waitFor(() => expect(quietControl()).toBeInTheDocument());
+
+        answerRunNow?.();
+        read = { ...RUNNING, state: "off" };
+        await board.readHint();
+        await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS);
+
+        expect(board.host.queries).toEqual([]);
+        expect(board.host.notices).toEqual([]);
+        expect(board.host.failures).toEqual([]);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
@@ -1051,61 +969,9 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
     });
   });
 
-  describe("when a re-read of the board fails", () => {
-    let answerRead: ReadAnswer;
-    let board: ReturnType<typeof openBoard>;
-
-    beforeEach(async () => {
-      vi.useFakeTimers({ shouldAdvanceTime: true });
-      answerRead = () => ON;
-      board = openBoard({
-        setting: () => answerRead(),
-        host: ASKER,
-        write: () => runNowAnswer(),
-      });
-      await chooseRunNow(board);
-      answerRead = READ_REFUSED;
-      await board.readHint();
-    });
-    afterEach(() => void vi.useRealTimers());
-
-    /** @scenario "A failed re-read leaves the next re-read its delay" */
-    it("reads again only after the next delay, and opens Langy once a read shows the run", async () => {
-      const [first, second] = REQUESTED_RUN_REREAD_DELAYS_MS;
-
-      await vi.advanceTimersByTimeAsync(first - 500);
-      expect(board.reads()).toHaveLength(3);
-      await vi.advanceTimersByTimeAsync(500);
-      await waitFor(() => expect(board.reads()).toHaveLength(4));
-      answerRead = () => RUNNING;
-      await vi.advanceTimersByTimeAsync(second);
-
-      await waitFor(() =>
-        expect(board.host.queries).toEqual([{ langyConversation: "conversation-7" }]),
-      );
-      expect(board.reads()).toHaveLength(5);
-      expect(board.host.failures).toEqual([]);
-    });
-
-    /** @scenario "Repeated failed re-reads stop when the delays end" */
-    it("stops after 4 re-reads, and leaves the rest to the deadline", async () => {
-      for (const [step, delay] of REQUESTED_RUN_REREAD_DELAYS_MS.entries()) {
-        await vi.advanceTimersByTimeAsync(delay);
-        await waitFor(() => expect(board.reads()).toHaveLength(4 + step));
-      }
-      await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS - 60_000);
-
-      expect(board.reads()).toHaveLength(7);
-      expect(board.host.failures).toEqual([]);
-      await vi.advanceTimersByTimeAsync(60_000);
-      await waitFor(() => expect(board.host.failures).toHaveLength(1));
-      expect(board.reads()).toHaveLength(8);
-    });
-  });
-
   describe("when the board has read no run for as long as a run can last", () => {
-    /** The read the board opened with, Run now's read and its 4 re-reads. */
-    const READS_BEFORE_DEADLINE = 2 + REQUESTED_RUN_REREAD_DELAYS_MS.length;
+    /** The read the board opened with: Run now asks none, and no timer reads before the deadline. */
+    const READS_BEFORE_DEADLINE = 1;
 
     beforeEach(() => void vi.useFakeTimers({ shouldAdvanceTime: true }));
     afterEach(() => void vi.useRealTimers());
@@ -1126,8 +992,46 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
         [],
         [{ title: `The run did not start: ${SKIP_REASON_WORDS.langy_off}.` }],
       ],
-    ])("%s, and reports no failure", async (_name, shown, queries, notices) => {
-      let read = ON;
+    ])(
+      "ends the spinner at expiry, %s, and reports no failure",
+      async (_name, shown, queries, notices) => {
+        let read = ON;
+        let answerRead: (() => void) | undefined;
+        let isHeld = false;
+        const board = openBoard({
+          setting: () =>
+            isHeld
+              ? new Promise<InsightDailyRunSetting>(
+                  (resolve) => (answerRead = () => resolve(shown)),
+                )
+              : read,
+          host: ASKER,
+          write: () => runNowAnswer(),
+        });
+        await aMinuteBeforeTheDeadline(board);
+
+        isHeld = true;
+        await vi.advanceTimersByTimeAsync(60_000);
+        await waitFor(() => expect(board.reads()).toHaveLength(READS_BEFORE_DEADLINE + 1));
+        // The spinner is gone before the read answers, and nothing was said.
+        expect((await openDropdown(board.user)).queryByText("Starting a run.")).toBeNull();
+        expect(board.host.queries).toEqual([]);
+        expect(board.host.failures).toEqual([]);
+
+        answerRead?.();
+        await waitFor(() => {
+          expect(board.host.queries).toEqual(queries);
+          expect(board.host.notices).toEqual(notices);
+        });
+        await vi.advanceTimersByTimeAsync(60_000);
+        expect(board.host.failures).toEqual([]);
+        expect(board.reads()).toHaveLength(READS_BEFORE_DEADLINE + 1);
+      },
+    );
+
+    /** @scenario "The deadline read never answers: the spinner still ends at expiry" */
+    it("ends the spinner at expiry and says nothing, and a later hint shows the run only in the dropdown", async () => {
+      let read: InsightDailyRunSetting | Promise<InsightDailyRunSetting> = ON;
       const board = openBoard({
         setting: () => read,
         host: ASKER,
@@ -1135,17 +1039,23 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
       });
       await aMinuteBeforeTheDeadline(board);
 
-      read = shown;
+      read = new Promise<InsightDailyRunSetting>(() => void 0);
       await vi.advanceTimersByTimeAsync(60_000);
+      await waitFor(() => expect(board.reads()).toHaveLength(READS_BEFORE_DEADLINE + 1));
+      await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS);
 
-      await waitFor(() => {
-        expect(board.host.queries).toEqual(queries);
-        expect(board.host.notices).toEqual(notices);
-      });
-      expect(board.reads()).toHaveLength(READS_BEFORE_DEADLINE + 1);
-      await vi.advanceTimersByTimeAsync(REQUESTED_RUN_LAST_READ_MS);
+      const waiting = await openDropdown(board.user);
+      expect(waiting.queryByText("Starting a run.")).toBeNull();
       expect(board.host.failures).toEqual([]);
-      expect(board.host.notices).toEqual(notices);
+      expect(board.host.notices).toEqual([]);
+      expect(board.host.queries).toEqual([]);
+
+      read = RUNNING;
+      await board.readHint();
+      expect(await waiting.findByText("A run is going.")).toBeInTheDocument();
+      expect(board.host.failures).toEqual([]);
+      expect(board.host.notices).toEqual([]);
+      expect(board.host.queries).toEqual([]);
     });
 
     /** @scenario "The deadline says the run could not be started when its last read finds none" */
@@ -1158,7 +1068,7 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
       await waitFor(() => expect(board.host.failures).toHaveLength(1));
       expect(board.host.failures[0]?.fallbackTitle).toBe("Couldn't start the run");
       expect(board.reads()).toHaveLength(READS_BEFORE_DEADLINE + 1);
-      await vi.advanceTimersByTimeAsync(REQUESTED_RUN_LAST_READ_MS);
+      await vi.advanceTimersByTimeAsync(60_000);
       expect(board.host.failures).toHaveLength(1);
       const again = await openDropdown(board.user);
       expect(again.getByRole("button", { name: "Run now" })).toBeInTheDocument();
@@ -1179,34 +1089,9 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
       await waitFor(() => expect(rebuilt.failures).toHaveLength(1));
       expect(board.host.failures).toEqual([]);
       expect(board.reads()).toHaveLength(READS_BEFORE_DEADLINE + 1);
-      await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS + REQUESTED_RUN_LAST_READ_MS);
+      await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS);
       expect(rebuilt.failures).toHaveLength(1);
       expect(board.reads()).toHaveLength(READS_BEFORE_DEADLINE + 1);
-    });
-
-    /** @scenario "The deadline does not move when the page's host is rebuilt" */
-    it("gives up on a read that never answers though a new host came while it waited", async () => {
-      let answerRead: ReadAnswer = () => ON;
-      const board = openBoard({
-        setting: () => answerRead(),
-        host: ASKER,
-        write: () => runNowAnswer(),
-      });
-      await aMinuteBeforeTheDeadline(board);
-
-      answerRead = () => new Promise<InsightDailyRunSetting>(() => void 0);
-      await vi.advanceTimersByTimeAsync(60_000);
-      await waitFor(() => expect(board.reads()).toHaveLength(READS_BEFORE_DEADLINE + 1));
-      await vi.advanceTimersByTimeAsync(REQUESTED_RUN_LAST_READ_MS / 2);
-      const rebuilt = new StubInsightHost(ASKER);
-      board.swapHost(rebuilt);
-      await vi.advanceTimersByTimeAsync(REQUESTED_RUN_LAST_READ_MS / 2);
-
-      await waitFor(() => expect(rebuilt.failures).toHaveLength(1));
-      expect(board.host.failures).toEqual([]);
-      expect(board.reads()).toHaveLength(READS_BEFORE_DEADLINE + 1);
-      await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS + REQUESTED_RUN_LAST_READ_MS);
-      expect(rebuilt.failures).toHaveLength(1);
     });
 
     /** @scenario "The deadline says so once when its last read fails" */
@@ -1224,39 +1109,10 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
 
       await waitFor(() => expect(board.host.failures).toHaveLength(1));
       expect(board.host.failures[0]?.fallbackTitle).toBe("Couldn't start the run");
-      await vi.advanceTimersByTimeAsync(REQUESTED_RUN_LAST_READ_MS);
+      await vi.advanceTimersByTimeAsync(60_000);
       expect(board.host.failures).toHaveLength(1);
       expect(board.reads()).toHaveLength(READS_BEFORE_DEADLINE + 1);
       expect(board.host.queries).toEqual([]);
-    });
-
-    /** @scenario "The deadline gives up on a last read that never answers" */
-    it("says so once when its read has not answered, and an answer after that opens nothing", async () => {
-      let answerRead: ReadAnswer = () => ON;
-      let answerLate: (() => void) | undefined;
-      const board = openBoard({
-        setting: () => answerRead(),
-        host: ASKER,
-        write: () => runNowAnswer(),
-      });
-      await aMinuteBeforeTheDeadline(board);
-
-      answerRead = () =>
-        new Promise<InsightDailyRunSetting>((resolve) => (answerLate = () => resolve(RUNNING)));
-      await vi.advanceTimersByTimeAsync(60_000);
-      await waitFor(() => expect(board.reads()).toHaveLength(READS_BEFORE_DEADLINE + 1));
-      expect(board.host.failures).toEqual([]);
-      await vi.advanceTimersByTimeAsync(REQUESTED_RUN_LAST_READ_MS);
-      await waitFor(() => expect(board.host.failures).toHaveLength(1));
-
-      answerLate?.();
-      await vi.advanceTimersByTimeAsync(1_000);
-
-      const after = await openDropdown(board.user);
-      expect(await after.findByText("A run is going.")).toBeInTheDocument();
-      expect(board.host.queries).toEqual([]);
-      expect(board.host.notices).toEqual([]);
-      expect(board.host.failures).toHaveLength(1);
     });
 
     /** @scenario "A run that shows after the deadline gave up opens nothing and says nothing" */
