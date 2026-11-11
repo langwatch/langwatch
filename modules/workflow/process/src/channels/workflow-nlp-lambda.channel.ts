@@ -1,8 +1,8 @@
 import { STATUS_CODES } from "node:http";
 
+import { readLwaResponsePayload } from "@langwatch/aws-client";
 import { createLogger } from "@langwatch/observability";
 
-import { readLwaResponsePayload } from "../rules/lambda-web-adapter-stream.rules.ts";
 import { sealStagedPayload } from "../rules/staged-payload-seal.rules.ts";
 import {
   type NlpLambdaInvoke,

@@ -44,6 +44,7 @@ import {
   analyticsTestSecrets,
   TEST_SESSION_SECRET,
 } from "../../app/__tests__/analytics-secrets.fixture.ts";
+import { ADMIT_EVERY_PLACEMENT } from "../../app/__tests__/analytics.fixture.ts";
 import { AnalyticsModule } from "../../app/analytics.app.ts";
 import {
   LangWatchQLExecutorRepository,
@@ -98,6 +99,7 @@ async function run({
 }) {
   const service = LangWatchQLService.create({
     accessRefusals: LangWatchQLAccessRefusalService.create(),
+    placement: ADMIT_EVERY_PLACEMENT,
     executor: new AnsweringExecutor(rows),
     database: "analytics",
     runTelemetry: LangWatchQLRunTelemetryService.create({ queryHashKey: QUERY_HASH_KEY }),
@@ -320,6 +322,7 @@ describe("LangWatchQL run telemetry", () => {
       };
       const service = LangWatchQLService.create({
         accessRefusals: LangWatchQLAccessRefusalService.create(),
+        placement: ADMIT_EVERY_PLACEMENT,
         executor: new AnsweringExecutor([{ n: 1 }]),
         database: "analytics",
         runTelemetry,

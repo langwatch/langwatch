@@ -4,6 +4,7 @@ exports[`the definition-driven access DDL > given fixed names, password hash and
 [
   "CREATE SETTINGS PROFILE OR REPLACE langwatch_profile
   SETTINGS custom_api_key_hash = '' CHANGEABLE_IN_READONLY,
+           log_comment = '' CHANGEABLE_IN_READONLY,
            readonly = 1 CONST,
            max_execution_time = 10 CONST,
            max_memory_usage = 1000000000 CONST,
@@ -14,7 +15,11 @@ exports[`the definition-driven access DDL > given fixed names, password hash and
            read_overflow_mode = 'throw' CONST,
            max_result_rows = 10000 CONST,
            max_result_bytes = 8000000 CONST,
-           result_overflow_mode = 'throw' CONST",
+           result_overflow_mode = 'throw' CONST,
+           log_query_settings = 0 CONST,
+           use_query_cache = 0 CONST,
+           use_query_condition_cache = 0 CONST,
+           allow_introspection_functions = 0 CONST",
   "CREATE USER OR REPLACE langwatch_lwql IDENTIFIED WITH sha256_hash BY 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' SETTINGS PROFILE langwatch_profile",
   "CREATE ROW POLICY OR REPLACE lwql_api_key_tenant_map_self ON langwatch.lwql_api_key_tenant_map
   USING has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash)
@@ -665,7 +670,7 @@ exports[`the definition-driven access DDL > given fixed names, password hash and
   "GRANT SELECT ON langwatch.webhook_endpoint_deliveries TO langwatch_lwql",
   "GRANT SELECT ON langwatch.workflow_versions TO langwatch_lwql",
   "GRANT SELECT ON langwatch.workflows TO langwatch_lwql",
-  "DROP NAMED COLLECTION IF EXISTS lwql_postgres",
-  "CREATE NAMED COLLECTION lwql_postgres AS host='pg.internal', port=5432, database='langwatch', user='lwql_ro', password='reader-secret'",
+  "CREATE NAMED COLLECTION IF NOT EXISTS lwql_postgres AS host='pg.internal', port=5432, database='langwatch', user='lwql_ro', password='reader-secret'",
+  "ALTER NAMED COLLECTION lwql_postgres SET host='pg.internal', port=5432, database='langwatch', user='lwql_ro', password='reader-secret'",
 ]
 `;

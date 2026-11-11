@@ -88,11 +88,13 @@ jobs:
       - run: make e2e-cold
       - run: make e2e-cold-move
       - run: make e2e-backup
+      - run: make e2e-access
       - name: Show logs on failure
         if: failure()
         run: |
           docker logs ch-e2e 2>&1 | tail -100 || true
           docker logs garage-e2e 2>&1 | tail -50 || true
+          docker logs ch-backup 2>&1 | tail -100 || true
 
   clickhouse-serverless-complete:
     needs: [changes, test, e2e]

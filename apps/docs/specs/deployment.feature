@@ -23,6 +23,12 @@ Feature: Publish the documentation as a static site
     And in-page navigation lands on the destination's address, not the old one
 
   @unit
+  Scenario: The release job's cache-bust redirect is not published
+    Given docs.json holds the "/ci/cache/busted/<timestamp>" redirect the release job rewrites
+    When the documentation is built
+    Then no redirect is published for it
+
+  @unit
   Scenario: Build with materialized Git LFS assets
     Given docs images, videos and fonts may be stored with Git LFS
     When the documentation checkout has its asset bytes

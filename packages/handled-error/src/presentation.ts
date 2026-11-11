@@ -661,6 +661,11 @@ const presentations = {
     describe: () =>
       "This project doesn't have the SQL workbench enabled yet. Ask your administrator to switch it on.",
   },
+  lwql_not_provisioned: {
+    title: "Custom SQL isn't set up where this data lives",
+    describe: () =>
+      "Custom SQL isn't set up yet on the server that holds this organisation's data. Ask your workspace administrator, or contact support.",
+  },
   saved_workbench_chart_already_exists: {
     title: "That chart id is already taken",
     describe: () =>
@@ -3735,10 +3740,19 @@ const presentations = {
   },
   instant_eval_opt_in_not_offered: {
     title: "Ask us to switch Instant Evals on",
-    describe: (error) =>
-      error.meta.deployment === "self_hosted"
+    // Hosted off is not something to ask for: the organization's own decision model is the way.
+    titleFor: (error) =>
+      error.meta.deployment === "hosted_off"
+        ? "LangWatch's hosted model is off for this organization"
+        : undefined,
+    describe: (error) => {
+      if (error.meta.deployment === "hosted_off") {
+        return "Run Instant Evals on your own decision model: pick one in the Instant Evals column of Default models.";
+      }
+      return error.meta.deployment === "self_hosted"
         ? "A self-hosted install gets Instant Evals from its license, or from whoever runs it when it has its own judge key, never from this switch. Contact us to add them to your license."
-        : "LangWatch switches Instant Evals on for an enterprise plan. Contact us to get them.",
+        : "LangWatch switches Instant Evals on for an enterprise plan. Contact us to get them.";
+    },
   },
   instant_eval_query_budget_exceeded: {
     title: "That's too much text to judge in one query",

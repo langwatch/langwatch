@@ -16,7 +16,10 @@ import {
 import { createTestLogger } from "@langwatch/test-harness";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { TEST_RUN_TELEMETRY } from "../../app/__tests__/analytics.fixture.ts";
+import {
+  ADMIT_EVERY_PLACEMENT,
+  TEST_RUN_TELEMETRY,
+} from "../../app/__tests__/analytics.fixture.ts";
 import { loadStockStatements } from "../../langwatch-ql/__tests__/stock-statements.ts";
 import { MAX_VIOLATIONS } from "../../rules/langwatch-ql-validation-shape.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
@@ -33,6 +36,7 @@ const STOCK_GATEWAY_SQL: string = loadStockStatements().find(
 const accessRefusals = LangWatchQLAccessRefusalService.create();
 const lwql = LangWatchQLService.create({
   accessRefusals,
+  placement: ADMIT_EVERY_PLACEMENT,
   runTelemetry: TEST_RUN_TELEMETRY,
   executor: null,
   database: "analytics",
@@ -147,6 +151,7 @@ describe("given a view no caller could see", () => {
   const gateway = LWQL_VIEW_CATALOG.find((view) => view.name === "gateway_request_spend")!;
   const service = LangWatchQLService.create({
     accessRefusals,
+    placement: ADMIT_EVERY_PLACEMENT,
     runTelemetry: TEST_RUN_TELEMETRY,
     executor: null,
     database: "analytics",

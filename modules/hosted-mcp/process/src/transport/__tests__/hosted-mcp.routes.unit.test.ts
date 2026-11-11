@@ -42,6 +42,7 @@ function handler() {
 const DISPATCHED_PATHS = [
   "/mcp",
   "/mcp/health",
+  "/mcp/docs",
   "/sse",
   "/.well-known/oauth-protected-resource",
   "/.well-known/oauth-protected-resource/mcp",
@@ -85,6 +86,29 @@ describe("given the hosted MCP route policy declarations", () => {
       expect(byVerb.get("OPTIONS /mcp")?.policy.kind).toBe("public");
       expect(byVerb.get("POST /mcp")?.family).toBe(HOSTED_MCP_FAMILY);
       expect(byVerb.get("POST /sse")?.policy).toEqual(byVerb.get("POST /mcp")?.policy);
+    });
+  });
+
+  describe("when the docs endpoint's policy is read", () => {
+    /** @scenario "The docs endpoint is declared public and the MCP transport stays behind a credential" */
+    it("declares POST /mcp/docs public with no credential and keeps POST /mcp behind an API key", () => {
+      const byVerb = new Map(
+        hostedMcpRoutePolicies().map((route) => [`${route.method} ${route.path}`, route]),
+      );
+
+      expect(byVerb.get("POST /mcp/docs")).toMatchObject({
+        policy: { kind: "public" },
+        credentialClass: "none",
+        credential: "public",
+        family: HOSTED_MCP_FAMILY,
+      });
+      expect(byVerb.get("OPTIONS /mcp/docs")?.policy.kind).toBe("public");
+      expect(byVerb.has("GET /mcp/docs")).toBe(false);
+      expect(byVerb.has("DELETE /mcp/docs")).toBe(false);
+      expect(byVerb.get("POST /mcp")).toMatchObject({
+        policy: { kind: "handlerManaged", credential: "apiKey" },
+        credentialClass: "project_api_key",
+      });
     });
   });
 

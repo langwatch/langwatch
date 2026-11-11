@@ -46,6 +46,7 @@ import {
   selectScalar,
   startLangWatchQLClickHouse,
   startLangWatchQLPostgres,
+  UNMAPPED_KEY_HASH,
 } from "./lwql-clickhouse-harness.ts";
 import { validateLangWatchQL } from "./lwql-validate.ts";
 import { LangWatchQLAccessAuditService } from "./support/langwatch-ql-access-audit.service.ts";
@@ -372,7 +373,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
       tenantColumn: "TenantId",
     });
     const garbage = await harness.restrictedClient({
-      keyHash: "not-a-real-key-hash",
+      keyHash: UNMAPPED_KEY_HASH,
     });
     for (const view of LWQL_VIEW_CATALOG) {
       const count = await selectScalar<string>(

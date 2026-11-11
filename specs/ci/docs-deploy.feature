@@ -40,3 +40,12 @@ Feature: Deploy the docs to their bucket from main
     And only new or changed keys are written, then keys the build dropped are deleted
     And every update names the store version it read, at most 50 keys at a time
     And a redirect the store cannot hold fails the deploy
+
+  @unit
+  Scenario: A deploy tells IndexNow which pages it changed
+    Given the sitemap the site served before the deploy and the build's sitemap
+    When the deploy has uploaded the build and refreshed the distribution
+    Then the pages the build adds or dates anew are submitted to IndexNow with the build's key and its location
+    And a first deploy, with no live sitemap, submits every page
+    And no changed page sends nothing
+    And a refused submission warns without failing the deploy

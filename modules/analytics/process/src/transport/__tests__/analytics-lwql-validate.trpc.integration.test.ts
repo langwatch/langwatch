@@ -9,7 +9,11 @@ import type { TrpcProcedureFactory, TrpcRouterMount } from "@langwatch/api/trpc"
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import { TEST_ACCESS_REFUSALS, TEST_RUN_TELEMETRY } from "../../app/__tests__/analytics.fixture.ts";
+import {
+  ADMIT_EVERY_PLACEMENT,
+  TEST_ACCESS_REFUSALS,
+  TEST_RUN_TELEMETRY,
+} from "../../app/__tests__/analytics.fixture.ts";
 import {
   catalogueWithout,
   EVERY_CATALOGUE_PERMISSION,
@@ -21,6 +25,7 @@ import { analyticsLwqlTrpcTransport, type AnalyticsLwqlApi } from "../analytics-
 const lwql = LangWatchQLService.create({
   accessRefusals: TEST_ACCESS_REFUSALS,
   runTelemetry: TEST_RUN_TELEMETRY,
+  placement: ADMIT_EVERY_PLACEMENT,
   executor: null,
   database: "analytics",
 });

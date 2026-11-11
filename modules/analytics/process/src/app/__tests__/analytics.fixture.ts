@@ -22,17 +22,26 @@ export const TEST_RUN_TELEMETRY = LangWatchQLRunTelemetryService.create({
 /** The refusal ledger for a suite that builds the LangWatchQL service alone. */
 export const TEST_ACCESS_REFUSALS = LangWatchQLAccessRefusalService.create();
 
+/** A placement gate that admits every run, for a suite that measures what happens past it. */
+export const ADMIT_EVERY_PLACEMENT: LangWatchQLServiceDependencies["placement"] = {
+  admit: () => Promise.resolve(),
+};
+
 /**
  * The real LangWatchQL service, for a suite that measures a real refusal —
  * built here so a consuming test never names the private service class.
  */
 export function createLangWatchQLService(
-  dependencies: Omit<LangWatchQLServiceDependencies, "runTelemetry" | "accessRefusals"> &
-    Partial<Pick<LangWatchQLServiceDependencies, "accessRefusals">>,
+  dependencies: Omit<
+    LangWatchQLServiceDependencies,
+    "runTelemetry" | "accessRefusals" | "placement"
+  > &
+    Partial<Pick<LangWatchQLServiceDependencies, "accessRefusals" | "placement">>,
 ): LangWatchQLService {
   return LangWatchQLService.create({
     runTelemetry: TEST_RUN_TELEMETRY,
     accessRefusals: TEST_ACCESS_REFUSALS,
+    placement: ADMIT_EVERY_PLACEMENT,
     ...dependencies,
   });
 }

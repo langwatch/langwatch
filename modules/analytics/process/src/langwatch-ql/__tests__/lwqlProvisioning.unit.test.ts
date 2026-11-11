@@ -59,6 +59,10 @@ describe("given the LangWatchQL settings profile statement", () => {
       ["rows returned", "max_result_rows = 444000 CONST"],
       ["bytes returned", "max_result_bytes = 555000 CONST"],
       ["result overflow", "result_overflow_mode = 'throw' CONST"],
+      ["query log settings", "log_query_settings = 0 CONST"],
+      ["query result cache", "use_query_cache = 0 CONST"],
+      ["query condition cache", "use_query_condition_cache = 0 CONST"],
+      ["introspection functions", "allow_introspection_functions = 0 CONST"],
     ])("pins the %s ceiling", (_label, expected) => {
       expect(accessModel.settingsProfileStatement({ names: NAMES, limits: LIMITS })).toContain(
         expected,
@@ -66,20 +70,21 @@ describe("given the LangWatchQL settings profile statement", () => {
     });
 
     /**
-     * The tenant capability is the one setting a caller may change, and its empty default is
-     * what makes an absent context read zero rows rather than every row.
+     * The tenant capability and the query log's comment are the settings the executor may
+     * change, and the capability's empty default makes an absent context read zero rows.
      */
-    it("leaves only the tenant capability changeable, defaulted to empty", () => {
+    it("leaves only the tenant capability and the log comment changeable, defaulted to empty", () => {
       const statement = accessModel.settingsProfileStatement({
         names: NAMES,
         limits: LIMITS,
       });
 
       expect(statement).toContain(`${NAMES.tenantSetting} = '' CHANGEABLE_IN_READONLY`);
+      expect(statement).toContain("log_comment = '' CHANGEABLE_IN_READONLY");
       expect(
         statement.match(/CHANGEABLE_IN_READONLY/g),
-        "exactly one setting may be changed per query",
-      ).toHaveLength(1);
+        "exactly two settings may be changed per query",
+      ).toHaveLength(2);
     });
   });
 

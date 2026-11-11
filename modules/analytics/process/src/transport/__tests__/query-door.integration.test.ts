@@ -24,7 +24,11 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { analyticsTestSecrets } from "../../app/__tests__/analytics-secrets.fixture.ts";
-import { TEST_ACCESS_REFUSALS, TEST_RUN_TELEMETRY } from "../../app/__tests__/analytics.fixture.ts";
+import {
+  ADMIT_EVERY_PLACEMENT,
+  TEST_ACCESS_REFUSALS,
+  TEST_RUN_TELEMETRY,
+} from "../../app/__tests__/analytics.fixture.ts";
 import { AnalyticsModule } from "../../app/analytics.app.ts";
 import { GATED_DATASET } from "../../langwatch-ql/__tests__/gatedDatasetFixture.ts";
 import {
@@ -77,6 +81,7 @@ function mountDoor({
   const service = LangWatchQLService.create({
     accessRefusals: TEST_ACCESS_REFUSALS,
     runTelemetry: TEST_RUN_TELEMETRY,
+    placement: ADMIT_EVERY_PLACEMENT,
     executor,
     database: DATABASE,
     views: [...LWQL_VIEW_CATALOG, GATED_DATASET],

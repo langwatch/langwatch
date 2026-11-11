@@ -15,7 +15,11 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { TEST_ACCESS_REFUSALS, TEST_RUN_TELEMETRY } from "../../app/__tests__/analytics.fixture.ts";
+import {
+  ADMIT_EVERY_PLACEMENT,
+  TEST_ACCESS_REFUSALS,
+  TEST_RUN_TELEMETRY,
+} from "../../app/__tests__/analytics.fixture.ts";
 import { LWQL_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLService } from "../langwatch-ql.service.ts";
 import { WorkbenchProtectionsService } from "../workbench-protections.service.ts";
@@ -29,6 +33,7 @@ const PROJECT_ID = "project-1";
 const lwql = LangWatchQLService.create({
   accessRefusals: TEST_ACCESS_REFUSALS,
   runTelemetry: TEST_RUN_TELEMETRY,
+  placement: ADMIT_EVERY_PLACEMENT,
   executor: null,
   database: "analytics",
 });
@@ -116,6 +121,7 @@ describe("given one table of allOf access and another of anyOf", () => {
     const service = LangWatchQLService.create({
       accessRefusals: TEST_ACCESS_REFUSALS,
       runTelemetry: TEST_RUN_TELEMETRY,
+      placement: ADMIT_EVERY_PLACEMENT,
       executor: null,
       database: "analytics",
       catalog: {
