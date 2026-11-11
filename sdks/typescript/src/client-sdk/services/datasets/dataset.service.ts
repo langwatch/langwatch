@@ -37,6 +37,8 @@ import {
   type DeleteRecordsResponse,
   type UploadResponse,
   type DatasetRecordResponse,
+  type UpsertRecordsOptions,
+  type UpsertRecordsResult,
 } from "./types";
 
 type ApiColumnType = NonNullable<
@@ -75,6 +77,27 @@ function toApiColumnTypes(
     }
     return { name, type: parsed.data };
   });
+}
+
+/** Rows sent per batch create by an upsert: the smallest batch any plan accepts. */
+const CREATE_BATCH_SIZE = 1000;
+
+/** A value as JSON with object keys sorted, so equal values compare equal whatever their order. */
+function stableJson(value: unknown): string {
+  return JSON.stringify(value, (_key, inner: unknown) =>
+    inner && typeof inner === "object" && !Array.isArray(inner)
+      ? Object.fromEntries(Object.entries(inner).sort(([a], [b]) => a.localeCompare(b)))
+      : inner,
+  );
+}
+
+/** A key column's value as a comparable string, so 1 and "1" stay different keys. */
+function keyOf(value: unknown): string {
+  return stableJson(value);
+}
+
+function sameEntry(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+  return stableJson(a) === stableJson(b);
 }
 
 type DatasetServiceConfig = {
@@ -373,6 +396,7 @@ export class DatasetService {
         body: {
           name: options.name,
           columnTypes: toApiColumnTypes(options.columnTypes ?? []),
+          ...(options.entries && options.entries.length > 0 ? { entries: options.entries } : {}),
         },
       }),
     );
@@ -467,6 +491,57 @@ export class DatasetService {
       `update record "${recordId}" in dataset "${slugOrId}"`,
       slugOrId,
     );
+  }
+
+  /**
+   * Updates the rows whose `key` column matches an entry, adds the entries whose key is new, and
+   * leaves alone the rows an entry would not change. Columns an entry leaves out keep their
+   * values. Refuses, before writing anything, a key that more than one existing row holds.
+   */
+  async upsertRecords(
+    slugOrId: string,
+    entries: Record<string, unknown>[],
+    { key }: UpsertRecordsOptions,
+  ): Promise<UpsertRecordsResult> {
+    const result: UpsertRecordsResult = { created: [], updated: [], unchanged: 0 };
+    if (entries.length === 0) return result;
+
+    const existing = new Map<string, DatasetEntry[]>();
+    for (const row of (await this.getDataset(slugOrId)).entries) {
+      if (!(key in row.entry)) continue;
+      const rowKey = keyOf(row.entry[key]);
+      existing.set(rowKey, [...(existing.get(rowKey) ?? []), row]);
+    }
+    const duplicated = entries
+      .filter((entry) => (existing.get(keyOf(entry[key]))?.length ?? 0) > 1)
+      .map((entry) => keyOf(entry[key]));
+    if (duplicated.length > 0) {
+      throw new DatasetValidationError(
+        `More than one row holds ${key} = ${duplicated.join(", ")}. ` +
+          "Delete the extra rows, then upsert again.",
+      );
+    }
+
+    const toCreate: Record<string, unknown>[] = [];
+    for (const entry of entries) {
+      const row = existing.get(keyOf(entry[key]))?.[0];
+      if (!row) {
+        toCreate.push(entry);
+        continue;
+      }
+      const merged = { ...row.entry, ...entry };
+      if (sameEntry(merged, row.entry)) {
+        result.unchanged++;
+        continue;
+      }
+      result.updated.push(await this.updateRecord(slugOrId, row.id, merged));
+    }
+    for (let start = 0; start < toCreate.length; start += CREATE_BATCH_SIZE) {
+      const batch = toCreate.slice(start, start + CREATE_BATCH_SIZE);
+      result.created.push(...(await this.createRecords(slugOrId, batch)).data);
+    }
+
+    return result;
   }
 
   /**

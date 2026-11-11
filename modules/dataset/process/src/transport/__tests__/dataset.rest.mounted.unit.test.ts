@@ -292,12 +292,67 @@ describe("the mounted dataset REST family", () => {
         projectId: "project-1",
         name: "User Feedback",
         columnTypes: [{ name: "input", type: "string" }],
+        editedBy: { kind: "user", id: "user-1" },
       });
       await expect(response.json()).resolves.toMatchObject({
         id: "dataset_1",
         slug: "my-dataset",
         platformUrl: "https://app.langwatch.test/project-one/datasets/dataset_1",
       });
+    });
+
+    /** @scenario "A dataset is created over REST with its columns and first rows in one call" */
+    it("hands the entries to the same create, so columns and rows land together", async () => {
+      const { send, stub } = mount();
+      const columnTypes = [
+        { name: "case_id", type: "string" },
+        { name: "input", type: "string" },
+      ];
+      const entries = [
+        { case_id: "c-1", input: "hello" },
+        { case_id: "c-2", input: "bye" },
+      ];
+
+      const response = await send("POST", "/api/dataset", { name: "QA", columnTypes, entries });
+
+      expect(response.status).toBe(201);
+      expect(stub.upsertDataset).toHaveBeenCalledTimes(1);
+      expect(stub.upsertDataset).toHaveBeenCalledWith({
+        projectId: "project-1",
+        name: "QA",
+        columnTypes,
+        datasetRecords: entries,
+        editedBy: { kind: "user", id: "user-1" },
+      });
+      expect(stub.batchCreateRecords).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Creating a dataset over REST refuses a row with a column the dataset does not define" */
+    it("refuses an entry naming a column the column types leave out", async () => {
+      const { send, stub } = mount();
+
+      const response = await send("POST", "/api/dataset", {
+        name: "QA",
+        columnTypes: [{ name: "input", type: "string" }],
+        entries: [{ input: "hello", expected: "hi" }],
+      });
+
+      expect(response.status).toBe(422);
+      expect(JSON.stringify(await response.json())).toContain("expected");
+      expect(stub.upsertDataset).not.toHaveBeenCalled();
+    });
+
+    it("refuses more entries than the batch ceiling", async () => {
+      const { send, stub } = mount();
+
+      const response = await send("POST", "/api/dataset", {
+        name: "QA",
+        columnTypes: [{ name: "input", type: "string" }],
+        entries: Array.from({ length: 4001 }, (_, index) => ({ input: `item-${index}` })),
+      });
+
+      expect(response.status).toBe(422);
+      expect(stub.upsertDataset).not.toHaveBeenCalled();
     });
 
     /** @scenario "Create a dataset requires a name" */

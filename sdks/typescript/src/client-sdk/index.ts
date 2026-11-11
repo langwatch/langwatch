@@ -22,6 +22,8 @@ export type {
   DeleteRecordsResponse,
   UploadResponse,
   DatasetRecordResponse,
+  UpsertRecordsOptions,
+  UpsertRecordsResult,
 } from "./services/datasets";
 export {
   DatasetError,

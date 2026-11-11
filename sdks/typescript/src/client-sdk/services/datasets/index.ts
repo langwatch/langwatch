@@ -28,4 +28,6 @@ export type {
   DeleteRecordsResponse,
   UploadResponse,
   DatasetRecordResponse,
+  UpsertRecordsOptions,
+  UpsertRecordsResult,
 } from "./types";

@@ -33,10 +33,32 @@ const DATASET_BATCH_MAX = resolveRequestBound("datasetBatchMax", "ENTERPRISE");
 
 const columnTypeSchema = z.object({ name: z.string(), type: datasetColumnTypeSchema });
 
-const datasetRestCreateSchemaDefinition = z.object({
-  name: z.string().min(1, "name is required"),
-  columnTypes: z.array(columnTypeSchema).optional().default([]),
-});
+/** A key no column defines is refused, as an append refuses it, rather than stored unseen. */
+const datasetRestCreateSchemaDefinition = z
+  .object({
+    name: z.string().min(1, "name is required"),
+    columnTypes: z.array(columnTypeSchema).optional().default([]),
+    entries: z
+      .array(z.record(z.string(), z.any()))
+      .max(DATASET_BATCH_MAX, `Maximum batch size is ${DATASET_BATCH_MAX} entries`)
+      .optional()
+      .describe(
+        "The dataset's first rows, written with it in one call. Each key must be a column in `columnTypes`.",
+      ),
+  })
+  .superRefine(({ columnTypes, entries }, context) => {
+    const columns = new Set(columnTypes.map((column) => column.name));
+    entries?.forEach((entry, index) => {
+      for (const key of Object.keys(entry)) {
+        if (key === "id" || columns.has(key)) continue;
+        context.addIssue({
+          code: "custom",
+          path: ["entries", index, key],
+          message: `Column "${key}" is not in columnTypes`,
+        });
+      }
+    });
+  });
 export interface DatasetRestCreateSchema extends Named<typeof datasetRestCreateSchemaDefinition> {}
 export const datasetRestCreateSchema: DatasetRestCreateSchema = datasetRestCreateSchemaDefinition;
 

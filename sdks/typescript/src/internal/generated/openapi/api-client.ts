@@ -580,7 +580,7 @@ export interface paths {
         /** @description List all non-archived datasets for the project (paginated) */
         get: operations["getApiDataset"];
         put?: never;
-        /** @description Create a new dataset */
+        /** @description Create a new dataset, optionally with its first rows in `entries`, written in the same call. */
         post: operations["postApiDataset"];
         delete?: never;
         options?: never;
@@ -8916,6 +8916,10 @@ export interface operations {
                         name: string;
                         /** @enum {string} */
                         type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
+                    }[];
+                    /** @description The dataset's first rows, written with it in one call. Each key must be a column in `columnTypes`. */
+                    entries?: {
+                        [key: string]: unknown;
                     }[];
                 };
             };

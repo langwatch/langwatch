@@ -46278,7 +46278,10 @@ type PostApiDatasetJSONBody struct {
 		Name string                                `json:"name"`
 		Type PostApiDatasetJSONBodyColumnTypesType `json:"type"`
 	} `json:"columnTypes,omitempty"`
-	Name string `json:"name"`
+
+	// Entries The dataset's first rows, written with it in one call. Each key must be a column in `columnTypes`.
+	Entries *[]map[string]interface{} `json:"entries,omitempty"`
+	Name    string                    `json:"name"`
 }
 
 // PostApiDatasetJSONBodyColumnTypesType defines parameters for PostApiDataset.

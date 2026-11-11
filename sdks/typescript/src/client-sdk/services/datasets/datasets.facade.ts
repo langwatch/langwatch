@@ -17,6 +17,8 @@ import {
   type DeleteRecordsResponse,
   type UploadResponse,
   type DatasetRecordResponse,
+  type UpsertRecordsOptions,
+  type UpsertRecordsResult,
 } from "./types";
 
 type DatasetsFacadeConfig = {
@@ -129,6 +131,39 @@ export class DatasetsFacade {
     entry: Record<string, unknown>,
   ): Promise<DatasetRecordResponse> => {
     return this.#datasetService.updateRecord(slugOrId, recordId, entry);
+  };
+
+  /**
+   * Updates or adds rows, matching existing rows on a key column, for keeping a dataset in sync
+   * with rows held elsewhere such as files in a repository. A row whose `key` value an entry
+   * holds is updated in place, keeping the columns the entry leaves out; a new key adds a row;
+   * a row the entry would not change is not written, so running it again writes nothing.
+   * @param slugOrId - The slug or ID of the dataset
+   * @param entries - The rows to upsert; each must hold the key column
+   * @param options - The key column that identifies a row, such as "case_id"
+   * @returns The created and updated records and the number of rows left unchanged
+   */
+  upsertRecords = async (
+    slugOrId: string,
+    entries: Record<string, unknown>[],
+    options: UpsertRecordsOptions,
+  ): Promise<UpsertRecordsResult> => {
+    const { key } = options;
+    if (!key) {
+      throw new DatasetValidationError("key must name the column that identifies a row");
+    }
+    const seen = new Set<string>();
+    for (const entry of entries) {
+      if (!(key in entry)) {
+        throw new DatasetValidationError(`Every entry must hold the key column "${key}"`);
+      }
+      const value = JSON.stringify(entry[key]);
+      if (seen.has(value)) {
+        throw new DatasetValidationError(`Two entries share the key ${key} = ${value}`);
+      }
+      seen.add(value);
+    }
+    return this.#datasetService.upsertRecords(slugOrId, entries, options);
   };
 
   /**

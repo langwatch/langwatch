@@ -91,6 +91,8 @@ export {
   type DeleteRecordsResponse,
   type UploadResponse,
   type DatasetRecordResponse,
+  type UpsertRecordsOptions,
+  type UpsertRecordsResult,
 } from "./client-sdk/services/datasets";
 
 // Evaluations API exports (Online Evaluations / Guardrails)

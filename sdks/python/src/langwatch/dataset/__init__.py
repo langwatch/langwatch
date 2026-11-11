@@ -40,6 +40,7 @@ from .types import (
     PaginatedResult,
     Pagination,
     UploadResult,
+    UpsertResult,
 )
 
 # Re-export custom error classes for convenient import.
@@ -64,6 +65,7 @@ __all__ = [
     "PaginatedResult",
     "Pagination",
     "UploadResult",
+    "UpsertResult",
     "GetDatasetOptions",
     "get_dataset",
 ]

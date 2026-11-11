@@ -47802,7 +47802,7 @@
             }
           }
         },
-        "description": "Create a new dataset",
+        "description": "Create a new dataset, optionally with its first rows in `entries`, written in the same call.",
         "security": [
           {
             "project_api_key": []
@@ -47860,6 +47860,18 @@
                         "name",
                         "type"
                       ]
+                    }
+                  },
+                  "entries": {
+                    "description": "The dataset's first rows, written with it in one call. Each key must be a column in `columnTypes`.",
+                    "maxItems": 4000,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
                     }
                   }
                 },
