@@ -23,9 +23,9 @@ new MATERIALIZED column.
 ## Decision
 
 1. **Latest-in-order dedup.** A view may pin `dedup.strategy: "latest-in-order"`. It reads its
-   table through a subquery `ORDER BY <full sort key, stableColumns>, <version> DESC,
-   <tieBreakColumns> DESC LIMIT 1 BY <full sort key, stableColumns>`: whole rows, newest version
-   first, one per key. The order matches the table's, so `optimize_read_in_order` merges the parts
+   table through a subquery
+   `ORDER BY <full sort key, stableColumns>, <version> DESC, <tieBreakColumns> DESC LIMIT 1 BY <full sort key, stableColumns>`:
+   whole rows, newest version first, one per key. The order matches the table's, so `optimize_read_in_order` merges the parts
    as a stream with no hash state. A filter on a key column reaches the primary key and
    partitions. An earlier form, `GROUP BY` the key with `argMax` per column under
    `optimize_aggregation_in_order`, measured far worse (below) and was replaced; the profile pins
@@ -92,12 +92,12 @@ host with a load average of 25. Failures are out of all 210 stock queries and ou
 read one of the nine views. The other 65 read no pinned view; they fail 0 (30 days) and 2 (60
 days, two `evaluation_metrics` coverage queries that also fail on main) in every configuration.
 
-| Configuration (CH 26.8.36.3) | 30 days: all / affected | 60 days: all / affected |
-| --- | --- | --- |
-| Before: main's SQL, FINAL views | 39/210, 39/145 | 47/210, 45/145 |
-| New SQL, `argMax` + aggregation in order | 76/210, 76/145 | 104/210, 102/145 |
-| New SQL, `LIMIT 1 BY` (shipped) | 42/210, 42/145 | 60/210, 58/145 |
-| New SQL, nine views on FINAL | 38/210, 38/145 | 55/210, 53/145 |
+| Configuration (CH 26.8.36.3)             | 30 days: all / affected | 60 days: all / affected |
+| ---------------------------------------- | ----------------------- | ----------------------- |
+| Before: main's SQL, FINAL views          | 39/210, 39/145          | 47/210, 45/145          |
+| New SQL, `argMax` + aggregation in order | 76/210, 76/145          | 104/210, 102/145        |
+| New SQL, `LIMIT 1 BY` (shipped)          | 42/210, 42/145          | 60/210, 58/145          |
+| New SQL, nine views on FINAL             | 38/210, 38/145          | 55/210, 53/145          |
 
 - **Against before.** `argMax`: 37 newly fail at 30 days and 57 at 60, none fixed. `LIMIT 1 BY`:
   11 newly fail and 8 pass that failed (30 days); 14 and 1 (60 days). New SQL on FINAL: 9 and 10;

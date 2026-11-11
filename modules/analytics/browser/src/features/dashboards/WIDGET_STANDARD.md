@@ -32,7 +32,7 @@ and draws one of these states:
 
 | State        | What the reader sees                                                                                                                                                      |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| loading      | A skeleton until a query first answers; "Slow query, still running…" after 5 seconds. See "Loading" below.                                                                            |
+| loading      | A skeleton until a query first answers; "Slow query, still running…" after 5 seconds. See "Loading" below.                                                                |
 | `no_access`  | What is withheld and who to ask, with a lock. See "No access" below.                                                                                                      |
 | failed       | "Couldn't load", the reason, and Retry; the card title names the widget. Retry runs all the widget's queries again. Short faces show whole lines only.                    |
 | `no_traffic` | "No traces in this period", naming what the query counts, and what sends it. See "Empty widgets" below.                                                                   |

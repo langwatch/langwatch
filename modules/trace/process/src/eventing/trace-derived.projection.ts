@@ -155,8 +155,11 @@ export interface TraceAnalyticsRow {
 
   // Trimmed Attributes map (post-trimAttributesForAnalytics).
   attributes: Record<string, string>;
-  /** The `metadata.*` keys the stock widgets read, as columns, from the trimmed map. */
-  metadataColumns: TraceAnalyticsMetadataColumns;
+  /**
+   * The `metadata.*` keys the stock widgets read, as columns, from the trimmed map. The fold
+   * always sets it; absent, the repository derives the same values from `attributes`.
+   */
+  metadataColumns?: TraceAnalyticsMetadataColumns;
 
   /**
    * The persistable-signal verdict. NOT a table column — readers derive it

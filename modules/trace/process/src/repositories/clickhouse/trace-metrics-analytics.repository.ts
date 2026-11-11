@@ -465,7 +465,7 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
       HasAnnotation: row.hasAnnotation,
 
       Attributes: row.attributes,
-      ...row.metadataColumns,
+      ...(row.metadataColumns ?? traceAnalyticsMetadataColumns(row.attributes)),
 
       SpanCount: Math.max(0, Math.round(row.spanCount)),
       AnnotationIds: row.annotationIds,
