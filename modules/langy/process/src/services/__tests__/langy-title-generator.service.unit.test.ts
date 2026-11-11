@@ -30,6 +30,8 @@ function messagesOf(records: { role: "user" | "assistant"; content: string }[]) 
 function generatorOver(input: {
   records: { role: "user" | "assistant"; content: string }[];
   text?: string;
+  resolvedModel?: string;
+  generateFailure?: Error;
 }) {
   const resolved: ModelDefaultResolveInput[] = [];
   const completions: ModelProviderTextGenerationInput[] = [];
@@ -37,7 +39,7 @@ function generatorOver(input: {
     resolveModelForFeature: async (request) => {
       resolved.push(request);
       return {
-        model: "openai/gpt-5-mini",
+        model: input.resolvedModel ?? "openai/gpt-5-mini",
         source: "role_default",
         scope: "project",
         feature: {
@@ -50,6 +52,7 @@ function generatorOver(input: {
     },
     generateText: async (request) => {
       completions.push(request);
+      if (input.generateFailure) throw input.generateFailure;
       return { text: input.text ?? "A Title" };
     },
   });
@@ -132,6 +135,36 @@ describe("given a conversation the customer never named", () => {
       expect("title" in generated && generated.title.length).toBe(
         LANGY_TITLE_GENERATION.MAX_TITLE_CHARS,
       );
+    });
+  });
+
+  describe("when the title model resolves to a Codex model", () => {
+    const records = [{ role: "user" as const, content: "hello" }];
+
+    it("generates the title with the cheap default model instead", async () => {
+      const { service, completions } = generatorOver({
+        records,
+        resolvedModel: "openai_codex/gpt-5.6-terra",
+      });
+
+      const generated = await service.generate(call);
+
+      expect(completions[0]?.model).toBe(LANGY_TITLE_GENERATION.MODEL);
+      expect(generated).toEqual({
+        outcome: "generated",
+        title: "A Title",
+        model: LANGY_TITLE_GENERATION.MODEL,
+      });
+    });
+
+    it("leaves the title unchanged without throwing when the cheap default also fails", async () => {
+      const { service } = generatorOver({
+        records,
+        resolvedModel: "openai_codex/gpt-5.6-terra",
+        generateFailure: new Error("provider down"),
+      });
+
+      await expect(service.generate(call)).resolves.toEqual({ outcome: "unchanged" });
     });
   });
 });
