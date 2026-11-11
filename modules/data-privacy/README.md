@@ -11,7 +11,7 @@ Data privacy: per-scope rules and the PII redaction level a project runs at.
 | Classification | core (`modules/catalogue.json`)                                                                                          |
 | Subjects       | data-privacy                                                                                                             |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                                                 |
-| Api token      | `DataPrivacyApi` = `moduleApi<DataPrivacyApi>()("data-privacy")`, `contract/src/data-privacy.api.ts:132` (16 operations) |
+| Api token      | `DataPrivacyApi` = `moduleApi<DataPrivacyApi>()("data-privacy")`, `contract/src/data-privacy.api.ts:142` (16 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                               |
 
 ## What data-privacy owns
@@ -21,7 +21,7 @@ Data privacy: per-scope rules and the PII redaction level a project runs at.
 | Postgres table                 | `DataPrivacyPolicy`                                                                                                                                                                                                                        | `process/src/repositories/prisma/prisma.data-privacy.repository.ts:15`           |
 | Postgres, accessed not claimed | `Department`, `Group`, `Organization`, `OrganizationUser`, `Project`, `Team`                                                                                                                                                               | `process/src/repositories/prisma/prisma.data-privacy-directory.repository.ts:17` |
 | Stores required                |                                                                                                                                                                                                                                            | `process/src/channels/http/http.data-privacy.channels.ts:18`                     |
-| Secrets                        | `googleApplicationCredentials` (GOOGLE_APPLICATION_CREDENTIALS)                                                                                                                                                                            | `process/src/app/data-privacy.app.ts:109`                                        |
+| Secrets                        | `googleApplicationCredentials` (GOOGLE_APPLICATION_CREDENTIALS), `requestIdKey` (API_KEY_PEPPER), `requestIdKeyFallback` (CREDENTIALS_SECRET), `requestIdKeyLastFallback` (NEXTAUTH_SECRET)                                                | `process/src/app/data-privacy.app.ts:139`                                        |
 | Config                         | `googleDlpDisabled` (LANGWATCH_DISABLE_GOOGLE_DLP), `enforcement` (LANGWATCH_DATA_PRIVACY_ENFORCEMENT), `nodeEnvironment` (NODE_ENV), `langevalsEndpoint` (LANGEVALS_ENDPOINT), `piiRedactionModelEndpoint` (PII_REDACTION_MODEL_ENDPOINT) | `contract/src/data-privacy.config.ts:11`                                         |
 
 Anything else data-privacy needs belongs to another module and is reached through its `*Api`.

@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable data-privacy operations shared by process peers after composition.
 
-Peers call these through the token, declared at `../contract/src/data-privacy.api.ts:50`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/data-privacy.api.ts:60`; nothing else in this package is public.
 
 #### `getResolvedForProject`
 
@@ -188,7 +188,10 @@ Declared at `src/eventing/pii-redaction-spend.pipeline.ts:35`. Events: `piiRedac
 
 | Kind   | Leaf                           | Environment variable                 | Declared at                                 |
 | ------ | ------------------------------ | ------------------------------------ | ------------------------------------------- |
-| secret | `googleApplicationCredentials` | `GOOGLE_APPLICATION_CREDENTIALS`     | `src/app/data-privacy.app.ts:109`           |
+| secret | `googleApplicationCredentials` | `GOOGLE_APPLICATION_CREDENTIALS`     | `src/app/data-privacy.app.ts:139`           |
+| secret | `requestIdKey`                 | `API_KEY_PEPPER`                     | `src/app/data-privacy.app.ts:141`           |
+| secret | `requestIdKeyFallback`         | `CREDENTIALS_SECRET`                 | `src/app/data-privacy.app.ts:142`           |
+| secret | `requestIdKeyLastFallback`     | `NEXTAUTH_SECRET`                    | `src/app/data-privacy.app.ts:143`           |
 | config | `googleDlpDisabled`            | `LANGWATCH_DISABLE_GOOGLE_DLP`       | `../contract/src/data-privacy.config.ts:11` |
 | config | `enforcement`                  | `LANGWATCH_DATA_PRIVACY_ENFORCEMENT` | `../contract/src/data-privacy.config.ts:16` |
 | config | `nodeEnvironment`              | `NODE_ENV`                           | `../contract/src/data-privacy.config.ts:18` |

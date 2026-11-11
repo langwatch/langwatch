@@ -131,6 +131,12 @@
       "path": "../../../packages/egress/tsconfig.build.json"
     },
     {
+      "path": "../../data-privacy/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/clickhouse-client/tsconfig.build.json"
+    },
+    {
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
@@ -150,9 +156,6 @@
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/clickhouse-client/tsconfig.build.json"
     }
   ],
   // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
