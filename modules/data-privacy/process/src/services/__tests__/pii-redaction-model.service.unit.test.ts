@@ -31,6 +31,7 @@ import {
   PII_REDACTION_MODEL_BREAKER_COOLDOWN_MS,
   PII_REDACTION_MODEL_TIMEOUT_MS,
 } from "../../rules/pii-redaction-model.rules.ts";
+import { piiRedactionRequestIdKey } from "../../rules/pii-redaction-spend.rules.ts";
 import { DataPrivacyProjectScopeService } from "../data-privacy-project-scope.service.ts";
 import { GoogleDlpRedactionService } from "../google-dlp-redaction.service.ts";
 import { OtlpSpanPiiRedactionService } from "../otlp-span-pii-redaction.service.ts";
@@ -205,6 +206,7 @@ function setup({
   const usage: { level: "info" | "warn"; fields: PiiRedactionModelUsage; message: string }[] = [];
   const priced: PiiRedactionSpendPricedEventData[] = [];
   const spend = PiiRedactionSpendService.create({
+    requestIdKey: piiRedactionRequestIdKey("test-key-pepper"),
     featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
     recordSpendPriced: async (fact) => {
       priced.push(fact);

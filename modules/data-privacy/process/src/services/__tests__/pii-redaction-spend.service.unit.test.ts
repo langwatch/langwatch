@@ -3,6 +3,7 @@ import type { FeatureFlagApi, FeatureFlagTarget } from "@langwatch/feature-flag-
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { piiRedactionRequestIdKey } from "../../rules/pii-redaction-spend.rules.ts";
 import { PiiRedactionSpendService } from "../pii-redaction-spend.service.ts";
 
 const ORGANIZATION_ID = "org_1";
@@ -13,7 +14,8 @@ function setup({
   free = false,
   flagFails = false,
   dispatchFails = false,
-}: { free?: boolean; flagFails?: boolean; dispatchFails?: boolean } = {}) {
+  noKey = false,
+}: { free?: boolean; flagFails?: boolean; dispatchFails?: boolean; noKey?: boolean } = {}) {
   let clock = NOW;
   const flagReads: { key: string; target: FeatureFlagTarget }[] = [];
   const featureFlags = createApiFixture<FeatureFlagApi>({
@@ -26,6 +28,7 @@ function setup({
   const facts: PiiRedactionSpendPricedEventData[] = [];
   const errors: { fields: Record<string, unknown>; message: string }[] = [];
   const spend = PiiRedactionSpendService.create({
+    requestIdKey: noKey ? undefined : piiRedactionRequestIdKey("test-key-pepper"),
     featureFlags,
     recordSpendPriced: async (fact) => {
       if (dispatchFails) throw new Error("queue unreachable");
@@ -49,6 +52,23 @@ const call = {
 };
 
 describe("PiiRedactionSpendService", () => {
+  describe("when it was built with no request-id key", () => {
+    it("records nothing and logs the unbilled call at error", async () => {
+      const { spend, facts, errors } = setup({ noKey: true });
+
+      await spend.record(call);
+
+      expect(facts).toEqual([]);
+      expect(errors).toEqual([
+        {
+          fields: { organizationId: ORGANIZATION_ID, projectId: PROJECT_ID, priceNanoUsd: 500_000 },
+          message:
+            "PII redaction model call not billed: no key pepper to derive its request id from",
+        },
+      ]);
+    });
+  });
+
   describe("when the model answers a batch of 1,000 characters", () => {
     /** @scenario "An answered batch is priced at the published rate per character" */
     it("records one priced fact at 500,000 nano dollars with our cost beside it", async () => {

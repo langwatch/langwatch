@@ -67,6 +67,20 @@ Feature: A PII redaction model call is priced per character, written to the spen
       Then its request id is derived from the project and the texts sent
 
     @unit
+    Scenario: The request id cannot be recomputed from a guessed text
+      Given a strict batch whose text is short, such as a phone number
+      When its request id is derived
+      Then it is an HMAC under a key derived from the deployment's key pepper, never a plain hash
+      And the same project and texts under another deployment's key give another id
+
+    @unit
+    Scenario: A deployment that calls the model and has no key pepper refuses to boot
+      Given the PII redaction model endpoint is configured
+      And none of API_KEY_PEPPER, CREDENTIALS_SECRET or NEXTAUTH_SECRET is set
+      When the data privacy module starts
+      Then it refuses to boot, rather than derive request ids anyone can recompute
+
+    @unit
     Scenario: A log record's or metric point's key reaches the model call
       Given a strict log record, or metric point, redacted with a record key
       When the model is asked to clear it

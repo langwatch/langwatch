@@ -1,11 +1,16 @@
+import { createHash } from "node:crypto";
+
 import { describe, expect, it } from "vitest";
 
 import {
   piiRedactionCostNanoUsd,
   piiRedactionPriceNanoUsd,
   piiRedactionSpendFact,
+  piiRedactionRequestIdKey,
   piiRedactionSpendRequestId,
 } from "../pii-redaction-spend.rules.ts";
+
+const KEY = piiRedactionRequestIdKey("test-pepper");
 
 describe("piiRedactionPriceNanoUsd", () => {
   /** @scenario "An answered batch is priced at the published rate per character" */
@@ -35,7 +40,7 @@ describe("piiRedactionCostNanoUsd", () => {
 });
 
 describe("piiRedactionSpendRequestId", () => {
-  const base = { projectId: "project_1", texts: ["call Ana"] };
+  const base = { key: KEY, projectId: "project_1", texts: ["call Ana"] };
 
   /** @scenario "The same span redacted twice is one request" */
   it("gives the same id for the same span and texts", () => {
@@ -62,6 +67,29 @@ describe("piiRedactionSpendRequestId", () => {
     expect(piiRedactionSpendRequestId({ ...base, projectId: "project_2" })).not.toBe(id);
   });
 
+  /** @scenario "The request id cannot be recomputed from a guessed text" */
+  it("is not the plain SHA-256 of the project and the texts", () => {
+    const plain = createHash("sha256");
+    for (const part of [base.projectId, "", ...base.texts]) plain.update(`${part.length}:${part}`);
+
+    expect(piiRedactionSpendRequestId(base)).not.toBe(
+      `piiredaction_${plain.digest("hex").slice(0, 32)}`,
+    );
+  });
+
+  /** @scenario "The request id cannot be recomputed from a guessed text" */
+  it("gives another id under another deployment's key", () => {
+    expect(
+      piiRedactionSpendRequestId({ ...base, key: piiRedactionRequestIdKey("other-pepper") }),
+    ).not.toBe(piiRedactionSpendRequestId(base));
+  });
+
+  /** @scenario "The request id cannot be recomputed from a guessed text" */
+  it("derives a key of its own, never the pepper itself", () => {
+    expect(Buffer.from(KEY).toString("utf8")).not.toBe("test-pepper");
+    expect(KEY).toHaveLength(32);
+  });
+
   it("does not read two texts joined as one text", () => {
     expect(piiRedactionSpendRequestId({ ...base, texts: ["ab", "c"] })).not.toBe(
       piiRedactionSpendRequestId({ ...base, texts: ["a", "bc"] }),
@@ -74,6 +102,7 @@ describe("piiRedactionSpendFact", () => {
   it("carries the organization, the characters, the texts, the rate version and both amounts", () => {
     expect(
       piiRedactionSpendFact({
+        key: KEY,
         organizationId: "org_1",
         projectId: "project_1",
         texts: ["call Ana", "hello"],
@@ -88,6 +117,7 @@ describe("piiRedactionSpendFact", () => {
       organizationId: "org_1",
       projectId: "project_1",
       requestId: piiRedactionSpendRequestId({
+        key: KEY,
         projectId: "project_1",
         recordKey: "trace-1:span-1",
         texts: ["call Ana", "hello"],

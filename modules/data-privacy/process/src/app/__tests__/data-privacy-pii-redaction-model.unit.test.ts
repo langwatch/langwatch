@@ -119,6 +119,31 @@ describe("given the PII redaction model wired into the module", () => {
     });
   });
 
+  describe("when the deployment names the model and has no key pepper", () => {
+    /** @scenario "A deployment that calls the model and has no key pepper refuses to boot" */
+    it("refuses to boot", async () => {
+      await expect(
+        createDataPrivacyTestApp({
+          dependencies: { featureFlags: flagsOff().featureFlags, permissions },
+          settings: { langevalsEndpoint: LANGEVALS, piiRedactionModelEndpoint: ALIAS_ARN },
+          keyPepper: null,
+        }),
+      ).rejects.toThrow(/API_KEY_PEPPER, CREDENTIALS_SECRET or NEXTAUTH_SECRET/);
+    });
+  });
+
+  describe("when the deployment names no model and has no key pepper", () => {
+    it("boots, as no call is ever priced", async () => {
+      await expect(
+        createDataPrivacyTestApp({
+          dependencies: { featureFlags: flagsOff().featureFlags, permissions },
+          settings: { langevalsEndpoint: LANGEVALS },
+          keyPepper: null,
+        }),
+      ).resolves.toBeDefined();
+    });
+  });
+
   describe("when an allowlisted organization's batch is refused by the model", () => {
     const meters = createRecordingMeterProvider();
 
