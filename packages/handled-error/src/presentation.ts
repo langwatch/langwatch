@@ -661,6 +661,11 @@ const presentations = {
     describe: () =>
       "This project doesn't have the SQL workbench enabled yet. Ask your administrator to switch it on.",
   },
+  lwql_not_provisioned: {
+    title: "Custom SQL isn't set up where this data lives",
+    describe: () =>
+      "Custom SQL isn't set up yet on the server that holds this organisation's data. Ask your workspace administrator, or contact support.",
+  },
   saved_workbench_chart_already_exists: {
     title: "That chart id is already taken",
     describe: () =>

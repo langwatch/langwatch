@@ -349,6 +349,7 @@ export function buildClickHouse(options: {
       })),
     ],
     organizationOf: (tenantId) => connection.organizationOf(tenantId),
+    placementOf: (tenantId) => connection.placementOf(tenantId),
   });
 
   return {

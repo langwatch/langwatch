@@ -69532,6 +69532,32 @@ A missing required key leaves the pods that read it in `CreateContainerConfigErr
 To add the keys later on chart-managed ClickHouse, delete the `<release>-lwql-access-render-<hash>` Job so the next sync or upgrade runs it again. Once it is `Complete`, restart the ClickHouse StatefulSet and the app and workers Deployments, which read the passwords at startup.
 
 With external PostgreSQL, the `DATABASE_URL` user needs `CREATE ROLE`, or at least `ALTER ROLE` on a pre-created `lwql_ro`, because the app re-converges the role on every boot. Without it LangWatchQL stays unavailable and the rest of LangWatch runs normally. See the chart README for the exact role statements.
+
+With external ClickHouse, add these query masking rules to the server's `config.d`, for example as `config.d/query-masking.yaml`. Each LangWatchQL statement carries its tenant capability as `SETTINGS custom_api_key_hash = '…'`, and ClickHouse also logs it as a bare sha256 hex value. Without the rules the server log file, `system.text_log` and `system.query_log` keep it. Chart-managed ClickHouse renders the same rules for you.
+
+Give these rules element names of their own, as below. ClickHouse merges each `config.d` file into the server config by element name, so a `rule` element in a later file merges into a `rule` already there instead of being added beside it: on 26.8 a `rule:` list here overwrote an operator's existing `rule` from an earlier file. Any element whose name starts with `rule` is read as a masking rule, so distinct names keep every rule active.
+
+```yaml
+query_masking_rules:
+    rule_lwql_statement:
+        name: hide custom_api_key_hash in a statement
+        regexp: (?i)[\x60"]?\b(custom_api_key_hash)\b[\x60"]?(?:\s|/\*.*?\*/)*=(?:\s|/\*.*?\*/)*(?:'(?:[^'\\]|\\.|'')*'|\$\$.*?\$\$|[^\s,;)]+)
+        replace: \1 = '[HIDDEN]'
+    rule_lwql_url:
+        name: hide custom_api_key_hash in a URL
+        regexp: (?i)\b(custom_api_key_hash)=[^&\s"]*
+        replace: \1=[HIDDEN]
+    rule_lwql_encoded_url:
+        name: hide custom_api_key_hash in an encoded URL
+        regexp: (?i)\b(custom_api_key_hash)(?:%20|\+)*%3D[^&\s"]*
+        replace: \1%3D[HIDDEN]
+    rule_lwql_sha256:
+        name: hide sha256 hex values
+        regexp: (?i)\b[0-9a-f]{64}\b
+        replace: '[HIDDEN]'
+```
+
+Only the restricted LangWatchQL identity is isolated by tenant. Any other ClickHouse user you grant the source database, the LangWatchQL database or a PostgreSQL engine table reads every tenant's rows.
 </Note>
 
 <Note>
@@ -69858,7 +69884,8 @@ clickhouse:
 The chart-managed ClickHouse is pinned to a version the release is tested
 against. An external instance is yours, so the version is your choice.
 LangWatch supports ClickHouse 25.8 and later, including 26.x and ClickHouse
-Cloud. The upgrade applies the release's ClickHouse migrations before the app
+Cloud. LangWatchQL needs 26.8 or later: its views declare the column types
+26.8 returns. The upgrade applies the release's ClickHouse migrations before the app
 starts, so the version has to accept every migration in the release you deploy.
 
 ### Auto-Tuning
@@ -73309,14 +73336,49 @@ Ensure the service account has S3 access (IRSA) or static credentials are config
 
 ### ClickHouse restarts with `NAMED_COLLECTION_ALREADY_EXISTS`
 
-With chart-managed ClickHouse, the chart delivers the LangWatchQL named collections `lwql_postgres` and `lwql_postgres_<database>` as server config. A collection of the same name created by hand with `CREATE NAMED COLLECTION` clashes with it, and the server stops at startup. Before you upgrade, list the collections and drop any whose `source` is `SQL`:
+With chart-managed ClickHouse, the chart delivers the LangWatchQL named collections `lwql_postgres` and `lwql_postgres_<database>` as server config. A collection of the same name created by hand with `CREATE NAMED COLLECTION` clashes with it, and the server stops at startup. Remove the hand-made one before you upgrade. If the server already stops, roll back to the previous release (`helm rollback`) so ClickHouse starts, follow these steps, then upgrade again:
+
+Named collections created by hand live on one replica only, so run every step on each ClickHouse pod. Set your release and namespace, and a helper that runs a query on one pod with the chart's password:
 
 ```bash
-kubectl -n langwatch exec sts/langwatch-clickhouse -- clickhouse-client -q \
-  "SELECT name, source FROM system.named_collections WHERE name LIKE 'lwql_postgres%'"
-kubectl -n langwatch exec sts/langwatch-clickhouse -- clickhouse-client -q \
-  "DROP NAMED COLLECTION lwql_postgres_langwatch"
+RELEASE=langwatch NS=langwatch
+PODS=$(kubectl -n "$NS" get pods -l "app.kubernetes.io/name=$RELEASE-clickhouse" -o name)
+ch() { kubectl -n "$NS" exec -i "$1" -c clickhouse -- sh -c \
+  'clickhouse-client --password "$(cat /mnt/secrets/password)" "$@"' ch "${@:2}"; }
 ```
+
+1. On each pod, list the collections, and the tables that read PostgreSQL through each one:
+
+   ```bash
+   for pod in $PODS; do echo "== $pod"; ch "$pod" <<'SQL'
+   SELECT c.name AS collection, c.source, t.database, t.name AS engine_table
+   FROM system.named_collections AS c
+   LEFT JOIN (
+     SELECT database, name,
+       extract(engine_full, '^PostgreSQL\\(\\s*`?([A-Za-z0-9_]+)') AS collection
+     FROM system.tables
+     WHERE engine = 'PostgreSQL'
+   ) AS t ON t.collection = c.name
+   WHERE c.name LIKE 'lwql_postgres%'
+   ORDER BY collection, engine_table
+   SQL
+   done
+   ```
+
+2. On each pod, for each collection whose `source` is `SQL`, drop the tables listed beside it. They hold no data: each one reads PostgreSQL when it is queried. The next deploy recreates the LangWatchQL tables only. Save the definition of any table you created yourself first (`SHOW CREATE TABLE`) and recreate it after the upgrade. Until the deploy, LangWatchQL's PostgreSQL-backed views are unavailable.
+
+   ```bash
+   pod=pod/$RELEASE-clickhouse-0 # the pod that listed the table
+   ch "$pod" -q "SHOW CREATE TABLE <database>.<engine_table>"
+   ch "$pod" -q "DROP TABLE <database>.<engine_table>"
+   ```
+
+3. On each pod, drop each collection whose `source` is `SQL`. ClickHouse refuses while any table still uses it (`NAMED_COLLECTION_IS_USED`):
+
+   ```bash
+   pod=pod/$RELEASE-clickhouse-0 # the pod that listed the collection
+   ch "$pod" -q "DROP NAMED COLLECTION <collection>"
+   ```
 
 Upgrades need no collection created by hand: the upgrade binds the LangWatchQL tables to a collection the server already holds.
 

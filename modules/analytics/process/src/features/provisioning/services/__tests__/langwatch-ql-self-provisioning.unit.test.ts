@@ -124,8 +124,8 @@ describe("given two stacks whose databases share one ClickHouse server", () => {
   it("gives each database its own named collection, and its engine tables read only that one", () => {
     const [a, b] = [statementsFor("lw_a"), statementsFor("lw_b")];
 
-    expect(a).toContain("DROP NAMED COLLECTION IF EXISTS lwql_postgres_lw_a");
-    expect(b).toContain("DROP NAMED COLLECTION IF EXISTS lwql_postgres_lw_b");
+    expect(a.some((s) => s.startsWith("ALTER NAMED COLLECTION lwql_postgres_lw_a SET"))).toBe(true);
+    expect(b.some((s) => s.startsWith("ALTER NAMED COLLECTION lwql_postgres_lw_b SET"))).toBe(true);
     expect(a.some((s) => s.includes("lwql_postgres_lw_b"))).toBe(false);
     const engineTables = a.filter((s) => s.includes("ENGINE = PostgreSQL"));
     expect(engineTables.length).toBeGreaterThan(0);

@@ -87,11 +87,10 @@ function keyMapOver(options: { configured?: boolean } = {}) {
   const repository = new RecordingKeyMapRepository();
   const findById = vi.fn(async (id: string) => (id === PROJECT_ID ? project(id) : null));
   const service = LwqlKeyMapService.create({
-    repository,
     projects: createApiFixture<ProjectApi>({ findById }),
     ...(options.configured === false
       ? {}
-      : { target: { connection: CONNECTION, sourceDatabase: "langwatch" } }),
+      : { target: { connection: CONNECTION, sourceDatabase: "langwatch", repository } }),
   });
   return { repository, findById, service };
 }

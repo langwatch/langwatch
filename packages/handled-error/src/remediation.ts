@@ -214,6 +214,12 @@ const registry = {
       "Ask an administrator to enable the SQL workbench for this project",
     ],
   },
+  lwql_not_provisioned: {
+    tips: [
+      "This organisation's data is on a server LangWatchQL is not provisioned on; retrying will not help",
+      "On a self-hosted install, let the deploy provision the LangWatchQL access model, then retry",
+    ],
+  },
   custom_chart_playground_not_enabled: {
     tips: [
       "Dashboard widgets need both Dashboards and LangWatchQL enabled for this project; retrying will not help",
