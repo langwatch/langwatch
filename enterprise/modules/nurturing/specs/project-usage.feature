@@ -131,6 +131,13 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     Then that day's row is deleted
 
   @unit
+  Scenario: A changed project's old trace days are deleted even without a placement or admin
+    Given a project nurturing never saw created, with a trace day older than the 30-day window
+    When the project's usage changes
+    Then that day's row is deleted
+    And nothing is sent
+
+  @unit
   Scenario: The organization's traits sum its projects
     Given an organization with two projects with usage and its trace counts
     When the traits are built

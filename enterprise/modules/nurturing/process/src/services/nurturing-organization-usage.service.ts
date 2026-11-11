@@ -51,14 +51,16 @@ export class NurturingOrganizationUsageService {
       clock,
     } = this.dependencies;
     if (projectId === "") return;
+    const now = clock.nowMs();
+    const windowStartDay = windowStartDayOf(now);
+    // Trace days are written for every project, placed or not, so its own old rows go first.
+    await traceDays.pruneBefore({ projectIds: [projectId], beforeDay: windowStartDay });
     const placement = await placements.getPlacement({ projectId });
     if (placement.outcome !== "known") return;
     const { organizationId } = placement;
     const [organization] = await milestones.findOrganization({ organizationId });
     const adminUserId = organization?.adminUserId;
     if (!adminUserId) return;
-    const now = clock.nowMs();
-    const windowStartDay = windowStartDayOf(now);
     const projectIds = await placements.findProjectIds({ organizationId });
     await traceDays.pruneBefore({ projectIds, beforeDay: windowStartDay });
     const [usage, folded, { organizationCreatedAt }] = await Promise.all([

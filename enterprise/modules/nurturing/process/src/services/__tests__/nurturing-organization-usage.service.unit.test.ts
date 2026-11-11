@@ -143,6 +143,19 @@ describe("NurturingOrganizationUsageService", () => {
     ).resolves.toEqual([]);
   });
 
+  /** @scenario "A changed project's old trace days are deleted even without a placement or admin" */
+  it("prunes an unplaced project's old trace days", async () => {
+    const { service, traceDays, sent } = await serviceOver({ placed: new Map() });
+    await seedTraceDay(traceDays, { projectId: "project-9", day: "2026-10-01" });
+
+    await service.usageChanged({ projectId: "project-9" });
+
+    await expect(
+      traceDays.findForProjects({ projectIds: ["project-9"], afterDay: "2000-01-01" }),
+    ).resolves.toEqual([]);
+    expect(sent).toEqual([]);
+  });
+
   /** @scenario "Prompt versions, scenario runs and evaluations count toward the habit" */
   it("counts the projects' evaluation days with the trace days for has_habit", async () => {
     const { service, projectUsage, traceDays, sent } = await serviceOver({
