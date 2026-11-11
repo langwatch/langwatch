@@ -27,11 +27,17 @@ function rowOf(attributes: Record<string, string>) {
   });
 }
 
+function columnsOf(attributes: Record<string, string>) {
+  const { metadataColumns } = rowOf(attributes);
+  if (!metadataColumns) throw new Error("the fold's row carries no metadata columns");
+  return metadataColumns;
+}
+
 describe("TraceAnalyticsFoldProjection metadata columns", () => {
   describe("given a trace that sent the widgets' metadata keys", () => {
     /** @scenario "The trace fold writes the metadata keys the stock widgets read" */
     it("writes each key's value to its column, as the trimmed map holds it", () => {
-      const row = rowOf({
+      const columns = columnsOf({
         "metadata.outcome": "resolved",
         "metadata.outcome_reason": "answered",
         "metadata.prompt_version": "v7",
@@ -40,7 +46,7 @@ describe("TraceAnalyticsFoldProjection metadata columns", () => {
         "metadata.sent_to_review": "true",
       });
 
-      expect(row.metadataColumns).toMatchObject({
+      expect(columns).toMatchObject({
         MetadataOutcome: "resolved",
         MetadataOutcomeReason: "answered",
         MetadataPromptVersion: "v7",
@@ -55,18 +61,15 @@ describe("TraceAnalyticsFoldProjection metadata columns", () => {
   describe("given a trace that names its environment only as metadata.env", () => {
     /** @scenario "The trace fold reads metadata.env when metadata.environment is absent" */
     it("writes metadata.env to MetadataEnvironment", () => {
-      expect(rowOf({ "metadata.env": "staging" }).metadataColumns.MetadataEnvironment).toBe(
-        "staging",
-      );
+      expect(columnsOf({ "metadata.env": "staging" }).MetadataEnvironment).toBe("staging");
       expect(
-        rowOf({ "metadata.environment": "", "metadata.env": "staging" }).metadataColumns
-          .MetadataEnvironment,
+        columnsOf({ "metadata.environment": "", "metadata.env": "staging" }).MetadataEnvironment,
       ).toBe("staging");
     });
 
     it("prefers metadata.environment when the trace sent both", () => {
       expect(
-        rowOf({ "metadata.environment": "production", "metadata.env": "staging" }).metadataColumns
+        columnsOf({ "metadata.environment": "production", "metadata.env": "staging" })
           .MetadataEnvironment,
       ).toBe("production");
     });
@@ -74,7 +77,7 @@ describe("TraceAnalyticsFoldProjection metadata columns", () => {
 
   describe("given a trace that sent none of them", () => {
     it("writes an empty string to every metadata column", () => {
-      expect(Object.values(rowOf({}).metadataColumns).every((value) => value === "")).toBe(true);
+      expect(Object.values(columnsOf({})).every((value) => value === "")).toBe(true);
     });
   });
 });
