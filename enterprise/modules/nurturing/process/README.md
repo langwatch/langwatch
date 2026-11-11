@@ -1,6 +1,6 @@
 # @langwatch/enterprise-nurturing-process
 
-The server half of [nurturing](../README.md). Product analytics and lifecycle messaging: every owner tells nurturing through a subscriber on its own pipeline, and nurturing alone talks to PostHog and Customer.io.
+The server half of [nurturing](../README.md). Product analytics and lifecycle messaging: nurturing learns from the owners' events, keeps its own copies, and alone talks to PostHog and Customer.io.
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`NurturingApi`)
 
-Every owner tells nurturing through a subscriber on its own pipeline (§9); nurturing names no peer.
+Nurturing learns from the owners' events (§9); an owner that pushes a fact calls this.
 
 Peers call these through the token, declared at `../contract/src/nurturing-types.ts:246`; nothing else in this package is public.
 

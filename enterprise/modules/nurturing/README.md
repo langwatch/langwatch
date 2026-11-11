@@ -1,6 +1,6 @@
 # nurturing
 
-Product analytics and lifecycle messaging: every owner tells nurturing through a subscriber on its own pipeline, and nurturing alone talks to PostHog and Customer.io.
+Product analytics and lifecycle messaging: nurturing learns from the owners' events, keeps its own copies, and alone talks to PostHog and Customer.io.
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 

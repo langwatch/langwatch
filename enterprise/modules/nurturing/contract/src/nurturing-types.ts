@@ -240,8 +240,7 @@ export type CioBatchCall =
     };
 
 /**
- * Every owner tells nurturing through a subscriber on its own pipeline (§9);
- * nurturing names no peer.
+ * Nurturing learns from the owners' events (§9); an owner that pushes a fact calls this.
  */
 export interface NurturingApi {
   /** Records the signal on nurturing's pipeline; its subscriber sends what main sent, once. */

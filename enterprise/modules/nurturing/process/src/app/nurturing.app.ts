@@ -29,7 +29,7 @@ type NurturingSetup = FeatureSetup<
   NurturingChannels
 >;
 
-/** Owners tell nurturing; no module names it as a peer, so it can never close a cycle (§9). */
+/** Nurturing learns from the owners' events; no module names it as a peer, so it can never close a cycle (§9). */
 export class NurturingModule implements NurturingApi {
   static readonly contract = NurturingApi;
   static readonly dependencies = { users: UserApi, organizations: OrganizationApi };
