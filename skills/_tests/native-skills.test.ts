@@ -36,10 +36,9 @@ const SIGN_IN_COPY = [
   "signs this machine in",
   "where you are logging in",
   "finishes in the browser",
-  "set up an api key",
-  "create an api key",
-  "generate an api key",
-  "new api key",
+  "login --api-key",
+  "writes a project's key",
+  "ask for a new key",
 ];
 
 function signInCopyIn(body: string): string[] {

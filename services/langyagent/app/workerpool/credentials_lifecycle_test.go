@@ -319,6 +319,30 @@ func TestAcquireWarm_RevokesItsUnusedKeyWhenItReusesAWorker(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 		assert.Empty(t, rev.revoked(), "the worker's own key is still in use and must not be revoked")
 	})
+
+	t.Run("a warm with a different signature revokes its key and leaves the worker", func(t *testing.T) {
+		rev := &recordingRevoker{}
+		p := newLifecyclePool(t, rev)
+		t.Cleanup(p.Shutdown)
+
+		w := &Worker{
+			conversationID: "conv-warm-sig", credSig: sigOf(creds),
+			apiKeyID: creds.LangwatchAPIKeyID, langwatchEndpoint: "http://cp",
+			spawnedAt: time.Now(), lastSeen: time.Now(),
+		}
+		p.mu.Lock()
+		p.workers["conv-warm-sig"] = w
+		p.mu.Unlock()
+
+		warmCreds := creds
+		warmCreds.Model = creds.Model + "-other"
+		warmCreds.LangwatchAPIKeyID = "key-b"
+		require.NotEqual(t, sigOf(creds), sigOf(warmCreds))
+		got, err := p.AcquireWarm(context.Background(), "conv-warm-sig", warmCreds)
+		require.NoError(t, err)
+		assert.Same(t, w, got, "a mismatched warm returns the live worker untouched")
+		assert.Equal(t, []string{"key-b"}, rev.eventually(t, 1), "the warm's unused key is revoked")
+	})
 }
 
 // A keyed re-dispatch of a turn the over-age worker already completed (an

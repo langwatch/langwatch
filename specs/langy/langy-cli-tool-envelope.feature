@@ -204,6 +204,12 @@ Feature: Langy recognises its own CLI behind a shell tool call
       Then the card shows the CLI's own sign-in instructions
 
     @unit
+    Scenario: The card's copy of the CLI's missing-key lines matches the CLI
+      Given the card recognises the CLI's missing-key lines by their exact wording
+      When the CLI's own source is read
+      Then each line the card matches is printed there word for word
+
+    @unit
     Scenario: A refusal on the same status for a different reason keeps its own words
       When Langy's tool call is refused on the same status for a reason that is not about access
       Then the card says what the platform said

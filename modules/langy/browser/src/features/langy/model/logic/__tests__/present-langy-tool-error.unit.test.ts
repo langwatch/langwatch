@@ -589,7 +589,7 @@ describe("presentLangyToolError", () => {
 
   // The lines are copied from the CLI, so a reword there must fail this gate.
   describe("given the CLI's missing-key lines", () => {
-    /** @scenario "A missing key printed as plain text on the developer's own machine keeps the CLI's own words" */
+    /** @scenario "The card's copy of the CLI's missing-key lines matches the CLI" */
     it("matches the lines the CLI prints in its source", () => {
       const cliSource = fs.readFileSync(
         path.resolve(here, "../../../../../../../../../sdks/typescript/src/cli/utils/apiKey.ts"),
