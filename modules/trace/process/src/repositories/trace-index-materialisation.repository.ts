@@ -11,7 +11,7 @@ export const materialisationMutationSchema = z.object({
 
 export type MaterialisationMutation = z.infer<typeof materialisationMutationSchema>;
 
-/** The `trace_analytics` columns goose 00125 copies out of `Attributes`, in its order. */
+/** The `trace_analytics` columns goose 00126 copies out of `Attributes`, in its order. */
 export const ANALYTICS_METADATA_COLUMNS = [
   "MetadataOutputAction",
   "MetadataOutcome",
@@ -26,7 +26,7 @@ export const ANALYTICS_METADATA_COLUMNS = [
 
 /**
  * The shared ClickHouse target's progress materialising goose 00103's `idx_updated_at` and
- * goose 00125's metadata columns.
+ * goose 00126's metadata columns.
  */
 export abstract class TraceIndexMaterialisationRepository {
   /** Newest first; empty once ClickHouse pruned the finished mutation, or before one was issued. */

@@ -1,5 +1,5 @@
 Feature: The trace analytics metadata columns are stored in existing rows after an upgrade
-  Goose migration 00125 adds nine columns to trace_analytics, each computed from one metadata
+  Goose migration 00126 adds nine columns to trace_analytics, each computed from one metadata
   key of the row's Attributes, and starts one ClickHouse mutation that stores them in the parts
   written before it. A background upgrade step waits on that mutation so the Upgrades page shows
   its progress and its failure. Until it finishes, an older part computes the value on read.

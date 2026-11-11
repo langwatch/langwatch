@@ -37,7 +37,7 @@ type Materialisation = Readonly<{
 }>;
 
 /**
- * Waits on the mutations goose starts (00103's `idx_updated_at`, 00125's metadata columns), so
+ * Waits on the mutations goose starts (00103's `idx_updated_at`, 00126's metadata columns), so
  * their progress and failure reach the upgrade ledger. Starts one once when none is recorded and
  * the table does not already hold what it builds.
  */
