@@ -19,6 +19,43 @@ export type SharedKeyWriter = Pick<ApiKeyService, "writeDisabled" | "reopenDisab
   grantAndActivate(key: DisabledApiKey): Promise<{ token: string }>;
 };
 
+/** Mints keys shared across servers; `mint` documents the contract. */
+export class SharedKeyMintService {
+  static create(options: {
+    apiKeys: SharedKeyWriter;
+    keys: Pick<ApiKeyRepository, "findById">;
+  }): SharedKeyMintService {
+    return new SharedKeyMintService(options);
+  }
+
+  private constructor(
+    private readonly options: {
+      apiKeys: SharedKeyWriter;
+      keys: Pick<ApiKeyRepository, "findById">;
+    },
+  ) {}
+
+  /**
+   * Mints a key once across every server (`mintOnce`): the claimant writes it, shares it sealed
+   * while its grants fold, then shares it active. A key whose grants have not landed is granted
+   * again by the next attempt, never written anew. `written` marks the call that activated it.
+   * A pending key revoked on purpose (it has a cause) is minted over, never reopened.
+   */
+  mint(
+    input: Omit<Mint, "apiKeys" | "isPending">,
+  ): Promise<{ token: string; apiKeyId: string; expiresAtMs: number; written: boolean }> {
+    const { apiKeys, keys } = this.options;
+    return mintShared({
+      ...input,
+      apiKeys,
+      isPending: async (apiKeyId) => {
+        const row = await keys.findById({ id: apiKeyId });
+        return row !== null && row.revocationCause === null;
+      },
+    });
+  }
+}
+
 /** A key as every server shares it, sealed: its token, and whether its grants have landed. */
 const sharedKeySchema = z.object({
   apiKeyId: z.string(),
@@ -46,12 +83,7 @@ function parseJson(value: string): unknown {
   }
 }
 
-/**
- * Mints a key once across every server (`mintOnce`): the claimant writes it, shares it sealed
- * while its grants fold, then shares it active. A key whose grants have not landed is granted
- * again by the next attempt, never written anew. `written` marks the call that activated it.
- */
-export async function mintSharedKey(input: {
+async function mintShared(input: {
   apiKeys: SharedKeyWriter;
   store: SharedCredentialStore;
   address: SharedCredentialAddress;
@@ -122,14 +154,6 @@ export async function mintSharedKey(input: {
   }
 }
 
-/** Whether a pending key is still only disabled; one revoked on purpose (a cause) is not. */
-export function stillDisabled(keys: Pick<ApiKeyRepository, "findById">) {
-  return async (apiKeyId: string): Promise<boolean> => {
-    const row = await keys.findById({ id: apiKeyId });
-    return row !== null && row.revocationCause === null;
-  };
-}
-
 async function firstPending({
   candidates,
   isPending,
@@ -143,7 +167,7 @@ async function firstPending({
   return undefined;
 }
 
-type Mint = Parameters<typeof mintSharedKey>[0];
+type Mint = Parameters<typeof mintShared>[0];
 
 /** Writes the key revoked and shares it before its grants, so a retry resumes it. */
 async function write({

@@ -28,12 +28,13 @@ import { MemoryApiKeyRepository } from "../../repositories/memory/memory.api-key
 import { RUN_KEY_REUSE_MARGIN_MS } from "../../rules/run-key.rules.ts";
 import type { DisabledApiKey } from "../api-key-lifecycle.service.ts";
 import { RunKeyMintService } from "../run-key-mint.service.ts";
+import { SharedKeyMintService, type SharedKeyWriter } from "../shared-key-mint.service.ts";
 
 const projectId = "project-1";
 const starter = "user-1";
 
 type Grant = "lands" | "pending" | "refused" | "activatedThenPending";
-type RunKeyWriter = Parameters<typeof RunKeyMintService.create>[0]["apiKeys"];
+type RunKeyWriter = SharedKeyWriter;
 
 function createService(
   initiallyHeld: readonly string[],
@@ -119,7 +120,11 @@ function createService(
   const apiKeys: RunKeyWriter = { writeDisabled, reopenDisabled, grantAndActivate };
 
   return {
-    service: RunKeyMintService.create({ apiKeys, keys, authz, held: shared }),
+    service: RunKeyMintService.create({
+      sharedKeys: SharedKeyMintService.create({ apiKeys, keys }),
+      authz,
+      held: shared,
+    }),
     created,
     granted,
     grantWill: (next: Grant) => {

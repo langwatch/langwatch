@@ -80,6 +80,7 @@ import {
   type VisibleProjectsQuery,
 } from "../services/project-provisioning.service.ts";
 import { RunKeyMintService } from "../services/run-key-mint.service.ts";
+import { SharedKeyMintService } from "../services/shared-key-mint.service.ts";
 import type { ApiKeyOrganizationsDoorApi } from "../transport/api-key-organizations.rest.ts";
 import type { ApiKeyProjectsDoorApi } from "../transport/api-key-projects.rest.ts";
 
@@ -208,14 +209,17 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
       }),
       tokens: ApiKeyTokenService.create(pepper, previousPepper),
     });
-    const runKeys = RunKeyMintService.create({
+    const sharedKeys = SharedKeyMintService.create({
       apiKeys: service,
       keys: setup.repositories.apiKeys,
+    });
+    const runKeys = RunKeyMintService.create({
+      sharedKeys,
       authz: authorization,
       held: setup.repositories.runKeys,
     });
     const heldKeys = HeldKeyMintService.create({
-      apiKeys: service,
+      sharedKeys,
       keys: setup.repositories.apiKeys,
       held: setup.repositories.heldKeys,
     });

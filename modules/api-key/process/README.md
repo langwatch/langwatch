@@ -807,10 +807,10 @@ Declared at `src/eventing/api-key.pipeline.ts:90`.
 
 | Kind   | Leaf                 | Environment variable          | Declared at                            |
 | ------ | -------------------- | ----------------------------- | -------------------------------------- |
-| secret | `pepper`             | `API_KEY_PEPPER`              | `src/app/api-key.app.ts:182`           |
-| secret | `pepperFallback`     | `CREDENTIALS_SECRET`          | `src/app/api-key.app.ts:183`           |
-| secret | `pepperLastFallback` | `NEXTAUTH_SECRET`             | `src/app/api-key.app.ts:184`           |
-| secret | `pepperPrevious`     | `CREDENTIALS_SECRET_PREVIOUS` | `src/app/api-key.app.ts:186`           |
+| secret | `pepper`             | `API_KEY_PEPPER`              | `src/app/api-key.app.ts:183`           |
+| secret | `pepperFallback`     | `CREDENTIALS_SECRET`          | `src/app/api-key.app.ts:184`           |
+| secret | `pepperLastFallback` | `NEXTAUTH_SECRET`             | `src/app/api-key.app.ts:185`           |
+| secret | `pepperPrevious`     | `CREDENTIALS_SECRET_PREVIOUS` | `src/app/api-key.app.ts:187`           |
 | config | `docsOrigins`        | `LANGWATCH_DOCS_ORIGINS`      | `../contract/src/api-key.config.ts:23` |
 | config | `isSaas`             | `IS_SAAS`                     | `../contract/src/api-key.config.ts:25` |
 | config | `publicBaseUrl`      | `BASE_HOST`                   | `../contract/src/api-key.config.ts:27` |

@@ -18,6 +18,7 @@ import { MemoryApiKeyRepository } from "../../repositories/memory/memory.api-key
 import { ApiKeyTokenService } from "../api-key-token.service.ts";
 import { ApiKeyService } from "../api-key.service.ts";
 import { HELD_KEY_GRANT_RETRY_AFTER_MS, HeldKeyMintService } from "../held-key-mint.service.ts";
+import { SharedKeyMintService } from "../shared-key-mint.service.ts";
 
 const ORG_ID = "org_1";
 /** The adapter's own read-your-writes window and pace (authz-grant.store.ts). */
@@ -111,7 +112,7 @@ function createFixture(foldMs: number) {
     tokens: ApiKeyTokenService.create("test-pepper"),
   });
   const service = HeldKeyMintService.create({
-    apiKeys,
+    sharedKeys: SharedKeyMintService.create({ apiKeys, keys: repository }),
     keys: repository,
     held: MemorySharedCredentialStore.create(),
   });

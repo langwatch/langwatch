@@ -24,6 +24,7 @@ import { MemoryApiKeyRepository } from "../../repositories/memory/memory.api-key
 import { ApiKeyTokenService } from "../api-key-token.service.ts";
 import { ApiKeyService } from "../api-key.service.ts";
 import { RunKeyMintService } from "../run-key-mint.service.ts";
+import { SharedKeyMintService } from "../shared-key-mint.service.ts";
 
 const projectId = "project-1";
 const input = { userId: "user-1", projectId, permissions: ["traces:create"] };
@@ -153,7 +154,11 @@ function createServers() {
 
     return {
       apiKeys,
-      runKeys: RunKeyMintService.create({ apiKeys, keys: repository, authz, held }),
+      runKeys: RunKeyMintService.create({
+        sharedKeys: SharedKeyMintService.create({ apiKeys, keys: repository }),
+        authz,
+        held,
+      }),
     };
   };
 

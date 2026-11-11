@@ -9,6 +9,7 @@ import { MemoryApiKeyDatabase } from "../../repositories/memory/memory.api-key.d
 import { MemoryApiKeyRepository } from "../../repositories/memory/memory.api-key.repository.ts";
 import type { DisabledApiKey } from "../api-key-lifecycle.service.ts";
 import { HELD_KEY_GRANT_RETRY_AFTER_MS, HeldKeyMintService } from "../held-key-mint.service.ts";
+import { SharedKeyMintService } from "../shared-key-mint.service.ts";
 
 const GRANT_WAIT_MS = 10_000;
 const MAX_ATTEMPTS = 4;
@@ -93,7 +94,7 @@ function createFixture({
     memory,
     rows: () => memory.keys(),
     service: HeldKeyMintService.create({
-      apiKeys,
+      sharedKeys: SharedKeyMintService.create({ apiKeys, keys: repository }),
       keys: repository,
       held: MemorySharedCredentialStore.create(),
     }),

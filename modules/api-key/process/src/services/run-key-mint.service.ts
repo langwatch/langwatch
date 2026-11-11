@@ -16,7 +16,7 @@ import {
   runKeyCacheKey,
   runKeyLifetimeMs,
 } from "../rules/run-key.rules.ts";
-import { mintSharedKey, stillDisabled, type SharedKeyWriter } from "./shared-key-mint.service.ts";
+import type { SharedKeyMintService } from "./shared-key-mint.service.ts";
 
 type HeldRunKey = { token: string; expiresAtMs: number };
 
@@ -27,8 +27,7 @@ type HeldRunKey = { token: string; expiresAtMs: number };
  */
 export class RunKeyMintService {
   static create(options: {
-    apiKeys: SharedKeyWriter;
-    keys: Pick<ApiKeyRepository, "findById">;
+    sharedKeys: SharedKeyMintService;
     authz: Pick<AuthzApi, "getScope" | "effectivePermissions">;
     held: SharedCredentialStore;
   }): RunKeyMintService {
@@ -40,8 +39,7 @@ export class RunKeyMintService {
 
   private constructor(
     private readonly options: {
-      apiKeys: SharedKeyWriter;
-      keys: Pick<ApiKeyRepository, "findById">;
+      sharedKeys: SharedKeyMintService;
       authz: Pick<AuthzApi, "getScope" | "effectivePermissions">;
       held: SharedCredentialStore;
     },
@@ -98,10 +96,8 @@ export class RunKeyMintService {
     input: MintRunKeyInput & { organizationId: string; cacheKey: string },
   ): Promise<HeldRunKey> {
     const { minRemainingMs } = input;
-    const shared = await mintSharedKey({
-      apiKeys: this.options.apiKeys,
+    const shared = await this.options.sharedKeys.mint({
       store: this.options.held,
-      isPending: stillDisabled(this.options.keys),
       address: { tenantId: input.projectId, contentKey: input.cacheKey },
       newExpiresAt: () => nowInstant().add({ milliseconds: runKeyLifetimeMs(minRemainingMs) }),
       keyFor: (expiresAt) => createInput({ input, expiresAt }),
