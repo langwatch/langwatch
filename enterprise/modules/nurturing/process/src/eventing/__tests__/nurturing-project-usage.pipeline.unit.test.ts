@@ -37,8 +37,8 @@ import { MemoryNurturingTraceDayRepository } from "../../repositories/memory/mem
 import type { NurturingProjectUsageOwner } from "../../repositories/nurturing-project-usage.repository.ts";
 import {
   queueRetryElapsedMs,
-  retriesUncopiedProject,
   TRACE_COUNTING_WINDOW_MS,
+  UNCOPIED_PROJECT_RETRY_WINDOW_MS,
 } from "../../rules/nurturing-project-usage.rules.ts";
 import { NurturingUncopiedProjectsService } from "../../services/nurturing-uncopied-projects.service.ts";
 import {
@@ -59,11 +59,14 @@ import {
 
 const OCCURRED_AT = 1_000;
 
-/** The last delivery attempt an uncopied project's batch retries on, read off the retry window. */
-const LAST_RETRY_ATTEMPT =
-  Array.from({ length: 61 }, (_, index) => index + 1)
-    .filter((deliveryAttempt) => retriesUncopiedProject({ deliveryAttempt }))
-    .at(-1) ?? 1;
+/** The first delivery attempt at or past the retry window: the last copy check, then a drop. */
+const FINAL_ATTEMPT =
+  Array.from({ length: 61 }, (_, index) => index + 1).find(
+    (attempt) => queueRetryElapsedMs({ attempt }) >= UNCOPIED_PROJECT_RETRY_WINDOW_MS,
+  ) ?? 61;
+
+/** The last delivery attempt an uncopied project's batch retries on. */
+const LAST_RETRY_ATTEMPT = FINAL_ATTEMPT - 1;
 
 /** The retry about 30 s after the first delivery, or the window's last if it is shorter. */
 const ABOUT_30_S_ATTEMPT = Math.min(
@@ -606,6 +609,25 @@ describe("the trace-day count", () => {
     expect((await days()).map((day) => day.traceCount)).toEqual([1]);
   });
 
+  /** @scenario "A new project whose copy lands within the retry window is counted" */
+  it("counts a trace whose copy lands a second before the window ends, on the attempt at or past it", async () => {
+    const counting = countingOver({ createdAt: NOON - 86_400_000, copied: false });
+    const subscriber = nurturingTraceDaySubscriber(counting);
+    const days = () =>
+      counting.traceDays.findForProjects({ projectIds: ["project-1"], afterDay: "" });
+    expect(queueRetryElapsedMs({ attempt: LAST_RETRY_ATTEMPT })).toBeLessThan(
+      UNCOPIED_PROJECT_RETRY_WINDOW_MS - 1000,
+    );
+
+    await expect(
+      subscriber.handleBatch([itemOf(OK, "trace-1", NOON, LAST_RETRY_ATTEMPT)]),
+    ).rejects.toThrow("has not landed yet");
+    await counting.landCopies();
+    await subscriber.handleBatch([itemOf(OK, "trace-1", NOON, FINAL_ATTEMPT)]);
+
+    expect((await days()).map((day) => day.traceCount)).toEqual([1]);
+  });
+
   /** @scenario "A project with no copy after the retries is dropped, and its later batches at once" */
   it("drops an uncopied project's trace once its retries run out, and its later traces with no retry", async () => {
     const counting = countingOver({ createdAt: NOON - 86_400_000, copied: false });
@@ -616,7 +638,7 @@ describe("the trace-day count", () => {
     await expect(
       subscriber.handleBatch([itemOf(OK, "trace-1", NOON, LAST_RETRY_ATTEMPT)]),
     ).rejects.toThrow("has not landed yet");
-    await subscriber.handleBatch([itemOf(OK, "trace-1", NOON, LAST_RETRY_ATTEMPT + 1)]);
+    await subscriber.handleBatch([itemOf(OK, "trace-1", NOON, FINAL_ATTEMPT)]);
     await subscriber.handleBatch([itemOf(OK, "trace-2", NOON + 1000, 1)]);
     expect(await days()).toEqual([]);
 

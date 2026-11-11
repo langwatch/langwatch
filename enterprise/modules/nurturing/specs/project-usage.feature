@@ -19,8 +19,9 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   Customer.io removes them and a rolling trait never says "active" for ever; later syncs leave
   them out, and its trace rows are dropped. Nurturing's placement copy is written by its own
   subscriber, so a new project's first traces can arrive before it: for a project without a copy
-  the batch fails and the queue retries it, for about five minutes of the queue's backoff (one
-  named retry window), until the copy lands. When the retries run out the trace is dropped and the
+  the batch fails and the queue retries it, while each attempt starts inside a five-minute retry
+  window (the measured lag is seconds), until the copy lands. The first attempt at or past the
+  window checks the copy one last time; still uncopied, the trace is dropped and the
   project is remembered in a bounded per-process set, so its later batches are dropped at once
   with no retry; the copy is always read first, so a copy that lands later counts the project
   again. A placed project whose organization has no creation copy belongs to an
@@ -191,11 +192,12 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     When the trace is counted
     Then the batch fails after counting the rest, and the queue retries it
     And when the copy lands a retry later, about 30 seconds in, the trace counts once
+    And a copy landing a second before the window ends is counted on the first attempt at or past it
 
   @unit
   Scenario: A project with no copy after the retries is dropped, and its later batches at once
     Given a project nurturing has no placement copy of
-    When its trace batch is still uncopied on the last retry inside the retry window
+    When its trace batch is still uncopied on the first attempt at or past the retry window
     Then the batch is dropped without failing, and no count is written
     And a later batch of the project is dropped at once, with no retry and no failure
     And once the project's copy lands, its next trace counts

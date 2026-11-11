@@ -331,20 +331,17 @@ describe("queueRetryElapsedMs()", () => {
 
 describe("retriesUncopiedProject()", () => {
   /** @scenario "A project with no copy after the retries is dropped, and its later batches at once" */
-  it("retries an attempt only while its next retry lands inside the window", () => {
+  it("retries every attempt that starts inside the window, and drops the first at or past it", () => {
     const attempts = Array.from({ length: 25 }, (_, index) => index + 1);
-    const retrying = attempts.filter((deliveryAttempt) =>
-      retriesUncopiedProject({ deliveryAttempt }),
-    );
-    const last = retrying.at(-1) ?? 0;
+    const final =
+      attempts.find(
+        (attempt) => queueRetryElapsedMs({ attempt }) >= UNCOPIED_PROJECT_RETRY_WINDOW_MS,
+      ) ?? 0;
 
-    expect(retrying).toEqual(attempts.slice(0, last));
-    expect(queueRetryElapsedMs({ attempt: last + 1 })).toBeLessThanOrEqual(
-      UNCOPIED_PROJECT_RETRY_WINDOW_MS,
-    );
-    expect(queueRetryElapsedMs({ attempt: last + 2 })).toBeGreaterThan(
-      UNCOPIED_PROJECT_RETRY_WINDOW_MS,
-    );
+    expect(
+      attempts.filter((deliveryAttempt) => retriesUncopiedProject({ deliveryAttempt })),
+    ).toEqual(attempts.slice(0, final - 1));
+    expect(retriesUncopiedProject({ deliveryAttempt: final })).toBe(false);
   });
 
   /** @scenario "A new project whose copy lands within the retry window is counted" */

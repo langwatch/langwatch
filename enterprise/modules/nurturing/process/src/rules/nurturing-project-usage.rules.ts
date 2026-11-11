@@ -30,7 +30,11 @@ export function isTraceCounted({
   return organizationCreatedAt !== null && at - organizationCreatedAt < TRACE_COUNTING_WINDOW_MS;
 }
 
-/** How long a project's batch is retried with no placement copy: sized from the measured project-to-copy lag (to be measured). */
+/**
+ * How long a project's batch is retried with no placement copy. Measured project-to-copy lag 0.7-2.7 s
+ * on the dev stack (2026-11-11); 5 min is a floor. The last copy check lands at the first attempt
+ * at or past the window (~8.5 min with today's backoff).
+ */
 export const UNCOPIED_PROJECT_RETRY_WINDOW_MS = 5 * 60 * 1000;
 
 /** What a batch of a project nurturing has no placement copy of does: fail to be retried, or drop. */
@@ -47,11 +51,11 @@ export function queueRetryElapsedMs({ attempt }: Readonly<{ attempt: number }>):
   return elapsed;
 }
 
-/** Whether an uncopied project's batch retries: its next attempt still runs inside the window. */
+/** Whether an uncopied project's batch retries: this attempt still runs inside the window. */
 export function retriesUncopiedProject({
   deliveryAttempt = 1,
 }: Readonly<{ deliveryAttempt?: number }>): boolean {
-  return queueRetryElapsedMs({ attempt: deliveryAttempt + 1 }) <= UNCOPIED_PROJECT_RETRY_WINDOW_MS;
+  return queueRetryElapsedMs({ attempt: deliveryAttempt }) < UNCOPIED_PROJECT_RETRY_WINDOW_MS;
 }
 
 /** The traits read from trace days: rolling, so each is removed when the window ends. */
