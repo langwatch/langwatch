@@ -6,7 +6,12 @@
 
 import { describe, expect, it } from "vitest";
 
-import { adminMenu, settingsMenu, type SettingsMenuGates } from "../settings-menu.ts";
+import {
+  adminMenu,
+  isSettingsMenuItemActiveAmong,
+  settingsMenu,
+  type SettingsMenuGates,
+} from "../settings-menu.ts";
 
 const EVERYTHING_CLOSED: SettingsMenuGates = {
   hasPermission: () => false,
@@ -173,6 +178,55 @@ describe("given an enterprise plan", () => {
       expect(
         hrefsIn({ enterprisePlan: "included", hasPermission: (p) => p === "auditLog:view" }),
       ).toContain("/settings/audit-log");
+    });
+  });
+});
+
+describe("given the People & access group", () => {
+  function accessHrefsIn(gates: Partial<SettingsMenuGates>): string[] {
+    const group = settingsMenu({ ...EVERYTHING_CLOSED, enterprisePlan: "included", ...gates }).find(
+      (candidate) => candidate.id === "settings-access",
+    );
+    return group?.items.map((item) => item.href) ?? [];
+  }
+
+  describe("when the reader may manage the organization", () => {
+    /** @scenario "Teams & projects has its own entry under Users" */
+    it("offers Teams & projects right after Users, on the Users page's teams tab", () => {
+      expect(accessHrefsIn({ hasPermission: (p) => p === "organization:manage" })).toEqual([
+        "/settings/directory",
+        "/settings/directory?tab=teams",
+        "/settings/roles",
+      ]);
+    });
+
+    /** @scenario "Teams & projects has its own entry under Users" */
+    it("lights Teams & projects alone on its tab and Users alone elsewhere on the page", () => {
+      const items = settingsMenu({
+        ...EVERYTHING_CLOSED,
+        hasPermission: (p) => p === "organization:manage",
+      }).find((group) => group.id === "settings-access")!.items;
+      const marked = (pathname: string, search: string) =>
+        items
+          .filter((item) =>
+            isSettingsMenuItemActiveAmong({ item, siblings: items, pathname, search }),
+          )
+          .map((item) => item.label);
+
+      expect(marked("/settings/directory", "?tab=teams")).toEqual(["Teams & projects"]);
+      expect(marked("/settings/directory", "?tab=groups")).toEqual(["Users"]);
+      expect(marked("/settings/directory", "")).toEqual(["Users"]);
+      expect(marked("/settings/teams/platform", "")).toEqual(["Teams & projects"]);
+    });
+  });
+
+  describe("when the reader may not manage the organization", () => {
+    /** @scenario "Teams & projects is offered only to whoever may manage the organization" */
+    it("offers no Teams & projects entry", () => {
+      expect(accessHrefsIn({ hasPermission: (p) => p === "members:view" })).toEqual([
+        "/settings/directory",
+        "/settings/roles",
+      ]);
     });
   });
 });

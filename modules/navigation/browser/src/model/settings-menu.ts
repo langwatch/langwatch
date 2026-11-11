@@ -59,6 +59,8 @@ export interface SettingsMenuItem {
    * test sees an owner.
    */
   alsoActiveAt?: string[];
+  /** A tab of a shared page: lit only while the address carries this query value. */
+  tab?: { param: string; value: string };
   icon: LucideIcon;
   /**
    * An Enterprise entry offered to a plan that lacks it: the sidebar shows a lock and "Included
@@ -73,14 +75,39 @@ export interface SettingsMenuItem {
 export function isSettingsMenuItemActive({
   item,
   pathname,
+  search = "",
 }: {
   item: SettingsMenuItem;
   pathname: string;
+  search?: string;
 }): boolean {
   // By prefix, so a detail page (/settings/teams/:team) keeps its owner lit.
   if (item.alsoActiveAt?.some((base) => isPathUnder({ pathname, base }))) return true;
+  if (item.tab && new URLSearchParams(search).get(item.tab.param) !== item.tab.value) return false;
   if (item.isExactMatch) return pathname === item.href;
   return isPathUnder({ pathname, base: item.includePath ?? item.href });
+}
+
+/** As above, but an entry for a whole page yields to a lit sibling that names its open tab. */
+export function isSettingsMenuItemActiveAmong({
+  item,
+  siblings,
+  pathname,
+  search = "",
+}: {
+  item: SettingsMenuItem;
+  siblings: readonly SettingsMenuItem[];
+  pathname: string;
+  search?: string;
+}): boolean {
+  if (!isSettingsMenuItemActive({ item, pathname, search })) return false;
+  if (item.tab) return true;
+  return !siblings.some(
+    (sibling) =>
+      sibling !== item &&
+      sibling.tab &&
+      isSettingsMenuItemActive({ item: sibling, pathname, search }),
+  );
 }
 
 export interface SettingsMenuGroup {
@@ -214,7 +241,7 @@ function organizationGroup({
   };
 }
 
-function accessGroup({ enterprisePlan }: SettingsMenuGates): SettingsMenuGroup {
+function accessGroup({ enterprisePlan, hasPermission }: SettingsMenuGates): SettingsMenuGroup {
   return {
     id: "settings-access",
     label: "People & access",
@@ -230,10 +257,23 @@ function accessGroup({ enterprisePlan }: SettingsMenuGates): SettingsMenuGroup {
           "/settings/scim",
           "/settings/groups",
           "/settings/members",
-          "/settings/teams",
           "/settings/access",
         ],
       },
+      // A shortcut to the Users page's Teams tab, which readers could not find; the tab is
+      // offered to an organization manager only, so the entry is too.
+      ...(hasPermission("organization:manage")
+        ? [
+            {
+              label: "Teams & projects",
+              href: "/settings/directory?tab=teams",
+              includePath: "/settings/directory",
+              tab: { param: "tab", value: "teams" },
+              icon: UsersRound,
+              alsoActiveAt: ["/settings/teams"],
+            },
+          ]
+        : []),
       // Every organization role reads it through `members:view`, Lite included; the page
       // offers its edits to a manager only. Definitions and assignments are two tabs.
       ...enterpriseEntry({
