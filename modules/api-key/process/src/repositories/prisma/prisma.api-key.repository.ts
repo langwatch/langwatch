@@ -42,11 +42,12 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
     });
   }
   /** SQL so a revoke with a cause that landed first is never undone: that key stays revoked. */
-  async activate(input: { id: string }): Promise<ApiKeyRow> {
+  async activate(input: { id: string; organizationId: string }): Promise<ApiKeyRow> {
     const activated = await this.database.$executeRaw`
       UPDATE "ApiKey"
          SET "revokedAt" = NULL, "updatedAt" = now()
        WHERE "id" = ${input.id}
+         AND "organizationId" = ${input.organizationId}
          AND "revocationCause" IS NULL
     `;
     if (activated === 0) throw new ApiKeyAlreadyRevokedError(input.id);

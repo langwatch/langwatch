@@ -96,7 +96,7 @@ function createService(
     granted.push(key.id);
     if (grant === "pending") throw new AuthzGrantNotConfirmedError();
     if (grant === "activatedThenPending") {
-      await repository.activate({ id: rowIds.get(key.id) ?? key.id });
+      await repository.activate({ id: rowIds.get(key.id) ?? key.id, organizationId: "org-1" });
       throw new AuthzGrantNotConfirmedError();
     }
     if (grant === "refused") throw new Error("the ledger refused the write");

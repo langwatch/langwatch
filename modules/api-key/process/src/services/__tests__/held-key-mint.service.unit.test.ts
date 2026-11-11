@@ -84,7 +84,7 @@ function createFixture({
       if (Date.now() - start < landsAtMs) throw new AuthzGrantNotConfirmedError();
       const row = await repository.findById({ id: key.id });
       if (row) beforeActivate?.(row);
-      await repository.activate({ id: key.id });
+      await repository.activate({ id: key.id, organizationId: "org-1" });
       return { token: key.token };
     },
   };
