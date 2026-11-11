@@ -80,4 +80,38 @@ describe.skipIf(!DB_URL)("PrismaTeamRepository.organizationIdsForMember", () => 
       expect(found.toSorted()).toEqual(organizationIds.toSorted());
     });
   });
+
+  describe("given a person who joined two active organizations, then one since disabled", () => {
+    /** @scenario "A person's most recently joined organization is read across tenants" */
+    it("answers the newest active membership's organization", async () => {
+      const later = await prisma.organization.create({
+        data: { name: "later org", slug: `--test-${namespace}-later` },
+      });
+      organizationIds.push(later.id);
+      await prisma.organizationUser.create({
+        data: {
+          userId,
+          organizationId: later.id,
+          role: OrganizationUserRole.MEMBER,
+          createdAt: new Date(Date.now() + 60_000),
+        },
+      });
+      await prisma.organizationUser.update({
+        where: { userId_organizationId: { userId, organizationId: disabledOrganizationId } },
+        data: { createdAt: new Date(Date.now() + 120_000) },
+      });
+
+      await expect(repository.mostRecentOrganizationIdForMember({ userId })).resolves.toEqual({
+        outcome: "member",
+        organizationId: later.id,
+      });
+    });
+
+    /** @scenario "A person's most recently joined organization is read across tenants" */
+    it("answers none for a person with no active membership", async () => {
+      await expect(
+        repository.mostRecentOrganizationIdForMember({ userId: `${namespace}-nobody` }),
+      ).resolves.toEqual({ outcome: "none" });
+    });
+  });
 });

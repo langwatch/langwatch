@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { NurturingTraceDay } from "../rules/nurturing-trace-day.rules.ts";
+import type {
+  NurturingCountedTrace,
+  NurturingTraceDay,
+} from "../rules/nurturing-trace-day.rules.ts";
 
 /** The read and retention of the per-project, per-day trace counts: no write. */
 export interface NurturingTraceDayReadRepository {
@@ -7,15 +10,19 @@ export interface NurturingTraceDayReadRepository {
   findForProjects(
     input: Readonly<{ projectIds: readonly string[]; afterDay: string }>,
   ): Promise<NurturingTraceDay[]>;
-  /** Drops the projects' days before `beforeDay`: no read reaches them any more. */
+  /**
+   * Drops the projects' days before `beforeDay`, and every project's counted traces before it:
+   * no read reaches them, and no trace that old is re-stored or redelivered.
+   */
   pruneBefore(input: Readonly<{ projectIds: readonly string[]; beforeDay: string }>): Promise<void>;
 }
 
 /** Nurturing's per-project, per-day trace counts: the increment, and the read. */
 export interface NurturingTraceDayRepository extends NurturingTraceDayReadRepository {
   /**
-   * Adds each increment's counts to its project's day, the newest times kept: one atomic write
-   * per day. Not idempotent: a redelivered batch, or a retry after a write, counts again.
+   * Counts each trace once per project, id and kind, durably: one atomic write per batch records
+   * the traces not yet counted and adds only those to their project's day. A re-stored trace, a
+   * redelivered batch or a retry after the write counts nothing again.
    */
-  addTraceDays(increments: readonly NurturingTraceDay[]): Promise<void>;
+  countTraces(traces: readonly NurturingCountedTrace[]): Promise<void>;
 }

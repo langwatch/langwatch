@@ -23,6 +23,7 @@ import {
   type PersonalFeatures,
   type PersonalWorkspace,
   type PricingModel,
+  type MemberMostRecentOrganization,
 } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
@@ -286,6 +287,9 @@ class UnusedTeams extends TeamRepository {
   organizationIdsForMember(): Promise<string[]> {
     throw new Error("not used by this test");
   }
+  mostRecentOrganizationIdForMember(): Promise<MemberMostRecentOrganization> {
+    throw new Error("not used by this test");
+  }
   getById(): Promise<OrganizationTeam> {
     throw new Error("not used by this test");
   }
@@ -458,6 +462,9 @@ class MemoryTeams extends TeamRepository {
   }
 
   organizationIdsForMember(): Promise<string[]> {
+    throw new Error("not used by this test");
+  }
+  mostRecentOrganizationIdForMember(): Promise<MemberMostRecentOrganization> {
     throw new Error("not used by this test");
   }
 

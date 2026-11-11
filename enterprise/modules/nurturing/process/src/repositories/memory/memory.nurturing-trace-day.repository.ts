@@ -1,19 +1,32 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { NurturingTraceDay } from "../../rules/nurturing-trace-day.rules.ts";
+import {
+  countedTraceKeyOf,
+  type NurturingCountedTrace,
+  type NurturingTraceDay,
+  traceDayIncrementsOf,
+} from "../../rules/nurturing-trace-day.rules.ts";
 import type { NurturingTraceDayRepository } from "../nurturing-trace-day.repository.ts";
 
-/** Nurturing's trace-day rows in memory, incremented as the Postgres upsert increments them. */
+/** Nurturing's trace-day rows in memory, counted once per trace as the Postgres write counts. */
 export class MemoryNurturingTraceDayRepository implements NurturingTraceDayRepository {
   static create(): MemoryNurturingTraceDayRepository {
     return new MemoryNurturingTraceDayRepository();
   }
 
   readonly #days = new Map<string, NurturingTraceDay>();
+  /** Each counted trace's key, with its day for the prune. */
+  readonly #counted = new Map<string, string>();
 
   private constructor() {}
 
-  async addTraceDays(increments: readonly NurturingTraceDay[]): Promise<void> {
-    for (const increment of increments) {
+  async countTraces(traces: readonly NurturingCountedTrace[]): Promise<void> {
+    const fresh = traces.filter((trace) => {
+      const key = countedTraceKeyOf(trace);
+      if (this.#counted.has(key)) return false;
+      this.#counted.set(key, trace.day);
+      return true;
+    });
+    for (const increment of traceDayIncrementsOf(fresh)) {
       const key = JSON.stringify([increment.projectId, increment.day]);
       const known = this.#days.get(key);
       const lastTimes = [known?.lastTraceAt ?? null, increment.lastTraceAt].filter(
@@ -53,6 +66,9 @@ export class MemoryNurturingTraceDayRepository implements NurturingTraceDayRepos
   }: Readonly<{ projectIds: readonly string[]; beforeDay: string }>): Promise<void> {
     for (const [key, day] of this.#days) {
       if (projectIds.includes(day.projectId) && day.day < beforeDay) this.#days.delete(key);
+    }
+    for (const [key, day] of this.#counted) {
+      if (day < beforeDay) this.#counted.delete(key);
     }
   }
 }

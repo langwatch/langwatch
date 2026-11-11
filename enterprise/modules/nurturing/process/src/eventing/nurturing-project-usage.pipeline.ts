@@ -2,9 +2,11 @@
 /**
  * Nurturing's own per-project usage (§9): one peer fold per owner pipeline (prompt, evaluator,
  * scenario, simulation run), a row per project each, and subscribers on trace's span_received and
- * trace_failed adding root spans and failed traces to their project's UTC day, one upsert a batch.
+ * trace_failed counting each trace and failed trace once into its project's UTC day, one statement
+ * a batch, while the organization is inside its counting window.
  * Evaluations add a day per project a day. Each change syncs the organization as one Customer.io
- * group call, placed by nurturing's own copy of project and organization creation. Without a
+ * group call, mirrored onto each member whose latest organization it is (the emails read person
+ * attributes), placed by nurturing's own copy of project and organization creation. Without a
  * Customer.io channel nothing reads these rows, so nothing here is registered. Why event
  * driven: https://github.com/langwatch/tasks/issues/1131.
  * Spec: enterprise/modules/nurturing/specs/project-usage.feature
@@ -72,8 +74,8 @@ import {
 import { z } from "zod";
 
 import type { NurturingModule } from "../app/nurturing.app.ts";
-import type { NurturingClaimRepository } from "../repositories/nurturing-claim.repository.ts";
 import type { NurturingOrganizationCreatedRepository } from "../repositories/nurturing-organization-created.repository.ts";
+import type { NurturingProjectDirectoryRepository } from "../repositories/nurturing-project-directory.repository.ts";
 import type { NurturingProjectPlacementRepository } from "../repositories/nurturing-project-placement.repository.ts";
 import {
   NURTURING_PROJECT_USAGE_PROJECTION_VERSION,
@@ -85,16 +87,12 @@ import type { NurturingRepositories } from "../repositories/nurturing.repositori
 import {
   emptyProjectUsage,
   foldProjectUsage,
+  isTraceCounted,
   type NurturingProjectUsageFact,
   type NurturingProjectUsageState,
 } from "../rules/nurturing-project-usage.rules.ts";
 import { utcDayOf } from "../rules/nurturing-time.rules.ts";
-import {
-  failedTraceDayIncrementsOf,
-  type NurturingTraceSpan,
-  traceDayIncrementsOf,
-} from "../rules/nurturing-trace-day.rules.ts";
-import { NurturingClaimReleaseService } from "../services/nurturing-claim-release.service.ts";
+import type { NurturingCountedTrace } from "../rules/nurturing-trace-day.rules.ts";
 
 /** Hosts nurturing's peer folds and subscribers over the owners' facts; no event of its own. */
 export const NURTURING_PROJECT_USAGE_PIPELINE_NAME = "nurturing_project_usage" as const;
@@ -251,14 +249,14 @@ const originAttributesSchema = z
   .array(z.object({ key: z.string(), value: z.object({ stringValue: z.string().nullish() }) }))
   .optional();
 
-function originOf(attributes: z.output<typeof originAttributesSchema>): string | undefined {
+function extractOrigin(attributes: z.output<typeof originAttributesSchema>): string | undefined {
   const origin = attributes?.find(({ key }) => key === ORIGIN_ATTRIBUTE)?.value.stringValue;
   return origin ? origin : undefined;
 }
 
-/** What the trace-day count reads of a span: root or not, and origin; no body. */
+/** What the trace-day count reads of a span: its trace, root or not, and origin; no body. */
 export type NurturingTraceSpanData = Readonly<{
-  span: Pick<SpanReceivedEventData["span"], "parentSpanId">;
+  span: Pick<SpanReceivedEventData["span"], "traceId" | "parentSpanId">;
   /** The explicit origin, the span's own before its resource's, as trace hoists it. */
   origin?: string;
 }>;
@@ -266,14 +264,16 @@ export type NurturingTraceSpanData = Readonly<{
 const traceSpanDataSchema = z
   .object({
     span: spanReceivedEventDataSchema.shape.span
-      .pick({ parentSpanId: true })
+      .pick({ traceId: true, parentSpanId: true })
       .extend({ attributes: originAttributesSchema }),
     resource: z.object({ attributes: originAttributesSchema }).nullish(),
   })
-  .transform(({ span: { parentSpanId, attributes }, resource }): NurturingTraceSpanData => ({
-    span: { parentSpanId },
-    origin: originOf(attributes) ?? originOf(resource?.attributes),
-  }));
+  .transform(
+    ({ span: { traceId, parentSpanId, attributes }, resource }): NurturingTraceSpanData => ({
+      span: { traceId, parentSpanId },
+      origin: extractOrigin(attributes) ?? extractOrigin(resource?.attributes),
+    }),
+  );
 
 /** Not a sample's or Langy's own trace, which trace's `isRealFirstIngest` leaves out too. */
 function isCustomerOrigin(origin: string | undefined): boolean {
@@ -290,15 +290,97 @@ export function isCountedTrace(data: NurturingTraceSpanData): boolean {
   return isRootSpan(data) && isCustomerOrigin(data.origin);
 }
 
-/** A root span as its count takes it: its project (the tenant) and append day. */
-export function traceSpanOf(
-  context: Pick<PeerSubscriberContext, "tenantId" | "createdAt">,
-): NurturingTraceSpan {
+/** A root span as its count takes it: its project (the tenant), trace and append day. */
+export function countedTraceOf({
+  data,
+  context,
+}: Readonly<{
+  data: NurturingTraceSpanData;
+  context: Pick<PeerSubscriberContext, "tenantId" | "createdAt">;
+}>): NurturingCountedTrace {
   return {
     projectId: String(context.tenantId),
+    traceId: data.span.traceId,
+    kind: "trace",
     day: utcDayOf(context.createdAt),
-    appendedAt: context.createdAt,
+    at: context.createdAt,
   };
+}
+
+/** What the trace and failure counts read to keep only organizations in their window. */
+export type NurturingTraceCountingDeps = Readonly<{
+  traceDays: NurturingTraceDayRepository;
+  placements: Pick<NurturingProjectPlacementRepository, "getPlacement">;
+  organizationsCreated: Pick<NurturingOrganizationCreatedRepository, "findOrganizationCreatedAt">;
+  /** The owners' rows, asked only when nurturing's copy has not landed. */
+  directory: Pick<NurturingProjectDirectoryRepository, "getPlacement" | "getOrganizationCreatedAt">;
+}>;
+
+/** A project's organization creation, from nurturing's copies or, if one lags, its owners'. */
+type ProjectOrganizationCreation =
+  | Readonly<{ outcome: "copied"; organizationCreatedAt: number }>
+  | Readonly<{ outcome: "notCopied"; organizationCreatedAt: number | null }>;
+
+async function projectOrganizationCreationOf({
+  projectId,
+  placements,
+  organizationsCreated,
+  directory,
+}: Readonly<{ projectId: string }> &
+  Omit<NurturingTraceCountingDeps, "traceDays">): Promise<ProjectOrganizationCreation> {
+  const placement = await placements.getPlacement({ projectId });
+  if (placement.outcome === "known") {
+    const { organizationCreatedAt } = await organizationsCreated.findOrganizationCreatedAt({
+      organizationId: placement.organizationId,
+    });
+    if (organizationCreatedAt !== null) return { outcome: "copied", organizationCreatedAt };
+  }
+  const owned = await directory.getPlacement({ projectId });
+  if (owned.outcome !== "known") return { outcome: "notCopied", organizationCreatedAt: null };
+  const { organizationCreatedAt } = await directory.getOrganizationCreatedAt({
+    organizationId: owned.organizationId,
+  });
+  return { outcome: "notCopied", organizationCreatedAt };
+}
+
+/**
+ * Counts the batch's traces whose organization is inside its counting window, each once,
+ * durably (the repository's per-trace rows). Past the window nothing reads the counts. Copies
+ * are written by their own subscribers, so a new project's first traces can come first: then the
+ * batch throws after counting the rest, and the queue retries until the copy lands.
+ */
+async function countInWindow({
+  traces,
+  ...deps
+}: Readonly<{ traces: readonly NurturingCountedTrace[] }> &
+  NurturingTraceCountingDeps): Promise<void> {
+  if (traces.length === 0) return;
+  const creations = new Map(
+    await Promise.all(
+      [...new Set(traces.map(({ projectId }) => projectId))].map(
+        async (projectId) =>
+          [projectId, await projectOrganizationCreationOf({ projectId, ...deps })] as const,
+      ),
+    ),
+  );
+  const inWindow = (trace: NurturingCountedTrace) =>
+    isTraceCounted({
+      organizationCreatedAt: creations.get(trace.projectId)?.organizationCreatedAt ?? null,
+      at: trace.at,
+    });
+  const copied = (trace: NurturingCountedTrace) =>
+    creations.get(trace.projectId)?.outcome === "copied";
+  await deps.traceDays.countTraces(traces.filter((trace) => copied(trace) && inWindow(trace)));
+  const waiting = [
+    ...new Set(
+      traces.filter((trace) => !copied(trace) && inWindow(trace)).map(({ projectId }) => projectId),
+    ),
+  ];
+  if (waiting.length > 0) {
+    throw new Error(
+      `nurturing's copy of the placement or organization creation of ${waiting.join(", ")} has not landed yet`,
+    );
+  }
 }
 
 /** Most root spans of one project and day the queue drains into one batch, one upsert. */
@@ -311,12 +393,13 @@ export function traceDayGroupOf(event: Event): string {
 
 /**
  * One project's traces per UTC day: root spans of one project and day are coalesced, and each
- * batch adds its counts to the day in one Postgres upsert. Not idempotent: a redelivered batch,
- * or a retry after the write committed, counts its traces again. Not a fold, so no replay
- * rebuilds the rows. Child, sample and Langy spans mint no job; the handler drops any staged.
+ * batch counts its traces once each in one Postgres statement, so a re-stored trace or a
+ * redelivered batch counts nothing again. Only organizations in their counting window count. Not
+ * a fold, so no replay rebuilds the rows. Child, sample and Langy spans mint no job; the handler
+ * drops any staged.
  */
 export function nurturingTraceDaySubscriber(
-  traceDays: NurturingTraceDayRepository,
+  deps: NurturingTraceCountingDeps,
 ): PeerBatchSubscriberDefinition<typeof traceSpanDataSchema> {
   return {
     eventType: SPAN_RECEIVED_EVENT_TYPE,
@@ -327,42 +410,31 @@ export function nurturingTraceDaySubscriber(
       coalesceMaxBatch: TRACE_DAY_COALESCE_MAX_BATCH,
     },
     handleBatch: (items) =>
-      traceDays.addTraceDays(
-        traceDayIncrementsOf(
-          items
-            .filter(({ data }) => isCountedTrace(data))
-            .map(({ context }) => traceSpanOf(context)),
-        ),
-      ),
+      countInWindow({
+        ...deps,
+        traces: items
+          .filter(({ data }) => isCountedTrace(data))
+          .map(({ data, context }) => countedTraceOf({ data, context })),
+      }),
   };
 }
 
-/** What the failed-trace count reads of trace_failed: its project and the trace's origin. */
-const failedTraceDataSchema = traceFailedEventDataSchema.pick({ projectId: true, origin: true });
-
-/** A trace_failed's claim outlives any queue retry or outbox re-drive of the same fact. */
-export const FAILED_TRACE_CLAIM_TTL_SECONDS = 24 * 60 * 60;
-
-/** The claim of a trace_failed fact (ADR-179): its idempotency key, one per trace, else its id. */
-export function failedTraceClaimKeyOf(
-  context: Pick<PeerSubscriberContext, "idempotencyKey" | "eventId">,
-): string {
-  return `nurturing:failedTraceDay:${context.idempotencyKey ?? context.eventId}`;
-}
+/** What the failed-trace count reads of trace_failed: its project, trace and origin. */
+const failedTraceDataSchema = traceFailedEventDataSchema.pick({
+  projectId: true,
+  traceId: true,
+  origin: true,
+});
 
 /**
  * One project's failed traces per UTC day, from trace's own trace_failed fact (once per trace,
- * by trace's rule) on the day it was appended. Each fact is claimed first, so a redelivery never
- * counts twice; a failed write gives its claims back, so the retry counts. Sample and Langy
- * failures mint no job; the handler drops any staged.
+ * by trace's rule) on the day it was appended, counted once per trace as the trace count is, so a
+ * redelivered fact counts nothing again. Sample and Langy failures mint no job; the handler drops
+ * any staged.
  */
-export function nurturingFailedTraceDaySubscriber({
-  traceDays,
-  claims,
-}: Readonly<{
-  traceDays: NurturingTraceDayRepository;
-  claims: NurturingClaimRepository;
-}>): PeerBatchSubscriberDefinition<typeof failedTraceDataSchema> {
+export function nurturingFailedTraceDaySubscriber(
+  deps: NurturingTraceCountingDeps,
+): PeerBatchSubscriberDefinition<typeof failedTraceDataSchema> {
   return {
     eventType: TRACE_FAILED_EVENT_TYPE,
     data: failedTraceDataSchema,
@@ -371,40 +443,19 @@ export function nurturingFailedTraceDaySubscriber({
       groupKeyFn: traceDayGroupOf,
       coalesceMaxBatch: TRACE_DAY_COALESCE_MAX_BATCH,
     },
-    handleBatch: async (items) => {
-      const claimed = await Promise.allSettled(
-        items
+    handleBatch: (items) =>
+      countInWindow({
+        ...deps,
+        traces: items
           .filter(({ data }) => isCustomerOrigin(data.origin))
-          .map(async ({ data, context }) => {
-            const key = failedTraceClaimKeyOf(context);
-            const first = await claims.claim(key, FAILED_TRACE_CLAIM_TTL_SECONDS);
-            return { key, first, data, context };
-          }),
-      );
-      const fresh = claimed.flatMap((result) =>
-        result.status === "fulfilled" && result.value.first ? [result.value] : [],
-      );
-      try {
-        const refused = claimed.find(
-          (result): result is PromiseRejectedResult => result.status === "rejected",
-        );
-        if (refused) throw refused.reason;
-        await traceDays.addTraceDays(
-          failedTraceDayIncrementsOf(
-            fresh.map(({ data, context }) => ({
-              projectId: data.projectId,
-              day: utcDayOf(context.createdAt),
-              failedAt: context.createdAt,
-            })),
-          ),
-        );
-      } catch (error) {
-        await NurturingClaimReleaseService.create(claims).rethrowAfterReleasing({
-          error,
-          keys: fresh.map(({ key }) => key),
-        });
-      }
-    },
+          .map(({ data, context }) => ({
+            projectId: data.projectId,
+            traceId: data.traceId,
+            kind: "failed" as const,
+            day: utcDayOf(context.createdAt),
+            at: context.createdAt,
+          })),
+      }),
   };
 }
 
@@ -492,9 +543,9 @@ export function nurturingEvaluationDaySubscriber(
 /** What the usage sync needs; absent without a Customer.io channel, when nothing syncs. */
 export type NurturingUsageSync = Readonly<{
   traceDays: NurturingTraceDayRepository;
-  claims: NurturingClaimRepository;
   placements: NurturingProjectPlacementRepository;
   organizationsCreated: NurturingOrganizationCreatedRepository;
+  directory: NurturingTraceCountingDeps["directory"];
   usageChanged: UsageChanged;
 }>;
 
@@ -511,7 +562,8 @@ function nurturingProjectUsageHost({
   }).withEvents([]);
   // Without a channel no sync reads these rows, and none prunes the trace days, so none is kept.
   if (!sync) return host;
-  const { traceDays, claims, placements, organizationsCreated, usageChanged } = sync;
+  const { traceDays, placements, organizationsCreated, directory, usageChanged } = sync;
+  const counting = { traceDays, placements, organizationsCreated, directory };
   const subscribers = [organizationUsageSubscriber(usageChanged)];
   const traceSyncs = nurturingTraceUsageSyncSubscribers(usageChanged);
   return (
@@ -532,11 +584,8 @@ function nurturingProjectUsageHost({
         nurturingProjectUsagePeerFold({ owner: "simulation", store }),
         subscribers,
       )
-      .withPeerSubscriber("traceDayCount", nurturingTraceDaySubscriber(traceDays))
-      .withPeerSubscriber(
-        "failedTraceDayCount",
-        nurturingFailedTraceDaySubscriber({ traceDays, claims }),
-      )
+      .withPeerSubscriber("traceDayCount", nurturingTraceDaySubscriber(counting))
+      .withPeerSubscriber("failedTraceDayCount", nurturingFailedTraceDaySubscriber(counting))
       // Throttled, not debounced: an organization tracing without pause still syncs once per
       // window, 15 minutes after the window's first trace, when its root spans are counted.
       .withPeerSubscriber("firstTraceUsageSync", traceSyncs.firstTrace)
@@ -596,9 +645,9 @@ export const nurturingProjectUsageEventing = defineEventingModule({
       sync: app.syncsOrganizationUsage()
         ? {
             traceDays: repositories.traceDays,
-            claims: repositories.claims,
             placements: repositories.placements,
             organizationsCreated: repositories.organizationsCreated,
+            directory: repositories.projects,
             usageChanged: (input) => app.organizationUsageChanged(input),
           }
         : undefined,

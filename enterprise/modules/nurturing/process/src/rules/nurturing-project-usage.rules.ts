@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { CioOrgTraits } from "@langwatch/enterprise-nurturing-contract";
+import type { CioOrganizationUsageTraits } from "@langwatch/enterprise-nurturing-contract";
 import { Temporal } from "@langwatch/time";
 import { z } from "zod";
 
@@ -14,6 +14,52 @@ export const PROJECT_USAGE_WINDOW_MS = 30 * DAY_MS;
 
 /** The free window the per-email journey speaks of, from the organization's creation. */
 export const PROJECT_USAGE_TRIAL_WINDOW_MS = 14 * DAY_MS;
+
+/**
+ * How long after an organization's creation its traces are counted, and its trace traits sent:
+ * the free window plus a week for the emails that follow it. Past it nothing reads the counts, so
+ * none is kept: the per-trace dedup rows then scale with new organizations' traffic alone.
+ */
+export const TRACE_COUNTING_WINDOW_MS = PROJECT_USAGE_TRIAL_WINDOW_MS + 7 * DAY_MS;
+
+/** Whether a trace at `at` is counted: its organization is known and still in its window. */
+export function isTraceCounted({
+  organizationCreatedAt,
+  at,
+}: Readonly<{ organizationCreatedAt: number | null; at: number }>): boolean {
+  return organizationCreatedAt !== null && at - organizationCreatedAt < TRACE_COUNTING_WINDOW_MS;
+}
+
+/** The traits read from trace days: rolling, so each is removed when the window ends. */
+const TRACE_WINDOW_TRAITS = [
+  "trace_count",
+  "error_count",
+  "last_trace_date",
+  "last_failed_trace_at",
+  "active_last_7_days",
+  "back_since_day_0",
+  "active_day_0",
+  "active_day_1",
+  "active_day_12",
+  "active_day_13",
+  "has_habit",
+] as const satisfies readonly (keyof CioOrganizationUsageTraits)[];
+
+/** Every trace trait as null: Customer.io removes an attribute sent as null. */
+export function endedTraceWindowTraits(): CioOrganizationUsageTraits {
+  return Object.fromEntries(TRACE_WINDOW_TRAITS.map((trait) => [trait, null]));
+}
+
+/**
+ * The creation times whose counting window ended in (`after`, `upTo`]: the organizations a sweep
+ * over that span ends the window of, each in exactly one sweep.
+ */
+export function createdRangeOfEndedWindows({
+  after,
+  upTo,
+}: Readonly<{ after: number; upTo: number }>): Readonly<{ after: number; upTo: number }> {
+  return { after: after - TRACE_COUNTING_WINDOW_MS, upTo: upTo - TRACE_COUNTING_WINDOW_MS };
+}
 
 /** One project's prompt, evaluator and scenario usage as nurturing folds it from the owners. */
 export const nurturingProjectUsageStateSchema = z.object({
@@ -53,7 +99,10 @@ export function windowStartDayOf(now: number): string {
 
 /** The days after signup whose activity is a trait, `active_day_<n>`. */
 const TRACKED_SIGNUP_DAYS = [0, 1, 12, 13] as const;
-type SignupDayTraits = Pick<CioOrgTraits, `active_day_${(typeof TRACKED_SIGNUP_DAYS)[number]}`>;
+type SignupDayTraits = Pick<
+  CioOrganizationUsageTraits,
+  `active_day_${(typeof TRACKED_SIGNUP_DAYS)[number]}`
+>;
 
 /** A habit takes this many distinct active days, or this many distinct active ISO weeks. */
 const HABIT_MIN_ACTIVE = 3;
@@ -178,7 +227,7 @@ function traceTraits({
   otherActiveDays: readonly string[];
   now: number;
   organizationCreatedAt: number | null;
-}>): Partial<CioOrgTraits> {
+}>): CioOrganizationUsageTraits {
   const { lastTraceAt, lastFailedTraceAt, activeDays } = traces;
   const windowStartDay = windowStartDayOf(now);
   const habitDays = [
@@ -211,10 +260,11 @@ export function organizationUsageTraits({
   organizationCreatedAt,
 }: Readonly<{
   projects: readonly NurturingProjectUsageState[];
-  traces: NurturingTraceCounts;
+  /** Null past the organization's counting window: its trace traits are left as last sent. */
+  traces: NurturingTraceCounts | null;
   now: number;
   organizationCreatedAt: number | null;
-}>): Partial<CioOrgTraits> {
+}>): CioOrganizationUsageTraits {
   return {
     prompt_count: projects.reduce((sum, project) => sum + project.promptIds.length, 0),
     evaluator_count: projects.reduce((sum, project) => sum + project.evaluatorIds.length, 0),
@@ -227,11 +277,12 @@ export function organizationUsageTraits({
     ...(organizationCreatedAt !== null && {
       window_end_date: unixSecondsOf(organizationCreatedAt + PROJECT_USAGE_TRIAL_WINDOW_MS),
     }),
-    ...traceTraits({
-      traces,
-      otherActiveDays: projects.flatMap((project) => project.activeDays),
-      now,
-      organizationCreatedAt,
-    }),
+    ...(traces !== null &&
+      traceTraits({
+        traces,
+        otherActiveDays: projects.flatMap((project) => project.activeDays),
+        now,
+        organizationCreatedAt,
+      })),
   };
 }

@@ -2,6 +2,7 @@ import type {
   OrganizationTeam,
   OrganizationTeamPage,
   Team,
+  MemberMostRecentOrganization,
 } from "@langwatch/organization-contract";
 
 export abstract class TeamRepository {
@@ -63,6 +64,12 @@ export abstract class TeamRepository {
     userId: string;
     activeOnly?: boolean;
   }): Promise<string[]>;
+
+  /** The organization of this person's newest active membership (ties by id), or
+   *  `none` when they have none. */
+  abstract mostRecentOrganizationIdForMember(input: {
+    userId: string;
+  }): Promise<MemberMostRecentOrganization>;
 
   /** Runs `change` while holding the team's membership lock, so a membership
    *  read, its last-admin check and its write cannot interleave with another. */

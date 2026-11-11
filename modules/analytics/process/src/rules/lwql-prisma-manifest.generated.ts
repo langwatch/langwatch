@@ -1964,6 +1964,14 @@ export interface LwqlPrismaRows {
     readonly lastTraceAt: "DateTime?";
     readonly lastFailedTraceAt: "DateTime?";
   };
+  readonly NurturingProjectCountedTrace: {
+    readonly projectId: "String";
+    readonly traceId: "String";
+    readonly kind: "String";
+    readonly day: "String";
+    readonly appendedAt: "DateTime";
+    readonly createdAt: "DateTime";
+  };
   readonly BillingMeterCheckpoint: {
     readonly id: "String";
     readonly organizationId: "String";

@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { CioBatchCall } from "@langwatch/enterprise-nurturing-contract";
+import type {
+  CioBatchCall,
+  CioOrganizationUsageTraits,
+} from "@langwatch/enterprise-nurturing-contract";
+import { createLogger } from "@langwatch/observability";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 
 import type { NurturingMilestonesRepository } from "../repositories/nurturing-milestones.repository.ts";
 import type { NurturingOrganizationCreatedRepository } from "../repositories/nurturing-organization-created.repository.ts";
@@ -7,10 +12,18 @@ import type { NurturingProjectPlacementRepository } from "../repositories/nurtur
 import type { NurturingProjectUsageReadRepository } from "../repositories/nurturing-project-usage.repository.ts";
 import type { NurturingTraceDayReadRepository } from "../repositories/nurturing-trace-day.repository.ts";
 import {
+  createdRangeOfEndedWindows,
+  endedTraceWindowTraits,
+  isTraceCounted,
   organizationUsageTraits,
   windowStartDayOf,
 } from "../rules/nurturing-project-usage.rules.ts";
 import { traceCountsOf } from "../rules/nurturing-trace-day.rules.ts";
+
+const nurturingLogger = createLogger("langwatch:nurturing");
+
+/** Members read and identified per request, so a large organization never opens a burst. */
+const MEMBER_BATCH_SIZE = 100;
 
 type OrganizationUsageDependencies = Readonly<{
   projectUsage: NurturingProjectUsageReadRepository;
@@ -18,8 +31,13 @@ type OrganizationUsageDependencies = Readonly<{
   /** Nurturing's own copy of each project's organization, from project's creation facts. */
   placements: Pick<NurturingProjectPlacementRepository, "getPlacement" | "findProjectIds">;
   /** Nurturing's own copy of each organization's creation, from organization's facts. */
-  organizationsCreated: Pick<NurturingOrganizationCreatedRepository, "findOrganizationCreatedAt">;
+  organizationsCreated: Pick<
+    NurturingOrganizationCreatedRepository,
+    "findOrganizationCreatedAt" | "findOrganizationIdsCreatedBetween"
+  >;
   milestones: Pick<NurturingMilestonesRepository, "findOrganization">;
+  /** The organization's members and each member's organizations, read at need, never stored. */
+  organizations: Pick<OrganizationApi, "getAllMembers" | "mostRecentOrganizationIdForMember">;
   /** Rejects when Customer.io did not take the call, so the subscriber's job retries. */
   sendBatch: (calls: CioBatchCall[]) => Promise<void>;
   clock: Readonly<{ nowMs: () => number }>;
@@ -27,10 +45,10 @@ type OrganizationUsageDependencies = Readonly<{
 
 /**
  * Turns a project's changed usage into its organization's traits: sums the organization's projects
- * from nurturing's own rows, and sends one group call to the admin. It reads no other module's
- * data, not even placement: trace counts start at nurturing's first counted trace. Sends nothing
- * for a project nurturing never saw created (one made before it kept the copy), or one with no
- * admin yet.
+ * from nurturing's own rows, sends one group call to the admin, then mirrors the traits onto each
+ * member whose most recently joined organization it is. Trace counts start at nurturing's first
+ * counted trace. Sends nothing for a project nurturing never saw created (one made before it kept
+ * the copy), or one with no admin yet.
  */
 export class NurturingOrganizationUsageService {
   static create(dependencies: OrganizationUsageDependencies): NurturingOrganizationUsageService {
@@ -53,8 +71,7 @@ export class NurturingOrganizationUsageService {
     if (projectId === "") return;
     const now = clock.nowMs();
     const windowStartDay = windowStartDayOf(now);
-    // Trace days are written for every project, placed or not, so a path that sends nothing
-    // still prunes the changed project's own old rows.
+    // A path that sends nothing still prunes the changed project's own old rows.
     const pruneProject = () =>
       traceDays.pruneBefore({ projectIds: [projectId], beforeDay: windowStartDay });
     const placement = await placements.getPlacement({ projectId });
@@ -70,7 +87,10 @@ export class NurturingOrganizationUsageService {
       traceDays.findForProjects({ projectIds, afterDay: windowStartDay }),
       organizationsCreated.findOrganizationCreatedAt({ organizationId }),
     ]);
-    const traces = traceCountsOf({ days: folded, windowStartDay });
+    // Past the counting window no trace is counted, so the last trace traits sent stand.
+    const traces = isTraceCounted({ organizationCreatedAt, at: now })
+      ? traceCountsOf({ days: folded, windowStartDay })
+      : null;
     const traits = organizationUsageTraits({
       projects: usage,
       traces,
@@ -78,5 +98,63 @@ export class NurturingOrganizationUsageService {
       organizationCreatedAt,
     });
     await sendBatch([{ type: "group", userId: adminUserId, groupId: organizationId, traits }]);
+    await this.mirrorOntoMembers({ organizationId, traits });
+  }
+
+  /**
+   * Ends the trace window of every organization whose window ended in (`after`, `upTo`]: its trace
+   * traits go once as null, on the organization and its members, so a rolling trait cannot say
+   * "active" for ever. Later syncs leave them out. A refused call throws, so the sweep retries.
+   */
+  async traceWindowsEnded({
+    after,
+    upTo,
+  }: Readonly<{ after: number; upTo: number }>): Promise<void> {
+    const { organizationsCreated, milestones, sendBatch } = this.dependencies;
+    const ended = await organizationsCreated.findOrganizationIdsCreatedBetween(
+      createdRangeOfEndedWindows({ after, upTo }),
+    );
+    const traits = endedTraceWindowTraits();
+    for (const organizationId of ended) {
+      const [organization] = await milestones.findOrganization({ organizationId });
+      const adminUserId = organization?.adminUserId;
+      if (!adminUserId) continue;
+      await sendBatch([{ type: "group", userId: adminUserId, groupId: organizationId, traits }]);
+      await this.mirrorOntoMembers({ organizationId, traits });
+    }
+  }
+
+  /**
+   * The onboarding emails are person-triggered and read person attributes, so each member gets the
+   * traits too, unless they joined another organization since: that one's traits are theirs. A
+   * failure is reported and swallowed, as the other sinks': the group call stands, the next sync
+   * mirrors again.
+   */
+  private async mirrorOntoMembers({
+    organizationId,
+    traits,
+  }: Readonly<{ organizationId: string; traits: CioOrganizationUsageTraits }>): Promise<void> {
+    const { organizations, sendBatch } = this.dependencies;
+    try {
+      const members = await organizations.getAllMembers({ organizationId });
+      for (let start = 0; start < members.length; start += MEMBER_BATCH_SIZE) {
+        const latestOf = await Promise.all(
+          members.slice(start, start + MEMBER_BATCH_SIZE).map(async ({ id }) => {
+            const latest = await organizations.mostRecentOrganizationIdForMember({ userId: id });
+            return latest.outcome === "member" && latest.organizationId === organizationId
+              ? [id]
+              : [];
+          }),
+        );
+        const userIds = latestOf.flat();
+        if (userIds.length === 0) continue;
+        await sendBatch(userIds.map((userId) => ({ type: "identify", userId, traits })));
+      }
+    } catch (error) {
+      nurturingLogger.warn(
+        { error, organizationId },
+        "an organization's usage could not be mirrored onto its members",
+      );
+    }
   }
 }

@@ -15,4 +15,8 @@ export interface NurturingOrganizationCreatedRepository {
   findOrganizationCreatedAt(
     input: Readonly<{ organizationId: string }>,
   ): Promise<Readonly<{ organizationCreatedAt: number | null }>>;
+  /** The organizations created in (`after`, `upTo`], epoch ms. */
+  findOrganizationIdsCreatedBetween(
+    input: Readonly<{ after: number; upTo: number }>,
+  ): Promise<string[]>;
 }

@@ -25,15 +25,15 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { MemoryNurturingOrganizationCreatedRepository } from "../../repositories/memory/memory.nurturing-organization-created.repository.ts";
+import { MemoryNurturingProjectDirectoryRepository } from "../../repositories/memory/memory.nurturing-project-directory.repository.ts";
+import { MemoryNurturingProjectPlacementRepository } from "../../repositories/memory/memory.nurturing-project-placement.repository.ts";
 import { MemoryNurturingProjectUsageRepository } from "../../repositories/memory/memory.nurturing-project-usage.repository.ts";
 import { MemoryNurturingTraceDayRepository } from "../../repositories/memory/memory.nurturing-trace-day.repository.ts";
-import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import type { NurturingProjectUsageOwner } from "../../repositories/nurturing-project-usage.repository.ts";
-import type { NurturingTraceDayRepository } from "../../repositories/nurturing-trace-day.repository.ts";
+import { TRACE_COUNTING_WINDOW_MS } from "../../rules/nurturing-project-usage.rules.ts";
 import {
   evaluationDayKeyOf,
-  FAILED_TRACE_CLAIM_TTL_SECONDS,
-  failedTraceClaimKeyOf,
   nurturingEvaluationDaySubscriber,
   nurturingFailedTraceDaySubscriber,
   type NurturingProjectUsagePeerEvent,
@@ -47,6 +47,41 @@ import {
 } from "../nurturing-project-usage.pipeline.ts";
 
 const OCCURRED_AT = 1_000;
+
+/**
+ * The trace counts' dependencies: project-1 in org-1, created `createdAt`, as its owners hold
+ * it and, once `copied`, as nurturing's own copies do; any other project is held by nobody.
+ */
+function countingOver({
+  createdAt,
+  traceDays = MemoryNurturingTraceDayRepository.create(),
+  copied = true,
+}: {
+  createdAt: number;
+  traceDays?: MemoryNurturingTraceDayRepository;
+  copied?: boolean;
+}) {
+  const placements = MemoryNurturingProjectPlacementRepository.create({
+    placed: new Map(copied ? [["project-1", "org-1"]] : []),
+  });
+  const organizationsCreated = MemoryNurturingOrganizationCreatedRepository.create({
+    createdAt: new Map(copied ? [["org-1", createdAt]] : []),
+  });
+  return {
+    traceDays,
+    placements,
+    organizationsCreated,
+    directory: MemoryNurturingProjectDirectoryRepository.create({
+      placed: new Map([["project-1", "org-1"]]),
+      organizationsCreated: new Map([["org-1", createdAt]]),
+    }),
+    /** The copies' subscribers catch up. */
+    landCopies: async () => {
+      await placements.recordProject({ projectId: "project-1", organizationId: "org-1" });
+      await organizationsCreated.recordOrganizationCreated({ organizationId: "org-1", createdAt });
+    },
+  };
+}
 
 /** The envelope every owner event carries, on tenant `project-1`. */
 function envelope(type: string) {
@@ -294,11 +329,12 @@ describe("the trace syncs", () => {
 
   /** @scenario "A project's first trace syncs its organization too" */
   it("counts the first trace once, by its root span: the sync writes no count", async () => {
-    const traceDays = MemoryNurturingTraceDayRepository.create();
+    const counting = countingOver({ createdAt: context.createdAt });
+    const { traceDays } = counting;
     const { firstTrace } = nurturingTraceUsageSyncSubscribers(() => Promise.resolve());
-    const rootSpan = { span: { parentSpanId: null } };
+    const rootSpan = { span: { traceId: "trace-1", parentSpanId: null } };
 
-    await nurturingTraceDaySubscriber(traceDays).handleBatch([{ data: rootSpan, context }]);
+    await nurturingTraceDaySubscriber(counting).handleBatch([{ data: rootSpan, context }]);
     if (!firstTrace.handle) throw new Error("the first-trace sync handles one fact at a time");
     await firstTrace.handle(firstTrace.data.parse(firstTraceData), context);
 
@@ -365,14 +401,18 @@ describe("the trace-day count", () => {
   const OK = 1;
   const ERROR = 2;
 
-  /** trace's span fact as the subscriber gets it: the root marker, with a status it ignores. */
-  const spanData = (parentSpanId: string | null, code: typeof OK | typeof ERROR) => ({
-    span: { parentSpanId, status: { message: null, code } },
+  /** trace's span fact as the subscriber gets it: trace, root marker, a status it ignores. */
+  const spanData = (
+    parentSpanId: string | null,
+    code: typeof OK | typeof ERROR,
+    traceId = "trace-1",
+  ) => ({
+    span: { traceId, parentSpanId, status: { message: null, code } },
   });
 
-  /** One delivery: the span's project (tenant), its trace (aggregate) and append time. */
+  /** One delivery: the span's project (tenant), its trace and append time. */
   const itemOf = (code: typeof OK | typeof ERROR, traceId: string, createdAt = NOON) => ({
-    data: spanData(null, code),
+    data: spanData(null, code, traceId),
     context: {
       tenantId: createTenantId("project-1"),
       aggregateId: traceId,
@@ -382,10 +422,12 @@ describe("the trace-day count", () => {
     },
   });
 
-  function harness() {
-    const traceDays = MemoryNurturingTraceDayRepository.create();
-    const subscriber = nurturingTraceDaySubscriber(traceDays);
-    const days = () => traceDays.findForProjects({ projectIds: ["project-1"], afterDay: "" });
+  /** project-1's organization, created the day before NOON unless told otherwise. */
+  function harness(createdAt = NOON - 86_400_000) {
+    const counting = countingOver({ createdAt });
+    const subscriber = nurturingTraceDaySubscriber(counting);
+    const days = () =>
+      counting.traceDays.findForProjects({ projectIds: ["project-1"], afterDay: "" });
     return { subscriber, days };
   }
 
@@ -452,6 +494,7 @@ describe("the trace-day count", () => {
   /** A root span's raw fact: its origin on the span and on its resource, either absent. */
   const rawRoot = ({ span, resource }: { span?: string; resource?: string }) => ({
     span: {
+      traceId: "trace-1",
       parentSpanId: null,
       status: { message: null, code: OK },
       attributes: span ? [originAttribute(span)] : [],
@@ -491,14 +534,60 @@ describe("the trace-day count", () => {
     expect((await days()).map((day) => day.traceCount)).toEqual([1]);
   });
 
-  /** @scenario "A redelivered batch may count its traces twice" */
-  it("counts a redelivered root span again: the increment is not idempotent", async () => {
+  /** @scenario "A trace stored twice counts once" */
+  it("counts a re-stored or redelivered root span once", async () => {
     const { subscriber, days } = harness();
 
-    await subscriber.handleBatch([itemOf(OK, "trace-1")]);
-    await subscriber.handleBatch([itemOf(OK, "trace-1")]);
+    await subscriber.handleBatch([itemOf(OK, "trace-1"), itemOf(OK, "trace-1", NOON + 1000)]);
+    await subscriber.handleBatch([itemOf(OK, "trace-1", NOON + 2000)]);
 
-    expect((await days())[0]?.traceCount).toBe(2);
+    expect(await days()).toEqual([expect.objectContaining({ traceCount: 1, lastTraceAt: NOON })]);
+  });
+
+  /** @scenario "An organization past its counting window writes no counts" */
+  it("counts no trace of an organization past its window, nor of one never seen created", async () => {
+    const past = harness(NOON - TRACE_COUNTING_WINDOW_MS);
+    const inside = harness(NOON - TRACE_COUNTING_WINDOW_MS + 1);
+
+    await past.subscriber.handleBatch([itemOf(OK, "trace-1")]);
+    await inside.subscriber.handleBatch([itemOf(OK, "trace-1")]);
+    await inside.subscriber.handleBatch([
+      {
+        ...itemOf(OK, "trace-2"),
+        context: { ...itemOf(OK, "trace-2").context, tenantId: createTenantId("project-9") },
+      },
+    ]);
+
+    expect(await past.days()).toEqual([]);
+    expect((await inside.days()).map((day) => day.traceCount)).toEqual([1]);
+  });
+
+  /** @scenario "A new project's first trace waits for nurturing's copies" */
+  it("retries a new project's trace until its copies land, counting it once", async () => {
+    const counting = countingOver({ createdAt: NOON - 86_400_000, copied: false });
+    const subscriber = nurturingTraceDaySubscriber(counting);
+    const days = () =>
+      counting.traceDays.findForProjects({ projectIds: ["project-1"], afterDay: "" });
+
+    await expect(subscriber.handleBatch([itemOf(OK, "trace-1")])).rejects.toThrow(
+      "has not landed yet",
+    );
+    expect(await days()).toEqual([]);
+
+    await counting.landCopies();
+    await subscriber.handleBatch([itemOf(OK, "trace-1")]);
+    expect((await days()).map((day) => day.traceCount)).toEqual([1]);
+  });
+
+  /** @scenario "A new project's first trace waits for nurturing's copies" */
+  it("drops without a retry a trace of an uncopied organization past its window", async () => {
+    const counting = countingOver({ createdAt: NOON - TRACE_COUNTING_WINDOW_MS, copied: false });
+
+    await nurturingTraceDaySubscriber(counting).handleBatch([itemOf(OK, "trace-1")]);
+
+    await expect(
+      counting.traceDays.findForProjects({ projectIds: ["project-1"], afterDay: "" }),
+    ).resolves.toEqual([]);
   });
 
   /** @scenario "Traces arriving out of order count the same" */
@@ -526,14 +615,11 @@ describe("the failed-trace count", () => {
     ...(origin ? { origin } : {}),
   });
 
-  function harness(
-    traceDays: NurturingTraceDayRepository = MemoryNurturingTraceDayRepository.create(),
-  ) {
-    const subscriber = nurturingFailedTraceDaySubscriber({
-      traceDays,
-      claims: MemoryNurturingClaimRepository.create(),
-    });
-    const days = () => traceDays.findForProjects({ projectIds: ["project-1"], afterDay: "" });
+  function harness(createdAt = NOON - 86_400_000) {
+    const counting = countingOver({ createdAt });
+    const subscriber = nurturingFailedTraceDaySubscriber(counting);
+    const days = () =>
+      counting.traceDays.findForProjects({ projectIds: ["project-1"], afterDay: "" });
     /** One delivery; a redelivery carries a new event id but trace's idempotency key. */
     const itemOf = (traceId: string, origin?: string, createdAt = NOON, delivery = 1) => ({
       data: subscriber.data.parse(failedData(traceId, origin)),
@@ -554,39 +640,20 @@ describe("the failed-trace count", () => {
     const { subscriber, days, itemOf } = harness();
 
     await subscriber.handleBatch([itemOf("trace-1"), itemOf("trace-1", undefined, NOON, 2)]);
-    await subscriber.handleBatch([itemOf("trace-1", undefined, NOON, 3)]);
+    await subscriber.handleBatch([itemOf("trace-1", undefined, NOON + 1000, 3)]);
 
-    expect((await days()).map((day) => day.errorCount)).toEqual([1]);
-    expect(FAILED_TRACE_CLAIM_TTL_SECONDS).toBe(24 * 60 * 60);
+    expect(await days()).toEqual([
+      expect.objectContaining({ errorCount: 1, lastFailedTraceAt: NOON }),
+    ]);
   });
 
-  /** @scenario "A redelivered trace_failed counts its failure once" */
-  it("gives the claim back when the write fails, so the retry counts the failure", async () => {
-    const memory = MemoryNurturingTraceDayRepository.create();
-    let failNextWrite = true;
-    const flaky: NurturingTraceDayRepository = {
-      addTraceDays: (increments) => {
-        if (!failNextWrite) return memory.addTraceDays(increments);
-        failNextWrite = false;
-        return Promise.reject(new Error("the write failed"));
-      },
-      findForProjects: (input) => memory.findForProjects(input),
-      pruneBefore: (input) => memory.pruneBefore(input),
-    };
-    const { subscriber, days, itemOf } = harness(flaky);
+  /** @scenario "An organization past its counting window writes no counts" */
+  it("counts no failure of an organization past its window", async () => {
+    const { subscriber, days, itemOf } = harness(NOON - TRACE_COUNTING_WINDOW_MS);
 
-    await expect(subscriber.handleBatch([itemOf("trace-1")])).rejects.toThrow("the write failed");
-    await subscriber.handleBatch([itemOf("trace-1", undefined, NOON, 2)]);
+    await subscriber.handleBatch([itemOf("trace-1")]);
 
-    expect((await days()).map((day) => day.errorCount)).toEqual([1]);
-  });
-
-  /** @scenario "A redelivered trace_failed counts its failure once" */
-  it("claims a fact by its idempotency key, else its event id", () => {
-    expect(
-      failedTraceClaimKeyOf({ idempotencyKey: "project-1:trace_failed:t1", eventId: "e1" }),
-    ).toBe("nurturing:failedTraceDay:project-1:trace_failed:t1");
-    expect(failedTraceClaimKeyOf({ eventId: "e1" })).toBe("nurturing:failedTraceDay:e1");
+    expect(await days()).toEqual([]);
   });
 
   /** @scenario "A failed trace is counted from trace's trace_failed fact" */
@@ -614,8 +681,8 @@ describe("the failed-trace count", () => {
   /** @scenario "Root spans of one project and day are written as one increment" */
   it("queues failures on the same project and day group as the trace count", () => {
     const { subscriber } = harness();
-    const traceGroup = nurturingTraceDaySubscriber(MemoryNurturingTraceDayRepository.create())
-      .options?.groupKeyFn;
+    const traceGroup = nurturingTraceDaySubscriber(countingOver({ createdAt: NOON })).options
+      ?.groupKeyFn;
     const event = { ...envelope(TRACE_FAILED_EVENT_TYPE), createdAt: NOON } as Event;
 
     expect(subscriber.options?.groupKeyFn?.(event)).toBe(traceGroup?.(event));

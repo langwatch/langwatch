@@ -259,6 +259,11 @@ export interface OrganizationFounding {
   founderMemberships: { organizationId: string; joinedAtMs: number }[];
 }
 
+/** A person's newest active membership's organization, or that they have no active membership. */
+export type MemberMostRecentOrganization =
+  | Readonly<{ outcome: "member"; organizationId: string }>
+  | Readonly<{ outcome: "none" }>;
+
 export interface OrganizationApi {
   createAndAssign(
     input: Readonly<{
@@ -538,6 +543,13 @@ export interface OrganizationApi {
   organizationIdsForMember(
     input: Readonly<{ userId: string; activeOnly?: boolean }>,
   ): Promise<string[]>;
+  /**
+   * The organization of this person's newest active membership (ties by id), or `none` when they
+   * have none: the one organization a person-level trait about "their organization" is taken from.
+   */
+  mostRecentOrganizationIdForMember(
+    input: Readonly<{ userId: string }>,
+  ): Promise<MemberMostRecentOrganization>;
   /** The organization an email domain is claimed by for SSO, or null when none claims it. */
   findBySsoDomain(
     input: Readonly<{ domain: string }>,

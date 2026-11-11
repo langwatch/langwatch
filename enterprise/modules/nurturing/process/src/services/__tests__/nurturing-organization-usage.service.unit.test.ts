@@ -5,28 +5,62 @@
  */
 import type { CioBatchCall } from "@langwatch/enterprise-nurturing-contract";
 import { createTenantId } from "@langwatch/eventing";
-import { describe, expect, it } from "vitest";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { describe, expect, it, vi } from "vitest";
+
+const logger = vi.hoisted(() => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() }));
+
+vi.mock("@langwatch/observability", () => ({ createLogger: () => logger }));
 
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingOrganizationCreatedRepository } from "../../repositories/memory/memory.nurturing-organization-created.repository.ts";
 import { MemoryNurturingProjectPlacementRepository } from "../../repositories/memory/memory.nurturing-project-placement.repository.ts";
 import { MemoryNurturingProjectUsageRepository } from "../../repositories/memory/memory.nurturing-project-usage.repository.ts";
 import { MemoryNurturingTraceDayRepository } from "../../repositories/memory/memory.nurturing-trace-day.repository.ts";
-import { emptyProjectUsage, foldProjectUsage } from "../../rules/nurturing-project-usage.rules.ts";
-import { emptyTraceDay, type NurturingTraceDay } from "../../rules/nurturing-trace-day.rules.ts";
+import {
+  emptyProjectUsage,
+  foldProjectUsage,
+  TRACE_COUNTING_WINDOW_MS,
+} from "../../rules/nurturing-project-usage.rules.ts";
+import type {
+  NurturingCountedTrace,
+  NurturingTraceDay,
+} from "../../rules/nurturing-trace-day.rules.ts";
 import { NurturingOrganizationUsageService } from "../nurturing-organization-usage.service.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const NOW = Date.UTC(2026, 10, 20, 12);
 
+/** Each member's organizations, most recently joined first, as organization answers them. */
+type Memberships = ReadonlyMap<string, readonly string[]>;
+
+/** The organization's members and their organizations, as the organization module reads them. */
+function organizationsOver(
+  memberships: Memberships,
+): Pick<OrganizationApi, "getAllMembers" | "mostRecentOrganizationIdForMember"> {
+  return {
+    getAllMembers: async ({ organizationId }) =>
+      [...memberships]
+        .filter(([, organizationIds]) => organizationIds.includes(organizationId))
+        .map(([id]) => ({ id })) as never,
+    mostRecentOrganizationIdForMember: async ({ userId }) => {
+      const [organizationId] = memberships.get(userId) ?? [];
+      return organizationId ? { outcome: "member", organizationId } : { outcome: "none" };
+    },
+  };
+}
+
 async function serviceOver({
   placed,
-  createdAt = new Map(),
+  // Inside its trace counting window, so its trace traits are sent.
+  createdAt = new Map([["org-1", NOW - DAY_MS]]),
   send = async () => {},
+  organizations = organizationsOver(new Map()),
 }: {
   placed: ReadonlyMap<string, string>;
   createdAt?: ReadonlyMap<string, number>;
-  send?: () => Promise<void>;
+  send?: (calls: CioBatchCall[]) => Promise<void>;
+  organizations?: Pick<OrganizationApi, "getAllMembers" | "mostRecentOrganizationIdForMember">;
 }) {
   const projectUsage = MemoryNurturingProjectUsageRepository.create();
   const traceDays = MemoryNurturingTraceDayRepository.create();
@@ -43,8 +77,9 @@ async function serviceOver({
     placements: MemoryNurturingProjectPlacementRepository.create({ placed }),
     organizationsCreated: MemoryNurturingOrganizationCreatedRepository.create({ createdAt }),
     milestones,
+    organizations,
     sendBatch: async (calls) => {
-      await send();
+      await send(calls);
       sent.push(calls);
     },
     clock: { nowMs: () => NOW },
@@ -64,13 +99,31 @@ const traitsOf = (call: CioBatchCall | undefined) =>
 
 const storeContext = (key: string) => ({ aggregateId: key, tenantId: createTenantId(key), key });
 
-/** Arranges one project's trace day as its counted traces would have left it. */
+/** Arranges one project's trace day by counting its traces and failures, each a new trace. */
 async function seedTraceDay(
   traceDays: MemoryNurturingTraceDayRepository,
-  day: Partial<NurturingTraceDay> & Pick<NurturingTraceDay, "projectId" | "day">,
+  {
+    projectId,
+    day,
+    traceCount = 1,
+    errorCount = 0,
+    lastFailedTraceAt = NOW - DAY_MS,
+  }: Pick<NurturingTraceDay, "projectId" | "day"> &
+    Partial<Pick<NurturingTraceDay, "traceCount" | "errorCount">> & {
+      lastFailedTraceAt?: number;
+    },
 ) {
-  await traceDays.addTraceDays([
-    { ...emptyTraceDay(), traceCount: 1, lastTraceAt: NOW - DAY_MS, ...day },
+  const traces = (kind: NurturingCountedTrace["kind"], count: number, at: number) =>
+    Array.from({ length: count }, (_, n) => ({
+      projectId,
+      traceId: `${projectId}:${day}:${n}`,
+      kind,
+      day,
+      at,
+    }));
+  await traceDays.countTraces([
+    ...traces("trace", traceCount, NOW - DAY_MS),
+    ...traces("failed", errorCount, lastFailedTraceAt),
   ]);
 }
 
@@ -213,7 +266,10 @@ describe("NurturingOrganizationUsageService", () => {
       placed: new Map([["project-1", "org-1"]]),
       createdAt: new Map([["org-1", NOW - 3 * DAY_MS]]),
     });
-    const unseen = await serviceOver({ placed: new Map([["project-1", "org-1"]]) });
+    const unseen = await serviceOver({
+      placed: new Map([["project-1", "org-1"]]),
+      createdAt: new Map(),
+    });
     for (const { traceDays } of [seen, unseen]) {
       await seedTraceDay(traceDays, { projectId: "project-1", day: "2026-11-20" });
     }
@@ -235,5 +291,155 @@ describe("NurturingOrganizationUsageService", () => {
     await service.usageChanged({ projectId: "project-9" });
 
     expect(sent).toEqual([]);
+  });
+
+  describe("given an organization whose members are Customer.io people", () => {
+    const placed = new Map([["project-1", "org-1"]]);
+
+    /** @scenario "Each member of the organization gets its traits as person attributes" */
+    it("identifies each member with the organization's traits after the group call", async () => {
+      const { service, projectUsage, sent } = await serviceOver({
+        placed,
+        organizations: organizationsOver(
+          new Map([
+            ["admin-1", ["org-1", "org-0"]],
+            ["member-2", ["org-1"]],
+          ]),
+        ),
+      });
+      await projectUsage
+        .forOwner("prompt")
+        .store(usageOf("project-1", ["p1"]), storeContext("project-1"));
+
+      await service.usageChanged({ projectId: "project-1" });
+
+      const [group, identifies] = sent;
+      expect(group).toEqual([expect.objectContaining({ type: "group", groupId: "org-1" })]);
+      expect(identifies).toEqual([
+        { type: "identify", userId: "admin-1", traits: traitsOf(group?.[0]) },
+        { type: "identify", userId: "member-2", traits: traitsOf(group?.[0]) },
+      ]);
+      expect(traitsOf(identifies?.[0])).toMatchObject({ prompt_count: 1, trace_count: 0 });
+    });
+
+    /** @scenario "A member who joined another organization since does not get this one's traits" */
+    it("leaves out a member whose most recently joined organization is another", async () => {
+      const { service, sent } = await serviceOver({
+        placed,
+        organizations: organizationsOver(
+          new Map([
+            ["admin-1", ["org-1"]],
+            ["member-2", ["org-2", "org-1"]],
+          ]),
+        ),
+      });
+
+      await service.usageChanged({ projectId: "project-1" });
+
+      expect(sent[1]?.map((call) => call.userId)).toEqual(["admin-1"]);
+    });
+
+    /** @scenario "A failed identify is reported and swallowed" */
+    it("reports and swallows a refused identify, the group call already sent", async () => {
+      logger.warn.mockClear();
+      const { service, sent } = await serviceOver({
+        placed,
+        organizations: organizationsOver(new Map([["admin-1", ["org-1"]]])),
+        send: async (calls) => {
+          if (calls.some((call) => call.type === "identify")) throw new Error("refused");
+        },
+      });
+
+      await expect(service.usageChanged({ projectId: "project-1" })).resolves.toBeUndefined();
+
+      expect(sent.map((calls) => calls.map((call) => call.type))).toEqual([["group"]]);
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: "org-1" }),
+        expect.any(String),
+      );
+    });
+
+    /** @scenario "A failed identify is reported and swallowed" */
+    it("reports and swallows a members read that failed", async () => {
+      logger.warn.mockClear();
+      const { service, sent } = await serviceOver({
+        placed,
+        organizations: {
+          ...organizationsOver(new Map()),
+          getAllMembers: () => Promise.reject(new Error("organization unavailable")),
+        },
+      });
+
+      await expect(service.usageChanged({ projectId: "project-1" })).resolves.toBeUndefined();
+
+      expect(sent).toHaveLength(1);
+      expect(logger.warn).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  /** @scenario "An organization past its counting window writes no counts" */
+  it("sends no trace traits for an organization past its counting window", async () => {
+    const { service, traceDays, sent } = await serviceOver({
+      placed: new Map([["project-1", "org-1"]]),
+      createdAt: new Map([["org-1", NOW - 25 * DAY_MS]]),
+    });
+    await seedTraceDay(traceDays, { projectId: "project-1", day: "2026-11-19" });
+
+    await service.usageChanged({ projectId: "project-1" });
+
+    expect(traitsOf(sent[0]?.[0])).not.toHaveProperty("trace_count");
+    expect(traitsOf(sent[0]?.[0])).toMatchObject({ prompt_count: 0 });
+  });
+
+  describe("when an organization's trace window ends", () => {
+    const ended = NOW - TRACE_COUNTING_WINDOW_MS;
+
+    /** @scenario "The trace traits are removed once when an organization's window ends" */
+    it("sends its trace traits once as null, on the organization and its members", async () => {
+      const { service, sent } = await serviceOver({
+        placed: new Map(),
+        createdAt: new Map([
+          ["org-1", ended],
+          ["org-later", ended + 1],
+        ]),
+        organizations: organizationsOver(new Map([["member-2", ["org-1"]]])),
+      });
+
+      await service.traceWindowsEnded({ after: NOW - 60 * 60 * 1000, upTo: NOW });
+
+      const [group, identifies] = sent;
+      expect(group).toEqual([
+        {
+          type: "group",
+          userId: "admin-1",
+          groupId: "org-1",
+          traits: expect.objectContaining({
+            trace_count: null,
+            active_last_7_days: null,
+            has_habit: null,
+            active_day_13: null,
+          }),
+        },
+      ]);
+      expect(traitsOf(group?.[0])).not.toHaveProperty("prompt_count");
+      expect(identifies).toEqual([
+        { type: "identify", userId: "member-2", traits: traitsOf(group?.[0]) },
+      ]);
+      expect(sent).toHaveLength(2);
+    });
+
+    it("throws when Customer.io refused, so the sweep retries", async () => {
+      const { service } = await serviceOver({
+        placed: new Map(),
+        createdAt: new Map([["org-1", ended]]),
+        send: async () => {
+          throw new Error("Customer.io unavailable");
+        },
+      });
+
+      await expect(
+        service.traceWindowsEnded({ after: NOW - 60 * 60 * 1000, upTo: NOW }),
+      ).rejects.toThrow("Customer.io unavailable");
+    });
   });
 });

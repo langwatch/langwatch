@@ -11,6 +11,7 @@ import {
   type OrganizationGroup,
   type OrganizationGroupMember,
   type OrganizationTeam,
+  type MemberMostRecentOrganization,
 } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
@@ -83,6 +84,9 @@ class MemoryTeams extends TeamRepository {
   }
 
   organizationIdsForMember(): Promise<string[]> {
+    throw new Error("not used by this test");
+  }
+  mostRecentOrganizationIdForMember(): Promise<MemberMostRecentOrganization> {
     throw new Error("not used by this test");
   }
 

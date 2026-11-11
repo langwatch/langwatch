@@ -53,4 +53,15 @@ export class PrismaNurturingOrganizationCreatedRepository
     });
     return { organizationCreatedAt: row?.createdAt.getTime() ?? null };
   }
+
+  async findOrganizationIdsCreatedBetween({
+    after,
+    upTo,
+  }: Readonly<{ after: number; upTo: number }>): Promise<string[]> {
+    const rows = await this.#database.nurturingOrganizationCreated.findMany({
+      where: { createdAt: { gt: new Date(after), lte: new Date(upTo) } },
+      select: { organizationId: true },
+    });
+    return rows.map(({ organizationId }) => organizationId);
+  }
 }

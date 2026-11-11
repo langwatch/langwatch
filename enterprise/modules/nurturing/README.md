@@ -11,7 +11,7 @@ Product analytics and lifecycle messaging: nurturing learns from the owners' eve
 | Classification | enterprise (`modules/catalogue.json`)                                                                          |
 | Subjects       | nurturing, product-milestone                                                                                   |
 | Halves         | [contract](contract) · [process](process/README.md)                                                            |
-| Api token      | `NurturingApi` = `moduleApi<NurturingApi>()("nurturing")`, `contract/src/nurturing-types.ts:250` (1 operation) |
+| Api token      | `NurturingApi` = `moduleApi<NurturingApi>()("nurturing")`, `contract/src/nurturing-types.ts:259` (1 operation) |
 | Installed by   | api, worker, tasks (process)                                                                                   |
 
 ## What nurturing owns
@@ -22,7 +22,8 @@ Product analytics and lifecycle messaging: nurturing learns from the owners' eve
 | Postgres table                 | `NurturingOrganizationCreated`                                                                                                                | `process/src/repositories/prisma/prisma.nurturing-organization-created.repository.ts:14` |
 | Postgres table                 | `NurturingProject`                                                                                                                            | `process/src/repositories/prisma/prisma.nurturing-project-placement.repository.ts:12`    |
 | Postgres table                 | `NurturingProjectUsageView`                                                                                                                   | `process/src/repositories/prisma/prisma.nurturing-project-usage.repository.ts:32`        |
-| Postgres table                 | `NurturingProjectTraceDay`                                                                                                                    | `process/src/repositories/prisma/prisma.nurturing-trace-day.repository.ts:17`            |
+| Postgres table                 | `NurturingProjectTraceDay`                                                                                                                    | `process/src/repositories/prisma/prisma.nurturing-trace-day.repository.ts:22`            |
+| Postgres table                 | `NurturingProjectCountedTrace`                                                                                                                | `process/src/repositories/prisma/prisma.nurturing-trace-day.repository.ts:22`            |
 | Postgres, accessed not claimed | `Organization`, `Project`, `Team`                                                                                                             | `process/src/repositories/prisma/prisma.nurturing-project-directory.repository.ts:12`    |
 | Stores required                |                                                                                                                                               | `process/src/channels/http/http.customer-io.channel.ts:20`                               |
 | Stores required                |                                                                                                                                               | `process/src/channels/http/http.nurturing.channels.ts:13`                                |

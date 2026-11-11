@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`OrganizationApi`)
 
-Peers call these through the token, declared at `../contract/src/organization.api.ts:262`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/organization.api.ts:267`; nothing else in this package is public.
 
 #### `createAndAssign`
 
@@ -442,6 +442,14 @@ Every organization this person belongs to. Asked by a peer deciding something ab
 
 ```typescript
 organizationIdsForMember(input: Readonly<{ userId: string; activeOnly?: boolean }>): Promise<string[]>;
+```
+
+#### `mostRecentOrganizationIdForMember`
+
+The organization of this person's newest active membership (ties by id), or `none` when they have none: the one organization a person-level trait about "their organization" is taken from.
+
+```typescript
+mostRecentOrganizationIdForMember(input: Readonly<{ userId: string }>): Promise<MemberMostRecentOrganization>;
 ```
 
 #### `findBySsoDomain`
@@ -2506,7 +2514,7 @@ Declared at `src/eventing/seat-limit.pipeline.ts:18`. Events: `seatLimitReachedE
 
 | Kind   | Leaf                          | Environment variable      | Declared at                                 |
 | ------ | ----------------------------- | ------------------------- | ------------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:324`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:325`           |
 | config | `signUp.mode`                 | `SIGN_UP_MODE`            | `../contract/src/organization.config.ts:18` |
 | config | `signUp.allowedDomains`       | `SIGN_UP_ALLOWED_DOMAINS` | `../contract/src/organization.config.ts:19` |
 | config | `signUp.adminEmails`          | `ADMIN_EMAILS`            | `../contract/src/organization.config.ts:20` |

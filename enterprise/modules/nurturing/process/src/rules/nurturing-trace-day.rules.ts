@@ -17,18 +17,21 @@ export type NurturingTraceDay = Readonly<{
   lastFailedTraceAt: number | null;
 }>;
 
-/** A root span as nurturing counts it: its project and day; never its body. */
-export type NurturingTraceSpan = Readonly<{
-  projectId: string;
-  day: string;
-  appendedAt: number;
-}>;
+/** What one counted trace adds to: its root span's day count, or its failure count. */
+export type NurturingCountedTraceKind = "trace" | "failed";
 
-/** A trace trace recorded failed, as nurturing counts it: its project and the fact's day. */
-export type NurturingFailedTrace = Readonly<{
+/**
+ * One trace as nurturing counts it, once per kind: its project, id and the fact's day and time;
+ * never its body. A re-stored trace or a redelivered fact carries the same project, id and kind.
+ */
+export type NurturingCountedTrace = Readonly<{
   projectId: string;
+  traceId: string;
+  kind: NurturingCountedTraceKind;
+  /** UTC `YYYY-MM-DD` of the fact's append time. */
   day: string;
-  failedAt: number;
+  /** The fact's append time, epoch ms. */
+  at: number;
 }>;
 
 /** An organization's traces within the window, summed over its projects' days. */
@@ -55,59 +58,40 @@ export function emptyTraceDay(): NurturingTraceDay {
 const latest = (known: number | null, at: number) => Math.max(known ?? at, at);
 
 /**
- * Adds one trace to its project's day: one more trace and the newest time. Sums and maxima only,
- * so the order traces arrive in is moot.
+ * Adds one counted trace to its project's day: a trace or a failure, and its newest time. Sums
+ * and maxima only, so the order traces arrive in is moot.
  */
-export function addTrace(day: NurturingTraceDay, span: NurturingTraceSpan): NurturingTraceDay {
-  return {
-    ...day,
-    projectId: span.projectId,
-    day: span.day,
-    traceCount: day.traceCount + 1,
-    lastTraceAt: latest(day.lastTraceAt, span.appendedAt),
-  };
-}
-
-/** Adds one failed trace to its project's day: one more failure and the newest failure time. */
-export function addFailedTrace(
+export function addCountedTrace(
   day: NurturingTraceDay,
-  failure: NurturingFailedTrace,
+  trace: NurturingCountedTrace,
 ): NurturingTraceDay {
-  return {
-    ...day,
-    projectId: failure.projectId,
-    day: failure.day,
-    errorCount: day.errorCount + 1,
-    lastFailedTraceAt: latest(day.lastFailedTraceAt, failure.failedAt),
-  };
+  const at = { ...day, projectId: trace.projectId, day: trace.day };
+  return trace.kind === "trace"
+    ? { ...at, traceCount: day.traceCount + 1, lastTraceAt: latest(day.lastTraceAt, trace.at) }
+    : {
+        ...at,
+        errorCount: day.errorCount + 1,
+        lastFailedTraceAt: latest(day.lastFailedTraceAt, trace.at),
+      };
 }
 
-/** Items folded into one increment per project and day, so each day is written once. */
-function incrementsOf<Item extends Readonly<{ projectId: string; day: string }>>({
-  items,
-  add,
-}: Readonly<{
-  items: readonly Item[];
-  add: (day: NurturingTraceDay, item: Item) => NurturingTraceDay;
-}>): NurturingTraceDay[] {
+/** Counted traces folded into one increment per project and day, so each day is written once. */
+export function traceDayIncrementsOf(
+  traces: readonly NurturingCountedTrace[],
+): NurturingTraceDay[] {
   const days = new Map<string, NurturingTraceDay>();
-  for (const item of items) {
-    const key = JSON.stringify([item.projectId, item.day]);
-    days.set(key, add(days.get(key) ?? emptyTraceDay(), item));
+  for (const trace of traces) {
+    const key = JSON.stringify([trace.projectId, trace.day]);
+    days.set(key, addCountedTrace(days.get(key) ?? emptyTraceDay(), trace));
   }
   return [...days.values()];
 }
 
-/** A batch of root spans as the increments of their project's days. */
-export function traceDayIncrementsOf(spans: readonly NurturingTraceSpan[]): NurturingTraceDay[] {
-  return incrementsOf({ items: spans, add: addTrace });
-}
-
-/** A batch of failed traces as the increments of their project's days: failures only. */
-export function failedTraceDayIncrementsOf(
-  failures: readonly NurturingFailedTrace[],
-): NurturingTraceDay[] {
-  return incrementsOf({ items: failures, add: addFailedTrace });
+/** The key a trace is counted once by: its project, id and kind. */
+export function countedTraceKeyOf(
+  trace: Pick<NurturingCountedTrace, "projectId" | "traceId" | "kind">,
+): string {
+  return JSON.stringify([trace.projectId, trace.traceId, trace.kind]);
 }
 
 /** The days after `windowStartDay`, summed into the organization's trace counts. */

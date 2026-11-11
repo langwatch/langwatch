@@ -5,8 +5,9 @@ import {
   UserNotInOrganizationError,
   type OrganizationTeam,
   type OrganizationTeamPage,
+  type MemberMostRecentOrganization,
 } from "@langwatch/organization-contract";
-import { nowInstant, toDate, type Instant } from "@langwatch/time";
+import { nowInstant, Temporal, toDate, type Instant } from "@langwatch/time";
 
 import { TeamRepository } from "../team.repository.ts";
 import type { MemoryOrganizationDatabase, MemoryTeamRow } from "./memory.organization.database.ts";
@@ -174,6 +175,21 @@ export class MemoryTeamRepository extends TeamRepository {
           row.userId === input.userId && (input.activeOnly === false || row.disabledAt === null),
       )
       .map((row) => row.organizationId);
+  }
+
+  async mostRecentOrganizationIdForMember(input: {
+    userId: string;
+  }): Promise<MemberMostRecentOrganization> {
+    const [newest] = this.memory.organizationUsers
+      .filter((row) => row.userId === input.userId && row.disabledAt === null)
+      .toSorted(
+        (a, b) =>
+          Temporal.Instant.compare(b.createdAt, a.createdAt) ||
+          a.organizationId.localeCompare(b.organizationId),
+      );
+    return newest
+      ? { outcome: "member", organizationId: newest.organizationId }
+      : { outcome: "none" };
   }
 
   async memberOrganizationIds(input: {

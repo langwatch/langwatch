@@ -5099,6 +5099,8 @@ model NurturingProject {
 model NurturingOrganizationCreated {
   organizationId String   @id
   createdAt      DateTime
+
+  @@index([createdAt])
 }
 
 /// Nurturing's read model per organization: its admin and its milestone counts.
@@ -5144,22 +5146,40 @@ model NurturingProjectUsageView {
   @@id([projectId, owner])
 }
 
-/// Nurturing's own trace counts from trace's span_received (ARCHITECTURE §9), a root span being
-/// one trace, one row per project and UTC day of append time, incremented in place (a redelivery
-/// may count twice). Kept 30 days.
+/// Nurturing's own trace counts from trace's span_received and trace_failed (ARCHITECTURE §9), a
+/// root span being one trace, one row per project and UTC day of append time, incremented in place
+/// by the traces NurturingProjectCountedTrace had not yet counted. Kept 30 days.
 model NurturingProjectTraceDay {
   projectId         String
   /// UTC `YYYY-MM-DD` of the root spans' append time.
   day               String
   traceCount        Int       @default(0)
-  /// Root spans with an error status.
+  /// Traces trace recorded failed (lw.trace.trace_failed).
   errorCount        Int       @default(0)
   /// Append time of the newest root span.
   lastTraceAt       DateTime?
-  /// Append time of the newest erroring root span.
+  /// Append time of the newest trace_failed.
   lastFailedTraceAt DateTime?
 
   @@id([projectId, day])
+}
+
+/// Each trace nurturing counted into NurturingProjectTraceDay, once per kind, so a re-stored
+/// trace or a redelivered fact counts once. Written only for organizations inside their trace
+/// counting window, so rows scale with new organizations' traffic; kept 30 days, as the days.
+model NurturingProjectCountedTrace {
+  projectId  String
+  traceId    String
+  /// `trace` (its root span) or `failed` (its trace_failed).
+  kind       String
+  /// UTC `YYYY-MM-DD` of the fact's append time; the prune reads it.
+  day        String
+  /// The fact's append time.
+  appendedAt DateTime
+  createdAt  DateTime @default(now())
+
+  @@id([projectId, traceId, kind])
+  @@index([day])
 }
 
 model BillingMeterCheckpoint {

@@ -90,6 +90,7 @@ export class NurturingModule implements NurturingApi {
           placements: repositories.placements,
           organizationsCreated: repositories.organizationsCreated,
           milestones: repositories.milestones,
+          organizations: dependencies.organizations,
           sendBatch: (calls) => customerIo.batchOrThrow(calls),
           clock: { nowMs: () => nowInstant().epochMilliseconds },
         })
@@ -119,6 +120,13 @@ export class NurturingModule implements NurturingApi {
   /** A project's usage or traces changed: its organization's traits go to Customer.io. */
   async organizationUsageChanged(input: Readonly<{ projectId: string }>): Promise<void> {
     await this.#organizationUsage?.usageChanged(input);
+  }
+
+  /** The trace windows that ended in (`after`, `upTo`]: their trace traits go once as null. */
+  async organizationTraceWindowsEnded(
+    input: Readonly<{ after: number; upTo: number }>,
+  ): Promise<void> {
+    await this.#organizationUsage?.traceWindowsEnded(input);
   }
 
   async recordSignal(signal: NurturingSignal): Promise<void> {

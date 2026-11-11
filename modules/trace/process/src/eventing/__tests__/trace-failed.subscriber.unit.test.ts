@@ -23,18 +23,19 @@ import {
   createInitState,
   createSpanReceivedEvent,
   createTestRuntime,
+  type TestSpanReceivedEventOptions,
 } from "./trace-summary-test.fixtures.ts";
 
 const NOW = Date.UTC(2026, 10, 20, 12);
 const TRACE_ID = "aaaa0000000000000000000000000001";
 
-function foldSpans(spans: Parameters<typeof createSpanReceivedEvent>[0][]): TraceSummaryData {
+function foldSpans(spans: readonly TestSpanReceivedEventOptions[]): TraceSummaryData {
   const projection = TraceSummaryFoldProjection.create({
     store: { store: async () => {}, get: async () => ({ kind: "empty" as const }) },
     traceCanonicalisation: TraceCanonicalisationService.create(),
     runtime: createTestRuntime(),
   });
-  return spans.reduce(
+  return spans.reduce<TraceSummaryData>(
     (state, span) =>
       projection.apply(
         state,

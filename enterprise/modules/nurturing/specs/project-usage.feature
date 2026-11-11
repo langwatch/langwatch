@@ -8,16 +8,30 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   Failed traces are counted from trace's own lw.trace.trace_failed fact, recorded once per trace
   by trace's rule (any span's error), so nurturing keeps no copy of that rule. Sample and Langy
   traces are left out, as trace leaves them out of a project's first trace. Root spans and failed
-  traces of one project and day are batched, and each batch adds its counts to that day's row
-  with one Postgres upsert; rows are kept 30 days. The trace increment is not idempotent: a
-  redelivered batch may count its traces twice. A trace_failed fact is claimed by its idempotency
-  key for a day first (ADR-179), so a redelivered one counts its failure once. No span body reaches nurturing, and the rows are not rebuilt by a
-  projection replay.
+  traces of one project and day are batched, and each batch counts its traces once each in one
+  Postgres statement: a row per counted trace and kind (NurturingProjectCountedTrace) is inserted
+  unless it exists, and only the rows inserted are added to that day's row, so a trace stored in
+  two versions, a redelivered batch or a redelivered trace_failed counts once (issue 9378 AC 3).
+  Traces are counted only while their organization is inside its counting window (its creation
+  plus the 14-day free window and a week), so the per-trace rows scale with new organizations'
+  traffic alone. An hourly sweep (a scheduled process, since an organization that stopped tracing
+  syncs no more) sends each organization's trace traits once as null when its window ends, so
+  Customer.io removes them and a rolling trait never says "active" for ever; later syncs leave
+  them out. Nurturing's copies of placement and organization creation are written by their own
+  subscribers, so a new project's first traces can arrive before them: the owners' rows then tell
+  whether the organization is in its window, and if so the batch fails and the queue retries
+  until the copies land; past the window, or a project the owners do not hold, it is dropped. Rows are kept
+  30 days. No span body reaches nurturing, and the rows are not rebuilt by a projection replay.
   Nurturing reads no trace data: trace counts start at the count's deploy, and no cost is sent (a
   span carries no price). When a project's usage changes, or its organization traced (throttled
   to once per 15 minutes), nurturing places it in its organization from its own copy, written
   from project's lw.project.created, sums the organization's projects and sends their traits to
-  Customer.io as one group call on the admin. A project's first trace syncs as later ones do. The
+  Customer.io as one group call on the admin. The onboarding emails are person-triggered and read
+  person attributes, so the same sync then identifies each member with the same traits, unless
+  the member has joined another organization since: a member's traits are those of the
+  organization they joined last (organization's mostRecentOrganizationIdForMember).
+  Members are read at need, never stored. A failed identify is reported and swallowed, as the
+  other sinks' failures are; the group call stands. A project's first trace syncs as later ones do. The
   signup day comes from its own copy of
   lw.organization.created. It reads no other module's table, and keeps no copy for projects or
   organizations created before it did: those send nothing. It never pulls owner state on a
@@ -110,8 +124,7 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   Scenario: A redelivered trace_failed counts its failure once
     Given trace_failed for a project's trace, delivered again under a new event id
     When the failed-trace count takes each delivery
-    Then the trace counts one failed trace, the fact claimed by its idempotency key for a day
-    And a write that fails gives the claim back, so the retry counts the failure
+    Then the trace counts one failed trace, its counted row keyed by project, trace and kind
 
   @unit
   Scenario: A failure on the day after its trace's root span still counts
@@ -132,12 +145,35 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     Then the day's row gets one upsert adding their trace counts, and failed traces the same
     And two writers adding to one day at once lose no count
 
+  @unit @integration
+  Scenario: A trace stored twice counts once
+    Given a trace's root span counted on its project's day
+    When the trace is stored again in a second version, or its batch is redelivered or retried
+    Then the trace counts once, in one batch or across batches or writers
+    And its counted row is kept as long as its day row, 30 days
+
   @unit
-  Scenario: A redelivered batch may count its traces twice
-    Given a batch of root spans added to its project's day
-    When the same batch is delivered again, or retried after its write committed
-    Then its traces are counted again
-    And this is accepted: the counts steer emails, and an exact dedupe costs a row per trace
+  Scenario: An organization past its counting window writes no counts
+    Given an organization created more than 21 days before a trace or failure, or never seen created
+    When the trace or failure is counted
+    Then no counted-trace row and no count is written for it
+    And its organization's sync sends no trace trait
+
+  @unit
+  Scenario: The trace traits are removed once when an organization's window ends
+    Given an organization whose trace counting window ended within the last sweep's span
+    When the hourly sweep runs, on time or late
+    Then its trace traits go once as null on the organization and on each member it is the latest of
+    And no other trait is sent with them
+    And a refused call fails the sweep, so it is retried
+
+  @unit
+  Scenario: A new project's first trace waits for nurturing's copies
+    Given a project its owners hold, in an organization inside its window, before nurturing's copies landed
+    When its first trace is counted
+    Then the batch fails after counting the rest, and the queue retries it until the copies land
+    And it then counts the trace once
+    And a trace of an uncopied project past its window, or one its owners do not hold, is dropped
 
   @unit
   Scenario: Folds keyed across aggregates never re-fold from one aggregate's log
@@ -172,9 +208,9 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
 
   @unit @integration
   Scenario: Trace days older than the window are deleted
-    Given a project's trace day older than the 30-day window
+    Given a project's trace day and counted traces older than the 30-day window
     When its organization syncs
-    Then that day's row is deleted
+    Then that day's row is deleted, and every project's counted traces that old
 
   @unit
   Scenario: A changed project's old trace days are deleted even without a placement or admin
@@ -224,6 +260,26 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     Given a project placed in an organization with an admin
     When the project's usage changes
     Then Customer.io receives one group call on the admin with the organization's traits
+
+  @unit
+  Scenario: Each member of the organization gets its traits as person attributes
+    Given an organization with two members, each of whom joined it last
+    When a project of the organization changes its usage
+    Then after the group call, each member is identified with the organization's traits
+
+  @unit
+  Scenario: A member who joined another organization since does not get this one's traits
+    Given a member of the organization who joined a different organization after it
+    When a project of the organization changes its usage
+    Then that member is not identified with this organization's traits
+    And the other members still are
+
+  @unit
+  Scenario: A failed identify is reported and swallowed
+    Given Customer.io refuses the members' identify, or the members cannot be read
+    When a project of the organization changes its usage
+    Then the failure is reported as a warning and the sync does not fail
+    And the group call has already been sent
 
   @unit
   Scenario: A project nurturing never saw created sends nothing

@@ -7,9 +7,14 @@ import { describe, expect, it } from "vitest";
 
 import {
   emptyProjectUsage,
+  createdRangeOfEndedWindows,
+  endedTraceWindowTraits,
   foldProjectUsage,
+  isTraceCounted,
   type NurturingProjectUsageFact,
   organizationUsageTraits,
+  PROJECT_USAGE_TRIAL_WINDOW_MS,
+  TRACE_COUNTING_WINDOW_MS,
 } from "../nurturing-project-usage.rules.ts";
 import type { NurturingTraceCounts } from "../nurturing-trace-day.rules.ts";
 
@@ -235,5 +240,76 @@ describe("organizationUsageTraits() has_habit", () => {
 
   it("ignores other activity days older than the window", () => {
     expect(habitOf(["2026-11-10", "2026-11-17"], ["2026-10-01"])).toBe(false);
+  });
+});
+
+describe("isTraceCounted()", () => {
+  /** @scenario "An organization past its counting window writes no counts" */
+  it("counts a trace inside its organization's window, the free window and a week", () => {
+    expect(TRACE_COUNTING_WINDOW_MS).toBe(PROJECT_USAGE_TRIAL_WINDOW_MS + 7 * DAY_MS);
+    const organizationCreatedAt = NOW;
+
+    expect(isTraceCounted({ organizationCreatedAt, at: NOW + TRACE_COUNTING_WINDOW_MS - 1 })).toBe(
+      true,
+    );
+    expect(isTraceCounted({ organizationCreatedAt, at: NOW + TRACE_COUNTING_WINDOW_MS })).toBe(
+      false,
+    );
+    expect(isTraceCounted({ organizationCreatedAt: null, at: NOW })).toBe(false);
+  });
+});
+
+describe("organizationUsageTraits() past the counting window", () => {
+  /** @scenario "An organization past its counting window writes no counts" */
+  it("sends no trace trait, so Customer.io keeps the last ones sent", () => {
+    const traits = organizationUsageTraits({
+      projects: [],
+      traces: null,
+      now: NOW,
+      organizationCreatedAt: NOW - 30 * DAY_MS,
+    });
+
+    for (const trait of ["trace_count", "error_count", "has_habit", "active_last_7_days"]) {
+      expect(traits).not.toHaveProperty(trait);
+    }
+    expect(traits).toMatchObject({ prompt_count: 0, window_end_date: expect.any(Number) });
+  });
+});
+
+describe("endedTraceWindowTraits()", () => {
+  /** @scenario "The trace traits are removed once when an organization's window ends" */
+  it("answers every trace trait as null and no other trait", () => {
+    const traits = endedTraceWindowTraits();
+    const traced = organizationUsageTraits({
+      projects: [],
+      traces: NO_TRACES,
+      now: NOW,
+      organizationCreatedAt: NOW - DAY_MS,
+    });
+    const traceTraitNames = Object.keys(traced).filter(
+      (name) =>
+        ![
+          "prompt_count",
+          "evaluator_count",
+          "scenario_count",
+          "simulation_set_count",
+          "has_scenario_run",
+          "window_end_date",
+        ].includes(name),
+    );
+
+    expect(Object.values(traits).every((value) => value === null)).toBe(true);
+    expect(Object.keys(traits)).toEqual(expect.arrayContaining(traceTraitNames));
+    expect(traits).not.toHaveProperty("prompt_count");
+  });
+});
+
+describe("createdRangeOfEndedWindows()", () => {
+  /** @scenario "The trace traits are removed once when an organization's window ends" */
+  it("answers the creations whose window ended in the sweep's span", () => {
+    expect(createdRangeOfEndedWindows({ after: NOW - 3_600_000, upTo: NOW })).toEqual({
+      after: NOW - 3_600_000 - TRACE_COUNTING_WINDOW_MS,
+      upTo: NOW - TRACE_COUNTING_WINDOW_MS,
+    });
   });
 });

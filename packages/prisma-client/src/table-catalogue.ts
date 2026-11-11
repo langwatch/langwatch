@@ -144,6 +144,7 @@ export const prismaTableCatalogue = {
   "NurturingOrganization": "NurturingOrganization",
   "NurturingProjectUsageView": "NurturingProjectUsageView",
   "NurturingProjectTraceDay": "NurturingProjectTraceDay",
+  "NurturingProjectCountedTrace": "NurturingProjectCountedTrace",
   "BillingMeterCheckpoint": "BillingMeterCheckpoint",
   "VirtualKey": "VirtualKey",
   "VirtualKeyScope": "VirtualKeyScope",
@@ -2444,6 +2445,14 @@ export const prismaModelFieldCatalogue = {
     "lastTraceAt",
     "lastFailedTraceAt"
   ],
+  "NurturingProjectCountedTrace": [
+    "projectId",
+    "traceId",
+    "kind",
+    "day",
+    "appendedAt",
+    "createdAt"
+  ],
   "BillingMeterCheckpoint": [
     "id",
     "organizationId",
@@ -3735,6 +3744,7 @@ export const prismaRelationCatalogue = {
   "NurturingOrganization": {},
   "NurturingProjectUsageView": {},
   "NurturingProjectTraceDay": {},
+  "NurturingProjectCountedTrace": {},
   "BillingMeterCheckpoint": {},
   "VirtualKey": {
     "principalUser": "User",

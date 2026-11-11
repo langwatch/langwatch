@@ -303,6 +303,13 @@ Feature: Join before create - the choice happens before an organization is minte
     Then the answer comes back through the org-tenancy guard instead of a refusal
     And only the active membership counts unless disabled ones are asked for
 
+  @unit @integration
+  Scenario: A person's most recently joined organization is read across tenants
+    Given a person who joined two organizations at different times, and a third since disabled
+    When a peer asks for the organization they joined last
+    Then the newest active membership's organization comes back through the org-tenancy guard
+    And a person with no active membership gets none
+
   @integration
   Scenario: A domain's candidate organizations are read across tenants through the guarded client
     Given verified colleagues on one domain in two organizations

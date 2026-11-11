@@ -31,4 +31,13 @@ export class MemoryNurturingOrganizationCreatedRepository implements NurturingOr
   }: Readonly<{ organizationId: string }>): Promise<{ organizationCreatedAt: number | null }> {
     return { organizationCreatedAt: this.#createdAt.get(organizationId) ?? null };
   }
+
+  async findOrganizationIdsCreatedBetween({
+    after,
+    upTo,
+  }: Readonly<{ after: number; upTo: number }>): Promise<string[]> {
+    return [...this.#createdAt]
+      .filter(([, createdAt]) => createdAt > after && createdAt <= upTo)
+      .map(([organizationId]) => organizationId);
+  }
 }

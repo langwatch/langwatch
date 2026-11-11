@@ -6,39 +6,36 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  addFailedTrace,
-  addTrace,
+  addCountedTrace,
+  countedTraceKeyOf,
   emptyTraceDay,
-  failedTraceDayIncrementsOf,
-  type NurturingFailedTrace,
+  type NurturingCountedTrace,
   type NurturingTraceDay,
-  type NurturingTraceSpan,
   traceCountsOf,
   traceDayIncrementsOf,
 } from "../nurturing-trace-day.rules.ts";
 
 const AT = Date.UTC(2026, 10, 19, 12);
 
-const span = (overrides: Partial<NurturingTraceSpan> = {}): NurturingTraceSpan => ({
+const span = (overrides: Partial<NurturingCountedTrace> = {}): NurturingCountedTrace => ({
   projectId: "project-1",
+  traceId: "trace-1",
+  kind: "trace",
   day: "2026-11-19",
-  appendedAt: AT,
+  at: AT,
   ...overrides,
 });
 
-const failure = (overrides: Partial<NurturingFailedTrace> = {}): NurturingFailedTrace => ({
-  projectId: "project-1",
-  day: "2026-11-19",
-  failedAt: AT,
-  ...overrides,
-});
+const failure = (overrides: Partial<NurturingCountedTrace> = {}): NurturingCountedTrace =>
+  span({ kind: "failed", ...overrides });
 
-const addAll = (spans: readonly NurturingTraceSpan[]) => spans.reduce(addTrace, emptyTraceDay());
+const addAll = (traces: readonly NurturingCountedTrace[]) =>
+  traces.reduce(addCountedTrace, emptyTraceDay());
 
-describe("addTrace()", () => {
+describe("addCountedTrace()", () => {
   /** @scenario "A trace is its root span, counted on its project's day" */
   it("adds one trace per root span, keeping the newest time", () => {
-    expect(addAll([span(), span({ appendedAt: AT + 1000 })])).toEqual({
+    expect(addAll([span(), span({ traceId: "trace-2", at: AT + 1000 })])).toEqual({
       projectId: "project-1",
       day: "2026-11-19",
       traceCount: 2,
@@ -50,18 +47,16 @@ describe("addTrace()", () => {
 
   /** @scenario "Traces arriving out of order count the same" */
   it("answers the same counts whatever order the traces arrive in", () => {
-    const spans = [span({ appendedAt: AT + 2000 }), span({ appendedAt: AT })];
+    const traces = [span({ at: AT + 2000 }), span({ traceId: "trace-2", at: AT })];
 
-    expect(addAll(spans)).toEqual(addAll(spans.toReversed()));
+    expect(addAll(traces)).toEqual(addAll(traces.toReversed()));
   });
-});
 
-describe("addFailedTrace()", () => {
   /** @scenario "A failed trace is counted from trace's trace_failed fact" */
   it("adds one failed trace and its time to the day, leaving its traces as they were", () => {
-    const traced = addAll([span({ appendedAt: AT + 4000 })]);
+    const traced = addAll([span({ at: AT + 4000 })]);
 
-    expect(addFailedTrace(traced, failure({ failedAt: AT + 2000 }))).toEqual({
+    expect(addCountedTrace(traced, failure({ at: AT + 2000 }))).toEqual({
       ...traced,
       errorCount: 1,
       lastFailedTraceAt: AT + 2000,
@@ -69,36 +64,14 @@ describe("addFailedTrace()", () => {
   });
 });
 
-describe("failedTraceDayIncrementsOf()", () => {
-  /** @scenario "A failed trace is counted from trace's trace_failed fact" */
-  it("sums a batch's failed traces into one increment per project and day, adding no trace", () => {
-    expect(
-      failedTraceDayIncrementsOf([
-        failure(),
-        failure({ failedAt: AT + 1000 }),
-        failure({ day: "2026-11-20", failedAt: AT + 86_400_000 }),
-      ]),
-    ).toEqual([
-      {
-        projectId: "project-1",
-        day: "2026-11-19",
-        traceCount: 0,
-        errorCount: 2,
-        lastTraceAt: null,
-        lastFailedTraceAt: AT + 1000,
-      },
-      expect.objectContaining({ day: "2026-11-20", traceCount: 0, errorCount: 1 }),
-    ]);
-  });
-});
-
 describe("traceDayIncrementsOf()", () => {
   /** @scenario "Root spans of one project and day are written as one increment" */
-  it("sums a batch's root spans into one increment per project and day", () => {
+  it("sums a batch's traces and failures into one increment per project and day", () => {
     const increments = traceDayIncrementsOf([
       span(),
-      span({ appendedAt: AT + 1000 }),
-      span({ day: "2026-11-20", appendedAt: AT + 86_400_000 }),
+      span({ traceId: "trace-2", at: AT + 1000 }),
+      failure({ at: AT + 500 }),
+      span({ day: "2026-11-20", at: AT + 86_400_000 }),
       span({ projectId: "project-2" }),
     ]);
 
@@ -107,13 +80,22 @@ describe("traceDayIncrementsOf()", () => {
         projectId: "project-1",
         day: "2026-11-19",
         traceCount: 2,
-        errorCount: 0,
+        errorCount: 1,
         lastTraceAt: AT + 1000,
-        lastFailedTraceAt: null,
+        lastFailedTraceAt: AT + 500,
       },
       expect.objectContaining({ projectId: "project-1", day: "2026-11-20", traceCount: 1 }),
       expect.objectContaining({ projectId: "project-2", day: "2026-11-19", traceCount: 1 }),
     ]);
+  });
+});
+
+describe("countedTraceKeyOf()", () => {
+  /** @scenario "A trace stored twice counts once" */
+  it("keys a trace by its project, id and kind, not by its day or time", () => {
+    expect(countedTraceKeyOf(span())).toBe(countedTraceKeyOf(span({ day: "2026-11-20", at: 1 })));
+    expect(countedTraceKeyOf(span())).not.toBe(countedTraceKeyOf(failure()));
+    expect(countedTraceKeyOf(span())).not.toBe(countedTraceKeyOf(span({ projectId: "project-2" })));
   });
 });
 

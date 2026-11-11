@@ -2,19 +2,24 @@
 import { PrismaRepository } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import type { NurturingTraceDay } from "../../rules/nurturing-trace-day.rules.ts";
+import type {
+  NurturingCountedTrace,
+  NurturingTraceDay,
+} from "../../rules/nurturing-trace-day.rules.ts";
 import type { NurturingTraceDayRepository } from "../nurturing-trace-day.repository.ts";
 
-type NurturingTraceDayDatabase = Pick<PrismaClient, "nurturingProjectTraceDay" | "$executeRaw">;
-
-const dateOf = (at: number | null) => (at === null ? null : new Date(at));
+type NurturingTraceDayDatabase = Pick<
+  PrismaClient,
+  "nurturingProjectTraceDay" | "nurturingProjectCountedTrace" | "$executeRaw"
+>;
 
 /**
- * Nurturing's trace counts in Postgres (`NurturingProjectTraceDay`): one row per project and UTC
- * day with native counts, incremented in place.
+ * Nurturing's trace counts in Postgres: one `NurturingProjectTraceDay` row per project and UTC
+ * day with native counts, incremented in place by the traces `NurturingProjectCountedTrace` had
+ * not yet counted.
  */
 export class PrismaNurturingTraceDayRepository
-  extends PrismaRepository.for("NurturingProjectTraceDay")
+  extends PrismaRepository.for("NurturingProjectTraceDay", "NurturingProjectCountedTrace")
   implements NurturingTraceDayRepository
 {
   static create({
@@ -30,28 +35,44 @@ export class PrismaNurturingTraceDayRepository
     this.#database = prisma;
   }
 
-  /** One upsert per day: concurrent writers add to the row, so no count is lost between them. */
-  async addTraceDays(increments: readonly NurturingTraceDay[]): Promise<void> {
-    for (const {
-      projectId,
-      day,
-      traceCount,
-      errorCount,
-      lastTraceAt,
-      lastFailedTraceAt,
-    } of increments) {
-      await this.#database.$executeRaw`
-        INSERT INTO "NurturingProjectTraceDay" AS counted
-          ("projectId", "day", "traceCount", "errorCount", "lastTraceAt", "lastFailedTraceAt")
-        VALUES (${projectId}, ${day}, ${traceCount}::integer, ${errorCount}::integer,
-                ${dateOf(lastTraceAt)}::timestamp(3), ${dateOf(lastFailedTraceAt)}::timestamp(3))
-        ON CONFLICT ("projectId", "day") DO UPDATE SET
-          "traceCount" = counted."traceCount" + EXCLUDED."traceCount",
-          "errorCount" = counted."errorCount" + EXCLUDED."errorCount",
-          "lastTraceAt" = GREATEST(counted."lastTraceAt", EXCLUDED."lastTraceAt"),
-          "lastFailedTraceAt" = GREATEST(counted."lastFailedTraceAt", EXCLUDED."lastFailedTraceAt")
-      `;
-    }
+  /**
+   * One statement per batch: the traces not yet counted are inserted (a conflict is one already
+   * counted, or a duplicate in the batch), and only the inserted rows are added to their days.
+   * Concurrent writers add to a day row, so no count is lost between them.
+   */
+  async countTraces(traces: readonly NurturingCountedTrace[]): Promise<void> {
+    if (traces.length === 0) return;
+    await this.#database.$executeRaw`
+      WITH fresh AS (
+        INSERT INTO "NurturingProjectCountedTrace"
+          ("projectId", "traceId", "kind", "day", "appendedAt")
+        SELECT incoming."projectId", incoming."traceId", incoming."kind", incoming."day",
+               (to_timestamp(incoming."at" / 1000.0) AT TIME ZONE 'UTC')::timestamp(3)
+        FROM unnest(
+          ${traces.map(({ projectId }) => projectId)}::text[],
+          ${traces.map(({ traceId }) => traceId)}::text[],
+          ${traces.map(({ kind }) => kind)}::text[],
+          ${traces.map(({ day }) => day)}::text[],
+          ${traces.map(({ at }) => at)}::double precision[]
+        ) AS incoming("projectId", "traceId", "kind", "day", "at")
+        ON CONFLICT ("projectId", "traceId", "kind") DO NOTHING
+        RETURNING "projectId", "kind", "day", "appendedAt"
+      )
+      INSERT INTO "NurturingProjectTraceDay" AS counted
+        ("projectId", "day", "traceCount", "errorCount", "lastTraceAt", "lastFailedTraceAt")
+      SELECT "projectId", "day",
+             (count(*) FILTER (WHERE "kind" = 'trace'))::integer,
+             (count(*) FILTER (WHERE "kind" = 'failed'))::integer,
+             max("appendedAt") FILTER (WHERE "kind" = 'trace'),
+             max("appendedAt") FILTER (WHERE "kind" = 'failed')
+      FROM fresh
+      GROUP BY "projectId", "day"
+      ON CONFLICT ("projectId", "day") DO UPDATE SET
+        "traceCount" = counted."traceCount" + EXCLUDED."traceCount",
+        "errorCount" = counted."errorCount" + EXCLUDED."errorCount",
+        "lastTraceAt" = GREATEST(counted."lastTraceAt", EXCLUDED."lastTraceAt"),
+        "lastFailedTraceAt" = GREATEST(counted."lastFailedTraceAt", EXCLUDED."lastFailedTraceAt")
+    `;
   }
 
   async findForProjects({
@@ -76,6 +97,10 @@ export class PrismaNurturingTraceDayRepository
     projectIds,
     beforeDay,
   }: Readonly<{ projectIds: readonly string[]; beforeDay: string }>): Promise<void> {
+    // Every project's: a counted trace of an organization that no longer syncs still goes.
+    await this.#database.nurturingProjectCountedTrace.deleteMany({
+      where: { day: { lt: beforeDay } },
+    });
     if (projectIds.length === 0) return;
     await this.#database.nurturingProjectTraceDay.deleteMany({
       where: { projectId: { in: [...projectIds] }, day: { lt: beforeDay } },

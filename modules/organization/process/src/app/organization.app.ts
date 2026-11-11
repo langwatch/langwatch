@@ -132,6 +132,7 @@ import {
   type RefusedSignInOutcome,
   type SeatRequestResolved,
   type SeatRequestScope,
+  type MemberMostRecentOrganization,
 } from "@langwatch/organization-contract";
 import type * as organizationContractModule from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
@@ -1117,6 +1118,12 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
 
   organizationIdsForMember(input: { userId: string; activeOnly?: boolean }): Promise<string[]> {
     return this.#dependencies.organizations.organizationIdsForMember(input);
+  }
+
+  mostRecentOrganizationIdForMember(
+    input: Readonly<{ userId: string }>,
+  ): Promise<MemberMostRecentOrganization> {
+    return this.#dependencies.organizations.mostRecentOrganizationIdForMember(input);
   }
 
   getOrganizationMembers(input: GetOrganizationMembersInput): Promise<string[]> {
