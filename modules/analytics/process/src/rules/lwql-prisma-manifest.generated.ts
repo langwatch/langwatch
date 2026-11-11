@@ -1928,6 +1928,10 @@ export interface LwqlPrismaRows {
     readonly projectId: "String";
     readonly organizationId: "String";
   };
+  readonly NurturingOrganizationCreated: {
+    readonly organizationId: "String";
+    readonly createdAt: "DateTime";
+  };
   readonly NurturingOrganization: {
     readonly organizationId: "String";
     readonly adminUserId: "String?";

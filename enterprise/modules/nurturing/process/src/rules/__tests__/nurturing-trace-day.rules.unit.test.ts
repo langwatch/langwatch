@@ -56,10 +56,7 @@ describe("addTrace()", () => {
 
   /** @scenario "Traces arriving out of order count the same" */
   it("answers the same counts whatever order the traces arrive in", () => {
-    const spans = [
-      span({ appendedAt: AT + 2000 }),
-      span({ isError: true, appendedAt: AT }),
-    ];
+    const spans = [span({ appendedAt: AT + 2000 }), span({ isError: true, appendedAt: AT })];
 
     expect(addAll(spans)).toEqual(addAll(spans.toReversed()));
   });

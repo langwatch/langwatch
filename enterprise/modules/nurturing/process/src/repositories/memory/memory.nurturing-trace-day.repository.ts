@@ -2,8 +2,11 @@
 import type { NurturingTraceDay } from "../../rules/nurturing-trace-day.rules.ts";
 import type { NurturingTraceDayRepository } from "../nurturing-trace-day.repository.ts";
 
-const latest = (a: number | null, b: number | null) =>
-  a === null ? b : b === null ? a : Math.max(a, b);
+function latest(a: number | null, b: number | null): number | null {
+  if (a === null) return b;
+  if (b === null) return a;
+  return Math.max(a, b);
+}
 
 /** Nurturing's trace-day rows in memory, incremented as the Postgres upsert increments them. */
 export class MemoryNurturingTraceDayRepository implements NurturingTraceDayRepository {
@@ -37,9 +40,7 @@ export class MemoryNurturingTraceDayRepository implements NurturingTraceDayRepos
   async findForProjects({
     projectIds,
     afterDay,
-  }: Readonly<{ projectIds: readonly string[]; afterDay: string }>): Promise<
-    NurturingTraceDay[]
-  > {
+  }: Readonly<{ projectIds: readonly string[]; afterDay: string }>): Promise<NurturingTraceDay[]> {
     return [...this.#days.values()].filter(
       (day) => projectIds.includes(day.projectId) && day.day > afterDay,
     );

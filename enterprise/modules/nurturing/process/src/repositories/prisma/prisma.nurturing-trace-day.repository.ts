@@ -32,8 +32,14 @@ export class PrismaNurturingTraceDayRepository
 
   /** One upsert per day: concurrent writers add to the row, so no count is lost between them. */
   async addTraceDays(increments: readonly NurturingTraceDay[]): Promise<void> {
-    for (const { projectId, day, traceCount, errorCount, lastTraceAt, lastFailedTraceAt } of
-      increments) {
+    for (const {
+      projectId,
+      day,
+      traceCount,
+      errorCount,
+      lastTraceAt,
+      lastFailedTraceAt,
+    } of increments) {
       await this.#database.$executeRaw`
         INSERT INTO "NurturingProjectTraceDay" AS counted
           ("projectId", "day", "traceCount", "errorCount", "lastTraceAt", "lastFailedTraceAt")
@@ -51,9 +57,7 @@ export class PrismaNurturingTraceDayRepository
   async findForProjects({
     projectIds,
     afterDay,
-  }: Readonly<{ projectIds: readonly string[]; afterDay: string }>): Promise<
-    NurturingTraceDay[]
-  > {
+  }: Readonly<{ projectIds: readonly string[]; afterDay: string }>): Promise<NurturingTraceDay[]> {
     if (projectIds.length === 0) return [];
     const rows = await this.#database.nurturingProjectTraceDay.findMany({
       where: { projectId: { in: [...projectIds] }, day: { gt: afterDay } },

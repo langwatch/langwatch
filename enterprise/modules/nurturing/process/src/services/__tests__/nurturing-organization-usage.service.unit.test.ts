@@ -8,7 +8,8 @@ import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
-import { MemoryNurturingProjectDirectoryRepository } from "../../repositories/memory/memory.nurturing-project-directory.repository.ts";
+import { MemoryNurturingOrganizationCreatedRepository } from "../../repositories/memory/memory.nurturing-organization-created.repository.ts";
+import { MemoryNurturingProjectPlacementRepository } from "../../repositories/memory/memory.nurturing-project-placement.repository.ts";
 import { MemoryNurturingProjectUsageRepository } from "../../repositories/memory/memory.nurturing-project-usage.repository.ts";
 import { MemoryNurturingTraceDayRepository } from "../../repositories/memory/memory.nurturing-trace-day.repository.ts";
 import { emptyProjectUsage, foldProjectUsage } from "../../rules/nurturing-project-usage.rules.ts";
@@ -20,9 +21,11 @@ const NOW = Date.UTC(2026, 10, 20, 12);
 
 async function serviceOver({
   placed,
+  createdAt = new Map(),
   send = async () => {},
 }: {
   placed: ReadonlyMap<string, string>;
+  createdAt?: ReadonlyMap<string, number>;
   send?: () => Promise<void>;
 }) {
   const projectUsage = MemoryNurturingProjectUsageRepository.create();
@@ -37,7 +40,8 @@ async function serviceOver({
   const service = NurturingOrganizationUsageService.create({
     projectUsage,
     traceDays,
-    projects: MemoryNurturingProjectDirectoryRepository.create({ placed }),
+    placements: MemoryNurturingProjectPlacementRepository.create({ placed }),
+    organizationsCreated: MemoryNurturingOrganizationCreatedRepository.create({ createdAt }),
     milestones,
     sendBatch: async (calls) => {
       await send();
@@ -175,8 +179,26 @@ describe("NurturingOrganizationUsageService", () => {
     expect(traitsOf(sent[0]?.[0])).toMatchObject({ trace_count: 1 });
   });
 
-  /** @scenario "A project placed in no organization sends nothing" */
-  it("sends nothing for a project placed in no organization", async () => {
+  /** @scenario "The signup day comes from the organization's creation fact" */
+  it("sends signup-day traits only for an organization nurturing saw created", async () => {
+    const seen = await serviceOver({
+      placed: new Map([["project-1", "org-1"]]),
+      createdAt: new Map([["org-1", NOW - 3 * DAY_MS]]),
+    });
+    const unseen = await serviceOver({ placed: new Map([["project-1", "org-1"]]) });
+    for (const { traceDays } of [seen, unseen]) {
+      await seedTraceDay(traceDays, { projectId: "project-1", day: "2026-11-20" });
+    }
+
+    await seen.service.usageChanged({ projectId: "project-1" });
+    await unseen.service.usageChanged({ projectId: "project-1" });
+
+    expect(traitsOf(seen.sent[0]?.[0])).toMatchObject({ back_since_day_0: true });
+    expect(traitsOf(unseen.sent[0]?.[0])).not.toHaveProperty("back_since_day_0");
+  });
+
+  /** @scenario "A project nurturing never saw created sends nothing" */
+  it("sends nothing for a project nurturing never saw created", async () => {
     const { service, projectUsage, sent } = await serviceOver({ placed: new Map() });
     await projectUsage
       .forOwner("prompt")

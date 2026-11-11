@@ -5085,11 +5085,20 @@ model ProjectActiveDay {
 }
 
 /// Nurturing's read model: which organization a project belongs to, from project's created event.
+/// The per-email usage places a project and lists an organization's projects from these rows only.
 model NurturingProject {
   projectId      String @id
   organizationId String
 
   @@index([organizationId])
+}
+
+/// When an organization was created, from organization's created event: nurturing's own copy for
+/// the per-email usage's day offsets. Its own table, so an early creation never adds an unseeded
+/// NurturingOrganization row.
+model NurturingOrganizationCreated {
+  organizationId String   @id
+  createdAt      DateTime
 }
 
 /// Nurturing's read model per organization: its admin and its milestone counts.

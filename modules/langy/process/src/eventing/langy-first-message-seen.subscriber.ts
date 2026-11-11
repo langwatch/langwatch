@@ -2,7 +2,7 @@
  * `first_message_seen`: a completed answer from Langy in a conversation the user owns is the user
  * getting Langy's message. Recorded as a fact against the owner; the fact's idempotency key names
  * only the user, so the first one counts. Nurturing sets the person's trait from it.
- * @see specs/langy/langy-first-message-seen.feature
+ * @see modules/langy/specs/langy-first-message-seen.feature
  */
 import { DispatchError, type EventSubscriberDefinition } from "@langwatch/eventing";
 import { HandledError } from "@langwatch/handled-error";

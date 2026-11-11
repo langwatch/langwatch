@@ -140,6 +140,7 @@ export const prismaTableCatalogue = {
   "ApiKey": "ApiKey",
   "ProjectActiveDay": "ProjectActiveDay",
   "NurturingProject": "NurturingProject",
+  "NurturingOrganizationCreated": "NurturingOrganizationCreated",
   "NurturingOrganization": "NurturingOrganization",
   "NurturingProjectUsageView": "NurturingProjectUsageView",
   "NurturingProjectTraceDay": "NurturingProjectTraceDay",
@@ -2407,6 +2408,10 @@ export const prismaModelFieldCatalogue = {
     "projectId",
     "organizationId"
   ],
+  "NurturingOrganizationCreated": [
+    "organizationId",
+    "createdAt"
+  ],
   "NurturingOrganization": [
     "organizationId",
     "adminUserId",
@@ -3726,6 +3731,7 @@ export const prismaRelationCatalogue = {
   },
   "ProjectActiveDay": {},
   "NurturingProject": {},
+  "NurturingOrganizationCreated": {},
   "NurturingOrganization": {},
   "NurturingProjectUsageView": {},
   "NurturingProjectTraceDay": {},

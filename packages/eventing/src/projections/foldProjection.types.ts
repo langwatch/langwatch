@@ -1,7 +1,6 @@
 import type { ExhaustedOutcome } from "@langwatch/group-queue";
 
 import type { Event } from "../domain/types.ts";
-import type { EnqueueDispatchOptions } from "../subscribers/eventSubscriber.types.ts";
 import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
 
 // Stateful projection folding events into accumulated state via pure functions:
@@ -36,7 +35,7 @@ export interface FoldProjectionDefinition<State, E extends Event = Event> {
   key?: (event: E) => string;
 
   /** Optional processing behavior configuration. */
-  options?: FoldProjectionOptions<E>;
+  options?: FoldProjectionOptions;
 
   /**
    * Key name for the LastEventOccurredAt field on the state.
@@ -79,14 +78,9 @@ export interface FoldProjectionDefinition<State, E extends Event = Event> {
 /**
  * Options for configuring fold projection processing behavior.
  */
-export interface FoldProjectionOptions<E extends Event = Event> {
+export interface FoldProjectionOptions {
   /** Disable this projection in the assembled runtime. */
   disabled?: boolean;
-  /**
-   * Enqueue-time gate: a declined event mints no fold job. It must admit every event whose apply
-   * changes the state; a replay or re-fold still hands apply every event, so apply stays total.
-   */
-  enqueue?: Pick<EnqueueDispatchOptions<E>, "filter">;
   // `occurredAt` (default) follows business time; `acceptedAt` follows
   // event-log cursor for lifecycle aggregates where accepted order must win.
   eventOrdering?: "occurredAt" | "acceptedAt";

@@ -4,7 +4,7 @@ import type { ParsingSchema } from "../domain/eventSchemas.ts";
 import type { Event } from "../domain/types.ts";
 import type { TriggerContext, TriggerOptions } from "../pipeline/processManagerDefinition.ts";
 import { ConfigurationError } from "../services/errorHandling.ts";
-import type { FoldProjectionDefinition, FoldProjectionOptions } from "./foldProjection.types.ts";
+import type { FoldProjectionDefinition } from "./foldProjection.types.ts";
 import type { MapProjectionDefinition, MapProjectionOptions } from "./mapProjection.types.ts";
 
 /** One owner event a peer projection consumes: the owner contract's type and data schema. */
@@ -68,22 +68,7 @@ export function peerFoldProjection<State, Events extends readonly PeerEventSchem
     store: fold.store,
     LastEventOccurredAtKey: fold.LastEventOccurredAtKey,
     ...(key && { key: (event: Event) => peer.groupKey(event, key) }),
-    ...(fold.options && { options: peerFoldOptions({ options: fold.options, peer }) }),
-  };
-}
-
-/** The fold's options with its enqueue filter over the parsed event, as a peer map's. */
-function peerFoldOptions<Events extends readonly PeerEventSchema[]>({
-  options: { enqueue, ...rest },
-  peer,
-}: {
-  options: FoldProjectionOptions<PeerEvent<Events>>;
-  peer: PeerParser<Events>;
-}): FoldProjectionOptions<Event> {
-  const filter = enqueue?.filter;
-  return {
-    ...rest,
-    ...(filter && { enqueue: { filter: (event: Event) => peer.admits(event, filter) } }),
+    ...(fold.options && { options: fold.options }),
   };
 }
 

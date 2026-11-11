@@ -87,7 +87,8 @@ export class NurturingModule implements NurturingApi {
       ? NurturingOrganizationUsageService.create({
           projectUsage: repositories.projectUsage,
           traceDays: repositories.traceDays,
-          projects: repositories.projects,
+          placements: repositories.placements,
+          organizationsCreated: repositories.organizationsCreated,
           milestones: repositories.milestones,
           sendBatch: (calls) => customerIo.batchOrThrow(calls),
           clock: { nowMs: () => nowInstant().epochMilliseconds },
@@ -105,6 +106,14 @@ export class NurturingModule implements NurturingApi {
       }),
       organizationUsage,
     );
+  }
+
+  /**
+   * Whether the per-email usage syncs at all: only with a Customer.io channel. Without one, the
+   * usage pipeline registers nothing, so no row is written that no sync would read or prune.
+   */
+  syncsOrganizationUsage(): boolean {
+    return this.#organizationUsage !== undefined;
   }
 
   /** A project's usage or traces changed: its organization's traits go to Customer.io. */

@@ -35,8 +35,9 @@ through the owners' shares (`NurturingProjectDirectoryRepository`, R40).
 
 The rule is now:
 
-> nurturing may subscribe to and project owner events and read placement through
-> shares; it never pulls owner state on a schedule
+> nurturing may subscribe to and project owner events; it never pulls owner
+> state on a schedule. New code asks nothing of other modules, placement
+> included: it keeps its own copy from the owners' events
 
 So the per-email usage is peer folds in nurturing, in
 `nurturing-project-usage.pipeline.ts`. Four fold the owners' prompt, evaluator,
@@ -77,7 +78,22 @@ is exact. A redelivery is a no-op through the row's applied event ids.
 A span carries no price, so `total_cost` is not sent: nurturing reads no trace
 data, and every count comes from nurturing's own rows.
 
-Each change sums the organization's projects, listed through the owners' shares,
+Placement is nurturing's own copy too. A peer subscriber on project's
+`lw.project.created` writes the project's organization to `NurturingProject`,
+and one on organization's `lw.organization.created` keeps the organization's
+earliest creation time in `NurturingOrganizationCreated`, the signup day of the
+day traits. `lw.project.moved` stays within one organization and an archived
+project stays counted, so neither changes a row. Only new signups matter, so
+there is no fill: a project or organization created before the deploy is
+unknown to nurturing, and its usage sends nothing (an organization created
+before it sends no signup-day traits). The milestone and member-fact services
+on main still read placement, personal owners, first project and first message
+through the owners' shares (R40); moving them is separate work.
+
+Without a Customer.io channel no sync runs, so the usage pipeline registers no
+fold and no subscriber: nothing writes a row that no sync would read or prune.
+
+Each change sums the organization's projects, listed from nurturing's own copy,
 and sends one group call; trace's `lw.trace.trace_received`, throttled per
 organization to once per 15 minutes, starts the sync after traces. The daily pull
 from the owners' Apis (#9382 before this change) is the thing still refused:

@@ -313,6 +313,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // Nurturing's read model: an organization row by its id, and a project's
   // organization by the project id, which belongs to exactly one organization.
   NurturingOrganization: {},
+  NurturingOrganizationCreated: {},
   NurturingProject: {
     extraBound: ({ clause }) => typeof clauseField(clause, "projectId") === "string",
   },

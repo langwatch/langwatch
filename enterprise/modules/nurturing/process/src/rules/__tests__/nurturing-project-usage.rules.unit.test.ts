@@ -54,9 +54,9 @@ describe("foldProjectUsage()", () => {
   });
 
   /** @scenario "Prompt versions, scenario runs and evaluations mark their UTC day active" */
-  it("marks the day of each prompt, prompt version, scenario run and evaluation once", () => {
+  it("marks the day of each prompt version, scenario run and evaluation once", () => {
     const state = foldAll([
-      { kind: "prompt_created", promptId: "p1", occurredAt: NOW - 3 * DAY_MS },
+      { kind: "prompt_version_saved", occurredAt: NOW - 3 * DAY_MS },
       { kind: "prompt_version_saved", occurredAt: NOW - 2 * DAY_MS },
       { kind: "scenario_run", occurredAt: NOW - 2 * DAY_MS + 1000 },
       { kind: "evaluation_completed", occurredAt: NOW },
@@ -64,6 +64,14 @@ describe("foldProjectUsage()", () => {
     ]);
 
     expect(state.activeDays).toEqual(["2026-11-17", "2026-11-18", "2026-11-20"]);
+  });
+
+  /** @scenario "Creating a prompt counts the prompt but marks no day active" */
+  it("counts a created prompt without marking its day active", () => {
+    const state = foldAll([{ kind: "prompt_created", promptId: "p1", occurredAt: NOW }]);
+
+    expect(state.promptIds).toEqual(["p1"]);
+    expect(state.activeDays).toEqual([]);
   });
 
   it("drops active days older than the window of the newest fact", () => {

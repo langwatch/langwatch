@@ -12,10 +12,13 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   projection replay.
   Nurturing reads no trace data: trace counts start at the count's deploy, and no cost is sent (a
   span carries no price). When a project's usage changes, or its organization traced (throttled
-  to once per 15 minutes), nurturing places it in its organization through the owners' shares,
-  sums the organization's projects and sends their traits to Customer.io as one group call on
-  the admin. It never pulls owner state on a schedule, and sends counts and times only, never
-  content. flagged_count waits on its definition.
+  to once per 15 minutes), nurturing places it in its organization from its own copy, written
+  from project's lw.project.created, sums the organization's projects and sends their traits to
+  Customer.io as one group call on the admin. The signup day comes from its own copy of
+  lw.organization.created. It reads no other module's table, and keeps no copy for projects or
+  organizations created before it did: those send nothing. It never pulls owner state on a
+  schedule, and sends counts and times only, never content. flagged_count waits on its
+  definition. Without a Customer.io channel none of this is registered: nothing is counted.
 
   @unit
   Scenario: Every owner event becomes the fact its fold counts
@@ -48,9 +51,15 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
 
   @unit
   Scenario: Prompt versions, scenario runs and evaluations mark their UTC day active
-    Given a project creates a prompt, saves a prompt version, finishes a scenario run and completes an evaluation
+    Given a project saves a prompt version, finishes a scenario run and completes an evaluation
     Then each fact's UTC day is in the project's active days once
     And days older than 30 days before the newest fact are dropped
+
+  @unit
+  Scenario: Creating a prompt counts the prompt but marks no day active
+    Given a project creates a prompt on a day with no other activity
+    Then the project counts the prompt
+    And that day is not in the project's active days
 
   @unit @integration
   Scenario: Evaluations mark a project's day once
@@ -164,10 +173,36 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     Then Customer.io receives one group call on the admin with the organization's traits
 
   @unit
-  Scenario: A project placed in no organization sends nothing
-    Given a project its owners place in no organization
+  Scenario: A project nurturing never saw created sends nothing
+    Given a project created before nurturing kept its copy of placements
     When the project's usage changes or it traces
     Then Customer.io receives nothing
+
+  @unit @integration
+  Scenario: A created project is placed in its organization from the creation fact
+    Given project records lw.project.created for a project of an organization
+    When nurturing's placement subscriber takes it, once or redelivered
+    Then nurturing's own copy places the project in that organization
+    And the organization's projects list it
+
+  @unit
+  Scenario: A moved or archived project keeps its placement
+    Given a placed project
+    When project records lw.project.moved or lw.project.archived for it
+    Then its placement is unchanged, since a move stays within the organization
+
+  @unit @integration
+  Scenario: The signup day comes from the organization's creation fact
+    Given organization records lw.organization.created
+    When nurturing's subscriber takes it, once or redelivered with a later time
+    Then nurturing keeps the earliest creation time as the organization's signup day
+    And an organization created before nurturing kept the copy sends no signup-day traits
+
+  @unit
+  Scenario: Without a Customer.io channel nothing is counted
+    Given nurturing runs without a Customer.io channel
+    When its usage pipeline is built
+    Then it registers no fold and no subscriber, so a root span writes no trace day
 
   @integration
   Scenario: Each owner's fold keeps its own row per project

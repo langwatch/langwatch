@@ -284,7 +284,10 @@ describe("the trace-day count", () => {
     await subscriber.handleBatch([itemOf(OK, "trace-1", NOON + 11 * 3_600_000)]);
     await subscriber.handleBatch([itemOf(OK, "trace-2", NOON + 12 * 3_600_000)]);
 
-    expect((await days()).map((day) => [day.day, day.traceCount]).toSorted()).toEqual([
+    const counted = (await days())
+      .map((day) => [day.day, day.traceCount] as const)
+      .toSorted(([a], [b]) => a.localeCompare(b));
+    expect(counted).toEqual([
       ["2026-11-20", 1],
       ["2026-11-21", 1],
     ]);

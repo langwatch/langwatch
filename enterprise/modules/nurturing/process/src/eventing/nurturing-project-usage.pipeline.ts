@@ -4,7 +4,9 @@
  * scenario, simulation run), a row per project each, and a subscriber on trace's span_received
  * that adds its root spans to their project's UTC day with one Postgres upsert per batch.
  * Evaluations add a day per project a day. Each change syncs the organization as one Customer.io
- * group call. See ADR 001 (nurturing), amendment.
+ * group call, placed by nurturing's own copy of project and organization creation. Without a
+ * Customer.io channel nothing reads these rows, so nothing here is registered. See ADR 001
+ * (nurturing), amendment.
  * Spec: enterprise/modules/nurturing/specs/project-usage.feature
  */
 import {
@@ -28,8 +30,17 @@ import {
   type PeerFoldProjectionDeclaration,
   type PeerFoldSubscriberSpec,
   type PeerSubscriberContext,
+  type PeerSubscriberDefinition,
   throttledWindow,
 } from "@langwatch/eventing";
+import {
+  ORGANIZATION_CREATED_EVENT_TYPE,
+  organizationCreatedEventDataSchema,
+} from "@langwatch/organization-contract";
+import {
+  PROJECT_CREATED_EVENT_TYPE,
+  projectCreatedEventDataSchema,
+} from "@langwatch/project-contract";
 import {
   PROMPT_CREATED_EVENT_TYPE,
   PROMPT_DELETED_EVENT_TYPE,
@@ -55,14 +66,14 @@ import {
 import { z } from "zod";
 
 import type { NurturingModule } from "../app/nurturing.app.ts";
+import type { NurturingOrganizationCreatedRepository } from "../repositories/nurturing-organization-created.repository.ts";
+import type { NurturingProjectPlacementRepository } from "../repositories/nurturing-project-placement.repository.ts";
 import {
   NURTURING_PROJECT_USAGE_PROJECTION_VERSION,
   type NurturingProjectUsageOwner,
   type NurturingProjectUsageRepository,
 } from "../repositories/nurturing-project-usage.repository.ts";
-import type {
-  NurturingTraceDayRepository,
-} from "../repositories/nurturing-trace-day.repository.ts";
+import type { NurturingTraceDayRepository } from "../repositories/nurturing-trace-day.repository.ts";
 import type { NurturingRepositories } from "../repositories/nurturing.repositories.ts";
 import {
   emptyProjectUsage,
@@ -294,26 +305,35 @@ function organizationUsageSubscriber(
 /** What the trace sync reads of trace_received; its throttle reads the organization. */
 const traceSyncDataSchema = traceReceivedEventDataSchema.pick({ projectId: true });
 
+/** What the usage sync needs; absent without a Customer.io channel, when nothing syncs. */
+export type NurturingUsageSync = Readonly<{
+  traceDays: NurturingTraceDayRepository;
+  placements: NurturingProjectPlacementRepository;
+  organizationsCreated: NurturingOrganizationCreatedRepository;
+  usageChanged: UsageChanged;
+}>;
+
 function nurturingProjectUsageHost({
   store,
-  traceDays,
-  usageChanged,
+  sync,
 }: Readonly<{
   store: NurturingProjectUsageRepository;
-  traceDays: NurturingTraceDayRepository;
-  usageChanged: UsageChanged;
+  sync: NurturingUsageSync | undefined;
 }>) {
+  const host = definePipeline({
+    name: NURTURING_PROJECT_USAGE_PIPELINE_NAME,
+    aggregate: defineAggregate({ type: "nurturing_project_usage_view" }),
+  }).withEvents([]);
+  // Without a channel no sync reads these rows, and none prunes the trace days, so none is kept.
+  if (!sync) return host;
+  const { traceDays, placements, organizationsCreated, usageChanged } = sync;
   const subscribers = [organizationUsageSubscriber(usageChanged)];
   const traceSync = throttledWindow<Event>({
     makeId: traceSyncKeyOf,
     windowMs: TRACE_USAGE_SYNC_WINDOW_MS,
   });
   return (
-    definePipeline({
-      name: NURTURING_PROJECT_USAGE_PIPELINE_NAME,
-      aggregate: defineAggregate({ type: "nurturing_project_usage_view" }),
-    })
-      .withEvents([])
+    host
       .withPeerFoldProjection(
         nurturingProjectUsagePeerFold({ owner: "prompt", store }),
         subscribers,
@@ -354,7 +374,39 @@ function nurturingProjectUsageHost({
         },
         handle: ({ projectId, occurredAt }) => store.recordEvaluationDay({ projectId, occurredAt }),
       })
+      .withPeerSubscriber("projectPlacement", nurturingProjectPlacementSubscriber(placements))
+      .withPeerSubscriber(
+        "organizationCreated",
+        nurturingOrganizationCreatedSubscriber(organizationsCreated),
+      )
   );
+}
+
+/**
+ * Nurturing's own copy of a project's organization, from project's creation fact (§9). A move
+ * stays within the organization and an archived project stays counted, so only creation writes.
+ */
+export function nurturingProjectPlacementSubscriber(
+  placements: NurturingProjectPlacementRepository,
+): PeerSubscriberDefinition<typeof projectCreatedEventDataSchema> {
+  return {
+    eventType: PROJECT_CREATED_EVENT_TYPE,
+    data: projectCreatedEventDataSchema,
+    handle: ({ projectId, organizationId }) =>
+      placements.recordProject({ projectId, organizationId }),
+  };
+}
+
+/** Nurturing's own copy of an organization's creation, the signup day of its usage traits. */
+export function nurturingOrganizationCreatedSubscriber(
+  organizationsCreated: NurturingOrganizationCreatedRepository,
+): PeerSubscriberDefinition<typeof organizationCreatedEventDataSchema> {
+  return {
+    eventType: ORGANIZATION_CREATED_EVENT_TYPE,
+    data: organizationCreatedEventDataSchema,
+    handle: ({ organizationId, occurredAt }) =>
+      organizationsCreated.recordOrganizationCreated({ organizationId, createdAt: occurredAt }),
+  };
 }
 
 /** The host pipeline as a TYPE, derived from the builder above. */
@@ -373,7 +425,13 @@ export const nurturingProjectUsageEventing = defineEventingModule({
   build: ({ repositories, app }: EventingSetup<NurturingRepositories, NurturingModule>) =>
     buildNurturingProjectUsagePipeline({
       store: repositories.projectUsage,
-      traceDays: repositories.traceDays,
-      usageChanged: (input) => app.organizationUsageChanged(input),
+      sync: app.syncsOrganizationUsage()
+        ? {
+            traceDays: repositories.traceDays,
+            placements: repositories.placements,
+            organizationsCreated: repositories.organizationsCreated,
+            usageChanged: (input) => app.organizationUsageChanged(input),
+          }
+        : undefined,
     }),
 });

@@ -145,11 +145,9 @@ export function foldProjectUsage(
     LastEventOccurredAt: Math.max(state.LastEventOccurredAt, fact.occurredAt),
   };
   switch (fact.kind) {
+    // Creating a prompt is not a habit activity: only its saved versions mark a day.
     case "prompt_created":
-      return withActiveDay(
-        { ...base, promptIds: withId(state.promptIds, fact.promptId) },
-        fact.occurredAt,
-      );
+      return { ...base, promptIds: withId(state.promptIds, fact.promptId) };
     case "prompt_version_saved":
     case "evaluation_completed":
       return withActiveDay(base, fact.occurredAt);
