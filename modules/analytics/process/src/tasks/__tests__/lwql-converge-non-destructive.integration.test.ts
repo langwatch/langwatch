@@ -144,8 +144,8 @@ describe("given a rendered-mode install whose PostgreSQL engine tables work", ()
       if (result.exitCode !== 0) throw new Error(`reader role setup failed: ${result.stderr}`);
     }
     // The SQL stand-in for the collection the config store mounts; the containers share a bridge.
+    await harness.dropNamedCollection(collection);
     await harness.applyAsAdmin([
-      `DROP NAMED COLLECTION IF EXISTS ${collection}`,
       `CREATE NAMED COLLECTION ${collection} AS host = '${postgres.container.getIpAddress("bridge")}', ` +
         `port = 5432, database = '${postgres.container.getDatabase()}', ` +
         `user = '${LWQL_POSTGRES_READER_ROLE}', password = '${postgres.readerPassword}'`,
@@ -155,10 +155,10 @@ describe("given a rendered-mode install whose PostgreSQL engine tables work", ()
 
   afterAll(async () => {
     // A reused container reloads each table at restart; one whose collection is gone never loads.
-    await harness?.applyAsAdmin([
-      ...ENGINE_TABLES.map((table) => `DROP TABLE IF EXISTS ${names.database}.${table}`),
-      `DROP NAMED COLLECTION IF EXISTS ${collection}`,
-    ]);
+    await harness?.applyAsAdmin(
+      ENGINE_TABLES.map((table) => `DROP TABLE IF EXISTS ${names.database}.${table}`),
+    );
+    await harness?.dropNamedCollection(collection);
     await Promise.all([harness?.stop(), postgres?.stop()]);
   });
 
@@ -193,7 +193,7 @@ describe("given a rendered-mode install whose PostgreSQL engine tables work", ()
       expect(await engineTables()).toEqual(ENGINE_TABLES.toSorted());
       const before = await answers();
 
-      await harness.applyAsAdmin([`DROP NAMED COLLECTION ${collection}`]);
+      await harness.dropNamedCollection(collection);
       await expect(
         convergeLwqlAccessModel({ database: noPostgres, plan: plan(), failOnError: true }),
       ).rejects.toMatchObject({ code: "669" });

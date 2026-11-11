@@ -93,13 +93,15 @@ describe("given a rendered install whose engine tables were built on the reader'
   });
 
   /** The SQL stand-in for the collection file the config store loads. */
-  const collectionHolds = (password: string) =>
-    harness.applyAsAdmin([
-      `DROP NAMED COLLECTION IF EXISTS ${collection}`,
+  const collectionHolds = async (password: string) => {
+    // The engine tables still use it; from 26.2 a plain DROP refuses with NAMED_COLLECTION_IS_USED.
+    await harness.dropNamedCollection(collection);
+    await harness.applyAsAdmin([
       `CREATE NAMED COLLECTION ${collection} AS host = '${postgres.container.getIpAddress("bridge")}', ` +
         `port = 5432, database = '${postgres.container.getDatabase()}', ` +
         `user = '${LWQL_POSTGRES_READER_ROLE}', password = '${password}'`,
     ]);
+  };
 
   const deploy = (readerPassword: string) =>
     convergeLwqlAccessModel({
@@ -247,10 +249,10 @@ describe("given a rendered install whose engine tables were built on the reader'
 
   afterAll(async () => {
     // A reused container reloads each table at restart; one whose collection is gone never loads.
-    await harness?.applyAsAdmin([
-      ...ENGINE_TABLES.map((table) => `DROP TABLE IF EXISTS ${names.database}.${table}`),
-      `DROP NAMED COLLECTION IF EXISTS ${collection}`,
-    ]);
+    await harness?.applyAsAdmin(
+      ENGINE_TABLES.map((table) => `DROP TABLE IF EXISTS ${names.database}.${table}`),
+    );
+    await harness?.dropNamedCollection(collection);
     await connection?.closeOnce();
     await Promise.all([harness?.stop(), postgres?.stop()]);
   });
