@@ -7,9 +7,12 @@ Feature: LangWatchQL access-model delivery to every chart-managed ClickHouse rep
 
   A deploy-time Job runs the application image, renders the two files
   (`renderLwqlAccessConfig`), and writes them into the Secret
-  `<release>-lwql-clickhouse-access`. Every ClickHouse pod mounts that Secret at
+  `<release>-lwql-clickhouse-access`. Every ClickHouse pod mounts that Secret as
+  the directory `/etc/clickhouse-server/lwql`, and the image links its files to
   `/etc/clickhouse-server/users.d/lwql-access.yaml` and
-  `/etc/clickhouse-server/config.d/lwql-named-collection.yaml`, so the restricted
+  `/etc/clickhouse-server/config.d/lwql-named-collection.yaml` (`LWQL_ACCESS_DIR`).
+  Kubelet updates a directory mount in place, so a patched Secret reaches the
+  running server with no restart. So the restricted
   identity, its profile, grants, both row policies and the PostgreSQL named
   collection land in the `users_xml` store of every replica — install, upgrade,
   scale-up or disk rebuild alike, with no per-pod app action.
@@ -24,7 +27,7 @@ Feature: LangWatchQL access-model delivery to every chart-managed ClickHouse rep
     Given the chart is rendered with chart-managed ClickHouse and lwql.enabled
     Then a deploy-time Job runs the application image and renders the access files
     And the Job's ServiceAccount may only create the access Secret and get, update or patch it by name
-    And every ClickHouse pod mounts the access Secret at the users.d and config.d paths
+    And every ClickHouse pod mounts the access Secret as a directory and links its files into users.d and config.d
     And no chart template renders any part of the access model itself
 
   # ── AC3: every replica carries the whole access set ───────────────────────

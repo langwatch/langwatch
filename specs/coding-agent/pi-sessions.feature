@@ -179,6 +179,42 @@ Rule: One row per pi session, keyed by pi's own session id
     Then the row's stop reason is that same "aborted" value
     And the row counts no internal errors and no API errors
 
+Rule: A pi session's columns come from what its spans carry
+
+  # The title and files read message content, which the extension sends only
+  # with content capture on (pi-extension-install.feature). Lines changed stay
+  # zero: nothing pi declares, and no GenAI key, counts them.
+
+  @unit
+  Scenario: A pi session is named from the prompt its run carries
+    Given a pi run whose gen_ai.input.messages holds the user's prompt
+    When the session is folded
+    Then the row is titled from the prompt's first line, as a prompt-derived title
+
+  @unit
+  Scenario: Each pi run counts as one prompt
+    Given a pi session of one run
+    When the session is folded
+    Then the row counts one prompt
+
+  @unit
+  Scenario: The files pi's file tools name are the session's files touched
+    Given a pi session whose read, edit and write calls name files in their arguments
+    When the session is folded
+    Then the row's files touched are those files, once each
+
+  @unit
+  Scenario: A pi session records pi's version
+    Given a pi session whose resource carries service.version
+    When the session is folded
+    Then the row's agent version is that version
+
+  @unit
+  Scenario: Lines changed stay unreported for pi
+    Given a pi session that edited a file
+    When the session is folded
+    Then the row's lines added and removed are zero
+
 Rule: pi sessions reach the trace explorer as pi, not as an unknown agent
 
   # Parked: the banner's agent list in modules/trace/browser has no pi, so it reads unknown.

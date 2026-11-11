@@ -37,6 +37,24 @@ export interface SavedRunPreparation {
   carriedOverCells: CarriedOverCell[];
 }
 
+/** A dataset_version needs a saved dataset to read: the body's dataset_id or a saved active one. */
+function refuseVersionWithoutSavedDataset({
+  state,
+  runInputs,
+}: {
+  state: z.infer<typeof persistedEvaluationsV3StateSchema>;
+  runInputs: z.infer<typeof runInputsBodySchema>;
+}): void {
+  if (runInputs.dataset_version === undefined || runInputs.dataset_id !== undefined) return;
+  const active = state.datasets.find((dataset) => dataset.id === state.activeDatasetId);
+  if (active?.type === "saved" && active.datasetId) return;
+  throw new ExperimentEvaluationInputError({
+    status: 400,
+    reason:
+      "A dataset_version names a saved dataset's version, and this run reads no saved dataset",
+  });
+}
+
 export class ExperimentSavedRunPreparationService {
   private constructor(private readonly experiments: ExperimentService) {}
 
@@ -73,6 +91,7 @@ export class ExperimentSavedRunPreparationService {
     }
     const savedState = ExperimentSavedStateExecutionService.create();
     const runInputs = savedState.parseRunInputs({ body: input.body });
+    refuseVersionWithoutSavedDataset({ state: parseResult.data, runInputs });
     const prepared = await savedState.prepareSavedStateExecution({
       experiments: this.experiments,
       services: runs.services,

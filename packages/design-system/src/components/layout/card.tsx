@@ -70,6 +70,8 @@ interface CardBaseProps {
   status?: CardStatus;
   /** A StatusChip, a count. */
   badge?: ReactNode;
+  /** end (default): the badge at the header's right end. title: right after the title. */
+  badgePlacement?: "end" | "title";
   /**
    * md 16px, sm 12px, xs 8px; none: a ListTable, code block or editor fills it. lg 20px is the old
    * Chakra card's space. xl 24px all round; inline-lg 24px across, 20px down. Default md;
@@ -102,6 +104,8 @@ interface PlainCardProps {
   actions?: ReactNode;
   /** What the reader can do, under the body. */
   footer?: ReactNode;
+  /** A rule between the body and the footer, so the footer reads as the card's conclusion. */
+  footerDivider?: boolean;
 }
 
 /** A card that opens something: its children are only presentation, so no controls inside. */
@@ -114,6 +118,7 @@ interface LinkedCardProps {
   opener: ReactElement<OpenerProps>;
   actions?: never;
   footer?: never;
+  footerDivider?: never;
 }
 
 export type CardProps = CardBaseProps & ToneProps & (PlainCardProps | LinkedCardProps);
@@ -379,7 +384,10 @@ function OpenerLayer({ opener, title }: { opener: ReactElement<OpenerProps>; tit
   );
 }
 
-type HeaderParts = Pick<CardBaseProps, "title" | "status" | "icon" | "badge" | "description"> & {
+type HeaderParts = Pick<
+  CardBaseProps,
+  "title" | "status" | "icon" | "badge" | "badgePlacement" | "description"
+> & {
   actions?: ReactNode;
 };
 
@@ -389,7 +397,7 @@ function CardHeader({
   band,
   headTone,
   titleLevel,
-  parts: { title, status, icon, badge, actions, description },
+  parts: { title, status, icon, badge, badgePlacement, actions, description },
 }: {
   inset: { x: number; y: number };
   band: typeof FILLS.band | typeof NO_FILLS.band;
@@ -423,8 +431,9 @@ function CardHeader({
             {title}
           </Text>
         )}
+        {badgePlacement === "title" && badge}
         <Spacer />
-        {badge}
+        {badgePlacement !== "title" && badge}
         {actions != null && (
           <HStack gap={1} flexShrink={0}>
             {actions}
@@ -558,6 +567,36 @@ function refuseUnsupportedShape({
   }
 }
 
+/** What the reader can do, under the body; a divided footer sits under a border-grey rule. */
+function CardFooter({
+  band,
+  insetX,
+  insetY,
+  divided,
+  children,
+}: {
+  band: typeof FILLS.band | typeof NO_FILLS.band;
+  insetX: number;
+  insetY: number;
+  divided: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <HStack
+      gap={2}
+      flexWrap="wrap"
+      {...band}
+      paddingX={insetX || 4}
+      paddingTop={divided ? 3 : 2}
+      paddingBottom={divided ? 3 : insetY || 3}
+      {...(divided ? { borderTopWidth: "1px", borderColor: "border" } : {})}
+      data-card-footer-divider={divided ? "" : undefined}
+    >
+      {children}
+    </HStack>
+  );
+}
+
 export function Card({
   variant = "panel",
   tone,
@@ -571,8 +610,10 @@ export function Card({
   icon,
   status,
   badge,
+  badgePlacement = "end",
   actions,
   footer,
+  footerDivider = false,
   opener,
   padding: paddingProp,
   bodyLayout = "flow",
@@ -634,14 +675,14 @@ export function Card({
             band={fit.band}
             headTone={headTone}
             titleLevel={titleLevel}
-            parts={{ title, status, icon, badge, actions, description }}
+            parts={{ title, status, icon, badge, badgePlacement, actions, description }}
           />
         )}
         {children != null && (
           <Box
             paddingX={insetX}
             paddingTop={hasHeader ? 0 : insetY}
-            paddingBottom={footer != null ? 0 : insetY}
+            paddingBottom={footer != null && !footerDivider ? 0 : insetY}
             flex={1}
             minWidth={0}
             {...fit.content}
@@ -659,16 +700,9 @@ export function Card({
           </Box>
         )}
         {footer != null && (
-          <HStack
-            gap={2}
-            flexWrap="wrap"
-            {...fit.band}
-            paddingX={insetX || 4}
-            paddingTop={2}
-            paddingBottom={insetY || 3}
-          >
+          <CardFooter band={fit.band} insetX={insetX} insetY={insetY} divided={footerDivider}>
             {footer}
-          </HStack>
+          </CardFooter>
         )}
       </ChakraCard.Body>
     </ChakraCard.Root>

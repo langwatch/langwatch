@@ -4,6 +4,7 @@
  * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
+import { HandledError } from "@langwatch/handled-error";
 import {
   INSTANT_EVAL_PRICING,
   INSTANT_EVAL_CLASSIFIER_LIMITS,
@@ -432,6 +433,60 @@ describe("given a judge that answers nothing at all", () => {
 
       await expect(service.judgePage(INPUT)).rejects.toThrow(InstantEvalClassifierUnavailableError);
       expect(judgments.written).toEqual([]);
+    });
+  });
+});
+
+/** A handled reason the hosted judge fails with when LangWatch is not reached. */
+class UnreachableError extends HandledError {
+  constructor() {
+    super("connect_unreachable", "LangWatch-hosted services were not reached", {
+      httpStatus: 503,
+      fault: "customer",
+    });
+  }
+}
+
+describe("given a judge that fails every row with the same handled reason", () => {
+  describe("when the page is judged", () => {
+    /** @scenario "A page the judge could not answer at all fails with the judge's own reason" */
+    it("throws that reason so the failed run carries its code", async () => {
+      const { service, judgments } = await judging({
+        keyPage: { keys: [rowKey("t1"), rowKey("t2")], hasMore: false },
+        rows: [
+          { TraceId: "t1", annoyed: "one" },
+          { TraceId: "t2", annoyed: "two" },
+        ],
+        answer: async () => {
+          throw new UnreachableError();
+        },
+      });
+
+      await expect(service.judgePage(INPUT)).rejects.toMatchObject({ code: "connect_unreachable" });
+      expect(judgments.written).toEqual([]);
+    });
+  });
+});
+
+describe("given a judge that fails every row for different reasons", () => {
+  describe("when the page is judged", () => {
+    /** @scenario "A page the judge could not answer for mixed reasons fails as the judge being unavailable" */
+    it("throws the judge being unavailable", async () => {
+      const { service } = await judging({
+        keyPage: { keys: [rowKey("t1"), rowKey("t2")], hasMore: false },
+        rows: [
+          { TraceId: "t1", annoyed: "one" },
+          { TraceId: "t2", annoyed: "two" },
+        ],
+        answer: async ({ index }) => {
+          if (index === 0) {
+            throw new UnreachableError();
+          }
+          throw new Error("the judge is down");
+        },
+      });
+
+      await expect(service.judgePage(INPUT)).rejects.toThrow(InstantEvalClassifierUnavailableError);
     });
   });
 });

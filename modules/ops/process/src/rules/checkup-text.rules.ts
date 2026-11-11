@@ -50,3 +50,32 @@ export function portOf(url: string): number {
 export function normalizeUrl(url: string): string {
   return url.trim().replace(/\/+$/, "").toLowerCase();
 }
+
+/** Sync refusals an outbound firewall rule can fix. */
+const NETWORK_SYNC_REFUSALS: ReadonlySet<string> = new Set([
+  "connect_unreachable",
+  "hosted_service_unavailable",
+]);
+
+/** A license sync refusal in plain words; the code itself is never shown. */
+const SYNC_REFUSAL_SENTENCES: Readonly<Record<string, string>> = {
+  connect_unreachable: "This install could not reach LangWatch",
+  hosted_service_unavailable: "LangWatch did not answer with a result",
+  connect_license_revoked: "LangWatch revoked this license",
+  connect_license_expired: "The license has expired",
+  connect_license_not_registered: "LangWatch has no hosted services set up for this license",
+  connect_wrong_instance: "The license is bound to another install",
+  connect_credential_pending: "LangWatch is still preparing this license's key",
+  connect_license_token_malformed: "The stored license could not be read",
+  rate_limited: "LangWatch asked this install to slow down",
+};
+
+export function syncRefusalSentence(code: string): string {
+  return Object.hasOwn(SYNC_REFUSAL_SENTENCES, code)
+    ? (SYNC_REFUSAL_SENTENCES[code] ?? "LangWatch refused the sync")
+    : "LangWatch refused the sync";
+}
+
+export function isNetworkSyncRefusal(code: string): boolean {
+  return NETWORK_SYNC_REFUSALS.has(code);
+}

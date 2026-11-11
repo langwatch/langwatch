@@ -123,3 +123,18 @@ export const authFailureMessage = ({
 
   return fallback;
 };
+
+const SSO_HAND_OFF_REFUSED =
+  "We couldn't start your organization's sign-in. Try again, or ask your administrator to check the single sign-on connection.";
+
+/**
+ * Wording for a refused hand-off to an identity provider. The server's own message
+ * names endpoints and settings, which only an administrator can act on, so it is not shown.
+ */
+export const ssoHandOffFailureMessage = ({
+  code,
+  status,
+}: {
+  code?: string;
+  status?: number;
+}): string => authFailureMessage({ code, status, fallback: SSO_HAND_OFF_REFUSED });

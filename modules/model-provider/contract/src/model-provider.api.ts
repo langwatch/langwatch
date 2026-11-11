@@ -135,6 +135,8 @@ export interface ModelProviderCredentialProbeRequest {
   readonly organizationId?: string;
   readonly provider: string;
   readonly customKeys: Record<string, string>;
+  /** The model about to run on it; Azure probes this deployment and skips without one. */
+  readonly model?: string;
 }
 /** A credential that is already stored, probed against a base URL. */
 export interface ModelProviderStoredCredentialProbeRequest {

@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+
 import { OrganizationInvalidCredentialsError } from "@langwatch/api";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
@@ -62,9 +64,13 @@ import {
   type SsoArrivalAdmission,
   type SsoArrivalApi,
 } from "@langwatch/identity-contract";
-import { NotificationService } from "@langwatch/notification-contract";
+import { isEmailUnconfigured, NotificationService } from "@langwatch/notification-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
-import { OrganizationApi, type InviteLanding } from "@langwatch/organization-contract";
+import {
+  OrganizationApi,
+  type InviteLanding,
+  type OrganizationUserRole,
+} from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import {
@@ -130,6 +136,7 @@ import type { AuthRepositories } from "../repositories/auth.repositories.ts";
 import type { AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
 import { mountedSocialMethodIds } from "../rules/mounted-social-methods.rules.ts";
 import { queryCacheKeyDeriver } from "../rules/query-cache-key.rules.ts";
+import { signInHintSealer } from "../rules/sign-in-hint.rules.ts";
 import { keyedIdentifierHasher } from "../rules/sign-in-identifier-hash.rules.ts";
 import { buildSignUpVerificationUrl } from "../rules/signup-verification-link.rules.ts";
 import { resolveDialableIdentityProviderOrigins } from "../rules/trusted-origins.rules.ts";
@@ -194,7 +201,10 @@ const logger = createLogger("langwatch:auth");
 type AuthAppPeers = Readonly<{
   apiKeys: ApiKeyApi;
   featureFlags: FeatureFlagApi;
-  identity: Pick<IdentityApi, "routeSignIn" | "sendOwnAddressConfirmation" | "resolveEmail">;
+  identity: Pick<
+    IdentityApi,
+    "routeSignIn" | "sendOwnAddressConfirmation" | "resolveEmail" | "classifyRefusedSignIn"
+  >;
   /** The sign-up policy, and the invitation an invite link lands on (organization's). */
   organizations: SignUpPolicy &
     Pick<OrganizationApi, "getInviteLanding" | "requestFreshInvite" | "countMembershipsForUser">;
@@ -333,6 +343,8 @@ export class AuthModule implements AuthApiContract {
   #browserSession: BetterAuthDeploymentIdentity | undefined;
   /** Refuses until {@link AuthModule.create} resolves the session secret it is derived from. */
   #deriveQueryCacheKey = queryCacheKeyDeriver({ secret: undefined });
+  /** Seals the sign-in hint cookie; sealed under the session secret once it resolves. */
+  #signInHints = signInHintSealer({ secret: undefined });
 
   /** This deployment's answer to {@link AuthModule.offersPasskeys}. */
   #offersPasskeys = false;
@@ -501,6 +513,9 @@ export class AuthModule implements AuthApiContract {
       },
       deriveQueryCacheKey: (input) => this.#deriveQueryCacheKey(input),
       now: nowInstant,
+      signInHints: () => this.#signInHints,
+      refusedSignIns: dependencies.identity,
+      newReferenceId: () => randomBytes(16).toString("hex"),
     });
   }
 
@@ -586,10 +601,8 @@ export class AuthModule implements AuthApiContract {
         checkSignUp,
         isWithinBudget: (input) => app.isWithinBudget(input),
         revokeAllBrowserSessions: (input) => app.revokeAllBrowserSessions(input),
-        isEmailUnconfigured: async () => {
-          const view = await dependencies.notifications.getMailDelivery();
-          return view.provider === undefined && !view.misconfigured;
-        },
+        isEmailUnconfigured: async () =>
+          isEmailUnconfigured({ mail: await dependencies.notifications.getMailDelivery() }),
       }),
       processName,
       rateLimits: repositories.rateLimits,
@@ -702,6 +715,7 @@ export class AuthModule implements AuthApiContract {
           : undefined;
       app.#browserSession = identity;
       app.#deriveQueryCacheKey = queryCacheKeyDeriver({ secret: sessionSecret });
+      app.#signInHints = signInHintSealer({ secret: sessionSecret });
 
       if (identity) {
         app.#composeBetterAuth = () =>
@@ -1006,6 +1020,13 @@ export class AuthModule implements AuthApiContract {
     return {
       signedInUsers: await this.#sessions.countSignedInUsersAmong({ userIds: memberUserIds, at }),
     };
+  }
+
+  findSessionUsersSince(input: {
+    userIds: readonly string[];
+    since: number;
+  }): Promise<readonly string[]> {
+    return this.#sessions.findSessionUsersSince(input);
   }
 
   listBrowserSessions(input: {
@@ -1544,6 +1565,7 @@ export class LoggedBetterAuthAnnouncements extends BetterAuthAnnouncements {
     userId: string;
     organizationId: string;
     organizationName: string;
+    role: OrganizationUserRole;
   }): void {
     this.lifecycle.ssoAutoAdded(input);
   }

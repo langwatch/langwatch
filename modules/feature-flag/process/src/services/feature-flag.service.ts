@@ -31,6 +31,7 @@ import type {
   FeatureFlagExperimentRepository,
 } from "../repositories/feature-flag-experiment-setting.repository.ts";
 import type { FeatureFlagRepository } from "../repositories/feature-flag.repository.ts";
+import { deploymentDefaultOf } from "../rules/feature-flag-config.rules.ts";
 import { isExperimentFlag, tenantPolicyOf } from "../rules/feature-flag-registry.rules.ts";
 import type { FeatureFlagRowStore } from "./cached-feature-flag-row.service.ts";
 import type { OrganizationCreatedAtCacheService } from "./organization-created-at-cache.service.ts";
@@ -102,7 +103,7 @@ export class FeatureFlagService {
       return stored;
     }
 
-    return definition.defaultValue;
+    return deploymentDefaultOf({ definition, isSaas: this.config.isSaas });
   }
 
   async resolveFrontendFlags(
@@ -410,11 +411,12 @@ export class FeatureFlagService {
     const flags = this.registry.definitions.map((definition) => {
       const row = stored.find(({ key }) => key === definition.key);
       const envOverride = this.config.overrides.get(definition.key) ?? null;
+      const defaultValue = deploymentDefaultOf({ definition, isSaas: this.config.isSaas });
 
       return {
         key: definition.key,
         scope: definition.scope,
-        defaultValue: definition.defaultValue,
+        defaultValue,
         description: definition.description,
         family: definition.family ?? null,
         storedValue: row?.enabled ?? null,
@@ -424,7 +426,7 @@ export class FeatureFlagService {
           envOverride,
           rules: row?.rules ?? [],
           rowEnabled: row?.enabled ?? null,
-          registryDefault: definition.defaultValue,
+          registryDefault: defaultValue,
         }),
         lastEditedBy: row?.lastEditedBy ?? null,
         updatedAt: row?.updatedAt ? toDate(row.updatedAt) : null,
@@ -484,7 +486,7 @@ export class FeatureFlagService {
     await this.repository.upsertRules({
       key,
       rules,
-      seedEnabled: definition.defaultValue ?? false,
+      seedEnabled: deploymentDefaultOf({ definition, isSaas: this.config.isSaas }),
       lastEditedBy,
     });
     await this.rows.invalidate(key);

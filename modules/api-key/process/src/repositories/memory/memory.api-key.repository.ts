@@ -1,4 +1,5 @@
 import {
+  ApiKeyAlreadyRevokedError,
   CLI_LOGIN_KEY_NAME_PREFIX,
   isSystemApiKey,
   type ApiKeyRevocationCause,
@@ -113,6 +114,23 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
         ? { ...key, revokedAt: toDate(nowInstant()), revocationCause: input.cause }
         : key,
     );
+  }
+
+  async rotateSecret(input: {
+    id: string;
+    organizationId: string;
+    lookupId: string;
+    hashedSecret: string;
+  }): Promise<ApiKeyRow> {
+    const live = this.#find(
+      (key) => key.id === input.id && key.organizationId === input.organizationId && !key.revokedAt,
+    );
+    if (!live) throw new ApiKeyAlreadyRevokedError(input.id);
+    return this.update({
+      id: input.id,
+      hashedSecret: input.hashedSecret,
+      lookupId: input.lookupId,
+    });
   }
 
   async updateLastUsedAt(input: { id: string }): Promise<void> {

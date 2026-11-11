@@ -177,7 +177,7 @@ describe("the settings shell in a new navigation mode", () => {
       expect(screen.getByText("People & access")).toBeInTheDocument();
       expect(generalLink("/settings")).toHaveAttribute("href", "/settings");
       expect(generalLink("/settings/project")).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "Directory" })).toHaveAttribute(
+      expect(screen.getByRole("link", { name: "Users" })).toHaveAttribute(
         "href",
         "/settings/directory",
       );
@@ -242,7 +242,7 @@ describe("the settings shell in a new navigation mode", () => {
       expect(
         within(organizationGroup!).getByRole("link", { name: /^Authentication/ }),
       ).toHaveAttribute("href", "/settings/authentication");
-      expect(within(peopleGroup!).getByRole("link", { name: "Directory" })).toHaveAttribute(
+      expect(within(peopleGroup!).getByRole("link", { name: "Users" })).toHaveAttribute(
         "href",
         "/settings/directory",
       );
@@ -255,12 +255,9 @@ describe("the settings shell in a new navigation mode", () => {
       }
     });
 
-    it("lights Directory and Roles on the old addresses that forward onto them", () => {
+    it("lights Users and Roles on the old addresses that forward onto them", () => {
       renderSettingsSidebar({ pathname: "/settings/members" });
-      expect(screen.getByRole("link", { name: "Directory" })).toHaveAttribute(
-        "aria-current",
-        "page",
-      );
+      expect(screen.getByRole("link", { name: "Users" })).toHaveAttribute("aria-current", "page");
       cleanup();
 
       renderSettingsSidebar({ pathname: "/settings/role-bindings" });
@@ -286,7 +283,7 @@ describe("the settings shell in a new navigation mode", () => {
         expect(within(link).getByLabelText("Included in Enterprise")).toBeInTheDocument();
       }
       expect(screen.queryByText("ENT")).not.toBeInTheDocument();
-      for (const name of [/^Directory/, /^Authentication/]) {
+      for (const name of [/^Users/, /^Authentication/]) {
         const link = screen.getByRole("link", { name });
         expect(within(link).queryByLabelText("Included in Enterprise")).not.toBeInTheDocument();
       }
@@ -309,12 +306,9 @@ describe("the settings shell in a new navigation mode", () => {
     });
 
     /** @scenario "A detail page keeps its owning entry lit" */
-    it("lights Directory on a team's own page", () => {
+    it("lights Users on a team's own page", () => {
       renderSettingsSidebar({ pathname: "/settings/teams/platform" });
-      expect(screen.getByRole("link", { name: "Directory" })).toHaveAttribute(
-        "aria-current",
-        "page",
-      );
+      expect(screen.getByRole("link", { name: "Users" })).toHaveAttribute("aria-current", "page");
     });
 
     /** @scenario "The settings groups fold, and start open" */
@@ -325,11 +319,11 @@ describe("the settings shell in a new navigation mode", () => {
       // A folded group reads "Expand <name>", so none of them means all open.
       expect(screen.queryAllByRole("button", { name: /^Expand / })).toEqual([]);
       expect(screen.getAllByRole("button", { name: /^Collapse / }).length).toBeGreaterThan(1);
-      expect(screen.getByRole("link", { name: "Directory" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Users" })).toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: "Collapse People & access" }));
 
-      expect(screen.queryByRole("link", { name: "Directory" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Users" })).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Collapse Organization" })).toHaveAttribute(
         "aria-expanded",
         "true",
@@ -343,7 +337,7 @@ describe("the settings shell in a new navigation mode", () => {
         "aria-expanded",
         "false",
       );
-      expect(screen.queryByRole("link", { name: "Directory" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Users" })).not.toBeInTheDocument();
       expect(generalLink("/settings")).toBeInTheDocument();
     });
 
@@ -355,7 +349,7 @@ describe("the settings shell in a new navigation mode", () => {
       const region = screen.getByTestId("sidebar-scroll-region");
       expect(row).toContainElement(search);
       expect(region).not.toContainElement(search);
-      expect(region).toContainElement(screen.getByRole("link", { name: "Directory" }));
+      expect(region).toContainElement(screen.getByRole("link", { name: "Users" }));
       expect(getComputedStyle(row).borderBottomWidth).not.toBe("1px");
       const back = screen.getByRole("link", { name: /^Back/ });
       expect(region).not.toContainElement(back);
@@ -374,7 +368,7 @@ describe("the settings shell in a new navigation mode", () => {
 
       expect(entries.filter((entry) => entry === "API keys")).toHaveLength(1);
       expect(entries.indexOf("API keys")).toBe(entries.indexOf("General") + 1);
-      expect(entries.indexOf("API keys")).toBeLessThan(entries.indexOf("Directory"));
+      expect(entries.indexOf("API keys")).toBeLessThan(entries.indexOf("Users"));
     });
 
     /** @scenario The menu marks the page that is open */

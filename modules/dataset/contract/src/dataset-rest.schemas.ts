@@ -14,6 +14,7 @@ import { z } from "zod";
 
 import { DATASET_VERSION_PAGE_LIMIT_MAX, datasetVersionListItemSchema } from "./dataset-version.ts";
 import {
+  datasetColumnRenamesSchema,
   appendStoredObjectToDatasetInputSchema,
   createDatasetFromStoredObjectInputSchema,
   DATASET_PAGE_LIMIT_MAX,
@@ -42,6 +43,11 @@ export const datasetRestCreateSchema: DatasetRestCreateSchema = datasetRestCreat
 const datasetRestUpdateSchemaDefinition = z.object({
   name: z.string().min(1).optional(),
   columnTypes: z.array(columnTypeSchema).optional(),
+  columnRenames: datasetColumnRenamesSchema
+    .optional()
+    .describe(
+      "Which existing column each renamed column came from, as `{ from, to }` names. Sent, values move by these renames and by unchanged names only. Omitted, columns left over after matching names pair by position.",
+    ),
 });
 export interface DatasetRestUpdateSchema extends Named<typeof datasetRestUpdateSchemaDefinition> {}
 export const datasetRestUpdateSchema: DatasetRestUpdateSchema = datasetRestUpdateSchemaDefinition;

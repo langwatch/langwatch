@@ -2,6 +2,7 @@
 /**
  * @see specs/langy/langy-cli-tool-envelope.feature
  *      "A plan limit is a decision, not a broken step"
+ * @see specs/langy/langy-card-taxonomy.feature
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { render, screen } from "@testing-library/react";
@@ -59,7 +60,9 @@ const limitFailure = JSON.stringify({
   },
 });
 
-const turn = (): UIMessage =>
+const reply = { type: "text", text: "You are out of scenarios on this plan." };
+
+const turn = ({ answered = false }: { answered?: boolean } = {}): UIMessage =>
   ({
     id: "assistant-limit",
     role: "assistant",
@@ -73,13 +76,14 @@ const turn = (): UIMessage =>
         },
         errorText: limitFailure,
       },
+      ...(answered ? [reply] : []),
     ],
   }) as UIMessage;
 
-const renderTurn = () =>
+const renderTurn = ({ answered = false }: { answered?: boolean } = {}) =>
   render(
     <DesignSystemProvider forcedTheme="light">
-      <LangyToolActivity message={turn()} />
+      <LangyToolActivity message={turn({ answered })} live={!answered} />
     </DesignSystemProvider>,
   );
 
@@ -97,6 +101,20 @@ describe("a tool call refused on a plan limit", () => {
     expect(card.textContent).not.toContain(
       "Your access in this project doesn't cover this action.",
     );
+  });
+
+  /** @scenario "A failure the person can act on keeps its card" */
+  it("keeps its card in the conversation while the turn is still running", () => {
+    renderTurn();
+    expect(screen.getByRole("alert")).toBeTruthy();
+    expect(screen.queryByRole("list", { name: "Finished steps" })).toBeNull();
+  });
+
+  /** @scenario "A failure the person can act on keeps its card" */
+  it("keeps its card in the conversation after the turn answered", () => {
+    renderTurn({ answered: true });
+    expect(screen.getByRole("alert").textContent).toContain("all 3 are in use");
+    expect(screen.queryByRole("list", { name: "Finished steps" })).toBeNull();
   });
 
   it("never shows the platform's internal vocabulary", () => {

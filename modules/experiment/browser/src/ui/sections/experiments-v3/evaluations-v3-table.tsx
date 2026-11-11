@@ -42,7 +42,6 @@ import { isGoldenFieldSatisfied } from "../../../model/experiments-v3/types.ts";
 import { CHECKBOX_WIDTH_PX } from "../../../model/experiments-v3/workbench-column-widths.ts";
 import {
   datasetEditDraft,
-  editedDatasetUpdate,
   savedDatasetUpdate,
 } from "../../../model/experiments-v3/workbench-dataset-edits.ts";
 import { VirtualizedTableBody } from "../../blocks/dataset/virtualized-table-body.tsx";
@@ -247,7 +246,7 @@ export function EvaluationsV3Table({
     addDataset,
     setActiveDataset,
     updateDataset,
-    removeMappingsToMissingColumns,
+    applyDatasetColumnsEdit,
     setColumnWidths,
     toggleColumnVisibility,
     duplicateTarget,
@@ -282,7 +281,7 @@ export function EvaluationsV3Table({
       addDataset: state.addDataset,
       setActiveDataset: state.setActiveDataset,
       updateDataset: state.updateDataset,
-      removeMappingsToMissingColumns: state.removeMappingsToMissingColumns,
+      applyDatasetColumnsEdit: state.applyDatasetColumnsEdit,
       setColumnWidths: state.setColumnWidths,
       toggleColumnVisibility: state.toggleColumnVisibility,
       duplicateTarget: state.duplicateTarget,
@@ -870,16 +869,7 @@ export function EvaluationsV3Table({
         }}
         onSuccess={(updatedDataset) => {
           if (!activeDataset) return;
-          updateDataset(
-            activeDataset.id,
-            editedDatasetUpdate({
-              dataset: activeDataset,
-              edited: updatedDataset,
-              rowCount: getRowCount(activeDataset.id),
-            }),
-          );
-          // An explicit columns edit, unlike a dataset load, drops mappings to removed columns.
-          removeMappingsToMissingColumns({ datasetId: activeDataset.id });
+          applyDatasetColumnsEdit({ datasetId: activeDataset.id, edited: updatedDataset });
           setEditDatasetDrawerOpen(false);
         }}
       />

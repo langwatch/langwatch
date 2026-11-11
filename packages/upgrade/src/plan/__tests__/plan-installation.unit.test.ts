@@ -78,6 +78,37 @@ describe("planInstallation()", () => {
     });
   });
 
+  describe("when the last upgrade ran an image of 3.21.0 cut before its manifest shipped", () => {
+    /** @scenario "An install upgraded by a release image cut without its manifest reruns none of its steps" */
+    it("plans from the last named release and leaves out every step that run recorded", () => {
+      const { installed, plan } = planInstallation({
+        ...planning,
+        steps: [{ id: "prisma:20261101000000_a", status: "done" }],
+        runs: [
+          upgradeTo("3.20.1"),
+          { ...upgradeTo("3.20.1"), release: null, startedAt: new Date("2026-10-21T00:00:00Z") },
+        ],
+      });
+      const planned = plan.releases.flatMap((release) => [...release.schema, ...release.blocking]);
+
+      expect(installed).toBe("3.20.1");
+      expect(planned).toEqual(["prisma:20261201000000_b"]);
+    });
+  });
+
+  describe("when a fresh install ran only an image of 3.21.0 cut before its manifest shipped", () => {
+    /** @scenario "An install upgraded by a release image cut without its manifest reruns none of its steps" */
+    it("infers 3.21.0 from the settled schema once the manifest ships", () => {
+      const { installed } = planInstallation({
+        ...planning,
+        steps: [{ id: "prisma:20261101000000_a", status: "done" }],
+        runs: [{ ...upgradeTo("3.21.0"), release: null }],
+      });
+
+      expect(installed).toBe("3.21.0");
+    });
+  });
+
   describe("when the runner applied everything itself on a fresh database", () => {
     it("reads the installation as fresh, with nothing installed", () => {
       const { installed } = planInstallation({

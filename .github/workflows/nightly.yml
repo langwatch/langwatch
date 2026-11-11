@@ -286,6 +286,11 @@ jobs:
       REDIS_URL: "redis://localhost:6379"
       CI_REDIS_URL: "redis://localhost:6379"
       CI_CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/test_langwatch"
+      # The names the package integration suites read (their `skipIf` guards).
+      # Without them every such suite skipped here, its only CI lane.
+      LANGWATCH_TEST_DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
+      LANGWATCH_TEST_REDIS_URL: "redis://localhost:6379"
+      LANGWATCH_TEST_CLICKHOUSE_URL: "http://default:ci_password@localhost:8123"
       LANGWATCH_NLP_SERVICE: "http://localhost:5561"
       LANGWATCH_ENDPOINT: "http://localhost:3000"
       VITEST_ISOLATE_WORKER_REDIS: "1"
@@ -470,7 +475,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
       clickhouse:
-        image: clickhouse/clickhouse-server:25.10.2.65
+        image: clickhouse/clickhouse-server:26.8.36.3
         ports:
           - 8123:8123
         env:

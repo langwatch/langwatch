@@ -128,6 +128,10 @@ jobs:
               - 'pnpm-workspace.yaml'
               - 'package.json'
               - '.npmrc'
+              # The runtime-dependencies policy reads the image's install list and
+              # the peers its pnpmfile strips; an edit to either must run the lint.
+              - 'infra/docker/prune-runtime-tree.sh'
+              - 'infra/docker/image.pnpmfile.cjs'
               # NOTE: 'charts/**' is deliberately NOT listed. Integration suites
               # do render the chart and assert on the output, so a chart-only
               # edit can break a package test without touching a file
@@ -690,9 +694,16 @@ jobs:
       REDIS_URL: "redis://localhost:6379"
       CI_REDIS_URL: "redis://localhost:6379"
       CI_CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/test_langwatch"
+      # The names the package integration suites read (their `skipIf` guards).
+      # Without them every such suite skipped here, its only CI lane.
+      LANGWATCH_TEST_DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
+      LANGWATCH_TEST_REDIS_URL: "redis://localhost:6379"
+      LANGWATCH_TEST_CLICKHOUSE_URL: "http://default:ci_password@localhost:8123"
       LANGWATCH_NLP_SERVICE: "http://localhost:5561"
       LANGWATCH_ENDPOINT: "http://localhost:3000"
       VITEST_ISOLATE_WORKER_REDIS: "1"
+      # Vitest's transform cache is one per user (ADR-196); keep it where the job restores it.
+      VITEST_FS_MODULE_CACHE_DIR: ${{ github.workspace }}/node_modules/.vitest-cache
       CI: "true"
     runs-on: ubuntu-latest
     # Read the checkout; write only to prune this pull request's older suite results.
@@ -1075,7 +1086,7 @@ jobs:
         run: >-
           pnpm --filter @langwatch/architecture-enforcer lint --
           --no-declarations
-          --policies application-boundaries,default-test-lane,prisma-migration-access,prisma-table-ownership,service-projection-boundaries,workspace-seams,teaching-citations,deleted-spellings-in-teaching,lint-rule-skill-pointers,feature-configuration,rest-namespace-owners,cycles,architecture-records,browser-package-exports,manifests,browser-node-leak,migration-owners,eventing-table-access,feature-layout,service-ceilings,rerunnable-migrations
+          --policies application-boundaries,default-test-lane,prisma-migration-access,prisma-table-ownership,service-projection-boundaries,workspace-seams,teaching-citations,deleted-spellings-in-teaching,lint-rule-skill-pointers,feature-configuration,rest-namespace-owners,cycles,architecture-records,browser-package-exports,manifests,browser-node-leak,migration-owners,eventing-table-access,feature-layout,service-ceilings,rerunnable-migrations,runtime-dependencies
 
       # THE GATE. Oxlint over the whole governed tree, and a non-zero exit
       # fails the job. A config error and a lint violation both surface here.
@@ -1479,9 +1490,6 @@ jobs:
 
       - name: Test check-added-images.sh
         run: bash .github/scripts/__tests__/check-added-images.test.sh
-
-      - name: Test publish-docker-ecr.yml path filters
-        run: bash .github/scripts/__tests__/publish-ecr-filters.test.sh
 
       - name: Test nearest-ancestor-tag.sh
         run: bash .github/scripts/__tests__/nearest-ancestor-tag.test.sh

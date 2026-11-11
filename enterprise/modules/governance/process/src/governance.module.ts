@@ -129,6 +129,26 @@ export const governanceProcessModule: PublishedProcessModule<"governance", Gover
           return { ...report, dryRun };
         },
       }),
+      // A completed step never reruns, so the ingest source types added since (pi_cli,
+      // copilot_*, grok_cli) are recorded by a step of their own.
+      defineMigrationStep({
+        id: "governance:record-coding-assistant-ingest-source-billing",
+        kind: "data",
+        mode: "background",
+        description:
+          "Records each organisation's billed facts again, so every ingest source type has one.",
+        needsOldWritersGone: true,
+        run: async ({ checkpoint, dryRun, signal }) => {
+          const resumed = checkpoint.resumeFrom?.afterOrganizationId;
+          const report = await app.codingAssistantBilling.backfill({
+            after: typeof resumed === "string" ? resumed : undefined,
+            dryRun,
+            signal,
+            onPage: (page) => (dryRun ? Promise.resolve() : checkpoint.save({ report: page })),
+          });
+          return { ...report, dryRun };
+        },
+      }),
       // W11-D1 (b): migrated endpoints keep the legacy scheme, so the plan gate passes them.
       defineMigrationStep({
         id: "governance:migrate-anomaly-webhook-destinations",

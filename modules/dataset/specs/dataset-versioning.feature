@@ -7,6 +7,10 @@ Feature: Dataset version history
   storage: a DatasetVersion row in Postgres, and the rows as JSONL chunks in the object storage
   the dataset module already writes (local disk or a bucket, so every self-hosted install has it).
   Versions are numbered per dataset from 1. A version is never edited; restoring writes a new one.
+  The system's own saves (the "initial" save before a first edit, the autosave and the
+  first-version background step) skip a dataset that has no rows and no versions yet: there is
+  nothing to restore, so a dataset created empty gets version 1 from its first save with rows.
+  A save by hand, an experiment run or a restore still saves, rows or not.
   A snapshot whose content hash equals the latest version's creates nothing new.
 
   # --- Saving versions ---
@@ -16,6 +20,25 @@ Feature: Dataset version history
     Given a dataset with version 1
     When a user edits a row and nobody edits the dataset for the quiet period
     Then the dataset has version 2 saved automatically, authored by that user
+
+  @unit
+  Scenario: The first edit of a dataset with rows keeps its content as version 1
+    Given a dataset with rows and no versions
+    When a user edits a row
+    Then version 1 holds the rows from before the edit, with the trigger "initial"
+
+  @unit
+  Scenario: A dataset created empty gets no empty version 1
+    Given a dataset created with columns and no rows
+    When a user adds rows and the edits go quiet
+    Then version 1 is the autosave holding those rows
+
+  @unit
+  Scenario: The autosave of a dataset still empty saves nothing
+    Given a dataset created with columns and no rows
+    When the dataset has been quiet for the whole period and the autosave runs
+    Then the dataset has no versions
+    And the first autosave after rows are added is version 1
 
   @unit
   Scenario: Edits inside the quiet period save one version
@@ -279,12 +302,44 @@ Feature: Dataset version history
   # --- Existing datasets ---
 
   @unit
+  Scenario: A dataset stored with an empty slug gets a slug from its name
+    Given datasets stored before slugs were required, with an empty slug
+    When the background step "dataset:fill-empty-slugs" runs
+    Then each one has the slug its name gives, as creating a dataset would
+    And a name another dataset in the project already holds gets the next numbered slug
+    And a name with no letters or digits gets the slug "dataset"
+    And a dataset that has a slug keeps it
+    And running the step again changes nothing
+    And a dry run changes nothing and saves no checkpoint
+
+  @unit
+  Scenario: The first-version step runs after empty slugs are filled
+    Given the background steps the dataset module declares
+    Then "dataset:create-first-versions" runs after "dataset:fill-empty-slugs"
+
+  @integration
+  Scenario: Postgres gives a dataset with an empty slug a free slug once
+    Given a Postgres project holding a dataset with an empty slug and one whose slug its name gives
+    When the empty slug is filled
+    Then the dataset gets the next numbered slug, the unique slug index refusing the taken one
+    And the dataset opens by id and by its new slug
+    And filling it again finds nothing to fill
+
+  @unit
   Scenario: Existing datasets get version 1 in the background
     Given datasets created before versioning, with no versions
     When the background step "dataset:create-first-versions" runs
-    Then each ready dataset has version 1 with the trigger "initial"
+    Then each ready dataset with rows has version 1 with the trigger "initial"
+    And a dataset with no rows gets no version
     And running the step again creates nothing
     And a dry run creates nothing and saves no checkpoint
+
+  @unit
+  Scenario: The first-version step retries a dataset whose rows it could not read
+    Given a dataset whose rows fail to read during the first-version step
+    When the step runs
+    Then the step fails, saves no checkpoint past that project, and retries it
+    And a dataset that is gone or no longer ready by the time its rows are read is skipped
 
   @unit
   Scenario: The first-version step resumes from its checkpoint

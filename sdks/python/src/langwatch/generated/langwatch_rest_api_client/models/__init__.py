@@ -3659,6 +3659,7 @@ from .patch_api_dashboards_by_dashboard_id_widgets_by_widget_id_response_500_tra
     PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse500Trace,
 )
 from .patch_api_dataset_by_slug_or_id_body import PatchApiDatasetBySlugOrIdBody
+from .patch_api_dataset_by_slug_or_id_body_column_renames_item import PatchApiDatasetBySlugOrIdBodyColumnRenamesItem
 from .patch_api_dataset_by_slug_or_id_body_column_types_item import PatchApiDatasetBySlugOrIdBodyColumnTypesItem
 from .patch_api_dataset_by_slug_or_id_body_column_types_item_type import (
     PatchApiDatasetBySlugOrIdBodyColumnTypesItemType,
@@ -11429,6 +11430,7 @@ __all__ = (
     "PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse500Meta",
     "PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse500Trace",
     "PatchApiDatasetBySlugOrIdBody",
+    "PatchApiDatasetBySlugOrIdBodyColumnRenamesItem",
     "PatchApiDatasetBySlugOrIdBodyColumnTypesItem",
     "PatchApiDatasetBySlugOrIdBodyColumnTypesItemType",
     "PatchApiDatasetBySlugOrIdRecordsByRecordIdBody",

@@ -51,6 +51,8 @@ export const FRONTEND_FEATURE_FLAGS = [
   "release_instant_evals",
   // The own decision models in the Instant Evals column of Default models (ADR-182).
   "release_instant_evals_own_decision_model",
+  // LangWatch Evals Preview says it routes through the LangWatch Judge (ADR-190).
+  "release_instant_evals_judge_router",
   // The guided onboarding variant, read on the welcome flow with the user's
   // id, which the percentage rollout buckets on (guided-onboarding-variant.feature).
   "experiment_onboarding_langy_guided",

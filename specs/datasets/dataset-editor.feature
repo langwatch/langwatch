@@ -533,3 +533,62 @@ Feature: Dataset editor
     Given the dataset editor opened on an existing dataset and its values loaded
     When its name and a column name are edited and applied
     Then the applied dataset carries the typed name and column
+
+  @integration
+  Scenario: The dataset editor hands back each edited column with the caller's id for it
+    Given the dataset editor opened on columns that carry the caller's ids
+    When one column is renamed and another is added, then applied or saved
+    Then the renamed column comes back with its original id
+    And the added column comes back without one
+    And the saved column list carries no ids
+
+  @unit
+  Scenario: A save that deletes one column and renames another keeps the renamed column's values
+    Given a saved dataset with columns "first" and "second", each holding values
+    When one save deletes "first" and renames "second" to "renamed"
+    Then the save names the rename from "second" to "renamed"
+    And every row of "renamed" holds the values "second" held
+    And the values of "first" are gone
+    And a save that names no renames pairs leftover columns by position, as before
+    And this holds whether the rows are stored in Postgres, in chunked files or in a single file from an earlier release
+
+  @unit
+  Scenario: A dataset save does not undo a column edit that committed while it ran
+    Given a saved dataset with columns "input" and "expected_output"
+    And a save that renames the dataset is running
+    When another save commits the columns "later" before the first save writes the name
+    Then the dataset has the new name
+    And its columns are still "later"
+
+  @integration @unit
+  Scenario: A record write that arrives during a column edit waits for it and is refused when keyed by a removed column
+    Given a saved dataset with columns "input" and "expected_output"
+    And a column edit that deletes "input" and renames "expected_output" to "reference" is running
+    When a record write keyed by "input" and "expected_output", naming those columns, arrives
+    Then the write waits until the column edit has committed
+    And it is refused as "dataset_stale_columns"
+    And every row of "reference" still holds the values "expected_output" held
+    And the same write re-keyed to "reference" and sent again is stored
+
+  @unit
+  Scenario: A record write keyed by columns a later edit swapped is refused
+    Given a saved dataset with columns "first" and "second"
+    And a column edit renames "first" to "second" and "second" to "first"
+    When a record write naming the columns "first" then "second" arrives
+    Then it is refused as "dataset_stale_columns"
+    And a write naming the columns in their current order is stored
+    And the workbench, refused after its own reorder, sends the same record again under the new order
+
+  @unit
+  Scenario: A column edit that moves no values leaves the stored records untouched
+    Given a saved dataset whose records are stored in Postgres
+    When a save only changes a column's type, reorders the columns or adds one
+    Then the new columns are stored
+    And no record is rewritten
+
+  @unit
+  Scenario: A column rename that does not match the dataset is refused
+    Given a saved dataset with columns "input" and "expected_output"
+    When a save names a rename from a column the dataset lacks, to a column the save lacks, or names a column in two renames
+    Then the save is refused as "validation_error"
+    And the stored columns and records are unchanged

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   authoredHeroPreload,
+  deferBelowFoldPosters,
   pageRasters,
   rewritePageImages,
   type ImageVariants,
@@ -118,5 +119,41 @@ describe("authoredHeroPreload", () => {
   it("preloads nothing when no responsive image is marked high priority", () => {
     const html = page({ article: img({ src: "/docs/images/a.png" }) });
     expect(authoredHeroPreload({ html })).toBe("");
+  });
+});
+
+describe("when a guide plays videos", () => {
+  const video = ({ poster }: { poster: string }) =>
+    `<video controls="" preload="none" width="1200" height="720" poster="${poster}"><source src="/docs/v.webm"/></video>`;
+
+  /** @scenario "Serve videos as small web encodings with a poster" */
+  it("keeps a poster above the fold and defers each one below it to the media script", () => {
+    const html = deferBelowFoldPosters({
+      html: page({
+        article: `<p>Short intro.</p>${video({ poster: "/docs/a.webp" })}<h2>Setup</h2><h2>Use</h2>${video({ poster: "/docs/b.webp" })}`,
+      }),
+    });
+    expect(html).toContain('poster="/docs/a.webp"');
+    expect(html).toContain('data-docs-poster="/docs/b.webp"');
+    const scripted = html.slice(0, html.indexOf("<noscript>"));
+    expect(scripted).not.toContain(' poster="/docs/b.webp"');
+  });
+
+  /** @scenario "Serve videos as small web encodings with a poster" */
+  it("keeps the poster for a reader without scripts in a noscript copy", () => {
+    const html = deferBelowFoldPosters({
+      html: page({ article: `<p>${"word ".repeat(200)}</p>${video({ poster: "/docs/d.webp" })}` }),
+    });
+    const fallback = /<noscript>([\s\S]*?)<\/noscript>/.exec(html)?.[1] ?? "";
+    expect(fallback).toContain("video[data-docs-poster]{display:none!important}");
+    expect(fallback).toContain(video({ poster: "/docs/d.webp" }));
+  });
+
+  /** @scenario "Serve videos as small web encodings with a poster" */
+  it("counts the article's text before a video, as it does for images", () => {
+    const html = deferBelowFoldPosters({
+      html: page({ article: `<p>${"word ".repeat(200)}</p>${video({ poster: "/docs/c.webp" })}` }),
+    });
+    expect(html).toContain('data-docs-poster="/docs/c.webp"');
   });
 });

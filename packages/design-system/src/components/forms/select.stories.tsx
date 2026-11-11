@@ -1,7 +1,7 @@
 import { Box, createListCollection, Stack } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { Select } from "./select.tsx";
+import { scrollToListItem, Select } from "./select.tsx";
 
 const models = createListCollection({
   items: [
@@ -124,5 +124,35 @@ export const NarrowWidth: Story = {
         </Select.Content>
       </Select.Root>
     </Box>
+  ),
+};
+
+const manyModels = createListCollection({
+  items: Array.from({ length: 30 }, (_, index) => ({
+    label: `gpt-model-${index}`,
+    value: `openai/gpt-model-${index}`,
+  })),
+});
+
+/** A fixed header above rows that scroll on their own: no row passes behind the header. */
+export const WithFixedHeader: Story = {
+  render: (args) => (
+    <Select.Root {...args} collection={manyModels} scrollToIndexFn={scrollToListItem}>
+      <Select.Trigger aria-label="Model">
+        <Select.ValueText placeholder="Choose a model" />
+      </Select.Trigger>
+      <Select.Content overflow="hidden">
+        <Box flexShrink={0} padding={2} borderBottom="1px solid" borderColor="border">
+          Search models
+        </Box>
+        <Select.List>
+          {manyModels.items.map((item) => (
+            <Select.Item key={item.value} item={item}>
+              {item.label}
+            </Select.Item>
+          ))}
+        </Select.List>
+      </Select.Content>
+    </Select.Root>
   ),
 };
