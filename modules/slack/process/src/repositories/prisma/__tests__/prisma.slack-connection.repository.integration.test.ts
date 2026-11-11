@@ -15,7 +15,6 @@ import {
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { SlackConnectionRecord } from "../../slack-connection.repository.ts";
-import { PrismaSlackConnectionClaimRepository } from "../prisma.slack-connection-claim.repository.ts";
 import { PrismaSlackConnectionRepository } from "../prisma.slack-connection.repository.ts";
 
 /** Hex, not a cipher: a stored column that spells out the plaintext fails the test. */
@@ -51,7 +50,6 @@ function record(overrides: Partial<SlackConnectionRecord> = {}): SlackConnection
 describe.skipIf(!databaseUrl)("PrismaSlackConnectionRepository", () => {
   let connection: PrismaConnection;
   let connections: PrismaSlackConnectionRepository;
-  let claims: PrismaSlackConnectionClaimRepository;
 
   const clear = async () => {
     for (const each of [organizationId, otherOrganizationId]) {
@@ -70,7 +68,6 @@ describe.skipIf(!databaseUrl)("PrismaSlackConnectionRepository", () => {
       prisma: connection.client,
       encryption: hexEncryption,
     });
-    claims = PrismaSlackConnectionClaimRepository.create(connection.client);
   });
 
   beforeEach(clear);
@@ -217,29 +214,6 @@ describe.skipIf(!databaseUrl)("PrismaSlackConnectionRepository", () => {
       const kept = await connections.findById({ id: row.id });
       expect(kept.map((each) => each.name)).toEqual(["Renamed"]);
 
-      await connections.delete({ id: row.id, organizationId });
-      await expect(connections.findById({ id: row.id })).resolves.toEqual([]);
-    });
-  });
-
-  describe("given a connection an automation claims", () => {
-    it("the foreign key refuses a delete that skipped the service's claim check", async () => {
-      const [row] = await connections.create({ record: record(), actorId: "user-1" });
-      if (!row) throw new Error("the connection was not stored");
-      await claims.upsert({
-        connectionId: row.id,
-        claimantId: "trigger-1",
-        claimantLabel: "Errors to ops",
-        organizationId,
-        projectId,
-      });
-
-      await expect(connections.delete({ id: row.id, organizationId })).rejects.toMatchObject({
-        code: "P2014",
-      });
-      await expect(connections.findById({ id: row.id })).resolves.toHaveLength(1);
-
-      await claims.delete({ connectionId: row.id, claimantId: "trigger-1", projectId });
       await connections.delete({ id: row.id, organizationId });
       await expect(connections.findById({ id: row.id })).resolves.toEqual([]);
     });

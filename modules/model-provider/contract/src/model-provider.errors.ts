@@ -565,6 +565,17 @@ export class ProviderRefusedError extends HandledError {
   }
 }
 
+/** The key and endpoint answered, but no deployment by this name lives there. */
+export class ProviderDeploymentNotFoundError extends HandledError {
+  constructor({ provider, deployment }: { provider: string; deployment: string }) {
+    super("provider_deployment_not_found", `${provider} has no deployment named ${deployment}`, {
+      fault: "customer",
+      httpStatus: 400,
+      meta: { provider, deployment },
+    });
+  }
+}
+
 /** The account behind the credential cannot pay for a call. */
 export class ProviderOutOfCreditError extends HandledError {
   constructor({ provider }: { provider: string }) {

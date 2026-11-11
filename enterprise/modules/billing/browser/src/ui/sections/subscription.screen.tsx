@@ -29,7 +29,7 @@ export default function SubscriptionScreen() {
   return (
     <>
       <PageLayout.Header>
-        <PageLayout.Heading>Subscription</PageLayout.Heading>
+        <PageLayout.Heading>Plan & billing</PageLayout.Heading>
       </PageLayout.Header>
       <VStack width="full" gap={6} align="stretch" paddingTop={4}>
         {isSettled ? (

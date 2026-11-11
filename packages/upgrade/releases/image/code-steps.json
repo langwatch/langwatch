@@ -144,7 +144,7 @@
     "kind": "data",
     "mode": "background",
     "owner": "dataset",
-    "description": "Saves version 1 of every dataset that has no version history yet."
+    "description": "Saves version 1 of every dataset that has rows and no version history yet."
   },
   {
     "id": "evaluation:fill-id-indexes",
@@ -200,6 +200,14 @@
     "mode": "background",
     "owner": "governance",
     "description": "Records each organisation's coding-assistant billed facts, which trace folds at ingest.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "governance:record-coding-assistant-ingest-source-billing",
+    "kind": "data",
+    "mode": "background",
+    "owner": "governance",
+    "description": "Records each organisation's billed facts again, so every ingest source type has one.",
     "needsOldWritersGone": true
   },
   {
@@ -435,6 +443,14 @@
     "mode": "background",
     "owner": "trace",
     "description": "Waits for ClickHouse to build the trace summaries updated-at index over existing rows.",
+    "needsOldWritersGone": false
+  },
+  {
+    "id": "trace:track-analytics-metadata-columns-materialisation",
+    "kind": "data",
+    "mode": "background",
+    "owner": "trace",
+    "description": "Waits for ClickHouse to store the trace analytics metadata columns in existing rows.",
     "needsOldWritersGone": false
   },
   {

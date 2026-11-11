@@ -144,6 +144,12 @@
       "cells": ["C2"],
       "note": "codingAgents router only reads on the old image: SQL, flagged"
     },
+    "governance:record-coding-assistant-ingest-source-billing": {
+      "status": "pending",
+      "seed": "tenancy-sql:governance",
+      "cells": ["C2"],
+      "note": "codingAgents router only reads on the old image: SQL, flagged"
+    },
     "governance:replay-cost-charges": {
       "status": "pending",
       "seed": "tenancy-sql:governance",
@@ -247,6 +253,12 @@
       "status": "seeded",
       "seed": "heavy:otlp",
       "note": "about 300k spans through the OTLP door",
+      "cells": ["C1", "C3"]
+    },
+    "trace:track-analytics-metadata-columns-materialisation": {
+      "status": "seeded",
+      "seed": "heavy:otlp",
+      "note": "the same spans fold trace_analytics rows whose metadata columns the mutation stores",
       "cells": ["C1", "C3"]
     },
     "upcast:entitlement:lw.usage.month_counted": {

@@ -66,6 +66,7 @@ const SERVICE_PROVIDER = {
   singleLogoutUrl: "https://app.test/api/auth/sso/saml2/sp/slo/ssoc_legacy",
   entityId: "https://app.test/api/auth/sso/saml2/sp/metadata/ssoc_legacy",
   metadataUrl: "https://app.test/api/auth/sso/saml2/sp/metadata/ssoc_legacy",
+  refusalPageUrl: "https://app.test/api/auth/sso/refused/ssoc_1",
 };
 
 /** The organization signing in through the provider we set up for it. */

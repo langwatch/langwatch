@@ -114,7 +114,7 @@ describe("given the Flight Deck cockpit widgets", () => {
   /** @scenario "AC27 Flight Deck: Accepted, edited or regenerated reads each output's action" */
   it("shares outputs by the action their trace metadata sends", () => {
     const { code, queries } = build("gen-acceptance");
-    expect(queries.actions).toContain("Attributes['metadata.output_action'] AS action");
+    expect(queries.actions).toContain("MetadataOutputAction AS action");
     for (const action of ["accepted", "edited", "regenerated", "dropped"]) {
       expect(code).toContain(`key: "${action}"`);
     }

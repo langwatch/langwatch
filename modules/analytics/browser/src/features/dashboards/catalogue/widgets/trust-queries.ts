@@ -70,9 +70,9 @@ export const HEALTH_FIELDS: readonly HealthField[] = [
     key: "outcome",
     label: "Outcome",
     send: "an outcome, such as resolved, in the trace metadata",
-    view: "traces",
-    condition: "Attributes['metadata.outcome'] != ''",
-    readBy: /metadata\.outcome/,
+    view: "trace_metrics",
+    condition: "MetadataOutcome != ''",
+    readBy: /metadata\.outcome|\bMetadataOutcome\b/,
     need: "outcome",
   },
 ];

@@ -13,7 +13,12 @@ import {
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import { readCliErrorDocument } from "@langwatch/handled-error/langwatch-handled-error";
-import { cliToolResultPayload, cliToolResultSchema, parseCliJson } from "@langwatch/langy-contract";
+import {
+  cliToolResultPayload,
+  cliToolResultSchema,
+  isLangyCallStoppedText,
+  parseCliJson,
+} from "@langwatch/langy-contract";
 import type { UIMessage } from "ai";
 import { AlertCircle, Braces, Check, ChevronRight, Layers3 } from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
@@ -33,6 +38,7 @@ import {
 import { isNotificationToolPart } from "../../../../model/langy-notifications.ts";
 import { isPlanToolPart } from "../../../../model/langy-plan.ts";
 import { langyThinkingShimmerStyles } from "../../../../model/values/langy-shimmer.ts";
+import { LangyFailureReference } from "../../../../ui/elements/langy-failure-reference.tsx";
 import { LangyInterruptedNote } from "../../../../ui/elements/langy-interrupted-note.tsx";
 import { isCodeAccessToolPart } from "../../../tools/model/langy-code-access-tool.ts";
 import {
@@ -44,6 +50,7 @@ import { isSecretSnippetToolPart } from "../../../tools/model/langy-secret-snipp
 import {
   type LangyToolErrorPresentation,
   presentLangyToolError,
+  readerMustAct,
 } from "../../model/logic/langy-tool-failure.ts";
 import {
   commandOf,
@@ -58,7 +65,7 @@ import {
   toolResultForCapability,
 } from "./capabilities/langy-capability-renderer.tsx";
 import { isReaderDecision, LangyFailedStepCard } from "./langy-failed-step-card.tsx";
-import { LangyToolErrorCard } from "./langy-tool-error-card.tsx";
+import { hasToolErrorActions, LangyToolErrorActions } from "./langy-tool-error-card.tsx";
 
 const dotPulse = keyframes`
   0%, 100% { opacity: 1; transform: scale(1); }
@@ -130,6 +137,8 @@ export type FailedToolCall = {
   id: string;
   call: ToolCall;
   presentation: LangyToolErrorPresentation;
+  /** The tool as called (`local_bash`), before a command rename; local-tool checks read it. */
+  sourceToolName: string | undefined;
   /** @see Sequenced */
   order: number;
 };
@@ -356,7 +365,7 @@ export function hasLangyActivity(message: PartsView): boolean {
   );
 }
 
-/** Failed calls are errors, never green "completed" activity rows. */
+/** The failed calls in a message: receipt rows tagged failed, or cards the reader acts on. */
 export const toFailedToolCalls = memoizeOnParts(readFailedToolCalls);
 
 function readFailedToolCalls(message: PartsView): FailedToolCall[] {
@@ -364,8 +373,11 @@ function readFailedToolCalls(message: PartsView): FailedToolCall[] {
   message.parts.forEach((rawPart, index) => {
     const part = rawPart as ToolPartLike;
     if (!renderedToolFailure(part)) return;
+    // A call the user's own Stop ended (a question, a local command) is no failed step.
+    if (isLangyCallStoppedText(part.errorText)) return;
     const name = partToolName(part);
     if (!name) return;
+    const sourceToolName = rawToolName(part);
     const described = describeToolCall({ name, input: part.input });
     const call: ToolCall = {
       toolCallId: part.toolCallId,
@@ -381,8 +393,9 @@ function readFailedToolCalls(message: PartsView): FailedToolCall[] {
       presentation: presentLangyToolError({
         title: described.title,
         errorText: part.errorText ?? part.output,
-        toolName: name,
+        toolName: sourceToolName,
       }),
+      sourceToolName,
       order: index,
     });
   });
@@ -437,9 +450,11 @@ function readActivityGroups(message: PartsView): ActivityGroup[] {
 
     // A tool call whose output is a staged proposal renders as a ProposalCard.
     if (isProposalOutput(part.output)) return;
-    // A failed call has its own red error card, including structured trace/log
-    // actions. It must never get the green checkmark of a completed activity.
-    if (renderedToolFailure(part)) return;
+    // A failed call is drawn from toFailedToolCalls, as a failed row of the receipt
+    // or its own card. It must never get the green checkmark of a completed activity.
+    // A call the user's own Stop ended stays an unfinished row, drawn interrupted once settled.
+    const stopped = isLangyCallStoppedText(part.errorText);
+    if (renderedToolFailure(part) && !stopped) return;
     // A call whose name maps to a capability is a CARD for its whole life —
     // the pending shell while it runs, the bespoke card once it settles. Only a
     // failed one falls back here (there is no result to draw, so raw JSON is
@@ -456,7 +471,7 @@ function readActivityGroups(message: PartsView): ActivityGroup[] {
     // says which skill and what it is for. Never "Coding", never "Skill".
     const described = describeToolCall({ name, input: part.input });
     const key = described.key;
-    const done = DONE_STATES.has(part.state ?? "");
+    const done = !stopped && DONE_STATES.has(part.state ?? "");
     const call: ToolCall = {
       toolCallId: part.toolCallId,
       name,
@@ -496,7 +511,8 @@ export function LangyToolActivity({
   message,
   reasoningTitles,
   live = true,
-  answeredAfter = false,
+  interrupted = false,
+  endsTheTurn = true,
 }: {
   message: UIMessage;
   /**
@@ -507,14 +523,17 @@ export function LangyToolActivity({
   /** @see LangyActivityParts */
   live?: boolean;
   /** @see LangyActivityParts */
-  answeredAfter?: boolean;
+  interrupted?: boolean;
+  /** @see LangyActivityParts */
+  endsTheTurn?: boolean;
 }) {
   return (
     <LangyActivityParts
       parts={message.parts}
       reasoningTitles={reasoningTitles}
       live={live}
-      answeredAfter={answeredAfter}
+      interrupted={interrupted}
+      endsTheTurn={endsTheTurn}
     />
   );
 }
@@ -527,16 +546,18 @@ export function LangyActivityParts({
   parts,
   reasoningTitles = [],
   live = true,
-  answeredAfter = false,
+  interrupted = false,
+  endsTheTurn = true,
 }: PartsView & {
   reasoningTitles?: string[];
   live?: boolean;
+  /** The reader pressed Stop. A stopped turn asks nothing of them, so failures stay folded. */
+  interrupted?: boolean;
   /**
-   * The turn wrote its reply in a LATER run than this one. A run holds only
-   * its own parts, so it cannot see the answer that followed it; the caller
-   * can. See the recovered-failure fold below.
+   * Nothing in the turn comes after these parts. A run holds only its own parts, so it
+   * cannot see a later run; the caller can. See {@link keepsItsCard}.
    */
-  answeredAfter?: boolean;
+  endsTheTurn?: boolean;
 }) {
   const [devMode] = useLangyDevMode();
   const turnProgress = useLangyStore((state) => state.turnProgress);
@@ -559,44 +580,46 @@ export function LangyActivityParts({
     return null;
   }
 
-  // While the turn is streaming, the action that finished LAST holds its ground as a
-  // settled card instead of folding into the receipt the instant its output lands — the
-  // reader is watching the model think about what that call returned.
-  const heldGroup = (() => {
-    if (turnPhase === "idle") return null;
-    if (runningGroups.length > 0 || pending.length > 0) return null;
-    if (allCompletedGroups.length === 0) return null;
-    const latest = allCompletedGroups.reduce((left, right) =>
-      right.lastOrder > left.lastOrder ? right : left,
-    );
-    const supersededAt = Math.max(
-      lastAnswerTextIndex(view),
-      ...capabilityCalls.map((entry) => entry.order),
-      ...failures.map((failure) => failure.order),
-    );
-    return latest.lastOrder > supersededAt ? latest : null;
-  })();
+  const busy = runningGroups.length > 0 || pending.length > 0;
+  const heldGroup = heldGroupOf({
+    view,
+    held: turnPhase !== "idle" && !busy,
+    completed: allCompletedGroups,
+    later: [...capabilityCalls, ...failures],
+  });
   const completedGroups = heldGroup
     ? allCompletedGroups.filter((group) => group !== heldGroup)
     : allCompletedGroups;
+  const { failureCards, foldedFailures } = partitionFailures({
+    failures,
+    live,
+    interrupted,
+    lastStep: endsTheTurn ? lastStepIndex(view) : -1,
+  });
+  const heldFailure = heldFailureOf({
+    view,
+    held: live && !interrupted && !busy,
+    folded: foldedFailures,
+    later: [
+      ...allCompletedGroups.map((group) => ({ order: group.lastOrder })),
+      ...capabilityCalls,
+      ...failureCards,
+    ],
+  });
+  const receiptFailures = heldFailure
+    ? foldedFailures.filter((failure) => failure !== heldFailure)
+    : foldedFailures;
+  const receiptOrders = [
+    ...completedGroups.map((group) => group.order),
+    ...receiptFailures.map((failure) => failure.order),
+  ];
 
   // One ordered transcript, a stable sort on the part each block came from (see {@link Sequenced}).
-  // A step that failed and was followed by the turn's own reply is folded to one line that opens
-  // into the same card, since nothing is hidden. A turn still running, or one that never replied,
-  // keeps its failures where they are.
-  const answerIndex = lastAnswerTextIndex(view);
   const rows: { key: string; order: number; node: ReactNode }[] = [
-    ...failures.map(({ id, call, presentation, order }) => ({
+    ...failureCards.map(({ id, call, presentation, order }) => ({
       key: `failure:${id}`,
       order,
-      node: (
-        <FailedToolCallRow
-          call={call}
-          presentation={presentation}
-          devMode={devMode}
-          recovered={!live && (answeredAfter || answerIndex > order)}
-        />
-      ),
+      node: <FailedToolCallRow call={call} presentation={presentation} devMode={devMode} />,
     })),
     ...runningGroups.map((group) => ({
       key: `running:${group.key}`,
@@ -608,15 +631,20 @@ export function LangyActivityParts({
       ),
     })),
     // Finished work has ONE shape, whatever the count.
-    ...(completedGroups.length > 0
+    ...(receiptOrders.length > 0
       ? [
           {
             key: "completed-batch",
             // The receipt stands where the first step it summarises ran.
-            order: Math.min(...completedGroups.map((group) => group.order)),
+            order: Math.min(...receiptOrders),
             node: (
               <CompletedActivityBatch
                 groups={completedGroups}
+                heldGroups={heldGroup ? [heldGroup] : []}
+                failures={receiptFailures}
+                heldFailures={heldFailure ? [heldFailure] : []}
+                cardSteps={capabilityCalls.length}
+                runningSteps={live && !interrupted ? runningGroups.length + pending.length : 0}
                 reasoningTitles={reasoningTitles}
                 devMode={devMode}
               />
@@ -632,6 +660,19 @@ export function LangyActivityParts({
             node: (
               <VStack align="stretch" gap={2} as="ul">
                 <LatestSettledActivityCard group={heldGroup} devMode={devMode} />
+              </VStack>
+            ),
+          },
+        ]
+      : []),
+    ...(heldFailure
+      ? [
+          {
+            key: `held-failure:${heldFailure.id}`,
+            order: heldFailure.order,
+            node: (
+              <VStack align="stretch" gap={0} as="ul">
+                <FailedActivityRow failure={heldFailure} devMode={devMode} />
               </VStack>
             ),
           },
@@ -671,15 +712,125 @@ export function LangyActivityParts({
 }
 
 /**
+ * While the turn is streaming, the action that finished LAST holds its ground as a settled
+ * card instead of folding into the receipt the instant its output lands: the reader is
+ * watching the model think about what that call returned.
+ */
+function heldGroupOf({
+  view,
+  held,
+  completed,
+  later,
+}: {
+  view: PartsView;
+  held: boolean;
+  completed: ActivityGroup[];
+  /** Settled blocks that would supersede the group if they came after it. */
+  later: Sequenced[];
+}): ActivityGroup | null {
+  if (!held || completed.length === 0) return null;
+  const latest = completed.reduce((left, right) =>
+    right.lastOrder > left.lastOrder ? right : left,
+  );
+  const supersededAt = Math.max(lastAnswerTextIndex(view), ...later.map((entry) => entry.order));
+  return latest.lastOrder > supersededAt ? latest : null;
+}
+
+/**
+ * The newest folded failure holds its ground as one quiet line, like the held success,
+ * until the next step starts.
+ */
+function heldFailureOf({
+  view,
+  held,
+  folded,
+  later,
+}: {
+  view: PartsView;
+  held: boolean;
+  folded: FailedToolCall[];
+  later: Sequenced[];
+}): FailedToolCall | null {
+  const newest = folded.at(-1);
+  if (!held || !newest) return null;
+  const supersededAt = Math.max(lastAnswerTextIndex(view), ...later.map((entry) => entry.order));
+  return newest.order > supersededAt ? newest : null;
+}
+
+/** Split the failures into the cards that stay in the conversation and the receipt rows. */
+function partitionFailures({
+  failures,
+  live,
+  interrupted,
+  lastStep,
+}: {
+  failures: FailedToolCall[];
+  live: boolean;
+  interrupted: boolean;
+  lastStep: number;
+}): { failureCards: FailedToolCall[]; foldedFailures: FailedToolCall[] } {
+  const failureCards: FailedToolCall[] = [];
+  const foldedFailures: FailedToolCall[] = [];
+  for (const failure of failures) {
+    const isLastStep = failure.order === lastStep;
+    const keep = keepsItsCard({ failure, live, interrupted, isLastStep });
+    (keep ? failureCards : foldedFailures).push(failure);
+  }
+  return { failureCards, foldedFailures };
+}
+
+/**
+ * Whether a failed step stays a card in the conversation rather than a row of the receipt:
+ * only when the reader has to act. A denied permission, a decision the card offers, access
+ * refused or an app not connected, or the step a settled, unstopped turn ended on.
+ */
+function keepsItsCard({
+  failure,
+  live,
+  interrupted,
+  isLastStep,
+}: {
+  failure: FailedToolCall;
+  live: boolean;
+  interrupted: boolean;
+  isLastStep: boolean;
+}): boolean {
+  if (failure.call.state === "output-denied") return true;
+  if (readerMustAct({ presentation: failure.presentation, toolName: failure.sourceToolName }))
+    return true;
+  if (isReaderDecision({ call: failure.call, presentation: failure.presentation })) return true;
+  if (live || interrupted) return false;
+  return isLastStep;
+}
+
+/**
  * The implementation trail is one receipt, not one card per mechanism. Hover
  * previews it; click pins it open for touch/keyboard users.
  */
 function CompletedActivityBatch({
   groups,
+  heldGroups = [],
+  failures,
+  heldFailures = [],
+  cardSteps = 0,
+  runningSteps = 0,
   reasoningTitles = [],
   devMode,
 }: {
   groups: ActivityGroup[];
+  /**
+   * Steps that worked but stand beside the receipt as the turn's latest card; the header
+   * still counts them.
+   */
+  heldGroups?: ActivityGroup[];
+  /** Failed steps the turn worked past, listed among the steps that worked. */
+  failures: FailedToolCall[];
+  /** The newest failure, standing beside the receipt as one line; the header still counts it. */
+  heldFailures?: FailedToolCall[];
+  /** Capability calls that rendered as their own cards: steps that worked, outside the receipt. */
+  cardSteps?: number;
+  /** Steps still running: not failed, so the turn is not all failures yet. */
+  runningSteps?: number;
   /** The turn's folded thinking steps — rows of the receipt, expanded only. */
   reasoningTitles?: string[];
   devMode: boolean;
@@ -688,21 +839,54 @@ function CompletedActivityBatch({
   // visible by default so a seven-step dataset/evaluation flow cannot look like
   // it silently skipped three calls on touchscreens or keyboard navigation.
   const [open, setOpen] = useState(true);
-  const userToggled = useRef(false);
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      if (!userToggled.current) setOpen(false);
+  const pinned = useRef(false);
+  const closeTimer = useRef<number | undefined>(undefined);
+  const pauseClose = () => window.clearTimeout(closeTimer.current);
+  const scheduleClose = () => {
+    pauseClose();
+    closeTimer.current = window.setTimeout(() => {
+      if (!pinned.current) setOpen(false);
     }, 2200);
-    return () => window.clearTimeout(timer);
+  };
+  useEffect(() => {
+    scheduleClose();
+    return pauseClose;
   }, []);
-  const callCount = groups.reduce((count, group) => count + group.calls.length, 0);
+  // A pointer passing over only pauses the close; a click or focus means it is being read.
+  const pin = () => {
+    pinned.current = true;
+    pauseClose();
+  };
+  const failedCount = failures.length + heldFailures.length;
+  const worked = [...groups, ...heldGroups];
+  const callCount = worked.reduce(
+    (count, group) => count + group.calls.length,
+    failedCount + cardSteps,
+  );
+  const steps = [
+    ...groups.map((group) => ({
+      order: group.order,
+      node: <CompletedActivityRow key={`group:${group.key}`} group={group} devMode={devMode} />,
+    })),
+    ...failures.map((failure) => ({
+      order: failure.order,
+      node: <FailedActivityRow key={`failure:${failure.id}`} failure={failure} devMode={devMode} />,
+    })),
+  ].toSorted((left, right) => left.order - right.order);
 
   return (
     // The summary is the CARD; the steps it summarises hang beneath it. A
     // border wrapping both was tried and reverted — the receipt reads better
     // as a compact row you can expand than as a box that grows a list inside
     // itself.
-    <VStack align="stretch" gap={2}>
+    <VStack
+      align="stretch"
+      gap={2}
+      onPointerEnter={pauseClose}
+      onPointerLeave={scheduleClose}
+      onFocusCapture={pin}
+      onClickCapture={pin}
+    >
       <chakra.button
         type="button"
         width="full"
@@ -715,31 +899,16 @@ function CompletedActivityBatch({
         textAlign="left"
         cursor="pointer"
         aria-expanded={open}
-        onClick={() => {
-          userToggled.current = true;
-          setOpen((value) => !value);
-        }}
+        onClick={() => setOpen((value) => !value)}
         _hover={{ borderColor: "border.emphasized" }}
       >
-        <HStack gap={2}>
-          <Box color="green.fg" display="flex" flexShrink={0}>
-            <Check size={11} />
-          </Box>
-          <Text textStyle="xs" fontWeight="560" color="fg" flex={1} truncate>
-            {groups.length} {groups.length === 1 ? "action" : "actions"} completed
-          </Text>
-          <Text textStyle="2xs" color="fg.subtle">
-            {callCount} {callCount === 1 ? "tool call" : "tool calls"}
-          </Text>
-          <Box
-            color="fg.subtle"
-            display="flex"
-            transform={open ? "rotate(90deg)" : undefined}
-            transition="transform 150ms ease"
-          >
-            <ChevronRight size={12} />
-          </Box>
-        </HStack>
+        <ReceiptHeader
+          actionCount={worked.length + cardSteps}
+          runningCount={runningSteps}
+          callCount={callCount}
+          failedCount={failedCount}
+          open={open}
+        />
       </chakra.button>
       {open ? (
         <VStack
@@ -752,10 +921,9 @@ function CompletedActivityBatch({
           borderLeftWidth="1px"
           borderColor="border.muted"
           as="ul"
+          aria-label="Finished steps"
         >
-          {groups.map((group) => (
-            <CompletedActivityRow key={group.key} group={group} devMode={devMode} />
-          ))}
+          {steps.map((step) => step.node)}
           {/* The thinking steps the model narrated between calls — part of the
               turn's process record, so they live in the same receipt as the
               actions they punctuated, quieter (they claim thought, not work). */}
@@ -780,38 +948,175 @@ function CompletedActivityBatch({
 }
 
 /**
+ * The receipt's summary line. Failures are counted in the same quiet grey as the calls,
+ * never red; a receipt of only failures says so and drops the green check.
+ */
+function ReceiptHeader({
+  actionCount,
+  runningCount,
+  callCount,
+  failedCount,
+  open,
+}: {
+  actionCount: number;
+  runningCount: number;
+  callCount: number;
+  failedCount: number;
+  open: boolean;
+}) {
+  const plural = (count: number) => (count === 1 ? "action" : "actions");
+  const allFailed = actionCount === 0 && runningCount === 0;
+  const title = (() => {
+    if (allFailed) return `${failedCount} ${plural(failedCount)} failed`;
+    if (actionCount === 0) return "Working";
+    return `${actionCount} ${plural(actionCount)} completed`;
+  })();
+  const calls = `${callCount} ${callCount === 1 ? "tool call" : "tool calls"}`;
+  return (
+    <HStack gap={2}>
+      <Box color={actionCount === 0 ? "fg.subtle" : "green.fg"} display="flex" flexShrink={0}>
+        {actionCount === 0 ? <AlertCircle size={11} aria-hidden="true" /> : <Check size={11} />}
+      </Box>
+      <Text textStyle="xs" fontWeight="560" color="fg" flex={1} truncate>
+        {title}
+      </Text>
+      {allFailed ? null : (
+        <Text textStyle="2xs" color="fg.subtle">
+          {failedCount > 0 ? `${calls}, ${failedCount} failed` : calls}
+        </Text>
+      )}
+      <Box
+        color="fg.subtle"
+        display="flex"
+        transform={open ? "rotate(90deg)" : undefined}
+        transition="transform 150ms ease"
+      >
+        <ChevronRight size={12} />
+      </Box>
+    </HStack>
+  );
+}
+
+/**
  * One finished step inside the receipt.
  */
 function CompletedActivityRow({ group, devMode }: { group: ActivityGroup; devMode: boolean }) {
-  const [jsonOpen, setJsonOpen] = useState(false);
-  const [resultOpen, setResultOpen] = useState(false);
   // The receipt names what ran; the result is what the model actually read,
   // and "why did it conclude that?" is unanswerable without it. Only rows
   // with a recorded result open — an empty disclosure would promise
   // something the record does not hold.
   const callsWithResult = group.calls.filter((call) => toolResultText(call) !== null);
-  const canOpenResult = callsWithResult.length > 0;
 
-  // Spans, not the default paragraph: the disclosure below wraps these in a
-  // native <button>, which may hold phrasing content only.
-  const label = (
+  return (
+    <ReceiptRow
+      label={<ReceiptRowLabel color="fg">{completedActivityLabel(group.label)}</ReceiptRowLabel>}
+      detail={group.detail}
+      opened={
+        callsWithResult.length > 0
+          ? callsWithResult.map((call, index) => (
+              <OpenedToolCall key={call.toolCallId ?? index} call={call} />
+            ))
+          : null
+      }
+      rawCalls={group.calls}
+      devMode={devMode}
+    />
+  );
+}
+
+/**
+ * A failed step inside the receipt: the same past-tense line as a step that worked,
+ * tagged "failed", opening into the command, its error text and the links it carries.
+ */
+function FailedActivityRow({ failure, devMode }: { failure: FailedToolCall; devMode: boolean }) {
+  const { call, presentation } = failure;
+  const described = describeToolCall({ name: call.name, input: call.input });
+  const { message, detail } = presentation;
+  // Copy the raw block already carries (a plain error's own text) is not said twice. The block
+  // shows the failure without colour codes, so it agrees with the presentation's raw.
+  const raw = presentation.raw ?? toolResultText(call) ?? "";
+  const messageIsNew = !raw.includes(message);
+  const detailIsNew = detail === undefined || !raw.includes(detail);
+  const explainsBeyondRaw = messageIsNew && detailIsNew;
+
+  return (
+    <ReceiptRow
+      label={
+        <Box as="span" display="flex" alignItems="center" gap={1.5} flex={1} minWidth={0}>
+          <ReceiptRowLabel color="fg.muted">
+            {completedActivityLabel(described.title)}
+          </ReceiptRowLabel>
+          <Text as="span" textStyle="2xs" color="fg.subtle" flexShrink={0}>
+            failed
+          </Text>
+        </Box>
+      }
+      detail={described.detail}
+      opened={
+        <>
+          {explainsBeyondRaw ? (
+            <Text textStyle="2xs" color="fg.muted">
+              {presentation.message}
+              {presentation.detail ? ` ${presentation.detail}` : ""}
+            </Text>
+          ) : null}
+          <OpenedToolCall call={call} />
+          {presentation.code ? <LangyFailureReference code={presentation.code} /> : null}
+          {hasToolErrorActions(presentation) ? (
+            <LangyToolErrorActions presentation={presentation} />
+          ) : null}
+        </>
+      }
+      rawCalls={[call]}
+      devMode={devMode}
+    />
+  );
+}
+
+/**
+ * The label of a receipt row. A span, not the default paragraph: the disclosure wraps it
+ * in a native <button>, which may hold phrasing content only.
+ */
+function ReceiptRowLabel({ color, children }: { color: string; children: ReactNode }) {
+  return (
     <Text
       as="span"
       display="block"
       textStyle="xs"
-      color="fg"
+      color={color}
       fontWeight="520"
       flex={1}
       // Without this the label wraps to a second line and the row grows,
-      // while the detail beside it truncates — the two halves of one row
-      // disagreeing about how to run out of space.
+      // while the detail beside it truncates.
       minWidth={0}
       truncate
     >
-      {completedActivityLabel(group.label)}
+      {children}
     </Text>
   );
-  const detail = group.detail ? (
+}
+
+/**
+ * The shell every receipt row shares: the label and its mono detail, opening into what the
+ * step returned when there is anything to open, and dev mode's raw payload beside it.
+ */
+function ReceiptRow({
+  label,
+  detail,
+  opened,
+  rawCalls,
+  devMode,
+}: {
+  label: ReactNode;
+  detail?: string;
+  /** What opening the row shows; null when the record holds nothing to show. */
+  opened: ReactNode | null;
+  rawCalls: ToolCall[];
+  devMode: boolean;
+}) {
+  const [jsonOpen, setJsonOpen] = useState(false);
+  const [resultOpen, setResultOpen] = useState(false);
+  const detailText = detail ? (
     <Text
       as="span"
       display="block"
@@ -821,42 +1126,40 @@ function CompletedActivityRow({ group, devMode }: { group: ActivityGroup; devMod
       maxWidth="52%"
       truncate
     >
-      {group.detail}
+      {detail}
     </Text>
   ) : null;
 
   return (
     <VStack align="stretch" gap={1} as="li">
       <HStack gap={2} paddingY={1.5}>
-        {canOpenResult ? (
+        {opened ? (
           <ResultDisclosureButton
             isExpanded={resultOpen}
             onToggle={() => setResultOpen((value) => !value)}
           >
             {label}
             {/* The truncated command gives way to the full one below it. */}
-            {resultOpen ? null : detail}
+            {resultOpen ? null : detailText}
           </ResultDisclosureButton>
         ) : (
           <>
             {label}
-            {detail}
+            {detailText}
           </>
         )}
         {devMode ? (
           <RawDataToggle isOpen={jsonOpen} onToggle={() => setJsonOpen((value) => !value)} />
         ) : null}
       </HStack>
-      {resultOpen ? (
+      {opened && resultOpen ? (
         <VStack align="stretch" gap={1.5} paddingBottom={1.5}>
-          {callsWithResult.map((call, index) => (
-            <OpenedToolCall key={call.toolCallId ?? index} call={call} />
-          ))}
+          {opened}
         </VStack>
       ) : null}
       {devMode && jsonOpen ? (
         <VStack align="stretch" gap={1} paddingBottom={1.5}>
-          {group.calls.map((call, index) => (
+          {rawCalls.map((call, index) => (
             <RawCallJson key={call.toolCallId ?? index} call={call} />
           ))}
         </VStack>
@@ -938,6 +1241,14 @@ function RawDataToggle({ isOpen, onToggle }: { isOpen: boolean; onToggle: () => 
  * withhold the disclosure, not to render "nothing".
  */
 function toolResultText(call: ToolCall): string | null {
+  const text = readToolResultText(call);
+  return text === null ? null : text.replace(ANSI_COLOUR, "");
+}
+
+/** Terminal colour codes: the same strip the failure presentation applies to its raw text. */
+const ANSI_COLOUR = /\p{Cc}\[[0-9;]*m/gu;
+
+function readToolResultText(call: ToolCall): string | null {
   if (call.errorText) return call.errorText;
   const raw = call.output;
   if (raw === undefined || raw === null) return null;
@@ -1142,24 +1453,12 @@ function FailedToolCallRow({
   call,
   presentation,
   devMode,
-  recovered = false,
 }: {
   call: ToolCall;
   presentation: LangyToolErrorPresentation;
   devMode: boolean;
-  /**
-   * The turn went on to answer after this step failed. The card folds to one
-   * line, which opens into the same card — a recovered step is process record,
-   * and the turn's own reply is the account of what happened.
-   */
-  recovered?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  // A decision the reader can make is never folded: its card is the way to
-  // make it (LangyFailedStepCard).
-  if (recovered && !isReaderDecision({ call, presentation })) {
-    return <RecoveredToolFailureRow presentation={presentation} />;
-  }
   return (
     <VStack align="stretch" gap={1}>
       <Box position="relative">
@@ -1171,44 +1470,6 @@ function FailedToolCallRow({
         ) : null}
       </Box>
       {devMode && open ? <RawCallJson call={call} /> : null}
-    </VStack>
-  );
-}
-
-/**
- * A step that failed and that the turn recovered from, folded to one line — quiet, not gone,
- * one click from the same card, no longer competing with the answer.
- */
-function RecoveredToolFailureRow({ presentation }: { presentation: LangyToolErrorPresentation }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <VStack align="stretch" gap={2}>
-      <chakra.button
-        type="button"
-        width="full"
-        textAlign="left"
-        cursor="pointer"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <HStack gap={2}>
-          <Box color="fg.subtle" display="flex" flexShrink={0}>
-            <AlertCircle size={11} aria-hidden="true" />
-          </Box>
-          <Text textStyle="xs" color="fg.subtle" flex={1} truncate>
-            {presentation.title}, and Langy carried on
-          </Text>
-          <Box
-            color="fg.subtle"
-            display="flex"
-            transform={open ? "rotate(90deg)" : undefined}
-            transition="transform 150ms ease"
-          >
-            <ChevronRight size={12} />
-          </Box>
-        </HStack>
-      </chakra.button>
-      {open ? <LangyToolErrorCard presentation={presentation} /> : null}
     </VStack>
   );
 }
@@ -1293,19 +1554,26 @@ function groupCategory(group: ActivityGroup): string {
   }
 }
 
-/**
- * One RUNNING activity group, as a CARD.
- */
+/** A text part that says something: the turn's own answer prose. */
+function isAnswerText(part: unknown): boolean {
+  const candidate = part as { type?: string; text?: string } | null;
+  return (
+    candidate?.type === "text" &&
+    typeof candidate.text === "string" &&
+    candidate.text.trim().length > 0
+  );
+}
+
+/** The index of the last answer text in the parts, or -1. */
 function lastAnswerTextIndex(view: PartsView): number {
-  let last = -1;
-  view.parts.forEach((part, index) => {
-    const candidate = part as { type?: string; text?: string };
-    const carriesText = typeof candidate.text === "string" && candidate.text.trim().length > 0;
-    if (candidate?.type === "text" && carriesText) {
-      last = index;
-    }
-  });
-  return last;
+  return view.parts.findLastIndex(isAnswerText);
+}
+
+/** The index of the last step the parts took, a tool call or answer text, or -1. */
+function lastStepIndex(view: PartsView): number {
+  return view.parts.findLastIndex(
+    (part) => isAnswerText(part) || partToolName(part as ToolPartLike) !== undefined,
+  );
 }
 
 /**

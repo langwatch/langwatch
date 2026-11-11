@@ -177,6 +177,64 @@ describe("applyJq", () => {
     expect(applyJq(".data[] | .slug", data)).toEqual(applyJq(".data[].slug", data));
   });
 
+  it("says the value is null when iterating null, and points to the shell", () => {
+    expect(() => applyJq(".a[]", { a: null })).toThrow(/it is null/);
+    expect(() => applyJq(".a[]", { a: null })).toThrow(/real `jq`/);
+  });
+
+  it("names the type of a scalar that is iterated", () => {
+    expect(() => applyJq(".a[]", { a: "x" })).toThrow(/it is a string/);
+  });
+
+  it("names the type of a scalar that is indexed", () => {
+    expect(() => applyJq(".a[0]", { a: 42 })).toThrow(/indexes a value that is not an array/);
+    expect(() => applyJq(".a[0]", { a: 42 })).toThrow(/it is a number/);
+  });
+
+  /** @scenario "Iterating a value that is not a list says what the value is and where a list is" */
+  it("lists the keys of an iterated object and the path to the key that holds a list", () => {
+    const data = { data: { items: [1], total: 3 } };
+
+    expect(() => applyJq(".data[]", data)).toThrow(/keys: items, total/);
+    expect(() => applyJq(".data[]", data)).toThrow(/try \.data\.items\[\]/);
+  });
+
+  it("suggests the list path when an object is indexed, too", () => {
+    expect(() => applyJq(".data[0]", { data: { items: [1] } })).toThrow(/try \.data\.items\[\]/);
+  });
+
+  it("never suggests a key the subset cannot spell", () => {
+    expect(() => applyJq(".data[]", { data: { "my key": [1] } })).toThrow(/keys: my key/);
+    expect(() => applyJq(".data[]", { data: { "my key": [1] } })).not.toThrow(/try /);
+  });
+
+  it("names an empty object as empty", () => {
+    expect(() => applyJq(".a[]", { a: {} })).toThrow(/it is an empty object/);
+  });
+
+  it("suggests at most three list paths", () => {
+    const data = { data: { a: [1], b: [1], c: [1], d: [1] } };
+
+    expect(() => applyJq(".data[]", data)).toThrow(
+      /try \.data\.a\[\], \.data\.b\[\], \.data\.c\[\]\./,
+    );
+    expect(() => applyJq(".data[]", data)).not.toThrow(/\.data\.d\[\]/);
+  });
+
+  it("gives no path hint when no key of the object holds a list", () => {
+    const data = { data: { a: 1, b: "two" } };
+
+    expect(() => applyJq(".data[]", data)).toThrow(/keys: a, b/);
+    expect(() => applyJq(".data[]", data)).not.toThrow(/try /);
+  });
+
+  it("names at most five keys and never leaks a value", () => {
+    const data = { d: { k1: "secretvalue", k2: 1, k3: 1, k4: 1, k5: 1, k6: 1, k7: 1 } };
+
+    expect(() => applyJq(".d[]", data)).toThrow(/keys: k1, k2, k3, k4, k5, …/);
+    expect(() => applyJq(".d[]", data)).not.toThrow(/secretvalue|k6/);
+  });
+
   /** @scenario "A pipe into a path on a single value reads that value" */
   it("pipes into a path on a single value, with no iteration to spread over", () => {
     expect(applyJq(".meta | .name", { meta: { name: "langwatch" } })).toBe("langwatch");

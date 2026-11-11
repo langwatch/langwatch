@@ -33,7 +33,6 @@ export function ServiceProviderSection({
   deploymentSignIn?: { name: string; redirectUrl: string } | null;
 }) {
   const rows = serviceProviderRowsFor({ protocol, addresses });
-  const one = rows.length === 1;
 
   return (
     <Card
@@ -43,14 +42,12 @@ export function ServiceProviderSection({
       data-testid="service-provider"
     >
       <Text color="fg.muted" fontSize="sm" maxWidth="72ch">
-        {one
-          ? "Create an application there and give it this address. It is ours and it does not change."
-          : "Create an application there and give it these values. They are ours and they do not change."}
+        Create an application there and give it these values. They are ours and they do not change.
         {!connected && (
           <>
             {" "}
             The part shown as <InlineCode>{SERVICE_PROVIDER_PLACEHOLDER}</InlineCode> is filled in
-            once you register below, so come back for the finished {one ? "address" : "addresses"}.
+            once you register below, so come back for the finished addresses.
           </>
         )}
       </Text>

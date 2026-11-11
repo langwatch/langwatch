@@ -1,3 +1,4 @@
+import { isLangyCallStoppedText } from "@langwatch/langy-contract";
 import { memorySessionState } from "@langwatch/process-stores";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 /**
@@ -227,6 +228,23 @@ describe("given a folder connected to the conversation", () => {
         outcome: "polled",
         answer: { state: "done", ok: false, error: { code: "cancelled" } },
       });
+    });
+
+    /** @scenario A command I stopped reads as stopped, not as failed */
+    it("settles with text the browser reads as the user's own stop", async () => {
+      const call = await dispatcher.start({
+        projectId,
+        conversationId,
+        turnId,
+        call: { tool: "local_bash", params: { command: "pnpm build" } },
+        timeoutMs: 60_000,
+      });
+
+      await dispatcher.cancel({ callId: call.callId });
+
+      const poll = await dispatcher.poll({ callId: call.callId, holdMs: 0 });
+      const error = poll.outcome === "polled" ? poll.answer.error : undefined;
+      expect(isLangyCallStoppedText(`${error?.code}: ${error?.message}`)).toBe(true);
     });
 
     it("cancels a second time without contradicting the first answer", async () => {

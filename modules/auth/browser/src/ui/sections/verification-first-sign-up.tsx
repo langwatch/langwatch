@@ -309,7 +309,7 @@ export function VerificationFirstSignUp() {
 
   const dialFederated = (method: SignInMethod) => {
     rememberPendingMethod(method);
-    void signIn(method.id, {
+    return signIn(method.id, {
       callbackUrl: callbackUrl ?? JOIN_BEFORE_CREATE_PATH,
       // The routed address prefills the provider's screen as the OIDC login hint.
       loginHint: routedEmail?.trim() || undefined,

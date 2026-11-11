@@ -4,7 +4,7 @@
  * reads the same names as types — the mounted namespace, never respelled.
  */
 
-// `create` and `mintDocsSessionKey` are the only procedures that return a plaintext
+// `create`, `rotate` and `mintDocsSessionKey` are the only procedures that return a plaintext
 // token — once, at minting; every read hands back a five-character `lookupIdPrefix` and
 // nothing more. `nameById` answers null identically for an unknown id and one
 // in another organization, so it cannot enumerate. `orgProjects` / `orgTeams`
@@ -19,6 +19,7 @@ import {
   apiKeyTrpcNameByIdInputSchema,
   apiKeyTrpcOrganizationScopeSchema,
   apiKeyTrpcRevokeInputSchema,
+  apiKeyTrpcRotateInputSchema,
   apiKeyTrpcUpdateInputSchema,
 } from "./api-key-trpc.schemas.ts";
 import {
@@ -65,6 +66,11 @@ export const apiKeyTrpc = defineTrpcContract("apiKey")
   .mutation("revoke")
   .withInput(apiKeyTrpcRevokeInputSchema)
   .withOutput(apiKeyRevokedSchema)
+
+  // Swaps the key's secret and answers the new token once; the old secret stops at once.
+  .mutation("rotate")
+  .withInput(apiKeyTrpcRotateInputSchema)
+  .withOutput(apiKeyMintedSchema)
 
   .query("orgProjects")
   .withInput(apiKeyTrpcOrganizationScopeSchema)

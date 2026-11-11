@@ -113,6 +113,7 @@ export class InstantEvalJudgeModule implements InstantEvalJudgeApi {
       repositories: setup.repositories,
       classifier,
       decisionModels,
+      spend: setup.channels.spend,
       limiter,
       isCloud: isLangWatchJudgeHost(setup.config),
       recordSpendPriced: async (fact) => {

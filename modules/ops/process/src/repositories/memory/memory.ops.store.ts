@@ -7,6 +7,7 @@ import {
   type LiveSnapshot,
   type ReplayHistoryEntry,
   type ReplayStatus,
+  type SeatSharingCheck,
   type SelfHostedNotice,
 } from "@langwatch/ops-contract";
 
@@ -75,6 +76,8 @@ export class MemoryOpsStore {
   /** Per ClickHouse endpoint, the last storage reading and the last backup it saw. */
   readonly cloudLatestRelease: CloudLatestRelease[] = [];
   readonly cloudNotices: SelfHostedNotice[] = [];
+  /** The last seat sharing check, at most one. */
+  readonly seatSharingChecks: SeatSharingCheck[] = [];
   readonly storageReadings = new Map<string, Omit<StorageStatsReading, "lastBackup">>();
   readonly storageLastBackups = new Map<string, NonNullable<StorageStatsReading["lastBackup"]>>();
   /** The published snapshots and the writer lease over them; a lease here never lapses. */

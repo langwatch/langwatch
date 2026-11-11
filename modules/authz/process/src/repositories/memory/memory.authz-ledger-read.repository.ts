@@ -1,6 +1,8 @@
 import { grantConditionSchema } from "@langwatch/authorization";
 import { type AuthzSharedProjectGrant, OffboardIncompleteError } from "@langwatch/authz-contract";
+import { isFullMember } from "@langwatch/entitlement-contract";
 import type { Instant } from "@langwatch/time";
+import { z } from "zod";
 
 import {
   AuthzLedgerReadRepository,
@@ -60,6 +62,8 @@ function directoryRow(row: AuthzMemoryGrantRow): LedgerDirectoryGrantRow {
     revokedAt: row.revokedAt,
   };
 }
+
+const permissionsSchema = z.array(z.string());
 
 /** The ledger's reads over the memory Grant and Role heads, with the Prisma queries' filters. */
 export class MemoryAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
@@ -309,10 +313,12 @@ export class MemoryAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
     legacyTeamMemberships: number;
     pendingInvites: number;
     organizationMembership: boolean;
+    heldFullSeat: boolean;
   }> {
     const { memory } = this;
     const restore = this.snapshot();
     try {
+      const heldFullSeat = this.heldFullSeat({ organizationId, userId });
       const organizationMembership = memory.memberships.delete(
         memory.membershipKey(organizationId, userId),
       );
@@ -360,11 +366,40 @@ export class MemoryAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
         legacyTeamMemberships,
         pendingInvites,
         organizationMembership,
+        heldFullSeat,
       };
     } catch (error) {
       restore();
       throw error;
     }
+  }
+
+  /** Classified as the Postgres twin does: an active seat's role, an external's team roles. */
+  private heldFullSeat({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): boolean {
+    const { memory } = this;
+    const membership = memory.memberships.get(memory.membershipKey(organizationId, userId));
+    if (!membership || membership.disabled) return false;
+    const customRoleIds = new Set(
+      memory.bindings
+        .filter(
+          (row) =>
+            row.organizationId === organizationId &&
+            row.userId === userId &&
+            row.scopeType === "TEAM" &&
+            row.customRoleId !== null,
+        )
+        .map((row) => row.customRoleId),
+    );
+    const permissions = memory.roles
+      .filter((role) => role.organizationId === organizationId && customRoleIds.has(role.id))
+      .flatMap((role) => permissionsSchema.safeParse(role.permissions).data ?? []);
+    return isFullMember(membership.role, permissions.length > 0 ? permissions : undefined);
   }
 
   /** The rows the offboarding transaction deletes, as they were before it began. */

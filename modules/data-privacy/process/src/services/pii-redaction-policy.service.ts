@@ -30,6 +30,11 @@ export type PIICheckOptions = {
   exceptPatterns?: readonly string[];
   /** The tenant the batch belongs to, when the path has one. */
   projectId?: string;
+  /**
+   * The PII level of the tenant's resolved policy, absent when none was resolved. Only a
+   * resolved strict level may reach the PII redaction model.
+   */
+  resolvedPiiLevel?: PiiLevel;
 };
 
 /**
@@ -109,7 +114,8 @@ const batchClearPII = async ({
   options: PIICheckOptions;
   spareNamesAndPlaces: readonly boolean[];
 }): Promise<(string | null)[]> => {
-  const { piiRedactionLevel, mainMethod, entities, exceptPatterns, projectId } = options;
+  const { piiRedactionLevel, mainMethod, entities, exceptPatterns, projectId, resolvedPiiLevel } =
+    options;
 
   if (mainMethod === "google_dlp") {
     return runGoogleDlpBatch({
@@ -127,6 +133,7 @@ const batchClearPII = async ({
       piiRedactionLevel,
       entities,
       projectId,
+      resolvedPiiLevel,
       spareNamesAndPlaces,
     });
   } catch {
@@ -343,11 +350,13 @@ export class PiiRedactionPolicyService {
     entities,
     exceptPatterns,
     projectId,
+    resolvedPiiLevel,
   }: {
     piiRedactionLevel: PIIRedactionLevel;
     entities?: readonly string[] | undefined;
     exceptPatterns?: readonly string[] | undefined;
     projectId?: string | undefined;
+    resolvedPiiLevel?: PiiLevel | undefined;
   }): Promise<RedactionOptions> {
     const disabled = this.deps.featureFlags
       ? await this.deps.featureFlags.isEnabled("ops_pii_strict_presidio_redaction_disabled", {
@@ -381,6 +390,7 @@ export class PiiRedactionPolicyService {
         ...(entities && entities.length > 0 ? { entities } : {}),
         ...(exceptPatterns && exceptPatterns.length > 0 ? { exceptPatterns } : {}),
         ...(projectId ? { projectId } : {}),
+        ...(resolvedPiiLevel ? { resolvedPiiLevel } : {}),
       },
     };
   }

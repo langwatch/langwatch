@@ -106,6 +106,7 @@ async function facetsFor({
   const facets = await service.getFacets({
     authorization,
     timeRange: window,
+    filterKey: query,
     filterFor: createFacetFilterResolver({
       queryText: query,
       compile: (text) =>
@@ -295,6 +296,61 @@ describe("the sidebar's facet counts", () => {
 
       for (const call of calls.batched) expect(call.timeRange).toEqual(live);
       for (const call of calls.categorical) expect(call.timeRange).toEqual(live);
+    });
+  });
+
+  describe("given the same request arrives again while the first is still counting", () => {
+    function sharedService() {
+      const { repository, calls } = recordingRepository();
+      const service = TraceListService.create({
+        discoverUpdates: { publishProjectEvent: async () => {} },
+        facets: CLICKHOUSE_FACET_CATALOG,
+        repository,
+        evaluationRuns: MemoryTraceEvaluationRunsRepository.create(),
+        topicNames: { findNamesByIds: async () => new Map() },
+      });
+      const request = (filterKey: string) =>
+        service.getFacets({
+          authorization: ownProof({ projectId: TENANT }),
+          timeRange,
+          filterFor: () => undefined,
+          filterKey,
+        });
+      return { request, calls };
+    }
+
+    /** @scenario "A repeated facet request shares the count still running" */
+    it("answers both from one run", async () => {
+      const once = sharedService();
+      await once.request("status:error");
+      const scansPerRun = once.calls.batched.length;
+
+      const { request, calls } = sharedService();
+      const [first, second] = await Promise.all([request("status:error"), request("status:error")]);
+
+      expect(second).toBe(first);
+      expect(calls.batched).toHaveLength(scansPerRun);
+    });
+
+    /** @scenario "A repeated facet request shares the count still running" */
+    it("runs a different query on its own", async () => {
+      const { request, calls } = sharedService();
+      await Promise.all([request("status:error"), request("service:api")]);
+      const twoRuns = calls.batched.length;
+
+      const single = sharedService();
+      await single.request("status:error");
+      expect(twoRuns).toBe(2 * single.calls.batched.length);
+    });
+
+    /** @scenario "A repeated facet request shares the count still running" */
+    it("counts afresh once the first run has answered", async () => {
+      const { request, calls } = sharedService();
+      await request("status:error");
+      const scansPerRun = calls.batched.length;
+      await request("status:error");
+
+      expect(calls.batched).toHaveLength(2 * scansPerRun);
     });
   });
 });

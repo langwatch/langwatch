@@ -111,6 +111,34 @@ describe("TraceSummaryFoldProjection compact log contribution", () => {
     });
     expect(after.attributes["langwatch.reserved.log_record_count"]).toBe("1");
   });
+
+  describe("when the log names its service", () => {
+    const withService = (service: string): LogContributedEvent => {
+      const event = makeContribution();
+      return {
+        ...event,
+        data: {
+          ...event.data,
+          liftedAttributes: { ...event.data.liftedAttributes, "service.name": service },
+        },
+      };
+    };
+
+    it("names a spanless trace's service", () => {
+      const after = makeProjection().handleTraceLogContributed(
+        withService("grok-cli"),
+        createInitState(),
+      );
+      expect(after.attributes["service.name"]).toBe("grok-cli");
+    });
+
+    it("never replaces the service a span already named", () => {
+      const state = createInitState();
+      const spanNamed = { ...state, attributes: { ...state.attributes, "service.name": "app" } };
+      const after = makeProjection().handleTraceLogContributed(withService("codex"), spanNamed);
+      expect(after.attributes["service.name"]).toBe("app");
+    });
+  });
 });
 
 describe("TraceSummaryFoldProjection — log-path lift", () => {

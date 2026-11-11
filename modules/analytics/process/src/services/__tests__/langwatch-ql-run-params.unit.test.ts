@@ -7,6 +7,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ADMIT_EVERY_PLACEMENT,
+  TEST_RUN_TELEMETRY,
+} from "../../app/__tests__/analytics.fixture.ts";
+import {
   LangWatchQLExecutorRepository,
   type LangWatchQLExecutionRequest,
   type LangWatchQLExecutionResult,
@@ -48,7 +52,12 @@ type RunInput = Partial<Parameters<LangWatchQLService["executeForProjects"]>[0]>
 
 async function run(input: RunInput) {
   const executor = new RecordingExecutor();
-  const service = LangWatchQLService.create({ executor, database: "analytics" });
+  const service = LangWatchQLService.create({
+    runTelemetry: TEST_RUN_TELEMETRY,
+    placement: ADMIT_EVERY_PLACEMENT,
+    executor,
+    database: "analytics",
+  });
   const result = await service.executeForProjects({
     projects: [{ id: "project-1", lwqlKey: "key-1" }],
     protections: {
@@ -373,7 +382,12 @@ describe("given the validation the insight gate asks for", () => {
     canSeeCapturedOutput: true,
   };
   const validate = (sql: string) =>
-    LangWatchQLService.create({ executor: null, database: "analytics" }).validate({
+    LangWatchQLService.create({
+      runTelemetry: TEST_RUN_TELEMETRY,
+      placement: ADMIT_EVERY_PLACEMENT,
+      executor: null,
+      database: "analytics",
+    }).validate({
       projectId: "project-1",
       protections: PROTECTIONS,
       sql,

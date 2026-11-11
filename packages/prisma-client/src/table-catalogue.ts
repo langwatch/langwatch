@@ -3,6 +3,7 @@ export const prismaTableCatalogue = {
   "Account": "Account",
   "AccountCredential": "AccountCredential",
   "Session": "Session",
+  "UserErasure": "UserErasure",
   "User": "User",
   "VerificationToken": "VerificationToken",
   "Identifier": "Identifier",
@@ -26,6 +27,10 @@ export const prismaTableCatalogue = {
   "JoinRequest": "JoinRequest",
   "TeamUser": "TeamUser",
   "OrganizationUser": "OrganizationUser",
+  "SeatHold": "SeatHold",
+  "SeatRequest": "SeatRequest",
+  "OrganizationSeatLease": "OrganizationSeatLease",
+  "OrganizationAccessNotice": "OrganizationAccessNotice",
   "Team": "Team",
   "Organization": "Organization",
   "IssuedLicense": "IssuedLicense",
@@ -182,6 +187,7 @@ export const prismaTableCatalogue = {
   "IdentityMatchSuggestion": "IdentityMatchSuggestion",
   "ConnectedSeatChange": "ConnectedSeatChange",
   "ConnectedStatement": "ConnectedStatement",
+  "LicenseRenewalClaim": "LicenseRenewalClaim",
   "InstanceIdentity": "InstanceIdentity",
   "SelfHostedInstance": "SelfHostedInstance",
   "SelfHostedInstanceDiagnostic": "SelfHostedInstanceDiagnostic",
@@ -247,6 +253,11 @@ export const prismaModelFieldCatalogue = {
     "lastSeenAt",
     "createdAt",
     "updatedAt"
+  ],
+  "UserErasure": [
+    "id",
+    "accountCreatedAt",
+    "erasedAt"
   ],
   "User": [
     "id",
@@ -571,7 +582,56 @@ export const prismaModelFieldCatalogue = {
     "departmentId",
     "disabledAt",
     "pendingSsoGrantId",
-    "membershipStamp"
+    "membershipStamp",
+    "fullSeatSince",
+    "seatPendingSince"
+  ],
+  "SeatHold": [
+    "id",
+    "organizationId",
+    "userId",
+    "email",
+    "name",
+    "seatTakenAt",
+    "heldUntil",
+    "reason",
+    "createdAt"
+  ],
+  "SeatRequest": [
+    "id",
+    "organizationId",
+    "email",
+    "userId",
+    "name",
+    "status",
+    "source",
+    "idpRefused",
+    "idpKind",
+    "salesNotifiedAt",
+    "openedAt",
+    "resolvedAt",
+    "resolvedByUserId",
+    "seatPendingSince",
+    "createdAt",
+    "updatedAt"
+  ],
+  "OrganizationSeatLease": [
+    "organizationId",
+    "holder",
+    "expiresAt",
+    "createdAt"
+  ],
+  "OrganizationAccessNotice": [
+    "id",
+    "organizationId",
+    "kind",
+    "email",
+    "name",
+    "idp",
+    "dayKey",
+    "idpRefused",
+    "createdAt",
+    "mailedAt"
   ],
   "Team": [
     "id",
@@ -2171,6 +2231,22 @@ export const prismaModelFieldCatalogue = {
     "maxDashboards",
     "maxCustomGraphs",
     "maxAutomations",
+    "seatsKept",
+    "seatsKeptUntil",
+    "seatLineQuantity",
+    "seatLineQuantityAt",
+    "seatLineWriteQuantities",
+    "seatLineWriteSince",
+    "seatLineWriteAt",
+    "seatLineWriteAttempts",
+    "seatLineWriteFlaggedAt",
+    "seatRepairQuantity",
+    "seatRepairLiftedQuantity",
+    "seatRepairSince",
+    "seatRepairAttempts",
+    "seatRepairFlaggedAt",
+    "seatLineLeaseToken",
+    "seatLineLeaseUntil",
     "organization",
     "invoices"
   ],
@@ -2339,6 +2415,9 @@ export const prismaModelFieldCatalogue = {
     "codingAgentTypes",
     "codingActiveDays",
     "codingLastActiveDay",
+    "codingTerminalTypes",
+    "codingRepositoryKeys",
+    "codingFirstDays",
     "lastTraceAt",
     "updatedAt"
   ],
@@ -3026,6 +3105,15 @@ export const prismaModelFieldCatalogue = {
     "month",
     "sentAt"
   ],
+  "LicenseRenewalClaim": [
+    "stripeInvoiceId",
+    "stripeSubscriptionId",
+    "claimToken",
+    "claimedAt",
+    "issuedLicense",
+    "deliveredAt",
+    "licenseId"
+  ],
   "InstanceIdentity": [
     "id",
     "instanceId",
@@ -3133,6 +3221,7 @@ export const prismaRelationCatalogue = {
   "Session": {
     "user": "User"
   },
+  "UserErasure": {},
   "User": {
     "accounts": "Account",
     "accountCredentials": "AccountCredential",
@@ -3218,6 +3307,10 @@ export const prismaRelationCatalogue = {
     "user": "User",
     "organization": "Organization"
   },
+  "SeatHold": {},
+  "SeatRequest": {},
+  "OrganizationSeatLease": {},
+  "OrganizationAccessNotice": {},
   "Team": {
     "members": "TeamUser",
     "organization": "Organization",
@@ -3720,6 +3813,7 @@ export const prismaRelationCatalogue = {
   "IdentityMatchSuggestion": {},
   "ConnectedSeatChange": {},
   "ConnectedStatement": {},
+  "LicenseRenewalClaim": {},
   "InstanceIdentity": {},
   "SelfHostedInstance": {},
   "SelfHostedInstanceDiagnostic": {},

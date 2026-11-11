@@ -65,7 +65,7 @@ export class InviteAcceptanceService {
           organizationId: invite.organizationId,
         }));
       if (isCallerRetryingItsOwnAccept) {
-        await this.applyInviteGrants({ userId, invite });
+        await this.completeAcceptance({ userId, invite });
 
         return;
       }
@@ -116,7 +116,7 @@ export class InviteAcceptanceService {
           organizationId: invite.organizationId,
         }));
       if (isCallerRacingItself) {
-        await this.applyInviteGrants({ userId, invite });
+        await this.completeAcceptance({ userId, invite });
 
         return;
       }
@@ -124,7 +124,23 @@ export class InviteAcceptanceService {
       throw new InviteNotFoundError("Invitation is no longer open");
     }
 
+    await this.completeAcceptance({ userId, invite });
+  }
+
+  /** The grant tail, then a person back within their seat hold takes the held seat. */
+  private async completeAcceptance({
+    userId,
+    invite,
+  }: {
+    userId: string;
+    invite: OrganizationInvite;
+  }): Promise<void> {
     await this.applyInviteGrants({ userId, invite });
+    await this.deps.seats.takeBackHeldSeat?.({
+      organizationId: invite.organizationId,
+      userId,
+      email: invite.email,
+    });
   }
 
   /**

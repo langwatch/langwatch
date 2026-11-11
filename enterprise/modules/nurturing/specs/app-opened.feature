@@ -12,8 +12,13 @@ Feature: App opens reach Customer.io on the opening user
     And tracks sessions_page_viewed on user-1
 
   @unit
+  Scenario: Any tracked page open identifies app_last_opened_at
+    When auth records an open of the sessions page, the personal overview, or a usage, cost or plan page for user-1
+    Then Customer.io identifies user-1 with app_last_opened_at in Unix seconds
+
+  @unit
   Scenario: Repeated opens inside an hour send once per user
-    When the same user opens the page twice inside an hour
+    When the same user opens the sessions page twice inside an hour
     Then one identify and one track are sent
     And after the hour both are sent again
 

@@ -54,9 +54,10 @@ import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi, type PaginatedProjects } from "@langwatch/project-contract";
 import {
+  apiKeyPepper,
   credentialsSecret,
   credentialsSecretPrevious,
-  Secret,
+  intoKeyPepper,
   sessionSecret,
   type ScopedSecrets,
 } from "@langwatch/secrets";
@@ -150,16 +151,11 @@ function scopeNames(
 async function apiKeyPeppers(
   secrets: ScopedSecrets,
 ): Promise<{ pepper: string; previousPepper: string | undefined }> {
-  const { pepper, pepperFallback, pepperLastFallback, pepperPrevious } = ApiKeyModule.secrets;
-  const answered = await secrets.into(pepper, (primary) =>
-    secrets.into(pepperFallback, (credentials) =>
-      secrets.into(pepperLastFallback, (session) =>
-        secrets.into(pepperPrevious, (previous) => ({
-          pepper: [primary, credentials, session].find((value) => value !== void 0 && value !== ""),
-          previousPepper: primary ? void 0 : previous || void 0,
-        })),
-      ),
-    ),
+  const answered = await intoKeyPepper(secrets, (chosen, fromApiKeyPepper) =>
+    secrets.into(ApiKeyModule.secrets.pepperPrevious, (previous) => ({
+      pepper: chosen,
+      previousPepper: fromApiKeyPepper ? void 0 : previous || void 0,
+    })),
   );
   if (answered.pepper === void 0) {
     throw new ConfigParseError([
@@ -181,7 +177,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
 
   /** Main's pepper chain, first set wins: API_KEY_PEPPER, CREDENTIALS_SECRET, NEXTAUTH_SECRET. */
   static readonly secrets = {
-    pepper: Secret.load("API_KEY_PEPPER", { optional: true }),
+    pepper: apiKeyPepper,
     pepperFallback: credentialsSecret,
     pepperLastFallback: sessionSecret,
     /** Verifies keys hashed before a CREDENTIALS_SECRET rotation; each re-hashes on next use. */
@@ -735,6 +731,32 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
     const callerIsAdmin = await this.#isOrganizationAdmin(input.organizationId, by);
 
     await this.#service.revoke({
+      id: input.apiKeyId,
+      callerUserId: by.id,
+      callerIsAdmin,
+      organizationId: input.organizationId,
+    });
+  }
+
+  /**
+   * A new secret for one key, answered once; the old one is refused at once. The same caller rule
+   * as revoke, and like a mint an operator acting as a member may not do it.
+   */
+  async rotateKey(
+    input: Readonly<{ organizationId: string; apiKeyId: string }>,
+    by: ApiKeyCaller,
+  ): Promise<{ token: string; apiKey: ApiKey }> {
+    if (by.impersonatorId) {
+      throw new PermissionDeniedError({
+        permission: "organization:view",
+        scope: { type: "organization", id: input.organizationId },
+        denialReason: "no-grant",
+      });
+    }
+    await this.#ensureMember(input.organizationId, by);
+    const callerIsAdmin = await this.#isOrganizationAdmin(input.organizationId, by);
+
+    return this.#service.rotate({
       id: input.apiKeyId,
       callerUserId: by.id,
       callerIsAdmin,

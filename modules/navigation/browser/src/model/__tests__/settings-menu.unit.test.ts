@@ -85,6 +85,11 @@ describe("given the hosted product", () => {
       expect(hrefsIn({ isSaaS: true })).toContain("/settings/subscription");
       expect(hrefsIn({ isSaaS: true })).not.toContain("/settings/license");
     });
+
+    /** @scenario "A Lite Member finds the subscription page in the settings menu on the cloud" */
+    it("offers the subscription page to a lite member too", () => {
+      expect(hrefsIn({ isSaaS: true, isLiteMember: true })).toContain("/settings/subscription");
+    });
   });
 });
 
@@ -110,6 +115,17 @@ describe("given a lite member", () => {
       expect(hrefs).toContain("/settings/model-providers");
       expect(hrefs).not.toContain("/settings/authentication");
     });
+
+    /** @scenario "Billing is not a seat" */
+    it("offers the billing pages to a lite member who holds Billing", () => {
+      const hrefs = hrefsIn({
+        isLiteMember: true,
+        isSaaS: true,
+        hasPermission: (p) => p === "subscription:manage",
+      });
+      expect(hrefs).toContain("/settings/usage");
+      expect(hrefs).toContain("/settings/subscription");
+    });
   });
 });
 
@@ -121,7 +137,7 @@ describe("given an enterprise plan", () => {
       expect(hrefs).not.toContain("/settings/role-bindings");
     });
 
-    it("offers Directory on every plan, in place of Members, Teams, Groups and SCIM", () => {
+    it("offers Users on every plan, in place of Members, Teams, Groups and SCIM", () => {
       for (const enterprisePlan of ["pending", "locked", "included"] as const) {
         const hrefs = hrefsIn({ enterprisePlan });
         expect(hrefs).toContain("/settings/directory");
@@ -202,8 +218,11 @@ describe("given a plan that lacks Enterprise", () => {
       }
     });
 
-    it("hides them from a lite member", () => {
-      expect(lockedHrefsIn({ hasPermission: () => true, isLiteMember: true })).toEqual([]);
+    /** @scenario "A Lite Member lists members" */
+    it("keeps Roles & access for a lite member, read-only, and hides the audit log", () => {
+      expect(lockedHrefsIn({ hasPermission: () => true, isLiteMember: true })).toEqual([
+        "/settings/roles",
+      ]);
     });
   });
 });
@@ -285,5 +304,20 @@ describe("given every Settings entry", () => {
       enterprisePlan: "included",
     }).flatMap((group) => group.items.map((item) => item.icon));
     expect(new Set(icons).size).toBe(icons.length);
+  });
+});
+
+describe("given a member on LangWatch Cloud", () => {
+  describe("when the menu is built", () => {
+    /** @scenario "The settings menu names the two billing pages Usage and Plan & billing" */
+    it("names the usage page Usage and the subscription page Plan & billing", () => {
+      const items = settingsMenu({ ...EVERYTHING_CLOSED, isSaaS: true, hosting: "cloud" }).flatMap(
+        (group) => group.items,
+      );
+      const labelOf = (href: string) => items.find((item) => item.href === href)?.label;
+
+      expect(labelOf("/settings/usage")).toBe("Usage");
+      expect(labelOf("/settings/subscription")).toBe("Plan & billing");
+    });
   });
 });

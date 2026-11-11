@@ -76,6 +76,20 @@ describe("HttpInstantEvalDecisionModelChannel", () => {
       expect(judgement.skippedReason).toBeUndefined();
     });
 
+    it("hands the provider's own tokens back for the spend ledger", async () => {
+      agent
+        .get(ORIGIN)
+        .intercept({ path: PATH, method: "POST" })
+        .reply(200, {
+          answers: { annoyed: { type: "noul", noul: 0.8 } },
+          usage: { input_tokens: 99, output_tokens: 5 },
+        });
+
+      const judgement = await classify();
+
+      expect(judgement.providerUsage).toEqual({ inputTokens: 99, outputTokens: 5 });
+    });
+
     it("sends the organization's key", async () => {
       let authorization: unknown;
       agent

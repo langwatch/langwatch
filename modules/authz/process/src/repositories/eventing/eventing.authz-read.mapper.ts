@@ -1,5 +1,6 @@
 // The grant-head rows a decision reads, translated one way whichever backing read them.
 import {
+  BILLING_ROLE_KEY,
   type BindingRoleKey,
   type CollectedBinding,
   type GrantScopeTier,
@@ -67,11 +68,13 @@ export function collectBindings<TRow extends BindingGrantRow>({
   for (const row of rows) {
     if (!isBindingScope(row.scopeType)) continue;
     const { roleKey } = row;
-    if (!isBindingRoleKey(roleKey)) continue;
+    // Billing reaches a decision only from the organization; the matcher fences the rest.
+    const isBilling = roleKey === BILLING_ROLE_KEY && row.scopeType === "ORGANIZATION";
+    if (!isBilling && !isBindingRoleKey(roleKey)) continue;
     // Reported, never filtered: whether an elapsed end still grants is the collector's call.
     const expiresAtMs = row.expiresAt?.epochMilliseconds;
     bindings.push({
-      roleKey,
+      roleKey: isBilling ? BILLING_ROLE_KEY : (roleKey as BindingRoleKey),
       scopeType: row.scopeType,
       scopeId: row.scopeId,
       viaGroupId: viaGroupId(row),

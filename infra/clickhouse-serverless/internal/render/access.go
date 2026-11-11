@@ -24,48 +24,49 @@ func renderCustomSettingsPrefixes(configD string) error {
 	})
 }
 
-// accessManagementConfig maps to zz-access-management.yaml: the access-DDL
-// grants the `default` (admin) user needs to create the LangWatchQL access
-// model through SQL.
-type accessManagementConfig struct {
-	Users accessManagementUsers `yaml:"users"`
+// accessManagementFile sets what the `default` (admin) user may do with access
+// entities and named collections. The `zz-` prefix is load-bearing: users.d
+// merges in lexicographic order and the later file wins over the stock
+// users.xml, which grants both flags.
+const accessManagementFile = "zz-access-management.yaml"
+
+// renderedCollectionGrants is what default keeps in rendered mode: use and see
+// the collections the rendered model delivers (lwql_postgres and its
+// per-database aliases), never create, alter or drop one.
+var renderedCollectionGrants = []string{
+	"GRANT ALL ON *.*",
+	"REVOKE ACCESS MANAGEMENT, NAMED COLLECTION ADMIN ON *.*",
+	"GRANT NAMED COLLECTION, SHOW NAMED COLLECTIONS ON lwql_postgres*",
 }
 
-type accessManagementUsers struct {
-	Default accessManagementGrants `yaml:"default"`
-}
-
-type accessManagementGrants struct {
-	AccessManagement       int `yaml:"access_management"`
-	NamedCollectionControl int `yaml:"named_collection_control"`
-	ShowNamedCollections   int `yaml:"show_named_collections"`
-	// show_named_collections_secrets is deliberately absent — see the doc on
-	// renderAccessManagement.
-}
-
-// renderAccessManagement writes zz-access-management.yaml granting the
-// `default` (admin) user the right to create users, profiles, row policies and
-// named collections through SQL — what the app's LangWatchQL self-provisioning
-// runs at boot. Nothing here widens what any *other* user can do.
-//
-// show_named_collections_secrets is deliberately NOT granted: the
-// lwql_postgres named collection the app provisions holds a plaintext
-// PostgreSQL password (ClickHouse must dial PG with the real value), and that
-// grant would expose it through SHOW CREATE NAMED COLLECTION. show_named_collections
-// (existence, secrets redacted) is enough for administration.
-//
-// The `zz-` prefix is load-bearing: users.d files merge in lexicographic
-// order and the later file wins, so this must sort after any file declaring
-// `access_management: 0` for the same user.
-func renderAccessManagement(usersD string) error {
-	return writeYAML(filepath.Join(usersD, "zz-access-management.yaml"), accessManagementConfig{
-		Users: accessManagementUsers{
-			Default: accessManagementGrants{
-				AccessManagement:       1,
-				NamedCollectionControl: 1,
-				ShowNamedCollections:   1,
-			},
-		},
+// renderAccessManagement: sql mode gets the access-DDL flags; rendered mode
+// (LWQL_ACCESS_DIR) gets a grants list instead, and ClickHouse refuses one
+// beside the flags, so they are removed; DEFAULT_USER_ACCESS_MANAGEMENT=false
+// sets both to 0, and =true keeps the flags even in rendered mode. The secrets
+// grant is never given: it would expose the PostgreSQL password via SHOW CREATE.
+func renderAccessManagement(input *config.Input, usersD string) error {
+	var user map[string]any
+	explicit := input.DefaultUserAccessManagement != nil
+	switch {
+	case !input.GrantsDefaultAccessManagement():
+		user = map[string]any{"access_management": 0, "named_collection_control": 0}
+	case input.LWQLAccessDir != "" && !explicit:
+		remove := map[string]string{"@remove": "1"}
+		user = map[string]any{
+			"access_management":        remove,
+			"named_collection_control": remove,
+			"show_named_collections":   remove,
+			"grants":                   map[string]any{"query": renderedCollectionGrants},
+		}
+	default:
+		user = map[string]any{
+			"access_management":        1,
+			"named_collection_control": 1,
+			"show_named_collections":   1,
+		}
+	}
+	return writeYAML(filepath.Join(usersD, accessManagementFile), map[string]any{
+		"users": map[string]any{"default": user},
 	})
 }
 

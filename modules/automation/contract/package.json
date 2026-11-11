@@ -16,6 +16,10 @@
     "./templating": {
       "types": "./dist/templating/render-email.d.ts",
       "default": "./src/templating/render-email.ts"
+    },
+    "./alert-link": {
+      "types": "./dist/alert-link.d.ts",
+      "default": "./src/alert-link.ts"
     }
   },
   "scripts": {
