@@ -103,8 +103,15 @@ Feature: Settings shell
 
   @integration
   Scenario: A detail page keeps its owning entry lit
-    Given I open a team's own page under /settings/teams
+    Given I may manage my organization
+    And I open a team's own page under /settings/teams
     Then the Teams & projects entry is marked as the open one
+
+  @unit @integration
+  Scenario: A team page lights Users for whoever may not manage the organization
+    Given I may view teams but may not manage my organization
+    When I open a team's own page under /settings/teams
+    Then the Users entry is marked as the open one
 
   @unit
   Scenario: A still-loading plan hides the enterprise entries

@@ -325,6 +325,15 @@ describe("the settings shell in a new navigation mode", () => {
       expect(markedEntries()).toEqual(["Teams & projects"]);
     });
 
+    /** @scenario "A team page lights Users for whoever may not manage the organization" */
+    it("lights Users on a team's own page when Teams & projects is not offered", () => {
+      renderSettingsSidebar({
+        pathname: "/settings/teams/platform",
+        permissions: ["team:view", "members:view"],
+      });
+      expect(markedEntries()).toEqual(["Users"]);
+    });
+
     /** @scenario "Teams & projects has its own entry under Users" */
     it("offers Teams & projects right after Users, opening the Users page on its tab", () => {
       renderSettingsSidebar({ permissions: ["organization:manage"] });

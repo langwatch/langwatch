@@ -228,6 +228,27 @@ describe("given the People & access group", () => {
         "/settings/roles",
       ]);
     });
+
+    /** @scenario "A team page lights Users for whoever may not manage the organization" */
+    it("keeps Users lit on a team's own page", () => {
+      const items = settingsMenu({
+        ...EVERYTHING_CLOSED,
+        hasPermission: (p) => p === "team:view",
+      }).find((group) => group.id === "settings-access")!.items;
+
+      expect(
+        items
+          .filter((item) =>
+            isSettingsMenuItemActiveAmong({
+              item,
+              siblings: items,
+              pathname: "/settings/teams/platform",
+              search: "",
+            }),
+          )
+          .map((item) => item.label),
+      ).toEqual(["Users"]);
+    });
   });
 });
 

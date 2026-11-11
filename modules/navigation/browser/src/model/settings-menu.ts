@@ -59,8 +59,6 @@ export interface SettingsMenuItem {
    * test sees an owner.
    */
   alsoActiveAt?: string[];
-  /** A tab of a shared page: lit only while the address carries this query value. */
-  tab?: { param: string; value: string };
   icon: LucideIcon;
   /**
    * An Enterprise entry offered to a plan that lacks it: the sidebar shows a lock and "Included
@@ -83,12 +81,24 @@ export function isSettingsMenuItemActive({
 }): boolean {
   // By prefix, so a detail page (/settings/teams/:team) keeps its owner lit.
   if (item.alsoActiveAt?.some((base) => isPathUnder({ pathname, base }))) return true;
-  if (item.tab && new URLSearchParams(search).get(item.tab.param) !== item.tab.value) return false;
-  if (item.isExactMatch) return pathname === item.href;
-  return isPathUnder({ pathname, base: item.includePath ?? item.href });
+  const [hrefPath = item.href, hrefQuery] = item.href.split("?");
+  // An entry whose href opens a tab (?tab=teams) is lit only while the address shows that tab.
+  if (hrefQuery) {
+    const current = new URLSearchParams(search);
+    for (const [key, value] of new URLSearchParams(hrefQuery)) {
+      if (current.get(key) !== value) return false;
+    }
+  }
+  if (item.isExactMatch) return pathname === hrefPath;
+  return isPathUnder({ pathname, base: item.includePath ?? hrefPath });
 }
 
-/** As above, but an entry for a whole page yields to a lit sibling that names its open tab. */
+/** An entry whose href opens one tab of a shared page. */
+function opensTab(item: SettingsMenuItem): boolean {
+  return item.href.includes("?");
+}
+
+/** As above, but an entry for a whole page yields to a lit sibling that opens one of its tabs. */
 export function isSettingsMenuItemActiveAmong({
   item,
   siblings,
@@ -101,11 +111,11 @@ export function isSettingsMenuItemActiveAmong({
   search?: string;
 }): boolean {
   if (!isSettingsMenuItemActive({ item, pathname, search })) return false;
-  if (item.tab) return true;
+  if (opensTab(item)) return true;
   return !siblings.some(
     (sibling) =>
       sibling !== item &&
-      sibling.tab &&
+      opensTab(sibling) &&
       isSettingsMenuItemActive({ item: sibling, pathname, search }),
   );
 }
@@ -257,18 +267,19 @@ function accessGroup({ enterprisePlan, hasPermission }: SettingsMenuGates): Sett
           "/settings/scim",
           "/settings/groups",
           "/settings/members",
+          "/settings/teams",
           "/settings/access",
         ],
       },
       // A shortcut to the Users page's Teams tab, which readers could not find; the tab is
-      // offered to an organization manager only, so the entry is too.
+      // offered to an organization manager only, so the entry is too. Where both are offered,
+      // Users yields team pages to it; a reader without it still sees Users lit there.
       ...(hasPermission("organization:manage")
         ? [
             {
               label: "Teams & projects",
               href: "/settings/directory?tab=teams",
               includePath: "/settings/directory",
-              tab: { param: "tab", value: "teams" },
               icon: UsersRound,
               alsoActiveAt: ["/settings/teams"],
             },
