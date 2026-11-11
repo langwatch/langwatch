@@ -388,7 +388,7 @@ describe("inlineDeclarationsOf", () => {
   });
 
   describe("given inline names past the parameter limit", () => {
-    /** @scenario "An inline name past the scenario's parameter limit is flagged as ignored" */
+    /** @scenario "An inline name past the scenario's parameter limit is flagged as refused" */
     it("flags only the names the run leaves undeclared, every place they are written", () => {
       const text =
         "A { tone: calm } customer in { region: eu-central }, still { region: eu-central }";

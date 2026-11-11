@@ -1017,8 +1017,8 @@ describe("the scenario dialog", () => {
       );
     });
 
-    /** @scenario "The editor shows an inline declaration past the parameter limit as ignored" */
-    it("lists the name past the limit as ignored and the one before it as declared", async () => {
+    /** @scenario "The editor shows an inline declaration past the parameter limit as refused" */
+    it("lists the name past the limit as refused and the one before it as declared", async () => {
       const user = userEvent.setup();
       openStored(
         Array.from({ length: 19 }, (_, index) => ({ name: `stored_${index}`, defaultValue: "x" })),
@@ -1029,7 +1029,7 @@ describe("the scenario dialog", () => {
       expect(screen.getByTestId("inline-parameter-declared-tone")).toHaveTextContent("calm");
       const region = screen.getByTestId("inline-parameter-over_limit-region");
       expect(region).toHaveTextContent(
-        "Over the 20-parameter limit, so this declaration is ignored",
+        "Over the 20-parameter limit: a run of this scenario is refused until it is removed",
       );
       expect(region).toHaveTextContent("over limit");
       expect(

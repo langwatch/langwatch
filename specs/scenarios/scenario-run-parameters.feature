@@ -232,7 +232,7 @@ Feature: Scenario run parameters
     Then both declarations are flagged as a secret
 
   @unit
-  Scenario: An inline name past the scenario's parameter limit is flagged as ignored
+  Scenario: An inline name past the scenario's parameter limit is flagged as refused
     Given a scenario declaring nineteen parameters
     And its situation reads "A { tone: calm } customer in { region: eu-central }"
     When it is read for inline declarations
@@ -269,11 +269,11 @@ Feature: Scenario run parameters
     And "plan" from the situation is listed as overridden, saying "free" is not used and a run must give a value
 
   @integration
-  Scenario: The editor shows an inline declaration past the parameter limit as ignored
+  Scenario: The editor shows an inline declaration past the parameter limit as refused
     Given the scenario editor is open on a scenario declaring nineteen parameters
     When the situation reads "A { tone: calm } customer in { region: eu-central }"
     Then "tone" is listed as declared from the situation
-    And "region" is listed as over the limit with "Over the 20-parameter limit, so this declaration is ignored"
+    And "region" is listed as over the limit with "Over the 20-parameter limit: a run of this scenario is refused until it is removed"
 
   @integration
   Scenario: The editor warns when a name is declared twice inline with another default

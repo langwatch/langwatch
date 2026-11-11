@@ -54,8 +54,8 @@ function InlineParameterDetail({ declaration }: { declaration: InlineDeclaration
     case "over_limit":
       return (
         <Text color="fg.muted">
-          Over the {MAX_SCENARIO_PARAMETER_DEFINITIONS}-parameter limit, so this declaration is
-          ignored
+          Over the {MAX_SCENARIO_PARAMETER_DEFINITIONS}-parameter limit: a run of this scenario is
+          refused until it is removed
         </Text>
       );
     case "declared":
