@@ -29,7 +29,7 @@ Facts the design rests on:
 - A run writes one bulk insert per page of up to 500 rows (`INSTANT_EVAL_PAGE_SIZE`, `instant-eval-run-sizing.rules.ts:15`) through `instant-eval-judge-page.service.ts:452`, with `async_insert` (`clickhouse.instant-eval-judgments.repository.ts:87-113`). The record carries no `_retention_days`, so every row keeps the default 0, which means never expire.
 - `instant_eval_judgments` and `instant_eval_runs` are in `INDEFINITE_DEFAULT_RETENTION_TABLES` (`modules/data-retention/contract/src/retention-tables.ts:81-87`), not in the customer cascade.
 - `Passed` is derived at write from `Probability >= threshold` (`instant-eval-verdicts.rules.ts:49-54`). So a pass can be derived again on read with any threshold.
-- Two readers depend on the judgments table: the Explorer `eval:"question"` chip (`trace-query-subquery.rules.ts:74`, a declared exception in `clickhouse-table-ownership.ts:128-133`) and the LWQL `analytics.judgments` view (`lwql-view-catalog.rules.ts:2295-2296`).
+- Two readers depend on the judgments table: the Explorer `eval:"question"` chip (`trace-query-subquery.rules.ts:74`, a declared exception in `clickhouse-table-ownership.ts:128-133`) and the LWQL `analytics.judgments` view (`lwql-view-catalog.rules.ts:2314-2316`).
 - `evaluation_runs` is `ReplacingMergeTree(UpdatedAt)`, `PARTITION BY toYearWeek(ScheduledAt)`, `ORDER BY (TenantId, EvaluationId)` (00002). The trace page reads it through `trace-evaluation-runs.repository.ts`, helped by the `evaluation_runs_by_trace_id_index` (00121).
 
 ## The two questions
@@ -140,7 +140,7 @@ Each trigger uses the same path:
 
 ### 3. The trace page reads this table
 
-The trace drawer shows every result on its trace, labelled by source. `eval_results` is owned by the instant-eval module. A plain read of another module's table is a query on its owner's `*Api` (`dev/docs/ARCHITECTURE.md` section 7, "A ClickHouse table has one owner"). So instant-eval adds a results-by-trace query to `InstantEvalApi`. Trace calls it through a channel bound to that token (section 5, "A channel may be bound to another module's `*Api` token"). A binding makes no peer edge, so it is allowed although instant-eval already depends on `TraceApi` (`instant-eval.app.ts:152-157`, `static dependencies`).
+The trace drawer shows every result on its trace, labelled by source. `eval_results` is owned by the instant-eval module. A plain read of another module's table is a query on its owner's `*Api` (`dev/docs/ARCHITECTURE.md` section 7, "A ClickHouse table has one owner"). So instant-eval adds a results-by-trace query to `InstantEvalApi`. Trace calls it through a channel bound to that token (section 5, "A channel may be bound to another module's `*Api` token"). A binding makes no peer edge, so it is allowed although instant-eval already depends on `TraceApi` (`instant-eval.app.ts:157-166`, `static dependencies`).
 
 The run page, the Explorer `eval:"q"` chip and the `analytics.judgments` LWQL view stay on `instant_eval_judgments`, which runs keep writing. The chip filters one run and reads the `Passed` stored at write, and the view's public columns are run-shaped (`RunId`, `QuestionId`, `Passed`) and include `ThreadId`, which `eval_results` does not carry; neither fits `eval_results`. Whether they move is the open question on run storage.
 
