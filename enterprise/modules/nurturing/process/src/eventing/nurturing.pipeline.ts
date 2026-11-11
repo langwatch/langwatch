@@ -77,11 +77,19 @@ import {
   membersInvitedEventDataSchema,
   ORGANIZATION_SIGNED_UP_EVENT_TYPE,
   organizationSignedUpEventDataSchema,
+  PERSONAL_TEAM_CREATED_EVENT_TYPE,
+  PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
+  personalTeamCreatedEventDataSchema,
+  personalWorkspaceProvisionedEventDataSchema,
 } from "@langwatch/organization-contract";
 import {
   PROJECT_CREATED_EVENT_TYPE,
+  PROJECT_FIRST_MESSAGE_LISTED_EVENT_TYPE,
+  PROJECT_PERSONAL_OWNER_LISTED_EVENT_TYPE,
   type ProjectCreatedEventData,
   projectCreatedEventDataSchema,
+  projectFirstMessageListedEventDataSchema,
+  projectPersonalOwnerListedEventDataSchema,
 } from "@langwatch/project-contract";
 import {
   PROMPT_CREATED_EVENT_TYPE,
@@ -97,6 +105,8 @@ import {
 import {
   FIRST_TRACE_RECORDED_EVENT_TYPE,
   firstTraceRecordedEventDataSchema,
+  PROJECT_TRACED_EVENT_TYPE,
+  projectTracedEventDataSchema,
   TRACE_RECEIVED_EVENT_TYPE,
   traceReceivedEventDataSchema,
 } from "@langwatch/trace-contract";
@@ -252,6 +262,17 @@ export function buildNurturingPipeline(deps: {
   codingSessionsStored: (input: {
     sessions: readonly CodingAgentSessionStoredEventData[];
     deliver: (signal: NurturingSignal) => Promise<void>;
+  }) => Promise<void>;
+  /** Copies a personal project's owner into nurturing's own row; never delivers. */
+  recordPersonalOwner: (input: {
+    projectId: string;
+    organizationId: string;
+    ownerUserId: string;
+  }) => Promise<void>;
+  /** Copies a traced project into nurturing's own row; never delivers. */
+  recordTracedProject: (input: {
+    projectId: string;
+    organizationId: string | null;
   }) => Promise<void>;
 }): NurturingPipeline {
   const deliverSignal = (signal: NurturingSignal) =>
@@ -532,6 +553,37 @@ export function buildNurturingPipeline(deps: {
             }),
         }),
       )
+      // Copies only: these five write nurturing's own rows and deliver nothing.
+      .withPeerSubscriber("personalTeamCreated", {
+        eventType: PERSONAL_TEAM_CREATED_EVENT_TYPE,
+        data: personalTeamCreatedEventDataSchema,
+        handle: ({ projectId, organizationId, userId }) =>
+          deps.recordPersonalOwner({ projectId, organizationId, ownerUserId: userId }),
+      })
+      .withPeerSubscriber("personalWorkspaceProvisioned", {
+        eventType: PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
+        data: personalWorkspaceProvisionedEventDataSchema,
+        handle: ({ projectId, organizationId, userId }) =>
+          deps.recordPersonalOwner({ projectId, organizationId, ownerUserId: userId }),
+      })
+      .withPeerSubscriber("personalOwnerListed", {
+        eventType: PROJECT_PERSONAL_OWNER_LISTED_EVENT_TYPE,
+        data: projectPersonalOwnerListedEventDataSchema,
+        handle: ({ projectId, organizationId, ownerUserId }) =>
+          deps.recordPersonalOwner({ projectId, organizationId, ownerUserId }),
+      })
+      .withPeerSubscriber("projectTraced", {
+        eventType: PROJECT_TRACED_EVENT_TYPE,
+        data: projectTracedEventDataSchema,
+        handle: ({ projectId, organizationId }) =>
+          deps.recordTracedProject({ projectId, organizationId }),
+      })
+      .withPeerSubscriber("firstMessageListed", {
+        eventType: PROJECT_FIRST_MESSAGE_LISTED_EVENT_TYPE,
+        data: projectFirstMessageListedEventDataSchema,
+        handle: ({ projectId, organizationId }) =>
+          deps.recordTracedProject({ projectId, organizationId }),
+      })
       .withPeerSubscriber("appPageOpened", {
         eventType: APP_PAGE_OPENED_EVENT_TYPE,
         data: appPageOpenedEventDataSchema,

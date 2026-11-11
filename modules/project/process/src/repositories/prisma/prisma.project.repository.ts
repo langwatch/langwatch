@@ -48,6 +48,7 @@ import {
 import type {
   LiveLegacyKey,
   ProjectBackfillEntry,
+  ProjectHistoryEntry,
   ProjectRepository,
   ProjectWithOrgAdmin,
   TouchCodingAgentActivityInput,
@@ -466,6 +467,42 @@ export class PrismaProjectRepository
           presenceEnabled: row.presenceEnabled,
           isArchived: row.archivedAt !== null,
           adminUserId: organization.members[0]?.userId ?? null,
+        },
+      };
+    });
+  }
+
+  async findHistoryPage({
+    afterId,
+    limit,
+  }: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<ProjectHistoryEntry[]> {
+    const rows = await this.prisma.project.findMany({
+      where: afterId === null ? {} : { id: { gt: afterId } },
+      orderBy: { id: "asc" },
+      take: limit,
+      select: {
+        id: true,
+        isPersonal: true,
+        ownerUserId: true,
+        firstMessage: true,
+        team: { select: { organizationId: true, organization: { select: { id: true } } } },
+      },
+    });
+    return rows.map((row): ProjectHistoryEntry => {
+      // relationMode "prisma" keeps no foreign keys: a deleted team or organization leaves this.
+      const organizationId = row.team?.organization?.id;
+      if (!organizationId) return { kind: "orphan", id: row.id };
+      return {
+        kind: "whole",
+        project: {
+          id: row.id,
+          organizationId,
+          isPersonal: row.isPersonal,
+          ownerUserId: row.ownerUserId,
+          firstMessage: row.firstMessage,
         },
       };
     });

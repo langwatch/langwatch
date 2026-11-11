@@ -20805,6 +20805,71 @@
       ]
     },
     {
+      "name": "NurturingPersonalProject",
+      "tableName": "NurturingPersonalProject",
+      "documentation": "Nurturing's copy of each personal project's owner, from organization's and project's facts.\nThe first owner recorded stays: a personal project's owner never changes.",
+      "primaryKey": [
+        "projectId"
+      ],
+      "fields": [
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "ownerUserId",
+          "columnName": "ownerUserId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "NurturingTracedProject",
+      "tableName": "NurturingTracedProject",
+      "documentation": "Nurturing's copy of each project that received a real trace, from trace's and project's facts.",
+      "primaryKey": [
+        "projectId"
+      ],
+      "fields": [
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
       "name": "BillingMeterCheckpoint",
       "tableName": "BillingMeterCheckpoint",
       "documentation": "",

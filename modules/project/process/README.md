@@ -6,7 +6,7 @@ The server half of [project](../README.md). Projects: finding them, their summar
 
 ## Installation
 
-`defineProcessModule("project").withRepositories(projectRepositories).withApi(ProjectModule).withTransports(projectRest, projectTrpcTransport).provideMiddlewareContext(…).withEventing(projectLifecycleEventing).withMigrations(…)`, `src/project.module.ts:13`.
+`defineProcessModule("project").withRepositories(projectRepositories).withApi(ProjectModule).withTransports(projectRest, projectTrpcTransport).provideMiddlewareContext(…).withEventing(projectLifecycleEventing).withMigrations(…)`, `src/project.module.ts:14`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -637,19 +637,21 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `project_lifecycle` (aggregate `project`)
 
-Declared at `src/eventing/project-lifecycle.pipeline.ts:51`. Events: `projectCreatedEventSchema`, `projectLegacyKeyRevokedEventSchema`, `projectPresenceSettingChangedEventSchema`, `projectMovedEventSchema`, `projectArchivedEventSchema`, `projectDepartmentAssignedEventSchema`, `projectTraceSharingDisabledEventSchema`, `projectAggregateRuleChangedEventSchema`, `projectRevivedEventSchema`.
+Declared at `src/eventing/project-lifecycle.pipeline.ts:55`. Events: `projectCreatedEventSchema`, `projectLegacyKeyRevokedEventSchema`, `projectPresenceSettingChangedEventSchema`, `projectMovedEventSchema`, `projectArchivedEventSchema`, `projectDepartmentAssignedEventSchema`, `projectTraceSharingDisabledEventSchema`, `projectAggregateRuleChangedEventSchema`, `projectRevivedEventSchema`, `projectPersonalOwnerListedEventSchema`, `projectFirstMessageListedEventSchema`.
 
 | Kind    | Name                                | Handles | Declared at                                     |
 | ------- | ----------------------------------- | ------- | ----------------------------------------------- |
-| command | `recordProjectCreated`              | –       | `src/eventing/project-lifecycle.pipeline.ts:66` |
-| command | `recordProjectLegacyKeyRevoked`     | –       | `src/eventing/project-lifecycle.pipeline.ts:67` |
-| command | `recordPresenceSettingChanged`      | –       | `src/eventing/project-lifecycle.pipeline.ts:68` |
-| command | `recordProjectMoved`                | –       | `src/eventing/project-lifecycle.pipeline.ts:69` |
-| command | `recordProjectArchived`             | –       | `src/eventing/project-lifecycle.pipeline.ts:70` |
-| command | `recordProjectDepartmentAssigned`   | –       | `src/eventing/project-lifecycle.pipeline.ts:71` |
-| command | `recordProjectTraceSharingDisabled` | –       | `src/eventing/project-lifecycle.pipeline.ts:72` |
-| command | `recordProjectAggregateRuleChanged` | –       | `src/eventing/project-lifecycle.pipeline.ts:73` |
-| command | `recordProjectRevived`              | –       | `src/eventing/project-lifecycle.pipeline.ts:74` |
+| command | `recordProjectCreated`              | –       | `src/eventing/project-lifecycle.pipeline.ts:72` |
+| command | `recordProjectLegacyKeyRevoked`     | –       | `src/eventing/project-lifecycle.pipeline.ts:73` |
+| command | `recordPresenceSettingChanged`      | –       | `src/eventing/project-lifecycle.pipeline.ts:74` |
+| command | `recordProjectMoved`                | –       | `src/eventing/project-lifecycle.pipeline.ts:75` |
+| command | `recordProjectArchived`             | –       | `src/eventing/project-lifecycle.pipeline.ts:76` |
+| command | `recordProjectDepartmentAssigned`   | –       | `src/eventing/project-lifecycle.pipeline.ts:77` |
+| command | `recordProjectTraceSharingDisabled` | –       | `src/eventing/project-lifecycle.pipeline.ts:78` |
+| command | `recordProjectAggregateRuleChanged` | –       | `src/eventing/project-lifecycle.pipeline.ts:79` |
+| command | `recordProjectRevived`              | –       | `src/eventing/project-lifecycle.pipeline.ts:80` |
+| command | `recordPersonalOwnerListed`         | –       | `src/eventing/project-lifecycle.pipeline.ts:81` |
+| command | `recordFirstMessageListed`          | –       | `src/eventing/project-lifecycle.pipeline.ts:82` |
 
 ## Configuration
 

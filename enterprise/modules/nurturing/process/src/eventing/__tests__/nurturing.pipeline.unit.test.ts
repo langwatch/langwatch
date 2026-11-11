@@ -118,6 +118,8 @@ function nurturingOverMemoryPostHog(users: UserApi = createApiFixture<UserApi>({
     evaluationsCompleted: async () => undefined,
     simulationRunsFinished: async () => undefined,
     codingSessionsStored: async () => undefined,
+    recordPersonalOwner: async () => undefined,
+    recordTracedProject: async () => undefined,
   });
   const subscribers: EventSubscriberDefinition<Event>[] = [];
   const registry = createApiFixture<

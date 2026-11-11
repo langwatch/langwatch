@@ -96,6 +96,7 @@ function compose() {
     milestones: createApiFixture<TraceProcessingPipelineInput["milestones"]>({
       recordFirstTrace: async () => undefined,
       recordTraceReceived: async () => undefined,
+      recordProjectTraced: async () => undefined,
     }),
   }).build({ participation: "consume" });
   return { pipeline, updateMetadata };

@@ -77,6 +77,20 @@ export type ProjectBackfillEntry =
   | Readonly<{ kind: "whole"; project: ProjectBackfillRow }>
   | Readonly<{ kind: "orphan"; id: string }>;
 
+/** One stored project as the history listing step reads it: its owner and first message. */
+export type ProjectHistoryRow = Readonly<{
+  id: string;
+  organizationId: string;
+  isPersonal: boolean;
+  ownerUserId: string | null;
+  firstMessage: boolean;
+}>;
+
+/** One row of the projects table for the history listing: whole, or an orphan it skips. */
+export type ProjectHistoryEntry =
+  | Readonly<{ kind: "whole"; project: ProjectHistoryRow }>
+  | Readonly<{ kind: "orphan"; id: string }>;
+
 /** Persistence owned by the Project module. It never crosses into a caller. */
 export interface ProjectRepository {
   findPaths(input: { projectIds: string[] }): Promise<ProjectPath[]>;
@@ -120,6 +134,8 @@ export interface ProjectRepository {
     afterId: string | null;
     limit: number;
   }): Promise<ProjectBackfillEntry[]>;
+  /** Every project, archived ones included, in id order after `afterId`; empty at the end. */
+  findHistoryPage(input: { afterId: string | null; limit: number }): Promise<ProjectHistoryEntry[]>;
   findTraceSharingConfig(id: string): Promise<TraceSharingConfig | null>;
   searchByQuery(input: {
     query: string;

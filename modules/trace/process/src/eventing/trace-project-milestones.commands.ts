@@ -3,19 +3,24 @@ import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/even
 import {
   FIRST_TRACE_RECORDED_EVENT_TYPE,
   MONTH_TRACE_IDS_LISTED_EVENT_TYPE,
+  PROJECT_TRACED_EVENT_TYPE,
   TRACE_RECEIVED_EVENT_TYPE,
 } from "@langwatch/trace-contract";
 
 import {
   type FirstTraceRecordedEvent,
   type MonthTraceIdsListedEvent,
+  type ProjectTracedEvent,
   RECORD_MONTH_TRACE_IDS_COMMAND_TYPE,
+  RECORD_PROJECT_TRACED_COMMAND_TYPE,
   RECORD_FIRST_TRACE_COMMAND_TYPE,
   RECORD_TRACE_RECEIVED_COMMAND_TYPE,
   type RecordFirstTraceCommandData,
   type RecordMonthTraceIdsCommandData,
   recordMonthTraceIdsCommandDataSchema,
   recordFirstTraceCommandDataSchema,
+  type RecordProjectTracedCommandData,
+  recordProjectTracedCommandDataSchema,
   type RecordTraceReceivedCommandData,
   recordTraceReceivedCommandDataSchema,
   TRACE_PROJECT_AGGREGATE_TYPE,
@@ -117,6 +122,38 @@ export class RecordMonthTraceIdsCommand implements CommandHandler<
   }
 
   static getAggregateId(payload: RecordMonthTraceIdsCommandData): string {
+    return payload.projectId;
+  }
+}
+
+/** Records that a project was traced; one event per project, whoever administers it. */
+export class RecordProjectTracedCommand implements CommandHandler<
+  Command<RecordProjectTracedCommandData>,
+  ProjectTracedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_PROJECT_TRACED_COMMAND_TYPE,
+    recordProjectTracedCommandDataSchema,
+    "Record that a project received its first real trace, with or without an organization admin",
+  );
+
+  handle(command: Command<RecordProjectTracedCommandData>): ProjectTracedEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<ProjectTracedEvent>({
+        aggregateType: TRACE_PROJECT_AGGREGATE_TYPE,
+        aggregateId: data.projectId,
+        tenantId: createTenantId(command.tenantId),
+        type: PROJECT_TRACED_EVENT_TYPE,
+        version: TRACE_PROJECT_MILESTONES_EVENT_VERSION,
+        data,
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.projectId}:project_traced`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordProjectTracedCommandData): string {
     return payload.projectId;
   }
 }

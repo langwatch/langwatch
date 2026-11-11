@@ -45,6 +45,24 @@ export const traceReceivedEventDataSchema: TraceReceivedEventDataSchema =
   traceReceivedEventDataSchemaDefinition;
 export type TraceReceivedEventData = z.infer<typeof traceReceivedEventDataSchema>;
 
+/** A project's first real trace, recorded with or without an organization admin. */
+export const PROJECT_TRACED_EVENT_TYPE = "lw.trace.project_traced" as const;
+
+/** Ids only: no person, so an organization without an admin is still told. */
+const projectTracedEventDataSchemaDefinition = z.object({
+  tenantId: z.string().min(1),
+  projectId: z.string().min(1),
+  /** Null when the project's team or organization is gone. */
+  organizationId: z.string().min(1).nullable(),
+  occurredAt: z.number().int().nonnegative(),
+});
+export interface ProjectTracedEventDataSchema extends Named<
+  typeof projectTracedEventDataSchemaDefinition
+> {}
+export const projectTracedEventDataSchema: ProjectTracedEventDataSchema =
+  projectTracedEventDataSchemaDefinition;
+export type ProjectTracedEventData = z.infer<typeof projectTracedEventDataSchema>;
+
 /** A page of a project's trace ids first seen in a month, sent by trace's upgrade step. */
 export const MONTH_TRACE_IDS_LISTED_EVENT_TYPE = "lw.trace.month_trace_ids_listed" as const;
 /** The most trace ids one listing event carries. */

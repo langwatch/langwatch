@@ -47,7 +47,10 @@ export interface ProjectMetadataSubscriberDeps {
    */
   projects: TraceProjectMetadata;
   /** Records the first and later traces as trace's own events (§9); a failure is only logged. */
-  milestones: Pick<TraceProjectMilestonesService, "recordFirstTrace" | "recordTraceReceived">;
+  milestones: Pick<
+    TraceProjectMilestonesService,
+    "recordFirstTrace" | "recordTraceReceived" | "recordProjectTraced"
+  >;
 }
 
 /**
@@ -60,14 +63,15 @@ async function trackFirstTraceIntegrated({
   source,
   tenantId,
   attrs,
+  admin,
 }: {
   deps: ProjectMetadataSubscriberDeps;
   source: FirstTraceSource;
   tenantId: string;
   attrs: Record<string, string>;
+  admin: OrgAdminResolution;
 }): Promise<void> {
-  const { userId, organizationCreatedAt, onboardingVariant } =
-    await deps.projects.resolveOrgAdmin(tenantId);
+  const { userId, organizationCreatedAt, onboardingVariant } = admin;
   if (!userId) return;
 
   try {
@@ -83,6 +87,30 @@ async function trackFirstTraceIntegrated({
     });
   } catch (error) {
     logger.error({ tenantId, error }, "Failed to record the first trace (non-fatal)");
+  }
+}
+
+/** The project's first real trace with its organization, admin or not; non-fatal. */
+async function trackProjectTraced({
+  deps,
+  source,
+  tenantId,
+  organizationId,
+}: {
+  deps: ProjectMetadataSubscriberDeps;
+  source: FirstTraceSource;
+  tenantId: string;
+  organizationId: string | null;
+}): Promise<void> {
+  try {
+    await deps.milestones.recordProjectTraced({
+      tenantId,
+      projectId: tenantId,
+      organizationId,
+      occurredAt: source.occurredAt,
+    });
+  } catch (error) {
+    logger.error({ tenantId, error }, "Failed to record the project as traced (non-fatal)");
   }
 }
 
@@ -191,7 +219,9 @@ async function markFirstMessage({
   // Fired after the metadata write commits, so a failed write retries
   // the event on the project's next trace instead of dropping it.
   if (!project.firstMessage) {
-    await trackFirstTraceIntegrated({ deps, source, tenantId, attrs });
+    const admin = await deps.projects.resolveOrgAdmin(tenantId);
+    await trackProjectTraced({ deps, source, tenantId, organizationId: admin.organizationId });
+    await trackFirstTraceIntegrated({ deps, source, tenantId, attrs, admin });
   }
 }
 

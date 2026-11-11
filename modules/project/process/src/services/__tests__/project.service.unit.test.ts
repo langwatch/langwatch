@@ -30,6 +30,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type {
   ProjectBackfillEntry,
+  ProjectHistoryEntry,
   ProjectRepository,
 } from "../../repositories/project.repository.ts";
 import { ProjectCreatedNoticeService } from "../project-created-notice.service.ts";
@@ -162,6 +163,7 @@ class StubRepository implements ProjectRepository {
   touchCodingAgentPullRequestSeen = vi.fn(async () => undefined);
   findWithOrgAdmin = vi.fn(async () => null);
   findBackfillPage = vi.fn(async (): Promise<ProjectBackfillEntry[]> => []);
+  findHistoryPage = vi.fn(async (): Promise<ProjectHistoryEntry[]> => []);
   findTraceSharingConfig = vi.fn(async () => null);
   searchByQuery = vi.fn(async () => []);
   update = vi.fn(async () => applicationProject);

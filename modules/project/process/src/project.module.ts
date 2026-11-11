@@ -6,6 +6,7 @@ import { defineMigrationStep } from "@langwatch/upgrade/step";
 import { ProjectModule } from "./app/project.app.ts";
 import { projectLifecycleEventing } from "./eventing/project-lifecycle.pipeline.ts";
 import { projectRepositories } from "./repositories/project-repositories.registry.ts";
+import { projectHistoryListingCheckpointSchema } from "./services/project-history-listing.service.ts";
 import { projectRest } from "./transport/project.rest.ts";
 import { projectTrpcTransport } from "./transport/project.trpc.ts";
 
@@ -56,6 +57,36 @@ export const projectProcessModule: PublishedProcessModule<"project", ProjectApi>
             },
             onPageDone: ({ afterProjectId, report: page }) =>
               checkpoint.save({ report: { afterProjectId, ...page } }),
+          });
+          return { ...report, dryRun };
+        },
+      }),
+      defineMigrationStep({
+        id: "project:list-personal-owner-and-first-message-facts",
+        kind: "data",
+        mode: "background",
+        // An old worker runs no subscriber of these facts' peers, so list once it is gone.
+        needsOldWritersGone: true,
+        description:
+          "Lists every personal project's owner and every project that already received its first message, archived ones included.",
+        run: async ({ checkpoint, dryRun, signal }) => {
+          const resumed = projectHistoryListingCheckpointSchema.safeParse(checkpoint.resumeFrom);
+          const { afterProjectId, ...countedBefore } = resumed.success
+            ? resumed.data
+            : {
+                afterProjectId: null,
+                ownerFactsToSend: 0,
+                firstMessageFactsToSend: 0,
+                skippedOrphans: 0,
+                orphanProjectIds: [],
+              };
+          const report = await app.sendHistoryFacts({
+            dryRun,
+            signal,
+            afterProjectId,
+            countedBefore,
+            onPageDone: ({ afterProjectId: after, report: page }) =>
+              checkpoint.save({ report: { afterProjectId: after, ...page } }),
           });
           return { ...report, dryRun };
         },
