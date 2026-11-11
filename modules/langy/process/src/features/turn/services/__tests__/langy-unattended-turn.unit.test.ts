@@ -265,7 +265,9 @@ describe("an unattended Langy turn", () => {
       const fixture = makeFixture();
       fixture.acceptTurn.mockRejectedValueOnce(new Error("the turn could not be recorded"));
 
-      await expect(fixture.start(unattendedTurn)).rejects.toThrow("could not be recorded");
+      await expect(fixture.start(unattendedTurn)).rejects.toMatchObject({
+        code: "langy_agent_unavailable",
+      });
 
       expect(fixture.mint).toHaveBeenCalledWith(
         expect.objectContaining({ holdKey: expect.stringMatching(/^langyhold_/) }),
@@ -451,9 +453,9 @@ describe("a turn in a run conversation", () => {
       const fixture = makeFixture({ existing: RUN_CONVERSATION });
       fixture.acceptTurn.mockRejectedValueOnce(new Error("the turn could not be recorded"));
 
-      await expect(fixture.start(replyIn("conversation-1"))).rejects.toThrow(
-        "could not be recorded",
-      );
+      await expect(fixture.start(replyIn("conversation-1"))).rejects.toMatchObject({
+        code: "langy_agent_unavailable",
+      });
 
       expect(fixture.mint).toHaveBeenCalledWith(
         expect.not.objectContaining({ holdKey: expect.anything() }),
