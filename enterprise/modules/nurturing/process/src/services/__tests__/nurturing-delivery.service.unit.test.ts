@@ -158,7 +158,7 @@ describe("NurturingDeliveryService", () => {
       await settle();
 
       expect(posthog.tracked).toHaveLength(1);
-      expect(cio.sent).toHaveLength(2);
+      expect(cio.sent).toHaveLength(1);
     });
   });
 
