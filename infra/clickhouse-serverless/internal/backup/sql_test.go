@@ -63,12 +63,12 @@ func TestSQLRefusesAndQuotes(t *testing.T) {
 func TestLookupsReadBackupLogAcrossReplicas(t *testing.T) {
 	since := time.Unix(1_800_000_000, 0)
 	local := Tables{}.CreatedSQL("langwatch", since)
-	if !strings.Contains(local, "FROM system.backup_log ") || strings.Contains(local, "system.backups ") || strings.Contains(local, "skip_unavailable") {
+	if !strings.Contains(local, "FROM merge('system', '^backup_log') ") || strings.Contains(local, "system.backups ") || strings.Contains(local, "skip_unavailable") {
 		t.Errorf("local lookup: %s", local)
 	}
 	cluster := Tables{Cluster: "langwatch"}
 	for _, q := range []string{cluster.CreatedSQL("langwatch", since), cluster.SummarySQL("langwatch", Full)} {
-		if !strings.Contains(q, "FROM clusterAllReplicas('langwatch', system.backup_log)") || !strings.HasSuffix(q, "SETTINGS skip_unavailable_shards = 1") {
+		if !strings.Contains(q, "FROM clusterAllReplicas('langwatch', merge('system', '^backup_log'))") || !strings.HasSuffix(q, "SETTINGS skip_unavailable_shards = 1") {
 			t.Errorf("cluster lookup: %s", q)
 		}
 		if !strings.Contains(q, "status = 'BACKUP_CREATED'") {
@@ -80,6 +80,23 @@ func TestLookupsReadBackupLogAcrossReplicas(t *testing.T) {
 	}
 	if q := cluster.InFlightSQL(); !strings.Contains(q, "clusterAllReplicas('langwatch', system.backups)") {
 		t.Errorf("in-flight check is not cluster-wide: %s", q)
+	}
+}
+
+// @scenario "The base is found in the backup_log copies an upgrade renamed"
+func TestEveryBackupLogReadCoversTheRenamedCopies(t *testing.T) {
+	for _, tables := range []Tables{{}, {Cluster: "langwatch"}} {
+		for _, q := range []string{
+			tables.CreatedSQL("langwatch", time.Unix(1_800_000_000, 0)),
+			tables.SummarySQL("langwatch", Full),
+			tables.SummarySQL("langwatch", Incremental),
+			tables.LoggedStatusSQL("id"),
+			tables.ListSQL(10),
+		} {
+			if strings.Contains(q, "system.backup_log") || !strings.Contains(q, "merge('system', '^backup_log')") {
+				t.Errorf("reads backup_log without the copies an upgrade renamed: %s", q)
+			}
+		}
 	}
 }
 
