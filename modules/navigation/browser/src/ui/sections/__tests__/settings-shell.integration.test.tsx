@@ -46,9 +46,11 @@ function renderSettingsSidebar({
   isSaaS = false,
   hasCloudOps = false,
   permissions = ["organization:view", "auditLog:view", "triggers:view", "sso:view"],
+  organizationPermissions = [],
   surface = "settings",
 }: {
   surface?: "settings" | "admin";
+  organizationPermissions?: string[];
   pathname?: string;
   search?: string;
   isLiteMember?: boolean;
@@ -67,6 +69,7 @@ function renderSettingsSidebar({
         pathname,
         search,
         permissions,
+        organizationPermissions,
         plan: { isEnterprise, isLoading: false, isLiteMember },
         opsAccess: { hasAccess: hasOpsAccess, isAdmin: isOpsAdmin },
         deployment: { isSaaS, hasCloudOps },
@@ -345,6 +348,18 @@ describe("the settings shell in a new navigation mode", () => {
         .getAllByRole("link")
         .map((link) => link.textContent?.trim());
       expect(entries.indexOf("Teams & projects")).toBe(entries.indexOf("Users") + 1);
+      expect(screen.getByRole("link", { name: "Teams & projects" })).toHaveAttribute(
+        "href",
+        "/settings/directory?tab=teams",
+      );
+    });
+
+    /** @scenario "Teams & projects asks who may manage the organization the way its tab does" */
+    it("offers Teams & projects to a manager whose open project does not grant it", () => {
+      renderSettingsSidebar({
+        permissions: ["members:view"],
+        organizationPermissions: ["organization:manage"],
+      });
       expect(screen.getByRole("link", { name: "Teams & projects" })).toHaveAttribute(
         "href",
         "/settings/directory?tab=teams",

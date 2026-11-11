@@ -156,6 +156,12 @@ Feature: Settings shell
     When the settings menu is built
     Then People & access offers no Teams & projects entry
 
+  @unit @integration
+  Scenario: Teams & projects asks who may manage the organization the way its tab does
+    Given I may manage my organization, though not through the project I have open
+    When the settings sidebar renders
+    Then People & access offers Teams & projects, as the Users page offers its Teams tab
+
   @integration
   Scenario: The menu marks the page that is open
     Given I open the Email Suppressions settings page

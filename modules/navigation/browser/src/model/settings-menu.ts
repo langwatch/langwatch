@@ -138,6 +138,11 @@ export interface SettingsMenuGroup {
  */
 export interface SettingsMenuGates {
   hasPermission: (permission: string) => boolean;
+  /**
+   * The same check across the whole organization, not just the open project: what an
+   * organization page asks, so an entry onto one is offered exactly when the page is.
+   */
+  hasOrganizationPermission: (permission: string) => boolean;
   isSaaS: boolean;
   hasCloudOps: boolean;
   hosting: Hosting;
@@ -251,7 +256,11 @@ function organizationGroup({
   };
 }
 
-function accessGroup({ enterprisePlan, hasPermission }: SettingsMenuGates): SettingsMenuGroup {
+function accessGroup({
+  enterprisePlan,
+  hasPermission,
+  hasOrganizationPermission,
+}: SettingsMenuGates): SettingsMenuGroup {
   return {
     id: "settings-access",
     label: "People & access",
@@ -272,9 +281,10 @@ function accessGroup({ enterprisePlan, hasPermission }: SettingsMenuGates): Sett
         ],
       },
       // A shortcut to the Users page's Teams tab, which readers could not find; the tab is
-      // offered to an organization manager only, so the entry is too. Where both are offered,
-      // Users yields team pages to it; a reader without it still sees Users lit there.
-      ...(hasPermission("organization:manage")
+      // offered to an organization manager only, so the entry is too, asked the way the tab
+      // asks it. Where both are offered, Users yields team pages to it; a reader without it
+      // still sees Users lit there.
+      ...(hasOrganizationPermission("organization:manage")
         ? [
             {
               label: "Teams & projects",

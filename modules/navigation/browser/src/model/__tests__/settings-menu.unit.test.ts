@@ -15,6 +15,7 @@ import {
 
 const EVERYTHING_CLOSED: SettingsMenuGates = {
   hasPermission: () => false,
+  hasOrganizationPermission: () => false,
   isSaaS: false,
   hasCloudOps: false,
   hosting: "self-hosted",
@@ -193,18 +194,32 @@ describe("given the People & access group", () => {
   describe("when the reader may manage the organization", () => {
     /** @scenario "Teams & projects has its own entry under Users" */
     it("offers Teams & projects right after Users, on the Users page's teams tab", () => {
-      expect(accessHrefsIn({ hasPermission: (p) => p === "organization:manage" })).toEqual([
-        "/settings/directory",
-        "/settings/directory?tab=teams",
-        "/settings/roles",
-      ]);
+      expect(
+        accessHrefsIn({ hasOrganizationPermission: (p) => p === "organization:manage" }),
+      ).toEqual(["/settings/directory", "/settings/directory?tab=teams", "/settings/roles"]);
+    });
+
+    /** @scenario "Teams & projects asks who may manage the organization the way its tab does" */
+    it("follows the organization-wide answer, not the open project's", () => {
+      expect(
+        accessHrefsIn({
+          hasPermission: () => false,
+          hasOrganizationPermission: (p) => p === "organization:manage",
+        }),
+      ).toContain("/settings/directory?tab=teams");
+      expect(
+        accessHrefsIn({
+          hasPermission: (p) => p === "organization:manage",
+          hasOrganizationPermission: () => false,
+        }),
+      ).not.toContain("/settings/directory?tab=teams");
     });
 
     /** @scenario "Teams & projects has its own entry under Users" */
     it("lights Teams & projects alone on its tab and Users alone elsewhere on the page", () => {
       const items = settingsMenu({
         ...EVERYTHING_CLOSED,
-        hasPermission: (p) => p === "organization:manage",
+        hasOrganizationPermission: (p) => p === "organization:manage",
       }).find((group) => group.id === "settings-access")!.items;
       const marked = (pathname: string, search: string) =>
         items
