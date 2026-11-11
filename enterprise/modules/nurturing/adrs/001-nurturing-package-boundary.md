@@ -101,4 +101,11 @@ before/after count shows no difference.
 
 **Consequences.** Two more tables to keep in step with their facts. A fact whose send fails is
 not filled later; its log line is the accepted residue. `ownerUserId` is a kept user id, like
-`NurturingOrganization.adminUserId`; neither reacts to an account's erasure yet.
+`NurturingOrganization.adminUserId`. On user's `lw.user.erased`, nurturing deletes every
+`NurturingPersonalProject` row the account owns and sets `adminUserId` to null wherever it
+names the account, in every organization, through one raw statement each that skips the
+tenancy guard with its reason (by user, as dataset forgets an erased version author). It reads
+no other module's table and calls no sink; a redelivery finds nothing left. Accepted residue: a
+personal-owner fact delivered after the erasure (a delayed `personal_owner_listed`, a
+redelivered workspace fact) writes the owner row again, and a late `project_created` naming
+the account as admin sets `adminUserId` again, as nurturing keeps no record of who was erased.

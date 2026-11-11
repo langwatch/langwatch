@@ -7,6 +7,13 @@ Feature: Nurturing keeps its own copy of personal owners and traced projects, fr
   traits a person is sent are still read where they were. Writing a copy calls no sink, so no
   Customer.io or PostHog request comes from these facts.
 
+  When user records an account erased, nurturing deletes every owner row naming it, in every
+  organization, and clears it wherever its own organization rows name it admin. It reads no
+  other module's table and calls no sink. Accepted residue: a personal-owner fact delivered
+  after the erasure (a delayed listing or a redelivered workspace fact) writes the owner row
+  again, and a late project-created fact naming the account as admin names it again, as
+  nurturing keeps no record of who was erased.
+
   @unit @integration
   Scenario: A new personal workspace leaves one owner row naming its member
     When organization records a personal team for member user-1, delivered twice
@@ -45,4 +52,20 @@ Feature: Nurturing keeps its own copy of personal owners and traced projects, fr
     Given nurturing holds a traced row from trace's live fact
     When project lists that project and another one as having received their first message
     Then each project has exactly one traced row
+    And neither Customer.io nor PostHog receives a request
+
+  @unit @integration
+  Scenario: An erased account's owner and admin rows are cleared, and nothing is sent
+    Given nurturing holds owner rows for user-1 in two organizations and one for user-2
+    And nurturing's organization rows name user-1 admin of one organization and user-2 of another
+    When user records user-1 erased, delivered twice
+    Then no owner row names user-1, and user-2's row stays
+    And no organization row names user-1 admin, and user-2 stays admin of its organization
+    And neither Customer.io nor PostHog receives a request
+
+  @unit @integration
+  Scenario: An erasure of an account nurturing holds no row for changes nothing
+    Given nurturing holds owner and admin rows for user-1 and user-2
+    When user records erased an account no nurturing row names
+    Then every owner and organization row is as it was
     And neither Customer.io nor PostHog receives a request

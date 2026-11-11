@@ -112,8 +112,10 @@ import {
 } from "@langwatch/trace-contract";
 import {
   USER_CREATED_EVENT_TYPE,
+  USER_ERASED_EVENT_TYPE,
   USER_REGISTERED_EVENT_TYPE,
   userCreatedEventDataSchema,
+  userErasedEventDataSchema,
   userLifecycleEventDataSchema,
 } from "@langwatch/user-contract";
 import {
@@ -274,6 +276,8 @@ export function buildNurturingPipeline(deps: {
     projectId: string;
     organizationId: string | null;
   }) => Promise<void>;
+  /** Takes an erased account out of nurturing's own rows; never delivers. */
+  forgetErasedUser: (input: { userId: string }) => Promise<void>;
 }): NurturingPipeline {
   const deliverSignal = (signal: NurturingSignal) =>
     deps.deliver({ key: nurturingSignalKey(signal), signal });
@@ -583,6 +587,12 @@ export function buildNurturingPipeline(deps: {
         data: projectFirstMessageListedEventDataSchema,
         handle: ({ projectId, organizationId }) =>
           deps.recordTracedProject({ projectId, organizationId }),
+      })
+      // User's erasure fact: nurturing deletes its own rows naming the account, and sends nothing.
+      .withPeerSubscriber("userErased", {
+        eventType: USER_ERASED_EVENT_TYPE,
+        data: userErasedEventDataSchema,
+        handle: ({ userId }) => deps.forgetErasedUser({ userId }),
       })
       .withPeerSubscriber("appPageOpened", {
         eventType: APP_PAGE_OPENED_EVENT_TYPE,

@@ -21,6 +21,12 @@ export class MemoryNurturingPersonalProjectRepository implements NurturingPerson
     return row ? [row.ownerUserId] : [];
   }
 
+  async forgetOwner({ ownerUserId }: Readonly<{ ownerUserId: string }>): Promise<void> {
+    for (const [projectId, row] of this.#rows) {
+      if (row.ownerUserId === ownerUserId) this.#rows.delete(projectId);
+    }
+  }
+
   /** Every stored row in write order, for a test to read what the copy holds. */
   storedRows(): NurturingPersonalProjectRow[] {
     return [...this.#rows.values()];

@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { PrismaRepository, type PrismaRepositoryClient } from "@langwatch/prisma-client";
+import {
+  PrismaRepository,
+  type PrismaRepositoryClient,
+  skipTenantCheck,
+} from "@langwatch/prisma-client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type {
   NurturingPersonalProjectRepository,
@@ -8,7 +13,8 @@ import type {
 
 type NurturingPersonalProjectDatabase = PrismaRepositoryClient<
   readonly ["NurturingPersonalProject"]
->;
+> &
+  Pick<PrismaClient, "$executeRaw">;
 
 /** Nurturing's `NurturingPersonalProject`: each personal project's owner, the first one kept. */
 export class PrismaNurturingPersonalProjectRepository
@@ -23,8 +29,11 @@ export class PrismaNurturingPersonalProjectRepository
     return new PrismaNurturingPersonalProjectRepository(prisma);
   }
 
+  readonly #database: NurturingPersonalProjectDatabase;
+
   private constructor(prisma: NurturingPersonalProjectDatabase) {
     super(prisma);
+    this.#database = prisma;
   }
 
   async recordOwner(input: NurturingPersonalProjectRow): Promise<void> {
@@ -38,5 +47,13 @@ export class PrismaNurturingPersonalProjectRepository
   async findOwnerUserIds({ projectId }: Readonly<{ projectId: string }>): Promise<string[]> {
     const row = await this.prisma.nurturingPersonalProject.findUnique({ where: { projectId } });
     return row ? [row.ownerUserId] : [];
+  }
+
+  async forgetOwner({ ownerUserId }: Readonly<{ ownerUserId: string }>): Promise<void> {
+    await this.#database.$executeRaw`${skipTenantCheck({
+      // An erased account owns no personal project in any organization: the row goes by user.
+      SKIP_TENANT_CHECK: true,
+    })}
+      DELETE FROM "NurturingPersonalProject" WHERE "ownerUserId" = ${ownerUserId}`;
   }
 }

@@ -17,16 +17,23 @@ import {
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { PROJECT_TRACED_EVENT_TYPE, PROJECT_TRACED_EVENT_VERSION } from "@langwatch/trace-contract";
-import type { UserApi } from "@langwatch/user-contract";
+import {
+  USER_AGGREGATE_TYPE,
+  USER_ERASED_EVENT_TYPE,
+  USER_LIFECYCLE_EVENT_VERSION,
+  type UserApi,
+} from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
 import { MemoryPostHogChannel } from "../../channels/memory/memory.posthog.channel.ts";
+import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingPersonalProjectRepository } from "../../repositories/memory/memory.nurturing-personal-project.repository.ts";
 import { MemoryNurturingTracedProjectRepository } from "../../repositories/memory/memory.nurturing-traced-project.repository.ts";
 import { unplacedMemberFacts } from "../../services/__tests__/nurturing-member-facts.test-helpers.ts";
 import { NurturingDeliveryService } from "../../services/nurturing-delivery.service.ts";
 import { NurturingProjectFactsService } from "../../services/nurturing-project-facts.service.ts";
+import { NurturingUserErasureService } from "../../services/nurturing-user-erasure.service.ts";
 import { NurturingService } from "../../services/nurturing.service.ts";
 import { buildNurturingPipeline } from "../nurturing.pipeline.ts";
 
@@ -58,12 +65,14 @@ function nurturingOverCopies() {
   });
   const personalProjects = MemoryNurturingPersonalProjectRepository.create();
   const tracedProjects = MemoryNurturingTracedProjectRepository.create();
+  const organizations = MemoryNurturingMilestonesRepository.create();
   const { logger, lines } = createTestLogger();
   const projectFacts = NurturingProjectFactsService.create({
     personalProjects,
     tracedProjects,
     logger,
   });
+  const userErasure = NurturingUserErasureService.create({ personalProjects, organizations });
   const pipeline = buildNurturingPipeline({
     deliver: (input) => delivery.deliver(input),
     projectCreated: async () => undefined,
@@ -74,6 +83,7 @@ function nurturingOverCopies() {
     codingSessionsStored: async () => undefined,
     recordPersonalOwner: (input) => projectFacts.recordPersonalOwner(input),
     recordTracedProject: (input) => projectFacts.recordTracedProject(input),
+    forgetErasedUser: (input) => userErasure.forgetUser(input),
   });
   const subscribers: EventSubscriberDefinition<Event>[] = [];
   const registry = createApiFixture<
@@ -96,7 +106,14 @@ function nurturingOverCopies() {
       posthog: posthog.tracked.length + posthog.identified.length,
     };
   };
-  return { personalProjects, tracedProjects, deliverFact, sinkRequests, logLines: lines };
+  return {
+    personalProjects,
+    tracedProjects,
+    organizations,
+    deliverFact,
+    sinkRequests,
+    logLines: lines,
+  };
 }
 
 const NO_REQUESTS = { customerIo: 0, posthog: 0 };
@@ -220,6 +237,17 @@ function firstMessageListed({
   });
 }
 
+/** User's fact that an account was erased; its tenant is the user's own id. */
+function userErased({ userId }: { userId: string }) {
+  return fact({
+    type: USER_ERASED_EVENT_TYPE,
+    aggregateType: USER_AGGREGATE_TYPE,
+    aggregateId: userId,
+    version: USER_LIFECYCLE_EVENT_VERSION,
+    data: { tenantId: userId, userId, occurredAt: 2_000, organizationIds: ["org-1"] },
+  });
+}
+
 describe("nurturing's copy of each personal project's owner", () => {
   describe("when organization records a personal team, delivered twice", () => {
     /** @scenario "A new personal workspace leaves one owner row naming its member" */
@@ -337,6 +365,82 @@ describe("nurturing's copy of each traced project", () => {
         { projectId: "project-fa", organizationId: "org-a" },
       ]);
       await expect(tracedProjects.hasTraced({ organizationId: "org-a" })).resolves.toBe(true);
+      await expect(sinkRequests()).resolves.toEqual(NO_REQUESTS);
+    });
+  });
+});
+
+describe("nurturing's rows naming an erased account", () => {
+  /** Owner rows for user-1 in two organizations and one for user-2; user-1 and user-2 as admins. */
+  async function nurturingHoldingTwoAccounts() {
+    const nurturing = nurturingOverCopies();
+    const { personalProjects, organizations } = nurturing;
+    await personalProjects.recordOwner({
+      projectId: "project-u1a",
+      organizationId: "org-1",
+      ownerUserId: "user-1",
+    });
+    await personalProjects.recordOwner({
+      projectId: "project-u1b",
+      organizationId: "org-2",
+      ownerUserId: "user-1",
+    });
+    await personalProjects.recordOwner({
+      projectId: "project-u2",
+      organizationId: "org-1",
+      ownerUserId: "user-2",
+    });
+    await organizations.recordOrganization({
+      organizationId: "org-1",
+      adminUserId: "user-1",
+      seeded: false,
+    });
+    await organizations.recordOrganization({
+      organizationId: "org-2",
+      adminUserId: "user-2",
+      seeded: false,
+    });
+    return nurturing;
+  }
+
+  const adminOf = async (
+    organizations: MemoryNurturingMilestonesRepository,
+    organizationId: string,
+  ) => (await organizations.findOrganization({ organizationId })).map((row) => row.adminUserId);
+
+  describe("when user records an account erased, delivered twice", () => {
+    /** @scenario "An erased account's owner and admin rows are cleared, and nothing is sent" */
+    it("deletes its owner rows in every organization, clears it as admin and calls neither sink", async () => {
+      const { personalProjects, organizations, deliverFact, sinkRequests } =
+        await nurturingHoldingTwoAccounts();
+
+      await deliverFact(userErased({ userId: "user-1" }));
+      await deliverFact(userErased({ userId: "user-1" }));
+
+      expect(personalProjects.storedRows()).toEqual([
+        { projectId: "project-u2", organizationId: "org-1", ownerUserId: "user-2" },
+      ]);
+      await expect(adminOf(organizations, "org-1")).resolves.toEqual([null]);
+      await expect(adminOf(organizations, "org-2")).resolves.toEqual(["user-2"]);
+      await expect(sinkRequests()).resolves.toEqual(NO_REQUESTS);
+    });
+  });
+
+  describe("when user records erased an account no nurturing row names", () => {
+    /** @scenario "An erasure of an account nurturing holds no row for changes nothing" */
+    it("leaves every row as it was and calls neither sink", async () => {
+      const { personalProjects, organizations, deliverFact, sinkRequests } =
+        await nurturingHoldingTwoAccounts();
+
+      await deliverFact(userErased({ userId: "user-9" }));
+
+      expect(personalProjects.storedRows().map(({ projectId }) => projectId)).toEqual([
+        "project-u1a",
+        "project-u1b",
+        "project-u2",
+      ]);
+      await expect(adminOf(organizations, "org-1")).resolves.toEqual(["user-1"]);
+      await expect(adminOf(organizations, "org-2")).resolves.toEqual(["user-2"]);
       await expect(sinkRequests()).resolves.toEqual(NO_REQUESTS);
     });
   });

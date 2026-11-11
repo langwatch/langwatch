@@ -3,6 +3,7 @@ import type { NurturingClaimRepository } from "./nurturing-claim.repository.ts";
 import type {
   NurturingCodingMilestonesRepository,
   NurturingMilestonesRepository,
+  NurturingOrganizationAdminRepository,
   NurturingTraceMilestonesRepository,
 } from "./nurturing-milestones.repository.ts";
 import type { NurturingPersonalProjectRepository } from "./nurturing-personal-project.repository.ts";
@@ -13,7 +14,8 @@ import type { NurturingTracedProjectRepository } from "./nurturing-traced-projec
 export interface NurturingRepositories {
   readonly milestones: NurturingMilestonesRepository &
     NurturingCodingMilestonesRepository &
-    NurturingTraceMilestonesRepository;
+    NurturingTraceMilestonesRepository &
+    NurturingOrganizationAdminRepository;
   readonly projects: NurturingProjectDirectoryRepository;
   /** Nurturing's own copies, written from the owners' facts (§9); read by nothing yet. */
   readonly personalProjects: NurturingPersonalProjectRepository;

@@ -31,6 +31,7 @@ function nurturing() {
     codingSessionsStored: async ({ sessions }) => void codingBatches.push([...sessions]),
     recordPersonalOwner: async () => undefined,
     recordTracedProject: async () => undefined,
+    forgetErasedUser: async () => undefined,
   });
   const subscribers: EventSubscriberDefinition<Event>[] = [];
   const registry = createApiFixture<

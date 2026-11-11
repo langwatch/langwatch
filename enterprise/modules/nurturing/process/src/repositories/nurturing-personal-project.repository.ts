@@ -13,4 +13,6 @@ export interface NurturingPersonalProjectRepository {
   recordOwner(input: NurturingPersonalProjectRow): Promise<void>;
   /** The personal project's owner, as one id; none for a project nurturing never recorded. */
   findOwnerUserIds(input: Readonly<{ projectId: string }>): Promise<string[]>;
+  /** Deletes every row naming the user as owner, in any organization; none left is a no-op. */
+  forgetOwner(input: Readonly<{ ownerUserId: string }>): Promise<void>;
 }

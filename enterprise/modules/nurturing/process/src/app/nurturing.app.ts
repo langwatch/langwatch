@@ -21,6 +21,7 @@ import { NurturingDeliveryService } from "../services/nurturing-delivery.service
 import { NurturingMemberFactsService } from "../services/nurturing-member-facts.service.ts";
 import { NurturingMilestonesService } from "../services/nurturing-milestones.service.ts";
 import { NurturingProjectFactsService } from "../services/nurturing-project-facts.service.ts";
+import { NurturingUserErasureService } from "../services/nurturing-user-erasure.service.ts";
 import { NurturingService } from "../services/nurturing.service.ts";
 
 type NurturingSetup = FeatureSetup<
@@ -84,6 +85,10 @@ export class NurturingModule implements NurturingApi {
       tracedProjects: repositories.tracedProjects,
       logger: createLogger("langwatch:nurturing:project-facts"),
     });
+    const userErasure = NurturingUserErasureService.create({
+      personalProjects: repositories.personalProjects,
+      organizations: repositories.milestones,
+    });
     return new NurturingModule(
       buildNurturingPipeline({
         deliver: (input) => delivery.deliver(input),
@@ -95,6 +100,7 @@ export class NurturingModule implements NurturingApi {
         codingSessionsStored: (input) => codingMilestones.sessionsStored(input),
         recordPersonalOwner: (input) => projectFacts.recordPersonalOwner(input),
         recordTracedProject: (input) => projectFacts.recordTracedProject(input),
+        forgetErasedUser: (input) => userErasure.forgetUser(input),
       }),
     );
   }
