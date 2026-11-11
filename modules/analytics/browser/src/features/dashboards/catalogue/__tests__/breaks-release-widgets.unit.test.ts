@@ -86,7 +86,7 @@ describe("given the Where my agent breaks widgets", () => {
   it("reads tool spans only and shows the recovered share and the worst tool", () => {
     const { code, sql } = buildOf("tools-error-rate");
     // Both the calls and the failed calls that look their parent up read tool spans only.
-    expect(sql.main.match(/AND SpanType = 'tool'/g)).toHaveLength(2);
+    expect(sql.main?.match(/AND SpanType = 'tool'/g)).toHaveLength(2);
     expect(sql.main).not.toContain("SpanAttributes");
     expect(code).toContain("Tool error rate");
     expect(code).toContain("Recovered, of ");
