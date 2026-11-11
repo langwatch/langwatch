@@ -215,7 +215,7 @@ npx langwatch experiment run my-experiment --wait --fail-on-evaluator-failures
   </Tab>
 </Tabs>
 
-With the flag, the job exits with code 1 when any evaluator returns a failing verdict or errors instead of judging (a bad key or a timeout, for example), as well as on the default failures. An evaluator that errors on every row checked nothing, so it never passes the gate. The CLI flag needs `--wait`. Add `-f json` to the CLI to print the run status as JSON, with each evaluator's passed, failed and errored counts under `summary.evaluators`.
+With the flag, the job exits with code 1 when any evaluator returns a failing verdict or errors instead of judging (a bad key or a timeout, for example), as well as on the default failures. An evaluator that errors on every row gave no verdict, so it never passes the gate. The CLI flag needs `--wait`. Add `-f json` to the CLI to print the run status as JSON, with each evaluator's passed, failed and errored counts under `summary.evaluators`.
 
 ---
 

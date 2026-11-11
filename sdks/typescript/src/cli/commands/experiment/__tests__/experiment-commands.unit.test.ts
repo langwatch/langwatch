@@ -297,7 +297,12 @@ describe("runExperimentCommand()", () => {
 
     /** @scenario "A run that fails on the server fails the job" */
     it("exits 1 when the server marks the run failed", async () => {
-      mockGetRunStatus.mockResolvedValue({ runId: "run_123", status: "failed", progress: 1, total: 3 });
+      mockGetRunStatus.mockResolvedValue({
+        runId: "run_123",
+        status: "failed",
+        progress: 1,
+        total: 3,
+      });
 
       await expect(runExperimentCommand("quality-check", { wait: true })).rejects.toThrow(
         ProcessExitError,
