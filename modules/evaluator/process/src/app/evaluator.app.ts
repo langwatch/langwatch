@@ -62,11 +62,11 @@ import { evaluatorPlatformUrl } from "../rules/evaluator-platform-url.rules.ts";
 import { findTraceIdsPassingPreconditions } from "../rules/precondition-trace-data.rules.ts";
 import { EvaluatorCodeExecutionService } from "../services/evaluator-code-execution.service.ts";
 import { EvaluatorCreationCapService } from "../services/evaluator-creation-cap.service.ts";
-import {
-  EvaluatorDeletionFactsService,
-  type EvaluatorLifecycleSenders,
-} from "../services/evaluator-deletion-facts.service.ts";
 import { EvaluatorHistoryService } from "../services/evaluator-history.service.ts";
+import {
+  EvaluatorLifecycleFactsService,
+  type EvaluatorLifecycleSenders,
+} from "../services/evaluator-lifecycle-facts.service.ts";
 import { EvaluatorLinkedRowsService } from "../services/evaluator-linked-rows.service.ts";
 import { EvaluatorReplicationService } from "../services/evaluator-replication.service.ts";
 import { EvaluatorVersionService } from "../services/evaluator-version.service.ts";
@@ -113,7 +113,7 @@ type EvaluatorAppParts = Readonly<{
   modelProviders: ModelProviderApi;
   permissions: AuthzApi;
   graph: EvaluatorGraph;
-  deletionFacts: EvaluatorDeletionFactsService;
+  lifecycleFacts: EvaluatorLifecycleFactsService;
   publications: EvaluatorWorkflowPublicationService;
   /** The cloud Free cap on custom evaluators. */
   creationCaps: EvaluatorCreationCapService;
@@ -177,6 +177,8 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
       evaluators: repositories.evaluators,
     });
 
+    const lifecycleFacts = EvaluatorLifecycleFactsService.create();
+
     return new EvaluatorModule({
       evaluators,
       versions,
@@ -184,12 +186,13 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
       modelProviders: dependencies.modelProviders,
       permissions: dependencies.permissions,
       graph,
-      deletionFacts: EvaluatorDeletionFactsService.create(),
+      lifecycleFacts,
       publications: EvaluatorWorkflowPublicationService.create({
         workflows: dependencies.workflows,
         evaluators,
         creationCaps,
         versions,
+        lifecycleFacts,
       }),
       publicBaseUrl: config.publicBaseUrl,
     });
@@ -197,7 +200,7 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
 
   /** evaluator_lifecycle's senders, once the pipeline registers in this process. */
   connectLifecycle(senders: EvaluatorLifecycleSenders): void {
-    this.#dependencies.deletionFacts.connect(senders);
+    this.#dependencies.lifecycleFacts.connect(senders);
   }
 
   /** Archives the evaluators a workflow backed once workflow records the archive (§9). */
@@ -206,7 +209,7 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
       evaluators: EvaluatorWorkflowArchiveService.create({
         evaluators: this.#dependencies.evaluators,
         versions: this.#dependencies.versions,
-        deletionFacts: this.#dependencies.deletionFacts,
+        lifecycleFacts: this.#dependencies.lifecycleFacts,
       }),
     });
   }
@@ -487,7 +490,16 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
       }
     }
 
-    return this.#dependencies.evaluators.create(input);
+    return this.#recordCreated(await this.#dependencies.evaluators.create(input));
+  }
+
+  /** Records `lw.evaluator.created` after the row's own transaction has committed. */
+  async #recordCreated(evaluator: Evaluator): Promise<Evaluator> {
+    await this.#dependencies.lifecycleFacts.recordEvaluatorCreated({
+      projectId: evaluator.projectId,
+      evaluatorId: evaluator.id,
+    });
+    return evaluator;
   }
 
   /**
@@ -511,7 +523,7 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
       this.#resolveEmbeddingsModel(input.projectId, input.config),
     ]);
 
-    return this.#dependencies.evaluators.createWithDefaults({
+    const created = await this.#dependencies.evaluators.createWithDefaults({
       id: input.id ?? newEvaluatorId(),
       projectId: input.projectId,
       name: input.name,
@@ -523,12 +535,13 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
         embeddingsModel: resolvedEmbedding?.model ?? null,
       },
     });
+    return this.#recordCreated(created);
   }
 
   /** Creates an evaluator against models already resolved by the caller. */
   async createWithDefaults(input: EvaluatorCreateInput): Promise<Evaluator> {
     await this.#dependencies.creationCaps.assertCreationAllowed({ projectId: input.projectId });
-    return this.#dependencies.evaluators.createWithDefaults(input);
+    return this.#recordCreated(await this.#dependencies.evaluators.createWithDefaults(input));
   }
 
   /** Updates an evaluator, refusing a code evaluator that carries no program. */
@@ -577,7 +590,7 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
           projectId: input.projectId,
         })
       : null;
-    await this.#dependencies.deletionFacts.recordEvaluatorDeleted({
+    await this.#dependencies.lifecycleFacts.recordEvaluatorDeleted({
       projectId: input.projectId,
       evaluatorId: input.id,
     });

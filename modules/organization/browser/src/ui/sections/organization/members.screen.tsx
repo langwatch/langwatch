@@ -3,7 +3,6 @@
  * D12): three cuts of one list (specs/identity/directory-administration.feature).
  */
 
-import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { FilterChips } from "@langwatch/design-system/filter-chips";
 import { Menu } from "@langwatch/design-system/menu";
@@ -24,7 +23,7 @@ import { Ban, MoreVertical, Plus, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useState, type ComponentProps } from "react";
 
 import { HandledErrorAlert } from "../../../behavior/handled-error-form.tsx";
-import type { RouterOutputs } from "../../../behavior/organization-api.ts";
+import type { HeldSeat, RouterOutputs } from "../../../behavior/organization-api.ts";
 import { api } from "../../../behavior/organization-api.ts";
 import { useOrganizationToaster } from "../../../behavior/organization-feedback.ts";
 import { reportUnexpected } from "../../../behavior/report-unexpected.ts";
@@ -49,8 +48,10 @@ import {
   type PeopleCut,
   peopleCutItems,
   peopleCutShows,
+  waitsForSeat,
 } from "../../../model/people-cuts.ts";
 import type { OrganizationUserRole } from "../../../model/prisma-types.ts";
+import { heldSeatChipLabel } from "../../../model/seat-removal-copy.ts";
 import { JoinRequestRow } from "../../../ui/blocks/join-requests-table.tsx";
 import { AutomaticJoinsNotice } from "../../../ui/elements/automatic-joins-notice.tsx";
 import { CopyInput } from "../../../ui/elements/copy-input.tsx";
@@ -64,6 +65,7 @@ import { DepartmentPicker } from "../../../ui/sections/department-picker.tsx";
 import { InviteRow } from "../../../ui/sections/invites-table.tsx";
 import { MemberSeatUsage } from "../../../ui/sections/member-seat-usage.tsx";
 import { PersonIdentityRow } from "../person-identity-row.tsx";
+import { RemoveMemberDialog } from "../remove-member-dialog.tsx";
 
 /** The organization graph as the browser receives it: instants are ISO strings. */
 type OrganizationWithMembersAndTheirTeams =
@@ -141,7 +143,7 @@ function usePeopleListState({
   const { openDrawer } = useDrawer();
   const { cut, selectCut } = useCutFromAddress();
 
-  const invitesFlow = useInviteFlow({ organization, activePlan });
+  const invitesFlow = useInviteFlow({ organization, activePlan, canManage });
   const removal = useMemberRemoval(organization.id);
   const reads = usePeopleListReads({
     organization,
@@ -218,6 +220,8 @@ function PeopleList({
           showDepartment={people.showDepartment}
           twoStep={people.twoStep}
           joinRequests={people.joinRequests}
+          heldSeats={people.heldSeats}
+          heldSeatByMember={people.heldSeatByMember}
           canDeleteMember={people.canDeleteMember}
           canDisableMember={people.canDisableMember}
           onOpenPerson={(userId) => people.openDrawer(PersonDrawerToken, { userId })}
@@ -235,21 +239,14 @@ function PeopleList({
         onClose={people.onInviteModalClose}
       />
 
-      <ConfirmDialog
-        open={people.confirmingRemoval !== null}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) people.setConfirmingRemoval(null);
-        }}
-        title="Remove from organization"
-        message={`Remove ${
-          people.confirmingRemoval?.label ?? "this member"
-        } from this organization? They lose access to everything in it.`}
-        confirmLabel="Remove"
-        tone="danger"
+      <RemoveMemberDialog
+        organizationId={organization.id}
+        organizationName={organization.name}
+        target={people.confirmingRemoval}
         loading={people.deleting}
-        onConfirm={() => {
-          if (!people.confirmingRemoval) return;
-          people.deleteMember(people.confirmingRemoval.userId);
+        onClose={() => people.setConfirmingRemoval(null)}
+        onConfirm={(removal) => {
+          people.deleteMember(removal);
           people.setConfirmingRemoval(null);
         }}
       />
@@ -276,9 +273,8 @@ function DepartmentChip({ name }: { name: string | undefined }) {
 }
 
 /**
- * Row actions for a member. Disable is the reversible one, and is how an
- * organization gets back within its licensed seats; delete removes the
- * membership outright. See seat-reconciliation.feature.
+ * Row actions for a member. Disable is the reversible one; delete removes the
+ * membership outright. Both hold a full seat as seat-rotation.feature says.
  */
 function MemberRowActions({
   member,
@@ -319,7 +315,7 @@ function MemberRowActions({
               onClick={() => onSetDisabled(member.userId, false)}
             >
               <Undo2 size={16} />
-              Give their seat back
+              {waitsForSeat(member) ? "Give them a seat" : "Give their seat back"}
             </Menu.Item>
           ) : (
             <Menu.Item
@@ -389,6 +385,15 @@ function MemberStatusChip({ member }: { member: Member }) {
       />
     );
   }
+  if (waitsForSeat(member)) {
+    return (
+      <IdentityChip
+        label="Waiting for a seat"
+        title="They joined while every full seat was taken. Their seat request is listed under Waiting for a seat."
+        data-testid="member-waiting-for-seat"
+      />
+    );
+  }
   if (member.disabledAt) {
     return (
       <IdentityChip
@@ -402,9 +407,34 @@ function MemberStatusChip({ member }: { member: Member }) {
   return null;
 }
 
+/** A removed person whose full seat is still held, greyed, until the seat frees. */
+function HeldSeatRow({ seat }: { seat: HeldSeat }) {
+  return (
+    <PersonIdentityRow
+      name={seat.name}
+      address={seat.email}
+      muted
+      data-testid="held-seat-row"
+      trailing={<HeldSeatChip seat={seat} />}
+    />
+  );
+}
+
+/** The day a held full seat frees, on whichever row its person has. */
+function HeldSeatChip({ seat }: { seat: HeldSeat }) {
+  return (
+    <IdentityChip
+      label={heldSeatChipLabel(seat)}
+      title="Their full seat counts as in use until this day, 30 days after they took it."
+      data-testid="held-seat-chip"
+    />
+  );
+}
+
 /** One member, as the People list draws them. */
 function MemberListRow({
   member,
+  heldSeat,
   organizationId,
   provenance,
   department,
@@ -418,6 +448,7 @@ function MemberListRow({
   onRequestRemoval,
 }: {
   member: Member;
+  heldSeat: HeldSeat | undefined;
   organizationId: string;
   provenance: Provenance;
   department: ReturnType<typeof useDepartmentColumn>;
@@ -430,6 +461,10 @@ function MemberListRow({
   onSetDisabled: ReturnType<typeof useMemberDisableAction>["setMemberDisabled"];
   onRequestRemoval: (target: RemovalTarget) => void;
 }) {
+  // One shared read for every row: the query cache answers all but the first.
+  const billingMembers = api.authz.listBillingMembers.useQuery({ organizationId });
+  const holdsBilling = !!billingMembers.data?.some((holder) => holder.userId === member.userId);
+
   return (
     <PersonIdentityRow
       name={member.user.name}
@@ -450,7 +485,13 @@ function MemberListRow({
               Developer
             </Badge>
           )}
+          {holdsBilling && (
+            <Badge colorPalette="purple" size="sm" data-testid="member-billing-badge">
+              Billing
+            </Badge>
+          )}
           <MemberStatusChip member={member} />
+          {heldSeat && <HeldSeatChip seat={heldSeat} />}
         </>
       }
       chips={
@@ -616,6 +657,8 @@ function PeopleRows({
   showDepartment,
   twoStep,
   joinRequests,
+  heldSeats,
+  heldSeatByMember,
   canDeleteMember,
   canDisableMember,
   onOpenPerson,
@@ -638,6 +681,8 @@ function PeopleRows({
   showDepartment: boolean;
   twoStep: ReturnType<typeof useTwoStepRequirement>;
   joinRequests: ReturnType<typeof useJoinRequests>;
+  heldSeats: HeldSeat[];
+  heldSeatByMember: Map<string, HeldSeat>;
   canDeleteMember: (memberId: string) => boolean;
   canDisableMember: (memberId: string) => boolean;
   onOpenPerson: (userId: string) => void;
@@ -647,24 +692,29 @@ function PeopleRows({
   onResendInvite: ReturnType<typeof useInviteActions>["resendInvite"];
   onRevokeInvite: ReturnType<typeof useInviteActions>["revokeInvite"];
 }) {
-  const memberRows = peopleCutShows({ cut, list: "members" })
-    ? members.map((member) => (
-        <MemberListRow
-          key={`member:${member.userId}`}
-          member={member}
-          organizationId={organizationId}
-          provenance={provenance?.[member.userId]}
-          department={department}
-          departmentNameById={departmentNameById}
-          showDepartment={showDepartment}
-          twoStep={twoStep}
-          canDisable={canDisableMember(member.userId)}
-          canDelete={canDeleteMember(member.userId)}
-          onOpen={() => onOpenPerson(member.userId)}
-          onSetDisabled={onSetDisabled}
-          onRequestRemoval={onRequestRemoval}
-        />
-      ))
+  const memberRow = (member: Member) => (
+    <MemberListRow
+      key={`member:${member.userId}`}
+      member={member}
+      heldSeat={heldSeatByMember.get(member.userId)}
+      organizationId={organizationId}
+      provenance={provenance?.[member.userId]}
+      department={department}
+      departmentNameById={departmentNameById}
+      showDepartment={showDepartment}
+      twoStep={twoStep}
+      canDisable={canDisableMember(member.userId)}
+      canDelete={canDeleteMember(member.userId)}
+      onOpen={() => onOpenPerson(member.userId)}
+      onSetDisabled={onSetDisabled}
+      onRequestRemoval={onRequestRemoval}
+    />
+  );
+  const memberRows = peopleCutShows({ cut, list: "members" }) ? members.map(memberRow) : [];
+
+  // A held seat's person is greyed after the members until the seat frees (seat-rotation.feature).
+  const heldSeatRows = peopleCutShows({ cut, list: "members" })
+    ? heldSeats.map((seat) => <HeldSeatRow key={`held:${seat.userId}`} seat={seat} />)
     : [];
 
   const inviteRows = peopleCutShows({ cut, list: "invited" })
@@ -696,7 +746,7 @@ function PeopleRows({
 
   return (
     <IdentityRowList data-testid="people-list" empty={emptyPeopleCutText(cut)}>
-      {[...memberRows, ...inviteRows, ...requestRows]}
+      {[...memberRows, ...heldSeatRows, ...inviteRows, ...requestRows]}
     </IdentityRowList>
   );
 }
@@ -705,9 +755,12 @@ function PeopleRows({
 function useInviteFlow({
   organization,
   activePlan,
+  canManage,
 }: {
   organization: OrganizationWithMembersAndTheirTeams;
   activePlan: PlanInfo;
+  /** Invitations are a manager's list; a reader is never asked for them. */
+  canManage: boolean;
 }) {
   const {
     open: isInviteLinkOpen,
@@ -717,7 +770,7 @@ function useInviteFlow({
 
   const pendingInvites = api.invite.getOrganizationPendingInvites.useQuery(
     { organizationId: organization.id },
-    { enabled: !!organization.id },
+    { enabled: !!organization.id && canManage },
   );
 
   const [selectedInvites, setSelectedInvites] = useState<{ inviteCode: string; email: string }[]>(
@@ -796,21 +849,36 @@ function useMemberRemoval(organizationId: string) {
         reportUnexpected(error, tags);
       });
     void queryClient.organization.getDirectoryCounts.invalidate();
+    void queryClient.organization.listHeldSeats.invalidate();
     void queryClient.limits.getUsage.invalidate();
     void queryClient.licenseEnforcement.checkLimit.invalidate();
   };
 
-  const deleteMember = (userId: string) => {
+  const deleteMember = ({
+    userId,
+    giveSeatToUserId,
+  }: {
+    userId: string;
+    giveSeatToUserId: string | null;
+  }) => {
     deleteMemberMutation.mutate(
-      { organizationId, userId },
+      { organizationId, userId, giveSeatToUserId },
       {
-        onSuccess: () => {
-          toaster.create({
-            title: "Member removed successfully",
-            description: "The member has been removed from the organization.",
-            type: "success",
-            duration: 5000,
-          });
+        onSuccess: (removed) => {
+          toaster.create(
+            removed?.seatHandoverFailed
+              ? {
+                  title: "Member removed",
+                  description:
+                    "Their seat did not go to the person waiting: enable them in Users to give it.",
+                }
+              : {
+                  title: "Member removed successfully",
+                  description: "The member has been removed from the organization.",
+                  type: "success",
+                  duration: 5000,
+                },
+          );
           invalidateMembership({ userId, organizationId });
         },
         onError: () => {
@@ -883,6 +951,17 @@ function usePeopleListReads({
   );
 
   const joinRequests = useJoinRequests({ organizationId: organization.id, canManage });
+  const heldSeatsQuery = api.organization.listHeldSeats.useQuery(
+    { organizationId: organization.id },
+    { enabled: !!organization.id && canManage },
+  );
+  // A member still listed carries their held seat as a chip; everyone else gets a greyed row.
+  const memberIds = new Set(organization.members.map((member) => member.userId));
+  const allHeldSeats = heldSeatsQuery.data?.heldSeats ?? [];
+  const heldSeats = allHeldSeats.filter((seat) => !memberIds.has(seat.userId));
+  const heldSeatByMember = new Map(
+    allHeldSeats.filter((seat) => memberIds.has(seat.userId)).map((seat) => [seat.userId, seat]),
+  );
   const twoStep = useTwoStepRequirement({ organizationId: organization.id, canManage });
 
   return {
@@ -893,6 +972,8 @@ function usePeopleListReads({
     invites,
     openInvites,
     joinRequests,
+    heldSeats,
+    heldSeatByMember,
     twoStep,
   };
 }

@@ -22,6 +22,7 @@ import {
   parseDecisionResponse,
 } from "../../rules/instant-eval-decision-wire.rules.ts";
 import type {
+  InstantEvalDecisionModelAnswer,
   InstantEvalDecisionModelChannel,
   InstantEvalDecisionModelRequest,
 } from "../instant-eval-decision-model.channel.ts";
@@ -60,7 +61,7 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
   async classify(
     { text, questions, decisionModel, isBilledToLangWatch }: InstantEvalDecisionModelRequest,
     signal?: AbortSignal,
-  ): Promise<InstantEvalJudgement> {
+  ): Promise<InstantEvalDecisionModelAnswer> {
     const limits = INSTANT_EVAL_CLASSIFIER_LIMITS;
     const budgetTokens = instantEvalTextBudget({ questions, limits });
     if (budgetTokens === 0) return instantEvalSkipped("classifier_input_too_large");
@@ -80,6 +81,7 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
         endpoint: decisionModel.endpoint,
         authorization: authorizationHeaderOf(decisionModel),
         body,
+        isOwnModel: !isBilledToLangWatch,
         signal,
       });
       if (sent.kind === "answered") {
@@ -92,6 +94,7 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
         return {
           verdicts: readClassifierVerdicts({ questions, response }),
           ...billedTokensOf({ isBilledToLangWatch, response }),
+          ...ownKeyUsageOf({ isBilledToLangWatch, response }),
           isTextTruncated: prepared.isTruncated,
         };
       }
@@ -113,11 +116,13 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
     endpoint,
     authorization,
     body,
+    isOwnModel,
     signal,
   }: {
     endpoint: string;
     authorization: Readonly<Record<string, string>>;
     body: string;
+    isOwnModel: boolean;
     signal: AbortSignal | undefined;
   }): Promise<
     | Readonly<{ kind: "answered"; body: unknown }>
@@ -147,7 +152,7 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
       return {
         kind: "failed",
         status: response.status,
-        failure: decisionFailureOf({ status: response.status }),
+        failure: decisionFailureOf({ status: response.status, isOwnModel }),
         retryAfter: response.headers.get("retry-after"),
       };
     } catch (error) {
@@ -195,6 +200,20 @@ function billedTokensOf({
     inputTokens: response.usage?.input_tokens ?? 0,
     ...(outputTokens === undefined ? {} : { outputTokens }),
   };
+}
+
+/** The provider's tokens on the organization's own key, for the ledger; never on LangWatch's. */
+function ownKeyUsageOf({
+  isBilledToLangWatch,
+  response,
+}: {
+  isBilledToLangWatch: boolean | undefined;
+  response: { usage?: { input_tokens?: number; output_tokens?: number } | undefined };
+}): Pick<InstantEvalDecisionModelAnswer, "providerUsage"> {
+  if (isBilledToLangWatch || !response.usage) return {};
+  const { input_tokens: inputTokens = 0, output_tokens: outputTokens = 0 } = response.usage;
+  if (inputTokens === 0 && outputTokens === 0) return {};
+  return { providerUsage: { inputTokens, outputTokens } };
 }
 
 function waitMs({ attempt, retryAfter }: { attempt: number; retryAfter: string | null }): number {

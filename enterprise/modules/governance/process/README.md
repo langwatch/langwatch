@@ -1874,7 +1874,7 @@ interface Input {
   organizationId: string;
   id: string;
 }
-type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:76
+type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:81
 
 // ingestionSources.create
 type Input = z.infer<typeof ingestionSourceCreateInputSchema>; // ../contract/src/features/ingestion/ingestion-sources.trpc.ts:32
@@ -1893,15 +1893,15 @@ interface Input {
   pullSchedule?: string | null;
   traceProjectId?: string | null;
 }
-type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:76
+type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:81
 
 // ingestionSources.rotateSecret
 type Input = z.infer<typeof sourceInOrganization>; // ../contract/src/features/ingestion/ingestion-sources.trpc.ts:15
-type Output = z.infer<typeof ingestionSourceWithSecretSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:90
+type Output = z.infer<typeof ingestionSourceWithSecretSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:95
 
 // ingestionSources.archive
 type Input = z.infer<typeof sourceInOrganization>; // ../contract/src/features/ingestion/ingestion-sources.trpc.ts:15
-type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:76
+type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:81
 
 // ingestionSources.validateOttl
 // Input: inline, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:89
@@ -1917,7 +1917,7 @@ interface Input {
   organizationId: string;
   sourceType: string;
 }
-// Output: ottlStarterTemplateSchema, ../contract/src/features/ingestion/ingestion-source.ts:107
+// Output: ottlStarterTemplateSchema, ../contract/src/features/ingestion/ingestion-source.ts:112
 interface Output {
   enabled: boolean;
   statements: string[];

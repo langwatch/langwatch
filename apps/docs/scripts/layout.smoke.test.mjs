@@ -31,11 +31,18 @@ async function assertDocumentFlow({ page, desktop }) {
         );
       })
       .map((node) => node.className);
+    /* Everything the page shows above the footer: article, contents rail, endpoint columns. */
+    const bottoms = [...panel.querySelectorAll("#content, #content > *, .docs-layout > [class]")]
+      .filter((node) => node !== footer && !node.matches(".docs-nav-plane"))
+      .map((node) => node.getBoundingClientRect().bottom);
     return {
-      footerOutside: !panel.contains(footer),
+      footerInside: panel.contains(footer),
       footerTop: bounds(footer).top,
+      footerLeft: bounds(footer).left,
+      footerBottom: bounds(footer).bottom,
+      mainBottom: Math.max(...bottoms),
       panelBottom: bounds(panel).bottom,
-      footerWidth: bounds(footer).width,
+      railRight: bounds(rail).right,
       railBottom: bounds(rail).bottom,
       railHeight: bounds(rail).height,
       headerHeight: bounds(header).height,
@@ -45,12 +52,13 @@ async function assertDocumentFlow({ page, desktop }) {
       overflow: document.documentElement.scrollWidth > innerWidth,
     };
   });
-  assert.equal(geometry.footerOutside, true);
-  assert.ok(geometry.footerTop >= geometry.panelBottom);
-  assert.equal(geometry.footerWidth, page.viewportSize().width);
+  assert.equal(geometry.footerInside, true);
+  assert.ok(geometry.footerTop >= geometry.mainBottom - 1);
+  assert.ok(geometry.footerBottom <= geometry.panelBottom + 1);
   assert.deepEqual(geometry.scrollBoxes, []);
   assert.equal(geometry.overflow, false);
   if (desktop) {
+    assert.ok(geometry.footerLeft >= geometry.railRight, "the footer sits beside the page list");
     assert.ok(geometry.railBottom <= geometry.panelBottom + 1);
     assert.equal(geometry.railPosition, "sticky");
     assert.ok(geometry.railHeight <= geometry.viewport - geometry.headerHeight + 1);

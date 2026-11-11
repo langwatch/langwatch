@@ -196,6 +196,17 @@ describe("the installed billing application", () => {
       });
     });
 
+    /** @scenario "The connected-billing overview is refused outside LangWatch Cloud" */
+    it("refuses the overview by the same handled code, reading and auditing nothing", async () => {
+      const { app, asked, audited } = billingApp({ isSaas: false, withStripe: false });
+
+      await expect(
+        app.getConnectedBillingOverview({ organizationId: ACME }, STAFF),
+      ).rejects.toMatchObject({ code: "connected_billing_unavailable" });
+      expect(asked).toEqual([]);
+      expect(audited).toEqual([]);
+    });
+
     it("runs no billing tick and no seat invoicing pass at all", async () => {
       const { app, repositories } = billingApp({ isSaas: false, withStripe: false });
 

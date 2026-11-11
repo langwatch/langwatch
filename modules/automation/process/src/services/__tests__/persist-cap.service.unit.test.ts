@@ -27,6 +27,7 @@ const persistCapDependencies = {
     requestBound: vi.fn(),
     resolvePlanNextStep: vi.fn(),
     assertWithinUsageLimit: vi.fn(),
+    getUsageMonthBreakdown: vi.fn(),
   },
   config: {
     free: 100,

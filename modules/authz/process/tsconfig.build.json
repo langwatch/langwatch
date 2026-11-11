@@ -69,6 +69,9 @@
       "path": "../../../packages/eventing/tsconfig.build.json"
     },
     {
+      "path": "../../entitlement/contract/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
     },
     {

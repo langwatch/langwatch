@@ -226,6 +226,7 @@ export const workflowEvaluationRequestedEventDataSchema = z.object({
   total: z.number(),
   data: z.array(z.record(z.string(), z.unknown())).optional(),
   datasetId: z.string().optional(),
+  datasetVersion: z.number().int().positive().optional(),
   parameters: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
   rowIndices: z.array(z.number()).optional(),
 });

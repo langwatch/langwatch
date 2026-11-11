@@ -3,10 +3,9 @@ import { Link, Text } from "@langwatch/design-system/primitives";
 import { Star } from "lucide-react";
 
 import type { SiteMeta } from "../../navigation/model.ts";
+import { formatStars, githubLabel } from "../model/github-stars.ts";
 
-const COUNT = new Intl.NumberFormat("en-GB");
-
-export function GithubLink({ site }: { site: Pick<SiteMeta, "github" | "stars"> }) {
+export function GithubLink({ site }: { site: Pick<SiteMeta, "github" | "stars" | "starsReadAt"> }) {
   const stars = site.stars;
   return (
     <Link
@@ -18,16 +17,26 @@ export function GithubLink({ site }: { site: Pick<SiteMeta, "github" | "stars"> 
       fontSize="13px"
       color="fg.muted"
       textDecoration="none"
-      aria-label={stars === null ? "GitHub" : `GitHub, ${COUNT.format(stars)} stars`}
+      aria-label={githubLabel({ stars })}
+      data-docs-github=""
+      data-docs-stars-at={site.starsReadAt ?? undefined}
       _hover={{ color: "fg", textDecoration: "none" }}
     >
       <GitHubIcon size={16} />
-      {stars === null ? null : (
-        <>
-          <Star size={14} aria-hidden="true" />
-          <Text as="span">{COUNT.format(stars)}</Text>
-        </>
-      )}
+      {/* Rendered even without a build-time count, so the browser can fill in a live one. */}
+      <Text
+        as="span"
+        display="inline-flex"
+        alignItems="center"
+        gap="2"
+        data-docs-stars=""
+        hidden={stars === null}
+      >
+        <Star size={14} aria-hidden="true" />
+        <Text as="span" data-docs-stars-count="">
+          {stars === null ? "" : formatStars({ stars })}
+        </Text>
+      </Text>
     </Link>
   );
 }

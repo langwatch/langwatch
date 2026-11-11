@@ -66,6 +66,10 @@ class HostServiceDatasetHost extends DatasetHostApi {
       : void 0;
   }
 
+  currentUserId(): string | undefined {
+    return this.session.currentUser()?.id;
+  }
+
   hasPermission(permission: string): boolean {
     return this.session.hasPermission(permission);
   }

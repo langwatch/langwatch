@@ -5,6 +5,7 @@ sees in Titlecase. These rules decide which of its new spans to trust.
 Measured bounds: specs/evaluators/langevals-presidio-allcaps-person-names.feature
 """
 
+import re
 import unicodedata
 from itertools import pairwise
 from typing import Any
@@ -16,6 +17,11 @@ from spacy.strings import hash_string
 # The shape a harvested span needs to be a name and not a titlecased acronym.
 MIN_SPAN_WORDS = 2
 MIN_NORMALISED_TOKEN_LENGTH = 4
+
+# Any gap may sit inside a name (J. SMITH, JOHN "JACK" WHITFIELD, Robert:
+# MILLER) unless it ends a quoted field: a quote beside a colon, comma or
+# semicolon, as in "method": "POST", "url" or 'POST', 'url'.
+FIELD_END = re.compile(r"[\"'“”‘’]\s*[:,;]|[:,;]\s*[\"'“”‘’]")
 
 # A word reads as a name when its Titlecase form sits this many times nearer
 # the top of the frequency-sorted vector table than its lowercase and capital
@@ -100,6 +106,37 @@ def has_name_shaped_rewrite(*, original: str, normalised: str) -> bool:
         original[left_end:right_start].isspace()
         for (_, left_end), (right_start, _) in pairwise(rewritten)
     )
+
+
+def could_hold_a_rewritten_name(*, original: str, normalised: str) -> bool:
+    """Whether some span of the text could pass `normalisation_justifies_span`.
+
+    That takes a rewritten word of 4+ letters beside another word, or two
+    rewritten words with only whitespace between them (AMY LEE, not TCP/IP).
+    A capital word fenced off as its own field ("POST") never makes one.
+    """
+    runs = _word_runs(original)
+    rewritten = {
+        (start, end)
+        for start, end in runs
+        if original[start:end] != normalised[start:end]
+    }
+    if not rewritten:
+        return False
+
+    def rewritten_length(run: tuple[int, int]) -> int:
+        return run[1] - run[0] if run in rewritten else 0
+
+    for left, right in pairwise(runs):
+        gap = original[left[1] : right[0]]
+        if FIELD_END.search(gap):
+            continue
+        left_length, right_length = rewritten_length(left), rewritten_length(right)
+        if left_length and right_length and gap.isspace():
+            return True
+        if max(left_length, right_length) >= MIN_NORMALISED_TOKEN_LENGTH:
+            return True
+    return False
 
 
 def _frequency_rank(vectors: Any, form: str) -> float:

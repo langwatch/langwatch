@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.13"]
+        python-version: ["3.11", "3.13"]
     env:
       # Beats the workspace root's .python-version, which would otherwise pin
       # every matrix leg to the same interpreter.

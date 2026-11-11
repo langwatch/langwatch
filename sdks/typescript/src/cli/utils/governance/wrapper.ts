@@ -21,6 +21,7 @@ import { isLoggedIn, loadConfig, saveConfig } from "./config";
 import { copilotGatewayModelPreflight, copilotPrespawnWarnings } from "./copilot-prespawn";
 import { runDeviceFlowLogin } from "./login-flow";
 import { ensurePiTelemetryExtension } from "./pi-plugin";
+import { piPrespawnWarnings } from "./pi-prespawn";
 import { clearToolProjectPin, pinToolToProject } from "./project-scope";
 import {
   assertLaunchHookFile,
@@ -28,6 +29,7 @@ import {
   SHELL_FUNCTION_TOOLS,
 } from "./shell-rc";
 import { envForTool } from "./tool-env";
+import { isToolResolvable } from "./tool-presence";
 import { aliasShellFor, infoRunKind, runInfoRun, toolNotFoundMessage } from "./wrapper-info-run";
 import { resolveWrapperMode } from "./wrapper-mode";
 import {
@@ -604,6 +606,12 @@ async function prepareLaunch({
       process.stderr.write(`${warning}\n`);
     }
   }
+  // A pi older than the extension's minimum still captures, so it warns and never blocks.
+  if (tool === "pi") {
+    for (const warning of piPrespawnWarnings()) {
+      process.stderr.write(`${warning}\n`);
+    }
+  }
 
   // Copilot BYOK (gateway) requires a model; fail fast with an actionable
   // message instead of copilot's opaque downstream error.
@@ -771,6 +779,13 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
   // anything below reads the config, signs in, mints a key or writes wiring.
   const infoRun = infoRunKind(args);
   if (infoRun) return runInfoRun({ tool, args, kind: infoRun });
+
+  // A tool that cannot start gets nothing written for it: no config, login,
+  // key, rc block, hook file or extension.
+  if (!isToolResolvable({ tool })) {
+    process.stderr.write(`${toolNotFoundMessage(tool)}\n`);
+    process.exit(127);
+  }
 
   // Before the config is read, so every save below carries it. The Claude
   // Code plugin's hooks run the CLI through this record when PATH cannot

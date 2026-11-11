@@ -23,3 +23,9 @@ Feature: test:affected and lint:changed rerun only what an edit can change
     Given a change to an oxlint configuration or the module catalogue
     When lint:changed runs without --types
     Then oxlint is given the whole tree
+
+  Scenario: A lint run whose every path is ignored has no problems
+    Given oxlint is given only paths its ignore patterns exclude
+    When it prints "No files found to lint." and exits 1
+    Then the lint run reports 0 problems and passes
+    And output that is neither that line nor a JSON report still fails the run

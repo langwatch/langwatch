@@ -15,8 +15,6 @@ const LAUNCHER = ".docs-agent-launcher";
 const PICK = ".docs-agent-pick[data-reel]";
 const motion = matchMedia("(prefers-reduced-motion: no-preference)");
 let chosen = "claude";
-let manual = false;
-let timer: ReturnType<typeof setTimeout> | undefined;
 
 type Reel = {
   pick: HTMLElement;
@@ -122,8 +120,6 @@ function run({ turning }: { turning: Reel }) {
 
 /** Takes hold of a launcher's reel, catching it where it is if it is already turning. */
 function grab({ pick }: { pick: HTMLElement }) {
-  manual = true;
-  clearTimeout(timer);
   if (reel?.pick === pick) return reel;
   if (reel) {
     cancelAnimationFrame(reel.frame);
@@ -200,26 +196,6 @@ function release({ event, pick }: { event: PointerEvent; pick: HTMLElement }) {
   });
 }
 
-function busy() {
-  return (
-    document.hidden ||
-    Boolean(document.querySelector(`${LAUNCHER}:hover, ${LAUNCHER}:focus-within`))
-  );
-}
-
-function schedule() {
-  clearTimeout(timer);
-  if (manual || !motion.matches) return;
-  timer = setTimeout(() => {
-    const select = document.querySelector<HTMLSelectElement>(`${LAUNCHER} select`);
-    if (!select || busy() || reel) return schedule();
-    const options = [...select.options].map((option) => option.value);
-    chosen = options[(options.indexOf(chosen) + 1) % options.length] ?? chosen;
-    show();
-    schedule();
-  }, 2800);
-}
-
 function onPointerDown(event: PointerEvent) {
   const pick = event.target instanceof Element ? event.target.closest<HTMLElement>(PICK) : null;
   if (!pick || event.button !== 0) return;
@@ -275,8 +251,6 @@ function onWheel(event: WheelEvent) {
 function onChange(event: Event) {
   const select = event.target;
   if (!(select instanceof HTMLSelectElement) || !select.closest(LAUNCHER)) return;
-  manual = true;
-  clearTimeout(timer);
   chosen = select.value;
   show();
 }
@@ -292,16 +266,13 @@ function onNavigated() {
     reel = undefined;
   }
   show();
-  schedule();
 }
 
 function onMotionChange() {
-  clearTimeout(timer);
   show();
-  schedule();
 }
 
-/** Wires the sidebar agent launcher: drag, wheel and select turn it; idle, it cycles. */
+/** Wires the sidebar agent launcher: drag, wheel and select turn it; left alone, it stays put. */
 export function startAgentChoice() {
   document.addEventListener("pointerdown", onPointerDown);
   document.addEventListener("pointermove", onPointerMove);
@@ -313,5 +284,4 @@ export function startAgentChoice() {
   document.addEventListener("docs:navigated", onNavigated);
   motion.addEventListener("change", onMotionChange);
   show();
-  schedule();
 }

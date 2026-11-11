@@ -154,7 +154,14 @@
       "Claude-SearchBot",
       "PerplexityBot",
       "Google-Extended",
-      "CCBot"
+      "CCBot",
+      "Perplexity-User",
+      "Applebot",
+      "Applebot-Extended",
+      "Meta-ExternalAgent",
+      "Amazonbot",
+      "DuckAssistBot",
+      "MistralAI-User"
     ],
     "known": {
       "code-missing-import": [

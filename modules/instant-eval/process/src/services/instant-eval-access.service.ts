@@ -1,6 +1,7 @@
 /**
- * Whether a project may run Instant Evals: the plan, flag, license (main #8416) or switch is the
- * product decision, a judge for the organization the operational one; rollout is per PROJECT.
+ * Whether a project may run Instant Evals: its own decision model, or else the plan, flag, license
+ * (main #8416) or switch is the product decision, a judge for the organization the operational
+ * one; rollout is per PROJECT.
  * @see modules/instant-eval/specs/instant-eval-opt-in.feature
  */
 
@@ -31,6 +32,16 @@ export interface InstantEvalPlanReader {
   isEnterprisePlan(organizationId: string): Promise<boolean>;
 }
 
+/** Whether LangWatch switched its hosted model off for the organization, whatever else says. */
+export interface InstantEvalHostedSwitchReader {
+  isHostedOff(input: { projectId: string; organizationId: string }): Promise<boolean>;
+}
+
+/** Whether the project's Instant Evals column is its own decision model, ready to run. */
+export interface InstantEvalOwnModelReader {
+  runsOnOwnModel(input: { projectId: string }): Promise<boolean>;
+}
+
 export class InstantEvalAccessService {
   private readonly flags: InstantEvalFlagReader;
   private readonly projects: InstantEvalProjectReader;
@@ -39,6 +50,8 @@ export class InstantEvalAccessService {
   private readonly isJudgeConfigured: () => boolean;
   private readonly judge: Pick<InstantEvalJudgeChannel, "isAvailableForOrganization">;
   private readonly hostedPlans: InstantEvalPlanReader | null;
+  private readonly ownModels: InstantEvalOwnModelReader | null;
+  private readonly hostedSwitch: InstantEvalHostedSwitchReader;
 
   private constructor(options: {
     flags: InstantEvalFlagReader;
@@ -48,6 +61,8 @@ export class InstantEvalAccessService {
     isJudgeConfigured: () => boolean;
     judge: Pick<InstantEvalJudgeChannel, "isAvailableForOrganization">;
     hostedPlans: InstantEvalPlanReader | null;
+    ownModels: InstantEvalOwnModelReader | null;
+    hostedSwitch: InstantEvalHostedSwitchReader;
   }) {
     this.flags = options.flags;
     this.projects = options.projects;
@@ -56,6 +71,8 @@ export class InstantEvalAccessService {
     this.isJudgeConfigured = options.isJudgeConfigured;
     this.judge = options.judge;
     this.hostedPlans = options.hostedPlans;
+    this.ownModels = options.ownModels;
+    this.hostedSwitch = options.hostedSwitch;
   }
 
   static create({
@@ -66,6 +83,8 @@ export class InstantEvalAccessService {
     isJudgeConfigured,
     judge = {},
     hostedPlans,
+    ownModels = null,
+    hostedSwitch,
   }: {
     flags: InstantEvalFlagReader;
     projects: InstantEvalProjectReader;
@@ -85,6 +104,13 @@ export class InstantEvalAccessService {
      * wiring fails to compile instead of falling back to the self-hosted rule.
      */
     hostedPlans: InstantEvalPlanReader | null;
+    /**
+     * A project on its own decision model may judge whatever the release says: its key, its bill.
+     * The resolver answers "own" only under the own-model flag with a usable key (ADR-182).
+     */
+    ownModels?: InstantEvalOwnModelReader | null;
+    /** Required, so a forgotten wiring fails to compile instead of reaching the hosted model. */
+    hostedSwitch: InstantEvalHostedSwitchReader;
   }): InstantEvalAccessService {
     return new InstantEvalAccessService({
       flags,
@@ -94,6 +120,8 @@ export class InstantEvalAccessService {
       isJudgeConfigured,
       judge,
       hostedPlans,
+      ownModels,
+      hostedSwitch,
     });
   }
 
@@ -103,12 +131,20 @@ export class InstantEvalAccessService {
    * popover, while an unreleased one is never offered a judgement at all.
    */
   async isReleased({ projectId }: { projectId: string }): Promise<boolean> {
+    if (await this.runsOnOwnModel(projectId)) return true;
+    return this.isHostedReleased({ projectId });
+  }
+
+  /** Whether LangWatch's own model is released, which an own decision model never decides. */
+  async isHostedReleased({ projectId }: { projectId: string }): Promise<boolean> {
     const organizationId = await this.projects.findOrganizationId(projectId);
     return this.releasedFor({ projectId, organizationId });
   }
 
   /** An organization the judge does not judge for sees the functions unavailable, not skipped. */
   async isEnabled({ projectId }: { projectId: string }): Promise<boolean> {
+    // An own model needs neither LangWatch's classifier nor its license.
+    if (await this.runsOnOwnModel(projectId)) return true;
     if (!this.isJudgeConfigured()) return false;
     const organizationId = await this.projects.findOrganizationId(projectId);
     if (
@@ -122,9 +158,9 @@ export class InstantEvalAccessService {
   }
 
   /**
-   * Hosted: the flag for an enterprise organization, its own switch otherwise, so a switch thrown
-   * before an upgrade no longer counts. Judging through Connect: the license alone, never the
-   * flag. Elsewhere, a checkout judging with its own key, the flag.
+   * Never where LangWatch switched hosted off. Hosted: the flag for an enterprise organization, its
+   * own switch otherwise, so a switch thrown before an upgrade no longer counts. Judging through
+   * Connect: the license alone, never the flag. Elsewhere, a checkout with its own key, the flag.
    */
   private async releasedFor({
     projectId,
@@ -133,6 +169,12 @@ export class InstantEvalAccessService {
     projectId: string;
     organizationId: string | undefined;
   }): Promise<boolean> {
+    if (
+      organizationId !== undefined &&
+      (await this.hostedSwitch.isHostedOff({ projectId, organizationId }))
+    ) {
+      return false;
+    }
     if (this.hostedPlans) {
       if (organizationId === undefined) return false;
       if (await this.hostedPlans.isEnterprisePlan(organizationId)) {
@@ -144,6 +186,10 @@ export class InstantEvalAccessService {
       return organizationId === undefined ? false : this.isLicensed(organizationId);
     }
     return this.isFlagged({ projectId, organizationId });
+  }
+
+  private async runsOnOwnModel(projectId: string): Promise<boolean> {
+    return this.ownModels ? this.ownModels.runsOnOwnModel({ projectId }) : false;
   }
 
   private isFlagged({

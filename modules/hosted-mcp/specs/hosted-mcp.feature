@@ -1,6 +1,8 @@
 Feature: Hosted MCP answers main's root paths on the api process
   Hosted MCP declares a raw HTTP door for main's MCP root paths, so the api process answers
   them over the raw Node request ahead of every route, and closes its sessions at shutdown.
+  `/mcp/docs` is the one path that takes no credential: it serves only the docs tools, keeps
+  no session, and replaces the docs MCP that langwatch.ai/docs/mcp used to serve.
 
   @unit
   Scenario: The hosted MCP feature installs from store members and peers alone
@@ -129,3 +131,101 @@ Feature: Hosted MCP answers main's root paths on the api process
     When nothing else is sent for 20 seconds
     Then the stream carries a keepalive comment
     And the session keeps counting against its key's session limit
+
+  # --- The docs endpoint: anyone may read the LangWatch and Scenario docs at /mcp/docs, signed in or not ---
+
+  @integration
+  Scenario: An anonymous client at the docs endpoint lists exactly the docs tools
+    Given a client with no credential
+    When it lists the tools at "/mcp/docs"
+    Then it sees "fetch_langwatch_docs" and "fetch_scenario_docs" and no other tool
+
+  @integration
+  Scenario: A docs tool at the docs endpoint returns a docs page
+    Given a client with no credential
+    When it calls "fetch_langwatch_docs" at "/mcp/docs" for a page under the docs
+    Then the page is fetched from "https://langwatch.ai/docs/" and its text is returned
+
+  @integration
+  Scenario: The docs endpoint refuses a URL outside the docs
+    Given a client with no credential
+    When it calls "fetch_langwatch_docs" at "/mcp/docs" with a URL on another host
+    Then the tool answers an error naming the trusted docs address
+    And nothing is fetched
+
+  @integration
+  Scenario: The docs endpoint serves no project tool
+    Given a client with no credential
+    When it calls a project tool at "/mcp/docs"
+    Then the call is refused as a tool the server does not have
+
+  @integration
+  Scenario: A credential sent to the docs endpoint is neither checked nor used
+    Given a client presenting a bearer that is not valid
+    When it lists the tools at "/mcp/docs"
+    Then it is served the docs tools rather than asked to sign in
+
+  @integration
+  Scenario: The MCP endpoint still asks an anonymous client to sign in
+    Given a client with no credential
+    When it sends an initialize request to "/mcp"
+    Then the endpoint answers 401 with a WWW-Authenticate challenge
+
+  @integration
+  Scenario: The docs endpoint keeps no session
+    Given a client with no credential
+    When it initializes and calls a docs tool at "/mcp/docs"
+    Then no session id is returned
+    And no session record is written
+
+  @integration
+  Scenario: The docs endpoint answers only POST
+    When a client sends GET or DELETE to "/mcp/docs"
+    Then the endpoint answers 405
+
+  @integration
+  Scenario: A browser client's preflight to the docs endpoint is answered
+    When a browser sends a CORS preflight to "/mcp/docs"
+    Then the endpoint answers 200 with headers allowing any origin
+
+  # --- The docs endpoint cannot be turned into an amplifier ---
+
+  @integration
+  Scenario: A batch sent to the docs endpoint is refused
+    Given a client with no credential
+    When it posts a JSON-RPC batch of docs tool calls to "/mcp/docs"
+    Then the endpoint answers 400 with a JSON-RPC invalid request error
+    And nothing is fetched
+
+  @integration
+  Scenario: An oversized body sent to the docs endpoint is refused
+    Given a client with no credential
+    When it posts a body larger than 64 KB to "/mcp/docs"
+    Then the endpoint answers 413
+    And nothing is fetched
+
+  @integration
+  Scenario: Docs fetches beyond the endpoint's bound are refused rather than queued
+    Given 16 docs fetches from the docs endpoint are still in flight
+    When another client calls a docs tool for a page not yet fetched
+    Then the call answers a tool error asking it to retry
+    And no further fetch is started
+
+  @integration
+  Scenario: A repeated docs page is served from the cache
+    Given a client fetched a docs page through the docs endpoint
+    When another client asks for the same page within a minute
+    Then it is given the same text without a second fetch
+
+  @integration
+  Scenario: A client that disconnects stops its docs fetch
+    Given a client's docs tool call is waiting on a docs page
+    When the client disconnects
+    Then the fetch for that page is aborted
+
+  @unit
+  Scenario: The docs endpoint is declared public and the MCP transport stays behind a credential
+    Given the hosted MCP route policy declarations
+    When the policy for "POST /mcp/docs" is read
+    Then it is a public endpoint taking no credential
+    And "POST /mcp" still requires an API key

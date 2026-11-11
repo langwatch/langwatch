@@ -14985,6 +14985,402 @@ func (e GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesType)
 	}
 }
 
+// Defines values for GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKind.
+const (
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKindApiKey GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKind = "api_key"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKindSystem GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKind = "system"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKindUser   GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKind = "user"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKind enum.
+func (e GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKind) Valid() bool {
+	switch e {
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKindApiKey:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKindSystem:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKindUser:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType.
+const (
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeAnnotations  GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType = "annotations"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeBoolean      GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType = "boolean"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeChatMessages GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType = "chat_messages"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeDate         GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType = "date"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeEvaluations  GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType = "evaluations"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeFile         GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType = "file"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeImage        GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType = "image"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeJson         GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType = "json"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeList         GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType = "list"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeNumber       GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType = "number"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeRagContexts  GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType = "rag_contexts"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeSpans        GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType = "spans"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeString       GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType = "string"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType enum.
+func (e GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType) Valid() bool {
+	switch e {
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeAnnotations:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeBoolean:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeChatMessages:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeDate:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeEvaluations:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeFile:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeImage:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeJson:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeList:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeNumber:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeRagContexts:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeSpans:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTrigger.
+const (
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTriggerAutosave      GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTrigger = "autosave"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTriggerExperimentRun GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTrigger = "experiment_run"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTriggerInitial       GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTrigger = "initial"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTriggerManual        GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTrigger = "manual"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTriggerRestore       GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTrigger = "restore"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTrigger enum.
+func (e GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTrigger) Valid() bool {
+	switch e {
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTriggerAutosave:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTriggerExperimentRun:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTriggerInitial:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTriggerManual:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTriggerRestore:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKind.
+const (
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKindApiKey PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKind = "api_key"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKindSystem PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKind = "system"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKindUser   PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKind = "user"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKind enum.
+func (e PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKind) Valid() bool {
+	switch e {
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKindApiKey:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKindSystem:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKindUser:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType.
+const (
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeAnnotations  PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType = "annotations"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeBoolean      PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType = "boolean"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeChatMessages PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType = "chat_messages"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeDate         PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType = "date"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeEvaluations  PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType = "evaluations"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeFile         PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType = "file"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeImage        PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType = "image"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeJson         PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType = "json"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeList         PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType = "list"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeNumber       PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType = "number"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeRagContexts  PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType = "rag_contexts"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeSpans        PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType = "spans"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeString       PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType = "string"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType enum.
+func (e PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType) Valid() bool {
+	switch e {
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeAnnotations:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeBoolean:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeChatMessages:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeDate:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeEvaluations:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeFile:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeImage:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeJson:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeList:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeNumber:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeRagContexts:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeSpans:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTrigger.
+const (
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTriggerAutosave      PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTrigger = "autosave"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTriggerExperimentRun PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTrigger = "experiment_run"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTriggerInitial       PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTrigger = "initial"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTriggerManual        PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTrigger = "manual"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTriggerRestore       PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTrigger = "restore"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTrigger enum.
+func (e PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTrigger) Valid() bool {
+	switch e {
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTriggerAutosave:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTriggerExperimentRun:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTriggerInitial:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTriggerManual:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTriggerRestore:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKind.
+const (
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKindApiKey GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKind = "api_key"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKindSystem GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKind = "system"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKindUser   GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKind = "user"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKind enum.
+func (e GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKind) Valid() bool {
+	switch e {
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKindApiKey:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKindSystem:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKindUser:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType.
+const (
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeAnnotations  GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType = "annotations"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeBoolean      GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType = "boolean"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeChatMessages GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType = "chat_messages"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeDate         GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType = "date"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeEvaluations  GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType = "evaluations"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeFile         GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType = "file"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeImage        GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType = "image"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeJson         GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType = "json"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeList         GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType = "list"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeNumber       GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType = "number"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeRagContexts  GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType = "rag_contexts"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeSpans        GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType = "spans"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeString       GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType = "string"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType enum.
+func (e GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType) Valid() bool {
+	switch e {
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeAnnotations:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeBoolean:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeChatMessages:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeDate:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeEvaluations:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeFile:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeImage:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeJson:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeList:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeNumber:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeRagContexts:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeSpans:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTrigger.
+const (
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTriggerAutosave      GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTrigger = "autosave"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTriggerExperimentRun GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTrigger = "experiment_run"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTriggerInitial       GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTrigger = "initial"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTriggerManual        GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTrigger = "manual"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTriggerRestore       GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTrigger = "restore"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTrigger enum.
+func (e GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTrigger) Valid() bool {
+	switch e {
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTriggerAutosave:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTriggerExperimentRun:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTriggerInitial:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTriggerManual:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTriggerRestore:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKind.
+const (
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKindApiKey PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKind = "api_key"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKindSystem PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKind = "system"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKindUser   PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKind = "user"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKind enum.
+func (e PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKind) Valid() bool {
+	switch e {
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKindApiKey:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKindSystem:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKindUser:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType.
+const (
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeAnnotations  PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType = "annotations"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeBoolean      PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType = "boolean"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeChatMessages PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType = "chat_messages"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeDate         PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType = "date"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeEvaluations  PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType = "evaluations"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeFile         PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType = "file"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeImage        PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType = "image"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeJson         PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType = "json"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeList         PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType = "list"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeNumber       PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType = "number"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeRagContexts  PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType = "rag_contexts"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeSpans        PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType = "spans"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeString       PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType = "string"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType enum.
+func (e PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType) Valid() bool {
+	switch e {
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeAnnotations:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeBoolean:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeChatMessages:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeDate:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeEvaluations:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeFile:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeImage:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeJson:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeList:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeNumber:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeRagContexts:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeSpans:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTrigger.
+const (
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTriggerAutosave      PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTrigger = "autosave"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTriggerExperimentRun PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTrigger = "experiment_run"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTriggerInitial       PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTrigger = "initial"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTriggerManual        PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTrigger = "manual"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTriggerRestore       PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTrigger = "restore"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTrigger enum.
+func (e PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTrigger) Valid() bool {
+	switch e {
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTriggerAutosave:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTriggerExperimentRun:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTriggerInitial:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTriggerManual:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTriggerRestore:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RevokeDocsSession200JSONResponseBodyRevoked.
 const (
 	RevokeDocsSession200JSONResponseBodyRevokedTrue RevokeDocsSession200JSONResponseBodyRevoked = true
@@ -24788,6 +25184,7 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1LangyManage                   GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "langy:manage"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1LangyUpdate                   GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "langy:update"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1LangyView                     GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "langy:view"
+	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1MembersView                   GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "members:view"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1OpsManage                     GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "ops:manage"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1OpsView                       GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "ops:view"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1OrganizationDelete            GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "organization:delete"
@@ -24815,6 +25212,8 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1ScenariosManage               GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "scenarios:manage"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1ScenariosUpdate               GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "scenarios:update"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1ScenariosView                 GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "scenarios:view"
+	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SeatRequestsManage            GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "seatRequests:manage"
+	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SeatRequestsView              GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "seatRequests:view"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SecretsCreate                 GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "secrets:create"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SecretsDelete                 GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "secrets:delete"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SecretsManage                 GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "secrets:manage"
@@ -24822,6 +25221,8 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SecretsView                   GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "secrets:view"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SsoManage                     GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "sso:manage"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SsoView                       GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "sso:view"
+	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SubscriptionManage            GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "subscription:manage"
+	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SubscriptionUpgrade           GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "subscription:upgrade"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1TeamManage                    GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "team:manage"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1TeamView                      GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "team:view"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1TracesCreate                  GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "traces:create"
@@ -25002,6 +25403,8 @@ func (e GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1) Valid()
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1LangyView:
 		return true
+	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1MembersView:
+		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1OpsManage:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1OpsView:
@@ -25056,6 +25459,10 @@ func (e GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1) Valid()
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1ScenariosView:
 		return true
+	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SeatRequestsManage:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SeatRequestsView:
+		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SecretsCreate:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SecretsDelete:
@@ -25069,6 +25476,10 @@ func (e GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1) Valid()
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SsoManage:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SsoView:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SubscriptionManage:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SubscriptionUpgrade:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1TeamManage:
 		return true
@@ -25241,6 +25652,7 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1LangyManage                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "langy:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1LangyUpdate                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "langy:update"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1LangyView                     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "langy:view"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1MembersView                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "members:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1OpsManage                     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "ops:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1OpsView                       GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "ops:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1OrganizationDelete            GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "organization:delete"
@@ -25268,6 +25680,8 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1ScenariosManage               GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "scenarios:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1ScenariosUpdate               GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "scenarios:update"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1ScenariosView                 GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "scenarios:view"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SeatRequestsManage            GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "seatRequests:manage"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SeatRequestsView              GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "seatRequests:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SecretsCreate                 GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "secrets:create"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SecretsDelete                 GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "secrets:delete"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SecretsManage                 GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "secrets:manage"
@@ -25275,6 +25689,8 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SecretsView                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "secrets:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SsoManage                     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "sso:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SsoView                       GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "sso:view"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SubscriptionManage            GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "subscription:manage"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SubscriptionUpgrade           GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "subscription:upgrade"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1TeamManage                    GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "team:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1TeamView                      GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "team:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1TracesCreate                  GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "traces:create"
@@ -25455,6 +25871,8 @@ func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1) V
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1LangyView:
 		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1MembersView:
+		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1OpsManage:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1OpsView:
@@ -25509,6 +25927,10 @@ func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1) V
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1ScenariosView:
 		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SeatRequestsManage:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SeatRequestsView:
+		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SecretsCreate:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SecretsDelete:
@@ -25522,6 +25944,10 @@ func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1) V
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SsoManage:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SsoView:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SubscriptionManage:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SubscriptionUpgrade:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1TeamManage:
 		return true
@@ -25694,6 +26120,7 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1LangyManage                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "langy:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1LangyUpdate                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "langy:update"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1LangyView                     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "langy:view"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1MembersView                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "members:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1OpsManage                     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "ops:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1OpsView                       GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "ops:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1OrganizationDelete            GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "organization:delete"
@@ -25721,6 +26148,8 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1ScenariosManage               GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "scenarios:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1ScenariosUpdate               GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "scenarios:update"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1ScenariosView                 GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "scenarios:view"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SeatRequestsManage            GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "seatRequests:manage"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SeatRequestsView              GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "seatRequests:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SecretsCreate                 GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "secrets:create"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SecretsDelete                 GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "secrets:delete"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SecretsManage                 GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "secrets:manage"
@@ -25728,6 +26157,8 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SecretsView                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "secrets:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SsoManage                     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "sso:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SsoView                       GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "sso:view"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SubscriptionManage            GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "subscription:manage"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SubscriptionUpgrade           GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "subscription:upgrade"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1TeamManage                    GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "team:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1TeamView                      GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "team:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1TracesCreate                  GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "traces:create"
@@ -25908,6 +26339,8 @@ func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1) V
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1LangyView:
 		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1MembersView:
+		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1OpsManage:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1OpsView:
@@ -25962,6 +26395,10 @@ func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1) V
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1ScenariosView:
 		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SeatRequestsManage:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SeatRequestsView:
+		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SecretsCreate:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SecretsDelete:
@@ -25975,6 +26412,10 @@ func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1) V
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SsoManage:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SsoView:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SubscriptionManage:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SubscriptionUpgrade:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1TeamManage:
 		return true
@@ -26267,6 +26708,7 @@ const (
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1LangyManage                   GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "langy:manage"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1LangyUpdate                   GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "langy:update"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1LangyView                     GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "langy:view"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1MembersView                   GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "members:view"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1OpsManage                     GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "ops:manage"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1OpsView                       GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "ops:view"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1OrganizationDelete            GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "organization:delete"
@@ -26294,6 +26736,8 @@ const (
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1ScenariosManage               GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "scenarios:manage"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1ScenariosUpdate               GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "scenarios:update"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1ScenariosView                 GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "scenarios:view"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SeatRequestsManage            GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "seatRequests:manage"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SeatRequestsView              GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "seatRequests:view"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SecretsCreate                 GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "secrets:create"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SecretsDelete                 GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "secrets:delete"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SecretsManage                 GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "secrets:manage"
@@ -26301,6 +26745,8 @@ const (
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SecretsView                   GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "secrets:view"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SsoManage                     GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "sso:manage"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SsoView                       GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "sso:view"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SubscriptionManage            GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "subscription:manage"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SubscriptionUpgrade           GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "subscription:upgrade"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1TeamManage                    GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "team:manage"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1TeamView                      GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "team:view"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1TracesCreate                  GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "traces:create"
@@ -26481,6 +26927,8 @@ func (e GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1) Valid() bool {
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1LangyView:
 		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1MembersView:
+		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1OpsManage:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1OpsView:
@@ -26535,6 +26983,10 @@ func (e GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1) Valid() bool {
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1ScenariosView:
 		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SeatRequestsManage:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SeatRequestsView:
+		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SecretsCreate:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SecretsDelete:
@@ -26548,6 +27000,10 @@ func (e GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1) Valid() bool {
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SsoManage:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SsoView:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SubscriptionManage:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SubscriptionUpgrade:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1TeamManage:
 		return true
@@ -26720,6 +27176,7 @@ const (
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1LangyManage                   GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "langy:manage"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1LangyUpdate                   GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "langy:update"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1LangyView                     GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "langy:view"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1MembersView                   GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "members:view"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1OpsManage                     GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "ops:manage"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1OpsView                       GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "ops:view"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1OrganizationDelete            GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "organization:delete"
@@ -26747,6 +27204,8 @@ const (
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1ScenariosManage               GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "scenarios:manage"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1ScenariosUpdate               GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "scenarios:update"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1ScenariosView                 GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "scenarios:view"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SeatRequestsManage            GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "seatRequests:manage"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SeatRequestsView              GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "seatRequests:view"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SecretsCreate                 GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "secrets:create"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SecretsDelete                 GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "secrets:delete"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SecretsManage                 GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "secrets:manage"
@@ -26754,6 +27213,8 @@ const (
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SecretsView                   GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "secrets:view"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SsoManage                     GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "sso:manage"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SsoView                       GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "sso:view"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SubscriptionManage            GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "subscription:manage"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SubscriptionUpgrade           GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "subscription:upgrade"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1TeamManage                    GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "team:manage"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1TeamView                      GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "team:view"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1TracesCreate                  GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "traces:create"
@@ -26934,6 +27395,8 @@ func (e GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1) Valid() bool {
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1LangyView:
 		return true
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1MembersView:
+		return true
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1OpsManage:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1OpsView:
@@ -26988,6 +27451,10 @@ func (e GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1) Valid() bool {
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1ScenariosView:
 		return true
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SeatRequestsManage:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SeatRequestsView:
+		return true
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SecretsCreate:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SecretsDelete:
@@ -27001,6 +27468,10 @@ func (e GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1) Valid() bool {
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SsoManage:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SsoView:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SubscriptionManage:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SubscriptionUpgrade:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1TeamManage:
 		return true
@@ -29572,6 +30043,7 @@ const (
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceGovernanceView        ConfirmStoredObjectUpload200JSONResponseBodyAudience = "governance:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceIngestionSourcesView  ConfirmStoredObjectUpload200JSONResponseBodyAudience = "ingestionSources:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceLangyView             ConfirmStoredObjectUpload200JSONResponseBodyAudience = "langy:view"
+	ConfirmStoredObjectUpload200JSONResponseBodyAudienceMembersView           ConfirmStoredObjectUpload200JSONResponseBodyAudience = "members:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceOpsView               ConfirmStoredObjectUpload200JSONResponseBodyAudience = "ops:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceOrganizationView      ConfirmStoredObjectUpload200JSONResponseBodyAudience = "organization:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudiencePlaygroundView        ConfirmStoredObjectUpload200JSONResponseBodyAudience = "playground:view"
@@ -29579,6 +30051,7 @@ const (
 	ConfirmStoredObjectUpload200JSONResponseBodyAudiencePromptsView           ConfirmStoredObjectUpload200JSONResponseBodyAudience = "prompts:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceRoutingPoliciesView   ConfirmStoredObjectUpload200JSONResponseBodyAudience = "routingPolicies:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceScenariosView         ConfirmStoredObjectUpload200JSONResponseBodyAudience = "scenarios:view"
+	ConfirmStoredObjectUpload200JSONResponseBodyAudienceSeatRequestsView      ConfirmStoredObjectUpload200JSONResponseBodyAudience = "seatRequests:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceSecretsView           ConfirmStoredObjectUpload200JSONResponseBodyAudience = "secrets:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceSsoView               ConfirmStoredObjectUpload200JSONResponseBodyAudience = "sso:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceTeamView              ConfirmStoredObjectUpload200JSONResponseBodyAudience = "team:view"
@@ -29638,6 +30111,8 @@ func (e ConfirmStoredObjectUpload200JSONResponseBodyAudience) Valid() bool {
 		return true
 	case ConfirmStoredObjectUpload200JSONResponseBodyAudienceLangyView:
 		return true
+	case ConfirmStoredObjectUpload200JSONResponseBodyAudienceMembersView:
+		return true
 	case ConfirmStoredObjectUpload200JSONResponseBodyAudienceOpsView:
 		return true
 	case ConfirmStoredObjectUpload200JSONResponseBodyAudienceOrganizationView:
@@ -29651,6 +30126,8 @@ func (e ConfirmStoredObjectUpload200JSONResponseBodyAudience) Valid() bool {
 	case ConfirmStoredObjectUpload200JSONResponseBodyAudienceRoutingPoliciesView:
 		return true
 	case ConfirmStoredObjectUpload200JSONResponseBodyAudienceScenariosView:
+		return true
+	case ConfirmStoredObjectUpload200JSONResponseBodyAudienceSeatRequestsView:
 		return true
 	case ConfirmStoredObjectUpload200JSONResponseBodyAudienceSecretsView:
 		return true
@@ -29698,6 +30175,7 @@ const (
 	GetStoredObjectParamsAudienceGovernanceView        GetStoredObjectParamsAudience = "governance:view"
 	GetStoredObjectParamsAudienceIngestionSourcesView  GetStoredObjectParamsAudience = "ingestionSources:view"
 	GetStoredObjectParamsAudienceLangyView             GetStoredObjectParamsAudience = "langy:view"
+	GetStoredObjectParamsAudienceMembersView           GetStoredObjectParamsAudience = "members:view"
 	GetStoredObjectParamsAudienceOpsView               GetStoredObjectParamsAudience = "ops:view"
 	GetStoredObjectParamsAudienceOrganizationView      GetStoredObjectParamsAudience = "organization:view"
 	GetStoredObjectParamsAudiencePlaygroundView        GetStoredObjectParamsAudience = "playground:view"
@@ -29705,6 +30183,7 @@ const (
 	GetStoredObjectParamsAudiencePromptsView           GetStoredObjectParamsAudience = "prompts:view"
 	GetStoredObjectParamsAudienceRoutingPoliciesView   GetStoredObjectParamsAudience = "routingPolicies:view"
 	GetStoredObjectParamsAudienceScenariosView         GetStoredObjectParamsAudience = "scenarios:view"
+	GetStoredObjectParamsAudienceSeatRequestsView      GetStoredObjectParamsAudience = "seatRequests:view"
 	GetStoredObjectParamsAudienceSecretsView           GetStoredObjectParamsAudience = "secrets:view"
 	GetStoredObjectParamsAudienceSsoView               GetStoredObjectParamsAudience = "sso:view"
 	GetStoredObjectParamsAudienceTeamView              GetStoredObjectParamsAudience = "team:view"
@@ -29764,6 +30243,8 @@ func (e GetStoredObjectParamsAudience) Valid() bool {
 		return true
 	case GetStoredObjectParamsAudienceLangyView:
 		return true
+	case GetStoredObjectParamsAudienceMembersView:
+		return true
 	case GetStoredObjectParamsAudienceOpsView:
 		return true
 	case GetStoredObjectParamsAudienceOrganizationView:
@@ -29777,6 +30258,8 @@ func (e GetStoredObjectParamsAudience) Valid() bool {
 	case GetStoredObjectParamsAudienceRoutingPoliciesView:
 		return true
 	case GetStoredObjectParamsAudienceScenariosView:
+		return true
+	case GetStoredObjectParamsAudienceSeatRequestsView:
 		return true
 	case GetStoredObjectParamsAudienceSecretsView:
 		return true
@@ -29824,6 +30307,7 @@ const (
 	GetStoredObject200JSONResponseBodyCapabilityAudienceGovernanceView        GetStoredObject200JSONResponseBodyCapabilityAudience = "governance:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudienceIngestionSourcesView  GetStoredObject200JSONResponseBodyCapabilityAudience = "ingestionSources:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudienceLangyView             GetStoredObject200JSONResponseBodyCapabilityAudience = "langy:view"
+	GetStoredObject200JSONResponseBodyCapabilityAudienceMembersView           GetStoredObject200JSONResponseBodyCapabilityAudience = "members:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudienceOpsView               GetStoredObject200JSONResponseBodyCapabilityAudience = "ops:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudienceOrganizationView      GetStoredObject200JSONResponseBodyCapabilityAudience = "organization:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudiencePlaygroundView        GetStoredObject200JSONResponseBodyCapabilityAudience = "playground:view"
@@ -29831,6 +30315,7 @@ const (
 	GetStoredObject200JSONResponseBodyCapabilityAudiencePromptsView           GetStoredObject200JSONResponseBodyCapabilityAudience = "prompts:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudienceRoutingPoliciesView   GetStoredObject200JSONResponseBodyCapabilityAudience = "routingPolicies:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudienceScenariosView         GetStoredObject200JSONResponseBodyCapabilityAudience = "scenarios:view"
+	GetStoredObject200JSONResponseBodyCapabilityAudienceSeatRequestsView      GetStoredObject200JSONResponseBodyCapabilityAudience = "seatRequests:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudienceSecretsView           GetStoredObject200JSONResponseBodyCapabilityAudience = "secrets:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudienceSsoView               GetStoredObject200JSONResponseBodyCapabilityAudience = "sso:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudienceTeamView              GetStoredObject200JSONResponseBodyCapabilityAudience = "team:view"
@@ -29890,6 +30375,8 @@ func (e GetStoredObject200JSONResponseBodyCapabilityAudience) Valid() bool {
 		return true
 	case GetStoredObject200JSONResponseBodyCapabilityAudienceLangyView:
 		return true
+	case GetStoredObject200JSONResponseBodyCapabilityAudienceMembersView:
+		return true
 	case GetStoredObject200JSONResponseBodyCapabilityAudienceOpsView:
 		return true
 	case GetStoredObject200JSONResponseBodyCapabilityAudienceOrganizationView:
@@ -29903,6 +30390,8 @@ func (e GetStoredObject200JSONResponseBodyCapabilityAudience) Valid() bool {
 	case GetStoredObject200JSONResponseBodyCapabilityAudienceRoutingPoliciesView:
 		return true
 	case GetStoredObject200JSONResponseBodyCapabilityAudienceScenariosView:
+		return true
+	case GetStoredObject200JSONResponseBodyCapabilityAudienceSeatRequestsView:
 		return true
 	case GetStoredObject200JSONResponseBodyCapabilityAudienceSecretsView:
 		return true
@@ -29968,6 +30457,7 @@ const (
 	GovernanceView        GetStoredObject200JSONResponseBodyMetadataAudiences = "governance:view"
 	IngestionSourcesView  GetStoredObject200JSONResponseBodyMetadataAudiences = "ingestionSources:view"
 	LangyView             GetStoredObject200JSONResponseBodyMetadataAudiences = "langy:view"
+	MembersView           GetStoredObject200JSONResponseBodyMetadataAudiences = "members:view"
 	OpsView               GetStoredObject200JSONResponseBodyMetadataAudiences = "ops:view"
 	OrganizationView      GetStoredObject200JSONResponseBodyMetadataAudiences = "organization:view"
 	PlaygroundView        GetStoredObject200JSONResponseBodyMetadataAudiences = "playground:view"
@@ -29975,6 +30465,7 @@ const (
 	PromptsView           GetStoredObject200JSONResponseBodyMetadataAudiences = "prompts:view"
 	RoutingPoliciesView   GetStoredObject200JSONResponseBodyMetadataAudiences = "routingPolicies:view"
 	ScenariosView         GetStoredObject200JSONResponseBodyMetadataAudiences = "scenarios:view"
+	SeatRequestsView      GetStoredObject200JSONResponseBodyMetadataAudiences = "seatRequests:view"
 	SecretsView           GetStoredObject200JSONResponseBodyMetadataAudiences = "secrets:view"
 	SsoView               GetStoredObject200JSONResponseBodyMetadataAudiences = "sso:view"
 	TeamView              GetStoredObject200JSONResponseBodyMetadataAudiences = "team:view"
@@ -30034,6 +30525,8 @@ func (e GetStoredObject200JSONResponseBodyMetadataAudiences) Valid() bool {
 		return true
 	case LangyView:
 		return true
+	case MembersView:
+		return true
 	case OpsView:
 		return true
 	case OrganizationView:
@@ -30047,6 +30540,8 @@ func (e GetStoredObject200JSONResponseBodyMetadataAudiences) Valid() bool {
 	case RoutingPoliciesView:
 		return true
 	case ScenariosView:
+		return true
+	case SeatRequestsView:
 		return true
 	case SecretsView:
 		return true
@@ -45951,6 +46446,11 @@ type GetApiDatasetBySlugOrId200JSONResponseBodyColumnTypesType string
 
 // PatchApiDatasetBySlugOrIdJSONBody defines parameters for PatchApiDatasetBySlugOrId.
 type PatchApiDatasetBySlugOrIdJSONBody struct {
+	// ColumnRenames Which existing column each renamed column came from, as `{ from, to }` names. Sent, values move by these renames and by unchanged names only. Omitted, columns left over after matching names pair by position.
+	ColumnRenames *[]struct {
+		From string `json:"from"`
+		To   string `json:"to"`
+	} `json:"columnRenames,omitempty"`
 	ColumnTypes *[]struct {
 		Name string                                           `json:"name"`
 		Type PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType `json:"type"`
@@ -45992,6 +46492,53 @@ type PatchApiDatasetBySlugOrIdRecordsByRecordIdJSONBody struct {
 type PostApiDatasetBySlugOrIdUploadMultipartBody struct {
 	File openapi_types.File `json:"file"`
 }
+
+// GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKind defines parameters for GetApiDatasetBySlugOrIdVersions.
+type GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKind string
+
+// GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType defines parameters for GetApiDatasetBySlugOrIdVersions.
+type GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType string
+
+// GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTrigger defines parameters for GetApiDatasetBySlugOrIdVersions.
+type GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTrigger string
+
+// PostApiDatasetBySlugOrIdVersionsJSONBody defines parameters for PostApiDatasetBySlugOrIdVersions.
+type PostApiDatasetBySlugOrIdVersionsJSONBody struct {
+	Name *string `json:"name,omitempty"`
+}
+
+// PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKind defines parameters for PostApiDatasetBySlugOrIdVersions.
+type PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKind string
+
+// PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType defines parameters for PostApiDatasetBySlugOrIdVersions.
+type PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType string
+
+// PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTrigger defines parameters for PostApiDatasetBySlugOrIdVersions.
+type PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTrigger string
+
+// GetApiDatasetBySlugOrIdVersionsByVersionParams defines parameters for GetApiDatasetBySlugOrIdVersionsByVersion.
+type GetApiDatasetBySlugOrIdVersionsByVersionParams struct {
+	Page  *int `form:"page,omitempty" json:"page,omitempty"`
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKind defines parameters for GetApiDatasetBySlugOrIdVersionsByVersion.
+type GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKind string
+
+// GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType defines parameters for GetApiDatasetBySlugOrIdVersionsByVersion.
+type GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType string
+
+// GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTrigger defines parameters for GetApiDatasetBySlugOrIdVersionsByVersion.
+type GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTrigger string
+
+// PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKind defines parameters for PostApiDatasetBySlugOrIdVersionsByVersionRestore.
+type PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKind string
+
+// PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType defines parameters for PostApiDatasetBySlugOrIdVersionsByVersionRestore.
+type PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType string
+
+// PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTrigger defines parameters for PostApiDatasetBySlugOrIdVersionsByVersionRestore.
+type PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTrigger string
 
 // RevokeDocsSession200JSONResponseBodyRevoked defines parameters for RevokeDocsSession.
 type RevokeDocsSession200JSONResponseBodyRevoked bool
@@ -46575,6 +47122,14 @@ type GetApiExperimentsRunsParams struct {
 	PageSize *int `form:"pageSize,omitempty" json:"pageSize,omitempty"`
 }
 
+// GetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0 defines parameters for GetApiExperimentsRuns.
+type GetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0 = int
+
+// GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency defines parameters for GetApiExperimentsRuns.
+type GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency struct {
+	union json.RawMessage
+}
+
 // GetApiExperimentsRunsByRunId200JSONResponseBodyStatus defines parameters for GetApiExperimentsRunsByRunId.
 type GetApiExperimentsRunsByRunId200JSONResponseBodyStatus string
 
@@ -46584,12 +47139,26 @@ type GetApiExperimentsRunsByRunIdResultsParams struct {
 	ExperimentSlug *string `form:"experimentSlug,omitempty" json:"experimentSlug,omitempty"`
 }
 
+// GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0 defines parameters for GetApiExperimentsRunsByRunIdResults.
+type GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0 = int
+
+// GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency defines parameters for GetApiExperimentsRunsByRunIdResults.
+type GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency struct {
+	union json.RawMessage
+}
+
 // GetApiExperimentsRunsByRunIdResults200JSONResponseBodyEvaluationsStatus defines parameters for GetApiExperimentsRunsByRunIdResults.
 type GetApiExperimentsRunsByRunIdResults200JSONResponseBodyEvaluationsStatus string
 
 // GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0 defines parameters for GetApiExperimentsRunsByRunIdResults.
 type GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0 = []struct {
-	AgentId       *string                                                                                                    `json:"agentId,omitempty"`
+	AgentId *string `json:"agentId,omitempty"`
+
+	// AgentLabel The deploy label an agent target ran at, such as production
+	AgentLabel *string `json:"agentLabel,omitempty"`
+
+	// AgentVersion The agent version the label pointed at when the run started
+	AgentVersion  *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion                             `json:"agentVersion,omitempty"`
 	EvaluatorId   *string                                                                                                    `json:"evaluatorId,omitempty"`
 	Id            string                                                                                                     `json:"id"`
 	Metadata      *map[string]GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_Metadata_AdditionalProperties `json:"metadata,omitempty"`
@@ -46598,6 +47167,14 @@ type GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0 = []struct {
 	PromptId      *string                                                                                                    `json:"promptId,omitempty"`
 	PromptVersion *float32                                                                                                   `json:"promptVersion,omitempty"`
 	Type          string                                                                                                     `json:"type"`
+}
+
+// GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0 defines parameters for GetApiExperimentsRunsByRunIdResults.
+type GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0 = int
+
+// GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion defines parameters for GetApiExperimentsRunsByRunIdResults.
+type GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion struct {
+	union json.RawMessage
 }
 
 // GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0Metadata0 defines parameters for GetApiExperimentsRunsByRunIdResults.
@@ -46621,11 +47198,12 @@ type GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets struct {
 
 // PostApiExperimentsBySlugRunJSONBody defines parameters for PostApiExperimentsBySlugRun.
 type PostApiExperimentsBySlugRunJSONBody struct {
-	Concurrency *int                                                                            `json:"concurrency,omitempty"`
-	Data        *[]map[string]interface{}                                                       `json:"data,omitempty"`
-	DatasetId   *string                                                                         `json:"dataset_id,omitempty"`
-	Parameters  *map[string]PostApiExperimentsBySlugRunJSONBody_Parameters_AdditionalProperties `json:"parameters,omitempty"`
-	RowIndices  *[]int                                                                          `json:"row_indices,omitempty"`
+	Concurrency    *int                                                                            `json:"concurrency,omitempty"`
+	Data           *[]map[string]interface{}                                                       `json:"data,omitempty"`
+	DatasetId      *string                                                                         `json:"dataset_id,omitempty"`
+	DatasetVersion *int                                                                            `json:"dataset_version,omitempty"`
+	Parameters     *map[string]PostApiExperimentsBySlugRunJSONBody_Parameters_AdditionalProperties `json:"parameters,omitempty"`
+	RowIndices     *[]int                                                                          `json:"row_indices,omitempty"`
 }
 
 // PostApiExperimentsBySlugRunJSONBodyParameters0 defines parameters for PostApiExperimentsBySlugRun.
@@ -56049,6 +56627,9 @@ type PostApiWorkflowsByIdEvaluateJSONBody struct {
 	// DatasetId Platform dataset id to evaluate; mutually exclusive with data
 	DatasetId *string `json:"dataset_id,omitempty"`
 
+	// DatasetVersion Version of the saved dataset to evaluate (dataset_id, else the workflow's attached dataset); defaults to its current content
+	DatasetVersion *int `json:"dataset_version,omitempty"`
+
 	// Parameters Constant entry inputs applied to every row, e.g. a feature flag or PR number
 	Parameters *map[string]PostApiWorkflowsByIdEvaluateJSONBody_Parameters_AdditionalProperties `json:"parameters,omitempty"`
 
@@ -56720,6 +57301,9 @@ type PatchApiDatasetBySlugOrIdRecordsByRecordIdJSONRequestBody PatchApiDatasetBy
 
 // PostApiDatasetBySlugOrIdUploadMultipartRequestBody defines body for PostApiDatasetBySlugOrIdUpload for multipart/form-data ContentType.
 type PostApiDatasetBySlugOrIdUploadMultipartRequestBody PostApiDatasetBySlugOrIdUploadMultipartBody
+
+// PostApiDatasetBySlugOrIdVersionsJSONRequestBody defines body for PostApiDatasetBySlugOrIdVersions for application/json ContentType.
+type PostApiDatasetBySlugOrIdVersionsJSONRequestBody PostApiDatasetBySlugOrIdVersionsJSONBody
 
 // PostApiDspyLogStepsJSONRequestBody defines body for PostApiDspyLogSteps for application/json ContentType.
 type PostApiDspyLogStepsJSONRequestBody = PostApiDspyLogStepsJSONBody
@@ -101797,6 +102381,114 @@ func (t *PutApiEvaluatorsById200JSONResponseBody_Version) UnmarshalJSON(b []byte
 	return err
 }
 
+// AsGetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0 returns the union data inside the GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency as a GetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0
+func (t GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency) AsGetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0() (GetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0, error) {
+	var body GetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0 overwrites any union data inside the GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency as the provided GetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0
+func (t *GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency) FromGetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0(v GetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0 performs a merge with any union data inside the GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency, using the provided GetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0
+func (t *GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency) MergeGetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0(v GetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0 returns the union data inside the GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency as a GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0
+func (t GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency) AsGetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0() (GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0, error) {
+	var body GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0 overwrites any union data inside the GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency as the provided GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0
+func (t *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency) FromGetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0(v GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0 performs a merge with any union data inside the GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency, using the provided GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0
+func (t *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency) MergeGetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0(v GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0 returns the union data inside the GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion as a GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0
+func (t GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion) AsGetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0() (GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0, error) {
+	var body GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0 overwrites any union data inside the GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion as the provided GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0
+func (t *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion) FromGetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0(v GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0 performs a merge with any union data inside the GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion, using the provided GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0
+func (t *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion) MergeGetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0(v GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsGetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0Metadata0 returns the union data inside the GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_Metadata_AdditionalProperties as a GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0Metadata0
 func (t GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_Metadata_AdditionalProperties) AsGetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0Metadata0() (GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0Metadata0, error) {
 	var body GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0Metadata0
@@ -127078,6 +127770,20 @@ type ClientInterface interface {
 	// PostApiDatasetBySlugOrIdUploadWithBody request with any body
 	PostApiDatasetBySlugOrIdUploadWithBody(ctx context.Context, slugOrId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetApiDatasetBySlugOrIdVersions request
+	GetApiDatasetBySlugOrIdVersions(ctx context.Context, slugOrId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostApiDatasetBySlugOrIdVersionsWithBody request with any body
+	PostApiDatasetBySlugOrIdVersionsWithBody(ctx context.Context, slugOrId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PostApiDatasetBySlugOrIdVersions(ctx context.Context, slugOrId string, body PostApiDatasetBySlugOrIdVersionsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetApiDatasetBySlugOrIdVersionsByVersion request
+	GetApiDatasetBySlugOrIdVersionsByVersion(ctx context.Context, slugOrId string, version int, params *GetApiDatasetBySlugOrIdVersionsByVersionParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostApiDatasetBySlugOrIdVersionsByVersionRestore request
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore(ctx context.Context, slugOrId string, version int, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// RevokeDocsSession request
 	RevokeDocsSession(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -130699,6 +131405,66 @@ func (c *Client) PatchApiDatasetBySlugOrIdRecordsByRecordId(ctx context.Context,
 
 func (c *Client) PostApiDatasetBySlugOrIdUploadWithBody(ctx context.Context, slugOrId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostApiDatasetBySlugOrIdUploadRequestWithBody(c.Server, slugOrId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiDatasetBySlugOrIdVersions(ctx context.Context, slugOrId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiDatasetBySlugOrIdVersionsRequest(c.Server, slugOrId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiDatasetBySlugOrIdVersionsWithBody(ctx context.Context, slugOrId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiDatasetBySlugOrIdVersionsRequestWithBody(c.Server, slugOrId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiDatasetBySlugOrIdVersions(ctx context.Context, slugOrId string, body PostApiDatasetBySlugOrIdVersionsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiDatasetBySlugOrIdVersionsRequest(c.Server, slugOrId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiDatasetBySlugOrIdVersionsByVersion(ctx context.Context, slugOrId string, version int, params *GetApiDatasetBySlugOrIdVersionsByVersionParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiDatasetBySlugOrIdVersionsByVersionRequest(c.Server, slugOrId, version, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiDatasetBySlugOrIdVersionsByVersionRestore(ctx context.Context, slugOrId string, version int, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiDatasetBySlugOrIdVersionsByVersionRestoreRequest(c.Server, slugOrId, version)
 	if err != nil {
 		return nil, err
 	}
@@ -142183,6 +142949,208 @@ func NewPostApiDatasetBySlugOrIdUploadRequestWithBody(server string, slugOrId st
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetApiDatasetBySlugOrIdVersionsRequest generates requests for GetApiDatasetBySlugOrIdVersions
+func NewGetApiDatasetBySlugOrIdVersionsRequest(server string, slugOrId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "slugOrId", slugOrId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/dataset/%s/versions", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPostApiDatasetBySlugOrIdVersionsRequest calls the generic PostApiDatasetBySlugOrIdVersions builder with application/json body
+func NewPostApiDatasetBySlugOrIdVersionsRequest(server string, slugOrId string, body PostApiDatasetBySlugOrIdVersionsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostApiDatasetBySlugOrIdVersionsRequestWithBody(server, slugOrId, "application/json", bodyReader)
+}
+
+// NewPostApiDatasetBySlugOrIdVersionsRequestWithBody generates requests for PostApiDatasetBySlugOrIdVersions with any type of body
+func NewPostApiDatasetBySlugOrIdVersionsRequestWithBody(server string, slugOrId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "slugOrId", slugOrId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/dataset/%s/versions", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetApiDatasetBySlugOrIdVersionsByVersionRequest generates requests for GetApiDatasetBySlugOrIdVersionsByVersion
+func NewGetApiDatasetBySlugOrIdVersionsByVersionRequest(server string, slugOrId string, version int, params *GetApiDatasetBySlugOrIdVersionsByVersionParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "slugOrId", slugOrId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "version", version, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/dataset/%s/versions/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Page != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "page", *params.Page, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPostApiDatasetBySlugOrIdVersionsByVersionRestoreRequest generates requests for PostApiDatasetBySlugOrIdVersionsByVersionRestore
+func NewPostApiDatasetBySlugOrIdVersionsByVersionRestoreRequest(server string, slugOrId string, version int) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "slugOrId", slugOrId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "version", version, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/dataset/%s/versions/%s/restore", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -154198,6 +155166,20 @@ type ClientWithResponsesInterface interface {
 
 	// PostApiDatasetBySlugOrIdUploadWithBodyWithResponse request with any body
 	PostApiDatasetBySlugOrIdUploadWithBodyWithResponse(ctx context.Context, slugOrId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiDatasetBySlugOrIdUploadResponse, error)
+
+	// GetApiDatasetBySlugOrIdVersionsWithResponse request
+	GetApiDatasetBySlugOrIdVersionsWithResponse(ctx context.Context, slugOrId string, reqEditors ...RequestEditorFn) (*GetApiDatasetBySlugOrIdVersionsResponse, error)
+
+	// PostApiDatasetBySlugOrIdVersionsWithBodyWithResponse request with any body
+	PostApiDatasetBySlugOrIdVersionsWithBodyWithResponse(ctx context.Context, slugOrId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiDatasetBySlugOrIdVersionsResponse, error)
+
+	PostApiDatasetBySlugOrIdVersionsWithResponse(ctx context.Context, slugOrId string, body PostApiDatasetBySlugOrIdVersionsJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiDatasetBySlugOrIdVersionsResponse, error)
+
+	// GetApiDatasetBySlugOrIdVersionsByVersionWithResponse request
+	GetApiDatasetBySlugOrIdVersionsByVersionWithResponse(ctx context.Context, slugOrId string, version int, params *GetApiDatasetBySlugOrIdVersionsByVersionParams, reqEditors ...RequestEditorFn) (*GetApiDatasetBySlugOrIdVersionsByVersionResponse, error)
+
+	// PostApiDatasetBySlugOrIdVersionsByVersionRestoreWithResponse request
+	PostApiDatasetBySlugOrIdVersionsByVersionRestoreWithResponse(ctx context.Context, slugOrId string, version int, reqEditors ...RequestEditorFn) (*PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse, error)
 
 	// RevokeDocsSessionWithResponse request
 	RevokeDocsSessionWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*RevokeDocsSessionResponse, error)
@@ -166497,6 +167479,228 @@ func (r PostApiDatasetBySlugOrIdUploadResponse) ContentType() string {
 	return ""
 }
 
+type GetApiDatasetBySlugOrIdVersionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data []struct {
+			AuthorId    *string                                                           `json:"authorId"`
+			AuthorKind  *GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKind `json:"authorKind"`
+			AuthorName  *string                                                           `json:"authorName"`
+			ChunkCount  int                                                               `json:"chunkCount"`
+			ColumnTypes []struct {
+				Name string                                                                `json:"name"`
+				Type GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType `json:"type"`
+			} `json:"columnTypes"`
+			ContentHash         string                                                        `json:"contentHash"`
+			CreatedAt           time.Time                                                     `json:"createdAt"`
+			DatasetId           string                                                        `json:"datasetId"`
+			Id                  string                                                        `json:"id"`
+			Name                *string                                                       `json:"name"`
+			Pinned              bool                                                          `json:"pinned"`
+			ProjectId           string                                                        `json:"projectId"`
+			RestoredFromVersion *int                                                          `json:"restoredFromVersion"`
+			RowCount            int                                                           `json:"rowCount"`
+			RunCount            int                                                           `json:"runCount"`
+			SizeBytes           int                                                           `json:"sizeBytes"`
+			Trigger             GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTrigger `json:"trigger"`
+			Version             int                                                           `json:"version"`
+		} `json:"data"`
+		Restorable bool `json:"restorable"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiDatasetBySlugOrIdVersionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiDatasetBySlugOrIdVersionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiDatasetBySlugOrIdVersionsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PostApiDatasetBySlugOrIdVersionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		AuthorId    *string                                                        `json:"authorId"`
+		AuthorKind  *PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKind `json:"authorKind"`
+		ChunkCount  int                                                            `json:"chunkCount"`
+		ColumnTypes []struct {
+			Name string                                                             `json:"name"`
+			Type PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType `json:"type"`
+		} `json:"columnTypes"`
+		ContentHash         string                                                     `json:"contentHash"`
+		CreatedAt           time.Time                                                  `json:"createdAt"`
+		DatasetId           string                                                     `json:"datasetId"`
+		Id                  string                                                     `json:"id"`
+		Name                *string                                                    `json:"name"`
+		Pinned              bool                                                       `json:"pinned"`
+		ProjectId           string                                                     `json:"projectId"`
+		RestoredFromVersion *int                                                       `json:"restoredFromVersion"`
+		RowCount            int                                                        `json:"rowCount"`
+		RunCount            int                                                        `json:"runCount"`
+		SizeBytes           int                                                        `json:"sizeBytes"`
+		Trigger             PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTrigger `json:"trigger"`
+		Version             int                                                        `json:"version"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r PostApiDatasetBySlugOrIdVersionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostApiDatasetBySlugOrIdVersionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostApiDatasetBySlugOrIdVersionsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetApiDatasetBySlugOrIdVersionsByVersionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Pagination struct {
+			Limit int `json:"limit"`
+			Page  int `json:"page"`
+			Total int `json:"total"`
+		} `json:"pagination"`
+		Rows []struct {
+			Entry map[string]interface{} `json:"entry"`
+			Id    string                 `json:"id"`
+		} `json:"rows"`
+		Version struct {
+			AuthorId    *string                                                                       `json:"authorId"`
+			AuthorKind  *GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKind `json:"authorKind"`
+			ChunkCount  int                                                                           `json:"chunkCount"`
+			ColumnTypes []struct {
+				Name string                                                                            `json:"name"`
+				Type GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType `json:"type"`
+			} `json:"columnTypes"`
+			ContentHash         string                                                                    `json:"contentHash"`
+			CreatedAt           time.Time                                                                 `json:"createdAt"`
+			DatasetId           string                                                                    `json:"datasetId"`
+			Id                  string                                                                    `json:"id"`
+			Name                *string                                                                   `json:"name"`
+			Pinned              bool                                                                      `json:"pinned"`
+			ProjectId           string                                                                    `json:"projectId"`
+			RestoredFromVersion *int                                                                      `json:"restoredFromVersion"`
+			RowCount            int                                                                       `json:"rowCount"`
+			RunCount            int                                                                       `json:"runCount"`
+			SizeBytes           int                                                                       `json:"sizeBytes"`
+			Trigger             GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTrigger `json:"trigger"`
+			Version             int                                                                       `json:"version"`
+		} `json:"version"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiDatasetBySlugOrIdVersionsByVersionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiDatasetBySlugOrIdVersionsByVersionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiDatasetBySlugOrIdVersionsByVersionResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Changed bool `json:"changed"`
+		Version struct {
+			AuthorId    *string                                                                               `json:"authorId"`
+			AuthorKind  *PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKind `json:"authorKind"`
+			ChunkCount  int                                                                                   `json:"chunkCount"`
+			ColumnTypes []struct {
+				Name string                                                                                    `json:"name"`
+				Type PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType `json:"type"`
+			} `json:"columnTypes"`
+			ContentHash         string                                                                            `json:"contentHash"`
+			CreatedAt           time.Time                                                                         `json:"createdAt"`
+			DatasetId           string                                                                            `json:"datasetId"`
+			Id                  string                                                                            `json:"id"`
+			Name                *string                                                                           `json:"name"`
+			Pinned              bool                                                                              `json:"pinned"`
+			ProjectId           string                                                                            `json:"projectId"`
+			RestoredFromVersion *int                                                                              `json:"restoredFromVersion"`
+			RowCount            int                                                                               `json:"rowCount"`
+			RunCount            int                                                                               `json:"runCount"`
+			SizeBytes           int                                                                               `json:"sizeBytes"`
+			Trigger             PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTrigger `json:"trigger"`
+			Version             int                                                                               `json:"version"`
+		} `json:"version"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type RevokeDocsSessionResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -167496,9 +168700,11 @@ type GetApiExperimentsRunsResponse struct {
 			TotalHits float32 `json:"totalHits"`
 		} `json:"pagination"`
 		Runs []struct {
-			ExperimentId string   `json:"experimentId"`
-			Progress     *float32 `json:"progress,omitempty"`
-			RunId        string   `json:"runId"`
+			// Concurrency Cells the run executed at once. Null for a run that recorded none.
+			Concurrency  *GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency `json:"concurrency,omitempty"`
+			ExperimentId string                                                     `json:"experimentId"`
+			Progress     *float32                                                   `json:"progress,omitempty"`
+			RunId        string                                                     `json:"runId"`
 			Summary      struct {
 				DatasetAverageCost     *float32 `json:"datasetAverageCost,omitempty"`
 				DatasetAverageDuration *float32 `json:"datasetAverageDuration,omitempty"`
@@ -167564,6 +168770,9 @@ type GetApiExperimentsRunsByRunIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
+		// Concurrency Cells the run executes at once, as it was fixed when the run started
+		Concurrency *int `json:"concurrency,omitempty"`
+
 		// DomainError The full failure envelope, when the failure carried one
 		DomainError *struct {
 			// Code Stable failure code; branch on this
@@ -167691,6 +168900,9 @@ type GetApiExperimentsRunsByRunIdResultsResponse struct {
 				Received int  `json:"received"`
 			} `json:"evaluations"`
 		} `json:"completeness"`
+
+		// Concurrency Cells the run executed at once. Null for a run that recorded none.
+		Concurrency *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency `json:"concurrency,omitempty"`
 
 		// Dataset One row per dataset entry, with what the target predicted
 		Dataset []struct {
@@ -167829,6 +169041,9 @@ type PostApiExperimentsBySlugRunResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
+		// Concurrency Cells this run executes at once: the request's `concurrency`, else the server default
+		Concurrency *int `json:"concurrency,omitempty"`
+
 		// RunId Identifier to poll this run with
 		RunId string `json:"runId"`
 
@@ -183531,6 +184746,50 @@ func (c *ClientWithResponses) PostApiDatasetBySlugOrIdUploadWithBodyWithResponse
 		return nil, err
 	}
 	return ParsePostApiDatasetBySlugOrIdUploadResponse(rsp)
+}
+
+// GetApiDatasetBySlugOrIdVersionsWithResponse request returning *GetApiDatasetBySlugOrIdVersionsResponse
+func (c *ClientWithResponses) GetApiDatasetBySlugOrIdVersionsWithResponse(ctx context.Context, slugOrId string, reqEditors ...RequestEditorFn) (*GetApiDatasetBySlugOrIdVersionsResponse, error) {
+	rsp, err := c.GetApiDatasetBySlugOrIdVersions(ctx, slugOrId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiDatasetBySlugOrIdVersionsResponse(rsp)
+}
+
+// PostApiDatasetBySlugOrIdVersionsWithBodyWithResponse request with arbitrary body returning *PostApiDatasetBySlugOrIdVersionsResponse
+func (c *ClientWithResponses) PostApiDatasetBySlugOrIdVersionsWithBodyWithResponse(ctx context.Context, slugOrId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiDatasetBySlugOrIdVersionsResponse, error) {
+	rsp, err := c.PostApiDatasetBySlugOrIdVersionsWithBody(ctx, slugOrId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiDatasetBySlugOrIdVersionsResponse(rsp)
+}
+
+func (c *ClientWithResponses) PostApiDatasetBySlugOrIdVersionsWithResponse(ctx context.Context, slugOrId string, body PostApiDatasetBySlugOrIdVersionsJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiDatasetBySlugOrIdVersionsResponse, error) {
+	rsp, err := c.PostApiDatasetBySlugOrIdVersions(ctx, slugOrId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiDatasetBySlugOrIdVersionsResponse(rsp)
+}
+
+// GetApiDatasetBySlugOrIdVersionsByVersionWithResponse request returning *GetApiDatasetBySlugOrIdVersionsByVersionResponse
+func (c *ClientWithResponses) GetApiDatasetBySlugOrIdVersionsByVersionWithResponse(ctx context.Context, slugOrId string, version int, params *GetApiDatasetBySlugOrIdVersionsByVersionParams, reqEditors ...RequestEditorFn) (*GetApiDatasetBySlugOrIdVersionsByVersionResponse, error) {
+	rsp, err := c.GetApiDatasetBySlugOrIdVersionsByVersion(ctx, slugOrId, version, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiDatasetBySlugOrIdVersionsByVersionResponse(rsp)
+}
+
+// PostApiDatasetBySlugOrIdVersionsByVersionRestoreWithResponse request returning *PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse
+func (c *ClientWithResponses) PostApiDatasetBySlugOrIdVersionsByVersionRestoreWithResponse(ctx context.Context, slugOrId string, version int, reqEditors ...RequestEditorFn) (*PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse, error) {
+	rsp, err := c.PostApiDatasetBySlugOrIdVersionsByVersionRestore(ctx, slugOrId, version, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse(rsp)
 }
 
 // RevokeDocsSessionWithResponse request returning *RevokeDocsSessionResponse
@@ -199399,6 +200658,212 @@ func ParsePostApiDatasetBySlugOrIdUploadResponse(rsp *http.Response) (*PostApiDa
 	return response, nil
 }
 
+// ParseGetApiDatasetBySlugOrIdVersionsResponse parses an HTTP response from a GetApiDatasetBySlugOrIdVersionsWithResponse call
+func ParseGetApiDatasetBySlugOrIdVersionsResponse(rsp *http.Response) (*GetApiDatasetBySlugOrIdVersionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiDatasetBySlugOrIdVersionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Data []struct {
+				AuthorId    *string                                                           `json:"authorId"`
+				AuthorKind  *GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKind `json:"authorKind"`
+				AuthorName  *string                                                           `json:"authorName"`
+				ChunkCount  int                                                               `json:"chunkCount"`
+				ColumnTypes []struct {
+					Name string                                                                `json:"name"`
+					Type GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType `json:"type"`
+				} `json:"columnTypes"`
+				ContentHash         string                                                        `json:"contentHash"`
+				CreatedAt           time.Time                                                     `json:"createdAt"`
+				DatasetId           string                                                        `json:"datasetId"`
+				Id                  string                                                        `json:"id"`
+				Name                *string                                                       `json:"name"`
+				Pinned              bool                                                          `json:"pinned"`
+				ProjectId           string                                                        `json:"projectId"`
+				RestoredFromVersion *int                                                          `json:"restoredFromVersion"`
+				RowCount            int                                                           `json:"rowCount"`
+				RunCount            int                                                           `json:"runCount"`
+				SizeBytes           int                                                           `json:"sizeBytes"`
+				Trigger             GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTrigger `json:"trigger"`
+				Version             int                                                           `json:"version"`
+			} `json:"data"`
+			Restorable bool `json:"restorable"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostApiDatasetBySlugOrIdVersionsResponse parses an HTTP response from a PostApiDatasetBySlugOrIdVersionsWithResponse call
+func ParsePostApiDatasetBySlugOrIdVersionsResponse(rsp *http.Response) (*PostApiDatasetBySlugOrIdVersionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostApiDatasetBySlugOrIdVersionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			AuthorId    *string                                                        `json:"authorId"`
+			AuthorKind  *PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKind `json:"authorKind"`
+			ChunkCount  int                                                            `json:"chunkCount"`
+			ColumnTypes []struct {
+				Name string                                                             `json:"name"`
+				Type PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType `json:"type"`
+			} `json:"columnTypes"`
+			ContentHash         string                                                     `json:"contentHash"`
+			CreatedAt           time.Time                                                  `json:"createdAt"`
+			DatasetId           string                                                     `json:"datasetId"`
+			Id                  string                                                     `json:"id"`
+			Name                *string                                                    `json:"name"`
+			Pinned              bool                                                       `json:"pinned"`
+			ProjectId           string                                                     `json:"projectId"`
+			RestoredFromVersion *int                                                       `json:"restoredFromVersion"`
+			RowCount            int                                                        `json:"rowCount"`
+			RunCount            int                                                        `json:"runCount"`
+			SizeBytes           int                                                        `json:"sizeBytes"`
+			Trigger             PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTrigger `json:"trigger"`
+			Version             int                                                        `json:"version"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetApiDatasetBySlugOrIdVersionsByVersionResponse parses an HTTP response from a GetApiDatasetBySlugOrIdVersionsByVersionWithResponse call
+func ParseGetApiDatasetBySlugOrIdVersionsByVersionResponse(rsp *http.Response) (*GetApiDatasetBySlugOrIdVersionsByVersionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiDatasetBySlugOrIdVersionsByVersionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Pagination struct {
+				Limit int `json:"limit"`
+				Page  int `json:"page"`
+				Total int `json:"total"`
+			} `json:"pagination"`
+			Rows []struct {
+				Entry map[string]interface{} `json:"entry"`
+				Id    string                 `json:"id"`
+			} `json:"rows"`
+			Version struct {
+				AuthorId    *string                                                                       `json:"authorId"`
+				AuthorKind  *GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKind `json:"authorKind"`
+				ChunkCount  int                                                                           `json:"chunkCount"`
+				ColumnTypes []struct {
+					Name string                                                                            `json:"name"`
+					Type GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType `json:"type"`
+				} `json:"columnTypes"`
+				ContentHash         string                                                                    `json:"contentHash"`
+				CreatedAt           time.Time                                                                 `json:"createdAt"`
+				DatasetId           string                                                                    `json:"datasetId"`
+				Id                  string                                                                    `json:"id"`
+				Name                *string                                                                   `json:"name"`
+				Pinned              bool                                                                      `json:"pinned"`
+				ProjectId           string                                                                    `json:"projectId"`
+				RestoredFromVersion *int                                                                      `json:"restoredFromVersion"`
+				RowCount            int                                                                       `json:"rowCount"`
+				RunCount            int                                                                       `json:"runCount"`
+				SizeBytes           int                                                                       `json:"sizeBytes"`
+				Trigger             GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTrigger `json:"trigger"`
+				Version             int                                                                       `json:"version"`
+			} `json:"version"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse parses an HTTP response from a PostApiDatasetBySlugOrIdVersionsByVersionRestoreWithResponse call
+func ParsePostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse(rsp *http.Response) (*PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Changed bool `json:"changed"`
+			Version struct {
+				AuthorId    *string                                                                               `json:"authorId"`
+				AuthorKind  *PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKind `json:"authorKind"`
+				ChunkCount  int                                                                                   `json:"chunkCount"`
+				ColumnTypes []struct {
+					Name string                                                                                    `json:"name"`
+					Type PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType `json:"type"`
+				} `json:"columnTypes"`
+				ContentHash         string                                                                            `json:"contentHash"`
+				CreatedAt           time.Time                                                                         `json:"createdAt"`
+				DatasetId           string                                                                            `json:"datasetId"`
+				Id                  string                                                                            `json:"id"`
+				Name                *string                                                                           `json:"name"`
+				Pinned              bool                                                                              `json:"pinned"`
+				ProjectId           string                                                                            `json:"projectId"`
+				RestoredFromVersion *int                                                                              `json:"restoredFromVersion"`
+				RowCount            int                                                                               `json:"rowCount"`
+				RunCount            int                                                                               `json:"runCount"`
+				SizeBytes           int                                                                               `json:"sizeBytes"`
+				Trigger             PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTrigger `json:"trigger"`
+				Version             int                                                                               `json:"version"`
+			} `json:"version"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseRevokeDocsSessionResponse parses an HTTP response from a RevokeDocsSessionWithResponse call
 func ParseRevokeDocsSessionResponse(rsp *http.Response) (*RevokeDocsSessionResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -200463,9 +201928,11 @@ func ParseGetApiExperimentsRunsResponse(rsp *http.Response) (*GetApiExperimentsR
 				TotalHits float32 `json:"totalHits"`
 			} `json:"pagination"`
 			Runs []struct {
-				ExperimentId string   `json:"experimentId"`
-				Progress     *float32 `json:"progress,omitempty"`
-				RunId        string   `json:"runId"`
+				// Concurrency Cells the run executed at once. Null for a run that recorded none.
+				Concurrency  *GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency `json:"concurrency,omitempty"`
+				ExperimentId string                                                     `json:"experimentId"`
+				Progress     *float32                                                   `json:"progress,omitempty"`
+				RunId        string                                                     `json:"runId"`
 				Summary      struct {
 					DatasetAverageCost     *float32 `json:"datasetAverageCost,omitempty"`
 					DatasetAverageDuration *float32 `json:"datasetAverageDuration,omitempty"`
@@ -200533,6 +202000,9 @@ func ParseGetApiExperimentsRunsByRunIdResponse(rsp *http.Response) (*GetApiExper
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
+			// Concurrency Cells the run executes at once, as it was fixed when the run started
+			Concurrency *int `json:"concurrency,omitempty"`
+
 			// DomainError The full failure envelope, when the failure carried one
 			DomainError *struct {
 				// Code Stable failure code; branch on this
@@ -200656,6 +202126,9 @@ func ParseGetApiExperimentsRunsByRunIdResultsResponse(rsp *http.Response) (*GetA
 					Received int  `json:"received"`
 				} `json:"evaluations"`
 			} `json:"completeness"`
+
+			// Concurrency Cells the run executed at once. Null for a run that recorded none.
+			Concurrency *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency `json:"concurrency,omitempty"`
 
 			// Dataset One row per dataset entry, with what the target predicted
 			Dataset []struct {
@@ -200786,6 +202259,9 @@ func ParsePostApiExperimentsBySlugRunResponse(rsp *http.Response) (*PostApiExper
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
+			// Concurrency Cells this run executes at once: the request's `concurrency`, else the server default
+			Concurrency *int `json:"concurrency,omitempty"`
+
 			// RunId Identifier to poll this run with
 			RunId string `json:"runId"`
 

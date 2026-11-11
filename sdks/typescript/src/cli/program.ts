@@ -13,6 +13,7 @@ import { withQuotedNameHint } from "./commands/agents/quoted-name-hint.js";
 import { TRACE_SOURCES } from "./commands/dashboards/definitionInput";
 import type { QuestionDraft } from "./commands/instant-evals/questionFlags";
 import { parsePromptSpec } from "./types";
+import { parseDatasetVersionFlag } from "./utils/datasetVersionFlag";
 import { SOURCE_TYPE_BY_TOOL } from "./utils/governance/otel-env-block";
 import { resolveControlPlaneUrl } from "./utils/governance/resolveEndpoint";
 import { sessionContextHookArguments } from "./utils/governance/session-context-agents";
@@ -1714,8 +1715,16 @@ function registerExperimentCommands(program: Command): void {
         "--concurrency <n>",
         "Cells (one row against one target) to run at once for this run only, 1 to 24 (default: the server's setting; 1 runs them in order)",
       )
+      .option(
+        "--dataset-version <n>",
+        "Version of the experiment's saved dataset to run, overriding the version the experiment pins",
+        parseDatasetVersionFlag,
+      )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (slug: string, options: { wait?: boolean; param?: string[]; concurrency?: string }) => {
+    async (
+      slug: string,
+      options: { wait?: boolean; param?: string[]; concurrency?: string; datasetVersion?: number },
+    ) => {
       const { runExperimentCommand: impl } = await import("./commands/experiment/run.js");
       return impl(slug, options);
     },

@@ -100,7 +100,7 @@ describe("given the What users ask widgets", () => {
   it("compares topic shares with the equally long period before and marks new topics", () => {
     const { sql, tsx } = buildOf("ask-rising");
     expect(sql.shares).toContain(
-      "countIf(t.OccurredAt < {dashboard_context_period_start:DateTime})",
+      "uniqExactIf(t.TraceId, t.OccurredAt < {dashboard_context_period_start:DateTime})",
     );
     expect(sql.shares).toContain("subtractSeconds({dashboard_context_period_start:DateTime}");
     expect(tsx).toContain("num(row.in_previous) === 0 && num(row.in_period) > 0");

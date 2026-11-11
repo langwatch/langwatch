@@ -12,6 +12,7 @@ import {
   isOwnDecisionModelId,
   type DecisionModelEntry,
   type DecisionModelResolution,
+  type ModelDefaultScope,
 } from "@langwatch/model-provider-contract";
 
 /** The Default models keys that hold a decision model. */
@@ -32,6 +33,34 @@ export function picksOwnDecisionModel({
     ([key, model]) =>
       isDecisionDefaultKey(key) && isOwnDecisionModelId(model) && stored[key] !== model,
   );
+}
+
+/**
+ * Each own decision model a config would store, with the scopes it must run from: every scope
+ * for a new pick, only the scopes it gains for a value kept as it was.
+ */
+export function ownDecisionPicksToCheck({
+  config,
+  stored = {},
+  scopes,
+  storedScopes = [],
+}: {
+  config: Readonly<Record<string, string>>;
+  stored?: Readonly<Record<string, string>>;
+  scopes: readonly ModelDefaultScope[];
+  storedScopes?: readonly ModelDefaultScope[];
+}): { model: string; scopes: ModelDefaultScope[] }[] {
+  const isStoredScope = (scope: ModelDefaultScope) =>
+    storedScopes.some(
+      (kept) => kept.scopeType === scope.scopeType && kept.scopeId === scope.scopeId,
+    );
+  return Object.entries(config)
+    .filter(([key, model]) => isDecisionDefaultKey(key) && isOwnDecisionModelId(model))
+    .map(([key, model]) => ({
+      model,
+      scopes: stored[key] === model ? scopes.filter((scope) => !isStoredScope(scope)) : [...scopes],
+    }))
+    .filter((pick) => pick.scopes.length > 0);
 }
 
 type DecisionProviderRow = Readonly<{

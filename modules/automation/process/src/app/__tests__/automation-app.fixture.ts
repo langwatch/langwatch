@@ -206,6 +206,7 @@ export function createCanonicalAutomationApp(): {
           requestBound: vi.fn<EntitlementApiContract["requestBound"]>(),
           resolvePlanNextStep: vi.fn<EntitlementApiContract["resolvePlanNextStep"]>(),
           assertWithinUsageLimit: vi.fn<EntitlementApiContract["assertWithinUsageLimit"]>(),
+          getUsageMonthBreakdown: vi.fn<EntitlementApiContract["getUsageMonthBreakdown"]>(),
         },
         auditLog,
         traces: createApiFixture<TraceApi>({}),

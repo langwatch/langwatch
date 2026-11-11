@@ -236,6 +236,21 @@ const RESOURCE_COPY = {
     blurb: "Which version of an evaluator each deploy label, such as production, points at.",
     area: "Building",
   },
+  subscription: {
+    label: "Subscription",
+    blurb: "The organization's paid plan, its seats and its invoices.",
+    area: "Organization",
+  },
+  seatRequests: {
+    label: "Seat requests",
+    blurb: "Requests to give a seat to someone the seat limit held back.",
+    area: "Organization",
+  },
+  members: {
+    label: "Members",
+    blurb: "Who is in the organization and which roles they hold.",
+    area: "Organization",
+  },
   featureFlags: {
     label: "Feature flag experiments",
     blurb: "Which experiments a project or organization is enrolled in.",
@@ -283,6 +298,7 @@ const ACTION_COPY = {
     label: "Deploy",
     blurb: "Move a deploy label to another version, and archive one that carries a label.",
   },
+  upgrade: { label: "Upgrade", blurb: "Start a paid plan and pay for it." },
   viewOtherPersonal: {
     label: "View everyone's personal keys",
     blurb: "See the personal keys other people own.",

@@ -3,7 +3,12 @@
  */
 
 import type { Agent, AgentApi } from "@langwatch/agent-contract";
-import type { DatasetApi, DatasetColumns } from "@langwatch/dataset-contract";
+import {
+  SYSTEM_DATASET_VERSION_AUTHOR,
+  type DatasetApi,
+  type DatasetColumns,
+  type DatasetVersionAuthor,
+} from "@langwatch/dataset-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { Evaluator, EvaluatorApi } from "@langwatch/evaluator-contract";
 import {
@@ -28,7 +33,6 @@ import {
   parseJsonColumns,
   rowBytesOf,
   rowsFromInlineData,
-  savedDatasetPageRows,
 } from "../rules/experiment-execution-data.rules.ts";
 import { ExperimentTargetLoadingService } from "./experiment-target-loading.service.ts";
 
@@ -81,6 +85,7 @@ type DatasetInput = {
     records: Record<string, unknown[]>;
   };
   datasetId?: string;
+  datasetVersion?: number | null;
   columns: { id: string; name: string; type: string }[];
 };
 
@@ -95,6 +100,12 @@ export type LoadedWorkflow = {
   dsl: StudioWorkflow;
 };
 
+/** The saved dataset version a run read, linked to the run once it has an id. */
+export type LoadedDatasetVersion = { datasetId: string; versionId: string; version: number };
+
+/** An agent as a run loaded it, with the version a label or a version number resolved to. */
+export type LoadedAgent = Agent & { version?: number | null };
+
 /** DB evaluator rows a run has loaded, keyed by their own id. */
 export type LoadedEvaluators = Map<string, { id: string; name: string; config: unknown }>;
 
@@ -105,9 +116,13 @@ export type LoadedExecutionData = {
   datasetRows: Record<string, unknown>[];
   datasetColumns: { id: string; name: string; type: string }[];
   loadedPrompts: Map<string, VersionedPrompt>;
-  loadedAgents: Map<string, Agent>;
+  loadedAgents: Map<string, LoadedAgent>;
   loadedEvaluators: Map<string, Evaluator>;
   loadedWorkflows: Map<string, LoadedWorkflow>;
+  /** Absent when the rows came with the request or from an inline dataset. */
+  datasetVersion?: LoadedDatasetVersion;
+  /** The row ids of a pinned version, in run order; absent when the run read current content. */
+  pinnedVersionRowIds?: string[];
 };
 
 /**
@@ -140,6 +155,10 @@ type EvaluatorForLoading = {
 export type ExecutionDataInputs = {
   data?: Record<string, unknown>[];
   datasetId?: string;
+  /** The saved dataset's version to read; overrides the version the reference pins. */
+  datasetVersion?: number;
+  /** Who a version saved for this run is attributed to; the platform when absent. */
+  by?: DatasetVersionAuthor;
   parameters?: Record<string, string | number | boolean>;
 };
 
@@ -182,11 +201,13 @@ export class ExperimentExecutionDataService {
     projectId,
     organizationId,
     services,
+    inputs,
   }: {
     dataset: DatasetInput;
     projectId: string;
     organizationId: string;
     services: ExecutionDataServices;
+    inputs?: ExecutionDataInputs;
   }): Promise<BaseDataset> {
     if (dataset.type === "inline" && dataset.inline) {
       const columns = dataset.inline.columns;
@@ -204,6 +225,8 @@ export class ExperimentExecutionDataService {
     if (dataset.type === "saved" && dataset.datasetId) {
       const saved = await this.readSavedDataset({
         slugOrId: dataset.datasetId,
+        version: inputs?.datasetVersion ?? dataset.datasetVersion ?? undefined,
+        by: inputs?.by,
         projectId,
         organizationId,
         services,
@@ -215,6 +238,8 @@ export class ExperimentExecutionDataService {
         rows: parseJsonColumns(saved.rows, jsonColumnNames(columns)),
         columns,
         source: "saved",
+        datasetVersion: saved.datasetVersion,
+        ...(saved.pinnedVersionRowIds ? { pinnedVersionRowIds: saved.pinnedVersionRowIds } : {}),
       };
     }
 
@@ -225,57 +250,87 @@ export class ExperimentExecutionDataService {
   }
 
   /**
-   * Every row of a saved dataset, read page by page, or a refusal: the run
-   * never starts over fewer rows than the dataset has. A dataset that is not
-   * ready (uploading, processing, failed) refuses the read by name.
+   * Every row of the dataset version a run reads: the pinned one, or the current content saved
+   * as one. Above the row bound it is refused before any row is read; a dataset that is not
+   * ready refuses the read by name.
    */
   private async readSavedDataset({
     slugOrId,
+    version: pinned,
+    by,
     projectId,
     organizationId,
     services,
   }: {
     slugOrId: string;
+    version: number | undefined;
+    by: DatasetVersionAuthor | undefined;
     projectId: string;
     organizationId: string;
     services: ExecutionDataServices;
-  }): Promise<{ rows: Record<string, unknown>[]; columnTypes: DatasetColumns }> {
+  }): Promise<{
+    rows: Record<string, unknown>[];
+    columnTypes: DatasetColumns;
+    datasetVersion: LoadedDatasetVersion;
+    pinnedVersionRowIds?: string[];
+  }> {
     const [maxRows, maxBytes] = await Promise.all([
       services.entitlements.requestBound({ key: "datasetRowsMax", organizationId }),
       services.entitlements.requestBound({ key: "datasetWholeReadBytes", organizationId }),
     ]);
-    const head = await services.datasets.getDatasetHead({ slugOrId, projectId });
-    const rowCount = head.total;
+    // The current content's row count is checked before it is saved as a version; its byte
+    // size is known only once the version is written, so that refusal comes after the copy.
+    if (pinned === undefined) {
+      const head = await services.datasets.getDatasetHead({ slugOrId, projectId });
+      if (head.total > maxRows) {
+        throw new ExperimentDatasetTooManyRowsError({ rowCount: head.total, maxRows });
+      }
+    }
+
+    const resolved = await services.datasets.resolveVersionForRun({
+      projectId,
+      datasetId: slugOrId,
+      ...(pinned !== undefined ? { version: pinned } : {}),
+      by: by ?? SYSTEM_DATASET_VERSION_AUTHOR,
+    });
+    const rowCount = resolved.rowCount;
     if (rowCount > maxRows) {
       throw new ExperimentDatasetTooManyRowsError({ rowCount, maxRows });
     }
+    if (resolved.sizeBytes > maxBytes) {
+      throw new ExperimentDatasetTooLargeToRunError({ maxBytes });
+    }
 
-    const limit = savedDatasetPageRows(head.records.map((record) => record.entry));
+    const content = await services.datasets.readVersion({
+      projectId,
+      datasetId: resolved.datasetId,
+      version: resolved.version,
+    });
     const rows: Record<string, unknown>[] = [];
+    const rowIds: string[] = [];
     let bytes = 0;
-    for (let page = 1; rows.length < rowCount; page++) {
-      const read = await services.datasets.getDatasetPage({
-        slugOrId: head.dataset.id,
-        projectId,
-        page,
-        limit,
-      });
-      if (read.count !== rowCount || read.datasetRecords.length === 0) {
-        throw new ExperimentDatasetChangedDuringReadError({ rowCount, rowsRead: rows.length });
+    for (const row of content.rows) {
+      bytes += rowBytesOf(row.entry);
+      if (bytes > maxBytes) {
+        throw new ExperimentDatasetTooLargeToRunError({ maxBytes });
       }
-      for (const record of read.datasetRecords) {
-        bytes += rowBytesOf(record.entry);
-        if (bytes > maxBytes) {
-          throw new ExperimentDatasetTooLargeToRunError({ maxBytes });
-        }
-        rows.push(record.entry);
-      }
+      rows.push(row.entry);
+      rowIds.push(row.id);
     }
     if (rows.length !== rowCount) {
       throw new ExperimentDatasetChangedDuringReadError({ rowCount, rowsRead: rows.length });
     }
 
-    return { rows, columnTypes: head.dataset.columnTypes };
+    return {
+      rows,
+      columnTypes: resolved.columnTypes,
+      datasetVersion: {
+        datasetId: resolved.datasetId,
+        versionId: resolved.id,
+        version: resolved.version,
+      },
+      ...(pinned !== undefined ? { pinnedVersionRowIds: rowIds } : {}),
+    };
   }
 
   /**
@@ -368,6 +423,10 @@ export class ExperimentExecutionDataService {
       loadedAgents,
       loadedEvaluators,
       loadedWorkflows,
+      ...(baseDataset.datasetVersion ? { datasetVersion: baseDataset.datasetVersion } : {}),
+      ...(baseDataset.pinnedVersionRowIds
+        ? { pinnedVersionRowIds: baseDataset.pinnedVersionRowIds }
+        : {}),
     };
   }
 
@@ -393,11 +452,13 @@ export class ExperimentExecutionDataService {
     }
 
     if (!inputs?.datasetId) {
-      return this.loadDataset({ dataset, projectId, organizationId, services });
+      return this.loadDataset({ dataset, projectId, organizationId, services, inputs });
     }
 
     const saved = await this.readSavedDataset({
       slugOrId: inputs.datasetId,
+      version: inputs.datasetVersion,
+      by: inputs.by,
       projectId,
       organizationId,
       services,
@@ -412,12 +473,17 @@ export class ExperimentExecutionDataService {
       rows: parseJsonColumns(saved.rows, jsonColumnNames(columns)),
       columns,
       source: "saved",
+      datasetVersion: saved.datasetVersion,
     };
   }
 }
 
 /** The rows a run starts from, and whether the request or a saved dataset held them. */
-type BaseDataset = LoadedDataset & { source: "inline" | "saved" };
+type BaseDataset = LoadedDataset & {
+  source: "inline" | "saved";
+  datasetVersion?: LoadedDatasetVersion;
+  pinnedVersionRowIds?: string[];
+};
 
 /** The names of the columns whose cells hold JSON. */
 function jsonColumnNames(columns: { name: string; type: string }[]): Set<string> {

@@ -661,6 +661,11 @@ const presentations = {
     describe: () =>
       "This project doesn't have the SQL workbench enabled yet. Ask your administrator to switch it on.",
   },
+  lwql_not_provisioned: {
+    title: "Custom SQL isn't set up where this data lives",
+    describe: () =>
+      "Custom SQL isn't set up yet on the server that holds this organisation's data. Ask your workspace administrator, or contact support.",
+  },
   saved_workbench_chart_already_exists: {
     title: "That chart id is already taken",
     describe: () =>
@@ -1407,6 +1412,9 @@ const presentations = {
   api_key_already_revoked: {
     title: "This API key is already revoked",
   },
+  api_key_expired: {
+    title: "This API key has expired",
+  },
   /**
    * The caller is signed in and simply may not do this.
    *
@@ -1700,6 +1708,15 @@ const presentations = {
     describe: () =>
       "The provider didn't recognise it. Check you copied the whole key, and that it belongs to the right account.",
   },
+  provider_deployment_not_found: {
+    // The key and endpoint are fine; only the deployment name is wrong, so the
+    // copy names it rather than sending the customer to mint a new key.
+    title: "That deployment wasn't found",
+    describe: (error) =>
+      typeof error.meta.deployment === "string" && error.meta.deployment
+        ? `The key and endpoint work, but there is no deployment named "${error.meta.deployment}". Pick the model you deployed, or type the deployment name exactly as it appears in Azure.`
+        : "The key and endpoint work, but the deployment wasn't found. Type the deployment name exactly as it appears in Azure.",
+  },
   provider_endpoint_redirected: {
     // Not "we couldn't reach it" — something answered, and it wants us
     // somewhere else. Saying so is the difference between the customer
@@ -1752,9 +1769,14 @@ const presentations = {
     // fault: provider. It answered and said no, but not in terms we can map —
     // a 429 or a 503 is theirs to fix, so the copy must not send the customer
     // hunting through their own key settings.
+    // A 404 is the one refusal that never clears on a retry: the address is wrong.
     title: "The provider refused the check",
-    describe: () =>
-      "It answered, but wouldn't confirm the key. This is usually temporary — try again in a moment.",
+    titleFor: (error) =>
+      error.meta.status === 404 ? "Nothing answers at that address" : undefined,
+    describe: (error) =>
+      error.meta.status === 404
+        ? "The provider answered 404, so the key was not checked. Check the endpoint is the base URL of your resource, with no path after it."
+        : "It answered, but wouldn't confirm the key. This is usually temporary — try again in a moment.",
   },
   provider_service_disabled: {
     // The single most useful thing this whole flow says: the key is fine, the
@@ -1898,6 +1920,11 @@ const presentations = {
   license_key_invalid: {
     title: "That license key isn't valid",
     describe: () => "Check the key you pasted, or ask your account team for a new one.",
+  },
+  license_organization_mismatch: {
+    title: "This licence belongs to another organization",
+    describe: () =>
+      "It was issued for a different organization on LangWatch. Ask your account team for a licence issued to this one.",
   },
   license_expired: {
     title: "Your license has expired",
@@ -2115,6 +2142,15 @@ const presentations = {
     title: "You can't remove yourself from the organization",
     describe: () => "Ask another organization admin to make this change.",
   },
+  seat_request_not_found: {
+    title: "This seat request is no longer open",
+    describe: () =>
+      "Someone may have approved or declined it already. Reload to see the open requests.",
+  },
+  seat_change_busy: {
+    title: "Another seat change is in progress",
+    describe: () => "Try again in a moment.",
+  },
   member_seat_limit_reached: {
     title: "All member seats are in use",
     describe: () => "Free a seat by disabling a membership, or upgrade the plan to add more.",
@@ -2202,8 +2238,8 @@ const presentations = {
     describe: (error) => {
       const email = str(error, "email", "");
       return email
-        ? `${email} already has a pending invite. Revoke it first to send a new one.`
-        : "A pending invite for this address already exists. Revoke it first to send a new one.";
+        ? `${email} already has a pending invite. Resend it from the Invited list instead.`
+        : "A pending invite for this address already exists. Resend it from the Invited list instead.";
     },
   },
   invite_already_accepted: {
@@ -3121,6 +3157,25 @@ const presentations = {
     title: "Seat billing is unavailable right now",
     describe: () => "Nothing was charged. Try again in a moment.",
   },
+  seat_quantity_below_in_use: {
+    // fault: customer. The seat count asked for is below the minimum (the full
+    // seats in use, and never below one), so nothing changed or was charged.
+    title: "That's too few seats",
+    describe: (error) => {
+      const minimum = num(error, "minimum", 0);
+      return minimum > 0
+        ? `Nothing changed. Choose at least ${minimum} ${minimum === 1 ? "seat" : "seats"}.`
+        : "Nothing changed. Choose at least as many seats as are in use.";
+    },
+  },
+  subscription_already_active: {
+    // fault: customer. A checkout was asked for while a plan is live, so we
+    // started nothing. Plan changes and cancelling go through the billing
+    // portal, which an organization administrator opens.
+    title: "This organization already has a plan",
+    describe: () =>
+      "Nothing was charged. Ask an organization admin to change the plan from the billing settings.",
+  },
   subscription_ambiguous: {
     // fault: platform. Two live plans on one account, which only an operator
     // can have created and only an operator can resolve. Nothing was charged,
@@ -3666,7 +3721,7 @@ const presentations = {
     describe: (error) => {
       const budget = error.meta.budgetUsd;
       const allowance = typeof budget === "number" ? `$${budget.toFixed(2)}` : "the free";
-      return `Organizations without a paid plan can judge up to ${allowance} of text in total. Upgrade your plan under Settings, Subscription to keep running Instant Evals.`;
+      return `Organizations without a paid plan can judge up to ${allowance} of text in total. Upgrade your plan under Settings, Plan & billing to keep running Instant Evals.`;
     },
   },
   instant_eval_memory_judge_in_production: {
@@ -3685,10 +3740,19 @@ const presentations = {
   },
   instant_eval_opt_in_not_offered: {
     title: "Ask us to switch Instant Evals on",
-    describe: (error) =>
-      error.meta.deployment === "self_hosted"
+    // Hosted off is not something to ask for: the organization's own decision model is the way.
+    titleFor: (error) =>
+      error.meta.deployment === "hosted_off"
+        ? "LangWatch's hosted model is off for this organization"
+        : undefined,
+    describe: (error) => {
+      if (error.meta.deployment === "hosted_off") {
+        return "Run Instant Evals on your own decision model: pick one in the Instant Evals column of Default models.";
+      }
+      return error.meta.deployment === "self_hosted"
         ? "A self-hosted install gets Instant Evals from its license, or from whoever runs it when it has its own judge key, never from this switch. Contact us to add them to your license."
-        : "LangWatch switches Instant Evals on for an enterprise plan. Contact us to get them.",
+        : "LangWatch switches Instant Evals on for an enterprise plan. Contact us to get them.";
+    },
   },
   instant_eval_query_budget_exceeded: {
     title: "That's too much text to judge in one query",
@@ -4081,6 +4145,11 @@ const presentations = {
     describe: () =>
       "A Developer seat works in your own project only. Ask an admin for a Member seat if you need shared projects.",
   },
+  developer_seats_unavailable: {
+    // No Developer seat price is configured for the subscription's currency and interval.
+    title: "Developer seats aren't sold on this plan yet",
+    describe: () => "Nothing was charged. Contact us at sales@langwatch.ai to add Developer seats.",
+  },
   dataset_column_type_change_unsupported: {
     // Customer fault in the ADR-045 sense: they asked for something the format
     // can't do, and there is a way to get where they were going.
@@ -4126,6 +4195,20 @@ const presentations = {
     title: "That dataset is gone",
     describe: () =>
       "It was archived, or it belongs to another project. Reload the list and pick one that is still there.",
+  },
+  dataset_version_not_found: {
+    title: "That dataset version is gone",
+    describe: () =>
+      "The dataset has no version with that number, or retention removed it. Open the history and pick one that is listed.",
+  },
+  dataset_version_restore_unsupported: {
+    title: "This dataset can't be restored here",
+    describe: () =>
+      "It is kept in the older single-file layout. Copy the dataset to a new one first, then restore there.",
+  },
+  dataset_version_too_large: {
+    title: "That version is too large to read at once",
+    describe: () => "Page through the version's rows instead, or ask for a larger dataset limit.",
   },
   dataset_chunk_too_large: {
     title: "That value is too large to save",
@@ -5597,8 +5680,9 @@ const presentations = {
     describe: () => "Remove or replace it to run the workflow.",
   },
   jsonpath_no_match: {
-    title: "A field didn't match anything",
-    describe: () => "Check the field path against your data.",
+    // The endpoint answered; only the output path missed. Copy about reaching it would be wrong.
+    title: "The reply has no value at the output path",
+    describe: () => "The request went through. Check the output path against the response.",
   },
   code_block_timeout: {
     title: "A code step took too long",
@@ -6474,8 +6558,13 @@ const presentations = {
   },
   connect_unreachable: {
     title: "Hosted services were not reached",
-    describe: () =>
-      "LangWatch-hosted services could not be reached. Allow outbound access to the host and port named on this message.",
+    describe: (error) => {
+      const host = str(error, "host", "");
+      const port = typeof error.meta.port === "number" ? String(error.meta.port) : "";
+      return host
+        ? `LangWatch-hosted services could not be reached. Allow outbound access to ${host}${port ? ` on port ${port}` : ""}.`
+        : "LangWatch-hosted services could not be reached. Allow outbound access from this install to LangWatch.";
+    },
   },
   connected_billing_commit_mismatch: {
     title: "That commit is not what the license says",
@@ -6494,7 +6583,16 @@ const presentations = {
   },
   activation_code_already_redeemed: {
     title: "Activation code already used",
-    describe: () => "This activation code has already been used on another installation.",
+    describe: (error) => {
+      const sameInstall = error.meta.sameInstall;
+      if (sameInstall === true) {
+        return "This code was already used on this install. Ask LangWatch for a new one.";
+      }
+      if (sameInstall === false) {
+        return "This code was already used on another install. Ask LangWatch for a new one.";
+      }
+      return "This code was already used. Ask LangWatch for a new one.";
+    },
   },
   activation_code_expired: {
     title: "Activation code expired",

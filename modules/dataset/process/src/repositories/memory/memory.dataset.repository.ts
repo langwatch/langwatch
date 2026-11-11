@@ -19,6 +19,7 @@ import {
   type DatasetRecordCountColumns,
   type DatasetRepository,
   type DatasetUpdateInput,
+  type EmptySlugFill,
 } from "../dataset.repository.ts";
 import type { MemoryDatasetDatabase } from "./memory.dataset.database.ts";
 
@@ -90,6 +91,41 @@ export class MemoryDatasetRepository implements DatasetRepository {
       .map(({ id, projectId, contentLayout, status, chunkCount }) =>
         datasetStorageEntrySchema.parse({ id, projectId, contentLayout, status, chunkCount }),
       );
+  }
+
+  async findEmptySlugPage(input: {
+    projectId: string;
+    afterId?: string;
+    limit: number;
+  }): Promise<{ id: string; name: string }[]> {
+    return this.#database
+      .datasets()
+      .filter(
+        (row) =>
+          row.projectId === input.projectId &&
+          row.slug === "" &&
+          (!input.afterId || row.id > input.afterId),
+      )
+      .toSorted((left, right) => Number(left.id > right.id) - Number(left.id < right.id))
+      .slice(0, input.limit)
+      .map(({ id, name }) => ({ id, name }));
+  }
+
+  async fillEmptySlug(input: {
+    id: string;
+    projectId: string;
+    slug: string;
+  }): Promise<EmptySlugFill> {
+    const rows = this.#database.datasets().filter((row) => row.projectId === input.projectId);
+    const row = rows.find((candidate) => candidate.id === input.id);
+    if (!row || row.slug !== "") return "not-empty";
+    if (rows.some((candidate) => candidate.slug === input.slug)) return "taken";
+    this.#database.putDataset({
+      ...row,
+      slug: input.slug,
+      updatedAt: toDate(this.#database.now()),
+    });
+    return "filled";
   }
 
   async findAll(input: {
@@ -174,7 +210,7 @@ export class MemoryDatasetRepository implements DatasetRepository {
       ...row,
       name: input.name,
       slug: input.slug,
-      columnTypes: input.columnTypes,
+      columnTypes: input.columnTypes ?? row.columnTypes,
       updatedAt: toDate(this.#database.now()),
     };
 

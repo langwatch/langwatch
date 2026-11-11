@@ -93,6 +93,35 @@ function queryParams(request: QueryRequest): Record<string, unknown> {
 }
 
 /**
+ * ClickHouse cancels a query whose client went away only when the query is read-only, and a POST
+ * is read-only only under `readonly` 1 or 2. Every routed read carries both, so a read the app
+ * abandons stops on the server (ADR-197).
+ */
+export const CANCELLED_ON_CLIENT_CLOSE = {
+  readonly: "2",
+  cancel_http_readonly_queries_on_client_close: "1",
+} as const;
+
+/** A read's settings: the caller's, read-only and cancelled on client close, whatever it set. */
+export function readSettings(
+  settings: Record<string, string | number> | undefined,
+): Record<string, string | number> {
+  return { ...settings, ...CANCELLED_ON_CLIENT_CLOSE };
+}
+
+/** One read, sent with the cancellation settings over the caller's own. */
+function sendRead<Client extends RoutableStatementClient>(
+  vendor: Client,
+  request: QueryRequest,
+): ReturnType<RoutableStatementClient["query"]> {
+  return vendor.query({
+    ...queryParams(request),
+    clickhouse_settings: readSettings(request.settings),
+    format: "JSONEachRow",
+  });
+}
+
+/**
  * A server before 25.11 that fails after its 200 writes the failure as a last `{"exception"}`
  * row, which the vendor client hands over as data; read it as the failure it is, with the
  * server's code, as VendorClientResilience does (specs/clickhouse/single-client-access.feature).
@@ -179,7 +208,7 @@ export function routingDriver<Client extends RoutableStatementClient>(
 
       const started = nowInstant().epochMilliseconds;
       const rows = await onTarget(connection, vendor, async () => {
-        const resultSet = await vendor.query({ ...queryParams(request), format: "JSONEachRow" });
+        const resultSet = await sendRead(vendor, request);
         const read = (await resultSet.json()) as Row[];
         refuseInbandException(read);
         return read;
@@ -190,7 +219,7 @@ export function routingDriver<Client extends RoutableStatementClient>(
     async *stream<Row>(request: QueryRequest): AsyncGenerator<Row[]> {
       const vendor = await serverFor(connection, request);
       try {
-        const resultSet = await vendor.query({ ...queryParams(request), format: "JSONEachRow" });
+        const resultSet = await sendRead(vendor, request);
         for await (const batch of resultSet.stream<Row>()) {
           const rows = batch.map((row) => row.json());
           refuseInbandException(rows);

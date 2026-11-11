@@ -10,6 +10,7 @@ import {
 } from "@langwatch/dataset-contract";
 import { generate } from "@langwatch/ksuid";
 import { PrismaRepository } from "@langwatch/prisma-client";
+import { isUniqueConstraintError } from "@langwatch/prisma-client/errors";
 import { type Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { type Instant, toDate } from "@langwatch/time";
 
@@ -19,6 +20,7 @@ import {
   type DatasetRecordCountColumns,
   type DatasetRepository,
   type DatasetUpdateInput,
+  type EmptySlugFill,
 } from "../dataset.repository.ts";
 
 /**
@@ -82,6 +84,40 @@ export class PrismaDatasetRepository
     return rows.map((row) => datasetStorageEntrySchema.parse(row));
   }
 
+  async findEmptySlugPage(input: {
+    projectId: string;
+    afterId?: string;
+    limit: number;
+  }): Promise<{ id: string; name: string }[]> {
+    return this.database.dataset.findMany({
+      where: {
+        projectId: input.projectId,
+        slug: "",
+        ...(input.afterId ? { id: { gt: input.afterId } } : {}),
+      },
+      orderBy: { id: "asc" },
+      take: input.limit,
+      select: { id: true, name: true },
+    });
+  }
+
+  async fillEmptySlug(input: {
+    id: string;
+    projectId: string;
+    slug: string;
+  }): Promise<EmptySlugFill> {
+    try {
+      const { count } = await this.database.dataset.updateMany({
+        where: { id: input.id, projectId: input.projectId, slug: "" },
+        data: { slug: input.slug },
+      });
+      return count === 1 ? "filled" : "not-empty";
+    } catch (error) {
+      if (isUniqueConstraintError(error)) return "taken";
+      throw error;
+    }
+  }
+
   async findAll(input: {
     projectId: string;
     page: number;
@@ -141,7 +177,7 @@ export class PrismaDatasetRepository
       data: {
         name: input.name,
         slug: input.slug,
-        columnTypes: input.columnTypes as Prisma.InputJsonValue,
+        ...(input.columnTypes ? { columnTypes: input.columnTypes as Prisma.InputJsonValue } : {}),
       },
     });
     return toDataset(row);

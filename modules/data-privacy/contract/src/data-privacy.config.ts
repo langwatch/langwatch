@@ -18,6 +18,11 @@ export const dataPrivacyConfig = Config.define((c) => ({
   nodeEnvironment,
   /** Evaluation's leaf, held by instance: this module calls Presidio itself (R5, 2026-10-06). */
   langevalsEndpoint,
+  /**
+   * Where the PII redaction model is reached: its Lambda alias ARN (`arn:aws:lambda:...`) or its
+   * HTTP address, for a cluster or self-hosted service. Unset names no model.
+   */
+  piiRedactionModelEndpoint: c.env("PII_REDACTION_MODEL_ENDPOINT", z.string().optional()),
 }));
 
 export type DataPrivacyServerConfig = ConfigOf<typeof dataPrivacyConfig>;

@@ -1776,6 +1776,11 @@
           "name": "ExpectedEvaluatorResults",
           "type": "Nullable(UInt32)",
           "comment": ""
+        },
+        {
+          "name": "Concurrency",
+          "type": "Nullable(UInt16)",
+          "comment": ""
         }
       ]
     },
@@ -2252,6 +2257,11 @@
         },
         {
           "name": "ImageCount",
+          "type": "UInt64",
+          "comment": ""
+        },
+        {
+          "name": "WebSearchRequests",
           "type": "UInt64",
           "comment": ""
         }
@@ -5234,6 +5244,51 @@
         {
           "name": "EarliestSpanStartMs",
           "type": "UInt64",
+          "comment": ""
+        },
+        {
+          "name": "MetadataOutputAction",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "MetadataOutcome",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "MetadataSentToReview",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "MetadataDocumentType",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "MetadataFlow",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "MetadataLanguage",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "MetadataSegment",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "MetadataTeam",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "MetadataTopic",
+          "type": "String",
           "comment": ""
         }
       ]

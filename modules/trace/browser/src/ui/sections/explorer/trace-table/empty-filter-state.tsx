@@ -17,7 +17,13 @@ import { useDataPrivacySnapshot } from "../../../../behavior/reads/use-project-r
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { useSearchSubmitRequestStore } from "../../../../features/explorer/behavior/search-submit-request.store.ts";
 import { useExplorerCounts } from "../../../../features/explorer/behavior/use-explorer-counts.ts";
+import { useInstantEvalRunStore } from "../../../../features/instant-eval/behavior/instant-eval-run.store.ts";
 import { useInstantEvalRuns } from "../../../../features/instant-eval/behavior/use-instant-eval-runs.ts";
+import { useRetryInstantEval } from "../../../../features/instant-eval/behavior/use-retry-instant-eval.ts";
+import {
+  failedInstantEvalChip,
+  instantEvalFailureMessage,
+} from "../../../../model/instant-eval-failure.ts";
 import { PIIRedactionAlert } from "../../../blocks/pii-redaction-notice.tsx";
 import { looksLikeEmail, redactsEmailAddresses } from "../utils/email-shaped-query.ts";
 import { QueryBreakdownChips } from "./query-breakdown-chips.tsx";
@@ -60,10 +66,15 @@ export const AGGREGATE_HISTORY_NOTE =
 function instantEvalEmptyContent({
   isJudging,
   hasUnjudgedEval,
+  failedEvalMessage,
 }: {
   isJudging: boolean;
   hasUnjudgedEval: boolean;
+  failedEvalMessage: string | null;
 }): EmptyContent | null {
+  if (failedEvalMessage) {
+    return { title: "The Instant Eval did not finish", description: failedEvalMessage };
+  }
   if (hasUnjudgedEval) {
     return {
       title: "These results are not judged yet",
@@ -106,6 +117,7 @@ export function emptyContent({
   rangeHours,
   isJudging,
   hasUnjudgedEval = false,
+  failedEvalMessage = null,
   isAggregate = false,
 }: {
   activeLensId: string;
@@ -115,10 +127,12 @@ export function emptyContent({
   isJudging: boolean;
   /** An eval chip has no run for this window, lens and filter. */
   hasUnjudgedEval?: boolean;
+  /** Why an eval chip's run failed, when one did. */
+  failedEvalMessage?: string | null;
   /** The open project is an aggregate, which reads its members' traces. */
   isAggregate?: boolean;
 }): EmptyContent {
-  const judging = instantEvalEmptyContent({ isJudging, hasUnjudgedEval });
+  const judging = instantEvalEmptyContent({ isJudging, hasUnjudgedEval, failedEvalMessage });
   // A run still judging, or not started, explains the empty table on its own.
   if (judging) return judging;
   const content = lensEmptyContent({ activeLensId, hasFilters, rangeHours });
@@ -228,7 +242,7 @@ function widerRangeActions({
  * eval chip leads, because judging the results is what fills the table; every
  * other action widens what is searched.
  */
-function emptyStateActions({
+export function emptyStateActions({
   activeLensId,
   hasFilters,
   isJudging,
@@ -238,6 +252,7 @@ function emptyStateActions({
   selectLens,
   setTimeRange,
   judgeTheseResults,
+  retryFailedEval,
 }: {
   activeLensId: string;
   hasFilters: boolean;
@@ -248,8 +263,11 @@ function emptyStateActions({
   selectLens: (lensId: string) => void;
   setTimeRange: (range: TimeRange) => void;
   judgeTheseResults: () => void;
+  /** Starts a failed chip's eval again; null when no chip's run failed. */
+  retryFailedEval: (() => void) | null;
 }): ActionButton[] {
   const actions: ActionButton[] = [];
+  if (retryFailedEval) actions.push({ label: "Retry", primary: true, onClick: retryFailedEval });
   // The query goes back through the search bar as it stands, so the chip's run
   // starts the way Enter on it does: the same estimate, cost rule and refusals,
   // with the question judged as written.
@@ -259,7 +277,11 @@ function emptyStateActions({
   // While a run judges, the way out is Stop on the progress bar. Offering
   // "Clear filters" as the main action would throw the run's chip away.
   if (hasFilters && !isJudging) {
-    actions.push({ label: "Clear filters", onClick: clearAll, primary: !unjudgedChip });
+    actions.push({
+      label: "Clear filters",
+      onClick: clearAll,
+      primary: !unjudgedChip && !retryFailedEval,
+    });
   }
   if (activeLensId !== "all-traces") {
     actions.push({
@@ -286,6 +308,9 @@ export const EmptyFilterState: React.FC = () => {
   const { chips: evalChips } = useInstantEvalRuns();
   const unjudgedChip = evalChips.find((chip) => chip.runId === null);
   const requestSubmit = useSearchSubmitRequestStore((s) => s.requestSubmit);
+  const runs = useInstantEvalRunStore((s) => s.runs);
+  const retry = useRetryInstantEval();
+  const failed = failedInstantEvalChip({ chips: evalChips, runs });
 
   const hasFilters = queryText.trim().length > 0;
   const rangeHours = (timeRange.to - timeRange.from) / MS_PER_HOUR;
@@ -295,6 +320,7 @@ export const EmptyFilterState: React.FC = () => {
     rangeHours,
     isJudging,
     hasUnjudgedEval: Boolean(unjudgedChip),
+    failedEvalMessage: failed ? instantEvalFailureMessage({ run: failed.run }) : null,
     isAggregate: isAggregateProjectKind(project?.kind),
   });
 
@@ -311,6 +337,7 @@ export const EmptyFilterState: React.FC = () => {
       if (!unjudgedChip) return;
       requestSubmit({ text: queryText });
     },
+    retryFailedEval: failed ? () => retry(failed.chip.key) : null,
   });
 
   return (

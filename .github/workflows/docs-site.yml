@@ -32,6 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
+      docs-site: ${{ steps.detect.outputs.docs-site }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -40,7 +41,23 @@ jobs:
       - uses: ./.github/actions/detect-changes
         id: detect
         with:
+          # A push to main is diffed too, so a merge that touches nothing the
+          # site shows neither rebuilds, audits nor redeploys it.
+          push-strategy: diff
           filters: |
+            # The heavy jobs (build, browser checks, audit, deploy): what the
+            # site shows, the workspace packages its build reads (the app's
+            # dependency closure, tools/docsdeploy/site_gate_test.go) and the
+            # tooling that ships it.
+            docs-site:
+              - 'docs/**'
+              - 'apps/docs/**'
+              - 'CHANGELOG.md'
+              - 'packages/design-system/**'
+              - 'packages/time/**'
+              - '.github/workflows/docs-site.yml'
+              - 'cmd/docsdeploy/**'
+              - 'tools/docsdeploy/**'
             relevant:
               - 'docs/**'
               - 'apps/docs/**'
@@ -53,6 +70,7 @@ jobs:
               - 'packages/time/**'
               - 'packages/vitest-config/**'
               - 'sdks/typescript/**'
+              - '.github/actions/docs-media-encoders/**'
               - 'dev/tests/e2e-stack/**'
               - 'packages/oxlint-rules/**'
               - 'packages/architecture-enforcer/oxlint.architecture.jsonc'
@@ -101,7 +119,7 @@ jobs:
 
   build:
     needs: changes
-    if: needs.changes.outputs.relevant == 'true'
+    if: needs.changes.outputs.docs-site == 'true'
     runs-on: ubuntu-latest
     # A cold media cache encodes every image and video (about 8 minutes), then the
     # 340 MB artifact uploads; warm runs finish well inside this.
@@ -136,27 +154,7 @@ jobs:
           key: docs-site-${{ matrix.mount }}-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |
             docs-site-${{ matrix.mount }}-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
-      # Encoded images and videos, keyed on the media and the encoders' settings alone, so a
-      # docs-only change never re-encodes; the build prunes entries it no longer uses.
-      - name: Restore the encoded docs media
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: apps/docs/node_modules/.cache/docs-media
-          key: docs-media-${{ runner.os }}-${{ hashFiles('docs/images/**', 'docs/media/**', 'apps/docs/src/site/image-variants.ts', 'apps/docs/src/site/video-variants.ts') }}
-          restore-keys: |
-            docs-media-${{ runner.os }}-
-      # The build transcodes the docs videos to AV1 and H.264 (src/site/video-variants.ts).
-      # A stalled Ubuntu mirror once held this for 30 minutes: retry stalled
-      # connections, and fail fast enough to rerun.
-      - name: Install ffmpeg
-        timeout-minutes: 10
-        env:
-          APT_OPTS: -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
-        run: |
-          command -v ffmpeg || {
-            sudo apt-get $APT_OPTS update
-            sudo apt-get $APT_OPTS install -y --no-install-recommends ffmpeg
-          }
+      - uses: ./.github/actions/docs-media-encoders
       - name: Read the Playwright version
         id: playwright
         run: |
@@ -172,6 +170,9 @@ jobs:
         timeout-minutes: 10
         run: pnpm --filter @langwatch/docs-site exec playwright install --with-deps chromium
       - name: Build the documentation
+        env:
+          # Signs the star count read, which GitHub refuses from shared runner addresses.
+          GITHUB_TOKEN: ${{ github.token }}
         run: pnpm --filter @langwatch/docs-site build ${{ matrix.build-args }}
       - name: Enforce the browser size budget
         if: matrix.mount == 'root'
@@ -365,7 +366,7 @@ jobs:
     if: >-
       github.ref == 'refs/heads/main'
       && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-      && needs.changes.outputs.relevant == 'true'
+      && needs.changes.outputs.docs-site == 'true'
       && vars.DOCS_SITE_BUCKET != ''
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -413,6 +414,10 @@ jobs:
       # pages, indexes and exports revalidate; other static files keep an hour.
       # Hashed files go first and are never deleted, so a page still open in a
       # tab loads its scripts; pages go last, so none names a missing file.
+      # The sitemap this deploy replaces, so IndexNow hears only what changed;
+      # absent on a first deploy.
+      - name: Read the live sitemap
+        run: aws s3 cp "s3://$BUCKET/docs/sitemap.xml" "$RUNNER_TEMP/live-sitemap.xml" --only-show-errors || true
       - name: Upload the content-hashed files
         run: >-
           aws s3 sync "$SITE" "s3://$BUCKET/docs/" --only-show-errors
@@ -450,6 +455,13 @@ jobs:
         run: >-
           aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION"
           --paths '/docs' '/docs/*' --query Invalidation.Id --output text
+      # Bing (and so ChatGPT search and Copilot) learns of changed pages now
+      # rather than at its next crawl. A refusal warns; the deploy has landed.
+      - name: Tell IndexNow what changed
+        run: >-
+          go run ./cmd/docsdeploy indexnow -live "$RUNNER_TEMP/live-sitemap.xml"
+          -sitemap "$SITE/sitemap.xml" -key-file "$SITE/indexnow.txt"
+          || echo "::warning::IndexNow did not accept this deploy's pages"
 
   docs-site-complete:
     needs: [changes, verify, build, check, audit, deploy]

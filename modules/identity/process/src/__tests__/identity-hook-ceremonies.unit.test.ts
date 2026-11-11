@@ -31,6 +31,15 @@ async function identityWithLatchedUser(): Promise<IdentityModule> {
   await repositories.latch.recordFinalized({ userId: LATCHED, report: null });
   const config = {
     ssoDomainProofDnsServers: [],
+    outboundProxy: {
+      HTTPS_PROXY: undefined,
+      https_proxy: undefined,
+      HTTP_PROXY: undefined,
+      http_proxy: undefined,
+      NO_PROXY: undefined,
+      no_proxy: undefined,
+    },
+    nodeEnvProxy: { NODE_USE_ENV_PROXY: false, NODE_OPTIONS: undefined },
     isSaas: false,
     publicBaseUrl: undefined,
     passkeysEnabled: false,

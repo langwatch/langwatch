@@ -17,8 +17,9 @@ Ensure you have the SDK installed:
 pip install langwatch
 ```
 
-The SDK supports Python 3.10 through 3.14. On an interpreter outside that
-range pip does not fail, it installs the newest release that accepts it, so
+The SDK supports Python 3.11 through 3.14. On an interpreter outside that
+range, pip installs the newest older release that accepts it (on Python 3.10
+that is the last 1.4.x release) and fails only when no release does, so
 check the installed version with `pip show langwatch` if `langwatch.setup` is
 missing.
 
