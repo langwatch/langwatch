@@ -440,6 +440,9 @@ export class OtlpSpanPiiRedactionService {
        * The real OTLP attribute name behind each key of `attributes`, where the two differ.
        */
       attributeNames?: Record<string, string>;
+
+      /** The record's own key; see `DataPrivacyLogRecord.recordKey`. */
+      recordKey?: string;
     },
     piiRedactionLevel: PIIRedactionLevel,
     tenantId?: TenantId,
@@ -457,6 +460,8 @@ export class OtlpSpanPiiRedactionService {
       attributes: Record<string, string>;
       resourceAttributes: Record<string, string>;
       attributeNames?: Record<string, string>;
+      /** The point's own key; see `DataPrivacyMetricAttributes.recordKey`. */
+      recordKey?: string;
     },
     piiRedactionLevel: PIIRedactionLevel,
     tenantId?: TenantId,

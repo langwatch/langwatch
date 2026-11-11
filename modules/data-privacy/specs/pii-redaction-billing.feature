@@ -61,10 +61,32 @@ Feature: A PII redaction model call is priced per character, written to the spen
       Then their priced facts carry different request ids
 
     @unit
-    Scenario: A log record or metric point with no span is keyed by its own text
-      Given a strict log record that names no trace or span
+    Scenario: A batch given no record key is keyed by its own text
+      Given a strict batch whose caller names no record
       When the model answers it
       Then its request id is derived from the project and the texts sent
+
+    @unit
+    Scenario: A log record's or metric point's key reaches the model call
+      Given a strict log record, or metric point, redacted with a record key
+      When the model is asked to clear it
+      Then the model call carries that record key, which the request id is derived from
+
+    @unit
+    Scenario: A log record is keyed by the time it is stored under
+      Given a strict log record
+      When it is redacted
+      Then its record key is its event time, else its observed time, else the time it was accepted
+      And a retried export of the same record carries the same key
+      And two identical log lines with different times carry different keys, so each call is charged
+
+    @unit
+    Scenario: A metric point is keyed by its metric and its times
+      Given a strict metric point
+      When it is redacted
+      Then its record key names the metric, the point's start time and its time
+      And a retried export of the same point carries the same key
+      And the same attributes exported a minute later carry a different key, so each call is charged
 
     @unit
     Scenario: A priced fact that cannot be recorded never fails the redaction

@@ -40,11 +40,15 @@
    `pii_redaction`, model `pii-redaction-model`, no virtual key, input tokens zero, cost the
    customer price, our estimated cost and the characters in the metadata. Gateway looks up the
    team itself, as for the judge.
-4. **The request id is derived from the batch.** A hash of the project, the record's trace and
-   span ids when it has them, and the texts sent. A retried ingestion gives the same id and the
-   ledger, keyed by project and request id, keeps one row; two spans with the same text differ
-   by span id. A log record or metric point with no span is keyed by its texts alone, so two
-   identical ones in a project are charged once.
+4. **The request id is derived from the record and the batch.** A hash of the project, the
+   record's own key and the texts sent. A span's key is its trace and span ids; a log record's
+   is the time it is stored under (event time, else observed time, else the time it was
+   accepted); a metric point's is its metric name, start time and time. A retried ingestion
+   gives the same id and the ledger, keyed by project and request id, keeps one row. The same
+   text in another record is another call and is charged again: an SDK re-exports a metric's
+   attribute set every interval, and a service logs the same line many times. A log record with
+   no time carries the time it was accepted, so a retry of it is charged again, as it is also
+   stored again.
 5. **Recording never blocks redaction.** A fact that cannot be dispatched is logged at error
    with its amounts and the redacted batch is returned. Under-billing a call is preferred to
    failing a customer's ingestion.

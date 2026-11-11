@@ -53,8 +53,8 @@ describe("piiRedactionSpendRequestId", () => {
     );
   });
 
-  /** @scenario "A log record or metric point with no span is keyed by its own text" */
-  it("keys a record with no span by the project and the texts", () => {
+  /** @scenario "A batch given no record key is keyed by its own text" */
+  it("keys a batch with no record key by the project and the texts", () => {
     const id = piiRedactionSpendRequestId(base);
 
     expect(piiRedactionSpendRequestId(base)).toBe(id);

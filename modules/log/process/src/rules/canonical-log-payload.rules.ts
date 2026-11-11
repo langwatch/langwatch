@@ -174,3 +174,27 @@ export function canonicalPayloadParts(args: {
     canonicalBody,
   };
 }
+
+/**
+ * The key a log record is redacted under, which the PII redaction model's priced request id is
+ * derived from: the time it is stored under (ADR-201). A record whose time cannot be read is
+ * rejected when it is built.
+ */
+export function logRedactionRecordKey({
+  log,
+  acceptedAt,
+}: {
+  log: UnknownRecord;
+  acceptedAt: number;
+}): string {
+  try {
+    const timestamp = effectiveTimestamp({
+      timeUnixNano: optionalTimestamp(log.timeUnixNano, "timeUnixNano"),
+      observedTimeUnixNano: optionalTimestamp(log.observedTimeUnixNano, "observedTimeUnixNano"),
+      acceptedAt,
+    });
+    return `log:${timestamp}`;
+  } catch {
+    return "log:unreadable-time";
+  }
+}
