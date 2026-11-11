@@ -5,39 +5,18 @@ import { createLogger } from "@langwatch/observability";
 import type { VoiceMediaUpgrade } from "@langwatch/scenario-contract";
 
 import { handOffVoiceSocket } from "../../../channels/voice-socket-handoff.channels.ts";
+import type {
+  PendingVoiceCall,
+  PendingVoiceCallStoreRepository,
+} from "../../../repositories/pending-voice-call-store.repository.ts";
 
 const logger = createLogger("langwatch:voice:call-claim");
 
 // Slice 1 spike for https://github.com/langwatch/tasks/issues/1002: claim a pending call,
 // spawn the child after the upgrade arrives, then hand it the raw socket.
 
-/** A call waiting to be claimed (spike). */
-export interface PendingVoiceCall {
-  nonce: string;
-}
-
-/** What taking a nonce found: the pending call, answered at most once. */
-export type TakenPendingVoiceCall = { taken: true; call: PendingVoiceCall } | { taken: false };
-
-/** Single-use lookup of pending calls (spike). */
-export interface PendingVoiceCallStore {
-  take(nonce: string): Promise<TakenPendingVoiceCall>;
-}
-
-/** In-memory store (spike); take deletes. */
-export class InMemoryPendingVoiceCallStore implements PendingVoiceCallStore {
-  private readonly calls = new Map<string, PendingVoiceCall>();
-
-  add(call: PendingVoiceCall): void {
-    this.calls.set(call.nonce, call);
-  }
-
-  take(nonce: string): Promise<TakenPendingVoiceCall> {
-    const call = this.calls.get(nonce);
-    this.calls.delete(nonce);
-    return Promise.resolve(call ? { taken: true, call } : { taken: false });
-  }
-}
+/** How long a refused socket gets to close itself before the parent destroys it. */
+const REFUSAL_CLOSE_TIMEOUT_MS = 5000;
 
 /**
  * The claiming pod spawns the child after the upgrade arrives, then hands it the raw socket.
@@ -45,14 +24,14 @@ export class InMemoryPendingVoiceCallStore implements PendingVoiceCallStore {
  */
 export class VoiceCallClaimService {
   static create(input: {
-    pending: PendingVoiceCallStore;
+    pending: PendingVoiceCallStoreRepository;
     spawnChild: (call: PendingVoiceCall) => ChildProcess;
   }): VoiceCallClaimService {
     return new VoiceCallClaimService(input.pending, input.spawnChild);
   }
 
   private constructor(
-    private readonly pending: PendingVoiceCallStore,
+    private readonly pending: PendingVoiceCallStoreRepository,
     private readonly spawnChild: (call: PendingVoiceCall) => ChildProcess,
   ) {}
 
@@ -87,13 +66,18 @@ export class VoiceCallClaimService {
         { url: upgrade.url, status: 403 },
         "voice media upgrade refused: no pending call",
       );
-      socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
+      this.refuse(socket);
       return;
     }
     const child = this.spawnChild(result.call);
     child.once("error", (error: Error) => {
       logger.error({ error, nonce: upgrade.nonce }, "voice child failed to spawn");
       socket.destroy();
+    });
+    // "error" only covers a spawn/kill/IPC-send failure; a child that crashes or is killed
+    // after spawning exits silently without this, leaving no log and an unreleased socket.
+    child.once("exit", (code, signal) => {
+      logger.warn({ nonce: upgrade.nonce, code, signal }, "voice child exited");
     });
     try {
       await handOffVoiceSocket({
@@ -110,5 +94,15 @@ export class VoiceCallClaimService {
       throw error;
     }
     logger.info({ nonce: upgrade.nonce }, "voice media socket handed to spawned child");
+    // child.send(msg, socket) already closes the parent's handle (Node docs: keepOpen defaults
+    // to false); this is a no-op safety net, not the real release, in case that ever changes.
+    socket.destroy();
+  }
+
+  /** Ends the refusal response; destroys the socket itself if the client never closes its side. */
+  private refuse(socket: Socket): void {
+    socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
+    const timeout = setTimeout(() => socket.destroy(), REFUSAL_CLOSE_TIMEOUT_MS);
+    socket.once("close", () => clearTimeout(timeout));
   }
 }

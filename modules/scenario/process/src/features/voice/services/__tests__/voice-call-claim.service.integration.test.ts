@@ -9,10 +9,8 @@ import { VOICE_MEDIA_SOCKET_MESSAGE } from "@langwatch/scenario-contract";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import WebSocket from "ws";
 
-import {
-  InMemoryPendingVoiceCallStore,
-  VoiceCallClaimService,
-} from "../voice-call-claim.service.ts";
+import { InMemoryPendingVoiceCallStoreRepository } from "../../../../repositories/memory/memory.pending-voice-call-store.repository.ts";
+import { VoiceCallClaimService } from "../voice-call-claim.service.ts";
 import { frameText } from "./fixtures/frame-text.ts";
 import { FIXTURE_MEDIA_SOCKET_MESSAGE } from "./fixtures/media-socket-message.ts";
 
@@ -27,7 +25,7 @@ let children: ChildProcess[];
 let clients: WebSocket[];
 let rawSockets: Socket[];
 let spawnedAt: number[];
-let store: InMemoryPendingVoiceCallStore;
+let store: InMemoryPendingVoiceCallStoreRepository;
 
 function spawnChild(): ChildProcess {
   spawnedAt.push(performance.now());
@@ -87,7 +85,7 @@ beforeEach(() => {
   clients = [];
   rawSockets = [];
   spawnedAt = [];
-  store = new InMemoryPendingVoiceCallStore();
+  store = new InMemoryPendingVoiceCallStoreRepository();
 });
 
 afterEach(async () => {
