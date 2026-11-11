@@ -12,7 +12,8 @@ const ALLOWED = {
 };
 
 function scriptHash({ script }: { script: string }) {
-  const body = /^<script>([\s\S]*)<\/script>$/.exec(script)?.[1] ?? "";
+  const body = /^<script>([\s\S]*)<\/script>$/.exec(script)?.[1];
+  if (body === undefined) throw new Error("not a bare <script> element: update the hashing here");
   return `sha256-${createHash("sha256").update(body).digest("base64")}`;
 }
 
