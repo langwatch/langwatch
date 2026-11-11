@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Nurturing's own per-project usage (§9): one peer fold per owner pipeline (prompt, evaluator,
- * scenario, simulation run), a row per project each, and a subscriber on trace's span_received
- * that adds its root spans to their project's UTC day with one Postgres upsert per batch.
+ * scenario, simulation run), a row per project each, and subscribers on trace's span_received and
+ * trace_failed adding root spans and failed traces to their project's UTC day, one upsert a batch.
  * Evaluations add a day per project a day. Each change syncs the organization as one Customer.io
  * group call, placed by nurturing's own copy of project and organization creation. Without a
  * Customer.io channel nothing reads these rows, so nothing here is registered. Why event
@@ -58,14 +58,21 @@ import {
   simulationSetCreatedEventDataSchema,
 } from "@langwatch/scenario-contract";
 import {
+  FIRST_TRACE_RECORDED_EVENT_TYPE,
+  firstTraceRecordedEventDataSchema,
+  LANGY_TRACE_ORIGIN,
   SPAN_RECEIVED_EVENT_TYPE,
+  type SpanReceivedEventData,
   spanReceivedEventDataSchema,
+  TRACE_FAILED_EVENT_TYPE,
   TRACE_RECEIVED_EVENT_TYPE,
+  traceFailedEventDataSchema,
   traceReceivedEventDataSchema,
 } from "@langwatch/trace-contract";
 import { z } from "zod";
 
 import type { NurturingModule } from "../app/nurturing.app.ts";
+import type { NurturingClaimRepository } from "../repositories/nurturing-claim.repository.ts";
 import type { NurturingOrganizationCreatedRepository } from "../repositories/nurturing-organization-created.repository.ts";
 import type { NurturingProjectPlacementRepository } from "../repositories/nurturing-project-placement.repository.ts";
 import {
@@ -83,9 +90,11 @@ import {
 } from "../rules/nurturing-project-usage.rules.ts";
 import { utcDayOf } from "../rules/nurturing-time.rules.ts";
 import {
+  failedTraceDayIncrementsOf,
   type NurturingTraceSpan,
   traceDayIncrementsOf,
 } from "../rules/nurturing-trace-day.rules.ts";
+import { NurturingClaimReleaseService } from "../services/nurturing-claim-release.service.ts";
 
 /** Hosts nurturing's peer folds and subscribers over the owners' facts; no event of its own. */
 export const NURTURING_PROJECT_USAGE_PIPELINE_NAME = "nurturing_project_usage" as const;
@@ -178,11 +187,20 @@ export function traceSyncKeyOf(event: Event): string {
     : `subscriber:traceUsageSync:project:${String(event.tenantId)}`;
 }
 
+/** The project an evaluation is about: its data's project, else its tenant. */
+function evaluationProjectIdOf(event: Event): string {
+  const { data } = event as Event<{ projectId?: unknown }>;
+  return typeof data?.projectId === "string" ? data.projectId : String(event.tenantId);
+}
+
 /** The dedup key of an evaluation: its project's UTC day, so each day writes once. */
 export function evaluationDayKeyOf(event: Event): string {
-  const { data } = event as Event<{ projectId?: unknown }>;
-  const projectId = typeof data?.projectId === "string" ? data.projectId : String(event.tenantId);
-  return `subscriber:evaluationActiveDay:${projectId}:${utcDayOf(event.occurredAt)}`;
+  return `subscriber:evaluationActiveDay:${evaluationProjectIdOf(event)}:${utcDayOf(event.occurredAt)}`;
+}
+
+/** The queue group of an evaluation: its project, whose one evaluation row the days share. */
+export function evaluationProjectGroupOf(event: Event): string {
+  return `evaluationActiveDay:${evaluationProjectIdOf(event)}`;
 }
 
 /** One owner's peer fold, one row per project in its store; lane `<pipeline>.<owner>Usage`. */
@@ -219,30 +237,66 @@ export function nurturingProjectUsagePeerFold<Owner extends NurturingProjectUsag
   };
 }
 
-/** What the trace-day count reads of a span: whether it is a root, and its status; no body. */
-const traceSpanDataSchema = z.object({
-  span: spanReceivedEventDataSchema.shape.span.pick({ parentSpanId: true, status: true }),
-});
+/** The trace-level origin attribute, set on a span or (Langy's relay) on its resource. */
+const ORIGIN_ATTRIBUTE = "langwatch.origin";
 
-type NurturingTraceSpanData = z.output<typeof traceSpanDataSchema>;
+/** Origins trace keeps out of a project's first trace: onboarding samples and Langy's turns. */
+const NON_CUSTOMER_ORIGINS: ReadonlySet<string> = new Set(["sample", LANGY_TRACE_ORIGIN]);
 
-/** OTLP's `STATUS_CODE_ERROR`: the status trace's rollup counts a failed trace by. */
-const OTLP_STATUS_CODE_ERROR = 2;
+/**
+ * An OTLP attribute as the origin read takes it: its key and string value. Lighter than the
+ * contract's any-value parse, which the enqueue filter would otherwise run on every span appended.
+ */
+const originAttributesSchema = z
+  .array(z.object({ key: z.string(), value: z.object({ stringValue: z.string().nullish() }) }))
+  .optional();
+
+function originOf(attributes: z.output<typeof originAttributesSchema>): string | undefined {
+  const origin = attributes?.find(({ key }) => key === ORIGIN_ATTRIBUTE)?.value.stringValue;
+  return origin ? origin : undefined;
+}
+
+/** What the trace-day count reads of a span: root or not, and origin; no body. */
+export type NurturingTraceSpanData = Readonly<{
+  span: Pick<SpanReceivedEventData["span"], "parentSpanId">;
+  /** The explicit origin, the span's own before its resource's, as trace hoists it. */
+  origin?: string;
+}>;
+
+const traceSpanDataSchema = z
+  .object({
+    span: spanReceivedEventDataSchema.shape.span
+      .pick({ parentSpanId: true })
+      .extend({ attributes: originAttributesSchema }),
+    resource: z.object({ attributes: originAttributesSchema }).nullish(),
+  })
+  .transform(({ span: { parentSpanId, attributes }, resource }): NurturingTraceSpanData => ({
+    span: { parentSpanId },
+    origin: originOf(attributes) ?? originOf(resource?.attributes),
+  }));
+
+/** Not a sample's or Langy's own trace, which trace's `isRealFirstIngest` leaves out too. */
+function isCustomerOrigin(origin: string | undefined): boolean {
+  return origin === undefined || !NON_CUSTOMER_ORIGINS.has(origin);
+}
 
 /** A root span: one per trace, the only span the trace-day count takes. */
 export function isRootSpan(data: NurturingTraceSpanData): boolean {
   return !data.span.parentSpanId;
 }
 
-/** A root span as its count takes it: its project (the tenant), append day, and failure. */
+/** A customer's trace: its root span, unless a sample's or Langy's own turn. */
+export function isCountedTrace(data: NurturingTraceSpanData): boolean {
+  return isRootSpan(data) && isCustomerOrigin(data.origin);
+}
+
+/** A root span as its count takes it: its project (the tenant) and append day. */
 export function traceSpanOf(
-  data: NurturingTraceSpanData,
   context: Pick<PeerSubscriberContext, "tenantId" | "createdAt">,
 ): NurturingTraceSpan {
   return {
     projectId: String(context.tenantId),
     day: utcDayOf(context.createdAt),
-    isError: data.span.status.code === OTLP_STATUS_CODE_ERROR,
     appendedAt: context.createdAt,
   };
 }
@@ -258,8 +312,8 @@ export function traceDayGroupOf(event: Event): string {
 /**
  * One project's traces per UTC day: root spans of one project and day are coalesced, and each
  * batch adds its counts to the day in one Postgres upsert. Not idempotent: a redelivered batch,
- * or a retry after the write committed, counts its traces again. A subscriber, not a fold, so
- * the rows are not rebuilt by a projection replay. Child spans mint no job.
+ * or a retry after the write committed, counts its traces again. Not a fold, so no replay
+ * rebuilds the rows. Child, sample and Langy spans mint no job; the handler drops any staged.
  */
 export function nurturingTraceDaySubscriber(
   traceDays: NurturingTraceDayRepository,
@@ -268,46 +322,177 @@ export function nurturingTraceDaySubscriber(
     eventType: SPAN_RECEIVED_EVENT_TYPE,
     data: traceSpanDataSchema,
     options: {
-      enqueue: { filter: isRootSpan },
+      enqueue: { filter: isCountedTrace },
       groupKeyFn: traceDayGroupOf,
       coalesceMaxBatch: TRACE_DAY_COALESCE_MAX_BATCH,
     },
     handleBatch: (items) =>
       traceDays.addTraceDays(
-        traceDayIncrementsOf(items.map(({ data, context }) => traceSpanOf(data, context))),
+        traceDayIncrementsOf(
+          items
+            .filter(({ data }) => isCountedTrace(data))
+            .map(({ context }) => traceSpanOf(context)),
+        ),
       ),
+  };
+}
+
+/** What the failed-trace count reads of trace_failed: its project and the trace's origin. */
+const failedTraceDataSchema = traceFailedEventDataSchema.pick({ projectId: true, origin: true });
+
+/** A trace_failed's claim outlives any queue retry or outbox re-drive of the same fact. */
+export const FAILED_TRACE_CLAIM_TTL_SECONDS = 24 * 60 * 60;
+
+/** The claim of a trace_failed fact (ADR-179): its idempotency key, one per trace, else its id. */
+export function failedTraceClaimKeyOf(
+  context: Pick<PeerSubscriberContext, "idempotencyKey" | "eventId">,
+): string {
+  return `nurturing:failedTraceDay:${context.idempotencyKey ?? context.eventId}`;
+}
+
+/**
+ * One project's failed traces per UTC day, from trace's own trace_failed fact (once per trace,
+ * by trace's rule) on the day it was appended. Each fact is claimed first, so a redelivery never
+ * counts twice; a failed write gives its claims back, so the retry counts. Sample and Langy
+ * failures mint no job; the handler drops any staged.
+ */
+export function nurturingFailedTraceDaySubscriber({
+  traceDays,
+  claims,
+}: Readonly<{
+  traceDays: NurturingTraceDayRepository;
+  claims: NurturingClaimRepository;
+}>): PeerBatchSubscriberDefinition<typeof failedTraceDataSchema> {
+  return {
+    eventType: TRACE_FAILED_EVENT_TYPE,
+    data: failedTraceDataSchema,
+    options: {
+      enqueue: { filter: ({ origin }) => isCustomerOrigin(origin) },
+      groupKeyFn: traceDayGroupOf,
+      coalesceMaxBatch: TRACE_DAY_COALESCE_MAX_BATCH,
+    },
+    handleBatch: async (items) => {
+      const claimed = await Promise.allSettled(
+        items
+          .filter(({ data }) => isCustomerOrigin(data.origin))
+          .map(async ({ data, context }) => {
+            const key = failedTraceClaimKeyOf(context);
+            const first = await claims.claim(key, FAILED_TRACE_CLAIM_TTL_SECONDS);
+            return { key, first, data, context };
+          }),
+      );
+      const fresh = claimed.flatMap((result) =>
+        result.status === "fulfilled" && result.value.first ? [result.value] : [],
+      );
+      try {
+        const refused = claimed.find(
+          (result): result is PromiseRejectedResult => result.status === "rejected",
+        );
+        if (refused) throw refused.reason;
+        await traceDays.addTraceDays(
+          failedTraceDayIncrementsOf(
+            fresh.map(({ data, context }) => ({
+              projectId: data.projectId,
+              day: utcDayOf(context.createdAt),
+              failedAt: context.createdAt,
+            })),
+          ),
+        );
+      } catch (error) {
+        await NurturingClaimReleaseService.create(claims).rethrowAfterReleasing({
+          error,
+          keys: fresh.map(({ key }) => key),
+        });
+      }
+    },
   };
 }
 
 type UsageChanged = (input: Readonly<{ projectId: string }>) => Promise<void>;
 
 /**
- * Each fold's subscriber: debounced per project, so a burst of one owner's facts sends once. The
- * framework keeps each subscriber's dedup to its own lane, so facts of several owners in the same
- * minute send once per owner; each send is the organization's whole sum, so a repeat is harmless.
+ * Each fold's subscriber: throttled per project, so a burst of one owner's facts sends once, a
+ * minute after its first fact; a steady stream cannot push the send back. The framework keeps
+ * each subscriber's dedup to its own lane, so several owners' facts send once per owner; each
+ * send is the organization's whole sum, so a repeat is harmless.
  */
-function organizationUsageSubscriber(
+export function organizationUsageSubscriber(
   usageChanged: UsageChanged,
 ): PeerFoldSubscriberSpec<NurturingProjectUsageState> {
   return {
     name: "organizationUsage",
-    delay: USAGE_SYNC_DELAY_MS,
-    dedup: {
+    ...throttledWindow<Event>({
       makeId: (event) => `project:${projectIdOf(event as NurturingProjectUsagePeerEvent)}`,
-      ttlMs: USAGE_SYNC_DELAY_MS,
-      extend: true,
-      replace: true,
-    },
+      windowMs: USAGE_SYNC_DELAY_MS,
+    }),
     handler: (_event, { state }) => usageChanged({ projectId: state.projectId }),
   };
 }
 
+/** What the first-trace sync reads of first_trace_recorded: its project, the throttle key. */
+const firstTraceSyncDataSchema = firstTraceRecordedEventDataSchema.pick({ projectId: true });
+
 /** What the trace sync reads of trace_received; its throttle reads the organization. */
 const traceSyncDataSchema = traceReceivedEventDataSchema.pick({ projectId: true });
+
+/**
+ * The trace syncs, throttled per organization: trace records a project's first real trace as
+ * first_trace_recorded and only later ones as trace_received, so both sync. Each only reads the
+ * counts its root span added, so the first trace is counted once.
+ */
+export function nurturingTraceUsageSyncSubscribers(usageChanged: UsageChanged): Readonly<{
+  firstTrace: PeerSubscriberDefinition<typeof firstTraceSyncDataSchema>;
+  laterTrace: PeerSubscriberDefinition<typeof traceSyncDataSchema>;
+}> {
+  const { delay, dedup } = throttledWindow<Event>({
+    makeId: traceSyncKeyOf,
+    windowMs: TRACE_USAGE_SYNC_WINDOW_MS,
+  });
+  const options = { delay, deduplication: dedup };
+  return {
+    firstTrace: {
+      eventType: FIRST_TRACE_RECORDED_EVENT_TYPE,
+      data: firstTraceSyncDataSchema,
+      options,
+      handle: ({ projectId }) => usageChanged({ projectId }),
+    },
+    laterTrace: {
+      eventType: TRACE_RECEIVED_EVENT_TYPE,
+      data: traceSyncDataSchema,
+      options,
+      handle: ({ projectId }) => usageChanged({ projectId }),
+    },
+  };
+}
+
+/**
+ * Evaluations add their UTC day to the project's evaluation row, once a day; no sync of their
+ * own, the next one reads the days. One lane per project, since the row is read, then written.
+ */
+export function nurturingEvaluationDaySubscriber(
+  store: NurturingProjectUsageRepository,
+): PeerSubscriberDefinition<typeof evaluationLifecycleCompletedEventDataSchema> {
+  return {
+    eventType: EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
+    data: evaluationLifecycleCompletedEventDataSchema,
+    options: {
+      groupKeyFn: evaluationProjectGroupOf,
+      deduplication: {
+        makeId: evaluationDayKeyOf,
+        ttlMs: EVALUATION_DAY_DEDUP_TTL_MS,
+        extend: false,
+        replace: false,
+        shouldSurviveDispatch: true,
+      },
+    },
+    handle: ({ projectId, occurredAt }) => store.recordEvaluationDay({ projectId, occurredAt }),
+  };
+}
 
 /** What the usage sync needs; absent without a Customer.io channel, when nothing syncs. */
 export type NurturingUsageSync = Readonly<{
   traceDays: NurturingTraceDayRepository;
+  claims: NurturingClaimRepository;
   placements: NurturingProjectPlacementRepository;
   organizationsCreated: NurturingOrganizationCreatedRepository;
   usageChanged: UsageChanged;
@@ -326,12 +511,9 @@ function nurturingProjectUsageHost({
   }).withEvents([]);
   // Without a channel no sync reads these rows, and none prunes the trace days, so none is kept.
   if (!sync) return host;
-  const { traceDays, placements, organizationsCreated, usageChanged } = sync;
+  const { traceDays, claims, placements, organizationsCreated, usageChanged } = sync;
   const subscribers = [organizationUsageSubscriber(usageChanged)];
-  const traceSync = throttledWindow<Event>({
-    makeId: traceSyncKeyOf,
-    windowMs: TRACE_USAGE_SYNC_WINDOW_MS,
-  });
+  const traceSyncs = nurturingTraceUsageSyncSubscribers(usageChanged);
   return (
     host
       .withPeerFoldProjection(
@@ -351,29 +533,15 @@ function nurturingProjectUsageHost({
         subscribers,
       )
       .withPeerSubscriber("traceDayCount", nurturingTraceDaySubscriber(traceDays))
+      .withPeerSubscriber(
+        "failedTraceDayCount",
+        nurturingFailedTraceDaySubscriber({ traceDays, claims }),
+      )
       // Throttled, not debounced: an organization tracing without pause still syncs once per
       // window, 15 minutes after the window's first trace, when its root spans are counted.
-      .withPeerSubscriber("traceUsageSync", {
-        eventType: TRACE_RECEIVED_EVENT_TYPE,
-        data: traceSyncDataSchema,
-        options: { delay: traceSync.delay, deduplication: traceSync.dedup },
-        handle: (data) => usageChanged({ projectId: data.projectId }),
-      })
-      // Evaluations count only as habit days, which the next sync reads: no sync of their own.
-      .withPeerSubscriber("evaluationActiveDay", {
-        eventType: EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
-        data: evaluationLifecycleCompletedEventDataSchema,
-        options: {
-          deduplication: {
-            makeId: evaluationDayKeyOf,
-            ttlMs: EVALUATION_DAY_DEDUP_TTL_MS,
-            extend: false,
-            replace: false,
-            shouldSurviveDispatch: true,
-          },
-        },
-        handle: ({ projectId, occurredAt }) => store.recordEvaluationDay({ projectId, occurredAt }),
-      })
+      .withPeerSubscriber("firstTraceUsageSync", traceSyncs.firstTrace)
+      .withPeerSubscriber("traceUsageSync", traceSyncs.laterTrace)
+      .withPeerSubscriber("evaluationActiveDay", nurturingEvaluationDaySubscriber(store))
       .withPeerSubscriber("projectPlacement", nurturingProjectPlacementSubscriber(placements))
       .withPeerSubscriber(
         "organizationCreated",
@@ -428,6 +596,7 @@ export const nurturingProjectUsageEventing = defineEventingModule({
       sync: app.syncsOrganizationUsage()
         ? {
             traceDays: repositories.traceDays,
+            claims: repositories.claims,
             placements: repositories.placements,
             organizationsCreated: repositories.organizationsCreated,
             usageChanged: (input) => app.organizationUsageChanged(input),

@@ -4,17 +4,21 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   table (peer folds, ARCHITECTURE §9). A peer fold re-folds from one owner's event log, so there
   are four folds, one per owner pipeline, each keeping its own row per project. Evaluations add
   their UTC day to one more row per project, at most once a day. Traces are counted by a peer
-  subscriber on trace's span_received, which queues root spans only: a root span is one trace, a
-  root span with an error status one failed trace, as trace's own rollup counts them. Root spans
-  of one project and day are batched, and each batch adds its counts to that day's row with one
-  Postgres upsert; rows are kept 30 days. The increment is not idempotent: a redelivered batch
-  may count its traces twice. No span body reaches nurturing, and the rows are not rebuilt by a
+  subscriber on trace's span_received, which queues root spans only: a root span is one trace.
+  Failed traces are counted from trace's own lw.trace.trace_failed fact, recorded once per trace
+  by trace's rule (any span's error), so nurturing keeps no copy of that rule. Sample and Langy
+  traces are left out, as trace leaves them out of a project's first trace. Root spans and failed
+  traces of one project and day are batched, and each batch adds its counts to that day's row
+  with one Postgres upsert; rows are kept 30 days. The trace increment is not idempotent: a
+  redelivered batch may count its traces twice. A trace_failed fact is claimed by its idempotency
+  key for a day first (ADR-179), so a redelivered one counts its failure once. No span body reaches nurturing, and the rows are not rebuilt by a
   projection replay.
   Nurturing reads no trace data: trace counts start at the count's deploy, and no cost is sent (a
   span carries no price). When a project's usage changes, or its organization traced (throttled
   to once per 15 minutes), nurturing places it in its organization from its own copy, written
   from project's lw.project.created, sums the organization's projects and sends their traits to
-  Customer.io as one group call on the admin. The signup day comes from its own copy of
+  Customer.io as one group call on the admin. A project's first trace syncs as later ones do. The
+  signup day comes from its own copy of
   lw.organization.created. It reads no other module's table, and keeps no copy for projects or
   organizations created before it did: those send nothing. It never pulls owner state on a
   schedule, and sends counts and times only, never content. flagged_count waits on its
@@ -61,6 +65,12 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     Then the project counts the prompt
     And that day is not in the project's active days
 
+  @unit
+  Scenario: A project's evaluation days are written one at a time
+    Given evaluations of one project on two UTC days, taken at once
+    When nurturing adds their days to the project's evaluation row
+    Then they run one after another in the project's lane, so the row keeps both days
+
   @unit @integration
   Scenario: Evaluations mark a project's day once
     Given several evaluations of a project complete on the same UTC day
@@ -81,10 +91,33 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     Then only the root span is queued to the trace-day count, so a child span costs no job
 
   @unit
-  Scenario: A failed trace is a root span with an error status
-    Given a root span with an error status and a root span without one
-    When the trace-day count takes them
-    Then the day counts 2 traces and 1 failed trace, and the failed one's time
+  Scenario: Sample and Langy traces are not counted
+    Given root spans whose langwatch.origin, on the span or else its resource, is sample or langy
+    When trace appends them
+    Then none is queued to the trace-day count, as trace keeps them out of a project's first trace
+    And one already queued is not counted
+    And a root span of any other origin, or none, is queued
+    And a trace_failed of a sample or Langy trace counts no failed trace
+
+  @unit
+  Scenario: A failed trace is counted from trace's trace_failed fact
+    Given trace records trace_failed for a project's trace, by its own rule
+    When the failed-trace count takes it
+    Then the project's day of the fact counts 1 failed trace, and its time
+    And a root span's error status alone counts no failed trace
+
+  @unit
+  Scenario: A redelivered trace_failed counts its failure once
+    Given trace_failed for a project's trace, delivered again under a new event id
+    When the failed-trace count takes each delivery
+    Then the trace counts one failed trace, the fact claimed by its idempotency key for a day
+    And a write that fails gives the claim back, so the retry counts the failure
+
+  @unit
+  Scenario: A failure on the day after its trace's root span still counts
+    Given a project's trace counted on one UTC day and its trace_failed appended on the next
+    When the organization's traits are built
+    Then error_count counts the failure, and its day is an active day
 
   @unit
   Scenario: Traces arriving out of order count the same
@@ -96,7 +129,7 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   Scenario: Root spans of one project and day are written as one increment
     Given root spans of one project queued on one UTC day
     When the queue drains them as one batch
-    Then the day's row gets one upsert adding their trace and failed-trace counts
+    Then the day's row gets one upsert adding their trace counts, and failed traces the same
     And two writers adding to one day at once lose no count
 
   @unit
@@ -117,6 +150,19 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     Given traces arrive in two projects of one organization within 15 minutes
     Then they share one sync, one group call
     And a trace fact from before facts named their organization syncs on its project instead
+
+  @unit
+  Scenario: A project's first trace syncs its organization too
+    Given trace records a project's first real trace as first_trace_recorded, not trace_received
+    When nurturing takes it
+    Then the organization syncs, throttled as a later trace's sync is
+    And the trace is counted once, by its root span, since a sync only reads the counts
+
+  @unit
+  Scenario: A steady stream of a project's facts still syncs within a minute
+    Given a project's owner facts arriving less than a minute apart without pause
+    When its fold's subscriber takes them
+    Then the organization syncs a minute after the first fact, not after the stream stops
 
   @unit
   Scenario: The organization's traits sum its projects' trace days

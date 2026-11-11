@@ -40,19 +40,21 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `nurturing_project_usage` (aggregate `nurturing_project_usage_view`)
 
-Declared at `src/eventing/nurturing-project-usage.pipeline.ts:323`.
+Declared at `src/eventing/nurturing-project-usage.pipeline.ts:508`.
 
 | Kind                 | Name                                                              | Handles                                                                                         | Declared at                                            |
 | -------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| peer subscriber      | `traceDayCount`                                                   | `lw.obs.trace.span_received` from [trace](../../../../modules/trace/README.md)                  | `src/eventing/nurturing-project-usage.pipeline.ts:353` |
-| peer subscriber      | `traceUsageSync`                                                  | `lw.trace.trace_received` from [trace](../../../../modules/trace/README.md)                     | `src/eventing/nurturing-project-usage.pipeline.ts:356` |
-| peer subscriber      | `evaluationActiveDay`                                             | `lw.evaluation.lifecycle_completed` from [evaluation](../../../../modules/evaluation/README.md) | `src/eventing/nurturing-project-usage.pipeline.ts:363` |
-| peer subscriber      | `projectPlacement`                                                | `lw.project.created` from [project](../../../../modules/project/README.md)                      | `src/eventing/nurturing-project-usage.pipeline.ts:377` |
-| peer subscriber      | `organizationCreated`                                             | `lw.organization.created` from [organization](../../../../modules/organization/README.md)       | `src/eventing/nurturing-project-usage.pipeline.ts:378` |
-| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "prompt", store })`     | –                                                                                               | `src/eventing/nurturing-project-usage.pipeline.ts:337` |
-| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "evaluator", store })`  | –                                                                                               | `src/eventing/nurturing-project-usage.pipeline.ts:341` |
-| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "scenario", store })`   | –                                                                                               | `src/eventing/nurturing-project-usage.pipeline.ts:345` |
-| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "simulation", store })` | –                                                                                               | `src/eventing/nurturing-project-usage.pipeline.ts:349` |
+| peer subscriber      | `traceDayCount`                                                   | `lw.obs.trace.span_received` from [trace](../../../../modules/trace/README.md)                  | `src/eventing/nurturing-project-usage.pipeline.ts:535` |
+| peer subscriber      | `failedTraceDayCount`                                             | ≈ event type not read                                                                           | `src/eventing/nurturing-project-usage.pipeline.ts:536` |
+| peer subscriber      | `firstTraceUsageSync`                                             | `lw.trace.first_trace_recorded` from [trace](../../../../modules/trace/README.md)               | `src/eventing/nurturing-project-usage.pipeline.ts:542` |
+| peer subscriber      | `traceUsageSync`                                                  | `lw.trace.trace_received` from [trace](../../../../modules/trace/README.md)                     | `src/eventing/nurturing-project-usage.pipeline.ts:543` |
+| peer subscriber      | `evaluationActiveDay`                                             | `lw.evaluation.lifecycle_completed` from [evaluation](../../../../modules/evaluation/README.md) | `src/eventing/nurturing-project-usage.pipeline.ts:544` |
+| peer subscriber      | `projectPlacement`                                                | `lw.project.created` from [project](../../../../modules/project/README.md)                      | `src/eventing/nurturing-project-usage.pipeline.ts:545` |
+| peer subscriber      | `organizationCreated`                                             | `lw.organization.created` from [organization](../../../../modules/organization/README.md)       | `src/eventing/nurturing-project-usage.pipeline.ts:546` |
+| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "prompt", store })`     | –                                                                                               | `src/eventing/nurturing-project-usage.pipeline.ts:519` |
+| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "evaluator", store })`  | –                                                                                               | `src/eventing/nurturing-project-usage.pipeline.ts:523` |
+| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "scenario", store })`   | –                                                                                               | `src/eventing/nurturing-project-usage.pipeline.ts:527` |
+| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "simulation", store })` | –                                                                                               | `src/eventing/nurturing-project-usage.pipeline.ts:531` |
 
 ### Pipeline `nurturing` (aggregate `nurturing_signal`)
 

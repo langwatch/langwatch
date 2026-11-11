@@ -4,7 +4,9 @@ import {
   firstTraceRecordedEventDataSchema,
   MONTH_TRACE_IDS_LISTED_EVENT_TYPE,
   monthTraceIdsListedEventDataSchema,
+  TRACE_FAILED_EVENT_TYPE,
   TRACE_RECEIVED_EVENT_TYPE,
+  traceFailedEventDataSchema,
   traceReceivedEventDataSchema,
 } from "@langwatch/trace-contract";
 import { z } from "zod";
@@ -17,6 +19,7 @@ export const TRACE_PROJECT_MILESTONES_EVENT_VERSION = "2026-10-01" as const;
 export const RECORD_FIRST_TRACE_COMMAND_TYPE = "lw.trace.record_first_trace" as const;
 export const RECORD_TRACE_RECEIVED_COMMAND_TYPE = "lw.trace.record_trace_received" as const;
 export const RECORD_MONTH_TRACE_IDS_COMMAND_TYPE = "lw.trace.record_month_trace_ids" as const;
+export const RECORD_TRACE_FAILED_COMMAND_TYPE = "lw.trace.record_trace_failed" as const;
 
 export const recordFirstTraceCommandDataSchema = firstTraceRecordedEventDataSchema;
 export type RecordFirstTraceCommandData = z.infer<typeof recordFirstTraceCommandDataSchema>;
@@ -26,6 +29,9 @@ export type RecordTraceReceivedCommandData = z.infer<typeof recordTraceReceivedC
 
 export const recordMonthTraceIdsCommandDataSchema = monthTraceIdsListedEventDataSchema;
 export type RecordMonthTraceIdsCommandData = z.infer<typeof recordMonthTraceIdsCommandDataSchema>;
+
+export const recordTraceFailedCommandDataSchema = traceFailedEventDataSchema;
+export type RecordTraceFailedCommandData = z.infer<typeof recordTraceFailedCommandDataSchema>;
 
 const event = <Type extends string, Data extends z.ZodTypeAny>(type: Type, data: Data) =>
   z.object({
@@ -50,3 +56,8 @@ export const monthTraceIdsListedEventSchema = event(
   recordMonthTraceIdsCommandDataSchema,
 );
 export type MonthTraceIdsListedEvent = z.infer<typeof monthTraceIdsListedEventSchema>;
+export const traceFailedEventSchema = event(
+  TRACE_FAILED_EVENT_TYPE,
+  recordTraceFailedCommandDataSchema,
+);
+export type TraceFailedEvent = z.infer<typeof traceFailedEventSchema>;

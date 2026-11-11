@@ -53,12 +53,16 @@ describe("the usage pipeline's registration", () => {
     expect(lanes).toEqual([]);
   });
 
-  it("registers the trace-day count and the placement copies with a channel", () => {
+  /** @scenario "A project's first trace syncs its organization too" */
+  it("registers the trace-day count, both trace syncs and the placement copies with a channel", () => {
     const lanes = usageLanesWith(true);
 
     expect(lanes).toEqual(
       expect.arrayContaining([
         lane("traceDayCount"),
+        lane("failedTraceDayCount"),
+        lane("firstTraceUsageSync"),
+        lane("traceUsageSync"),
         lane("projectPlacement"),
         lane("organizationCreated"),
       ]),

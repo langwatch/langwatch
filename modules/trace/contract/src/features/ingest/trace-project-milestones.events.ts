@@ -47,6 +47,25 @@ export const traceReceivedEventDataSchema: TraceReceivedEventDataSchema =
   traceReceivedEventDataSchemaDefinition;
 export type TraceReceivedEventData = z.infer<typeof traceReceivedEventDataSchema>;
 
+/** A trace that became failed by trace's own rule (`containsErrorStatus`), recorded once. */
+export const TRACE_FAILED_EVENT_TYPE = "lw.trace.trace_failed" as const;
+
+const traceFailedEventDataSchemaDefinition = z.object({
+  tenantId: z.string().min(1),
+  projectId: z.string().min(1),
+  traceId: z.string().min(1),
+  /** When the span that found the trace failed was appended, epoch ms. */
+  occurredAt: z.number().int().nonnegative(),
+  /** The trace's `langwatch.origin` when it failed; absent while unresolved. */
+  origin: z.string().min(1).optional(),
+});
+export interface TraceFailedEventDataSchema extends Named<
+  typeof traceFailedEventDataSchemaDefinition
+> {}
+export const traceFailedEventDataSchema: TraceFailedEventDataSchema =
+  traceFailedEventDataSchemaDefinition;
+export type TraceFailedEventData = z.infer<typeof traceFailedEventDataSchema>;
+
 /** A page of a project's trace ids first seen in a month, sent by trace's upgrade step. */
 export const MONTH_TRACE_IDS_LISTED_EVENT_TYPE = "lw.trace.month_trace_ids_listed" as const;
 /** The most trace ids one listing event carries. */

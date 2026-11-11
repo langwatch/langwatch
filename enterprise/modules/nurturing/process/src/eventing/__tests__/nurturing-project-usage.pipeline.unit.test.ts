@@ -18,17 +18,29 @@ import {
   SIMULATION_RUN_EVENT_TYPES,
   SIMULATION_SET_CREATED_EVENT_TYPE,
 } from "@langwatch/scenario-contract";
-import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
+import {
+  FIRST_TRACE_RECORDED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_TYPE,
+  TRACE_FAILED_EVENT_TYPE,
+} from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryNurturingProjectUsageRepository } from "../../repositories/memory/memory.nurturing-project-usage.repository.ts";
 import { MemoryNurturingTraceDayRepository } from "../../repositories/memory/memory.nurturing-trace-day.repository.ts";
+import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import type { NurturingProjectUsageOwner } from "../../repositories/nurturing-project-usage.repository.ts";
+import type { NurturingTraceDayRepository } from "../../repositories/nurturing-trace-day.repository.ts";
 import {
   evaluationDayKeyOf,
+  FAILED_TRACE_CLAIM_TTL_SECONDS,
+  failedTraceClaimKeyOf,
+  nurturingEvaluationDaySubscriber,
+  nurturingFailedTraceDaySubscriber,
   type NurturingProjectUsagePeerEvent,
   nurturingProjectUsagePeerFold,
   nurturingTraceDaySubscriber,
+  nurturingTraceUsageSyncSubscribers,
+  organizationUsageSubscriber,
   projectIdOf,
   projectUsageFactOf,
   traceSyncKeyOf,
@@ -195,6 +207,106 @@ describe("the evaluation day row", () => {
   });
 });
 
+describe("the evaluation day subscriber", () => {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const NOON = Date.UTC(2026, 10, 20, 12);
+  const evaluation = (projectId: string, occurredAt: number) => ({
+    tenantId: projectId,
+    projectId,
+    evaluationId: `evaluation-${occurredAt}`,
+    occurredAt,
+  });
+  const contextOf = (occurredAt: number) => ({
+    tenantId: createTenantId("project-1"),
+    aggregateId: `evaluation-${occurredAt}`,
+    createdAt: occurredAt,
+    occurredAt,
+    eventId: `event-${occurredAt}`,
+  });
+
+  /** @scenario "A project's evaluation days are written one at a time" */
+  it("queues a project's evaluations in one lane whatever their day, so both days are kept", async () => {
+    const store = MemoryNurturingProjectUsageRepository.create();
+    const subscriber = nurturingEvaluationDaySubscriber(store);
+    const group = subscriber.options?.groupKeyFn;
+
+    expect(group?.(peerFact(evaluation("project-1", NOON), NOON))).toBe(
+      group?.(peerFact(evaluation("project-1", NOON + DAY_MS), NOON + DAY_MS)),
+    );
+    expect(group?.(peerFact(evaluation("project-2", NOON), NOON))).not.toBe(
+      group?.(peerFact(evaluation("project-1", NOON), NOON)),
+    );
+
+    if (!subscriber.handle) throw new Error("the evaluation day handles one fact at a time");
+    await subscriber.handle(evaluation("project-1", NOON), contextOf(NOON));
+    await subscriber.handle(evaluation("project-1", NOON + DAY_MS), contextOf(NOON + DAY_MS));
+
+    const rows = await store.findForProjects({ projectIds: ["project-1"] });
+    expect(rows.map((row) => row.activeDays.toSorted())).toEqual([["2026-11-20", "2026-11-21"]]);
+  });
+});
+
+describe("the fold's organization sync", () => {
+  /** @scenario "A steady stream of a project's facts still syncs within a minute" */
+  it("pins a project's sync to its first fact, so a steady stream cannot push it back", () => {
+    const { delay, dedup } = organizationUsageSubscriber(() => Promise.resolve());
+
+    expect(delay).toBe(60_000);
+    expect(dedup).toMatchObject({ ttlMs: 60_000, extend: false, replace: true });
+    if (typeof dedup !== "object") throw new Error("the sync dedups per project");
+    expect(dedup.makeId(promptCreated)).toBe(dedup.makeId(promptVersionSaved));
+    expect(dedup.makeId(promptCreated)).toBe("project:project-1");
+  });
+});
+
+describe("the trace syncs", () => {
+  const firstTraceData = {
+    tenantId: "project-1",
+    projectId: "project-1",
+    userId: "user-1",
+    sdkLanguage: "python",
+    sdkFramework: "unknown",
+    occurredAt: OCCURRED_AT,
+  };
+  const context = {
+    tenantId: createTenantId("project-1"),
+    aggregateId: "project-1",
+    createdAt: OCCURRED_AT,
+    occurredAt: OCCURRED_AT,
+    eventId: "first-trace-event",
+  };
+
+  /** @scenario "A project's first trace syncs its organization too" */
+  it("syncs on a project's first trace, throttled as a later trace's sync is", async () => {
+    const synced: string[] = [];
+    const { firstTrace, laterTrace } = nurturingTraceUsageSyncSubscribers(({ projectId }) => {
+      synced.push(projectId);
+      return Promise.resolve();
+    });
+
+    expect(firstTrace.eventType).toBe(FIRST_TRACE_RECORDED_EVENT_TYPE);
+    expect(firstTrace.options).toEqual(laterTrace.options);
+    if (!firstTrace.handle) throw new Error("the first-trace sync handles one fact at a time");
+    await firstTrace.handle(firstTrace.data.parse(firstTraceData), context);
+
+    expect(synced).toEqual(["project-1"]);
+  });
+
+  /** @scenario "A project's first trace syncs its organization too" */
+  it("counts the first trace once, by its root span: the sync writes no count", async () => {
+    const traceDays = MemoryNurturingTraceDayRepository.create();
+    const { firstTrace } = nurturingTraceUsageSyncSubscribers(() => Promise.resolve());
+    const rootSpan = { span: { parentSpanId: null } };
+
+    await nurturingTraceDaySubscriber(traceDays).handleBatch([{ data: rootSpan, context }]);
+    if (!firstTrace.handle) throw new Error("the first-trace sync handles one fact at a time");
+    await firstTrace.handle(firstTrace.data.parse(firstTraceData), context);
+
+    const days = await traceDays.findForProjects({ projectIds: ["project-1"], afterDay: "" });
+    expect(days.map((day) => day.traceCount)).toEqual([1]);
+  });
+});
+
 describe("each owner's peer fold", () => {
   const cases: [NurturingProjectUsageOwner, NurturingProjectUsagePeerEvent, object][] = [
     ["prompt", promptCreated, { promptIds: ["p1"] }],
@@ -253,7 +365,7 @@ describe("the trace-day count", () => {
   const OK = 1;
   const ERROR = 2;
 
-  /** trace's span fact as the subscriber gets it: only the root marker and the status. */
+  /** trace's span fact as the subscriber gets it: the root marker, with a status it ignores. */
   const spanData = (parentSpanId: string | null, code: typeof OK | typeof ERROR) => ({
     span: { parentSpanId, status: { message: null, code } },
   });
@@ -306,10 +418,19 @@ describe("the trace-day count", () => {
     expect(group?.(event(NOON) as Event)).not.toBe(group?.(event(NOON + 86_400_000) as Event));
     expect(subscriber.options?.coalesceMaxBatch).toBeGreaterThan(1);
 
-    await subscriber.handleBatch([itemOf(OK, "trace-1"), itemOf(ERROR, "trace-2")]);
+    await subscriber.handleBatch([itemOf(OK, "trace-1"), itemOf(OK, "trace-2")]);
+
+    expect(await days()).toEqual([expect.objectContaining({ traceCount: 2 })]);
+  });
+
+  /** @scenario "A failed trace is counted from trace's trace_failed fact" */
+  it("counts no failed trace from a root span's error status alone", async () => {
+    const { subscriber, days } = harness();
+
+    await subscriber.handleBatch([itemOf(ERROR, "trace-1")]);
 
     expect(await days()).toEqual([
-      expect.objectContaining({ traceCount: 2, errorCount: 1, lastFailedTraceAt: NOON }),
+      expect.objectContaining({ traceCount: 1, errorCount: 0, lastFailedTraceAt: null }),
     ]);
   });
 
@@ -320,6 +441,54 @@ describe("the trace-day count", () => {
     expect(filter?.(spanData(null, OK))).toBe(true);
     expect(filter?.(spanData("", ERROR))).toBe(true);
     expect(filter?.(spanData("root-span", OK))).toBe(false);
+  });
+
+  /** An OTLP `langwatch.origin` attribute, as trace's span fact carries it. */
+  const originAttribute = (origin: string) => ({
+    key: "langwatch.origin",
+    value: { stringValue: origin },
+  });
+
+  /** A root span's raw fact: its origin on the span and on its resource, either absent. */
+  const rawRoot = ({ span, resource }: { span?: string; resource?: string }) => ({
+    span: {
+      parentSpanId: null,
+      status: { message: null, code: OK },
+      attributes: span ? [originAttribute(span)] : [],
+    },
+    resource: { attributes: resource ? [originAttribute(resource)] : [] },
+  });
+
+  /** @scenario "Sample and Langy traces are not counted" */
+  it.each([
+    ["a sample span", rawRoot({ span: "sample" }), false],
+    ["a Langy resource", rawRoot({ resource: "langy" }), false],
+    ["a Langy span", rawRoot({ span: "langy" }), false],
+    ["an application span", rawRoot({ span: "application" }), true],
+    ["no origin", rawRoot({}), true],
+    [
+      "a span origin over its resource's",
+      rawRoot({ span: "application", resource: "langy" }),
+      true,
+    ],
+  ])("decides whether a root span of %s is queued", (_name, raw, queued) => {
+    const { subscriber } = harness();
+
+    expect(subscriber.options?.enqueue?.filter?.(subscriber.data.parse(raw))).toBe(queued);
+  });
+
+  /** @scenario "Sample and Langy traces are not counted" */
+  it("counts no sample or Langy root span a queue already holds", async () => {
+    const { subscriber, days } = harness();
+    const parsed = (raw: ReturnType<typeof rawRoot>) => subscriber.data.parse(raw);
+
+    await subscriber.handleBatch([
+      { ...itemOf(OK, "trace-1"), data: parsed(rawRoot({ span: "sample" })) },
+      { ...itemOf(OK, "trace-2"), data: parsed(rawRoot({ resource: "langy" })) },
+      { ...itemOf(OK, "trace-3"), data: parsed(rawRoot({ span: "application" })) },
+    ]);
+
+    expect((await days()).map((day) => day.traceCount)).toEqual([1]);
   });
 
   /** @scenario "A redelivered batch may count its traces twice" */
@@ -342,5 +511,131 @@ describe("the trace-day count", () => {
     expect(await days()).toEqual([
       expect.objectContaining({ traceCount: 2, lastTraceAt: NOON + 1000 }),
     ]);
+  });
+});
+
+describe("the failed-trace count", () => {
+  const NOON = Date.UTC(2026, 10, 20, 12);
+
+  /** trace's trace_failed fact as trace records it. */
+  const failedData = (traceId: string, origin?: string) => ({
+    tenantId: "project-1",
+    projectId: "project-1",
+    traceId,
+    occurredAt: NOON,
+    ...(origin ? { origin } : {}),
+  });
+
+  function harness(
+    traceDays: NurturingTraceDayRepository = MemoryNurturingTraceDayRepository.create(),
+  ) {
+    const subscriber = nurturingFailedTraceDaySubscriber({
+      traceDays,
+      claims: MemoryNurturingClaimRepository.create(),
+    });
+    const days = () => traceDays.findForProjects({ projectIds: ["project-1"], afterDay: "" });
+    /** One delivery; a redelivery carries a new event id but trace's idempotency key. */
+    const itemOf = (traceId: string, origin?: string, createdAt = NOON, delivery = 1) => ({
+      data: subscriber.data.parse(failedData(traceId, origin)),
+      context: {
+        tenantId: createTenantId("project-1"),
+        aggregateId: `project-1:${traceId}`,
+        createdAt,
+        occurredAt: createdAt,
+        eventId: `${traceId}-failed-${delivery}`,
+        idempotencyKey: `project-1:trace_failed:${traceId}`,
+      },
+    });
+    return { subscriber, days, itemOf };
+  }
+
+  /** @scenario "A redelivered trace_failed counts its failure once" */
+  it("counts a trace's failure once however often its fact is delivered", async () => {
+    const { subscriber, days, itemOf } = harness();
+
+    await subscriber.handleBatch([itemOf("trace-1"), itemOf("trace-1", undefined, NOON, 2)]);
+    await subscriber.handleBatch([itemOf("trace-1", undefined, NOON, 3)]);
+
+    expect((await days()).map((day) => day.errorCount)).toEqual([1]);
+    expect(FAILED_TRACE_CLAIM_TTL_SECONDS).toBe(24 * 60 * 60);
+  });
+
+  /** @scenario "A redelivered trace_failed counts its failure once" */
+  it("gives the claim back when the write fails, so the retry counts the failure", async () => {
+    const memory = MemoryNurturingTraceDayRepository.create();
+    let failNextWrite = true;
+    const flaky: NurturingTraceDayRepository = {
+      addTraceDays: (increments) => {
+        if (!failNextWrite) return memory.addTraceDays(increments);
+        failNextWrite = false;
+        return Promise.reject(new Error("the write failed"));
+      },
+      findForProjects: (input) => memory.findForProjects(input),
+      pruneBefore: (input) => memory.pruneBefore(input),
+    };
+    const { subscriber, days, itemOf } = harness(flaky);
+
+    await expect(subscriber.handleBatch([itemOf("trace-1")])).rejects.toThrow("the write failed");
+    await subscriber.handleBatch([itemOf("trace-1", undefined, NOON, 2)]);
+
+    expect((await days()).map((day) => day.errorCount)).toEqual([1]);
+  });
+
+  /** @scenario "A redelivered trace_failed counts its failure once" */
+  it("claims a fact by its idempotency key, else its event id", () => {
+    expect(
+      failedTraceClaimKeyOf({ idempotencyKey: "project-1:trace_failed:t1", eventId: "e1" }),
+    ).toBe("nurturing:failedTraceDay:project-1:trace_failed:t1");
+    expect(failedTraceClaimKeyOf({ eventId: "e1" })).toBe("nurturing:failedTraceDay:e1");
+  });
+
+  /** @scenario "A failed trace is counted from trace's trace_failed fact" */
+  it("counts each trace_failed on its project's day of append, with the newest time", async () => {
+    const { subscriber, days, itemOf } = harness();
+
+    expect(subscriber.eventType).toBe(TRACE_FAILED_EVENT_TYPE);
+    await subscriber.handleBatch([
+      itemOf("trace-1"),
+      itemOf("trace-2", "application", NOON + 1000),
+    ]);
+
+    expect(await days()).toEqual([
+      {
+        projectId: "project-1",
+        day: "2026-11-20",
+        traceCount: 0,
+        errorCount: 2,
+        lastTraceAt: null,
+        lastFailedTraceAt: NOON + 1000,
+      },
+    ]);
+  });
+
+  /** @scenario "Root spans of one project and day are written as one increment" */
+  it("queues failures on the same project and day group as the trace count", () => {
+    const { subscriber } = harness();
+    const traceGroup = nurturingTraceDaySubscriber(MemoryNurturingTraceDayRepository.create())
+      .options?.groupKeyFn;
+    const event = { ...envelope(TRACE_FAILED_EVENT_TYPE), createdAt: NOON } as Event;
+
+    expect(subscriber.options?.groupKeyFn?.(event)).toBe(traceGroup?.(event));
+    expect(subscriber.options?.coalesceMaxBatch).toBeGreaterThan(1);
+  });
+
+  /** @scenario "Sample and Langy traces are not counted" */
+  it("queues and counts no failure of a sample or Langy trace", async () => {
+    const { subscriber, days, itemOf } = harness();
+    const filter = subscriber.options?.enqueue?.filter;
+
+    expect(filter?.(itemOf("trace-1", "sample").data)).toBe(false);
+    expect(filter?.(itemOf("trace-1", "langy").data)).toBe(false);
+    expect(filter?.(itemOf("trace-1").data)).toBe(true);
+
+    await subscriber.handleBatch([
+      itemOf("trace-1", "sample"),
+      itemOf("trace-2", "langy"),
+      itemOf("trace-3"),
+    ]);
+    expect((await days()).map((day) => day.errorCount)).toEqual([1]);
   });
 });
