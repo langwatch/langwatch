@@ -18,6 +18,8 @@ import { MemoryNullTraceAttributedRollupRepository } from "./memory.null-trace-a
 import { MemoryNullTraceClusteringSampleRepository } from "./memory.null-trace-clustering-sample.repository.ts";
 import { MemoryNullTraceLegacyReadRepository } from "./memory.null-trace-legacy-read.repository.ts";
 import { MemoryNullTraceListRepository } from "./memory.null-trace-list.repository.ts";
+import { MemorySpanAnalyticsFloorRepository } from "./memory.span-analytics-floor.repository.ts";
+import { MemorySpanAnalyticsRepository } from "./memory.span-analytics.repository.ts";
 import { MemorySpanStorageRepository } from "./memory.span-storage.repository.ts";
 import { MemoryTraceAnalyticsRepository } from "./memory.trace-analytics-projection.repository.ts";
 import { MemoryTraceAnalyticsRollupRepository } from "./memory.trace-analytics-rollup.repository.ts";
@@ -147,6 +149,8 @@ export class MemoryTraceRepositories {
       summaryProjection: MemoryTraceSummaryProjectionRepository.create(),
       analyticsProjection: MemoryTraceAnalyticsRepository.create(),
       analyticsRollup: MemoryTraceAnalyticsRollupRepository.create(),
+      spanAnalytics: MemorySpanAnalyticsRepository.create(),
+      spanAnalyticsFloor: MemorySpanAnalyticsFloorRepository.create(),
       summaryFoldCache: MemoryTraceSummaryFoldCacheRepository.create(),
       analyticsFoldCache: MemoryTraceAnalyticsFoldCacheRepository.create(),
       spanStorage: MemorySpanStorageRepository.create(spans),

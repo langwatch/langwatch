@@ -48,9 +48,16 @@ import {
 } from "@langwatch/trace-contract";
 
 import { LOG_FILL_ONLY_KEYS } from "../features/derivation/services/trace-attribute-accumulation.service.ts";
+import {
+  type TraceAnalyticsMetadataColumns,
+  traceAnalyticsMetadataColumns,
+} from "../rules/trace-widget-columns.rules.ts";
 import type { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service.ts";
 
 const logger = createLogger("langwatch:trace-processing:trace-analytics-fold");
+
+/** The fold's name, which is also its replay lane (analytics ADR-006). */
+export const TRACE_ANALYTICS_PROJECTION_NAME = "traceAnalytics";
 
 /**
  * Deterministic fold for the slim `trace_analytics` table: hoisted
@@ -72,11 +79,14 @@ const traceAnalyticsEvents = [
 ] as const;
 
 /**
- * Schema-snapshot version (calendar date), bumped on derivation/trim
- * changes. 2026-07-29 = ADR-071 step 3 split; NOT a refold trigger, see
- * {@link TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT}.
+ * Schema-snapshot version (calendar date), bumped on derivation/trim changes; NOT a refold
+ * trigger, see {@link TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT}. 2026-11-11 = the metadata
+ * columns the fold writes (analytics ADR-006); the replay's rows win a tie on `UpdatedAt` by it.
  */
-export const TRACE_ANALYTICS_PROJECTION_VERSION_LATEST = "2026-07-29" as const;
+export const TRACE_ANALYTICS_PROJECTION_VERSION_LATEST = "2026-11-11" as const;
+
+/** The stamp before the fold wrote its metadata columns; its rows decode the same way. */
+export const TRACE_ANALYTICS_PROJECTION_VERSION_PRE_METADATA = "2026-07-29" as const;
 
 /**
  * How far OccurredAt (frozen anchor, ADR-071 step 3) may sit from a read's
@@ -145,6 +155,8 @@ export interface TraceAnalyticsRow {
 
   // Trimmed Attributes map (post-trimAttributesForAnalytics).
   attributes: Record<string, string>;
+  /** The `metadata.*` keys the stock widgets read, as columns, from the trimmed map. */
+  metadataColumns: TraceAnalyticsMetadataColumns;
 
   /**
    * The persistable-signal verdict. NOT a table column — readers derive it
@@ -304,7 +316,7 @@ export class TraceAnalyticsFoldProjection
 {
   private readonly traceCanonicalisation: TraceCanonicalisationService;
   private readonly runtime: TraceProjectionRuntimeService;
-  readonly name = "traceAnalytics";
+  readonly name = TRACE_ANALYTICS_PROJECTION_NAME;
   readonly version = TRACE_ANALYTICS_PROJECTION_VERSION_LATEST;
   readonly store: FoldProjectionStore<TraceAnalyticsData>;
 
@@ -773,6 +785,7 @@ export class TraceAnalyticsFoldProjection
     const labels = TraceAnalyticsFoldProjection.parseLabels(
       attrs[TRACE_ANALYTICS_ATTR_KEYS.LABELS],
     );
+    const attributes = trimAttributesForAnalytics(attrs);
 
     return {
       tenantId,
@@ -822,7 +835,8 @@ export class TraceAnalyticsFoldProjection
       hasError: state.containsErrorStatus,
       hasAnnotation: state.annotationIds && state.annotationIds.length > 0 ? true : null,
 
-      attributes: trimAttributesForAnalytics(attrs),
+      attributes,
+      metadataColumns: traceAnalyticsMetadataColumns(attributes),
 
       hasSignal: TraceAnalyticsFoldProjection.hasPersistableSignal(state),
 

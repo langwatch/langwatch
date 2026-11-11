@@ -44,10 +44,9 @@ import {
   toError,
 } from "./clickhouse.query-error-translation.mapper.ts";
 
-/**
- * How long the driver waits on a LangWatchQL query, in milliseconds.
- */
-const LWQL_REQUEST_TIMEOUT_MS = (DEFAULT_LWQL_RESOURCE_LIMITS.maxExecutionTimeSeconds + 5) * 1000;
+/** How long the driver waits on a LangWatchQL query, in milliseconds: the cap, plus slack. */
+export const LWQL_REQUEST_TIMEOUT_MS =
+  (DEFAULT_LWQL_RESOURCE_LIMITS.maxExecutionTimeSeconds + 5) * 1000;
 
 /**
  * Sockets this process may hold open against the LangWatchQL endpoint at once.

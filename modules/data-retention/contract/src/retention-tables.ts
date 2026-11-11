@@ -8,6 +8,7 @@ const EVENT_LOG = EVENT_TABLES[0].table;
 export const RETENTION_TABLE_CATEGORY_MAP = {
   [EVENT_LOG]: "traces",
   stored_spans: "traces",
+  span_analytics: "traces",
   stored_log_records: "traces",
   log_records: "traces",
   metric_data_points: "traces",

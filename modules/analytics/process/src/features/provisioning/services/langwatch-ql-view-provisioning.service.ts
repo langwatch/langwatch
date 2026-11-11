@@ -91,8 +91,9 @@ export class LangWatchQLViewProvisioningService {
     dedup: LangWatchQLDedupStrategy;
   }): string[] {
     // Grants and row policies are the access model's (ADR-159), emitted from its definition.
-    return views.map((view) =>
+    return views.flatMap((view) => [
       viewStatements.viewStatement({ names, sourceDatabase, view, dedup }),
-    );
+      ...viewStatements.flooredViewStatements({ names, sourceDatabase, view, dedup }),
+    ]);
   }
 }

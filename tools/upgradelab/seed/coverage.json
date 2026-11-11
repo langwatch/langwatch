@@ -261,6 +261,18 @@
       "note": "the same spans fold trace_analytics rows whose metadata columns the mutation stores",
       "cells": ["C1", "C3"]
     },
+    "trace:replay-trace-analytics-widget-columns": {
+      "status": "seeded",
+      "seed": "heavy:otlp",
+      "note": "the seeded spans' events refold trace_analytics rows with the fold's metadata columns",
+      "cells": ["C1", "C3"]
+    },
+    "trace:replay-span-analytics": {
+      "status": "seeded",
+      "seed": "heavy:otlp",
+      "note": "the seeded spans' events map to the span_analytics rows the replay writes",
+      "cells": ["C1", "C3"]
+    },
     "upcast:entitlement:lw.usage.month_counted": {
       "status": "unheld",
       "note": "branch-era event type, never written by a release; the upcast-events overlay (L5) injects it"

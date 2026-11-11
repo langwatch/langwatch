@@ -53,6 +53,25 @@
     "CapturedInput <- SpanAttributes [input]",
     "CapturedOutput <- SpanAttributes [output]"
   ],
+  "span_metrics <- span_analytics": [
+    "TenantId <- TenantId",
+    "TraceId <- TraceId",
+    "SpanId <- SpanId",
+    "ParentSpanId <- ParentSpanId",
+    "StartTime <- StartTime",
+    "EndTime <- EndTime",
+    "DurationMs <- DurationMs",
+    "SpanName <- SpanName",
+    "SpanKind <- SpanKind",
+    "StatusCode <- StatusCode",
+    "Cost <- Cost [cost:view]",
+    "NonBilledCost <- NonBilledCost [cost:view]",
+    "SpanType <- SpanType",
+    "ErrorType <- ErrorType",
+    "RagContextCount <- RagContextCount",
+    "InputHash <- InputHash [input]",
+    "DeploymentEnvironment <- DeploymentEnvironment"
+  ],
   "evaluations <- evaluation_runs": [
     "TenantId <- TenantId",
     "EvaluationId <- EvaluationId",
@@ -131,7 +150,10 @@
     "MetadataLanguage <- MetadataLanguage",
     "MetadataSegment <- MetadataSegment",
     "MetadataTeam <- MetadataTeam",
-    "MetadataTopic <- MetadataTopic"
+    "MetadataTopic <- MetadataTopic",
+    "MetadataOutcomeReason <- MetadataOutcomeReason",
+    "MetadataPromptVersion <- MetadataPromptVersion",
+    "MetadataEnvironment <- MetadataEnvironment"
   ],
   "trace_metrics_by_minute <- trace_analytics_rollup": [
     "TenantId <- TenantId",

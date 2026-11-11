@@ -58,6 +58,8 @@ export type CodeStepId =
   | "topic:seed-clustering-schedules"
   | "trace:track-updated-at-index-materialisation"
   | "trace:track-analytics-metadata-columns-materialisation"
+  | "trace:replay-trace-analytics-widget-columns"
+  | "trace:replay-span-analytics"
   | "trace:send-month-trace-ids"
   | "trace:fill-id-indexes"
   | "user:record-created-facts"

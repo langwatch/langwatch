@@ -35,6 +35,7 @@ import type { TraceMediaReferenceResolver } from "../features/media/services/tra
 import type { TraceSpanNormalization } from "../features/span/services/span-normalization.service.ts";
 import { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service.ts";
 import { EventingRecordSpanAdapter, RECORD_SPAN_DEDUPLICATION } from "./record-span.commands.ts";
+import { type SpanAnalyticsRow, SpanAnalyticsMapProjection } from "./span-analytics.projection.ts";
 import { SpanStorageMapProjection } from "./span-storage.projection.ts";
 import {
   type TraceAnalyticsData,
@@ -57,6 +58,7 @@ export type EventingTracePipelineAdapterOptions = {
   summaryStore: FoldProjectionStore<TraceSummaryData>;
   derivedStore: FoldProjectionStore<TraceAnalyticsData>;
   rollupStore: AppendStore<TraceAnalyticsRollupRow>;
+  spanAnalyticsStore: AppendStore<SpanAnalyticsRow>;
   canonicalisation: TraceCanonicalisationService;
   ioExtraction: TraceIoExtraction;
   mediaReferences: TraceMediaReferenceResolver;
@@ -138,6 +140,13 @@ function buildTracePipeline(options: EventingTracePipelineAdapterOptions) {
     .withClickHouseMapProjection(
       SpanStorageMapProjection.create({
         store: options.spanStore,
+        spanCostService: runtime.spanCost,
+        spanNormalization: runtime.spanNormalization,
+      }),
+    )
+    .withClickHouseMapProjection(
+      SpanAnalyticsMapProjection.create({
+        store: options.spanAnalyticsStore,
         spanCostService: runtime.spanCost,
         spanNormalization: runtime.spanNormalization,
       }),

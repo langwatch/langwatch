@@ -4,17 +4,25 @@ import {
   projectRequestContextOf,
 } from "@langwatch/api/rest";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
+import { nowInstant } from "@langwatch/time";
 import type { TraceApi, TraceServerConfig } from "@langwatch/trace-contract";
-import { defineMigrationStep } from "@langwatch/upgrade/step";
+import { defineMigrationStep, defineProjectionReplayStep } from "@langwatch/upgrade/step";
 
 import { TraceModule } from "./app/trace.app.ts";
 import { traceChannels } from "./channels/trace-channels.registry.ts";
+import { SPAN_ANALYTICS_PROJECTION_NAME } from "./eventing/span-analytics.projection.ts";
+import { TRACE_ANALYTICS_PROJECTION_NAME } from "./eventing/trace-derived.projection.ts";
 import { traceProcessingEventing } from "./eventing/trace-processing.pipeline.ts";
 import { traceProjectMilestonesEventing } from "./eventing/trace-project-milestones.pipeline.ts";
 import { traceCollectorEvaluationsEventing } from "./features/ingestion/eventing/trace-collector-evaluations.pipeline.ts";
 import { traceIngestSourceBillingEventing } from "./features/ingestion/eventing/trace-ingest-source-billing.pipeline.ts";
 import { TRACE_ID_INDEXES } from "./repositories/clickhouse/clickhouse.trace-id-indexes.database.ts";
 import { traceRepositories } from "./repositories/trace-repositories.registry.ts";
+import {
+  SPAN_ANALYTICS_REPLAY_STEP_ID,
+  TRACE_ANALYTICS_REPLAY_STEP_ID,
+  WIDGET_COLUMNS_REPLAY_HOURS,
+} from "./rules/trace-widget-columns.rules.ts";
 import {
   materialisationProgressSchema,
   TraceIndexMaterialisationService,
@@ -84,7 +92,7 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
     .withEventing(traceProjectMilestonesEventing)
     .withEventing(traceCollectorEvaluationsEventing)
     .withEventing(traceIngestSourceBillingEventing)
-    .withMigrations(({ app, repositories }) => [
+    .withMigrations(({ app, repositories, replayer }) => [
       defineMigrationStep({
         id: "trace:track-updated-at-index-materialisation",
         kind: "data",
@@ -117,6 +125,26 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
             signal,
             onPoll: (progress) => checkpoint.save({ report: progress }),
           }),
+      }),
+      // Refold the window the stock widgets read, once no older writer is left to write rows
+      // without the fold's columns (analytics ADR-006); one step per lane.
+      defineProjectionReplayStep({
+        id: TRACE_ANALYTICS_REPLAY_STEP_ID,
+        description:
+          "Refolds the last 62 days of trace analytics rows so they carry the stock widgets' metadata columns.",
+        lane: TRACE_ANALYTICS_PROJECTION_NAME,
+        since: nowInstant().subtract({ hours: WIDGET_COLUMNS_REPLAY_HOURS }).toString(),
+        needsOldWritersGone: true,
+        replayer,
+      }),
+      defineProjectionReplayStep({
+        id: SPAN_ANALYTICS_REPLAY_STEP_ID,
+        description:
+          "Fills span_analytics with the last 62 days of spans, the history the stock span widgets read.",
+        lane: SPAN_ANALYTICS_PROJECTION_NAME,
+        since: nowInstant().subtract({ hours: WIDGET_COLUMNS_REPLAY_HOURS }).toString(),
+        needsOldWritersGone: true,
+        replayer,
       }),
       defineMigrationStep({
         id: "trace:send-month-trace-ids",

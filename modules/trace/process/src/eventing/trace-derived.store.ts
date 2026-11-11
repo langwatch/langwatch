@@ -10,16 +10,19 @@ import { TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT } from "@langwatch/trace-c
 import type { TraceAnalyticsProjectionRepository } from "../repositories/trace-analytics-projection.repository.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
+  TRACE_ANALYTICS_PROJECTION_VERSION_PRE_METADATA,
   type TraceAnalyticsData,
   TraceAnalyticsFoldProjection,
 } from "./trace-derived.projection.ts";
 
 /**
- * The projection stamps `getWithApplied` will decode: the current shape, and the pre-split
- * shape it can read unambiguously. Everything older is a store miss.
+ * The projection stamps `getWithApplied` will decode: the current shape, the one before the
+ * metadata columns (its read-back state is the same), and the pre-split shape it can read
+ * unambiguously. Everything older is a store miss.
  */
 const DECODABLE_PROJECTION_VERSIONS: ReadonlySet<string> = new Set([
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
+  TRACE_ANALYTICS_PROJECTION_VERSION_PRE_METADATA,
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
 ]);
 

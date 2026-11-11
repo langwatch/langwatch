@@ -4507,6 +4507,108 @@
       ]
     },
     {
+      "name": "span_analytics",
+      "engine": "ReplacingMergeTree",
+      "sortingKey": "TenantId, TraceId, SpanId",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "TraceId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "SpanId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "ParentSpanId",
+          "type": "Nullable(String)",
+          "comment": ""
+        },
+        {
+          "name": "StartTime",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "EndTime",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "DurationMs",
+          "type": "UInt64",
+          "comment": ""
+        },
+        {
+          "name": "SpanName",
+          "type": "LowCardinality(String)",
+          "comment": ""
+        },
+        {
+          "name": "SpanKind",
+          "type": "UInt8",
+          "comment": ""
+        },
+        {
+          "name": "StatusCode",
+          "type": "Nullable(UInt8)",
+          "comment": ""
+        },
+        {
+          "name": "Cost",
+          "type": "Nullable(Float64)",
+          "comment": ""
+        },
+        {
+          "name": "NonBilledCost",
+          "type": "Nullable(Float64)",
+          "comment": ""
+        },
+        {
+          "name": "SpanType",
+          "type": "LowCardinality(String)",
+          "comment": ""
+        },
+        {
+          "name": "ErrorType",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "RagContextCount",
+          "type": "UInt32",
+          "comment": ""
+        },
+        {
+          "name": "InputHash",
+          "type": "UInt64",
+          "comment": ""
+        },
+        {
+          "name": "DeploymentEnvironment",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "ProjectedAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "UInt16",
+          "comment": ""
+        }
+      ]
+    },
+    {
       "name": "stored_log_records",
       "engine": "ReplacingMergeTree",
       "sortingKey": "TenantId, TraceId, SpanId, ProjectionId",
@@ -5288,6 +5390,21 @@
         },
         {
           "name": "MetadataTopic",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "MetadataOutcomeReason",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "MetadataPromptVersion",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "MetadataEnvironment",
           "type": "String",
           "comment": ""
         }

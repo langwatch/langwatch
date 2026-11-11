@@ -32,6 +32,7 @@ import type {
   TraceSpanTokenEstimation,
 } from "./record-span.commands.ts";
 import { EventingRecordSpanAdapter } from "./record-span.commands.ts";
+import { SpanAnalyticsStore } from "./span-analytics.store.ts";
 import { createSpanStorageBroadcastHandler } from "./span-storage-broadcast.subscriber.ts";
 import { SpanStorageStore } from "./span-storage.store.ts";
 import { TraceAnalyticsStore } from "./trace-derived.store.ts";
@@ -68,6 +69,7 @@ export interface TraceProcessingPipelineInput {
     | "summaryProjection"
     | "analyticsProjection"
     | "analyticsRollup"
+    | "spanAnalytics"
     | "summaryFoldCache"
     | "analyticsFoldCache"
   >;
@@ -136,6 +138,10 @@ export class TraceProcessingRuntimeAdapter {
       ),
       rollupStore: TraceAnalyticsRollupStore.create({
         storage: repositories.analyticsRollup,
+        defaultRetentionDays,
+      }),
+      spanAnalyticsStore: SpanAnalyticsStore.create({
+        storage: repositories.spanAnalytics,
         defaultRetentionDays,
       }),
       canonicalisation,

@@ -1096,7 +1096,8 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
           viewStatements.viewStatement({
             names: harness.names,
             sourceDatabase: facts,
-            view,
+            // Pinned as the entry's own: `traces` pins latest-in-order (ADR-006), which wins.
+            view: { ...view, dedup: { ...view.dedup, strategy } },
             dedup: strategy,
           }),
         ]);

@@ -50,32 +50,13 @@ export const REPEAT_CHECK = "Repeated Sentence Check";
 export const FIELD_CHECK = "Field accuracy per field";
 const WRONG_PREFIX = "Wrong: ";
 
-/** At least one trace in the period carries the attribute; labels need a non-empty list. */
-const carries = (attribute: string) =>
-  attribute === LABELS
-    ? `countIf(Attributes['${LABELS}'] NOT IN ('', '[]')) > 0, '${attribute}'`
-    : `countIf(Attributes['${attribute}'] != '') > 0, '${attribute}'`;
-
-/** The one attribute this project's period groups by, empty when no trace carries any. */
-const UNIT_KEY = `(
-  SELECT multiIf(
-    ${UNIT_KEYS.map(({ attribute }) => carries(attribute)).join(",\n    ")},
-    '')
-  FROM traces
-  WHERE ${inPeriod("OccurredAt")}
-) AS unit_key`;
-
-/** A trace's unit: the chosen attribute's value, the first label for labels. */
-const UNIT = `if(unit_key = '${LABELS}', JSONExtractString(Attributes['${LABELS}'], 1),
-  Attributes[unit_key])`;
-
 /** A conversation is its thread; a trace with no thread is a conversation of one. */
 const CONVERSATION = `if(Attributes['langwatch.thread.id'] != '', Attributes['langwatch.thread.id'],
   TraceId)`;
 
 /**
- * The same choice of unit over `trace_metrics`, whose typed columns hold each key (tasks#1117):
- * the widgets that need no prompt version read there instead of the heavier `traces`.
+ * The one attribute this project's period groups by, read from `trace_metrics`' typed columns
+ * (tasks#1117), never the `traces` map, which runs out of memory on large projects.
  */
 const METRICS_UNIT_COLUMNS: Readonly<Record<UnitAttribute, string>> = {
   "langwatch.customer_id": "ifNull(CustomerId, '')",
@@ -110,39 +91,54 @@ const METRICS_UNIT = `multiIf(
 
 const METRICS_CONVERSATION = "coalesce(nullIf(ConversationId, ''), TraceId)";
 
-/** The prompt or config version a trace ran on: its managed prompt, else its metadata. */
-const VERSION = `coalesce(nullIf(Attributes['metadata.prompt_version'], ''),
-  LastUsedPromptVersionId, '')`;
+/** A trace's key in the judged-trace joins: 16 bytes instead of the id (analytics ADR-004). */
+const TRACE_KEY = "sipHash128(TraceId)";
 
 /**
- * Judges' verdicts joined to the unit, version and time of the answer they judged, over the
- * period and the one before: an evaluation is stamped when it ran, maybe long after the answer.
- * Guardrails guard, they do not grade.
+ * Judges' verdicts per judged trace, over the period and the one before: an evaluation is
+ * stamped when it ran, maybe long after the answer. Guardrails guard, they do not grade. One
+ * small row per trace, so it is the joined side and the trace rows stream past it.
  */
-const JUDGED_TRACES = `FROM evaluation_metrics AS e
-INNER JOIN (
-  SELECT TraceId, ${UNIT} AS unit, ${VERSION} AS version, OccurredAt AS at
-  FROM traces
-  WHERE ${inPeriodAndPrevious("OccurredAt")}
-) AS t ON t.TraceId = e.TraceId
-WHERE e.OccurredAt >= ${PREVIOUS_START}
-  AND e.Passed IS NOT NULL
-  AND e.IsGuardrail = false`;
+const JUDGED_PER_TRACE = `SELECT ${TRACE_KEY} AS trace, countIf(Passed = 1) AS passed, count() AS judged
+  FROM evaluation_metrics
+  WHERE OccurredAt >= ${PREVIOUS_START}
+    AND Passed IS NOT NULL
+    AND IsGuardrail = false
+  GROUP BY trace`;
+
+/** The time a managed-version row carries, after every trace row, so no `min` picks it. */
+const AFTER_EVERY_ROW = "toDateTime64('2200-01-01 00:00:00', 3)";
 
 /**
- * The verdicts joined to each trace's first `trace_metrics` row, so the unit is picked as
- * UNIT_VOLUME_SQL picks it (att-table joins the two by unit) and a moved trace joins once.
+ * Each judged trace once, with the unit and metadata version of its first `trace_metrics` row:
+ * the rows stream past the judged side and only judged traces are grouped. With `managed`, the
+ * managed prompt version streams in beside the rows, so no second join (analytics ADR-004).
  */
-const JUDGED_METRICS_TRACES = `FROM evaluation_metrics AS e
-INNER JOIN (
-  SELECT TraceId, ${METRICS_UNIT} AS unit, OccurredAt AS at
-  FROM trace_metrics
-  WHERE ${inPeriodAndPrevious("OccurredAt")}
-    AND ${firstTraceMetricsRow()}
-) AS t ON t.TraceId = e.TraceId
-WHERE e.OccurredAt >= ${PREVIOUS_START}
-  AND e.Passed IS NOT NULL
-  AND e.IsGuardrail = false`;
+function judgedUnitTraces({ managed }: { managed: boolean }): string {
+  const managedRows = `
+    UNION ALL
+    SELECT ${TRACE_KEY} AS trace, '' AS unit, '' AS version, ${AFTER_EVERY_ROW} AS at,
+      LastUsedPromptVersionId AS managed
+    FROM traces
+    WHERE ${inPeriodAndPrevious("OccurredAt")}
+      AND LastUsedPromptVersionId != ''`;
+  return `SELECT t.trace AS trace,
+    argMin(t.unit, t.at) AS unit,
+    argMin(t.version, t.at) AS version,
+    min(t.at) AS at,${managed ? "\n    any(t.managed) AS managed," : ""}
+    any(e.passed) AS passed,
+    any(e.judged) AS judged
+  FROM (
+    SELECT ${TRACE_KEY} AS trace, ${METRICS_UNIT} AS unit, MetadataPromptVersion AS version,
+      OccurredAt AS at${managed ? ",\n      CAST(NULL AS Nullable(String)) AS managed" : ""}
+    FROM trace_metrics
+    WHERE ${inPeriodAndPrevious("OccurredAt")}${managed ? managedRows : ""}
+  ) AS t
+  INNER JOIN (
+    ${JUDGED_PER_TRACE}
+  ) AS e ON e.trace = t.trace
+  GROUP BY t.trace${managed ? `\n  HAVING at < ${AFTER_EVERY_ROW}` : ""}`;
+}
 
 export const UNIT_VOLUME_SQL = `WITH ${METRICS_UNIT_KEY}
 SELECT unit_key, ${METRICS_UNIT} AS unit,
@@ -179,19 +175,45 @@ LIMIT 6`;
 /** Each unit's judged answers in the period and in the equally long window before it. */
 export const UNIT_PASS_RATES_SQL = `WITH ${METRICS_UNIT_KEY}
 SELECT t.unit AS unit,
-  countIf(e.Passed = 1 AND t.at >= ${START}) AS passed,
-  countIf(t.at >= ${START}) AS judged,
-  countIf(e.Passed = 1 AND t.at < ${START}) AS passed_before,
-  countIf(t.at < ${START}) AS judged_before
-${JUDGED_METRICS_TRACES}
+  sumIf(t.passed, t.at >= ${START}) AS passed,
+  sumIf(t.judged, t.at >= ${START}) AS judged,
+  sumIf(t.passed, t.at < ${START}) AS passed_before,
+  sumIf(t.judged, t.at < ${START}) AS judged_before
+FROM (
+  ${judgedUnitTraces({ managed: false })}
+) AS t
 GROUP BY unit
 LIMIT 200`;
 
-const VERSIONS = `SELECT ${VERSION} AS version, min(OccurredAt) AS first_seen
-    FROM traces
-    WHERE ${inPeriodAndPrevious("OccurredAt")}
-    GROUP BY version
-    HAVING version != ''`;
+/**
+ * A trace's prompt or config version is the one its metadata names (`trace_metrics`), else its
+ * managed prompt version (a plain `traces` column), never the map (analytics ADR-004). The id
+ * set holds only traces that send a metadata version, as 64-bit hashes: a set of id strings
+ * outgrew the memory limit on 2M traces a month.
+ */
+const METADATA_VERSIONED = `SELECT cityHash64(TraceId)
+        FROM trace_metrics
+        WHERE ${inPeriodAndPrevious("OccurredAt")}
+          AND MetadataPromptVersion != ''`;
+
+const VERSIONS = `SELECT version, min(first_seen) AS first_seen
+    FROM (
+      SELECT MetadataPromptVersion AS version, min(OccurredAt) AS first_seen
+      FROM trace_metrics
+      WHERE ${inPeriodAndPrevious("OccurredAt")}
+        AND MetadataPromptVersion != ''
+      GROUP BY version
+      UNION ALL
+      SELECT ifNull(LastUsedPromptVersionId, '') AS version, min(OccurredAt) AS first_seen
+      FROM traces
+      WHERE ${inPeriodAndPrevious("OccurredAt")}
+        AND LastUsedPromptVersionId != ''
+        AND cityHash64(TraceId) NOT IN (
+          ${METADATA_VERSIONED}
+        )
+      GROUP BY version
+    )
+    GROUP BY version`;
 
 /** The newest version and the one it replaced, when the newest started in the period. */
 export const LAST_CHANGE_SQL = `SELECT versions[1].2 AS version,
@@ -206,14 +228,20 @@ FROM (
 WHERE length(versions) > 1
   AND changed_at >= ${START}`;
 
-/** Each unit's judged answers per version; the widget compares the newest with the one before. */
-export const VERSION_PASS_RATES_SQL = `WITH ${UNIT_KEY}
-SELECT unit_key, t.unit AS unit, t.version AS version,
+/**
+ * Each unit's judged answers per version; the widget compares the newest with the one before.
+ * The managed prompt version is read beside the judged traces' rows, never joined to them.
+ */
+export const VERSION_PASS_RATES_SQL = `WITH ${METRICS_UNIT_KEY}
+SELECT unit_key, t.unit AS unit,
+  coalesce(nullIf(t.version, ''), t.managed, '') AS version,
   min(t.at) AS first_seen,
-  countIf(e.Passed = 1) AS passed,
-  count() AS judged
-${JUDGED_TRACES}
-  AND t.version != ''
+  sum(t.passed) AS passed,
+  sum(t.judged) AS judged
+FROM (
+  ${judgedUnitTraces({ managed: true })}
+) AS t
+WHERE version != ''
 GROUP BY unit, version
 LIMIT 500`;
 
@@ -222,9 +250,9 @@ const VOICE_REPLIES = `SELECT TraceId,
     min(StartTime) AS started,
     dateDiff('millisecond', min(StartTime), max(EndTime)) AS reply_ms,
     sumIf(DurationMs, SpanName = 'stt') AS listening_ms,
-    sumIf(DurationMs, SpanAttributes['langwatch.span.type'] = 'llm') AS thinking_ms,
+    sumIf(DurationMs, SpanType = 'llm') AS thinking_ms,
     sumIf(DurationMs, SpanName = 'tts') AS speaking_ms
-  FROM spans
+  FROM span_metrics
   WHERE ${inPeriod("StartTime")}
   GROUP BY TraceId
   HAVING countIf(SpanName IN ('stt', 'tts')) > 0`;
@@ -265,7 +293,7 @@ const VOICE_CALLS = `SELECT ${CONVERSATION} AS call,
   FROM traces
   WHERE ${inPeriod("OccurredAt")}
     AND TraceId IN (
-      SELECT TraceId FROM spans WHERE ${inPeriod("StartTime")} AND SpanName IN ('stt', 'tts')
+      SELECT TraceId FROM span_metrics WHERE ${inPeriod("StartTime")} AND SpanName IN ('stt', 'tts')
     )
   GROUP BY call`;
 
@@ -295,30 +323,42 @@ FROM (
   ${VOICE_CALLS}
 )`;
 
-const FIELD_CHECKS = `FROM evaluations AS e
-INNER JOIN (
-  SELECT TraceId, ${UNIT} AS unit
-  FROM traces
-  WHERE ${inPeriod("OccurredAt")}
-) AS t ON t.TraceId = e.TraceId
-WHERE ${inPeriod("e.ScheduledAt")}
-  AND e.EvaluatorName = '${FIELD_CHECK}'
-  AND e.Status = 'processed'`;
+/**
+ * Each field check once, with its trace's unit. The checks are the joined side, so the trace
+ * rows stream past them, and a trace with two rows still counts its checks once.
+ */
+const fieldChecks = (condition = "") => `FROM (
+  SELECT e.EvaluationId AS id,
+    argMin(t.unit, t.at) AS unit,
+    any(e.Details) AS details
+  FROM (
+    SELECT TraceId, ${METRICS_UNIT} AS unit, OccurredAt AS at
+    FROM trace_metrics
+    WHERE ${inPeriod("OccurredAt")}
+  ) AS t
+  INNER JOIN (
+    SELECT EvaluationId, TraceId, Details
+    FROM evaluations
+    WHERE ${inPeriod("ScheduledAt")}
+      AND EvaluatorName = '${FIELD_CHECK}'
+      AND Status = 'processed'${condition}
+  ) AS e ON e.TraceId = t.TraceId
+  GROUP BY e.EvaluationId
+) AS c`;
 
-export const FIELD_CHECKS_SQL = `WITH ${UNIT_KEY}
-SELECT unit_key, t.unit AS unit, count() AS checked
-${FIELD_CHECKS}
+export const FIELD_CHECKS_SQL = `WITH ${METRICS_UNIT_KEY}
+SELECT unit_key, c.unit AS unit, count() AS checked
+${fieldChecks()}
 GROUP BY unit
 ORDER BY checked DESC
 LIMIT 50`;
 
 /** Each field a check named wrong, per unit. */
-export const WRONG_FIELDS_SQL = `WITH ${UNIT_KEY}
-SELECT t.unit AS unit,
-  arrayJoin(splitByString(', ', substring(ifNull(e.Details, ''), ${WRONG_PREFIX.length + 1}))) AS field,
+export const WRONG_FIELDS_SQL = `WITH ${METRICS_UNIT_KEY}
+SELECT c.unit AS unit,
+  arrayJoin(splitByString(', ', substring(ifNull(c.details, ''), ${WRONG_PREFIX.length + 1}))) AS field,
   count() AS wrong
-${FIELD_CHECKS}
-  AND startsWith(e.Details, '${WRONG_PREFIX}')
+${fieldChecks(`\n      AND startsWith(Details, '${WRONG_PREFIX}')`)}
 GROUP BY unit, field
 LIMIT 500`;
 

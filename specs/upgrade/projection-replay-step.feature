@@ -165,3 +165,11 @@ Feature: A module fills a new read model at deploy by replaying a projection lan
     Given a projection replay step declared with a trailing pass
     When it runs as a dry run, or its signal aborts during the first pass
     Then the lane is replayed only once
+
+  # A reader that shows where a replayed lane's history starts reads it from the step (analytics ADR-006).
+
+  @unit
+  Scenario: A replay step's report keeps the instant its lane was first replayed from
+    Given a projection replay step that completed and runs again from its cursor
+    When the worker runs it
+    Then every report it saves and returns names the instant its first run replayed from

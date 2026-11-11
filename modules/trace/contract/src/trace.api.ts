@@ -3,6 +3,7 @@ import type { InstantEvalRunReference } from "@langwatch/instant-eval-contract";
 import { moduleApi } from "@langwatch/module";
 
 import type { ConversationView } from "./conversation/conversation-steps.ts";
+import type { SpanAnalyticsFloor } from "./features/analytics/span-analytics-floor.ts";
 import type {
   TraceAttributedRecency,
   TraceAttributedSpendComparison,
@@ -197,6 +198,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
    * readable conversation at all, which is a different answer from an empty one.
    */
   renderTraceMessages(input: { trace: Trace; side: TraceMessagesSide }): Promise<string | null>;
+  /** Where the span widgets' history starts, from the span_analytics replay's recorded since. */
+  getSpanAnalyticsFloor(): Promise<SpanAnalyticsFloor>;
   /** One named span's chat messages as JSON, and whether the trace holds it. */
   renderSpanMessages(input: { trace: Trace; spanId: string }): Promise<TraceRenderedSpanMessages>;
   /** The whole trace as one JSON object, spans included. */

@@ -133,35 +133,48 @@ export const NON_PRODUCTION_ENVIRONMENTS = [
 const list = (values: readonly string[]) => `[${values.map((value) => `'${value}'`).join(", ")}]`;
 const ENVIRONMENTS = list(NON_PRODUCTION_ENVIRONMENTS);
 
+/** A trace's test origin, kept apart from the environment positions below it. */
+const ORIGIN_CODE = 16;
+/** Room for a code below a row's time, so one `min` picks the first row and its code together. */
+const CODE_SPAN = 32;
+
+/** The first trace row's code, read back from below its time. */
+const TRACE_CODE = `first % ${CODE_SPAN}`;
+
 /**
  * Traces and cost per noise source (owner, 2026-10-08): a test origin, else a non-production
- * environment from a span, the metadata or a label; empty is production. Cost comes from spans
- * and stays unknown, never $0, where none was sent; traces come first for the report.
- */
-export const NOISE_SOURCES_SQL = `SELECT source, uniqExact(TraceId) AS traces, sum(cost) AS cost
+ * environment from a span, the metadata or a label; empty is production. Unsent cost stays
+ * unknown, never $0. Spans and trace rows meet in one fixed-size group per trace (ADR-004). */
+export const NOISE_SOURCES_SQL = `SELECT multiIf(
+    ${TRACE_CODE} > ${ORIGIN_CODE}, arrayElement(${list(TEST_ORIGINS)}, ${TRACE_CODE} - ${ORIGIN_CODE}),
+    environment > 0, arrayElement(${ENVIRONMENTS}, environment),
+    arrayElement(${ENVIRONMENTS}, ${TRACE_CODE})) AS source,
+  count() AS traces,
+  sum(cost) AS cost
 FROM (
-  SELECT s.TraceId AS TraceId, s.cost AS cost,
-    multiIf(has(${list(TEST_ORIGINS)}, t.origin), t.origin,
-      has(${ENVIRONMENTS}, s.environment), s.environment,
-      has(${ENVIRONMENTS}, t.environment), t.environment,
-      arrayFirst((label) -> has(${ENVIRONMENTS}, label), t.labels)) AS source
+  SELECT trace,
+    sum(cost) AS cost,
+    any(environment) AS environment,
+    minIf(dateDiff('millisecond', toDateTime64(0, 3), at) * ${CODE_SPAN} + code, isTrace) AS first
   FROM (
-    SELECT TraceId, Attributes['langwatch.origin'] AS origin,
-      lower(coalesce(nullIf(Attributes['metadata.environment'], ''),
-        nullIf(Attributes['metadata.env'], ''), '')) AS environment,
-      arrayMap((label) -> lower(label),
-        JSONExtract(Attributes['langwatch.labels'], 'Array(String)')) AS labels
-    FROM traces
-    WHERE ${inPeriod("OccurredAt")}
-  ) AS t
-  INNER JOIN (
-    SELECT TraceId, sum(Cost) AS cost,
-      lower(any(coalesce(nullIf(ResourceAttributes['deployment.environment'], ''),
-        nullIf(ResourceAttributes['deployment.environment.name'], '')))) AS environment
-    FROM spans
+    SELECT sipHash128(TraceId) AS trace, Cost AS cost,
+      if(DeploymentEnvironment = '', NULL,
+        toUInt8(indexOf(${ENVIRONMENTS}, lower(DeploymentEnvironment)))) AS environment,
+      toUInt8(0) AS code, toDateTime64(0, 3) AS at, false AS isTrace
+    FROM span_metrics
     WHERE ${inPeriod("StartTime")}
-    GROUP BY TraceId
-  ) AS s ON s.TraceId = t.TraceId
+    UNION ALL
+    SELECT sipHash128(TraceId) AS trace, CAST(NULL AS Nullable(Float64)) AS cost,
+      CAST(NULL AS Nullable(UInt8)) AS environment,
+      toUInt8(if(has(${list(TEST_ORIGINS)}, Origin), ${ORIGIN_CODE} + indexOf(${list(TEST_ORIGINS)}, Origin),
+        indexOf(${ENVIRONMENTS}, if(has(${ENVIRONMENTS}, lower(MetadataEnvironment)), lower(MetadataEnvironment),
+          arrayFirst((label) -> has(${ENVIRONMENTS}, label), arrayMap((label) -> lower(label), Labels)))))) AS code,
+      OccurredAt AS at, true AS isTrace
+    FROM trace_metrics
+    WHERE ${inPeriod("OccurredAt")}
+  )
+  GROUP BY trace
+  HAVING countIf(NOT isTrace) > 0 AND first > 0
 )
 GROUP BY source
 ORDER BY traces DESC

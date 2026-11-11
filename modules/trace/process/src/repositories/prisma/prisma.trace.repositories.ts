@@ -10,6 +10,7 @@ import { MemberTraceClickHouseClientRepository } from "../clickhouse/clickhouse.
 import { ClickHouseTraceModelSpendRepository } from "../clickhouse/clickhouse.trace-model-spend.repository.ts";
 import { LogRecordStorageClickHouseRepository } from "../clickhouse/log-record-storage.repository.ts";
 import { SessionGroupsClickHouseRepository } from "../clickhouse/session-groups.repository.ts";
+import { SpanAnalyticsClickHouseRepository } from "../clickhouse/span-analytics.repository.ts";
 import { SpanStorageClickHouseRepository } from "../clickhouse/span-storage.repository.ts";
 import { TraceAnalyticsRollupClickHouseRepository } from "../clickhouse/trace-analytics-rollup.repository.ts";
 import { TraceDerivationSpanClickHouseRepository } from "../clickhouse/trace-derivation-span.repository.ts";
@@ -25,6 +26,7 @@ import {
 } from "../clickhouse/trace-summary.repository.ts";
 import { TraceUsageCountClickHouseRepository } from "../clickhouse/trace-usage-count.repository.ts";
 import type { TraceRepositories } from "../trace.repositories.ts";
+import { PrismaSpanAnalyticsFloorRepository } from "./prisma.span-analytics-floor.repository.ts";
 import { PrismaTraceAnnotationScoresRepository } from "./prisma.trace-annotation-scores.repository.ts";
 import { PrismaTraceAnnotationsRepository } from "./prisma.trace-annotations.repository.ts";
 import { PrismaTraceEditOverlayRepository } from "./prisma.trace-edit-overlay.repository.ts";
@@ -70,6 +72,8 @@ export class PostgresTraceRepositories {
       analyticsRollup: TraceAnalyticsRollupClickHouseRepository.create({
         resolveClient: traceClickHouse,
       }),
+      spanAnalytics: SpanAnalyticsClickHouseRepository.create({ resolveClient: traceClickHouse }),
+      spanAnalyticsFloor: PrismaSpanAnalyticsFloorRepository.create(members.prisma),
       spanStorage: SpanStorageClickHouseRepository.create(storage),
       spanTree: ClickHouseTraceSpanRepository.create(storage),
       existence: ClickHouseTraceExistenceRepository.create({

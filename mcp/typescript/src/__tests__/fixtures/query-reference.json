@@ -48,6 +48,7 @@
         "CAST",
         "ceil",
         "ceiling",
+        "cityHash64",
         "coalesce",
         "concat",
         "concatWithSeparator",
@@ -176,6 +177,7 @@
         "simpleJSONExtractString",
         "simpleJSONExtractUInt",
         "simpleJSONHas",
+        "sipHash128",
         "splitByChar",
         "splitByString",
         "sqrt",
@@ -794,6 +796,165 @@
             }
           ],
           "exampleSql": "SELECT TraceId, SpanId, ParentSpanId\nFROM analytics.spans\nWHERE StartTime >= subtractDays(now(), 7)\nORDER BY StartTime DESC\nLIMIT 100"
+        },
+        {
+          "name": "analytics.span_metrics",
+          "description": "One row per span with its timing, status, cost and the LangWatch facts dashboards group by, and no attribute map. Holds spans from the span_analytics floor on.",
+          "grain": "one row per (TenantId, TraceId, SpanId), latest version only",
+          "joinKeys": [
+            "TenantId",
+            "TraceId",
+            "SpanId"
+          ],
+          "timeColumn": "StartTime",
+          "freshness": "seconds behind ingestion",
+          "columns": [
+            {
+              "name": "TenantId",
+              "type": "String",
+              "description": "Project the span belongs to.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TraceId",
+              "type": "String",
+              "description": "Trace the span belongs to.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "SpanId",
+              "type": "String",
+              "description": "Span identifier, unique within the trace.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ParentSpanId",
+              "type": "Nullable(String)",
+              "description": "Parent span, null for the root span.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "StartTime",
+              "type": "DateTime64(3)",
+              "description": "When the span started. Filter on this to prune partitions.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "EndTime",
+              "type": "DateTime64(3)",
+              "description": "When the span ended.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "DurationMs",
+              "type": "UInt64",
+              "description": "Span duration in milliseconds.",
+              "unit": "ms",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "SpanName",
+              "type": "LowCardinality(String)",
+              "description": "Operation name of the span.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "SpanKind",
+              "type": "UInt8",
+              "description": "OpenTelemetry span kind.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "StatusCode",
+              "type": "Nullable(UInt8)",
+              "description": "OpenTelemetry status code.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Cost",
+              "type": "Nullable(Float64)",
+              "description": "Billed cost attributed to the span, in USD.",
+              "unit": "USD",
+              "gates": [
+                "costs",
+                "cost:view"
+              ],
+              "available": true
+            },
+            {
+              "name": "NonBilledCost",
+              "type": "Nullable(Float64)",
+              "description": "Cost attributed to the span that is not billed, in USD.",
+              "unit": "USD",
+              "gates": [
+                "costs",
+                "cost:view"
+              ],
+              "available": true
+            },
+            {
+              "name": "SpanType",
+              "type": "LowCardinality(String)",
+              "description": "LangWatch's kind of span, such as llm, tool or rag, from langwatch.span.type. Empty when the span sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ErrorType",
+              "type": "String",
+              "description": "The type of error the span recorded, from exception.type, else error.type. Empty when it recorded neither.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "RagContextCount",
+              "type": "UInt32",
+              "description": "How many contexts a retrieval span returned, the length of langwatch.rag.contexts. 0 when it returned none or sent no list.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "InputHash",
+              "type": "UInt64",
+              "description": "A hash of the span's captured input: equal inputs share it, 0 when it sent none. Reveals no text, but tells equal inputs apart, so it is gated like captured input.",
+              "unit": null,
+              "gates": [
+                "input"
+              ],
+              "available": true
+            },
+            {
+              "name": "DeploymentEnvironment",
+              "type": "String",
+              "description": "The environment the span's service ran in, from the resource's deployment.environment, else deployment.environment.name. Empty when it sent neither.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            }
+          ],
+          "exampleSql": "SELECT TraceId, SpanId, ParentSpanId\nFROM analytics.span_metrics\nWHERE StartTime >= subtractDays(now(), 7)\nORDER BY StartTime DESC\nLIMIT 100"
         },
         {
           "name": "analytics.evaluations",
@@ -1444,6 +1605,30 @@
               "name": "MetadataTopic",
               "type": "String",
               "description": "The topic the application gave the trace, from the trace's metadata.topic. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetadataOutcomeReason",
+              "type": "String",
+              "description": "Why the conversation ended as it did, from the trace's metadata.outcome_reason. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetadataPromptVersion",
+              "type": "String",
+              "description": "The prompt or configuration version the application names, from the trace's metadata.prompt_version. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetadataEnvironment",
+              "type": "String",
+              "description": "The environment the application ran in, from the trace's metadata.environment, else metadata.env. Empty when the trace sent neither.",
               "unit": null,
               "gates": [],
               "available": true
@@ -18814,7 +18999,7 @@
       "maxStatementLength": 50000,
       "maxRowsReturned": 10000,
       "maxResultBytes": 8000000,
-      "maxExecutionTimeSeconds": 10,
+      "maxExecutionTimeSeconds": 60,
       "pagination": "The endpoint has no cursor. Page by writing a keyset predicate into the statement and rebinding its parameters; see the example tagged `paging`."
     },
     "endpoints": [

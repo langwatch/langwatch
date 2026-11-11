@@ -454,6 +454,22 @@
     "needsOldWritersGone": false
   },
   {
+    "id": "trace:replay-trace-analytics-widget-columns",
+    "kind": "data",
+    "mode": "background",
+    "owner": "trace",
+    "description": "Refolds the last 62 days of trace analytics rows so they carry the stock widgets' metadata columns.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "trace:replay-span-analytics",
+    "kind": "data",
+    "mode": "background",
+    "owner": "trace",
+    "description": "Fills span_analytics with the last 62 days of spans, the history the stock span widgets read.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "trace:send-month-trace-ids",
     "kind": "data",
     "mode": "background",

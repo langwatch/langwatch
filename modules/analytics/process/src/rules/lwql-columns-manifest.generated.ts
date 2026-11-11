@@ -926,6 +926,27 @@ export interface LwqlClickHouseRows {
     readonly "Criteria.Status": "Array(LowCardinality(String))";
     readonly "Criteria.Reasoning": "Array(String)";
   };
+  readonly span_analytics: {
+    readonly TenantId: "String";
+    readonly TraceId: "String";
+    readonly SpanId: "String";
+    readonly ParentSpanId: "Nullable(String)";
+    readonly StartTime: "DateTime64(3)";
+    readonly EndTime: "DateTime64(3)";
+    readonly DurationMs: "UInt64";
+    readonly SpanName: "LowCardinality(String)";
+    readonly SpanKind: "UInt8";
+    readonly StatusCode: "Nullable(UInt8)";
+    readonly Cost: "Nullable(Float64)";
+    readonly NonBilledCost: "Nullable(Float64)";
+    readonly SpanType: "LowCardinality(String)";
+    readonly ErrorType: "String";
+    readonly RagContextCount: "UInt32";
+    readonly InputHash: "UInt64";
+    readonly DeploymentEnvironment: "String";
+    readonly ProjectedAt: "DateTime64(3)";
+    readonly _retention_days: "UInt16";
+  };
   readonly stored_log_records: {
     readonly ProjectionId: "String";
     readonly TenantId: "String";
@@ -1086,6 +1107,9 @@ export interface LwqlClickHouseRows {
     readonly MetadataSegment: "String";
     readonly MetadataTeam: "String";
     readonly MetadataTopic: "String";
+    readonly MetadataOutcomeReason: "String";
+    readonly MetadataPromptVersion: "String";
+    readonly MetadataEnvironment: "String";
   };
   readonly trace_analytics_rollup: {
     readonly TenantId: "String";

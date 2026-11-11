@@ -25,8 +25,10 @@ describe("given the Flight Deck cockpit widgets", () => {
     }
     expect(code).toContain("<Change ");
     for (const sql of Object.values(queries)) expect(sql).toContain("subtractSeconds(");
-    expect(queries.checks).toContain("NOT e.IsGuardrail");
-    expect(queries.checks).toContain(`e.EvaluatorName != '${OUTCOME_JUDGE}'`);
+    expect(queries.checks).toContain("NOT IsGuardrail");
+    expect(queries.checks).toContain(`EvaluatorName != '${OUTCOME_JUDGE}'`);
+    // Per-trace verdict counts are the joined side, so the period's trace rows are never hashed.
+    expect(queries.checks).toContain("INNER JOIN (\n  SELECT TraceId, countIf(Passed = 1) AS pass");
     expect(code).toContain('"Not measured"');
     expect(code).toContain('LW.navigate("onlineEvaluations"');
   });
@@ -42,11 +44,15 @@ describe("given the Flight Deck cockpit widgets", () => {
       build("cost-verdict").queries.outcomes,
     ];
     for (const sql of outcomeQueries) {
-      expect(sql).toContain(`evaluator = '${OUTCOME_JUDGE}'`);
-      expect(sql).toContain("Attributes['metadata.outcome']");
+      expect(sql).toContain(`EvaluatorName = '${OUTCOME_JUDGE}'`);
+      expect(sql).toContain("MetadataOutcome AS outcome");
       expect(sql).toContain("argMax(outcome, sent)");
-      expect(sql).toContain("t.OccurredAt AS at");
+      expect(sql).toContain("t.OccurredAt AS row_at");
+      expect(sql).not.toContain("Attributes[");
     }
+    // Only the reasons widget reads a sent reason, from its typed column.
+    expect(build("ck-attention").queries.reasons).toContain("nullIf(MetadataOutcomeReason, '')");
+    expect(build("ck-kpis").queries.outcomes).not.toContain("MetadataOutcomeReason");
   });
 
   /** @scenario "AC22 Flight Deck: Needs attention names the one problem to look at first" */
@@ -71,8 +77,10 @@ describe("given the Flight Deck cockpit widgets", () => {
   /** @scenario "AC23 Flight Deck: Top request my agent cannot serve names a topic, a count and an example" */
   it("names the topic with the most capability-gap conversations and one request", () => {
     const { code, queries } = build("ck-top-ask");
-    expect(queries.gap).toContain("countIf(o.outcome = 'capability_gap') AS gaps");
-    expect(queries.gap).toContain("anyIf(t.input, o.outcome = 'capability_gap') AS example");
+    expect(queries.gap).toContain("countIf(outcome = 'capability_gap') AS gaps");
+    expect(queries.gap).toContain("x.input AS example");
+    // The request's text is read from traces for the shown traces only.
+    expect(queries.gap).toContain("AND TraceId IN (SELECT trace_id FROM (");
     expect(queries.gap).toContain("ORDER BY gaps DESC");
     expect(code).toContain("<TraceLink id={top.trace_id} />");
     expect(code).toContain("conversations asked for something my agent cannot do.");
@@ -100,13 +108,16 @@ describe("given the Flight Deck cockpit widgets", () => {
     expect(queries.trend).toContain("countIf(outcome = 'resolved') AS resolved");
     expect(queries.changes).toContain("arrayJoin(Models)");
     expect(queries.changes).toContain("LastUsedPromptVersionId");
+    expect(queries.changes).toContain("MetadataPromptVersion AS name");
+    expect(queries.changes).not.toContain("Attributes[");
     expect(code).toContain("markers={changes.data.map(markerOf)}");
   });
 
   /** @scenario "AC26 Flight Deck: Task success is the share of calls that got the job done, per language" */
   it("shares resolved calls with an outcome per language", () => {
     const { code, queries } = build("voice-task-success");
-    expect(queries.trend).toContain("Attributes['metadata.language']");
+    expect(queries.trend).toContain("t.MetadataLanguage AS language");
+    expect(queries.trend).not.toContain("Attributes[");
     expect(queries.trend).toContain("countIf(outcome = 'resolved') AS done");
     expect(code).toContain('label={"Task success: " + row.language}');
   });

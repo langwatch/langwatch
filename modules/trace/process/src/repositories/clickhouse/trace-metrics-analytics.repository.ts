@@ -13,6 +13,10 @@ import { z } from "zod";
 
 import type { TraceAnalyticsRow } from "../../eventing/trace-derived.projection.ts";
 import {
+  type TraceAnalyticsMetadataColumns,
+  traceAnalyticsMetadataColumns,
+} from "../../rules/trace-widget-columns.rules.ts";
+import {
   TraceAnalyticsProjectionRepository,
   type TraceAnalyticsProjectionRead,
 } from "../trace-analytics-projection.repository.ts";
@@ -33,6 +37,9 @@ const READ_BACK_FOLD_INSERT_SETTINGS = {
   async_insert: 1,
   wait_for_async_insert: 1,
   input_format_skip_unknown_fields: 0,
+  // Goose 00126's metadata columns stay MATERIALIZED for older writers until the contract step;
+  // the fold writes them itself, which takes this and a named column list (analytics ADR-006).
+  insert_allow_materialized_columns: 1,
 } as const;
 
 /**
@@ -40,7 +47,7 @@ const READ_BACK_FOLD_INSERT_SETTINGS = {
  * 00039). 64-bit-integer columns are serialised as strings in JSONEachRow
  * (JSON numbers can't round-trip past 2^53); other types stay unstringified.
  */
-interface ClickHouseTraceAnalyticsWriteRecord {
+type ClickHouseTraceAnalyticsWriteRecord = {
   TenantId: string;
   TraceId: string;
   Version: string;
@@ -77,26 +84,37 @@ interface ClickHouseTraceAnalyticsWriteRecord {
 
   Attributes: Record<string, string>;
 
-  // ── Read-back state (ADR-066, migration 00056) ─────────────────────────
-  SpanCount: number;
-  AnnotationIds: string[];
-  // UInt64 epoch-ms columns ride as strings, like TotalDurationMs — exact
-  // integer round-trip, TZ-immune (the fold compares these numerically).
-  RootSpanStartTimeMs: string;
-  TraceNameFromFallback: boolean;
-  RootMetadataFromFallback: boolean;
-  TraceNameUserOverridden: boolean;
-  LastEventOccurredAt: string;
+  // ── The stock widgets' metadata columns (migrations 00126, 00128) ──────
+} & TraceAnalyticsMetadataColumns & {
+    // ── Read-back state (ADR-066, migration 00056) ─────────────────────────
+    SpanCount: number;
+    AnnotationIds: string[];
+    // UInt64 epoch-ms columns ride as strings, like TotalDurationMs — exact
+    // integer round-trip, TZ-immune (the fold compares these numerically).
+    RootSpanStartTimeMs: string;
+    TraceNameFromFallback: boolean;
+    RootMetadataFromFallback: boolean;
+    TraceNameUserOverridden: boolean;
+    LastEventOccurredAt: string;
 
-  // ── Span timing baseline (ADR-071 step 3, migration 00061) ─────────────
-  // The earliest span start, split out of OccurredAt when that column became
-  // the frozen storage anchor. Same string-carried UInt64 treatment.
-  EarliestSpanStartMs: string;
+    // ── Span timing baseline (ADR-071 step 3, migration 00061) ─────────────
+    // The earliest span start, split out of OccurredAt when that column became
+    // the frozen storage anchor. Same string-carried UInt64 treatment.
+    EarliestSpanStartMs: string;
 
-  // ── Durable dedup watermark (ADR-066, migration 00056) ─────────────────
-  AppliedEventIds: string[];
+    // ── Durable dedup watermark (ADR-066, migration 00056) ─────────────────
+    AppliedEventIds: string[];
 
-  _retention_days: number;
+    _retention_days: number;
+  };
+
+/** Every column the fold writes, named: ClickHouse takes a MATERIALIZED column only when listed. */
+function writeColumns(
+  records: readonly ClickHouseTraceAnalyticsWriteRecord[],
+): [string, ...string[]] {
+  const [first] = records;
+  if (!first) throw new Error("trace_analytics insert with no rows");
+  return Object.keys(first) as [string, ...string[]];
 }
 
 export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjectionRepository {
@@ -137,15 +155,13 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
 
     try {
       const client = await this.options.resolveClient(row.tenantId);
+      const values = [
+        TraceAnalyticsClickHouseRepository.toClickHouseRecord(row, retentionDays, appliedEventIds),
+      ];
       await client.insert({
         table: TABLE_NAME,
-        values: [
-          TraceAnalyticsClickHouseRepository.toClickHouseRecord(
-            row,
-            retentionDays,
-            appliedEventIds,
-          ),
-        ],
+        values,
+        columns: writeColumns(values),
         format: "JSONEachRow",
         clickhouse_settings: READ_BACK_FOLD_INSERT_SETTINGS,
       });
@@ -186,15 +202,13 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
 
     try {
       const client = await this.options.resolveClient(tenantId);
+      const values = entries.map(({ row, retentionDays, appliedEventIds }) =>
+        TraceAnalyticsClickHouseRepository.toClickHouseRecord(row, retentionDays, appliedEventIds),
+      );
       await client.insert({
         table: TABLE_NAME,
-        values: entries.map(({ row, retentionDays, appliedEventIds }) =>
-          TraceAnalyticsClickHouseRepository.toClickHouseRecord(
-            row,
-            retentionDays,
-            appliedEventIds,
-          ),
-        ),
+        values,
+        columns: writeColumns(values),
         format: "JSONEachRow",
         clickhouse_settings: READ_BACK_FOLD_INSERT_SETTINGS,
       });
@@ -451,6 +465,7 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
       HasAnnotation: row.hasAnnotation,
 
       Attributes: row.attributes,
+      ...row.metadataColumns,
 
       SpanCount: Math.max(0, Math.round(row.spanCount)),
       AnnotationIds: row.annotationIds,
@@ -526,6 +541,10 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
           : Boolean(record.HasAnnotation),
 
       attributes: TraceAnalyticsClickHouseRepository.asStringMap(record.Attributes),
+      // Not read back: the fold re-derives them from the map on its next write.
+      metadataColumns: traceAnalyticsMetadataColumns(
+        TraceAnalyticsClickHouseRepository.asStringMap(record.Attributes),
+      ),
 
       // Derived, not read — there is no HasSignal column. Mirrors
       // analytics' has-signal predicate door for door, including the version

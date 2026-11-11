@@ -19,7 +19,8 @@ describe("given the Where my agent breaks widgets", () => {
   it("splits errored traces by type or first failing step, with the rate and changes", () => {
     const { code, sql } = buildOf("up-errors");
     expect(sql.types).toContain("StatusCode = 2");
-    expect(sql.types).toContain("SpanAttributes['exception.type']");
+    expect(sql.types).toContain("coalesce(nullIf(ErrorType, ''), SpanName)");
+    expect(sql.types).not.toContain("SpanAttributes");
     expect(sql.types).toContain("argMin(");
     expect(sql.rate).toContain("countIf(HasError) / count()");
     expect(sql.changes).toContain("FROM prompt_versions");
@@ -32,7 +33,11 @@ describe("given the Where my agent breaks widgets", () => {
   it("counts a failure as recovered when the span above it did not fail", () => {
     const { code, sql } = buildOf("up-where-fails");
     expect(sql.main).toContain("p.SpanId = c.ParentSpanId");
-    expect(sql.main).toContain("c.StatusCode = 2 AND p.StatusCode != 2 AS recovered");
+    expect(sql.main).toContain(
+      "c.StatusCode = 2 AND ifNull(p.found, 0) = 1 AND p.StatusCode != 2 AS recovered",
+    );
+    // Only failed calls look their parent up, so the joined side never holds every span.
+    expect(sql.main).toContain("AND StatusCode = 2\n      )\n  ) AS p");
     expect(sql.main).toContain("ORDER BY failures - recovered DESC");
     expect(sql.main).not.toContain("'tool'");
     expect(code).toContain("reached the user");
@@ -42,12 +47,12 @@ describe("given the Where my agent breaks widgets", () => {
   it("counts a top-level span with no children as a step whose failure reached the user", () => {
     const { sql } = buildOf("up-where-fails");
     expect(sql.main).toContain("UNION ALL");
-    expect(sql.main).toContain("LEFT ANTI JOIN (");
-    expect(sql.main).toContain("ON k.TraceId = r.TraceId AND k.ParentSpanId = r.SpanId");
-    expect(sql.main).not.toContain("NOT IN");
+    // Checked against the parent ids of top-level spans only, a set far smaller than all spans.
+    expect(sql.main).toContain("AND (TraceId, SpanId) NOT IN (");
+    expect(sql.main).toContain("AND (TraceId, ifNull(ParentSpanId, '')) IN (");
     expect(sql.main).toContain("StatusCode = 2 AS failed, false AS recovered");
     expect(buildOf("tools-error-rate").sql.main).toContain(
-      "AND r.ParentSpanId IS NULL\n    AND r.SpanAttributes['langwatch.span.type'] = 'tool'",
+      "AND ParentSpanId IS NULL\n    AND SpanType = 'tool'",
     );
   });
 
@@ -64,7 +69,7 @@ describe("given the Where my agent breaks widgets", () => {
   /** @scenario "AC62 Where my agent breaks: loops and retries are read from repeated spans" */
   it("finds loops by tool and input, retries by a later sibling after a failure", () => {
     const { code, sql } = buildOf("up-loops");
-    expect(sql.daily).toContain("GROUP BY TraceId, SpanName, CapturedInput");
+    expect(sql.daily).toContain("GROUP BY TraceId, SpanName, InputHash");
     expect(sql.daily).toContain("HAVING count() >= 3");
     expect(sql.daily).toContain("max(StartTime) > minIf(StartTime, StatusCode = 2)");
     expect(sql.daily).toContain("GROUP BY TraceId, ParentSpanId");
@@ -78,7 +83,8 @@ describe("given the Where my agent breaks widgets", () => {
   /** @scenario "AC63 Where my agent breaks: tool error rate says how many tool errors the agent recovered" */
   it("reads tool spans only and shows the recovered share and the worst tool", () => {
     const { code, sql } = buildOf("tools-error-rate");
-    expect(sql.main).toContain("c.SpanAttributes['langwatch.span.type'] = 'tool'");
+    expect(sql.main).toContain("AND ifNull(ParentSpanId, '') != ''\n    AND SpanType = 'tool'");
+    expect(sql.main).not.toContain("SpanAttributes");
     expect(code).toContain("Tool error rate");
     expect(code).toContain("Recovered, of ");
     expect(code).toContain("Worst tool");

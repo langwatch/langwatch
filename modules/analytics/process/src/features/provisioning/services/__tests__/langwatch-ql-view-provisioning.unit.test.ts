@@ -476,3 +476,63 @@ describe("given a view joining a project_id-keyed fact table", () => {
     });
   });
 });
+
+/** The views the stock widgets read, deduplicated in sort-key order instead of with FINAL. */
+describe("given the views pinned to latest-in-order", () => {
+  const render = (name: string) => {
+    const view = pickLwqlViewByName(name);
+    if (!view) throw new Error(`${name} is not in the catalog`);
+    return viewStatements.viewStatement({
+      names: NAMES,
+      sourceDatabase: SOURCE_DATABASE,
+      view,
+      dedup: SHIPPED_LWQL_DEDUP,
+    });
+  };
+
+  /** @scenario "The views the stock widgets read keep each row's latest version without FINAL" */
+  it.each([
+    "trace_metrics",
+    "traces",
+    "evaluations",
+    "simulations",
+    "experiment_run_results",
+    "experiment_items",
+    "simulation_trace_metrics",
+    "gateway_request_spend",
+    "span_metrics",
+  ])("renders %s newest version first, one row per sort key", (name) => {
+    const sql = render(name);
+
+    expect(sql).not.toContain("FINAL");
+    expect(sql).toMatch(/ORDER BY [^\n]+ DESC\n {2}LIMIT 1 BY /);
+    expect(sql).toContain(`\n) AS ${LWQL_SOURCE_ALIAS}`);
+  });
+
+  it("orders trace_metrics by its whole sort key and breaks a version tie on Version", () => {
+    const sql = render("trace_metrics");
+
+    expect(sql).toContain(
+      "ORDER BY `TenantId`, `OccurredAt`, `TraceId`, `UpdatedAt` DESC, `Version` DESC\n" +
+        "  LIMIT 1 BY `TenantId`, `OccurredAt`, `TraceId`",
+    );
+  });
+
+  it("keeps span_metrics' stable StartTime in its key, so a period filter prunes partitions", () => {
+    expect(render("span_metrics")).toContain(
+      "LIMIT 1 BY `TenantId`, `TraceId`, `SpanId`, `StartTime`",
+    );
+  });
+
+  it("grants the tie-break column the view reads only to pick a version", () => {
+    const view = pickLwqlViewByName("trace_metrics");
+    if (!view) throw new Error("trace_metrics is not in the catalog");
+
+    expect(viewStatements.grantedSourceColumns(view)).toContain("Version");
+  });
+
+  /** @scenario "Every other view keeps the shipped FINAL" */
+  it("keeps FINAL on a view the stock widgets do not read", () => {
+    expect(render("spans")).toContain("langwatch.stored_spans AS src FINAL");
+  });
+});

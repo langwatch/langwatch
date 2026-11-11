@@ -17,6 +17,7 @@ import {
 const COMPLEMENT_VIEWS = [
   "traces",
   "spans",
+  "span_metrics",
 ] as const satisfies readonly (typeof TRACE_VIEWS)[number][];
 
 /** The source `trace_metrics` gives a trace with a null or empty Origin (`sourceOfOrigin`). */

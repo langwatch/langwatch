@@ -20,7 +20,7 @@ export type LangWatchQLColumnUnit = (typeof LWQL_COLUMN_UNITS)[number];
  * How a view collapses its source's rows to one per logical record.
  * @see ../views.ts — how each is rendered, and the measurement that chose the default
  */
-export type LangWatchQLDedupStrategy = "in-tuple" | "final" | "none";
+export type LangWatchQLDedupStrategy = "in-tuple" | "final" | "latest-in-order" | "none";
 
 /**
  * One exposed column.
@@ -131,10 +131,25 @@ interface LangWatchQLViewDedup {
    */
   readonly versionColumn?: string;
   /**
+   * Under `latest-in-order`: columns compared after the version when two versions tie, so a
+   * replay's row (a newer `Version`) wins where `FINAL` would keep the last insert (ADR-006).
+   */
+  readonly tieBreakColumns?: readonly string[];
+  /**
+   * Under `latest-in-order`: source columns no version of a row changes, grouped beside the sort
+   * key so a caller's range on them reaches the table's partition and primary key (ADR-006).
+   */
+  readonly stableColumns?: readonly string[];
+  /**
    * Set when the source is an `AggregatingMergeTree`, whose rows for one key are
    * *summed together* rather than one superseding the others.
    */
   readonly aggregating?: boolean;
+  /**
+   * An in-tuple dataset's column that never falls from one version of a row to the next, so a
+   * read bounded below on it may dedup from that bound alone (analytics ADR-005).
+   */
+  readonly floorColumn?: string;
 }
 
 /**
@@ -366,6 +381,8 @@ export class LangWatchQLCatalogShapesService {
         ...view.columns.flatMap((column) => column.sourceColumns),
         ...view.dedup.keyColumns.map((key) => this.physicalColumn(view, key)),
         ...(view.dedup.versionColumn ? [view.dedup.versionColumn] : []),
+        ...(view.dedup.tieBreakColumns ?? []),
+        ...(view.dedup.stableColumns ?? []),
         // A column read only to filter (`where`) or to match the join (`on`, its
         // primary side) is a source column the view reads just as a projected one
         // is, and must be granted or the restricted read is denied on it.

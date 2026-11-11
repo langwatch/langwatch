@@ -1,7 +1,7 @@
 /**
- * The LangWatchQL behind the Answer quality and What users ask widgets. A conversation's
- * outcome is the one the app sends as `metadata.outcome`, else the outcome judge's label on
- * the trace it judged; a topic is the clustered topic, else the app's `metadata.topic`.
+ * The LangWatchQL behind the Answer quality and What users ask widgets. An outcome is the app's
+ * `metadata.outcome`, else the outcome judge's label; a topic is the clustered topic, else the
+ * app's `metadata.topic`. No query reads a map (analytics ADR-004).
  */
 
 import {
@@ -18,38 +18,82 @@ export const OUTCOME_JUDGE = "Conversation Outcome Judge";
 
 type Window = (column: string) => string;
 
-const APP_OUTCOME = "t.Attributes['metadata.outcome']";
+/**
+ * The outcome judge's latest label per trace, with its free text `withReason`. Only the
+ * widgets that show a reason open `evaluations`, the one view that carries that text.
+ */
+const judgeVerdicts = ({ window, withReason }: { window: Window; withReason: boolean }) =>
+  withReason
+    ? `SELECT TraceId,
+        argMax(Label, ScheduledAt) AS label,
+        argMax(Details, ScheduledAt) AS reason
+      FROM evaluations
+      WHERE ${window("ScheduledAt")}
+        AND EvaluatorName = '${OUTCOME_JUDGE}'
+        AND ArchivedAt IS NULL
+      GROUP BY TraceId`
+    : `SELECT TraceId, argMax(Label, OccurredAt) AS label
+      FROM evaluation_metrics
+      WHERE ${window("OccurredAt")}
+        AND EvaluatorName = '${OUTCOME_JUDGE}'
+      GROUP BY TraceId`;
 
 /**
- * Every trace in the window with its topic and, on the trace that closed a conversation,
- * its outcome and reason; `outcome` is empty on every other trace.
+ * Every trace in the window that closed a conversation, once, with its topic, its outcome and,
+ * `withReason`, its reason. A sent outcome wins over the judge's. Only closed traces are grouped:
+ * the trace rows stream past the judge's verdicts (analytics ADR-004).
  */
-function tracesWithOutcome({ window }: { window: Window }): string {
+function tracesWithOutcome({
+  window,
+  withReason = false,
+}: {
+  window: Window;
+  withReason?: boolean;
+}): string {
+  const judgeReason = withReason ? ", ifNull(j.reason, '') AS reason" : "";
+  const sentReason = withReason ? ", MetadataOutcomeReason AS reason" : "";
   return `(
-  SELECT t.TraceId AS trace_id,
-    t.OccurredAt AS at,
-    coalesce(nullIf(p.TopicName, ''), nullIf(t.Attributes['metadata.topic'], '')) AS topic,
-    if(${APP_OUTCOME} != '', ${APP_OUTCOME}, ifNull(j.label, '')) AS outcome,
-    if(${APP_OUTCOME} != '', t.Attributes['metadata.outcome_reason'], ifNull(j.reason, ''))
-      AS reason
-  FROM traces AS t
-  LEFT JOIN (
-    SELECT TraceId,
-      argMax(Label, ScheduledAt) AS label,
-      argMax(Details, ScheduledAt) AS reason
-    FROM evaluations
-    WHERE ${window("ScheduledAt")}
-      AND EvaluatorName = '${OUTCOME_JUDGE}'
-      AND ArchivedAt IS NULL
-    GROUP BY TraceId
-  ) AS j ON j.TraceId = t.TraceId
-  LEFT JOIN topics AS p ON p.TopicId = t.TopicId
-  WHERE ${window("t.OccurredAt")}
+  SELECT c.trace_id AS trace_id,
+    c.at AS at,
+    coalesce(nullIf(p.TopicName, ''), nullIf(c.meta_topic, '')) AS topic,
+    c.outcome AS outcome${withReason ? ",\n    c.reason AS reason" : ""}
+  FROM (
+    SELECT trace_id,
+      min(row_at) AS at,
+      argMin(topic_id, row_at) AS topic_id,
+      argMin(meta_topic, row_at) AS meta_topic,
+      argMax(outcome, sent) AS outcome${withReason ? ",\n      argMax(reason, sent) AS reason" : ""}
+    FROM (
+      SELECT t.TraceId AS trace_id, t.OccurredAt AS row_at, t.topic_id AS topic_id,
+        t.MetadataTopic AS meta_topic, ifNull(j.label, '') AS outcome${judgeReason}, 0 AS sent
+      FROM (
+        SELECT TraceId, OccurredAt, ifNull(TopicId, '') AS topic_id, MetadataTopic
+        FROM trace_metrics
+        WHERE ${window("OccurredAt")}
+      ) AS t
+      INNER JOIN (
+        ${judgeVerdicts({ window, withReason })}
+      ) AS j ON j.TraceId = t.TraceId
+      UNION ALL
+      SELECT TraceId AS trace_id, OccurredAt AS row_at, ifNull(TopicId, '') AS topic_id,
+        MetadataTopic AS meta_topic, MetadataOutcome AS outcome${sentReason}, 1 AS sent
+      FROM trace_metrics
+      WHERE ${window("OccurredAt")}
+        AND MetadataOutcome != ''
+    )
+    GROUP BY trace_id
+  ) AS c
+  LEFT JOIN topics AS p ON p.TopicId = c.topic_id
 )`;
 }
 
 const IN_PERIOD = tracesWithOutcome({ window: inPeriod });
+const IN_PERIOD_WITH_REASON = tracesWithOutcome({ window: inPeriod, withReason: true });
 const WITH_PREVIOUS = tracesWithOutcome({ window: inPeriodAndPrevious });
+const WITH_PREVIOUS_AND_REASON = tracesWithOutcome({
+  window: inPeriodAndPrevious,
+  withReason: true,
+});
 
 export const OUTCOME_TREND_SQL = `SELECT ${bucketOf("at")} AS bucket,
   count() AS closed,
@@ -72,7 +116,7 @@ export const OUTCOME_REASONS_SQL = `SELECT reason,
   any(outcome) AS kind,
   countIf(at >= ${START}) AS in_period,
   countIf(at < ${START}) AS in_previous
-FROM ${WITH_PREVIOUS}
+FROM ${WITH_PREVIOUS_AND_REASON}
 WHERE outcome NOT IN ('', 'resolved')
   AND reason != ''
 GROUP BY reason
@@ -152,8 +196,9 @@ HAVING min(Passed) = 1
 ORDER BY modulo(toUnixTimestamp(min(ScheduledAt)), 997)
 LIMIT 1`;
 
-const RAG_SPAN = "SpanAttributes['langwatch.span.type'] = 'rag'";
-const NOTHING_FOUND = `${RAG_SPAN} AND JSONLength(SpanAttributes['langwatch.rag.contexts']) = 0`;
+// Typed span columns, never the SpanAttributes map, which runs out of memory on large projects.
+const RAG_SPAN = "SpanType = 'rag'";
+const NOTHING_FOUND = `${RAG_SPAN} AND RagContextCount = 0`;
 
 /** One row per trace that searched: whether a search came back empty and whether it errored. */
 const SEARCHES = `(
@@ -162,7 +207,7 @@ const SEARCHES = `(
     max(${RAG_SPAN}) AS searched,
     max(${NOTHING_FOUND}) AS found_nothing,
     max(StatusCode = 2) AS errored
-  FROM spans
+  FROM span_metrics
   WHERE ${inPeriod("StartTime")}
   GROUP BY trace_id
   HAVING searched = 1
@@ -197,7 +242,7 @@ ORDER BY bucket`;
 export const CANNOT_SERVE_SQL = `SELECT topic,
   count() AS requests,
   topK(1)(reason)[1] AS reason
-FROM ${IN_PERIOD}
+FROM ${IN_PERIOD_WITH_REASON}
 WHERE outcome = 'capability_gap'
 GROUP BY topic
 ORDER BY requests DESC
@@ -232,26 +277,46 @@ WHERE ${inPeriod("t.OccurredAt")}
 GROUP BY bucket, topic
 ORDER BY bucket`;
 
-/** Checks exclude guardrails and the outcome judge: they say whether an answer was safe. */
-export const TOPIC_QUALITY_SQL = `SELECT c.topic AS topic,
-  count() AS requests,
-  countIf(c.outcome != '') AS closed,
-  countIf(c.outcome = 'resolved') AS resolved,
-  countIf(c.outcome = 'capability_gap') AS cannot,
-  sum(ifNull(e.passed, 0)) AS checks_passed,
-  sum(ifNull(e.runs, 0)) AS checks_run
-FROM ${IN_PERIOD} AS c
+/**
+ * Checks exclude guardrails and the outcome judge: they say whether an answer was safe. Requests
+ * and checks count trace rows; outcomes come from the closed traces alone.
+ */
+export const TOPIC_QUALITY_SQL = `SELECT r.topic AS topic,
+  r.requests AS requests,
+  ifNull(c.closed, 0) AS closed,
+  ifNull(c.resolved, 0) AS resolved,
+  ifNull(c.cannot, 0) AS cannot,
+  r.checks_passed AS checks_passed,
+  r.checks_run AS checks_run
+FROM (
+  SELECT ${TOPIC} AS topic,
+    count() AS requests,
+    sum(ifNull(e.passed, 0)) AS checks_passed,
+    sum(ifNull(e.runs, 0)) AS checks_run
+  FROM trace_metrics AS t
+  LEFT JOIN topics AS p ON p.TopicId = t.TopicId
+  LEFT JOIN (
+    SELECT TraceId, countIf(Passed = 1) AS passed, count() AS runs
+    FROM evaluation_metrics
+    WHERE ${inPeriod("OccurredAt")}
+      AND Passed IS NOT NULL
+      AND IsGuardrail = 0
+      AND EvaluatorName != '${OUTCOME_JUDGE}'
+    GROUP BY TraceId
+  ) AS e ON e.TraceId = t.TraceId
+  WHERE ${inPeriod("t.OccurredAt")}
+    AND topic IS NOT NULL
+  GROUP BY topic
+) AS r
 LEFT JOIN (
-  SELECT TraceId, countIf(Passed = 1) AS passed, count() AS runs
-  FROM evaluation_metrics
-  WHERE ${inPeriod("OccurredAt")}
-    AND Passed IS NOT NULL
-    AND IsGuardrail = 0
-    AND EvaluatorName != '${OUTCOME_JUDGE}'
-  GROUP BY TraceId
-) AS e ON e.TraceId = c.trace_id
-WHERE c.topic IS NOT NULL
-GROUP BY topic
+  SELECT topic,
+    countIf(outcome != '') AS closed,
+    countIf(outcome = 'resolved') AS resolved,
+    countIf(outcome = 'capability_gap') AS cannot
+  FROM ${IN_PERIOD}
+  WHERE topic IS NOT NULL
+  GROUP BY topic
+) AS c ON c.topic = r.topic
 ORDER BY requests DESC
 LIMIT 6`;
 

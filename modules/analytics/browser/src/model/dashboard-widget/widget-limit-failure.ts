@@ -4,6 +4,7 @@
  */
 
 import type { ChartQueryError } from "@langwatch/analytics-contract/chart-frame-protocol";
+import { DEFAULT_LWQL_RESOURCE_LIMITS } from "@langwatch/analytics-contract/langwatch-ql-limits";
 
 /** Who reads the card, which decides whether the limit is theirs to fix. */
 export type WidgetLimitAudience =
@@ -27,17 +28,23 @@ export interface WidgetLimitWords {
   readonly shortNote?: string;
 }
 
-const BUILT_IN_MESSAGE =
-  "This widget hit a LangWatch limit in the selected period. This is not a problem with your data.";
+const NOT_YOUR_DATA = "This is not a problem with your data.";
+const TIME_LIMIT_SECONDS = DEFAULT_LWQL_RESOURCE_LIMITS.maxExecutionTimeSeconds;
+const TOOK_TOO_LONG = `This query took longer than ${TIME_LIMIT_SECONDS} s, the most a widget may take.`;
+
+const BUILT_IN_MESSAGE: Readonly<Record<string, string>> = {
+  query_memory_exceeded: `This widget hit a LangWatch limit in the selected period. ${NOT_YOUR_DATA}`,
+  query_timeout: `${TOOK_TOO_LONG} ${NOT_YOUR_DATA}`,
+};
 
 const SHORT_MESSAGE: Readonly<Record<string, string>> = {
   query_memory_exceeded: "Hit the memory limit.",
-  query_timeout: "Hit the time limit.",
+  query_timeout: `Took longer than ${TIME_LIMIT_SECONDS} s.`,
 };
 
 const EDITABLE_MESSAGE: Readonly<Record<string, string>> = {
   query_memory_exceeded: "The query used more memory than a widget may use.",
-  query_timeout: "The query ran past the time a widget may take.",
+  query_timeout: TOOK_TOO_LONG,
 };
 
 /** Whether `code` is one of the two resource limits that have their own words. */
@@ -55,7 +62,7 @@ export function widgetLimitWords({
 }): WidgetLimitWords | null {
   if (!audience || !isWidgetLimitFailure(code)) return null;
   const editable = EDITABLE_MESSAGE[code] as string;
-  if (audience.kind === "built_in") return { message: BUILT_IN_MESSAGE };
+  if (audience.kind === "built_in") return { message: BUILT_IN_MESSAGE[code] as string };
   const shortMessage = Object.hasOwn(SHORT_MESSAGE, code) ? SHORT_MESSAGE[code] : undefined;
   const canEdit = audience.onEditWithLangy !== undefined || audience.onEditCode !== undefined;
   return canEdit

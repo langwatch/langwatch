@@ -136,6 +136,14 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     envVar: "CLICKHOUSE_COLD_STORAGE_SPANS_TTL_DAYS",
     hardcodedDefault: 49,
   },
+  // The span widgets' typed facts (goose 00128): aged on the span's start, like stored_spans.
+  {
+    table: "span_analytics",
+    ttlColumn: "StartTime",
+    retentionTTLColumn: "StartTime",
+    envVar: "CLICKHOUSE_COLD_STORAGE_SPAN_ANALYTICS_TTL_DAYS",
+    hardcodedDefault: 49,
+  },
   {
     table: "trace_summaries",
     ttlColumn: "OccurredAt",

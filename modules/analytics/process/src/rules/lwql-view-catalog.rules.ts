@@ -55,7 +55,14 @@ const TRACES: UngatedViewDefinition = {
   joinKeys: ["TenantId", "TraceId"],
   timeColumn: "OccurredAt",
   freshness: PROJECTION_FRESHNESS,
-  dedup: { keyColumns: ["TenantId", "TraceId"], versionColumn: "UpdatedAt" },
+  // Not grouped on `OccurredAt`: a row folded before the anchor froze (ADR-071) may have moved
+  // it, and the view keeps one row per trace (analytics ADR-006).
+  dedup: {
+    keyColumns: ["TenantId", "TraceId"],
+    versionColumn: "UpdatedAt",
+    strategy: "latest-in-order",
+    tieBreakColumns: ["Version"],
+  },
   columns: [
     {
       name: "TenantId",
@@ -408,6 +415,142 @@ const SPANS: UngatedViewDefinition = {
   ],
 };
 
+/**
+ * Span metrics: one row per span, the span facts the stock widgets read and no map, written by
+ * the trace module's spanAnalytics projection (analytics ADR-006). History from the replay's floor.
+ */
+const SPAN_METRICS: UngatedViewDefinition = {
+  name: "span_metrics",
+  sourceTable: "span_analytics",
+  description:
+    "One row per span with its timing, status, cost and the LangWatch facts dashboards group by, and no attribute map. Holds spans from the span_analytics floor on.",
+  grain: "one row per (TenantId, TraceId, SpanId), latest version only",
+  joinKeys: ["TenantId", "TraceId", "SpanId"],
+  timeColumn: "StartTime",
+  freshness: PROJECTION_FRESHNESS,
+  // A span's StartTime comes from the span itself and never changes, so it is grouped beside the
+  // key and a period filter prunes partitions.
+  dedup: {
+    keyColumns: ["TenantId", "TraceId", "SpanId"],
+    versionColumn: "ProjectedAt",
+    strategy: "latest-in-order",
+    stableColumns: ["StartTime"],
+  },
+  columns: [
+    {
+      name: "TenantId",
+      type: "String",
+      description: "Project the span belongs to.",
+      sourceColumns: ["TenantId"],
+    },
+    {
+      name: "TraceId",
+      type: "String",
+      description: "Trace the span belongs to.",
+      sourceColumns: ["TraceId"],
+    },
+    {
+      name: "SpanId",
+      type: "String",
+      description: "Span identifier, unique within the trace.",
+      sourceColumns: ["SpanId"],
+    },
+    {
+      name: "ParentSpanId",
+      type: "Nullable(String)",
+      description: "Parent span, null for the root span.",
+      sourceColumns: ["ParentSpanId"],
+      nullIsValue: true,
+    },
+    {
+      name: "StartTime",
+      type: "DateTime64(3)",
+      description: "When the span started. Filter on this to prune partitions.",
+      sourceColumns: ["StartTime"],
+    },
+    {
+      name: "EndTime",
+      type: "DateTime64(3)",
+      description: "When the span ended.",
+      sourceColumns: ["EndTime"],
+    },
+    {
+      name: "DurationMs",
+      type: "UInt64",
+      unit: "ms",
+      description: "Span duration in milliseconds.",
+      sourceColumns: ["DurationMs"],
+    },
+    {
+      name: "SpanName",
+      type: "LowCardinality(String)",
+      description: "Operation name of the span.",
+      sourceColumns: ["SpanName"],
+    },
+    {
+      name: "SpanKind",
+      type: "UInt8",
+      description: "OpenTelemetry span kind.",
+      sourceColumns: ["SpanKind"],
+    },
+    {
+      name: "StatusCode",
+      type: "Nullable(UInt8)",
+      description: "OpenTelemetry status code.",
+      sourceColumns: ["StatusCode"],
+    },
+    {
+      name: "Cost",
+      type: "Nullable(Float64)",
+      unit: "USD",
+      description: "Billed cost attributed to the span, in USD.",
+      sourceColumns: ["Cost"],
+    },
+    {
+      name: "NonBilledCost",
+      type: "Nullable(Float64)",
+      unit: "USD",
+      description: "Cost attributed to the span that is not billed, in USD.",
+      sourceColumns: ["NonBilledCost"],
+    },
+    {
+      name: "SpanType",
+      type: "LowCardinality(String)",
+      description:
+        "LangWatch's kind of span, such as llm, tool or rag, from langwatch.span.type. Empty when the span sent none.",
+      sourceColumns: ["SpanType"],
+    },
+    {
+      name: "ErrorType",
+      type: "String",
+      description:
+        "The type of error the span recorded, from exception.type, else error.type. Empty when it recorded neither.",
+      sourceColumns: ["ErrorType"],
+    },
+    {
+      name: "RagContextCount",
+      type: "UInt32",
+      description:
+        "How many contexts a retrieval span returned, the length of langwatch.rag.contexts. 0 when it returned none or sent no list.",
+      sourceColumns: ["RagContextCount"],
+    },
+    {
+      name: "InputHash",
+      type: "UInt64",
+      description:
+        "A hash of the span's captured input: equal inputs share it, 0 when it sent none. Reveals no text, but tells equal inputs apart, so it is gated like captured input.",
+      sourceColumns: ["InputHash"],
+    },
+    {
+      name: "DeploymentEnvironment",
+      type: "String",
+      description:
+        "The environment the span's service ran in, from the resource's deployment.environment, else deployment.environment.name. Empty when it sent neither.",
+      sourceColumns: ["DeploymentEnvironment"],
+    },
+  ],
+};
+
 /** Evaluations: one row per evaluation run. */
 const EVALUATIONS: UngatedViewDefinition = {
   name: "evaluations",
@@ -420,6 +563,8 @@ const EVALUATIONS: UngatedViewDefinition = {
   dedup: {
     keyColumns: ["TenantId", "EvaluationId"],
     versionColumn: "UpdatedAt",
+    strategy: "latest-in-order",
+    tieBreakColumns: ["Version"],
   },
   columns: [
     {
@@ -546,6 +691,8 @@ const SIMULATIONS: UngatedViewDefinition = {
   dedup: {
     keyColumns: ["TenantId", "ScenarioRunId"],
     versionColumn: "UpdatedAt",
+    strategy: "latest-in-order",
+    tieBreakColumns: ["Version"],
   },
   columns: [
     {
@@ -698,6 +845,8 @@ const TRACE_METRICS: UngatedViewDefinition = {
   dedup: {
     keyColumns: ["TenantId", "OccurredAt", "TraceId"],
     versionColumn: "UpdatedAt",
+    strategy: "latest-in-order",
+    tieBreakColumns: ["Version"],
   },
   columns: [
     {
@@ -943,6 +1092,28 @@ const TRACE_METRICS: UngatedViewDefinition = {
       description:
         "The topic the application gave the trace, from the trace's metadata.topic. Empty when the trace sent none.",
       sourceColumns: ["MetadataTopic"],
+    },
+    // Three more keys the stock widgets read (goose 00128), so no stock widget opens a map.
+    {
+      name: "MetadataOutcomeReason",
+      type: "String",
+      description:
+        "Why the conversation ended as it did, from the trace's metadata.outcome_reason. Empty when the trace sent none.",
+      sourceColumns: ["MetadataOutcomeReason"],
+    },
+    {
+      name: "MetadataPromptVersion",
+      type: "String",
+      description:
+        "The prompt or configuration version the application names, from the trace's metadata.prompt_version. Empty when the trace sent none.",
+      sourceColumns: ["MetadataPromptVersion"],
+    },
+    {
+      name: "MetadataEnvironment",
+      type: "String",
+      description:
+        "The environment the application ran in, from the trace's metadata.environment, else metadata.env. Empty when the trace sent neither.",
+      sourceColumns: ["MetadataEnvironment"],
     },
     // `HasAnnotation`, `EarliestSpanStartMs` and `Attributes` are withheld: the first would answer
     // "annotated?" two ways against the authoritative `annotations` table, the second is fold
@@ -1210,6 +1381,8 @@ const EVALUATION_METRICS: UngatedViewDefinition = {
     strategy: "in-tuple",
     keyColumns: ["TenantId", "OccurredAt", "EvaluationId"],
     versionColumn: "UpdatedAt",
+    // The fold writes OccurredAt as the running max of its events' times.
+    floorColumn: "OccurredAt",
   },
   columns: [
     {
@@ -2699,6 +2872,9 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
       MetadataSegment: "inherit",
       MetadataTeam: "inherit",
       MetadataTopic: "inherit",
+      MetadataOutcomeReason: "inherit",
+      MetadataPromptVersion: "inherit",
+      MetadataEnvironment: "inherit",
     },
   }),
   trace_metrics_by_minute: defineTableCatalogue({
@@ -3084,6 +3260,31 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
       UpdatedAt: "inherit",
       _retention_days: "inherit",
       _size_bytes: "inherit",
+    },
+  }),
+  span_metrics: defineTableCatalogue({
+    sourceTable: "span_analytics",
+    access: { allOf: ["analytics:view", "traces:view"] },
+    columns: {
+      TenantId: "inherit",
+      TraceId: "inherit",
+      SpanId: "inherit",
+      ParentSpanId: "inherit",
+      StartTime: "inherit",
+      EndTime: "inherit",
+      DurationMs: "inherit",
+      SpanName: "inherit",
+      SpanKind: "inherit",
+      StatusCode: "inherit",
+      Cost: { access: { allOf: ["cost:view"] } },
+      NonBilledCost: { access: { allOf: ["cost:view"] } },
+      SpanType: "inherit",
+      ErrorType: "inherit",
+      RagContextCount: "inherit",
+      InputHash: { content: "input" },
+      DeploymentEnvironment: "inherit",
+      ProjectedAt: "omit",
+      _retention_days: "omit",
     },
   }),
   experiment_items: defineTableCatalogue({
@@ -3782,6 +3983,7 @@ function clickhouseView(view: string, joinKeys?: readonly string[]): LangWatchQL
 export const LWQL_VIEW_CATALOG: readonly LangWatchQLViewDefinition[] = [
   handWrittenView(TRACES),
   handWrittenView(SPANS),
+  handWrittenView(SPAN_METRICS),
   handWrittenView(EVALUATIONS),
   handWrittenView(SIMULATIONS),
   handWrittenView(TRACE_METRICS),

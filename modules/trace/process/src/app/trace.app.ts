@@ -72,6 +72,7 @@ import {
   type TracesSessionsPage,
   type SharedTraceDto,
   type Span,
+  type SpanAnalyticsFloor,
   type SpanDetail,
   type SpanLangwatchSignals,
   type SpanResourceInfo,
@@ -339,6 +340,7 @@ import {
   type TraceClickHouseResolver,
 } from "../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import { ClickHouseTraceFullRecordRepository } from "../repositories/clickhouse/trace-full-record.repository.ts";
+import type { SpanAnalyticsFloorRepository } from "../repositories/span-analytics-floor.repository.ts";
 import type { StoredTraceSpan } from "../repositories/span-storage.repository.ts";
 import type { TraceAttributeSpendRepository } from "../repositories/trace-attribute-spend.repository.ts";
 import type { TraceAttributedRollupRepository } from "../repositories/trace-attributed-rollup.repository.ts";
@@ -366,6 +368,7 @@ import {
 import { generateAsciiTree } from "../rules/trace-formatting.rules.ts";
 import { tracePath, tracePlatformUrl } from "../rules/trace-platform-url.rules.ts";
 import { formatSpansDigest, formatSpansDigestBounded } from "../rules/trace-readable-span.rules.ts";
+import { spanAnalyticsFloorOf } from "../rules/trace-widget-columns.rules.ts";
 import { buildTrackedEventSpan } from "../rules/tracked-event-span.rules.ts";
 import { PreconditionTraceDataService } from "../services/precondition-trace-data.service.ts";
 import { ScenarioRoleMetricsDerivationService } from "../services/scenario-role-metrics-derivation.service.ts";
@@ -972,6 +975,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     app.#attributeSpend = setup.repositories.attributeSpend;
     app.#attributedRollup = setup.repositories.attributedRollup;
     app.#usageCount = setup.repositories.usageCount;
+    app.#spanAnalyticsFloor = setup.repositories.spanAnalyticsFloor;
     app.#preconditionSamples = TracePreconditionSampleService.create({
       traces: app,
       evaluators: setup.dependencies.evaluators,
@@ -1321,6 +1325,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   #attributeSpend: TraceAttributeSpendRepository | null = null;
   #attributedRollup: TraceAttributedRollupRepository | null = null;
   #usageCount: TraceUsageCountRepository | null = null;
+  #spanAnalyticsFloor: SpanAnalyticsFloorRepository | null = null;
   #preconditionSamples: TracePreconditionSampleService | null = null;
 
   readPreconditionSampleTraces(
@@ -1610,6 +1615,11 @@ export class TraceModule implements TraceApi, CollectorApp {
     if (input.side === "input") return JSON.stringify(messages.input);
     if (input.side === "output") return JSON.stringify(messages.output);
     return JSON.stringify(messages);
+  }
+
+  async getSpanAnalyticsFloor(): Promise<SpanAnalyticsFloor> {
+    if (!this.#spanAnalyticsFloor) return { from: null };
+    return spanAnalyticsFloorOf(await this.#spanAnalyticsFloor.findReplayStep());
   }
 
   async renderSpanMessages(input: {

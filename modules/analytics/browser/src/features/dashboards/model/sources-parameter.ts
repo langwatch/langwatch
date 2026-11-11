@@ -15,7 +15,13 @@ export const PRESENCE_QUERY = "present";
 export const SOURCE_VIEWS = ["trace_metrics", "evaluation_metrics"] as const;
 
 /** Views keyed by the trace that carries the origin, reached through `trace_metrics`. */
-export const TRACE_VIEWS = ["traces", "spans", "evaluations", "annotations"] as const;
+export const TRACE_VIEWS = [
+  "traces",
+  "spans",
+  "span_metrics",
+  "evaluations",
+  "annotations",
+] as const;
 
 /** Views that keep an origin, or reach one through their trace. */
 export const VIEWS_WITH_ORIGIN: readonly string[] = [...SOURCE_VIEWS, ...TRACE_VIEWS];

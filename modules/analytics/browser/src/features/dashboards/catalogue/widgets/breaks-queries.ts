@@ -6,45 +6,49 @@
 
 import { bucketOf, END, inPeriod, MIDPOINT, START } from "../../templates/model/lwql-period.ts";
 
-const SPAN_TYPE = "SpanAttributes['langwatch.span.type']";
+// Typed span columns, never the SpanAttributes map, which runs out of memory on large projects.
+const SPAN_TYPE = "SpanType";
 
 /** The evaluator that fails a task whose first tool was the wrong one. */
 export const WRONG_TOOL_JUDGE = "Tool choice";
 
 /**
- * Calls, failures and recovered failures per step. A failure is recovered when the span above
- * it still ended without an error. A top-level span with nothing below it (a trace of one span,
- * or of flat spans) is a step too, and its failure always reached the user.
+ * Calls, failures and failures recovered by the span above; a lone top-level span is a step whose
+ * failure reached the user. Steps are counted in one pass; only failed calls look their parent
+ * up, as the hashed side; an unstored parent's call counts, not recovered (analytics ADR-004).
  */
 function stepFailuresSql({ toolsOnly, limit }: { toolsOnly: boolean; limit: number }): string {
-  const tools = (column: string) => (toolsOnly ? `\n    AND ${column} = 'tool'` : "");
+  const tools = toolsOnly ? `\n      AND ${SPAN_TYPE} = 'tool'` : "";
   return `SELECT step,
-  count() AS calls,
-  countIf(failed) AS failures,
-  countIf(recovered) AS recovered
+  sum(calls) AS calls,
+  sum(failures) AS failures,
+  sum(recovered) AS recovered
 FROM (
-  SELECT c.SpanName AS step,
-    c.StatusCode = 2 AS failed,
-    c.StatusCode = 2 AND p.StatusCode != 2 AS recovered
-  FROM spans AS c
-  INNER JOIN (
-    SELECT TraceId, SpanId, StatusCode
-    FROM spans
-    WHERE StartTime >= subtractDays(${START}, 1) AND StartTime < ${END}
-  ) AS p ON p.TraceId = c.TraceId AND p.SpanId = c.ParentSpanId
-  WHERE ${inPeriod("c.StartTime")}
-    AND c.ParentSpanId IS NOT NULL${tools(`c.${SPAN_TYPE}`)}
+  SELECT SpanName AS step, count() AS calls, countIf(StatusCode = 2) AS failures, 0 AS recovered
+  FROM span_metrics
+  WHERE ${inPeriod("StartTime")}${tools}
+    AND (ifNull(ParentSpanId, '') != ''
+      OR (ParentSpanId IS NULL
+        AND sipHash128(TraceId, SpanId) NOT IN (
+          SELECT sipHash128(TraceId, ifNull(ParentSpanId, ''))
+          FROM span_metrics
+          WHERE ${inPeriod("StartTime")}
+            AND ParentSpanId IS NOT NULL
+        )))
+  GROUP BY step
   UNION ALL
-  SELECT r.SpanName AS step, r.StatusCode = 2 AS failed, false AS recovered
-  FROM spans AS r
-  LEFT ANTI JOIN (
-    SELECT DISTINCT TraceId, ParentSpanId
-    FROM spans
-    WHERE ${inPeriod("StartTime")}
-      AND ParentSpanId IS NOT NULL
-  ) AS k ON k.TraceId = r.TraceId AND k.ParentSpanId = r.SpanId
-  WHERE ${inPeriod("r.StartTime")}
-    AND r.ParentSpanId IS NULL${tools(`r.${SPAN_TYPE}`)}
+  SELECT c.step AS step, 0 AS calls, 0 AS failures, count() AS recovered
+  FROM span_metrics AS p
+  INNER JOIN (
+    SELECT TraceId, ifNull(ParentSpanId, '') AS parent, SpanName AS step
+    FROM span_metrics
+    WHERE ${inPeriod("StartTime")}${tools}
+      AND ifNull(ParentSpanId, '') != ''
+      AND StatusCode = 2
+  ) AS c ON c.TraceId = p.TraceId AND c.parent = p.SpanId
+  WHERE p.StartTime >= subtractDays(${START}, 1) AND p.StartTime < ${END}
+    AND p.StatusCode != 2
+  GROUP BY step
 )
 GROUP BY step
 ORDER BY failures - recovered DESC, failures DESC, calls DESC
@@ -57,8 +61,7 @@ export const FAILING_STEPS_SQL = stepFailuresSql({ toolsOnly: false, limit: 3 })
 /** Every tool, so the widget's totals cover all of them. */
 export const TOOL_FAILURES_SQL = stepFailuresSql({ toolsOnly: true, limit: 50 });
 
-const ERROR_CATEGORY = `coalesce(nullIf(SpanAttributes['exception.type'], ''),
-    nullIf(SpanAttributes['error.type'], ''), SpanName)`;
+const ERROR_CATEGORY = "coalesce(nullIf(ErrorType, ''), SpanName)";
 
 /** Traces with an error per bucket, named by the first step below the root that failed. */
 export const ERRORS_BY_TYPE_SQL = `SELECT bucket, category, count() AS traces
@@ -66,7 +69,7 @@ FROM (
   SELECT TraceId,
     ${bucketOf("min(StartTime)")} AS bucket,
     argMin(${ERROR_CATEGORY}, tuple(ParentSpanId IS NULL, StartTime)) AS category
-  FROM spans
+  FROM span_metrics
   WHERE ${inPeriod("StartTime")}
     AND StatusCode = 2
   GROUP BY TraceId
@@ -81,10 +84,10 @@ ORDER BY bucket`;
 const REPEATS = `SELECT TraceId, min(StartTime) AS at, SpanName AS step, 1 AS looped,
     sum(ifNull(Cost, 0)) - argMin(ifNull(Cost, 0), StartTime) AS cost,
     countIf(Cost IS NULL) AS uncosted
-  FROM spans
+  FROM span_metrics
   WHERE ${inPeriod("StartTime")}
     AND ${SPAN_TYPE} = 'tool'
-  GROUP BY TraceId, SpanName, CapturedInput
+  GROUP BY TraceId, SpanName, InputHash
   HAVING count() >= 3
   LIMIT 10000
   UNION ALL
@@ -92,7 +95,7 @@ const REPEATS = `SELECT TraceId, min(StartTime) AS at, SpanName AS step, 1 AS lo
     anyIf(SpanName, StatusCode = 2) AS step, 0 AS looped,
     sumIf(ifNull(Cost, 0), StatusCode = 2) AS cost,
     countIf(Cost IS NULL AND StatusCode = 2) AS uncosted
-  FROM spans
+  FROM span_metrics
   WHERE ${inPeriod("StartTime")}
     AND ParentSpanId IS NOT NULL
   GROUP BY TraceId, ParentSpanId, if(${SPAN_TYPE} = 'llm', 'llm', SpanName)

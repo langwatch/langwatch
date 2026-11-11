@@ -27,6 +27,7 @@ import type {
   TraceSpanTokenEstimation,
 } from "./record-span.commands.ts";
 import { EventingRecordSpanAdapter } from "./record-span.commands.ts";
+import type { SpanAnalyticsRow } from "./span-analytics.projection.ts";
 import type { TraceAnalyticsData } from "./trace-derived.projection.ts";
 import { EventingTracePipelineAdapter } from "./trace-processing-projections.pipeline.ts";
 import type { TraceAnalyticsRollupRow } from "./trace-rollup.projection.ts";
@@ -212,6 +213,7 @@ export function createTraceProcessingProducerPipeline(input: {
       role,
       "trace analytics rollup",
     ),
+    spanAnalyticsStore: new ProducerOnlyAppendStore<SpanAnalyticsRow>(role, "span analytics"),
     canonicalisation: new ProducerOnlyCanonicalisation(role),
     ioExtraction: new ProducerOnlyIoExtraction(role),
     mediaReferences: new ProducerOnlyMediaReferences(role),
