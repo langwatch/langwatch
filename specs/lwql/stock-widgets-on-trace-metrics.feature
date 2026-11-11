@@ -12,7 +12,7 @@ Feature: Stock trace widgets read the light trace table
 
     @integration
     Scenario: The migration fills the metadata columns for existing rows
-      Given trace_analytics rows written before migration 00125
+      Given trace_analytics rows written before migration 00126
       When the migration and its background step have run
       Then each row's metadata columns hold the values of its Attributes
       And a missing key reads as empty text
