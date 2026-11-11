@@ -20,8 +20,10 @@ describe("given the Answer quality widgets", () => {
   it("takes the app's outcome before the outcome judge's label, and compares reasons", () => {
     const { sql, tsx } = buildOf("ans-outcomes");
     expect(OUTCOME_JUDGE).toBe("Conversation Outcome Judge");
-    // A sent outcome (sent = 1) wins over the judge's label (sent = 0).
-    expect(sql.trend).toContain("argMax(outcome, sent) AS outcome");
+    // A sent outcome (sent = 1) wins over the judge's label (sent = 0), then the latest row.
+    expect(sql.trend).toContain("argMax(outcome, tuple(sent, row_at, outcome)) AS outcome");
+    // Outcome and reason come from one row, whatever ties.
+    expect(sql.reasons).toContain("argMax(reason, tuple(sent, row_at, outcome, reason)) AS reason");
     expect(sql.trend).toContain("MetadataOutcome AS outcome");
     expect(sql.trend).toContain("ifNull(j.label, '') AS outcome");
     // Only the reasons query reads a reason, from the typed column: no query opens the map.

@@ -52,6 +52,8 @@ function tracesWithOutcome({
 }): string {
   const judgeReason = withReason ? ", ifNull(j.reason, '') AS reason" : "";
   const sentReason = withReason ? ", MetadataOutcomeReason AS reason" : "";
+  // Sent first, then the latest row; the whole-row key keeps outcome and reason from one row.
+  const pick = `tuple(sent, row_at, outcome${withReason ? ", reason" : ""})`;
   return `(
   SELECT c.trace_id AS trace_id,
     c.at AS at,
@@ -62,7 +64,7 @@ function tracesWithOutcome({
       min(row_at) AS at,
       argMin(topic_id, row_at) AS topic_id,
       argMin(meta_topic, row_at) AS meta_topic,
-      argMax(outcome, sent) AS outcome${withReason ? ",\n      argMax(reason, sent) AS reason" : ""}
+      argMax(outcome, ${pick}) AS outcome${withReason ? `,\n      argMax(reason, ${pick}) AS reason` : ""}
     FROM (
       SELECT t.TraceId AS trace_id, t.OccurredAt AS row_at, t.topic_id AS topic_id,
         t.MetadataTopic AS meta_topic, ifNull(j.label, '') AS outcome${judgeReason}, 0 AS sent

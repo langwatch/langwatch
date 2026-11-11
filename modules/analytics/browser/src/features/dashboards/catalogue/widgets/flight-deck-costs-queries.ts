@@ -88,7 +88,8 @@ const outcomeRows = ({
       AND MetadataOutcome != ''`;
 };
 
-// A conversation's outcome sits on its last turn; a sent outcome wins over the judge's. A trace
+// A conversation's outcome sits on its last turn; a sent outcome wins over the judge's, then
+// the latest row. A whole-row key picks outcome and reason from one row, whatever ties. A trace
 // whose trace_metrics anchor moved (ADR-082) is dated, and topped, by its first row.
 const outcomes = ({
   window,
@@ -96,9 +97,11 @@ const outcomes = ({
   withReason = false,
   withLanguage = false,
   withTopic = false,
-}: { window: Window; from: string } & OutcomeExtras) => `SELECT trace_id,
-    min(row_at) AS at, argMax(outcome, sent) AS outcome${
-      withReason ? ", argMax(reason, sent) AS reason" : ""
+}: { window: Window; from: string } & OutcomeExtras) => {
+  const pick = `tuple(sent, row_at, outcome${withReason ? ", reason" : ""})`;
+  return `SELECT trace_id,
+    min(row_at) AS at, argMax(outcome, ${pick}) AS outcome${
+      withReason ? `, argMax(reason, ${pick}) AS reason` : ""
     }${withLanguage ? ", any(language) AS language" : ""}${
       withTopic
         ? ", argMin(topic_id, row_at) AS topic_id, argMin(meta_topic, row_at) AS meta_topic"
@@ -108,6 +111,7 @@ const outcomes = ({
     ${outcomeRows({ window, from, withReason, withLanguage, withTopic })}
   )
   GROUP BY trace_id`;
+};
 
 /**
  * Check verdicts per trace, outcome judge and guardrails left out: the joined side of a check

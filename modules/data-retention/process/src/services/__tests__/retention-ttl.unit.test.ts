@@ -102,8 +102,8 @@ describe("hasRetentionTTL", () => {
 });
 
 describe("RETENTION_MANAGED_TABLES", () => {
-  it("includes all 19 retention-managed tables", () => {
-    expect(RETENTION_MANAGED_TABLES).toHaveLength(19);
+  it("includes all 20 retention-managed tables", () => {
+    expect(RETENTION_MANAGED_TABLES).toHaveLength(20);
     expect(RETENTION_MANAGED_TABLES).toContain("stored_spans");
     expect(RETENTION_MANAGED_TABLES).toContain("event_log");
     expect(RETENTION_MANAGED_TABLES).toContain("trace_summaries");

@@ -106,6 +106,7 @@ const SHADOW_METER_TABLES = new Set<RetentionManagedTable>([
 ]);
 
 const TABLES_WITHOUT_SIZE_COLUMN = new Set<RetentionManagedTable>([
+  "span_analytics",
   "trace_analytics",
   "trace_analytics_rollup",
   "evaluation_analytics",

@@ -299,7 +299,8 @@ function WidgetFrameOverWindow({
           {cover}
         </Box>
       )}
-      {!cover && readsSpanMetrics(definition.queries) && (
+      {/* An empty span widget may only lack history, so its empty face keeps the notice. */}
+      {(!cover || face.kind === "no_traffic") && readsSpanMetrics(definition.queries) && (
         <SpanDataFloorNotice
           projectId={projectId}
           queries={definition.queries}
