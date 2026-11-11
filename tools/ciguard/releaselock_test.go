@@ -1,4 +1,4 @@
-package releaselock_test
+package ciguard_test
 
 import (
 	"encoding/json"
@@ -7,10 +7,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/langwatch/langwatch/tools/releaselock"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
+
+	"github.com/langwatch/langwatch/pkg/ciscan"
+	"github.com/langwatch/langwatch/tools/ciguard"
 )
 
-var sdk = releaselock.Packages[0]
+var sdk = ciguard.ReleasePackages[0]
 
 func entry(lockName string) string {
 	return `{"type":"toml","path":"/uv.lock","jsonpath":"$.package[?(@.name.value=='` + lockName + `')].version"}`
@@ -38,8 +42,8 @@ func manifest(sdkVersion, ksuidVersion string) string {
 	return `{"sdks/python":"` + sdkVersion + `","packages/ksuid-python":"` + ksuidVersion + `"}`
 }
 
-func inStep() releaselock.Files {
-	return releaselock.Files{
+func inStep() ciguard.ReleaseLockFiles {
+	return ciguard.ReleaseLockFiles{
 		Config:        config(entry("langwatch"), entry("langwatch-ksuid")),
 		Manifest:      manifest("1.4.0", "1.0.1"),
 		RootPyproject: rootPyproject,
@@ -51,9 +55,9 @@ func inStep() releaselock.Files {
 	}
 }
 
-func problemsOf(t *testing.T, files releaselock.Files) string {
+func problemsOf(t *testing.T, files ciguard.ReleaseLockFiles) string {
 	t.Helper()
-	got, err := releaselock.Problems(files)
+	got, err := ciguard.ReleaseLockProblems(files)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,11 +80,11 @@ func TestExtraFilesProblems(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			var cfg releaselock.Config
+			var cfg ciguard.ReleaseConfig
 			if err := json.Unmarshal([]byte(config(tc.extra, "")), &cfg); err != nil {
 				t.Fatal(err)
 			}
-			if got := releaselock.ExtraFilesProblems(cfg, sdk); len(got) != tc.want || (tc.want > 0 && !strings.Contains(got[0], tc.advice)) {
+			if got := ciguard.ReleaseExtraFilesProblems(cfg, sdk); len(got) != tc.want || (tc.want > 0 && !strings.Contains(got[0], tc.advice)) {
 				t.Fatalf("got %v; want %d problems advising %q", got, tc.want, tc.advice)
 			}
 		})
@@ -163,7 +167,7 @@ func TestUnlistedWorkspaceMemberFails(t *testing.T) {
 func TestProblemsRejectsBadJSON(t *testing.T) {
 	files := inStep()
 	files.Config = "{"
-	if _, err := releaselock.Problems(files); err == nil {
+	if _, err := ciguard.ReleaseLockProblems(files); err == nil {
 		t.Fatal("want an error for malformed config")
 	}
 }
@@ -188,11 +192,11 @@ func TestCheckReadsRepositoryFiles(t *testing.T) {
 	for path, content := range files.Pyprojects {
 		write(path+"/pyproject.toml", content)
 	}
-	if got, err := releaselock.Check(root); err != nil || len(got) != 0 {
+	if got, err := ciguard.ReleaseLock(root); err != nil || len(got) != 0 {
 		t.Fatalf("got %v, %v; want no problems", got, err)
 	}
 	write("uv.lock", lock(lockBlock("langwatch", "1.3.0", "sdks/python"), lockBlock("langwatch-ksuid", "1.0.1", "packages/ksuid-python")))
-	if got, err := releaselock.Check(root); err != nil || len(got) != 1 {
+	if got, err := ciguard.ReleaseLock(root); err != nil || len(got) != 1 {
 		t.Fatalf("got %v, %v; want one problem", got, err)
 	}
 }
@@ -253,5 +257,24 @@ func TestMultiLineMembersFails(t *testing.T) {
 	files.RootPyproject = "[tool.uv.workspace]\nmembers = [\n  \"sdks/python\",\n  \"packages/ksuid-python\",\n]\n"
 	if got := problemsOf(t, files); !strings.Contains(got, "no one-line") {
 		t.Fatalf("got %q, want the members-list problem", got)
+	}
+}
+
+// @scenario "A change to any file the release-lock guard reads runs the guard"
+func TestReleaseLockRunsWhenAFileItReadsChanges(t *testing.T) {
+	root, err := ciscan.RepoRoot(".")
+	require.NoError(t, err)
+	workflow, err := ciscan.Load(root, ".github/workflows/go-ci.yaml")
+	require.NoError(t, err)
+
+	var filters map[string][]string
+	for _, step := range workflow.Jobs["changes"].Steps {
+		if text, ok := step.StringWith("filters"); ok {
+			require.NoError(t, yaml.Unmarshal([]byte(text), &filters))
+		}
+	}
+
+	for _, path := range ciguard.ReleaseLockInputPaths() {
+		require.Contains(t, filters["ciguards"], path, "go-ci's ciguards filter must list %s", path)
 	}
 }

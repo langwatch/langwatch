@@ -18,7 +18,6 @@ import (
 
 	"github.com/langwatch/langwatch/pkg/ciscan"
 	"github.com/langwatch/langwatch/tools/ciguard"
-	"github.com/langwatch/langwatch/tools/releaselock"
 )
 
 type guard struct {
@@ -55,7 +54,7 @@ func main() {
 		{name: "transform-cache", run: ciguard.TransformCacheProblems},
 		{name: "vitest-transform-flag", run: ciguard.UncachedVitestScripts},
 		{name: "main-suites", run: ciguard.MainSuites},
-		{name: "release-lock", run: releaselock.Check},
+		{name: "release-lock", run: ciguard.ReleaseLock},
 	}
 
 	if failed := runAll(guards, repoRoot); failed {

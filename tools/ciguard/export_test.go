@@ -5,3 +5,6 @@ var WorkflowAndActionFiles = workflowAndActionFiles
 
 // IsStoredAWSKeyLine exposes the line check to the external tests.
 var IsStoredAWSKeyLine = isStoredAWSKeyLine
+
+// ReleaseLockInputPaths exposes the files the release-lock guard reads to the external tests.
+var ReleaseLockInputPaths = releaseLockInputPaths

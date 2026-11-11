@@ -76,3 +76,8 @@ Feature: A Python package release keeps uv.lock in step
   Scenario: A multi-line workspace members list fails the check
     Given the root pyproject.toml writes its uv workspace members over several lines
     Then the guard says it cannot read the members list
+
+  @unit
+  Scenario: A change to any file the release-lock guard reads runs the guard
+    Given the go-ci ciguards path filter
+    Then it lists every file the release-lock guard reads

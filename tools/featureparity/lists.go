@@ -65,7 +65,6 @@ var (
 		"tools/migrationorder",
 		"tools/linkcheck",
 		"tools/chartpush",
-		"tools/releaselock",
 		"tools/slacknotify",
 		"tools/ecrtag",
 		"tools/docsdeploy",
