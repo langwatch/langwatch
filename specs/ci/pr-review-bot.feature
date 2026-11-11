@@ -10,7 +10,9 @@ Feature: PR Review Bot workflow
   # (1) The PR is not from dependabot (Dependabot has separate secret management)
   # (2) The PR is from the same repository (forks cannot access repo secrets)
   # (3) The PR is not a draft (drafts are not ready for review)
-  # (4) ci-complete succeeded
+  # (4) ci-complete succeeded, and then every other check on the head commit
+  #     (the separate workflows: pr conventions, go-ci, code-scanners, ...) has
+  #     finished without failing
   # (5) The event is a pull request (the bot reads github.event.pull_request)
   # Additionally, concurrency ensures only one review per PR runs at a time.
   #
@@ -45,6 +47,29 @@ Feature: PR Review Bot workflow
     Given a merge queue run of pr.yml
     When ci-complete succeeds
     Then the review job is skipped
+
+  # ============================================================================
+  # Gating: the other workflows' checks
+  # ============================================================================
+  #
+  # ci-complete covers only the calls of pr.yml. The review job's first step
+  # lists the head commit's check runs, waits while any is unfinished, and gives
+  # the go-ahead only when none failed; every action step of the job needs it.
+  # A new push cancels the run (see Concurrency) and with it the wait.
+
+  @unit
+  Scenario: The review waits for every other check on the head commit
+    Given CI passed and another workflow's check on the head commit is still running
+    When the review job starts
+    Then its wait step keeps polling the check runs
+    And no review is posted until that check has finished
+
+  @unit
+  Scenario: The review does not start when another check failed
+    Given CI passed and another workflow's check on the head commit failed
+    When the wait step reads the check runs
+    Then the review steps are skipped
+    And no review is posted to the PR
 
   # ============================================================================
   # Gating: Dependabot PRs
@@ -143,9 +168,9 @@ Feature: PR Review Bot workflow
   # contents: write is required so the default GITHUB_TOKEN can call
   # resolveReviewThread; anything less only loses thread auto-resolution.
   @unit
-  Scenario: The review workflow grants exactly contents write and pull-requests write
+  Scenario: The review workflow grants exactly checks read, contents write and pull-requests write
     When the workflow runs
-    Then the workflow grants permissions: contents: write, pull-requests: write
+    Then the workflow grants permissions: checks: read, contents: write, pull-requests: write
     And the workflow does not grant any extra permissions
 
   # ============================================================================

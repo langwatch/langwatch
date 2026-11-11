@@ -37,8 +37,11 @@ var prReviewBotGateClauses = map[string]string{
 var prReviewBotTriggerTypes = []string{"opened", "synchronize", "reopened", "ready_for_review"}
 
 // prReviewBotRequiredPermissions are the exact permissions the review job must grant:
-// contents: write (for resolveReviewThread) and pull-requests: write (for posting reviews).
+// contents: write (for resolveReviewThread), pull-requests: write (for posting
+// reviews) and checks: read (for listing the head commit's check runs while
+// waiting for them).
 var prReviewBotRequiredPermissions = map[string]string{
+	"checks":        "read",
 	"contents":      "write",
 	"pull-requests": "write",
 }
@@ -49,7 +52,7 @@ var fullSHAPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 // PRReviewBot reports every way the PR Review Bot workflow has drifted from
 // the invariants specs/ci/pr-review-bot.feature describes: the wait for
-// ci-complete, the skip gate, the trigger types that can run a review,
+// ci-complete, the wait for every other check, the skip gate, the trigger types that can run a review,
 // single-review-in-flight concurrency, full-SHA pinning on every action it
 // uses, and the required permissions block.
 func PRReviewBot(repoRoot string) ([]string, error) {
@@ -65,6 +68,7 @@ func PRReviewBot(repoRoot string) ([]string, error) {
 	}
 	problems = append(problems, needs...)
 	problems = append(problems, prReviewBotGates(workflow)...)
+	problems = append(problems, prReviewBotWaitsForChecks(workflow)...)
 	problems = append(problems, prReviewBotTriggers(workflow)...)
 	problems = append(problems, prReviewBotConcurrency(workflow)...)
 	problems = append(problems, prReviewBotPermissions(workflow)...)
@@ -124,6 +128,49 @@ func prReviewBotGates(workflow *ciscan.Workflow) []string {
 		if !strings.Contains(job.If, clause) {
 			problems = append(problems, fmt.Sprintf(
 				"%s no longer gates on %q (%s check missing)", PRReviewBotWorkflow, clause, name))
+		}
+	}
+
+	return problems
+}
+
+// prReviewBotWaitStep is the id of the review job's first step, which waits
+// until every other check run on the head commit finished and decides through
+// its `proceed` output whether the review runs.
+const prReviewBotWaitStep = "wait-for-checks"
+
+// prReviewBotProceedClause is the `if:` every `uses:` step of the review job
+// carries, so a failed check spends no tokens.
+const prReviewBotProceedClause = "steps." + prReviewBotWaitStep + ".outputs.proceed == 'true'"
+
+// prReviewBotWaitsForChecks checks the review job still waits for the checks of
+// the separate workflows (ci-complete covers only pr.yml's own calls) and that
+// no action step can run without that wait's go-ahead. Like the gate clauses,
+// it reads literal text: a wait whose `run:` no longer lists check runs, or an
+// action step that lost its `if:`, would let the review start on a PR whose
+// other checks are still running or red, and nothing else would notice.
+func prReviewBotWaitsForChecks(workflow *ciscan.Workflow) []string {
+	job, ok := workflow.Jobs[prReviewBotReviewJob]
+	if !ok { // prReviewBotGates reports a missing job
+		return nil
+	}
+
+	var problems []string
+	waits := slices.IndexFunc(job.Steps, func(step ciscan.Step) bool { return step.ID == prReviewBotWaitStep })
+	switch {
+	case waits < 0:
+		problems = append(problems, fmt.Sprintf(
+			"%s review job has no step with id %q waiting for the other checks", PRReviewBotWorkflow, prReviewBotWaitStep))
+	case !strings.Contains(job.Steps[waits].Run, "check-runs"):
+		problems = append(problems, fmt.Sprintf(
+			"%s step %q does not read the head commit's check-runs", PRReviewBotWorkflow, prReviewBotWaitStep))
+	}
+
+	for i := range job.Steps {
+		step := job.Steps[i]
+		if step.Uses != "" && !strings.Contains(step.If, prReviewBotProceedClause) {
+			problems = append(problems, fmt.Sprintf(
+				"%s review step %q is not gated on %q", PRReviewBotWorkflow, step.Uses, prReviewBotProceedClause))
 		}
 	}
 
@@ -230,7 +277,7 @@ func comparePRReviewBotPermissionScopes(scopes map[string]string) []string {
 	for _, key := range grantedKeys {
 		if _, required := prReviewBotRequiredPermissions[key]; !required {
 			problems = append(problems, fmt.Sprintf(
-				"%s permissions block has extra key %q (only contents and pull-requests are needed)", PRReviewBotWorkflow, key))
+				"%s permissions block has extra key %q (only checks, contents and pull-requests are needed)", PRReviewBotWorkflow, key))
 		}
 	}
 

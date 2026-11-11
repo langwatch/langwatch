@@ -15,6 +15,7 @@ import (
 
 // prReviewBotPermissionsBlock is the review job's `permissions:` block, kept as its own constant so it stays in sync with the tests that strip or replace it.
 const prReviewBotPermissionsBlock = `    permissions:
+      checks: read
       contents: write # so the default token can call resolveReviewThread; read would only lose thread auto-resolution
       pull-requests: write
 `
@@ -51,11 +52,15 @@ jobs:
       github.event.pull_request.draft == false
     runs-on: ubuntu-latest
 ` + prReviewBotPermissionsBlock + `    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: wait-for-checks
+        run: gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/check-runs"
+      - if: steps.wait-for-checks.outputs.proceed == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - uses: langwatch/langwatch-pr-review-bot@7ff0638fa8cb21fb3f94f8a12b893c6d5446e521 # main 2026-09-22
+      - if: steps.wait-for-checks.outputs.proceed == 'true'
+        uses: langwatch/langwatch-pr-review-bot@7ff0638fa8cb21fb3f94f8a12b893c6d5446e521 # main 2026-09-22
         with:
           slack_notify: "false"
           claude_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -243,6 +248,43 @@ func TestPRReviewBotTriggersOnReadyForReview(t *testing.T) {
 	assert.Contains(t, strings.Join(problems, "\n"), "pull_request types")
 }
 
+// @scenario "The review waits for every other check on the head commit"
+func TestPRReviewBotWaitsForTheOtherChecks(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow, "      - id: wait-for-checks\n        run: gh api \"repos/$GITHUB_REPOSITORY/commits/$SHA/check-runs\"\n", "", 1)
+	root := writePRReviewBotWorkflow(t, broken)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), `no step with id "wait-for-checks"`)
+}
+
+func TestPRReviewBotWaitReadsTheCheckRuns(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow, "commits/$SHA/check-runs", "commits/$SHA", 1)
+	root := writePRReviewBotWorkflow(t, broken)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), "does not read the head commit's check-runs")
+}
+
+// @scenario "The review does not start when another check failed"
+func TestPRReviewBotGatesEveryActionOnTheWait(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow,
+		"      - if: steps.wait-for-checks.outputs.proceed == 'true'\n        uses: langwatch", "      - uses: langwatch", 1)
+	root := writePRReviewBotWorkflow(t, broken)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), "langwatch/langwatch-pr-review-bot")
+	assert.Contains(t, strings.Join(problems, "\n"), "is not gated")
+}
+
 // @scenario "In-progress review is canceled for the same PR"
 func TestPRReviewBotCancelsInProgressRunsForTheSamePR(t *testing.T) {
 	noCancel := strings.Replace(goodPRReviewBotWorkflow, "cancel-in-progress: true", "cancel-in-progress: false", 1)
@@ -267,7 +309,7 @@ func TestPRReviewBotRequiresTheGroupToKeyOnThePR(t *testing.T) {
 	assert.Contains(t, strings.Join(problems, "\n"), "does not key on the PR number")
 }
 
-// @scenario "The review workflow grants exactly contents write and pull-requests write"
+// @scenario "The review workflow grants exactly checks read, contents write and pull-requests write"
 func TestPRReviewBotRequiresContentsWrite(t *testing.T) {
 	withRead := strings.Replace(goodPRReviewBotWorkflow,
 		"  contents: write",
@@ -291,6 +333,17 @@ func TestPRReviewBotReportsAMissingPermissionsBlock(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, problems)
 	assert.Contains(t, strings.Join(problems, "\n"), "declares no permissions block")
+}
+
+func TestPRReviewBotRequiresChecksRead(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow, "      checks: read\n", "", 1)
+	root := writePRReviewBotWorkflow(t, broken)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), `missing "checks"`)
 }
 
 func TestPRReviewBotReportsAMissingRequiredPermissionKey(t *testing.T) {
@@ -330,7 +383,7 @@ func TestPRReviewBotRejectsExtraPermissions(t *testing.T) {
 	assert.Contains(t, strings.Join(problems, "\n"), "extra")
 }
 
-// @scenario "The review workflow grants exactly contents write and pull-requests write"
+// @scenario "The review workflow grants exactly checks read, contents write and pull-requests write"
 func TestPRReviewBotUsesJobLevelPermissionsWhenPresent(t *testing.T) {
 	overridden := strings.Replace(goodPRReviewBotWorkflow, prWorkflowPermissionsBlock,
 		"permissions:\n  contents: write\n  pull-requests: write\n", 1)
@@ -387,9 +440,10 @@ func TestPRReviewBotRejectsAPinWithNoVersionComment(t *testing.T) {
 // @scenario "Local composite actions are left out of the pin check"
 func TestPRReviewBotAcceptsALocalCompositeAction(t *testing.T) {
 	withLocalAction := strings.Replace(goodPRReviewBotWorkflow,
-		"      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n",
-		"      - uses: ./.github/actions/go-build-cache\n"+
-			"      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n", 1)
+		"        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n",
+		"        uses: ./.github/actions/go-build-cache\n"+
+			"      - if: steps.wait-for-checks.outputs.proceed == 'true'\n"+
+			"        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n", 1)
 	root := writePRReviewBotWorkflow(t, withLocalAction)
 
 	problems, err := ciguard.PRReviewBot(root)
