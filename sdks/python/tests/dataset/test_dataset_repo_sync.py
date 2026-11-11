@@ -249,7 +249,7 @@ class TestUpsertRecords:
             ]
         )
 
-        with pytest.raises(ValueError, match="c-1"):
+        with pytest.raises(ValueError, match="c-1.*Delete the extra rows, then upsert again"):
             _facade(server).upsert_records(
                 "qa-cases",
                 entries=[{"case_id": "c-1", "expected_output": "x"}],
@@ -258,6 +258,7 @@ class TestUpsertRecords:
 
         assert server.writes() == []
 
+    # @scenario "Upserting by a key column refuses two entries with the same key"
     def test_refuses_two_entries_with_the_same_key(self):
         server = self._server()
 

@@ -9,7 +9,6 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { LangWatch } from "@/client-sdk";
 
-import { DatasetValidationError } from "../errors";
 
 const ENDPOINT = "http://langwatch.test";
 
@@ -208,10 +207,11 @@ describe("Feature: Keeping a dataset in sync with files held in a repository", (
         langwatch.datasets.upsertRecords("qa-cases", [{ case_id: "c-1", input: "x" }], {
           key: "case_id",
         }),
-      ).rejects.toThrow(/c-1/);
+      ).rejects.toThrow(/c-1.*Delete the extra rows, then upsert again/);
       expect(fake.writes()).toEqual([]);
     });
 
+    /** @scenario "Upserting by a key column refuses two entries with the same key" */
     it("refuses two entries with the same key, before any request", async () => {
       const fake = serveDataset(TWO_ROWS);
 
@@ -219,7 +219,7 @@ describe("Feature: Keeping a dataset in sync with files held in a repository", (
         langwatch.datasets.upsertRecords("qa-cases", [{ case_id: "c-5" }, { case_id: "c-5" }], {
           key: "case_id",
         }),
-      ).rejects.toThrow(DatasetValidationError);
+      ).rejects.toThrow(/share the key case_id = "c-5"/);
       expect(fake.state.requests).toEqual([]);
     });
 

@@ -52,9 +52,16 @@ Feature: Keeping a dataset in sync with files held in a repository
 
   @unit
   Scenario: Upserting by a key column refuses a key that matches more than one row
+    # A dataset filled by the old append-only sync holds such rows on its first upsert.
     Given a dataset holds two rows whose "case_id" is "c-1"
     When a script upserts an entry with "case_id" "c-1"
     Then the SDK refuses before writing anything and names the duplicated key
+    And the error says to delete the extra rows and upsert again
+
+  @unit
+  Scenario: Upserting by a key column refuses two entries with the same key
+    When a script upserts two entries whose "case_id" is "c-1"
+    Then the SDK refuses before sending any request and names the shared key
 
   @unit
   Scenario: Upserting by a key column refuses an entry without the key
