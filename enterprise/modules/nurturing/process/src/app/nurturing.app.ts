@@ -46,15 +46,21 @@ export class NurturingModule implements NurturingApi {
 
   readonly #pipeline: NurturingPipeline;
   readonly #organizationUsage: NurturingOrganizationUsageService | undefined;
-  readonly #uncopiedProjects = NurturingUncopiedProjectsService.create();
+  readonly #uncopiedProjects: NurturingUncopiedProjectsService;
   #commands: EventingCommands<NurturingPipeline> | undefined;
 
-  private constructor(
-    pipeline: NurturingPipeline,
-    organizationUsage: NurturingOrganizationUsageService | undefined,
-  ) {
+  private constructor({
+    pipeline,
+    organizationUsage,
+    uncopiedProjects,
+  }: Readonly<{
+    pipeline: NurturingPipeline;
+    organizationUsage: NurturingOrganizationUsageService | undefined;
+    uncopiedProjects: NurturingUncopiedProjectsService;
+  }>) {
     this.#pipeline = pipeline;
     this.#organizationUsage = organizationUsage;
+    this.#uncopiedProjects = uncopiedProjects;
   }
 
   static async create({
@@ -114,8 +120,12 @@ export class NurturingModule implements NurturingApi {
       organizations: repositories.milestones,
       members: repositories.members,
     });
-    return new NurturingModule(
-      buildNurturingPipeline({
+    const uncopiedProjects = NurturingUncopiedProjectsService.create({
+      uncopiedProjects: repositories.uncopiedProjects,
+      clock: { nowMs: () => nowInstant().epochMilliseconds },
+    });
+    return new NurturingModule({
+      pipeline: buildNurturingPipeline({
         deliver: (input) => delivery.deliver(input),
         projectCreated: (data) => milestones.projectCreated(data),
         guidedTurnFailed: (data) => delivery.deliverGuidedTurnFailed(data),
@@ -128,7 +138,8 @@ export class NurturingModule implements NurturingApi {
         forgetErasedUser: (input) => userErasure.forgetUser(input),
       }),
       organizationUsage,
-    );
+      uncopiedProjects,
+    });
   }
 
   /**
@@ -150,11 +161,19 @@ export class NurturingModule implements NurturingApi {
     await this.#organizationUsage?.tracesChanged(input);
   }
 
+  /** Whether this process already dropped a project with no placement copy. */
+  uncopiedProjectDropped(input: Readonly<{ projectId: string }>): boolean {
+    return this.#uncopiedProjects.isDropped(input);
+  }
+
   /** A trace batch of a project nurturing has no placement copy of: retried, or dropped. */
-  uncopiedProjectOutcome(
-    input: Readonly<{ projectId: string; deliveryAttempt?: number }>,
-  ): UncopiedProjectOutcome {
+  uncopiedProjectOutcome(input: Readonly<{ projectId: string }>): Promise<UncopiedProjectOutcome> {
     return this.#uncopiedProjects.outcomeOf(input);
+  }
+
+  /** A project's placement copy was written: it is no longer uncopied. */
+  async uncopiedProjectCopied(input: Readonly<{ projectId: string }>): Promise<void> {
+    await this.#uncopiedProjects.copyLanded(input);
   }
 
   /** The trace windows that ended in (`after`, `upTo`]: their trace traits go once as null. */

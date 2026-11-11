@@ -322,17 +322,18 @@ export function countedTraceOf({
   };
 }
 
-/** Whether a batch of a project with no placement copy, on the queue's attempt, retries or drops. */
-export type UncopiedProjectOutcomeOf = (
-  input: Readonly<{ projectId: string; deliveryAttempt?: number }>,
-) => UncopiedProjectOutcome;
+/** The projects with no placement copy: one this process already dropped, and a batch's outcome. */
+export type NurturingUncopiedProjects = Readonly<{
+  isDropped: (input: Readonly<{ projectId: string }>) => boolean;
+  outcomeOf: (input: Readonly<{ projectId: string }>) => Promise<UncopiedProjectOutcome>;
+}>;
 
 /** What the trace and failure counts read to keep only organizations in their window. */
 export type NurturingTraceCountingDeps = Readonly<{
   traceDays: NurturingTraceDayRepository;
   placements: Pick<NurturingProjectPlacementRepository, "getPlacement">;
   organizationsCreated: Pick<NurturingOrganizationCreatedRepository, "findOrganizationCreatedAt">;
-  uncopiedProjectOutcome: UncopiedProjectOutcomeOf;
+  uncopiedProjects: NurturingUncopiedProjects;
 }>;
 
 /**
@@ -361,19 +362,22 @@ async function copiedProjectOf({
  * Counts the batch's traces whose organization is inside its counting window, each once, durably
  * (the repository's per-trace rows). The placement copy has its own subscriber, so a new project's
  * traces can come first: an uncopied project fails the batch after the rest are counted, and the
- * queue retries, until its retry window runs out; then it drops, as does a placed project whose
- * organization has no creation copy. The copy is read first, so a copy landing later counts again.
+ * queue retries, until its window from first seen runs out; then it drops, as does a placed project
+ * whose organization has no creation copy. A project this process dropped is skipped with no read;
+ * its copy landing forgets it.
  */
 async function countInWindow({
   traces,
-  deliveryAttempt,
   ...deps
-}: Readonly<{ traces: readonly NurturingCountedTrace[]; deliveryAttempt?: number }> &
+}: Readonly<{ traces: readonly NurturingCountedTrace[] }> &
   NurturingTraceCountingDeps): Promise<void> {
   if (traces.length === 0) return;
+  const projectIds = [...new Set(traces.map(({ projectId }) => projectId))].filter(
+    (projectId) => !deps.uncopiedProjects.isDropped({ projectId }),
+  );
   const projects = new Map(
     await Promise.all(
-      [...new Set(traces.map(({ projectId }) => projectId))].map(
+      projectIds.map(
         async (projectId) => [projectId, await copiedProjectOf({ projectId, ...deps })] as const,
       ),
     ),
@@ -389,20 +393,18 @@ async function countInWindow({
       );
     }),
   );
-  const waiting = [...projects].flatMap(([projectId, project]) =>
-    project.outcome === "unplaced" &&
-    deps.uncopiedProjectOutcome({ projectId, deliveryAttempt }) === "retry"
-      ? [projectId]
-      : [],
+  const outcomes = await Promise.all(
+    [...projects].map(async ([projectId, project]) =>
+      project.outcome === "unplaced" &&
+      (await deps.uncopiedProjects.outcomeOf({ projectId })) === "retry"
+        ? [projectId]
+        : [],
+    ),
   );
+  const waiting = outcomes.flat();
   if (waiting.length > 0) {
     throw new Error(`nurturing's placement copy of ${waiting.join(", ")} has not landed yet`);
   }
-}
-
-/** A batch's queue attempt (one delivery, so its items carry the same); outside the queue, the first. */
-function deliveryAttemptOf(items: readonly Readonly<{ context: PeerSubscriberContext }>[]): number {
-  return items[0]?.context.deliveryAttempt ?? 1;
 }
 
 /** Most root spans of one project and day the queue drains into one batch, one upsert. */
@@ -434,7 +436,6 @@ export function nurturingTraceDaySubscriber(
     handleBatch: (items) =>
       countInWindow({
         ...deps,
-        deliveryAttempt: deliveryAttemptOf(items),
         traces: items
           .filter(({ data }) => isCountedTrace(data))
           .map(({ data, context }) => countedTraceOf({ data, context })),
@@ -469,7 +470,6 @@ export function nurturingFailedTraceDaySubscriber(
     handleBatch: (items) =>
       countInWindow({
         ...deps,
-        deliveryAttempt: deliveryAttemptOf(items),
         traces: items
           .filter(({ data }) => isCustomerOrigin(data.origin))
           .map(({ data, context }) => ({
@@ -567,6 +567,8 @@ export function nurturingEvaluationDaySubscriber(
 /** Nurturing's own copies of owner facts, kept whether or not a channel syncs. */
 export type NurturingUsageCopies = Readonly<{
   placements: NurturingProjectPlacementRepository;
+  /** A project's placement copy was written: it is no longer uncopied. */
+  copyLanded: (input: Readonly<{ projectId: string }>) => Promise<void>;
   organizationsCreated: NurturingOrganizationCreatedRepository;
   members: NurturingOrganizationMemberRepository;
 }>;
@@ -574,7 +576,7 @@ export type NurturingUsageCopies = Readonly<{
 /** What the usage sync needs; absent without a Customer.io channel, when nothing syncs. */
 export type NurturingUsageSync = Readonly<{
   traceDays: NurturingTraceDayRepository;
-  uncopiedProjectOutcome: UncopiedProjectOutcomeOf;
+  uncopiedProjects: NurturingUncopiedProjects;
   usageChanged: UsageChanged;
   /** A trace's sync: the organization's, unless its counting window has ended. */
   tracesChanged: UsageChanged;
@@ -589,7 +591,7 @@ function nurturingProjectUsageHost({
   copies: NurturingUsageCopies;
   sync: NurturingUsageSync | undefined;
 }>) {
-  const { placements, organizationsCreated, members } = copies;
+  const { placements, copyLanded, organizationsCreated, members } = copies;
   // The copies always register, as nurturing's other copies do: a channel configured later
   // then finds the projects, organizations and members created before it.
   const copied = definePipeline({
@@ -597,7 +599,10 @@ function nurturingProjectUsageHost({
     aggregate: defineAggregate({ type: "nurturing_project_usage_view" }),
   })
     .withEvents([])
-    .withPeerSubscriber("projectPlacement", nurturingProjectPlacementSubscriber(placements))
+    .withPeerSubscriber(
+      "projectPlacement",
+      nurturingProjectPlacementSubscriber({ placements, copyLanded }),
+    )
     .withPeerSubscriber(
       "organizationCreated",
       nurturingOrganizationCreatedSubscriber(organizationsCreated),
@@ -659,8 +664,8 @@ function nurturingProjectUsageHost({
     );
   // Without a channel no sync reads the usage rows, and none prunes the trace days, so none is kept.
   if (!sync) return copied;
-  const { traceDays, uncopiedProjectOutcome, usageChanged, tracesChanged } = sync;
-  const counting = { traceDays, placements, organizationsCreated, uncopiedProjectOutcome };
+  const { traceDays, uncopiedProjects, usageChanged, tracesChanged } = sync;
+  const counting = { traceDays, placements, organizationsCreated, uncopiedProjects };
   const subscribers = [organizationUsageSubscriber(usageChanged)];
   const traceSyncs = nurturingTraceUsageSyncSubscribers(tracesChanged);
   return (
@@ -695,14 +700,21 @@ function nurturingProjectUsageHost({
  * Nurturing's own copy of a project's organization, from project's creation fact (§9). A move
  * stays within the organization and an archived project stays counted, so only creation writes.
  */
-export function nurturingProjectPlacementSubscriber(
-  placements: NurturingProjectPlacementRepository,
-): PeerSubscriberDefinition<typeof projectCreatedEventDataSchema> {
+export function nurturingProjectPlacementSubscriber({
+  placements,
+  copyLanded,
+}: Readonly<{
+  placements: Pick<NurturingProjectPlacementRepository, "recordProject">;
+  copyLanded: NurturingUsageCopies["copyLanded"];
+}>): PeerSubscriberDefinition<typeof projectCreatedEventDataSchema> {
   return {
     eventType: PROJECT_CREATED_EVENT_TYPE,
     data: projectCreatedEventDataSchema,
-    handle: ({ projectId, organizationId }) =>
-      placements.recordProject({ projectId, organizationId }),
+    // The copy first: a forget that fails retries the fact, and the write repeats harmlessly.
+    handle: async ({ projectId, organizationId }) => {
+      await placements.recordProject({ projectId, organizationId });
+      await copyLanded({ projectId });
+    },
   };
 }
 
@@ -785,13 +797,17 @@ export const nurturingProjectUsageEventing = defineEventingModule({
       store: repositories.projectUsage,
       copies: {
         placements: repositories.placements,
+        copyLanded: (input) => app.uncopiedProjectCopied(input),
         organizationsCreated: repositories.organizationsCreated,
         members: repositories.members,
       },
       sync: app.syncsOrganizationUsage()
         ? {
             traceDays: repositories.traceDays,
-            uncopiedProjectOutcome: (input) => app.uncopiedProjectOutcome(input),
+            uncopiedProjects: {
+              isDropped: (input) => app.uncopiedProjectDropped(input),
+              outcomeOf: (input) => app.uncopiedProjectOutcome(input),
+            },
             usageChanged: (input) => app.organizationUsageChanged(input),
             tracesChanged: (input) => app.organizationTracesChanged(input),
           }

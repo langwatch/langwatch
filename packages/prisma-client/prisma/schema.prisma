@@ -5093,6 +5093,14 @@ model NurturingProject {
   @@index([organizationId])
 }
 
+/// A project nurturing saw traces of with no placement copy, and when it first did: every worker
+/// retries its trace batches only within one window from then, across restarts. Deleted when the
+/// copy lands.
+model NurturingUncopiedProject {
+  projectId   String   @id
+  firstSeenAt DateTime @default(now())
+}
+
 /// Nurturing's own copy of each organization's members, from the owners' member facts (§9):
 /// organization's signed_up and invite_accepted and auth's sso_auto_added join, member_removed
 /// and member_disabled leave, member_enabled returns. Each column keeps its latest time.

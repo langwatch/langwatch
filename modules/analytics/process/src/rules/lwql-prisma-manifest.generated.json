@@ -20669,6 +20669,34 @@
       ]
     },
     {
+      "name": "NurturingUncopiedProject",
+      "tableName": "NurturingUncopiedProject",
+      "documentation": "A project nurturing saw traces of with no placement copy, and when it first did: every worker\nretries its trace batches only within one window from then, across restarts. Deleted when the\ncopy lands.",
+      "primaryKey": [
+        "projectId"
+      ],
+      "fields": [
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "firstSeenAt",
+          "columnName": "firstSeenAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
       "name": "NurturingOrganizationMember",
       "tableName": "NurturingOrganizationMember",
       "documentation": "Nurturing's own copy of each organization's members, from the owners' member facts (§9):\norganization's signed_up and invite_accepted and auth's sso_auto_added join, member_removed\nand member_disabled leave, member_enabled returns. Each column keeps its latest time.",

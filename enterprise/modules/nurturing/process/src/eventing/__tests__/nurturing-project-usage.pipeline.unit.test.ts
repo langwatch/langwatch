@@ -1,9 +1,9 @@
-import type { CioBatchCall } from "@langwatch/enterprise-nurturing-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
  * @see enterprise/modules/nurturing/specs/project-usage.feature
  */
+import type { CioBatchCall } from "@langwatch/enterprise-nurturing-contract";
 import {
   EVALUATOR_CREATED_EVENT_TYPE,
   EVALUATOR_DELETED_EVENT_TYPE,
@@ -28,7 +28,7 @@ import {
   SPAN_RECEIVED_EVENT_TYPE,
   TRACE_FAILED_EVENT_TYPE,
 } from "@langwatch/trace-contract";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingOrganizationCreatedRepository } from "../../repositories/memory/memory.nurturing-organization-created.repository.ts";
@@ -36,9 +36,9 @@ import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/
 import { MemoryNurturingProjectPlacementRepository } from "../../repositories/memory/memory.nurturing-project-placement.repository.ts";
 import { MemoryNurturingProjectUsageRepository } from "../../repositories/memory/memory.nurturing-project-usage.repository.ts";
 import { MemoryNurturingTraceDayRepository } from "../../repositories/memory/memory.nurturing-trace-day.repository.ts";
+import { MemoryNurturingUncopiedProjectRepository } from "../../repositories/memory/memory.nurturing-uncopied-project.repository.ts";
 import type { NurturingProjectUsageOwner } from "../../repositories/nurturing-project-usage.repository.ts";
 import {
-  queueRetryElapsedMs,
   TRACE_COUNTING_WINDOW_MS,
   UNCOPIED_PROJECT_RETRY_WINDOW_MS,
 } from "../../rules/nurturing-project-usage.rules.ts";
@@ -62,27 +62,11 @@ import {
 
 const OCCURRED_AT = 1_000;
 
-/** The first delivery attempt at or past the retry window: the last copy check, then a drop. */
-const FINAL_ATTEMPT =
-  Array.from({ length: 61 }, (_, index) => index + 1).find(
-    (attempt) => queueRetryElapsedMs({ attempt }) >= UNCOPIED_PROJECT_RETRY_WINDOW_MS,
-  ) ?? 61;
-
-/** The last delivery attempt an uncopied project's batch retries on. */
-const LAST_RETRY_ATTEMPT = FINAL_ATTEMPT - 1;
-
-/** The retry about 30 s after the first delivery, or the window's last if it is shorter. */
-const ABOUT_30_S_ATTEMPT = Math.min(
-  Array.from({ length: 61 }, (_, index) => index + 1).find(
-    (attempt) => queueRetryElapsedMs({ attempt }) >= 30_000,
-  ) ?? LAST_RETRY_ATTEMPT,
-  LAST_RETRY_ATTEMPT,
-);
-
 /**
  * The trace counts' dependencies: project-1 in org-1, created `createdAt`, once `copied` in
  * nurturing's placement copy and, once `organizationCopied`, in its creation copy; any other
- * project is never placed. Uncopied projects go through nurturing's own retry-or-drop service.
+ * project is never placed. Uncopied projects go through nurturing's own retry-or-drop service, on a
+ * clock the test moves by hand.
  */
 function countingOver({
   createdAt,
@@ -101,15 +85,24 @@ function countingOver({
   const organizationsCreated = MemoryNurturingOrganizationCreatedRepository.create({
     createdAt: new Map(organizationCopied ? [["org-1", createdAt]] : []),
   });
-  const uncopiedProjects = NurturingUncopiedProjectsService.create();
+  let now = createdAt;
+  const uncopiedProjects = NurturingUncopiedProjectsService.create({
+    uncopiedProjects: MemoryNurturingUncopiedProjectRepository.create(),
+    clock: { nowMs: () => now },
+  });
   return {
     traceDays,
     placements,
     organizationsCreated,
-    uncopiedProjectOutcome: uncopiedProjects.outcomeOf.bind(uncopiedProjects),
-    /** The copies' subscribers catch up. */
+    uncopiedProjects,
+    /** Moves the uncopied projects' clock on. */
+    advance: (ms: number) => {
+      now += ms;
+    },
+    /** The copies' subscribers catch up, the placement's forgetting the project as uncopied. */
     landCopies: async () => {
       await placements.recordProject({ projectId: "project-1", organizationId: "org-1" });
+      await uncopiedProjects.copyLanded({ projectId: "project-1" });
       await organizationsCreated.recordOrganizationCreated({ organizationId: "org-1", createdAt });
     },
   };
@@ -503,13 +496,8 @@ describe("the trace-day count", () => {
     span: { traceId, parentSpanId, status: { message: null, code } },
   });
 
-  /** One delivery: the span's project (tenant), its trace, append time and queue attempt. */
-  const itemOf = (
-    code: typeof OK | typeof ERROR,
-    traceId: string,
-    createdAt = NOON,
-    deliveryAttempt = 1,
-  ) => ({
+  /** One delivery: the span's project (tenant), its trace and append time. */
+  const itemOf = (code: typeof OK | typeof ERROR, traceId: string, createdAt = NOON) => ({
     data: spanData(null, code, traceId),
     context: {
       tenantId: createTenantId("project-1"),
@@ -517,7 +505,6 @@ describe("the trace-day count", () => {
       createdAt,
       occurredAt: createdAt,
       eventId: `${traceId}-${createdAt}`,
-      deliveryAttempt,
     },
   });
 
@@ -656,7 +643,7 @@ describe("the trace-day count", () => {
   });
 
   /** @scenario "A new project whose copy lands within the retry window is counted" */
-  it("retries a new project's trace until its copy lands a retry later, then counts it once", async () => {
+  it("retries a new project's trace until its copy lands about 30 seconds later, then counts it once", async () => {
     const counting = countingOver({ createdAt: NOON - 86_400_000, copied: false });
     const subscriber = nurturingTraceDaySubscriber(counting);
     const days = () =>
@@ -667,47 +654,54 @@ describe("the trace-day count", () => {
     );
     expect(await days()).toEqual([]);
 
+    counting.advance(30_000);
     await counting.landCopies();
-    await subscriber.handleBatch([itemOf(OK, "trace-1", NOON, ABOUT_30_S_ATTEMPT)]);
-    await subscriber.handleBatch([itemOf(OK, "trace-1", NOON, ABOUT_30_S_ATTEMPT + 1)]);
+    await subscriber.handleBatch([itemOf(OK, "trace-1")]);
+    await subscriber.handleBatch([itemOf(OK, "trace-1")]);
     expect((await days()).map((day) => day.traceCount)).toEqual([1]);
   });
 
   /** @scenario "A new project whose copy lands within the retry window is counted" */
-  it("counts a trace whose copy lands a second before the window ends, on the attempt at or past it", async () => {
+  it("counts a trace whose copy lands a second before the window ends, on the next retry", async () => {
     const counting = countingOver({ createdAt: NOON - 86_400_000, copied: false });
     const subscriber = nurturingTraceDaySubscriber(counting);
     const days = () =>
       counting.traceDays.findForProjects({ projectIds: ["project-1"], afterDay: "" });
-    expect(queueRetryElapsedMs({ attempt: LAST_RETRY_ATTEMPT })).toBeLessThan(
-      UNCOPIED_PROJECT_RETRY_WINDOW_MS - 1000,
-    );
 
-    await expect(
-      subscriber.handleBatch([itemOf(OK, "trace-1", NOON, LAST_RETRY_ATTEMPT)]),
-    ).rejects.toThrow("has not landed yet");
+    await expect(subscriber.handleBatch([itemOf(OK, "trace-1")])).rejects.toThrow(
+      "has not landed yet",
+    );
+    counting.advance(UNCOPIED_PROJECT_RETRY_WINDOW_MS - 1000);
+    await expect(subscriber.handleBatch([itemOf(OK, "trace-1")])).rejects.toThrow(
+      "has not landed yet",
+    );
     await counting.landCopies();
-    await subscriber.handleBatch([itemOf(OK, "trace-1", NOON, FINAL_ATTEMPT)]);
+    counting.advance(1000);
+    await subscriber.handleBatch([itemOf(OK, "trace-1")]);
 
     expect((await days()).map((day) => day.traceCount)).toEqual([1]);
   });
 
   /** @scenario "A project with no copy after the retries is dropped, and its later batches at once" */
-  it("drops an uncopied project's trace once its retries run out, and its later traces with no retry", async () => {
+  it("drops an uncopied project's trace once its window has passed, and its later traces with no read", async () => {
     const counting = countingOver({ createdAt: NOON - 86_400_000, copied: false });
     const subscriber = nurturingTraceDaySubscriber(counting);
     const days = () =>
       counting.traceDays.findForProjects({ projectIds: ["project-1"], afterDay: "" });
+    const placementReads = vi.spyOn(counting.placements, "getPlacement");
 
-    await expect(
-      subscriber.handleBatch([itemOf(OK, "trace-1", NOON, LAST_RETRY_ATTEMPT)]),
-    ).rejects.toThrow("has not landed yet");
-    await subscriber.handleBatch([itemOf(OK, "trace-1", NOON, FINAL_ATTEMPT)]);
-    await subscriber.handleBatch([itemOf(OK, "trace-2", NOON + 1000, 1)]);
+    await expect(subscriber.handleBatch([itemOf(OK, "trace-1")])).rejects.toThrow(
+      "has not landed yet",
+    );
+    counting.advance(UNCOPIED_PROJECT_RETRY_WINDOW_MS);
+    await subscriber.handleBatch([itemOf(OK, "trace-1")]);
+    placementReads.mockClear();
+    await subscriber.handleBatch([itemOf(OK, "trace-2", NOON + 1000)]);
+    expect(placementReads).not.toHaveBeenCalled();
     expect(await days()).toEqual([]);
 
     await counting.landCopies();
-    await subscriber.handleBatch([itemOf(OK, "trace-3", NOON + 2000, 1)]);
+    await subscriber.handleBatch([itemOf(OK, "trace-3", NOON + 2000)]);
     expect((await days()).map((day) => day.traceCount)).toEqual([1]);
   });
 

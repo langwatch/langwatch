@@ -14,7 +14,6 @@ import {
   type NurturingProjectUsageFact,
   organizationUsageTraits,
   PROJECT_USAGE_TRIAL_WINDOW_MS,
-  queueRetryElapsedMs,
   retriesUncopiedProject,
   TRACE_COUNTING_WINDOW_MS,
   UNCOPIED_PROJECT_RETRY_WINDOW_MS,
@@ -317,35 +316,17 @@ describe("createdRangeOfEndedWindows()", () => {
   });
 });
 
-describe("queueRetryElapsedMs()", () => {
-  /** @scenario "A new project whose copy lands within the retry window is counted" */
-  it("answers when the queue runs an attempt after the first: 0.5 s doubling, capped at 10 minutes", () => {
-    expect([1, 2, 3, 4].map((attempt) => queueRetryElapsedMs({ attempt }))).toEqual([
-      0, 500, 1_500, 3_500,
-    ]);
-    expect(queueRetryElapsedMs({ attempt: 25 }) - queueRetryElapsedMs({ attempt: 24 })).toBe(
-      600_000,
-    );
-  });
-});
-
 describe("retriesUncopiedProject()", () => {
-  /** @scenario "A project with no copy after the retries is dropped, and its later batches at once" */
-  it("retries every attempt that starts inside the window, and drops the first at or past it", () => {
-    const attempts = Array.from({ length: 25 }, (_, index) => index + 1);
-    const final =
-      attempts.find(
-        (attempt) => queueRetryElapsedMs({ attempt }) >= UNCOPIED_PROJECT_RETRY_WINDOW_MS,
-      ) ?? 0;
+  /** @scenario "The retry window is real time from first seen, shared by every worker and kept across a restart" */
+  it("retries while less than the window has passed since the project was first seen", () => {
+    const firstSeenAt = NOW;
 
+    expect(retriesUncopiedProject({ firstSeenAt, now: NOW })).toBe(true);
     expect(
-      attempts.filter((deliveryAttempt) => retriesUncopiedProject({ deliveryAttempt })),
-    ).toEqual(attempts.slice(0, final - 1));
-    expect(retriesUncopiedProject({ deliveryAttempt: final })).toBe(false);
-  });
-
-  /** @scenario "A new project whose copy lands within the retry window is counted" */
-  it("takes a delivery with no attempt as the first", () => {
-    expect(retriesUncopiedProject({})).toBe(retriesUncopiedProject({ deliveryAttempt: 1 }));
+      retriesUncopiedProject({ firstSeenAt, now: NOW + UNCOPIED_PROJECT_RETRY_WINDOW_MS - 1 }),
+    ).toBe(true);
+    expect(
+      retriesUncopiedProject({ firstSeenAt, now: NOW + UNCOPIED_PROJECT_RETRY_WINDOW_MS }),
+    ).toBe(false);
   });
 });

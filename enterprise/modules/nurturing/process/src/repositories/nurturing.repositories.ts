@@ -14,6 +14,7 @@ import type { NurturingProjectPlacementRepository } from "./nurturing-project-pl
 import type { NurturingProjectUsageRepository } from "./nurturing-project-usage.repository.ts";
 import type { NurturingTraceDayRepository } from "./nurturing-trace-day.repository.ts";
 import type { NurturingTracedProjectRepository } from "./nurturing-traced-project.repository.ts";
+import type { NurturingUncopiedProjectRepository } from "./nurturing-uncopied-project.repository.ts";
 
 /** The rows nurturing owns and the owners' project rows it reads (R40), chosen once at boot. */
 export interface NurturingRepositories {
@@ -35,5 +36,7 @@ export interface NurturingRepositories {
   /** Nurturing's own copies, written from the owners' facts (§9); read by nothing yet. */
   readonly personalProjects: NurturingPersonalProjectRepository;
   readonly tracedProjects: NurturingTracedProjectRepository;
+  /** When nurturing first saw each project with no placement copy, shared by every worker. */
+  readonly uncopiedProjects: NurturingUncopiedProjectRepository;
   readonly claims: NurturingClaimRepository;
 }

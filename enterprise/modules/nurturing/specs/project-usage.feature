@@ -19,12 +19,12 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   Customer.io removes them and a rolling trait never says "active" for ever; later syncs leave
   them out, and its trace rows are dropped. Nurturing's placement copy is written by its own
   subscriber, so a new project's first traces can arrive before it: for a project without a copy
-  the batch fails and the queue retries it, while each attempt starts inside a five-minute retry
-  window (the measured lag is seconds), until the copy lands. The first attempt at or past the
-  window checks the copy one last time; still uncopied, the trace is dropped and the
-  project is remembered in a bounded per-process set, so its later batches are dropped at once
-  with no retry; the copy is always read first, so a copy that lands later counts the project
-  again. A placed project whose organization has no creation copy belongs to an
+  the batch fails and the queue retries it, until the copy lands, for five minutes of real time
+  from when any worker first saw the project uncopied (the measured lag is seconds). That first
+  sighting is a row nurturing keeps, so every worker shares the window and a restart does not open
+  a new one. Past the window the trace is dropped and the project is cached in a bounded
+  per-process set, so its later batches are dropped at once with no read and no retry. The copy
+  landing deletes the row and the process's cached drop, so the project's later traces count. A placed project whose organization has no creation copy belongs to an
   organization created before the copy existed: its traces are dropped at once, as such
   organizations get no trace traits. Nothing else is read. Rows are kept 30 days: inside its
   counting window no organization has an older one, so a sync deletes old rows only past it. No span body reaches nurturing, and the rows are not rebuilt by a projection replay.
@@ -191,16 +191,24 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     Given a trace of a new project whose placement nurturing has not copied yet
     When the trace is counted
     Then the batch fails after counting the rest, and the queue retries it
-    And when the copy lands a retry later, about 30 seconds in, the trace counts once
-    And a copy landing a second before the window ends is counted on the first attempt at or past it
+    And when the copy lands about 30 seconds in, the next retry counts the trace once
+    And a copy landing a second before the window ends is counted on the next retry
 
   @unit
   Scenario: A project with no copy after the retries is dropped, and its later batches at once
     Given a project nurturing has no placement copy of
-    When its trace batch is still uncopied on the first attempt at or past the retry window
+    When its trace batch is still uncopied once the retry window from first seen has passed
     Then the batch is dropped without failing, and no count is written
-    And a later batch of the project is dropped at once, with no retry and no failure
-    And once the project's copy lands, its next trace counts
+    And a later batch of the project is dropped at once, with no read, no retry and no failure
+    And once the project's copy lands, its first-seen row and cached drop are deleted
+    And its next trace counts
+
+  @unit @integration
+  Scenario: The retry window is real time from first seen, shared by every worker and kept across a restart
+    Given a project nurturing has no placement copy of, first seen by one worker
+    When the window has passed and another worker, or the same one restarted, sees its trace batch
+    Then that batch is dropped at once, with no new window
+    And concurrent first sightings keep one first-seen time
 
   @unit
   Scenario: A trace of an organization older than nurturing's creation copy is dropped

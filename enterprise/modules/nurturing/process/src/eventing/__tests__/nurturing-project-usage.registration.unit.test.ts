@@ -11,7 +11,10 @@ import { describe, expect, it } from "vitest";
 import type { NurturingModule } from "../../app/nurturing.app.ts";
 import { MemoryNurturingOrganizationCreatedRepository } from "../../repositories/memory/memory.nurturing-organization-created.repository.ts";
 import { MemoryNurturingProjectPlacementRepository } from "../../repositories/memory/memory.nurturing-project-placement.repository.ts";
+import { MemoryNurturingUncopiedProjectRepository } from "../../repositories/memory/memory.nurturing-uncopied-project.repository.ts";
 import { MemoryNurturingRepositories } from "../../repositories/memory/memory.nurturing.repositories.ts";
+import { UNCOPIED_PROJECT_RETRY_WINDOW_MS } from "../../rules/nurturing-project-usage.rules.ts";
+import { NurturingUncopiedProjectsService } from "../../services/nurturing-uncopied-projects.service.ts";
 import {
   NURTURING_PROJECT_USAGE_PIPELINE_NAME,
   nurturingOrganizationCreatedSubscriber,
@@ -85,7 +88,10 @@ describe("the placement copies", () => {
   /** @scenario "A created project is placed in its organization from the creation fact" */
   it("places a created project in its organization, the same on a redelivery", async () => {
     const placements = MemoryNurturingProjectPlacementRepository.create();
-    const subscriber = nurturingProjectPlacementSubscriber(placements);
+    const subscriber = nurturingProjectPlacementSubscriber({
+      placements,
+      copyLanded: async () => {},
+    });
     const data = {
       tenantId: "project-1",
       projectId: "project-1",
@@ -108,11 +114,43 @@ describe("the placement copies", () => {
 
   /** @scenario "A moved or archived project keeps its placement" */
   it("takes only the creation fact, so a move or an archive writes nothing", () => {
-    const subscriber = nurturingProjectPlacementSubscriber(
-      MemoryNurturingProjectPlacementRepository.create(),
-    );
+    const subscriber = nurturingProjectPlacementSubscriber({
+      placements: MemoryNurturingProjectPlacementRepository.create(),
+      copyLanded: async () => {},
+    });
 
     expect(subscriber.eventType).toBe(PROJECT_CREATED_EVENT_TYPE);
+  });
+
+  /** @scenario "A project with no copy after the retries is dropped, and its later batches at once" */
+  it("forgets a project as uncopied once its copy is written, deleting its first-seen row", async () => {
+    let now = 1_000;
+    const uncopiedProjects = MemoryNurturingUncopiedProjectRepository.create();
+    const uncopied = NurturingUncopiedProjectsService.create({
+      uncopiedProjects,
+      clock: { nowMs: () => now },
+    });
+    await uncopied.outcomeOf({ projectId: "project-1" });
+    now += UNCOPIED_PROJECT_RETRY_WINDOW_MS;
+    await uncopied.outcomeOf({ projectId: "project-1" });
+    const placements = MemoryNurturingProjectPlacementRepository.create();
+    const subscriber = nurturingProjectPlacementSubscriber({
+      placements,
+      copyLanded: (input) => uncopied.copyLanded(input),
+    });
+
+    if (!subscriber.handle) throw new Error("placement handles one fact at a time");
+    await subscriber.handle(
+      { tenantId: "project-1", projectId: "project-1", organizationId: "org-1", occurredAt: now },
+      contextAt(now),
+    );
+
+    expect(uncopiedProjects.storedProjectIds()).toEqual([]);
+    expect(uncopied.isDropped({ projectId: "project-1" })).toBe(false);
+    await expect(placements.getPlacement({ projectId: "project-1" })).resolves.toEqual({
+      outcome: "known",
+      organizationId: "org-1",
+    });
   });
 
   /** @scenario "A project nurturing never saw created sends nothing" */
