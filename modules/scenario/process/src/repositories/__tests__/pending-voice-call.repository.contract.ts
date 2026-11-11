@@ -188,7 +188,6 @@ export function describePendingVoiceCallRepositoryContract(
 
   describe("given a pending call", () => {
     describe("when a different nonce is put for the same run", () => {
-      /** @scenario "A pending call cannot be put again with a different nonce" */
       it("refuses the put as pending and keeps the first call intact", async () => {
         const { repository } = await create();
         const first = freshPendingVoiceCall();
