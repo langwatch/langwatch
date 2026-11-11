@@ -20,7 +20,7 @@ import { ClickHouseMigrateTask } from "../clickhouse-migrate.task.ts";
 
 const MIGRATION = resolve(
   import.meta.dirname,
-  "../../migrations/00125_trace_analytics_metadata_columns.sql",
+  "../../migrations/00126_trace_analytics_metadata_columns.sql",
 );
 
 /** Each column and the `Attributes` key it is computed from. */

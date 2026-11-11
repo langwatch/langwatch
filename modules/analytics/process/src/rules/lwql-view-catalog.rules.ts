@@ -880,7 +880,7 @@ const TRACE_METRICS: UngatedViewDefinition = {
       sourceColumns: ["HasError"],
     },
     // The metadata keys the stock widgets read, copied out of `Attributes` by ClickHouse (goose
-    // 00125, tasks#1117), so a widget reads them without the map.
+    // 00126, tasks#1117), so a widget reads them without the map.
     {
       name: "MetadataOutputAction",
       type: "String",
