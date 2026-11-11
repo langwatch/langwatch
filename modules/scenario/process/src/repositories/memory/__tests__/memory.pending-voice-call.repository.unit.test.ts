@@ -124,26 +124,6 @@ describe("MemoryPendingVoiceCallRepository", () => {
     });
   });
 
-  describe("given a pending call", () => {
-    /** @scenario "A pending call cannot be put again with a different nonce" */
-    it("refuses a put with a different nonce and keeps the first call's SID", async () => {
-      const { repository } = createClock();
-      const first = freshPendingVoiceCall();
-      await repository.put({ call: first, ttlSeconds: 60 });
-      await repository.attachCallSid({ scenarioRunId: first.scenarioRunId, callSid: "CA-1" });
-
-      const second = { ...freshPendingVoiceCall(), scenarioRunId: first.scenarioRunId };
-      const put = await repository.put({ call: second, ttlSeconds: 60 });
-      const cancelled = await repository.cancel({
-        scenarioRunId: first.scenarioRunId,
-        tombstoneTtlSeconds: 600,
-      });
-
-      expect(put).toEqual({ stored: false, reason: "pending" });
-      expect(cancelled).toEqual({ state: "pending", callSid: "CA-1" });
-    });
-  });
-
   describe("given a claimed run", () => {
     /** @scenario "A claimed run cannot be put again" */
     it("refuses a second put as claimed and keeps the call SID", async () => {

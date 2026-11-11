@@ -103,6 +103,25 @@ describe("VoiceCallDialService", () => {
     });
   });
 
+  describe("given Twilio rejects the dial", () => {
+    it("answers dial-failed instead of throwing, and places no later call", async () => {
+      const { pending, callControl, service } = setup({
+        whileDialling: async () => {
+          throw new Error("simulated Twilio error");
+        },
+      });
+
+      const result = await service.dial(DIAL);
+
+      expect(result).toEqual({ dialed: false, reason: "dial-failed" });
+      expect(callControl.endedCalls).toEqual([]);
+      await expect(pending.peek({ scenarioRunId: "run-1", nonce: "nonce-1" })).resolves.toEqual({
+        found: true,
+        call: CALL,
+      });
+    });
+  });
+
   describe("given a run cancelled while Twilio is dialling", () => {
     it("ends the call it placed and answers cancelled", async () => {
       const { pending, callControl, service } = setup({

@@ -1,12 +1,16 @@
+import { createLogger } from "@langwatch/observability";
+
 import type { TwilioCallControlChannel } from "../../../channels/twilio-call-control.channels.ts";
 import {
   PENDING_VOICE_CALL_TTL_SECONDS,
   type PendingVoiceCallRepository,
 } from "../../../repositories/pending-voice-call.repository.ts";
 
+const logger = createLogger("langwatch:voice:call-dial");
+
 export type VoiceCallDialResult =
   | { dialed: true; callSid: string }
-  | { dialed: false; reason: "already-dialed" | "cancelled" | "expired" };
+  | { dialed: false; reason: "already-dialed" | "cancelled" | "expired" | "dial-failed" };
 
 /**
  * The worker dials a run's call (tasks#1002 slice 3): stores the call, then dials, so any pod can
@@ -34,11 +38,9 @@ export class VoiceCallDialService {
   }): Promise<VoiceCallDialResult> {
     const { projectId, scenarioRunId, nonce, to } = input;
 
-    // A same-nonce retry short-circuits here; `put` itself refuses a different nonce while a
-    // call is still pending, so a run never holds more than one pending call at a time.
-    const existing = await this.pending.peek({ scenarioRunId, nonce });
-    if (existing.found) return { dialed: false, reason: "already-dialed" };
-
+    // `put` itself refuses a run that already has a pending, claimed or cancelled call, so a
+    // same-nonce retry (or a retry after claim/cancel) answers `already-dialed`/`cancelled` from
+    // the store below without a separate peek.
     const stored = await this.pending.put({
       call: { nonce, projectId, scenarioRunId },
       ttlSeconds: PENDING_VOICE_CALL_TTL_SECONDS,
@@ -50,7 +52,16 @@ export class VoiceCallDialService {
       };
     }
 
-    const { callSid } = await this.callControl.placeCall({ projectId, to, nonce });
+    let callSid: string;
+    try {
+      callSid = (await this.callControl.placeCall({ projectId, to, nonce })).callSid;
+    } catch (error) {
+      // Twilio refused or failed the dial. The pending record keeps no SID until its TTL lapses,
+      // so a retry in that window answers already-dialed (the same bounded window as the
+      // claim/cancel crash; releasing early needs a new repository method).
+      logger.warn({ error, projectId, scenarioRunId }, "voice call dial failed");
+      return { dialed: false, reason: "dial-failed" };
+    }
     const attached = await this.pending.attachCallSid({ scenarioRunId, callSid });
     if (!attached.attached) {
       // The cancel or the lapse came while dialling and could not see this SID: hang up here.

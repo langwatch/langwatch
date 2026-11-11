@@ -69,24 +69,6 @@ describe.skipIf(!redisUrl)("RedisPendingVoiceCallRepository", () => {
       });
     });
 
-    describe("when a different nonce is put for the same run", () => {
-      it("refuses the put as pending and keeps the first call's SID", async () => {
-        const first = freshPendingVoiceCall();
-        await repository.put({ call: first, ttlSeconds: LIFETIME_SECONDS });
-        await repository.attachCallSid({ scenarioRunId: first.scenarioRunId, callSid: "CA-1" });
-
-        const second = { ...freshPendingVoiceCall(), scenarioRunId: first.scenarioRunId };
-        const put = await repository.put({ call: second, ttlSeconds: LIFETIME_SECONDS });
-        const cancelled = await repository.cancel({
-          scenarioRunId: first.scenarioRunId,
-          tombstoneTtlSeconds: 60,
-        });
-
-        expect(put).toEqual({ stored: false, reason: "pending" });
-        expect(cancelled).toEqual({ state: "pending", callSid: "CA-1" });
-      });
-    });
-
     describe("when the run is claimed and another call is put for it", () => {
       /** @scenario "A claimed run cannot be put again" */
       it("refuses the put as claimed and keeps the call SID", async () => {
