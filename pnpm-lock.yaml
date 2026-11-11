@@ -9294,6 +9294,9 @@ importers:
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-client
+      '@langwatch/data-privacy-contract':
+        specifier: workspace:*
+        version: link:../../data-privacy/contract
       '@langwatch/egress':
         specifier: workspace:*
         version: link:../../../packages/egress

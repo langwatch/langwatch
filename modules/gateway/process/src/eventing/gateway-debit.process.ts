@@ -1,3 +1,4 @@
+import { PII_REDACTION_REQUEST_TYPE } from "@langwatch/data-privacy-contract";
 import type { ProcessManagerApplier } from "@langwatch/eventing";
 import { z } from "zod";
 
@@ -184,6 +185,8 @@ export class GatewayDebitProcess {
     outcome: SpendOutcome,
   ): { state: GatewayDebitsState; intents?: Intent[] } {
     if (this.movedNothing(outcome)) return { state };
+    // A spent AI budget must never turn redaction off (ADR-201 decision 8).
+    if (outcome.data.request_type === PII_REDACTION_REQUEST_TYPE) return { state };
     const key = `debits:${outcome.status}`;
     const stated = this.attributionFromOutcome(outcome.data);
     if (stated) {
