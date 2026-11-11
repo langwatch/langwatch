@@ -42,7 +42,6 @@ Anything else nurturing needs belongs to another module and is reached through i
 | Name            | Token             | Module                                                  |
 | --------------- | ----------------- | ------------------------------------------------------- |
 | `organizations` | `OrganizationApi` | [organization](../../../modules/organization/README.md) |
-| `projects`      | `ProjectApi`      | [project](../../../modules/project/README.md)           |
 | `users`         | `UserApi`         | [user](../../../modules/user/README.md)                 |
 
 ## Who depends on nurturing

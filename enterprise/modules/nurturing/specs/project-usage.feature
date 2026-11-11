@@ -18,11 +18,12 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   syncs no more) sends each organization's trace traits once as null when its window ends, so
   Customer.io removes them and a rolling trait never says "active" for ever; later syncs leave
   them out, and its trace rows are dropped. Nurturing's placement copy is written by its own
-  subscriber, so a new project's first traces can arrive before it: for a project without a copy,
-  nurturing asks project's API when it was created, and while the project is younger than two
-  hours (inside the queue's retry budget of about 2.5 hours) the batch fails and the queue retries
-  until the copy lands; a trace of an older project, one created before the copy existed, is
-  dropped at once. A placed project whose organization has no creation copy belongs to an
+  subscriber, so a new project's first traces can arrive before it: for a project without a copy
+  the batch fails and the queue retries it, for about five minutes of the queue's backoff (one
+  named retry window), until the copy lands. When the retries run out the trace is dropped and the
+  project is remembered in a bounded per-process set, so its later batches are dropped at once
+  with no retry; the copy is always read first, so a copy that lands later counts the project
+  again. A placed project whose organization has no creation copy belongs to an
   organization created before the copy existed: its traces are dropped at once, as such
   organizations get no trace traits. Nothing else is read. Rows are kept 30 days: inside its
   counting window no organization has an older one, so a sync deletes old rows only past it. No span body reaches nurturing, and the rows are not rebuilt by a projection replay.
@@ -45,8 +46,8 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   On a usage sync a failed identify is reported and swallowed, as the
   other sinks' failures are; the group call stands. At a window's end it fails the sweep, which retries. A project's first trace syncs as later ones do. The
   signup day comes from its own copy of
-  lw.organization.created. It reads no other module's table and asks project's API nothing but an
-  uncopied project's creation time, and keeps no copy for projects or
+  lw.organization.created. It reads no other module's table and calls no other module's API for
+  a usage fact, and keeps no copy for projects or
   organizations created before it did: those send nothing. It never pulls owner state on a
   schedule, and sends counts and times only, never content. flagged_count waits on its
   definition. Without a Customer.io channel no fold, trace count or sync is registered: nothing is
@@ -185,19 +186,19 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     And the retried sweep sends the same nulls again
 
   @unit
-  Scenario: A new project's first trace waits for nurturing's copies
-    Given a trace of a project whose placement nurturing has not copied yet
-    When the trace is counted less than two hours after project created the project
+  Scenario: A new project whose copy lands within the retry window is counted
+    Given a trace of a new project whose placement nurturing has not copied yet
+    When the trace is counted
     Then the batch fails after counting the rest, and the queue retries it
-    And once the copies land the trace counts once
-    And when they never land, the trace is dropped without failing once the project is two hours old
+    And when the copy lands a retry later, about 30 seconds in, the trace counts once
 
   @unit
-  Scenario: A trace of a project older than nurturing's placement copy is dropped at once
-    Given a project nurturing has no placement copy of, created more than two hours ago or no longer held by project
-    When a trace of the project is counted, however young
-    Then it is dropped without failing the batch, and no count is written
-    And project's API is asked only for the project's creation time
+  Scenario: A project with no copy after the retries is dropped, and its later batches at once
+    Given a project nurturing has no placement copy of
+    When its trace batch is still uncopied on the last retry inside the retry window
+    Then the batch is dropped without failing, and no count is written
+    And a later batch of the project is dropped at once, with no retry and no failure
+    And once the project's copy lands, its next trace counts
 
   @unit
   Scenario: A trace of an organization older than nurturing's creation copy is dropped

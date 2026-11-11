@@ -30,6 +30,30 @@ export function isTraceCounted({
   return organizationCreatedAt !== null && at - organizationCreatedAt < TRACE_COUNTING_WINDOW_MS;
 }
 
+/** How long a project's batch is retried with no placement copy: sized from the measured project-to-copy lag (to be measured). */
+export const UNCOPIED_PROJECT_RETRY_WINDOW_MS = 5 * 60 * 1000;
+
+/** What a batch of a project nurturing has no placement copy of does: fail to be retried, or drop. */
+export type UncopiedProjectOutcome = "retry" | "drop";
+
+/**
+ * How long after a job's first attempt the queue runs `attempt`: group-queue's backoff, 0.5 s
+ * doubling to a 10-minute cap (packages/group-queue/src/groupQueue.ts JOB_RETRY_CONFIG), mirrored
+ * so nurturing depends on no queue package; a drift moves the window, never past the budget.
+ */
+export function queueRetryElapsedMs({ attempt }: Readonly<{ attempt: number }>): number {
+  let elapsed = 0;
+  for (let rung = 1; rung < attempt; rung++) elapsed += Math.min(500 * 2 ** (rung - 1), 600_000);
+  return elapsed;
+}
+
+/** Whether an uncopied project's batch retries: its next attempt still runs inside the window. */
+export function retriesUncopiedProject({
+  deliveryAttempt = 1,
+}: Readonly<{ deliveryAttempt?: number }>): boolean {
+  return queueRetryElapsedMs({ attempt: deliveryAttempt + 1 }) <= UNCOPIED_PROJECT_RETRY_WINDOW_MS;
+}
+
 /** The traits read from trace days: rolling, so each is removed when the window ends. */
 const TRACE_WINDOW_TRAITS = [
   "trace_count",

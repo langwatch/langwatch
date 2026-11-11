@@ -14,7 +14,10 @@ import {
   type NurturingProjectUsageFact,
   organizationUsageTraits,
   PROJECT_USAGE_TRIAL_WINDOW_MS,
+  queueRetryElapsedMs,
+  retriesUncopiedProject,
   TRACE_COUNTING_WINDOW_MS,
+  UNCOPIED_PROJECT_RETRY_WINDOW_MS,
 } from "../nurturing-project-usage.rules.ts";
 import type { NurturingTraceCounts } from "../nurturing-trace-day.rules.ts";
 
@@ -311,5 +314,41 @@ describe("createdRangeOfEndedWindows()", () => {
       after: NOW - 3_600_000 - TRACE_COUNTING_WINDOW_MS,
       upTo: NOW - TRACE_COUNTING_WINDOW_MS,
     });
+  });
+});
+
+describe("queueRetryElapsedMs()", () => {
+  /** @scenario "A new project whose copy lands within the retry window is counted" */
+  it("answers when the queue runs an attempt after the first: 0.5 s doubling, capped at 10 minutes", () => {
+    expect([1, 2, 3, 4].map((attempt) => queueRetryElapsedMs({ attempt }))).toEqual([
+      0, 500, 1_500, 3_500,
+    ]);
+    expect(queueRetryElapsedMs({ attempt: 25 }) - queueRetryElapsedMs({ attempt: 24 })).toBe(
+      600_000,
+    );
+  });
+});
+
+describe("retriesUncopiedProject()", () => {
+  /** @scenario "A project with no copy after the retries is dropped, and its later batches at once" */
+  it("retries an attempt only while its next retry lands inside the window", () => {
+    const attempts = Array.from({ length: 25 }, (_, index) => index + 1);
+    const retrying = attempts.filter((deliveryAttempt) =>
+      retriesUncopiedProject({ deliveryAttempt }),
+    );
+    const last = retrying.at(-1) ?? 0;
+
+    expect(retrying).toEqual(attempts.slice(0, last));
+    expect(queueRetryElapsedMs({ attempt: last + 1 })).toBeLessThanOrEqual(
+      UNCOPIED_PROJECT_RETRY_WINDOW_MS,
+    );
+    expect(queueRetryElapsedMs({ attempt: last + 2 })).toBeGreaterThan(
+      UNCOPIED_PROJECT_RETRY_WINDOW_MS,
+    );
+  });
+
+  /** @scenario "A new project whose copy lands within the retry window is counted" */
+  it("takes a delivery with no attempt as the first", () => {
+    expect(retriesUncopiedProject({})).toBe(retriesUncopiedProject({ deliveryAttempt: 1 }));
   });
 });
