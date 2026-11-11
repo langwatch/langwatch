@@ -134,10 +134,8 @@ export class DatasetsFacade {
   };
 
   /**
-   * Updates or adds rows, matching existing rows on a key column, for keeping a dataset in sync
-   * with rows held elsewhere such as files in a repository. A row whose `key` value an entry
-   * holds is updated in place, keeping the columns the entry leaves out; a new key adds a row;
-   * a row the entry would not change is not written, so running it again writes nothing.
+   * Upserts rows matched on a key column: a known key updates in place (columns left out are
+   * kept), a new key adds a row, and an unchanged row is not written, so a rerun writes nothing.
    * @param slugOrId - The slug or ID of the dataset
    * @param entries - The rows to upsert; each must hold the key column
    * @param options - The key column that identifies a row, such as "case_id"
