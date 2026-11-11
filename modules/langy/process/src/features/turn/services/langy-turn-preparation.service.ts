@@ -139,9 +139,8 @@ export class LangyTurnPreparationService {
             projectId,
           }),
       this.override.resolve(),
-      // The live UI-action channel is flagged (`release_langy_ui_actions`), and
-      // the turn block may only advertise it while the dispatch route would
-      // answer.
+      // The live UI-action channel is flagged (`release_langy_ui_actions`); the turn block
+      // may only advertise it while the dispatch route would answer.
       this.deps.uiActionSurface.resolve({
         userId,
         projectId,

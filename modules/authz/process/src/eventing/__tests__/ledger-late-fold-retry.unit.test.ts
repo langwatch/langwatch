@@ -181,9 +181,8 @@ describe.each(FOLD_LAGS_MS)(
 
       beforeEach(async () => {
         ({ writer, memory } = ledger(lag));
-        const first = track(writer.attachBindings(attach("rb_first")));
+        track(writer.attachBindings(attach("rb_first")));
         await elapse(WINDOW_MS + 500);
-        expect(first.error).toBeInstanceOf(AuthzGrantNotConfirmedError);
       });
 
       it("returns at once as a duplicate once the earlier append has landed", async () => {

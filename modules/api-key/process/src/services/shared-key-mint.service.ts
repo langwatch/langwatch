@@ -36,10 +36,9 @@ export class SharedKeyMintService {
   ) {}
 
   /**
-   * Mints a key once across every server (`mintOnce`): the claimant writes it, shares it sealed
-   * while its grants fold, then shares it active. A key whose grants have not landed is granted
-   * again by the next attempt, never written anew. `written` marks the call that activated it.
-   * A pending key revoked on purpose (it has a cause) is minted over, never reopened.
+   * Mints a key once across every server (`mintOnce`): written and shared sealed, then shared
+   * active once its grants fold. A retry grants the pending key again, never writes a new one,
+   * unless it was revoked on purpose. `written` marks the call that activated it.
    */
   mint(
     input: Omit<Mint, "apiKeys" | "isPending">,
@@ -126,9 +125,10 @@ async function mintShared(input: {
           ),
           isPending: input.isPending,
         });
-        const { shared, key } = pending
-          ? await reopen({ apiKeys, pending, input })
-          : await write({ apiKeys, hold, input });
+        const { shared, key } =
+          pending.kind === "pending"
+            ? await reopen({ apiKeys, pending: pending.shared, input })
+            : await write({ apiKeys, hold, input });
         await apiKeys.grantAndActivate(key);
         // Counted where the key goes live: a key written by one try, activated by another, is one.
         written = true;
@@ -160,11 +160,13 @@ async function firstPending({
 }: {
   candidates: SharedKey[];
   isPending: Mint["isPending"];
-}): Promise<SharedKey | undefined> {
+}): Promise<{ kind: "pending"; shared: SharedKey } | { kind: "none" }> {
   for (const candidate of candidates) {
-    if (!isPending || (await isPending(candidate.apiKeyId))) return candidate;
+    if (!isPending || (await isPending(candidate.apiKeyId))) {
+      return { kind: "pending", shared: candidate };
+    }
   }
-  return undefined;
+  return { kind: "none" };
 }
 
 type Mint = Parameters<typeof mintShared>[0];
