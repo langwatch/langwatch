@@ -525,6 +525,7 @@ describe("the plan questions (E6)", () => {
     free: false,
     maxMembers: 10,
     maxMembersLite: 10,
+    maxMembersDeveloper: 0,
     maxMessagesPerMonth: 10,
     canPublish: true,
     webhookEndpointsEnabled,

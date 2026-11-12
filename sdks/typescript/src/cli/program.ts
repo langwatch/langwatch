@@ -1626,13 +1626,22 @@ function registerEvaluatorCommands(program: Command): void {
   emitsResult(
     evaluatorCmd
       .command("create <name>")
-      .description("Create a new evaluator")
-      .requiredOption(
+      .description("Create a new evaluator: a built-in one (--type) or a custom code one (--code)")
+      .option(
         "--type <evaluatorType>",
-        "Evaluator type (e.g. langevals/llm_boolean; see `langwatch evaluator types`)",
+        "Built-in evaluator type (e.g. langevals/llm_boolean; see `langwatch evaluator types`)",
+      )
+      .option(
+        "--code <file>",
+        "Python file for a custom code evaluator (a class Code with __call__)",
+      )
+      .option(
+        "--input <name[:type]>",
+        "An input of the code evaluator, type defaulting to str (repeatable)",
+        collectParam,
       )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (name: string, options: { type: string }) => {
+    async (name: string, options: { type?: string; code?: string; input?: string[] }) => {
       try {
         const { createEvaluatorCommand: impl } = await import("./commands/evaluators/create.js");
         return await impl(name, options);

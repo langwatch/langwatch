@@ -1,5 +1,6 @@
 import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
 import {
+  ModelExecutionUnavailableError,
   ModelNotConfiguredError,
   type ModelProviderApi,
   type ModelProviderResolution,
@@ -144,6 +145,27 @@ describe("LangyTitleGeneratorService", () => {
         },
         generateText: async () => {
           throw unconfigured();
+        },
+      });
+      const generate = LangyTitleGeneratorService.create({
+        messages: messages(),
+        models: api,
+      }).generator();
+
+      await expect(generate(args)).resolves.toEqual({ outcome: "unchanged" });
+    });
+  });
+
+  describe("when the title model is a codex model this deployment cannot execute", () => {
+    /** @scenario "A title model this deployment cannot execute is not retried" */
+    it("keeps the placeholder title and raises nothing, so the outbox does not retry", async () => {
+      const { api } = modelProviders({
+        resolveModelForFeature: async () => ({ ...RESOLVED, model: "openai_codex/gpt-5.6-terra" }),
+        generateText: async () => {
+          throw new ModelExecutionUnavailableError({
+            model: "openai_codex/gpt-5.6-terra",
+            featureKey: "langy.conversation_title",
+          });
         },
       });
       const generate = LangyTitleGeneratorService.create({

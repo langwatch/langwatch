@@ -42,6 +42,7 @@ export function planWith({
     free: true,
     maxMembers: 2 + freeFull,
     maxMembersLite: freeLite,
+    maxMembersDeveloper: 0,
     maxMessagesPerMonth: 1_000_000,
     canPublish: true,
     prices: { USD: 0, EUR: 0 },

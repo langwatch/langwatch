@@ -11,7 +11,10 @@ T = TypeVar("T", bound="PostApiEvaluatorsBodyConfig")
 
 @_attrs_define
 class PostApiEvaluatorsBodyConfig:
-    """ """
+    """For a built-in evaluator: { evaluatorType, settings }. For a code evaluator: { code, inputs: [{ identifier, type }]
+    }; outputs are the fixed passed, score, label and details. For a workflow evaluator: {}.
+
+    """
 
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 

@@ -1,24 +1,33 @@
 import type { LocalToolCall } from "@langwatch/langy-contract";
 
-/** The longest command the activity line shows before it trails off. */
-const ACTIVITY_COMMAND_CAP = 120;
+/** "Ada's machine" from the person's name, else the machine's own name, else "your machine". */
+function machineLabel({
+  personName,
+  hostname,
+}: {
+  personName: string | null;
+  hostname: string | null;
+}): string {
+  const firstName = personName?.trim().split(/\s+/)[0];
+  if (firstName) return `${firstName}'s machine`;
+  return hostname?.trim() || "your machine";
+}
 
-/** What the panel says while one call runs on the developer's machine. */
+/**
+ * What the panel says while one call runs on the developer's machine. Never the
+ * command itself: the card already shows it, and a raw uv line reads as noise.
+ */
 export function callActivityLine({
   call,
-  machine,
+  personName,
+  hostname,
 }: {
   call: LocalToolCall;
-  machine: string;
+  personName: string | null;
+  hostname: string | null;
 }): string {
-  if (call.tool === "local_bash") {
-    const command = call.params.command.replace(/\s+/g, " ").trim();
-    const shown =
-      command.length > ACTIVITY_COMMAND_CAP
-        ? `${command.slice(0, ACTIVITY_COMMAND_CAP)}...`
-        : command;
-    return `Running on ${machine}: ${shown}`;
-  }
+  const machine = machineLabel({ personName, hostname });
+  if (call.tool === "local_bash") return `Running on ${machine}`;
   if (
     call.tool === "local_write" ||
     call.tool === "local_edit" ||

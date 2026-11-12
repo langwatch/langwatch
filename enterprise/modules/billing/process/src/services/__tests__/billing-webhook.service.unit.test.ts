@@ -134,6 +134,7 @@ const createMockItemCalculator = () => ({
     GROWTH_EVENTS_EUR_ANNUAL_UNTIL_MAR_2026: "price_growth_events_eur_annual_until_mar_2026",
     GROWTH_EVENTS_USD_MONTHLY_UNTIL_MAR_2026: "price_growth_events_usd_monthly_until_mar_2026",
     GROWTH_EVENTS_USD_ANNUAL_UNTIL_MAR_2026: "price_growth_events_usd_annual_until_mar_2026",
+    DEVELOPER_SEAT_EUR_MONTHLY: "price_developer_seat_eur_monthly",
   },
 });
 
@@ -153,6 +154,7 @@ const makeSubscription = (
   seatsKeptUntil: null,
   maxMembers: null,
   maxMembersLite: null,
+  maxMembersDeveloper: null,
   maxMessagesPerMonth: null,
   ...overrides,
 });
@@ -1385,6 +1387,80 @@ describe("EEWebhookService", () => {
           maxMembers: 5,
           maxMessagesPerMonth: 30_000,
         });
+      });
+
+      describe("when the subscription carries Growth seats", () => {
+        const updateWithItems = async (items: { price: { id: string }; quantity: number }[]) => {
+          subRepo.findByStripeId.mockResolvedValue(
+            makeSubscription({
+              status: SubscriptionStatus.ACTIVE,
+              plan: "GROWTH_SEAT_EUR_MONTHLY",
+            }),
+          );
+          subRepo.updateQuantities.mockResolvedValue({
+            outcome: "updated",
+            subscription: makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+          });
+          const promise = service.handleSubscriptionUpdated({
+            subscription: {
+              id: "sub_stripe_1",
+              status: "active",
+              canceled_at: null,
+              ended_at: null,
+              items: { data: items },
+            } as any,
+          });
+          await vi.advanceTimersByTimeAsync(2000);
+          await promise;
+        };
+
+        /** @scenario Developer seats bought on Growth become the Developer seat cap */
+        it("stores the Developer seat line quantity as the Developer seat cap", async () => {
+          await updateWithItems([
+            { price: { id: "price_growth_seat_eur_monthly" }, quantity: 5 },
+            { price: { id: "price_developer_seat_eur_monthly" }, quantity: 3 },
+          ]);
+
+          expect(subRepo.updateQuantities).toHaveBeenCalledWith(
+            expect.objectContaining({ id: "sub_db_1", maxMembers: 5, maxMembersDeveloper: 3 }),
+          );
+        });
+
+        /** @scenario Removing the Developer seat line sets the Developer seat cap to none */
+        it("stores a Developer seat cap of 0 when no Developer seat line remains", async () => {
+          await updateWithItems([{ price: { id: "price_growth_seat_eur_monthly" }, quantity: 5 }]);
+
+          expect(subRepo.updateQuantities).toHaveBeenCalledWith(
+            expect.objectContaining({ maxMembersDeveloper: 0 }),
+          );
+        });
+      });
+
+      /** @scenario A subscription without Growth seats keeps the Developer seat cap Ops set */
+      it("leaves the Developer seat cap alone on a tiered subscription", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "LAUNCH" }),
+        );
+        subRepo.updateQuantities.mockResolvedValue({
+          outcome: "updated",
+          subscription: makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        });
+
+        const promise = service.handleSubscriptionUpdated({
+          subscription: {
+            id: "sub_stripe_1",
+            status: "active",
+            canceled_at: null,
+            ended_at: null,
+            items: { data: [{ price: { id: "price_launch_users" }, quantity: 2 }] },
+          } as any,
+        });
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(subRepo.updateQuantities.mock.calls[0]?.[0]).not.toHaveProperty(
+          "maxMembersDeveloper",
+        );
       });
 
       /** @scenario Transition to active triggers a notification */

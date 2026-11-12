@@ -382,3 +382,32 @@ describe("generateLicenseKey overrides", () => {
     });
   });
 });
+
+describe("generateLicenseKey with Developer seats", () => {
+  /** @scenario A licence minted without Developer seats signs as it did before */
+  it("signs no Developer seat field when none are stated", () => {
+    const { licenseData, licenseKey } = generateLicenseKey(baseParams);
+
+    expect("maxMembersDeveloper" in licenseData.plan).toBe(false);
+    expect(
+      validateLicense({ licenseKey, publicKey: TEST_PUBLIC_KEY, now: fromDate(baseParams.now) })
+        .valid,
+    ).toBe(true);
+  });
+
+  /** @scenario A licence states its Developer seats */
+  it("signs the Developer seats stated and still validates", () => {
+    const { licenseData, licenseKey } = generateLicenseKey({
+      ...baseParams,
+      maxMembersDeveloper: 6,
+    });
+    const result = validateLicense({
+      licenseKey,
+      publicKey: TEST_PUBLIC_KEY,
+      now: fromDate(baseParams.now),
+    });
+
+    expect(licenseData.plan.maxMembersDeveloper).toBe(6);
+    expect(result.valid && result.planInfo.maxMembersDeveloper).toBe(6);
+  });
+});

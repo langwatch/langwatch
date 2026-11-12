@@ -1,4 +1,8 @@
-import { ModelNotConfiguredError, type ModelProviderApi } from "@langwatch/model-provider-contract";
+import {
+  ModelNotConfiguredError,
+  type ModelProviderApi,
+  type ModelProviderExecution,
+} from "@langwatch/model-provider-contract";
 import type { ProjectApi, ProjectWithTeam } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
@@ -64,7 +68,68 @@ function getModel(resolveModelForFeature: ModelProviderApi["resolveModelForFeatu
   });
 }
 
+const CODEX_MODEL = "openai_codex/gpt-5.6-terra";
+
+const codexProvider: ModelProviderExecution = {
+  id: "provider-codex",
+  organizationId: "organization-1",
+  provider: "openai_codex",
+  name: "Codex",
+  enabled: true,
+  routingHandle: null,
+  scopes: [],
+  customKeys: null,
+  customModels: [],
+  customEmbeddingsModels: [],
+  extraHeaders: [],
+  rateLimitRpm: null,
+  rateLimitTpm: null,
+  rateLimitRpd: null,
+  fallbackPriorityGlobal: null,
+  providerConfig: null,
+  createdAt: AT,
+  updatedAt: AT,
+  models: null,
+  embeddingsModels: null,
+  isSystem: false,
+  embeddingsUnsupported: false,
+};
+
+/** Built the way the app builds it: no codex handle is composed. */
+function getTitleModel() {
+  return ModelProviderExecutionHandleService.create({
+    modelProviders: createApiFixture<ModelProviderApi>({
+      getExecutionProviders: async () => ({ openai_codex: codexProvider }),
+      resolveModelForFeature: async ({ featureKey }) => ({
+        model: CODEX_MODEL,
+        source: "role_default",
+        scope: "project",
+        feature: {
+          key: featureKey,
+          role: "FAST",
+          displayName: "Langy chat titles",
+          description: "Names each Langy conversation from its messages.",
+        },
+      }),
+    }),
+    projects: createApiFixture<ProjectApi>({ findWithTeam: async () => project }),
+    executionProxyBaseUrl: "https://nlp.example.test/go/proxy/v1",
+  }).resolve({ projectId: project.id, featureKey: "langy.conversation_title" });
+}
+
 describe("ModelProviderExecutionHandleService", () => {
+  describe("given the feature resolves to a codex model and no codex handle is composed", () => {
+    describe("when the handle is asked for", () => {
+      /** @scenario "A codex model this process cannot execute is refused with a typed code" */
+      it("refuses with model_execution_unavailable, naming the model and feature", async () => {
+        await expect(getTitleModel()).rejects.toMatchObject({
+          code: "model_execution_unavailable",
+          meta: { model: CODEX_MODEL, featureKey: "langy.conversation_title" },
+        });
+      });
+    });
+  });
+
   describe("given no explicit model", () => {
     describe("when the feature-default resolver fails on infrastructure", () => {
       it("propagates the resolver's own failure instead of rescuing another model", async () => {

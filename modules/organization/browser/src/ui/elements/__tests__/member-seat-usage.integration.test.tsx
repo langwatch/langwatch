@@ -60,10 +60,12 @@ vi.mock("../../../behavior/organization-api.ts", () => ({
 
 import { MemberSeatUsage } from "../../sections/member-seat-usage.tsx";
 
-const planWith = ({ maxMembers, maxMembersLite }: { maxMembers: number; maxMembersLite: number }) =>
-  ({ maxMembers, maxMembersLite }) as any;
+type SeatPlan = { maxMembers: number; maxMembersLite: number; maxMembersDeveloper?: number };
 
-const renderSeatUsage = (plan: { maxMembers: number; maxMembersLite: number }) =>
+const planWith = ({ maxMembers, maxMembersLite, maxMembersDeveloper = 0 }: SeatPlan) =>
+  ({ maxMembers, maxMembersLite, maxMembersDeveloper }) as any;
+
+const renderSeatUsage = (plan: SeatPlan) =>
   renderWithDesignSystem(<MemberSeatUsage organizationId="org_1" activePlan={planWith(plan)} />);
 
 describe("given an organization with a seat allowance of each kind", () => {
@@ -91,13 +93,13 @@ describe("given an organization with a seat allowance of each kind", () => {
       expect(await screen.findByText("membersLite: 1 / 3")).toBeInTheDocument();
     });
 
-    /** @scenario Developers are counted and never capped */
-    it("shows the Developer seats with no limit beside them", async () => {
-      mockUsageData.current = { membersCount: 5, membersLiteCount: 5, membersDeveloperCount: 10 };
+    /** @scenario The member list shows Developer seats against the Developer seats paid for */
+    it("shows the Developer seats in use against the plan's Developer cap", async () => {
+      mockUsageData.current = { membersCount: 5, membersLiteCount: 5, membersDeveloperCount: 3 };
 
-      renderSeatUsage({ maxMembers: 5, maxMembersLite: 5 });
+      renderSeatUsage({ maxMembers: 5, maxMembersLite: 5, maxMembersDeveloper: 4 });
 
-      expect(await screen.findByText("Developers: 10 / none")).toBeInTheDocument();
+      expect(await screen.findByText("Developers: 3 / 4")).toBeInTheDocument();
     });
   });
 

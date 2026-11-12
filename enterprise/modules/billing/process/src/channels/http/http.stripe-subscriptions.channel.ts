@@ -31,6 +31,22 @@ export class HttpStripeSubscriptionsChannel extends StripeSubscriptionsChannel {
     return subscriptionOf(await this.stripe.subscriptions.retrieve(subscriptionId));
   }
 
+  async listCustomerSubscriptions({
+    customerId,
+  }: {
+    customerId: string;
+  }): Promise<BillingSubscription[]> {
+    const subscriptions: BillingSubscription[] = [];
+    for await (const subscription of this.stripe.subscriptions.list({
+      customer: customerId,
+      status: "all",
+      limit: 100,
+    })) {
+      subscriptions.push(subscriptionOf(subscription));
+    }
+    return subscriptions;
+  }
+
   async updateSubscription({
     subscriptionId,
     change,

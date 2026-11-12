@@ -176,6 +176,10 @@ import {
   type GatewayInstantEvalJudgeSpendPipeline,
 } from "../eventing/gateway-instant-eval-judge-spend.pipeline.ts";
 import {
+  buildGatewayPiiRedactionSpendPipeline,
+  type GatewayPiiRedactionSpendPipeline,
+} from "../eventing/gateway-pii-redaction-spend.pipeline.ts";
+import {
   buildGatewayPulledUsageLedgerPipeline,
   type GatewayPulledUsageLedgerPipeline,
 } from "../eventing/gateway-pulled-usage-ledger.pipeline.ts";
@@ -208,6 +212,7 @@ import { GatewayRealtimeSessionSweepService } from "../features/realtime-session
 import type { GatewayRealtimeSessionCollaborators } from "../features/realtime-session/services/gateway-realtime-session.service.ts";
 import { FixedGatewaySettlementPolicyService } from "../features/spend/services/fixed-gateway-settlement-policy.service.ts";
 import { GatewayInstantEvalJudgeSpendService } from "../features/spend/services/gateway-instant-eval-judge-spend.service.ts";
+import { GatewayPiiRedactionSpendService } from "../features/spend/services/gateway-pii-redaction-spend.service.ts";
 import { GatewaySpendDebitService } from "../features/spend/services/gateway-spend-debit.service.ts";
 import { GatewaySpendEventsService } from "../features/spend/services/gateway-spend-events.service.ts";
 import {
@@ -1460,6 +1465,16 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
   instantEvalJudgeSpendPipeline(): GatewayInstantEvalJudgeSpendPipeline {
     return buildGatewayInstantEvalJudgeSpendPipeline({
       spend: GatewayInstantEvalJudgeSpendService.create({
+        projects: this.#dependencies.projects,
+        recordPricedSpend: (input) => this.#internalProtocol.recordPricedSpend(input),
+      }),
+    });
+  }
+
+  /** gateway_pii_redaction_spend: the ledger row for each PII redaction model call (ADR-201). */
+  piiRedactionSpendPipeline(): GatewayPiiRedactionSpendPipeline {
+    return buildGatewayPiiRedactionSpendPipeline({
+      spend: GatewayPiiRedactionSpendService.create({
         projects: this.#dependencies.projects,
         recordPricedSpend: (input) => this.#internalProtocol.recordPricedSpend(input),
       }),

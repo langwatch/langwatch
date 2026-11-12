@@ -1906,6 +1906,65 @@ model ScimSsoConnectionView {
   @@index([organizationId, createdAt])
 }
 
+/// Organization's monthly seat peak, folded from its seat changes (modules/organization, ADR-002).
+/// A read model, one row per organization: rebuildable by replaying the event log, so no relation.
+/// Epochs in milliseconds.
+/// Organization's seat-peak counts (ADR-002): one row per organization once counting opened.
+model OrganizationSeatPeak {
+  /// The organization, which is also the aggregate id.
+  organizationId String @id
+  /// When the opening snapshot was taken, epoch milliseconds.
+  openedAt       Float
+  fullSeats      Int
+  liteSeats      Int
+  developerSeats Int
+  /// The latest change time applied to any holder; invitations expire up to it.
+  latestChangeAt Float
+  /// Changes whose `from` disagreed with the seat the fold held.
+  mismatches     Int
+}
+
+/// One member's or pending invitation's seat as the seat peak last applied it (ADR-002).
+model OrganizationSeatPeakHolder {
+  organizationId String
+  /// `member`, `invitation` or `hold` (a seat held after somebody left).
+  holderKind     String
+  /// The member's or the hold's userId, or the invitation's id.
+  holderId       String
+  /// `full`, `lite`, `developer` or `none`.
+  seat           String
+  lastChangedAt  Float
+  /// Absent for a seat the opening snapshot recorded.
+  lastChangeId   String?
+  /// An invitation's expiry; null for a member or an invitation that never expires.
+  expiresAt      Float?
+  /// The fold gave the invitation's seat back at `expiresAt`.
+  expiredByFold  Boolean @default(false)
+  /// A hold whose seat a live full invitation to its address took: that invitation's id.
+  suppressedBy   String?
+  /// The fold gave a suppressed hold its seat back when that invitation expired.
+  restoredByFold Boolean @default(false)
+
+  @@id([organizationId, holderKind, holderId])
+  @@index([organizationId, holderKind, seat, expiresAt])
+  @@index([organizationId, suppressedBy])
+}
+
+/// One calendar month's (UTC) seat peaks for an organization (ADR-002).
+model OrganizationSeatPeakMonth {
+  organizationId String
+  /// `YYYY-MM`.
+  month          String
+  fullPeak       Int
+  fullPeakAt     Float
+  litePeak       Int
+  litePeakAt     Float
+  fullAtEnd      Int
+  liteAtEnd      Int
+
+  @@id([organizationId, month])
+}
+
 enum PlanTypes {
   FREE
   PRO
@@ -4658,6 +4717,8 @@ model Subscription {
   maxWorkflows          Int?
   maxRetentionDays      Int?
   maxMembersLite        Int?
+  /// Developer seats the organization pays for; null falls to the plan's own cap.
+  maxMembersDeveloper   Int?
   maxTeams              Int?
   maxPrompts            Int?
   maxEvaluators         Int?
@@ -4932,7 +4993,7 @@ model Grant {
   // Which grants a braid change replaced, live or revoked (ADR-201 §2), is
   // served by "Grant_organizationId_replacesGrantId_idx", partial on
   // `WHERE "replacesGrantId" IS NOT NULL`, from migration
-  // 20261112180003_braids_grant_replaced_lookup; undeclarable for the same reason.
+  // 20261113180003_braids_grant_replaced_lookup; undeclarable for the same reason.
   //
   // "Grant_resource_terms_check" is an all-or-nothing CHECK over the tier's
   // four identity columns (token, permission, resourceKind, projectId), tied
