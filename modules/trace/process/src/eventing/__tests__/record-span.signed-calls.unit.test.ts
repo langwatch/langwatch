@@ -45,6 +45,8 @@ const orchestratorKey: SigningKey = {
   revoked: false,
 };
 
+const dottedKey: SigningKey = { ...orchestratorKey, publicId: "teamkey1", secret: "team-secret" };
+
 function hmacOf({ key, text }: { key: SigningKey; text: string }): string {
   return createHmac("sha256", `lwsk_${key.publicId}_${key.secret}`)
     .update(text, "utf8")
@@ -267,6 +269,85 @@ describe("span admission for signed calls", () => {
       });
 
       expect(stored[MARK]).toBeUndefined();
+    });
+
+    describe("when a signed key is sent twice, or shadowed by a nested value", () => {
+      const sentWith = (attributes: OtlpSpan["attributes"]): OtlpSpan => ({
+        ...span({ attributes: {} }),
+        attributes: [
+          ...attributes,
+          { key: "langwatch.signature", value: { stringValue: signedWeb() } },
+        ],
+      });
+
+      /** @scenario "A signed entry sent twice, or shadowed by a nested value, does not verify" */
+      it.each([
+        [
+          "the signed value then another",
+          [
+            { key: "orchestrator", value: { stringValue: "web" } },
+            { key: "orchestrator", value: { stringValue: "admin" } },
+          ],
+        ],
+        [
+          "another value then the signed one",
+          [
+            { key: "orchestrator", value: { stringValue: "admin" } },
+            { key: "orchestrator", value: { stringValue: "web" } },
+          ],
+        ],
+      ])("stores %s without a mark", async (_shape, attributes) => {
+        const directory = keyDirectory([orchestratorKey]);
+
+        const stored = await storedAttributes({
+          handler: admission({ signatures: directory }),
+          command: commandFor({ sent: sentWith(attributes) }),
+        });
+
+        expect(stored[MARK]).toBeUndefined();
+        expect(directory.asked).toEqual([]);
+      });
+
+      /** @scenario "A signed entry sent twice, or shadowed by a nested value, does not verify" */
+      it("stores a dotted key a nested value flattens onto without a mark", async () => {
+        const directory = keyDirectory([dottedKey]);
+        const signed = sign({ key: dottedKey, traceId: TRACE, entries: { "team.name": "web" } });
+        const sent: OtlpSpan = {
+          ...span({ attributes: {} }),
+          attributes: [
+            { key: "team.name", value: { stringValue: "web" } },
+            {
+              key: "team",
+              value: {
+                kvlistValue: { values: [{ key: "name", value: { stringValue: "admin" } }] },
+              },
+            },
+            { key: "langwatch.signature", value: { stringValue: signed } },
+          ],
+        };
+
+        const stored = await storedAttributes({
+          handler: admission({ signatures: directory }),
+          command: commandFor({ sent }),
+        });
+
+        expect(stored[`${VERIFIED_ATTRIBUTE_PREFIX}team.name`]).toBeUndefined();
+      });
+
+      it("stores the signature sent twice without a mark", async () => {
+        const directory = keyDirectory([orchestratorKey]);
+        const sent = sentWith([
+          { key: "orchestrator", value: { stringValue: "web" } },
+          { key: "langwatch.signature", value: { stringValue: signedWeb() } },
+        ]);
+
+        const stored = await storedAttributes({
+          handler: admission({ signatures: directory }),
+          command: commandFor({ sent }),
+        });
+
+        expect(stored[MARK]).toBeUndefined();
+      });
     });
 
     /** @scenario "A signing key is only looked up inside the span's own organisation" */

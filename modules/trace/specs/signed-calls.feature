@@ -58,6 +58,13 @@ Feature: Signed calls
       Then the span is stored without a verified mark
 
     @unit
+    Scenario: A signed entry sent twice, or shadowed by a nested value, does not verify
+      Given "orchestrator" signed the entry orchestrator "web"
+      When a span carries the signature with orchestrator sent twice, "web" then "admin", or with a nested value stored under the same key
+      Then the span is stored without a verified mark
+      And the signature is checked against the value the span is stored with, never another
+
+    @unit
     Scenario: A client cannot send its own verified mark
       When a span arrives carrying an attribute under langwatch.reserved.verified
       Then the attribute is removed before the span is stored

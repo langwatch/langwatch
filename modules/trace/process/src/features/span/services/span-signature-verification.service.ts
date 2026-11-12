@@ -7,6 +7,7 @@ import { VERIFIED_ATTRIBUTE_PREFIX } from "@langwatch/authorization";
 import { createLogger } from "@langwatch/observability";
 import type { OtlpSpan } from "@langwatch/otlp/trace-request";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { OtlpTraceRequestService } from "@langwatch/trace-contract/otlp-decoding";
 
 /** Longest a span waits on a signature check; past it the span is admitted unverified. */
 export const SPAN_SIGNATURE_VERIFICATION_TIMEOUT_MS = 1_000;
@@ -54,20 +55,27 @@ export class SpanSignatureVerificationService {
     });
   }
 
-  /** The signed entries a span offers, or unsigned when it carries no readable signature. */
+  /**
+   * The signed entries a span offers, read from the attributes as the store keeps them, or
+   * unsigned. A signed key or the signature sent twice, or kept as anything but the one string
+   * sent (a nested value flattened onto it), would verify one value and store another: unsigned.
+   */
   static signatureOf(span: OtlpSpan): SpanSignature {
-    const stringOf = (key: string): string | undefined => {
-      const value = span.attributes.find((attribute) => attribute.key === key)?.value;
-      return typeof value?.stringValue === "string" ? value.stringValue : undefined;
-    };
-    const signature = stringOf(BRAID_SIGNATURE_ATTRIBUTE);
-    if (signature === undefined) return { kind: "unsigned" };
+    const sentOf = (key: string) => span.attributes.filter((attribute) => attribute.key === key);
+    const [sentSignature, ...again] = sentOf(BRAID_SIGNATURE_ATTRIBUTE);
+    const signature = sentSignature?.value.stringValue;
+    if (typeof signature !== "string" || again.length > 0) return { kind: "unsigned" };
     const parsed = parseBraidSignature({ attribute: signature });
     if (!parsed) return { kind: "unsigned" };
+    const kept = OtlpTraceRequestService.normalizeOtlpAttributes(span.attributes);
+    if (kept[BRAID_SIGNATURE_ATTRIBUTE] !== signature) return { kind: "unsigned" };
     const entries: Record<string, string> = {};
     for (const key of parsed.keys) {
-      const value = stringOf(key);
-      if (value !== undefined) entries[key] = value;
+      const sent = sentOf(key);
+      if (sent.length === 0 && kept[key] === undefined) continue;
+      const value = sent.length === 1 ? sent[0]?.value.stringValue : undefined;
+      if (typeof value !== "string" || kept[key] !== value) return { kind: "unsigned" };
+      entries[key] = value;
     }
     return { kind: "signed", signature, entries };
   }
