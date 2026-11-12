@@ -635,3 +635,12 @@ not operations.
   braid reads no row past its end and offers a next page whenever it is full, so an exact end costs
   one empty page; rows naming their project rather than an owner are audited for every project not
   the reader's; `Verified("k")` also requires entry k present, so a mark without it never matches (§3, §8).
+- v1.19 (2026-11-12, from review, under the "never fail open" ruling). Every select that reads a table,
+  each UNION arm and subquery on its own, carries a tenant marker as a top-level AND conjunct of its own
+  WHERE; a JOIN reads only a subquery fenced on its own, and a comma join, a table function and `IN table`
+  are refused; reading a fenced subquery or the statement's own CTE needs no second marker, and
+  `{{idBound}}` bounds time only, so it never counts as one. No alias, CTE or window anywhere in a
+  statement takes a name the fence reads, in any case, quoted or bound, with or without AS, because an
+  alias reaches a subquery whose table lacks the column whatever the settings. The reader pins
+  `prefer_column_name_to_alias` and `enable_global_with_statement` on every statement; neither a
+  statement nor its caller can change them (§3).

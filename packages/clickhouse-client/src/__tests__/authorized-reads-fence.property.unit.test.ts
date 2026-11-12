@@ -35,7 +35,7 @@ import {
 import { StatementScopeError, type StatementScopeViolation } from "../statementScopeError.ts";
 
 const SEED = 0x5eed_b4a1;
-const CASES = 6000;
+const CASES = 8000;
 const NOW = 1_800_000_000_000;
 const READER = "proj_reader";
 const SECOND_OWN = "proj_reader_two";
@@ -53,6 +53,10 @@ const KNOWN_REFUSALS: ReadonlySet<StatementScopeViolation["kind"]> = new Set([
   "plain-marker-under-braids",
   "loose-latest-version-marker",
   "loose-tenant-marker",
+  "shadowing-alias",
+  "unfenced-select",
+  "pinned-setting",
+  "settings-under-braids",
   "unsupported-condition-version",
   "over-budget",
   "over-param-budget",
@@ -282,7 +286,32 @@ type StatementCase = {
   held: HeldTraceBound | undefined;
   /** A marker was put under OR, XOR or NOT, or outside its WHERE: the fence must refuse it. */
   loose: boolean;
+  /** An alias takes a name the fence reads, or a select reads a table past its own marker. */
+  breaches: boolean;
 };
+
+/** What heads a statement's select list: a plain list, an alias the fence reads, a subquery. */
+const PROJECTIONS = {
+  plain: [""],
+  breach: [
+    "'proj_reader' AS TenantId, ",
+    "map('orchestrator', 'web') AS SpanAttributes, ",
+    "'proj_reader' TenantId, ",
+    "'x' AS `SpanName`, ",
+    "now() as starttime, ",
+    "(SELECT any(SpanName) FROM stored_spans WHERE SpanId = {traceId:String}) AS n, ",
+  ],
+} as const;
+
+/** What the outer select reads: the span table, or a second table joined or listed beside it. */
+const SOURCES = {
+  plain: ["stored_spans"],
+  breach: [
+    "stored_spans a JOIN stored_spans b ON a.TraceId = b.TraceId",
+    "stored_spans, trace_summaries",
+    "stored_spans a JOIN trace_summaries b USING (TraceId)",
+  ],
+} as const;
 
 /** A random mix of every marker the fence reads, in shapes it accepts and shapes it refuses. */
 function statementOf(random: Random): StatementCase {
@@ -331,10 +360,16 @@ function statementOf(random: Random): StatementCase {
     const [lead, close] = pick({ random, from: ELECTION_LEADS });
     return `${lead}${ELECTION_TUPLE}${latest()} GROUP BY TenantId, TraceId, SpanId)${close}`;
   };
+  let breaches = false;
+  const breach = (text: string): string => {
+    breaches = true;
+    return text;
+  };
   const extras = [
     () => election(),
     mixedElection,
-    () => ` AND SpanId IN (SELECT SpanId FROM stored_spans WHERE 1 = 1${election()})`,
+    () => breach(` AND SpanId IN (SELECT SpanId FROM stored_spans WHERE 1 = 1${election()})`),
+    () => ` AND SpanId IN (SELECT SpanId FROM stored_spans WHERE ${conditions()}${election()})`,
     () => ` AND TraceId IN (SELECT TraceId FROM trace_summaries WHERE ${placed(tenantSet())})`,
     () =>
       ` AND TraceId IN (SELECT TraceId FROM trace_summaries WHERE ${placed(tenantScope(column()))})`,
@@ -342,23 +377,45 @@ function statementOf(random: Random): StatementCase {
     () => " AND TenantId = {tenant:String}",
     () => " AND a.TenantId = b.TenantId",
   ].filter(() => chance({ random, p: 0.12 }));
+  // Now and then a select reading a table past the fence, or a union arm fenced on its own.
+  const reads = [
+    () => breach(" UNION ALL SELECT SpanId, SpanName FROM stored_spans WHERE 1 = 1"),
+    () => ` UNION ALL SELECT SpanId, SpanName FROM stored_spans WHERE ${conditions()}`,
+    () => breach(" AND TraceId IN trace_summaries"),
+    () => breach(" UNION ALL SELECT toString(number), '' FROM numbers(10)"),
+  ].filter(() => chance({ random, p: 0.04 }));
   // Now and then a marker in a clause that filters no row: HAVING, or the select list.
   const clause = pick({ random, from: [...Array<string>(14).fill("where"), "having", "select"] });
   const stray = pick({ random, from: [conditions, () => tenantScope(column()), tenantSet] });
   loose ||= clause !== "where";
   const having = clause === "having" ? ` GROUP BY SpanId HAVING ${stray()}` : "";
   const selected = clause === "select" ? `${stray()} AS fenced, ` : "";
-  const body = `${outer}${extras.map((extra) => extra()).join("")}${having}`;
   const fragment = clause !== "select" && chance({ random, p: 0.25 });
+  const shaped = <T extends { plain: readonly string[]; breach: readonly string[] }>(from: T) =>
+    !fragment && chance({ random, p: 0.08 })
+      ? breach(pick({ random, from: from.breach }))
+      : pick({ random, from: from.plain });
+  const projection = shaped(PROJECTIONS);
+  const source = shaped(SOURCES);
+  const lead =
+    !fragment && chance({ random, p: 0.02 }) ? breach("WITH 'proj_reader' AS TenantId ") : "";
+  const tail = chance({ random, p: 0.03 })
+    ? breach(" SETTINGS prefer_column_name_to_alias = 0")
+    : "";
+  const read = [...extras, ...reads].map((extra) => extra()).join("");
+  const body = `${outer}${read}${having}${tail}`;
   const queryParams: Record<string, unknown> = { traceId: "tr-1", sinceMs: NOW - 60_000 };
   if (chance({ random, p: 0.05 }))
     queryParams[pick({ random, from: ["tenantScope_own", "idBound_x"] })] = "x";
   return {
-    text: fragment ? body : `SELECT SpanId, ${selected}SpanName FROM stored_spans WHERE ${body}`,
+    text: fragment
+      ? body
+      : `${lead}SELECT SpanId, ${projection}${selected}SpanName FROM ${source} WHERE ${body}`,
     queryParams,
     fragment,
     held,
     loose,
+    breaches,
   };
 }
 
@@ -484,6 +541,52 @@ function trailOf({ text, close }: { text: string; close: number }): string {
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+/** Names the fence reads, written out here so the oracle does not trust the reader's own list. */
+const FENCE_COLUMNS = [
+  "TenantId",
+  "TraceId",
+  "SpanId",
+  "UpdatedAt",
+  "SpanName",
+  "SpanAttributes",
+  "ResourceAttributes",
+  ...TENANT_SCOPE_TIME_COLUMNS,
+];
+const SHADOWING_ALIAS = new RegExp(
+  String.raw`(?:\bAS\s+|'\s+)[\`"]?(?:${FENCE_COLUMNS.join("|")})\b`,
+  "i",
+);
+
+/** The select scope around `position`: its group, cut at UNION, with nested selects left out. */
+function ownScopeOf({ text, position }: { text: string; position: number }): string {
+  const open = enclosingGroups({ text, position }).at(-1);
+  const end = open === undefined ? text.length : closingOf({ text, open });
+  let scope = "";
+  for (let index = open === undefined ? 0 : open + 1; index < end; index += 1) {
+    if (/^\((?:SELECT|WITH)\b/.test(text.slice(index, index + 6))) {
+      index = closingOf({ text, open: index });
+      scope += " G ";
+    } else if (text.startsWith(" UNION ", index) && index < position) {
+      scope = "";
+    } else if (text.startsWith(" UNION ", index)) {
+      break;
+    } else {
+      scope += text[index];
+    }
+  }
+  return scope;
+}
+
+/** Every select in the rendered text reading a table carries a fence expansion of its own. */
+function unfencedReadViolation({ text }: { text: string }): string | undefined {
+  for (const match of text.matchAll(/\bFROM\s+(?:stored_spans|trace_summaries|numbers)\b/g)) {
+    if (!/\bTenantId IN \(\{tenantScope_/.test(ownScopeOf({ text, position: match.index }))) {
+      return `a select reading a table with no fence of its own: ${text.slice(match.index, match.index + 60)}`;
+    }
+  }
+  return undefined;
+}
+
 type Outcome =
   | { kind: "refused"; reason: string }
   | { kind: "rendered"; text: string; params: Record<string, unknown> };
@@ -548,6 +651,10 @@ function violationsOf({
 }: ReturnType<typeof outcomeOf> & { outcome: Extract<Outcome, { kind: "rendered" }> }): string[] {
   const found: string[] = [];
   if (statement.loose) found.push("a marker under OR, XOR or NOT, or outside its WHERE, rendered");
+  if (statement.breaches) found.push("a shadowing alias or a select past the fence, rendered");
+  if (SHADOWING_ALIAS.test(outcome.text)) found.push("an alias the fence reads, rendered");
+  const unfencedRead = unfencedReadViolation({ text: outcome.text });
+  if (unfencedRead !== undefined) found.push(unfencedRead);
   const literals = outcome.text.match(/lit_[a-z]+_\d+/g);
   if (literals !== null) found.push(`condition literal in the text: ${literals[0]}`);
   const election = electionViolation({ text: outcome.text });

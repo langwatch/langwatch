@@ -13,6 +13,14 @@ export const ID_BOUND_PARAM_PREFIX = "idBound";
 /** Why a tenant marker is not a top-level AND conjunct of its WHERE. */
 export type LooseMarkerPlacement = "not-a-conjunct" | "outside-where" | "unreadable";
 
+/** How a select reads rows no marker of its own fences. */
+export type UnfencedReadReason =
+  | "no-marker"
+  | "table-join"
+  | "table-function"
+  | "table-in"
+  | "unreadable";
+
 export type StatementScopeViolation =
   | { kind: "missing-marker" }
   | { kind: "unknown-time-column"; column: string }
@@ -28,6 +36,9 @@ export type StatementScopeViolation =
   | { kind: "loose-latest-version-marker" }
   | { kind: "settings-under-braids" }
   | { kind: "loose-tenant-marker"; marker: string; placement: LooseMarkerPlacement }
+  | { kind: "shadowing-alias"; name: string }
+  | { kind: "unfenced-select"; reason: UnfencedReadReason }
+  | { kind: "pinned-setting"; setting: string }
   | { kind: "unsupported-condition-version"; version: number }
   | { kind: "uncompiled-braid-condition" }
   | { kind: "over-budget"; bytes: number; budget: number }
@@ -73,6 +84,12 @@ function describe(violation: StatementScopeViolation): string {
       return "The proof carries braids, so a SETTINGS clause in the statement could lift the time limit the proof's expiry sets. Pass settings through the reader's clickhouse_settings instead.";
     case "loose-tenant-marker":
       return describeLooseMarker(violation);
+    case "shadowing-alias":
+      return `The statement names an alias "${violation.name}", a name the fence reads; the fence would read the alias in place of the column. Name the alias something else.`;
+    case "unfenced-select":
+      return describeUnfencedRead(violation.reason);
+    case "pinned-setting":
+      return `The statement names the setting "${violation.setting}", which the reader pins on every statement.`;
     case "unsupported-condition-version":
       return `A braid's condition was compiled by compiler version ${violation.version}, which this reader cannot render.`;
     case "uncompiled-braid-condition":
@@ -81,6 +98,23 @@ function describe(violation: StatementScopeViolation): string {
       return `The expanded statement is ${violation.bytes} bytes, over the ${violation.budget}-byte budget ClickHouse parses.`;
     case "over-param-budget":
       return `The expanded statement binds ${violation.params} parameters, over the ${violation.budget} ClickHouse accepts in one request.`;
+  }
+}
+
+function describeUnfencedRead(reason: UnfencedReadReason): string {
+  const write =
+    "Write a tenant marker as a top-level AND conjunct of the WHERE of every select that reads a table.";
+  switch (reason) {
+    case "no-marker":
+      return `A select reads a table with no tenant marker in its own WHERE; a marker in another UNION arm or subquery fences none of its rows. ${write}`;
+    case "table-join":
+      return `A JOIN or a comma reads a table beside the fenced one. Join a subquery whose own WHERE carries a tenant marker instead. ${write}`;
+    case "table-function":
+      return `A select reads a table function, which no tenant marker fences. ${write}`;
+    case "table-in":
+      return `An IN reads a table by name, which no tenant marker fences. Write IN (a subquery whose WHERE carries a tenant marker). ${write}`;
+    case "unreadable":
+      return `The fence cannot follow what the statement reads with certainty (an unbalanced bracket, a FROM it cannot place, or a character it does not know), so it refuses it. ${write}`;
   }
 }
 

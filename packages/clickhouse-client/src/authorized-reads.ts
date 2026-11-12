@@ -39,6 +39,7 @@ import {
   type LooseMarkerPlacement,
   StatementScopeError,
   TENANT_SCOPE_PARAM_PREFIX,
+  type UnfencedReadReason,
 } from "./statementScopeError.ts";
 
 /** Resolves the routed client a project's reads are sent through. */
@@ -579,6 +580,16 @@ export function singleTenantOf({
   return tenants.length === 1 ? tenants[0] : undefined;
 }
 
+/**
+ * Settings sent with every statement, which neither its text nor its caller may change: a column
+ * wins over an alias of its name, and a statement's WITH reaches every select (ADR-201 §3).
+ */
+export const PINNED_SETTINGS = {
+  prefer_column_name_to_alias: 1,
+  enable_global_with_statement: 1,
+} as const;
+const PINNED_SETTING = new RegExp(`\\b(?:${Object.keys(PINNED_SETTINGS).join("|")})\\b`, "i");
+
 /** What a repository hands the reader: main's statement shape, rows always as JSONEachRow. */
 type ScopedQueryParams = {
   query: string;
@@ -637,14 +648,17 @@ export class TenantScopedReader {
       fence: this.deps.fence,
     });
     const client = await this.resolvedClient();
-    const settings = this.#settingsWithinProof(params.clickhouse_settings);
+    const settings = {
+      ...this.#settingsWithinProof(params.clickhouse_settings),
+      ...PINNED_SETTINGS,
+    };
     // The client expands an `{{idBound}}` marker, reading the index under this fence's tenants.
     const result = await client.query<Row>({
       tenantId: this.deps.tenantId,
       tenantIds: tenantsOf(this.deps.fence),
       sql: expanded.query,
       params: expanded.queryParams,
-      ...(settings ? { settings } : {}),
+      settings,
       ...(params.SKIP_COLD_SCAN_CHECK === true ? { SKIP_COLD_SCAN_CHECK: true } : {}),
       ...(params.idBound === undefined ? {} : { idBound: params.idBound }),
       ...(params.retryOnTimeout === false ? { retryOnTimeout: false } : {}),
@@ -734,6 +748,7 @@ export function expandStatement({
   if (expanded.windowed === 0) {
     throw new StatementScopeError({ kind: "missing-marker" });
   }
+  refuseUnfencedReads({ text: query });
   refuseUnappliedBraids({ fence, expanded });
   refuseOverBudget({ statement: expanded.text, params: expanded.queryParams });
   return { query: expanded.text, queryParams: expanded.queryParams };
@@ -1194,9 +1209,7 @@ function refuseLooseTenantMarkers({ text, fragment }: { text: string; fragment: 
   const [first] = written;
   if (first === undefined) return;
   const shape = shapeOf(text);
-  const markers = (shape?.tokens ?? []).flatMap((token, index) =>
-    token.kind === "marker" && IS_TENANT_MARKER.test(token.text) ? [index] : [],
-  );
+  const markers = shape === undefined ? [] : tenantMarkersOf(shape);
   // A marker the lexer did not read as one sits in a comment or a literal.
   if (shape === undefined || markers.length !== written.length) {
     throw new StatementScopeError({
@@ -1210,6 +1223,259 @@ function refuseLooseTenantMarkers({ text, fragment }: { text: string; fragment: 
     if (placement === "conjunct") continue;
     const name = shape.tokens[marker]?.text ?? first;
     throw new StatementScopeError({ kind: "loose-tenant-marker", marker: name, placement });
+  }
+}
+
+/** The tenant markers among a shape's tokens, by index. */
+const tenantMarkersOf = (shape: Shape): number[] =>
+  shape.tokens.flatMap((token, index) =>
+    token.kind === "marker" && IS_TENANT_MARKER.test(token.text) ? [index] : [],
+  );
+
+/** One term of each kind a compiled condition holds, so a new kind does not compile until added. */
+const PROBE_TERMS = {
+  attributeEquals: [
+    { kind: "attributeEquals", on: "span", key: "k", value: "v" },
+    { kind: "attributeEquals", on: "resource", key: "k", value: "v" },
+  ],
+  nameEquals: [{ kind: "nameEquals", value: "v" }],
+  attributePresent: [{ kind: "attributePresent", key: "k" }],
+  verified: [{ kind: "verified", key: "k" }],
+} satisfies {
+  [Kind in BraidConditionTerm["kind"]]: readonly Extract<BraidConditionTerm, { kind: Kind }>[];
+};
+
+/**
+ * Every name the fence's expansion reads, lower-cased: each word a probe fence renders (every time
+ * column, held bound and condition term) that calls nothing and is no keyword, and the election's
+ * keys off its head. An alias may take none of them, or the fence would read the alias.
+ */
+function fenceReadNamesOf(): ReadonlySet<string> {
+  const window: SharedWindow = { projectId: "p", from: 1, until: 2 };
+  const compiledWhere: CompiledWhere = {
+    version: BRAID_CONDITION_COMPILER_VERSION,
+    tree: { kind: "and", terms: Object.values(PROBE_TERMS).flat() },
+  };
+  const fence: TenantFence = {
+    own: ["p"],
+    shared: [window],
+    braids: {
+      reader: "p",
+      clauses: [
+        { kind: "traceWindow", digest: "", windows: [window] },
+        { kind: "braid", digest: "d", windows: [window], compiledWhere },
+      ],
+    },
+  };
+  const bounds: (HeldTraceParam | undefined)[] = [
+    undefined,
+    { kind: "traceId", param: "t" },
+    { kind: "sinceMs", param: "s" },
+  ];
+  const rendered = TENANT_SCOPE_TIME_COLUMNS.flatMap((column) => [
+    fenceExpression({ fence, column }).sql,
+    ...bounds.map((held) => conditionsExpression({ fence, column, held }).sql),
+  ]);
+  const tokens = tokensOf([...rendered, setExpression(fence).sql].join(" "));
+  if (tokens === undefined) throw new Error("the fence renders text its own reader cannot read");
+  const read = tokens.filter(
+    (token, index) =>
+      token.kind === "word" && tokens[index + 1]?.text !== "(" && !/^[A-Z]+$/.test(token.text),
+  );
+  const keys = ELECTION_HEAD.source.match(/[A-Z][a-z]\w*/g) ?? [];
+  return new Set([...read.map((token) => token.text), ...keys].map((name) => name.toLowerCase()));
+}
+
+/** The names no alias may take; exported so a test holds them to the columns the fence reads. */
+export const FENCE_READ_NAMES = fenceReadNamesOf();
+
+/** Words a column may follow; a fence name after another word, a value or a bracket is an alias. */
+const LEADS_A_COLUMN = new Set(
+  (
+    "SELECT DISTINCT ALL WHERE PREWHERE HAVING AND OR XOR NOT BY ON USING WHEN THEN ELSE CASE IN" +
+    " IS LIKE ILIKE BETWEEN EXISTS ANY FROM JOIN WITH INTERVAL GLOBAL OVER PARTITION QUALIFY TO STEP"
+  ).split(" "),
+);
+
+/** A token read as an identifier: a word or a quoted name, and `?` for one a parameter binds. */
+function identifierOf(token: MarkerToken | undefined): string | undefined {
+  if (token?.kind === "word") return token.text;
+  if (token?.kind !== "operand") return undefined;
+  if (/^\{\s*\w+\s*:\s*Identifier\s*\}$/i.test(token.text)) return "?";
+  const quote = token.text.charAt(0);
+  if (quote !== '"' && quote !== "`") return undefined;
+  return token.text
+    .slice(1, -1)
+    .replaceAll(`\\${quote}`, quote)
+    .replaceAll(quote + quote, quote);
+}
+
+/** A name the fence reads, in any case; a name a parameter binds could be any of them. */
+const readByFence = (name: string | undefined): name is string =>
+  name === "?" || (name !== undefined && FENCE_READ_NAMES.has(name.toLowerCase()));
+
+/** Whether a name after `before` is an alias written with no AS. */
+function isImplicitAlias(before: MarkerToken | undefined): boolean {
+  if (before === undefined || before.kind === "operator" || before.kind === "open") return false;
+  const word = wordOf(before);
+  return word === undefined || !LEADS_A_COLUMN.has(word);
+}
+
+/**
+ * Refuses an alias taking a name the fence reads: `AS name` (quoted or bound too), a CTE or window
+ * `name AS (…)`, or a name after a value, a bracket or a non-keyword. Statement-wide, since an
+ * alias reaches a subquery whose table lacks the column whatever the settings (ADR-201 §3).
+ */
+function refuseShadowingAliases(tokens: readonly MarkerToken[]): void {
+  for (const [index, token] of tokens.entries()) {
+    const before = tokens[index - 1];
+    const after = tokens[index + 1];
+    const as = wordOf(token) === "AS";
+    const named = as ? identifierOf(after?.text === "(" ? before : after) : identifierOf(token);
+    if (readByFence(named) && (as || isImplicitAlias(before))) {
+      throw new StatementScopeError({ kind: "shadowing-alias", name: named });
+    }
+  }
+}
+
+/** Functions whose own grammar writes FROM in their brackets: `EXTRACT(DAY FROM t)`, `trim(…)`. */
+const FROM_TAKING_FUNCTIONS = new Set(["EXTRACT", "TRIM", "SUBSTRING", "OVERLAY"]);
+const SET_OPERATORS = new Set(["UNION", "INTERSECT", "EXCEPT"]);
+
+const unfenced = (reason: UnfencedReadReason) =>
+  new StatementScopeError({ kind: "unfenced-select", reason });
+
+/** A group's selects: its units split at UNION, INTERSECT and EXCEPT. */
+function armsOf({ shape, group }: { shape: Shape; group: Group }): number[][] {
+  const arms: number[][] = [[]];
+  for (const at of unitsOf({ shape, from: group.open + 1, to: group.close })) {
+    if (SET_OPERATORS.has(wordOf(shape.tokens[at]) ?? "")) arms.push([]);
+    else arms.at(-1)?.push(at);
+  }
+  return arms;
+}
+
+/** The select arm a conjunct marker fences, climbing plain brackets, as `group:arm`. */
+function fencedArmOf({ shape, marker }: { shape: Shape; marker: number }): string {
+  let unit = marker;
+  let index = shape.groupOf[unit] ?? ROOT;
+  for (let group = shape.groups[index]; group?.kind === "plain"; group = shape.groups[index]) {
+    unit = group.open;
+    index = shape.groupOf[unit] ?? ROOT;
+  }
+  const group = shape.groups[index];
+  const arms = group === undefined ? [] : armsOf({ shape, group });
+  return `${index}:${arms.findIndex((units) => units.includes(unit))}`;
+}
+
+/** Names the statement's own WITH gives a subquery, `name AS (SELECT …)`, before its SELECT. */
+function cteNamesOf(shape: Shape): ReadonlySet<string> {
+  const units = unitsOf({ shape, from: 0, to: shape.tokens.length });
+  const select = units.findIndex((at) => wordOf(shape.tokens[at]) === "SELECT");
+  const names = new Set<string>();
+  for (const [index, at] of units.slice(0, Math.max(select, 0)).entries()) {
+    const name = identifierOf(shape.tokens[at]);
+    const body = shape.groups.find((group) => group.open === units[index + 2]);
+    const as = wordOf(shape.tokens[units[index + 1] ?? -1]) === "AS";
+    if (name !== undefined && as && body?.kind === "select") names.add(name);
+  }
+  return names;
+}
+
+/** What a FROM or JOIN reads: a subquery or the statement's CTE, fenced on its own, or a table. */
+function sourceOf({
+  shape,
+  at,
+  ctes,
+}: {
+  shape: Shape;
+  at: number | undefined;
+  ctes: ReadonlySet<string>;
+}): "fenced" | "table" {
+  const token = at === undefined ? undefined : shape.tokens[at];
+  if (token?.kind === "open") {
+    if (shape.groups.find((group) => group.open === at)?.kind === "select") return "fenced";
+    throw unfenced("unreadable");
+  }
+  const name = identifierOf(token);
+  if (at === undefined || name === undefined) throw unfenced("unreadable");
+  const next = shape.tokens[at + 1]?.text;
+  if (next === "(") throw unfenced("table-function");
+  return ctes.has(name) && next !== "." ? "fenced" : "table";
+}
+
+/** Whether a select arm reads a table by name; a JOIN or comma to one or a second FROM refuses. */
+function readsTable({
+  shape,
+  arm,
+  ctes,
+}: {
+  shape: Shape;
+  arm: readonly number[];
+  ctes: ReadonlySet<string>;
+}): boolean {
+  const from = arm.findIndex((at) => wordOf(shape.tokens[at]) === "FROM");
+  if (from === -1) return false;
+  const reads = sourceOf({ shape, at: arm[from + 1], ctes }) === "table";
+  let joining = true;
+  for (let index = from + 1; index < arm.length; index += 1) {
+    const at = arm[index] ?? -1;
+    const word = wordOf(shape.tokens[at]);
+    if (word === "FROM") throw unfenced("unreadable");
+    if (word === "JOIN") {
+      joining = wordOf(shape.tokens[arm[index - 1] ?? -1]) !== "ARRAY";
+      if (joining && sourceOf({ shape, at: arm[index + 1], ctes }) === "table") {
+        throw unfenced("table-join");
+      }
+    } else if (word !== undefined && CLAUSE_WORDS.has(word)) {
+      joining = false;
+    } else if (joining && shape.tokens[at]?.text === ",") {
+      throw unfenced("table-join");
+    }
+  }
+  return reads;
+}
+
+/** `x IN table` reads the whole table; a set is a bracket, a parameter or a function's value. */
+function refuseTablesInSets({
+  tokens,
+  ctes,
+}: {
+  tokens: readonly MarkerToken[];
+  ctes: ReadonlySet<string>;
+}): void {
+  for (const [index, token] of tokens.entries()) {
+    if (wordOf(token) !== "IN") continue;
+    const name = identifierOf(tokens[index + 1]);
+    if (name === undefined || tokens[index + 2]?.text === "(" || ctes.has(name)) continue;
+    throw unfenced("table-in");
+  }
+}
+
+/**
+ * Every select reading a table carries a tenant marker as a top-level AND conjunct of its own
+ * WHERE, each UNION arm and subquery on its own (ADR-201 §3). A subquery or the statement's CTE
+ * holds rows already fenced; a join or comma to a table, a table function and `IN table` refuse.
+ */
+function refuseUnfencedReads({ text }: { text: string }): void {
+  const setting = PINNED_SETTING.exec(text);
+  if (setting !== null) {
+    throw new StatementScopeError({ kind: "pinned-setting", setting: setting[0] });
+  }
+  const shape = shapeOf(text);
+  if (shape === undefined) throw unfenced("unreadable");
+  refuseShadowingAliases(shape.tokens);
+  const ctes = cteNamesOf(shape);
+  refuseTablesInSets({ tokens: shape.tokens, ctes });
+  const fenced = new Set(tenantMarkersOf(shape).map((marker) => fencedArmOf({ shape, marker })));
+  for (const [index, group] of shape.groups.entries()) {
+    const fromTaking = FROM_TAKING_FUNCTIONS.has(wordOf(shape.tokens[group.open - 1]) ?? "");
+    if (group.kind === "index" || (group.kind === "plain" && fromTaking)) continue;
+    for (const [arm, units] of armsOf({ shape, group }).entries()) {
+      if (readsTable({ shape, arm: units, ctes }) && !fenced.has(`${index}:${arm}`)) {
+        throw unfenced("no-marker");
+      }
+    }
   }
 }
 
@@ -1231,6 +1497,7 @@ export function expandFragment({
   refuseUnconditionedMarkers({ text: fragment, fence });
   refuseLooseTenantMarkers({ text: fragment, fragment: true });
   const expanded = replaceMarkers({ text: fragment, queryParams, fence });
+  refuseUnfencedReads({ text: fragment });
   refuseUnappliedBraids({ fence, expanded });
   return { sql: expanded.text, params: expanded.queryParams };
 }

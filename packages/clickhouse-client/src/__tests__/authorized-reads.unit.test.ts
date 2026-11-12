@@ -132,6 +132,28 @@ describe("AuthorizedClickHouse", () => {
         expect(sent().retryOnTimeout).toBe(false);
       });
 
+      /** @scenario "A column always wins over an alias of its name" */
+      it("pins a column over an alias of its name, whatever the caller's settings", async () => {
+        const { sent, clickhouse } = clientWith();
+        const reader = clickhouse.as(proof(), { reads: "traces" });
+
+        await reader.query({
+          query: `SELECT TraceId FROM trace_summaries WHERE ${tenantScope("OccurredAt")}`,
+          format: "JSONEachRow",
+          clickhouse_settings: {
+            prefer_column_name_to_alias: 0,
+            enable_global_with_statement: 0,
+            max_threads: 2,
+          },
+        });
+
+        expect(sent().settings).toMatchObject({
+          prefer_column_name_to_alias: 1,
+          enable_global_with_statement: 1,
+          max_threads: 2,
+        });
+      });
+
       // @scenario "The client adds the tenant set from the proof"
       it("restricts the query to tenants aggregate, A and B, and A and B to their windows", async () => {
         const { sent, resolveClient, clickhouse } = clientWith();

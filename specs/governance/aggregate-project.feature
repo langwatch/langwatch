@@ -156,6 +156,30 @@ Feature: An aggregate project reads its member projects
     # Checked on the caller's text before expansion, so the fence's own OR
     # between own projects and braid clauses is never seen.
 
+  @unit
+  Scenario: Every select that reads a table carries a tenant marker of its own
+    Given a statement with a UNION arm, a scalar subquery or a nested select reading a table with no tenant marker in its own WHERE
+    And a statement with a JOIN or comma to a table, a table function, or an IN over a table by name
+    When the store client expands it
+    Then the client refuses it as an unfenced select and no query runs
+    And a select reading a fenced subquery or the statement's own CTE, or joining a fenced subquery, renders as before
+    # {{idBound}} bounds time only, so it never counts as a select's tenant marker.
+
+  @unit
+  Scenario: No alias takes a name the fence reads
+    Given a statement naming an alias TenantId, SpanAttributes, a time column or another name the fence reads
+    And the alias is written with or without AS, quoted, in any case, in a WITH or an ARRAY JOIN
+    When the store client expands it
+    Then the client refuses it and no query runs
+
+  @integration
+  Scenario: A column always wins over an alias of its name
+    Given two tenants' spans and a statement whose alias shadows a column the fence reads
+    When the statement runs with ClickHouse's default settings
+    Then the other tenant's span passes the fence
+    And with the settings the reader pins on every statement only the fenced span passes
+    And neither the statement nor its caller can change those settings
+
   @integration
   Scenario: A plain project reads the same rows as before
     Given an ordinary project with traces
