@@ -159,7 +159,6 @@ function harness(
       protections: { catalogue: { permissions: [] }, canSeeCosts: true },
     }),
     getPlan: async () => ({ name: "Launch", isFree: true }),
-    database: () => "analytics",
     ...options.peers,
   };
 

@@ -4,6 +4,7 @@
  * policy.
  */
 import type { LangWatchQLColumn, LangWatchQLStatistics } from "@langwatch/analytics-contract";
+import type { TenantRoute } from "@langwatch/clickhouse-client";
 
 /** A submitted, already-validated query as it reaches the transport. */
 export interface LangWatchQLExecutionRequest {
@@ -45,9 +46,34 @@ export interface LangWatchQLConnection {
   readonly tenantSetting: string;
 }
 
-/** The narrow seam the LangWatchQL service depends on. */
-export abstract class LangWatchQLExecutorRepository {
+/** Where a statement over these projects runs; refuses rather than fall back to shared. */
+export type LangWatchQLTenantRouting = (input: {
+  tenantIds: readonly string[];
+}) => Promise<TenantRoute>;
+
+/** The server a run goes to, and its database where that is not the shared one. */
+export interface LangWatchQLRoute {
+  readonly executor: LangWatchQLExecutorRepository;
+  readonly database?: string;
+}
+
+/** The narrow seam the LangWatchQL service depends on: where a run goes, then what runs it. */
+export interface LangWatchQLRouter {
+  resolveRoute(input: { tenantIds: readonly string[] }): Promise<LangWatchQLRoute>;
+  close(): Promise<void>;
+}
+
+/** Runs a statement on one server; a single-server deployment routes every run to it. */
+export abstract class LangWatchQLExecutorRepository implements LangWatchQLRouter {
   abstract execute(request: LangWatchQLExecutionRequest): Promise<LangWatchQLExecutionResult>;
+
+  /**
+   * Where a run over these projects goes. A single-server executor is its own answer, on the
+   * deployment's database.
+   */
+  resolveRoute(_input: { tenantIds: readonly string[] }): Promise<LangWatchQLRoute> {
+    return Promise.resolve({ executor: this });
+  }
 
   /**
    * Releases whatever transport this executor holds.

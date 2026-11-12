@@ -225,6 +225,7 @@ function installation({
             protections: { catalogue: { permissions: [] } },
           }),
           validateLangWatchQL: () => ({ parameters: [], appFunctions: [] }),
+          validateLangWatchQLForRun: async () => ({ parameters: [], appFunctions: [] }),
           describeLangWatchQLJudgements: () => [JUDGEMENT],
           executeLangWatchQLPass: async () => execution([]),
           ...analytics,
@@ -452,7 +453,7 @@ describe("given a process that installs Instant Evals over the memory tier", () 
     it("hands the gate each target's statement with every parameter it declares bound", async () => {
       const gated: { sql: string; parameters: Record<string, unknown> }[] = [];
       const analytics: Partial<AnalyticsApi> = {
-        validateLangWatchQL: ({ sql, parameters = {} }) => {
+        validateLangWatchQLForRun: async ({ sql, parameters = {} }) => {
           const declared = [...sql.matchAll(/\{(\w+):/g)].map((match) => match[1] ?? "");
           const unbound = declared.filter((name) => !(name in parameters));
           if (unbound.length > 0) throw new Error(`unbound parameters: ${unbound.join(", ")}`);

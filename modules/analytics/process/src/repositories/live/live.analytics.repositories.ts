@@ -67,6 +67,7 @@ export class LiveAnalyticsRepositories {
         postgres: databaseTarget,
         database: () => prisma,
         unconfirmedSince: RedisLwqlUnconfirmedSinceRepository.create({ redis }),
+        routeTenantSet: ({ tenantIds }) => clickhouse.routeOfTenantSet({ tenantIds }),
       },
     };
   }

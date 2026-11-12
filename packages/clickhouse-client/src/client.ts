@@ -29,7 +29,7 @@ import type { RetryPolicy } from "./retry.ts";
 import type { StatementOperation, StatementReporter } from "./statementReporting.ts";
 import { ID_BOUND_PARAM_PREFIX, StatementScopeError } from "./statementScopeError.ts";
 import { extractQueryType, extractTableName } from "./statementShape.ts";
-import type { ClickHouseTenantPlacement, PrivateRouteVariable } from "./tenancy.ts";
+import type { ClickHouseTenantPlacement, PrivateRouteVariable, TenantRoute } from "./tenancy.ts";
 import type { TenantGuard } from "./tenantGuard.ts";
 import type { QueryTracer } from "./tracing.ts";
 
@@ -52,6 +52,8 @@ export interface ClickHouseQueryClientOptions {
   privateRouteVariables?: readonly PrivateRouteVariable[] | undefined;
   /** The organisation a tenant belongs to, from the router's cache; needed once a route exists. */
   organizationOf?: ((tenantId: string) => Promise<string>) | undefined;
+  /** Where a declared tenant set is answered, refusing as the connection does; shared if absent. */
+  routeTenantSet?: TenantSetRouting | undefined;
   /** The router's recorded placement and resolved server per tenant; none without a connection. */
   placementOf?: ((tenantId: string) => Promise<ClickHouseTenantPlacement>) | undefined;
   /** Builds the handled refusal for a read whose server stopped answering; raw by default. */
@@ -64,6 +66,9 @@ export interface ClickHouseQueryClientOptions {
    */
   insertCoalesceMaxRows?: number | undefined;
 }
+
+/** Routes a declared tenant set to one server, or refuses it; never falls back to shared. */
+export type TenantSetRouting = (input: { tenantIds: readonly string[] }) => Promise<TenantRoute>;
 
 /** The handled refusal for a read whose server did not answer once retries ran out. */
 export abstract class ClickHouseUnavailableErrorFactory {
@@ -112,6 +117,7 @@ export class ClickHouseQueryClient {
   private readonly routes: ReadonlyMap<string, string>;
   private readonly routeVariables: readonly PrivateRouteVariable[];
   private readonly organizationOf: ((tenantId: string) => Promise<string>) | undefined;
+  private readonly routeTenantSet: TenantSetRouting | undefined;
   private readonly placement:
     | ((tenantId: string) => Promise<ClickHouseTenantPlacement>)
     | undefined;
@@ -133,6 +139,7 @@ export class ClickHouseQueryClient {
     unavailableErrorFactory,
     overloadErrorFactory,
     organizationOf,
+    routeTenantSet,
     placementOf,
     insertCoalesceMaxRows,
   }: ClickHouseQueryClientOptions) {
@@ -147,6 +154,7 @@ export class ClickHouseQueryClient {
     this.unavailable = unavailableErrorFactory;
     this.overloaded = overloadErrorFactory;
     this.organizationOf = organizationOf;
+    this.routeTenantSet = routeTenantSet;
     this.placement = placementOf;
     this.idIndexRegistry = new IdIndexRegistry(this);
     this.coalescer =
@@ -194,6 +202,15 @@ export class ClickHouseQueryClient {
       throw new Error("A client built without its connection cannot name a tenant's placement.");
     }
     return this.placement(tenantId);
+  }
+
+  /**
+   * Where a declared tenant set's statements land, for a caller that dials its own identity.
+   * Unlike {@link targetOf}, a recorded private organisation with no route is refused, not shared.
+   */
+  routeOfTenantSet({ tenantIds }: { tenantIds: readonly string[] }): Promise<TenantRoute> {
+    if (this.routeTenantSet === undefined) return Promise.resolve({ kind: "shared" });
+    return this.routeTenantSet({ tenantIds });
   }
 
   /**

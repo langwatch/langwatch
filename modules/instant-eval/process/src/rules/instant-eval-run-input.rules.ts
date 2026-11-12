@@ -72,14 +72,11 @@ function statementSourceOf(input: InstantEvalRunInput): InstantEvalStatementSour
 
 export function instantEvalStatementFor({
   input,
-  database,
   now,
   filter,
   selection,
 }: {
   readonly input: InstantEvalRunInput;
-  /** The database the LangWatchQL views live in. */
-  readonly database: string;
   readonly now: Instant;
   /** The target's trace filter, already compiled against the trace view. */
   readonly filter?: CompiledInstantEvalFilter | null;
@@ -98,7 +95,6 @@ export function instantEvalStatementFor({
 
   return expandInstantEvalShorthand({
     shorthand: source.shorthand,
-    database,
     now,
     ...(filter ? { filter } : {}),
     ...(selection ? { selection } : {}),

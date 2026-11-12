@@ -98,6 +98,7 @@ import type {
 import { ClickHouseLangWatchQLExecutorRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
 import { LwqlKeyMapClickHouseRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-key-map.repository.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
+import { RoutedLangWatchQLExecutorRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-routed-executor.repository.ts";
 import type { LangWatchQLAppFunctionStoreRepository } from "../repositories/langwatch-ql-app-function-store.repository.ts";
 import type { LangWatchQLConnection } from "../repositories/langwatch-ql-executor.repository.ts";
 import {
@@ -566,7 +567,13 @@ export class AnalyticsModule
       queryHashKey: await queryHashKey(setup.secrets),
     });
     const langWatchQL = LangWatchQLServiceClass.create({
-      executor: connection ? ClickHouseLangWatchQLExecutorRepository.create({ connection }) : null,
+      executor: connection
+        ? RoutedLangWatchQLExecutorRepository.create({
+            connection,
+            route: langWatchQl.routeTenantSet,
+            createExecutor: (input) => ClickHouseLangWatchQLExecutorRepository.create(input),
+          })
+        : null,
       placement: LangWatchQLPlacementGateService.create({
         placement: setup.repositories.lwqlPlacement,
         target: lwqlTargetOf({ connection }),
@@ -1087,6 +1094,12 @@ export class AnalyticsModule
 
   validateLangWatchQL(input: LangWatchQLValidationInput): LangWatchQLAcceptedStatement {
     return this.#dependencies.langWatchQL.validate(input);
+  }
+
+  validateLangWatchQLForRun(
+    input: LangWatchQLValidationInput,
+  ): Promise<LangWatchQLAcceptedStatement> {
+    return this.#dependencies.langWatchQL.validateForRun(input);
   }
 
   /** The projects a card's editor may offer this member. */

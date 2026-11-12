@@ -382,11 +382,9 @@ function windowConditions(timeColumn: string): readonly string[] {
 
 /** The filter as a subquery over the trace view, time-bounded on its own. */
 function traceSubquery({
-  database,
   filterSql,
   traceColumn,
 }: {
-  readonly database: string;
   readonly filterSql: string;
   readonly traceColumn: string;
 }): string {
@@ -394,7 +392,7 @@ function traceSubquery({
   return (
     `${traceColumn} IN (\n` +
     `    SELECT TraceId\n` +
-    `    FROM ${database}.traces\n` +
+    `    FROM traces\n` +
     `    WHERE ${where}\n` +
     `  )`
   );
@@ -402,14 +400,11 @@ function traceSubquery({
 
 export function expandInstantEvalShorthand({
   shorthand,
-  database,
   now,
   filter,
   selection,
 }: {
   readonly shorthand: InstantEvalShorthandInput;
-  /** The database the LangWatchQL views live in. */
-  readonly database: string;
   readonly now: Instant;
   /** The caller's filter, already compiled against the trace view. */
   readonly filter?: CompiledInstantEvalFilter | null;
@@ -441,7 +436,6 @@ export function expandInstantEvalShorthand({
       template.filterPlacement === "inline"
         ? `(${applied.sql})`
         : traceSubquery({
-            database,
             filterSql: applied.sql,
             traceColumn: template.filterTraceColumn ?? "TraceId",
           }),
@@ -449,7 +443,7 @@ export function expandInstantEvalShorthand({
   }
 
   return {
-    sql: renderStatement({ template, columns, conditions, database }),
+    sql: renderStatement({ template, columns, conditions }),
     parameters: {
       start_at: clickHouseDateTime64(start),
       end_at: clickHouseDateTime64(end),
@@ -463,20 +457,17 @@ function renderStatement({
   template,
   columns,
   conditions,
-  database,
 }: {
   readonly template: TargetTemplate;
   readonly columns: readonly InstantEvalShorthandColumn[];
   readonly conditions: readonly string[];
-  readonly database: string;
 }): string {
   const projection = [
     ...template.projection,
     ...columns.map((column) => `${column.expression} AS ${column.id}`),
   ];
-  const from = template.alias
-    ? `${database}.${template.view} AS ${template.alias}`
-    : `${database}.${template.view}`;
+  // Unqualified on purpose: the run's route resolves it, so a private database name works.
+  const from = template.alias ? `${template.view} AS ${template.alias}` : template.view;
   return [
     `SELECT\n  ${projection.join(",\n  ")}`,
     `FROM ${from}`,

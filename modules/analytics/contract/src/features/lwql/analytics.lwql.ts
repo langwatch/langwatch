@@ -489,6 +489,8 @@ export abstract class LangWatchQLService {
     input: { protections: LangWatchQLProtections } & LangWatchQLEvalGate,
   ): LangWatchQLSchema;
   abstract validate(input: LangWatchQLValidationInput): LangWatchQLAcceptedStatement;
+  /** For a run about to start: the placement gate, then the route, then the statement on it. */
+  abstract validateForRun(input: LangWatchQLValidationInput): Promise<LangWatchQLAcceptedStatement>;
   abstract execute(
     input: LangWatchQLExecuteInput & LangWatchQLEvalGate,
   ): Promise<LangWatchQLQueryResult>;
