@@ -34,9 +34,11 @@ ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_analytics
 -- +goose StatementEnd
 
 -- One row per span, written by the spanAnalytics map projection from the same span event that
--- stored_spans is written from. ReplacingMergeTree(ProjectedAt): a replay or a redelivery writes
--- the span again and the later projection wins. Partitioned and TTL'd on StartTime like
--- stored_spans, so its rows age with the span they describe.
+-- stored_spans is written from. The store skips a span whose key is already stored, so the first
+-- copy wins and a replay or a redelivery only fills spans that are missing. ReplacingMergeTree
+-- (ProjectedAt) decides only between two copies that both got in, when their partition merges,
+-- and there the later projection wins. Partitioned and TTL'd on StartTime like stored_spans, so
+-- its rows age with the span they describe.
 -- +goose StatementBegin
 CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.span_analytics
 (

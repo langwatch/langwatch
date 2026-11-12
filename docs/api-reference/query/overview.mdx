@@ -66,7 +66,7 @@ Two column families are gated rather than freely selectable: free-text carriers 
 |------|-------------|-------|-------|-------------|
 | `traces` | One row per trace, with its timing, token, cost and error rollups. | `input`, `output`, `costs` | one row per (TenantId, TraceId), latest version only | `OccurredAt` |
 | `spans` | One row per span, with its timing, status and attributes. | `input`, `output`, `costs` | one row per (TenantId, TraceId, SpanId), latest version only | `StartTime` |
-| `span_metrics` | One row per span with its timing, status, cost and the LangWatch facts dashboards group by, and no attribute map. Holds spans from the span_analytics floor on. | `input`, `costs` | one row per (TenantId, TraceId, SpanId), latest version only | `StartTime` |
+| `span_metrics` | One row per span with its timing, status, cost and the LangWatch facts dashboards group by, and no attribute map. Holds spans from the span_analytics floor on. | `costs` | one row per (TenantId, TraceId, SpanId); a duplicate span is counted | `StartTime` |
 | `logs` | Canonical OpenTelemetry log records: requests, responses and provider events, correlated to their trace and span. | `input`, `output` | one row per (TenantId, TraceId, TimeUnixMs, RecordId) | `TimeUnixMs` |
 | `log_ingestion_usage` | Per-tenant log ingestion usage estimates. | None | one row per (OrganizationId, RecordId), latest version only | `AcceptedAt` |
 | `metric_points` | Individual metric data points with gauges, sums, histograms, and summaries | `output` | one row per (SeriesId, TimeUnixMs, PointId) | `TimeUnixMs` |
