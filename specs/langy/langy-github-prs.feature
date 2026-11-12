@@ -196,3 +196,21 @@ Feature: Langy opens GitHub PRs via the installed GitHub App
     When a turn reserves a pull-request permit
     Then the reservation is allowed
     And the turn is told nothing was reserved, so it releases nothing
+
+  # ── What the github skill teaches about the clone ──────────────────────
+
+  # A cloud replay could not run a repository's tests because a Python
+  # dependency was missing, and the clone never had its dependencies installed.
+  @unit
+  Scenario: The github skill installs the clone's dependencies before running its tests
+    When the github skill is read
+    Then it tells Langy to install the repository's dependencies first, with the tool the repository's files name
+    And it names uv sync, uv pip install -r requirements.txt and npm ci among them
+    And when the install fails it tells Langy to run the tests in the repository's CI with gh workflow run
+
+  # The file tools take a path as text, so "$HOME/work/<repo>" used to reach
+  # them literally.
+  @unit
+  Scenario: The github skill gives the file tools the clone's absolute path
+    When the github skill is read
+    Then it tells Langy to give the read, edit and write tools the absolute path pwd prints
