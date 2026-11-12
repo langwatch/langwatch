@@ -1,3 +1,5 @@
+import type { UnknownTraceFilterFieldHint } from "@langwatch/trace-contract";
+
 /**
  * What an unknown trace filter field most likely meant, so a caller that guessed a name learns
  * the one the language has. Spec: specs/traces/trace-filter-api.feature.
@@ -62,9 +64,6 @@ function fieldsSpelledLike(name: string, knownFields: readonly string[]): string
     .toSorted((a, b) => a.distance - b.distance)
     .map(({ field }) => field);
 }
-
-/** What an unknown field most likely meant, or that nothing fits. */
-type UnknownTraceFilterFieldHint = { kind: "hint"; text: string } | { kind: "none" };
 
 /** Points an unknown field at the field or the free-text search the language has. */
 export function hintForUnknownTraceFilterField({

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { hintForUnknownTraceFilterField } from "../trace-query-unknown-field.ts";
+import { hintForUnknownTraceFilterField } from "../trace-query-unknown-field.rules.ts";
 
 const knownFields = ["status", "label", "user", "conversation", "traceName", "model"];
 

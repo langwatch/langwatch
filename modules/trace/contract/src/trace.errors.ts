@@ -2,7 +2,9 @@ import { HandledError, NotFoundError, remediation } from "@langwatch/handled-err
 
 import type { AiActionErrorDetails } from "./features/query/trace-ai-query.ts";
 import { FILTER_TOO_COMPLEX_MESSAGE } from "./features/query/trace-query-analysis.ts";
-import { hintForUnknownTraceFilterField } from "./features/query/trace-query-unknown-field.ts";
+
+/** What an unknown filter field most likely meant, or that nothing fits. */
+export type UnknownTraceFilterFieldHint = { kind: "hint"; text: string } | { kind: "none" };
 
 /** The configured model provider did not produce a usable trace query. */
 export class AiQueryProviderError extends HandledError {
@@ -156,8 +158,12 @@ export class FilterTooComplexError extends HandledError {
 export class FilterFieldUnknownError extends HandledError {
   declare readonly code: "filter_field_unknown";
 
-  constructor(field: string, knownFields: string[]) {
-    const found = hintForUnknownTraceFilterField({ field, knownFields });
+  /** `found` names the field or the free-text search the caller most likely meant. */
+  constructor(
+    field: string,
+    knownFields: string[],
+    found: UnknownTraceFilterFieldHint = { kind: "none" },
+  ) {
     const hint = found.kind === "hint" ? found.text : null;
     super("filter_field_unknown", [`Unknown field: @${field}.`, hint].filter(Boolean).join(" "), {
       httpStatus: 422,
