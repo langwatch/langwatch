@@ -90,9 +90,6 @@ const traceAnalyticsEvents = [
  */
 export const TRACE_ANALYTICS_PROJECTION_VERSION_LATEST = "2026-11-12" as const;
 
-/** The stamp before the fold kept evaluation outcomes; its rows decode with none. */
-export const TRACE_ANALYTICS_PROJECTION_VERSION_PRE_EVALUATIONS = "2026-11-11" as const;
-
 /** The stamp before the fold wrote its metadata columns; its rows decode the same way. */
 export const TRACE_ANALYTICS_PROJECTION_VERSION_PRE_METADATA = "2026-07-29" as const;
 

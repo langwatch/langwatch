@@ -11,6 +11,8 @@ export type TraceAnalyticsProjectionEntry = {
 export type TraceAnalyticsProjectionRead = {
   row: TraceAnalyticsRow;
   appliedEventIds: string[];
+  /** A read-back column would not decode: the fold rebuilds instead of storing over it. */
+  undecodable?: true;
 };
 
 /** Private persistence capability for the trace_analytics projection. */

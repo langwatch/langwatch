@@ -99,6 +99,13 @@ Feature: Each evaluation's outcome is kept beside its trace's columns
     And the trace row records the rows' digest
 
   @unit
+  Scenario: Unreadable stored outcomes are rebuilt from the trace's events, never stored over
+    Given a trace row whose stored evaluation outcomes do not decode
+    When the fold reads that row back
+    Then the read reports the row undecodable rather than a state with no outcomes
+    And the fold rebuilds the trace from its events instead of storing over the row
+
+  @unit
   Scenario: Evaluation rows keep async inserts and plain reads while the quorum flag is off
     Given the evaluation analytics quorum flag is off, its default
     When evaluation rows are written and the live rows are read back

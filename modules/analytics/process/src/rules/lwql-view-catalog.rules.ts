@@ -424,16 +424,17 @@ const SPAN_METRICS: UngatedViewDefinition = {
   sourceTable: "span_analytics",
   description:
     "One row per span with its timing, status, cost and the LangWatch facts dashboards group by, and no attribute map. Holds spans from the span_analytics floor on.",
-  grain: "one row per (TenantId, TraceId, SpanId)",
+  grain: "one row per (TenantId, TraceId, SpanId), latest version only",
   joinKeys: ["TenantId", "TraceId", "SpanId"],
   timeColumn: "StartTime",
   freshness: PROJECTION_FRESHNESS,
-  // Read plainly: SpanAnalyticsStore looks a span's key up before it appends, so the first copy
-  // is the only one (ADR-034 amendment). A dedup here kept every span key of the period in
-  // memory (analytics ADR-006).
+  // A span's StartTime comes from the span itself and never changes, so it is grouped beside the
+  // key and a period filter prunes partitions.
   dedup: {
     keyColumns: ["TenantId", "TraceId", "SpanId"],
-    strategy: "none",
+    versionColumn: "ProjectedAt",
+    strategy: "latest-in-order",
+    stableColumns: ["StartTime"],
   },
   columns: [
     {

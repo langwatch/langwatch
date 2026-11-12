@@ -294,6 +294,20 @@ Feature: Product sidebars
     When I open a Gateway page and then open a dashboard address
     Then the page draws the Dashboards sidebar
 
+  @unit
+  Scenario: A sidebar hint from another project is ignored
+    Given I opened a dashboard from LLM Ops in one project
+    When I open a dashboard address in another project or organization
+    Then the page draws the Dashboards sidebar
+    And the device remembers "dashboards" for that organization
+
+  @unit
+  Scenario: A sidebar hint for an unreachable LLM Ops is ignored
+    Given this tab holds an LLM Ops hint
+    And my seat does not reach LLM Ops
+    When I open a dashboard address
+    Then the page draws the Dashboards sidebar
+
   @integration
   Scenario: The remembered product is the sidebar drawn
     Given I opened a dashboard from LLM Ops

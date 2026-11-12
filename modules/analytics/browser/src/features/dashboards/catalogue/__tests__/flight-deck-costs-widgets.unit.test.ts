@@ -54,7 +54,7 @@ describe("given the Flight Deck cockpit widgets", () => {
       expect(sql).not.toContain("Attributes[");
     }
     // The moved widgets read the judge from the trace evaluations, dated by the trace on the row.
-    const moved = outcomeQueries.filter((sql) => sql.includes("FROM trace_evaluation_metrics"));
+    const moved = outcomeQueries.filter((sql) => sql?.includes("FROM trace_evaluation_metrics"));
     expect(moved).toHaveLength(6);
     for (const sql of moved) expect(sql).toContain("TraceOccurredAt AS row_at");
     // Only the reasons widget reads a sent reason, from its typed column.
@@ -126,7 +126,7 @@ describe("given the Flight Deck cockpit widgets", () => {
   /** @scenario "AC26 Flight Deck: Task success is the share of calls that got the job done, per language" */
   it("shares resolved calls with an outcome per language", () => {
     const { code, queries } = build("voice-task-success");
-    expect(queries.trend).toContain("t.MetadataLanguage AS language");
+    expect(queries.trend).toContain(", MetadataLanguage AS language");
     expect(queries.trend).not.toContain("Attributes[");
     expect(queries.trend).toContain("countIf(outcome = 'resolved') AS done");
     expect(code).toContain('label={"Task success: " + row.language}');

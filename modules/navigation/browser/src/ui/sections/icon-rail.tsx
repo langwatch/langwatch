@@ -34,7 +34,8 @@ export function ProductIconRail({
     const home = product.homeHref({ projectSlug });
     if (!home) return;
     // Choosing Dashboards means its own sidebar, whatever page the reader left.
-    if (product.id === "dashboards") writeDashboardsSidebarHint({ hint: "dashboards" });
+    if (product.id === "dashboards")
+      writeDashboardsSidebarHint({ hint: "dashboards", projectId: host.project()?.id });
     host.navigate(home);
   };
 

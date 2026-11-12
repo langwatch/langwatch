@@ -136,7 +136,7 @@ describe("given the Call quality widgets", () => {
   /** @scenario "AC86 Call quality: calls not ended and repeated sentences" */
   it("counts calls ending on an error and calls the repeat check failed, per 1,000", () => {
     const { code, sql } = built("voice-call-health");
-    expect(sql.summary).toContain("argMax(ContainsErrorStatus, OccurredAt) AS not_ended");
+    expect(sql.summary).toContain("argMax(ContainsErrorStatus, at) AS not_ended");
     expect(sql.summary).toContain(`EvaluatorName = '${REPEAT_CHECK}'`);
     expect(sql.summary).toContain("AS repeat_checks");
     expect(code).toContain('"Add the " + REPEAT_CHECK');

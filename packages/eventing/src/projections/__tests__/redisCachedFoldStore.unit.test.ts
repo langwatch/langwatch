@@ -278,7 +278,10 @@ describe("RedisCachedFoldStore", () => {
         redis.set.mockRejectedValueOnce(new Error("OOM"));
         const { store, inner } = createStore(redis);
 
-        await expect(store.store({ count: 5, UpdatedAt: 200 }, CONTEXT)).resolves.toBeUndefined();
+        await expect(store.store({ count: 5, UpdatedAt: 200 }, CONTEXT)).resolves.toEqual({
+          count: 5,
+          UpdatedAt: 200,
+        });
         expect(inner.calls.store).toHaveLength(1);
       });
     });

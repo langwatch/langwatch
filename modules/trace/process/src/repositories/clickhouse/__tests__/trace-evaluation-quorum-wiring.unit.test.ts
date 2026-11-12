@@ -35,7 +35,6 @@ const write: TraceEvaluationAnalyticsWrite = {
     metadataFlow: "",
     metadataSegment: "",
     metadataPromptVersion: "",
-    occurredAtFromMs: 1_758_100_000_000,
   },
   sign: 1,
   revision: 1,

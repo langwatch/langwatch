@@ -264,10 +264,7 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
       if (window === undefined) {
         return await this.queryLatestVersionById({ authorization, traceId });
       }
-      return await queryWindowed<{
-        row: TraceAnalyticsRow;
-        appliedEventIds: string[];
-      } | null>({
+      return await queryWindowed<TraceAnalyticsProjectionRead | null>({
         table: TABLE_NAME,
         hintMs: window !== undefined ? (window.fromMs + window.toMs) / 2 : null,
         ...(window !== undefined ? { windowMs: (window.toMs - window.fromMs) / 2 } : {}),
@@ -422,7 +419,7 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
     authorization: Authorization;
     traceId: string;
     window?: { fromMs: number; toMs: number };
-  }): Promise<{ row: TraceAnalyticsRow; appliedEventIds: string[] } | null> {
+  }): Promise<TraceAnalyticsProjectionRead | null> {
     const client = this.reader(authorization);
 
     const partitionFilter =
@@ -462,12 +459,20 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
 
   private static latestOf(
     rows: readonly Record<string, unknown>[],
-  ): { row: TraceAnalyticsRow; appliedEventIds: string[] } | null {
+  ): TraceAnalyticsProjectionRead | null {
     const record = rows[0];
     if (!record) return null;
+    const outcomes = TraceAnalyticsClickHouseRepository.decodeOutcomes({
+      text: asString(record.EvaluationOutcomes),
+      traceId: asString(record.TraceId),
+    });
     return {
-      row: TraceAnalyticsClickHouseRepository.fromRecord(record),
+      row: {
+        ...TraceAnalyticsClickHouseRepository.fromRecord(record),
+        evaluationOutcomes: outcomes.readable ? outcomes.outcomes : {},
+      },
       appliedEventIds: TraceAnalyticsClickHouseRepository.asStringArray(record.AppliedEventIds),
+      ...(outcomes.readable ? {} : { undecodable: true as const }),
     };
   }
 
@@ -655,9 +660,6 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
       traceNameUserOverridden: Boolean(record.TraceNameUserOverridden),
       lastEventOccurredAt: TraceAnalyticsClickHouseRepository.asNumber(record.LastEventOccurredAt),
       earliestSpanStartMs: TraceAnalyticsClickHouseRepository.asNumber(record.EarliestSpanStartMs),
-      evaluationOutcomes: TraceAnalyticsClickHouseRepository.decodeOutcomes(
-        asString(record.EvaluationOutcomes),
-      ),
       evaluationRowsDigest: asString(record.EvaluationRowsDigest),
     };
   }
@@ -669,14 +671,26 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
     return Object.keys(outcomes).length === 0 ? "" : JSON.stringify(outcomes);
   }
 
-  /** The column's JSON; '' (an older row) or anything unparseable decodes as none. */
-  private static decodeOutcomes(text: string): Record<string, TraceEvaluationOutcome> {
-    if (text === "") return {};
+  /**
+   * The column's JSON; '' (an older row) is none. Anything unparseable is unreadable, never none:
+   * folding onto none would store '' over the outcomes, so the read reports the row undecodable.
+   */
+  private static decodeOutcomes({
+    text,
+    traceId,
+  }: {
+    text: string;
+    traceId: string;
+  }): { readable: true; outcomes: Record<string, TraceEvaluationOutcome> } | { readable: false } {
+    if (text === "") return { readable: true, outcomes: {} };
     try {
-      return evaluationOutcomesSchema.parse(JSON.parse(text));
+      return { readable: true, outcomes: evaluationOutcomesSchema.parse(JSON.parse(text)) };
     } catch (error) {
-      logger.warn({ error }, "Unreadable trace_analytics EvaluationOutcomes; decoding as none");
-      return {};
+      logger.warn(
+        { traceId, error },
+        "Unreadable trace_analytics EvaluationOutcomes; the fold rebuilds the trace from its events",
+      );
+      return { readable: false };
     }
   }
 }

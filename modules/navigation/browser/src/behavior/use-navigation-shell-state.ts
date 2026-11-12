@@ -10,6 +10,7 @@ import { useSyncExternalStore } from "react";
 
 import { belongsToNoOrganization } from "../model/belongs-to-no-organization.ts";
 import {
+  honourDashboardsSidebarHint,
   readDashboardsSidebarHint,
   subscribeToDashboardsSidebarHint,
 } from "../model/dashboards-sidebar-hint.ts";
@@ -31,6 +32,7 @@ import {
   SHELL_SIDEBAR_WIDTH_EXPANDED,
 } from "../model/shell-layout.ts";
 import { useIsMobileViewport } from "./use-is-mobile-viewport.ts";
+import { useReachableProducts } from "./use-reachable-products.ts";
 
 export interface NavigationShellReadyState {
   status: "ready";
@@ -73,11 +75,14 @@ export function useNavigationShellState({
   const isSmallScreen = useBreakpointValue({ base: true, lg: false }, { fallback: "lg" });
   const isMobile = useIsMobileViewport();
   const host = useNavigationHost();
-  const sidebarHint = useSyncExternalStore(
+  const { reachableProducts } = useReachableProducts();
+  const projectId = host.project()?.id;
+  const storedHint = useSyncExternalStore(
     subscribeToDashboardsSidebarHint,
-    readDashboardsSidebarHint,
+    () => readDashboardsSidebarHint({ projectId }),
     () => null,
   );
+  const sidebarHint = honourDashboardsSidebarHint({ hint: storedHint, reachableProducts });
 
   const user = host.currentUser();
   const project = host.project();

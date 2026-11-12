@@ -354,8 +354,8 @@ export class EvaluationRunClickHouseReadRepository {
 
   /**
    * Finished runs on a trace whose last event is at or after `sinceMs`, after the cursor, oldest
-   * first: each run's latest version by argMax over light columns, never the inputs. A run is
-   * scheduled before it finishes, so the partition bound reaches a day below `sinceMs`.
+   * first: each run's latest version by argMax over light columns. A run is scheduled before it
+   * finishes, so the partition bound reaches a day below the later of `sinceMs` and the cursor.
    */
   async findOutcomesSince(input: {
     authorization: Authorization;
@@ -389,7 +389,9 @@ export class EvaluationRunClickHouseReadRepository {
         LIMIT {limit:UInt32}
       `,
       query_params: {
-        scheduledFrom: input.sinceMs - OUTCOME_SCHEDULE_SLACK_MS,
+        scheduledFrom:
+          Math.max(input.sinceMs, input.after?.occurredAt ?? input.sinceMs) -
+          OUTCOME_SCHEDULE_SLACK_MS,
         since: input.sinceMs,
         afterOccurredAt: input.after?.occurredAt ?? -1,
         afterEvaluationId: input.after?.evaluationId ?? "",

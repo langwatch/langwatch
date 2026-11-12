@@ -47,14 +47,13 @@ describe("given the Where my agent breaks widgets", () => {
   it("counts a top-level span with no children as a step whose failure reached the user", () => {
     const { sql } = buildOf("up-where-fails");
     expect(sql.main).toContain("UNION ALL");
-    // A top-level span no span names as parent, checked against hashed parent ids.
-    expect(sql.main).toContain(
-      "OR (ParentSpanId IS NULL\n        AND sipHash128(TraceId, SpanId) NOT IN (",
-    );
-    expect(sql.main).toContain("SELECT sipHash128(TraceId, ifNull(ParentSpanId, ''))");
-    expect(sql.main).toContain("countIf(StatusCode = 2) AS failures, 0 AS recovered");
+    // A top-level span with no child is found by grouping each span with its children under
+    // one hash, then keeping the groups that hold a top-level span and nothing below it.
+    expect(sql.main).toContain("GROUP BY sipHash128(TraceId, ifNull(ParentSpanId, SpanId))");
+    expect(sql.main).toContain("HAVING top_level > 0 AND countIf(ParentSpanId IS NOT NULL) = 0");
+    expect(sql.main).toContain("sum(failed) AS failures, 0 AS recovered");
     expect(buildOf("tools-error-rate").sql.main).toContain(
-      "AND SpanType = 'tool'\n    AND (ifNull(ParentSpanId, '') != ''\n      OR (ParentSpanId IS NULL",
+      "AND SpanType = 'tool'\n    AND ifNull(ParentSpanId, '') != ''",
     );
   });
 
@@ -75,7 +74,9 @@ describe("given the Where my agent breaks widgets", () => {
     expect(sql.daily).toContain("GROUP BY TraceId, SpanName, input");
     expect(sql.daily).toContain("HAVING count() >= 3");
     expect(sql.daily).toContain("max(StartTime) > minIf(StartTime, StatusCode = 2)");
-    expect(sql.daily).toContain("GROUP BY TraceId, ParentSpanId");
+    expect(sql.daily).toContain(
+      "GROUP BY sipHash128(TraceId, ifNull(ParentSpanId, ''), if(SpanType = 'llm', 'llm', SpanName))",
+    );
     expect(sql.totals).toContain("sum(CostSum)");
     expect(code).toContain("Cost of the repeats");
     expect(sql.daily).toContain("countIf(unpriced) AS uncosted");

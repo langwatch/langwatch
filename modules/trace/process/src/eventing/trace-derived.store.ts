@@ -13,7 +13,6 @@ import type {
 } from "../repositories/trace-analytics-projection.repository.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
-  TRACE_ANALYTICS_PROJECTION_VERSION_PRE_EVALUATIONS,
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_METADATA,
   type TraceAnalyticsData,
   TraceAnalyticsFoldProjection,
@@ -21,13 +20,12 @@ import {
 import type { TraceEvaluationAnalyticsStore } from "./trace-evaluation-analytics.store.ts";
 
 /**
- * The projection stamps `getWithApplied` will decode: the current shape, the two before it (no
- * outcomes, then no metadata columns; their read-back state is otherwise the same), and the
- * pre-split shape it can read unambiguously. Everything older is a store miss.
+ * The projection stamps `getWithApplied` will decode: the current shape, the one before it (no
+ * outcomes or metadata columns; its read-back state is otherwise the same), and the pre-split
+ * shape it can read unambiguously. Everything older is a store miss.
  */
 const DECODABLE_PROJECTION_VERSIONS: ReadonlySet<string> = new Set([
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
-  TRACE_ANALYTICS_PROJECTION_VERSION_PRE_EVALUATIONS,
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_METADATA,
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
 ]);
@@ -158,10 +156,10 @@ export class TraceAnalyticsStore implements FoldProjectionStore<TraceAnalyticsDa
       window: context.readWindow,
     });
     if (!found) return { state: null, appliedEventIds: [], miss: "absent" };
-    // Stale schema snapshot: read-back columns didn't exist when this row was
-    // written, so decoding would fabricate state. Reported `undecodable`, not
-    // `absent`, so the executor won't retry an unwindowed re-read.
-    if (!DECODABLE_PROJECTION_VERSIONS.has(found.row.version)) {
+    // Stale schema snapshot, or a column that would not decode: folding on would fabricate state
+    // and store it over the row. Reported `undecodable`, not `absent`, so the executor refolds
+    // from the event log and won't retry an unwindowed re-read.
+    if (found.undecodable || !DECODABLE_PROJECTION_VERSIONS.has(found.row.version)) {
       return { state: null, appliedEventIds: [], miss: "undecodable" };
     }
     return {

@@ -41,7 +41,9 @@ projections are the architecture, and no read uses `FINAL`.
    run cannot grow one trace's state without bound: past that a new evaluation is refused rather
    than an older one dropped, because a dropped evaluation would strand its written row. It
    persists in `trace_analytics` as `EvaluationOutcomes` (JSON) beside `EvaluationRowsDigest`, the
-   digest of the rows last written.
+   digest of the rows last written. A stored `EvaluationOutcomes` that does not decode makes the
+   read-back an undecodable miss, so the fold refolds the trace from its events rather than
+   storing an empty map over the outcomes.
    A separate fold was rejected: it has nowhere to keep a trace's columns for a trace with no
    evaluation yet, so its read-back would find nothing and lose them; this fold already folds and
    reads back every column the rows copy.
@@ -61,7 +63,10 @@ projections are the architecture, and no read uses `FINAL`.
      writes the live row again at `Sign = -1` (byte-identical, same `Revision`) and the new one at
      `Sign = +1`, `Revision + 1`; new writes `Sign = +1`, `Revision = 1`.
 
-   The diff reads ClickHouse, never the fold state, because the two writes are not atomic. Rows
+   The read-then-insert is safe because one trace has one writer at a time: the fold's group
+   queue runs one job per trace group, and a replay pauses the lane, drains the batch's groups and
+   defers live events past its cutoff before it writes. The diff reads ClickHouse, never the fold
+   state, because the two writes are not atomic. Rows
    first, then `trace_analytics`: a crash between them leaves the old digest, so the next store
    reads, finds the rows already there and writes nothing but the trace row. A replay (state
    from scratch, digest '') and an older row's read-back take the same path, so neither writes a
@@ -88,8 +93,8 @@ projections are the architecture, and no read uses `FINAL`.
   rows moved. The store answers the state stamped with the digest it wrote and the Redis fold
   cache holds that, so a cached state neither reads again nor keeps a stale digest that would
   skip a change back to earlier content.
-- An orphan or doubled group from a lagging replica stays until that trace's next content change
-  or a replay.
+- An orphan or doubled group from a lagging replica, or from a stalled worker whose claim the
+  queue gave to another, stays until that trace's next content change or a replay.
 - `TRACE_EVALUATION_ANALYTICS_QUORUM_READS` (off by default, enabled nowhere) writes these rows
   synchronously with `insert_quorum = 'auto'` and reads them with `select_sequential_consistency`,
   so the read-back sees the fold's own last write on a replica; live-row repair stays the safety
