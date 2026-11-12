@@ -21,6 +21,8 @@ const refetchWorkspace = vi.fn();
 const renewRequest = vi.fn();
 let workspaceData: unknown = null;
 let workspaceError: unknown = null;
+const workspaceReadEnabled: boolean[] = [];
+const refetch = vi.fn();
 let githubInstallations: {
   installationId: string;
   accountLogin: string;
@@ -92,13 +94,20 @@ vi.mock("../../../../../behavior/langy-api.ts", () => ({
   api: {
     langy: {
       getLocalWorkspace: {
-        useQuery: () => ({
-          data: workspaceData,
-          isLoading: workspaceData === null && workspaceError === null,
-          isError: workspaceError !== null,
-          error: workspaceError,
-          refetch: refetchWorkspace,
-        }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) => {
+          workspaceReadEnabled.push(options?.enabled !== false);
+          // A disabled query never asks the server, so it holds nothing.
+          if (options?.enabled === false) {
+            return { data: undefined, isLoading: false, isError: false, error: null, refetch };
+          }
+          return {
+            data: workspaceData,
+            isLoading: workspaceData === null && workspaceError === null,
+            isError: workspaceError !== null,
+            error: workspaceError,
+            refetch: refetchWorkspace,
+          };
+        },
       },
       renewLocalControlRequest: {
         useMutation: () => ({
@@ -131,6 +140,7 @@ vi.mock("../../../../../behavior/langy-api.ts", () => ({
   },
 }));
 
+import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import { writeLocalFolderPick } from "../../../../tools/model/langy-code-access-pick.ts";
 import { LangyCodeAccessCard } from "../../../../tools/ui/sections/langy-code-access-card.tsx";
 
@@ -145,6 +155,7 @@ beforeEach(() => {
   namesAskerFlag = false;
   writeText.mockClear();
   Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+  workspaceReadEnabled.length = 0;
   githubInstallations = [{ installationId: "i1", accountLogin: "acme" }];
   // The local-folder pick persists per browser, so one test's click would
   // otherwise open the next test's card already waiting.
@@ -580,5 +591,36 @@ describe("given GitHub was remembered", () => {
       preference: null,
     });
     expect(onAskAgain).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("given the first message of a conversation whose record is not written yet", () => {
+  const NOT_FOUND = { data: { error: { code: "langy_conversation_not_found", httpStatus: 404 } } };
+
+  beforeEach(() => {
+    act(() => {
+      useLangyStore.getState().startNewConversation();
+      useLangyStore.getState().beginTurn({ conversationId: "c_new", turnId: "t_1" });
+    });
+    // What the server answers until the conversation's projection folds.
+    workspaceData = null;
+    workspaceError = NOT_FOUND;
+  });
+
+  /** @scenario "The card of a conversation that is still being created waits for it" */
+  it("reads nothing and keeps its checking line until the conversation is confirmed", () => {
+    renderCard({ conversationId: "c_new" });
+
+    expect(workspaceReadEnabled.every((enabled) => !enabled)).toBe(true);
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByText("Conversation not found")).toBeNull();
+    expect(screen.getByText("Checking how I can reach your code")).toBeDefined();
+
+    workspaceData = ASKING;
+    workspaceError = null;
+    act(() => useLangyStore.getState().confirmConversation("c_new"));
+
+    expect(workspaceReadEnabled.at(-1)).toBe(true);
+    expect(screen.getByText("How should I reach your code?")).toBeDefined();
   });
 });
