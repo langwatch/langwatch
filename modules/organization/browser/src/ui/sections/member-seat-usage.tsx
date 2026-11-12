@@ -6,9 +6,8 @@ import { api } from "../../behavior/organization-api.ts";
 import { SEAT_TYPE_COPY } from "../../model/seat-type-copy.ts";
 
 /**
- * Each kind of seat in use against the plan's cap. A plan with no Lite seats and none
- * taken (Free) shows no Lite card, not "0 / 0"; Developer seats always show, so a
- * Developer held over a cap of 0 reads as such.
+ * Each kind of seat in use against the plan's cap. Free (no Lite seats, none taken) shows
+ * no Lite card; Developer seats always show, so a Developer over a cap of 0 reads as such.
  * Spec: specs/licensing/seat-reconciliation.feature, specs/members/developer-seat.feature
  */
 export function MemberSeatUsage({
