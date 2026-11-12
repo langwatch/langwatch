@@ -12,9 +12,12 @@ import type { TracesSpanReader } from "#app/trace.app";
 
 import { braidedProof } from "../../../../__tests__/support/authorization-proofs.fixture.ts";
 import { TraceBraidDetailService } from "../../../read/services/trace-braid-detail.service.ts";
+import { MemoryNullTraceBraidReadsRepository } from "../../repositories/memory/memory.null-trace-braid-reads.repository.ts";
 import {
+  TRACE_BRAID_READS,
   TRACE_SPAN_READS,
   TraceBraidAuditedSpanReadService,
+  type TraceBraidRead,
   type TraceSpanRead,
   type TraceSpanTreeReads,
 } from "../trace-braid-audited-span-read.service.ts";
@@ -56,6 +59,10 @@ function doorOver({ results }: { results: Readonly<Record<string, unknown>> }) {
       },
       "tree",
     ),
+    braids: Object.assign(MemoryNullTraceBraidReadsRepository.create(), {
+      sumSpansInTrace: async () => [totalsOf(READER), totalsOf(OWNER)],
+      countReaderBraidActivity: async () => new Map([[BRAID_ID, 3]]),
+    }),
     audit: TraceBraidDetailService.create({
       directory: {
         authz: createApiFixture<AuthzApi>({ recordBraidedSpansView: recordView }, "braidAuthz"),
@@ -69,6 +76,42 @@ function doorOver({ results }: { results: Readonly<Record<string, unknown>> }) {
   const read = (method: TraceSpanRead) =>
     door.read(method, params as Parameters<TracesSpanReader[typeof method]>[0]);
   return { door, read, recordView, authorization, params };
+}
+
+const BRAID_ID = "braid-1";
+
+function totalsOf(tenantId: string) {
+  return {
+    tenantId,
+    spanCount: 2,
+    startMs: 0,
+    endMs: 1,
+    inputTokens: 1,
+    outputTokens: 1,
+    explicitCost: 0,
+    costInput: null,
+  };
+}
+
+/** The reads under the reader's braided proof, showing totals or counts of an owner's spans. */
+const SHOWING_AN_OWNERS_TOTALS = ["sumSpansInTrace", "countReaderBraidActivity"] as const;
+
+function braidParams(authorization: ReturnType<typeof braidedProof>) {
+  return {
+    authorization,
+    traceId: "trace-1",
+    sinceMs: 0,
+    braids: [
+      {
+        braidId: BRAID_ID,
+        ownerProjectId: OWNER,
+        readerProjectId: READER,
+        compiledWhere: undefined,
+        fromMs: 0,
+        untilMs: 1,
+      },
+    ],
+  };
 }
 
 function treeNode(ownerProjectId?: string) {
@@ -121,6 +164,70 @@ describe("TraceBraidAuditedSpanReadService", () => {
       recordView.mockRejectedValueOnce(new Error("audit store unreachable"));
 
       await expect(read(method)).rejects.toThrow("audit store unreachable");
+    });
+  });
+
+  it("names how every braid read's owners are read", () => {
+    expect(TRACE_BRAID_READS.toSorted()).toEqual(
+      Object.getOwnPropertyNames(
+        Object.getPrototypeOf(MemoryNullTraceBraidReadsRepository.create()),
+      )
+        .filter((name) => name !== "constructor")
+        .toSorted(),
+    );
+  });
+
+  describe.each(SHOWING_AN_OWNERS_TOTALS)("when %s returns an owner's totals", (method) => {
+    const readBraid = (
+      door: TraceBraidAuditedSpanReadService,
+      authorization: ReturnType<typeof braidedProof>,
+    ) =>
+      (door.braidReads[method] as (params: unknown) => Promise<unknown>)(
+        braidParams(authorization),
+      );
+
+    /** @scenario "A span read that skips the audit door cannot be written" */
+    it("records one braided spans viewed entry naming the owner before it returns", async () => {
+      const { door, recordView, authorization } = doorOver({ results: SHOWING_AN_OWNER });
+
+      await readBraid(door, authorization);
+
+      expect(recordView).toHaveBeenCalledTimes(1);
+      expect(recordView).toHaveBeenCalledWith({
+        actor: authorization.actor,
+        readerProjectId: READER,
+        ownerProjectIds: [OWNER],
+      });
+    });
+
+    /** @scenario "A span read that skips the audit door cannot be written" */
+    it("refuses rather than return the totals when the entry cannot be written", async () => {
+      const { door, recordView, authorization } = doorOver({ results: SHOWING_AN_OWNER });
+      recordView.mockRejectedValueOnce(new Error("audit store unreachable"));
+
+      await expect(readBraid(door, authorization)).rejects.toThrow("audit store unreachable");
+    });
+  });
+
+  describe.each(
+    TRACE_BRAID_READS.filter(
+      (method): method is Exclude<TraceBraidRead, (typeof SHOWING_AN_OWNERS_TOTALS)[number]> =>
+        !(SHOWING_AN_OWNERS_TOTALS as readonly string[]).includes(method),
+    ),
+  )("when %s reads a resource no braid opens", (method) => {
+    it("records nothing", async () => {
+      const { door, recordView, authorization } = doorOver({ results: SHOWING_AN_OWNER });
+
+      await (door.braidReads[method] as (params: unknown) => Promise<unknown>)({
+        ...braidParams(authorization),
+        traceIds: [],
+        limit: 1,
+        excludedPrefix: "langwatch.",
+        live: [],
+        draft: braidParams(authorization).braids[0],
+      });
+
+      expect(recordView).not.toHaveBeenCalled();
     });
   });
 

@@ -111,6 +111,13 @@ Feature: Braided spans in the reader's traces
       And terms joined by AND alone, as every trace repository writes them, still render
 
     @unit
+    Scenario: Nothing after the latest-version election can negate or widen it
+      Given a span read whose latest-version election is AND-ed into the fenced select
+      When the election is compared, negated or OR-ed by what follows it, or its own select filters more than keys and versions
+      Then the statement is refused as a loose latest-version marker
+      And AND-ed terms, the end of the WHERE or the enclosing select's close, as every trace repository writes them, still render
+
+    @unit
     Scenario: A braid's activity counts only spans in traces the reader holds
       Given matching "specialists" spans in traces "orchestrator" holds and in traces it does not
       When the "orchestrator" Braids page counts the braid's activity
@@ -339,16 +346,23 @@ Feature: Braided spans in the reader's traces
     @integration
     Scenario: Every view of a braided trace is audited, or refused
       Given a live braid from "specialists" into "orchestrator"
-      When sam opens the span tree, full spans, resources, timeline or instrumentation badges of an "orchestrator" trace holding "specialists" spans
+      When sam opens the header's braided totals, span tree, full spans, resources, timeline or instrumentation badges of an "orchestrator" trace holding "specialists" spans
       Then each read records one braided spans viewed entry before it returns them
       And a read whose entry cannot be written fails and returns no "specialists" span
 
     @unit
     Scenario: A span read that skips the audit door cannot be written
-      Given the reads the trace module's span store answers
-      When any of them returns a "specialists" span
+      Given the reads the trace module's span store and braid reads answer
+      When any of them returns a "specialists" span, or totals or counts derived from one
       Then it returns only after the braided spans viewed entry is written, and fails when it cannot be
       And a new span read cannot be called until it names how its result's owners are read
+
+    @integration
+    Scenario: The reader's braid activity counts are audited, or refused
+      Given a live braid from "specialists" into "orchestrator" with matching spans this week
+      When sam opens the "orchestrator" Braids page and its activity counts the braid's spans
+      Then the count records the braided spans viewed entry before it returns
+      And a count whose entry cannot be written fails and returns no count
 
   Rule: The braid dialog previews what the reader will see
 

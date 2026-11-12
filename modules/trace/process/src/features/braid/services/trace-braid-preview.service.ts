@@ -28,8 +28,8 @@ import {
   NO_BRAID_TRACE_COUNTS,
   type BraidActivityRead,
   type BraidWindowRead,
-  type TraceBraidReadsRepository,
 } from "../repositories/trace-braid-reads.repository.ts";
+import type { AuditedTraceBraidReads } from "./trace-braid-audited-span-read.service.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** ADR-201 §7: the preview counts the reader's last 7 days of traces. */
@@ -114,7 +114,7 @@ function nodeOf(node: SpanTreeNode): SpanTreeNode {
  */
 export class TraceBraidPreviewService {
   static create(deps: {
-    reads: TraceBraidReadsRepository;
+    reads: AuditedTraceBraidReads;
     readerSpans: BraidReaderSpans;
     braids: Pick<AuthzApi, "listBraids">;
     now?: () => number;
@@ -122,13 +122,13 @@ export class TraceBraidPreviewService {
     return new TraceBraidPreviewService(deps);
   }
 
-  readonly #reads: TraceBraidReadsRepository;
+  readonly #reads: AuditedTraceBraidReads;
   readonly #readerSpans: BraidReaderSpans;
   readonly #braids: Pick<AuthzApi, "listBraids">;
   readonly #now: () => number;
 
   private constructor(deps: {
-    reads: TraceBraidReadsRepository;
+    reads: AuditedTraceBraidReads;
     readerSpans: BraidReaderSpans;
     braids: Pick<AuthzApi, "listBraids">;
     now?: () => number;

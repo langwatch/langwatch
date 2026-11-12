@@ -1,4 +1,4 @@
-import type { Authorization } from "@langwatch/authorization";
+import { type Authorization, ownProjectIdReadBy } from "@langwatch/authorization";
 import {
   type ElasticSearchEvent,
   type Span,
@@ -13,6 +13,7 @@ import type { TracesSpanReader } from "#app/trace.app";
 
 import type { TraceService } from "../../../services/trace.service.ts";
 import type { TraceBraidDetailService } from "../../read/services/trace-braid-detail.service.ts";
+import type { TraceBraidReadsRepository } from "../repositories/trace-braid-reads.repository.ts";
 
 /** Every read the span store answers. */
 export type TraceSpanRead = keyof TracesSpanReader;
@@ -80,32 +81,93 @@ const OWNERS_OF: { readonly [K in TraceSpanRead]: OwnerRule<K> } = {
 /** Every span read the trace module issues; the store is never handed out. */
 export const TRACE_SPAN_READS = Object.keys(OWNERS_OF) as readonly TraceSpanRead[];
 
+/** Every read the braid reads repository answers. */
+export type TraceBraidRead = {
+  [K in keyof TraceBraidReadsRepository]: TraceBraidReadsRepository[K] extends (
+    input: never,
+  ) => Promise<unknown>
+    ? K
+    : never;
+}[keyof TraceBraidReadsRepository];
+type BraidReadParams<K extends TraceBraidRead> = Parameters<TraceBraidReadsRepository[K]>[0];
+type BraidReadResult<K extends TraceBraidRead> = Awaited<ReturnType<TraceBraidReadsRepository[K]>>;
+type BraidOwnerRule<K extends TraceBraidRead> = (read: {
+  params: BraidReadParams<K>;
+  result: BraidReadResult<K>;
+}) => Owners;
+
+/** The braid reads, each returned only once the owners it shows are audited. */
+export type AuditedTraceBraidReads = {
+  readonly [K in TraceBraidRead]: (params: BraidReadParams<K>) => Promise<BraidReadResult<K>>;
+};
+
+/** A statement on a resource the fence opens to no braid ("traces"): it shows no owner's row. */
+const noBraidedOwner = (): Owners => [];
+
 /**
- * The one door the trace module's span reads pass through (ADR-201 §8, v1.10): a read showing an
- * owner's span records one braided spans viewed entry first, or throws instead of returning. A
- * read showing only the reader's spans records nothing.
+ * How each braid read names the owners whose spans its totals or counts come from. A read missing
+ * here fails the build, so a new braid read under the reader's proof is audited (ADR-201 §8).
+ */
+const BRAID_OWNERS_OF: { readonly [K in TraceBraidRead]: BraidOwnerRule<K> } = {
+  findReaderTraceIds: noBraidedOwner,
+  countOwnerSpansInTraces: noBraidedOwner,
+  findAttributeKeys: noBraidedOwner,
+  countOwnerBraidActivity: noBraidedOwner,
+  findOwnerSpansMarked: noBraidedOwner,
+  countReaderBraidActivity: ({ params, result }) =>
+    params.braids.flatMap((braid) =>
+      (result.get(braid.braidId) ?? 0) > 0 ? [braid.ownerProjectId] : [],
+    ),
+  sumSpansInTrace: ({ params, result }) => {
+    const reader = ownProjectIdReadBy(params.authorization);
+    return result.flatMap((group) => (group.tenantId === reader ? [] : [group.tenantId]));
+  },
+};
+
+/** Every braid read the trace module issues; the repository is never handed out. */
+export const TRACE_BRAID_READS = Object.keys(BRAID_OWNERS_OF) as readonly TraceBraidRead[];
+
+/**
+ * The one door the trace module's span and braid reads pass through (ADR-201 §8, v1.10): a read
+ * showing an owner's span, or totals or counts of them, records one braided spans viewed entry
+ * first, or throws instead of returning. A read showing only the reader's spans records nothing.
  */
 export class TraceBraidAuditedSpanReadService {
   static create(deps: {
     spans: TracesSpanReader;
     tree: TraceSpanTreeReads | undefined;
+    braids: TraceBraidReadsRepository;
     audit: Pick<TraceBraidDetailService, "recordView">;
   }): TraceBraidAuditedSpanReadService {
-    return new TraceBraidAuditedSpanReadService(deps.spans, deps.tree, deps.audit);
+    return new TraceBraidAuditedSpanReadService(deps);
   }
 
   readonly #spans: TracesSpanReader;
   readonly #tree: TraceSpanTreeReads | undefined;
+  readonly #braids: TraceBraidReadsRepository;
   readonly #audit: Pick<TraceBraidDetailService, "recordView">;
+  /** What the braid dialog, the Braids page and the trace header read through, never the store. */
+  readonly braidReads: AuditedTraceBraidReads;
 
-  private constructor(
-    spans: TracesSpanReader,
-    tree: TraceSpanTreeReads | undefined,
-    audit: Pick<TraceBraidDetailService, "recordView">,
-  ) {
-    this.#spans = spans;
-    this.#tree = tree;
-    this.#audit = audit;
+  private constructor(deps: {
+    spans: TracesSpanReader;
+    tree: TraceSpanTreeReads | undefined;
+    braids: TraceBraidReadsRepository;
+    audit: Pick<TraceBraidDetailService, "recordView">;
+  }) {
+    this.#spans = deps.spans;
+    this.#tree = deps.tree;
+    this.#braids = deps.braids;
+    this.#audit = deps.audit;
+    this.braidReads = {
+      findReaderTraceIds: (params) => this.#readBraid("findReaderTraceIds", params),
+      countOwnerSpansInTraces: (params) => this.#readBraid("countOwnerSpansInTraces", params),
+      findAttributeKeys: (params) => this.#readBraid("findAttributeKeys", params),
+      countOwnerBraidActivity: (params) => this.#readBraid("countOwnerBraidActivity", params),
+      countReaderBraidActivity: (params) => this.#readBraid("countReaderBraidActivity", params),
+      sumSpansInTrace: (params) => this.#readBraid("sumSpansInTrace", params),
+      findOwnerSpansMarked: (params) => this.#readBraid("findOwnerSpansMarked", params),
+    };
   }
 
   /** One span store read, returned only once the owners it shows are audited. */
@@ -157,6 +219,22 @@ export class TraceBraidAuditedSpanReadService {
       authorization: input.authorization,
       ownerProjectIds: braidOwnersOf(nodes),
       result: nodes,
+    });
+  }
+
+  async #readBraid<K extends TraceBraidRead>(
+    method: K,
+    params: BraidReadParams<K>,
+  ): Promise<BraidReadResult<K>> {
+    const reader = this.#braids[method] as (
+      params: BraidReadParams<K>,
+    ) => Promise<BraidReadResult<K>>;
+    const result = await reader.call(this.#braids, params);
+    const ownersOf = BRAID_OWNERS_OF[method] as BraidOwnerRule<K>;
+    return this.#audited({
+      authorization: (params as { authorization: Authorization }).authorization,
+      ownerProjectIds: ownersOf({ params, result }),
+      result,
     });
   }
 

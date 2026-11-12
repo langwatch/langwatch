@@ -47,6 +47,7 @@ function detailApp({ planType }: { planType?: PlanType }) {
     braidDirectory: {
       authz: createApiFixture<NonNullable<TraceAppDependencies["braidDirectory"]>["authz"]>(
         {
+          recordBraidedSpansView: async () => undefined,
           listBraids: async () => ({
             intoOtherProjects: [],
             fromOtherProjects: [

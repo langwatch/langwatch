@@ -1488,14 +1488,16 @@ export class TraceModule implements TraceApi, CollectorApp {
     const { authorizeRead } = dependencies;
     this.#braidPause = TraceBraidPauseService.create({ plans: dependencies.braidPlans });
     this.#braidDetail = TraceBraidDetailService.create({ directory: dependencies.braidDirectory });
-    // The one holder of the span store: a span read returns an owner's span audited (ADR-201 §8).
+    // The one holder of the span store and the braid reads: each returns an owner's span, or
+    // totals and counts of them, audited (ADR-201 §8).
     this.#spanReads = TraceBraidAuditedSpanReadService.create({
       spans: dependencies.traces.spans,
       tree: dependencies.traces.tree,
+      braids: dependencies.traces.braidReads,
       audit: this.#braidDetail,
     });
     this.#braidedTotals = TraceBraidedTotalsService.create({
-      reads: dependencies.traces.braidReads,
+      reads: this.#spanReads.braidReads,
       prices: dependencies.braidPrices,
     });
     this.#drawer = TraceDrawerReadService.create({
@@ -1505,7 +1507,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       mappers: traceReadMapperPorts,
     });
     this.#braidPreview = TraceBraidPreviewService.create({
-      reads: dependencies.traces.braidReads,
+      reads: this.#spanReads.braidReads,
       readerSpans: async (read) =>
         (await this.readSpanSummaries(read)).map(mapLegacySpanSummaryToTreeNode),
       braids: dependencies.braidDirectory.authz,
