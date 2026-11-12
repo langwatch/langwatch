@@ -170,8 +170,12 @@ describe("given evaluations whose versions sit before, inside and after the wind
 
   /** @scenario "A read with no window keeps the whole-history dedup" */
   it("reads every evaluation's latest version when there is no window", async () => {
+    // The migrated facts hold the harness's own evaluations too, so name this suite's.
+    const ids = Object.keys(EVALUATIONS)
+      .map((id) => `'${id}'`)
+      .join(", ");
     const { written, sent, isFloored } = await both(
-      "SELECT EvaluationId, Passed FROM evaluation_metrics ORDER BY EvaluationId",
+      `SELECT EvaluationId, Passed FROM evaluation_metrics WHERE EvaluationId IN (${ids}) ORDER BY EvaluationId`,
     );
 
     expect(written).toEqual(passedRows(Object.keys(EVALUATIONS).toSorted()));

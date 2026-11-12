@@ -46,7 +46,9 @@ describe("given the Flight Deck cockpit widgets", () => {
     for (const sql of outcomeQueries) {
       expect(sql).toContain(`EvaluatorName = '${OUTCOME_JUDGE}'`);
       expect(sql).toContain("MetadataOutcome AS outcome");
-      expect(sql).toContain("argMax(outcome, tuple(sent, row_at, outcome");
+      expect(sql).toContain(
+        "argMax(r.outcome, toUInt64(r.sent) * 9223372036854775808 + toUInt64(toUnixTimestamp64Milli(r.row_at)) * 1048576 + cityHash64(r.outcome",
+      );
       expect(sql).toContain("t.OccurredAt AS row_at");
       expect(sql).not.toContain("Attributes[");
     }

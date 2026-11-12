@@ -78,20 +78,30 @@ export const HEALTH_FIELDS: readonly HealthField[] = [
 ];
 
 // Each field is a filter, never a column the result reads, so the completeness report does
-// not swap a missing field for a setup view: showing the gap is this widget's whole job.
-const branch = ({ field, view, filter }: { field: string; view: string; filter: string }) =>
-  `SELECT '${field}' AS field, uniqExact(TraceId) AS traces
+// not swap a missing field for a setup view: showing the gap is this widget's whole job. One
+// scan per view, its rows repeated per field: a view read per field ran out of memory.
+const scan = ({ view, fields }: { view: string; fields: readonly Coverage[] }) =>
+  `SELECT field, uniqExact(TraceId) AS traces
 FROM ${view}
-WHERE ${inPeriod("OccurredAt")}${filter}
-LIMIT 1`;
+ARRAY JOIN [${fields.map(({ key }) => `'${key}'`).join(", ")}] AS field
+WHERE ${inPeriod("OccurredAt")}
+  AND (${fields
+    .map(({ key, condition }) => `field = '${key}'${condition ? ` AND ${condition}` : ""}`)
+    .join("\n    OR ")})
+GROUP BY field`;
+
+interface Coverage {
+  readonly key: string;
+  readonly view: string;
+  readonly condition?: string;
+}
+
+const COVERAGE: readonly Coverage[] = [{ key: "all", view: "trace_metrics" }, ...HEALTH_FIELDS];
 
 /** Traces in the period ("all"), and how many carry each field. */
-export const FIELD_COVERAGE_SQL = [
-  branch({ field: "all", view: "trace_metrics", filter: "" }),
-  ...HEALTH_FIELDS.map(({ key, view, condition }) =>
-    branch({ field: key, view, filter: `\n  AND ${condition}` }),
-  ),
-].join("\nUNION ALL\n");
+export const FIELD_COVERAGE_SQL = [...new Set(COVERAGE.map(({ view }) => view))]
+  .map((view) => scan({ view, fields: COVERAGE.filter((field) => field.view === view) }))
+  .join("\nUNION ALL\n");
 
 /**
  * Traces with a model, and those with a span whose model has no price, per bucket. Traces

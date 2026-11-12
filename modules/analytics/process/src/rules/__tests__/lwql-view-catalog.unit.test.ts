@@ -22,7 +22,12 @@ import {
   gateForContentCategory,
   isContentAttributeKey,
 } from "../lwql-content-gating.rules.ts";
-import { LWQL_CATALOG, LWQL_VIEW_CATALOG, pickLwqlViewByName } from "../lwql-view-catalog.rules.ts";
+import {
+  LWQL_CATALOG,
+  LWQL_VIEW_CATALOG,
+  pickLwqlViewByName,
+  TENANT_COLUMN,
+} from "../lwql-view-catalog.rules.ts";
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 
@@ -611,9 +616,17 @@ describe("given the LangWatchQL view catalog when a dataset's source sorts by a 
       narrower.length,
       "no dataset narrows its grain — this case is inspecting nothing",
     ).toBeGreaterThan(0);
+    // `latest-in-order` keeps one row per whole key; the tenant's row policy fixes the tenant
+    // column, so that is one row per grain when the key adds only the tenant column (ADR-006).
+    const addsOnlyTheTenant = (view: (typeof narrower)[number]) =>
+      view.dedup.keyColumns
+        .filter((key) => !catalogShapes.grainColumns(view).includes(key))
+        .every((key) => key === (view.tenantColumn ?? TENANT_COLUMN));
     for (const view of narrower) {
       expect(
-        view.dedup.strategy === "in-tuple" || view.dedup.aggregating === true,
+        view.dedup.strategy === "in-tuple" ||
+          view.dedup.aggregating === true ||
+          (view.dedup.strategy === "latest-in-order" && addsOnlyTheTenant(view)),
         `${view.name} publishes a grain narrower than its engine's key under plain FINAL, which merges on the whole key and cannot deliver it`,
       ).toBe(true);
     }

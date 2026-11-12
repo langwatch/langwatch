@@ -33,6 +33,8 @@ function structuralColumns(view: (typeof LWQL_VIEW_CATALOG)[number]): ReadonlySe
   return new Set([
     ...view.dedup.keyColumns.map((key) => shapes.physicalColumn(view, key)),
     ...(view.dedup.versionColumn ? [view.dedup.versionColumn] : []),
+    ...(view.dedup.tieBreakColumns ?? []),
+    ...(view.dedup.stableColumns ?? []),
     ...(view.whereSourceColumns ?? []),
     ...(view.join?.onSourceColumns?.primary ?? []),
     ...(view.tenantColumn ? [view.tenantColumn] : ["TenantId"]),

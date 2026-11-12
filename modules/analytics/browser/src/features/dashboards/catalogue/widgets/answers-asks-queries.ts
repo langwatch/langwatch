@@ -39,37 +39,29 @@ const judgeVerdicts = ({ window, withReason }: { window: Window; withReason: boo
       GROUP BY TraceId`;
 
 /**
- * Every trace in the window that closed a conversation, once, with its topic, its outcome and,
- * `withReason`, its reason. A sent outcome wins over the judge's. Only closed traces are grouped:
- * the trace rows stream past the judge's verdicts (analytics ADR-004).
+ * Every trace in the window that closed a conversation, once, with its outcome and, as asked, its
+ * reason and topic. A sent outcome wins over the judge's (analytics ADR-004).
  */
 function tracesWithOutcome({
   window,
   withReason = false,
+  withTopic = false,
 }: {
   window: Window;
   withReason?: boolean;
+  withTopic?: boolean;
 }): string {
   const judgeReason = withReason ? ", ifNull(j.reason, '') AS reason" : "";
   const sentReason = withReason ? ", MetadataOutcomeReason AS reason" : "";
-  // Sent first, then the latest row; the whole-row key keeps outcome and reason from one row.
-  const pick = `tuple(sent, row_at, outcome${withReason ? ", reason" : ""})`;
-  return `(
-  SELECT c.trace_id AS trace_id,
-    c.at AS at,
-    coalesce(nullIf(p.TopicName, ''), nullIf(c.meta_topic, '')) AS topic,
-    c.outcome AS outcome${withReason ? ",\n    c.reason AS reason" : ""}
-  FROM (
-    SELECT trace_id,
-      min(row_at) AS at,
-      argMin(topic_id, row_at) AS topic_id,
-      argMin(meta_topic, row_at) AS meta_topic,
-      argMax(outcome, ${pick}) AS outcome${withReason ? `,\n      argMax(reason, ${pick}) AS reason` : ""}
-    FROM (
-      SELECT t.TraceId AS trace_id, t.OccurredAt AS row_at, t.topic_id AS topic_id,
-        t.MetadataTopic AS meta_topic, ifNull(j.label, '') AS outcome${judgeReason}, 0 AS sent
+  const traceTopic = withTopic ? ", ifNull(TopicId, '') AS topic_id, MetadataTopic" : "";
+  const judgeTopic = withTopic ? ", t.topic_id AS topic_id, t.MetadataTopic AS meta_topic" : "";
+  const sentTopic = withTopic
+    ? ", ifNull(TopicId, '') AS topic_id, MetadataTopic AS meta_topic"
+    : "";
+  const rows = `SELECT t.TraceId AS trace_id, t.OccurredAt AS row_at${judgeTopic},
+        ifNull(j.label, '') AS outcome${judgeReason}, 0 AS sent
       FROM (
-        SELECT TraceId, OccurredAt, ifNull(TopicId, '') AS topic_id, MetadataTopic
+        SELECT TraceId, OccurredAt${traceTopic}
         FROM trace_metrics
         WHERE ${window("OccurredAt")}
       ) AS t
@@ -77,24 +69,60 @@ function tracesWithOutcome({
         ${judgeVerdicts({ window, withReason })}
       ) AS j ON j.TraceId = t.TraceId
       UNION ALL
-      SELECT TraceId AS trace_id, OccurredAt AS row_at, ifNull(TopicId, '') AS topic_id,
-        MetadataTopic AS meta_topic, MetadataOutcome AS outcome${sentReason}, 1 AS sent
+      SELECT TraceId AS trace_id, OccurredAt AS row_at${sentTopic},
+        MetadataOutcome AS outcome${sentReason}, 1 AS sent
       FROM trace_metrics
       WHERE ${window("OccurredAt")}
-        AND MetadataOutcome != ''
-    )
-    GROUP BY trace_id
-  ) AS c
-  LEFT JOIN topics AS p ON p.TopicId = c.topic_id
+        AND MetadataOutcome != ''`;
+  // Sent first, then the latest row: one row per trace, sent and time, as the judge gives one
+  // verdict per trace, so outcome and reason come from one row. UInt64, not a tuple: a tuple
+  // key's generic state took 350 MB more over 1.76M traces (code 241 at the 1 GB limit).
+  const pick =
+    "toUInt64(r.sent) * 4611686018427387904 + toUInt64(toUnixTimestamp64Milli(r.row_at))";
+  // Each trace keeps a 64-bit hash of its first topic, not two strings; the window's few
+  // distinct topics then name it.
+  const topicState = withTopic
+    ? "\n      argMin(cityHash64(r.topic_id, r.meta_topic), r.row_at) AS topic_key,"
+    : "";
+  const topicNames = `LEFT JOIN (
+    SELECT cityHash64(m.topic_id, m.meta_topic) AS topic_key,
+      any(coalesce(nullIf(p.TopicName, ''), nullIf(m.meta_topic, ''))) AS topic
+    FROM (
+      SELECT DISTINCT ifNull(TopicId, '') AS topic_id, MetadataTopic AS meta_topic
+      FROM trace_metrics
+      WHERE ${window("OccurredAt")}
+    ) AS m
+    LEFT JOIN topics AS p ON p.TopicId = m.topic_id
+    GROUP BY topic_key
+  ) AS k ON k.topic_key = c.topic_key`;
+  // Grouped on a 128-bit hash, not the id string; the id is kept for a widget that reads it.
+  return `(
+  SELECT c.trace_id AS trace_id,
+    c.at AS at,${withTopic ? "\n    k.topic AS topic," : ""}
+    c.outcome AS outcome${withReason ? ",\n    c.reason AS reason" : ""}
+  FROM (
+    SELECT any(r.trace_id) AS trace_id,
+      min(r.row_at) AS at,${topicState}
+      argMax(r.outcome, ${pick}) AS outcome${withReason ? `,\n      argMax(r.reason, ${pick}) AS reason` : ""}
+    FROM (
+      ${rows}
+    ) AS r
+    GROUP BY sipHash128(r.trace_id)
+  ) AS c${withTopic ? `\n  ${topicNames}` : ""}
 )`;
 }
 
 const IN_PERIOD = tracesWithOutcome({ window: inPeriod });
-const IN_PERIOD_WITH_REASON = tracesWithOutcome({ window: inPeriod, withReason: true });
+const IN_PERIOD_WITH_TOPIC = tracesWithOutcome({ window: inPeriod, withTopic: true });
 const WITH_PREVIOUS = tracesWithOutcome({ window: inPeriodAndPrevious });
 const WITH_PREVIOUS_AND_REASON = tracesWithOutcome({
   window: inPeriodAndPrevious,
   withReason: true,
+});
+const IN_PERIOD_WITH_TOPIC_AND_REASON = tracesWithOutcome({
+  window: inPeriod,
+  withReason: true,
+  withTopic: true,
 });
 
 export const OUTCOME_TREND_SQL = `SELECT ${bucketOf("at")} AS bucket,
@@ -129,7 +157,7 @@ LIMIT 5`;
 export const UNANSWERED_TOPICS_SQL = `SELECT topic,
   count() AS closed,
   countIf(outcome = 'refusal') AS refused
-FROM ${IN_PERIOD}
+FROM ${IN_PERIOD_WITH_TOPIC}
 WHERE outcome != ''
   AND topic IS NOT NULL
 GROUP BY topic
@@ -244,7 +272,7 @@ ORDER BY bucket`;
 export const CANNOT_SERVE_SQL = `SELECT topic,
   count() AS requests,
   topK(1)(reason)[1] AS reason
-FROM ${IN_PERIOD_WITH_REASON}
+FROM ${IN_PERIOD_WITH_TOPIC_AND_REASON}
 WHERE outcome = 'capability_gap'
 GROUP BY topic
 ORDER BY requests DESC
@@ -315,7 +343,7 @@ LEFT JOIN (
     countIf(outcome != '') AS closed,
     countIf(outcome = 'resolved') AS resolved,
     countIf(outcome = 'capability_gap') AS cannot
-  FROM ${IN_PERIOD}
+  FROM ${IN_PERIOD_WITH_TOPIC}
   WHERE topic IS NOT NULL
   GROUP BY topic
 ) AS c ON c.topic = r.topic

@@ -114,7 +114,7 @@ describe("the LangWatchQL function allowlist", () => {
       [
         "a 128-bit and a 64-bit id hash",
         "SELECT sipHash128(TraceId) AS trace FROM traces " +
-          "WHERE cityHash64(TraceId) NOT IN (SELECT cityHash64(TraceId) FROM trace_metrics)",
+          "WHERE cityHash64(TraceId) NOT IN (SELECT cityHash64(TraceId) FROM spans)",
       ],
       [
         "the standard DISTINCT aggregate spelling",

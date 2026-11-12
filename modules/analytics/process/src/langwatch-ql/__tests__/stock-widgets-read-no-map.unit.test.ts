@@ -32,16 +32,17 @@ describe("given the 39 stock queries that ran out of memory on a large project",
   });
 
   /** @scenario "No rewritten stock query reads a map" */
-  it("reads captured input only for the examples ck-top-ask shows", () => {
+  it("reads captured input only for the examples ck-top-ask shows and the loop widgets", () => {
     const reading = LABELS.filter((label) => STOCK.get(label)?.includes("CapturedInput"));
-    expect(reading).toEqual(["ck-top-ask/gap"]);
+    // Loops compare inputs on the gated spans view: no analytics view holds an input (#6856).
+    expect(reading.toSorted()).toEqual(["ck-top-ask/gap", "up-loops/daily", "up-loops/steps"]);
     expect(STOCK.get("ck-top-ask/gap")).toContain("AND TraceId IN (SELECT trace_id FROM (");
   });
 });
 
 describe("given the columns goose 00128 adds", () => {
   /** @scenario "The new columns are exposed under their tables' access rules" */
-  it("exposes each on its view from its own source column, InputHash gated like the input", () => {
+  it("exposes each on its view from its own source column, and no input hash", () => {
     const spans = exposedCatalogueColumns({ table: LWQL_CLICKHOUSE_CATALOGUE.span_metrics });
     const traces = exposedCatalogueColumns({ table: LWQL_CLICKHOUSE_CATALOGUE.trace_metrics });
     for (const name of ["SpanType", "ErrorType", "RagContextCount", "DeploymentEnvironment"]) {
@@ -50,11 +51,7 @@ describe("given the columns goose 00128 adds", () => {
         name,
       ).toEqual({ name, source: name });
     }
-    expect(spans.find((column) => column.name === "InputHash")).toEqual({
-      name: "InputHash",
-      source: "InputHash",
-      content: "input",
-    });
+    expect(spans.find((column) => column.name === "InputHash")).toBeUndefined();
     for (const name of ["MetadataOutcomeReason", "MetadataPromptVersion", "MetadataEnvironment"]) {
       expect(
         traces.find((column) => column.name === name),
@@ -66,11 +63,14 @@ describe("given the columns goose 00128 adds", () => {
 
 describe("given the stock span widgets", () => {
   /** @scenario "The span widgets read span_metrics, not spans" */
-  it("read span_metrics; only a widget's 90-day presence check still reads spans", () => {
+  it("read span_metrics; only presence checks, loops, step latency and voice calls read spans", () => {
     const readingSpans = [...STOCK].filter(([, sql]) => /\b(?:FROM|JOIN)\s+spans\b/.test(sql));
-    expect(readingSpans.map(([label]) => label).every((label) => label.endsWith("/present"))).toBe(
-      true,
-    );
+    const allowed = (label: string) =>
+      label.endsWith("/present") ||
+      label.startsWith("up-loops/") ||
+      label.startsWith("voice-call-health/") ||
+      label === "up-step-latency/operations";
+    expect(readingSpans.map(([label]) => label).every(allowed)).toBe(true);
     expect([...STOCK.values()].some((sql) => sql.includes("FROM span_metrics"))).toBe(true);
   });
 });

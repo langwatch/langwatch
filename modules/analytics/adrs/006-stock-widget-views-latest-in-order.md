@@ -51,10 +51,13 @@ new MATERIALIZED column.
 5. **Span columns from a map projection.** A new map projection, `spanAnalytics`, beside
    `spanStorage`, writes `span_analytics` (ReplacingMergeTree(ProjectedAt), partitioned by
    `toYearWeek(StartTime)`, ordered by `(TenantId, TraceId, SpanId)`, no maps), and the
-   `span_metrics` view exposes it, `InputHash` gated like `CapturedInput`. The five columns leave
-   `spans`. `ErrorType` falls back from `exception.type` to `error.type`; `InputHash` is the first
-   8 bytes of the input's SHA-256, and 0 for a span with no input. The stock span widgets read
-   `span_metrics`. Their presence checks still read `spans`, since they look back 90 days.
+   `span_metrics` view exposes it, all but `InputHash`: the analytics views expose no captured
+   content, not even a hash of it (#6856). `ErrorType` falls back from `exception.type` to
+   `error.type`; `InputHash` is the first 8 bytes of the input's SHA-256, and 0 for a span with no
+   input. The stock span widgets read `span_metrics`. Their presence checks still read `spans`,
+   since they look back 90 days, and so do the loop widgets, which compare `CapturedInput`, and
+   the step latency and voice call health, which read no map and ran out of memory on
+   `span_metrics` alone.
 6. **History by replay, not by mutation.** Two `defineProjectionReplayStep` steps, one per lane
    (`traceAnalytics`, `spanAnalytics`), replay the last 62 days (the longest stock period plus two)
    after old writers are gone. No goose file starts a mutation; the 00128 fill steps are gone.
@@ -82,7 +85,7 @@ new MATERIALIZED column.
 - **Rollout and rollback.** A row an old writer writes during the rollout, or after a rollback,
   holds '' in the three 00128 columns and has no `span_analytics` row until a replay reaches it.
   `span_metrics` is empty before its replay runs, and holds nothing older than the floor.
-- **`InputHash`** is computed in the projection, not by ClickHouse; only equality is read.
+- **`InputHash`** is computed in the projection, not by ClickHouse, and no view exposes it.
 
 ## Measurements
 

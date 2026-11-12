@@ -89,7 +89,7 @@ const outcomeRows = ({
 };
 
 // A conversation's outcome sits on its last turn; a sent outcome wins over the judge's, then
-// the latest row. A whole-row key picks outcome and reason from one row, whatever ties. A trace
+// the latest row. One key picks outcome and reason from one row, a hash breaking a tie. A trace
 // whose trace_metrics anchor moved (ADR-082) is dated, and topped, by its first row.
 const outcomes = ({
   window,
@@ -98,10 +98,16 @@ const outcomes = ({
   withLanguage = false,
   withTopic = false,
 }: { window: Window; from: string } & OutcomeExtras) => {
-  const pick = `tuple(sent, row_at, outcome${withReason ? ", reason" : ""})`;
+  // Sent, then the latest ms, then a 20-bit hash of the pick: two judge labels at one ms tie
+  // only within a hash bucket. UInt64, not a tuple, whose generic state ran out of memory.
+  const hashed = withReason ? "r.outcome, r.reason" : "r.outcome";
+  const pick =
+    "toUInt64(r.sent) * 9223372036854775808" +
+    " + toUInt64(toUnixTimestamp64Milli(r.row_at)) * 1048576" +
+    ` + cityHash64(${hashed}) % 1048576`;
   return `SELECT trace_id,
-    min(row_at) AS at, argMax(outcome, ${pick}) AS outcome${
-      withReason ? `, argMax(reason, ${pick}) AS reason` : ""
+    min(row_at) AS at, argMax(r.outcome, ${pick}) AS outcome${
+      withReason ? `, argMax(r.reason, ${pick}) AS reason` : ""
     }${withLanguage ? ", any(language) AS language" : ""}${
       withTopic
         ? ", argMin(topic_id, row_at) AS topic_id, argMin(meta_topic, row_at) AS meta_topic"
@@ -109,7 +115,7 @@ const outcomes = ({
     }
   FROM (
     ${outcomeRows({ window, from, withReason, withLanguage, withTopic })}
-  )
+  ) AS r
   GROUP BY trace_id`;
 };
 
@@ -323,7 +329,7 @@ const LOOKBACK = `OccurredAt >= subtractDays(${START}, 90) AND OccurredAt < ${EN
 /**
  * When each prompt version was first seen: a trace's managed prompt version, else its metadata's
  * (`trace_metrics`), never the map (analytics ADR-004). The id set holds 64-bit hashes of the
- * traces that send a metadata version: id strings outgrew the memory limit on 2M traces a month.
+ * managed-version traces: id strings outgrew 1 GB; a view read to bound it cost more.
  */
 const PROMPT_VERSIONS_FIRST_SEEN = `SELECT LastUsedPromptVersionId AS name, min(OccurredAt) AS first_at
     FROM traces
@@ -340,12 +346,6 @@ const PROMPT_VERSIONS_FIRST_SEEN = `SELECT LastUsedPromptVersionId AS name, min(
         FROM traces
         WHERE ${LOOKBACK}
           AND LastUsedPromptVersionId != ''
-          AND cityHash64(TraceId) IN (
-            SELECT cityHash64(TraceId)
-            FROM trace_metrics
-            WHERE ${LOOKBACK}
-              AND MetadataPromptVersion != ''
-          )
       )
     GROUP BY name`;
 

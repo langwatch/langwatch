@@ -224,8 +224,9 @@ describe("given the views pinned to latest-in-order and their FINAL twins", () =
   it("keeps the latest version, the replay and both rows of a moved anchor in trace_metrics", async () => {
     const result = await harness.admin.query({
       query:
+        // The migrated facts hold the harness's own traces too; only this seed's keys are read.
         `SELECT TraceId, ConversationId FROM ${harness.names.database}.trace_metrics ` +
-        `ORDER BY TraceId, OccurredAt`,
+        `WHERE startsWith(TraceId, 'key-') ORDER BY TraceId, OccurredAt`,
       format: "JSONEachRow",
     });
 

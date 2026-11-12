@@ -10,19 +10,19 @@ Feature: The stock widgets that ran out of memory read no map and no FINAL
   Scenario: No rewritten stock query reads a map
     Given the 39 stock queries that ran out of memory
     Then none reads a key of Attributes, SpanAttributes or ResourceAttributes
-    And only ck-top-ask reads captured input, for the traces it shows
+    And only ck-top-ask, for the traces it shows, and the loop widgets read captured input
 
   @unit
   Scenario: The new columns are exposed under their tables' access rules
     Given the metadata columns on trace_analytics and the span_analytics columns
     Then trace_metrics and span_metrics expose each from its own source column
-    And the input hash is gated like the captured input
+    And span_metrics exposes no input hash, as the analytics views expose no captured content
 
   @unit
   Scenario: The span widgets read span_metrics, not spans
     Given the stock span widgets
     Then each reads span_metrics
-    And only a widget's presence check, which looks back 90 days, still reads spans
+    And only the 90-day presence checks, loops, step latency and voice call health read spans
 
   @unit
   Scenario: The trace fold writes the metadata keys the stock widgets read

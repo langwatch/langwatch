@@ -29,7 +29,7 @@ describe("given the Can I trust my numbers? widgets", () => {
     ]) {
       expect(sql.fields).toContain(filter);
     }
-    expect(sql.fields).toContain("SELECT 'all' AS field");
+    expect(sql.fields).toContain("field = 'all'");
     expect(sql.fields).not.toMatch(/SELECT [^']*\b(?:UserId|TotalCost|ConversationId)\b[^\n]*AS/);
     expect(code).toContain("Missing on ");
     expect(code).toContain("Sending it unlocks: ");

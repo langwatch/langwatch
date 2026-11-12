@@ -291,8 +291,9 @@ const VOICE_CALLS = `SELECT ${CONVERSATION} AS call,
     )) AS repeated
   FROM traces
   WHERE ${inPeriod("OccurredAt")}
+    -- spans, as on main: span_metrics' dedup of every span in the period ran out of memory.
     AND TraceId IN (
-      SELECT TraceId FROM span_metrics WHERE ${inPeriod("StartTime")} AND SpanName IN ('stt', 'tts')
+      SELECT TraceId FROM spans WHERE ${inPeriod("StartTime")} AND SpanName IN ('stt', 'tts')
     )
   GROUP BY call`;
 

@@ -111,11 +111,13 @@ GROUP BY model
 ORDER BY p95_ms DESC
 LIMIT 5`;
 
+// Reads `spans`, as on main: it reads no map, and span_metrics' dedup of every span in the
+// period ran out of memory where spans did not.
 export const SLOWEST_OPERATIONS_SQL = `SELECT SpanName AS operation,
   sum(DurationMs) AS total_ms,
   quantileExact(0.95)(DurationMs) AS p95_ms,
   count() AS spans
-FROM span_metrics
+FROM spans
 WHERE ${inPeriod("StartTime")}
 GROUP BY operation
 ORDER BY total_ms DESC

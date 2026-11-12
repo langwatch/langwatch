@@ -69,7 +69,6 @@
     "SpanType <- SpanType",
     "ErrorType <- ErrorType",
     "RagContextCount <- RagContextCount",
-    "InputHash <- InputHash [input]",
     "DeploymentEnvironment <- DeploymentEnvironment"
   ],
   "evaluations <- evaluation_runs": [

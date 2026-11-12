@@ -23,9 +23,10 @@ PR 9439 (goose 00126) gave `trace_analytics` nine metadata columns and moved 15 
 1. A stock widget query reads no map. The value it needs is a typed column: an existing one on
    `trace_metrics` or `evaluation_metrics`, or one the trace module's projections write (ADR-006):
    `MetadataOutcomeReason`, `MetadataPromptVersion` and `MetadataEnvironment` on `trace_analytics`,
-   written by its fold; `SpanType`, `ErrorType`, `RagContextCount`, `InputHash` and
-   `DeploymentEnvironment` on `span_analytics`, which the `span_metrics` view exposes and the span
-   widgets read in place of `spans`. `InputHash` is gated like `CapturedInput`.
+   written by its fold; `SpanType`, `ErrorType`, `RagContextCount` and `DeploymentEnvironment`
+   on `span_analytics`, which the `span_metrics` view exposes and the span widgets read in place
+   of `spans`. The analytics views expose no captured content, not even a hash of it (#6856), so
+   the loop widgets still compare `CapturedInput` on the gated `spans` view, as on main.
 2. A join hashes its small side: per-trace evaluation counts, the outcome judge's verdicts, or
    the parents of failed spans. The period's trace or span rows stream past it.
 3. An id set (`IN`, `NOT IN`) holds a bounded population: the traces that send a metadata prompt

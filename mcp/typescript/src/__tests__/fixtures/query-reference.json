@@ -936,16 +936,6 @@
               "available": true
             },
             {
-              "name": "InputHash",
-              "type": "UInt64",
-              "description": "A hash of the span's captured input: equal inputs share it, 0 when it sent none. Reveals no text, but tells equal inputs apart, so it is gated like captured input.",
-              "unit": null,
-              "gates": [
-                "input"
-              ],
-              "available": true
-            },
-            {
               "name": "DeploymentEnvironment",
               "type": "String",
               "description": "The environment the span's service ran in, from the resource's deployment.environment, else deployment.environment.name. Empty when it sent neither.",

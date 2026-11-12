@@ -81,13 +81,19 @@ ORDER BY bucket`;
 // a failed call followed by another under the same parent, of the same step, or of
 // any model call. A trace that does both counts once for each. `uncosted` counts the spans
 // with no cost, which make the summed cost a lower bound.
+// Loops compare CapturedInput on the gated spans view: no analytics view holds input (#6856).
 const REPEATS = `SELECT TraceId, min(StartTime) AS at, SpanName AS step, 1 AS looped,
     sum(ifNull(Cost, 0)) - argMin(ifNull(Cost, 0), StartTime) AS cost,
     countIf(Cost IS NULL) AS uncosted
-  FROM span_metrics
+  FROM spans
   WHERE ${inPeriod("StartTime")}
-    AND ${SPAN_TYPE} = 'tool'
-  GROUP BY TraceId, SpanName, InputHash
+    AND sipHash128(TraceId, SpanId) IN (
+      SELECT sipHash128(TraceId, SpanId)
+      FROM span_metrics
+      WHERE ${inPeriod("StartTime")}
+        AND ${SPAN_TYPE} = 'tool'
+    )
+  GROUP BY TraceId, SpanName, CapturedInput
   HAVING count() >= 3
   LIMIT 10000
   UNION ALL

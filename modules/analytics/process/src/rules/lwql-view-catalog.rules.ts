@@ -535,13 +535,6 @@ const SPAN_METRICS: UngatedViewDefinition = {
       sourceColumns: ["RagContextCount"],
     },
     {
-      name: "InputHash",
-      type: "UInt64",
-      description:
-        "A hash of the span's captured input: equal inputs share it, 0 when it sent none. Reveals no text, but tells equal inputs apart, so it is gated like captured input.",
-      sourceColumns: ["InputHash"],
-    },
-    {
       name: "DeploymentEnvironment",
       type: "String",
       description:
@@ -3281,7 +3274,8 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
       SpanType: "inherit",
       ErrorType: "inherit",
       RagContextCount: "inherit",
-      InputHash: { content: "input" },
+      // Withheld: the analytics views expose no captured content, not even its hash (#6856).
+      InputHash: "omit",
       DeploymentEnvironment: "inherit",
       ProjectedAt: "omit",
       _retention_days: "omit",

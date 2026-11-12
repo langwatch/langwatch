@@ -71,7 +71,7 @@ describe("given the Where my agent breaks widgets", () => {
   /** @scenario "AC62 Where my agent breaks: loops and retries are read from repeated spans" */
   it("finds loops by tool and input, retries by a later sibling after a failure", () => {
     const { code, sql } = buildOf("up-loops");
-    expect(sql.daily).toContain("GROUP BY TraceId, SpanName, InputHash");
+    expect(sql.daily).toContain("GROUP BY TraceId, SpanName, CapturedInput");
     expect(sql.daily).toContain("HAVING count() >= 3");
     expect(sql.daily).toContain("max(StartTime) > minIf(StartTime, StatusCode = 2)");
     expect(sql.daily).toContain("GROUP BY TraceId, ParentSpanId");
