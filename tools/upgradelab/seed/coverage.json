@@ -255,6 +255,12 @@
       "note": "about 300k spans through the OTLP door",
       "cells": ["C1", "C3"]
     },
+    "trace:track-analytics-metadata-columns-materialisation": {
+      "status": "seeded",
+      "seed": "heavy:otlp",
+      "note": "the same spans fold trace_analytics rows whose metadata columns the mutation stores",
+      "cells": ["C1", "C3"]
+    },
     "upcast:entitlement:lw.usage.month_counted": {
       "status": "unheld",
       "note": "branch-era event type, never written by a release; the upcast-events overlay (L5) injects it"

@@ -75,6 +75,8 @@ export function BlockPickerDialog({
   onAddWidgets,
   onSkip,
   onClose,
+  allowBuildYourOwn = true,
+  seedsLangyAfterAdd = true,
 }: {
   /** The board the picker opened on, attached as Langy's context. */
   board: BoardSubject;
@@ -84,6 +86,10 @@ export function BlockPickerDialog({
   /** Opens the widget editor on a new widget instead; the caller closes the picker with it. */
   onSkip: () => void;
   onClose: () => void;
+  /** False on a board that takes no widgets of its own, where there is no editor to go to. */
+  allowBuildYourOwn?: boolean;
+  /** False when the add opens another board, whose Langy context this board is not. */
+  seedsLangyAfterAdd?: boolean;
 }) {
   const langy = useLangyAsk();
   const analytics = useUiAnalytics();
@@ -106,7 +112,7 @@ export function BlockPickerDialog({
     onClose();
     // After the close has painted: starting the write redraws every card on the board.
     await afterNextPaint();
-    if (!(await onAddWidgets(question)) || !langy.enabled) return;
+    if (!(await onAddWidgets(question)) || !langy.enabled || !seedsLangyAfterAdd) return;
     for (const widget of pickerWidgets(question.id)) {
       langy.ask(widgetPromptDraft({ widget, board, period }));
     }
@@ -142,9 +148,11 @@ export function BlockPickerDialog({
         <Dialog.Header borderBottomWidth="1px" paddingX={5} paddingY={3.5}>
           <HStack width="full" gap={2}>
             <Dialog.Title textStyle="cardTitle">Add a widget</Dialog.Title>
-            <Button size="sm" variant="outline" marginStart="auto" onClick={onSkip}>
-              {BUILD_IT_MYSELF}
-            </Button>
+            {allowBuildYourOwn && (
+              <Button size="sm" variant="outline" marginStart="auto" onClick={onSkip}>
+                {BUILD_IT_MYSELF}
+              </Button>
+            )}
             <Dialog.CloseTrigger position="static" />
           </HStack>
         </Dialog.Header>
@@ -186,7 +194,9 @@ export function BlockPickerDialog({
             {!hasMatches && (
               <VStack align="start" gap={2} paddingX={3}>
                 <Text textStyle="bodySm" color="fg.muted">
-                  {`No widget matches. Press "${BUILD_IT_MYSELF}" to write your own with Langy.`}
+                  {allowBuildYourOwn
+                    ? `No widget matches. Press "${BUILD_IT_MYSELF}" to write your own with Langy.`
+                    : "No widget matches. Clear the search and filters to see them all."}
                 </Text>
                 <Button
                   size="xs"

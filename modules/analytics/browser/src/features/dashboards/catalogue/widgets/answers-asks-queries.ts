@@ -8,6 +8,7 @@ import {
   END,
   START,
   bucketOf,
+  firstTraceMetricsRow,
   inPeriod,
   inPeriodAndPrevious,
 } from "../../templates/model/lwql-period.ts";
@@ -207,23 +208,26 @@ export const CANNOT_SERVE_TOTALS_SQL = `SELECT count() AS closed,
 FROM ${IN_PERIOD}
 WHERE outcome != ''`;
 
-const TOPIC = "coalesce(nullIf(p.TopicName, ''), nullIf(t.Attributes['metadata.topic'], ''))";
+/** The clustered topic, else the app's, read from `trace_metrics` (tasks#1117). */
+const TOPIC = "coalesce(nullIf(p.TopicName, ''), nullIf(t.MetadataTopic, ''))";
 
 export const TOPIC_SHARES_SQL = `SELECT ${TOPIC} AS topic,
-  countIf(t.OccurredAt >= ${START}) AS in_period,
-  countIf(t.OccurredAt < ${START}) AS in_previous
-FROM traces AS t
+  uniqExactIf(t.TraceId, t.OccurredAt >= ${START}) AS in_period,
+  uniqExactIf(t.TraceId, t.OccurredAt < ${START}) AS in_previous
+FROM trace_metrics AS t
 LEFT JOIN topics AS p ON p.TopicId = t.TopicId
 WHERE ${inPeriodAndPrevious("t.OccurredAt")}
+  AND ${firstTraceMetricsRow({ view: "t" })}
   AND topic IS NOT NULL
 GROUP BY topic`;
 
 export const TOPIC_DAILY_SQL = `SELECT ${bucketOf("t.OccurredAt")} AS bucket,
   ${TOPIC} AS topic,
-  count() AS traces
-FROM traces AS t
+  uniqExact(t.TraceId) AS traces
+FROM trace_metrics AS t
 LEFT JOIN topics AS p ON p.TopicId = t.TopicId
 WHERE ${inPeriod("t.OccurredAt")}
+  AND ${firstTraceMetricsRow({ view: "t" })}
   AND topic IS NOT NULL
 GROUP BY bucket, topic
 ORDER BY bucket`;

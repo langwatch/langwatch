@@ -80,7 +80,7 @@ Feature: Publish every deployable image to the artifacts registry
 
   @unit
   Scenario: An image built from its own directory reads its inputs there
-    Given the build table gives langwatch-clickhouse-serverless the context infra/clickhouse-serverless
+    Given a build table row names its own directory as the build context
     When publish-docker-ecr selects the images to build and builds that image
     Then its Dockerfile's sources and its .dockerignore are read from that directory, and a change to the root .dockerignore does not rebuild it
     And a source outside that directory makes its inputs unreadable

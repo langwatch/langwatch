@@ -65,6 +65,8 @@ export interface LangWatchQLCompletenessInput {
   readonly executor: LangWatchQLExecutorRepository;
   /** The capability the main query ran with, so the report sees exactly its tenants. */
   readonly tenantCapability: string;
+  /** The projects that capability scopes, named in the query log's comment. */
+  readonly projectIds: readonly string[];
   readonly validation: AcceptedLangWatchQL;
   readonly database: string;
   readonly views: readonly LangWatchQLViewDefinition[];
@@ -108,6 +110,7 @@ export class LangWatchQLCompletenessService {
             : { [GRANULARITY_PARAMETER]: granularitySeconds }),
         },
         tenantCapability: input.tenantCapability,
+        projectIds: input.projectIds,
       });
 
       return {

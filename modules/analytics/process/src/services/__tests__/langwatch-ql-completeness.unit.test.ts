@@ -6,7 +6,10 @@
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { TEST_RUN_TELEMETRY } from "../../app/__tests__/analytics.fixture.ts";
+import {
+  ADMIT_EVERY_PLACEMENT,
+  TEST_RUN_TELEMETRY,
+} from "../../app/__tests__/analytics.fixture.ts";
 import {
   LangWatchQLExecutorRepository,
   type LangWatchQLExecutionRequest,
@@ -90,6 +93,7 @@ function run({
   const executor = new ScriptedExecutor(answers);
   const service = LangWatchQLService.create({
     runTelemetry: TEST_RUN_TELEMETRY,
+    placement: ADMIT_EVERY_PLACEMENT,
     executor,
     database: "analytics",
     limits: { maxRows: 1_000, maxResultBytes },

@@ -155,6 +155,26 @@ describe("<ProviderModelSelector/>", () => {
     });
   });
 
+  describe("given a placeholder and nothing picked", () => {
+    it("shows the placeholder in the trigger", () => {
+      renderSelector({ options: [MINI], placeholder: "Choose a model" });
+
+      expect(within(trigger()).queryByText("Choose a model")).not.toBeNull();
+    });
+  });
+
+  describe("given a footer", () => {
+    it("pins it inside the dropdown, under the rows", async () => {
+      renderSelector({ options: [MINI], footer: <a href="/settings">Configure</a> });
+
+      await userEvent.setup().click(trigger());
+
+      const footer = screen.getByTestId("provider-model-selector-footer");
+      expect(within(footer).getByRole("link", { name: "Configure" })).toBeTruthy();
+      expect(listbox().contains(footer)).toBe(true);
+    });
+  });
+
   describe("given an inherit entry", () => {
     const inheritOption = { model: CUSTOM.value, label: "Inherit (from organization)" };
 

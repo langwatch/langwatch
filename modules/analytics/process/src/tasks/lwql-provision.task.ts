@@ -15,7 +15,6 @@ import {
   LangWatchQLCollectionBindingService,
   type LwqlAccessModelMode,
   type LwqlCollectionProbe,
-  NO_COLLECTION_STATE,
 } from "../features/provisioning/services/langwatch-ql-collection-binding.service.ts";
 import {
   LangWatchQLProductionProvisioningService,
@@ -410,13 +409,14 @@ async function convergeClickHouse({
   if (mode === "sql") {
     await clusterGuard.assertSafe({ query: (sql) => repository.queryRows(sql), source });
   }
-  const server =
-    mode === "rendered"
-      ? await repository.readCollectionState({
-          database: names.database,
-          candidates: collectionBinding.renderedCollectionCandidates({ names }),
-        })
-      : NO_COLLECTION_STATE;
+  // Both modes read it: sql mode never writes a collection a config file defines.
+  const server = await repository.readCollectionState({
+    database: names.database,
+    candidates:
+      mode === "rendered"
+        ? collectionBinding.renderedCollectionCandidates({ names })
+        : [collectionBinding.namedCollection({ names, mode })],
+  });
   const render = ({ collectionLoaded, only: drifted }: LwqlEngineTableGate) =>
     selfProvisioning.clickHouseStatements({
       names,
@@ -452,7 +452,9 @@ async function convergeClickHouse({
     const statements = render(unprobed);
     const split = afterNamedCollection(statements);
     const head = await run(statements.slice(0, split));
-    gate = head.some((s) => isNamedCollectionKind(s.kind)) ? await gateByProbe() : unprobed;
+    // No collection statement ran (a config file owns it), or one was skipped: probe first.
+    const unwritten = split === 0 || head.some((s) => isNamedCollectionKind(s.kind));
+    gate = unwritten ? await gateByProbe() : unprobed;
     skipped = [...head, ...(await run(render(gate).slice(split)))];
   } else {
     gate = await gateByProbe();
