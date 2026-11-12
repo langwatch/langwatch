@@ -16,7 +16,12 @@ import {
 } from "@langwatch/prisma-client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import type { ProjectedTopic, TopicModelData } from "../../../eventing/topic-model.projection.ts";
+import type { TopicClusteringTopicsRecordedEvent } from "../../../eventing/topic-clustering.events.ts";
+import {
+  type ProjectedTopic,
+  type TopicModelData,
+  TopicModelFoldProjection,
+} from "../../../eventing/topic-model.projection.ts";
 import {
   PrismaTopicModelProjectionRepository,
   type TopicModelProjectionDatabase,
@@ -71,11 +76,45 @@ function projection(eventId: string, topics: ProjectedTopic[]): StoredProjection
 
 const byId = (a: ProjectedTopic, b: ProjectedTopic) => a.id.localeCompare(b.id);
 
+/** A clustering event carrying the model's topics, without the times the fold resolves. */
+function recordedEvent(params: {
+  id: string;
+  mode: "replace" | "merge";
+  topics: ProjectedTopic[];
+  occurredAt: number;
+}): TopicClusteringTopicsRecordedEvent {
+  return {
+    id: params.id,
+    aggregateId: projectId,
+    aggregateType: "topic_clustering",
+    tenantId: projectId,
+    createdAt: params.occurredAt,
+    occurredAt: params.occurredAt,
+    type: "lw.obs.topic_clustering.topics_recorded",
+    version: "2026-07-20",
+    data: {
+      mode: params.mode,
+      source: "clustering",
+      dedupeKey: `run:${params.id}:page-1`,
+      topics: params.topics.map((t) => ({
+        id: t.id,
+        name: t.name,
+        parentId: t.parentId,
+        embeddingsModel: t.embeddingsModel,
+        centroid: t.centroid,
+        p95Distance: t.p95Distance,
+        automaticallyGenerated: t.automaticallyGenerated,
+      })),
+    },
+  } as TopicClusteringTopicsRecordedEvent;
+}
+
 describe.skipIf(!databaseUrl)("Prisma topic model projection store", () => {
   let connection: PrismaConnection;
   let failOnUpsertChunk = 0;
   let upsertChunk = 0;
   let repository: PrismaTopicModelProjectionRepository;
+  let fold: TopicModelFoldProjection;
 
   beforeAll(async () => {
     if (!databaseUrl) throw new Error("Test database URL is required");
@@ -92,10 +131,13 @@ describe.skipIf(!databaseUrl)("Prisma topic model projection store", () => {
         }
         return prisma.$executeRaw(...args);
       }) as typeof prisma.$executeRaw,
+      $queryRaw: ((...args: Parameters<typeof prisma.$queryRaw>) =>
+        prisma.$queryRaw(...args)) as typeof prisma.$queryRaw,
       topic: prisma.topic,
       topicModelProjection: prisma.topicModelProjection,
     };
     repository = PrismaTopicModelProjectionRepository.create({ database });
+    fold = TopicModelFoldProjection.create({ store: repository });
 
     await prisma.organization.create({
       data: { id: organizationId, name: namespace, slug: namespace },
@@ -149,8 +191,16 @@ describe.skipIf(!databaseUrl)("Prisma topic model projection store", () => {
     return read.kind === "folded" ? read.projection.cursor.eventId : undefined;
   }
 
+  /** The worker's path for one event: read the stored model, fold the event, store it. */
+  async function applyEvent(event: TopicClusteringTopicsRecordedEvent): Promise<void> {
+    const read = await repository.get(projectId, context);
+    const state = read.kind === "folded" ? read.projection.state : fold.init();
+    const next = fold.handleTopicClusteringTopicsRecorded(event, state);
+    await repository.store(projection(event.id, next.Topics), context);
+  }
+
   describe("when a large model is stored", () => {
-    /** @scenario "A large topic model is stored without one long transaction" */
+    /** @scenario "A stored topic model reads back exactly as recorded" */
     it("reads back every topic exactly as recorded", async () => {
       const topics = model("event-1", { parents: 50, children: 450 });
 
@@ -161,24 +211,50 @@ describe.skipIf(!databaseUrl)("Prisma topic model projection store", () => {
     });
   });
 
-  describe("when a store fails partway and the event replays", () => {
+  describe("when a store fails partway and the event replays through the fold", () => {
     /** @scenario "Replaying a store that failed partway converges to the new model" */
-    it("keeps the old cursor, then converges to the new model on replay", async () => {
-      const next = model("event-2", { parents: 30, children: 270 });
-      const previous = model("event-1", { parents: 50, children: 450 });
-      await repository.store(projection("event-1", previous), context);
-
-      failUpsertChunk(2);
-      await expect(repository.store(projection("event-2", next), context)).rejects.toThrow(
-        "connection reset",
+    it("keeps the old cursor, then converges for a replace and a merge", async () => {
+      const events = [
+        recordedEvent({
+          id: `${namespace}-e1`,
+          mode: "replace",
+          topics: model("e1", { parents: 50, children: 450 }),
+          occurredAt: 1_700_000_001_000,
+        }),
+        recordedEvent({
+          id: `${namespace}-e2`,
+          mode: "replace",
+          topics: model("e2", { parents: 30, children: 270 }),
+          occurredAt: 1_700_000_002_000,
+        }),
+        recordedEvent({
+          id: `${namespace}-e3`,
+          mode: "merge",
+          topics: model("e3", { parents: 40, children: 260 }),
+          occurredAt: 1_700_000_003_000,
+        }),
+      ];
+      const [first, ...rest] = events;
+      if (!first) throw new Error("no events");
+      const stored = await repository.get(projectId, context);
+      const clean = events.reduce(
+        (state, event) => fold.handleTopicClusteringTopicsRecorded(event, state),
+        stored.kind === "folded" ? stored.projection.state : fold.init(),
       );
-      expect(await cursorEventId()).toBe("event-1");
+      await applyEvent(first);
 
-      failUpsertChunk(0);
-      await repository.store(projection("event-2", next), context);
+      for (const event of rest) {
+        const before = await cursorEventId();
+        failUpsertChunk(2);
+        await expect(applyEvent(event)).rejects.toThrow("connection reset");
+        expect(await cursorEventId()).toBe(before);
 
-      expect(await cursorEventId()).toBe("event-2");
-      expect(await storedTopics()).toEqual(next.toSorted(byId));
+        failUpsertChunk(0);
+        await applyEvent(event);
+        expect(await cursorEventId()).toBe(event.id);
+      }
+
+      expect(await storedTopics()).toEqual(clean.Topics.toSorted(byId));
     });
   });
 
@@ -200,7 +276,7 @@ describe.skipIf(!databaseUrl)("Prisma topic model projection store", () => {
 
   describe("when an id belongs to another project", () => {
     /** @scenario "A topic id from another project never overwrites that project's topic" */
-    it("fails the store and leaves the other project's row unchanged", async () => {
+    it("fails the store before writing and leaves the other project's row unchanged", async () => {
       const prisma = connection.client;
       const foreignId = `${namespace}-foreign`;
       await prisma.topic.create({
@@ -217,11 +293,16 @@ describe.skipIf(!databaseUrl)("Prisma topic model projection store", () => {
         where: { id: foreignId, projectId: otherProjectId },
       });
 
+      const cursorBefore = await cursorEventId();
+      const fresh = topic("fresh", null, "event-3");
       const forged = { ...topic("foreign", null, "event-3"), name: "Ours" };
       await expect(
-        repository.store(projection("event-3", [topic("p0", null, "event-3"), forged]), context),
-      ).rejects.toThrow("Stored 1 of 2 topics");
-      expect(await cursorEventId()).not.toBe("event-3");
+        repository.store(projection("event-3", [fresh, forged]), context),
+      ).rejects.toThrow("another project owns 1 of these topic ids");
+
+      expect(cursorBefore).toBeDefined();
+      expect(await cursorEventId()).toBe(cursorBefore);
+      expect(await prisma.topic.findUnique({ where: { id: fresh.id, projectId } })).toBeNull();
 
       const after = await prisma.topic.findUnique({
         where: { id: foreignId, projectId: otherProjectId },

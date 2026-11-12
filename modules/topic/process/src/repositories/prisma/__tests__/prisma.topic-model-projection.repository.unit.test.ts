@@ -58,8 +58,13 @@ function boundRows(values: unknown[]): BoundRows {
   };
 }
 
-/** `rowsRefused` stands for rows whose ids another project owns: the update skips them. */
-function makeDatabase(options: { failOnUpsertChunk?: number; rowsRefused?: number } = {}) {
+/**
+ * `foreignIds` are ids the ownership read finds in another project. `rowsRefused` stands
+ * for rows claimed by another project after that read: the update skips them.
+ */
+function makeDatabase(
+  options: { failOnUpsertChunk?: number; foreignIds?: string[]; rowsRefused?: number } = {},
+) {
   const calls: string[] = [];
   const chunks: BoundRows[] = [];
   let upsertChunk = 0;
@@ -71,6 +76,7 @@ function makeDatabase(options: { failOnUpsertChunk?: number; rowsRefused?: numbe
     chunks.push(boundRows(values));
     return boundRows(values).ids.length - (options.rowsRefused ?? 0);
   });
+  const queryRaw = vi.fn(async () => (options.foreignIds ?? []).map((id) => ({ id })));
   const deleteMany = vi.fn(async (args?: { where?: { parentId?: unknown } }) => {
     calls.push(args?.where?.parentId ? "delete stale children" : "delete stale topics");
     return { count: 0 };
@@ -82,10 +88,11 @@ function makeDatabase(options: { failOnUpsertChunk?: number; rowsRefused?: numbe
   const database = prismaDouble({
     $transaction: transaction,
     $executeRaw: (sql, ...values) => executeRaw(sql as TemplateStringsArray, ...values),
+    $queryRaw: queryRaw,
     topic: { deleteMany },
     topicModelProjection: { upsert: cursorUpsert },
   });
-  return { database, calls, chunks, transaction, executeRaw, deleteMany, cursorUpsert };
+  return { database, calls, chunks, transaction, executeRaw, queryRaw, deleteMany, cursorUpsert };
 }
 
 describe("PrismaTopicModelProjectionRepository.store", () => {
@@ -161,8 +168,23 @@ describe("PrismaTopicModelProjectionRepository.store", () => {
   });
 
   describe("when another project owns one of the ids", () => {
-    /** @scenario "A topic id from another project never overwrites that project's topic" */
-    it("fails the store and leaves the cursor for a replay", async () => {
+    /** @scenario "A topic id another project owns is refused before anything is written" */
+    it("fails the store before writing or deleting anything", async () => {
+      const { database, executeRaw, deleteMany, cursorUpsert } = makeDatabase({
+        foreignIds: ["theirs"],
+      });
+      const repository = PrismaTopicModelProjectionRepository.create({ database });
+
+      await expect(
+        repository.store(projection([topic("ours"), topic("theirs")]), context),
+      ).rejects.toThrow("another project owns 1 of these topic ids");
+
+      expect(executeRaw).not.toHaveBeenCalled();
+      expect(deleteMany).not.toHaveBeenCalled();
+      expect(cursorUpsert).not.toHaveBeenCalled();
+    });
+
+    it("still fails the store when another project claims an id after the check", async () => {
       const { database, cursorUpsert, deleteMany } = makeDatabase({ rowsRefused: 1 });
       const repository = PrismaTopicModelProjectionRepository.create({ database });
 

@@ -117,10 +117,15 @@ Feature: Topic clustering owns the topic model
 
   @integration
   Scenario: Replaying a store that failed partway converges to the new model
-    Given storing the next model failed after some topics were written
-    When the event is stored again
-    Then the stored topics are exactly the next model
-    And the projection cursor names the next event
+    Given storing a replace or a merge event failed after some topics were written
+    When the worker replays the event, folding it over the stored model
+    Then the stored topics are exactly the model a clean fold produces
+    And the projection cursor names the replayed event
+
+  @integration
+  Scenario: A stored topic model reads back exactly as recorded
+    When the projection stores a model of hundreds of topics
+    Then every topic reads back with the same fields, centroid and recorded time
 
   @unit
   Scenario: A topic id recorded twice in one model is stored once
@@ -139,9 +144,17 @@ Feature: Topic clustering owns the topic model
     Then the dropped subtopics are deleted before the dropped parents
     And a model with no topics deletes nothing
 
+  @unit
+  Scenario: A topic id another project owns is refused before anything is written
+    Given another project owns one of the model's topic ids
+    When the projection stores the model
+    Then the store fails before any topic is written or deleted
+    And the projection cursor does not move
+
   @integration
   Scenario: A topic id from another project never overwrites that project's topic
     Given another project holds a topic with a given id
     When this project's model carries a topic with the same id
-    Then the store fails and the projection cursor does not move
+    Then the store fails before any of this project's topics is written
+    And the projection cursor does not move
     And the other project's topic is unchanged

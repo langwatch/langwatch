@@ -5,14 +5,15 @@ import type {
   StoredProjectionRead,
 } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { ProjectedTopic, TopicModelData } from "../../eventing/topic-model.projection.ts";
 
-/** The two models, plus the raw SQL the bulk topic upsert needs. */
+/** The two models, plus the raw SQL the ownership check and the bulk topic upsert need. */
 export type TopicModelProjectionDatabase = Pick<
   PrismaClient,
-  "$executeRaw" | "topic" | "topicModelProjection"
+  "$executeRaw" | "$queryRaw" | "topic" | "topicModelProjection"
 >;
 
 // KSUID resource for topic-model projection cursor rows (KSUID_RESOURCES.TOPIC_MODEL_PROJECTION).
@@ -107,6 +108,7 @@ export class PrismaTopicModelProjectionRepository implements StateProjectionStor
       ...topics.filter((t) => t.parentId === null),
       ...topics.filter((t) => t.parentId !== null),
     ];
+    await this.refuseForeignIds({ projectId, ids: keptIds });
     const writtenAt = new Date();
     for (let start = 0; start < ordered.length; start += TOPIC_UPSERT_CHUNK_SIZE) {
       await this.upsertTopics({
@@ -138,9 +140,27 @@ export class PrismaTopicModelProjectionRepository implements StateProjectionStor
     });
   }
 
+  /** Throws before any write when another project owns one of the ids, so nothing lands. */
+  private async refuseForeignIds(input: { projectId: string; ids: string[] }): Promise<void> {
+    const { projectId, ids } = input;
+    if (ids.length === 0) return;
+    const foreign = await this.prisma.$queryRaw<{ id: string }[]>`
+      ${skipTenantCheck({
+        // Reads only ids, to refuse this project's write when another project owns one.
+        SKIP_TENANT_CHECK: true,
+      })}
+      SELECT "id" FROM "Topic" WHERE "id" = ANY(${ids}::text[]) AND "projectId" <> ${projectId}
+    `;
+    if (foreign.length > 0) {
+      throw new Error(
+        `Refused to store topics: another project owns ${foreign.length} of these topic ids.`,
+      );
+    }
+  }
+
   /**
-   * One statement per chunk. The update only lands on a row the project owns, so an
-   * id another project owns is refused loudly and never overwrites that project's row.
+   * One statement per chunk. The update only lands on a row the project owns, so an id
+   * another project claims between the check and the write still never overwrites it.
    * createdAt is the recorded time: the batch cadence gate reads it under replay.
    */
   private async upsertTopics(input: {
