@@ -96,6 +96,15 @@ export const LWQL_SHARED_READER_ROLE = "lwql_ro";
  */
 export const LWQL_ORG_SCOPE_FRAGMENT = `${postgresLiteral(ORG_ROLE_PREFIX)}::text || md5(`;
 
+/**
+ * Lower-cased fragments a scoped view's stored definition must also carry: the membership catalog
+ * the org-role lookup joins, and the comparison tying that membership to the session user (the
+ * definition deparses `current_user` upper-case, hence lower-cased matching). A view that looks
+ * the org role up without both is not row-scoped to the reader.
+ */
+export const LWQL_ORG_MEMBERSHIP_FRAGMENT = "pg_auth_members";
+export const LWQL_SESSION_USER_FRAGMENT = "rolname = current_user";
+
 /** Where the per-reader row scope reads each row's owning project. */
 export interface PostgresReaderRowScope {
   /** The shared reader login, which keeps every row. */

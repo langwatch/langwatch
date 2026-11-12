@@ -216,12 +216,8 @@ describe("given per-reader row scoping over every generated Postgres view", () =
   });
 
   describe("when the seed is checked against vacuous passes", () => {
-    // Views whose shared baseline legitimately lacks a row for one org. One line of reason each.
-    // Empty on purpose: every rowFilter view (boards, widgets, the five Langy tables) is seeded
-    // visible for both orgs by SEED_COLUMN_OVERRIDES and the shared conversation id default.
-    const EMPTY_FOR_AN_ORG: Record<string, string> = {};
-
-    it.each(VIEW_NAMES.filter((view) => !(view in EMPTY_FOR_AN_ORG)))(
+    // Every rowFilter view (boards, widgets, the Langy tables) is seeded visible for both orgs.
+    it.each(VIEW_NAMES)(
       "%s: the shared baseline has rows for both orgs",
       (view) => {
         const rows = shared[view] as Row[];
@@ -232,12 +228,6 @@ describe("given per-reader row scoping over every generated Postgres view", () =
         ]);
       },
     );
-
-    it.each(Object.keys(EMPTY_FOR_AN_ORG))("%s: an allowlisted view really is empty for an org", (view) => {
-      const rows = (shared[view] ?? []) as Row[];
-
-      expect(rows.some(ownedBy(organizations, ORG_A)) && rows.some(ownedBy(organizations, ORG_B))).toBe(false);
-    });
   });
 
   describe("when a project moves to another organization's team", () => {
@@ -422,6 +412,43 @@ describe("given per-reader row scoping over every generated Postgres view", () =
 
     it("the group still has SELECT on a scoped view", async () => {
       expect(await canSelect(scoped)).toBe("t");
+    });
+  });
+
+  describe("when look-alike views carry the org-role lookup but no membership tie to the session user", () => {
+    const [withoutMembership, withoutSessionTie] = [VIEW_NAMES[2] as string, VIEW_NAMES[3] as string];
+    const lookup = "g.rolname = 'lwql_org_'::text || md5('x')";
+
+    beforeAll(async () => {
+      await admin(`REVOKE ALL ON ALL TABLES IN SCHEMA ${SCHEMA} FROM ${GROUP}`);
+      // Security barrier and the org-role fragment, but nothing ties the lookup to who is asking.
+      const decoys: Record<string, string> = {
+        [withoutMembership]: `EXISTS (SELECT 1 FROM pg_roles g WHERE ${lookup})`,
+        [withoutSessionTie]: `EXISTS (SELECT 1 FROM pg_roles g JOIN pg_auth_members m ON m.roleid = g.oid WHERE ${lookup})`,
+      };
+      for (const [view, predicate] of Object.entries(decoys)) {
+        await admin(`DROP VIEW ${q(SCHEMA)}.${q(view)}`);
+        await admin(
+          `CREATE VIEW ${q(SCHEMA)}.${q(view)} WITH (security_barrier = true) AS SELECT 1 AS bogus_column WHERE ${predicate}`,
+        );
+        await admin(`GRANT SELECT ON ${q(SCHEMA)}.${q(view)} TO ${GROUP}`);
+      }
+      await applyAll(provisioning.postgresReaderGrantStatements({ schema: SCHEMA, role: SHARED_READER }));
+    });
+
+    const canSelect = (view: string) =>
+      admin(`SELECT has_table_privilege('${GROUP}', '${q(SCHEMA)}.${q(view)}', 'SELECT')`);
+
+    it("the group has no SELECT on a view with no membership join, a stale grant included", async () => {
+      expect(await canSelect(withoutMembership)).toBe("f");
+    });
+
+    it("the group has no SELECT on a view with a membership join but no session-user comparison", async () => {
+      expect(await canSelect(withoutSessionTie)).toBe("f");
+    });
+
+    it("the group still has SELECT on a scoped view", async () => {
+      expect(await canSelect(VIEW_NAMES[4] as string)).toBe("t");
     });
   });
 

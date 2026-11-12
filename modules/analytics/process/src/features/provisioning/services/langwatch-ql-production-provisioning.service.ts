@@ -15,8 +15,10 @@ import { LangWatchQLCapabilityService } from "../../../services/langwatch-ql-cap
 import type { LangWatchQLViewDefinition } from "../../../services/langwatch-ql-catalog-shapes.service.ts";
 import { LangWatchQLSqlTextService } from "../../../services/langwatch-ql-sql-text.service.ts";
 import {
+  LWQL_ORG_MEMBERSHIP_FRAGMENT,
   LWQL_ORG_SCOPE_FRAGMENT,
   LWQL_SCOPED_READER_GROUP,
+  LWQL_SESSION_USER_FRAGMENT,
   LWQL_SHARED_READER_ROLE,
 } from "./langwatch-ql-postgres-mapping.service.ts";
 import { LangWatchQLPostgresViewsService } from "./langwatch-ql-postgres-views.service.ts";
@@ -47,7 +49,8 @@ export const LWQL_POSTGRES_READER_ROLE = LWQL_SHARED_READER_ROLE;
 
 /**
  * Runs `grant` only when the live view is the row-scoped one: a security barrier whose stored
- * definition carries the org-role lookup and the `current_user` test. A stale unscoped view of
+ * definition carries the org-role lookup, the `pg_auth_members` join and the
+ * `rolname = current_user` test. A stale unscoped view of
  * the same name must never reach the scoped-reader group, so a live view that fails the
  * guard has any existing `SELECT` revoked rather than merely left ungranted.
  */
@@ -67,7 +70,8 @@ function scopedViewGuard({
     `AND c.relkind = 'v' ` +
     `AND 'security_barrier=true' = ANY(coalesce(c.reloptions, '{}')) ` +
     `AND position(${postgresLiteral(LWQL_ORG_SCOPE_FRAGMENT)} in ${definition}) > 0 ` +
-    `AND position('current_user' in lower(${definition})) > 0) THEN\n` +
+    `AND position(${postgresLiteral(LWQL_ORG_MEMBERSHIP_FRAGMENT)} in lower(${definition})) > 0 ` +
+    `AND position(${postgresLiteral(LWQL_SESSION_USER_FRAGMENT)} in lower(${definition})) > 0) THEN\n` +
     `      EXECUTE ${postgresLiteral(grant)};\n` +
     `    ELSIF to_regclass(${postgresLiteral(qualifiedView)}) IS NOT NULL THEN\n` +
     `      EXECUTE ${postgresLiteral(revoke)};\n` +

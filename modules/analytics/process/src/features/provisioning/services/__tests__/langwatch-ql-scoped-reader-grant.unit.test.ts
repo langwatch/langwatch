@@ -7,8 +7,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  LWQL_ORG_MEMBERSHIP_FRAGMENT,
   LWQL_ORG_SCOPE_FRAGMENT,
   LWQL_SCOPED_READER_GROUP,
+  LWQL_SESSION_USER_FRAGMENT,
 } from "../langwatch-ql-postgres-mapping.service.ts";
 import { LangWatchQLProductionProvisioningService } from "../langwatch-ql-production-provisioning.service.ts";
 
@@ -25,7 +27,9 @@ describe("given the scoped-reader group's grant statements", () => {
       expect(block).toContain("c.relkind = 'v'");
       expect(block).toContain("'security_barrier=true' = ANY(coalesce(c.reloptions, '{}'))");
       expect(block).toContain(`position('${LWQL_ORG_SCOPE_FRAGMENT.replaceAll("'", "''")}' in pg_get_viewdef(c.oid))`);
-      expect(block).toContain("position('current_user' in lower(pg_get_viewdef(c.oid)))");
+      expect(block).toContain(`position('${LWQL_ORG_MEMBERSHIP_FRAGMENT}' in lower(pg_get_viewdef(c.oid)))`);
+      expect(block).toContain(`position('${LWQL_SESSION_USER_FRAGMENT}' in lower(pg_get_viewdef(c.oid)))`);
+      expect(block).not.toContain("position('current_user' in");
     });
 
     it("revokes from the group on a live view that fails the guard", () => {

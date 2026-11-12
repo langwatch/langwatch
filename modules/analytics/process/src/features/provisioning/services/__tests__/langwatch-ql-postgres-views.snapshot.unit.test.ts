@@ -6,7 +6,11 @@
 
 import { describe, expect, it } from "vitest";
 
-import { LWQL_ORG_SCOPE_FRAGMENT } from "../langwatch-ql-postgres-mapping.service.ts";
+import {
+  LWQL_ORG_MEMBERSHIP_FRAGMENT,
+  LWQL_ORG_SCOPE_FRAGMENT,
+  LWQL_SESSION_USER_FRAGMENT,
+} from "../langwatch-ql-postgres-mapping.service.ts";
 import { LangWatchQLPostgresViewsService } from "../langwatch-ql-postgres-views.service.ts";
 import { LangWatchQLProductionProvisioningService } from "../langwatch-ql-production-provisioning.service.ts";
 
@@ -36,6 +40,13 @@ describe("given the generated approved Postgres views", () => {
 
     it("carries the canonical org-role scope fragment in every statement", () => {
       expect(statements.filter((s) => !s.includes(LWQL_ORG_SCOPE_FRAGMENT))).toEqual([]);
+    });
+
+    it("ties the org-role membership to the session user in every statement", () => {
+      const lowered = statements.map((s) => s.toLowerCase());
+
+      expect(lowered.filter((s) => !s.includes(LWQL_ORG_MEMBERSHIP_FRAGMENT))).toEqual([]);
+      expect(lowered.filter((s) => !s.includes(LWQL_SESSION_USER_FRAGMENT))).toEqual([]);
     });
 
     it("exempts the default shared reader role in every statement", () => {
