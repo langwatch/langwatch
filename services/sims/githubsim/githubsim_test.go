@@ -154,6 +154,48 @@ func TestPullRequestLifecycleAndCheckRuns(t *testing.T) {
 	require.Equal(t, http.StatusCreated, run.Code)
 	list := call(s, "GET", "/repos/langwatch-demo/app/commits/abc/check-runs", tok, "")
 	assert.Contains(t, list.Body.String(), `"total_count":1`)
+	suites := call(s, "GET", "/repos/langwatch-demo/app/commits/abc/check-suites", tok, "")
+	assert.Contains(t, suites.Body.String(), `"latest_check_runs_count":1`)
+	assert.Contains(t, suites.Body.String(), `"status":"completed"`)
+}
+
+// @scenario "A check suite on a pull request's head commit is delivered as GitHub sends it"
+func TestCheckSuiteDelivery(t *testing.T) {
+	target, got := webhookTarget(t, http.StatusOK)
+	s := testServer(t, func(c *Config) { c.WebhookURL = target.URL })
+	tok := mint(t, s, `{}`)
+	opened := call(s, "POST", "/repos/langwatch-demo/app/pulls", tok, `{"title":"Fix","head":"langy/fix","base":"main"}`)
+	require.Equal(t, http.StatusCreated, opened.Code, opened.Body.String())
+	call(s, "POST", "/repos/langwatch-demo/app/check-runs", tok, `{"name":"unit","head_sha":"def","status":"completed","conclusion":"failure"}`)
+
+	rec := call(s, "POST", "/_sim/api/deliver", "", `{"event":"check_suite","repo":"langwatch-demo/app","number":2,"headSha":"def"}`)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	hook := <-got
+	assert.Equal(t, "check_suite", hook.event)
+	var payload struct {
+		Action       string             `json:"action"`
+		Installation struct{ ID int64 } `json:"installation"`
+		Repository   struct{ ID int64 } `json:"repository"`
+		CheckSuite   struct {
+			HeadBranch   string `json:"head_branch"`
+			HeadSHA      string `json:"head_sha"`
+			Conclusion   string `json:"conclusion"`
+			PullRequests []struct {
+				Number int
+				Head   struct{ Repo struct{ ID int64 } }
+				Base   struct{ Repo struct{ ID int64 } }
+			} `json:"pull_requests"`
+		} `json:"check_suite"`
+	}
+	require.NoError(t, json.Unmarshal(hook.body, &payload))
+	assert.Equal(t, "completed", payload.Action)
+	assert.Equal(t, int64(1001), payload.Installation.ID)
+	assert.Equal(t, "langy/fix", payload.CheckSuite.HeadBranch)
+	assert.Equal(t, "failure", payload.CheckSuite.Conclusion)
+	require.Len(t, payload.CheckSuite.PullRequests, 1)
+	assert.Equal(t, 2, payload.CheckSuite.PullRequests[0].Number)
+	assert.Equal(t, payload.Repository.ID, payload.CheckSuite.PullRequests[0].Head.Repo.ID)
+	assert.Equal(t, payload.Repository.ID, payload.CheckSuite.PullRequests[0].Base.Repo.ID)
 }
 
 type received struct {

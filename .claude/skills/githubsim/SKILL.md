@@ -33,7 +33,7 @@ GET  /app/installations/{id}                       App JWT
 POST /app/installations/{id}/access_tokens         App JWT; 422 for a permission not granted
 GET  /installation/repositories                    token; paged
 GET|POST /repos/{o}/{r}/pulls   GET .../pulls/{n}   head=owner:branch, state=
-POST|GET /repos/{o}/{r}/check-runs | commits/{sha}/check-runs
+POST|GET /repos/{o}/{r}/check-runs | commits/{sha}/check-runs | commits/{sha}/check-suites (one rolled-up suite)
 GET  /apps/{slug}/installations/new?account=<login>&state=…   redirects to the setup URL
 GET  /login/oauth/authorize | POST /login/oauth/access_token | GET /user, /user/emails
 ```
@@ -55,6 +55,8 @@ haven sim github pr open --repo langwatch-demo/app --head feat/x --deliver
 haven sim github pr merge --repo langwatch-demo/app --number 1 --deliver
 haven sim github app suspend|unsuspend|delete|add-repo|remove-repo --installation 1001 --deliver
 haven sim github deliver --event pull_request --action closed --repo langwatch-demo/app --number 1 [--bad-signature|--omit-signature]
+# CI finished on a pull request (post the check runs for <sha> first):
+curl -X POST <sim>/_sim/api/deliver -d '{"event":"check_suite","repo":"langwatch-demo/app","number":2,"headSha":"<sha>"}'
 haven sim github fault add --status 429 --retry-after 30 --match /pulls --times 1
 haven sim github fault list | clear      haven sim github clear | reset
 ```
