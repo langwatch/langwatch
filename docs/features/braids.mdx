@@ -199,6 +199,12 @@ The calling service signs the entries it names, inside an active span: the signa
   </Tab>
   <Tab title="Go">
     ```go
+    import (
+    	"os"
+
+    	langwatch "github.com/langwatch/langwatch/sdks/go"
+    )
+
     // Calling service, inside an active span: the signature covers the current trace.
     ctx, err := langwatch.SignBaggage(ctx, os.Getenv("LANGWATCH_SIGNING_KEY"), map[string]string{
     	"orchestrator": "web",
@@ -210,6 +216,11 @@ The calling service signs the entries it names, inside an active span: the signa
     ```
 
     ```go
+    import (
+    	langwatch "github.com/langwatch/langwatch/sdks/go"
+    	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+    )
+
     // Called service: add the copy processor to your tracer provider.
     braids, err := langwatch.NewBraidBaggageSpanProcessor("orchestrator")
     if err != nil {
