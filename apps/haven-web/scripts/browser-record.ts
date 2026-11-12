@@ -105,16 +105,19 @@ export function describeElement(el: Element): Described {
   const label = text(labels?.[0]?.textContent) || labelled;
   const content = text((el as HTMLElement).innerText);
   const hint = `${input.name ?? ""} ${el.id} ${el.getAttribute("autocomplete") ?? ""}`;
+  const secret =
+    type === "password" || /pass|secret|token|api.?key|one-time-code|cc-number|cc-csc/i.test(hint);
   return {
     tag,
     role,
-    name: text(el.getAttribute("aria-label")) || label || content || text(input.value),
+    name:
+      text(el.getAttribute("aria-label")) || label || content || (secret ? "" : text(input.value)),
     label,
     testid: el.getAttribute("data-testid") ?? "",
     placeholder: el.getAttribute("placeholder") ?? "",
     text: content,
     id: el.id,
-    secret: type === "password" || /pass|secret|token|api.?key/i.test(hint),
+    secret,
   };
 }
 
