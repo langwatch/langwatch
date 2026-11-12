@@ -144,7 +144,7 @@ validateLangWatchQL(input: LangWatchQLValidationInput): LangWatchQLAcceptedState
 
 #### `validateLangWatchQLForRun`
 
-Admits a statement for a run about to start: the project's route is asked first and the statement is judged against the route's database. A saved statement uses `validateLangWatchQL`, which needs no route.
+Admits a statement for a run about to start: the placement gate, then the project's route, then the statement judged against the route's database. A saved statement uses `validateLangWatchQL`, which needs no route.
 
 ```typescript
 validateLangWatchQLForRun(input: LangWatchQLValidationInput): Promise<LangWatchQLAcceptedStatement>;

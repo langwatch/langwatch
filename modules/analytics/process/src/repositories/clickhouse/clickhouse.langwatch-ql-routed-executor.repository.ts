@@ -1,7 +1,7 @@
 /**
- * Runs each LangWatchQL statement on the ClickHouse holding its projects' rows: the shared one,
- * or an organization's own. Always as the LangWatchQL identity: a private route's credentials
- * are dropped, since that route's user may create and drop anything. Spec: specs/lwql/api.feature.
+ * Runs each LangWatchQL statement where its projects' rows are: the shared ClickHouse, or an
+ * organization's own as its route URL's login; the shared login never leaves the shared server.
+ * Unreachable until ADR-200's opt-in, which decides the identity. Spec: specs/lwql/api.feature.
  */
 import { LangWatchQLUnavailableError } from "@langwatch/analytics-contract";
 import {
@@ -50,9 +50,9 @@ function refused(reason: string): LangWatchQLUnavailableError {
 }
 
 /**
- * The route's server as the LangWatchQL identity: its origin and database, never the route's
- * user or password. A URL that is not http(s), or names no database, a reserved one or a
- * non-lower-case-identifier one, is refused without its text, which may carry those credentials.
+ * The route's server, database and login, every one from the route URL; only the tenant setting's
+ * name is the shared connection's. A URL that is not http(s), carries no user, or names no
+ * database, a reserved one or a non-lower-case-identifier one, is refused without its text.
  */
 function privateConnectionOf({
   shared,
@@ -63,21 +63,33 @@ function privateConnectionOf({
 }): LangWatchQLConnection {
   let parsed: URL;
   let database: string;
+  let username: string;
+  let password: string;
   try {
     parsed = new URL(url);
     database = decodeURIComponent(parsed.pathname.replace(/^\/+/, ""));
+    username = decodeURIComponent(parsed.username);
+    password = decodeURIComponent(parsed.password);
   } catch {
     // Never the caught error: a URL parse failure carries the whole URL, password included.
     throw refused("unparsable route URL");
   }
   // Any other scheme parses to the origin "null", which no driver can dial.
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw refused("bad scheme");
+  // Failing closed: a route with no login of its own must not borrow the shared one.
+  if (username === "") throw refused("no route credentials");
   // Failing closed: a route naming no database must not adopt the shared deployment's.
   if (database === "") throw refused("no database");
   // Written unquoted into generated SQL: only a lower-case identifier, never a reserved one.
   if (!PLAIN_DATABASE_NAME.test(database)) throw refused("bad name shape");
   if (RESERVED_DATABASES.includes(database)) throw refused("reserved database");
-  return { ...shared, url: parsed.origin, database };
+  return {
+    url: parsed.origin,
+    username,
+    password,
+    database,
+    tenantSetting: shared.tenantSetting,
+  };
 }
 
 /** An organization's executor, and the statements running on it right now. */

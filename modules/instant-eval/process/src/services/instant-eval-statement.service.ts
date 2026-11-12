@@ -33,8 +33,9 @@ import {
 } from "../rules/instant-eval-run-questions.rules.ts";
 import type { InstantEvalRowSourceService } from "./instant-eval-row-source.service.ts";
 
-/** The refusals of the route, not of the statement: they reach the caller as they were. */
+/** Gate and route refusals, not the statement's: they reach the caller as they were. */
 const ROUTE_REFUSAL_CODES: ReadonlySet<string> = new Set([
+  "lwql_not_provisioned",
   "lwql_unavailable",
   "private_dataplane_unavailable",
 ]);
@@ -159,7 +160,7 @@ export class InstantEvalStatementService {
 
   /**
    * The policy's verdict, re-raised as the run's own invalid-query code with its violations.
-   * The route's refusal is not the statement's and passes through unchanged.
+   * The gate's or the route's refusal is not the statement's and passes through unchanged.
    */
   async #validateForRun({
     caller,

@@ -24,6 +24,13 @@ Feature: LangWatchQL never answers across a tenant or an instance
     And the executor is never called, so the shared server is never queried for it
 
   @unit
+  Scenario: A routed organisation is refused before its routed executor is built
+    Given an organisation whose data is on its own ClickHouse
+    When it runs a LangWatchQL query, a pass, or a run's validation
+    Then it is refused with error code lwql_not_provisioned
+    And its route is never asked, so no executor for its ClickHouse is built and no login reaches it
+
+  @unit
   Scenario: A gate that cannot decide refuses rather than falling back
     Given the organisation's route cannot be read
     When it runs a LangWatchQL query

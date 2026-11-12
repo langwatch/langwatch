@@ -41,8 +41,8 @@ Feature: The Instant Eval run over REST, one LWQL statement, judged as a job
   @unit
   Scenario: A run is judged against the organization's route, and a route refusal is not rewritten
     Given an organization whose statement is judged at the start of a run
-    When the query layer refuses the route
-    Then the run is refused with the route's own refusal, not instant_eval_query_invalid
+    When the query layer's placement gate or the route refuses the organization
+    Then the run is refused with that refusal, not instant_eval_query_invalid
     And a refusal of the statement itself is still instant_eval_query_invalid
 
   @integration

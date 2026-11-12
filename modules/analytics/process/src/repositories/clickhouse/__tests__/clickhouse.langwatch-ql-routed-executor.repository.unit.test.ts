@@ -164,8 +164,8 @@ describe("given a statement over no projects", () => {
 });
 
 describe("given a statement over an organization with a private ClickHouse", () => {
-  /** @scenario "A LangWatchQL query for an organization with a private ClickHouse runs on that ClickHouse as the LangWatchQL identity" */
-  it("runs on the route's origin and database as the LangWatchQL identity, with no route credentials anywhere", async () => {
+  /** @scenario "A LangWatchQL query for an organization with a private ClickHouse runs on that ClickHouse with the route's own login" */
+  it("builds the private client from the route's own login, never the shared LangWatchQL user or password", async () => {
     const { shared, run } = fixture();
 
     await run(["project-private"]);
@@ -173,13 +173,17 @@ describe("given a statement over an organization with a private ClickHouse", () 
     const [isolated] = privateDrivers();
     expect(isolated?.config).toMatchObject({
       url: "https://private.invalid:8443",
-      username: SHARED.username,
-      password: SHARED.password,
+      username: "route-user",
+      password: "route-password",
       database: "acme_db",
     });
-    expect(JSON.stringify(drivers.map((driver) => driver.config))).not.toMatch(
-      /route-user|route-password/,
-    );
+    expect(isolated?.config.username).not.toBe(SHARED.username);
+    expect(isolated?.config.password).not.toBe(SHARED.password);
+    expect(JSON.stringify(isolated?.config)).not.toContain(SHARED.password);
+    expect(shared.config).toMatchObject({
+      username: SHARED.username,
+      password: SHARED.password,
+    });
     expect(isolated?.query).toHaveBeenCalledWith(
       expect.objectContaining({ clickhouse_settings: { custom_lwql_key_hash: "capability" } }),
     );
@@ -369,7 +373,6 @@ describe("when the executor closes", () => {
   });
 });
 
-// A handled private_dataplane_unavailable keeps its own code and message.
 describe("given the router refuses an organization with private_dataplane_unavailable", () => {
   class RouteMissingError extends HandledError {
     constructor() {
@@ -391,6 +394,7 @@ describe("given the router refuses an organization with private_dataplane_unavai
     }
   }
 
+  /** @scenario "A LangWatchQL query for an organization whose private route is missing is refused, never answered from the shared ClickHouse" */
   it("rethrows that refusal unchanged and runs nothing on the shared ClickHouse", async () => {
     const refusal = new RouteMissingError();
     const executor = RoutedLangWatchQLExecutorRepository.create({
@@ -405,9 +409,49 @@ describe("given the router refuses an organization with private_dataplane_unavai
     );
 
     expect(thrown).toBe(refusal);
-    expect(thrown).toMatchObject({ code: "private_dataplane_unavailable" });
+    expect(thrown).toMatchObject({
+      code: "private_dataplane_unavailable",
+      httpStatus: 503,
+      meta: { variable: "CLICKHOUSE_URL__globex__org-labelled", problem: "missing" },
+    });
     expect(shared?.query).not.toHaveBeenCalled();
+    expect(privateDrivers()).toEqual([]);
   });
+});
+
+describe("given a private route whose URL carries no login of its own", () => {
+  /** @scenario "A private route that carries no login of its own is refused" */
+  it.each([
+    ["no user or password", "https://private.invalid:8443/acme_db"],
+    ["a password but no user", "https://:route-password@private.invalid:8443/acme_db"],
+  ])(
+    "refuses a route without its own credentials, with %s, and builds no private client",
+    async (_, url) => {
+      const built: string[] = [];
+      const executor = RoutedLangWatchQLExecutorRepository.create({
+        connection: SHARED,
+        route: () => Promise.resolve({ kind: "private", organizationId: "org-no-login", url }),
+        createExecutor: (input) => {
+          built.push(input.target);
+          return ClickHouseLangWatchQLExecutorRepository.create(input);
+        },
+      });
+      const [shared] = drivers;
+
+      const refusal = (await runOn({ executor, tenantIds: ["project-x"] }).catch(
+        (error: unknown) => error,
+      )) as HandledError;
+
+      expect(refusal).toMatchObject({
+        code: "lwql_unavailable",
+        message: "LangWatchQL is not available for this organization's ClickHouse.",
+      });
+      expect(refusal.reasons.map((r) => r.message)).toEqual(["no route credentials"]);
+      expect(built).toEqual(["shared"]);
+      expect(privateDrivers()).toEqual([]);
+      expect(shared?.query).not.toHaveBeenCalled();
+    },
+  );
 });
 
 // A route URL with no usable origin is refused, never dialled as "null".

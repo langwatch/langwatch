@@ -167,7 +167,7 @@ function qualifiersOf(requests: readonly LangWatchQLExecutionRequest[]): string[
 }
 
 describe("given a private organization whose route database is acme_db and a shared database analytics", () => {
-  /** @scenario "A LangWatchQL query for an organization with a private ClickHouse runs on that ClickHouse as the LangWatchQL identity" */
+  /** @scenario "A LangWatchQL query for an organization with a private ClickHouse runs on that ClickHouse with the route's own login" */
   it("refuses a statement naming the shared database, and runs nothing", async () => {
     const attempt = run({ answers: [PRIVATE], sql: countFrom("analytics.trace_metrics") });
 

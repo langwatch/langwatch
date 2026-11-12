@@ -68,7 +68,7 @@ export interface LangWatchQLServiceDependencies {
    * with weaker guarantees.
    */
   readonly executor: LangWatchQLRouter | null;
-  /** Every run passes this before the executor (ADR-200): placement, then provisioning. */
+  /** Every run passes this before its route is asked (ADR-200): placement, then provisioning. */
   readonly placement: Pick<LangWatchQLPlacementGateService, "admit">;
   /** Database the LangWatchQL views live in, and what unqualified names resolve to. */
   readonly database: string;
@@ -233,13 +233,13 @@ export class LangWatchQLService {
   }
 
   /**
-   * Decides whether a run may start: asks the route first, then judges the statement against
-   * the route's database. The route's refusal comes before any statement refusal.
+   * Decides whether a run may start: the placement gate, then the route, then the statement
+   * against the route's database. The gate's and the route's refusals come before the statement's.
    */
   async validateForRun(
     input: Omit<Parameters<LangWatchQLService["validate"]>[0], "database">,
   ): Promise<ValidatedLangWatchQL> {
-    const { database } = await this.resolveRoute({ tenantIds: [input.projectId] });
+    const { database } = await this.admittedRoute({ tenantIds: [input.projectId] });
     return this.validate({ ...input, database });
   }
 
@@ -289,11 +289,11 @@ export class LangWatchQLService {
   }
 
   /**
-   * Where this run goes, asked once and before anything is judged. With no executor there is
-   * no route to ask: the run is judged against the shared database and then refused by
-   * `requireExecutor`, so a caller without permission still hears that first.
+   * The placement gate, then the route, once and before anything is judged (ADR-200): a refused
+   * run resolves no route and builds no routed executor. With no executor there is no route: the
+   * run is judged on the shared database, then refused by `requireExecutor`: policy refusal first.
    */
-  private async resolveRoute({
+  private async admittedRoute({
     tenantIds,
   }: {
     readonly tenantIds: readonly string[];
@@ -301,6 +301,7 @@ export class LangWatchQLService {
     const { executor } = this.deps;
     if (!executor) return { database: this.deps.database };
 
+    await this.deps.placement.admit({ projectIds: tenantIds });
     const route: LangWatchQLRoute = await executor.resolveRoute({ tenantIds });
     return { executor: route.executor, database: route.database ?? this.deps.database };
   }
@@ -342,7 +343,7 @@ export class LangWatchQLService {
     isInstantEvalsEnabled,
   }: LangWatchQLPassInput & LangWatchQLEvalGate): Promise<LangWatchQLQueryResult> {
     const wrapper = langWatchQLPassSchema.parse(pass);
-    const { executor: routed, database } = await this.resolveRoute({ tenantIds: [project.id] });
+    const { executor: routed, database } = await this.admittedRoute({ tenantIds: [project.id] });
     const validation = this.validate({
       projectId: project.id,
       database,
@@ -364,7 +365,6 @@ export class LangWatchQLService {
       tenantIds: [project.id],
       kind: "pass",
     });
-    await this.deps.placement.admit({ projectIds: [project.id] });
 
     const composed = langWatchQLPassSql({ sql, pass: wrapper });
     const executionParameters = { ...validation.boundParameters, ...composed.parameters };
@@ -404,7 +404,7 @@ export class LangWatchQLService {
     LangWatchQLMemberScope): Promise<LangWatchQLQueryResult> {
     const projectIds = projects.map((project) => project.id);
     const boundSources = resolveRunSources(sources);
-    const { executor: routed, database } = await this.resolveRoute({ tenantIds: projectIds });
+    const { executor: routed, database } = await this.admittedRoute({ tenantIds: projectIds });
     const validation = this.validate({
       projectId: projectIds.join(",") || "(none)",
       database,
@@ -428,7 +428,6 @@ export class LangWatchQLService {
       tenantIds: projectIds,
       kind: "query",
     });
-    await this.deps.placement.admit({ projectIds });
 
     const tenantCapability = lwqlCapability.tenantCapabilitySet({
       secrets: projects.map((project) => project.lwqlKey),

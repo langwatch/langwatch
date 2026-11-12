@@ -97,7 +97,7 @@ function qualifiersOf(requests: readonly LangWatchQLExecutionRequest[]): string[
 }
 
 describe("given a statement for an organization whose route names its own database", () => {
-  /** @scenario "A LangWatchQL query for an organization with a private ClickHouse runs on that ClickHouse as the LangWatchQL identity" */
+  /** @scenario "A LangWatchQL query for an organization with a private ClickHouse runs on that ClickHouse with the route's own login" */
   it("leaves an unqualified statement unqualified and dials the route database", async () => {
     const { done, privateExecutor, sharedExecutor } = privateRun({
       sql: "SELECT count() AS n FROM trace_metrics LIMIT 1",

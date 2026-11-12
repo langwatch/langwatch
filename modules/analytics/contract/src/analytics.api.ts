@@ -169,10 +169,10 @@ export interface AnalyticsApi {
    */
   validateLangWatchQL(input: LangWatchQLValidationInput): LangWatchQLAcceptedStatement;
   /**
-   * Admits a statement for a run about to start: the project's route is asked first and the
-   * statement is judged against the route's database. A saved statement uses
+   * Admits a statement for a run about to start: the placement gate, then the project's route,
+   * then the statement judged against the route's database. A saved statement uses
    * `validateLangWatchQL`, which needs no route.
-   * @throws the route's own refusal when the route is missing or broken.
+   * @throws the gate's or the route's own refusal when either refuses.
    */
   validateLangWatchQLForRun(
     input: LangWatchQLValidationInput,

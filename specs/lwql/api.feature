@@ -744,26 +744,39 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then the query is rejected rather than executed with weaker guarantees
 
   # ---------------------------------------------------------------------------
-  # Organizations with a private ClickHouse (issue #9248). Provisioning the
-  # LangWatchQL objects on a private ClickHouse lands in a later PR.
+  # Organizations with a private ClickHouse (issue #9248). This path is
+  # unreachable today: the placement gate (specs/lwql/isolation.feature) refuses
+  # every routed organization with lwql_not_provisioned before any route is
+  # asked, until ADR-200's per-organization Ops opt-in exists. The scenarios
+  # below describe the query layer behind that opt-in. Which identity and login
+  # a private ClickHouse is queried as stays ADR-200's later decision; until
+  # then the query layer uses only the login the route URL carries, never the
+  # shared LangWatchQL one. Provisioning LangWatchQL objects on a private
+  # ClickHouse lands in a later PR.
   # ---------------------------------------------------------------------------
 
   @unit
-  Scenario: A LangWatchQL query for an organization with a private ClickHouse runs on that ClickHouse as the LangWatchQL identity
-    Given an organization whose projects are routed to its own ClickHouse by a URL carrying the server's own user and password
+  Scenario: A LangWatchQL query for an organization with a private ClickHouse runs on that ClickHouse with the route's own login
+    Given an organization whose projects are routed to its own ClickHouse by a URL carrying that server's own user and password
     When a LangWatchQL query reads that organization's projects
     Then it runs on the route's server and database
-    And it connects as the LangWatchQL restricted identity, never with the user or password in the route URL
-    And a query for an organization without a private ClickHouse still runs on the shared ClickHouse
+    And it connects with the user and password in the route URL, never with the shared LangWatchQL user or password
+    And a query for an organization without a private ClickHouse still runs on the shared ClickHouse as the LangWatchQL identity
+
+  @unit
+  Scenario: A private route that carries no login of its own is refused
+    Given an organization routed to its own ClickHouse by a URL with no user in it
+    When a LangWatchQL query reads that organization's projects
+    Then the query layer refuses it with error code lwql_unavailable before any client is built for that route
+    And the shared LangWatchQL user and password are never sent to the route's server
 
   @unit
   Scenario: A LangWatchQL query for an organization whose private route is missing is refused, never answered from the shared ClickHouse
     Given an organization recorded as keeping its data on its own ClickHouse
     And this deployment has no route to that ClickHouse
     When a LangWatchQL query reads that organization's projects
-    Then the query layer refuses it with the route's refusal, lwql_unavailable or private_dataplane_unavailable (the router's own handled refusal, passed through unchanged)
-    And the REST API answers 503 private_dataplane_unavailable, saying the organization keeps its data on its own ClickHouse, which this deployment cannot reach
-    And the refusal names the variable that is missing or malformed, never its value; the label inside the variable is shown to that organization's caller
+    Then a plain route error is refused with error code lwql_unavailable
+    And the router's handled private_dataplane_unavailable passes through as the same error, its code, its 503 status and the variable it names (never its value) unchanged
     And no statement runs on the shared ClickHouse
 
   @unit
@@ -775,7 +788,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 
   @unit
   Scenario: A LangWatchQL query on a private ClickHouse without LangWatchQL set up is refused
-    Given an organization whose private ClickHouse does not know the LangWatchQL identity or has no LangWatchQL views
+    Given an organization whose private ClickHouse refuses the route's login or has no LangWatchQL views
     When a LangWatchQL query reads that organization's projects
     Then the query layer refuses it with error code lwql_unavailable, saying LangWatchQL is not set up on this organization's ClickHouse yet
     And the refusal names no URL, user or password

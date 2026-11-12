@@ -103,11 +103,14 @@ const accept = (runVerdict?: Error) => {
 
 describe("given a run validated at its start", () => {
   /** @scenario "A run is judged against the organization's route, and a route refusal is not rewritten" */
-  it("passes a route refusal through by its error code, not its class, because the two refusal codes belong to classes of different packages", async () => {
-    const routeRefusal = new Refusal("private_dataplane_unavailable");
+  it.each(["lwql_not_provisioned", "lwql_unavailable", "private_dataplane_unavailable"])(
+    "passes a %s refusal through by its error code, not its class, because the refusal codes belong to classes of different packages",
+    async (code) => {
+      const routeRefusal = new Refusal(code);
 
-    await expect(accept(routeRefusal)).rejects.toBe(routeRefusal);
-  });
+      await expect(accept(routeRefusal)).rejects.toBe(routeRefusal);
+    },
+  );
 
   /** @scenario "A run is judged against the organization's route, and a route refusal is not rewritten" */
   it("still refuses a statement the policy refuses as an invalid query", async () => {
