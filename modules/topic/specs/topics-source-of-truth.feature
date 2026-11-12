@@ -99,3 +99,30 @@ Feature: Topic clustering owns the topic model
     When the worker runs the background step "topic:seed-clustering-schedules"
     Then each of those projects is asked for a bootstrap clustering run
     And projects that already have a scheduled wake are skipped
+
+  @unit
+  Scenario: A large topic model is stored without one long transaction
+    Given a clustering run that recorded hundreds of topics, each with a centroid
+    When the projection stores the model
+    Then the topics are written in bounded chunks, parents before subtopics
+    And no single database transaction spans the whole model
+    And the projection cursor moves only after every topic is written
+
+  @unit
+  Scenario: A store that fails partway leaves the cursor for a replay
+    Given the projection has stored an earlier model
+    When storing the next model fails after some topics were written
+    Then the projection cursor still names the earlier event
+    And replaying the event converges to the next model exactly
+
+  @unit
+  Scenario: Stale subtopics are removed before their parents
+    When the projection stores a model that drops some topics
+    Then the dropped subtopics are deleted before the dropped parents
+    And a model with no topics deletes nothing
+
+  @integration
+  Scenario: A topic id from another project never overwrites that project's topic
+    Given another project holds a topic with a given id
+    When this project's model carries a topic with the same id
+    Then the other project's topic is unchanged
