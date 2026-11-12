@@ -32,7 +32,7 @@ export function duplicateSteps({
     .map(([id, named]) => ({ id, sources: filesById.get(id) ?? named.map(sourceOf) }));
 }
 
-/** Preflight's refusal: the ledger registers every shipped step in one statement, one row per id. */
+/** Preflight's refusal: the ledger registers every shipped step in one statement, by id. */
 export function duplicateStepFailure({
   duplicates,
 }: {
