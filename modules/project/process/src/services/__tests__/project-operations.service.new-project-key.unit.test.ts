@@ -19,6 +19,9 @@ class NewProjectDirectory implements ProjectOperationsDirectory {
   create: ProjectOperationsDirectory["create"] = () => this.refuse();
   archive: ProjectOperationsDirectory["archive"] = () => this.refuse();
   rotateLegacyApiKey: ProjectOperationsDirectory["rotateLegacyApiKey"] = () => this.refuse();
+  findLegacyApiKeyLastUsedAt: ProjectOperationsDirectory["findLegacyApiKeyLastUsedAt"] = () =>
+    this.refuse();
+  findLiveLegacyKeys: ProjectOperationsDirectory["findLiveLegacyKeys"] = () => this.refuse();
 
   private refuse(): Promise<never> {
     return Promise.reject(new Error("only the status read is under test"));
@@ -83,6 +86,7 @@ describe("ProjectOperationsService", () => {
 
       await expect(operations.getLegacyKeyStatus({ projectId: "project_gamma" })).resolves.toEqual({
         present: false,
+        lastUsedAt: null,
       });
     });
   });

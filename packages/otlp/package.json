@@ -27,17 +27,19 @@
   },
   "scripts": {
     "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
-    "test": "vitest run"
+    "test": "vitest run --fsModuleCache"
   },
   "dependencies": {
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@opentelemetry/api": "catalog:",
     "@opentelemetry/otlp-transformer": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@opentelemetry/sdk-trace-base": "catalog:",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

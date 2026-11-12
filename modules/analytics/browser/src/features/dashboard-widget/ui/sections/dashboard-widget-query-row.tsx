@@ -152,6 +152,11 @@ export function DashboardWidgetQueryRow({
               <DashboardWidgetQueryParamsEditor
                 params={query.parameters ?? []}
                 onChange={(parameters) => onChange({ ...query, parameters })}
+                sources={query.sources}
+                onSourcesChange={(sources) => onChange({ ...query, sources })}
+                sql={query.sql}
+                projects={query.projects}
+                onProjectsChange={(projects) => onChange({ ...query, projects })}
               />
 
               <DashboardWidgetQueryResultView run={lastRun} />

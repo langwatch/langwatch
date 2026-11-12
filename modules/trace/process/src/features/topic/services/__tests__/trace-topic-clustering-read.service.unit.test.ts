@@ -143,7 +143,12 @@ describe("TraceTopicClusteringReadService", () => {
     it("answers no cursor for an empty page", async () => {
       const page = await reader(new RecordingClusteringSampleRepository()).readPage(firstPage);
 
-      expect(page).toEqual({ traces: [], lastSort: undefined, returnedCount: 0 });
+      expect(page).toEqual({
+        traces: [],
+        lastSort: undefined,
+        returnedCount: 0,
+        occurredAtMsByTraceId: {},
+      });
     });
 
     it("keeps a trace's topic only when the caller knows that topic", async () => {
@@ -195,6 +200,45 @@ describe("TraceTopicClusteringReadService", () => {
       const page = await reader(repository).readPage(firstPage);
 
       expect(page.traces[0]?.input).toBe(expected);
+    });
+  });
+
+  describe("when a run reads inside its OccurredAt window", () => {
+    /** @scenario "A finished run moves the clustering watermark so the next run skips what it read" */
+    it("starts the read at the watermark and ends it at the run's settle bound", async () => {
+      const repository = new RecordingClusteringSampleRepository();
+
+      await reader(repository).readPage({
+        ...firstPage,
+        occurredSinceMs: NOW - DAY_MS,
+        occurredBeforeMs: NOW - 3_600_000,
+      });
+
+      expect(repository.pageQueries[0]).toMatchObject({
+        windowStartMs: NOW - DAY_MS,
+        windowEndMs: NOW - 3_600_000,
+      });
+    });
+
+    /** @scenario "A finished run moves the clustering watermark so the next run skips what it read" */
+    it("never reads past the hot tier, however old the watermark", async () => {
+      const repository = new RecordingClusteringSampleRepository();
+
+      await reader(repository).readPage({ ...firstPage, occurredSinceMs: NOW - 400 * DAY_MS });
+
+      expect(repository.pageQueries[0]?.windowStartMs).toBe(NOW - 49 * DAY_MS);
+      expect(repository.pageQueries[0]).not.toHaveProperty("windowEndMs");
+    });
+
+    /** @scenario "A topic assignment lands on a trace older than the summary read window" */
+    it("answers each trace's own OccurredAt", async () => {
+      const repository = new RecordingClusteringSampleRepository([
+        row({ traceId: "trace-a", occurredAtMs: 7_000 }),
+      ]);
+
+      const page = await reader(repository).readPage(firstPage);
+
+      expect(page.occurredAtMsByTraceId).toEqual({ "trace-a": 7_000 });
     });
   });
 });

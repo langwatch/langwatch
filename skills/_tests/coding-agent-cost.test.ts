@@ -96,9 +96,12 @@ describe("the coding-agent-cost skill", () => {
         .find((p) => p.includes("For one project,"));
       expect(oneProject, "the skill says how to read one project").toBeTruthy();
       expect(oneProject).toContain("add `AND TenantId = '<id>'` to every query below");
+      expect(oneProject).toContain(
+        "the project id is `$LANGWATCH_PROJECT_ID` when set (never run `langwatch whoami` then",
+      );
       expect(oneProject).toContain("`personal_project.id` in `langwatch whoami`");
       expect(oneProject).toContain(
-        "if that field is missing, ask the user which project id to use",
+        'if whoami reports "Not logged in" or that field is missing, ask the user which project id to use',
       );
       expect(oneProject).not.toContain("--project");
     });

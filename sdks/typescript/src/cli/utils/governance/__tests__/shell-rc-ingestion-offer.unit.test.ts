@@ -45,6 +45,7 @@ vi.mock("../config", async () => {
 
 let tmpHome: string;
 let logSpy: ReturnType<typeof vi.spyOn>;
+let errorSpy: ReturnType<typeof vi.spyOn>;
 const origHome = process.env.HOME;
 const origUserprofile = process.env.USERPROFILE;
 const origShell = process.env.SHELL;
@@ -75,7 +76,9 @@ function claudeSettingsPath(): string {
 
 /** Everything the offer printed this run, as one blob to assert against. */
 function logged(): string {
-  return logSpy.mock.calls.map((call: unknown[]) => String(call[0])).join("\n");
+  return [...logSpy.mock.calls, ...errorSpy.mock.calls]
+    .map((call: unknown[]) => String(call[0]))
+    .join("\n");
 }
 
 beforeEach(() => {
@@ -94,6 +97,7 @@ beforeEach(() => {
   lastPrompts.length = 0;
   saveConfigMock.mockReset();
   logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+  errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
 });
 
 afterEach(() => {

@@ -2,12 +2,12 @@ import type { WireOf } from "@langwatch/api/web";
 /**
  * The organization's audit trail, at `/settings/audit-log`. ONE TABLE OVER TWO WRITE SHAPES.
  */
+import { EnterpriseLock } from "@langwatch/browser-host/enterprise-lock";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
-  Button,
   Badge,
   Box,
   HStack,
@@ -16,6 +16,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { RestrictedAccess } from "@langwatch/design-system/restricted-access";
 import { ScopeChipPicker } from "@langwatch/design-system/scope-chip-picker";
 import type { EnrichedAuditLog as StoredEnrichedAuditLog } from "@langwatch/organization-contract";
 
@@ -38,6 +39,8 @@ import {
 } from "../../../model/audit-log-export.ts";
 import {
   auditBackLink,
+  type AuditProjectFilter,
+  auditProjectFilterIn,
   matchMemberId,
   searchMatchesNobody,
   readAuditPaging,
@@ -114,11 +117,24 @@ function auditProjectTree({
   };
 }
 
+const AUDIT_LOG_DESCRIPTION =
+  "See who changed what across your organization, and when, in a trail you can search and export.";
+
 /**
  * The page in place of the table: an upsell below Enterprise, or, when a project grant showed the
  * entry but the organization-wide read refuses, who can see it. Null when the table renders.
  */
-function auditLogNotice({ isEnterprise, error }: { isEnterprise: boolean; error: unknown }) {
+function auditLogNotice({
+  isEnterprise,
+  error,
+  canManage,
+  canSeePlans,
+}: {
+  isEnterprise: boolean;
+  error: unknown;
+  canManage: boolean;
+  canSeePlans: boolean;
+}) {
   const refused = readHandledError(error)?.code === "permission_denied";
   if (isEnterprise && !refused) return null;
   return (
@@ -135,17 +151,12 @@ function auditLogNotice({ isEnterprise, error }: { isEnterprise: boolean; error:
           testId="audit-log-admins-only"
         />
       ) : (
-        <NoDataInfoBlock
-          size="page"
-          icon={<Lock />}
-          title="Audit log is included in Enterprise"
-          description="See who changed what across your organization, and when, in a trail you can search and export."
-          testId="audit-log-enterprise-upsell"
-          primaryAction={
-            <Button asChild colorPalette="orange" size="sm">
-              <Link href="/settings/plans">See plans</Link>
-            </Button>
-          }
+        <EnterpriseLock
+          feature="Audit log"
+          description={AUDIT_LOG_DESCRIPTION}
+          canManage={canManage}
+          canSeePlans={canSeePlans}
+          data-testid="audit-log-enterprise-upsell"
         />
       )}
     </>
@@ -167,6 +178,26 @@ async function collectAuditLogs<T>({
     collected.push(...batch.auditLogs);
   }
   return collected;
+}
+
+/**
+ * The project filter, rebased during render rather than masked: the organization
+ * the reader left must not come back carrying its old project if they return.
+ */
+function useAuditProjectFilter({
+  organizationId,
+  scopedProjectId,
+}: {
+  organizationId: string;
+  scopedProjectId: string | undefined;
+}) {
+  const [filter, setFilter] = useState<AuditProjectFilter>(() => ({
+    organizationId,
+    projectId: scopedProjectId ?? null,
+  }));
+  const rebased = auditProjectFilterIn({ filter, organizationId });
+  if (filter.organizationId !== organizationId) setFilter(rebased);
+  return [rebased, setFilter] as const;
 }
 
 /** Filter controls share one 32px line, 13px text and a 4px radius. */
@@ -224,6 +255,30 @@ function AuditFeed({
   );
 }
 
+/**
+ * A reader without `auditLog:view`: below Enterprise the lock says why, before any grant
+ * matters.
+ */
+export function Forbidden({ permission }: { permission: string }) {
+  const host = useOrganizationHost();
+  if (host.isPlanLoading()) return <SettingsRowsSkeleton rows={8} />;
+  if (host.isEnterprise()) return <RestrictedAccess permission={permission} />;
+  return (
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Audit log</PageLayout.Heading>
+      </PageLayout.Header>
+      <EnterpriseLock
+        feature="Audit log"
+        description={AUDIT_LOG_DESCRIPTION}
+        canManage={host.hasOrganizationPermission("organization:manage")}
+        canSeePlans={host.hasOrganizationPermission("organization:view")}
+        data-testid="audit-log-enterprise-upsell"
+      />
+    </>
+  );
+}
+
 export default function AuditLogScreen() {
   const host = useOrganizationHost();
   const scope = host.scope();
@@ -238,9 +293,11 @@ export default function AuditLogScreen() {
 
   const [userSearch, setUserSearch] = useState(query.userSearch ?? "");
   const [actionFilter, setActionFilter] = useState(query.actionFilter ?? "");
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
-    scope.projectId ?? null,
-  );
+  const [projectFilter, setProjectFilter] = useAuditProjectFilter({
+    organizationId,
+    scopedProjectId: scope.projectId,
+  });
+  const selectedProjectId = projectFilter.projectId;
   const [isExporting, setIsExporting] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
 
@@ -275,7 +332,12 @@ export default function AuditLogScreen() {
     return <SettingsRowsSkeleton rows={8} />;
   }
 
-  const notice = auditLogNotice({ isEnterprise, error: auditLogs.error });
+  const notice = auditLogNotice({
+    isEnterprise,
+    error: auditLogs.error,
+    canManage: host.hasOrganizationPermission("organization:manage"),
+    canSeePlans: host.hasOrganizationPermission("organization:view"),
+  });
   if (notice) return notice;
 
   const feed = matchesNobody ? undefined : auditLogs.data;
@@ -304,7 +366,7 @@ export default function AuditLogScreen() {
   };
 
   const handleProjectChange = (projectId: string | null) => {
-    setSelectedProjectId(projectId);
+    setProjectFilter({ organizationId, projectId });
     host.setQuery(withAuditFilter(query, { projectId: projectId ?? void 0 }));
   };
 

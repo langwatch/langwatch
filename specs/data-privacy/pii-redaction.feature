@@ -39,6 +39,10 @@ Feature: Redacting personal data from traces
     Then the stored input has the name redacted
     And the analysis service was called
 
+  # Strict stores what the analysis service redacts, and that service reads
+  # capitals as evidence of a name. How a name in capitals is still found:
+  # specs/evaluators/langevals-presidio-allcaps-person-names.feature
+
   # Strict layers names and locations on top of the essential entities. If the
   # analysis service is unreachable (or simply not configured in development),
   # strict must not leave everything exposed: the native essential pass still
@@ -708,6 +712,27 @@ Feature: Redacting personal data from traces
   Scenario: A long value holding no personal data is returned unchanged
     When a trace is ingested whose input is a long opaque token
     Then the stored input is byte-for-byte what was sent
+
+  # Finding an address used to take time that grew with the square of the
+  # value's length: the address pattern was retried from every position of a
+  # long run of letters and digits. One large span (an embedded image, a token
+  # or a hash beside an "@") held a worker for over a minute, and every other
+  # job on it waited. The address is now found in one pass, and it finds the
+  # same addresses the pattern did.
+  #
+  # Bindings: packages/redaction/src/__tests__/essentialPii.emailScan.unit.test.ts
+  @unit
+  Scenario: A large value beside an address marker does not hold up the worker
+    When a trace is ingested whose input is the largest value redaction scans,
+      one long run of letters and digits with an "@" beside it
+    Then redaction of that value finishes within a second
+
+  @unit
+  Scenario: Every address in packed text is redacted, and look-alikes are left alone
+    When a trace is ingested whose input packs addresses against each other
+      and against text that only looks like an address
+    Then each address is replaced by an address marker
+    And text with no domain ending after its "@" is left as it was
 
   # Phone numbers are the same idea again, counted in digits rather than in
   # characters: text whose longest run of digits is shorter than any phone

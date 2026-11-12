@@ -79,7 +79,7 @@ When the statement matches more rows than the limit, the run judges the first pa
 
 `GET /api/v1/instant-evals/{id}/results` pages through what the run wrote, keyset-paged with a `cursor`. Filter with `questionId`, `matched` and `status`:
 
-```
+```http
 GET /api/v1/instant-evals/run_123/results?questionId=refused&matched=true&limit=200
 ```
 

@@ -25,12 +25,14 @@ Manage them at **Settings > Model Providers**. The table lists each configuratio
 | Codex (OpenAI account) | Sign in with your OpenAI account. Used by coding features only |
 | Anthropic | API key, or a base URL |
 | Gemini | API key. Add a project and a location to use Gemini through Vertex AI |
-| Azure OpenAI | API key and endpoint, optional API version. **Use API Gateway** switches to an API gateway base URL and version |
+| Azure OpenAI | API key and endpoint, optional API version. **Use API Gateway** switches to an API gateway base URL and version. Optional **Decisions Deployment** and **Microsoft Decision 1 Deployment** name the deployments [Instant Evals can run on](/features/instant-evals/own-model#azure) |
 | Bedrock | AWS access key id, secret access key and region |
 | Vertex AI | Service account JSON, project and location |
-| DeepSeek, xAI, Cerebras, Groq, Voyage AI | API key |
+| DeepSeek, Doubleword, xAI, Cerebras, Groq, Voyage AI | API key |
 | ElevenLabs | API key, optional webhook secret. See [Voice Agents](/agent-testing/voice-agents#before-you-start) for the key permissions it needs |
 | Azure Safety | Content Safety endpoint and key, for the Azure safety evaluators |
+| Inception, Perplexity, TypeSafe, OpenRouter, Fireworks | API key, for the decision models [Instant Evals can run on](/features/instant-evals/own-model) |
+| Cloudflare Workers AI | Account id and API token, for the decision models [Instant Evals can run on](/features/instant-evals/own-model) |
 | Custom (OpenAI-compatible) | Base URL and optional API key, for a LiteLLM proxy, vLLM or any endpoint that serves `/chat/completions` |
 
 You can save several configurations of the same vendor, for example one OpenAI account per region, and tell them apart by **Name**.
@@ -87,9 +89,11 @@ The **All you can see** filter above the table narrows the list and the default 
 
 ## Default models
 
-The **Default Models** section on the same page sets the model each feature uses unless the user picks one in the feature itself. A config sets a model per role (**Default**, **Fast**, **Langy**, **Embeddings**) and per feature, for example the model a new prompt or evaluator starts with, the Langy chat model, trace AI search, workflow commit messages, and the topic clustering model and embeddings.
+The **Default Models** section on the same page sets the model each feature uses unless the user picks one in the feature itself. A config sets a model per role (**Default**, **Fast**, **Langy**, **Embeddings**, **Instant Evals**) and per feature, for example the model a new prompt or evaluator starts with, the Langy chat model, trace AI search, workflow commit messages, and the topic clustering model and embeddings.
 
 Click **Add config**, pick the scopes and the models. A project config beats a team config, which beats an organization config. A feature that no config names inherits from the wider scope.
+
+The **Instant Evals** column takes only decision models: LangWatch Evals Preview, the default, or one on your own key. See [Run Instant Evals on your own decision model](/features/instant-evals/own-model).
 
 <Frame>
 <img src="/images/platform/model-providers-default-models.png" alt="The Default Models section with one config and the Add config button" />

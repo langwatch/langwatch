@@ -3,7 +3,7 @@
  * requirement its credential class publishes, the 3.1 spelling of an exclusive bound, a
  * hand-written operation, the deprecation headers, and the external URL a caller is linked to.
  */
-import type { MiddlewareHandler } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import { describeRoute, resolver, type DescribeRouteOptions } from "hono-openapi";
 import { z, type ZodType } from "zod";
 
@@ -136,9 +136,7 @@ export function restRouteDocumentation({
   if (deprecated) {
     options.deprecated = true;
 
-    options.description = [options.description, deprecationNotice(deprecated)]
-      .filter((part) => part !== undefined && part !== "")
-      .join(" ");
+    options.description = withDeprecationNotice({ description: options.description, deprecated });
   }
 
   return options;
@@ -833,9 +831,32 @@ export function handWrittenDocs(spec: DescribeRouteOptions): EndpointDocs {
 // Marking a route, or a whole family, superseded.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** The operation's description and the deprecation notice, each ended as a sentence. */
+function withDeprecationNotice({
+  description,
+  deprecated,
+}: {
+  description: string | undefined;
+  deprecated: RestDeprecation;
+}): string {
+  return [description, deprecationNotice(deprecated)]
+    .map((part) => part?.trimEnd() ?? "")
+    .filter((part) => part !== "")
+    .map((part) => (/[.!?]$/.test(part) ? part : `${part}.`))
+    .join(" ");
+}
+
 /** The sentence a deprecated answer carries, written or derived. */
 export function deprecationNotice({ successor, notice }: RestDeprecation): string {
   return notice ?? `This endpoint is deprecated; use ${successor}`;
+}
+
+/** The successor with each `{param}` the caller's own path named filled in. */
+function successorFor({ successor, c }: { successor: string; c: Context }): string {
+  return successor.replace(/\{(\w+)\}/g, (template, name: string) => {
+    const value = c.req.param(name);
+    return value === undefined ? template : encodeURIComponent(value);
+  });
 }
 
 /**
@@ -851,7 +872,10 @@ export function deprecatedAlias(deprecation: RestDeprecation): MiddlewareHandler
     // them too: a header written after `next()` is never reached once the
     // error is on its way to the boundary.
     c.header("Deprecation", "true");
-    c.header("Link", `<${deprecation.successor}>; rel="successor-version"`);
+    c.header(
+      "Link",
+      `<${successorFor({ successor: deprecation.successor, c })}>; rel="successor-version"`,
+    );
     c.header("X-API-Deprecation-Notice", notice);
     c.header("Warning", `299 - "${notice}"`);
     await next();

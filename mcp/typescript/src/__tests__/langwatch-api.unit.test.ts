@@ -46,6 +46,20 @@ describe("langwatch-api", () => {
     });
   }
 
+  describe("given any request to the LangWatch API", () => {
+    /** @scenario The MCP server names the API version on every request */
+    it("names the server's API version", async () => {
+      const { getTraceById, LANGWATCH_API_VERSION } = await import("../langwatch-api.ts");
+      mockJsonResponse({});
+
+      await getTraceById("trace_1");
+
+      const [, calledOptions] = mockFetch.mock.calls[0]!;
+      expect(calledOptions.headers["X-API-Version"]).toBe(LANGWATCH_API_VERSION);
+      expect(LANGWATCH_API_VERSION).toBe("2026-10-26");
+    });
+  });
+
   describe("searchTraces()", () => {
     it("sends POST to /api/v1/traces/search with format digest by default", async () => {
       const { searchTraces } = await import("../langwatch-api.ts");
@@ -588,7 +602,52 @@ describe("langwatch-api", () => {
       expect(error.tips).toBeUndefined();
       expect(error.docsUrl).toBeUndefined();
       expect(error.fault).toBeUndefined();
-      expect(error.message).toBe("LangWatch API error 401: Invalid API key");
+      expect(error.message).toBe("LangWatch API error 401: Invalid API key\nCode: unauthorized");
+    });
+
+    /** @scenario "QP08 An unknown source is refused at every door" */
+    it("shows the code and the sources a v1 validation failure would have accepted", async () => {
+      const { searchTraces } = await import("../langwatch-api.ts");
+      mockErrorResponse(
+        422,
+        JSON.stringify({
+          code: "validation_error",
+          message: "The request body didn't match the expected shape.",
+          meta: {
+            target: "json",
+            fields: ["sources.0"],
+            reasons: [
+              {
+                code: "schema_failure",
+                message: "Invalid option",
+                meta: { field: "sources.0", expected: ["application", "langy"], received: "bogus" },
+              },
+            ],
+          },
+        }),
+      );
+
+      const error = await searchTraces({ startDate: 1000, endDate: 2000 }).catch((e) => e);
+
+      expect(error.message).toContain("Code: validation_error");
+      expect(error.message).toContain(
+        'sources.0 — received "bogus" — expected one of: application, langy',
+      );
+    });
+
+    /** @scenario "QP09c Every door gives the same refusal body for the same missing project" */
+    it("shows the code of a refusal that carries no reasons", async () => {
+      const { searchTraces } = await import("../langwatch-api.ts");
+      mockErrorResponse(
+        404,
+        JSON.stringify({ code: "project_not_found", message: "Project not found", meta: {} }),
+      );
+
+      const error = await searchTraces({ startDate: 1000, endDate: 2000 }).catch((e) => e);
+
+      expect(error.message).toBe(
+        "LangWatch API error 404: Project not found\nCode: project_not_found",
+      );
     });
 
     it("ignores an invalid fault value", async () => {

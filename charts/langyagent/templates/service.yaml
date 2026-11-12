@@ -8,6 +8,12 @@ kind: Service
 metadata:
   name: {{ include "langyagent.fullname" . }}
   labels: {{- include "langyagent.labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- range $key, $value := . }}
+    {{ $key }}: {{ $value | toString | quote }}
+    {{- end }}
+  {{- end }}
 spec:
   # ClusterIP only — the agent is never exposed outside the cluster. The
   # control plane reaches it at http://<release>-langyagent:<port>.

@@ -74,7 +74,8 @@ describe("validateProviderApiKey", () => {
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
-    it("skips validation for azure provider", async () => {
+    /** @scenario "An Azure credential with no deployment to ask is not checked" */
+    it("skips validation for an azure credential with no deployment to ask", async () => {
       const result = await validateProviderApiKey("azure", {
         AZURE_OPENAI_API_KEY: "test-key",
         AZURE_OPENAI_ENDPOINT: "https://test.openai.azure.com",
@@ -150,6 +151,109 @@ describe("validateProviderApiKey", () => {
           ELEVENLABS_API_KEY: "sk_test",
         }),
       ).rejects.toBeInstanceOf(ProviderUnreachableError);
+    });
+  });
+
+  describe("when validating an Azure key against a deployment", () => {
+    const azureKeys = {
+      AZURE_OPENAI_API_KEY: "azure-key-1234",
+      AZURE_OPENAI_ENDPOINT: "https://acme.openai.azure.com/",
+    };
+    const probeAzure = (keys: Record<string, string> = azureKeys) =>
+      HttpModelProviderCredentialProbeService.validateProviderApiKey({
+        provider: "azure",
+        customKeys: keys,
+        model: "gpt-acme",
+        egress,
+      });
+
+    /** @scenario "An Azure key is checked with one chat completion against the chosen deployment" */
+    it("posts a one-token chat completion to the deployment with the api-key header", async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true, status: 200 });
+
+      const result = await probeAzure();
+
+      expect(result.outcome).toBe("verified");
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const [url, init] = mockFetch.mock.calls[0] as [string, Record<string, unknown>];
+      expect(url).toBe(
+        "https://acme.openai.azure.com/openai/deployments/gpt-acme/chat/completions?api-version=2025-04-01-preview",
+      );
+      expect(init).toMatchObject({
+        method: "POST",
+        headers: expect.objectContaining({ "api-key": "azure-key-1234" }),
+      });
+      expect(JSON.parse(init.body as string)).toMatchObject({ max_tokens: 1 });
+      expect(url).not.toContain("azure-key-1234");
+    });
+
+    /** @scenario "An Azure credential is checked at its own api-version" */
+    it("uses the credential's AZURE_OPENAI_API_VERSION when it carries one", async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true, status: 200 });
+
+      await probeAzure({ ...azureKeys, AZURE_OPENAI_API_VERSION: "2024-10-21" });
+
+      const [url] = mockFetch.mock.calls[0] as [string];
+      expect(url).toContain("?api-version=2024-10-21");
+    });
+
+    /** @scenario "Azure reports a refused key as a bad key" */
+    it.each([401, 403])("reports an invalid key on %i", async (status) => {
+      mockFetch.mockResolvedValueOnce({ ok: false, status });
+
+      expect(codeOf(await probeAzure())).toBe("provider_key_invalid");
+    });
+
+    /** @scenario "Azure reports a missing deployment by its name" */
+    it("names the deployment Azure could not find on a DeploymentNotFound 404", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        text: async () =>
+          JSON.stringify({ error: { code: "DeploymentNotFound", message: "No such deployment." } }),
+      });
+
+      const result = await probeAzure();
+
+      expect(codeOf(result)).toBe("provider_deployment_not_found");
+      expect(result.valid ? undefined : result.domainError.meta).toMatchObject({
+        deployment: "gpt-acme",
+      });
+    });
+
+    /** @scenario "A bare Azure 404 does not claim the key works" */
+    it("reports a 404 without Azure's deployment code as a plain refusal", async () => {
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 404, text: async () => "Not Found" });
+
+      expect(codeOf(await probeAzure())).toBe("provider_refused");
+    });
+
+    /** @scenario "Azure answering past authentication proves the credential" */
+    it.each([429, 400])("treats %i as a reachable, accepted credential", async (status) => {
+      mockFetch.mockResolvedValueOnce({ ok: false, status });
+
+      expect((await probeAzure()).outcome).toBe("verified");
+    });
+
+    /** @scenario "An Azure endpoint that does not answer is reported as unreachable" */
+    it("reports an endpoint that never answers as unreachable, naming the endpoint", async () => {
+      mockFetch.mockRejectedValue(new Error("getaddrinfo ENOTFOUND acme.openai.azure.com"));
+
+      await expect(probeAzure()).rejects.toMatchObject({
+        code: "provider_unreachable",
+        meta: expect.objectContaining({ hasConfigurableEndpoint: true }),
+      });
+    });
+
+    /** @scenario "An Azure credential routed through an API gateway is not checked" */
+    it("does not check a credential routed through an API gateway", async () => {
+      const result = await probeAzure({
+        ...azureKeys,
+        AZURE_API_GATEWAY_BASE_URL: "https://apim.acme.example",
+      });
+
+      expect(result).toMatchObject({ outcome: "unchecked", reason: "provider_not_probeable" });
+      expect(mockFetch).not.toHaveBeenCalled();
     });
   });
 
@@ -1254,6 +1358,22 @@ describe("given a deployment that points a provider's probe at its own API root"
     });
 
     expect(mockFetch).toHaveBeenCalledWith("https://api.deepseek.com/v1/models", expect.anything());
+  });
+
+  it("asks Doubleword's own models endpoint for a Doubleword key", async () => {
+    const result = await probeAt({
+      provider: "doubleword",
+      customKeys: { DOUBLEWORD_API_KEY: "any-key" },
+      deployed: {},
+    });
+
+    expect(result.outcome).toBe("verified");
+    expect(mockFetch).toHaveBeenCalledWith(
+      "https://api.doubleword.ai/v1/models",
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer any-key" }),
+      }),
+    );
   });
 });
 

@@ -26,7 +26,7 @@ existing routes:
 
 | Surface | Purpose | Audience | Where it lives |
 |---------|---------|----------|----------------|
-| `/governance` | Daily-use **org governance home**: spend, ingestion-source health, anomalies, per-user breakdown. Read-mostly. | Org admins whose org's `setupState.governanceActive` is `true` (see [Persona-based home routing](#persona-based-home-routing--the-setup-state-signal) below) | Top-level route, org-scoped. |
+| `/governance` | Daily-use **org governance home**: spend, ingestion-source health, anomalies, per-user breakdown. Read-mostly. | Org admins whose org's `setupState.governanceActive` is `true` (see [Persona-based home routing](#persona-based-home-routing-the-setup-state-signal) below) | Top-level route, org-scoped. |
 | `/me`, `/me/settings` | Daily-use **personal home**: your usage, your budget, your personal VK, your IDE setup snippet. | Any user with a personal VK | Top-level route, principal-scoped. |
 | `/[project]/...` | LLMOps daily-use, traces, evals, datasets, scenarios, workflows. | Project members | Per-project routes. **Unchanged** from current LangWatch. |
 | `/governance/ingestion-sources`, `/gateway/routing-policies` | Admin-authoring (CRUD), create, rotate, archive sources, publish routing policies. | The governance pages open on `governance:view` and `/gateway/routing-policies` on `routingPolicies:view`. Each write control needs the matching `:manage` grant (`ingestionSources:manage`, `routingPolicies:manage`) and is hidden without it. | Governance sub-routes, deliberately separate from daily-use surfaces. |
@@ -77,7 +77,7 @@ anomaly rules and no recent gateway activity gets
 
 ## The split: control plane vs data plane
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         LangWatch control plane                     │
 │                                                                     │
@@ -117,7 +117,7 @@ without touching any other.
 | ----- | ------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **1** | Gateway proxy             | Yes                         | Mid-flight inspect, rewrite, **block**. Mint per-user virtual keys. Enforce policy + budget before the call leaves the gateway.                                              |
 | **2** | BYOK endpoint routing     | Sometimes                   | Customer points a SaaS platform's "custom LLM endpoint" at the gateway. Same depth as Tier 1 _for traffic that flows through it_.                                            |
-| **3** | Audit log ingest          | No                          | Pull from a closed platform's compliance API into [`IngestionSource`](#tier-3--audit-log-ingest) records. Detect anomalies, alert, **trigger admin-API revoke** out-of-band. |
+| **3** | Audit log ingest          | No                          | Pull from a closed platform's compliance API into [`IngestionSource`](#tier-3-audit-log-ingest) records. Detect anomalies, alert, **trigger admin-API revoke** out-of-band. |
 | **4** | OTel, SDK instrumentation | Partial                     | Customer's agent code (or an opt-in SaaS like Claude Cowork) emits OpenTelemetry to LangWatch. Per-turn detail, no block, but full trace context.                            |
 | **5** | Sandboxed runtime         | Yes (you host it)           | LangWatch runs the agent. Egress policy, MCP allowlist, file-system jail, tool approval. Maximum control.                                                                    |
 
@@ -136,7 +136,7 @@ Tier 1 is everything documented under
 is to acquire a virtual key, then `exec` the underlying tool with
 the gateway's base URL injected:
 
-```
+```text
 Dev terminal              LangWatch                  Provider
 ─────────────             ─────────                  ────────
 $ langwatch               app.langwatch.ai           api.anthropic.com

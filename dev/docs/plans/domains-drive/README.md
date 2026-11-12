@@ -32,7 +32,7 @@ G2 ─► W3  dd-14 ──► dd-15                                    (serial)
 | dd-03 | Entitlement reads sources supplied by billing and licensing                                                        | lane-sonnet               | 1    |
 | dd-04 | Remaining core → enterprise edges (coding-agent, model-provider, ops, user, organization → governance and billing) | lane-sonnet               | 1    |
 | dd-05 | Browser hubs, expand: owner contracts gain declaration, drawer and client types                                    | lane-opus-medium          | 1    |
-| dd-06 | Browser hubs, switch and delete: 157 declaration/drawer importers, about 98 workflow-api importers, slots          | lane-sonnet (tslsp)       | 1b   |
+| dd-06 | Browser hubs, switch and delete: 157 declaration/drawer importers, about 98 workflow-api importers, slots          | lane-sonnet (rush ts)     | 1b   |
 | dd-07 | Routes into modules: `ui-route-table.ts` (947 lines) becomes composition only                                      | lane-sonnet               | 2    |
 | dd-08 | process-server transport reads supplied credential, permission and session tokens                                  | lane-opus (high: auth)    | 2    |
 | dd-09 | Tenancy: sessions, membership, personal workspace, scim/identity                                                   | lane-opus (high: authz)   | 2    |
@@ -41,7 +41,7 @@ G2 ─► W3  dd-14 ──► dd-15                                    (serial)
 | dd-12 | Authoring cascade: archive/copy as events across workflow, agent, evaluator, monitor, experiment, dataset          | lane-sonnet               | 2    |
 | dd-13 | Ingest seams: span contributors, trace reactions as subscribers, log merged into trace, evaluation edges           | lane-opus-medium          | 2    |
 | dd-14 | Merge suite into scenario                                                                                          | lane-sonnet               | 3    |
-| dd-15 | Renames: one vocabulary, kernel split, §16 deleted, `#/` aliases                                                   | lane-sonnet (tslsp)       | 3    |
+| dd-15 | Renames: one vocabulary, kernel split, §16 deleted, `#/` aliases                                                   | lane-sonnet (rush ts)     | 3    |
 
 That's 8 Sonnet lanes and 7 Opus lanes (three on high effort, four on medium).
 Sonnet lanes spawn with no model override.

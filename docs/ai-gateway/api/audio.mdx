@@ -6,7 +6,7 @@ sidebarTitle: Audio (TTS + STT)
 
 ## Endpoints
 
-```
+```http
 POST /v1/audio/speech
 POST /v1/audio/transcriptions
 Authorization: Bearer vk-lw-<ULID>
@@ -156,7 +156,7 @@ curl -N https://gateway.langwatch.ai/v1/audio/speech \
   -d '{"model": "openai/gpt-4o-mini-tts", "voice": "nova", "input": "Hello.", "stream_format": "sse"}'
 ```
 
-```
+```text
 data: {"type":"speech.audio.delta","audio":"//PkxAAAAAAAAAAA..."}
 
 data: {"type":"speech.audio.done","usage":{"input_tokens":14,"output_tokens":101,"total_tokens":115}}
@@ -174,7 +174,7 @@ curl -N https://gateway.langwatch.ai/v1/audio/transcriptions \
   -F "file=@call-recording.wav"
 ```
 
-```
+```text
 data: {"type":"transcript.text.delta","delta":"Hello"}
 
 data: {"type":"transcript.text.done","text":"Hello from the gateway.","usage":{"type":"duration","seconds":2}}

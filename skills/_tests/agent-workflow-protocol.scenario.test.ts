@@ -16,7 +16,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const isCI = !!process.env.CI;
-const judgeModel = openai("gpt-5-mini");
+const judgeModel = openai("gpt-6-luna");
 const repoRoot = path.resolve(__dirname, "../..");
 
 /**

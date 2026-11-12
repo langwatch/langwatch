@@ -24,6 +24,13 @@ const (
 	// (openai-compat) provider with DeepSeek's public endpoint as the
 	// default base URL.
 	ProviderDeepSeek ProviderID = "deepseek"
+	// ProviderDoubleword hosts open-weight models behind an OpenAI-compatible API
+	// and is not in Bifrost's ModelProvider enum either. It takes the same
+	// vLLM (openai-compat) route as DeepSeek, defaulting to Doubleword's
+	// public endpoint. Its model ids carry the vendor's own slash
+	// ("deepseek-ai/DeepSeek-V4.1-Flash"), so only the first segment of
+	// "doubleword/<model>" is the provider.
+	ProviderDoubleword ProviderID = "doubleword"
 	// ProviderVoyage is direct-API only. Bifrost has no Voyage ModelProvider
 	// enum; the gateway proxies Voyage embeddings via a thin direct
 	// HTTP path. Voyage's wire format is OpenAI-compatible so no body
@@ -86,6 +93,10 @@ const (
 	// realtime voice socket the gateway does not carry (ADR-097). Its spend
 	// record is admitted here and closed later, by the vendor's own report.
 	RequestTypeRealtimeSession RequestType = "realtime_session"
+	// RequestTypeDecisions is POST /v1/decisions (OpenAI Decisions API):
+	// typed questions over an input, answered with probabilities.
+	// Non-streaming only.
+	RequestTypeDecisions RequestType = "decisions"
 )
 
 // Params holds data for a customer AI trace.

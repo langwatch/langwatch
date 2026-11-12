@@ -4,10 +4,7 @@ import {
   eventPayloadSchema,
   findEventPayloadField,
 } from "../../rules/trace-event-log-payload.rules.ts";
-import {
-  TraceEventPayloadFieldNotFoundError,
-  TracePayloadReaderRepository,
-} from "../trace-payload-reader.repository.ts";
+import { TracePayloadReaderRepository } from "../trace-payload-reader.repository.ts";
 
 /** Every offloaded trace field is recorded on the trace aggregate; no other is asked. */
 const TRACE_AGGREGATE_TYPE = "trace";
@@ -28,12 +25,12 @@ export class EventingTraceEventPayloadRepository extends TracePayloadReaderRepos
     super();
   }
 
-  async read(input: {
+  async readFields(input: {
     tenantId: string;
     traceId: string;
     eventId: string;
-    field: string;
-  }): Promise<string> {
+    fields: readonly string[];
+  }): Promise<ReadonlyMap<string, string>> {
     const event = await this.eventReadSeat.getEvent({
       tenantId: createTenantId(input.tenantId),
       aggregateType: TRACE_AGGREGATE_TYPE,
@@ -41,11 +38,13 @@ export class EventingTraceEventPayloadRepository extends TracePayloadReaderRepos
       eventId: input.eventId,
     });
     const payload = eventPayloadSchema.safeParse(event.data);
-    const value = payload.success ? findEventPayloadField(payload.data, input.field) : null;
-    if (value === null) {
-      throw new TraceEventPayloadFieldNotFoundError(input.eventId, input.field);
+    const values = new Map<string, string>();
+    if (!payload.success) return values;
+    for (const field of input.fields) {
+      const value = findEventPayloadField(payload.data, field);
+      if (value !== null) values.set(field, value);
     }
 
-    return value;
+    return values;
   }
 }

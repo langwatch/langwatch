@@ -26,6 +26,7 @@ import type { FeatureSetup } from "@langwatch/process";
 import type { DataPrivacyChannels } from "../channels/data-privacy.channels.ts";
 import { googleApplicationCredentials } from "../channels/google-dlp.channel.ts";
 import type { DataPrivacyRepositories } from "../repositories/data-privacy.repositories.ts";
+import { PII_REDACTION_MODEL_TIMEOUT_MS } from "../rules/pii-redaction-model.rules.ts";
 import { ContentDropPolicyService } from "../services/content-drop-policy.service.ts";
 import { DataPrivacyPermissionsService } from "../services/data-privacy-permissions.service.ts";
 import { DataPrivacyProjectScopeService } from "../services/data-privacy-project-scope.service.ts";
@@ -37,6 +38,8 @@ import { OtlpSpanContentDropService } from "../services/otlp-span-content-drop.s
 import { OtlpSpanPiiRedactionService } from "../services/otlp-span-pii-redaction.service.ts";
 import { PiiAnalysisMetricsOtelService } from "../services/pii-analysis-metrics-otel.service.ts";
 import { PiiAnalysisService } from "../services/pii-analysis.service.ts";
+import { PiiRedactionModelService } from "../services/pii-redaction-model.service.ts";
+import { DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH } from "../services/pii-redaction-policy.service.ts";
 import { PresidioRedactionService } from "../services/presidio-redaction.service.ts";
 
 /** A project's place in the organization chain, plus the name it renders under. */
@@ -77,9 +80,6 @@ export interface DataPrivacyDirectoryReader {
    */
   findScopeOrganizationId(input: { scope: DataPrivacyScope }): Promise<string | null>;
 }
-
-/** Main's worker read 250_000 characters per attribute before skipping one (its own constant). */
-const PII_REDACTION_MAX_ATTRIBUTE_LENGTH = 250_000;
 
 type DataPrivacySetup = FeatureSetup<
   typeof DataPrivacyModule.dependencies,
@@ -149,16 +149,29 @@ export class DataPrivacyModule implements DataPrivacyApi {
       metrics,
       timeoutMs: DATA_PRIVACY_PRESIDIO_TIMEOUT_MS,
     });
+    const projectScopes = DataPrivacyProjectScopeService.create({
+      repository: repositories.projectScopes,
+    });
     const analysis = PiiAnalysisService.create({
       presidio,
+      model: PiiRedactionModelService.create({
+        model: PresidioRedactionService.create({
+          presidio: channels.piiRedactionModel,
+          // Its calls, durations and outcomes carry its own method and evaluator labels, so
+          // Presidio's series stay Presidio's.
+          metrics,
+          timeoutMs: PII_REDACTION_MODEL_TIMEOUT_MS,
+          method: "pii_redaction_model",
+        }),
+        featureFlags: dependencies.featureFlags,
+        scopes: projectScopes,
+        metrics,
+      }),
       dlp: GoogleDlpRedactionService.create({
         dlp: channels.dlp,
         disabled: isGoogleDlpDisabled({ config }),
         metrics,
       }),
-    });
-    const projectScopes = DataPrivacyProjectScopeService.create({
-      repository: repositories.projectScopes,
     });
     const privacy = DataPrivacyService.create({
       repository: repositories.policies,
@@ -174,7 +187,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
         transport: analysis,
         isLangevalsConfigured: () => analysis.isPresidioConfigured(),
         isProduction: config.nodeEnvironment === "production",
-        piiRedactionMaxAttributeLength: PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
+        piiRedactionMaxAttributeLength: DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
         nativePolicyEnforced: config.enforcement !== "off",
         dataPrivacy: privacy,
         featureFlags: dependencies.featureFlags,

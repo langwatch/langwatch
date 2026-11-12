@@ -36,7 +36,7 @@ set -euo pipefail
 
 export LANGWATCH_API_KEY="$CI_LANGWATCH_TOKEN"
 GATEWAY_URL="${LANGWATCH_GATEWAY_URL:-https://gateway.langwatch.ai}"
-MODEL="${SMOKE_MODEL:-openai/gpt-5-mini}"
+MODEL="${SMOKE_MODEL:-openai/gpt-6-luna}"
 STAMP=$(date -u +%Y%m%dT%H%M%S)
 
 cleanup() {
@@ -76,7 +76,7 @@ curl -sS --fail-with-body --max-time 60 \
   -H "Content-Type: application/json" \
   -D "$HEADERS" -o "$BODY" \
   -X POST "$GATEWAY_URL/v1/chat/completions" \
-  -d "{\"model\":\"$MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}],\"max_tokens\":4}"
+  -d "{\"model\":\"$MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}],\"max_completion_tokens\":16,\"reasoning_effort\":\"none\"}"
 
 # 4. Check the response.
 REQUEST_ID=$(grep -i '^x-langwatch-gateway-request-id:' "$HEADERS" \

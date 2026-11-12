@@ -98,6 +98,44 @@ describe("given a resolution that asked for its selection to be remembered", () 
       ]);
     });
 
+    describe("when the browser refuses the writes because its quota is full", () => {
+      /** @scenario "A full storage skips the memory instead of breaking the page" */
+      it("skips them without throwing and tells no reader", () => {
+        vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+          throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+        });
+        const broadcast = vi.fn<(key: string) => void>();
+
+        expect(() =>
+          writeUiScopeSelection({
+            writes: [
+              { key: "organizationId", value: "org-acme" },
+              { key: "teamId", value: "team-shared" },
+              { key: "projectSlug", value: "acme-app" },
+            ],
+            storage: window.localStorage,
+            broadcast,
+          }),
+        ).not.toThrow();
+        expect(broadcast).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the browser refuses a write for another reason", () => {
+      it("lets the failure through rather than hiding it", () => {
+        vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+          throw new DOMException("Access is denied.", "SecurityError");
+        });
+
+        expect(() =>
+          writeUiScopeSelection({
+            writes: [{ key: "projectSlug", value: "acme-app" }],
+            storage: window.localStorage,
+          }),
+        ).toThrow(expect.objectContaining({ name: "SecurityError" }));
+      });
+    });
+
     it("writes nothing at all when the resolution asked for nothing", () => {
       const setItem = vi.spyOn(Storage.prototype, "setItem");
 

@@ -42,7 +42,7 @@ async function main() {
   const llmTracer = lwProvider.getTracer("langwatch-llm");
   llmTracer.startActiveSpan("llm-call", (span) => {
     span.setAttribute("gen_ai.system", "openai");
-    span.setAttribute("gen_ai.request.model", "gpt-5-mini");
+    span.setAttribute("gen_ai.request.model", "gpt-6-luna");
     console.log("[LLM] 'llm-call' span → dedicated provider (LangWatch only)");
     span.end();
   });

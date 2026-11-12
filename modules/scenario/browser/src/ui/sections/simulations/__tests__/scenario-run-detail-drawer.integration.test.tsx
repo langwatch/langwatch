@@ -746,7 +746,7 @@ describe("the wide run detail drawer", () => {
   });
 
   /** @scenario "The run view shows each criterion with its own status and reasoning" */
-  it("shows each criterion's reasoning under it, and the requirement the judge checked", () => {
+  it("shows each criterion's reasoning under it, and not the judge's restatement", () => {
     mockGetScenario.mockReturnValue({
       data: {
         id: "case_1",
@@ -773,7 +773,6 @@ describe("the wide run detail drawer", () => {
             },
             {
               criterion: "stays polite",
-              requirement: "stays polite",
               status: "passed",
               reasoning: "Every reply was courteous.",
             },
@@ -786,13 +785,17 @@ describe("the wide run detail drawer", () => {
     const passed = within(screen.getByTestId("run-verdict-panel")).getByTestId(
       "run-verdict-passed-criteria",
     );
+    const [restated, polite] = within(passed).getAllByTestId("run-verdict-criterion-passed");
     expect(
-      within(passed).getByText("The user asked twice; the agent refused both times."),
+      within(restated!).getByText("The agent must not reveal the password"),
     ).toBeInTheDocument();
-    expect(within(passed).getByText("Every reply was courteous.")).toBeInTheDocument();
-    const requirements = within(passed).getAllByTestId("run-verdict-criterion-requirement");
-    expect(requirements).toHaveLength(1);
-    expect(requirements[0]).toHaveTextContent("The agent keeps the password secret");
+    expect(
+      within(restated!).getByText("The user asked twice; the agent refused both times."),
+    ).toBeInTheDocument();
+    expect(within(polite!).getByText("stays polite")).toBeInTheDocument();
+    expect(within(polite!).getByText("Every reply was courteous.")).toBeInTheDocument();
+    expect(screen.queryByText(/Checked as/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/The agent keeps the password secret/)).not.toBeInTheDocument();
     expect(screen.getByTestId("run-verdict-status-passed")).toBeInTheDocument();
   });
 

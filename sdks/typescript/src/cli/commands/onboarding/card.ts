@@ -25,6 +25,7 @@ const PROVIDER_NAMES: Record<string, string> = {
   xai: "xAI",
   groq: "Groq",
   cerebras: "Cerebras",
+  doubleword: "Doubleword",
   custom: "Custom",
 };
 

@@ -1,3 +1,4 @@
+import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   EvaluatorInvalidConfigError,
   EvaluatorNotFoundError,
@@ -14,6 +15,7 @@ import { ZodError } from "zod";
 import type { EvaluatorRepository } from "../../repositories/evaluator.repository.ts";
 import type { EvaluatorCodeExecution } from "../evaluator-code-execution.service.ts";
 import { EvaluatorHistoryService } from "../evaluator-history.service.ts";
+import { EvaluatorVersionService } from "../evaluator-version.service.ts";
 import { EvaluatorService } from "../evaluator.service.ts";
 
 const baseEvaluator: Evaluator = {
@@ -47,6 +49,7 @@ function repository(overrides: Partial<EvaluatorRepository> = {}): EvaluatorRepo
     archive: vi.fn().mockResolvedValue(baseEvaluator),
     findCopies: vi.fn().mockResolvedValue([]),
     updateNameAndConfig: vi.fn().mockResolvedValue(undefined),
+    latestVersionNumbers: vi.fn().mockResolvedValue(new Map()),
     ...overrides,
   } as EvaluatorRepository;
 }
@@ -71,8 +74,15 @@ function service(
     codeExecution?: EvaluatorCodeExecution;
   } = {},
 ): EvaluatorService {
+  const evaluatorRepository = options.repository ?? repository();
   return EvaluatorService.create({
-    repository: options.repository ?? repository(),
+    repository: evaluatorRepository,
+    versions: EvaluatorVersionService.create({
+      repository: evaluatorRepository,
+      users: createApiFixture<UserApi>({ getProfiles: async () => [] }),
+      permissions: createApiFixture<AuthzApi>({}),
+      auditLog: { listEntityHistory: async () => [] },
+    }),
     workflows: options.workflows ?? workflows(),
     history: EvaluatorHistoryService.create({
       auditLog: {
@@ -418,14 +428,14 @@ describe("EvaluatorService", () => {
         }),
       });
 
-      const result = await evaluators.getByIdWithFields({
+      const [result] = await evaluators.findByIdWithFields({
         id: "e1",
         projectId: "p1",
       });
 
-      expect(result.fields).toEqual(fields);
-      expect(result.outputFields).toEqual(outputFields);
-      expect(result.outputFields).not.toContainEqual(
+      expect(result?.fields).toEqual(fields);
+      expect(result?.outputFields).toEqual(outputFields);
+      expect(result?.outputFields).not.toContainEqual(
         expect.objectContaining({ identifier: "details" }),
       );
     },
@@ -440,13 +450,13 @@ describe("EvaluatorService", () => {
       }),
     });
 
-    const result = await evaluators.getByIdWithFields({
+    const [result] = await evaluators.findByIdWithFields({
       id: "e1",
       projectId: "p1",
     });
 
-    expect(result.fields).toEqual([]);
-    expect(result.outputFields).toEqual(standardEvaluatorOutputFields);
+    expect(result?.fields).toEqual([]);
+    expect(result?.outputFields).toEqual(standardEvaluatorOutputFields);
   });
 
   it("uses configured code inputs and outputs", async () => {
@@ -465,13 +475,13 @@ describe("EvaluatorService", () => {
       }),
     });
 
-    const result = await evaluators.getByIdWithFields({
+    const [result] = await evaluators.findByIdWithFields({
       id: "e1",
       projectId: "p1",
     });
 
-    expect(result.fields).toEqual([{ identifier: "input", type: "str" }]);
-    expect(result.outputFields).toEqual([{ identifier: "passed", type: "bool" }]);
+    expect(result?.fields).toEqual([{ identifier: "input", type: "str" }]);
+    expect(result?.outputFields).toEqual([{ identifier: "passed", type: "bool" }]);
   });
 
   it("gets workflow fields through the canonical workflow service", async () => {
@@ -489,7 +499,7 @@ describe("EvaluatorService", () => {
       workflows: workflows({ getFields }),
     });
 
-    const result = await evaluators.getByIdWithFields({
+    const [result] = await evaluators.findByIdWithFields({
       id: "e1",
       projectId: "p1",
     });
@@ -498,10 +508,10 @@ describe("EvaluatorService", () => {
       workflowId: "w1",
       projectId: "p1",
     });
-    expect(result.fields).toEqual([{ identifier: "input", type: "str" }]);
-    expect(result.outputFields).toEqual([{ identifier: "result", type: "float" }]);
-    expect(result.workflowName).toBe("Workflow");
-    expect(result.workflowIcon).toBe("sparkles");
+    expect(result?.fields).toEqual([{ identifier: "input", type: "str" }]);
+    expect(result?.outputFields).toEqual([{ identifier: "result", type: "float" }]);
+    expect(result?.workflowName).toBe("Workflow");
+    expect(result?.workflowIcon).toBe("sparkles");
   });
 
   it("falls back to standard outputs when a workflow declares none", async () => {
@@ -511,13 +521,13 @@ describe("EvaluatorService", () => {
       }),
     });
 
-    const result = await evaluators.getByIdWithFields({
+    const [result] = await evaluators.findByIdWithFields({
       id: "e1",
       projectId: "p1",
     });
 
-    expect(result.fields).toEqual([]);
-    expect(result.outputFields).toEqual(standardEvaluatorOutputFields);
+    expect(result?.fields).toEqual([]);
+    expect(result?.outputFields).toEqual(standardEvaluatorOutputFields);
   });
 
   it("enriches every evaluator returned by the repository", async () => {

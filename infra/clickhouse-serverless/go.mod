@@ -1,8 +1,9 @@
 module github.com/langwatch/langwatch/infra/clickhouse-serverless
 
-go 1.27.3
+go 1.27.4
 
 require (
+	github.com/go-jose/go-jose/v4 v4.1.6
 	github.com/go-playground/validator/v10 v10.30.2
 	go.uber.org/zap v1.28.0
 	gopkg.in/yaml.v3 v3.0.1

@@ -4,6 +4,11 @@
  */
 import { createClient } from "@clickhouse/client";
 
+import {
+  authenticatedFromFile,
+  ClickHousePasswordFile,
+  usernameOf,
+} from "./clickhouse-password-file.ts";
 import type { ClickHouseConfig, DatabaseConfig } from "./config.ts";
 import type { BuiltMember } from "./datastore-members.ts";
 import type { ClickHouseAdmin, DatabaseTarget } from "./members.ts";
@@ -18,7 +23,10 @@ function parsedUrl(url: string | undefined): URL[] {
   }
 }
 
-/** Not configured where the URL is absent, unparsable or names no database; never a throw. */
+/**
+ * Not configured where the URL is absent, unparsable or names no database. Throws only when
+ * `CLICKHOUSE_PASSWORD_FILE` is set and gives no password, as the routed client does.
+ */
 export function buildClickHouseAdmin(
   config: ClickHouseConfig | undefined,
 ): BuiltMember<ClickHouseAdmin> {
@@ -30,10 +38,17 @@ export function buildClickHouseAdmin(
   server.password = "";
   server.pathname = "/";
   server.search = "";
-  const client = createClient({
-    url: config.url.trim(),
+  const url = config.url.trim();
+  const passwordFile = config.passwordFile
+    ? ClickHousePasswordFile.open({ path: config.passwordFile })
+    : undefined;
+  const vendorClient = createClient({
+    url,
     ...(config.requestTimeoutMs === undefined ? {} : { request_timeout: config.requestTimeoutMs }),
   });
+  const client = passwordFile
+    ? authenticatedFromFile({ client: vendorClient, username: usernameOf(url), passwordFile })
+    : vendorClient;
   return {
     value: {
       configured: true,
@@ -46,7 +61,8 @@ export function buildClickHouseAdmin(
           const result = await client.query({
             query: sql,
             format: "JSONEachRow",
-            ...(params ? { query_params: { ...params } } : {}),
+            // In the body: ClickHouse logs a request's URL, query parameters included, at trace.
+            ...(params ? { query_params: { ...params }, use_multipart_params: true } : {}),
           });
           return result.json<Record<string, unknown>>();
         },

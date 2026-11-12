@@ -107,6 +107,16 @@ describe("the templates finder", () => {
     });
   });
 
+  describe("given the flag is on", () => {
+    /** @scenario "AC3i The Dashboards pages do not point back to the old Analytics" */
+    it("does not point back to the old Analytics", () => {
+      openLibrary();
+
+      expect(screen.getByRole("heading", { level: 1, name: "Dashboard templates" })).toBeVisible();
+      expect(screen.queryByText(/Looking for the old Analytics/)).toBeNull();
+    });
+  });
+
   describe("given no search and no filters", () => {
     /** @scenario "AC101 Templates library: every ready template is listed by trunk" */
     it("lists every ready template once, under its trunk, in trunk order", () => {
@@ -290,7 +300,7 @@ describe("the templates finder", () => {
       const card = screen.getByRole("article", { name: READY.name });
 
       const added = await within(card).findByRole("link", {
-        name: `${READY.name} is added: open its board`,
+        name: `${READY.name} is added: open its dashboard`,
       });
       expect(added).toHaveAttribute("href", "/test-project/dashboards/board-9");
       expect(added).toHaveTextContent("Added");

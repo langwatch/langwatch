@@ -268,6 +268,12 @@ const PENDING_DRIFT_TTL_MS = 180_000;
  */
 const PENDING_RECONCILE_SWEEP_BACKSTOP_MS = 60 * 60 * 1000;
 
+/**
+ * How long the keyspace sweep waits after one that adopted. Under churn nearly
+ * every sweep adopts, so sweeping again at once walks the keyspace back to back.
+ */
+const PENDING_RECONCILE_SWEEP_RETRY_MS = 5 * 60 * 1000;
+
 /** Suffix of the key holding when the next keyspace sweep is due. */
 const SWEEP_DUE_KEY_SUFFIX = "stats:pending-recon-sweep-due";
 
@@ -2178,9 +2184,8 @@ export class QueueRedisRepository extends QueueRepository {
    */
   private async recordSweepOutcome(params: { prefix: string; adopted: number }): Promise<void> {
     const nextDueAt =
-      params.adopted > 0
-        ? nowInstant().epochMilliseconds
-        : nowInstant().epochMilliseconds + PENDING_RECONCILE_SWEEP_BACKSTOP_MS;
+      nowInstant().epochMilliseconds +
+      (params.adopted > 0 ? PENDING_RECONCILE_SWEEP_RETRY_MS : PENDING_RECONCILE_SWEEP_BACKSTOP_MS);
     await this.redis.set(`${params.prefix}${SWEEP_DUE_KEY_SUFFIX}`, String(nextDueAt));
   }
 

@@ -6,6 +6,7 @@ import {
 } from "../policy/defaults.ts";
 import type { SecurityHeaders } from "../policy/security-headers.ts";
 import type { DocumentAccess } from "./browser-bundle.ts";
+import type { EmbeddedDocumentSelection } from "./embedded-document.ts";
 import type { FramedDocumentSelection } from "./framed-document.ts";
 
 export type SurfacePolicy = (defaults: SecurityHeaders) => SecurityHeaders;
@@ -24,6 +25,7 @@ export class TransportSelection {
   #rest: SecurityHeaders | undefined;
   #bundle: BundleSelection | false | undefined;
   readonly #documents: FramedDocumentSelection[] = [];
+  readonly #embedded: EmbeddedDocumentSelection[] = [];
 
   private constructor(readonly defaults: SurfaceDefaultsOptions) {}
 
@@ -67,6 +69,22 @@ export class TransportSelection {
     return this;
   }
 
+  /** A module-built document the registered docs sites may frame (ADR-185), beside the bundle. */
+  embeddedDocument(selection: EmbeddedDocumentSelection): this {
+    if (!this.#bundle)
+      throw new Error(
+        "Select the browser bundle before an embedded document; it answers beside it.",
+      );
+    if (
+      [...this.#documents, ...this.#embedded].some((document) => document.path === selection.path)
+    )
+      throw new Error(`Two documents claim "${selection.path}".`);
+
+    this.#embedded.push(selection);
+
+    return this;
+  }
+
   get selected() {
     if (this.#bundle === undefined)
       throw new Error("surface.browserBundle must be selected or explicitly disabled.");
@@ -76,6 +94,7 @@ export class TransportSelection {
       rest: this.#rest,
       bundle: this.#bundle,
       documents: [...this.#documents],
+      embedded: [...this.#embedded],
     };
   }
 }

@@ -3,6 +3,12 @@ import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
 import type { CreateIngestionKeyInput } from "./api-key-rest.schemas.ts";
+import type {
+  DocsSessionKeyMinted,
+  DocsSessionRevoked,
+  MintDocsSessionKeyInput,
+  RevokeDocsSessionKeysInput,
+} from "./api-key.docs-session.ts";
 import type { ApiKeyListEntry, NamedApiKeyBinding } from "./api-key.list.ts";
 import type { CliSessionRevocationCause } from "./api-key.revocation-cause.ts";
 import type { MintAgentSandboxKeyInput, MintRunKeyInput } from "./api-key.run-key.ts";
@@ -125,6 +131,17 @@ export interface ApiKeyApi {
    * twelve hours, shared for eight. Nobody's in a shared project, the owner's in a personal one.
    */
   mintAgentSandboxKey(input: MintAgentSandboxKeyInput): Promise<string>;
+  /**
+   * A docs session key (ADR-185): the member in one project, for at most five minutes and never
+   * past their browser session or the organization's session ceiling. Refuses an operator acting
+   * as the member and a docs origin this deployment does not register.
+   */
+  mintDocsSessionKey(input: MintDocsSessionKeyInput): Promise<DocsSessionKeyMinted>;
+  /**
+   * Revokes the one docs key named, or every docs key the named browser sessions minted.
+   * Idempotent, and silent about any key that is not a live docs session key.
+   */
+  revokeDocsSessionKeys(input: RevokeDocsSessionKeysInput): Promise<DocsSessionRevoked>;
   /** Resolves organization-only credentials while keeping refusal classes apart. */
   resolveOrganizationToken(
     input: OrganizationApiKeyResolutionInput,
@@ -249,6 +266,19 @@ export interface ApiKeyApi {
     by: ApiKeyManagementCaller,
   ): Promise<NamedApiKeyBinding[]>;
   /**
+   * What a restricted key bound to every one of these scopes may carry: what the owner (else
+   * the caller) holds at each, by the mint's own resolver, so group grants count. Only an
+   * organization admin may ask about another owner.
+   */
+  listGrantablePermissions(
+    input: {
+      organizationId: string;
+      scopes: { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
+      ownerUserId?: string;
+    },
+    by: ApiKeyManagementCaller,
+  ): Promise<string[]>;
+  /**
    * One key id resolved to a display name. Answers null identically for an id
    * that does not exist and one in another organization, so it cannot enumerate.
    */
@@ -273,6 +303,14 @@ export interface ApiKeyApi {
     input: { organizationId: string; apiKeyId: string },
     by: ApiKeyManagementCaller,
   ): Promise<void>;
+  /**
+   * Swaps a key's secret for a new one, keeping its id, settings and grants, and answers the new
+   * token once. The old secret is refused at once: there is no grace period.
+   */
+  rotateKey(
+    input: { organizationId: string; apiKeyId: string },
+    by: ApiKeyManagementCaller,
+  ): Promise<{ token: string; apiKey: ApiKey }>;
   listOrganizationProjects(
     input: { organizationId: string },
     by: ApiKeyManagementCaller,

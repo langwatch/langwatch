@@ -16,7 +16,7 @@ vi.mock("../../../../../behavior/experiments-v3/use-evaluations-v3-store.ts", ()
           rows: [],
           cells: {},
           evaluators: [],
-          datasets: [{ id: "dataset_1", type: "inline", inline: { records: {} } }],
+          datasets: [{ id: "dataset_1", type: "inline", columns: [], inline: { records: {} } }],
           results: {
             targetOutputs: {},
             targetMetadata: {},

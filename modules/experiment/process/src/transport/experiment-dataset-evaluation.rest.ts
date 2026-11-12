@@ -63,7 +63,7 @@ export const experimentDatasetEvaluationRest = defineRestRouter(ExperimentApi)
   .keepsRecords()
   .withSharedPath(DATASET_NAMESPACE)
   .withInput(z.looseObject({}), { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
-  .withPermission("evaluations:manage")
+  .withPermission("evaluations:manage", { legacyKey: "legacy_project_key_experiments" })
   .withoutAudit("run, not a change")
   .withBodyLimit({ maxBytes: EVALUATE_MAX_BYTES })
   .withResponse("protocol", {

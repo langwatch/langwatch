@@ -1,10 +1,15 @@
 import type { LangWatchQLAcceptedGranularityStep } from "@langwatch/analytics-contract";
-import type { ChartFrameDashboardContext } from "@langwatch/analytics-contract/chart-frame-protocol";
+import type {
+  ChartFrameDashboardContext,
+  ChartQueryError,
+} from "@langwatch/analytics-contract/chart-frame-protocol";
 import type { DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import type { ChartFrameExecuteQuery } from "../../../behavior/frame-bridge.ts";
 import { declaredParamDefaults } from "../../../model/dashboard-widget/params-snapshot.ts";
+import { editorLimitError } from "../../../model/dashboard-widget/widget-limit-failure.ts";
 import { useDashboardWidgetChartNavigate } from "./use-dashboard-widget-chart-navigate.ts";
 import { useDashboardWidgetExecutor } from "./use-dashboard-widget-executor.ts";
 
@@ -23,7 +28,6 @@ export function useWidgetPreview({
   projectSlug,
   timeWindow,
   granularitySeconds,
-  excludeOrigins,
   widgetId,
   dashboardId,
   widgetName,
@@ -35,8 +39,6 @@ export function useWidgetPreview({
   timeWindow?: { start: number; end: number };
   /** The step the reserved parameters carry; the executor's hourly default when absent. */
   granularitySeconds?: LangWatchQLAcceptedGranularityStep;
-  /** Trace origins the board leaves out, so the preview draws what the card will. */
-  excludeOrigins?: readonly string[];
   widgetId?: string;
   dashboardId?: string;
   widgetName?: string;
@@ -62,7 +64,7 @@ export function useWidgetPreview({
   }, []);
 
   const {
-    executeQuery,
+    executeQuery: runQuery,
     runStandalone,
     params: hostParams,
     lastRuns,
@@ -73,9 +75,17 @@ export function useWidgetPreview({
       ? {
           timeWindow,
           ...(granularitySeconds ? { granularitySeconds } : {}),
-          ...(excludeOrigins ? { excludeOrigins } : {}),
         }
       : undefined,
+  );
+
+  // The preview has no failed face: the widget's own code prints what LW.query rejects with.
+  const executeQuery: ChartFrameExecuteQuery = useCallback(
+    (args) =>
+      runQuery(args).catch((error: ChartQueryError) => {
+        throw editorLimitError(error);
+      }),
+    [runQuery],
   );
 
   const paramsSnapshot = useMemo(() => declaredParamDefaults(previewQueries), [previewQueries]);

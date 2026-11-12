@@ -22,6 +22,11 @@ const nlpLambdaFleetSchemaDefinition = z.object({
   credentials_role_arn: z.string().trim().min(1).optional(),
   role_arn: z.string().min(1),
   image_uri: z.string().min(1),
+  /**
+   * Grows with every new image (unix seconds of its rollout). A pod never moves a function to an
+   * image with a lower order, so a rollout's old pods cannot revert it.
+   */
+  image_order: z.number().int().nonnegative().optional(),
   cache_bucket: z.string().min(1),
   subnet_ids: z.array(z.string().min(1)),
   security_group_ids: z.array(z.string().min(1)),

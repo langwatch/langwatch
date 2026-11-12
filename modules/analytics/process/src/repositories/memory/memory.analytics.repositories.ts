@@ -9,6 +9,9 @@ import { MemoryAnalyticsRateLimitRepository } from "./memory.analytics-rate-limi
 import { MemoryAnalyticsRecencyRepository } from "./memory.analytics-recency.repository.ts";
 import { MemoryAnalyticsSessionsRepository } from "./memory.analytics-sessions.repository.ts";
 import { MemoryAnalyticsRepository } from "./memory.analytics.repository.ts";
+import { MemoryLangWatchQLAccessModelAnswerRepository } from "./memory.langwatch-ql-access-model-answer.repository.ts";
+import { MemoryLangWatchQLPlacementRepository } from "./memory.langwatch-ql-placement.repository.ts";
+import { MemoryLwqlUnconfirmedSinceRepository } from "./memory.langwatch-ql-unconfirmed-since.repository.ts";
 
 /** The memory tier has no ClickHouse server to probe: it answers nothing, as a silent one does. */
 class MemoryLangWatchQLAppFunctionStoreRepository extends LangWatchQLAppFunctionStoreRepository {
@@ -43,6 +46,8 @@ export class MemoryAnalyticsRepositories {
       appFunctionStore: MemoryLangWatchQLAppFunctionStoreRepository.create(),
       recency: MemoryAnalyticsRecencyRepository.create({ evaluations: evaluationRows }),
       rateLimits: MemoryAnalyticsRateLimitRepository.create(),
+      lwqlPlacement: MemoryLangWatchQLPlacementRepository.create(),
+      lwqlAccessModelAnswer: MemoryLangWatchQLAccessModelAnswerRepository.create(),
       langWatchQl: {
         admin: { configured: false },
         postgres: { configured: false },
@@ -50,6 +55,7 @@ export class MemoryAnalyticsRepositories {
         database: () => {
           throw new Error("Memory stores provide no PostgreSQL for LangWatchQL provisioning.");
         },
+        unconfirmedSince: MemoryLwqlUnconfirmedSinceRepository.create(),
       },
     };
   }

@@ -7,6 +7,7 @@ import {
 } from "./classify.mjs";
 import { defineRule, renderMessage, renderTemplate } from "./define-rule.mjs";
 import { accessEscapeKindRule } from "./rules/access-escape-kind.rule.mjs";
+import { appFeatureLayoutRule } from "./rules/app-feature-layout.rule.mjs";
 import { authzMembersRequiredRule } from "./rules/authz-members-required.rule.mjs";
 import { bannedTestModelNamesRule } from "./rules/banned-test-model-names.rule.mjs";
 import { bannedVerbPrefixRule } from "./rules/banned-verb-prefix.rule.mjs";
@@ -104,6 +105,7 @@ const HOUSE_RULES = [
   bannedVerbPrefixRule,
   moduleClassesRule,
   moduleLayersRule,
+  appFeatureLayoutRule,
   passThroughClassRule,
   restRouteRule,
   storeContainmentRule,
@@ -193,6 +195,7 @@ export {
   bannedVerbPrefixRule,
   moduleClassesRule,
   moduleLayersRule,
+  appFeatureLayoutRule,
   passThroughClassRule,
   restRouteRule,
   storeContainmentRule,

@@ -1,6 +1,6 @@
 # Calibration
 
-15 fixtures in `fixtures/`: 10 that break named rules and 5 clean texts (four docs pages in the four page shapes, one blog paragraph). `.mdx` fixtures run with `--rules both`, `.md` with `--rules writing`, since docs-only rules like "open a concept page with a definition" are not defects on a blog post. Labels are in `fixtures/expected.json`. A rule counts as fired at probability 0.7 or above; the table is what `node calibrate.mjs 0.7` printed on 2026-09-18.
+17 fixtures in `fixtures/`: 11 that break named rules, 1 approved ad that should only warn (`ok-question-same-line.md`), and 5 clean texts (four docs pages in the four page shapes, one blog paragraph). `.mdx` fixtures run with `--rules both`, `.md` with `--rules writing`, since docs-only rules like "open a concept page with a definition" are not defects on a blog post. Labels are in `fixtures/expected.json`. A rule counts as fired at probability 0.7 or above; the table is what `node calibrate.mjs 0.7` printed on 2026-11-08. The Result and What the calibration changed sections describe the first calibration, on 2026-09-18.
 
 ## Result
 
@@ -26,100 +26,105 @@ Nine came from instructions that were too loose, and the fix was wording:
 
 Two things about Jev's sensitivity to phrasing showed up. A criterion that quotes a concrete fragment ("like 'Overhead was high. Handoffs failed silently.'") moves a rule from 0.59 to 0.9 on the same text. And the judge matches quoted examples very literally: three of my first instructions quoted sentences from the docs pages under test, which made the pages fail on those rules by construction. They were replaced with the guides' own examples and the reports were re-run; the findings survived with the same located sentences, at slightly lower probabilities (0.94 to 0.89, 0.86 to 0.78).
 
+## 2026-11-08: opening questions warn
+
+The writing guide now allows an opening question rarely, when the answer lands in the same line and the question is the reader's own words ("Laptop shut? It still works"). `writing/question-opener` is a local check with `severity: "warning"`: it prints with `w` and never fails the run. `open-flat` no longer counts a rhetorical question as a windup, and `punchline-section-opener` no longer treats a question as a punchline: on the first run it scored the new `bad-question-opener.md` fixture at 0.88, which would have turned the warning back into a failure. Two fixtures were added, `bad-question-opener.md` (no answer in the line) and `ok-question-same-line.md`; `ok-question-same-line.md` expects only the warning, and `bad-question-opener.md` expects the warning plus `writing/narrator-sentence`. Three runs over the 17 fixtures cost USD 0.0063 each; `question-opener` was 2 of 2 on all three. The remaining misses are on rules this change did not touch, and several of them differ between runs. On the third run `narrator-sentence` scored the "Ever wondered why" fixture at 0.75; that phrase is a narrator move in its own right, so the fixture now expects that rule too and the table counts it as a hit.
+
 ## Per-rule table
 
-Threshold 0.7. 15 fixtures, 30 requests, 138,513 input tokens, USD 0.0058.
+Threshold 0.7. 17 fixtures scored, 32 requests, 150,210 input tokens, USD 0.0063. Printed on 2026-11-08.
 
-| Rule                                 | TP  | FP  | FN  | Precision | Recall | Misses                                  |
-| ------------------------------------ | --- | --- | --- | --------- | ------ | --------------------------------------- |
-| docs/artifact-as-subject             | 1   | 1   | 0   | 50%       | 100%   | FP bad-docs-indefinite-event.mdx (0.71) |
-| docs/artifact-verbs-literal          | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| docs/aspirational-claim              | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| docs/bare-ai-gateway                 | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| docs/card-without-icon               | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| docs/comparison-to-other-area        | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| docs/concept-opener                  | 2   | 0   | 0   | 100%      | 100%   |                                         |
-| docs/description-restated            | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| docs/dev-process                     | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| docs/example-constructor             | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| docs/filler-sentence                 | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| docs/heading-indirect-form           | 2   | 0   | 0   | 100%      | 100%   |                                         |
-| docs/heading-question-mark           | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| docs/heading-unanswered              | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| docs/indefinite-event-opener         | 2   | 0   | 0   | 100%      | 100%   |                                         |
-| docs/infra-poetry                    | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| docs/it-matters-because              | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| docs/marketing-pitch                 | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| docs/marketing-words                 | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| docs/metaphorical-verb               | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| docs/narration-in-concept            | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| docs/pairs-with                      | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| docs/paragraph-over-80-words         | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| docs/paraphrased-artifact            | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| docs/preamble-opener                 | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| docs/product-casing                  | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| docs/release-flag                    | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| docs/restated-tool-guidance          | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| docs/rides                           | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| docs/rollout-gate                    | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| docs/statement-stack                 | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| docs/timeline-narration              | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| docs/title-repeated-as-heading       | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| docs/tool-seat-expectations          | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| docs/unshown-ui-element              | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| docs/vague-boundary                  | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| docs/voice-and-tense                 | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| docs/wall-of-prose                   | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/arrow-cta                    | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| writing/banned-words-2026-08-02      | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| writing/borrowed-structural-metaphor | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| writing/brand-closer                 | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/clinical-hedge               | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/conspiratorial-hook          | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| writing/dangling-demonstrative       | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/defensive-moat               | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/didnt-just-escalation        | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/ellipsis-shrug               | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| writing/em-dash                      | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| writing/empty-summary-sentence       | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/exclamation-marks            | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| writing/fake-epiphany                | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/grand-reframe                | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/gravitas-closer              | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| writing/imperative-signoff           | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/interesting-literal          | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| writing/invented-jargon              | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/keynote-closer               | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| writing/load-bearing                 | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| writing/low-information-density      | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/magic-reframe                | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| writing/marveling-at-ai              | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/mechanism-before-meaning     | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/most-vague-quantifier        | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| writing/narrator-sentence            | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| writing/negated-restart              | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/negation-reframe             | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| writing/open-flat                    | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/passive-voice                | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/personified-abstraction      | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/pronoun-chain                | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/pseudo-precision             | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/punchline-section-opener     | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/quoted-cliche-opener         | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/round-number-flex            | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/rule-of-three-anaphora       | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/second-order-abstraction     | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/staccato                     | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| writing/stating-priors               | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/teach-list-as-list           | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/two-beat-aphorism            | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/unintroduced-first-name      | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| writing/unnamed-concept              | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/vague-specifics              | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/vibe-phrases                 | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| writing/vibe-phrases-literal         | 1   | 0   | 0   | 100%      | 100%   |                                         |
-| writing/voiceover-summary            | 0   | 0   | 0   | n/a       | n/a    |                                         |
-| writing/x-not-y-closer               | 0   | 0   | 0   | n/a       | n/a    |                                         |
+| Rule                                 | TP  | FP  | FN  | Precision | Recall | Misses                                   |
+| ------------------------------------ | --- | --- | --- | --------- | ------ | ---------------------------------------- |
+| docs/artifact-as-subject             | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| docs/artifact-verbs-literal          | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| docs/aspirational-claim              | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| docs/bare-ai-gateway                 | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| docs/card-without-icon               | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| docs/comparison-to-other-area        | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| docs/concept-opener                  | 2   | 1   | 0   | 67%       | 100%   | FP clean-docs-troubleshooting.mdx (0.76) |
+| docs/description-restated            | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| docs/dev-process                     | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| docs/example-constructor             | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| docs/filler-sentence                 | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| docs/heading-indirect-form           | 1   | 0   | 1   | 100%      | 50%    | FN bad-docs-marketing.mdx (0.60)         |
+| docs/heading-question-mark           | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| docs/heading-unanswered              | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| docs/indefinite-event-opener         | 1   | 0   | 1   | 100%      | 50%    | FN bad-docs-artifact-verbs.mdx (0.64)    |
+| docs/infra-poetry                    | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| docs/it-matters-because              | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| docs/marketing-pitch                 | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| docs/marketing-words                 | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| docs/metaphorical-verb               | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| docs/narration-in-concept            | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| docs/pairs-with                      | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| docs/paragraph-over-80-words         | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| docs/paraphrased-artifact            | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| docs/preamble-opener                 | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| docs/product-casing                  | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| docs/release-flag                    | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| docs/restated-tool-guidance          | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| docs/rides                           | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| docs/rollout-gate                    | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| docs/statement-stack                 | 0   | 1   | 0   | 0%        | n/a    | FP bad-docs-indefinite-event.mdx (0.73)  |
+| docs/timeline-narration              | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| docs/title-repeated-as-heading       | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| docs/tool-seat-expectations          | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| docs/unshown-ui-element              | 0   | 0   | 1   | n/a       | 0%     | FN bad-docs-artifact-verbs.mdx (0.69)    |
+| docs/vague-boundary                  | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| docs/voice-and-tense                 | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| docs/wall-of-prose                   | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/arrow-cta                    | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| writing/banned-words-2026-08-02      | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| writing/borrowed-structural-metaphor | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| writing/brand-closer                 | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/clinical-hedge               | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/conspiratorial-hook          | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| writing/dangling-demonstrative       | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/defensive-moat               | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/didnt-just-escalation        | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/ellipsis-shrug               | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| writing/em-dash                      | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| writing/empty-summary-sentence       | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/exclamation-marks            | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| writing/fake-epiphany                | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/grand-reframe                | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/gravitas-closer              | 1   | 1   | 0   | 50%       | 100%   | FP bad-negation-reframe.md (0.80)        |
+| writing/imperative-signoff           | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/interesting-literal          | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| writing/invented-jargon              | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/keynote-closer               | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| writing/load-bearing                 | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| writing/low-information-density      | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/magic-reframe                | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| writing/marveling-at-ai              | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/mechanism-before-meaning     | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/most-vague-quantifier        | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| writing/narrator-sentence            | 2   | 0   | 0   | 100%      | 100%   |                                          |
+| writing/negated-restart              | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/negation-reframe             | 1   | 1   | 0   | 50%       | 100%   | FP bad-banned-words.md (0.70)            |
+| writing/open-flat                    | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/passive-voice                | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/personified-abstraction      | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/pronoun-chain                | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/pseudo-precision             | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/punchline-section-opener     | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/question-opener              | 2   | 0   | 0   | 100%      | 100%   |                                          |
+| writing/quoted-cliche-opener         | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/round-number-flex            | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/rule-of-three-anaphora       | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/second-order-abstraction     | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/staccato                     | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| writing/stating-priors               | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/teach-list-as-list           | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/two-beat-aphorism            | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/unintroduced-first-name      | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| writing/unnamed-concept              | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/vague-specifics              | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/vibe-phrases                 | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| writing/vibe-phrases-literal         | 1   | 0   | 0   | 100%      | 100%   |                                          |
+| writing/voiceover-summary            | 0   | 0   | 0   | n/a       | n/a    |                                          |
+| writing/x-not-y-closer               | 0   | 0   | 0   | n/a       | n/a    |                                          |
 
 Rules that never fired on any fixture and were never expected are the silent majority; they are listed under 'Silent rules' below.
 

@@ -26,6 +26,8 @@ export class TestApiKeyService implements ApiKeyApi {
   getByIdForCaller = unsupported<ApiKeyApi["getByIdForCaller"]>();
   mintRunKey = unsupported<ApiKeyApi["mintRunKey"]>();
   mintAgentSandboxKey = unsupported<ApiKeyApi["mintAgentSandboxKey"]>();
+  mintDocsSessionKey = unsupported<ApiKeyApi["mintDocsSessionKey"]>();
+  revokeDocsSessionKeys = unsupported<ApiKeyApi["revokeDocsSessionKeys"]>();
   getOrgMembers = unsupported<ApiKeyApi["getOrgMembers"]>();
   getOrgProjects = unsupported<ApiKeyApi["getOrgProjects"]>();
   getOrgTeams = unsupported<ApiKeyApi["getOrgTeams"]>();
@@ -36,6 +38,7 @@ export class TestApiKeyService implements ApiKeyApi {
   listAll = unsupported<ApiKeyApi["listAll"]>();
   listForCaller = unsupported<ApiKeyApi["listForCaller"]>();
   listCallerBindings = unsupported<ApiKeyApi["listCallerBindings"]>();
+  listGrantablePermissions = unsupported<ApiKeyApi["listGrantablePermissions"]>();
   findIngestionKeysForUser = unsupported<ApiKeyApi["findIngestionKeysForUser"]>();
   listIngestionKeysForProject = unsupported<ApiKeyApi["listIngestionKeysForProject"]>();
   listKeys = unsupported<ApiKeyApi["listKeys"]>();
@@ -51,6 +54,7 @@ export class TestApiKeyService implements ApiKeyApi {
   revokeCliSessionKey = unsupported<ApiKeyApi["revokeCliSessionKey"]>();
   revokeCliLoginKeysForDevice = unsupported<ApiKeyApi["revokeCliLoginKeysForDevice"]>();
   revokeKey = unsupported<ApiKeyApi["revokeKey"]>();
+  rotateKey = unsupported<ApiKeyApi["rotateKey"]>();
   update = unsupported<ApiKeyApi["update"]>();
   updateAsCaller = unsupported<ApiKeyApi["updateAsCaller"]>();
   updateKey = unsupported<ApiKeyApi["updateKey"]>();

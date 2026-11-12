@@ -255,10 +255,11 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
   // Spec: specs/langy/langy-mount-scope.feature
   { path: "/cli/auth", page: "pages/cli/auth" },
 
-  // Key and MCP consent: standalone branded cards, the project switcher lent
+  // Key, MCP and docs consent: standalone branded cards, the project switcher lent
   // into the card by the api-key host mount rather than drawn by the chrome.
   { path: "/authorize", page: "pages/authorize" },
   { path: "/mcp/authorize", page: "pages/mcp/authorize" },
+  { path: "/connect/docs", page: "pages/connect/docs" },
 
   // The published workflow chat is a chromeless page, as it was on main: one
   // full-height card with the wordmark, no header, sidebar or Langy panel.
@@ -961,6 +962,7 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
         page: "pages/ops/cloud/self-hosted-instances",
       },
       { path: "/ops/cloud/bug-reports", page: "pages/ops/cloud/bug-reports" },
+      { path: "/ops/cloud/seat-use", page: "pages/ops/cloud/seat-use" },
       // The retired back-office addresses: the bare one lands on Cloud admin,
       // each page on its new home, anything else on the Ops home.
       {

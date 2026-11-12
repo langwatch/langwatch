@@ -65,13 +65,16 @@ describe("the apiKey tRPC transport", () => {
       // part of every procedure's name, and of its React Query cache key.
       expect(Object.keys(router._def.procedures).toSorted()).toEqual([
         "apiKey.create",
+        "apiKey.grantablePermissions",
         "apiKey.list",
+        "apiKey.mintDocsSessionKey",
         "apiKey.myBindings",
         "apiKey.nameById",
         "apiKey.orgMembers",
         "apiKey.orgProjects",
         "apiKey.orgTeams",
         "apiKey.revoke",
+        "apiKey.rotate",
         "apiKey.update",
       ]);
     });
@@ -368,6 +371,67 @@ describe("the apiKey tRPC transport", () => {
     });
   });
 
+  describe("when a member rotates a key", () => {
+    const rotated = () => ({
+      rotateKey: vi.fn<ApiKeyApi["rotateKey"]>(async () => ({
+        token: "sk-lw-rotated-shown-once",
+        apiKey: storedKey(),
+      })),
+    });
+
+    /** @scenario Rotating answers a new secret once and keeps the key's id */
+    it("returns the new token once, with only the key's identity beside it", async () => {
+      const app = rotated();
+      const { caller } = harness(app);
+
+      const result = await caller.rotate({ organizationId: ORG_ID, apiKeyId: "ak_1" });
+
+      expect(app.rotateKey).toHaveBeenCalledWith(
+        { organizationId: ORG_ID, apiKeyId: "ak_1" },
+        { id: USER_ID, type: "user" },
+      );
+      expect(result.token).toBe("sk-lw-rotated-shown-once");
+      expect(Object.keys(result).toSorted()).toEqual(["apiKey", "token"]);
+      expect(result.apiKey).toEqual({
+        id: "ak_1",
+        name: "Test Key",
+        createdAt: new Date("2026-01-01"),
+      });
+    });
+
+    /** @scenario Rotating is audited without the secret */
+    it("records the rotation against the key without the new token anywhere in it", async () => {
+      const { caller, audit } = harness(rotated());
+
+      await caller.rotate({ organizationId: ORG_ID, apiKeyId: "ak_1" });
+
+      expect(audit.entries).toHaveLength(1);
+      expect(audit.entries[0]).toMatchObject({
+        userId: USER_ID,
+        organizationId: ORG_ID,
+        action: "apiKey.rotate",
+        args: { organizationId: ORG_ID, apiKeyId: "ak_1" },
+        error: undefined,
+      });
+      expect(JSON.stringify(audit.entries)).not.toContain("sk-lw-rotated-shown-once");
+    });
+
+    /** @scenario Only the key's owner or an organization admin may rotate it */
+    it("lets a not-owned refusal through with its own code, and audits it", async () => {
+      const { caller, audit } = harness({
+        rotateKey: async () => {
+          throw new ApiKeyNotOwnedError("ak_1");
+        },
+      });
+
+      await expect(
+        caller.rotate({ organizationId: ORG_ID, apiKeyId: "ak_1" }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN", cause: { code: "api_key_not_owned" } });
+      expect(audit.entries[0]?.action).toBe("apiKey.rotate");
+      expect(audit.entries[0]?.error).toBeDefined();
+    });
+  });
+
   describe("given the application raises a named failure", () => {
     it("lets a membership refusal through with its own code", async () => {
       const { caller } = harness({
@@ -446,6 +510,43 @@ describe("the apiKey tRPC transport", () => {
       await expect(caller.revoke({ organizationId: ORG_ID, apiKeyId: "ak_1" })).rejects.toThrow(
         "ECONNREFUSED 10.0.0.5:5432",
       );
+    });
+  });
+
+  describe("when a signed-in member allows the docs to connect", () => {
+    it("hands the member and the browser session they asked on to the application", async () => {
+      const mintDocsSessionKey = vi.fn(async () => ({
+        token: "sk-lw-docs",
+        expiresAt: "2026-10-26T12:05:00.000Z",
+        expiresIn: 300,
+        project: { id: "project_1", name: "Checkout" },
+      }));
+      const { caller } = harness({ mintDocsSessionKey });
+
+      await expect(
+        caller.mintDocsSessionKey({ projectId: "project_1", docsOrigin: "https://langwatch.ai" }),
+      ).resolves.toMatchObject({ token: "sk-lw-docs" });
+      expect(mintDocsSessionKey).toHaveBeenCalledWith({
+        userId: USER_ID,
+        impersonatorId: undefined,
+        browserSession: { id: "session-1", startedAt: null, expiresAt: null },
+        projectId: "project_1",
+        docsOrigin: "https://langwatch.ai",
+      });
+    });
+
+    it("refuses an operator acting as the member before the application runs", async () => {
+      const mintDocsSessionKey = vi.fn();
+      const { caller } = apiKeyTrpcCaller({
+        declaration: apiKeyTrpcTransport,
+        app: stubApiKeyApi({ mintDocsSessionKey }),
+        actor: { type: "user", id: USER_ID, impersonatorId: "operator_1" },
+      });
+
+      await expect(
+        caller.mintDocsSessionKey({ projectId: "project_1", docsOrigin: "https://langwatch.ai" }),
+      ).rejects.toMatchObject({ cause: { code: "permission_denied" } });
+      expect(mintDocsSessionKey).not.toHaveBeenCalled();
     });
   });
 });

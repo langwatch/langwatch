@@ -187,5 +187,6 @@ None: data-privacy declares no pipeline, process manager, subscriber or task.
 | config | `enforcement`                  | `LANGWATCH_DATA_PRIVACY_ENFORCEMENT` | `../contract/src/data-privacy.config.ts:16` |
 | config | `nodeEnvironment`              | `NODE_ENV`                           | `../contract/src/data-privacy.config.ts:18` |
 | config | `langevalsEndpoint`            | `LANGEVALS_ENDPOINT`                 | `../contract/src/data-privacy.config.ts:20` |
+| config | `piiRedactionModelEndpoint`    | `PII_REDACTION_MODEL_ENDPOINT`       | `../contract/src/data-privacy.config.ts:25` |
 
 <!-- readme:generated:end -->

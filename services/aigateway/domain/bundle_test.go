@@ -66,3 +66,22 @@ func TestSplitModelSpellingNormalizesTheQualifierCase(t *testing.T) {
 		t.Errorf("mixed-case alias gave %q, ok=%v, want %q", providerID, ok, ProviderVertex)
 	}
 }
+
+// Doubleword model ids carry the vendor's own slash, so only the first segment
+// of "doubleword/<model>" names the provider.
+//
+// @scenario "A Doubleword model id keeps its own vendor slash"
+func TestSplitModelSpellingKeepsTheDoublewordVendorSlash(t *testing.T) {
+	t.Parallel()
+
+	providerID, model, ok := SplitModelSpelling("doubleword/deepseek-ai/DeepSeek-V4.1-Flash")
+	if !ok {
+		t.Fatal("a doubleword spelling must split")
+	}
+	if providerID != ProviderDoubleword {
+		t.Errorf("provider = %q, want %q", providerID, ProviderDoubleword)
+	}
+	if model != "deepseek-ai/DeepSeek-V4.1-Flash" {
+		t.Errorf("model = %q, want deepseek-ai/DeepSeek-V4.1-Flash", model)
+	}
+}

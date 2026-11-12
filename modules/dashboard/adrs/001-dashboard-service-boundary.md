@@ -40,7 +40,7 @@ errors, and one abstract `DashboardService`. The server package publishes the
 composition adapter plus the three injection points the host fills: the
 identifier generator, the graph visibility policy and the saved-chart policy.
 The feature mounts no route of its own. The `dashboards`, `graphs` and
-saved-workbench-chart tRPC routers, the `/api/dashboards` and `/api/graphs` REST
+saved-workbench-chart tRPC routers, the `/api/v1/analytics/reports` and `/api/graphs` REST
 applications, and the saved-chart routes under `/api/v1/projects` are host
 transports over the composed service.
 

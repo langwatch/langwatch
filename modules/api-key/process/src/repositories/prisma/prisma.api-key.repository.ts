@@ -1,4 +1,5 @@
 import {
+  ApiKeyAlreadyRevokedError,
   CLI_LOGIN_KEY_NAME_PREFIX,
   HIDDEN_SYSTEM_KEY_NAMES,
   RESERVED_SYSTEM_KEY_NAMES,
@@ -121,6 +122,25 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
       where: { id: input.id },
     });
   }
+  /** SQL for the same reason as `revoke`: the fence must be re-checked under the row lock. */
+  async rotateSecret(input: {
+    id: string;
+    organizationId: string;
+    lookupId: string;
+    hashedSecret: string;
+  }): Promise<ApiKeyRow> {
+    const rotated = await this.database.$executeRaw`
+      UPDATE "ApiKey"
+         SET "lookupId" = ${input.lookupId},
+             "hashedSecret" = ${input.hashedSecret},
+             "updatedAt" = now()
+       WHERE "id" = ${input.id}
+         AND "organizationId" = ${input.organizationId}
+         AND "revokedAt" IS NULL
+    `;
+    if (rotated === 0) throw new ApiKeyAlreadyRevokedError(input.id);
+    return this.database.apiKey.findUniqueOrThrow({ where: { id: input.id } });
+  }
   async updateLastUsedAt(input: { id: string }): Promise<void> {
     await this.update({ id: input.id, lastUsedAt: nowInstant() });
   }
@@ -242,6 +262,26 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
       },
       select: { id: true, userId: true, organizationId: true },
     });
+  }
+  async findLiveBySessions(input: {
+    userId: string;
+    name: string;
+    browserSessionIds: readonly string[];
+  }): Promise<{ id: string; organizationId: string }[]> {
+    if (input.browserSessionIds.length === 0) return [];
+    return this.database.$queryRaw<{ id: string; organizationId: string }[]>`
+      ${skipTenantCheck({
+        // One person's own keys across their organizations, bounded by the indexed userId.
+        SKIP_TENANT_CHECK: true,
+      })}
+      SELECT "id", "organizationId"
+        FROM "ApiKey"
+       WHERE "userId" = ${input.userId}
+         AND "name" = ${input.name}
+         AND "isSystemManaged" = true
+         AND "revokedAt" IS NULL
+         AND "createdByBrowserSessionId" = ANY(${[...input.browserSessionIds]})
+    `;
   }
   async sweepElapsedLoginKeys(input: {
     before: Instant;

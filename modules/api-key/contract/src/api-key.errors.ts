@@ -76,6 +76,21 @@ export class ApiKeyAlreadyRevokedError extends HandledError {
   }
 }
 
+/** An expired key keeps its expiry through a rotation, so a new secret for it would be dead. */
+export class ApiKeyExpiredError extends HandledError {
+  declare readonly code: "api_key_expired";
+
+  constructor(id: string) {
+    super("api_key_expired", "API Key has expired", {
+      meta: { apiKeyId: id },
+      httpStatus: 409,
+      fault: "customer",
+      ...remediation("api_key_expired"),
+    });
+    this.name = "ApiKeyExpiredError";
+  }
+}
+
 export class ApiKeyReservedNameError extends HandledError {
   declare readonly code: "api_key_reserved_name";
 
@@ -122,6 +137,28 @@ export class ApiKeyPermissionDeniedError extends HandledError {
       },
     );
     this.name = "ApiKeyPermissionDeniedError";
+  }
+}
+
+/** A legacy project key (`Project.apiKey`) asked beyond ingestion and its project's scopes. */
+export class LegacyProjectKeyIngestionOnlyError extends HandledError {
+  declare readonly code: "legacy_project_key_ingestion_only";
+
+  constructor(options: { permission?: string; meta?: Record<string, unknown> } = {}) {
+    super(
+      "legacy_project_key_ingestion_only",
+      "This legacy project key is limited to ingestion and the scopes enabled for its project. Create an API key with the permissions this call needs and send it instead.",
+      {
+        meta: {
+          ...(options.permission ? { permission: options.permission } : {}),
+          ...options.meta,
+        },
+        httpStatus: 403,
+        fault: "customer",
+        ...remediation("legacy_project_key_ingestion_only"),
+      },
+    );
+    this.name = "LegacyProjectKeyIngestionOnlyError";
   }
 }
 

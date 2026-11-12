@@ -40,6 +40,7 @@ import {
 import {
   bindTrpcMiddlewareContext,
   browserSessionContext,
+  browserSessionWindowContext,
   callerAddressContext,
   createTrpcErrorFormatter,
   createTrpcRuntime,
@@ -72,6 +73,9 @@ export type TrpcSession = Readonly<{
   user: TrpcSessionUser;
   /** The browser session's own id, where the deployment tracks one. */
   sessionId?: string;
+  /** When that session began and when it ends, as ISO instants, where auth reports them. */
+  startedAt?: string;
+  expiresAt?: string;
 }>;
 
 /** The one context every procedure on this root is resolved against. */
@@ -338,6 +342,15 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
         browserSessionContext,
         (ctx: TrpcRequestContext) => ctx.session?.sessionId ?? null,
       ),
+      bindTrpcMiddlewareContext(browserSessionWindowContext, (ctx: TrpcRequestContext) =>
+        ctx.session?.sessionId
+          ? {
+              id: ctx.session.sessionId,
+              startedAt: ctx.session.startedAt ?? null,
+              expiresAt: ctx.session.expiresAt ?? null,
+            }
+          : null,
+      ),
       bindTrpcMiddlewareContext(
         callerAddressContext,
         (ctx: TrpcRequestContext) => ctx.clientIp() ?? null,
@@ -525,6 +538,8 @@ function sessionOf(caller: SessionCaller | null): TrpcSession | null {
         : {}),
     },
     ...(caller.sessionId ? { sessionId: caller.sessionId } : {}),
+    ...(caller.sessionStartedAt ? { startedAt: caller.sessionStartedAt } : {}),
+    ...(caller.sessionExpiresAt ? { expiresAt: caller.sessionExpiresAt } : {}),
   };
 }
 

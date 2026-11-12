@@ -67,8 +67,15 @@ export class SsoArrivalService {
       const { organizationId } = decision;
 
       if (await this.deps.memberships.isMember({ organizationId, userId: user.id })) {
-        // shortcut: a retry does not read the seat, so it resumes as MEMBER; read it for VIEWER.
-        await this.resumeAdmission({ user, organizationId, domain, role: "MEMBER" });
+        // A retry resumes the grant the stored seat is worth: a Lite Member's is a Viewer.
+        const roleOfSeat = async () => {
+          const seat = await this.deps.memberships.getMemberSeat({
+            organizationId,
+            userId: user.id,
+          });
+          return seat === "EXTERNAL" ? ("VIEWER" as const) : ("MEMBER" as const);
+        };
+        await this.resumeAdmission({ user, organizationId, domain, role: roleOfSeat });
         await this.adoptIdentity(user.id);
         return;
       }
@@ -152,7 +159,7 @@ export class SsoArrivalService {
     }
     // A Lite seat is worth an organization-wide Viewer, as a SCIM create grants it.
     const role = written.seat === "EXTERNAL" ? "VIEWER" : "MEMBER";
-    await this.resumeAdmission({ user, organizationId: org.id, domain, role });
+    await this.resumeAdmission({ user, organizationId: org.id, domain, role: async () => role });
   }
 
   /** Says how they got here for member provenance; the membership stands either way. */
@@ -186,14 +193,15 @@ export class SsoArrivalService {
     user: SsoArrivingUser;
     organizationId: string;
     domain: string;
-    role: "MEMBER" | "VIEWER";
+    /** Asked only once an admission is found pending, since reading the seat costs a query. */
+    role: () => Promise<"MEMBER" | "VIEWER">;
   }): Promise<void> {
     const scope = { organizationId, userId: user.id };
     let read = await this.deps.authz.readPendingAdmission(scope);
     if (!read.pending) return;
 
     if (read.admission.state === "pending") {
-      await this.grantDefaultMembership({ ...scope, ...read.admission, role });
+      await this.grantDefaultMembership({ ...scope, ...read.admission, role: await role() });
       read = await this.deps.authz.readPendingAdmission(scope);
       if (!read.pending) return;
       if (read.admission.state === "pending") throw new AuthzGrantNotConfirmedError();

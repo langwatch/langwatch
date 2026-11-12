@@ -12,6 +12,9 @@ export type BillingSubscriptionRecord = {
   maxMembersLite: number | null;
   maxMessagesPerMonth: number | null;
   lastPaymentFailedDate: Instant | null;
+  /** Seats a decrease leaves usable until `seatsKeptUntil`, the end of the period paid for. */
+  seatsKept: number | null;
+  seatsKeptUntil: Instant | null;
 };
 
 type BillingOrganizationRecord = {

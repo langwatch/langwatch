@@ -34,7 +34,7 @@ Some fields are **keyed**: they only mean something for one evaluation, one meta
 | Trace | `traces.error`, `traces.name`, `traces.origin` | Unkeyed | `{"traces.name": ["checkout"]}` |
 | Metadata | `metadata.user_id`, `metadata.thread_id`, `metadata.customer_id`, `metadata.labels`, `metadata.prompt_ids`, `metadata.key` | Unkeyed | `{"metadata.labels": ["production"]}` |
 | Metadata value | `metadata.value` | Keyed by metadata key | `{"metadata.value": {"plan": ["enterprise"]}}` |
-| Spans | `spans.type`, `spans.model` | Unkeyed | `{"spans.model": ["openai/gpt-5-mini"]}` |
+| Spans | `spans.type`, `spans.model` | Unkeyed | `{"spans.model": ["openai/gpt-6-luna"]}` |
 | Topics | `topics.topics`, `topics.subtopics` | Unkeyed, a list of topic ids | `{"topics.topics": ["<topicId>"]}` |
 | Evaluation present | `evaluations.evaluator_id`, `evaluations.evaluator_id.guardrails_only`, `evaluations.evaluator_id.has_passed`, `evaluations.evaluator_id.has_score`, `evaluations.evaluator_id.has_label` | Unkeyed, a list of monitor ids | `{"evaluations.evaluator_id": ["<monitorId>"]}` |
 | Evaluation result | `evaluations.passed`, `evaluations.score`, `evaluations.label`, `evaluations.state` | Keyed by monitor id | `{"evaluations.passed": {"<monitorId>": ["false"]}}` |

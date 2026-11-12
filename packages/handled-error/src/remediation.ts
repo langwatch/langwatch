@@ -27,6 +27,17 @@ const registry = {
       "Fix those fields and send the request again; retrying it unchanged will fail identically",
     ],
   },
+  projects_required: {
+    tips: [
+      'Send `projects`, a list of the project ids to read, or the string "all" for every project the key can read; the answer\'s `params.dashboard_context_projects` lists what was read',
+      "A key that reads exactly one project, such as a project API key, needs none: it defaults to that project",
+    ],
+  },
+  projects_unreadable: {
+    tips: [
+      "Ask an admin to grant the key's owner `analytics:view` on a project, or use a key that has it",
+    ],
+  },
   malformed_request: {
     tips: [
       "The body could not be parsed at all; check for truncated JSON, a trailing comma, or a Content-Type that does not match what was sent",
@@ -162,12 +173,14 @@ const registry = {
       "Read `meta.parameters`; it lists the reserved names the request set for itself",
       "`dashboard_context_period_start` and `dashboard_context_period_end` are supplied by the surface showing the chart; send `timeWindow: { start, end }` instead and drop them from `parameters`",
       "`dashboard_context_granularity_seconds` is likewise supplied by the surface; drop it from `parameters` and send it as the request's own `granularitySeconds` field instead",
+      "`dashboard_context_sources` and `dashboard_context_projects` are likewise supplied; drop them from `parameters` and send the request's own `sources` and `projects` fields instead",
     ],
   },
   lwql_reserved_parameter_type: {
     tips: [
       "Read `meta.parameters`; it lists the reserved names declared with the wrong type",
-      "Declare each as `DateTime` or `DateTime64`, for example `{dashboard_context_period_start:DateTime}`; the interval they describe is half-open, `>= {dashboard_context_period_start:DateTime} AND < {dashboard_context_period_end:DateTime}`",
+      "Declare each time-window name as `DateTime` or `DateTime64`, for example `{dashboard_context_period_start:DateTime}`; the interval they describe is half-open, `>= {dashboard_context_period_start:DateTime} AND < {dashboard_context_period_end:DateTime}`",
+      "Declare `dashboard_context_sources` and `dashboard_context_projects` as `Array(String)`, for example `{dashboard_context_sources:Array(String)}`",
     ],
   },
   lwql_result_too_large: {
@@ -199,6 +212,12 @@ const registry = {
     tips: [
       "The LangWatchQL feature is not enabled for this project; retrying will not help",
       "Ask an administrator to enable the SQL workbench for this project",
+    ],
+  },
+  lwql_not_provisioned: {
+    tips: [
+      "This organisation's data is on a server LangWatchQL is not provisioned on; retrying will not help",
+      "On a self-hosted install, let the deploy provision the LangWatchQL access model, then retry",
     ],
   },
   custom_chart_playground_not_enabled: {
@@ -241,7 +260,7 @@ const registry = {
   saved_workbench_charts_disabled_for_playground: {
     tips: [
       "The custom-chart-playground is enabled for this project, which turns off saved workbench charts; retrying will not help",
-      "Use the dashboard-widgets skill / `langwatch dashboard-widget` commands instead",
+      "Use the dashboard-widgets skill / `langwatch dashboard widget` commands instead",
     ],
   },
   lwql_unknown_identifier: {
@@ -309,8 +328,18 @@ const registry = {
     tips: ["Revoked keys cannot be reactivated — create a new API key if you need one"],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
+  api_key_expired: {
+    tips: ["An expired key cannot be rotated. Create a new API key instead"],
+    docsPath: "/api-reference/api-keys/create-api-key",
+  },
   api_key_permission_denied: {
     tips: ["Re-create the API key with the required scope, or ask an admin to raise your role"],
+    docsPath: "/api-reference/api-keys/create-api-key",
+  },
+  legacy_project_key_ingestion_only: {
+    tips: [
+      "A legacy project key is limited to ingestion and the scopes enabled for its project; create an API key with the permissions this call needs and send it instead",
+    ],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
   api_key_permission_not_delegable: {
@@ -328,6 +357,12 @@ const registry = {
   project_visibility_too_wide: {
     tips: ["Bind the key to the teams or projects it works with instead of the whole organization"],
     docsPath: "/api-reference/api-keys/create-api-key",
+  },
+  docs_origin_not_registered: {
+    tips: [
+      "Open the playground from a documentation site this installation registers, or paste an API key instead",
+      "A self-hosted installation registers more documentation sites in its configuration",
+    ],
   },
   api_key_reserved_name: {
     tips: [
@@ -414,7 +449,7 @@ const registry = {
   },
   duplicate_invite: {
     tips: [
-      "A pending invite for this email already exists; revoke it first, or treat this as already done",
+      "A pending invite for this email already exists; resend it, revoke it first, or treat this as already done",
     ],
   },
   scim_token_not_found: {
@@ -966,7 +1001,7 @@ const registry = {
   instant_eval_free_budget_exhausted: {
     tips: [
       "Read `meta.spentUsd` against `meta.budgetUsd`; the organization has spent its free Instant Evals allowance across every project",
-      "Upgrade the organization to a paid plan under Settings, Subscription; judged queries and runs are then billed per input token",
+      "Upgrade the organization to a paid plan under Settings, Plan & billing; judged queries and runs are then billed per input token",
     ],
   },
   instant_eval_not_enabled: {
@@ -978,6 +1013,7 @@ const registry = {
   instant_eval_opt_in_not_offered: {
     tips: [
       "Read `meta.deployment`; an enterprise organization is switched on by LangWatch rather than from the search bar, and a self-hosted install gets Instant Evals from a license that names them, or from its operator's RELEASE_INSTANT_EVALS flag when it judges with its own JEV_API_KEY",
+      "When `meta.deployment` is `hosted_off`, LangWatch's hosted model is off for the organization; set an own decision model as the INSTANT_EVALS default model instead",
       "Contact support@langwatch.ai to switch them on, or to add them to the license",
     ],
     docsPath: "/features/instant-evals/limits-and-cost",

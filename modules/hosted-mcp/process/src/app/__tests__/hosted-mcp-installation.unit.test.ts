@@ -9,6 +9,7 @@ import { RawHttpHost } from "@langwatch/api";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { HostedMcpApi } from "@langwatch/hosted-mcp-contract";
 import { createApp, ResourceScope } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
@@ -28,6 +29,7 @@ function process() {
       auth: createApiFixture<AuthApi>(),
       authz: createApiFixture<AuthzApi>(),
       governance: createApiFixture<GovernanceRestApi>(),
+      "feature-flag": createApiFixture<FeatureFlagApi>(),
     });
 }
 
@@ -58,6 +60,7 @@ describe("hosted MCP app installation", () => {
         project: createApiFixture<ProjectApi>(),
         auth: createApiFixture<AuthApi>(),
         governance: createApiFixture<GovernanceRestApi>(),
+        "feature-flag": createApiFixture<FeatureFlagApi>(),
       });
 
     // wrong-typed input: the types already refuse a missing peer; boot must too

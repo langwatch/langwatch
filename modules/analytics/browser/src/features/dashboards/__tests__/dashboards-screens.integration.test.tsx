@@ -143,7 +143,7 @@ describe("the Dashboards screens", () => {
     });
 
     describe("when the member has no My dashboard yet", () => {
-      /** @scenario "AC160b A member with no My dashboard gets one made, starred for them" */
+      /** @scenario "AC160b A member with no My dashboard gets one made, pinned for them" */
       it("makes exactly one and opens it, leaving the star to the server", async () => {
         const server = boardsServer([listed({ id: "team-1", name: "Weekly review" })]);
         const host = hostOpening({ flags: FLAG_ON });
@@ -188,6 +188,26 @@ describe("the Dashboards screens", () => {
 
         expect(await screen.findByRole("heading", { name: "Weekly review" })).toBeInTheDocument();
         expect(screen.queryByText("Default")).toBeNull();
+      });
+    });
+
+    describe("when the member opens a board", () => {
+      /** @scenario "AC3i The Dashboards pages do not point back to the old Analytics" */
+      it("does not ask if they look for the old Analytics", async () => {
+        renderDashboards({
+          element: <DashboardBoardScreen />,
+          host: hostOpening({ dashboardId: "board-1", flags: FLAG_ON }),
+          answer: (call) => {
+            if (call.path === "boards.getAll") return Promise.resolve([listed({ id: "board-1" })]);
+            if (call.path === "boards.listStarred") return Promise.resolve([]);
+            if (call.path === "dashboardWidgets.list") return Promise.resolve([]);
+            return NO_PROCEDURES(call);
+          },
+        });
+
+        expect(await screen.findByRole("heading", { name: "board-1" })).toBeInTheDocument();
+        expect(screen.queryByText(/Looking for the old Analytics/)).toBeNull();
+        expect(screen.queryByRole("link", { name: "Open Analytics" })).toBeNull();
       });
     });
   });

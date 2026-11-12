@@ -27,6 +27,8 @@ type SubscriptionRow = {
   maxMembersLite: number | null;
   maxMessagesPerMonth: number | null;
   lastPaymentFailedDate: Date | null;
+  seatsKept: number | null;
+  seatsKeptUntil: Date | null;
 };
 
 /** The subscription row on the one clock every reader above this file uses. */
@@ -44,6 +46,8 @@ function subscriptionRecordOf(row: SubscriptionRow): BillingSubscriptionRecord {
     maxMembersLite: row.maxMembersLite,
     maxMessagesPerMonth: row.maxMessagesPerMonth,
     lastPaymentFailedDate: row.lastPaymentFailedDate ? fromDate(row.lastPaymentFailedDate) : null,
+    seatsKept: row.seatsKept,
+    seatsKeptUntil: row.seatsKeptUntil ? fromDate(row.seatsKeptUntil) : null,
   };
 }
 

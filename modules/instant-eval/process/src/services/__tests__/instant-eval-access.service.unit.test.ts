@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   type InstantEvalFlagReader,
+  type InstantEvalHostedSwitchReader,
   InstantEvalAccessService,
   type InstantEvalOptInReader,
   type InstantEvalPlanReader,
@@ -31,20 +32,25 @@ const LOUD_FLAGS: InstantEvalFlagReader = {
 
 const NEVER_OPTED_IN: InstantEvalOptInReader = { isOptedIn: async () => false };
 
+const NOT_OFF: InstantEvalHostedSwitchReader = { isHostedOff: async () => false };
+
 function gate({
   isJudgeConfigured,
   flags = LOUD_FLAGS,
   projects = LOUD_PROJECTS,
   optIns = NEVER_OPTED_IN,
   hostedPlans,
+  hostedSwitch = NOT_OFF,
 }: {
   isJudgeConfigured: () => boolean;
   flags?: InstantEvalFlagReader;
   projects?: InstantEvalProjectReader;
   optIns?: InstantEvalOptInReader;
   hostedPlans: InstantEvalPlanReader | null;
+  hostedSwitch?: InstantEvalHostedSwitchReader;
 }) {
   return InstantEvalAccessService.create({
+    hostedSwitch,
     flags,
     projects,
     optIns,
@@ -141,6 +147,7 @@ describe("given a judge that judges for some organizations and not others", () =
     it("answers no, so the eval functions read as unavailable rather than skipped", async () => {
       const asked: string[] = [];
       const access = InstantEvalAccessService.create({
+        hostedSwitch: NOT_OFF,
         flags: released,
         projects,
         optIns: NEVER_OPTED_IN,
@@ -163,6 +170,7 @@ describe("given a judge that judges for some organizations and not others", () =
   describe("when the organization has it on", () => {
     it("goes on to the release flag", async () => {
       const access = InstantEvalAccessService.create({
+        hostedSwitch: NOT_OFF,
         flags: released,
         projects,
         optIns: NEVER_OPTED_IN,
@@ -310,6 +318,7 @@ describe("given a self-hosted install that judges through LangWatch, with the re
     /** @scenario "A license that names Instant Evals releases them without the flag" */
     it("may judge, from the license, without reading the organization's switch", async () => {
       const access = InstantEvalAccessService.create({
+        hostedSwitch: NOT_OFF,
         flags: flagOff,
         projects,
         judgesThroughConnect: true,
@@ -328,6 +337,7 @@ describe("given a self-hosted install that judges through LangWatch, with the re
     /** @scenario "The release flag does not release a self-hosted install without a license" */
     it("may not judge, without reading the flag or the organization's switch", async () => {
       const access = InstantEvalAccessService.create({
+        hostedSwitch: NOT_OFF,
         flags: LOUD_FLAGS,
         projects,
         judgesThroughConnect: true,
@@ -346,6 +356,7 @@ describe("given a self-hosted install that judges through LangWatch, with the re
     /** @scenario "An admin who switched hosted judging off keeps it off" */
     it("may not judge", async () => {
       const access = InstantEvalAccessService.create({
+        hostedSwitch: NOT_OFF,
         flags: flagOff,
         projects,
         judgesThroughConnect: true,
@@ -361,9 +372,64 @@ describe("given a self-hosted install that judges through LangWatch, with the re
   });
 });
 
+describe("given a self-hosted install with no license, no classifier and the release flag off", () => {
+  const unlicensed = ({ runsOnOwnModel }: { runsOnOwnModel: boolean }) =>
+    InstantEvalAccessService.create({
+      hostedSwitch: NOT_OFF,
+      flags: { isEnabled: async () => false },
+      projects: { findOrganizationId: async () => "organization-1" },
+      judgesThroughConnect: true,
+      optIns: NEVER_OPTED_IN,
+      isJudgeConfigured: () => false,
+      hostedPlans: null,
+      judge: { isAvailableForOrganization: async () => false },
+      ownModels: { runsOnOwnModel: async () => runsOnOwnModel },
+    });
+
+  describe("when the project's Instant Evals column is its own decision model, ready to run", () => {
+    /** @scenario "An own decision model releases Instant Evals without the flag or a license" */
+    it("may judge, while LangWatch's own model stays unreleased", async () => {
+      const access = InstantEvalAccessService.create({
+        hostedSwitch: NOT_OFF,
+        flags: LOUD_FLAGS,
+        projects: { findOrganizationId: async () => "organization-1" },
+        judgesThroughConnect: true,
+        optIns: NEVER_OPTED_IN,
+        isJudgeConfigured: () => {
+          throw new Error("the gate read the classifier");
+        },
+        hostedPlans: null,
+        judge: {
+          isAvailableForOrganization: () => {
+            throw new Error("the gate read the license");
+          },
+        },
+        ownModels: { runsOnOwnModel: async () => true },
+      });
+
+      await expect(access.isReleased({ projectId: "project-1" })).resolves.toBe(true);
+      await expect(access.isEnabled({ projectId: "project-1" })).resolves.toBe(true);
+      await expect(
+        unlicensed({ runsOnOwnModel: true }).isHostedReleased({ projectId: "project-1" }),
+      ).resolves.toBe(false);
+    });
+  });
+
+  describe("when its own decision model has no usable key", () => {
+    /** @scenario "An own decision model that cannot run releases nothing" */
+    it("may not judge", async () => {
+      const access = unlicensed({ runsOnOwnModel: false });
+
+      await expect(access.isReleased({ projectId: "project-1" })).resolves.toBe(false);
+      await expect(access.isEnabled({ projectId: "project-1" })).resolves.toBe(false);
+    });
+  });
+});
+
 /** A development checkout with no classifier: it judges, but not through LangWatch. */
 function devCheckout({ flagOn }: { flagOn: boolean }) {
   return InstantEvalAccessService.create({
+    hostedSwitch: NOT_OFF,
     flags: { isEnabled: async () => flagOn },
     projects: { findOrganizationId: async () => "organization-1" },
     judgesThroughConnect: false,
@@ -392,6 +458,115 @@ describe("given a development checkout", () => {
       const access = devCheckout({ flagOn: false });
 
       await expect(access.isReleased({ projectId: "project-1" })).resolves.toBe(false);
+    });
+  });
+});
+
+describe("given an organization LangWatch switched its hosted model off for", () => {
+  const OFF: InstantEvalHostedSwitchReader = { isHostedOff: async () => true };
+  const inOrganization: InstantEvalProjectReader = {
+    findOrganizationId: async () => "organization-1",
+  };
+  const LOUD_SWITCH: InstantEvalHostedSwitchReader = {
+    isHostedOff: () => {
+      throw new Error("the gate read the hosted switch");
+    },
+  };
+
+  describe("when it is a self-serve organization that switched Instant Evals on", () => {
+    /** @scenario "A self-serve organization with hosted switched off is not released by its own switch" */
+    it("may not judge, and LangWatch's own model is not released", async () => {
+      const asked: { projectId: string; organizationId: string }[] = [];
+      const access = gate({
+        isJudgeConfigured: () => true,
+        projects: inOrganization,
+        hostedPlans: { isEnterprisePlan: async () => false },
+        optIns: { isOptedIn: async () => true },
+        hostedSwitch: {
+          isHostedOff: async (input) => {
+            asked.push(input);
+            return true;
+          },
+        },
+      });
+
+      await expect(access.isEnabled({ projectId: "project-1" })).resolves.toBe(false);
+      await expect(access.isReleased({ projectId: "project-1" })).resolves.toBe(false);
+      await expect(access.isHostedReleased({ projectId: "project-1" })).resolves.toBe(false);
+      expect(asked[0]).toEqual({ projectId: "project-1", organizationId: "organization-1" });
+    });
+  });
+
+  describe("when it is an enterprise organization with the release flag on", () => {
+    /** @scenario "An enterprise organization with hosted switched off is not released by the release flag" */
+    it("may not judge, and LangWatch's own model is not released", async () => {
+      const access = gate({
+        isJudgeConfigured: () => true,
+        flags: { isEnabled: async () => true },
+        projects: inOrganization,
+        hostedPlans: { isEnterprisePlan: async () => true },
+        hostedSwitch: OFF,
+      });
+
+      await expect(access.isEnabled({ projectId: "project-1" })).resolves.toBe(false);
+      await expect(access.isHostedReleased({ projectId: "project-1" })).resolves.toBe(false);
+    });
+  });
+
+  describe("when it is a self-hosted install whose license names Instant Evals", () => {
+    /** @scenario "An install judging through LangWatch with hosted switched off is not released by its license" */
+    it("may not judge", async () => {
+      const access = InstantEvalAccessService.create({
+        hostedSwitch: OFF,
+        flags: { isEnabled: async () => true },
+        projects: inOrganization,
+        judgesThroughConnect: true,
+        optIns: NEVER_OPTED_IN,
+        isJudgeConfigured: () => true,
+        hostedPlans: null,
+        judge: { isAvailableForOrganization: async () => true },
+      });
+
+      await expect(access.isEnabled({ projectId: "project-1" })).resolves.toBe(false);
+      await expect(access.isReleased({ projectId: "project-1" })).resolves.toBe(false);
+    });
+  });
+
+  describe("when the project's Instant Evals column is its own decision model, ready to run", () => {
+    /** @scenario "An own decision model still runs for an organization with hosted switched off" */
+    it("may judge, without reading the hosted switch, while LangWatch's model stays unreleased", async () => {
+      const ownModel = (hostedSwitch: InstantEvalHostedSwitchReader) =>
+        InstantEvalAccessService.create({
+          hostedSwitch,
+          flags: { isEnabled: async () => true },
+          projects: inOrganization,
+          optIns: { isOptedIn: async () => true },
+          isJudgeConfigured: () => true,
+          hostedPlans: { isEnterprisePlan: async () => false },
+          ownModels: { runsOnOwnModel: async () => true },
+        });
+
+      await expect(ownModel(LOUD_SWITCH).isEnabled({ projectId: "project-1" })).resolves.toBe(true);
+      await expect(ownModel(LOUD_SWITCH).isReleased({ projectId: "project-1" })).resolves.toBe(
+        true,
+      );
+      await expect(ownModel(OFF).isHostedReleased({ projectId: "project-1" })).resolves.toBe(false);
+    });
+  });
+});
+
+describe("given a self-serve organization LangWatch did not switch its hosted model off for", () => {
+  describe("when it switched Instant Evals on", () => {
+    /** @scenario "With the hosted switch off for nobody, the plan still decides" */
+    it("may judge, from its own switch", async () => {
+      const access = gate({
+        isJudgeConfigured: () => true,
+        projects: { findOrganizationId: async () => "organization-1" },
+        hostedPlans: { isEnterprisePlan: async () => false },
+        optIns: { isOptedIn: async () => true },
+      });
+
+      await expect(access.isEnabled({ projectId: "project-1" })).resolves.toBe(true);
     });
   });
 });

@@ -58,7 +58,7 @@ curl https://openrouter.ai/api/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $OPENROUTER_API_KEY" \
   -d '{
-    "model": "openai/gpt-5-mini",
+    "model": "openai/gpt-6-luna",
     "messages": [{ "role": "user", "content": "Hello from OpenRouter" }]
   }'
 ```
@@ -108,7 +108,7 @@ Example request body:
 
 ```json
 {
-  "model": "openai/gpt-5-mini",
+  "model": "openai/gpt-6-luna",
   "messages": [{ "role": "user", "content": "Hello!" }],
   "user": "user_12345",
   "session_id": "session_abc",

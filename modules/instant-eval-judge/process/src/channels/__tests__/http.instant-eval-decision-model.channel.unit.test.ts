@@ -65,14 +65,29 @@ describe("HttpInstantEvalDecisionModelChannel", () => {
         .intercept({ path: PATH, method: "POST" })
         .reply(200, {
           answers: { annoyed: { type: "noul", noul: 0.8 } },
-          usage: { input_tokens: 99 },
+          usage: { input_tokens: 99, output_tokens: 5 },
         });
 
       const judgement = await classify();
 
       expect(judgement.verdicts).toEqual([{ questionId: "annoyed", probability: 0.8 }]);
       expect(judgement.inputTokens).toBe(0);
+      expect(judgement.outputTokens).toBeUndefined();
       expect(judgement.skippedReason).toBeUndefined();
+    });
+
+    it("hands the provider's own tokens back for the spend ledger", async () => {
+      agent
+        .get(ORIGIN)
+        .intercept({ path: PATH, method: "POST" })
+        .reply(200, {
+          answers: { annoyed: { type: "noul", noul: 0.8 } },
+          usage: { input_tokens: 99, output_tokens: 5 },
+        });
+
+      const judgement = await classify();
+
+      expect(judgement.providerUsage).toEqual({ inputTokens: 99, outputTokens: 5 });
     });
 
     it("sends the organization's key", async () => {
@@ -88,6 +103,76 @@ describe("HttpInstantEvalDecisionModelChannel", () => {
       await classify();
 
       expect(authorization).toBe("Bearer customer-key");
+    });
+
+    /** @scenario "An Azure decision model is sent to the project's own Azure resource" */
+    it("sends an Azure key in the api-key header and never as a bearer token", async () => {
+      const azureOrigin = "https://acme.openai.azure.com";
+      const azurePath = "/openai/v1/decisions";
+      let headers: Record<string, string> = {};
+      agent
+        .get(azureOrigin)
+        .intercept({ path: azurePath, method: "POST" })
+        .reply(200, (request) => {
+          headers = request.headers as Record<string, string>;
+          return { answers: [{ type: "predicate", name: "annoyed", probability: 0.7 }] };
+        });
+
+      const judgement = await channel().classify({
+        text: "I am fed up",
+        questions: [QUESTION],
+        decisionModel: {
+          model: "azure/decisions:gpt-6-luna",
+          wire: "openai_decisions",
+          providerModel: "gpt-6-luna",
+          endpoint: `${azureOrigin}${azurePath}`,
+          authHeader: "api_key",
+          apiKey: "azure-key",
+        },
+      });
+
+      expect(headers["api-key"]).toBe("azure-key");
+      expect(headers.authorization).toBeUndefined();
+      expect(judgement.verdicts).toEqual([{ questionId: "annoyed", probability: 0.7 }]);
+    });
+  });
+
+  describe("when the provider redirects elsewhere", () => {
+    /** @scenario "An Azure key is never sent to a host outside Azure" */
+    it("does not follow the redirect, so the key never leaves for the new host", async () => {
+      const azureOrigin = "https://acme.openai.azure.com";
+      const azurePath = "/openai/v1/decisions";
+      let elsewhereHits = 0;
+      agent
+        .get(azureOrigin)
+        .intercept({ path: azurePath, method: "POST" })
+        .reply(307, "", { headers: { location: "https://elsewhere.example/collect" } })
+        .persist();
+      agent
+        .get("https://elsewhere.example")
+        .intercept({ path: "/collect", method: "POST" })
+        .reply(200, () => {
+          elsewhereHits += 1;
+          return { answers: [] };
+        })
+        .persist();
+
+      const judgement = await channel().classify({
+        text: "I am fed up",
+        questions: [QUESTION],
+        decisionModel: {
+          model: "azure/decisions:gpt-6-luna",
+          wire: "openai_decisions",
+          providerModel: "gpt-6-luna",
+          endpoint: `${azureOrigin}${azurePath}`,
+          authHeader: "api_key",
+          apiKey: "azure-key",
+        },
+      });
+
+      expect(elsewhereHits).toBe(0);
+      expect(judgement.verdicts).toEqual([]);
+      expect(judgement.skippedReason).toBeDefined();
     });
   });
 

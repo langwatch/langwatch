@@ -2,7 +2,7 @@ import { grantConditionSchema, ledgerActorSchema } from "@langwatch/authorizatio
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-import { PROJECT_READER_ROLE_KEY } from "./roles.ts";
+import { BILLING_ROLE_KEY, PROJECT_READER_ROLE_KEY } from "./roles.ts";
 
 export const AUTHZ_ENGINE_MIGRATION_NAME = "authz-engine" as const;
 
@@ -66,6 +66,7 @@ export const GRANT_EVENT_SOURCES = [
   "read-through-mint",
   "migration",
   "aggregate-reconciler",
+  "checkout",
   "braid",
 ] as const;
 /** ADR-185 §1: a braid's grant, a `span` read from the owner project to the reader project. */
@@ -113,13 +114,7 @@ export const grantShapeRefinement = {
     if (isResourceScope && grant.expiresAtMs !== undefined) return false;
     const isOwnProjectCredential =
       grant.scope.type === "PROJECT" && grant.principal.id === grant.scope.id;
-    const isSharedProjectRead =
-      grant.principal.type === "project" &&
-      grant.scope.type === "PROJECT" &&
-      grant.principal.id !== grant.scope.id &&
-      grant.roleKey === PROJECT_READER_ROLE_KEY &&
-      grant.condition !== undefined &&
-      sharedConditionIsLegal({ condition: grant.condition, source: grant.source });
+    const isSharedProjectRead = isLegalSharedProjectRead(grant);
     if (grant.source === GRANT_SOURCE_BRAID && !isSharedProjectRead) return false;
     if (
       grant.principal.type === "project" &&
@@ -131,15 +126,44 @@ export const grantShapeRefinement = {
     }
     if ((grant.condition !== undefined) !== isSharedProjectRead) return false;
     if ((grant.roleKey === PROJECT_READER_ROLE_KEY) !== isSharedProjectRead) return false;
+    if (!billingRoleIsLegal(grant)) return false;
     return (
       isResourceScope === (grant.resource !== undefined) &&
       isResourceScope === (grant.roleKey === null)
     );
   },
   message:
-    "a RESOURCE grant carries resource terms and a null roleKey, every other scope carries a roleKey and no resource terms; a RESOURCE grant states its expiry inside those terms and never as the grant's own `expiresAtMs`; `anyone` principals exist only at RESOURCE scope, a `project` principal exists at RESOURCE scope, as its own project's credential (a PROJECT scope whose id is the principal's), or as a `project-reader` on another project's PROJECT scope carrying a non-span condition with an empty where, or, from a braid alone, a span condition whose where carries its compiled form; only that shared read carries a condition or the `project-reader` role, and a braid is only that shared span read; only a braid names the grant it replaces",
+    "a RESOURCE grant carries resource terms and a null roleKey, every other scope carries a roleKey and no resource terms; a RESOURCE grant states its expiry inside those terms and never as the grant's own `expiresAtMs`; `anyone` principals exist only at RESOURCE scope, a `project` principal exists at RESOURCE scope, as its own project's credential (a PROJECT scope whose id is the principal's), or as a `project-reader` on another project's PROJECT scope carrying a non-span condition with an empty where, or, from a braid alone, a span condition whose where carries its compiled form; only that shared read carries a condition or the `project-reader` role, and a braid is only that shared span read; only a braid names the grant it replaces; the `billing` role is held by a user at ORGANIZATION scope only",
   path: ["resource"] as const,
 };
+
+/** A `project-reader` read of another project, carrying a condition its source may write. */
+function isLegalSharedProjectRead(grant: {
+  principal: { type: string; id: string | null };
+  roleKey: string | null;
+  scope: { type: string; id: string };
+  source?: string;
+  condition?: { type?: string; where?: string; compiledWhere?: unknown };
+}): boolean {
+  return (
+    grant.principal.type === "project" &&
+    grant.scope.type === "PROJECT" &&
+    grant.principal.id !== grant.scope.id &&
+    grant.roleKey === PROJECT_READER_ROLE_KEY &&
+    grant.condition !== undefined &&
+    sharedConditionIsLegal({ condition: grant.condition, source: grant.source })
+  );
+}
+
+/** Billing is a person's, held on their organization alone. */
+function billingRoleIsLegal(grant: {
+  principal: { type: string };
+  roleKey: string | null;
+  scope: { type: string };
+}): boolean {
+  if (grant.roleKey !== BILLING_ROLE_KEY) return true;
+  return grant.principal.type === "user" && grant.scope.type === "ORGANIZATION";
+}
 
 /**
  * Only a braid writes a span condition, so no other writer makes a braid without the braid

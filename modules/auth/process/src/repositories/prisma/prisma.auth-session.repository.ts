@@ -91,6 +91,27 @@ export class PrismaAuthSessionRepository
     return rows.length;
   }
 
+  /** `updatedAt` rolls once a day while a session is used; `lastSeenAt` is finer where set. */
+  async findSessionUsersSince({
+    userIds,
+    since,
+  }: {
+    userIds: readonly string[];
+    since: number;
+  }): Promise<string[]> {
+    if (userIds.length === 0) return [];
+    const after = new Date(since);
+    const rows = await this.prisma.session.findMany({
+      where: {
+        userId: { in: [...userIds] },
+        OR: [{ updatedAt: { gte: after } }, { lastSeenAt: { gte: after } }],
+      },
+      select: { userId: true },
+      distinct: ["userId"],
+    });
+    return rows.map((row) => row.userId);
+  }
+
   async findById({ id }: { id: string }): Promise<StoredBrowserSession | null> {
     const row = await this.prisma.session.findUnique({ where: { id }, select: sessionSelect });
 

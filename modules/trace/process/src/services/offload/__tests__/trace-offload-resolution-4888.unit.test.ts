@@ -39,6 +39,7 @@ import {
   BlobNotFoundError,
 } from "../../../features/media/services/trace-blob-store.service.ts";
 import {
+  eventLogReads,
   blobStoreReading,
   blobStoreResolving,
   blobStoreWithoutClickHouse,
@@ -258,7 +259,7 @@ describe("TraceOffloadResolutionService.create().resolveOffloadedTraces() — AC
     });
 
     describe("when resolved", () => {
-      it("getFromEventLog is called exactly once (resolution attempted)", async () => {
+      it("the event_log is read exactly once (resolution attempted)", async () => {
         const blobSvc = blobStoreResolving({ [attrKey]: fullValue });
         const logger = createMockLogger();
 
@@ -270,7 +271,7 @@ describe("TraceOffloadResolutionService.create().resolveOffloadedTraces() — AC
           logger,
         });
 
-        expect(blobSvc.getFromEventLog).toHaveBeenCalledTimes(1);
+        expect(eventLogReads(blobSvc)).toHaveBeenCalledTimes(1);
       });
 
       it("no key with prefix 'langwatch.reserved.' remains in returned span attributes", async () => {
@@ -321,7 +322,7 @@ describe("TraceOffloadResolutionService.create().resolveOffloadedTraces() — AC
     });
 
     describe("when resolved with any caller opts", () => {
-      it("getFromEventLog is called 0 times", async () => {
+      it("the event_log is read 0 times", async () => {
         const blobSvc = blobStoreResolving({});
         const logger = createMockLogger();
 
@@ -333,7 +334,7 @@ describe("TraceOffloadResolutionService.create().resolveOffloadedTraces() — AC
           logger,
         });
 
-        expect(blobSvc.getFromEventLog).toHaveBeenCalledTimes(0);
+        expect(eventLogReads(blobSvc)).toHaveBeenCalledTimes(0);
       });
 
       it("returns spans unchanged (same object reference)", async () => {
@@ -405,7 +406,7 @@ describe("TraceOffloadResolutionService.create().resolveOffloadedTraces() — AC
   });
 
   // --- BlobNotFoundError ---
-  describe("given getFromEventLog throws BlobNotFoundError", () => {
+  describe("given the event_log read throws BlobNotFoundError", () => {
     function blobNotFoundStore(): TraceBlobStoreService {
       return blobStoreReading(async () => {
         throw new BlobNotFoundError("evt-fail", attrKey, "proj-1");
@@ -467,7 +468,7 @@ describe("TraceOffloadResolutionService.create().resolveOffloadedTraces() — AC
   });
 
   // --- BlobFieldNotFoundError ---
-  describe("given getFromEventLog throws BlobFieldNotFoundError", () => {
+  describe("given the event_log read throws BlobFieldNotFoundError", () => {
     function blobFieldNotFoundStore(): TraceBlobStoreService {
       return blobStoreReading(async () => {
         throw new BlobFieldNotFoundError("evt-fail", attrKey);
@@ -515,7 +516,7 @@ describe("TraceOffloadResolutionService.create().resolveOffloadedTraces() — AC
   });
 
   // --- CH-unconfigured (generic Error: "ClickHouseClient not configured") ---
-  describe("given getFromEventLog throws because ClickHouseClient is not configured", () => {
+  describe("given the event_log read throws because ClickHouseClient is not configured", () => {
     describe("when resolved", () => {
       it("does not throw", async () => {
         const logger = createMockLogger();
@@ -630,19 +631,10 @@ describe("TraceOffloadResolutionService.create().resolveOffloadedTraces() — AC
     });
 
     function partialBlobStore(): TraceBlobStoreService {
-      return blobStoreReading(
-        async ({
-          field,
-        }: {
-          eventId: string;
-          field: string;
-          tenantId: string;
-          aggregateId: string;
-        }) => {
-          if (field === attrA) return fullValue;
-          throw new BlobNotFoundError("evt-b", field, "proj-1");
-        },
-      );
+      return blobStoreReading(async ({ field }) => {
+        if (field === attrA) return fullValue;
+        throw new BlobNotFoundError("evt-b", field, "proj-1");
+      });
     }
 
     describe("when resolved", () => {

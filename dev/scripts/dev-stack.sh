@@ -152,6 +152,11 @@ if [ -z "${LW_GATEWAY_PUBLIC_URL:-}" ]; then
 fi
 echo "  ✓ gateway: port=${GATEWAY_PORT} cp=${GATEWAY_CONTROL_PLANE_URL} public=${LW_GATEWAY_PUBLIC_URL}"
 
+# The seeded local key (sk-lw-local-development-key) is a legacy project key,
+# which off this flag may only ingest. Local scripts call prompts and datasets
+# with it, so a dev stack keeps full access unless .env says otherwise.
+export LEGACY_PROJECT_KEY_FULL_ACCESS="${LEGACY_PROJECT_KEY_FULL_ACCESS:-1}"
+
 RUNTIME_ENV="DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true"
 
 # The quiet window every restart-on-change lane waits out before it acts. An

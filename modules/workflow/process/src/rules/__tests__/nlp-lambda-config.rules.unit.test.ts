@@ -3,6 +3,7 @@
  * and the code-block ceiling every per-project function is created with.
  *
  * @see modules/workflow/specs/studio-lambda-stream.feature
+ * @see specs/nlp-go/studio-lambda-cache.feature
  */
 import { describe, expect, it } from "vitest";
 
@@ -11,6 +12,7 @@ import {
   buildStudioLambdaConfig,
   buildStudioLambdaEnvironment,
   clampCodeBlockTimeoutSeconds,
+  studioLambdaRolloutStanding,
   type StudioLambdaFleetFields,
 } from "../nlp-lambda-config.rules.ts";
 
@@ -79,5 +81,33 @@ describe("given a deployment that fronts the studio engine with a Lambda fleet",
         NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_DEFAULT_SECONDS,
       );
     });
+  });
+});
+
+describe("where a pod's image stands against a function's recorded order", () => {
+  const standing = (ours: number | undefined, tag: string | undefined) =>
+    studioLambdaRolloutStanding({
+      ours,
+      tags: tag === undefined ? {} : { ImageOrder: tag },
+      tagsUnreadable: false,
+    });
+
+  /** @scenario "An ImageOrder tag that is not a whole number counts as no order" */
+  it("reads a tag that is not a whole number as no order, so the pod is ahead", () => {
+    expect(standing(200, "abc")).toBe("ahead");
+    expect(standing(200, "1.5")).toBe("ahead");
+    expect(standing(200, "")).toBe("ahead");
+    expect(standing(200, "-1")).toBe("ahead");
+  });
+
+  /** @scenario "An ImageOrder tag that is not a whole number counts as no order" */
+  it("compares a whole-number tag with the pod's order", () => {
+    expect(standing(200, "100")).toBe("ahead");
+    expect(standing(200, "200")).toBe("level");
+    expect(standing(200, "300")).toBe("behind");
+    expect(standing(undefined, "300")).toBe("unordered");
+    expect(studioLambdaRolloutStanding({ ours: 200, tags: undefined, tagsUnreadable: true })).toBe(
+      "unknown",
+    );
   });
 });
