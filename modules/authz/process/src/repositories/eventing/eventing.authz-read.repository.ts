@@ -356,8 +356,20 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
   }): Promise<SharedReadRow[]> => {
     const rows = (await liveGrants(this.database).findMany({
       where: sharedProjectReadsOf({ organizationId, readerProjectId }),
-      select: { id: true, scopeId: true, condition: true, expiresAt: true },
-    })) as { id: string; scopeId: string; condition: unknown; expiresAt: unknown }[];
+      select: {
+        id: true,
+        scopeId: true,
+        condition: true,
+        expiresAt: true,
+        replacesGrantId: true,
+      },
+    })) as {
+      id: string;
+      scopeId: string;
+      condition: unknown;
+      expiresAt: unknown;
+      replacesGrantId: string | null;
+    }[];
     return rows.flatMap((row) => {
       const condition = grantConditionSchema.safeParse(row.condition);
       if (!condition.success) return [];
@@ -367,6 +379,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
           memberProjectId: row.scopeId,
           condition: condition.data,
           expiresAt: row.expiresAt instanceof Date ? fromDate(row.expiresAt) : null,
+          ...(row.replacesGrantId === null ? {} : { replacesGrantId: row.replacesGrantId }),
         },
       ];
     });

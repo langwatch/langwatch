@@ -400,6 +400,31 @@ describe("AuthzBraidService", () => {
       expect((await service.listBraids({ projectId: OWNER })).intoOtherProjects).toHaveLength(1);
       expect((await service.listBraids({ projectId: READER })).fromOtherProjects).toHaveLength(1);
     });
+
+    /** @scenario "A replaced braid reads nothing once its replacement is live, even before the worker revokes it" */
+    it("lists only the replacement of a changed braid while the worker's revoke is pending", async () => {
+      const { create, service } = setup();
+      const braid = await create({ where: 'name == "a"' });
+      const changed = await service.changeBraid({
+        projectId: OWNER,
+        readerProjectId: READER,
+        braidId: braid.braidId,
+        where: 'name == "b"',
+        fromMs: FROM_MS,
+        actor: ANA,
+        caller: CALLER,
+      });
+
+      const listed = [
+        (await service.listBraids({ projectId: OWNER })).intoOtherProjects,
+        (await service.listBraids({ projectId: READER })).fromOtherProjects,
+        await service.listOrganizationBraids({ organizationId: ORG }),
+      ];
+
+      for (const braids of listed) {
+        expect(braids.map((each) => each.braidId)).toEqual([changed.braidId]);
+      }
+    });
   });
 });
 

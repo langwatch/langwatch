@@ -58,12 +58,14 @@ function ledger({ now }: { now: () => number }) {
     reader,
     condition,
     expiresAtMs,
+    replacesGrantId,
   }: {
     id: string;
     owner: string;
     reader: string;
     condition: GrantCondition;
     expiresAtMs?: number;
+    replacesGrantId?: string;
   }) =>
     projection.append({
       kind: "grant.upsert",
@@ -87,6 +89,7 @@ function ledger({ now }: { now: () => number }) {
         scopeType: "PROJECT",
         scopeId: owner,
         condition,
+        ...(replacesGrantId === undefined ? {} : { replacesGrantId }),
       },
     });
   const door = AuthorizationService.create({
@@ -298,6 +301,33 @@ describe("the proof a reader's trace read carries", () => {
         });
         expect(own?.permissions).not.toContain(SPAN_BRAID_PERMISSION);
       }
+    });
+  });
+
+  describe("given a braid changed to a narrower condition whose old grant the worker has not yet revoked", () => {
+    /** @scenario "A replaced braid reads nothing once its replacement is live, even before the worker revokes it" */
+    it("carries only the replacement, so the narrowing holds from the moment it is live", async () => {
+      const { braid, mint } = ledger({ now: () => Date.parse("2026-10-20T00:00:00Z") });
+      await braid({
+        id: "grant_wide",
+        owner: SPECIALISTS,
+        reader: ORCHESTRATOR,
+        condition: spanCondition({}),
+      });
+      await braid({
+        id: "grant_narrowed",
+        owner: SPECIALISTS,
+        reader: ORCHESTRATOR,
+        condition: spanCondition({ where: WEB }),
+        replacesGrantId: "grant_wide",
+      });
+
+      const proof = await mint(ORCHESTRATOR);
+
+      expect(proof.grants.map(({ via, condition }) => ({ via, where: condition?.where }))).toEqual([
+        { via: [], where: undefined },
+        { via: ["grant_narrowed"], where: WEB },
+      ]);
     });
   });
 

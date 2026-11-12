@@ -347,6 +347,14 @@ Feature: Braids
       And no third grant is attached
 
     @unit
+    Scenario: A replaced braid reads nothing once its replacement is live, even before the worker revokes it
+      Given a braid from "specialists" into "orchestrator" changed to a narrower condition
+      And the worker has not yet revoked the replaced grant
+      When "orchestrator" reads a trace
+      Then its proof carries the replacement braid alone
+      And the braid list shows the replacement alone
+
+    @unit
     Scenario: A change that would make a braid identical to another live braid is refused
       Given two live braids from "specialists" into "orchestrator" with different conditions
       When ana changes one braid's condition to the other's

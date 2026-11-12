@@ -258,9 +258,9 @@ export class AuthorizationService {
 }
 
 /**
- * One shared grant per applicable row, and the earliest expiry among them
- * under the ceiling. A row that cannot be applied - a where clause, an
- * expired grant, the reader naming itself - is left out.
+ * One shared grant per applicable row, and the earliest expiry among them under the ceiling. A
+ * row that cannot be applied - a where clause, an expired grant, the reader naming itself, a
+ * braid a live row replaces whether or not the worker has revoked it (ADR-201 §2) - is left out.
  */
 function sharedGrantsFrom({
   rows,
@@ -275,10 +275,12 @@ function sharedGrantsFrom({
 }): { shared: AuthorizationGrant[]; expiresAt: number } {
   const shared: AuthorizationGrant[] = [];
   let expiresAt = now + AUTHORIZATION_MAX_AGE_MS;
+  const replaced = new Set(rows.map((row) => row.replacesGrantId));
   for (const row of rows) {
     const condition = proofCondition(row.condition);
     const expiry = row.expiresAt?.epochMilliseconds;
     const applicable =
+      !replaced.has(row.grantId) &&
       row.memberProjectId !== readerProjectId &&
       condition !== "not_applicable" &&
       (expiry === undefined || expiry > now);

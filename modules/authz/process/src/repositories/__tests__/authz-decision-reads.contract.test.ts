@@ -768,6 +768,42 @@ describe.each(backends)("given the decision reads on the $name backend", (backen
       );
     });
   });
+
+  describe.skipIf(backend.skip)("when a reader project's live shared reads are read", () => {
+    it("reads which braid a change replaced, and none on a braid attached before", async () => {
+      const fixture = await open();
+      const { organizationId } = fixture;
+      const readerProjectId = id("project");
+      const condition = { type: "span", from: "2026-10-01T00:00:00.000Z" };
+      const braid = (input: Partial<GrantRowShape>) =>
+        grantRow({
+          organizationId,
+          principalType: "PROJECT",
+          principalId: readerProjectId,
+          roleKey: "project-reader",
+          source: "braid",
+          scopeType: "PROJECT",
+          scopeId: "owner_project",
+          condition,
+          ...input,
+        });
+      const older = braid({});
+      const changed = braid({ replacesGrantId: older.id, occurredAt: at(T0 + 1) });
+      await attach(fixture, older);
+      await attach(fixture, changed);
+
+      const rows = await fixture.repositories.read.findLiveSharedReads({
+        organizationId,
+        readerProjectId,
+      });
+
+      expect(rows.map((row) => row.grantId).toSorted()).toEqual([older.id, changed.id].toSorted());
+      expect(rows.find((row) => row.grantId === older.id)).not.toHaveProperty("replacesGrantId");
+      expect(rows.find((row) => row.grantId === changed.id)).toMatchObject({
+        replacesGrantId: older.id,
+      });
+    });
+  });
 });
 
 describe.each(backends)("given the access listings on the $name backend", (backend) => {

@@ -94,7 +94,8 @@ export interface GrantRowShape {
 
 /**
  * The columns a {@link GrantRowShape} holds, for a read that feeds one. `replacesGrantId` is left
- * out: on this release the fold writes it and nothing reads it back (ADR-201 §2).
+ * out: the reads that need it select it themselves, the minter's shared reads and the braid
+ * list (ADR-201 §2).
  */
 export const GRANT_ROW_COLUMNS = {
   id: true,

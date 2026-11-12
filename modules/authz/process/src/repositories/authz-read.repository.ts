@@ -72,12 +72,14 @@ export type AuthzDatabase = Readonly<{
   group: FindManyDelegate;
 }>;
 
-/** One shared read as the minter needs it: the grant, the member project and its window. */
+/** One shared read as the minter needs it: the grant, the member project and its window, and
+ *  the braid a change replaced, absent on every other grant (ADR-201 §2). */
 export type SharedReadRow = {
   grantId: string;
   memberProjectId: string;
   condition: GrantCondition;
   expiresAt: Instant | null;
+  replacesGrantId?: string;
 };
 
 /**

@@ -241,6 +241,7 @@ export class MemoryAuthzReadRepository extends AuthzReadRepository {
           memberProjectId: row.scopeId,
           condition: condition.data,
           expiresAt: row.expiresAt,
+          ...(row.replacesGrantId ? { replacesGrantId: row.replacesGrantId } : {}),
         },
       ];
     });

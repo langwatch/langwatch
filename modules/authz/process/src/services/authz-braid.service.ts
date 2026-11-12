@@ -76,7 +76,7 @@ export class AuthzBraidService {
       organizationId: lineage.organizationId,
       projectId,
     });
-    const braids = rows.map(braidOf);
+    const braids = withoutReplaced(rows).map(braidOf);
     return {
       intoOtherProjects: braids.filter((braid) => braid.ownerProjectId === projectId),
       fromOtherProjects: braids.filter((braid) => braid.readerProjectId === projectId),
@@ -88,7 +88,7 @@ export class AuthzBraidService {
     organizationId,
   }: AuthzOrganizationInput): Promise<AuthzOrganizationBraids> {
     const rows = await this.deps.reads.findBraids({ organizationId });
-    return rows.map(braidOf);
+    return withoutReplaced(rows).map(braidOf);
   }
 
   async createBraid(input: AuthzCreateBraidInput): Promise<AuthzBraid> {
@@ -367,7 +367,8 @@ export class AuthzBraidService {
   }
 }
 
-/** A live grant a change replaced is on its way out: it neither blocks nor counts (ADR-201 §2). */
+/** A live grant a change replaced is on its way out: it neither blocks, counts nor lists
+ *  (ADR-201 §2). */
 function withoutReplaced(live: readonly LedgerBraidRow[]): LedgerBraidRow[] {
   const replaced = new Set(live.map((row) => row.replacesGrantId));
   return live.filter((row) => !replaced.has(row.grantId));
