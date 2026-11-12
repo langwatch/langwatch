@@ -63,8 +63,7 @@ const calls = (
     const file = /^ {4}uses: \.\/\.github\/workflows\/(.+)$/m.exec(block)?.[1];
     const job = /^ {2}([\w-]+):/m.exec(block)?.[1];
     if (!file || !job) return [];
-    const own = /^ {4}permissions:\n((?: {6}.+\n)+)/m.exec(block)?.[0] ?? "";
-    return [{ job, file, granted: requested(own.replace(/^ {4}/gm, "")) }];
+    return [{ job, file, granted: requested(block) }];
   });
 };
 
