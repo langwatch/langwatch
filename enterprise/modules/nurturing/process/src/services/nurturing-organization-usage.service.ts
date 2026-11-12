@@ -19,7 +19,7 @@ import {
   windowStartDayOf,
 } from "../rules/nurturing-project-usage.rules.ts";
 import { traceCountsOf } from "../rules/nurturing-trace-day.rules.ts";
-import { copiedProjectOf } from "./nurturing-copied-project.ts";
+import { copiedProjectOf } from "./nurturing-copied-project.service.ts";
 
 /** Members read and identified per request, so a large organization never opens a burst. */
 const MEMBER_BATCH_SIZE = 100;

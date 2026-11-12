@@ -38,8 +38,8 @@ import { MemoryNurturingProjectPlacementRepository } from "../../repositories/me
 import { MemoryNurturingProjectUsageRepository } from "../../repositories/memory/memory.nurturing-project-usage.repository.ts";
 import { MemoryNurturingTraceDayRepository } from "../../repositories/memory/memory.nurturing-trace-day.repository.ts";
 import type { NurturingProjectUsageOwner } from "../../repositories/nurturing-project-usage.repository.ts";
-import { NurturingOrganizationUsageService } from "../../services/nurturing-organization-usage.service.ts";
 import { countingOver } from "../../services/__tests__/nurturing-trace-counting.test-helpers.ts";
+import { NurturingOrganizationUsageService } from "../../services/nurturing-organization-usage.service.ts";
 import {
   evaluationDayKeyOf,
   nurturingMembershipSubscriber,

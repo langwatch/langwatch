@@ -4,7 +4,7 @@ import type { NurturingProjectPlacementRepository } from "../repositories/nurtur
 import type { NurturingTraceDayRepository } from "../repositories/nurturing-trace-day.repository.ts";
 import { isTraceCounted } from "../rules/nurturing-project-usage.rules.ts";
 import type { NurturingCountedTrace } from "../rules/nurturing-trace-day.rules.ts";
-import { copiedProjectOf } from "./nurturing-copied-project.ts";
+import { copiedProjectOf } from "./nurturing-copied-project.service.ts";
 import type { NurturingUncopiedProjectsService } from "./nurturing-uncopied-projects.service.ts";
 
 type TraceCountingDependencies = Readonly<{

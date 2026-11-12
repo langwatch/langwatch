@@ -337,8 +337,7 @@ export function traceDayGroupOf(event: Event): string {
  */
 export function nurturingTraceDaySubscriber({
   countTraces,
-}: NurturingTraceCounting
-): PeerBatchSubscriberDefinition<typeof traceSpanDataSchema> {
+}: NurturingTraceCounting): PeerBatchSubscriberDefinition<typeof traceSpanDataSchema> {
   return {
     eventType: SPAN_RECEIVED_EVENT_TYPE,
     data: traceSpanDataSchema,
@@ -370,8 +369,7 @@ const failedTraceDataSchema = traceFailedEventDataSchema.pick({
  */
 export function nurturingFailedTraceDaySubscriber({
   countTraces,
-}: NurturingTraceCounting
-): PeerBatchSubscriberDefinition<typeof failedTraceDataSchema> {
+}: NurturingTraceCounting): PeerBatchSubscriberDefinition<typeof failedTraceDataSchema> {
   return {
     eventType: TRACE_FAILED_EVENT_TYPE,
     data: failedTraceDataSchema,
