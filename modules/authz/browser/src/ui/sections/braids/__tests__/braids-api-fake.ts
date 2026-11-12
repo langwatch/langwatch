@@ -25,6 +25,9 @@ export type BraidsApiState = {
   remove: Mock<(input: unknown) => void>;
   setPolicy: Mock<(input: unknown) => void>;
   targets: { projectId: string; selectable: boolean; reason?: "this_project" | "aggregate" }[];
+  /** When set, the target list query fails. */
+  targetsFail: boolean;
+  targetsRefetch: Mock<() => void>;
   targetsAsked: Mock<(input: unknown) => void>;
   viewers: { count: number; exact: boolean };
   /** Whether the reader signs its calls: its key in use, or null. */
@@ -62,6 +65,8 @@ export function braidsApiFake() {
     remove: vi.fn(),
     setPolicy: vi.fn(),
     targets: [],
+    targetsFail: false,
+    targetsRefetch: vi.fn(),
     targetsAsked: vi.fn(),
     viewers: { count: 0, exact: true },
     readerSigning: null,
@@ -118,10 +123,18 @@ export function braidsApiFake() {
         () => state.remove,
         (input: { braidId: string }) => ({ braidId: input.braidId }),
       ),
-      listBraidTargets: asked(
-        () => state.targets,
-        () => state.targetsAsked,
-      ),
+      listBraidTargets: {
+        useQuery: (input: unknown, options?: { enabled?: boolean }) => {
+          const enabled = options?.enabled !== false;
+          if (enabled) state.targetsAsked(input);
+          const refetch = state.targetsRefetch;
+          if (enabled && state.targetsFail) {
+            return { data: undefined, isLoading: false, isError: true, refetch };
+          }
+          const data = enabled ? state.targets : undefined;
+          return { data, isLoading: false, isError: false, refetch };
+        },
+      },
       countProjectTraceViewers: asked(() => state.viewers),
       createBraid: mutation(() => state.create, saved),
       changeBraid: mutation(() => state.change, saved),

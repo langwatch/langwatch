@@ -59,6 +59,8 @@ export type BraidDialogProps = {
   editing: AuthzBraid | undefined;
   /** This project's braids into others, so the dialog says what a reader already sees. */
   braidsInto: readonly AuthzBraid[];
+  /** The organisation keeps braids to its admins, so only they can remove one. */
+  keptToAdmins: boolean;
   onClose: () => void;
 };
 
@@ -126,7 +128,13 @@ function saveBlockedReason({
   return "Change the braid to save it";
 }
 
-export function BraidDialog({ projectId, editing, braidsInto, onClose }: BraidDialogProps) {
+export function BraidDialog({
+  projectId,
+  editing,
+  braidsInto,
+  keptToAdmins,
+  onClose,
+}: BraidDialogProps) {
   const host = useAuthzHost();
   const { projects } = host.organizationStructure();
   const [nowMs] = useState(() => nowInstant().epochMilliseconds);
@@ -195,7 +203,11 @@ export function BraidDialog({ projectId, editing, braidsInto, onClose }: BraidDi
       note={
         <HStack gap={1.5} color="fg.muted" textStyle="xs">
           <Lock size={12} aria-hidden />
-          <Text>Admins of either project can remove a braid at any time.</Text>
+          <Text>
+            {keptToAdmins
+              ? "Organisation admins can remove a braid at any time."
+              : "Admins of either project can remove a braid at any time."}
+          </Text>
         </HStack>
       }
       primaryAction={{
@@ -224,6 +236,8 @@ export function BraidDialog({ projectId, editing, braidsInto, onClose }: BraidDi
             someLeftOut={someLeftOut}
             listedOnly={projects.length > targetProjects.length ? targetProjects.length : undefined}
             isLoading={targets.isLoading}
+            loadFailed={targets.isError}
+            onRetry={() => void targets.refetch()}
             readerFixed={!!editing}
             onPick={(readerProjectId) => change({ readerProjectId })}
           />

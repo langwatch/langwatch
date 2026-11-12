@@ -302,6 +302,7 @@ export default function BraidsScreen() {
           projectId={projectId}
           editing={editing}
           braidsInto={braids.data.intoOtherProjects}
+          keptToAdmins={keptToAdmins}
           onClose={() => openBraid(undefined)}
         />
       ) : null}

@@ -1,6 +1,7 @@
 // From and Into: the project the braid starts from is fixed; the picker offers the projects the
 // viewer can read, the braid's own project and aggregates disabled with the reason.
 
+import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import { Menu } from "@langwatch/design-system/menu";
 import { Box, Button, Field, HStack, Stack, Text } from "@langwatch/design-system/primitives";
 import { ArrowRight, Check, ChevronDown, Lock } from "lucide-react";
@@ -17,6 +18,9 @@ export type BraidRouteFieldsProps = {
   /** Set when the organisation has more projects than the picker asks about: how many it lists. */
   listedOnly?: number;
   isLoading: boolean;
+  /** The target list query failed: the picker would be empty for the wrong reason. */
+  loadFailed: boolean;
+  onRetry: () => void;
   /** Edit keeps the reader: a braid into another project is a new braid. */
   readerFixed: boolean;
   onPick: (projectId: string) => void;
@@ -128,7 +132,17 @@ export function BraidRouteFields(props: BraidRouteFieldsProps) {
           <Field.HelperText>Sees them in its traces</Field.HelperText>
         </Field.Root>
       </HStack>
-      {props.someLeftOut ? (
+      {props.loadFailed ? (
+        <Banner
+          status="error"
+          title="The projects couldn't be loaded"
+          action={<BannerAction onClick={props.onRetry}>Try again</BannerAction>}
+          data-testid="braid-targets-error"
+        >
+          Without them there is no project to braid into.
+        </Banner>
+      ) : null}
+      {props.someLeftOut && !props.loadFailed ? (
         <Text fontSize="xs" color="fg.muted" data-testid="braid-targets-note">
           A braid can only go into a project whose traces you can read.
         </Text>

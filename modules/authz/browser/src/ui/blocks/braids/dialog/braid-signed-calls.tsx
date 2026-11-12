@@ -28,8 +28,10 @@ export type BraidSignedCallsProps = {
 function SigningLine({
   readerName,
   signing,
+  on,
   keysHref,
 }: {
+  on: boolean;
   readerName: string;
   signing: ReaderSigning;
   keysHref: string | undefined;
@@ -45,7 +47,7 @@ function SigningLine({
       </HStack>
     );
   }
-  if (signing.state === "none") {
+  if (signing.state === "none" && on) {
     return (
       <HStack
         gap={1.5}
@@ -58,8 +60,8 @@ function SigningLine({
         {keysHref ? (
           <Text>
             {`${readerName} doesn't sign its calls yet, so nothing will show. `}
-            <Link href={keysHref} data-testid="braid-create-key">
-              Create a key
+            <Link href={keysHref} isExternal data-testid="braid-create-key">
+              Create a key (opens in a new tab)
             </Link>
             {" · "}
             <Link href={`${BRAIDS_GUIDE_HREF}#signing`} isExternal>
@@ -97,6 +99,7 @@ export function BraidSignedCalls(props: BraidSignedCallsProps) {
           <SigningLine
             readerName={props.readerName}
             signing={props.signing}
+            on={props.on}
             keysHref={props.readerKeysHref}
           />
         ) : null}

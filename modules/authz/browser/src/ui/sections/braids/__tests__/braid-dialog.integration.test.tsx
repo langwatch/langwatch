@@ -69,6 +69,9 @@ beforeEach(() => {
     { projectId: "p-roll", selectable: false, reason: "aggregate" },
   ];
   state.targetsAsked.mockClear();
+  state.targetsFail = false;
+  state.targetsRefetch.mockClear();
+  state.keptToAdmins = false;
   state.viewers = { count: 14, exact: true };
   state.readerSigning = null;
   state.saveError = undefined;
@@ -376,6 +379,38 @@ describe("the braid dialog", () => {
     });
   });
 
+  describe("when the reader has no signing key and the switch is off", () => {
+    it("does not claim nothing will show", async () => {
+      const { user } = openDialog();
+      await pickReader(user);
+
+      expect(screen.queryByTestId("braid-signing-key")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the project list fails to load", () => {
+    it("says so and offers a retry instead of the unreadable-projects note", async () => {
+      braidsFake.state.targetsFail = true;
+      const { user } = openDialog();
+
+      expect(screen.getByTestId("braid-targets-error")).toBeInTheDocument();
+      expect(screen.queryByTestId("braid-targets-note")).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Try again" }));
+      expect(braidsFake.state.targetsRefetch).toHaveBeenCalled();
+    });
+  });
+
+  describe("when the organisation keeps braids to its admins", () => {
+    it("says only organisation admins can remove a braid", () => {
+      braidsFake.state.keptToAdmins = true;
+      openDialog();
+
+      expect(
+        screen.getByText("Organisation admins can remove a braid at any time."),
+      ).toBeInTheDocument();
+    });
+  });
+
   describe("when the reader has no signing key", () => {
     /** @scenario Only signed calls offers to set up signing when the reader has no key */
     it("says the reader does not sign yet and where to set it up", async () => {
@@ -386,7 +421,9 @@ describe("the braid dialog", () => {
 
       const line = screen.getByTestId("braid-signing-key");
       expect(line).toHaveTextContent("orchestrator doesn't sign its calls yet");
-      expect(within(line).getByRole("link", { name: "Create a key" })).toHaveAttribute(
+      const create = within(line).getByRole("link", { name: /Create a key/ });
+      expect(create).toHaveAttribute("target", "_blank");
+      expect(create).toHaveAttribute(
         "href",
         "/orchestrator-x1?return_to=%2Fsettings%2Fbraids%3Ftab%3Dkeys",
       );
