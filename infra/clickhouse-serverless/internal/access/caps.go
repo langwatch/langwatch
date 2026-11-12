@@ -6,7 +6,25 @@ import (
 	"math"
 	"sort"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
+
+// Cap is one setting's maximum: a whole number, refused rather than truncated
+// when the YAML gives a fraction.
+type Cap int64
+
+func (c *Cap) UnmarshalYAML(n *yaml.Node) error {
+	if n.Kind != yaml.ScalarNode || n.ShortTag() != "!!int" {
+		return fmt.Errorf("line %d: a cap must be a whole number, not %q", n.Line, n.Value)
+	}
+	var v int64
+	if err := n.Decode(&v); err != nil {
+		return err
+	}
+	*c = Cap(v)
+	return nil
+}
 
 // Cappable lists the settings a user's caps may set: the image's query limits,
 // each read by ClickHouse as no limit at 0, so every cap also renders a floor of 1.
@@ -28,6 +46,10 @@ func checkCaps(u User, r Rules, add func(where, format string, args ...any), whe
 			add(where, "caps.%s is protected by the policy and cannot be changed", name)
 		case limit <= 0:
 			add(where, "caps.%s must be above 0, which ClickHouse reads as no limit", name)
+		default:
+			if err := r.cat.checkSettingValue(name, int64(limit)); err != nil {
+				add(where, "caps.%s: %v", name, err)
+			}
 		}
 		if value, ok := u.Settings[name]; ok {
 			if v, isNumber := number(value); !isNumber || v <= 0 || v > float64(limit) {
@@ -93,9 +115,9 @@ func ownSettings(u User, c Constraints) map[string]any {
 	constraints := map[string]any{}
 	for name, limit := range u.Caps {
 		if _, set := out[name]; !set {
-			out[name] = limit
+			out[name] = int64(limit)
 		}
-		constraints[name] = map[string]any{"min": c.floor(u, name), "max": limit}
+		constraints[name] = map[string]any{"min": c.floor(u, name), "max": int64(limit)}
 	}
 	out["constraints"] = constraints
 	return out

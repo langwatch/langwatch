@@ -61,7 +61,7 @@ type User struct {
 	Quota    *Quota         `yaml:"quota"`
 	Grants   []string       `yaml:"grants"`
 	// Caps are this user's own maxima, rendered as constraints (see caps.go).
-	Caps map[string]int64 `yaml:"caps"`
+	Caps map[string]Cap `yaml:"caps"`
 }
 
 // Login holds exactly one login kind.

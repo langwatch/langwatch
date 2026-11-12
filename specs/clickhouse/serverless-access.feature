@@ -111,7 +111,7 @@ Feature: clickhouse-serverless gives every login a tier, rotates passwords and a
 
   @unit
   Scenario: A cap the image cannot render is refused
-    Given a user whose caps name a setting outside the cappable list, a protected setting, or a value of 0 or below
+    Given a user whose caps name a setting outside the cappable list, a protected setting, a value of 0 or below, a fraction, or a value the server would refuse
     Or whose own settings give a capped setting a value above the cap, 0, or not a number
     When ch-config loads the access file
     Then it fails with an error naming the offending entry

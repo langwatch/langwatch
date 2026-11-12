@@ -2,6 +2,7 @@ package access
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -106,7 +107,8 @@ func TestParse_RefusesCapsTheImageCannotRender(t *testing.T) {
 		{"not cappable", "caps: {max_threads: 4}", "caps.max_threads cannot be capped"},
 		{"zero is no limit", "caps: {max_rows_to_read: 0}", "caps.max_rows_to_read must be above 0"},
 		{"negative", "caps: {max_rows_to_read: -1}", "caps.max_rows_to_read must be above 0"},
-		{"not a whole number", "caps: {max_execution_time: 30s}", "cannot unmarshal"},
+		{"not a number", "caps: {max_execution_time: 30s}", "a cap must be a whole number"},
+		{"a fraction", "caps: {max_execution_time: 2.9}", "a cap must be a whole number"},
 		{"own setting above the cap", "settings: {max_rows_to_read: 20}, caps: {max_rows_to_read: 10}", `"max_rows_to_read" = 20 must be a number from 1 to the user's own cap of 10`},
 		{"own setting of 0", "settings: {max_rows_to_read: 0}, caps: {max_rows_to_read: 10}", "own cap of 10"},
 		{"own setting not a number", `settings: {max_rows_to_read: "5"}, caps: {max_rows_to_read: 10}`, "own cap of 10"},
@@ -233,5 +235,29 @@ func TestPlan_WithoutCapsRendersAsBefore(t *testing.T) {
 	}
 	if string(out) != before {
 		t.Errorf("a file without caps renders differently:\n%s", out)
+	}
+}
+
+// @scenario "A cap the image cannot render is refused"
+func TestCheckCaps_RefusesACapTheServerWouldReject(t *testing.T) {
+	r := Policy{}.Rules()
+	r.cat = Catalogue{settings: map[string]string{"max_execution_time": "Seconds"}}
+	// Stands in for clickhouse local: the server refuses a time past Int64 microseconds.
+	parsed := checkWithServerParser
+	t.Cleanup(func() { checkWithServerParser = parsed })
+	checkWithServerParser = func(name, value string) error {
+		if value == "10000000000000" {
+			return fmt.Errorf("setting %q = %q is refused by ClickHouse", name, value)
+		}
+		return nil
+	}
+	for value, want := range map[Cap]string{10000000000000: "caps.max_execution_time: setting", 10: ""} {
+		var got []string
+		checkCaps(User{Caps: map[string]Cap{"max_execution_time": value}}, r, func(_, format string, args ...any) {
+			got = append(got, fmt.Sprintf(format, args...))
+		}, "u")
+		if joined := strings.Join(got, "; "); (want == "") != (joined == "") || !strings.Contains(joined, want) {
+			t.Errorf("cap %d: got %q, want %q", value, joined, want)
+		}
 	}
 }
