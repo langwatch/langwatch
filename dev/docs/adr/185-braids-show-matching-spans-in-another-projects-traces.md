@@ -442,6 +442,29 @@ migration (a migration never drops a table here); an organisation with no row ha
 grant shape need no event version and no upcast, but an older worker would refuse an event it cannot parse:
 the schemas that read `braid` and `compiledWhere` ship one release before any route writes them.
 
+## Operations
+
+The `*Api` operations braids adds, reviewed by Alex (v1.8). Each route calls one of them.
+
+| Module  | Operation                                                  | What it does                                                |
+| ------- | ---------------------------------------------------------- | ----------------------------------------------------------- |
+| authz   | `listBraids`                                               | A project's braids, in both directions                      |
+| authz   | `createBraid`, `changeBraid`, `removeBraid`                | The braid writes (§1, §2)                                   |
+| authz   | `recordBraidedSpansView`                                   | The audit entry when a reader opens braided spans (§8)      |
+| authz   | `getOrganizationPolicy`, `setBraidsPolicy`                 | The setting that keeps braids to organisation admins (§2)   |
+| authz   | `listOrganizationBraids`                                   | Every live braid, for organisation admins                   |
+| authz   | `countProjectMembersHolding`                               | How many people in the reader will see the spans (§7)       |
+| authz   | `listBraidTargets`                                         | The dialog's project picker, with why a project is offered  |
+| api-key | `findSigningKeys`, `findProjectSigning`                    | A project's keys; whether a project signs its calls (§4)    |
+| api-key | `createSigningKey`, `rotateSigningKey`, `revokeSigningKey` | The key lifecycle (§4)                                      |
+| api-key | `verifyBraidSignature`                                     | Whether a signature holds, asked by trace at ingest (§4)    |
+| trace   | `previewBraid`, `readBraidTestTrace`                       | The dialog's preview and its test against a real trace (§7) |
+| trace   | `readBraidAttributeKeys`, `readBraidActivity`              | The condition editor's keys; spans matched in the last 24 h |
+
+A braided trace read is one trace operation per procedure that resolves each span's owner protections in
+a service (§5); `resolveBraidOwnerProtections`, `describeBraidedSpans` and `readBraidedHeaderTotals` are
+not operations.
+
 ## Rejected alternatives
 
 - **Copy the spans into the reader.** Data is stored once (ADR-177); a copy would need its own deletion,
@@ -541,3 +564,9 @@ the schemas that read `braid` and `compiledWhere` ship one release before any ro
   `replacesGrantId` (Schema), so a repeated change finds its own earlier attach and never merges into
   another identical braid. The dialog's member count decides each active member of the organisation at
   the reader, at most 500 per count, and says when the count is a floor (§7).
+- v1.8 (2026-11-12, Alex's rulings after the security, standards and eventing reviews). The operations
+  above are agreed. A signing key is revoked on any plan, as a braid is removed on any plan, so a
+  downgrade never strands a leaked key (§9). A braid change's api sends only the attach; a worker
+  subscriber revokes the replaced grant once the attach lands. The ClickHouse fence also requires a trace
+  the reader holds on every braid condition, and refuses a plain tenant marker under a braid filter.
+  Each braided trace procedure is one trace operation that applies owner protections in a service.
