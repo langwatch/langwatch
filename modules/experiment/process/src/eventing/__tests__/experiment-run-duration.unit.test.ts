@@ -28,8 +28,9 @@ const envelope = {
   occurredAt: 1_700_000_000_000,
 };
 
-const targetResult = (duration: number): TargetResultEvent => ({
+const targetResult = (duration: number, id = "evt-1"): TargetResultEvent => ({
   ...envelope,
+  id,
   type: EXPERIMENT_RUN_EVENT_TYPES.TARGET_RESULT,
   version: EXPERIMENT_RUN_EVENT_VERSIONS.TARGET_RESULT,
   data: {
@@ -101,7 +102,7 @@ describe("given a result with a fractional duration", () => {
       });
       let state = projection.init();
       state = projection.apply(state, targetResult(100.4));
-      state = projection.apply(state, { ...targetResult(100.4), id: "evt-2" });
+      state = projection.apply(state, targetResult(100.4, "evt-2"));
       expect(state.TotalDurationMs).toBe(200);
     });
   });
