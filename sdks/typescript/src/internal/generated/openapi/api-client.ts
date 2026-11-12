@@ -9831,6 +9831,7 @@ export interface operations {
                     };
                     row_indices?: number[];
                     concurrency?: number;
+                    repeat?: number;
                 };
             };
         };

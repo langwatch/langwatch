@@ -123,6 +123,8 @@ const TRIGGER_FILTERS_HELP =
   'Trace conditions as a JSON object. Unkeyed fields take a list, e.g. {"traces.error":["true"]}. Keyed fields nest the key: evaluations.* keys by MONITOR id (the `id` from `langwatch monitor list`, not the evaluator id), e.g. {"evaluations.passed":{"<monitorId>":["false"]}}; metadata.value keys by metadata key, e.g. {"metadata.value":{"<key>":["true"]}}. A keyed field sent flat is refused';
 
 const REPEAT_FLAG_HELP = "How many times to run each scenario against each target, from 1 to 5.";
+const EXPERIMENT_REPEAT_FLAG_HELP =
+  "How many times to run each dataset row against each target, from 1 to 5. With --wait, the output adds each row's pass rate over its runs.";
 
 const SIMULATOR_MODEL_FLAG_HELP =
   "The model that plays the user in this run. Left out, the project default is used.";
@@ -1736,10 +1738,17 @@ function registerExperimentCommands(program: Command): void {
         "Version of the experiment's saved dataset to run, overriding the version the experiment pins",
         parseDatasetVersionFlag,
       )
+      .option("--repeat <n>", EXPERIMENT_REPEAT_FLAG_HELP)
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (
       slug: string,
-      options: { wait?: boolean; param?: string[]; concurrency?: string; datasetVersion?: number },
+      options: {
+        wait?: boolean;
+        param?: string[];
+        concurrency?: string;
+        datasetVersion?: number;
+        repeat?: string;
+      },
     ) => {
       const { runExperimentCommand: impl } = await import("./commands/experiment/run.js");
       return impl(slug, options);

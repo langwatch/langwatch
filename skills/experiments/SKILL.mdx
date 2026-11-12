@@ -194,6 +194,7 @@ If the CLI supports a more specific read or run for the installed version, disco
 ## Use Experiments to Measure a Change
 
 An experiment is the yardstick for a prompt, model, retrieval or code change. Run the current version first, then the candidate on the same dataset and evaluators. When the application samples at non-zero temperature, run each version more than once (`langwatch experiment run <slug>` again, or the script again) and compare per row: a row that fails on one run and passes on the next is variation, not a regression. Two runs of the same version can differ by more than the change you are testing.
+`langwatch experiment run <slug> --repeat <n> --wait` (1 to 5) runs every row n times in one run and prints each row's pass rate, so one command shows which rows pass only some of the time.
 
 <MeasuredImprovement />
 

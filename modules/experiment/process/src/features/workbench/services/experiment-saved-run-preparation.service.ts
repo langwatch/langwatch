@@ -18,6 +18,11 @@ import {
 import { createLogger } from "@langwatch/observability";
 import type { z } from "zod";
 
+import {
+  repeatedRows,
+  repeatedScope,
+  runRepeatOf,
+} from "../../../rules/experiment-run-repeat.rules.ts";
 import { datasetVersionAuthorFrom } from "../../../rules/experiment-workbench-actor.rules.ts";
 import { ExperimentBoardRowsService } from "../../../services/experiment-board-rows.service.ts";
 import type { LoadedExecutionData } from "../../../services/experiment-execution-data.service.ts";
@@ -35,6 +40,8 @@ export interface SavedRunPreparation {
   runInputs: z.infer<typeof runInputsBodySchema>;
   boardRowIndices?: (number | null)[];
   carriedOverCells: CarriedOverCell[];
+  /** How many times every dataset row runs; absent runs each once. */
+  repeat?: number;
 }
 
 /** A dataset_version needs a saved dataset to read: the body's dataset_id or a saved active one. */
@@ -110,6 +117,27 @@ export class ExperimentSavedRunPreparationService {
     const scope: ExecutionScope = runInputs.row_indices
       ? { type: "rows", rowIndices: runInputs.row_indices }
       : { type: "full" };
+    const repeat = runRepeatOf(runInputs.repeat);
+    // The board holds one cell per row, so a repeated run keeps to its own results.
+    if (repeat > 1) {
+      return {
+        experimentId: prepared.experiment.id,
+        state: prepared.state,
+        data: {
+          datasetRows: repeatedRows({ rows: prepared.datasetRows, repeat }),
+          datasetColumns: prepared.datasetColumns,
+          loadedPrompts: prepared.loadedPrompts,
+          loadedAgents: prepared.loadedAgents,
+          loadedEvaluators: prepared.loadedEvaluators,
+          loadedWorkflows: prepared.loadedWorkflows,
+          ...(prepared.datasetVersion ? { datasetVersion: prepared.datasetVersion } : {}),
+        },
+        scope: repeatedScope({ scope, repeat }),
+        runInputs,
+        carriedOverCells: [],
+        repeat,
+      };
+    }
     // A run over another version than the board shows writes back onto the rows with its ids.
     const boardRowIndices =
       prepared.pinnedVersionRowIds && prepared.datasetVersion && runsSavedDataset(runInputs)

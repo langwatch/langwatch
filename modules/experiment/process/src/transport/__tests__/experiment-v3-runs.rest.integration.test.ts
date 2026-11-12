@@ -553,6 +553,51 @@ describe("POST /api/experiments/:slug/run", () => {
     }
   });
 
+  describe("when the body names a repeat of 3", () => {
+    /** @scenario "A run call that names a repeat plans the repeated run and keeps the workbench as it is" */
+    it("plans the run with that repeat and no write-back into the workbench", async () => {
+      const { request, starts } = await harness({ experiments: found(savedState()), redis: true });
+
+      const response = await request("/checkout-eval/run", runOf('{"repeat":3}'));
+
+      expect(response.status).toBe(200);
+      expect(starts).toMatchObject([{ plan: { repeat: 3, persistResults: false } }]);
+    });
+  });
+
+  describe("when the body names a repeat of 1", () => {
+    /** @scenario "A run call with a repeat of 1 runs every row once, as before" */
+    it("plans the run with no repeat, writing back as an unrepeated run does", async () => {
+      const { request, starts } = await harness({ experiments: found(savedState()), redis: true });
+
+      const response = await request("/checkout-eval/run", runOf('{"repeat":1}'));
+
+      expect(response.status).toBe(200);
+      expect(starts).toMatchObject([{ plan: { persistResults: true } }]);
+      expect((starts[0] as { plan: { repeat?: number } }).plan.repeat).toBeUndefined();
+    });
+  });
+
+  describe("when the body names a repeat outside 1 to 5", () => {
+    for (const repeat of [0, 6, 1.5]) {
+      /** @scenario "A run call with a repeat outside 1 to 5 is refused" */
+      it(`refuses ${repeat} with 400 and starts nothing`, async () => {
+        const { request, starts } = await harness({
+          experiments: found(savedState()),
+          redis: true,
+        });
+
+        const response = await request("/checkout-eval/run", runOf(JSON.stringify({ repeat })));
+
+        expect(response.status).toBe(400);
+        expect(await response.json()).toMatchObject({
+          code: "experiment_evaluation_input_invalid",
+        });
+        expect(starts).toEqual([]);
+      });
+    }
+  });
+
   describe("when the caller asks for JSON", () => {
     /** @scenario "A polled saved run starts on the run's pipeline and answers at once" */
     /** @scenario "Default response returns runId for polling" */

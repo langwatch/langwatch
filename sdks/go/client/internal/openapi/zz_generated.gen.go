@@ -47191,6 +47191,14 @@ type GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency struct {
 	union json.RawMessage
 }
 
+// GetApiExperimentsRuns200JSONResponseBodyRunsRepeat0 defines parameters for GetApiExperimentsRuns.
+type GetApiExperimentsRuns200JSONResponseBodyRunsRepeat0 = int
+
+// GetApiExperimentsRuns200JSONResponseBody_Runs_Repeat defines parameters for GetApiExperimentsRuns.
+type GetApiExperimentsRuns200JSONResponseBody_Runs_Repeat struct {
+	union json.RawMessage
+}
+
 // GetApiExperimentsRunsByRunId200JSONResponseBodyStatus defines parameters for GetApiExperimentsRunsByRunId.
 type GetApiExperimentsRunsByRunId200JSONResponseBodyStatus string
 
@@ -47210,6 +47218,14 @@ type GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency struct {
 
 // GetApiExperimentsRunsByRunIdResults200JSONResponseBodyEvaluationsStatus defines parameters for GetApiExperimentsRunsByRunIdResults.
 type GetApiExperimentsRunsByRunIdResults200JSONResponseBodyEvaluationsStatus string
+
+// GetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0 defines parameters for GetApiExperimentsRunsByRunIdResults.
+type GetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0 = int
+
+// GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Repeat defines parameters for GetApiExperimentsRunsByRunIdResults.
+type GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Repeat struct {
+	union json.RawMessage
+}
 
 // GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0 defines parameters for GetApiExperimentsRunsByRunIdResults.
 type GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0 = []struct {
@@ -47264,6 +47280,7 @@ type PostApiExperimentsBySlugRunJSONBody struct {
 	DatasetId      *string                                                                         `json:"dataset_id,omitempty"`
 	DatasetVersion *int                                                                            `json:"dataset_version,omitempty"`
 	Parameters     *map[string]PostApiExperimentsBySlugRunJSONBody_Parameters_AdditionalProperties `json:"parameters,omitempty"`
+	Repeat         *int                                                                            `json:"repeat,omitempty"`
 	RowIndices     *[]int                                                                          `json:"row_indices,omitempty"`
 }
 
@@ -102624,6 +102641,42 @@ func (t *GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency) UnmarshalJSO
 	return err
 }
 
+// AsGetApiExperimentsRuns200JSONResponseBodyRunsRepeat0 returns the union data inside the GetApiExperimentsRuns200JSONResponseBody_Runs_Repeat as a GetApiExperimentsRuns200JSONResponseBodyRunsRepeat0
+func (t GetApiExperimentsRuns200JSONResponseBody_Runs_Repeat) AsGetApiExperimentsRuns200JSONResponseBodyRunsRepeat0() (GetApiExperimentsRuns200JSONResponseBodyRunsRepeat0, error) {
+	var body GetApiExperimentsRuns200JSONResponseBodyRunsRepeat0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiExperimentsRuns200JSONResponseBodyRunsRepeat0 overwrites any union data inside the GetApiExperimentsRuns200JSONResponseBody_Runs_Repeat as the provided GetApiExperimentsRuns200JSONResponseBodyRunsRepeat0
+func (t *GetApiExperimentsRuns200JSONResponseBody_Runs_Repeat) FromGetApiExperimentsRuns200JSONResponseBodyRunsRepeat0(v GetApiExperimentsRuns200JSONResponseBodyRunsRepeat0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiExperimentsRuns200JSONResponseBodyRunsRepeat0 performs a merge with any union data inside the GetApiExperimentsRuns200JSONResponseBody_Runs_Repeat, using the provided GetApiExperimentsRuns200JSONResponseBodyRunsRepeat0
+func (t *GetApiExperimentsRuns200JSONResponseBody_Runs_Repeat) MergeGetApiExperimentsRuns200JSONResponseBodyRunsRepeat0(v GetApiExperimentsRuns200JSONResponseBodyRunsRepeat0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiExperimentsRuns200JSONResponseBody_Runs_Repeat) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiExperimentsRuns200JSONResponseBody_Runs_Repeat) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsGetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0 returns the union data inside the GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency as a GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0
 func (t GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency) AsGetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0() (GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0, error) {
 	var body GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0
@@ -102656,6 +102709,42 @@ func (t GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency) Mars
 }
 
 func (t *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0 returns the union data inside the GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Repeat as a GetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0
+func (t GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Repeat) AsGetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0() (GetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0, error) {
+	var body GetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0 overwrites any union data inside the GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Repeat as the provided GetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0
+func (t *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Repeat) FromGetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0(v GetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0 performs a merge with any union data inside the GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Repeat, using the provided GetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0
+func (t *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Repeat) MergeGetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0(v GetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Repeat) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Repeat) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -169532,8 +169621,11 @@ type GetApiExperimentsRunsResponse struct {
 			Concurrency  *GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency `json:"concurrency,omitempty"`
 			ExperimentId string                                                     `json:"experimentId"`
 			Progress     *float32                                                   `json:"progress,omitempty"`
-			RunId        string                                                     `json:"runId"`
-			Summary      struct {
+
+			// Repeat How many times the run repeated every dataset row. Run row `r * repeat + k` is repetition `k` of dataset row `r`. Null for a run that ran each row once.
+			Repeat  *GetApiExperimentsRuns200JSONResponseBody_Runs_Repeat `json:"repeat,omitempty"`
+			RunId   string                                                `json:"runId"`
+			Summary struct {
 				DatasetAverageCost     *float32 `json:"datasetAverageCost,omitempty"`
 				DatasetAverageDuration *float32 `json:"datasetAverageDuration,omitempty"`
 				DatasetCost            *float32 `json:"datasetCost,omitempty"`
@@ -169786,7 +169878,10 @@ type GetApiExperimentsRunsByRunIdResultsResponse struct {
 		ExperimentId string   `json:"experimentId"`
 		Progress     *float32 `json:"progress,omitempty"`
 		ProjectId    string   `json:"projectId"`
-		RunId        string   `json:"runId"`
+
+		// Repeat How many times the run repeated every dataset row. Run row `r * repeat + k` is repetition `k` of dataset row `r`. Null for a run that ran each row once.
+		Repeat *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Repeat `json:"repeat,omitempty"`
+		RunId  string                                                         `json:"runId"`
 
 		// Targets Resolves the targetId each dataset row and evaluation carries
 		Targets    *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets `json:"targets,omitempty"`
@@ -202849,8 +202944,11 @@ func ParseGetApiExperimentsRunsResponse(rsp *http.Response) (*GetApiExperimentsR
 				Concurrency  *GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency `json:"concurrency,omitempty"`
 				ExperimentId string                                                     `json:"experimentId"`
 				Progress     *float32                                                   `json:"progress,omitempty"`
-				RunId        string                                                     `json:"runId"`
-				Summary      struct {
+
+				// Repeat How many times the run repeated every dataset row. Run row `r * repeat + k` is repetition `k` of dataset row `r`. Null for a run that ran each row once.
+				Repeat  *GetApiExperimentsRuns200JSONResponseBody_Runs_Repeat `json:"repeat,omitempty"`
+				RunId   string                                                `json:"runId"`
+				Summary struct {
 					DatasetAverageCost     *float32 `json:"datasetAverageCost,omitempty"`
 					DatasetAverageDuration *float32 `json:"datasetAverageDuration,omitempty"`
 					DatasetCost            *float32 `json:"datasetCost,omitempty"`
@@ -203101,7 +203199,10 @@ func ParseGetApiExperimentsRunsByRunIdResultsResponse(rsp *http.Response) (*GetA
 			ExperimentId string   `json:"experimentId"`
 			Progress     *float32 `json:"progress,omitempty"`
 			ProjectId    string   `json:"projectId"`
-			RunId        string   `json:"runId"`
+
+			// Repeat How many times the run repeated every dataset row. Run row `r * repeat + k` is repetition `k` of dataset row `r`. Null for a run that ran each row once.
+			Repeat *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Repeat `json:"repeat,omitempty"`
+			RunId  string                                                         `json:"runId"`
 
 			// Targets Resolves the targetId each dataset row and evaluation carries
 			Targets    *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets `json:"targets,omitempty"`

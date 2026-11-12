@@ -78,7 +78,7 @@ const isRunNotFound = (error: unknown): boolean => {
 };
 
 /** Reads the run until it is whole or the wait is over, keeping the last read. */
-const readUntilComplete = async ({
+export const readUntilComplete = async ({
   read,
   waitSeconds,
   pollMs,

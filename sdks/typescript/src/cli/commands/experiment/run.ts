@@ -8,15 +8,28 @@ import { parseRunParameterFlags } from "../../utils/keyValueFlags";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
+import { parseRepeat } from "../run-plans/scopeFlags";
+import { readUntilComplete } from "./results";
+import { passRateText, rowPassRatesOf, type RowPassRate } from "./rowPassRates";
+
+/** How long a waited repeated run reads its stored rows for the pass rates. */
+const PASS_RATE_READ_SECONDS = 30;
 
 export const runExperimentCommand = async (
   slug: string,
-  options: { wait?: boolean; param?: string[]; concurrency?: string; datasetVersion?: number },
+  options: {
+    wait?: boolean;
+    param?: string[];
+    concurrency?: string;
+    datasetVersion?: number;
+    repeat?: string;
+  },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const parameters = parseRunParameterFlags({ pairs: options.param });
   const concurrency = parseConcurrencyFlag({ value: options.concurrency });
+  const repeat = parseRepeat(options.repeat);
 
   const service = new ExperimentsApiService();
   const spinner = createSpinner(`Starting experiment "${slug}"...`).start();
@@ -26,6 +39,7 @@ export const runExperimentCommand = async (
       parameters,
       ...(concurrency !== undefined ? { concurrency } : {}),
       ...(options.datasetVersion !== undefined ? { datasetVersion: options.datasetVersion } : {}),
+      ...(repeat !== undefined ? { repeat } : {}),
     });
 
     spinner.succeed(
@@ -72,10 +86,7 @@ export const runExperimentCommand = async (
       pollSpinner.warn(`Experiment ${status.status}`);
     }
 
-    return {
-      data: status,
-      table: () => printRunStatus({ runUrl: runResult.runUrl, status }),
-    };
+    return await waitedRunResult({ service, runResult, status, slug, repeat });
   } catch (error) {
     failSpinner({ spinner, error, action: "run experiment" });
     process.exit(1);
@@ -127,4 +138,69 @@ function printRunStatus({
     console.log(`    ${chalk.gray("View results:")}  ${status.summary.runUrl}`);
   }
   console.log();
+}
+
+/** A waited run's answer: its status, plus each dataset row's pass rate when it repeated rows. */
+async function waitedRunResult({
+  service,
+  runResult,
+  status,
+  slug,
+  repeat,
+}: {
+  service: ExperimentsApiService;
+  runResult: { runId: string; runUrl?: string };
+  status: Awaited<ReturnType<ExperimentsApiService["getRunStatus"]>>;
+  slug: string;
+  repeat: number | undefined;
+}): Promise<CommandResult> {
+  const table = () => printRunStatus({ runUrl: runResult.runUrl, status });
+  if (status.status !== "completed" || repeat === undefined || repeat < 2) {
+    return { data: status, table };
+  }
+  const rowPassRates = await readRowPassRates({ service, runId: runResult.runId, slug, repeat });
+  return {
+    data: { ...status, rowPassRates },
+    table: () => {
+      table();
+      printRowPassRates({ rates: rowPassRates });
+    },
+  };
+}
+
+/** The pass rate per dataset row and target, read once the run's rows are stored. */
+async function readRowPassRates({
+  service,
+  runId,
+  slug,
+  repeat,
+}: {
+  service: ExperimentsApiService;
+  runId: string;
+  slug: string;
+  repeat: number;
+}): Promise<RowPassRate[]> {
+  const results = await readUntilComplete({
+    read: () => service.getRunResults({ runId, experimentSlug: slug }),
+    waitSeconds: PASS_RATE_READ_SECONDS,
+    pollMs: 2000,
+    onPoll: () => {},
+  });
+  return rowPassRatesOf({ results, repeat });
+}
+
+function printRowPassRates({ rates }: { rates: RowPassRate[] }): void {
+  const repeat = rates[0]?.repeat;
+  console.log(chalk.bold(`  Pass rate per dataset row (each ran ${repeat} times):`));
+  for (const rate of rates) {
+    const target = rate.targetName ?? rate.targetId;
+    const label = target ? `Row ${rate.row} · ${target}` : `Row ${rate.row}`;
+    console.log(`    ${chalk.gray(`${label}:`)} ${passRateColour(rate)(passRateText(rate))}`);
+  }
+  console.log();
+}
+
+function passRateColour(rate: RowPassRate): (text: string) => string {
+  if (rate.graded === 0) return chalk.gray;
+  return rate.passed === rate.graded ? chalk.green : chalk.yellow;
 }
