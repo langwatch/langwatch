@@ -140,7 +140,14 @@ export const prismaTableCatalogue = {
   "ApiKey": "ApiKey",
   "ProjectActiveDay": "ProjectActiveDay",
   "NurturingProject": "NurturingProject",
+  "NurturingUncopiedProject": "NurturingUncopiedProject",
+  "NurturingOrganizationMember": "NurturingOrganizationMember",
+  "NurturingOrganizationCreated": "NurturingOrganizationCreated",
   "NurturingOrganization": "NurturingOrganization",
+  "NurturingProjectUsageView": "NurturingProjectUsageView",
+  "NurturingProjectTraceDay": "NurturingProjectTraceDay",
+  "NurturingPersonalProject": "NurturingPersonalProject",
+  "NurturingTracedProject": "NurturingTracedProject",
   "BillingMeterCheckpoint": "BillingMeterCheckpoint",
   "VirtualKey": "VirtualKey",
   "VirtualKeyScope": "VirtualKeyScope",
@@ -2406,6 +2413,21 @@ export const prismaModelFieldCatalogue = {
     "projectId",
     "organizationId"
   ],
+  "NurturingUncopiedProject": [
+    "projectId",
+    "firstSeenAt"
+  ],
+  "NurturingOrganizationMember": [
+    "organizationId",
+    "userId",
+    "joinedAt",
+    "leftAt",
+    "returnedAt"
+  ],
+  "NurturingOrganizationCreated": [
+    "organizationId",
+    "createdAt"
+  ],
   "NurturingOrganization": [
     "organizationId",
     "adminUserId",
@@ -2421,6 +2443,31 @@ export const prismaModelFieldCatalogue = {
     "codingFirstDays",
     "lastTraceAt",
     "updatedAt"
+  ],
+  "NurturingProjectUsageView": [
+    "projectId",
+    "owner",
+    "folded",
+    "appliedEventIds",
+    "projectionVersion",
+    "updatedAt"
+  ],
+  "NurturingProjectTraceDay": [
+    "projectId",
+    "day",
+    "traceCount",
+    "errorCount",
+    "lastTraceAt",
+    "lastFailedTraceAt"
+  ],
+  "NurturingPersonalProject": [
+    "projectId",
+    "organizationId",
+    "ownerUserId"
+  ],
+  "NurturingTracedProject": [
+    "projectId",
+    "organizationId"
   ],
   "BillingMeterCheckpoint": [
     "id",
@@ -3709,7 +3756,14 @@ export const prismaRelationCatalogue = {
   },
   "ProjectActiveDay": {},
   "NurturingProject": {},
+  "NurturingUncopiedProject": {},
+  "NurturingOrganizationMember": {},
+  "NurturingOrganizationCreated": {},
   "NurturingOrganization": {},
+  "NurturingProjectUsageView": {},
+  "NurturingProjectTraceDay": {},
+  "NurturingPersonalProject": {},
+  "NurturingTracedProject": {},
   "BillingMeterCheckpoint": {},
   "VirtualKey": {
     "principalUser": "User",

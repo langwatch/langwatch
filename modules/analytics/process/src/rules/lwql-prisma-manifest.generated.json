@@ -20652,7 +20652,7 @@
     {
       "name": "NurturingProject",
       "tableName": "NurturingProject",
-      "documentation": "Nurturing's read model: which organization a project belongs to, from project's created event.",
+      "documentation": "Nurturing's read model: which organization a project belongs to, from project's created event.\nThe per-email usage places a project and lists an organization's projects from these rows only.",
       "primaryKey": [
         "projectId"
       ],
@@ -20670,6 +20670,118 @@
           "name": "organizationId",
           "columnName": "organizationId",
           "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "NurturingUncopiedProject",
+      "tableName": "NurturingUncopiedProject",
+      "documentation": "A project nurturing saw traces of with no placement copy, and when it first did: every worker\nretries its trace batches only within one window from then, across restarts. Deleted when the\ncopy lands.",
+      "primaryKey": [
+        "projectId"
+      ],
+      "fields": [
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "firstSeenAt",
+          "columnName": "firstSeenAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "NurturingOrganizationMember",
+      "tableName": "NurturingOrganizationMember",
+      "documentation": "Nurturing's own copy of each organization's members, from the owners' member facts (§9):\norganization's signed_up and invite_accepted and auth's sso_auto_added join, member_removed\nand member_disabled leave, member_enabled returns. Each column keeps its latest time.",
+      "primaryKey": [
+        "organizationId",
+        "userId"
+      ],
+      "fields": [
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "userId",
+          "columnName": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "joinedAt",
+          "columnName": "joinedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "leftAt",
+          "columnName": "leftAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "returnedAt",
+          "columnName": "returnedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "NurturingOrganizationCreated",
+      "tableName": "NurturingOrganizationCreated",
+      "documentation": "When an organization was created, from organization's created event: nurturing's own copy for\nthe per-email usage's day offsets. Its own table, so an early creation never adds an unseeded\nNurturingOrganization row.",
+      "primaryKey": [
+        "organizationId"
+      ],
+      "fields": [
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
           "kind": "scalar",
           "isList": false,
           "isOptional": false,
@@ -20806,6 +20918,201 @@
           "name": "updatedAt",
           "columnName": "updatedAt",
           "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "NurturingProjectUsageView",
+      "tableName": "NurturingProjectUsageView",
+      "documentation": "Nurturing's own per-project usage: a peer fold over the owners' prompt, evaluator, scenario\nand simulation-run events (ARCHITECTURE §9), one peer fold per owner pipeline, summed per\norganization for the per-email traits. Traces are counted in NurturingProjectTraceDay.",
+      "primaryKey": [
+        "projectId",
+        "owner"
+      ],
+      "fields": [
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "owner",
+          "columnName": "owner",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The owner pipeline whose peer fold wrote the row (prompt, evaluator, scenario, simulation),\nor `evaluation`: the project's evaluation days, written by a subscriber, at most once a day."
+        },
+        {
+          "name": "folded",
+          "columnName": "folded",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The project's usage as the fold folded it (NurturingProjectUsageState)."
+        },
+        {
+          "name": "appliedEventIds",
+          "columnName": "appliedEventIds",
+          "type": "String",
+          "kind": "scalar",
+          "isList": true,
+          "isOptional": false,
+          "documentation": "The event ids of the last delivery folded in, so a redelivery folds once."
+        },
+        {
+          "name": "projectionVersion",
+          "columnName": "projectionVersion",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "A row of another version reads as undecodable and is re-folded from the log."
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Event-derived, so a replayed row equals the row it rebuilds."
+        }
+      ]
+    },
+    {
+      "name": "NurturingProjectTraceDay",
+      "tableName": "NurturingProjectTraceDay",
+      "documentation": "Nurturing's own trace counts from trace's span_received and trace_failed (ARCHITECTURE §9), a\nroot span being one trace, one row per project and UTC day of append time, incremented in place\nby each batch. A redelivered batch can count a trace twice; accepted (issue 9378). Kept 30 days.",
+      "primaryKey": [
+        "projectId",
+        "day"
+      ],
+      "fields": [
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "day",
+          "columnName": "day",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "UTC `YYYY-MM-DD` of the root spans' append time."
+        },
+        {
+          "name": "traceCount",
+          "columnName": "traceCount",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "errorCount",
+          "columnName": "errorCount",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Traces trace recorded failed (lw.trace.trace_failed)."
+        },
+        {
+          "name": "lastTraceAt",
+          "columnName": "lastTraceAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Append time of the newest root span."
+        },
+        {
+          "name": "lastFailedTraceAt",
+          "columnName": "lastFailedTraceAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Append time of the newest trace_failed."
+        }
+      ]
+    },
+    {
+      "name": "NurturingPersonalProject",
+      "tableName": "NurturingPersonalProject",
+      "documentation": "Nurturing's copy of each personal project's owner, from organization's and project's facts.\nThe first owner recorded stays: a personal project's owner never changes.",
+      "primaryKey": [
+        "projectId"
+      ],
+      "fields": [
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "ownerUserId",
+          "columnName": "ownerUserId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "NurturingTracedProject",
+      "tableName": "NurturingTracedProject",
+      "documentation": "Nurturing's copy of each project that received a real trace, from trace's and project's facts.",
+      "primaryKey": [
+        "projectId"
+      ],
+      "fields": [
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
           "kind": "scalar",
           "isList": false,
           "isOptional": false,

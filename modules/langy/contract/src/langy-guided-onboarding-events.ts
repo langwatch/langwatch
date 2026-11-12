@@ -1,6 +1,7 @@
 import type { Named } from "@langwatch/module";
 /**
- * Langy's guided onboarding fact: one failed turn of the organization's guided conversation.
+ * Langy's onboarding facts: a failed turn of the organization's guided conversation, and a
+ * person's first answer from Langy.
  * Peers react from their side (§9); langy sends no analytics itself.
  * @see specs/analytics/posthog-guided-onboarding.feature
  */
@@ -38,3 +39,26 @@ export const guidedOnboardingTurnFailedEventDataSchema: GuidedOnboardingTurnFail
 export type GuidedOnboardingTurnFailedEventData = z.infer<
   typeof guidedOnboardingTurnFailedEventDataSchema
 >;
+
+/**
+ * The first time Langy completed an answer in a conversation the user owns: the user got Langy's
+ * first message. One fact per user (the idempotency key names only the user); ids only.
+ */
+export const LANGY_FIRST_MESSAGE_SEEN_EVENT_TYPE =
+  "lw.langy_guided_onboarding.first_message_seen" as const;
+export const LANGY_FIRST_MESSAGE_SEEN_EVENT_VERSION = "2026-11-10" as const;
+
+const langyFirstMessageSeenEventDataSchemaDefinition = z.object({
+  /** The project the conversation lives in. */
+  tenantId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+  /** The conversation's owner: the person who got the answer. */
+  userId: z.string().min(1),
+  conversationId: z.string().min(1),
+});
+export interface LangyFirstMessageSeenEventDataSchema extends Named<
+  typeof langyFirstMessageSeenEventDataSchemaDefinition
+> {}
+export const langyFirstMessageSeenEventDataSchema: LangyFirstMessageSeenEventDataSchema =
+  langyFirstMessageSeenEventDataSchemaDefinition;
+export type LangyFirstMessageSeenEventData = z.infer<typeof langyFirstMessageSeenEventDataSchema>;

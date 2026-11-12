@@ -1929,6 +1929,21 @@ export interface LwqlPrismaRows {
     readonly projectId: "String";
     readonly organizationId: "String";
   };
+  readonly NurturingUncopiedProject: {
+    readonly projectId: "String";
+    readonly firstSeenAt: "DateTime";
+  };
+  readonly NurturingOrganizationMember: {
+    readonly organizationId: "String";
+    readonly userId: "String";
+    readonly joinedAt: "DateTime?";
+    readonly leftAt: "DateTime?";
+    readonly returnedAt: "DateTime?";
+  };
+  readonly NurturingOrganizationCreated: {
+    readonly organizationId: "String";
+    readonly createdAt: "DateTime";
+  };
   readonly NurturingOrganization: {
     readonly organizationId: "String";
     readonly adminUserId: "String?";
@@ -1944,6 +1959,31 @@ export interface LwqlPrismaRows {
     readonly codingFirstDays: "Int[]";
     readonly lastTraceAt: "DateTime?";
     readonly updatedAt: "DateTime";
+  };
+  readonly NurturingProjectUsageView: {
+    readonly projectId: "String";
+    readonly owner: "String";
+    readonly folded: "Json";
+    readonly appliedEventIds: "String[]";
+    readonly projectionVersion: "String";
+    readonly updatedAt: "DateTime";
+  };
+  readonly NurturingProjectTraceDay: {
+    readonly projectId: "String";
+    readonly day: "String";
+    readonly traceCount: "Int";
+    readonly errorCount: "Int";
+    readonly lastTraceAt: "DateTime?";
+    readonly lastFailedTraceAt: "DateTime?";
+  };
+  readonly NurturingPersonalProject: {
+    readonly projectId: "String";
+    readonly organizationId: "String";
+    readonly ownerUserId: "String";
+  };
+  readonly NurturingTracedProject: {
+    readonly projectId: "String";
+    readonly organizationId: "String";
   };
   readonly BillingMeterCheckpoint: {
     readonly id: "String";

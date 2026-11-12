@@ -31,6 +31,7 @@ import {
 import {
   USER_AGGREGATE_TYPE,
   USER_DEACTIVATED_EVENT_TYPE,
+  USER_ERASED_EVENT_TYPE,
   USER_LIFECYCLE_EVENT_VERSION,
   USER_REACTIVATED_EVENT_TYPE,
   USER_CREATED_EVENT_TYPE,
@@ -118,6 +119,9 @@ function nurturingOverMemoryPostHog(users: UserApi = createApiFixture<UserApi>({
     evaluationsCompleted: async () => undefined,
     simulationRunsFinished: async () => undefined,
     codingSessionsStored: async () => undefined,
+    recordPersonalOwner: async () => undefined,
+    recordTracedProject: async () => undefined,
+    forgetErasedUser: async () => undefined,
   });
   const subscribers: EventSubscriberDefinition<Event>[] = [];
   const registry = createApiFixture<
@@ -200,7 +204,11 @@ describe("nurturing's userRegistered peer subscriber", () => {
         subscribers
           .filter(({ eventTypes }) => eventTypes.some((type) => type.startsWith("lw.user.")))
           .map(({ eventTypes }) => eventTypes),
-      ).toEqual([[USER_REGISTERED_EVENT_TYPE], [USER_CREATED_EVENT_TYPE]]);
+      ).toEqual([
+        [USER_REGISTERED_EVENT_TYPE],
+        [USER_CREATED_EVENT_TYPE],
+        [USER_ERASED_EVENT_TYPE],
+      ]);
     });
   });
 });
