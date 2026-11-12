@@ -34,7 +34,7 @@ function snapshot({
   occurredAt: number;
   full?: number;
   lite?: number;
-  extra?: { holder: SeatHolder; seat: SeatKind }[];
+  extra?: { holder: SeatHolder; seat: SeatKind; suppressedBy?: string }[];
 }): SeatPeakFact {
   return {
     type: "seat_snapshot_taken",
@@ -885,6 +885,39 @@ describe("given a full invitation took a held seat's place", () => {
     expect(state.holds.left).toMatchObject({ seat: "full", restoredByFold: true });
     expect(state.counts.full).toBe(11);
     expect(novemberOf(state).fullPeak).toBe(11);
+  });
+
+  /** @scenario "A held seat an invitation stood in for when counting opened counts again when it expires" */
+  it("keeps the seatless hold at the opening and hands it the expiring invitation's seat", () => {
+    const state = foldAll([
+      snapshot({
+        occurredAt: NOV_1,
+        full: 9,
+        extra: [
+          { holder: invitation("inv-1", NOV_2), seat: "full" },
+          { holder: hold("left", DEC_1), seat: "none", suppressedBy: "inv-1" },
+        ],
+      }),
+      change({ holder: member("joiner"), from: "none", to: "full", occurredAt: NOV_3 }),
+    ]);
+
+    expect(state.invitations["inv-1"]?.seat).toBe("none");
+    expect(state.holds.left).toMatchObject({ seat: "full", restoredByFold: true });
+    expect(state.counts.full).toBe(11);
+    expect(novemberOf(state).fullPeak).toBe(11);
+  });
+
+  it("opens without a hold no invitation stands in for when it holds no seat", () => {
+    const state = foldAll([
+      snapshot({
+        occurredAt: NOV_1,
+        full: 9,
+        extra: [{ holder: hold("left", DEC_1), seat: "none" }],
+      }),
+    ]);
+
+    expect(state.holds).toEqual({});
+    expect(state.counts.full).toBe(9);
   });
 
   it("takes the seat back from the hold when a late extension revives the invitation", () => {

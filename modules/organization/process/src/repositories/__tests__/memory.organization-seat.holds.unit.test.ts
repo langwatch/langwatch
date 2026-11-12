@@ -82,6 +82,11 @@ describe("a seat held for somebody who left", () => {
       expect(
         await seats.findHoldUserIdsByEmail({ organizationId: ACME, email: "Linus@ACME.com" }),
       ).toEqual(["linus"]);
+      expect(await seats.findSeatHolders(ACME)).toContainEqual({
+        holder: { kind: "hold", userId: "linus", expiresAt: heldUntil.epochMilliseconds },
+        seat: "none",
+        suppressedBy: "inv-linus",
+      });
 
       memory.invites.delete("inv-linus");
 
@@ -99,6 +104,7 @@ describe("a seat held for somebody who left", () => {
       const holders = await seats.findSeatHolders(ACME);
 
       expect(holders.filter(({ seat }) => seat === "full")).toHaveLength(3);
+      expect(holders.filter(({ holder }) => holder.kind === "hold")).toHaveLength(1);
       expect(holders).toContainEqual({
         holder: { kind: "hold", userId: "linus", expiresAt: heldUntil.epochMilliseconds },
         seat: "full",

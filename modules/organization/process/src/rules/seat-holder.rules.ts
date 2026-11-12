@@ -30,3 +30,27 @@ export type SeatHolder = z.infer<typeof seatHolderSchema>;
 export function seatHolderId(holder: SeatHolder): string {
   return holder.kind === "invitation" ? holder.inviteId : holder.userId;
 }
+
+/**
+ * The live holds a full invitation to their person's address stands in for, each with that
+ * invitation: no seat now, the seat again when the invitation expires (ADR-002).
+ */
+export function suppressedHoldings({
+  holds,
+  fullUserIds,
+  fullInvitations,
+}: {
+  holds: readonly Readonly<{ userId: string; email?: string | null; expiresAt: number }>[];
+  fullUserIds: ReadonlySet<string>;
+  fullInvitations: readonly Readonly<{ id: string; email: string }>[];
+}): { holder: SeatHolder; seat: SeatKind; suppressedBy: string }[] {
+  return holds.flatMap(({ userId, email, expiresAt }) => {
+    if (fullUserIds.has(userId) || !email) return [];
+    const address = email.toLowerCase();
+    const invitation = fullInvitations.find((each) => each.email.toLowerCase() === address);
+    if (invitation === undefined) return [];
+    return [
+      { holder: { kind: "hold", userId, expiresAt }, seat: "none", suppressedBy: invitation.id },
+    ];
+  });
+}

@@ -54,7 +54,14 @@ export type RecordSeatChangedCommandData = z.infer<typeof recordSeatChangedComma
 export const recordSeatSnapshotCommandDataSchema = z.object({
   tenantId: z.string().min(1),
   organizationId: z.string().min(1),
-  holders: z.array(z.object({ holder: seatHolderSchema, seat: seatKindSchema })),
+  holders: z.array(
+    z.object({
+      holder: seatHolderSchema,
+      seat: seatKindSchema,
+      /** A hold a live full invitation to its address stands in for: that invitation's id. */
+      suppressedBy: z.string().min(1).optional(),
+    }),
+  ),
   occurredAt: z.number().int().nonnegative(),
 });
 export type RecordSeatSnapshotCommandData = z.infer<typeof recordSeatSnapshotCommandDataSchema>;

@@ -56,7 +56,8 @@ counts, because the cap counts it. So does a seat held for 30 days after somebod
    before one taken, so a hold replacing a seat never raises the peak. A hold giving its seat to
    an invitation records which one (`suppressedByInviteId`); when the fold expires that invitation
    it hands the seat back to the hold, inferred like the expiry, and takes it again if a late real
-   change revives the invitation. The fold keeps each pending invitation's expiry and, before applying
+   change revives the invitation. The opening snapshot records such a hold the same way: no seat,
+   and the invitation standing in for it. The fold keeps each pending invitation's expiry and, before applying
    a change, gives back the seats of invitations that expired before the change happened. It uses the
    change's own time, never the clock, so a replay gives the same answer.
 4. **A month with no change carries the count.** The peak of a month nobody joined or left is the
@@ -66,7 +67,8 @@ counts, because the cap counts it. So does a seat held for 30 days after somebod
    organization with every holder's seat as it stands; a second snapshot of an opened organization
    moves nothing. It waits until no pod of the previous
    release serves, since those move seats without recording the change. Until an organization has one, its changes are
-   not folded and the ops console says counting has not started. A new organization opens at zero.
+   not folded and the ops console says counting has not started. A new organization opens from the
+   same snapshot, taken when organization records it was created.
 6. **A custom role flips a seat across modules.** Whether a Lite Member holds a full seat depends on
    their custom role, which authz owns. Organization subscribes to authz's grant events, classifies
    the member again and records a seat change when the seat moved. Every such subscriber (authz,
@@ -90,7 +92,9 @@ counts, because the cap counts it. So does a seat held for 30 days after somebod
    invitation's expiry is inferred, not recorded, so it never outranks a real change: a late
    extension restores the seat with its new expiry, which is expired again by event time if it
    too is already past. So the running count is exact in any order, and only a momentary peak can be one
-   seat out when two changes cross. A holder who leaves keeps their row with no seat, so a late
+   seat out when two changes cross. One order is not exact: a hold's suppressed change arriving
+   after the fold has already expired the invitation it names is never handed its seat back. That
+   takes a delay as long as the invitation's life, and is one seat low until the hold ends. A holder who leaves keeps their row with no seat, so a late
    change cannot bring them back, and a redelivered change ties its holder's last change and moves
    nothing.
 
@@ -102,8 +106,10 @@ event was rejected too: it cannot be replayed, and an add followed quickly by a 
 counted after the removal and miss the high point. The fold costs an event on every path, which is
 also the audit trail the members table lacks: who held which seat, from when to when.
 
-The snapshot leaves a small window at deploy: a change written after the snapshot read the table but
-ordered before its event is counted twice or not at all. That is one seat, once, and only at deploy.
+The snapshot leaves a small window: a change written after the snapshot read the table but ordered
+before its event is counted twice or not at all. Each organization's snapshot is sent as soon as it
+is read, at deploy and when an organization is created, so the window is the time between the two:
+one seat, rarely, and only at an organization's opening.
 
 ## Consequences
 

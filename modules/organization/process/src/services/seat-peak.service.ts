@@ -112,12 +112,11 @@ export class SeatPeakService {
       });
       if (state.openedAt === null) unopened.push(organizationId);
     }
-    if (!dryRun && unopened.length > 0) {
-      const snapshots: RecordSeatSnapshotCommandData[] = [];
+    if (!dryRun) {
+      // Each sent as soon as it is read: a change between the two is lost to the opening.
       for (const organizationId of unopened) {
-        snapshots.push(await this.#snapshotOf({ organizationId, occurredAt }));
+        await this.#snapshotSender().send(await this.#snapshotOf({ organizationId, occurredAt }));
       }
-      await this.#snapshotSender().sendBatch(snapshots);
     }
     return {
       lastOrganizationId: page.ids.at(-1) ?? null,

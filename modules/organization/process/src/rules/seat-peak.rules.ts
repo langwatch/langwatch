@@ -274,6 +274,21 @@ function moveSuppressedHolds({
   return next;
 }
 
+/**
+ * The opening keeps a seated holder not yet expired, and a hold an invitation took the place of:
+ * seatless, to come back when that invitation expires.
+ */
+function keptAtOpening({
+  holder,
+  seat,
+  suppressedBy,
+  occurredAt,
+}: RecordSeatSnapshotCommandData["holders"][number] & { occurredAt: number }): boolean {
+  if (holder.kind === "member") return seat !== "none";
+  if (holder.expiresAt !== null && holder.expiresAt < occurredAt) return false;
+  return seat !== "none" || (holder.kind === "hold" && suppressedBy !== undefined);
+}
+
 function openSnapshot({
   state,
   snapshot,
@@ -288,16 +303,16 @@ function openSnapshot({
   >;
   let counts: SeatCounts = { full: 0, lite: 0, developer: 0 };
   const lastChangedAt = snapshot.occurredAt;
-  for (const { holder, seat } of snapshot.holders) {
-    if (seat === "none") continue;
+  for (const { holder, seat, suppressedBy } of snapshot.holders) {
+    if (!keptAtOpening({ holder, seat, suppressedBy, occurredAt: lastChangedAt })) continue;
     if (holder.kind === "member") {
       members[holder.userId] = { seat, lastChangedAt };
     } else {
-      if (holder.expiresAt !== null && holder.expiresAt < snapshot.occurredAt) continue;
       expiring[holder.kind][seatHolderId(holder)] = {
         seat,
         expiresAt: holder.expiresAt,
         lastChangedAt,
+        ...(suppressedBy === undefined ? {} : { suppressedBy }),
       };
     }
     counts = adjust({ counts, seat, by: 1 });

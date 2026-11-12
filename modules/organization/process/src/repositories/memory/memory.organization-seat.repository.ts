@@ -13,6 +13,7 @@ import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
 import { seatKindOf } from "../../rules/seat-change.rules.ts";
+import { suppressedHoldings } from "../../rules/seat-holder.rules.ts";
 import {
   type CountedSeatHold,
   type OrganizationSeatHolding,
@@ -233,6 +234,36 @@ export class MemoryOrganizationSeatRepository extends OrganizationSeatRepository
     return this.#members(organizationId, isFullMember).map((member) => member.userId);
   }
 
+  /** The live holds a live full invitation to their address stands in for. */
+  #suppressedHolds({
+    organizationId,
+    now,
+    permissionsOf,
+  }: {
+    organizationId: string;
+    now: Instant;
+    permissionsOf: PermissionsOf;
+  }): OrganizationSeatHolding[] {
+    return suppressedHoldings({
+      holds: this.memory.seatHolds
+        .filter(
+          (hold) =>
+            hold.organizationId === organizationId &&
+            Temporal.Instant.compare(hold.heldUntil, now) > 0,
+        )
+        .map((hold) => ({ ...hold, expiresAt: hold.heldUntil.epochMilliseconds })),
+      fullUserIds: new Set(
+        this.#members(organizationId, isFullMember).map((member) => member.userId),
+      ),
+      fullInvitations: [...this.memory.invites.values()].filter(
+        (invite) =>
+          invite.organizationId === organizationId &&
+          isLive(invite, now) &&
+          inviteHoldsSeat(invite, permissionsOf, isFullMember),
+      ),
+    });
+  }
+
   async findSeatHolders(organizationId: string): Promise<OrganizationSeatHolding[]> {
     const permissionsOf = this.#permissionsOf(organizationId);
     const now = nowInstant();
@@ -245,6 +276,7 @@ export class MemoryOrganizationSeatRepository extends OrganizationSeatRepository
         },
         seat: "full" as const,
       })),
+      ...this.#suppressedHolds({ organizationId, now, permissionsOf }),
       ...this.memory.organizationUsers
         .filter(
           (member) =>

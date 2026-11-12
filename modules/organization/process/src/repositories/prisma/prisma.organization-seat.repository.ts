@@ -28,6 +28,7 @@ import { fromDate } from "@langwatch/time";
 import { z } from "zod";
 
 import { seatKindOf } from "../../rules/seat-change.rules.ts";
+import { suppressedHoldings } from "../../rules/seat-holder.rules.ts";
 import {
   type CountedSeatHold,
   type OrganizationSeatHolding,
@@ -246,47 +247,40 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
   /** Every holder classified by the rule the counts above use, so the two cannot disagree. */
   async findSeatHolders(organizationId: string): Promise<OrganizationSeatHolding[]> {
     const context = await this.getMemberClassificationContext(organizationId);
-    const holds = countedSeatHolds({
-      holders: [
-        ...context.users.map((user) => ({
-          role: user.role,
-          permissions: context.userPermissionsMap.get(user.userId),
-          userId: user.userId,
-        })),
-        ...context.pendingInvites.map((invite) => ({
-          role: invite.role,
-          email: invite.email,
-          permissions: this.getInvitePermissions(invite.teamAssignments, context.customRoleMap),
-        })),
-      ],
-      holds: await this.prisma.seatHold.findMany({
+    const members = context.users.map((user) => ({
+      userId: user.userId,
+      role: user.role,
+      permissions: context.userPermissionsMap.get(user.userId),
+    }));
+    const invitations = context.pendingInvites.map((invite) => ({
+      ...invite,
+      permissions: this.getInvitePermissions(invite.teamAssignments, context.customRoleMap),
+    }));
+    const holds = (
+      await this.prisma.seatHold.findMany({
         where: { organizationId, heldUntil: { gt: new Date() } },
         select: { userId: true, email: true, heldUntil: true },
-      }),
-    });
+      })
+    ).map((hold) => ({ ...hold, expiresAt: fromDate(hold.heldUntil).epochMilliseconds }));
+    const isFull = (holder: { role: OrganizationUserRole; permissions: string[] | undefined }) =>
+      classifyMemberType(holder.role, holder.permissions) === "FullMember";
     return [
-      ...holds.map((hold) => ({
-        holder: {
-          kind: "hold" as const,
-          userId: hold.userId,
-          expiresAt: fromDate(hold.heldUntil).epochMilliseconds,
-        },
+      ...countedSeatHolds({ holders: [...members, ...invitations], holds }).map((hold) => ({
+        holder: { kind: "hold" as const, userId: hold.userId, expiresAt: hold.expiresAt },
         seat: "full" as const,
       })),
-      ...context.users.map((user) => ({
-        holder: { kind: "member" as const, userId: user.userId },
-        seat: seatKindOf(
-          classifyMemberType(user.role, context.userPermissionsMap.get(user.userId)),
-        ),
+      ...suppressedHoldings({
+        holds,
+        fullUserIds: new Set(members.filter(isFull).map(({ userId }) => userId)),
+        fullInvitations: invitations.filter(isFull),
+      }),
+      ...members.map(({ userId, role, permissions }) => ({
+        holder: { kind: "member" as const, userId },
+        seat: seatKindOf(classifyMemberType(role, permissions)),
       })),
-      ...context.pendingInvites.map((invite) => ({
-        holder: { kind: "invitation" as const, inviteId: invite.id, expiresAt: invite.expiresAt },
-        seat: seatKindOf(
-          classifyMemberType(
-            invite.role,
-            this.getInvitePermissions(invite.teamAssignments, context.customRoleMap),
-          ),
-        ),
+      ...invitations.map(({ id, expiresAt, role, permissions }) => ({
+        holder: { kind: "invitation" as const, inviteId: id, expiresAt },
+        seat: seatKindOf(classifyMemberType(role, permissions)),
       })),
     ];
   }
