@@ -25,14 +25,8 @@ const prWorkflowPermissionsBlock = `permissions:
   contents: read
 `
 
-// prReviewBotWaitStep is the review job's wait step with its failure branch.
-const prReviewBotWaitStep = `      - id: wait-for-checks
-        run: |
-          gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/check-runs"
-          if grep -qx failed <<<"$states"; then
-            echo "::error::another check failed; fix it and push"
-            exit 1
-          fi
+// prReviewBotWaitStep is the review job's wait step.
+const prReviewBotWaitStep = `      - run: go run ./cmd/waitforchecks
 `
 
 // goodPRReviewBotWorkflow mirrors the review job of .github/workflows/pr.yml as
@@ -57,18 +51,20 @@ jobs:
       !cancelled() &&
       needs.ci-complete.result == 'success' &&
       github.event_name == 'pull_request' &&
+      contains(fromJSON('["opened","synchronize","reopened","ready_for_review"]'), github.event.action) &&
       github.event.pull_request.user.login != 'dependabot[bot]' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.draft == false
     runs-on: ubuntu-latest
 ` + prReviewBotPermissionsBlock + `    steps:
-` + prReviewBotWaitStep + `      - if: steps.wait-for-checks.outputs.proceed == 'true'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - if: steps.wait-for-checks.outputs.proceed == 'true'
-        uses: langwatch/langwatch-pr-review-bot@7ff0638fa8cb21fb3f94f8a12b893c6d5446e521 # main 2026-09-22
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+` + prReviewBotWaitStep + `      - uses: langwatch/langwatch-pr-review-bot@7ff0638fa8cb21fb3f94f8a12b893c6d5446e521 # main 2026-09-22
         with:
           slack_notify: "false"
           claude_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -265,56 +261,38 @@ func TestPRReviewBotWaitsForTheOtherChecks(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotEmpty(t, problems)
-	assert.Contains(t, strings.Join(problems, "\n"), `no step with id "wait-for-checks"`)
+	assert.Contains(t, strings.Join(problems, "\n"), `no step running "go run ./cmd/waitforchecks"`)
 }
 
-func TestPRReviewBotWaitReadsTheCheckRuns(t *testing.T) {
-	broken := strings.Replace(goodPRReviewBotWorkflow, "commits/$SHA/check-runs", "commits/$SHA", 1)
-	root := writePRReviewBotWorkflow(t, broken)
-
-	problems, err := ciguard.PRReviewBot(root)
-
-	require.NoError(t, err)
-	require.NotEmpty(t, problems)
-	assert.Contains(t, strings.Join(problems, "\n"), "does not read the head commit's check-runs")
-}
-
-// @scenario "a failed check fails the review job"
-func TestPRReviewBotWaitFailsTheJobWhenACheckFailed(t *testing.T) {
-	broken := strings.Replace(goodPRReviewBotWorkflow, "            exit 1\n", "            exit 0\n", 1)
-	root := writePRReviewBotWorkflow(t, broken)
-
-	problems, err := ciguard.PRReviewBot(root)
-
-	require.NoError(t, err)
-	require.NotEmpty(t, problems)
-	assert.Contains(t, strings.Join(problems, "\n"), "can end green when another check failed")
-}
-
-// @scenario "a failed check fails the review job"
-func TestPRReviewBotWaitPrintsTheFailureMessage(t *testing.T) {
-	broken := strings.Replace(goodPRReviewBotWorkflow, "another check failed; fix it and push", "failed", 1)
-	root := writePRReviewBotWorkflow(t, broken)
-
-	problems, err := ciguard.PRReviewBot(root)
-
-	require.NoError(t, err)
-	require.NotEmpty(t, problems)
-	assert.Contains(t, strings.Join(problems, "\n"), "does not print")
-}
-
+// A failed wait fails the job, so the only way the bot runs on a red change is
+// to run before the wait.
 // @scenario "The review does not start when another check failed"
-func TestPRReviewBotGatesEveryActionOnTheWait(t *testing.T) {
+func TestPRReviewBotRunsTheWaitBeforeTheBot(t *testing.T) {
+	bot := goodPRReviewBotWorkflow[strings.Index(goodPRReviewBotWorkflow, "      - uses: langwatch"):]
+	moved := strings.Replace(goodPRReviewBotWorkflow, bot, "", 1)
+	moved = strings.Replace(moved, prReviewBotWaitStep, bot+prReviewBotWaitStep, 1)
+	require.NotEqual(t, goodPRReviewBotWorkflow, moved)
+	root := writePRReviewBotWorkflow(t, moved)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), "runs the bot before the wait")
+}
+
+// @scenario "Review does not run on other pull request event types"
+func TestPRReviewBotLimitsTheJobToTheFourEventTypes(t *testing.T) {
 	broken := strings.Replace(goodPRReviewBotWorkflow,
-		"      - if: steps.wait-for-checks.outputs.proceed == 'true'\n        uses: langwatch", "      - uses: langwatch", 1)
+		`      contains(fromJSON('["opened","synchronize","reopened","ready_for_review"]'), github.event.action) &&`+"\n", "", 1)
+	require.NotEqual(t, goodPRReviewBotWorkflow, broken)
 	root := writePRReviewBotWorkflow(t, broken)
 
 	problems, err := ciguard.PRReviewBot(root)
 
 	require.NoError(t, err)
 	require.NotEmpty(t, problems)
-	assert.Contains(t, strings.Join(problems, "\n"), "langwatch/langwatch-pr-review-bot")
-	assert.Contains(t, strings.Join(problems, "\n"), "is not gated")
+	assert.Contains(t, strings.Join(problems, "\n"), "event type")
 }
 
 // @scenario "In-progress review is canceled for the same PR"
@@ -543,6 +521,7 @@ func TestPRReviewBotAcceptsAQuotedUsesValue(t *testing.T) {
 	quoted := strings.Replace(goodPRReviewBotWorkflow,
 		"- uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1",
 		`- uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1`, 1)
+	require.NotEqual(t, goodPRReviewBotWorkflow, quoted, "the mutation must apply")
 	root := writePRReviewBotWorkflow(t, quoted)
 
 	problems, err := ciguard.PRReviewBot(root)
@@ -559,6 +538,7 @@ func TestPRReviewBotAcceptsARepeatedIdenticalStep(t *testing.T) {
 		"      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n",
 		"      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n"+
 			"      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n", 1)
+	require.NotEqual(t, goodPRReviewBotWorkflow, repeated, "the mutation must apply")
 	root := writePRReviewBotWorkflow(t, repeated)
 
 	problems, err := ciguard.PRReviewBot(root)

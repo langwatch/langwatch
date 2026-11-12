@@ -195,11 +195,12 @@ jobs:
   #
   # ci-complete covers only the calls of this workflow. The separate workflows
   # that also run on a pull_request (pr-conventions, go-ci, sdk-python-ci,
-  # code-scanners, ...) can still be running, so the first step waits until
-  # every other check run on the head commit has finished and skips the review
-  # if any failed. A new push cancels this run (concurrency above), and with it
-  # the wait. A wait that times out fails the job: the ruleset requires this
-  # check, and a silent pass would let an unreviewed change merge.
+  # code-scanners, ...) can still be running, so a step before the review
+  # waits until every other check run on the head commit has finished, and
+  # fails this job if any failed. A new push cancels this run (concurrency
+  # above), and with it the wait. A wait that times out fails the job too: the
+  # ruleset requires this check, and a silent pass would let an unreviewed
+  # change merge.
   review:
     needs: ci-complete
     # !cancelled() replaces the implicit success(). On a job, success() checks
@@ -212,6 +213,7 @@ jobs:
       !cancelled() &&
       needs.ci-complete.result == 'success' &&
       github.event_name == 'pull_request' &&
+      contains(fromJSON('["opened","synchronize","reopened","ready_for_review"]'), github.event.action) &&
       github.event.pull_request.user.login != 'dependabot[bot]' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.draft == false
@@ -222,36 +224,24 @@ jobs:
       contents: write # so the default token can call resolveReviewThread; read would only lose thread auto-resolution
       pull-requests: write
     steps:
-      - id: wait-for-checks
-        name: Wait for every other check on the head commit
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          deadline=$((SECONDS + 2700))
-          while [ "$SECONDS" -lt "$deadline" ]; do
-            # This job's own check run is named `review`; it would wait on itself.
-            states=$(gh api --paginate "repos/$GITHUB_REPOSITORY/commits/$SHA/check-runs?per_page=100" \
-              --jq '.check_runs[] | select(.name != "review") | if .status != "completed" then "pending" elif (.conclusion | IN("success", "skipped", "neutral")) then "ok" else "failed" end' | sort -u)
-            if grep -qx failed <<<"$states"; then
-              echo "::error::another check failed; fix it and push"
-              exit 1
-            fi
-            if ! grep -qx pending <<<"$states"; then
-              echo "proceed=true" >>"$GITHUB_OUTPUT"
-              exit 0
-            fi
-            sleep 30
-          done
-          echo "::error::checks on $SHA were still running after 45 minutes"
-          exit 1
-      - if: steps.wait-for-checks.outputs.proceed == 'true'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - if: steps.wait-for-checks.outputs.proceed == 'true'
-        uses: langwatch/langwatch-pr-review-bot@05d6c298cb28b0f67e2e7fda075b916a0294af5b # main 2026-10-24
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache: true
+      # A failed or timed-out wait fails this job, so the review step below
+      # never runs on a red or unfinished change (tools/waitforchecks).
+      - name: Wait for every other check on the head commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          # This job's own check run would wait on itself.
+          EXCLUDE_CHECK: review
+        run: go run ./cmd/waitforchecks
+      - uses: langwatch/langwatch-pr-review-bot@05d6c298cb28b0f67e2e7fda075b916a0294af5b # main 2026-10-24
         with:
           slack_notify: "false"
           claude_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

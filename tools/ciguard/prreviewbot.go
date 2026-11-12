@@ -31,11 +31,20 @@ var prReviewBotGateClauses = map[string]string{
 	"pull request": "github.event_name == 'pull_request'",
 	"ci-complete":  "needs.ci-complete.result == 'success'",
 	"skipped call": "!cancelled()",
+	// pr.yml may declare more pull_request types for the product checks (a
+	// review per label or edit would burn tokens), so the job lists its own.
+	"event type": prReviewBotEventTypeClause(),
 }
 
 // prReviewBotTriggerTypes are the pull_request event types that (subject to
 // the gate above) can run a review.
 var prReviewBotTriggerTypes = []string{"opened", "synchronize", "reopened", "ready_for_review"}
+
+// prReviewBotEventTypeClause is the `if:` clause limiting the review job to
+// prReviewBotTriggerTypes, as pr.yml spells it.
+func prReviewBotEventTypeClause() string {
+	return `contains(fromJSON('["` + strings.Join(prReviewBotTriggerTypes, `","`) + `"]'), github.event.action)`
+}
 
 // prReviewBotRequiredPermissions are the exact permissions the review job must grant:
 // contents: write (for resolveReviewThread), pull-requests: write (for posting
@@ -118,81 +127,41 @@ func prReviewBotGates(workflow *ciscan.Workflow) []string {
 	return problems
 }
 
-// prReviewBotWaitStep is the id of the review job's first step, which waits
-// until every other check run on the head commit finished and decides through
-// its `proceed` output whether the review runs.
-const prReviewBotWaitStep = "wait-for-checks"
+// prReviewBotWaitCommand is what the review job's wait step runs: it blocks
+// until every other check run on the head commit finished and exits non-zero
+// (failing the job) when one failed or the wait timed out. Its behaviour is
+// tested in tools/waitforchecks; this guard only notices it going missing.
+const prReviewBotWaitCommand = "go run ./cmd/waitforchecks"
 
-// prReviewBotProceedClause is the `if:` every `uses:` step of the review job
-// carries, so a failed check spends no tokens.
-const prReviewBotProceedClause = "steps." + prReviewBotWaitStep + ".outputs.proceed == 'true'"
+// prReviewBotBotAction is the action that spends the tokens.
+const prReviewBotBotAction = "langwatch/langwatch-pr-review-bot@"
 
 // prReviewBotWaitsForChecks checks the review job still waits for the checks of
-// the separate workflows (ci-complete covers only pr.yml's own calls) and that
-// no action step can run without that wait's go-ahead. Like the gate clauses,
-// it reads literal text: a wait whose `run:` no longer lists check runs, or an
-// action step that lost its `if:`, would let the review start on a PR whose
-// other checks are still running or red, and nothing else would notice.
+// the separate workflows (ci-complete covers only pr.yml's own calls) before
+// the bot step. A failed wait fails the job, so the bot never runs after it. Like
+// the gate clauses, it reads literal text: a wait that vanished, or moved after
+// the bot, would let the review start on a PR whose other checks are still
+// running or red, and nothing else would notice.
 func prReviewBotWaitsForChecks(workflow *ciscan.Workflow) []string {
 	job, ok := workflow.Jobs[prReviewBotReviewJob]
 	if !ok { // prReviewBotGates reports a missing job
 		return nil
 	}
 
-	var problems []string
-	waits := slices.IndexFunc(job.Steps, func(step ciscan.Step) bool { return step.ID == prReviewBotWaitStep })
-	switch {
-	case waits < 0:
-		problems = append(problems, fmt.Sprintf(
-			"%s review job has no step with id %q waiting for the other checks", PRReviewBotWorkflow, prReviewBotWaitStep))
-	case !strings.Contains(job.Steps[waits].Run, "check-runs"):
-		problems = append(problems, fmt.Sprintf(
-			"%s step %q does not read the head commit's check-runs", PRReviewBotWorkflow, prReviewBotWaitStep))
-	}
-
-	if waits >= 0 {
-		problems = append(problems, prReviewBotFailureBranch(job.Steps[waits].Run)...)
-	}
-
-	for i := range job.Steps {
-		step := job.Steps[i]
-		if step.Uses != "" && !strings.Contains(step.If, prReviewBotProceedClause) {
-			problems = append(problems, fmt.Sprintf(
-				"%s review step %q is not gated on %q", PRReviewBotWorkflow, step.Uses, prReviewBotProceedClause))
-		}
-	}
-
-	return problems
-}
-
-// prReviewBotFailureMessage is what the wait step prints when another check
-// failed; it marks the start of the failure branch.
-const prReviewBotFailureMessage = "another check failed; fix it and push"
-
-// prReviewBotBranchEnd finds the `fi` closing the failure branch.
-var prReviewBotBranchEnd = regexp.MustCompile(`(?m)^\s*fi\b`)
-
-// prReviewBotNonZeroExit matches an `exit` with a non-zero status.
-var prReviewBotNonZeroExit = regexp.MustCompile(`\bexit [1-9]`)
-
-// prReviewBotFailureBranch checks the wait step cannot end green when another
-// check failed: a green-skipped `review` satisfies the required check, so a red
-// PR would look reviewed. The branch from the failure message to its `fi` must
-// exit non-zero and never `exit 0`.
-func prReviewBotFailureBranch(run string) []string {
-	_, rest, found := strings.Cut(run, prReviewBotFailureMessage)
-	if !found {
+	waits := slices.IndexFunc(job.Steps, func(step ciscan.Step) bool {
+		return strings.Contains(step.Run, prReviewBotWaitCommand)
+	})
+	if waits < 0 {
 		return []string{fmt.Sprintf(
-			"%s step %q does not print %q when another check failed",
-			PRReviewBotWorkflow, prReviewBotWaitStep, prReviewBotFailureMessage)}
+			"%s review job has no step running %q to wait for the other checks", PRReviewBotWorkflow, prReviewBotWaitCommand)}
 	}
-	if end := prReviewBotBranchEnd.FindStringIndex(rest); end != nil {
-		rest = rest[:end[0]]
-	}
-	if strings.Contains(rest, "exit 0") || !prReviewBotNonZeroExit.MatchString(rest) {
+
+	bot := slices.IndexFunc(job.Steps, func(step ciscan.Step) bool {
+		return strings.HasPrefix(step.Uses, prReviewBotBotAction)
+	})
+	if bot >= 0 && bot < waits {
 		return []string{fmt.Sprintf(
-			"%s step %q can end green when another check failed (the failure branch must exit non-zero)",
-			PRReviewBotWorkflow, prReviewBotWaitStep)}
+			"%s review job runs the bot before the wait for the other checks", PRReviewBotWorkflow)}
 	}
 
 	return nil

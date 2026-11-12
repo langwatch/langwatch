@@ -55,10 +55,12 @@ Feature: PR Review Bot workflow
   # Gating: the other workflows' checks
   # ============================================================================
   #
-  # ci-complete covers only the calls of pr.yml. The review job's first step
-  # lists the head commit's check runs, waits while any is unfinished, and gives
-  # the go-ahead only when none failed; every action step of the job needs it.
-  # A new push cancels the run (see Concurrency) and with it the wait.
+  # ci-complete covers only the calls of pr.yml. A step of the review job, run
+  # before the bot step (`go run ./cmd/waitforchecks`, tools/waitforchecks),
+  # lists the head commit's check runs, waits while any is unfinished, and fails
+  # the job if one failed or the wait timed out, so the bot step never runs.
+  # It retries transient API errors (network, 5xx, rate limits) until its
+  # deadline. A new push cancels the run (see Concurrency) and with it the wait.
 
   @unit
   Scenario: The review waits for every other check on the head commit
@@ -71,14 +73,14 @@ Feature: PR Review Bot workflow
   Scenario: The review does not start when another check failed
     Given CI passed and another workflow's check on the head commit failed
     When the wait step reads the check runs
-    Then the review steps are skipped
+    Then the bot step does not run, because the wait step comes first and fails the job
     And no review is posted to the PR
 
   @unit
   Scenario: a failed check fails the review job
     Given CI passed and another workflow's check on the head commit failed
     When the wait step reads the check runs
-    Then the wait step prints "another check failed; fix it and push"
+    Then the wait step names the failed check in "another check failed: <names>; fix it and push"
     And the wait step exits non-zero
     And the review job ends red, never green-skipped
 
@@ -157,6 +159,15 @@ Feature: PR Review Bot workflow
     And the PR author is not dependabot
     When the workflow runs
     Then the review job executes
+
+  # pr.yml is shared with the product checks, which may declare more
+  # pull_request types (edited, labeled, ...). A review costs tokens, so the job
+  # lists the four types itself.
+  @unit
+  Scenario: Review does not run on other pull request event types
+    Given pr.yml also triggers on a pull_request type other than the four above
+    When the workflow runs for that type
+    Then the review job is skipped
 
   # ============================================================================
   # Concurrency
