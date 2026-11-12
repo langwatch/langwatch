@@ -29,7 +29,7 @@ const WEB: CompiledWhere = {
 
 type Statement = { sql: string; params: Record<string, unknown> };
 
-function spanRepository() {
+function spanRepository({ countsOwners = true }: { countsOwners?: boolean } = {}) {
   const statements: Statement[] = [];
   const clickhouse = new AuthorizedClickHouse({
     resolveClient: async () =>
@@ -39,7 +39,9 @@ function spanRepository() {
           execute: vi.fn<ScriptedStatements["execute"]>(async (request) => {
             statements.push({ sql: request.sql, params: request.params ?? {} });
             const counts = request.sql.includes("AS Total");
-            return { rows: counts ? [{ Total: 1, FromMs: 1, ToMs: 2 }] : [] };
+            const owners =
+              countsOwners && request.sql.includes("AS Tenants") ? { Tenants: [] } : {};
+            return { rows: counts ? [{ Total: 1, FromMs: 1, ToMs: 2, ...owners }] : [] };
           }),
         },
       }),
@@ -153,6 +155,21 @@ describe("SpanStorageClickHouseRepository trace-view reads", () => {
         expect(statements.map(({ sql }) => sql)).toEqual(own.map(({ sql }) => sql));
         for (const { sql } of statements) expect(sql).not.toContain("tenantScope_c");
       });
+    });
+  });
+
+  describe("when a braided page's count comes back without the projects it counts", () => {
+    /** @scenario "A page's total counting an owner's spans is audited, even with none of them shown" */
+    it("refuses the page rather than return a total whose owners go unaudited", async () => {
+      const { repo } = spanRepository({ countsOwners: false });
+      const authorization = braidedProof({
+        projectId: READER,
+        braids: [{ owner: OWNER, compiledWhere: WEB }],
+      });
+
+      await expect(
+        repo.listSpansPaginated({ authorization, reads: "spans", ...at, limit: 50, offset: 0 }),
+      ).rejects.toThrow("without the projects it counts");
     });
   });
 });

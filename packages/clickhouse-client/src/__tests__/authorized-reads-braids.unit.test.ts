@@ -634,6 +634,10 @@ describe("the fence over a span read", () => {
             ` AND toUnixTimestamp64Milli(UpdatedAt) < {cutMs:Int64}${KEYS}`,
           ],
           ["an exact version", ` AND UpdatedAt = {at:DateTime64(9)}${KEYS}`],
+          ["the upper bound on a double-quoted version", ` AND "UpdatedAt" < {cut:Int64}${KEYS}`],
+          ["the upper bound on a backtick-quoted version", " AND `UpdatedAt` < {cut:Int64}" + KEYS],
+          ["a column bound as an Identifier", ` AND {col:Identifier} < {cut:Int64}${KEYS}`],
+          ["a filter on a quoted changing column", ` AND "SpanName" = {n:String}${KEYS}`],
         ])("refuses an election whose own select carries %s", (_shape, inner) => {
           expect(refusalOf(fenced({ inner }))).toEqual({ kind: "loose-latest-version-marker" });
         });

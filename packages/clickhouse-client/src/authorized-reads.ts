@@ -812,6 +812,8 @@ const WORD = /[A-Za-z_]\w*/y;
 function isElectionClosedAsAConjunct({ text, from }: { text: string; from: number }): boolean {
   const body = flatScopeOf({ text, from });
   if (body === undefined || body.end === text.length || !isKeysElection(body)) return false;
+  // A quoted or parameter-bound identifier reads as an operand, so it could hide a version bound.
+  if (/["`]|:\s*Identifier\s*\}/i.test(text.slice(from, body.end))) return false;
   const after = flatScopeOf({ text, from: body.end + 1 });
   if (after === undefined) return false;
   const end = WHERE_END.exec(after.flat);

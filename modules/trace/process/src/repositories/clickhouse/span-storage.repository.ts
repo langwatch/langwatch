@@ -1832,6 +1832,10 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           format: "JSONEachRow",
         });
         const pageRows = fullSpanRowsSchema.parse(await pageResult.json());
+        // A braided total names the projects it counts, or its owners would go unaudited.
+        if (braided && range.Tenants === undefined) {
+          throw new Error("A braided span count came back without the projects it counts");
+        }
 
         return {
           spans: ownedSpansOf({ rows: pageRows, authorization, braided }),
