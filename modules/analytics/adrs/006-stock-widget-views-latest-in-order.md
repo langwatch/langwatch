@@ -29,10 +29,10 @@ new MATERIALIZED column.
    as a stream with no hash state. A filter on a key column reaches the primary key and
    partitions. An earlier form, `GROUP BY` the key with `argMax` per column under
    `optimize_aggregation_in_order`, measured far worse (below) and was replaced; the profile pins
-   no `optimize_aggregation_in_order`, so it stays the server default. Nine views pin the strategy:
+   no `optimize_aggregation_in_order`, so it stays the server default. Eight views pin the strategy:
    `trace_metrics`, `traces`, `evaluations`, `simulations`, `experiment_run_results`, `experiment_items`,
-   `simulation_trace_metrics`, `gateway_request_spend` and `span_metrics`. Every other view keeps
-   the shipped `FINAL`.
+   `simulation_trace_metrics` and `gateway_request_spend`. `span_metrics` takes none (decision 5).
+   Every other view keeps the shipped `FINAL`.
 2. **Version ties.** Where a replay can rewrite a row with the same `UpdatedAt`, the view breaks
    the tie by `Version` (`trace_metrics`, `traces`, `evaluations`, `simulations`,
    `experiment_run_results`, `gateway_request_spend`), as `FINAL` does by keeping the later insert.
@@ -55,9 +55,11 @@ new MATERIALIZED column.
    content, not even a hash of it (#6856). `ErrorType` falls back from `exception.type` to
    `error.type`; `InputHash` is the first 8 bytes of the input's SHA-256, and 0 for a span with no
    input. The stock span widgets read `span_metrics`. Their presence checks still read `spans`,
-   since they look back 90 days, and so do the loop widgets, which compare `CapturedInput`, and
-   the step latency and voice call health, which read no map and ran out of memory on
-   `span_metrics` alone.
+   since they look back 90 days, and so do the loop widgets, which compare `CapturedInput`.
+   `span_metrics` reads `span_analytics` with no dedup (`strategy: "none"`): the map projection
+   writes each span once and a span's facts never change. Under the production pin
+   (compatibility 25.10, which turns `optimize_limit_by_in_order` off) its `LIMIT 1 BY` held every
+   span key of the period and ran 11 stock widgets out of memory in under 3 seconds.
 6. **History by replay, not by mutation.** Two `defineProjectionReplayStep` steps, one per lane
    (`traceAnalytics`, `spanAnalytics`), replay the last 62 days (the longest stock period plus two)
    after old writers are gone. No goose file starts a mutation; the 00128 fill steps are gone.
@@ -73,12 +75,13 @@ new MATERIALIZED column.
 ## Consequences
 
 - **Version ties without a tie-break.** On an exact tie of the version column with no tie-break
-  (`experiment_items`, `simulation_trace_metrics` on `OccurredAt`, `span_metrics` on
-  `ProjectedAt`), `LIMIT 1 BY` keeps whichever row the sort meets first and `FINAL` the last
+  (`experiment_items`, `simulation_trace_metrics` on `OccurredAt`), `LIMIT 1 BY` keeps whichever row the sort meets first and `FINAL` the last
   inserted. The two differ only if one event was folded twice in the same millisecond with
   different values.
-- **A moved `StartTime`.** `span_metrics` groups by `StartTime` so that a time filter prunes; a span
-  re-sent with a different start time is two rows there, where `FINAL` on `stored_spans` keeps one.
+- **A span written twice.** `span_metrics` counts a second copy of a span until a merge removes it:
+  an insert retried after it landed, or the replay of decision 6 reaching a span the live writer
+  already wrote. A span re-sent with a different start time is two rows, where `FINAL` on
+  `stored_spans` keeps one.
 - **Time pruning.** `trace_metrics` and `span_metrics` prune by time through a key column. The
   other seven have no time column in their key, so a time filter applies after the dedup: their
   cost grows with the project's history, not the period. Measured below (for the argMax form).
@@ -140,3 +143,10 @@ days, two `evaluation_metrics` coverage queries that also fail on main) in every
 - **Row equality.** On seeded versions, duplicates, a replay tie and a moved anchor, with merges
   stopped, each of the nine views returns exactly its FINAL twin's rows (EXCEPT empty both ways),
   for both the `argMax` and the `LIMIT 1 BY` forms.
+
+## Amendment: retraction-pair projections settle instead (ADR-007)
+
+The stock evaluation widgets read `trace_evaluation_metrics` and `trace_evaluation_checks`, over
+`trace_evaluation_analytics`, a `VersionedCollapsingMergeTree` the trace fold writes with a
+retraction for every change. Those views take neither `FINAL` nor `LIMIT 1 BY` but the `settled`
+strategy: `GROUP BY` every column read, `HAVING sum(Sign) > 0` (ADR-007).

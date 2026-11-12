@@ -71,13 +71,22 @@ describe("given the Where my agent breaks widgets", () => {
   /** @scenario "AC62 Where my agent breaks: loops and retries are read from repeated spans" */
   it("finds loops by tool and input, retries by a later sibling after a failure", () => {
     const { code, sql } = buildOf("up-loops");
-    expect(sql.daily).toContain("GROUP BY TraceId, SpanName, CapturedInput");
+    expect(sql.daily).toContain("sipHash128(CapturedInput)");
+    expect(sql.daily).toContain("GROUP BY TraceId, SpanName, input");
     expect(sql.daily).toContain("HAVING count() >= 3");
     expect(sql.daily).toContain("max(StartTime) > minIf(StartTime, StatusCode = 2)");
     expect(sql.daily).toContain("GROUP BY TraceId, ParentSpanId");
     expect(sql.totals).toContain("sum(CostSum)");
     expect(code).toContain("Cost of the repeats");
-    expect(sql.daily).toContain("countIf(Cost IS NULL) AS uncosted");
+    expect(sql.daily).toContain("countIf(unpriced) AS uncosted");
+    expect(sql.daily).toContain("countIf(Cost IS NULL AND StatusCode = 2) AS uncosted");
+    // Retry groups are looked up by a 64-bit hash; the HAVING drops any a collision lets in.
+    expect(sql.daily).toContain(
+      "cityHash64(TraceId, ifNull(ParentSpanId, ''), if(SpanType = 'llm'",
+    );
+    expect(sql.daily).toContain("HAVING countIf(StatusCode = 2) > 0");
+    // Main's LIMIT 10000 per kind kept an arbitrary 10000 repeats; every repeat now counts.
+    expect(sql.daily).not.toContain("LIMIT 10000");
     expect(sql.daily).toContain("sum(uncosted) AS uncosted_spans");
     expect(code).toContain('usd(repeatCost) + (lowerBound ? "+" : "")');
   });
@@ -85,8 +94,10 @@ describe("given the Where my agent breaks widgets", () => {
   /** @scenario "AC63 Where my agent breaks: tool error rate says how many tool errors the agent recovered" */
   it("reads tool spans only and shows the recovered share and the worst tool", () => {
     const { code, sql } = buildOf("tools-error-rate");
-    // Both the calls and the failed calls that look their parent up read tool spans only.
-    expect(sql.main?.match(/AND SpanType = 'tool'/g)).toHaveLength(2);
+    // The calls below a parent and the failed calls that look their parent up read tool spans
+    // only; a lone top-level span counts when it is a tool (step, calls, failures).
+    expect(sql.main?.match(/AND SpanType = 'tool'/g)).toHaveLength(5);
+    expect(sql.main).toContain("HAVING top_level > 0 AND countIf(ParentSpanId IS NOT NULL) = 0");
     expect(sql.main).not.toContain("SpanAttributes");
     expect(code).toContain("Tool error rate");
     expect(code).toContain("Recovered, of ");

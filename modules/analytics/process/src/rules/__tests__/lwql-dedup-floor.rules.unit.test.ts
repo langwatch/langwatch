@@ -108,11 +108,15 @@ describe("given a statement that reads evaluation_metrics", () => {
     });
 
     /** @scenario "A read bounded below on OccurredAt deduplicates only from that bound" */
-    it("floors both evaluation reads of the attribution stock queries", () => {
-      for (const label of ["att-table/passRates", "att-change/units", "ck-attention/agreement"]) {
+    it("floors the evaluation reads of the attribution stock queries", () => {
+      for (const [label, view] of [
+        ["att-table/passRates", "trace_evaluation_metrics"],
+        ["att-change/units", "trace_evaluation_metrics"],
+        ["ck-attention/agreement", "trace_evaluation_checks"],
+      ] as const) {
         const sent = send(stock.get(label) ?? "");
-        expect(sent, label).toContain("evaluation_metrics__floor(lwql_floor = ");
-        expect(sent, label).not.toMatch(/FROM evaluation_metrics\s/);
+        expect(sent, label).toContain(`${view}__floor(lwql_floor = `);
+        expect(sent, label).not.toMatch(new RegExp(`FROM ${view}\\s`));
       }
     });
   });
@@ -212,5 +216,51 @@ describe("given a view whose dedup declares no floor column", () => {
     const sql = `SELECT TraceId FROM trace_metrics WHERE OccurredAt >= ${START}`;
 
     expect(send(sql)).toBe(sql);
+  });
+});
+
+describe("given a statement that reads a settled view over trace_evaluation_analytics", () => {
+  /** @scenario "A read bounded below on OccurredAt reads the settled view's floored twin" */
+  it("reads trace_evaluation_checks__floor from the bound on OccurredAt", () => {
+    expect(
+      send(
+        `SELECT sum(Evaluations) FROM trace_evaluation_checks WHERE OccurredAt >= ${START} AND TraceOccurredAt < ${END}`,
+      ),
+    ).toBe(
+      `SELECT sum(Evaluations) FROM trace_evaluation_checks__floor(lwql_floor = ${floorOf(START)}) AS trace_evaluation_checks ` +
+        `WHERE OccurredAt >= ${START} AND TraceOccurredAt < ${END}`,
+    );
+  });
+});
+
+describe("given the stock queries that read the trace evaluations", () => {
+  const MOVED = [
+    "ans-outcomes/totals",
+    "ans-topics/topics",
+    "att-change/units",
+    "att-table/passRates",
+    "ck-attention/agreement",
+    "ck-attention/reasons",
+    "ck-attention/segments",
+    "ck-kpis/checks",
+    "ck-kpis/outcomes",
+    "ck-top-ask/gap",
+    "cost-verdict/outcomes",
+    "rag-failure-source/trend",
+  ];
+
+  /** @scenario "Every read of the trace evaluations in a moved stock query reads the floored twin" */
+  it("sends every trace evaluation read of the moved queries to its floored twin", () => {
+    for (const label of MOVED) {
+      const sql = stock.get(label) ?? "";
+      const reads = sql.match(/FROM trace_evaluation_(metrics|checks)\b/g) ?? [];
+      const sent = send(sql);
+
+      expect(reads.length, label).toBeGreaterThan(0);
+      expect(
+        sent.match(/FROM trace_evaluation_(metrics|checks)__floor\(lwql_floor = /g),
+        label,
+      ).toHaveLength(reads.length);
+    }
   });
 });

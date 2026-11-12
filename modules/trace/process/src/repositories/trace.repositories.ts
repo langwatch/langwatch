@@ -21,6 +21,7 @@ import type { TraceAnnotationsReadRepository } from "./trace-annotations.reposit
 import type { TraceAttributeSpendRepository } from "./trace-attribute-spend.repository.ts";
 import type { TraceAttributedRollupRepository } from "./trace-attributed-rollup.repository.ts";
 import type { TraceDerivationSpanReaderRepository } from "./trace-derivation-span-reader.repository.ts";
+import type { TraceEvaluationAnalyticsRepository } from "./trace-evaluation-analytics.repository.ts";
 import type { TraceEvaluationRunsReadRepository } from "./trace-evaluation-runs.repository.ts";
 import type { TraceExistenceRepository } from "./trace-existence.repository.ts";
 import type { TraceIndexMaterialisationRepository } from "./trace-index-materialisation.repository.ts";
@@ -47,6 +48,8 @@ export interface TraceRepositories {
   readonly summaryProjection: TraceSummaryProjectionRepository;
   readonly analyticsProjection: TraceAnalyticsProjectionRepository;
   readonly analyticsRollup: TraceAnalyticsRollupRepository;
+  /** Each evaluation's outcome beside its trace's columns (goose 00129), the fold's to write. */
+  readonly evaluationAnalytics: TraceEvaluationAnalyticsRepository;
   /** The span facts the stock widgets read (goose 00128), appended per span. */
   readonly spanAnalytics: SpanAnalyticsRepository;
   /** The span_analytics replay step's ledger row: where the span widgets' history starts. */

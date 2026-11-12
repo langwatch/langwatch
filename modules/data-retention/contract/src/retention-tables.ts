@@ -17,6 +17,7 @@ export const RETENTION_TABLE_CATEGORY_MAP = {
   trace_summaries: "traces",
   trace_analytics: "traces",
   trace_analytics_rollup: "traces",
+  trace_evaluation_analytics: "traces",
   evaluation_runs: "traces",
   evaluation_analytics: "traces",
   evaluation_analytics_rollup: "traces",
@@ -109,6 +110,7 @@ const TABLES_WITHOUT_SIZE_COLUMN = new Set<RetentionManagedTable>([
   "span_analytics",
   "trace_analytics",
   "trace_analytics_rollup",
+  "trace_evaluation_analytics",
   "evaluation_analytics",
   "evaluation_analytics_rollup",
 ]);

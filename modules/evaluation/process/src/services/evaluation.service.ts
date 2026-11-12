@@ -3,6 +3,7 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   EvaluationNotFoundError,
   evaluationInputsQuerySchema,
+  evaluationOutcomesQuerySchema,
   evaluationRunDataSchema,
   evaluationRunLookupSchema,
   evaluationRunsByTraceQuerySchema,
@@ -17,6 +18,8 @@ import {
   type ExecuteEvaluationCommand,
   type UpsertEvaluationRunCommand,
   type EvaluationInputsQuery,
+  type EvaluationOutcomePage,
+  type EvaluationOutcomesQuery,
 } from "@langwatch/evaluation-contract";
 import { canReadCapturedContent, type TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
@@ -128,6 +131,28 @@ export class EvaluationService {
       }),
       traceId,
     });
+  }
+
+  /** A page of finished runs on a trace; a full page names where the next resumes. */
+  async listEvaluationOutcomes(input: EvaluationOutcomesQuery): Promise<EvaluationOutcomePage> {
+    const { tenantId, sinceMs, after, limit } = evaluationOutcomesQuerySchema.parse(input);
+    const outcomes = await this.options.repository.findOutcomesSince({
+      authorization: await this.ownProof({
+        projectId: tenantId,
+        entry: "EvaluationService.listEvaluationOutcomes",
+      }),
+      sinceMs,
+      after,
+      limit,
+    });
+    const last = outcomes.at(-1);
+    return {
+      outcomes,
+      next:
+        outcomes.length === limit && last
+          ? { occurredAt: last.occurredAt, evaluationId: last.evaluationId }
+          : null,
+    };
   }
 
   /** The `*Api` names a tenant, not a proof: the platform reads that one project as itself. */

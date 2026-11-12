@@ -6,7 +6,10 @@
 
 import { flooredViewName, LWQL_FLOOR_PARAMETER } from "../../../rules/lwql-dedup-floor.rules.ts";
 import { TENANT_COLUMN } from "../../../rules/lwql-view-catalog.rules.ts";
-import type { LangWatchQLDedupStrategy } from "../../../rules/lwql-view-dedup-shape.rules.ts";
+import {
+  FLOORED_DEDUP_STRATEGIES,
+  type LangWatchQLDedupStrategy,
+} from "../../../rules/lwql-view-dedup-shape.rules.ts";
 import {
   KEY_MAP_COLUMNS,
   type LangWatchQLNames,
@@ -104,6 +107,35 @@ function postgresTenantPredicate({
     `WHERE ${sourceColumn(TENANT_COLUMN)} >= ${bound("min")}\n` +
     `  AND ${sourceColumn(TENANT_COLUMN)} <= ${bound("max")}`
   );
+}
+
+/**
+ * One grain column as a `GROUP BY` key: a derived column groups by its expression, so the view
+ * holds one row per published value rather than one per source value it maps from.
+ */
+function groupKey(view: LangWatchQLViewDefinition, name: string): string {
+  const column = view.columns.find((candidate) => candidate.name === name);
+  return column?.expression
+    ? catalogShapes.columnExpression({ column, source: sourceColumn })
+    : sourceColumn(catalogShapes.physicalColumn(view, name));
+}
+
+/** The `GROUP BY` closing a grouped or settled view, with a settled view's `HAVING`; else "". */
+function groupingClause({
+  view,
+  grouped,
+  settled,
+}: {
+  view: LangWatchQLViewDefinition;
+  grouped: boolean;
+  settled: boolean;
+}): string {
+  if (!grouped && !settled) return "";
+  const keys = grouped
+    ? catalogShapes.grainColumns(view).map((name) => groupKey(view, name))
+    : viewDedup.settledGroupKeys(view);
+  const having = settled ? `\nHAVING ${viewDedup.settledHaving(view)}` : "";
+  return `\nGROUP BY ${keys.join(", ")}${having}`;
 }
 
 /**
@@ -308,13 +340,13 @@ export class LangWatchQLViewStatementsService {
     assertPredicateColumnsDeclared(view);
     const joinedColumn = deriveJoinedColumnQualifier(view);
     const strategy = viewDedup.strategyFor({ view, dedup });
-    const grain = catalogShapes.grainColumns(view);
     // Any aggregating source renders as a `GROUP BY`, whether its published grain
     // is narrower than the engine key (a rollup that groups away a breakdown
     // column) or equal to it (a per-key rollup whose measures are aggregate
     // states only a merge combinator can read). `FINAL` is not an option for the
     // latter: after a merge the state column is still binary.
     const grouped = !postgres && view.dedup.aggregating === true;
+    const settled = !postgres && strategy === "settled";
     const projection = view.columns
       .map((column) => {
         const expression = projectedExpression({ view, column, postgres, grouped, joinedColumn });
@@ -322,25 +354,18 @@ export class LangWatchQLViewStatementsService {
         return `  ${expression} AS ${sqlText.quotedColumn(column.name)}`;
       })
       .join(",\n");
-    const from = viewDedup.relation({
-      view,
-      relation,
-      strategy,
-      engineDedup: !postgres && !grouped,
-    });
+    const floored = floor === undefined ? {} : { floor };
+    const from = settled
+      ? viewDedup.settledRelation({ view, relation, ...floored })
+      : viewDedup.relation({ view, relation, strategy, engineDedup: !postgres && !grouped });
     const joinClause = joinRelationClause(view, sourceDatabase);
     const enginePredicate =
-      strategy === "in-tuple"
-        ? `\n${viewDedup.predicate({ view, relation, ...(floor === undefined ? {} : { floor }) })}`
-        : "";
+      strategy === "in-tuple" ? `\n${viewDedup.predicate({ view, relation, ...floored })}` : "";
     const where = postgres
       ? `\n${postgresTenantPredicate({ names, sourceDatabase })}`
       : enginePredicate;
     const preFilter = preFilterClause(view, where);
-    const groupKeys = grain.map((column) =>
-      sourceColumn(catalogShapes.physicalColumn(view, column)),
-    );
-    const groupBy = grouped ? `\nGROUP BY ${groupKeys.join(", ")}` : "";
+    const grouping = groupingClause({ view, grouped, settled });
 
     const viewName = floor === undefined ? view.name : flooredViewName(view.name);
     return (
@@ -348,7 +373,7 @@ export class LangWatchQLViewStatementsService {
       `${sqlText.assertIdentifier(names.database, "database")}.${sqlText.assertIdentifier(viewName, "view")}\n` +
       `SQL SECURITY INVOKER\n` +
       `AS SELECT\n${projection}\n` +
-      `FROM ${from}${joinClause}${where}${preFilter}${groupBy}`
+      `FROM ${from}${joinClause}${where}${preFilter}${grouping}`
     );
   }
 
@@ -370,7 +395,7 @@ export class LangWatchQLViewStatementsService {
   }): string[] {
     const { floorColumn } = view.dedup;
     const columns = view.columns.filter((column) => column.name === floorColumn);
-    if (viewDedup.strategyFor({ view, dedup }) !== "in-tuple") return [];
+    if (!FLOORED_DEDUP_STRATEGIES.has(viewDedup.strategyFor({ view, dedup }))) return [];
     // The twin reads its bound from a parameter typed like the floor column.
     return columns.map((column) =>
       this.viewStatement({

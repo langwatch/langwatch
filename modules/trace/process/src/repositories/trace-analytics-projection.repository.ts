@@ -27,4 +27,22 @@ export abstract class TraceAnalyticsProjectionRepository {
     traceId: string;
     window?: { fromMs: number; toMs: number };
   }): Promise<TraceAnalyticsProjectionRead | null>;
+
+  /**
+   * Each found trace's OccurredAt (the storage anchor) inside the window, or anywhere with none;
+   * a trace not found adds nothing. One read per trace here; a store that can read them together
+   * overrides it.
+   */
+  async findOccurredAtByTraceIds(input: {
+    authorization: Authorization;
+    traceIds: readonly string[];
+    window?: { fromMs: number; toMs: number };
+  }): Promise<{ traceId: string; occurredAtMs: number }[]> {
+    const found: { traceId: string; occurredAtMs: number }[] = [];
+    for (const traceId of new Set(input.traceIds)) {
+      const read = await this.findByTraceId({ ...input, traceId });
+      if (read) found.push({ traceId, occurredAtMs: read.row.occurredAtMs });
+    }
+    return found;
+  }
 }

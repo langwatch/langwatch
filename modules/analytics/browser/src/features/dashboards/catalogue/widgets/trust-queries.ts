@@ -79,16 +79,32 @@ export const HEALTH_FIELDS: readonly HealthField[] = [
 
 // Each field is a filter, never a column the result reads, so the completeness report does
 // not swap a missing field for a setup view: showing the gap is this widget's whole job. One
-// scan per view, its rows repeated per field: a view read per field ran out of memory. The
-// condition is counted, not filtered, so a field no trace carries keeps its row at 0.
-const scan = ({ view, fields }: { view: string; fields: readonly Coverage[] }) =>
-  `SELECT field, uniqExactIf(TraceId, ${fields
-    .map(({ key, condition }) => `field = '${key}'${condition ? ` AND ${condition}` : ""}`)
-    .join("\n    OR ")}) AS traces
-FROM ${view}
-ARRAY JOIN [${fields.map(({ key }) => `'${key}'`).join(", ")}] AS field
-WHERE ${inPeriod("OccurredAt")}
-GROUP BY field`;
+// scan per view, one row per trace on its 128-bit hash holding a flag per field, then summed:
+// a set of ids per field ran out of memory over 60 days. A field no trace carries keeps its
+// row at 0; a period with no trace has no row, as before.
+const scan = ({ view, fields }: { view: string; fields: readonly Coverage[] }) => {
+  const flagged = fields.filter(({ condition }) => condition);
+  const flags = flagged.map(({ key, condition }) => `max(${condition}) AS has_${key}`).join(",\n        ");
+  const sums = flagged.map(({ key }) => `sum(has_${key}) AS has_${key}`).join(", ");
+  const counts = fields
+    .map(({ key, condition }) => `('${key}', ${condition ? `has_${key}` : "traces"})`)
+    .join(", ");
+  return `SELECT counted.1 AS field, counted.2 AS traces
+FROM (
+  SELECT arrayJoin([${counts}]) AS counted
+  FROM (
+    SELECT count() AS traces, ${sums}
+    FROM (
+      SELECT sipHash128(TraceId) AS trace,
+        ${flags}
+      FROM ${view}
+      WHERE ${inPeriod("OccurredAt")}
+      GROUP BY trace
+    )
+    HAVING traces > 0
+  )
+)`;
+};
 
 interface Coverage {
   readonly key: string;

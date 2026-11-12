@@ -19,10 +19,18 @@ import { traceIngestSourceBillingEventing } from "./features/ingestion/eventing/
 import { TRACE_ID_INDEXES } from "./repositories/clickhouse/clickhouse.trace-id-indexes.database.ts";
 import { traceRepositories } from "./repositories/trace-repositories.registry.ts";
 import {
+  RECORD_EVALUATION_OUTCOMES_STEP_ID,
+  TRACE_EVALUATION_ANALYTICS_REPLAY_STEP_ID,
+} from "./rules/trace-evaluation-analytics.rules.ts";
+import {
   SPAN_ANALYTICS_REPLAY_STEP_ID,
   TRACE_ANALYTICS_REPLAY_STEP_ID,
   WIDGET_COLUMNS_REPLAY_HOURS,
 } from "./rules/trace-widget-columns.rules.ts";
+import {
+  EVALUATION_OUTCOMES_BACKFILL_HOURS,
+  evaluationOutcomesBackfillReportSchema,
+} from "./services/trace-evaluation-outcomes-migration.service.ts";
 import {
   materialisationProgressSchema,
   TraceIndexMaterialisationService,
@@ -92,43 +100,10 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
     .withEventing(traceProjectMilestonesEventing)
     .withEventing(traceCollectorEvaluationsEventing)
     .withEventing(traceIngestSourceBillingEventing)
-    .withMigrations(({ app, repositories, replayer }) => [
-      defineMigrationStep({
-        id: "trace:track-updated-at-index-materialisation",
-        kind: "data",
-        mode: "background",
-        description:
-          "Waits for ClickHouse to build the trace summaries updated-at index over existing rows.",
-        needsOldWritersGone: false,
-        run: ({ checkpoint, dryRun, signal }) =>
-          TraceIndexMaterialisationService.create({
-            mutations: repositories.indexMaterialisation,
-          }).waitForUpdatedAtIndex({
-            dryRun,
-            signal,
-            onPoll: (progress) => checkpoint.save({ report: progress }),
-          }),
-      }),
-      defineMigrationStep({
-        id: "trace:track-analytics-metadata-columns-materialisation",
-        kind: "data",
-        mode: "background",
-        description:
-          "Waits for ClickHouse to store the trace analytics metadata columns in existing rows.",
-        needsOldWritersGone: false,
-        run: ({ checkpoint, dryRun, signal }) =>
-          TraceIndexMaterialisationService.create({
-            mutations: repositories.indexMaterialisation,
-          }).waitForAnalyticsMetadataColumns({
-            dryRun,
-            resumed: materialisationProgressSchema.validate(checkpoint.resumeFrom),
-            signal,
-            onPoll: (progress) => checkpoint.save({ report: progress }),
-          }),
-      }),
+    .withMigrations(({ app, repositories, replayer }) => {
       // Refold the window the stock widgets read, once no older writer is left to write rows
       // without the fold's columns (analytics ADR-006); one step per lane.
-      defineProjectionReplayStep({
+      const replayTraceAnalytics = defineProjectionReplayStep({
         id: TRACE_ANALYTICS_REPLAY_STEP_ID,
         description:
           "Refolds the last 62 days of trace analytics rows so they carry the stock widgets' metadata columns.",
@@ -136,35 +111,103 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
         since: nowInstant().subtract({ hours: WIDGET_COLUMNS_REPLAY_HOURS }).toString(),
         needsOldWritersGone: true,
         replayer,
-      }),
-      defineProjectionReplayStep({
-        id: SPAN_ANALYTICS_REPLAY_STEP_ID,
-        description:
-          "Fills span_analytics with the last 62 days of spans, the history the stock span widgets read.",
-        lane: SPAN_ANALYTICS_PROJECTION_NAME,
-        since: nowInstant().subtract({ hours: WIDGET_COLUMNS_REPLAY_HOURS }).toString(),
-        needsOldWritersGone: true,
-        replayer,
-      }),
-      defineMigrationStep({
-        id: "trace:send-month-trace-ids",
+      });
+      // Done once every command is sent; the live trace fold writes those rows as it handles them.
+      const recordEvaluationOutcomes = defineMigrationStep({
+        id: RECORD_EVALUATION_OUTCOMES_STEP_ID,
         kind: "data",
         mode: "background",
         description:
-          "Sends each project's trace ids seen so far this month, so plan trace limits count from a complete month.",
-        // An old worker counts no trace live, so the step lists traces until the last is gone.
+          "Records each evaluation of the last 62 days on its trace, so the trace's evaluation rows can be written.",
+        // An older worker records no outcome live, so the step pages until the last is gone.
         needsOldWritersGone: true,
         run: ({ checkpoint, dryRun, signal }) => {
-          const resumed = traceMonthIdsReportSchema.safeParse(checkpoint.resumeFrom);
-          return app.sendMonthTraceIds({
+          const resumed = evaluationOutcomesBackfillReportSchema.safeParse(checkpoint.resumeFrom);
+          return app.recordEvaluationOutcomes({
             resumeFrom: resumed.success ? resumed.data : null,
             dryRun,
             signal,
             onPage: (report) => checkpoint.save({ report }),
           });
         },
-      }),
-    ])
+      });
+      return [
+        defineMigrationStep({
+          id: "trace:track-updated-at-index-materialisation",
+          kind: "data",
+          mode: "background",
+          description:
+            "Waits for ClickHouse to build the trace summaries updated-at index over existing rows.",
+          needsOldWritersGone: false,
+          run: ({ checkpoint, dryRun, signal }) =>
+            TraceIndexMaterialisationService.create({
+              mutations: repositories.indexMaterialisation,
+            }).waitForUpdatedAtIndex({
+              dryRun,
+              signal,
+              onPoll: (progress) => checkpoint.save({ report: progress }),
+            }),
+        }),
+        defineMigrationStep({
+          id: "trace:track-analytics-metadata-columns-materialisation",
+          kind: "data",
+          mode: "background",
+          description:
+            "Waits for ClickHouse to store the trace analytics metadata columns in existing rows.",
+          needsOldWritersGone: false,
+          run: ({ checkpoint, dryRun, signal }) =>
+            TraceIndexMaterialisationService.create({
+              mutations: repositories.indexMaterialisation,
+            }).waitForAnalyticsMetadataColumns({
+              dryRun,
+              resumed: materialisationProgressSchema.validate(checkpoint.resumeFrom),
+              signal,
+              onPoll: (progress) => checkpoint.save({ report: progress }),
+            }),
+        }),
+        replayTraceAnalytics,
+        defineProjectionReplayStep({
+          id: SPAN_ANALYTICS_REPLAY_STEP_ID,
+          description:
+            "Fills span_analytics with the last 62 days of spans, the history the stock span widgets read.",
+          lane: SPAN_ANALYTICS_PROJECTION_NAME,
+          since: nowInstant().subtract({ hours: WIDGET_COLUMNS_REPLAY_HOURS }).toString(),
+          needsOldWritersGone: true,
+          replayer,
+        }),
+        defineMigrationStep({
+          id: "trace:send-month-trace-ids",
+          kind: "data",
+          mode: "background",
+          description:
+            "Sends each project's trace ids seen so far this month, so plan trace limits count from a complete month.",
+          // An old worker counts no trace live, so the step lists traces until the last is gone.
+          needsOldWritersGone: true,
+          run: ({ checkpoint, dryRun, signal }) => {
+            const resumed = traceMonthIdsReportSchema.safeParse(checkpoint.resumeFrom);
+            return app.sendMonthTraceIds({
+              resumeFrom: resumed.success ? resumed.data : null,
+              dryRun,
+              signal,
+              onPage: (report) => checkpoint.save({ report }),
+            });
+          },
+        }),
+        recordEvaluationOutcomes,
+        // After both: the outcomes are in the log and the lane's own replay has run, so this pass
+        // writes every recent trace's evaluation rows from the whole history (trace ADR-003).
+        defineProjectionReplayStep({
+          id: TRACE_EVALUATION_ANALYTICS_REPLAY_STEP_ID,
+          description:
+            "Refolds the last 62 days of traces so each carries its evaluation rows for the stock widgets.",
+          lane: TRACE_ANALYTICS_PROJECTION_NAME,
+          since: nowInstant().subtract({ hours: EVALUATION_OUTCOMES_BACKFILL_HOURS }).toString(),
+          needsOldWritersGone: true,
+          after: [recordEvaluationOutcomes, replayTraceAnalytics],
+          replayer,
+        }),
+      ];
+    })
     .withIdIndexes(TRACE_ID_INDEXES, {
       description:
         "Fills the trace id indexes from rows older than their views, then marks them ready.",

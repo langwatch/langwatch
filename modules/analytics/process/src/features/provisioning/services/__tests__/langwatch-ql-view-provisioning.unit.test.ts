@@ -500,7 +500,6 @@ describe("given the views pinned to latest-in-order", () => {
     "experiment_items",
     "simulation_trace_metrics",
     "gateway_request_spend",
-    "span_metrics",
   ])("renders %s newest version first, one row per sort key", (name) => {
     const sql = render(name);
 
@@ -518,10 +517,13 @@ describe("given the views pinned to latest-in-order", () => {
     );
   });
 
-  it("keeps span_metrics' stable StartTime in its key, so a period filter prunes partitions", () => {
-    expect(render("span_metrics")).toContain(
-      "LIMIT 1 BY `TenantId`, `TraceId`, `SpanId`, `StartTime`",
-    );
+  /** @scenario "span_metrics reads its map projection with no dedup" */
+  it("reads span_metrics' table plainly, with no FINAL and no LIMIT 1 BY", () => {
+    const sql = render("span_metrics");
+
+    expect(sql).toContain(`span_analytics AS ${LWQL_SOURCE_ALIAS}`);
+    expect(sql).not.toContain("FINAL");
+    expect(sql).not.toContain("LIMIT 1 BY");
   });
 
   it("grants the tie-break column the view reads only to pick a version", () => {
@@ -534,5 +536,111 @@ describe("given the views pinned to latest-in-order", () => {
   /** @scenario "Every other view keeps the shipped FINAL" */
   it("keeps FINAL on a view the stock widgets do not read", () => {
     expect(render("spans")).toContain("langwatch.stored_spans AS src FINAL");
+  });
+});
+
+describe("given the views over trace_evaluation_analytics", () => {
+  const viewNamed = (name: string) => {
+    const view = pickLwqlViewByName(name);
+    if (!view) throw new Error(`${name} is not in the catalog`);
+    return view;
+  };
+  const render = (view: LangWatchQLViewDefinition) =>
+    viewStatements.viewStatement({
+      names: NAMES,
+      sourceDatabase: SOURCE_DATABASE,
+      view,
+      dedup: SHIPPED_LWQL_DEDUP,
+    });
+  const twins = (view: LangWatchQLViewDefinition) =>
+    viewStatements.flooredViewStatements({
+      names: NAMES,
+      sourceDatabase: SOURCE_DATABASE,
+      view,
+      dedup: SHIPPED_LWQL_DEDUP,
+    });
+  const metrics = viewNamed("trace_evaluation_metrics");
+  const checks = viewNamed("trace_evaluation_checks");
+  const sign = `${LWQL_SOURCE_ALIAS}.\`Sign\``;
+
+  describe("when trace_evaluation_metrics is rendered", () => {
+    const sql = render(metrics);
+    const groupBy = sql.split("\nGROUP BY ")[1]?.split("\nHAVING ")[0] ?? "";
+
+    /** @scenario "trace_evaluation_metrics keeps each evaluation's live revision without FINAL" */
+    it("groups by every source column it reads, Revision included and Sign excluded", () => {
+      const grouped = viewStatements
+        .grantedSourceColumns(metrics)
+        .filter((column) => column !== "Sign")
+        .map((column) => `${LWQL_SOURCE_ALIAS}.\`${column}\``);
+
+      expect(groupBy.split(", ").toSorted()).toEqual(grouped.toSorted());
+      expect(groupBy).toContain(`${LWQL_SOURCE_ALIAS}.\`Revision\``);
+    });
+
+    /** @scenario "trace_evaluation_metrics keeps each evaluation's live revision without FINAL" */
+    it("keeps a group whose signs sum above zero, reading its table with no FINAL", () => {
+      expect(sql).toContain(
+        "  FROM langwatch.trace_evaluation_analytics\n" + `) AS ${LWQL_SOURCE_ALIAS}\nGROUP BY `,
+      );
+      expect(sql.endsWith(`\nHAVING sum(${sign}) > 0`)).toBe(true);
+      expect(sql).not.toContain("FINAL");
+    });
+  });
+
+  describe("when trace_evaluation_checks is rendered", () => {
+    const sql = render(checks);
+
+    /** @scenario "trace_evaluation_checks counts the live evaluations per narrow grain" */
+    it("groups by its grain, Source and TraceSource by the expressions they publish", () => {
+      const source = (origin: string) =>
+        `multiIf(ifNull(${LWQL_SOURCE_ALIAS}.\`${origin}\`, '') = '', 'application'`;
+
+      expect(sql).toContain(
+        `\nGROUP BY ${["TenantId", "TraceId", "OccurredAt", "TraceOccurredAt", "EvaluatorName", "Passed", "IsGuardrail"].map((column) => `${LWQL_SOURCE_ALIAS}.\`${column}\``).join(", ")}, ${source("Origin")}`,
+      );
+      expect(sql.split("\nGROUP BY ")[1]).toContain(source("TraceOrigin"));
+      expect(sql).not.toContain("Revision");
+    });
+
+    /** @scenario "trace_evaluation_checks counts the live evaluations per narrow grain" */
+    it("sums the signs into Evaluations and keeps a group only while they sum above zero", () => {
+      expect(sql).toContain(`  sum(${sign}) AS \`Evaluations\``);
+      expect(sql.endsWith(`\nHAVING sum(${sign}) > 0`)).toBe(true);
+      expect(sql).not.toContain("FINAL");
+    });
+  });
+
+  /** @scenario "A floored twin of a settled view reads the source from its bound before it groups" */
+  it.each([metrics, checks])("floors $name's source read before the grouping", (view) => {
+    const [twin] = twins(view);
+
+    expect(twins(view)).toHaveLength(1);
+    expect(twin).toMatch(new RegExp(`^CREATE OR REPLACE VIEW langwatch\\.${view.name}__floor\\n`));
+    expect(twin).toContain(
+      "  FROM langwatch.trace_evaluation_analytics\n" +
+        "  WHERE `OccurredAt` >= {lwql_floor:DateTime64(3)}\n" +
+        `) AS ${LWQL_SOURCE_ALIAS}\nGROUP BY `,
+    );
+  });
+
+  /** @scenario "A settled view that declares no sign column is refused" */
+  it("refuses a settled view that declares no sign column, by name", () => {
+    const { signColumn: _sign, ...dedup } = metrics.dedup;
+
+    expect(() => render({ ...metrics, dedup })).toThrow(
+      /trace_evaluation_metrics cannot use settled/,
+    );
+  });
+
+  /** @scenario "Sign and Revision are granted for the dedup and exposed nowhere" */
+  it("grants Sign, and Revision where the view reads it, and exposes neither", () => {
+    expect(viewStatements.grantedSourceColumns(metrics)).toEqual(
+      expect.arrayContaining(["Sign", "Revision"]),
+    );
+    expect(viewStatements.grantedSourceColumns(checks)).toContain("Sign");
+    const exposed = [metrics, checks].flatMap((view) => view.columns.map(({ name }) => name));
+    expect(exposed).not.toContain("Sign");
+    expect(exposed).not.toContain("Revision");
   });
 });

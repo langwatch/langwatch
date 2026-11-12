@@ -39,18 +39,46 @@ const judgeVerdicts = ({ window, withReason }: { window: Window; withReason: boo
       GROUP BY TraceId`;
 
 /**
+ * The judge's latest label per trace from `trace_evaluation_metrics`, dated, and topped, by the
+ * trace's columns on the row, so no join to `trace_metrics` (analytics ADR-007).
+ */
+const judgeRowsOfTraceEvaluations = ({
+  window,
+  withTopic,
+}: {
+  window: Window;
+  withTopic: boolean;
+}) => {
+  const topic = withTopic
+    ? " any(ifNull(TopicId, '')) AS topic_id, any(MetadataTopic) AS meta_topic,"
+    : "";
+  return `SELECT TraceId AS trace_id, any(TraceOccurredAt) AS row_at,${topic}
+        ifNull(argMax(Label, OccurredAt), '') AS outcome, 0 AS sent
+      FROM trace_evaluation_metrics
+      WHERE ${window("OccurredAt")} AND ${window("TraceOccurredAt")}
+        AND EvaluatorName = '${OUTCOME_JUDGE}'
+      GROUP BY TraceId`;
+};
+
+/**
  * Every trace in the window that closed a conversation, once, with its outcome and, as asked, its
- * reason and topic. A sent outcome wins over the judge's (analytics ADR-004).
+ * reason and topic. A sent outcome wins over the judge's (analytics ADR-004). With
+ * `fromTraceEvaluations` the judge comes from `trace_evaluation_metrics`, which has no reason.
  */
 function tracesWithOutcome({
   window,
   withReason = false,
   withTopic = false,
+  fromTraceEvaluations = false,
 }: {
   window: Window;
   withReason?: boolean;
   withTopic?: boolean;
+  fromTraceEvaluations?: boolean;
 }): string {
+  if (withReason && fromTraceEvaluations) {
+    throw new Error("trace_evaluation_metrics carries no reason text; read evaluations for it");
+  }
   const judgeReason = withReason ? ", ifNull(j.reason, '') AS reason" : "";
   const sentReason = withReason ? ", MetadataOutcomeReason AS reason" : "";
   const traceTopic = withTopic ? ", ifNull(TopicId, '') AS topic_id, MetadataTopic" : "";
@@ -58,7 +86,9 @@ function tracesWithOutcome({
   const sentTopic = withTopic
     ? ", ifNull(TopicId, '') AS topic_id, MetadataTopic AS meta_topic"
     : "";
-  const rows = `SELECT t.TraceId AS trace_id, t.OccurredAt AS row_at${judgeTopic},
+  const judgeRows = fromTraceEvaluations
+    ? judgeRowsOfTraceEvaluations({ window, withTopic })
+    : `SELECT t.TraceId AS trace_id, t.OccurredAt AS row_at${judgeTopic},
         ifNull(j.label, '') AS outcome${judgeReason}, 0 AS sent
       FROM (
         SELECT TraceId, OccurredAt${traceTopic}
@@ -67,7 +97,8 @@ function tracesWithOutcome({
       ) AS t
       INNER JOIN (
         ${judgeVerdicts({ window, withReason })}
-      ) AS j ON j.TraceId = t.TraceId
+      ) AS j ON j.TraceId = t.TraceId`;
+  const rows = `${judgeRows}
       UNION ALL
       SELECT TraceId AS trace_id, OccurredAt AS row_at${sentTopic},
         MetadataOutcome AS outcome${sentReason}, 1 AS sent
@@ -113,12 +144,11 @@ function tracesWithOutcome({
 )`;
 }
 
-const IN_PERIOD = tracesWithOutcome({ window: inPeriod });
+const IN_PERIOD = tracesWithOutcome({ window: inPeriod, fromTraceEvaluations: true });
 const IN_PERIOD_WITH_TOPIC = tracesWithOutcome({ window: inPeriod, withTopic: true });
-const WITH_PREVIOUS = tracesWithOutcome({ window: inPeriodAndPrevious });
-const WITH_PREVIOUS_AND_REASON = tracesWithOutcome({
+const WITH_PREVIOUS_FROM_TRACE_EVALUATIONS = tracesWithOutcome({
   window: inPeriodAndPrevious,
-  withReason: true,
+  fromTraceEvaluations: true,
 });
 const IN_PERIOD_WITH_TOPIC_AND_REASON = tracesWithOutcome({
   window: inPeriod,
@@ -140,19 +170,45 @@ ORDER BY bucket`;
 
 export const OUTCOME_TOTALS_SQL = `SELECT countIf(at >= ${START}) AS closed,
   countIf(at < ${START}) AS closed_previous
-FROM ${WITH_PREVIOUS}
+FROM ${WITH_PREVIOUS_FROM_TRACE_EVALUATIONS}
 WHERE outcome != ''`;
 
+/**
+ * One pass over `trace_metrics` with the judge joined on, not a union that held both reads
+ * (1 GB limit); a row's own outcome wins over the judge's, as in `tracesWithOutcome`. `kind` is
+ * the smallest outcome of the reason: `any` gave a different one on each run.
+ */
 export const OUTCOME_REASONS_SQL = `SELECT reason,
-  any(outcome) AS kind,
+  min(outcome) AS kind,
   countIf(at >= ${START}) AS in_period,
   countIf(at < ${START}) AS in_previous
-FROM ${WITH_PREVIOUS_AND_REASON}
+FROM (
+  SELECT min(r.row_at) AS at,
+    argMax(r.outcome, r.precedence) AS outcome,
+    argMax(r.reason, r.precedence) AS reason
+  FROM (
+    SELECT t.TraceId AS trace_id, t.OccurredAt AS row_at,
+      if(t.MetadataOutcome != '', t.MetadataOutcome, ifNull(j.label, '')) AS outcome,
+      if(t.MetadataOutcome != '', t.MetadataOutcomeReason, ifNull(j.reason, '')) AS reason,
+      toUInt64(t.MetadataOutcome != '') * 4611686018427387904
+        + toUInt64(dateDiff('millisecond', toDateTime64(0, 3), t.OccurredAt)) AS precedence
+    FROM trace_metrics AS t
+    LEFT JOIN (
+      SELECT TraceId, label, reason, 1 AS judged
+      FROM (
+        ${judgeVerdicts({ window: inPeriodAndPrevious, withReason: true })}
+      )
+    ) AS j ON j.TraceId = t.TraceId
+    WHERE ${inPeriodAndPrevious("t.OccurredAt")}
+      AND (t.MetadataOutcome != '' OR j.judged = 1)
+  ) AS r
+  GROUP BY sipHash128(r.trace_id)
+)
 WHERE outcome NOT IN ('', 'resolved')
   AND reason != ''
 GROUP BY reason
 HAVING in_period > 0
-ORDER BY in_period DESC
+ORDER BY in_period DESC, reason
 LIMIT 5`;
 
 export const UNANSWERED_TOPICS_SQL = `SELECT topic,
@@ -244,7 +300,10 @@ const SEARCHES = `(
   HAVING searched = 1
 )`;
 
-/** A failed trace has one cause: an empty search first, then an error, then a failed check. */
+/**
+ * A failed trace has one cause: an empty search first, then an error, then a failed check. The
+ * checks come from `trace_evaluation_metrics`, the spans stay on `span_metrics`.
+ */
 export const FAILURE_SOURCE_SQL = `SELECT ${bucketOf("s.at")} AS bucket,
   count() AS searched,
   countIf(s.found_nothing = 1 AND (s.errored = 1 OR ifNull(j.failed, 0) = 1)) AS retrieval,
@@ -253,7 +312,7 @@ export const FAILURE_SOURCE_SQL = `SELECT ${bucketOf("s.at")} AS bucket,
 FROM ${SEARCHES} AS s
 LEFT JOIN (
   SELECT TraceId, max(Passed = 0) AS failed
-  FROM evaluation_metrics
+  FROM trace_evaluation_metrics
   WHERE ${inPeriod("OccurredAt")}
     AND Passed IS NOT NULL
     AND IsGuardrail = 0
@@ -286,6 +345,14 @@ WHERE outcome != ''`;
 
 /** The clustered topic, else the app's, read from `trace_metrics` (tasks#1117). */
 const TOPIC = "coalesce(nullIf(p.TopicName, ''), nullIf(t.MetadataTopic, ''))";
+/** The same topic, read from the trace's columns on a `trace_evaluation_metrics` row. */
+const EVALUATION_TOPIC = "coalesce(nullIf(p.TopicName, ''), nullIf(e.MetadataTopic, ''))";
+
+const IN_PERIOD_WITH_TOPIC_FROM_TRACE_EVALUATIONS = tracesWithOutcome({
+  window: inPeriod,
+  withTopic: true,
+  fromTraceEvaluations: true,
+});
 
 export const TOPIC_SHARES_SQL = `SELECT ${TOPIC} AS topic,
   uniqExactIf(t.TraceId, t.OccurredAt >= ${START}) AS in_period,
@@ -310,7 +377,8 @@ ORDER BY bucket`;
 
 /**
  * Checks exclude guardrails and the outcome judge: they say whether an answer was safe. Requests
- * and checks count trace rows; outcomes come from the closed traces alone.
+ * count trace rows and checks count evaluations, each topped by its trace's columns, so the two
+ * add up per topic with no join; outcomes come from the closed traces alone.
  */
 export const TOPIC_QUALITY_SQL = `SELECT r.topic AS topic,
   r.requests AS requests,
@@ -320,23 +388,27 @@ export const TOPIC_QUALITY_SQL = `SELECT r.topic AS topic,
   r.checks_passed AS checks_passed,
   r.checks_run AS checks_run
 FROM (
-  SELECT ${TOPIC} AS topic,
-    count() AS requests,
-    sum(ifNull(e.passed, 0)) AS checks_passed,
-    sum(ifNull(e.runs, 0)) AS checks_run
-  FROM trace_metrics AS t
-  LEFT JOIN topics AS p ON p.TopicId = t.TopicId
-  LEFT JOIN (
-    SELECT TraceId, countIf(Passed = 1) AS passed, count() AS runs
-    FROM evaluation_metrics
-    WHERE ${inPeriod("OccurredAt")}
-      AND Passed IS NOT NULL
-      AND IsGuardrail = 0
-      AND EvaluatorName != '${OUTCOME_JUDGE}'
-    GROUP BY TraceId
-  ) AS e ON e.TraceId = t.TraceId
-  WHERE ${inPeriod("t.OccurredAt")}
-    AND topic IS NOT NULL
+  SELECT topic, sum(requests) AS requests, sum(checks_passed) AS checks_passed, sum(checks_run) AS checks_run
+  FROM (
+    SELECT ${TOPIC} AS topic,
+      count() AS requests, 0 AS checks_passed, 0 AS checks_run
+    FROM trace_metrics AS t
+    LEFT JOIN topics AS p ON p.TopicId = t.TopicId
+    WHERE ${inPeriod("t.OccurredAt")}
+      AND topic IS NOT NULL
+    GROUP BY topic
+    UNION ALL
+    SELECT ${EVALUATION_TOPIC} AS topic,
+      0 AS requests, countIf(e.Passed = 1) AS checks_passed, count() AS checks_run
+    FROM trace_evaluation_metrics AS e
+    LEFT JOIN topics AS p ON p.TopicId = e.TopicId
+    WHERE ${inPeriod("e.OccurredAt")} AND ${inPeriod("e.TraceOccurredAt")}
+      AND e.Passed IS NOT NULL
+      AND e.IsGuardrail = 0
+      AND e.EvaluatorName != '${OUTCOME_JUDGE}'
+      AND topic IS NOT NULL
+    GROUP BY topic
+  )
   GROUP BY topic
 ) AS r
 LEFT JOIN (
@@ -344,7 +416,7 @@ LEFT JOIN (
     countIf(outcome != '') AS closed,
     countIf(outcome = 'resolved') AS resolved,
     countIf(outcome = 'capability_gap') AS cannot
-  FROM ${IN_PERIOD_WITH_TOPIC}
+  FROM ${IN_PERIOD_WITH_TOPIC_FROM_TRACE_EVALUATIONS}
   WHERE topic IS NOT NULL
   GROUP BY topic
 ) AS c ON c.topic = r.topic

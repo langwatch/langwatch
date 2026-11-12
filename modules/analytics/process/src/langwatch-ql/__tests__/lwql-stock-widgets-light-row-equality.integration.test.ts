@@ -40,21 +40,34 @@ function fixture(name: string): readonly StockQuery[] {
 /** Main's SQL for every stock query, as the catalogue stored it before the rewrite. */
 const MAIN = fixture("stock-widget-queries.main.json");
 const STOCK = new Map(fixture("stock-widget-queries.json").map((q) => [q.label, q.sql]));
+/**
+ * Main capped its loops and its retries at 10000 rows each with no ORDER BY, so which rows it kept
+ * was arbitrary; the shipped form drops the cap on purpose, so it is compared with main's uncapped.
+ */
+const UNCAPPED = new Set(["up-loops/daily", "up-loops/steps"]);
+const MAIN_CAP = "\n  LIMIT 10000";
+
+/** Main's form of a stock query, as the rows are compared with it. */
+const mainForm = ({ label, sql }: StockQuery): string =>
+  UNCAPPED.has(label) ? sql.replaceAll(MAIN_CAP, "") : sql;
+
 /** The 39 labels that ran out of memory: main's SQL for each differs from the rewrite. */
 const REWRITTEN = fixture("stock-widget-queries.light-baseline.json").map((q) => q.label);
-
-/** The one query that counts trace rows, not traces, for its request and check columns. */
-const ROW_COUNTED = ["ans-topics/topics"];
+/**
+ * The labels that read `trace_evaluation_analytics`, which this suite does not seed: their rows
+ * are proved in lwql-trace-evaluations-row-equality.integration.test.ts.
+ */
+const ON_TRACE_EVALUATIONS = new Set(
+  fixture("stock-widget-queries.trace-evaluations-baseline.json").map((q) => q.label),
+);
 
 /** The queries that date a closed trace by its first row inside the window (analytics ADR-004). */
 const IN_WINDOW_DATED = [
   "ans-idk/topics",
   "ans-idk/trend",
   "ans-outcomes/trend",
-  "ans-topics/topics",
   "ask-again/trend",
   "ask-cannot/totals",
-  "ck-top-ask/gap",
   "ck-trend/trend",
   "voice-task-success/trend",
 ];
@@ -546,9 +559,13 @@ describe("given traces, spans and evaluations of each source that the stock quer
   /** The labels whose rows differ from main's form on the FINAL views; every query must run. */
   async function differing(list: readonly string[]): Promise<string[]> {
     const labels: string[] = [];
-    for (const { label, sql } of MAIN) {
+    for (const query of MAIN.filter(({ label }) => !ON_TRACE_EVALUATIONS.has(label))) {
+      const { label } = query;
       const now = await run({ sql: STOCK.get(label) ?? "", list });
-      const before = await run({ sql: readingFinalTwins({ sql, database: finalTwins }), list });
+      const before = await run({
+        sql: readingFinalTwins({ sql: mainForm(query), database: finalTwins }),
+        list,
+      });
       expect(now.error, `${label} now`).toBeUndefined();
       expect(before.error, `${label} before`).toBeUndefined();
       if (now.rows !== before.rows) labels.push(label);
@@ -647,12 +664,28 @@ describe("given traces, spans and evaluations of each source that the stock quer
     expect(await differing(list)).toEqual([]);
   });
 
+  /** @scenario "The loops queries are compared with main's loops query without its arbitrary cap" */
+  it.each(LISTS)("returns main's uncapped loop and retry rows under $list", async ({ list }) => {
+    for (const label of UNCAPPED) {
+      const main = MAIN.find((query) => query.label === label);
+      expect(main?.sql.split(MAIN_CAP)).toHaveLength(3);
+      expect(STOCK.get(label)).not.toContain("LIMIT 10000");
+      const now = await run({ sql: STOCK.get(label) ?? "", list });
+      const before = await run({
+        sql: readingFinalTwins({ sql: main ? mainForm(main) : "", database: finalTwins }),
+        list,
+      });
+      expect(now.error, `${label} now`).toBeUndefined();
+      expect(now.rows, label).toBe(before.rows);
+    }
+  });
+
   /** @scenario "A trace with a second trace_metrics row later in the period counts once" */
   it("returns main's rows when a trace's second trace_metrics row lands later in the period", async () => {
     await moveAnchor({ trace: "a2", day: 3.75 });
     await moveAnchor({ trace: "a1", day: 1.2 });
 
-    expect(await differing(["application"])).toEqual(ROW_COUNTED);
+    expect(await differing(["application"])).toEqual([]);
     expect(await differing(["langy"])).toEqual([]);
   });
 

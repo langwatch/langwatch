@@ -1,4 +1,10 @@
 import {
+  EVALUATION_COMPLETED_EVENT_TYPE,
+  EVALUATION_REPORTED_EVENT_TYPE,
+  evaluationCompletedEventDataSchema,
+  evaluationReportedEventDataSchema,
+} from "@langwatch/evaluation-contract";
+import {
   type AppendStore,
   defineAggregate,
   definePipeline,
@@ -23,6 +29,7 @@ import {
   annotationRemovedEventSchema,
   annotationsBulkSyncedEventSchema,
   traceNameChangedEventSchema,
+  evaluationOutcomeRecordedEventSchema,
 } from "@langwatch/trace-contract";
 
 import type { TraceIoExtraction } from "../features/derivation/services/trace-io-extraction.service.ts";
@@ -33,6 +40,7 @@ import {
 } from "../features/ingestion/rules/trace-span-command-shard.rules.ts";
 import type { TraceMediaReferenceResolver } from "../features/media/services/trace-media-reference.service.ts";
 import type { TraceSpanNormalization } from "../features/span/services/span-normalization.service.ts";
+import type { TraceEvaluationOutcomeService } from "../services/trace-evaluation-outcome.service.ts";
 import { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service.ts";
 import { EventingRecordSpanAdapter, RECORD_SPAN_DEDUPLICATION } from "./record-span.commands.ts";
 import { type SpanAnalyticsRow, SpanAnalyticsMapProjection } from "./span-analytics.projection.ts";
@@ -41,6 +49,7 @@ import {
   type TraceAnalyticsData,
   TraceAnalyticsFoldProjection,
 } from "./trace-derived.projection.ts";
+import { EventingTraceEvaluationOutcomeAdapter } from "./trace-evaluation-outcome.commands.ts";
 import { EventingTraceOriginAdapter } from "./trace-origin.commands.ts";
 import { EventingTraceProcessingAdapter } from "./trace-processing.commands.ts";
 import {
@@ -49,6 +58,19 @@ import {
 } from "./trace-rollup.projection.ts";
 import { TraceSummaryFoldProjection } from "./trace-summary.projection.ts";
 import { EventingTraceTopicAdapter } from "./trace-topic-assignment.commands.ts";
+
+type TraceEvaluationOutcomeReactions = Pick<
+  TraceEvaluationOutcomeService,
+  "recordCompleted" | "recordReported"
+>;
+
+/** A composition that wired no outcome recorder (a test's): a delivery refuses by name. */
+const UNWIRED_EVALUATION_OUTCOMES: TraceEvaluationOutcomeReactions = {
+  recordCompleted: () =>
+    Promise.reject(new Error("this trace_processing composition records no evaluation outcomes")),
+  recordReported: () =>
+    Promise.reject(new Error("this trace_processing composition records no evaluation outcomes")),
+};
 
 /** Trace pipeline name; shared by both full and producer-only registration shapes. */
 const TRACE_PROCESSING_PIPELINE_NAME = "trace_processing";
@@ -66,6 +88,8 @@ export type EventingTracePipelineAdapterOptions = {
   spanNormalization: TraceSpanNormalization;
   prepareEventForProjection: (event: TraceProcessingEvent) => TraceProcessingEvent;
   recordSpanCommand: EventingRecordSpanAdapter;
+  /** Evaluation's COMPLETED and REPORTED, recorded as outcomes on their traces (ADR-003). */
+  evaluationOutcomes?: TraceEvaluationOutcomeReactions;
   spanCommandShardCount?: number;
 };
 
@@ -78,6 +102,7 @@ function buildTracePipeline(options: EventingTracePipelineAdapterOptions) {
     spanNormalization: options.spanNormalization,
   });
 
+  const evaluationOutcomes = options.evaluationOutcomes ?? UNWIRED_EVALUATION_OUTCOMES;
   const spanCommandShardCount = clampSpanShardCount(options.spanCommandShardCount ?? 1);
   const recordSpanOptions: {
     deduplication: typeof RECORD_SPAN_DEDUPLICATION;
@@ -103,85 +128,134 @@ function buildTracePipeline(options: EventingTracePipelineAdapterOptions) {
   // the trace's lane: on separate groups a delete could precede its add.
   const commands = EventingTraceProcessingAdapter.create();
 
-  return definePipeline({
-    name: TRACE_PROCESSING_PIPELINE_NAME,
-    aggregate: defineAggregate({
-      type: "trace",
-    }),
-  })
-    .withEvents([
-      spanReceivedEventSchema,
-      spanRecordedEventSchema,
-      topicAssignedEventSchema,
-      logRecordReceivedEventSchema,
-      logContributedEventSchema,
-      metricDataPointCorrelatedEventSchema,
-      originResolvedEventSchema,
-      annotationAddedEventSchema,
-      annotationRemovedEventSchema,
-      annotationsBulkSyncedEventSchema,
-      traceNameChangedEventSchema,
-    ])
-    .withProjectionPayloadPreparation(options.prepareEventForProjection)
-    .withClickHouseFoldProjection(
-      TraceSummaryFoldProjection.create({
-        store: options.summaryStore,
-        traceCanonicalisation: options.canonicalisation,
-        runtime,
+  return (
+    definePipeline({
+      name: TRACE_PROCESSING_PIPELINE_NAME,
+      aggregate: defineAggregate({
+        type: "trace",
       }),
-    )
-    .withClickHouseFoldProjection(
-      TraceAnalyticsFoldProjection.create({
-        store: options.derivedStore,
-        traceCanonicalisation: options.canonicalisation,
-        runtime,
-      }),
-    )
-    .withClickHouseMapProjection(
-      SpanStorageMapProjection.create({
-        store: options.spanStore,
-        spanCostService: runtime.spanCost,
-        spanNormalization: runtime.spanNormalization,
-      }),
-    )
-    .withClickHouseMapProjection(
-      SpanAnalyticsMapProjection.create({
-        store: options.spanAnalyticsStore,
-        spanCostService: runtime.spanCost,
-        spanNormalization: runtime.spanNormalization,
-      }),
-    )
-    .withClickHouseMapProjection(
-      TraceAnalyticsRollupMapProjection.create({
-        store: options.rollupStore,
-        spanCostService: runtime.spanCost,
-        spanNormalization: runtime.spanNormalization,
-      }),
-    )
-    .withCommandInstance({
-      name: "recordSpan",
-      handlerClass: EventingRecordSpanAdapter,
-      instance: options.recordSpanCommand,
-      options: recordSpanOptions,
     })
-    .withCommand("assignTopic", EventingTraceTopicAdapter)
-    .withCommand("recordLogContribution", commands.recordLogContributionCommand, {
-      coalesceMaxBatch: TRACE_CORRELATION_COALESCE_MAX_BATCH,
-    })
-    .withCommand("recordMetricCorrelation", commands.recordMetricCorrelationCommand, {
-      coalesceMaxBatch: TRACE_CORRELATION_COALESCE_MAX_BATCH,
-    })
-    .withCommand("resolveOrigin", EventingTraceOriginAdapter)
-    .withCommand("addAnnotation", commands.addAnnotationCommand, {
-      serializeByAggregate: true,
-    })
-    .withCommand("removeAnnotation", commands.removeAnnotationCommand, {
-      serializeByAggregate: true,
-    })
-    .withCommand("bulkSyncAnnotations", commands.bulkSyncAnnotationsCommand, {
-      serializeByAggregate: true,
-    })
-    .withCommand("changeTraceName", commands.changeTraceNameCommand);
+      .withEvents([
+        spanReceivedEventSchema,
+        spanRecordedEventSchema,
+        topicAssignedEventSchema,
+        logRecordReceivedEventSchema,
+        logContributedEventSchema,
+        metricDataPointCorrelatedEventSchema,
+        originResolvedEventSchema,
+        annotationAddedEventSchema,
+        annotationRemovedEventSchema,
+        annotationsBulkSyncedEventSchema,
+        traceNameChangedEventSchema,
+        evaluationOutcomeRecordedEventSchema,
+      ])
+      .withProjectionPayloadPreparation(options.prepareEventForProjection)
+      .withClickHouseFoldProjection(
+        TraceSummaryFoldProjection.create({
+          store: options.summaryStore,
+          traceCanonicalisation: options.canonicalisation,
+          runtime,
+        }),
+      )
+      .withClickHouseFoldProjection(
+        TraceAnalyticsFoldProjection.create({
+          store: options.derivedStore,
+          traceCanonicalisation: options.canonicalisation,
+          runtime,
+        }),
+      )
+      .withClickHouseMapProjection(
+        SpanStorageMapProjection.create({
+          store: options.spanStore,
+          spanCostService: runtime.spanCost,
+          spanNormalization: runtime.spanNormalization,
+        }),
+      )
+      .withClickHouseMapProjection(
+        SpanAnalyticsMapProjection.create({
+          store: options.spanAnalyticsStore,
+          spanCostService: runtime.spanCost,
+          spanNormalization: runtime.spanNormalization,
+        }),
+      )
+      .withClickHouseMapProjection(
+        TraceAnalyticsRollupMapProjection.create({
+          store: options.rollupStore,
+          spanCostService: runtime.spanCost,
+          spanNormalization: runtime.spanNormalization,
+        }),
+      )
+      .withCommandInstance({
+        name: "recordSpan",
+        handlerClass: EventingRecordSpanAdapter,
+        instance: options.recordSpanCommand,
+        options: recordSpanOptions,
+      })
+      .withCommand("assignTopic", EventingTraceTopicAdapter)
+      .withCommand("recordLogContribution", commands.recordLogContributionCommand, {
+        coalesceMaxBatch: TRACE_CORRELATION_COALESCE_MAX_BATCH,
+      })
+      .withCommand("recordMetricCorrelation", commands.recordMetricCorrelationCommand, {
+        coalesceMaxBatch: TRACE_CORRELATION_COALESCE_MAX_BATCH,
+      })
+      .withCommand("resolveOrigin", EventingTraceOriginAdapter)
+      .withCommand("addAnnotation", commands.addAnnotationCommand, {
+        serializeByAggregate: true,
+      })
+      .withCommand("removeAnnotation", commands.removeAnnotationCommand, {
+        serializeByAggregate: true,
+      })
+      .withCommand("bulkSyncAnnotations", commands.bulkSyncAnnotationsCommand, {
+        serializeByAggregate: true,
+      })
+      .withCommand("changeTraceName", commands.changeTraceNameCommand)
+      .withCommand("recordEvaluationOutcome", EventingTraceEvaluationOutcomeAdapter)
+      // A deliberate exception to "a peer subscriber writes its own row": the outcome is a trace
+      // fact the trace fold reacts to, ordered with the trace's own events (trace ADR-003).
+      .withPeerSubscriber("evaluationCompletedOutcome", {
+        eventType: EVALUATION_COMPLETED_EVENT_TYPE,
+        data: evaluationCompletedEventDataSchema.pick({
+          evaluationId: true,
+          status: true,
+          passed: true,
+          label: true,
+        }),
+        handle: (data, context) =>
+          evaluationOutcomes.recordCompleted({
+            data,
+            context: {
+              tenantId: context.tenantId,
+              aggregateId: context.aggregateId,
+              occurredAt: context.occurredAt,
+              createdAt: context.createdAt,
+              eventId: context.eventId,
+            },
+          }),
+      })
+      .withPeerSubscriber("evaluationReportedOutcome", {
+        eventType: EVALUATION_REPORTED_EVENT_TYPE,
+        data: evaluationReportedEventDataSchema.pick({
+          evaluationId: true,
+          evaluatorName: true,
+          traceId: true,
+          isGuardrail: true,
+          status: true,
+          passed: true,
+          label: true,
+        }),
+        handle: (data, context) =>
+          evaluationOutcomes.recordReported({
+            data,
+            context: {
+              tenantId: context.tenantId,
+              aggregateId: context.aggregateId,
+              occurredAt: context.occurredAt,
+              createdAt: context.createdAt,
+              eventId: context.eventId,
+            },
+          }),
+      })
+  );
 }
 
 /** Deliberate process-facing adapter for Trace's deterministic projections. */

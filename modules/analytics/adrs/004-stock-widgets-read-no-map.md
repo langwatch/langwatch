@@ -59,6 +59,26 @@ PR 9439 (goose 00126) gave `trace_analytics` nine metadata columns and moved 15 
    set held 3.5M traces and ran out of memory at 1 GB (ADR-006 Measurements). `cityHash64` joins
    `sipHash128` on the validator's function allow-list for it.
 
+8. The five span queries still over 1 GB or 60 s at 60 days (2026-11-12, round 17) run their heavy
+   parts one after another. Each span read builds its own source-filter set, and parts run side by
+   side passed the cap that each stays under alone, so `gatheredRows`
+   (`templates/model/lwql-gathered.ts`) runs a part as a scalar subquery, which ClickHouse runs to
+   the end before the rest, and unrolls its rows. `up-loops` gathers the candidate loop calls (tool
+   spans whose name repeats 3 times in the trace, input hashed with `sipHash128`) before grouping
+   them, and each of loops and retries before the union. Retries read only the groups holding a
+   failed call, found by a `cityHash64` set (a group a collision lets in holds no failed call, so
+   its `HAVING` drops it), and group by a `sipHash128` key. Main's `LIMIT 10000` on each kind had no
+   `ORDER BY`, so which repeats it kept was arbitrary: it is removed, and every repeat counts.
+   `up-where-fails` and `tools-error-rate` find lone top-level spans with one grouping by parent key
+   in place of the `NOT IN` of decision 7. `cost-waste` groups trace rows and span groups together
+   per trace instead of joining them, carrying each trace's `trace_metrics` row count so the join's
+   per-row counting stays exact, groups only tool spans by name, and keys both groupings by
+   `sipHash128`. `voice-call-health` gathers its speech traces and the failed repeat checks before
+   grouping calls. A gathered column must not alias a view's floor column, which keeps that view's
+   reads unfloored (ADR-005). Each returns the rows the previous form returned on an 8 GB user
+   (main's `up-loops` without its cap), 3 runs at 30 and 60 days on the proof dataset, ClickHouse
+   26.8.36.3.
+
 ## Consequences
 
 - The numbers stay those of the `traces` and `spans` forms, except: a `metadata.*` value longer

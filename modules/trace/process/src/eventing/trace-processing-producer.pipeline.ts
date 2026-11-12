@@ -189,6 +189,19 @@ class ProducerOnlyTokenEstimation implements TraceSpanTokenEstimation {
   }
 }
 
+/** Evaluation outcomes are recorded where the worker drains the peer lanes, never here. */
+class ProducerOnlyEvaluationOutcomes {
+  constructor(private readonly role: string) {}
+
+  recordCompleted(): Promise<void> {
+    return Promise.reject(producerOnly(this.role, "record an evaluation's outcome on its trace"));
+  }
+
+  recordReported(): Promise<void> {
+    return Promise.reject(producerOnly(this.role, "record an evaluation's outcome on its trace"));
+  }
+}
+
 class ProducerOnlyContentDrop implements TraceSpanContentDrop {
   constructor(private readonly role: string) {}
 
@@ -228,6 +241,7 @@ export function createTraceProcessingProducerPipeline(input: {
       tokenEstimation: new ProducerOnlyTokenEstimation(role),
       contentDrop: new ProducerOnlyContentDrop(role),
     }),
+    evaluationOutcomes: new ProducerOnlyEvaluationOutcomes(role),
     // No subscribers: they are consumer-side, and this registration drains
     // nothing. The command routing triple is derived from the pipeline and
     // command names the definition above already declares, which is what the

@@ -4,7 +4,18 @@
  */
 
 /** How a view collapses its source's rows to one per logical record. */
-export type LangWatchQLDedupStrategy = "in-tuple" | "final" | "latest-in-order" | "none";
+export type LangWatchQLDedupStrategy =
+  | "in-tuple"
+  | "final"
+  | "latest-in-order"
+  | "settled"
+  | "none";
+
+/** The strategies whose view gets a floored twin when its dedup declares a floor column. */
+export const FLOORED_DEDUP_STRATEGIES: ReadonlySet<LangWatchQLDedupStrategy> = new Set([
+  "in-tuple",
+  "settled",
+]);
 
 /** What identifies one row of a view, and how the source's versions collapse to it. */
 export interface LangWatchQLViewDedup {
@@ -36,8 +47,14 @@ export interface LangWatchQLViewDedup {
    */
   readonly aggregating?: boolean;
   /**
+   * Under `settled`: the source's sign column (+1 a row, -1 its retraction). The view keeps the
+   * rows whose signs sum above zero and never exposes it (analytics ADR-007).
+   */
+  readonly signColumn?: string;
+  /**
    * An in-tuple dataset's column that never falls from one version of a row to the next, so a
-   * read bounded below on it may dedup from that bound alone (analytics ADR-005).
+   * read bounded below on it may dedup from that bound alone (analytics ADR-005). Under
+   * `settled`, any column a retraction copies unchanged (analytics ADR-007).
    */
   readonly floorColumn?: string;
 }

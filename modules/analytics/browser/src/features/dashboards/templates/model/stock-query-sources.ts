@@ -7,9 +7,10 @@
 import type { TraceSource } from "@langwatch/analytics-contract";
 
 import {
+  SOURCE_AND_TRACE_SOURCE_VIEWS,
   SOURCE_VIEWS,
   SOURCES_PLACEHOLDER,
-  TRACE_VIEWS,
+  type TRACE_VIEWS,
   VIEWS_WITH_ORIGIN,
 } from "../../model/sources-parameter.ts";
 
@@ -138,7 +139,7 @@ function regionOf({ code, from }: { code: readonly string[]; from: number }): {
 
 function assertNotJoinedDirectly(written: string | undefined): void {
   const joined = (written ?? "").replace(/^analytics\./i, "").toLowerCase();
-  if ([...SOURCE_VIEWS, ...TRACE_VIEWS].some((view) => view === joined)) {
+  if (VIEWS_WITH_ORIGIN.includes(joined)) {
     throw new Error(`a stock query joins ${joined} directly; select it in a subquery`);
   }
 }
@@ -176,6 +177,9 @@ function sourcesPredicate({
 }): string {
   if ((SOURCE_VIEWS as readonly string[]).includes(view)) {
     return `${alias}.Source IN ${SOURCES_PLACEHOLDER}`;
+  }
+  if ((SOURCE_AND_TRACE_SOURCE_VIEWS as readonly string[]).includes(view)) {
+    return `${alias}.Source IN ${SOURCES_PLACEHOLDER} AND ${alias}.TraceSource IN ${SOURCES_PLACEHOLDER}`;
   }
 
   const key = `(${alias}.TenantId, ${alias}.TraceId)`;

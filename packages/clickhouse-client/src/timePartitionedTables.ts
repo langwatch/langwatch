@@ -21,6 +21,7 @@ export const TIME_PARTITIONED_TABLES = {
   // prefix on several of them, so an unwindowed read is a tenant-wide scan
   // across every partition — exactly what this detector exists to surface.
   trace_analytics: ["OccurredAt"],
+  trace_evaluation_analytics: ["OccurredAt"],
   span_analytics: ["StartTime"],
   trace_analytics_rollup: ["BucketStart"],
   trace_summaries: ["OccurredAt"],

@@ -88,6 +88,9 @@ describe("given the By customer widgets", () => {
       "sumIf(t.judged, t.at < {dashboard_context_period_start:DateTime})",
     );
     expect(sql.passRates).toContain("IsGuardrail = false");
+    // Each verdict carries its trace's time and unit columns: one read, no join to the traces.
+    expect(sql.passRates).toContain("FROM trace_evaluation_metrics");
+    expect(sql.passRates).toContain("min(TraceOccurredAt) AS at");
     expect(code).toContain("const MIN_JUDGED = 30;");
     expect(code).toContain("drop >= 0.02 && spread > 0 && drop / spread >= 1.96");
     for (const header of ["Pass rate", "Before", "AI cost"]) {
@@ -103,6 +106,7 @@ describe("given the By customer widgets", () => {
     expect(sql.units).toContain("GROUP BY unit, version");
     // The metadata version wins; the managed one is a plain traces column, never the map.
     expect(sql.units).toContain("coalesce(nullIf(t.version, ''), t.managed, '')");
+    expect(sql.units).toContain("FROM trace_evaluation_metrics");
     expect(sql.change).toContain("MetadataPromptVersion != ''");
     expect(sql.change).toContain("LastUsedPromptVersionId != ''");
     for (const text of [sql.units, sql.change]) expect(text).not.toContain("Attributes[");

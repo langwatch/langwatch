@@ -1,5 +1,6 @@
 import {
   type MigrationStep,
+  type MigrationStepDefinition,
   type MigrationStepReport,
   defineMigrationStep,
 } from "./migration-step.ts";
@@ -62,6 +63,7 @@ export function defineProjectionReplayStep({
   since = PROJECTION_REPLAY_FROM_START,
   needsOldWritersGone,
   trailingPass = false,
+  after,
 }: {
   id: string;
   description: string;
@@ -72,13 +74,15 @@ export function defineProjectionReplayStep({
   needsOldWritersGone?: boolean;
   /** After the first pass, replay again from the cursor it completed through. */
   trailingPass?: boolean;
+  /** The background steps whose work must be in the log before this lane replays it. */
+  after?: MigrationStepDefinition["after"];
 }): MigrationStep {
   return defineMigrationStep({
     id,
     kind: "data",
     mode: "background",
     description,
-    ...(needsOldWritersGone === undefined ? {} : { needsOldWritersGone }),
+    ...declaredOrdering({ needsOldWritersGone, after }),
     run: async ({ checkpoint, dryRun, signal }) => {
       let cursor = resumeCursor({ resumeFrom: checkpoint.resumeFrom, lane, since });
       const firstSince = resumeSince({ resumeFrom: checkpoint.resumeFrom, lane, since });
@@ -151,6 +155,20 @@ export function defineProjectionReplayStep({
       }
     },
   });
+}
+
+/** The ordering fields a replay step declares, each only when given. */
+function declaredOrdering({
+  needsOldWritersGone,
+  after,
+}: {
+  needsOldWritersGone: boolean | undefined;
+  after: MigrationStepDefinition["after"] | undefined;
+}): Pick<MigrationStepDefinition, "needsOldWritersGone" | "after"> {
+  return {
+    ...(needsOldWritersGone === undefined ? {} : { needsOldWritersGone }),
+    ...(after === undefined ? {} : { after }),
+  };
 }
 
 /** The cursor this lane last completed through, or the step's first-run instant. */

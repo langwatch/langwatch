@@ -160,6 +160,14 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     envVar: "CLICKHOUSE_COLD_STORAGE_TRACE_ANALYTICS_TTL_DAYS",
     hardcodedDefault: 49,
   },
+  // Each evaluation's outcome on its trace (goose 00129): aged on the evaluation's time.
+  {
+    table: "trace_evaluation_analytics",
+    ttlColumn: "OccurredAt",
+    retentionTTLColumn: "OccurredAt",
+    envVar: "CLICKHOUSE_COLD_STORAGE_TRACE_EVALUATION_ANALYTICS_TTL_DAYS",
+    hardcodedDefault: 49,
+  },
   // ADR-034 Phase 1: per-span rollup. Anchor on BucketStart (its sort + partition
   // leaf). BucketStart is DateTime64(3), so the ttlColumnExpression wraps in
   // toDateTime — CH rejects DateTime64 directly in TTL arithmetic.

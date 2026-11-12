@@ -15,6 +15,9 @@ import {
   annotationRemovedEventSchema,
   type AnnotationsBulkSyncedEvent,
   annotationsBulkSyncedEventSchema,
+  type EvaluationOutcomeRecordedEvent,
+  type EvaluationOutcomeRecordedEventData,
+  evaluationOutcomeRecordedEventSchema,
   firstUsableAnchor,
   foldSpanIntoTraceAnalytics,
   type LogContributedEvent,
@@ -48,6 +51,7 @@ import {
 } from "@langwatch/trace-contract";
 
 import { LOG_FILL_ONLY_KEYS } from "../features/derivation/services/trace-attribute-accumulation.service.ts";
+import { isFresherOutcome, keepsEvaluation } from "../rules/trace-evaluation-analytics.rules.ts";
 import {
   type TraceAnalyticsMetadataColumns,
   traceAnalyticsMetadataColumns,
@@ -76,14 +80,18 @@ const traceAnalyticsEvents = [
   annotationRemovedEventSchema,
   annotationsBulkSyncedEventSchema,
   traceNameChangedEventSchema,
+  evaluationOutcomeRecordedEventSchema,
 ] as const;
 
 /**
  * Schema-snapshot version (calendar date), bumped on derivation/trim changes; NOT a refold
- * trigger, see {@link TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT}. 2026-11-11 = the metadata
- * columns the fold writes (analytics ADR-006); the replay's rows win a tie on `UpdatedAt` by it.
+ * trigger, see {@link TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT}. 2026-11-12 = the evaluation
+ * outcomes the fold keeps (trace ADR-003); the replay's rows win a tie on `UpdatedAt` by it.
  */
-export const TRACE_ANALYTICS_PROJECTION_VERSION_LATEST = "2026-11-11" as const;
+export const TRACE_ANALYTICS_PROJECTION_VERSION_LATEST = "2026-11-12" as const;
+
+/** The stamp before the fold kept evaluation outcomes; its rows decode with none. */
+export const TRACE_ANALYTICS_PROJECTION_VERSION_PRE_EVALUATIONS = "2026-11-11" as const;
 
 /** The stamp before the fold wrote its metadata columns; its rows decode the same way. */
 export const TRACE_ANALYTICS_PROJECTION_VERSION_PRE_METADATA = "2026-07-29" as const;
@@ -99,6 +107,9 @@ const TRACE_ANALYTICS_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
  * platform default (500); must stay below MAX_APPLIED_EVENT_IDS.
  */
 const TRACE_ANALYTICS_COALESCE_MAX_BATCH = 128;
+
+/** One evaluation's outcome as the trace keeps it, keyed by its evaluation id. */
+export type TraceEvaluationOutcome = Omit<EvaluationOutcomeRecordedEventData, "evaluationId">;
 
 /**
  * The slim row in `trace_analytics`. Field names 1:1 to ClickHouse columns.
@@ -186,6 +197,10 @@ export interface TraceAnalyticsRow {
   traceNameUserOverridden: boolean;
   /** The fold's out-of-order checkpoint (distinct from OccurredAt). */
   lastEventOccurredAt: number;
+  /** `EvaluationOutcomes` (JSON): the outcomes the fold keeps; absent reads as none. */
+  evaluationOutcomes?: Readonly<Record<string, TraceEvaluationOutcome>>;
+  /** `EvaluationRowsDigest`: the trace_evaluation_analytics rows last written for this state. */
+  evaluationRowsDigest?: string;
 }
 
 /**
@@ -263,6 +278,11 @@ export interface TraceAnalyticsData {
    *  Survives a user rename (the name disowns its fallback provenance, but
    *  the metadata stand-in is still in place). */
   rootMetadataFromFallback?: boolean;
+
+  /** Each evaluation's freshest outcome; absent (as in an older release's state) means none. */
+  evaluations?: Readonly<Record<string, TraceEvaluationOutcome>>;
+  /** The digest of the evaluation rows the last write left; set by the store, never the fold. */
+  evaluationRowsDigest?: string;
 
   // Auto-managed by AbstractFoldProjection
   createdAt: number;
@@ -590,6 +610,23 @@ export class TraceAnalyticsFoldProjection
     };
   }
 
+  handleTraceEvaluationOutcomeRecorded(
+    event: EvaluationOutcomeRecordedEvent,
+    state: TraceAnalyticsData,
+  ): TraceAnalyticsData {
+    const { evaluationId, ...outcome } = event.data;
+    const current = state.evaluations?.[evaluationId];
+    if (current && !isFresherOutcome({ outcome, than: current })) {
+      return state;
+    }
+    if (!keepsEvaluation({ evaluations: state.evaluations, evaluationId })) return state;
+    return {
+      ...state,
+      traceId: state.traceId || event.aggregateId,
+      evaluations: { ...state.evaluations, [evaluationId]: outcome },
+    };
+  }
+
   private static readNullableString(value: string | undefined): string | null {
     if (typeof value !== "string" || value.length === 0) return null;
     return value;
@@ -851,6 +888,8 @@ export class TraceAnalyticsFoldProjection
       rootMetadataFromFallback: state.rootMetadataFromFallback ?? false,
       traceNameUserOverridden: state.traceNameUserOverridden ?? false,
       lastEventOccurredAt: state.LastEventOccurredAt,
+      evaluationOutcomes: state.evaluations ?? {},
+      evaluationRowsDigest: state.evaluationRowsDigest ?? "",
     };
   }
 
@@ -918,6 +957,12 @@ export class TraceAnalyticsFoldProjection
       traceNameUserOverridden: row.traceNameUserOverridden,
       traceNameFromFallback: row.traceNameFromFallback,
       rootMetadataFromFallback: row.rootMetadataFromFallback,
+
+      // Absent rather than empty, so a decoded trace without outcomes equals a folded one.
+      ...(row.evaluationOutcomes && Object.keys(row.evaluationOutcomes).length > 0
+        ? { evaluations: row.evaluationOutcomes }
+        : {}),
+      ...(row.evaluationRowsDigest ? { evaluationRowsDigest: row.evaluationRowsDigest } : {}),
 
       createdAt: row.createdAtMs,
       updatedAt: row.updatedAtMs,

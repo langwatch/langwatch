@@ -8,10 +8,16 @@ import {
 } from "@langwatch/clickhouse-client";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT } from "@langwatch/trace-contract";
+import {
+  evaluationOutcomeRecordedEventDataSchema,
+  TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
+} from "@langwatch/trace-contract";
 import { z } from "zod";
 
-import type { TraceAnalyticsRow } from "../../eventing/trace-derived.projection.ts";
+import type {
+  TraceAnalyticsRow,
+  TraceEvaluationOutcome,
+} from "../../eventing/trace-derived.projection.ts";
 import {
   type TraceAnalyticsMetadataColumns,
   traceAnalyticsMetadataColumns,
@@ -23,6 +29,15 @@ import {
 import type { TraceClickHouseWriteResolver } from "./clickhouse.trace-member-client.repository.ts";
 
 const analyticsRecordRowsSchema = z.array(z.record(z.string(), z.unknown()));
+
+const occurredAtRowsSchema = z.array(
+  z.object({ TraceId: z.string(), OccurredAtMs: z.union([z.number(), z.string()]) }),
+);
+
+const evaluationOutcomesSchema = z.record(
+  z.string(),
+  evaluationOutcomeRecordedEventDataSchema.omit({ evaluationId: true }),
+);
 
 const asString = (value: unknown): string =>
   typeof value === "string" || typeof value === "number" || typeof value === "bigint"
@@ -104,6 +119,10 @@ type ClickHouseTraceAnalyticsWriteRecord = {
 
     // ── Durable dedup watermark (ADR-066, migration 00056) ─────────────────
     AppliedEventIds: string[];
+
+    // ── Evaluation outcomes and the rows they left (trace ADR-003, migration 00129) ──
+    EvaluationOutcomes: string;
+    EvaluationRowsDigest: string;
 
     _retention_days: number;
   };
@@ -273,6 +292,69 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
       );
       throw error;
     }
+  }
+
+  /**
+   * Many traces' anchors in one read, bounded by the caller's window on the partition key, or by
+   * the TraceId index when there is none.
+   */
+  override async findOccurredAtByTraceIds({
+    authorization,
+    traceIds,
+    window,
+  }: {
+    authorization: Authorization;
+    traceIds: readonly string[];
+    window?: { fromMs: number; toMs: number };
+  }): Promise<{ traceId: string; occurredAtMs: number }[]> {
+    if (traceIds.length === 0) return [];
+    if (window === undefined) return this.queryOccurredAtByTraceIds({ authorization, traceIds });
+    const result = await this.reader(authorization).query({
+      // ID_BOUND_SKIP: many ids at once, bounded by the caller's OccurredAt window instead.
+      query: `
+        SELECT TraceId, toUnixTimestamp64Milli(argMax(OccurredAt, UpdatedAt)) AS OccurredAtMs
+        FROM ${TABLE_NAME}
+        WHERE ${tenantScope("OccurredAt")}
+          AND TraceId IN {traceIds:Array(String)}
+          AND OccurredAt BETWEEN fromUnixTimestamp64Milli({from:Int64})
+            AND fromUnixTimestamp64Milli({to:Int64})
+        GROUP BY TenantId, TraceId
+      `,
+      query_params: { traceIds: [...new Set(traceIds)], from: window.fromMs, to: window.toMs },
+      format: "JSONEachRow",
+    });
+    return TraceAnalyticsClickHouseRepository.anchorsOf(await result.json());
+  }
+
+  private static anchorsOf(rows: unknown): { traceId: string; occurredAtMs: number }[] {
+    return occurredAtRowsSchema.parse(rows).map((row) => ({
+      traceId: row.TraceId,
+      occurredAtMs: Number(row.OccurredAtMs),
+    }));
+  }
+
+  /** {@link findOccurredAtByTraceIds} with no window: the index bounds it once ready. */
+  private async queryOccurredAtByTraceIds({
+    authorization,
+    traceIds,
+  }: {
+    authorization: Authorization;
+    traceIds: readonly string[];
+  }): Promise<{ traceId: string; occurredAtMs: number }[]> {
+    const result = await this.reader(authorization).query({
+      query: `
+        SELECT TraceId, toUnixTimestamp64Milli(argMax(OccurredAt, UpdatedAt)) AS OccurredAtMs
+        FROM ${TABLE_NAME}
+        WHERE ${tenantScope("OccurredAt")}
+          AND TraceId IN {traceIds:Array(String)}
+          {{idBound:trace_analytics.TraceId:traceIds}}
+        GROUP BY TenantId, TraceId
+      `,
+      query_params: { traceIds: [...new Set(traceIds)] },
+      format: "JSONEachRow",
+      idBound: { fallback: "unbounded" },
+    });
+    return TraceAnalyticsClickHouseRepository.anchorsOf(await result.json());
   }
 
   /**
@@ -478,6 +560,11 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
 
       AppliedEventIds: [...appliedEventIds],
 
+      EvaluationOutcomes: TraceAnalyticsClickHouseRepository.encodeOutcomes(
+        row.evaluationOutcomes ?? {},
+      ),
+      EvaluationRowsDigest: row.evaluationRowsDigest ?? "",
+
       // NOTE: `row.hasSignal` is deliberately NOT serialised — there is no
       // HasSignal column. Readers derive the verdict from the columns above via
       // analytics' has-signal predicate, and `fromRecord` re-derives it on the
@@ -568,6 +655,28 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
       traceNameUserOverridden: Boolean(record.TraceNameUserOverridden),
       lastEventOccurredAt: TraceAnalyticsClickHouseRepository.asNumber(record.LastEventOccurredAt),
       earliestSpanStartMs: TraceAnalyticsClickHouseRepository.asNumber(record.EarliestSpanStartMs),
+      evaluationOutcomes: TraceAnalyticsClickHouseRepository.decodeOutcomes(
+        asString(record.EvaluationOutcomes),
+      ),
+      evaluationRowsDigest: asString(record.EvaluationRowsDigest),
     };
+  }
+
+  /** '' for none, so a trace without outcomes keeps the column's default. */
+  private static encodeOutcomes(
+    outcomes: Readonly<Record<string, TraceEvaluationOutcome>>,
+  ): string {
+    return Object.keys(outcomes).length === 0 ? "" : JSON.stringify(outcomes);
+  }
+
+  /** The column's JSON; '' (an older row) or anything unparseable decodes as none. */
+  private static decodeOutcomes(text: string): Record<string, TraceEvaluationOutcome> {
+    if (text === "") return {};
+    try {
+      return evaluationOutcomesSchema.parse(JSON.parse(text));
+    } catch (error) {
+      logger.warn({ error }, "Unreadable trace_analytics EvaluationOutcomes; decoding as none");
+      return {};
+    }
   }
 }

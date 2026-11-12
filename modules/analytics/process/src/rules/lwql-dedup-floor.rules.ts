@@ -7,6 +7,7 @@ import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog
 import { clickHouseSqlParser, type SqlAstNode } from "./langwatch-ql-parser.rules.ts";
 import { qualifyTableName } from "./langwatch-ql-policy.rules.ts";
 import { METADATA_FIELDS } from "./langwatch-ql-validation-shape.rules.ts";
+import { FLOORED_DEDUP_STRATEGIES } from "./lwql-view-dedup-shape.rules.ts";
 
 /** The parameter a floored view takes its lower bound in. */
 export const LWQL_FLOOR_PARAMETER = "lwql_floor";
@@ -23,18 +24,20 @@ export function baseViewName(relation: string): string {
   return relation.endsWith(FLOOR_SUFFIX) ? relation.slice(0, -FLOOR_SUFFIX.length) : relation;
 }
 
-/** The views whose twin is provisioned: in-tuple ones that declare a floor column. */
+/** The views whose twin is provisioned: in-tuple or settled ones that declare a floor column. */
 function floorableViews(
   views: readonly LangWatchQLViewDefinition[],
 ): { name: string; floorColumn: string }[] {
   return views.flatMap(({ name, dedup }) =>
-    dedup.strategy === "in-tuple" && dedup.floorColumn !== undefined
+    dedup.strategy !== undefined &&
+    FLOORED_DEDUP_STRATEGIES.has(dedup.strategy) &&
+    dedup.floorColumn !== undefined
       ? [{ name, floorColumn: dedup.floorColumn }]
       : [],
   );
 }
 
-/** The floored twins `views` provision: one per in-tuple view that declares a floor column. */
+/** The floored twins `views` provision: one per floorable view that declares a floor column. */
 export function flooredViewNames(views: readonly LangWatchQLViewDefinition[]): string[] {
   return floorableViews(views).map(({ name }) => flooredViewName(name));
 }

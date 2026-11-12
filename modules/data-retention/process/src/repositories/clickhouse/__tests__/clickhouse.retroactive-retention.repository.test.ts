@@ -88,6 +88,7 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
       "trace_summaries",
       "trace_analytics",
       "trace_analytics_rollup",
+      "trace_evaluation_analytics",
       "evaluation_runs",
       "evaluation_analytics",
       "evaluation_analytics_rollup",

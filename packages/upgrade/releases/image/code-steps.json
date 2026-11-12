@@ -478,6 +478,22 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "trace:record-evaluation-outcomes",
+    "kind": "data",
+    "mode": "background",
+    "owner": "trace",
+    "description": "Records each evaluation of the last 62 days on its trace, so the trace's evaluation rows can be written.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "trace:replay-trace-evaluation-analytics",
+    "kind": "data",
+    "mode": "background",
+    "owner": "trace",
+    "description": "Refolds the last 62 days of traces so each carries its evaluation rows for the stock widgets.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "trace:fill-id-indexes",
     "kind": "data",
     "mode": "background",

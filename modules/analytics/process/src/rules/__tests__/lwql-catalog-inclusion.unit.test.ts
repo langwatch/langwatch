@@ -154,6 +154,8 @@ describe("the LangWatchQL catalog is opt-in", () => {
       ["model_usage_by_minute", "trace_analytics_rollup"],
       ["evaluation_metrics", "evaluation_analytics"],
       ["evaluation_metrics_by_minute", "evaluation_analytics_rollup"],
+      ["trace_evaluation_metrics", "trace_evaluation_analytics"],
+      ["trace_evaluation_checks", "trace_evaluation_analytics"],
       ["coding_sessions", "coding_agent_sessions"],
       ["coding_session_events", "coding_agent_session_events"],
       ["coding_tool_results", "stored_spans"],

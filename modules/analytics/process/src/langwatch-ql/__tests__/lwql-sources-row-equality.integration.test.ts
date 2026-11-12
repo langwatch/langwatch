@@ -254,6 +254,23 @@ function seedRows(): Record<string, Record<string, unknown>[]> {
         Source: source,
       })),
     ),
+    // The same verdicts beside their trace's time, topic and source (analytics ADR-007).
+    trace_evaluation_metrics: SEEDS.flatMap((seed) =>
+      seed.sources.slice(0, 1).map((source) => ({
+        ...base(seed),
+        EvaluationId: `eval_${seed.trace}`,
+        OccurredAt: at(seed.time),
+        UpdatedAt: at(seed.time),
+        TraceOccurredAt: at(seed.time),
+        EvaluatorName: "Answered",
+        Status: "processed",
+        IsGuardrail: false,
+        Passed: !failing(seed),
+        Source: source,
+        TraceSource: source,
+        TopicId: topic(seed),
+      })),
+    ),
     topics: ["topic_billing", "topic_refunds"].map((id) => ({
       TenantId: "tenant",
       TopicId: id,

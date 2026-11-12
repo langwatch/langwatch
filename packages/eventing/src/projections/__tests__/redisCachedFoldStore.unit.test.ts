@@ -158,6 +158,25 @@ describe("RedisCachedFoldStore", () => {
     });
   });
 
+  describe("given a durable store that stamps the state it persists", () => {
+    describe("when the fold stores and then reads state", () => {
+      it("caches the state the durable store answered, not the one handed in", async () => {
+        const redis = createRedis();
+        const stamping: FoldProjectionStore<TestState> = {
+          get: async () => ({ kind: "empty" }),
+          store: async (state) => ({ ...state, count: state.count + 100 }),
+        };
+        const { store } = createStoreOver(redis, { store: stamping });
+
+        const persisted = await store.store({ count: 5, UpdatedAt: 200 }, CONTEXT);
+        const result = await store.get("agg-1", CONTEXT);
+
+        expect(persisted).toEqual({ count: 105, UpdatedAt: 200 });
+        expect(result).toEqual({ kind: "folded", state: { count: 105, UpdatedAt: 200 } });
+      });
+    });
+  });
+
   describe("given no cached entry", () => {
     describe("when the fold reads state", () => {
       /** @scenario a cold cache recovers state from the store, not the event log */

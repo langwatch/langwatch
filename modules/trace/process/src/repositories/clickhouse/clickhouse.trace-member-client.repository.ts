@@ -31,7 +31,7 @@ export interface TraceClickHouseWriteClient extends TraceClickHouseClient {
     /** The columns the rows carry; needed to write a MATERIALIZED one. Mutable, as the vendor's. */
     columns?: [string, ...string[]];
     format: "JSONEachRow";
-    clickhouse_settings?: Record<string, number>;
+    clickhouse_settings?: Record<string, string | number>;
   }): Promise<unknown>;
 }
 
@@ -99,7 +99,7 @@ export class MemberTraceClickHouseClientRepository implements TraceClickHouseWri
     values: readonly unknown[];
     columns?: [string, ...string[]];
     format: "JSONEachRow";
-    clickhouse_settings?: Record<string, number>;
+    clickhouse_settings?: Record<string, string | number>;
   }): Promise<unknown> {
     return this.clickhouse.insert({
       tenantId: this.tenantId,

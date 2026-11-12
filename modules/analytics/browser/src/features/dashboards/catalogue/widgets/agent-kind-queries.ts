@@ -4,6 +4,7 @@
  * check names are the ones the dashboards dev seed sends, so the demo fills every panel.
  */
 
+import { gatheredRows } from "../../templates/model/lwql-gathered.ts";
 import {
   bucketOf,
   END,
@@ -94,51 +95,56 @@ const METRICS_CONVERSATION = "coalesce(nullIf(ConversationId, ''), TraceId)";
 /** A trace's key in the judged-trace joins: 16 bytes instead of the id (analytics ADR-004). */
 const TRACE_KEY = "sipHash128(TraceId)";
 
-/**
- * Judges' verdicts per judged trace, over the period and the one before: an evaluation is
- * stamped when it ran, maybe long after the answer. Guardrails guard, they do not grade. One
- * small row per trace, so it is the joined side and the trace rows stream past it.
- */
-const JUDGED_PER_TRACE = `SELECT ${TRACE_KEY} AS trace, countIf(Passed = 1) AS passed, count() AS judged
-  FROM evaluation_metrics
-  WHERE OccurredAt >= ${PREVIOUS_START}
-    AND Passed IS NOT NULL
-    AND IsGuardrail = false
-  GROUP BY trace`;
-
 /** The time a managed-version row carries, after every trace row, so no `min` picks it. */
 const AFTER_EVERY_ROW = "toDateTime64('2200-01-01 00:00:00', 3)";
 
 /**
- * Each judged trace once, with the unit and metadata version of its first `trace_metrics` row:
- * the rows stream past the judged side and only judged traces are grouped. With `managed`, the
- * managed prompt version streams in beside the rows, so no second join (analytics ADR-004).
+ * Judges' verdicts over both periods, dated by the trace on their own row: an evaluation may run
+ * long after the answer, and no join to `trace_metrics` (analytics ADR-007). Guardrails guard.
  */
-function judgedUnitTraces({ managed }: { managed: boolean }): string {
-  const managedRows = `
-    UNION ALL
-    SELECT ${TRACE_KEY} AS trace, '' AS unit, '' AS version, ${AFTER_EVERY_ROW} AS at,
-      LastUsedPromptVersionId AS managed
-    FROM traces
-    WHERE ${inPeriodAndPrevious("OccurredAt")}
-      AND LastUsedPromptVersionId != ''`;
-  return `SELECT t.trace AS trace,
+const JUDGED_IN_BOTH_PERIODS = `OccurredAt >= ${PREVIOUS_START} AND ${inPeriodAndPrevious("TraceOccurredAt")}
+      AND Passed IS NOT NULL
+      AND IsGuardrail = false`;
+
+/** Each judged trace once, with the unit and metadata version of its first evaluation row. */
+const JUDGED_UNIT_TRACES = `SELECT ${TRACE_KEY} AS trace,
+    argMin(unit, TraceOccurredAt) AS unit,
+    argMin(MetadataPromptVersion, TraceOccurredAt) AS version,
+    min(TraceOccurredAt) AS at,
+    countIf(Passed = 1) AS passed,
+    count() AS judged
+  FROM (SELECT TraceId, TraceOccurredAt, MetadataPromptVersion, Passed, ${METRICS_UNIT} AS unit
+    FROM trace_evaluation_metrics
+    WHERE ${JUDGED_IN_BOTH_PERIODS})
+  GROUP BY trace`;
+
+/**
+ * Each judged trace once, as {@link JUDGED_UNIT_TRACES}, with the managed prompt version
+ * streamed in beside the verdicts, so no second join (analytics ADR-004); a trace with only a
+ * managed-version row is no judged trace and is left out.
+ */
+const JUDGED_VERSION_TRACES = `SELECT t.trace AS trace,
     argMin(t.unit, t.at) AS unit,
     argMin(t.version, t.at) AS version,
-    min(t.at) AS at,${managed ? "\n    any(t.managed) AS managed," : ""}
-    any(e.passed) AS passed,
-    any(e.judged) AS judged
+    min(t.at) AS at,
+    any(t.managed) AS managed,
+    countIf(t.judged = 1 AND t.passed = 1) AS passed,
+    countIf(t.judged = 1) AS judged
   FROM (
     SELECT ${TRACE_KEY} AS trace, ${METRICS_UNIT} AS unit, MetadataPromptVersion AS version,
-      OccurredAt AS at${managed ? ",\n      CAST(NULL AS Nullable(String)) AS managed" : ""}
-    FROM trace_metrics
-    WHERE ${inPeriodAndPrevious("OccurredAt")}${managed ? managedRows : ""}
+      TraceOccurredAt AS at,
+      CAST(NULL AS Nullable(String)) AS managed, Passed AS passed, 1 AS judged
+    FROM trace_evaluation_metrics
+    WHERE ${JUDGED_IN_BOTH_PERIODS}
+    UNION ALL
+    SELECT ${TRACE_KEY} AS trace, '' AS unit, '' AS version, ${AFTER_EVERY_ROW} AS at,
+      LastUsedPromptVersionId AS managed, CAST(NULL AS Nullable(Bool)) AS passed, 0 AS judged
+    FROM traces
+    WHERE ${inPeriodAndPrevious("OccurredAt")}
+      AND LastUsedPromptVersionId != ''
   ) AS t
-  INNER JOIN (
-    ${JUDGED_PER_TRACE}
-  ) AS e ON e.trace = t.trace
-  GROUP BY t.trace${managed ? `\n  HAVING at < ${AFTER_EVERY_ROW}` : ""}`;
-}
+  GROUP BY t.trace
+  HAVING at < ${AFTER_EVERY_ROW}`;
 
 export const UNIT_VOLUME_SQL = `WITH ${METRICS_UNIT_KEY}
 SELECT unit_key, ${METRICS_UNIT} AS unit,
@@ -172,7 +178,10 @@ GROUP BY unit
 ORDER BY cost DESC
 LIMIT 6`;
 
-/** Each unit's judged answers in the period and in the equally long window before it. */
+/**
+ * Each unit's judged answers in the period and in the equally long window before it. Most judged
+ * first: the cap keeps the units that can show a rate, the same each run.
+ */
 export const UNIT_PASS_RATES_SQL = `WITH ${METRICS_UNIT_KEY}
 SELECT t.unit AS unit,
   sumIf(t.passed, t.at >= ${START}) AS passed,
@@ -180,9 +189,10 @@ SELECT t.unit AS unit,
   sumIf(t.passed, t.at < ${START}) AS passed_before,
   sumIf(t.judged, t.at < ${START}) AS judged_before
 FROM (
-  ${judgedUnitTraces({ managed: false })}
+  ${JUDGED_UNIT_TRACES}
 ) AS t
 GROUP BY unit
+ORDER BY judged + judged_before DESC, unit
 LIMIT 200`;
 
 /**
@@ -230,6 +240,7 @@ WHERE length(versions) > 1
 /**
  * Each unit's judged answers per version; the widget compares the newest with the one before.
  * The managed prompt version is read beside the judged traces' rows, never joined to them.
+ * Most judged first: the cap keeps the rows that can reach the judged minimum, the same each run.
  */
 export const VERSION_PASS_RATES_SQL = `WITH ${METRICS_UNIT_KEY}
 SELECT unit_key, t.unit AS unit,
@@ -238,10 +249,11 @@ SELECT unit_key, t.unit AS unit,
   sum(t.passed) AS passed,
   sum(t.judged) AS judged
 FROM (
-  ${judgedUnitTraces({ managed: true })}
+  ${JUDGED_VERSION_TRACES}
 ) AS t
 WHERE version != ''
 GROUP BY unit, version
+ORDER BY judged DESC, unit, version
 LIMIT 500`;
 
 /** One row per voice reply: a trace with a speech span, its stage times summed. */
@@ -278,23 +290,34 @@ FROM (
   ${VOICE_REPLIES}
 )`;
 
+/**
+ * The traces with a speech span, gathered, like the failed repeat checks, before the calls are
+ * grouped: read side by side, the `traces` map and the checks ran past the memory cap at 60 days.
+ */
+const VOICE_TRACES = gatheredRows({
+  sql: `SELECT TraceId, ${CONVERSATION} AS call, OccurredAt AS at, ContainsErrorStatus
+    FROM traces
+    WHERE ${inPeriod("OccurredAt")}
+      AND TraceId IN (
+        SELECT TraceId FROM span_metrics WHERE ${inPeriod("StartTime")} AND SpanName IN ('stt', 'tts')
+      )`,
+  // Named apart from OccurredAt: an alias of that name keeps the evaluation reads unfloored.
+  columns: ["TraceId", "call", "at", "ContainsErrorStatus"],
+});
+
 /** One row per call: a conversation with a speech span, whether it ended on an error. */
-const VOICE_CALLS = `SELECT ${CONVERSATION} AS call,
-    min(OccurredAt) AS started,
-    argMax(ContainsErrorStatus, OccurredAt) AS not_ended,
-    max(TraceId IN (
-      SELECT TraceId
-      FROM evaluation_metrics
-      WHERE ${inPeriod("OccurredAt")}
-        AND EvaluatorName = '${REPEAT_CHECK}'
-        AND Passed = 0
-    )) AS repeated
-  FROM traces
-  WHERE ${inPeriod("OccurredAt")}
-    -- spans, as on main: span_metrics' dedup of every span in the period ran out of memory.
-    AND TraceId IN (
-      SELECT TraceId FROM spans WHERE ${inPeriod("StartTime")} AND SpanName IN ('stt', 'tts')
-    )
+const VOICE_CALLS = `SELECT call,
+    min(at) AS started,
+    argMax(ContainsErrorStatus, at) AS not_ended,
+    max(TraceId IN (${gatheredRows({
+      sql: `SELECT TraceId
+        FROM evaluation_metrics
+        WHERE ${inPeriod("OccurredAt")}
+          AND EvaluatorName = '${REPEAT_CHECK}'
+          AND Passed = 0`,
+      columns: ["TraceId"],
+    })})) AS repeated
+  FROM (${VOICE_TRACES})
   GROUP BY call`;
 
 export const VOICE_CALL_TREND_SQL = `SELECT ${bucketOf("started")} AS bucket,

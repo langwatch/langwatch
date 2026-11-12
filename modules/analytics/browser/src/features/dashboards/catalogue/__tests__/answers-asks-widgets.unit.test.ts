@@ -25,14 +25,18 @@ describe("given the Answer quality widgets", () => {
     const key =
       "toUInt64(r.sent) * 4611686018427387904 + toUInt64(dateDiff('millisecond', toDateTime64(0, 3), r.row_at))";
     expect(sql.trend).toContain(`argMax(r.outcome, ${key}) AS outcome`);
-    expect(sql.reasons).toContain(`argMax(r.reason, ${key}) AS reason`);
+    // The reasons query reads trace_metrics once with the judge joined on: no union of two reads.
+    expect(sql.reasons).toContain("argMax(r.reason, r.precedence) AS reason");
+    expect(sql.reasons).toContain("LEFT JOIN (");
+    expect(sql.reasons).not.toContain("UNION ALL");
+    expect(sql.reasons).toContain("min(outcome) AS kind");
     expect(sql.trend).toContain("GROUP BY sipHash128(r.trace_id)");
     // Only a widget that reads the topic keeps it per trace.
     expect(sql.trend).not.toContain("LEFT JOIN topics");
     expect(sql.trend).toContain("MetadataOutcome AS outcome");
-    expect(sql.trend).toContain("ifNull(j.label, '') AS outcome");
+    expect(sql.trend).toContain("ifNull(argMax(Label, OccurredAt), '') AS outcome");
     // Only the reasons query reads a reason, from the typed column: no query opens the map.
-    expect(sql.reasons).toContain("MetadataOutcomeReason AS reason");
+    expect(sql.reasons).toContain("t.MetadataOutcomeReason");
     expect(sql.trend).not.toContain("reason");
     for (const text of Object.values(sql)) expect(text).not.toContain("Attributes[");
     expect(sql.trend).toContain(`EvaluatorName = '${OUTCOME_JUDGE}'`);
@@ -129,7 +133,9 @@ describe("given the What users ask widgets", () => {
     const { sql, tsx } = buildOf("ans-topics");
     expect(sql.topics).toContain("countIf(outcome = 'resolved') AS resolved");
     expect(sql.topics).toContain("countIf(outcome = 'capability_gap') AS cannot");
-    expect(sql.topics).toContain("AND IsGuardrail = 0");
+    // Checks are counted per evaluation, topped by the trace's columns on the row.
+    expect(sql.topics).toContain("FROM trace_evaluation_metrics AS e");
+    expect(sql.topics).toContain("AND e.IsGuardrail = 0");
     expect(tsx).toContain('byOutcome ? "Resolved" : "Checks passed"');
   });
 

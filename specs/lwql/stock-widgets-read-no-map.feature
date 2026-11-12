@@ -3,8 +3,9 @@ Feature: The stock widgets that ran out of memory read no map and no FINAL
   because every view reads its table with FINAL and a key read of a map carries the whole map
   through the merge. They read typed columns the trace module's projections write instead: the
   trace_analytics fold writes the metadata keys, and a span map projection writes span_analytics,
-  which the span_metrics view exposes. The views they read keep each row's latest version with an
-  sort-key-ordered LIMIT 1 BY instead of FINAL. Why: modules/analytics/adrs/004 and 006.
+  which the span_metrics view exposes. The views they read keep each row's latest version with a
+  sort-key-ordered LIMIT 1 BY instead of FINAL; span_metrics, whose spans are written once, needs
+  neither. Why: modules/analytics/adrs/004 and 006.
 
   @unit
   Scenario: No rewritten stock query reads a map
@@ -22,7 +23,7 @@ Feature: The stock widgets that ran out of memory read no map and no FINAL
   Scenario: The span widgets read span_metrics, not spans
     Given the stock span widgets
     Then each reads span_metrics
-    And only the 90-day presence checks, loops, step latency and voice call health read spans
+    And only the 90-day presence checks and the loop widgets still read spans
 
   @unit
   Scenario: The trace fold writes the metadata keys the stock widgets read
@@ -51,12 +52,17 @@ Feature: The stock widgets that ran out of memory read no map and no FINAL
 
   @unit
   Scenario: The views the stock widgets read keep each row's latest version without FINAL
-    Given the views trace_metrics, traces, evaluations, simulations, experiment_run_results,
-      experiment_items, simulation_trace_metrics, gateway_request_spend and span_metrics
+    Given the eight views the stock widgets read that pin latest-in-order
     When their statements are rendered
     Then none reads its table with FINAL
     And each groups by its table's sort key and keeps every other column from the latest version
     And a version tie is broken by the row's Version
+
+  @unit
+  Scenario: span_metrics reads its map projection with no dedup
+    Given the span_metrics view over the spanAnalytics map projection, which writes each span once
+    When its statement is rendered
+    Then it reads span_analytics with neither FINAL nor LIMIT 1 BY
 
   @unit
   Scenario: Every other view keeps the shipped FINAL
@@ -103,6 +109,13 @@ Feature: The stock widgets that ran out of memory read no map and no FINAL
     Given traces, spans and evaluations of each source on the shipped migrations and views
     When every stock query runs in main's form on the FINAL views and in its shipped form on the
       shipped views, under each source list
+    Then both return the same rows
+
+  @integration
+  Scenario: The loops queries are compared with main's loops query without its arbitrary cap
+    Given main capped its loops and its retries at 10000 rows each with no order, so which rows it kept was arbitrary
+    And the shipped loops queries drop that cap on purpose
+    When the shipped loops queries and main's loops query with the cap removed run under each source list
     Then both return the same rows
 
   @integration

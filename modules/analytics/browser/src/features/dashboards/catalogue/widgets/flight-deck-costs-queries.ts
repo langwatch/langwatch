@@ -23,25 +23,39 @@ type Window = (column: string) => string;
 
 const CONVERSATION = "coalesce(nullIf(ConversationId, ''), TraceId)";
 
-// An evaluation is dated by its trace: it can run, or be re-run, long after the trace.
-const evaluationsOf = ({ window, from }: { window: Window; from: string }) => `SELECT
-    e.TraceId AS trace_id, t.OccurredAt AS at, e.EvaluatorName AS evaluator, e.Label AS label,
-    e.Passed = 1 AS ok, e.Passed IS NOT NULL AND NOT e.IsGuardrail
-      AND e.EvaluatorName != '${OUTCOME_JUDGE}' AS is_check,
-    t.customer AS customer
-  FROM evaluation_metrics AS e
-  INNER JOIN (
-    SELECT TraceId, OccurredAt, ifNull(CustomerId, '') AS customer
-    FROM trace_metrics
-    WHERE ${window("OccurredAt")}
-  ) AS t ON t.TraceId = e.TraceId
-  WHERE e.OccurredAt >= ${from}`;
-
 /**
  * What an outcome row carries beyond its trace, time, outcome and source: the reason, read
- * only where a widget shows it, the trace's language and its topic.
+ * only where a widget shows it, the trace's language and its topic. `fromTraceEvaluations`
+ * reads the judge's verdicts from `trace_evaluation_metrics`, which carries the trace's columns.
  */
-type OutcomeExtras = { withReason?: boolean; withLanguage?: boolean; withTopic?: boolean };
+type OutcomeExtras = {
+  withReason?: boolean;
+  withLanguage?: boolean;
+  withTopic?: boolean;
+  fromTraceEvaluations?: boolean;
+};
+
+/**
+ * The judge's verdicts, one row each, read with the trace's time and columns from the row: no
+ * join to `trace_metrics` (analytics ADR-007). An evaluation is dated by its trace.
+ */
+const judgeRowsOfTraceEvaluations = ({
+  window,
+  from,
+  withReason = false,
+  withLanguage = false,
+  withTopic = false,
+}: { window: Window; from: string } & OutcomeExtras) => {
+  const reason = withReason ? ", Label AS reason" : "";
+  const language = withLanguage ? ", MetadataLanguage AS language" : "";
+  const topic = withTopic ? ", ifNull(TopicId, '') AS topic_id, MetadataTopic AS meta_topic" : "";
+  return `SELECT TraceId AS trace_id, TraceOccurredAt AS row_at, Label AS outcome${reason}${language}${topic},
+      0 AS sent
+    FROM trace_evaluation_metrics
+    WHERE OccurredAt >= ${from} AND ${window("TraceOccurredAt")}
+      AND EvaluatorName = '${OUTCOME_JUDGE}'
+      AND Label != ''`;
+};
 
 /**
  * One row per verdict or sent outcome, not yet one per conversation. Both sides read
@@ -54,6 +68,7 @@ const outcomeRows = ({
   withReason = false,
   withLanguage = false,
   withTopic = false,
+  fromTraceEvaluations = false,
 }: { window: Window; from: string } & OutcomeExtras) => {
   const topicId = "ifNull(TopicId, '') AS topic_id";
   const traceTopic = withTopic ? `, ${topicId}, MetadataTopic` : "";
@@ -66,7 +81,9 @@ const outcomeRows = ({
   const traceLanguage = withLanguage ? ", MetadataLanguage" : "";
   const judgeLanguage = withLanguage ? ", t.MetadataLanguage AS language" : "";
   const sentLanguage = withLanguage ? ", MetadataLanguage AS language" : "";
-  return `SELECT e.TraceId AS trace_id, t.OccurredAt AS row_at, e.Label AS outcome${judgeReason}${judgeLanguage}${judgeTopic},
+  const judgeRows = fromTraceEvaluations
+    ? judgeRowsOfTraceEvaluations({ window, from, withReason, withLanguage, withTopic })
+    : `SELECT e.TraceId AS trace_id, t.OccurredAt AS row_at, e.Label AS outcome${judgeReason}${judgeLanguage}${judgeTopic},
       0 AS sent
     FROM (
       SELECT TraceId, OccurredAt${traceLanguage}${traceTopic}
@@ -79,7 +96,8 @@ const outcomeRows = ({
       WHERE OccurredAt >= ${from}
         AND EvaluatorName = '${OUTCOME_JUDGE}'
         AND Label != ''
-    ) AS e ON e.TraceId = t.TraceId
+    ) AS e ON e.TraceId = t.TraceId`;
+  return `${judgeRows}
     UNION ALL
     SELECT TraceId AS trace_id, OccurredAt AS row_at, MetadataOutcome AS outcome${sentReason}${sentLanguage}${sentTopic},
       1 AS sent
@@ -97,6 +115,7 @@ const outcomes = ({
   withReason = false,
   withLanguage = false,
   withTopic = false,
+  fromTraceEvaluations = false,
 }: { window: Window; from: string } & OutcomeExtras) => {
   // Sent, then the latest ms, then a 20-bit hash of the pick: two judge labels at one ms tie
   // only within a hash bucket. UInt64, not a tuple, whose generic state ran out of memory.
@@ -115,22 +134,13 @@ const outcomes = ({
         : ""
     }
   FROM (
-    ${outcomeRows({ window, from, withReason, withLanguage, withTopic })}
+    ${outcomeRows({ window, from, withReason, withLanguage, withTopic, fromTraceEvaluations })}
   ) AS r
   GROUP BY trace_id`;
 };
 
-/**
- * Check verdicts per trace, outcome judge and guardrails left out: the joined side of a check
- * query, one small row per judged trace, so its trace rows stream instead of being hashed.
- */
-const checksPerTrace = (from: string) => `SELECT TraceId, countIf(Passed = 1) AS pass, count() AS n
-    FROM evaluation_metrics
-    WHERE OccurredAt >= ${from}
-      AND Passed IS NOT NULL
-      AND NOT IsGuardrail
-      AND EvaluatorName != '${OUTCOME_JUDGE}'
-    GROUP BY TraceId`;
+/** A check verdict: the outcome judge and guardrails left out. */
+const IS_CHECK = `Passed IS NOT NULL AND NOT IsGuardrail AND EvaluatorName != '${OUTCOME_JUDGE}'`;
 
 /**
  * Trace cost plus evaluator cost, null only when neither side has a priced row: an unpriced
@@ -141,12 +151,26 @@ const costTotal = (traces: string, evaluations: string) =>
 
 const PERIOD = { window: inPeriod, from: START };
 const BOTH_PERIODS = { window: inPeriodAndPrevious, from: PREVIOUS_START };
+/** Evaluations of the traces in both periods; an evaluation never precedes its trace. */
+const EVALUATED_IN_BOTH_PERIODS = `OccurredAt >= ${PREVIOUS_START} AND ${inPeriodAndPrevious("TraceOccurredAt")}`;
 const RECENT_START = `subtractDays(now(), ${PRESENCE_DAYS})`;
 const RECENT = { window: (column: string) => `${column} >= ${RECENT_START}`, from: RECENT_START };
 
-/** One row when any conversation outcome arrived lately, to tell a quiet period from no setup. */
+/**
+ * One row when any outcome arrived lately, to tell a quiet period from no setup. Verdicts carry
+ * their trace's columns, so no join hashes 90 days of traces (analytics ADR-007). Each side is a
+ * scalar probe run in turn: side by side, the two wide scans overran the 1 GB limit.
+ */
+const SEEN_JUDGE_PROBE = judgeRowsOfTraceEvaluations(RECENT);
+const SEEN_SENT_PROBE = `SELECT TraceId FROM trace_metrics
+    WHERE ${RECENT.window("OccurredAt")} AND MetadataOutcome != ''`;
 export const OUTCOMES_SEEN_SQL = `SELECT 1 AS present
-FROM (${outcomeRows(RECENT)})
+FROM (
+  SELECT arrayJoin(arrayConcat(
+    (SELECT groupArray(1) FROM (SELECT 1 FROM (${SEEN_JUDGE_PROBE}) LIMIT 1)),
+    (SELECT groupArray(1) FROM (SELECT 1 FROM (${SEEN_SENT_PROBE}) LIMIT 1))
+  )) AS present
+)
 LIMIT 1`;
 
 // The clustered topic, else the topic the trace's metadata names, after grouping.
@@ -158,7 +182,7 @@ export const OUTCOME_COMPARISON_SQL = `SELECT
   countIf(at >= ${START} AND outcome = 'resolved') AS resolved,
   countIf(at < ${START}) AS closed_prev,
   countIf(at < ${START} AND outcome = 'resolved') AS resolved_prev
-FROM (${outcomes(BOTH_PERIODS)})`;
+FROM (${outcomes({ ...BOTH_PERIODS, fromTraceEvaluations: true })})`;
 
 /** All AI cost, traces and evaluator runs alike, and conversations, in both periods. */
 export const SPEND_COMPARISON_SQL = `SELECT
@@ -182,38 +206,27 @@ WHERE ${inPeriodAndPrevious("OccurredAt")}`;
  * dated by its trace.
  */
 export const CHECKS_COMPARISON_SQL = `SELECT
-  sumIf(c.pass, t.at >= ${START}) AS passed,
-  sumIf(c.n, t.at >= ${START}) AS judged,
-  sumIf(c.pass, t.at < ${START}) AS passed_prev,
-  sumIf(c.n, t.at < ${START}) AS judged_prev
-FROM (
-  SELECT TraceId, OccurredAt AS at
-  FROM trace_metrics
-  WHERE ${inPeriodAndPrevious("OccurredAt")}
-) AS t
-INNER JOIN (
-  ${checksPerTrace(PREVIOUS_START)}
-) AS c ON c.TraceId = t.TraceId`;
+  countIf(Passed = 1 AND TraceOccurredAt >= ${START}) AS passed,
+  countIf(TraceOccurredAt >= ${START}) AS judged,
+  countIf(Passed = 1 AND TraceOccurredAt < ${START}) AS passed_prev,
+  countIf(TraceOccurredAt < ${START}) AS judged_prev
+FROM trace_evaluation_metrics
+WHERE ${EVALUATED_IN_BOTH_PERIODS}
+  AND ${IS_CHECK}`;
 
 /** Check verdicts per customer, else per topic, in the period and the one before. */
 export const SEGMENT_PASS_RATES_SQL = `SELECT if(g.customer != '', g.customer, ${TOPIC}) AS segment,
   if(g.customer != '', 'customer', 'topic') AS kind,
   sum(g.pass) AS pass, sum(g.n) AS n, sum(g.base_pass) AS base_pass, sum(g.base_n) AS base_n
 FROM (
-  SELECT t.customer AS customer, t.topic_id AS topic_id, t.meta_topic AS meta_topic,
-    sumIf(c.pass, t.at >= ${START}) AS pass,
-    sumIf(c.n, t.at >= ${START}) AS n,
-    sumIf(c.pass, t.at < ${START}) AS base_pass,
-    sumIf(c.n, t.at < ${START}) AS base_n
-  FROM (
-    SELECT TraceId, OccurredAt AS at, ifNull(CustomerId, '') AS customer, TopicId AS topic_id,
-      MetadataTopic AS meta_topic
-    FROM trace_metrics
-    WHERE ${inPeriodAndPrevious("OccurredAt")}
-  ) AS t
-  INNER JOIN (
-    ${checksPerTrace(PREVIOUS_START)}
-  ) AS c ON c.TraceId = t.TraceId
+  SELECT ifNull(CustomerId, '') AS customer, TopicId AS topic_id, MetadataTopic AS meta_topic,
+    countIf(Passed = 1 AND TraceOccurredAt >= ${START}) AS pass,
+    countIf(TraceOccurredAt >= ${START}) AS n,
+    countIf(Passed = 1 AND TraceOccurredAt < ${START}) AS base_pass,
+    countIf(TraceOccurredAt < ${START}) AS base_n
+  FROM trace_evaluation_metrics
+  WHERE ${EVALUATED_IN_BOTH_PERIODS}
+    AND ${IS_CHECK}
   GROUP BY customer, topic_id, meta_topic
 ) AS g
 LEFT JOIN topics AS p ON p.TopicId = g.topic_id
@@ -225,18 +238,27 @@ LIMIT 50`;
 export const OUTCOME_REASONS_SQL = `SELECT reason, outcome,
   countIf(at >= ${START}) AS now,
   countIf(at < ${START}) AS before
-FROM (${outcomes({ ...BOTH_PERIODS, withReason: true })})
+FROM (${outcomes({ ...BOTH_PERIODS, withReason: true, fromTraceEvaluations: true })})
 GROUP BY reason, outcome
 ORDER BY now DESC
 LIMIT 30`;
 
-/** Per judge: how often its verdict matched the reviewer thumbs on the same trace. */
+const THUMBED = `SELECT TraceId FROM annotations WHERE CreatedAt >= ${START} AND IsThumbsUp IS NOT NULL`;
+
+/**
+ * Per judge: how often its verdict matched the reviewer thumbs on the same trace. The checks are
+ * counted per narrow grain, and only for traces a reviewer thumbed (analytics ADR-007).
+ */
 export const JUDGE_AGREEMENT_SQL = `SELECT e.evaluator AS evaluator,
-  count() AS audited,
-  countIf(e.ok = (a.up = 1)) AS agree,
-  countIf(e.ok) AS judge_pass,
-  countIf(a.up = 1) AS reviewer_pass
-FROM (${evaluationsOf(PERIOD)}) AS e
+  sum(e.n) AS audited,
+  sumIf(e.n, e.ok = (a.up = 1)) AS agree,
+  sumIf(e.n, e.ok) AS judge_pass,
+  sumIf(e.n, a.up = 1) AS reviewer_pass
+FROM (SELECT TraceId AS trace_id, EvaluatorName AS evaluator, Passed = 1 AS ok, Evaluations AS n
+  FROM trace_evaluation_checks
+  WHERE OccurredAt >= ${START} AND ${inPeriod("TraceOccurredAt")}
+    AND ${IS_CHECK}
+    AND TraceId IN (${THUMBED})) AS e
 INNER JOIN (
   SELECT TraceId, max(if(IsThumbsUp, 1, 0)) AS up
   FROM annotations
@@ -244,7 +266,6 @@ INNER JOIN (
     AND IsThumbsUp IS NOT NULL
   GROUP BY TraceId
 ) AS a ON a.TraceId = e.trace_id
-WHERE e.is_check
 GROUP BY evaluator
 HAVING audited >= 10
 ORDER BY audited DESC
@@ -288,7 +309,7 @@ const GAPS_BY_TOPIC = `SELECT ${TOPIC} AS topic,
       countIf(outcome = 'capability_gap') AS gaps,
       count() AS closed,
       minIf(trace_id, outcome = 'capability_gap') AS trace_id
-    FROM (${outcomes({ ...PERIOD, withTopic: true })})
+    FROM (${outcomes({ ...PERIOD, withTopic: true, fromTraceEvaluations: true })})
     GROUP BY topic_id, meta_topic
   ) AS g
   LEFT JOIN topics AS p ON p.TopicId = g.topic_id
@@ -320,7 +341,7 @@ ORDER BY gaps DESC`;
 export const RESOLVED_TREND_SQL = `SELECT ${bucketOf("at")} AS bucket,
   countIf(outcome = 'resolved') AS resolved,
   count() AS closed
-FROM (${outcomes(PERIOD)})
+FROM (${outcomes({ ...PERIOD, fromTraceEvaluations: true })})
 GROUP BY bucket
 ORDER BY bucket`;
 
@@ -369,7 +390,7 @@ LIMIT 8`;
 
 const languageOutcomes = `SELECT o.outcome AS outcome, o.at AS at,
     coalesce(nullIf(o.language, ''), 'Unknown') AS language
-  FROM (${outcomes({ ...PERIOD, withLanguage: true })}) AS o`;
+  FROM (${outcomes({ ...PERIOD, withLanguage: true, fromTraceEvaluations: true })}) AS o`;
 
 /** Calls with an outcome and those that got the task done, per bucket and language. */
 export const TASK_SUCCESS_TREND_SQL = `SELECT ${bucketOf("at")} AS bucket, language,
@@ -438,33 +459,34 @@ FROM (
 GROUP BY bucket, source
 ORDER BY bucket`;
 
-// Per production trace: its cost, spans, LLM retries and calls repeated past the first.
-const traceWaste = `SELECT ifNull(s.failed, 0) = 1 AS failed, t.cost AS cost,
-    ifNull(s.spans, 0) AS spans, ifNull(s.retries, 0) AS retries,
-    ifNull(s.repeats, 0) AS repeats, ifNull(s.llm_cost, 0) AS llm_cost, ifNull(s.llm_ok, 0) AS llm_ok
+// Per production trace: its cost, spans, LLM retries and calls repeated past the first. Only a
+// tool's calls are counted per name, for the repeats; the rest of a trace's spans are one group.
+// Trace and span rows meet in one grouping, which spills to disk, where a join ran out of memory;
+// `rows` counts the trace's `trace_metrics` rows, each of which the join matched once. Keys are
+// 128-bit hashes, whose fixed-size hash tables held 60 days under 1 GB where strings did not.
+const traceWaste = `SELECT max(root_failed) = 1 AS failed, sum(row_cost) AS cost, sum(trace_rows) AS rows,
+    sum(calls) AS spans, sum(errored_llm) AS retries, sum(repeated) AS repeats,
+    sum(ok_llm_cost) AS llm_cost, sum(ok_llm) AS llm_ok
   FROM (
-    SELECT TraceId, TotalCost AS cost
+    SELECT sipHash128(TraceId) AS trace, toFloat64(TotalCost) AS row_cost, toUInt64(1) AS trace_rows,
+      toUInt64(0) AS calls, toUInt8(0) AS root_failed, toUInt64(0) AS errored_llm,
+      toUInt64(0) AS repeated, toFloat64(0) AS ok_llm_cost, toUInt64(0) AS ok_llm
     FROM trace_metrics
     WHERE ${inPeriod("OccurredAt")}
-  ) AS t
-  LEFT JOIN (
-    SELECT TraceId, max(root_failed) AS failed, sum(calls) AS spans, sum(errored_llm) AS retries,
-      sumIf(calls - 1, is_tool AND calls >= 3) AS repeats,
-      sum(ok_llm_cost) AS llm_cost, sum(ok_llm) AS llm_ok
-    FROM (
-      SELECT TraceId, SpanName,
-        SpanType = 'tool' AS is_tool,
-        count() AS calls,
-        ${ROOT_FAILED} AS root_failed,
-        countIf(StatusCode = 2 AND SpanType = 'llm') AS errored_llm,
-        countIf(StatusCode != 2 AND SpanType = 'llm') AS ok_llm,
-        sumIf(ifNull(Cost, 0), StatusCode != 2 AND SpanType = 'llm') AS ok_llm_cost
-      FROM span_metrics
-      WHERE ${inPeriod("StartTime")}
-      GROUP BY TraceId, SpanName, is_tool
-    )
-    GROUP BY TraceId
-  ) AS s ON s.TraceId = t.TraceId`;
+    UNION ALL
+    SELECT any(sipHash128(TraceId)) AS trace, toFloat64(0) AS row_cost, toUInt64(0) AS trace_rows,
+      toUInt64(count()) AS calls,
+      toUInt8(${ROOT_FAILED}) AS root_failed,
+      toUInt64(countIf(StatusCode = 2 AND SpanType = 'llm')) AS errored_llm,
+      toUInt64(if(any(SpanType = 'tool') AND count() >= 3, count() - 1, 0)) AS repeated,
+      toFloat64(sumIf(ifNull(Cost, 0), StatusCode != 2 AND SpanType = 'llm')) AS ok_llm_cost,
+      toUInt64(countIf(StatusCode != 2 AND SpanType = 'llm')) AS ok_llm
+    FROM span_metrics
+    WHERE ${inPeriod("StartTime")}
+    GROUP BY sipHash128(TraceId, SpanType = 'tool', if(SpanType = 'tool', SpanName, ''))
+  )
+  GROUP BY trace
+  HAVING rows > 0`;
 
 /**
  * Wasted spend, each trace counted once: a failed trace's whole cost; for a trace that looped
@@ -473,12 +495,12 @@ const traceWaste = `SELECT ifNull(s.failed, 0) = 1 AS failed, t.cost AS cost,
  */
 export const WASTE_SQL = `SELECT
   sum(cost) AS spend,
-  countIf(failed) AS failed_traces,
+  sumIf(rows, failed) AS failed_traces,
   sumIf(cost, failed) AS failed_cost,
-  countIf(NOT failed AND repeats > 0) AS loop_traces,
+  sumIf(rows, NOT failed AND repeats > 0) AS loop_traces,
   sumIf(cost * repeats / greatest(spans, 1), NOT failed AND repeats > 0) AS loop_cost,
-  countIf(NOT failed AND repeats = 0 AND retries > 0) AS retry_traces,
-  sumIf(retries * llm_cost / greatest(llm_ok, 1), NOT failed AND repeats = 0 AND retries > 0)
+  sumIf(rows, NOT failed AND repeats = 0 AND retries > 0) AS retry_traces,
+  sumIf(rows * retries * llm_cost / greatest(llm_ok, 1), NOT failed AND repeats = 0 AND retries > 0)
     AS retry_cost
 FROM (${traceWaste})`;
 

@@ -22,6 +22,7 @@ import {
   type TraceAnalyticsRow,
 } from "../trace-derived.projection.ts";
 import { TraceAnalyticsStore } from "../trace-derived.store.ts";
+import { memoryEvaluationAnalytics } from "./trace-evaluation-analytics.fixtures.ts";
 import { createSpanReceivedEvent, createTestRuntime } from "./trace-summary-test.fixtures.ts";
 
 /**
@@ -59,6 +60,7 @@ function storeOver(row: TraceAnalyticsRow): TraceAnalyticsStore {
   })();
   return TraceAnalyticsStore.create({
     storage,
+    evaluationAnalytics: memoryEvaluationAnalytics(),
     defaultRetentionDays: () => 90,
     authorize: ownProofAuthorizer,
   });
@@ -197,6 +199,7 @@ describe("TraceAnalyticsStore dimension-only signal", () => {
         const fold = TraceAnalyticsFoldProjection.create({
           store: TraceAnalyticsStore.create({
             storage,
+            evaluationAnalytics: memoryEvaluationAnalytics(),
             defaultRetentionDays: () => 90,
             authorize: ownProofAuthorizer,
           }),

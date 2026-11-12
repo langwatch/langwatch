@@ -19,18 +19,19 @@ describe("given the Can I trust my numbers? widgets", () => {
   /** @scenario "AC166 Can I trust my numbers?: data health names each missing field and what it unlocks" */
   it("counts each field as a filter, so its gap is never the frame's setup view", () => {
     const { code, sql } = buildOf("data-health");
-    for (const filter of [
-      "AND notEmpty(Models)",
-      "AND (TotalCost IS NOT NULL OR empty(Models))",
-      "AND UserId IS NOT NULL",
-      "AND ConversationId IS NOT NULL",
-      "AND notEmpty(Labels)",
-      "AND MetadataOutcome != ''",
+    for (const flag of [
+      "max(notEmpty(Models)) AS has_model",
+      "max((TotalCost IS NOT NULL OR empty(Models))) AS has_cost",
+      "max(UserId IS NOT NULL) AS has_user",
+      "max(ConversationId IS NOT NULL) AS has_conversation",
+      "max(notEmpty(Labels)) AS has_labels",
+      "max(MetadataOutcome != '') AS has_outcome",
     ]) {
-      expect(sql.fields).toContain(filter);
+      expect(sql.fields).toContain(flag);
     }
-    expect(sql.fields).toContain("field = 'all'");
-    expect(sql.fields).not.toMatch(/SELECT [^']*\b(?:UserId|TotalCost|ConversationId)\b[^\n]*AS/);
+    expect(sql.fields).toContain("('all', traces)");
+    // The result reads only the field and its count, never a trace column.
+    expect(sql.fields).toMatch(/^SELECT counted\.1 AS field, counted\.2 AS traces/);
     expect(code).toContain("Missing on ");
     expect(code).toContain("Sending it unlocks: ");
     expect(code).toContain('<AllGood title="Every field arrives"');

@@ -27,8 +27,10 @@ describe("given the Flight Deck cockpit widgets", () => {
     for (const sql of Object.values(queries)) expect(sql).toContain("subtractSeconds(");
     expect(queries.checks).toContain("NOT IsGuardrail");
     expect(queries.checks).toContain(`EvaluatorName != '${OUTCOME_JUDGE}'`);
-    // Per-trace verdict counts are the joined side, so the period's trace rows are never hashed.
-    expect(queries.checks).toContain("INNER JOIN (\n  SELECT TraceId, countIf(Passed = 1) AS pass");
+    // One read of the trace evaluations: each verdict carries its trace's time, so no join.
+    expect(queries.checks).toContain("FROM trace_evaluation_metrics");
+    expect(queries.checks).toContain("countIf(TraceOccurredAt >= ");
+    expect(queries.checks).not.toContain("JOIN");
     expect(code).toContain('"Not measured"');
     expect(code).toContain('LW.navigate("onlineEvaluations"');
   });
@@ -49,9 +51,12 @@ describe("given the Flight Deck cockpit widgets", () => {
       expect(sql).toContain(
         "argMax(r.outcome, toUInt64(r.sent) * 9223372036854775808 + toUInt64(dateDiff('millisecond', toDateTime64(0, 3), r.row_at)) * 1048576 + cityHash64(r.outcome",
       );
-      expect(sql).toContain("t.OccurredAt AS row_at");
       expect(sql).not.toContain("Attributes[");
     }
+    // The moved widgets read the judge from the trace evaluations, dated by the trace on the row.
+    const moved = outcomeQueries.filter((sql) => sql.includes("FROM trace_evaluation_metrics"));
+    expect(moved).toHaveLength(6);
+    for (const sql of moved) expect(sql).toContain("TraceOccurredAt AS row_at");
     // Only the reasons widget reads a sent reason, from its typed column.
     expect(build("ck-attention").queries.reasons).toContain("nullIf(MetadataOutcomeReason, '')");
     expect(build("ck-kpis").queries.outcomes).not.toContain("MetadataOutcomeReason");
@@ -163,7 +168,10 @@ describe("given the Running costs widgets", () => {
   it("prices failed traces, loops and recovered retries, each trace once", () => {
     const { code, queries } = build("cost-waste");
     expect(queries.main).toContain("max(ifNull(ParentSpanId, '') = '' AND StatusCode = 2)");
-    expect(queries.main).toContain("sumIf(calls - 1, is_tool AND calls >= 3)");
+    expect(queries.main).toContain("if(any(SpanType = 'tool') AND count() >= 3, count() - 1, 0)");
+    // Trace rows and span groups meet in one grouping; each trace_metrics row counts once.
+    expect(queries.main).toContain("GROUP BY trace\n  HAVING rows > 0");
+    expect(queries.main).toContain("sumIf(rows, failed) AS failed_traces");
     expect(queries.main).toContain("NOT failed AND repeats = 0 AND retries > 0");
     expect(queries.main).not.toContain("Origin IN");
     expect(code).toContain('" of production spend"');

@@ -1,7 +1,7 @@
 /**
  * How a view's source keeps one version per logical row: the strategy it is rendered with, the
- * `WHERE` clause of the in-tuple form and the FROM relation of the engine-level forms
- * (analytics ADR-005, ADR-006).
+ * `WHERE` clause of the in-tuple form, the FROM relation of the engine-level forms and the
+ * grouping of the settled form (analytics ADR-005, ADR-006, ADR-007).
  */
 import type { LangWatchQLDedupStrategy } from "../../../rules/lwql-view-dedup-shape.rules.ts";
 import {
@@ -149,6 +149,75 @@ export class LangWatchQLViewDedupService {
       `  LIMIT 1 BY ${keyColumns.join(", ")}\n` +
       `) AS ${LWQL_SOURCE_ALIAS}`
     );
+  }
+
+  /**
+   * The `settled` relation (analytics ADR-007): the source columns the view reads, sign included,
+   * from the floor on when the view is a floored twin. A retraction copies its row, so a version
+   * and its retraction always fall on the same side of the floor.
+   */
+  settledRelation({
+    view,
+    relation,
+    floor,
+  }: {
+    view: LangWatchQLViewDefinition;
+    relation: string;
+    /** The floored twin's lower bound on the floor column; absent, every row is read. */
+    floor?: string;
+  }): string {
+    const signColumn = this.settledSign(view);
+    const { floorColumn } = view.dedup;
+    const columns = this.settledColumns(view).map((column) => sqlText.quotedColumn(column));
+    const where =
+      floor === undefined || floorColumn === undefined
+        ? ""
+        : `\n  WHERE ${sqlText.quotedColumn(catalogShapes.physicalColumn(view, floorColumn))} >= ${floor}`;
+    return (
+      `(\n  SELECT ${[...columns, sqlText.quotedColumn(signColumn)].join(", ")}\n` +
+      `  FROM ${relation}${where}\n` +
+      `) AS ${LWQL_SOURCE_ALIAS}`
+    );
+  }
+
+  /**
+   * A row-shaped settled view's `GROUP BY`: every column it reads but the sign, version included,
+   * so each version is one group and a filter on any column reaches below the aggregation.
+   */
+  settledGroupKeys(view: LangWatchQLViewDefinition): string[] {
+    return this.settledColumns(view).map((column) => sourceColumn(column));
+  }
+
+  /**
+   * A settled view's `HAVING`: a group is live while its signs sum above zero, so an orphan
+   * retraction never shows as a negative count (analytics ADR-007).
+   */
+  settledHaving(view: LangWatchQLViewDefinition): string {
+    return `sum(${sourceColumn(this.settledSign(view))}) > 0`;
+  }
+
+  /** The sign column, refused where a settled view lacks what the form reads. */
+  private settledSign(view: LangWatchQLViewDefinition): string {
+    const { signColumn, versionColumn, aggregating } = view.dedup;
+    if (!signColumn || (!versionColumn && !aggregating) || view.join) {
+      throw new Error(
+        `LangWatchQL view ${view.name} cannot use settled: it needs a sign column, a version ` +
+          `column unless it aggregates, and no join`,
+      );
+    }
+    return signColumn;
+  }
+
+  /** Every source column a settled view reads but the sign: key, version, then the rest. */
+  private settledColumns(view: LangWatchQLViewDefinition): string[] {
+    const { keyColumns, versionColumn, signColumn } = view.dedup;
+    return [
+      ...new Set([
+        ...keyColumns.map((key) => catalogShapes.physicalColumn(view, key)),
+        ...(versionColumn ? [versionColumn] : []),
+        ...catalogShapes.viewSourceColumns(view),
+      ]),
+    ].filter((column) => column !== signColumn);
   }
 
   /** The view's FROM relation: its table read with the strategy's engine-level dedup, if any. */

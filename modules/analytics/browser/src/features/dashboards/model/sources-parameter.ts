@@ -14,6 +14,15 @@ export const PRESENCE_QUERY = "present";
 /** Views with the normalised `Source` column. */
 export const SOURCE_VIEWS = ["trace_metrics", "evaluation_metrics"] as const;
 
+/**
+ * Views that keep both the evaluation's `Source` and its trace's `TraceSource`: the read they
+ * replace kept both `evaluation_metrics` and the joined `trace_metrics` to the sources.
+ */
+export const SOURCE_AND_TRACE_SOURCE_VIEWS = [
+  "trace_evaluation_metrics",
+  "trace_evaluation_checks",
+] as const;
+
 /** Views keyed by the trace that carries the origin, reached through `trace_metrics`. */
 export const TRACE_VIEWS = [
   "traces",
@@ -24,7 +33,11 @@ export const TRACE_VIEWS = [
 ] as const;
 
 /** Views that keep an origin, or reach one through their trace. */
-export const VIEWS_WITH_ORIGIN: readonly string[] = [...SOURCE_VIEWS, ...TRACE_VIEWS];
+export const VIEWS_WITH_ORIGIN: readonly string[] = [
+  ...SOURCE_VIEWS,
+  ...SOURCE_AND_TRACE_SOURCE_VIEWS,
+  ...TRACE_VIEWS,
+];
 
 /** The SQL without its comments, and with its string literals emptied. */
 function codeOf(sql: string): string {

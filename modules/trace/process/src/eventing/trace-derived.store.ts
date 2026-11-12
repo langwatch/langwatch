@@ -7,21 +7,27 @@ import {
 } from "@langwatch/eventing";
 import { TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT } from "@langwatch/trace-contract";
 
-import type { TraceAnalyticsProjectionRepository } from "../repositories/trace-analytics-projection.repository.ts";
+import type {
+  TraceAnalyticsProjectionEntry,
+  TraceAnalyticsProjectionRepository,
+} from "../repositories/trace-analytics-projection.repository.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
+  TRACE_ANALYTICS_PROJECTION_VERSION_PRE_EVALUATIONS,
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_METADATA,
   type TraceAnalyticsData,
   TraceAnalyticsFoldProjection,
 } from "./trace-derived.projection.ts";
+import type { TraceEvaluationAnalyticsStore } from "./trace-evaluation-analytics.store.ts";
 
 /**
- * The projection stamps `getWithApplied` will decode: the current shape, the one before the
- * metadata columns (its read-back state is the same), and the pre-split shape it can read
- * unambiguously. Everything older is a store miss.
+ * The projection stamps `getWithApplied` will decode: the current shape, the two before it (no
+ * outcomes, then no metadata columns; their read-back state is otherwise the same), and the
+ * pre-split shape it can read unambiguously. Everything older is a store miss.
  */
 const DECODABLE_PROJECTION_VERSIONS: ReadonlySet<string> = new Set([
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
+  TRACE_ANALYTICS_PROJECTION_VERSION_PRE_EVALUATIONS,
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_METADATA,
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
 ]);
@@ -33,31 +39,41 @@ const DECODABLE_PROJECTION_VERSIONS: ReadonlySet<string> = new Set([
  */
 export class TraceAnalyticsStore implements FoldProjectionStore<TraceAnalyticsData> {
   private readonly storage: TraceAnalyticsProjectionRepository;
+  private readonly evaluationAnalytics: TraceEvaluationAnalyticsStore;
   private readonly defaultRetentionDays: () => number;
   private readonly authorize: FoldReadAuthorizer;
 
   private constructor(options: {
     storage: TraceAnalyticsProjectionRepository;
+    evaluationAnalytics: TraceEvaluationAnalyticsStore;
     defaultRetentionDays: () => number;
     authorize: FoldReadAuthorizer;
   }) {
     this.storage = options.storage;
+    this.evaluationAnalytics = options.evaluationAnalytics;
     this.defaultRetentionDays = options.defaultRetentionDays;
     this.authorize = options.authorize;
   }
 
   static create(options: {
     storage: TraceAnalyticsProjectionRepository;
+    /** Written first: the trace row's EvaluationRowsDigest records what it left (trace ADR-003). */
+    evaluationAnalytics: TraceEvaluationAnalyticsStore;
     defaultRetentionDays: () => number;
     authorize: FoldReadAuthorizer;
   }): TraceAnalyticsStore {
     return new TraceAnalyticsStore(options);
   }
 
-  async store(state: TraceAnalyticsData, context: ProjectionStoreContext): Promise<void> {
-    const entry = this.toRow(state, context);
-    if (!entry) return;
+  /** Answers the state stamped with the rows digest written, so the fold cache carries it. */
+  async store(
+    state: TraceAnalyticsData,
+    context: ProjectionStoreContext,
+  ): Promise<TraceAnalyticsData> {
+    const [entry] = await this.withEvaluationRows([{ state, context }]);
+    if (!entry) return state;
     await this.storage.upsert(entry);
+    return { ...state, evaluationRowsDigest: entry.row.evaluationRowsDigest };
   }
 
   async storeBatch(
@@ -66,13 +82,31 @@ export class TraceAnalyticsStore implements FoldProjectionStore<TraceAnalyticsDa
       context: ProjectionStoreContext;
     }[],
   ): Promise<void> {
-    const batchRows = entries
-      .map(({ state, context }) => this.toRow(state, context))
-      .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
-
+    const batchRows = await this.withEvaluationRows(entries);
     if (batchRows.length === 0) return;
 
     await this.storage.upsertBatch(batchRows);
+  }
+
+  /** The trace rows, after their evaluation rows are written, stamped with those rows' digest. */
+  private async withEvaluationRows(
+    entries: readonly { state: TraceAnalyticsData; context: ProjectionStoreContext }[],
+  ): Promise<TraceAnalyticsProjectionEntry[]> {
+    const rows = entries.map(({ state, context }) => ({
+      state,
+      context,
+      entry: this.toRow(state, context),
+    }));
+    const written = rows.filter(
+      (row): row is typeof row & { entry: NonNullable<typeof row.entry> } => row.entry !== null,
+    );
+    const digests = await this.evaluationAnalytics.writeBatch(
+      written.map(({ state, context, entry }) => ({ state, context, traceRow: entry.row })),
+    );
+    return written.map(({ entry }, index) => ({
+      ...entry,
+      row: { ...entry.row, evaluationRowsDigest: digests[index] ?? "" },
+    }));
   }
 
   private toRow(

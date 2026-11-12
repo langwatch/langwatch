@@ -6,7 +6,7 @@ The server half of [trace](../README.md). Traces: ingestion and canonicalisation
 
 ## Installation
 
-`defineProcessModule("trace").withRepositories(traceRepositories).withChannels(traceChannels).withApi(TraceModule).withTransports(tracesTrpcTransport, sharedTraceTrpcTransport, spansTrpcTransport, exportProgressTrpcTransport, traceEditOverlayTrpcTransport, traceExportRest, traceLegacyRest, tracesRest, trackedEventRest, trackedEventLegacyPathRest, collectorRest, otlpIngestRest).provideMiddlewareContext(…).withDoors(…).withEventing(traceProcessingEventing).withEventing(traceProjectMilestonesEventing).withEventing(traceCollectorEvaluationsEventing).withEventing(traceIngestSourceBillingEventing).withMigrations(…).withIdIndexes(TRACE_ID_INDEXES, …)`, `src/trace.module.ts:48`.
+`defineProcessModule("trace").withRepositories(traceRepositories).withChannels(traceChannels).withApi(TraceModule).withTransports(tracesTrpcTransport, sharedTraceTrpcTransport, spansTrpcTransport, exportProgressTrpcTransport, traceEditOverlayTrpcTransport, traceExportRest, traceLegacyRest, tracesRest, trackedEventRest, trackedEventLegacyPathRest, collectorRest, otlpIngestRest).provideMiddlewareContext(…).withDoors(…).withEventing(traceProcessingEventing).withEventing(traceProjectMilestonesEventing).withEventing(traceCollectorEvaluationsEventing).withEventing(traceIngestSourceBillingEventing).withMigrations(…).withIdIndexes(TRACE_ID_INDEXES, …)`, `src/trace.module.ts:56`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -1955,25 +1955,28 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `trace_processing` (aggregate `trace`)
 
-Declared at `src/eventing/trace-processing-projections.pipeline.ts:106`. Events: `spanReceivedEventSchema`, `spanRecordedEventSchema`, `topicAssignedEventSchema`, `logRecordReceivedEventSchema`, `logContributedEventSchema`, `metricDataPointCorrelatedEventSchema`, `originResolvedEventSchema`, `annotationAddedEventSchema`, `annotationRemovedEventSchema`, `annotationsBulkSyncedEventSchema`, `traceNameChangedEventSchema`.
+Declared at `src/eventing/trace-processing-projections.pipeline.ts:132`. Events: `spanReceivedEventSchema`, `spanRecordedEventSchema`, `topicAssignedEventSchema`, `logRecordReceivedEventSchema`, `logContributedEventSchema`, `metricDataPointCorrelatedEventSchema`, `originResolvedEventSchema`, `annotationAddedEventSchema`, `annotationRemovedEventSchema`, `annotationsBulkSyncedEventSchema`, `traceNameChangedEventSchema`, `evaluationOutcomeRecordedEventSchema`.
 
-| Kind                           | Name                                                                                           | Handles | Declared at                                                 |
-| ------------------------------ | ---------------------------------------------------------------------------------------------- | ------- | ----------------------------------------------------------- |
-| command                        | –                                                                                              | –       | `src/eventing/trace-processing-projections.pipeline.ts:161` |
-| command                        | `assignTopic`                                                                                  | –       | `src/eventing/trace-processing-projections.pipeline.ts:167` |
-| command                        | `recordLogContribution`                                                                        | –       | `src/eventing/trace-processing-projections.pipeline.ts:168` |
-| command                        | `recordMetricCorrelation`                                                                      | –       | `src/eventing/trace-processing-projections.pipeline.ts:171` |
-| command                        | `resolveOrigin`                                                                                | –       | `src/eventing/trace-processing-projections.pipeline.ts:174` |
-| command                        | `addAnnotation`                                                                                | –       | `src/eventing/trace-processing-projections.pipeline.ts:175` |
-| command                        | `removeAnnotation`                                                                             | –       | `src/eventing/trace-processing-projections.pipeline.ts:178` |
-| command                        | `bulkSyncAnnotations`                                                                          | –       | `src/eventing/trace-processing-projections.pipeline.ts:181` |
-| command                        | `changeTraceName`                                                                              | –       | `src/eventing/trace-processing-projections.pipeline.ts:184` |
-| projection payload preparation | `≈ options.prepareEventForProjection`                                                          | –       | `src/eventing/trace-processing-projections.pipeline.ts:125` |
-| ClickHouse fold projection     | `≈ TraceSummaryFoldProjection.create({ store: options.summaryStore, traceCanonicalisation: o…` | –       | `src/eventing/trace-processing-projections.pipeline.ts:126` |
-| ClickHouse fold projection     | `≈ TraceAnalyticsFoldProjection.create({ store: options.derivedStore, traceCanonicalisation:…` | –       | `src/eventing/trace-processing-projections.pipeline.ts:133` |
-| ClickHouse map projection      | `≈ SpanStorageMapProjection.create({ store: options.spanStore, spanCostService: runtime.span…` | –       | `src/eventing/trace-processing-projections.pipeline.ts:140` |
-| ClickHouse map projection      | `≈ SpanAnalyticsMapProjection.create({ store: options.spanAnalyticsStore, spanCostService: r…` | –       | `src/eventing/trace-processing-projections.pipeline.ts:147` |
-| ClickHouse map projection      | `≈ TraceAnalyticsRollupMapProjection.create({ store: options.rollupStore, spanCostService: r…` | –       | `src/eventing/trace-processing-projections.pipeline.ts:154` |
+| Kind                           | Name                                                                                           | Handles                                                                 | Declared at                                                 |
+| ------------------------------ | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------- |
+| command                        | –                                                                                              | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:188` |
+| command                        | `assignTopic`                                                                                  | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:194` |
+| command                        | `recordLogContribution`                                                                        | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:195` |
+| command                        | `recordMetricCorrelation`                                                                      | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:198` |
+| command                        | `resolveOrigin`                                                                                | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:201` |
+| command                        | `addAnnotation`                                                                                | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:202` |
+| command                        | `removeAnnotation`                                                                             | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:205` |
+| command                        | `bulkSyncAnnotations`                                                                          | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:208` |
+| command                        | `changeTraceName`                                                                              | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:211` |
+| command                        | `recordEvaluationOutcome`                                                                      | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:212` |
+| peer subscriber                | `evaluationCompletedOutcome`                                                                   | `lw.evaluation.completed` from [evaluation](../../evaluation/README.md) | `src/eventing/trace-processing-projections.pipeline.ts:215` |
+| peer subscriber                | `evaluationReportedOutcome`                                                                    | `lw.evaluation.reported` from [evaluation](../../evaluation/README.md)  | `src/eventing/trace-processing-projections.pipeline.ts:234` |
+| projection payload preparation | `≈ options.prepareEventForProjection`                                                          | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:152` |
+| ClickHouse fold projection     | `≈ TraceSummaryFoldProjection.create({ store: options.summaryStore, traceCanonicalisation: o…` | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:153` |
+| ClickHouse fold projection     | `≈ TraceAnalyticsFoldProjection.create({ store: options.derivedStore, traceCanonicalisation:…` | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:160` |
+| ClickHouse map projection      | `≈ SpanStorageMapProjection.create({ store: options.spanStore, spanCostService: runtime.span…` | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:167` |
+| ClickHouse map projection      | `≈ SpanAnalyticsMapProjection.create({ store: options.spanAnalyticsStore, spanCostService: r…` | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:174` |
+| ClickHouse map projection      | `≈ TraceAnalyticsRollupMapProjection.create({ store: options.rollupStore, spanCostService: r…` | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:181` |
 
 ### Pipeline `trace_project_milestones` (aggregate `trace_project_milestone`)
 
@@ -2005,16 +2008,17 @@ Declared at `src/features/ingestion/eventing/trace-ingest-source-billing.pipelin
 
 ## Configuration
 
-| Kind   | Leaf                            | Environment variable                         | Declared at                          |
-| ------ | ------------------------------- | -------------------------------------------- | ------------------------------------ |
-| config | `spanProcessingShards`          | `TRACE_SPAN_PROCESSING_SHARDS`               | `../contract/src/trace.config.ts:13` |
-| config | `tokenizer.bpeDirectory`        | `TIKTOKENS_PATH`                             | `../contract/src/trace.config.ts:15` |
-| config | `tokenizer.fetchTimeoutMs`      | `TIKTOKEN_FETCH_TIMEOUT_MS`                  | `../contract/src/trace.config.ts:16` |
-| config | `tokenizer.disabled`            | `DISABLE_TOKENIZATION`                       | `../contract/src/trace.config.ts:20` |
-| config | `disableCodingAgentSpanFilter`  | `LANGWATCH_DISABLE_CODING_AGENT_SPAN_FILTER` | `../contract/src/trace.config.ts:28` |
-| config | `foldCacheTtlSeconds`           | `LANGWATCH_FOLD_CACHE_TTL_SECONDS`           | `../contract/src/trace.config.ts:35` |
-| config | `publicBaseUrl`                 | `BASE_HOST`                                  | `../contract/src/trace.config.ts:36` |
-| config | `objectRetentionConfirmed`      | `OBJECT_RETENTION_CONFIRMED`                 | `../contract/src/trace.config.ts:38` |
-| config | `legacySpoolRetentionConfirmed` | `AZURE_BLOB_SPOOL_RETENTION_CONFIRMED`       | `../contract/src/trace.config.ts:39` |
+| Kind   | Leaf                             | Environment variable                         | Declared at                          |
+| ------ | -------------------------------- | -------------------------------------------- | ------------------------------------ |
+| config | `spanProcessingShards`           | `TRACE_SPAN_PROCESSING_SHARDS`               | `../contract/src/trace.config.ts:13` |
+| config | `tokenizer.bpeDirectory`         | `TIKTOKENS_PATH`                             | `../contract/src/trace.config.ts:15` |
+| config | `tokenizer.fetchTimeoutMs`       | `TIKTOKEN_FETCH_TIMEOUT_MS`                  | `../contract/src/trace.config.ts:16` |
+| config | `tokenizer.disabled`             | `DISABLE_TOKENIZATION`                       | `../contract/src/trace.config.ts:20` |
+| config | `disableCodingAgentSpanFilter`   | `LANGWATCH_DISABLE_CODING_AGENT_SPAN_FILTER` | `../contract/src/trace.config.ts:28` |
+| config | `evaluationAnalyticsQuorumReads` | `TRACE_EVALUATION_ANALYTICS_QUORUM_READS`    | `../contract/src/trace.config.ts:36` |
+| config | `foldCacheTtlSeconds`            | `LANGWATCH_FOLD_CACHE_TTL_SECONDS`           | `../contract/src/trace.config.ts:43` |
+| config | `publicBaseUrl`                  | `BASE_HOST`                                  | `../contract/src/trace.config.ts:44` |
+| config | `objectRetentionConfirmed`       | `OBJECT_RETENTION_CONFIRMED`                 | `../contract/src/trace.config.ts:46` |
+| config | `legacySpoolRetentionConfirmed`  | `AZURE_BLOB_SPOOL_RETENTION_CONFIRMED`       | `../contract/src/trace.config.ts:47` |
 
 <!-- readme:generated:end -->

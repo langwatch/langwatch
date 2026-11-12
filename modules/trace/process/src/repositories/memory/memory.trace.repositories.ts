@@ -28,6 +28,7 @@ import { MemoryTraceAnnotationsRepository } from "./memory.trace-annotations.rep
 import { MemoryTraceAttributeSpendRepository } from "./memory.trace-attribute-spend.repository.ts";
 import { MemoryTraceDerivationSpanRepository } from "./memory.trace-derivation-span.repository.ts";
 import { MemoryTraceEditOverlayRepository } from "./memory.trace-edit-overlay.repository.ts";
+import { MemoryTraceEvaluationAnalyticsRepository } from "./memory.trace-evaluation-analytics.repository.ts";
 import { MemoryTraceEvaluationRunsRepository } from "./memory.trace-evaluation-runs.repository.ts";
 import { MemoryTraceExistenceRepository } from "./memory.trace-existence.repository.ts";
 import { MemoryTraceExportSlotRepository } from "./memory.trace-export-slot.repository.ts";
@@ -149,6 +150,7 @@ export class MemoryTraceRepositories {
       summaryProjection: MemoryTraceSummaryProjectionRepository.create(),
       analyticsProjection: MemoryTraceAnalyticsRepository.create(),
       analyticsRollup: MemoryTraceAnalyticsRollupRepository.create(),
+      evaluationAnalytics: MemoryTraceEvaluationAnalyticsRepository.create(),
       spanAnalytics: MemorySpanAnalyticsRepository.create(),
       spanAnalyticsFloor: MemorySpanAnalyticsFloorRepository.create(),
       summaryFoldCache: MemoryTraceSummaryFoldCacheRepository.create(),

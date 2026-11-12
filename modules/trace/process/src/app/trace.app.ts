@@ -372,6 +372,13 @@ import { spanAnalyticsFloorOf } from "../rules/trace-widget-columns.rules.ts";
 import { buildTrackedEventSpan } from "../rules/tracked-event-span.rules.ts";
 import { PreconditionTraceDataService } from "../services/precondition-trace-data.service.ts";
 import { ScenarioRoleMetricsDerivationService } from "../services/scenario-role-metrics-derivation.service.ts";
+import { TraceAnchorService } from "../services/trace-anchor.service.ts";
+import { TraceEvaluationOutcomeService } from "../services/trace-evaluation-outcome.service.ts";
+import {
+  type EvaluationOutcomesBackfillInput,
+  type EvaluationOutcomesBackfillReport,
+  TraceEvaluationOutcomesMigrationService,
+} from "../services/trace-evaluation-outcomes-migration.service.ts";
 import { TraceInstantEvalRunService } from "../services/trace-instant-eval-run.service.ts";
 import {
   TraceMetadataWriteService,
@@ -995,15 +1002,33 @@ export class TraceModule implements TraceApi, CollectorApp {
         setup.dependencies.dataRetention.getResolvedForProject({ projectId: tenantId }),
     };
     app.#collectorEvaluations = TraceCollectorEvaluationsService.create({ role });
+    const authorizeFoldRead = foldReadAuthorizer({
+      authz: setup.dependencies.authz,
+      codePath: FOLD_READ_CODE_PATH,
+    });
+    const traceAnchors = TraceAnchorService.create({
+      traces: setup.repositories.analyticsProjection,
+      authorize: authorizeFoldRead,
+    });
+    const evaluationOutcomes = TraceEvaluationOutcomeService.create({
+      evaluations: setup.channels.evaluations,
+      anchors: traceAnchors,
+      commands,
+      logger: createLogger("langwatch:trace:evaluation-outcomes"),
+    });
+    app.#evaluationOutcomesBackfill = TraceEvaluationOutcomesMigrationService.create({
+      projects: setup.dependencies.projects,
+      evaluations: setup.channels.evaluations,
+      anchors: traceAnchors,
+      commands,
+    });
     app.#processing = TraceProcessingRuntimeAdapter.create({
       role,
       tokenizer,
       peers: setup.dependencies,
       repositories: setup.repositories,
-      authorizeFoldRead: foldReadAuthorizer({
-        authz: setup.dependencies.authz,
-        codePath: FOLD_READ_CODE_PATH,
-      }),
+      authorizeFoldRead,
+      evaluationOutcomes,
       canonicalisation,
       commands,
       spool: blobStore,
@@ -1318,6 +1343,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   #processing: TraceProcessingRuntimeAdapter | null = null;
   #milestones: TraceProjectMilestonesService | null = null;
   #traceMonthIds: TraceMonthIdsMigrationService | null = null;
+  #evaluationOutcomesBackfill: TraceEvaluationOutcomesMigrationService | null = null;
   #retention: RetentionPolicyResolver | null = null;
   #collectorEvaluations: TraceCollectorEvaluationsService | null = null;
   #processingCommands: TraceProcessingCommandsService | null = null;
@@ -1370,6 +1396,16 @@ export class TraceModule implements TraceApi, CollectorApp {
       throw new TraceCapabilityUnavailableError("this process", "the month trace ids migration");
     }
     return this.#traceMonthIds.sendMonthTraceIds(input);
+  }
+
+  /** Records the last 62 days of evaluation outcomes on their traces, for the upgrade step. */
+  recordEvaluationOutcomes(
+    input: EvaluationOutcomesBackfillInput,
+  ): Promise<EvaluationOutcomesBackfillReport> {
+    if (!this.#evaluationOutcomesBackfill) {
+      throw new TraceCapabilityUnavailableError("this process", "the evaluation outcomes backfill");
+    }
+    return this.#evaluationOutcomesBackfill.recordEvaluationOutcomes(input);
   }
 
   /** trace_collector_evaluations: the same in every role; evaluation reports from its side (§9). */

@@ -424,17 +424,16 @@ const SPAN_METRICS: UngatedViewDefinition = {
   sourceTable: "span_analytics",
   description:
     "One row per span with its timing, status, cost and the LangWatch facts dashboards group by, and no attribute map. Holds spans from the span_analytics floor on.",
-  grain: "one row per (TenantId, TraceId, SpanId), latest version only",
+  grain: "one row per (TenantId, TraceId, SpanId)",
   joinKeys: ["TenantId", "TraceId", "SpanId"],
   timeColumn: "StartTime",
   freshness: PROJECTION_FRESHNESS,
-  // A span's StartTime comes from the span itself and never changes, so it is grouped beside the
-  // key and a period filter prunes partitions.
+  // Read plainly: SpanAnalyticsStore looks a span's key up before it appends, so the first copy
+  // is the only one (ADR-034 amendment). A dedup here kept every span key of the period in
+  // memory (analytics ADR-006).
   dedup: {
     keyColumns: ["TenantId", "TraceId", "SpanId"],
-    versionColumn: "ProjectedAt",
-    strategy: "latest-in-order",
-    stableColumns: ["StartTime"],
+    strategy: "none",
   },
   columns: [
     {
@@ -1646,6 +1645,255 @@ const EVALUATION_METRICS_BY_MINUTE: UngatedViewDefinition = {
         "Cost of the bucket's evaluations that is not billed, in USD. Billed cost is the difference from CostSum.",
       sourceColumns: ["NonBilledCostSum"],
       summed: true,
+    },
+  ],
+};
+
+type UngatedColumn = UngatedViewDefinition["columns"][number];
+
+/** The columns both views over `trace_evaluation_analytics` expose, one definition each. */
+const TRACE_EVALUATION_COLUMNS = {
+  TenantId: {
+    name: "TenantId",
+    type: "String",
+    description: "Project the evaluation belongs to.",
+    sourceColumns: ["TenantId"],
+  },
+  TraceId: {
+    name: "TraceId",
+    type: "String",
+    description: "Trace the evaluation ran against.",
+    sourceColumns: ["TraceId"],
+  },
+  OccurredAt: {
+    name: "OccurredAt",
+    type: "DateTime64(3)",
+    description:
+      "When the evaluation reached its latest state. Filter on this to prune partitions.",
+    sourceColumns: ["OccurredAt"],
+  },
+  TraceOccurredAt: {
+    name: "TraceOccurredAt",
+    type: "DateTime64(3)",
+    description:
+      "When the evaluated trace was first observed, as trace_metrics.OccurredAt has it. Filter on this to keep the traces of a period.",
+    sourceColumns: ["TraceOccurredAt"],
+  },
+  EvaluatorName: {
+    name: "EvaluatorName",
+    type: "Nullable(String)",
+    description: "Display name of the evaluator.",
+    sourceColumns: ["EvaluatorName"],
+  },
+  IsGuardrail: {
+    name: "IsGuardrail",
+    type: "Bool",
+    description: "Whether the evaluator ran as a guardrail.",
+    sourceColumns: ["IsGuardrail"],
+  },
+  Passed: {
+    name: "Passed",
+    type: "Nullable(Bool)",
+    description: "Pass/fail outcome, when the evaluator produced one.",
+    sourceColumns: ["Passed"],
+  },
+  Source: {
+    name: "Source",
+    type: "String",
+    description:
+      "The source the evaluation counts under, as evaluation_metrics.Source has it: its Origin when LangWatch lists it, application when the origin is missing or empty, other for any origin LangWatch does not list.",
+    sourceColumns: ["Origin"],
+    expression: (source) => sourceOfOrigin(source("Origin")),
+  },
+  TraceSource: {
+    name: "TraceSource",
+    type: "String",
+    description:
+      "The source the evaluated trace counts under, as trace_metrics.Source has it: its origin when LangWatch lists it, application when the origin is missing or empty, other for any origin LangWatch does not list. Filter it with {dashboard_context_sources:Array(String)}.",
+    sourceColumns: ["TraceOrigin"],
+    expression: (source) => sourceOfOrigin(source("TraceOrigin")),
+  },
+} satisfies Record<string, UngatedColumn>;
+
+/**
+ * Trace evaluations: one row per evaluation of a trace, written by the trace's fold beside the
+ * trace's time and dimensions. Read without FINAL by the settled dedup (analytics ADR-007).
+ */
+const TRACE_EVALUATION_METRICS: UngatedViewDefinition = {
+  name: "trace_evaluation_metrics",
+  sourceTable: "trace_evaluation_analytics",
+  description:
+    "One row per evaluation of a trace, its live outcome, carrying the evaluated trace's time, source and dimensions, so a read by the trace's period needs no join.",
+  grain:
+    "one row per (TenantId, TraceId, EvaluationId): each revision grouped with its retractions, kept while its signs sum above zero",
+  grainColumns: ["TenantId", "TraceId", "EvaluationId"],
+  joinKeys: ["TenantId", "TraceId"],
+  timeColumn: "OccurredAt",
+  freshness: PROJECTION_FRESHNESS,
+  dedup: {
+    strategy: "settled",
+    keyColumns: ["TenantId", "OccurredAt", "TraceId", "EvaluationId"],
+    versionColumn: "Revision",
+    signColumn: "Sign",
+    floorColumn: "OccurredAt",
+  },
+  columns: [
+    TRACE_EVALUATION_COLUMNS.TenantId,
+    TRACE_EVALUATION_COLUMNS.TraceId,
+    {
+      name: "EvaluationId",
+      type: "String",
+      description: "Evaluation run identifier.",
+      sourceColumns: ["EvaluationId"],
+    },
+    TRACE_EVALUATION_COLUMNS.OccurredAt,
+    {
+      name: "UpdatedAt",
+      type: "DateTime64(3)",
+      description: "When this version of the row was written.",
+      sourceColumns: ["UpdatedAt"],
+    },
+    TRACE_EVALUATION_COLUMNS.TraceOccurredAt,
+    TRACE_EVALUATION_COLUMNS.EvaluatorName,
+    {
+      name: "Status",
+      type: "LowCardinality(String)",
+      description: "Terminal state of the run: processed, skipped, or error.",
+      sourceColumns: ["Status"],
+    },
+    TRACE_EVALUATION_COLUMNS.IsGuardrail,
+    TRACE_EVALUATION_COLUMNS.Passed,
+    {
+      name: "Label",
+      type: "Nullable(String)",
+      description: "Categorical outcome, when the evaluator produced one.",
+      sourceColumns: ["Label"],
+    },
+    TRACE_EVALUATION_COLUMNS.Source,
+    TRACE_EVALUATION_COLUMNS.TraceSource,
+    {
+      name: "CustomerId",
+      type: "Nullable(String)",
+      description: "Customer account the evaluated trace was recorded for.",
+      sourceColumns: ["CustomerId"],
+    },
+    {
+      name: "TopicId",
+      type: "Nullable(String)",
+      description: "Topic the evaluated trace was clustered into.",
+      sourceColumns: ["TopicId"],
+    },
+    {
+      name: "Labels",
+      type: "Array(String)",
+      description: "Labels the SDK attached to the evaluated trace.",
+      sourceColumns: ["Labels"],
+    },
+    {
+      name: "MetadataTopic",
+      type: "String",
+      description:
+        "The topic the application gave the trace, from the trace's metadata.topic. Empty when the trace sent none.",
+      sourceColumns: ["MetadataTopic"],
+    },
+    {
+      name: "MetadataDocumentType",
+      type: "String",
+      description:
+        "The kind of document the trace handled, from the trace's metadata.document_type. Empty when the trace sent none.",
+      sourceColumns: ["MetadataDocumentType"],
+    },
+    {
+      name: "MetadataLanguage",
+      type: "String",
+      description:
+        "The language of the conversation, from the trace's metadata.language. Empty when the trace sent none.",
+      sourceColumns: ["MetadataLanguage"],
+    },
+    {
+      name: "MetadataTeam",
+      type: "String",
+      description:
+        "The team the trace counts under, from the trace's metadata.team. Empty when the trace sent none.",
+      sourceColumns: ["MetadataTeam"],
+    },
+    {
+      name: "MetadataFlow",
+      type: "String",
+      description:
+        "The flow of the application that ran the trace, from the trace's metadata.flow. Empty when the trace sent none.",
+      sourceColumns: ["MetadataFlow"],
+    },
+    {
+      name: "MetadataSegment",
+      type: "String",
+      description:
+        "The customer segment the trace counts under, from the trace's metadata.segment. Empty when the trace sent none.",
+      sourceColumns: ["MetadataSegment"],
+    },
+    {
+      name: "MetadataPromptVersion",
+      type: "String",
+      description:
+        "The prompt or configuration version the application names, from the trace's metadata.prompt_version. Empty when the trace sent none.",
+      sourceColumns: ["MetadataPromptVersion"],
+    },
+  ],
+};
+
+/** The narrow grain the count widgets read: every dimension they filter or group by. */
+const TRACE_EVALUATION_CHECKS_GRAIN = [
+  "TenantId",
+  "TraceId",
+  "OccurredAt",
+  "TraceOccurredAt",
+  "EvaluatorName",
+  "Passed",
+  "IsGuardrail",
+  "Source",
+  "TraceSource",
+];
+
+/**
+ * Trace evaluation checks: the live evaluations of `trace_evaluation_metrics` counted per narrow
+ * grain, so a count widget groups a few columns instead of every column (analytics ADR-007).
+ */
+const TRACE_EVALUATION_CHECKS: UngatedViewDefinition = {
+  name: "trace_evaluation_checks",
+  sourceTable: "trace_evaluation_analytics",
+  description:
+    "Live evaluations of traces counted per trace, evaluator and outcome, carrying the evaluated trace's time and source. Sum Evaluations to count evaluations.",
+  grain:
+    "one row per (TenantId, TraceId, OccurredAt, TraceOccurredAt, EvaluatorName, Passed, IsGuardrail, Source, TraceSource), Evaluations summed",
+  joinKeys: TRACE_EVALUATION_CHECKS_GRAIN,
+  timeColumn: "OccurredAt",
+  freshness: PROJECTION_FRESHNESS,
+  // The grain is the key the view's GROUP BY sums signs over; the source's own key is wider.
+  dedup: {
+    strategy: "settled",
+    keyColumns: TRACE_EVALUATION_CHECKS_GRAIN,
+    signColumn: "Sign",
+    aggregating: true,
+    floorColumn: "OccurredAt",
+  },
+  columns: [
+    TRACE_EVALUATION_COLUMNS.TenantId,
+    TRACE_EVALUATION_COLUMNS.TraceId,
+    TRACE_EVALUATION_COLUMNS.OccurredAt,
+    TRACE_EVALUATION_COLUMNS.TraceOccurredAt,
+    TRACE_EVALUATION_COLUMNS.EvaluatorName,
+    TRACE_EVALUATION_COLUMNS.Passed,
+    TRACE_EVALUATION_COLUMNS.IsGuardrail,
+    TRACE_EVALUATION_COLUMNS.Source,
+    TRACE_EVALUATION_COLUMNS.TraceSource,
+    {
+      name: "Evaluations",
+      type: "Int64",
+      description:
+        "Live evaluations in the row. Sum it to count evaluations; a row never holds zero.",
+      sourceColumns: ["Sign"],
+      aggregate: true,
+      expression: (source) => `sum(${source("Sign")})`,
     },
   ],
 };
@@ -2868,6 +3116,9 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
       MetadataOutcomeReason: "inherit",
       MetadataPromptVersion: "inherit",
       MetadataEnvironment: "inherit",
+      // The fold's working state for trace_evaluation_analytics (goose 00129), not a trace fact.
+      EvaluationOutcomes: "omit",
+      EvaluationRowsDigest: "omit",
     },
   }),
   trace_metrics_by_minute: defineTableCatalogue({
@@ -2966,6 +3217,71 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
       DurationSum: "inherit",
       CostSum: { access: { allOf: ["cost:view"] } },
       NonBilledCostSum: { access: { allOf: ["cost:view"] } },
+      _retention_days: "omit",
+    },
+  }),
+  trace_evaluation_metrics: defineTableCatalogue({
+    sourceTable: "trace_evaluation_analytics",
+    access: { allOf: ["analytics:view", "evaluations:view", "traces:view"] },
+    columns: {
+      TenantId: "inherit",
+      TraceId: "inherit",
+      EvaluationId: "inherit",
+      OccurredAt: "inherit",
+      UpdatedAt: "inherit",
+      TraceOccurredAt: "inherit",
+      EvaluatorName: "inherit",
+      Status: "inherit",
+      IsGuardrail: "inherit",
+      Passed: "inherit",
+      Label: "inherit",
+      Source: { source: "Origin" },
+      TraceSource: { source: "TraceOrigin" },
+      CustomerId: "inherit",
+      TopicId: "inherit",
+      Labels: "inherit",
+      MetadataTopic: "inherit",
+      MetadataDocumentType: "inherit",
+      MetadataLanguage: "inherit",
+      MetadataTeam: "inherit",
+      MetadataFlow: "inherit",
+      MetadataSegment: "inherit",
+      MetadataPromptVersion: "inherit",
+      // Read by the settled dedup only (analytics ADR-007).
+      Sign: "omit",
+      Revision: "omit",
+      _retention_days: "omit",
+    },
+  }),
+  trace_evaluation_checks: defineTableCatalogue({
+    sourceTable: "trace_evaluation_analytics",
+    access: { allOf: ["analytics:view", "evaluations:view", "traces:view"] },
+    columns: {
+      TenantId: "inherit",
+      TraceId: "inherit",
+      OccurredAt: "inherit",
+      TraceOccurredAt: "inherit",
+      EvaluatorName: "inherit",
+      Passed: "inherit",
+      IsGuardrail: "inherit",
+      Source: { source: "Origin" },
+      TraceSource: { source: "TraceOrigin" },
+      Evaluations: { source: "Sign" },
+      EvaluationId: "omit",
+      UpdatedAt: "omit",
+      Status: "omit",
+      Label: "omit",
+      CustomerId: "omit",
+      TopicId: "omit",
+      Labels: "omit",
+      MetadataTopic: "omit",
+      MetadataDocumentType: "omit",
+      MetadataLanguage: "omit",
+      MetadataTeam: "omit",
+      MetadataFlow: "omit",
+      MetadataSegment: "omit",
+      MetadataPromptVersion: "omit",
+      Revision: "omit",
       _retention_days: "omit",
     },
   }),
@@ -3985,6 +4301,8 @@ export const LWQL_VIEW_CATALOG: readonly LangWatchQLViewDefinition[] = [
   handWrittenView(MODEL_USAGE_BY_MINUTE),
   handWrittenView(EVALUATION_METRICS),
   handWrittenView(EVALUATION_METRICS_BY_MINUTE),
+  handWrittenView(TRACE_EVALUATION_METRICS),
+  handWrittenView(TRACE_EVALUATION_CHECKS),
   handWrittenView(CODING_AGENT_SESSIONS),
   handWrittenView(CODING_AGENT_SESSION_EVENTS),
   handWrittenView(CODING_TOOL_RESULTS),

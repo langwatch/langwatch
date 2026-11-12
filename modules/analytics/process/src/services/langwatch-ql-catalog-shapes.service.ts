@@ -340,6 +340,7 @@ export class LangWatchQLCatalogShapesService {
         ...view.columns.flatMap((column) => column.sourceColumns),
         ...view.dedup.keyColumns.map((key) => this.physicalColumn(view, key)),
         ...(view.dedup.versionColumn ? [view.dedup.versionColumn] : []),
+        ...(view.dedup.signColumn ? [view.dedup.signColumn] : []),
         ...(view.dedup.tieBreakColumns ?? []),
         ...(view.dedup.stableColumns ?? []),
         // A column read only to filter (`where`) or to match the join (`on`, its

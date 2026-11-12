@@ -6,3 +6,4 @@
 - [ADR-004: Stock widget queries read typed columns, never a map, and hash only the small side](./004-stock-widgets-read-no-map.md)
 - [ADR-005: A read bounded below on evaluation_metrics.OccurredAt deduplicates only from that bound](./005-evaluation-metrics-dedup-floor.md)
 - [ADR-006: The views the stock widgets read keep each row's latest version without FINAL, over columns the projections write](./006-stock-widget-views-latest-in-order.md)
+- [ADR-007: A view over a retraction-pair projection keeps the rows whose signs sum above zero](./007-settled-dedup-for-retraction-pair-projections.md)

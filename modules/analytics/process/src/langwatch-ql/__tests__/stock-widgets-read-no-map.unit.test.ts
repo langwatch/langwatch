@@ -63,13 +63,9 @@ describe("given the columns goose 00128 adds", () => {
 
 describe("given the stock span widgets", () => {
   /** @scenario "The span widgets read span_metrics, not spans" */
-  it("read span_metrics; only presence checks, loops, step latency and voice calls read spans", () => {
+  it("read span_metrics; only presence checks and loops still read spans", () => {
     const readingSpans = [...STOCK].filter(([, sql]) => /\b(?:FROM|JOIN)\s+spans\b/.test(sql));
-    const allowed = (label: string) =>
-      label.endsWith("/present") ||
-      label.startsWith("up-loops/") ||
-      label.startsWith("voice-call-health/") ||
-      label === "up-step-latency/operations";
+    const allowed = (label: string) => label.endsWith("/present") || label.startsWith("up-loops/");
     expect(readingSpans.map(([label]) => label).every(allowed)).toBe(true);
     expect([...STOCK.values()].some((sql) => sql.includes("FROM span_metrics"))).toBe(true);
   });

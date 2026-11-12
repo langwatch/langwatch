@@ -14,6 +14,7 @@ import { SpanAnalyticsClickHouseRepository } from "../clickhouse/span-analytics.
 import { SpanStorageClickHouseRepository } from "../clickhouse/span-storage.repository.ts";
 import { TraceAnalyticsRollupClickHouseRepository } from "../clickhouse/trace-analytics-rollup.repository.ts";
 import { TraceDerivationSpanClickHouseRepository } from "../clickhouse/trace-derivation-span.repository.ts";
+import { TraceEvaluationAnalyticsClickHouseRepository } from "../clickhouse/trace-evaluation-analytics.repository.ts";
 import { ClickHouseTraceEvaluationRunsRepository } from "../clickhouse/trace-evaluation-runs.repository.ts";
 import { ClickHouseTraceExistenceRepository } from "../clickhouse/trace-existence.repository.ts";
 import { ClickHouseTraceInstantEvalRunsRepository } from "../clickhouse/trace-instant-eval-runs.repository.ts";
@@ -44,6 +45,7 @@ export class PostgresTraceRepositories {
     members: Readonly<{
       prisma: PrismaClient;
       clickhouse: ClickHouseQueryClient;
+      evaluationAnalyticsQuorumReads: boolean;
     }>,
   ): Omit<
     TraceRepositories,
@@ -71,6 +73,10 @@ export class PostgresTraceRepositories {
       analyticsProjection: TraceAnalyticsClickHouseRepository.create(storage),
       analyticsRollup: TraceAnalyticsRollupClickHouseRepository.create({
         resolveClient: traceClickHouse,
+      }),
+      evaluationAnalytics: TraceEvaluationAnalyticsClickHouseRepository.create({
+        ...storage,
+        readYourWrites: members.evaluationAnalyticsQuorumReads,
       }),
       spanAnalytics: SpanAnalyticsClickHouseRepository.create({ resolveClient: traceClickHouse }),
       spanAnalyticsFloor: PrismaSpanAnalyticsFloorRepository.create(members.prisma),

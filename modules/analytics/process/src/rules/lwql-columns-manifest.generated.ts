@@ -1110,6 +1110,8 @@ export interface LwqlClickHouseRows {
     readonly MetadataOutcomeReason: "String";
     readonly MetadataPromptVersion: "String";
     readonly MetadataEnvironment: "String";
+    readonly EvaluationOutcomes: "String";
+    readonly EvaluationRowsDigest: "String";
   };
   readonly trace_analytics_rollup: {
     readonly TenantId: "String";
@@ -1128,6 +1130,34 @@ export interface LwqlClickHouseRows {
     readonly CacheWriteTokensSum: "SimpleAggregateFunction(sum, UInt64)";
     readonly ReasoningTokensSum: "SimpleAggregateFunction(sum, UInt64)";
     readonly _retention_days: "SimpleAggregateFunction(max, UInt16)";
+  };
+  readonly trace_evaluation_analytics: {
+    readonly TenantId: "String";
+    readonly TraceId: "String";
+    readonly EvaluationId: "String";
+    readonly OccurredAt: "DateTime64(3)";
+    readonly UpdatedAt: "DateTime64(3)";
+    readonly TraceOccurredAt: "DateTime64(3)";
+    readonly EvaluatorName: "Nullable(String)";
+    readonly Status: "LowCardinality(String)";
+    readonly IsGuardrail: "Bool";
+    readonly Passed: "Nullable(Bool)";
+    readonly Label: "Nullable(String)";
+    readonly Origin: "Nullable(String)";
+    readonly TraceOrigin: "Nullable(String)";
+    readonly CustomerId: "Nullable(String)";
+    readonly TopicId: "Nullable(String)";
+    readonly Labels: "Array(String)";
+    readonly MetadataTopic: "String";
+    readonly MetadataDocumentType: "String";
+    readonly MetadataLanguage: "String";
+    readonly MetadataTeam: "String";
+    readonly MetadataFlow: "String";
+    readonly MetadataSegment: "String";
+    readonly MetadataPromptVersion: "String";
+    readonly Sign: "Int8";
+    readonly Revision: "UInt64";
+    readonly _retention_days: "UInt16";
   };
   readonly trace_summaries: {
     readonly ProjectionId: "String";
