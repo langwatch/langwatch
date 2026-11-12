@@ -389,6 +389,7 @@ export class AuthzModule implements AuthzApi {
       userStandings,
       scopeLineage: permissions,
       engineSwitch: cutover,
+      braidChanges: braids,
     });
     const migration = LegacyImportAuthzGrantMigration.create({
       store: repositories.migration,

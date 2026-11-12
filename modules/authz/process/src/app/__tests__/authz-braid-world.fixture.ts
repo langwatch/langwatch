@@ -4,13 +4,17 @@
  * @see modules/authz/specs/braids.feature
  */
 import { createTrpcRuntime } from "@langwatch/api/trpc";
-import { EventSourcing } from "@langwatch/eventing";
+import { createTenantId, EventSourcing } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { testAuthorizeDefaults, trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { Temporal } from "@langwatch/time";
 import { initTRPC } from "@trpc/server";
 
+import {
+  AUTHZ_GRANT_AGGREGATE_TYPE,
+  type AuthzGrantsEvent,
+} from "../../eventing/authz-grant.events.ts";
 import type { AuthzAuditRow } from "../../repositories/authz-audit-trail.repository.ts";
 import type { AuthzRepositories } from "../../repositories/authz.repositories.ts";
 import { AuthzMemoryStore } from "../../repositories/memory/authz-memory.store.ts";
@@ -149,7 +153,8 @@ export async function braidWorld({
     secrets: createApiFixture<AuthzSetup["secrets"]>(),
     repositories,
   });
-  const eventing = new EventSourcing({ eventStore: EventStoreMemory.createForTesting() });
+  const eventStore = EventStoreMemory.createForTesting<AuthzGrantsEvent>();
+  const eventing = new EventSourcing({ eventStore });
   const senders = faultable(eventing.register(app.eventingPipeline()).commands);
   app.connectCommands(senders.commands);
   const plan = { enterprise };
@@ -243,6 +248,20 @@ export async function braidWorld({
     /** Every braid grant row, live or revoked, in the order attached. */
     braidRows: () => memory.grants.filter((row) => row.source === "braid"),
     auditRows: (): AuthzAuditRow[] => [...memory.auditLogs],
+    /** Hands one grant's stored events to a pipeline subscriber again, as a redelivery would. */
+    redeliver: async ({ subscriber, grantId }: { subscriber: string; grantId: string }) => {
+      const definition = app.eventingPipeline().eventSubscribers.get(subscriber);
+      if (!definition) throw new Error(`the grant pipeline has no subscriber ${subscriber}`);
+      const events = await eventStore.getEvents({
+        aggregateId: grantId,
+        context: { tenantId: createTenantId(ORG) },
+        aggregateType: AUTHZ_GRANT_AGGREGATE_TYPE,
+      });
+      for (const event of events) {
+        await definition.handle(event, { tenantId: ORG, aggregateId: grantId });
+      }
+      return events.length;
+    },
     close: () => eventing.close(),
   };
 }

@@ -696,17 +696,19 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     bindingIds,
     actor,
     reason,
+    commandId,
   }: {
     organizationId: string;
     bindingIds: string[];
     actor: LedgerActor;
     reason?: string;
+    commandId?: string;
   }): Promise<void> {
     // A revoke names its grant id: a selector cannot address an aggregate,
     // so resolving "every grant this principal holds" into ids is the
     // caller's job now, and the deny below is what makes that safe.
     const revokedAtMs = this.now();
-    const batchId = this.options.newCommandId?.() ?? newCommandId();
+    const batchId = commandId ?? this.options.newCommandId?.() ?? newCommandId();
     const senders = (await this.commands()).commands;
     // One send at a time: in memory mode a send resolves once its job ran, and a batch as wide as
     // the queue's concurrency starves the projection jobs those commands wait on. A move onto the
@@ -800,11 +802,14 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     bindingIds,
     actor,
     reason,
+    commandId,
   }: {
     organizationId: string;
     bindingIds: string[];
     actor: LedgerActor;
     reason?: string;
+    /** A stable id makes a resent revocation the same fact (its idempotency key). */
+    commandId?: string;
   }): Promise<void> {
     refusePlatformTenant(organizationId);
     if (bindingIds.length === 0) return;
@@ -813,12 +818,14 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
       bindingIds: string[];
       actor: LedgerActor;
       reason?: string;
+      commandId?: string;
     } = {
       organizationId,
       bindingIds,
       actor,
     };
     if (reason) revocation.reason = reason;
+    if (commandId) revocation.commandId = commandId;
     await this.appendGrantRevocation(revocation);
   }
 

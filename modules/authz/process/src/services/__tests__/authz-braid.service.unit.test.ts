@@ -28,10 +28,9 @@ const KINDS: Record<string, { organizationId: string; kind: string }> = {
 
 type Row = LedgerBraidRow & { revokedReason: string | null };
 
-function setup({ beyondCaller = [] as string[], failRevokeOnce = false } = {}) {
+function setup({ beyondCaller = [] as string[] } = {}) {
   const rows: Row[] = [];
   let ids = 0;
-  let revokeFailures = failRevokeOnce ? 1 : 0;
   const epoch = { bump: vi.fn(async () => {}) };
   const ledger = {
     attachBraidGrant: vi.fn(
@@ -59,8 +58,16 @@ function setup({ beyondCaller = [] as string[], failRevokeOnce = false } = {}) {
       },
     ),
     revokeBindings: vi.fn(
-      async ({ bindingIds, reason }: { bindingIds: string[]; reason?: string }) => {
-        if (revokeFailures-- > 0) throw new Error("revoke failed");
+      async ({
+        bindingIds,
+        reason,
+      }: {
+        organizationId: string;
+        bindingIds: string[];
+        actor: LedgerActor;
+        reason?: string;
+        commandId?: string;
+      }) => {
         for (const row of rows) {
           if (bindingIds.includes(row.grantId))
             Object.assign(row, { isLive: false, revokedReason: reason ?? null });
@@ -213,19 +220,23 @@ describe("AuthzBraidService", () => {
       expect(rows[0]?.isLive).toBe(true);
     });
 
-    it("attaches the new grant naming the old, revokes the old, and refuses a stale second change", async () => {
-      const { create, service, ledger, rows } = setup();
-      const braid = await create();
-      const change = (where: string) =>
+    const changeOf =
+      (service: AuthzBraidService, braidId: string) =>
+      (where: string): Promise<{ braidId: string }> =>
         service.changeBraid({
           projectId: OWNER,
           readerProjectId: READER,
-          braidId: braid.braidId,
+          braidId,
           where,
           fromMs: FROM_MS,
           actor: ANA,
           caller: CALLER,
         });
+
+    it("attaches the new grant naming the old, sends no revoke, and refuses a stale second change", async () => {
+      const { create, service, ledger, rows } = setup();
+      const braid = await create();
+      const change = changeOf(service, braid.braidId);
 
       const codes = await Promise.all([
         refusalOf(change('name == "a"')),
@@ -236,31 +247,83 @@ describe("AuthzBraidService", () => {
       expect(ledger.attachBraidGrant.mock.calls[1]?.[0]).toMatchObject({
         replacesGrantId: braid.braidId,
       });
-      expect(rows.filter((row) => row.isLive)).toHaveLength(1);
+      expect(ledger.revokeBindings).not.toHaveBeenCalled();
       expect(rows).toHaveLength(2);
     });
 
-    it("finishes a change whose revoke failed when repeated, without attaching a third grant", async () => {
-      const { create, service, rows } = setup({ failRevokeOnce: true });
+    /** @scenario "Repeating a change whose revoke is still pending answers the same change" */
+    it("answers a repeat of a change whose revoke the worker has not run with the grant it attached", async () => {
+      const { create, service, ledger } = setup();
       const braid = await create();
-      const change = () =>
-        service.changeBraid({
-          projectId: OWNER,
-          readerProjectId: READER,
-          braidId: braid.braidId,
-          where: 'name == "a"',
-          fromMs: FROM_MS,
-          actor: ANA,
-          caller: CALLER,
-        });
+      const change = changeOf(service, braid.braidId);
 
-      await expect(change()).rejects.toThrow("revoke failed");
-      await change();
+      const first = await change('name == "a"');
+      const repeated = await change('name == "a"');
 
-      expect(rows).toHaveLength(2);
-      expect(rows.find((row) => row.grantId === braid.braidId)?.isLive).toBe(false);
+      expect(repeated.braidId).toBe(first.braidId);
+      expect(ledger.attachBraidGrant).toHaveBeenCalledTimes(2);
+      expect(ledger.revokeBindings).not.toHaveBeenCalled();
     });
 
+    it("lets a braid with the replaced grant's terms be made while its revoke is pending", async () => {
+      const { create, service, rows } = setup();
+      const braid = await create({ where: 'name == "a"' });
+      await changeOf(service, braid.braidId)('name == "b"');
+
+      expect(await refusalOf(create({ where: 'name == "a"' }))).toBeUndefined();
+      expect(rows.filter((row) => row.isLive)).toHaveLength(3);
+    });
+  });
+
+  describe("when the worker revokes the grant a change replaced", () => {
+    /** @scenario "A replayed attach revokes nothing twice" */
+    it("revokes it once with braid_changed under the attach's command id, and a replay revokes nothing", async () => {
+      const { create, service, ledger, rows } = setup();
+      const braid = await create();
+      const replaced = {
+        organizationId: ORG,
+        grantId: braid.braidId,
+        actor: ANA,
+        commandId: "evt_1",
+      };
+
+      await service.revokeReplacedGrant(replaced);
+      await service.revokeReplacedGrant(replaced);
+
+      expect(ledger.revokeBindings).toHaveBeenCalledTimes(1);
+      expect(ledger.revokeBindings).toHaveBeenCalledWith({
+        organizationId: ORG,
+        bindingIds: [braid.braidId],
+        actor: ANA,
+        reason: "braid_changed",
+        commandId: "evt_1",
+      });
+      expect(rows[0]).toMatchObject({ isLive: false, revokedReason: "braid_changed" });
+    });
+
+    it("revokes nothing when the replaced grant was removed first", async () => {
+      const { create, service, ledger } = setup();
+      const braid = await create();
+      await service.removeBraid({
+        projectId: OWNER,
+        braidId: braid.braidId,
+        actor: ANA,
+        caller: CALLER,
+      });
+
+      await service.revokeReplacedGrant({
+        organizationId: ORG,
+        grantId: braid.braidId,
+        actor: ANA,
+        commandId: "evt_1",
+      });
+
+      expect(ledger.revokeBindings).toHaveBeenCalledTimes(1);
+      expect(ledger.revokeBindings.mock.calls[0]?.[0]).toMatchObject({ reason: "braid_removed" });
+    });
+  });
+
+  describe("when changing a braid", () => {
     describe("when another live braid already has the new terms", () => {
       /** @scenario "A change that would make a braid identical to another live braid is refused" */
       it("refuses with braid_already_exists and leaves both braids live as they were", async () => {

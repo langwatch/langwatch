@@ -9,6 +9,7 @@ import { BRAID_AUDIT_TARGET_KIND } from "@langwatch/authz-contract";
 import { compileBraidCondition } from "@langwatch/authz-contract/braid-condition-compiler";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { BRAID_CHANGE_SUBSCRIBER_NAME } from "../../eventing/authz-grant.pipeline.ts";
 import {
   AUTHORIZATION_MAX_AGE_MS,
   BRAID_REVOCATION_BOUND_MS,
@@ -333,6 +334,7 @@ describe("changing and removing a braid", () => {
 
       const changed = await change(made, ANA, braid.braidId, PAYMENTS);
 
+      await vi.waitFor(() => expect(live(made.braidRows())).toHaveLength(1));
       expect(made.braidRows()).toEqual([
         expect.objectContaining({ id: braid.braidId, revokedReason: "braid_changed" }),
         expect.objectContaining({
@@ -364,6 +366,7 @@ describe("changing and removing a braid", () => {
       expect(outcomes.filter((code) => code === undefined)).toHaveLength(1);
       expect(outcomes.filter((code) => code !== undefined)).toEqual(["braid_changed"]);
       expect(made.braidRows()).toHaveLength(2);
+      await vi.waitFor(() => expect(live(made.braidRows())).toHaveLength(1));
       expect(live(made.braidRows())).toEqual([
         expect.objectContaining({ replacesGrantId: braid.braidId }),
       ]);
@@ -390,21 +393,58 @@ describe("changing and removing a braid", () => {
     });
   });
 
-  describe("when revoking the old grant fails once", () => {
-    /** @scenario "A change whose old grant cannot be revoked reports failure and finishes when repeated" */
-    it("reports the failure, and the repeat revokes the old grant without attaching a third", async () => {
+  describe("when ana changes a braid and the worker takes the attach", () => {
+    /** @scenario "A braid change's replaced grant is revoked by the worker once the attach lands" */
+    it("revokes the old grant as ana with braid_changed, audited, and moves the epoch once it is revoked", async () => {
       const made = await world();
       const braid = await made.as(ANA).createBraid(braidInput());
-      made.failNext("revokeGrant");
+      const isOldLive = () => live(made.braidRows()).some((row) => row.id === braid.braidId);
+      const bumpsAfterRevoke: boolean[] = [];
+      const bump = made.repositories.epoch.bump.bind(made.repositories.epoch);
+      vi.spyOn(made.repositories.epoch, "bump").mockImplementation(async (input) => {
+        bumpsAfterRevoke.push(!isOldLive());
+        await bump(input);
+      });
 
-      const first = await failureOf(change(made, ANA, braid.braidId, PAYMENTS));
-      const repeated = await change(made, ANA, braid.braidId, PAYMENTS);
+      const changed = await change(made, ANA, braid.braidId, PAYMENTS);
 
-      expect(first).toBeDefined();
-      expect(made.braidRows()).toEqual([
-        expect.objectContaining({ id: braid.braidId, revokedReason: "braid_changed" }),
-        expect.objectContaining({ id: repeated.braidId, revokedAt: null }),
-      ]);
+      await vi.waitFor(() => expect(isOldLive()).toBe(false));
+      expect(made.braidRows()[0]).toMatchObject({ revokedReason: "braid_changed" });
+      expect(live(made.braidRows()).map((row) => row.id)).toEqual([changed.braidId]);
+      expect(bumpsAfterRevoke).toContain(true);
+      await vi.waitFor(() =>
+        expect(made.auditRows().filter((row) => row.action === "authz.grants.revoke")).toEqual([
+          expect.objectContaining({
+            userId: ANA,
+            targetId: braid.braidId,
+            metadata: expect.objectContaining({ reason: "braid_changed" }),
+          }),
+        ]),
+      );
+    });
+  });
+
+  describe("when the worker is handed a change's attach again", () => {
+    /** @scenario "A replayed attach revokes nothing twice" */
+    it("revokes nothing, audits nothing and leaves the epoch where it was", async () => {
+      const made = await world();
+      const braid = await made.as(ANA).createBraid(braidInput());
+      const changed = await change(made, ANA, braid.braidId, PAYMENTS);
+      await vi.waitFor(() => expect(live(made.braidRows())).toHaveLength(1));
+      const revokes = () =>
+        made.auditRows().filter((row) => row.action === "authz.grants.revoke").length;
+      await vi.waitFor(() => expect(revokes()).toBe(1));
+      const epoch = await made.repositories.epoch.findEpoch({ organizationId: ORG });
+
+      const redelivered = await made.redeliver({
+        subscriber: BRAID_CHANGE_SUBSCRIBER_NAME,
+        grantId: changed.braidId,
+      });
+
+      expect(redelivered).toBe(1);
+      expect(made.braidRows()[0]).toMatchObject({ revokedReason: "braid_changed" });
+      expect(revokes()).toBe(1);
+      await expect(made.repositories.epoch.findEpoch({ organizationId: ORG })).resolves.toBe(epoch);
     });
   });
 

@@ -1134,27 +1134,28 @@ Declared at `src/eventing/authz-aggregate-read.pipeline.ts:18`. Events: `authzAg
 
 ### Pipeline `authz_grant` (aggregate `authz_grant`)
 
-Declared at `src/eventing/authz-grant.pipeline.ts:69`. Events: `authzGrantEventSchemas`.
+Declared at `src/eventing/authz-grant.pipeline.ts:89`. Events: `authzGrantEventSchemas`.
 
-The chain builds early when `!sessionVersions` (`src/eventing/authz-grant.pipeline.ts:151`); the rows built only past that return say so. The caller's arguments decide which role gets which build.
+The chain builds early when `!sessionVersions` (`src/eventing/authz-grant.pipeline.ts:189`); the rows built only past that return say so. The caller's arguments decide which role gets which build.
 
 | Kind                      | Name                                                           | Handles                                                               | Declared at                                | Built                |
 | ------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------ | -------------------- |
-| command                   | `attachGrant`                                                  | –                                                                     | `src/eventing/authz-grant.pipeline.ts:86`  | always               |
-| command                   | `changeGrantRole`                                              | –                                                                     | `src/eventing/authz-grant.pipeline.ts:90`  | always               |
-| command                   | `revokeGrant`                                                  | –                                                                     | `src/eventing/authz-grant.pipeline.ts:94`  | always               |
-| command                   | `defineRole`                                                   | –                                                                     | `src/eventing/authz-grant.pipeline.ts:98`  | always               |
-| command                   | `changeRolePermissions`                                        | –                                                                     | `src/eventing/authz-grant.pipeline.ts:99`  | always               |
-| command                   | `deleteRole`                                                   | –                                                                     | `src/eventing/authz-grant.pipeline.ts:100` | always               |
-| subscriber                | `auditTrail`                                                   | –                                                                     | `src/eventing/authz-grant.pipeline.ts:77`  | always               |
-| peer subscriber           | `engineMigrationRolledBack`                                    | `lw.ops.tenant_migration.rolled_back` from [ops](../../ops/README.md) | `src/eventing/authz-grant.pipeline.ts:104` | always               |
-| peer subscriber           | `projectMoved`                                                 | `lw.project.moved` from [project](../../project/README.md)            | `src/eventing/authz-grant.pipeline.ts:121` | always               |
-| peer subscriber           | `projectArchived`                                              | `lw.project.archived` from [project](../../project/README.md)         | `src/eventing/authz-grant.pipeline.ts:126` | always               |
-| peer subscriber           | `userDeactivated`                                              | `lw.user.deactivated` from [user](../../user/README.md)               | `src/eventing/authz-grant.pipeline.ts:135` | always               |
-| peer subscriber           | `userReactivated`                                              | `lw.user.reactivated` from [user](../../user/README.md)               | `src/eventing/authz-grant.pipeline.ts:140` | always               |
-| peer subscriber           | `userErased`                                                   | `lw.identity.user_erased` from [identity](../../identity/README.md)   | `src/eventing/authz-grant.pipeline.ts:145` | always               |
-| ClickHouse map projection | `≈ AuthzGrantProjection.create(options.authzGrantsWriteStore)` | –                                                                     | `src/eventing/authz-grant.pipeline.ts:76`  | always               |
-| projection subscriber     | `sessionVersion`                                               | –                                                                     | `src/eventing/authz-grant.pipeline.ts:155` | past the early build |
+| command                   | `attachGrant`                                                  | –                                                                     | `src/eventing/authz-grant.pipeline.ts:106` | always               |
+| command                   | `changeGrantRole`                                              | –                                                                     | `src/eventing/authz-grant.pipeline.ts:110` | always               |
+| command                   | `revokeGrant`                                                  | –                                                                     | `src/eventing/authz-grant.pipeline.ts:114` | always               |
+| command                   | `defineRole`                                                   | –                                                                     | `src/eventing/authz-grant.pipeline.ts:118` | always               |
+| command                   | `changeRolePermissions`                                        | –                                                                     | `src/eventing/authz-grant.pipeline.ts:119` | always               |
+| command                   | `deleteRole`                                                   | –                                                                     | `src/eventing/authz-grant.pipeline.ts:120` | always               |
+| subscriber                | `auditTrail`                                                   | –                                                                     | `src/eventing/authz-grant.pipeline.ts:97`  | always               |
+| subscriber                | `braidChangeRevoke`                                            | `lw.authz.grant.attached` from [authz](../README.md)                  | `src/eventing/authz-grant.pipeline.ts:124` | always               |
+| peer subscriber           | `engineMigrationRolledBack`                                    | `lw.ops.tenant_migration.rolled_back` from [ops](../../ops/README.md) | `src/eventing/authz-grant.pipeline.ts:142` | always               |
+| peer subscriber           | `projectMoved`                                                 | `lw.project.moved` from [project](../../project/README.md)            | `src/eventing/authz-grant.pipeline.ts:159` | always               |
+| peer subscriber           | `projectArchived`                                              | `lw.project.archived` from [project](../../project/README.md)         | `src/eventing/authz-grant.pipeline.ts:164` | always               |
+| peer subscriber           | `userDeactivated`                                              | `lw.user.deactivated` from [user](../../user/README.md)               | `src/eventing/authz-grant.pipeline.ts:173` | always               |
+| peer subscriber           | `userReactivated`                                              | `lw.user.reactivated` from [user](../../user/README.md)               | `src/eventing/authz-grant.pipeline.ts:178` | always               |
+| peer subscriber           | `userErased`                                                   | `lw.identity.user_erased` from [identity](../../identity/README.md)   | `src/eventing/authz-grant.pipeline.ts:183` | always               |
+| ClickHouse map projection | `≈ AuthzGrantProjection.create(options.authzGrantsWriteStore)` | –                                                                     | `src/eventing/authz-grant.pipeline.ts:96`  | always               |
+| projection subscriber     | `sessionVersion`                                               | –                                                                     | `src/eventing/authz-grant.pipeline.ts:193` | past the early build |
 
 ### Pipeline `authz_member_offboarded` (aggregate `authz_member_offboarded`)
 

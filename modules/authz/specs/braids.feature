@@ -298,8 +298,8 @@ Feature: Braids
     Scenario: Changing a braid replaces it and names the braid it replaced
       Given a live braid from "specialists" into "orchestrator"
       When ana changes its condition
-      Then a new grant with the new condition is attached and the old one revoked
-      And the new grant names the grant it replaces
+      Then a new grant with the new condition is attached naming the grant it replaces
+      And once the worker takes the attach the old one is revoked
       And the old braid is no longer live
 
     @integration
@@ -326,12 +326,25 @@ Feature: Braids
       And the old braid is still live with its old condition
 
     @integration
-    Scenario: A change whose old grant cannot be revoked reports failure and finishes when repeated
+    Scenario: A braid change's replaced grant is revoked by the worker once the attach lands
       Given a live braid from "specialists" into "orchestrator"
-      And revoking a grant fails once
       When ana changes its condition
-      Then the change reports failure
-      And repeating the change revokes the old grant without attaching a third
+      Then the change sends the attach of the new grant alone
+      And the worker, taking that attach, revokes the old grant as ana with reason braid_changed
+      And the revoke is in the audit log, and the epoch moves once the old grant is revoked
+
+    @unit @integration
+    Scenario: A replayed attach revokes nothing twice
+      Given a braid change whose replaced grant the worker has revoked
+      When the worker is handed that attach again
+      Then no second revoke is sent, audited or moves the epoch
+
+    @unit
+    Scenario: Repeating a change whose revoke is still pending answers the same change
+      Given a braid change whose replaced grant the worker has not yet revoked
+      When ana repeats the same change
+      Then the change answers the grant already attached
+      And no third grant is attached
 
     @unit
     Scenario: A change that would make a braid identical to another live braid is refused

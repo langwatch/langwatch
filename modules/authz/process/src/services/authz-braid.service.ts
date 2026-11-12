@@ -100,7 +100,9 @@ export class AuthzBraidService {
     return this.deps.locks.withReaderLock({
       readerProjectId,
       write: async () => {
-        const live = await this.liveIntoReader({ organizationId, readerProjectId });
+        const live = withoutReplaced(
+          await this.liveIntoReader({ organizationId, readerProjectId }),
+        );
         const identical = live.find((row) => keyOf(row) === terms.key);
         if (identical) throw new BraidAlreadyExistsError({ braidId: identical.grantId });
         assertWithinConditionLimit({ live, readerProjectId, terms });
@@ -109,7 +111,10 @@ export class AuthzBraidService {
     });
   }
 
-  /** Checked whole first; then, under the reader's lock, attach the new grant, revoke the old. */
+  /**
+   * Checked whole first; then, under the reader's lock, attach the new grant naming the old.
+   * The worker revokes the old once the attach lands (ADR-201 §2), so the lock is not held for it.
+   */
   async changeBraid(input: AuthzChangeBraidInput): Promise<AuthzBraid> {
     const { projectId: ownerProjectId, readerProjectId, braidId, actor, caller } = input;
     const terms = this.termsOf({ ownerProjectId, input });
@@ -125,33 +130,55 @@ export class AuthzBraidService {
         if (old.ownerProjectId !== ownerProjectId) {
           throw new BraidNotOnProjectError({ braidId, projectId: ownerProjectId });
         }
+        // Changed already, its revoke still the worker's: a repeat answers that change.
+        const replacement = live.find((row) => row.replacesGrantId === braidId);
+        if (replacement && keyOf(replacement) === terms.key) return braidOf(replacement);
+        if (replacement) throw new BraidChangedError({ braidId });
         if (keyOf(old) === terms.key) return braidOf(old);
-        const others = live.filter((row) => row.grantId !== braidId);
-        // A repeat after a failed revoke finds its own earlier attach and revokes the old only;
-        // an identical braid that does not replace this one is another braid, never merged.
-        const earlier = others.find((row) => keyOf(row) === terms.key);
-        if (earlier && earlier.replacesGrantId !== braidId) {
-          throw new BraidAlreadyExistsError({ braidId: earlier.grantId });
-        }
-        if (!earlier) assertWithinConditionLimit({ live: others, readerProjectId, terms });
-        const changed = earlier
-          ? braidOf(earlier)
-          : await this.attach({
-              organizationId,
-              readerProjectId,
-              ownerProjectId,
-              terms,
-              actor,
-              replacesGrantId: braidId,
-            });
-        await this.deps.ledger.revokeBindings({
+        const others = withoutReplaced(live).filter((row) => row.grantId !== braidId);
+        const identical = others.find((row) => keyOf(row) === terms.key);
+        if (identical) throw new BraidAlreadyExistsError({ braidId: identical.grantId });
+        assertWithinConditionLimit({ live: others, readerProjectId, terms });
+        return this.attach({
           organizationId,
-          bindingIds: [braidId],
+          readerProjectId,
+          ownerProjectId,
+          terms,
           actor,
-          reason: BRAID_CHANGED_REASON,
+          replacesGrantId: braidId,
         });
-        return changed;
       },
+    });
+  }
+
+  /**
+   * The worker's half of a change (ADR-201 §2, §8): revoke the grant an attach replaced, as a
+   * direct revoke does. A replay finds it revoked and does nothing; `commandId` keeps a resend
+   * after a crash one fact.
+   */
+  async revokeReplacedGrant({
+    organizationId,
+    grantId,
+    actor,
+    commandId,
+  }: {
+    organizationId: string;
+    grantId: string;
+    actor: LedgerActor;
+    commandId: string;
+  }): Promise<void> {
+    const [replaced] = await this.deps.reads.findBraids({
+      organizationId,
+      grantId,
+      includeRevoked: true,
+    });
+    if (!replaced?.isLive) return;
+    await this.deps.ledger.revokeBindings({
+      organizationId,
+      bindingIds: [grantId],
+      actor,
+      reason: BRAID_CHANGED_REASON,
+      commandId,
     });
   }
 
@@ -338,6 +365,12 @@ export class AuthzBraidService {
       createdAtMs: now,
     };
   }
+}
+
+/** A live grant a change replaced is on its way out: it neither blocks nor counts (ADR-201 §2). */
+function withoutReplaced(live: readonly LedgerBraidRow[]): LedgerBraidRow[] {
+  const replaced = new Set(live.map((row) => row.replacesGrantId));
+  return live.filter((row) => !replaced.has(row.grantId));
 }
 
 /** A reader holds at most BRAID_MAX_DISTINCT_CONDITIONS distinct compiled conditions (§3). */
