@@ -275,6 +275,20 @@ RUN curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_CLI_VERSION}/
 
 # There is no Node runtime dependency here: the worker and the LangWatch CLI
 # are both Bun-compiled standalone binaries.
+#
+# A cloned repository's own checks (unit tests, lints) are the agent's to run,
+# so it needs a way to install a project's dependencies without root. `uv`
+# covers Python: `uv sync`, `uv run`, `uv pip install` and a managed
+# interpreter, all under the worker's per-session $HOME. Node is NOT baked in:
+# projects pin different majors, and the official tarball unpacks into $HOME
+# in seconds (skills/github explains the path). `make` runs the targets many
+# repositories wrap their checks in. Everything fetched goes through the
+# worker's egress policy like any other request.
+# COPY --from takes no build arg, so the uv pin lives in the image reference.
+COPY --from=ghcr.io/astral-sh/uv:0.9.5 /uv /uvx /usr/local/bin/
+RUN apt-get update && apt-get install -y --no-install-recommends make \
+    && rm -rf /var/lib/apt/lists/* \
+    && uv --version
 
 # The `langwatch` CLI as a single self-contained native binary, compiled from
 # THIS repo's sdks/typescript/ by the cli-builder stage — no longer

@@ -57,15 +57,22 @@ Fill in these fields:
 
 Set the repository permissions to exactly these, with no extra permissions. Tighter scope means a smaller blast radius.
 
-| Permission    | Access       |
-| ------------- | ------------ |
-| Contents      | Read & write |
-| Pull requests | Read & write |
-| Metadata      | Read         |
+| Permission    | Access       | Used for                                                                    |
+| ------------- | ------------ | --------------------------------------------------------------------------- |
+| Contents      | Read & write | Cloning, and pushing Langy's branch                                         |
+| Pull requests | Read & write | Opening the pull request                                                    |
+| Actions       | Read & write | Reading workflow runs and logs, starting a `workflow_dispatch` run          |
+| Checks        | Read         | Reading the checks on Langy's pull requests, and the `check_suite` event    |
+| Workflows     | Read & write | Pushing a change to `.github/workflows/` when Langy sets up the CI pipeline |
+| Metadata      | Read         | Required by GitHub for every App                                            |
 
-Under **Subscribe to events**, select **Pull request**. GitHub sends the installation lifecycle events (`installation`, `installation_repositories`) on its own. Subscribe to no other events.
+Under **Subscribe to events**, select **Pull request** and **Check suite**. GitHub sends the installation lifecycle events (`installation`, `installation_repositories`) on its own. Subscribe to no other events.
 
 The `pull_request` event links a pull request to its coding-agent sessions as soon as GitHub announces it. Without the event, linkage still works, but it waits for the periodic sweep, which can take up to a day for a branch that has been asked about a few times already.
+
+The `check_suite` event tells LangWatch that CI finished on one of Langy's pull requests, so Langy can read the result and follow up. See [CI follow-ups](#ci-follow-ups). Without it, Langy reads CI only while a turn is running.
+
+Actions, Checks and Workflows are optional. An installation that has not accepted them keeps working: tokens are minted with only what the installation granted, and Langy cannot read workflow runs, cannot be woken by CI, or cannot push workflow files, respectively. When you add them to an App that is already installed, GitHub asks an owner of each installing organization to accept the new permissions.
 
 Click **Create GitHub App**. On the resulting page:
 
@@ -181,6 +188,20 @@ To check the `pull_request` subscription, open a pull request on a repository th
 
 If anything goes wrong, the audit log (`langy.github.install`, `langy.github.disconnect`) and Sentry capture the failure paths.
 
+## CI follow-ups
+
+Langy cannot run a customer's agent in its sandbox, so the repository's CI is where its changes are measured. When every check on the head commit of a pull request Langy opened has finished, LangWatch starts a new Langy turn in the conversation that opened it, so Langy can read the result and fix, push or report.
+
+- **Which pull requests.** Only pull requests on a `langy/` branch of the repository itself, opened by a Langy turn, still open. A fork's pull request or a branch a person opened wakes nothing.
+- **Once per commit.** Re-running the checks on the same commit does not start a second turn. A new push starts a new run of CI, and its result can start the next follow-up.
+- **Capped.** After a few automatic follow-ups in a row on one pull request, LangWatch waits until the person sends a message in the conversation.
+- **What the turn holds.** It acts as the person who owns the conversation, as long as that person is still active and has Langy access. Its LangWatch key is view-only, and its GitHub token is minted for that one repository.
+
+<Note>
+  GitHub cannot limit an installation token to one branch. The follow-up turn is told to push only
+  to its pull request's branch, and branch protection on your default branch is what enforces it.
+</Note>
+
 ## Disconnect
 
 Go to **Settings > Integrations > Disconnect**, which opens GitHub's uninstall page (GitHub cannot be uninstalled via the API). Once GitHub confirms, the `installation.deleted` webhook removes the local record.
@@ -189,6 +210,6 @@ Go to **Settings > Integrations > Disconnect**, which opens GitHub's uninstall p
 
 - **Token in the agent pod, not on disk.** Langy workers receive a 1-hour installation token via `GH_TOKEN` env. The github skill wires `git config credential.helper '!gh auth git-credential'` so git pushes read it from env, with no `.gitconfig` and no `.git-credentials`. The clone directory lives inside the per-worker home that the idle reaper deletes (within 10 min).
 - **No data at rest.** No token or refresh token is stored control-plane side. The app private key is the only credential; it never leaves the control plane and never reaches the Langy agent pod. Tokens are minted per turn, cached in Redis a hair under their 1h lifetime, and self-expire. The cache key carries the GitHub host, so two GitHub instances cannot share an entry.
-- **Least privilege at mint time.** Tokens are minted with only `contents:write` and `pull_requests:write`, scoped to the installation's repositories (or a single repository when the turn targets one).
+- **Least privilege at mint time.** Tokens are minted with `contents:write` and `pull_requests:write`, plus `actions:write`, `checks:read` and `workflows:write` when the installation granted them, scoped to the installation's repositories (or a single repository when the turn targets one). Reading the checks of a commit for a CI follow-up uses a separate token with only `checks:read` and `pull_requests:read` on that repository.
 - **Sticky worker tokens.** A worker spawned with token T keeps T until the idle reaper kills it. Removing the installation cuts off new turns immediately; a live worker may hold a token for up to the idle TTL (within 10 min) or until it self-expires (within 1h).
-- **Egress.** The control plane reaches `api.github.com` to mint installation tokens and read installation metadata, or `<GITHUB_LANGY_HOST>` when one is set. Workers need `github.com`, `api.github.com`, and `codeload.github.com` to clone and push, which requires outbound egress to be enabled. See [Networking and egress](/self-hosting/langy/networking-and-egress).
+- **Egress.** The control plane reaches `api.github.com` to mint installation tokens and read installation metadata, or `<GITHUB_LANGY_HOST>` when one is set. Workers need `github.com`, `api.github.com`, and `codeload.github.com` to clone and push, which requires outbound egress to be enabled. To run a cloned repository's own tests in the sandbox, workers also fetch its dependencies: `pypi.org` and `files.pythonhosted.org` for Python, `nodejs.org` and `registry.npmjs.org` for Node. An egress allowlist without them leaves those checks to the repository's CI. See [Networking and egress](/self-hosting/langy/networking-and-egress).

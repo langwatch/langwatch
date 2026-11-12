@@ -222,6 +222,13 @@ export interface ModelProviderApi {
   getExecutionProviders(
     input: ModelProviderListProjectInput,
   ): Promise<Record<string, ModelProviderExecution>>;
+  /**
+   * Per provider key the project runs on, the bare model ids that provider's own model list
+   * answers with (cached per credential); a provider not asked or not answering is absent.
+   */
+  getServedModelsForProject(
+    input: ModelProviderListProjectInput,
+  ): Promise<Record<string, string[]>>;
   prepareExecution(
     input: ModelProviderExecutionPrepareInput,
   ): Promise<ModelProviderExecutionParameters>;

@@ -61,9 +61,16 @@ export const modelProviderTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("listAllForProjectForFrontend")
   .withPermission("project:view")
-  .handle(async ({ app, input }) =>
-    (await app.listForProject({ projectId: input.projectId })).map(toListEntry),
-  )
+  .handle(async ({ app, input }) => {
+    const [providers, served] = await Promise.all([
+      app.listForProject({ projectId: input.projectId }),
+      app.getServedModelsForProject({ projectId: input.projectId }),
+    ]);
+    return providers.map((provider) => ({
+      ...toListEntry(provider),
+      servedModels: served[provider.provider] ?? null,
+    }));
+  })
 
   .procedure("listDecisionModelsForProject")
   .withPermission("project:view")

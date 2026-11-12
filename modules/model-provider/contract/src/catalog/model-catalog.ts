@@ -186,6 +186,20 @@ export function isPickableCatalogModel(modelId: string): boolean {
   return !hasVariantSuffix(modelId) && !isBatchTier(modelId) && !isUnservedOpenAITierPro(modelId);
 }
 
+/**
+ * Whether a chat picker may offer this catalog id: its answer is text a chat turn can read.
+ * Audio, realtime and image-generation models refuse a plain chat call, and deep research
+ * needs a search tool attached to every request. Routers (`openrouter/auto`) stay.
+ */
+export function isChatSurfaceCatalogModel(modelId: string): boolean {
+  if (/deep-research/.test(modelId)) return false;
+  const entry = llmModels.models[modelId];
+  if (!entry) return true;
+  const output = entry.modality.split("->")[1] ?? "";
+  if (output.includes("audio")) return false;
+  return !output.includes("image") || modelId.startsWith("openrouter/");
+}
+
 export const allLitellmModels: Record<string, { mode: "chat" | "embedding" | "audio" | "image" }> =
   Object.fromEntries(
     Object.entries(llmModels.models)

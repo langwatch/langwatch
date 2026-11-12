@@ -365,6 +365,25 @@ describe("the modelProvider tRPC namespace", () => {
     });
   });
 
+  describe("when the browser lists the project's providers", () => {
+    /** @scenario The provider list the pickers read carries each provider's served models */
+    it("carries each provider's served models, and null where none is known", async () => {
+      const openai = storedProvider();
+      const anthropic = storedProvider({ id: "provider-anthropic", provider: "anthropic" });
+      const { caller } = mount({
+        modelProviders: {
+          listForProject: (async () => [openai, anthropic]) as never,
+          getServedModelsForProject: async () => ({ openai: ["gpt-6-sol"] }),
+        },
+      });
+
+      const list = await caller.listAllForProjectForFrontend({ projectId: PROJECT_A });
+
+      expect(list.find((row) => row.provider === "openai")?.servedModels).toEqual(["gpt-6-sol"]);
+      expect(list.find((row) => row.provider === "anthropic")?.servedModels).toBeNull();
+    });
+  });
+
   describe("when a write names neither a project nor an organization", () => {
     it("refuses before the gateway is reached", async () => {
       const upsert = vi.fn();
