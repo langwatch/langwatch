@@ -164,6 +164,10 @@ func (w Waiter) poll(ctx context.Context, p *pollState) (delay time.Duration, do
 
 		return w.Interval, done, verdict
 	}
+	if ctx.Err() != nil {
+		// The deadline cancelled the request: keep the last real answer for the report.
+		return 0, false, nil //nolint:nilerr // deadline cancel is not a failure; the report keeps the last real answer
+	}
 	if !transient(err) {
 		return 0, true, err
 	}
@@ -187,7 +191,10 @@ func (w Waiter) judge(s summary) (bool, error) {
 }
 
 func timeoutError(timeout time.Duration, last summary, lastErr error) error {
-	msg := fmt.Sprintf("checks were still running after %s: %s", timeout, strings.Join(last.pending, ", "))
+	msg := fmt.Sprintf("checks were still running after %s", timeout)
+	if len(last.pending) > 0 {
+		msg += ": " + strings.Join(last.pending, ", ")
+	}
 	if lastErr != nil {
 		msg += fmt.Sprintf(" (last API error: %v)", lastErr)
 	}

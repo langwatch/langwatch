@@ -102,7 +102,7 @@ func TestWaitFailsNamingTheFailedCheck(t *testing.T) {
 func TestWaitTimeoutNamesThePendingChecks(t *testing.T) {
 	api := &fakeAPI{responses: []response{{200, []run{ok("a"), pending("slow-one")}}}}
 
-	err := waiter(t, api, 50*time.Millisecond).Wait(context.Background())
+	err := waiter(t, api, 300*time.Millisecond).Wait(context.Background())
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "still running")
@@ -134,7 +134,7 @@ func TestWaitFailsAtOnceOnANonTransientAPIError(t *testing.T) {
 func TestWaitFailsWhenAPIErrorsPersistPastTheDeadline(t *testing.T) {
 	api := &fakeAPI{responses: []response{{status: http.StatusInternalServerError}}}
 
-	err := waiter(t, api, 50*time.Millisecond).Wait(context.Background())
+	err := waiter(t, api, 300*time.Millisecond).Wait(context.Background())
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "500")
@@ -197,7 +197,7 @@ func TestWaitTimeoutDoesNotBlameAnErrorThatRecovered(t *testing.T) {
 		{200, []run{pending("slow-one")}},
 	}}
 
-	err := waiter(t, api, 50*time.Millisecond).Wait(context.Background())
+	err := waiter(t, api, 300*time.Millisecond).Wait(context.Background())
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "slow-one")
