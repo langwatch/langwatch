@@ -34,6 +34,7 @@ import {
 import type { UpcastStepInput } from "../ledger.ts";
 import { loadReleases } from "../manifest/manifest-loader.ts";
 import type { ManifestStep } from "../manifest/manifest.ts";
+import type { ReleaseTreeSteps } from "../manifest/stamp.ts";
 import type { UpgradeClickHouse, UpgradePostgres } from "../ports.ts";
 import {
   isMigrationStep,
@@ -532,13 +533,16 @@ export type ImageUpgradeRunner = Readonly<{
  */
 export async function withImageUpgradeRunner<Result>({
   inputs,
+  tree: givenTree,
   use,
 }: {
   inputs: ImageUpgradeInputs;
+  /** The image tree, when the caller has already read it. */
+  tree?: ReleaseTreeSteps;
   use: (composed: ImageUpgradeRunner) => Promise<Result>;
 }): Promise<Result> {
   const releases = loadReleases();
-  const tree = readImageTree({ codeSteps: inputs.steps.map(codeStepOf) });
+  const tree = givenTree ?? readImageTree({ codeSteps: inputs.steps.map(codeStepOf) });
   const release = imageRelease({ manifests: releases.manifests, tree });
   const { targets } = clickhouseTargets(inputs);
   const sharedUrl = targets.find((target) => target.name === "shared")?.url;
@@ -595,9 +599,11 @@ export async function runImageUpgrade({
   inputs: ImageUpgradeInputs;
   signal: AbortSignal;
 }): Promise<UpgradeOutcome> {
-  assertUniqueStepIds({ tree: readImageTree({ codeSteps: inputs.steps.map(codeStepOf) }) });
+  const tree = readImageTree({ codeSteps: inputs.steps.map(codeStepOf) });
+  assertUniqueStepIds({ tree });
   return withImageUpgradeRunner({
     inputs,
+    tree,
     use: async ({ runner, withClickHouse }) => {
       if (!withClickHouse) writeUpgradeLine(noClickHouseLine());
       const outcome = await runner.run({ signal });
