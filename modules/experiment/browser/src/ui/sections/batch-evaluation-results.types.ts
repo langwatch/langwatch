@@ -504,8 +504,9 @@ export const transformBatchEvaluationData = (data: ExperimentRunWithItems): Batc
     : inferredTargetColumnsOf({ dataset, evaluations });
   const evaluatorNames = evaluatorNamesOf(evaluations);
   const index = runIndexOf({ dataset, evaluations, isV3 });
-  const rowCount = dataset.length > 0 ? Math.max(...dataset.map((d) => d.index)) + 1 : 0;
-  const heldRows = new Set(dataset.map((d) => d.index));
+  // A row is in the run when it has a dataset entry or an evaluation; either can land first.
+  const heldRows = new Set([...dataset.map((d) => d.index), ...evaluations.map((e) => e.index)]);
+  const rowCount = heldRows.size > 0 ? Math.max(...heldRows) + 1 : 0;
 
   const rows: BatchResultRow[] = Array.from({ length: rowCount }, (_, row) => ({
     index: row,
