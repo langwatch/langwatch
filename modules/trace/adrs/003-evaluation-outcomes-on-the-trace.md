@@ -72,12 +72,15 @@ projections are the architecture, and no read uses `FINAL`.
    from scratch, digest '') and an older row's read-back take the same path, so neither writes a
    duplicate.
 
-   A lagging replica on a cluster can leave an orphan -1 group (sum -1) or a doubled +1 group
-   (sum 2), so the live read keeps every group whose signs do not sum to zero and returns the
-   sum. The trace's next content change, or a replay, reads the live rows and repairs with
-   byte-identical rows at the same revision: +1 for an orphan, -1 for each surplus of a doubled
-   row, so the unchanged row nets 1 and every other group 0. A store whose digest is unchanged
-   reads nothing, so it repairs nothing.
+   The diff reads a group's sign sum only as live (above zero) or not, and never sizes a write
+   by it: one -1 per live group it replaces, nothing for a group summing to -1 or 2. Without the
+   quorum flag below, the read may come from a replica that has not received every write, so the
+   sum can be off in either direction. The fold writes a -1 only after reading its +1, so a -1
+   group means that +1 has not reached the replica read; writing a +1 for it would count the
+   evaluation twice once the original arrives. A group read at 2 may hide a -1 the replica lacks;
+   writing another -1 would remove the evaluation once that -1 arrives. The live read still
+   returns negative groups so the next revision never reuses a number the engine collapses on.
+   (Amended 2026-11-12: an earlier version wrote those repairs.)
 
 4. **History is filled by two background steps.** `trace:record-evaluation-outcomes` pages each
    project's finished evaluations of the last 62 days through `EvaluationApi.listEvaluationOutcomes`
@@ -93,13 +96,20 @@ projections are the architecture, and no read uses `FINAL`.
   rows moved. The store answers the state stamped with the digest it wrote and the Redis fold
   cache holds that, so a cached state neither reads again nor keeps a stale digest that would
   skip a change back to earlier content.
-- An orphan or doubled group from a lagging replica, or from a stalled worker whose claim the
-  queue gave to another, stays until that trace's next content change or a replay.
+- A -1 group whose +1 lags is transient: the +1's arrival nets it to 0. A doubled +1 written
+  when a lagging read hid the fold's own last write (a retry after a crash, a replay, a stalled
+  worker whose claim the queue gave to another) stays doubled, and a later change retracts only
+  one of the pair. Two quick changes read from a lagging replica can likewise strand a row. Only
+  the quorum flag below closes these on a cluster; a single node has no lag.
+- Readers: `trace_evaluation_metrics` groups the full row with `HAVING sum(Sign) > 0`, so a
+  group at 2 is one row and a group at -1 none. `trace_evaluation_checks` sums `Sign` per narrow
+  grain, so a group at 2 counts twice, and a -1 sharing a grain with a live row cancels it
+  until the lagging +1 arrives.
 - `TRACE_EVALUATION_ANALYTICS_QUORUM_READS` (off by default, enabled nowhere) writes these rows
   synchronously with `insert_quorum = 'auto'` and reads them with `select_sequential_consistency`,
-  so the read-back sees the fold's own last write on a replica; live-row repair stays the safety
-  net. That needs `insert_quorum_parallel = 0`, under which ClickHouse rejects an INSERT to the
-  table while the previous quorum insert is unfinished, so concurrent writers can fail under load
-  (a failed store the fold job retries). Turning it on needs a replicated cluster and a load check.
+  so the read-back sees the fold's own last write on a replica. That needs
+  `insert_quorum_parallel = 0`, under which ClickHouse rejects an INSERT to the table while the
+  previous quorum insert is unfinished, so concurrent writers can fail under load (a failed store
+  the fold job retries). Turning it on needs a replicated cluster and a load check.
 - Evaluation is reached through a channel bound to `EvaluationApi`, not a peer, since evaluation
   already depends on trace.

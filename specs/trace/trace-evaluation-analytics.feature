@@ -84,12 +84,17 @@ Feature: Each evaluation's outcome is kept beside its trace's columns
     Then no evaluation row is written and no live row is read
 
   @unit
-  Scenario: An orphan retraction and a doubled row converge to one live row
-    Given an evaluation with an orphan -1 group of old content and its current content stored twice at +1
-    And a folded state whose rows digest differs from the digest its trace row recorded
-    When the fold stores that state
-    Then the signs of the current content sum to exactly 1
-    And the signs of every other group of the evaluation sum to 0
+  Scenario: A live group whose signs sum to -1 writes no repair +1
+    Given an evaluation whose current row is live and whose old content reads as a group summing to -1
+    When the fold diffs its wanted rows against those live rows
+    Then no evaluation row is written
+
+  @unit
+  Scenario: A live group whose signs sum to 2 writes no extra -1
+    Given an evaluation whose current row reads as one group summing to 2
+    When the fold diffs its wanted rows against those live rows
+    Then no evaluation row is written
+    And a change of that row writes one -1 for it and the new row at the next revision
 
   @unit
   Scenario: A crash between the two writes heals

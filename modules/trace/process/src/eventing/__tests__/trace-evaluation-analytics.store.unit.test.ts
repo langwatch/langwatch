@@ -302,7 +302,7 @@ describe("TraceAnalyticsStore's evaluation rows", () => {
     });
   });
 
-  describe("given an orphan retraction and a doubled row of one evaluation, and a state with no recorded digest", () => {
+  describe("given a state with no recorded digest", () => {
     let rows: MemoryTraceEvaluationAnalyticsRepository;
     let state: TraceAnalyticsData;
     let traceRow: TraceAnalyticsRow;
@@ -310,31 +310,6 @@ describe("TraceAnalyticsStore's evaluation rows", () => {
       rows = harness().rows;
       state = fold(traceState(), FIRST);
       traceRow = project(state);
-    });
-
-    /** @scenario "An orphan retraction and a doubled row converge to one live row" */
-    it("nets the current content to one and every other group to zero", async () => {
-      const [current] = traceEvaluationRowsOf({ state, traceRow });
-      if (!current) throw new Error("the state has no evaluation row");
-      const stale = { ...current, topicId: "topic-old" };
-      const base = { updatedAtMs: ANCHOR_MS, retentionDays: 90 };
-      rows.inserted.push(
-        { row: stale, sign: -1, revision: 1, ...base },
-        { row: current, sign: 1, revision: 2, ...base },
-        { row: current, sign: 1, revision: 2, ...base },
-      );
-
-      await memoryEvaluationAnalytics({ storage: rows }).writeBatch([{ state, context, traceRow }]);
-
-      const sums = new Map<string, number>();
-      for (const write of rows.inserted) {
-        const key = JSON.stringify([write.row.topicId, write.revision, write.updatedAtMs]);
-        sums.set(key, (sums.get(key) ?? 0) + write.sign);
-      }
-      expect(Object.fromEntries(sums)).toEqual({
-        [JSON.stringify(["topic-old", 1, ANCHOR_MS])]: 0,
-        [JSON.stringify(["topic-billing", 2, ANCHOR_MS])]: 1,
-      });
     });
 
     it("writes nothing for a clean live row", async () => {

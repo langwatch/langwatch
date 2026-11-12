@@ -276,8 +276,8 @@ export class TraceEvaluationAnalyticsClickHouseRepository extends TraceEvaluatio
     occurredAtFromMs: number;
   }): Promise<LiveTraceEvaluationAnalyticsRow[]> {
     if (traceIds.length === 0) return [];
-    // Grouped by every column, so a row and its retraction cancel exactly. Sums other than 1
-    // (an orphan -1, a doubled +1) come back for repair, not hidden (trace ADR-003).
+    // Grouped by every column, so a row and its retraction cancel exactly. A negative group comes
+    // back too, so the fold's next revision skips its number (trace ADR-003).
     const result = await this.options.clickhouse.as(authorization, { reads: "traces" }).query({
       query: `
           SELECT

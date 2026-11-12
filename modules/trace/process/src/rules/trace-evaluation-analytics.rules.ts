@@ -93,7 +93,7 @@ export interface LiveTraceEvaluationAnalyticsRow {
   updatedAtMs: number;
   revision: number;
   retentionDays: number;
-  /** The group's sum(Sign): above 1 is a doubled row, below 0 an orphan retraction. */
+  /** The group's sum(Sign), never 0: only its sign is read, as replica lag can skew its size. */
   signSum: number;
 }
 
@@ -212,9 +212,9 @@ export function traceEvaluationRowsDigest(rows: readonly TraceEvaluationAnalytic
 }
 
 /**
- * The inserts that move the live rows to `wanted`: nothing for an unchanged row, a retraction
- * plus the next revision for a changed one, revision 1 for a new one. An orphan -1 or doubled +1
- * group from a lagging replica is repaired with byte-identical rows (trace ADR-003).
+ * The inserts that move the live rows to `wanted`: nothing for an unchanged row, one retraction
+ * per other live group plus the next revision for a changed one, revision 1 for a new one. A
+ * lagging replica skews a group's sign sum, so no write is sized by it (trace ADR-003).
  */
 export function traceEvaluationRowWrites({
   wanted,
@@ -237,33 +237,20 @@ export function traceEvaluationRowWrites({
     const content = canonicalContentOf(row);
     const positive = current.filter((entry) => entry.signSum > 0);
     const unchanged = positive.find((entry) => canonicalContentOf(entry.row) === content);
-    const orphanRepairs = current
-      .filter((entry) => entry.signSum < 0)
-      .flatMap((entry) => repeated({ entry, sign: 1, count: -entry.signSum }));
-    const retractions = positive.flatMap((entry) =>
-      repeated({ entry, sign: -1, count: entry === unchanged ? entry.signSum - 1 : entry.signSum }),
-    );
-    if (unchanged) return [...orphanRepairs, ...retractions];
+    const retractions = positive
+      .filter((entry) => entry !== unchanged)
+      .map((entry) => retractionOf(entry));
+    if (unchanged) return retractions;
+    // A negative group's revision still counts: the engine collapses by key and revision.
     const revision = Math.max(0, ...current.map((entry) => entry.revision)) + 1;
-    return [
-      ...orphanRepairs,
-      ...retractions,
-      { row, sign: 1 as const, revision, updatedAtMs, retentionDays },
-    ];
+    return [...retractions, { row, sign: 1 as const, revision, updatedAtMs, retentionDays }];
   });
 }
 
-function repeated({
-  entry,
-  sign,
-  count,
-}: {
-  entry: LiveTraceEvaluationAnalyticsRow;
-  sign: 1 | -1;
-  count: number;
-}): TraceEvaluationAnalyticsWrite[] {
+/** The live row written again at -1, byte for byte, so it cancels the one +1 the fold wrote. */
+function retractionOf(entry: LiveTraceEvaluationAnalyticsRow): TraceEvaluationAnalyticsWrite {
   const { row, revision, updatedAtMs, retentionDays } = entry;
-  return Array.from({ length: count }, () => ({ row, sign, revision, updatedAtMs, retentionDays }));
+  return { row, sign: -1, revision, updatedAtMs, retentionDays };
 }
 
 function rowKeyOf(

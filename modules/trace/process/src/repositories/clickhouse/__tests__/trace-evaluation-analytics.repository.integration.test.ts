@@ -1,9 +1,8 @@
 /**
  * @vitest-environment node
  * @integration
- * The live read of trace_evaluation_analytics over unmerged parts: an orphan retraction and a
- * doubled row come back with their sign sums, and the repair writes leave one live row
- * (trace ADR-003).
+ * The live read of trace_evaluation_analytics over unmerged parts: a -1 group and a doubled
+ * row come back with their sign sums, and the fold writes nothing for either (trace ADR-003).
  * @see specs/trace/trace-evaluation-analytics.feature
  */
 import type { ClickHouseClient } from "@clickhouse/client";
@@ -34,35 +33,6 @@ const tag = nanoid();
 const tenantId = `${tag}-project`;
 const traceId = `${tag}-trace`;
 const baseMs = Date.now();
-
-/** Every column a retraction must repeat, so a group is one exact row content. */
-const CONTENT_COLUMNS = [
-  "TenantId",
-  "TraceId",
-  "EvaluationId",
-  "OccurredAt",
-  "UpdatedAt",
-  "TraceOccurredAt",
-  "EvaluatorName",
-  "Status",
-  "IsGuardrail",
-  "Passed",
-  "Label",
-  "Origin",
-  "TraceOrigin",
-  "CustomerId",
-  "TopicId",
-  "Labels",
-  "MetadataTopic",
-  "MetadataDocumentType",
-  "MetadataLanguage",
-  "MetadataTeam",
-  "MetadataFlow",
-  "MetadataSegment",
-  "MetadataPromptVersion",
-  "Revision",
-  "_retention_days",
-].join(", ");
 
 const current: TraceEvaluationAnalyticsRow = {
   tenantId,
@@ -131,8 +101,9 @@ afterAll(async () => {
 
 describe.skipIf(!clickHouseConfigured)("trace_evaluation_analytics live read", () => {
   describe("given an orphan -1 group of old content and the current content stored twice at +1", () => {
-    /** @scenario "An orphan retraction and a doubled row converge to one live row" */
-    it("reads both groups with their sign sums and converges to one live row after the repair", async () => {
+    /** @scenario "A live group whose signs sum to -1 writes no repair +1" */
+    /** @scenario "A live group whose signs sum to 2 writes no extra -1" */
+    it("reads both groups with their sign sums and writes nothing for either", async () => {
       await repo.insertRows({ writes: [write({ row: stale, sign: -1, revision: 1 })] });
       await repo.insertRows({ writes: [write({ row: current, sign: 1, revision: 2 })] });
       await repo.insertRows({ writes: [write({ row: current, sign: 1, revision: 2 })] });
@@ -152,29 +123,14 @@ describe.skipIf(!clickHouseConfigured)("trace_evaluation_analytics live read", (
         { topicId: "topic-old", signSum: -1 },
       ]);
 
-      const writes = traceEvaluationRowWrites({
-        wanted: [current],
-        live,
-        updatedAtMs: baseMs + 1_000,
-        retentionDays: 30,
-      });
-      await repo.insertRows({ writes });
-
-      const result = await ch.query({
-        query: `
-          SELECT ${CONTENT_COLUMNS}, sum(Sign) AS signSum
-          FROM ${TABLE}
-          WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String}
-          GROUP BY ${CONTENT_COLUMNS}
-          HAVING sum(Sign) != 0
-        `,
-        query_params: { tenantId, traceId },
-        format: "JSONEachRow",
-      });
-      const groups = await result.json<{ TopicId: string; signSum: string }>();
-      expect(groups.map(({ TopicId, signSum }) => ({ TopicId, signSum: Number(signSum) }))).toEqual(
-        [{ TopicId: "topic-billing", signSum: 1 }],
-      );
+      expect(
+        traceEvaluationRowWrites({
+          wanted: [current],
+          live,
+          updatedAtMs: baseMs + 1_000,
+          retentionDays: 30,
+        }),
+      ).toEqual([]);
     });
   });
 });
