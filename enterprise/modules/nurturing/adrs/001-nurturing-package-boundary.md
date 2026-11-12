@@ -1,6 +1,6 @@
 # ADR-001: Nurturing learns from events and keeps its own copies
 
-**Status:** Accepted (2026-09-29); proposed amendment (2026-11-11), pending code-owner acceptance
+**Status:** Accepted (2026-09-29; amended 2026-11-11)
 
 **Behavioural contract:** [Nurturing](../specs/nurturing.feature)
 
