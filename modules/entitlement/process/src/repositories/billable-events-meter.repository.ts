@@ -17,6 +17,9 @@ export type ProjectMeterCount = { projectId: string; count: number };
 /** One UTC day's distinct billable events: `day` is `YYYY-MM-DD`. */
 export type DayMeterCount = { day: string; count: number };
 
+/** One event type's distinct billable events in a window. */
+export type EventTypeMeterCount = { eventType: string; count: number };
+
 /** The `billable_events` table, keyed by organization so private instances keep their cluster. */
 export abstract class BillableEventsMeterRepository {
   abstract insert(input: { record: BillableEventRecord; organizationId: string }): Promise<void>;
@@ -34,4 +37,10 @@ export abstract class BillableEventsMeterRepository {
     projectIds: readonly string[];
     window: MeterWindow;
   }): Promise<DayMeterCount[]>;
+  /** Approximate distinct keys per event type across the named projects; absent when none. */
+  abstract countByType(input: {
+    organizationId: string;
+    projectIds: readonly string[];
+    window: MeterWindow;
+  }): Promise<EventTypeMeterCount[]>;
 }

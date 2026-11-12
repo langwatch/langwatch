@@ -43,7 +43,7 @@ function counterOver({
 }
 
 async function meterWith(
-  events: { projectId: string; at: string; key: string }[],
+  events: { projectId: string; at: string; key: string; eventType?: string }[],
 ): Promise<MemoryBillableEventsMeterRepository> {
   const meter = MemoryBillableEventsMeterRepository.create();
   for (const event of events) {
@@ -53,7 +53,7 @@ async function meterWith(
         organizationId: ORGANIZATION_ID,
         tenantId: event.projectId,
         eventId: event.key,
-        eventType: "span",
+        eventType: event.eventType ?? "lw.obs.trace.span_received",
         deduplicationKey: event.key,
         eventTimestamp: Temporal.Instant.from(event.at).epochMilliseconds,
       },
@@ -118,6 +118,7 @@ describe("UsageMonthBreakdownService", () => {
 
   describe("given an organization metered in traces", () => {
     /** @scenario "A trace-metered organization gets no daily series" */
+    /** @scenario "A trace-metered organization gets no breakdown by kind" */
     it("answers no daily series and still each project's count", async () => {
       const meter = await meterWith([]);
       const service = UsageMonthBreakdownService.create({
@@ -135,6 +136,8 @@ describe("UsageMonthBreakdownService", () => {
 
       expect(breakdown.days).toBeNull();
       expect(breakdown.isDailyUnavailable).toBe(false);
+      expect(breakdown.byCategory).toBeNull();
+      expect(breakdown.isByCategoryUnavailable).toBe(false);
       expect(breakdown.projects).toEqual([
         { projectId: "project_triage", name: "triage", count: 12 },
       ]);
@@ -164,6 +167,7 @@ describe("UsageMonthBreakdownService", () => {
           countByDay: async () => {
             throw new Error("ClickHouse is unreachable");
           },
+          countByType: (input) => meter.countByType(input),
         },
         tenancy: tenancyWith(),
         now: () => NOW,
@@ -215,7 +219,75 @@ describe("UsageMonthBreakdownService", () => {
         days: null,
         isDailyUnavailable: true,
         projects: null,
+        byCategory: null,
+        isByCategoryUnavailable: true,
       });
+    });
+
+    /** @scenario "The breakdown by kind is marked unavailable when its read fails" */
+    it("answers no breakdown by kind when the per-kind meter fails, and keeps the rest", async () => {
+      const meter = await meterWith(EVENTS);
+      const service = UsageMonthBreakdownService.create({
+        counter: counterOver({ meter, usageUnit: "events" }),
+        meter: {
+          countByDay: (input) => meter.countByDay(input),
+          countByType: async () => {
+            throw new Error("ClickHouse is unreachable");
+          },
+        },
+        tenancy: tenancyWith(),
+        now: () => NOW,
+      });
+
+      const breakdown = await service.getMonthBreakdown({ organizationId: ORGANIZATION_ID });
+
+      expect(breakdown.byCategory).toBeNull();
+      expect(breakdown.isByCategoryUnavailable).toBe(true);
+      expect(breakdown.days).toHaveLength(30);
+      expect(breakdown.isDailyUnavailable).toBe(false);
+      expect(breakdown.projects).toHaveLength(2);
+    });
+  });
+
+  describe("given an events-metered organization with every kind of event", () => {
+    /** @scenario "The month breakdown counts an events-metered organization's month by kind" */
+    it("answers every kind in the page's order, zero for a kind with none", async () => {
+      const meter = await meterWith(
+        [
+          { type: "lw.obs.trace.span_received", key: "s1" },
+          { type: "lw.obs.trace.span_received", key: "s2" },
+          { type: "lw.obs.log.record_received", key: "l1" },
+          { type: "lw.obs.metric.data_point_received", key: "m1" },
+          { type: "lw.obs.metric.data_point_received", key: "m1" },
+          { type: "lw.experiment_run.started", key: "e1" },
+          { type: "lw.experiment_run.target_result", key: "e2" },
+          { type: "lw.experiment_run.evaluator_result", key: "e3" },
+          { type: "lw.simulation_run.message_snapshot", key: "x1" },
+        ].map(({ type, key }) => ({
+          projectId: "project_support",
+          at: "2026-11-02T10:00:00Z",
+          key,
+          eventType: type,
+        })),
+      );
+      const service = UsageMonthBreakdownService.create({
+        counter: counterOver({ meter, usageUnit: "events" }),
+        meter,
+        tenancy: tenancyWith(),
+        now: () => NOW,
+      });
+
+      const breakdown = await service.getMonthBreakdown({ organizationId: ORGANIZATION_ID });
+
+      expect(breakdown.isByCategoryUnavailable).toBe(false);
+      expect(breakdown.byCategory).toEqual([
+        { category: "spans", count: 2 },
+        { category: "logs", count: 1 },
+        { category: "metrics", count: 1 },
+        { category: "evaluations", count: 0 },
+        { category: "experiments", count: 3 },
+        { category: "scenarios", count: 1 },
+      ]);
     });
   });
 });

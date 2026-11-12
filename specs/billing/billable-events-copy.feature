@@ -8,38 +8,36 @@ Feature: What we tell customers is billable matches what we bill
   # Cross-references:
   #   modules/entitlement: the orgBillableEventsMeter projection, the meter and the
   #     only authority on what is billable.
-  #   docs/pricing/billable-events.mdx — the full list.
-  #   docs/pricing.mdx — the short answer, and the FAQ version of it.
+  #   docs/pricing/billable-events.mdx: the full list.
+  #   docs/pricing.mdx: the short answer, and the FAQ version of it.
   #
-  # Context. The meter subscribes to seven event types across four families:
-  # spans, evaluations, experiment runs and simulation runs. The full list page
-  # names all seven. The short answers did not: the Events section offered "a
-  # span within a trace, or a scenario or evaluation run", which drops
-  # experiments, and the pricing FAQ offered "a span within a trace or a
-  # scenario run", which drops evaluations and experiments too.
+  # Context. The meter subscribes to nine event types across six families:
+  # spans, log records, metric data points, evaluations, experiment runs and
+  # simulation runs. The full list page names all nine. A log record counts
+  # once; a metric series counts once per UTC hour in which it sent a point.
   #
   # A reader who only sees the short answer plans around spans. An experiment
   # sweep over 100 rows with 2 evaluators is roughly 301 events, so the omitted
   # families are not a rounding error on the bill.
   #
   # The short answer is not the full list and should not become it. It names
-  # the four families in the customer's own words; the counting rules, the
+  # the families in the customer's own words; the counting rules, the
   # per-family arithmetic and the never-billed list stay one click away.
 
   Rule: The short answer names every family the meter bills
 
     @unit
-    Scenario: The Events section covers all four billable families
-      Given the meter bills spans, evaluations, experiments and simulations
+    Scenario: The Events section covers every billable family
+      Given the meter bills spans, logs, metrics, evaluations, experiments and simulations
       When someone reads the short definition on the pricing page
-      Then it names all four in plain language
+      Then it names all six in plain language
       And it points at the full list for the counting rules
 
     @unit
-    Scenario: The pricing FAQ answer covers all four billable families
+    Scenario: The pricing FAQ answer covers every billable family
       Given a reader who only opens the FAQ accordion
       When they read what counts as a billable event
-      Then it names all four families rather than spans and scenarios alone
+      Then it names all six families rather than spans and scenarios alone
 
   Rule: The full list stays exactly the meter's list
 
@@ -54,3 +52,10 @@ Feature: What we tell customers is billable matches what we bill
       Given the documentation names event types customers are charged for
       Then each one is a type the meter actually subscribes to
       And a type removed from the meter stops being advertised as billable
+
+    @unit
+    Scenario: The documented list explains how logs and metrics are counted
+      Given the meter bills one event per log record and one per metric series per UTC hour
+      When someone reads the billable-events documentation
+      Then it says a log record counts once
+      And it says a metric series counts once per hour and what a series is

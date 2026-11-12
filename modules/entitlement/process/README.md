@@ -6,7 +6,7 @@ The server half of [entitlement](../README.md). What a plan allows, and what has
 
 ## Installation
 
-`defineProcessModule("entitlement").withRepositories(entitlementRepositories).withApi(EntitlementModule).withTransports(planTrpcTransport, usageLimitsTrpcTransport, organizationSpendTrpcTransport).withEventing(entitlementUsageWarningEventing).withEventing(usageEventing)`, `src/entitlement.module.ts:17`.
+`defineProcessModule("entitlement").withRepositories(entitlementRepositories).withApi(EntitlementModule).withTransports(planTrpcTransport, usageLimitsTrpcTransport, organizationSpendTrpcTransport).withEventing(entitlementUsageWarningEventing).withEventing(usageEventing).withMigrations(…)`, `src/entitlement.module.ts:22`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -131,7 +131,7 @@ type Output = z.infer<typeof usageStatsSchema>; // ../contract/src/usage.ts:89
 
 // limits.getMonthBreakdown
 type Input = z.infer<typeof entitlementOrganizationScopeSchema>; // ../contract/src/entitlement.schemas.ts:17
-type Output = z.infer<typeof usageMonthBreakdownSchema>; // ../contract/src/usage.ts:125
+type Output = z.infer<typeof usageMonthBreakdownSchema>; // ../contract/src/usage.ts:151
 
 // limits.checkAndSendUsageLimitNotification
 // Input: sendUsageLimitWarningInputSchema, ../contract/src/entitlement.schemas.ts:43

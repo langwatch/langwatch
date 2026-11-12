@@ -2,7 +2,7 @@
 title: What counts as a billable event
 description: "The complete list of events LangWatch Cloud bills for, what is never billed, and how deduplication works"
 sidebarTitle: Billable events
-keywords: billable event, events, pricing, span, evaluation, experiment, simulation, metering, deduplication
+keywords: billable event, events, pricing, span, log, metric, evaluation, experiment, simulation, metering, deduplication
 ---
 
 LangWatch Cloud bills on **ingested events per billing period**. The list below is complete, so you can predict a bill from your own workload rather than from a sample.
@@ -19,6 +19,8 @@ These are the only events that increment your count. Everything else the platfor
 | What you did                                                                                                                  | Billable event                       | Counted                   |
 | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | ------------------------- |
 | Your app, or a coding assistant you track, sent a span (an LLM call, tool call, retrieval step, or any other step in a trace) | `lw.obs.trace.span_received`         | One per span              |
+| Your app sent an OpenTelemetry log record                                                                                     | `lw.obs.log.record_received`         | One per log record        |
+| Your app sent an OpenTelemetry metric data point                                                                              | `lw.obs.metric.data_point_received`  | One per series per hour   |
 | An evaluation produced a result                                                                                               | `lw.evaluation.reported`             | One per evaluation result |
 | An experiment run started                                                                                                     | `lw.experiment_run.started`          | One per run               |
 | An experiment recorded a target's output                                                                                      | `lw.experiment_run.target_result`    | One per target result     |
@@ -27,6 +29,12 @@ These are the only events that increment your count. Everything else the platfor
 | A simulation recorded a conversation snapshot                                                                                 | `lw.simulation_run.message_snapshot` | One per snapshot          |
 
 Spans dominate the count whenever your app sends traces. A single trace of an agent turn typically contains several spans, one per step.
+
+### Reading the cost of logs and metrics
+
+Each log record counts as one event, however it reaches LangWatch.
+
+Metrics count per series, not per data point. A series is one metric name with one set of attribute values, for example `http.server.duration` with `route=/chat` and `status=200`. A series counts one event for each UTC clock hour in which it sent at least one point, however many points it sent in that hour. A counter exported every 10 seconds is one event an hour, so about 720 events in a 30-day month. The same metric with a second `route` value is a second series and counts separately.
 
 ### Reading an experiment's cost
 

@@ -19,6 +19,8 @@ export interface TableTTLEntry {
   retentionTTLColumn?: string;
   /** Override for the retention TTL column expression (e.g. for UInt64 epoch ms). */
   retentionTTLColumnExpression?: string;
+  /** Fixed platform DELETE on the cold-storage anchor, for tables outside customer retention. */
+  deleteAfterMonths?: number;
 }
 
 /**
@@ -31,6 +33,8 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     ttlColumn: "EventTimestamp",
     envVar: "CLICKHOUSE_COLD_STORAGE_BILLABLE_EVENTS_TTL_DAYS",
     hardcodedDefault: 49,
+    // The usage meter reads only the current and previous billing month (migration 00128).
+    deleteAfterMonths: 13,
   },
   {
     table: "dspy_steps",
@@ -338,21 +342,42 @@ export function hasRetentionTTL(engineFull: string): boolean {
   return engineFull.includes("_retention_days");
 }
 
-/** Whether this table should get the retention-only TTL rewrite (no cold storage). */
-function isRetentionOnlyEligible({
-  retentionTTLExpr,
+export function buildFixedDeleteTTLExpression(config: TableTTLEntry): string | null {
+  if (config.deleteAfterMonths === undefined) return null;
+  const colExpr = config.ttlColumnExpression ?? `toDateTime(${config.ttlColumn})`;
+  return `${colExpr} + INTERVAL ${config.deleteAfterMonths} MONTH DELETE`;
+}
+
+/** ClickHouse stores `INTERVAL n MONTH` as `toIntervalMonth(n)` and drops the implicit DELETE. */
+export function hasFixedDeleteTTL({
+  config,
+  engineFull,
+}: {
+  config: TableTTLEntry;
+  engineFull: string;
+}): boolean {
+  if (config.deleteAfterMonths === undefined) return true;
+  return engineFull.includes(`toIntervalMonth(${config.deleteAfterMonths})`);
+}
+
+/** The DELETE clauses a table must keep through every MODIFY TTL, and whether one is missing. */
+function deleteClauses({
   tableConfig,
   engineFull,
   managedTables,
 }: {
-  retentionTTLExpr: string | null;
   tableConfig: TableTTLEntry;
   engineFull: string;
   managedTables: readonly string[];
-}): boolean {
-  if (!retentionTTLExpr) return false;
-  if (!managedTables.includes(tableConfig.table)) return false;
-  return !hasRetentionTTL(engineFull);
+}): { clauses: string[]; missing: boolean } {
+  const retention = managedTables.includes(tableConfig.table)
+    ? buildRetentionTTLExpression(tableConfig)
+    : null;
+  const fixedDelete = buildFixedDeleteTTLExpression(tableConfig);
+  const missing =
+    (retention !== null && !hasRetentionTTL(engineFull)) ||
+    !hasFixedDeleteTTL({ config: tableConfig, engineFull });
+  return { clauses: [retention, fixedDelete].filter((c): c is string => c !== null), missing };
 }
 
 interface ReconcileOptions {
@@ -392,7 +417,7 @@ type TableTTLPlan = Readonly<{
 
 /**
  * TTL volume routing (`TO VOLUME 'cold'`) only works on tiered-storage tables. A table on another
- * policy, or any table while cold-storage management is off, still gets its retention DELETE TTL.
+ * policy, or any table while cold-storage management is off, still gets its DELETE clauses.
  */
 function planRetentionOnlyTTL({
   tableConfig,
@@ -403,20 +428,16 @@ function planRetentionOnlyTTL({
   tableInfo: TableEngineInfo;
   managedTables: readonly string[];
 }): TableTTLPlan {
-  const retentionTTLExpr = buildRetentionTTLExpression(tableConfig);
   const table = tableConfig.table;
-  if (
-    retentionTTLExpr &&
-    isRetentionOnlyEligible({
-      retentionTTLExpr,
-      tableConfig,
-      engineFull: tableInfo.engine_full,
-      managedTables,
-    })
-  ) {
+  const { clauses, missing } = deleteClauses({
+    tableConfig,
+    engineFull: tableInfo.engine_full,
+    managedTables,
+  });
+  if (missing) {
     return {
       kind: "alter",
-      ttl: retentionTTLExpr,
+      ttl: clauses.join(",\n  "),
       level: "info",
       message: "Applying retention-only TTL (no cold storage)",
       context: { table },
@@ -432,8 +453,8 @@ function planRetentionOnlyTTL({
 }
 
 /**
- * MODIFY TTL replaces the whole expression atomically, so a table that carries the retention clause
- * always re-emits it, or a hot-days bump would silently drop its DELETE clause.
+ * MODIFY TTL replaces the whole expression atomically, so a table that carries DELETE clauses
+ * always re-emits them, or a hot-days bump would silently drop them.
  */
 function planTieredTTL({
   tableConfig,
@@ -449,11 +470,9 @@ function planTieredTTL({
   const table = tableConfig.table;
   const desiredDays = resolveHotDays(tableConfig, hotDayOverrides);
   const currentDays = parseTTLDaysFromEngineMetadata(engineFull);
-  const retentionTTLExpr = buildRetentionTTLExpression(tableConfig);
-  const retention = managedTables.includes(table) ? retentionTTLExpr : null;
-  const retentionMissing = retention !== null && !hasRetentionTTL(engineFull);
+  const deletes = deleteClauses({ tableConfig, engineFull, managedTables });
 
-  if (!shouldRewriteTTL({ currentDays, desiredDays, engineFull }) && !retentionMissing) {
+  if (!shouldRewriteTTL({ currentDays, desiredDays, engineFull }) && !deletes.missing) {
     return {
       kind: "skip",
       ttl: "",
@@ -466,10 +485,10 @@ function planTieredTTL({
   const coldTTLExpr = buildDesiredTTLExpression({ config: tableConfig, days: desiredDays });
   return {
     kind: "alter",
-    ttl: [coldTTLExpr, retention].filter(Boolean).join(",\n  "),
+    ttl: [coldTTLExpr, ...deletes.clauses].join(",\n  "),
     level: "info",
     message: "Updating TTL",
-    context: { table, from: currentDays, to: desiredDays, retentionTTL: retention !== null },
+    context: { table, from: currentDays, to: desiredDays, deleteClauses: deletes.clauses.length },
   };
 }
 

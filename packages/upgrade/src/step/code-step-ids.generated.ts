@@ -19,6 +19,7 @@ export type CodeStepId =
   | "dataset:move-content-to-object-storage"
   | "dataset:fill-empty-slugs"
   | "dataset:create-first-versions"
+  | "entitlement:materialise-billable-events-ttl"
   | "evaluation:fill-id-indexes"
   | "evaluation:fill-second-id-indexes"
   | "evaluator:backfill-versions"

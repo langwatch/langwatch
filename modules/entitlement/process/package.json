@@ -31,6 +31,8 @@
     "@langwatch/evaluation-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/log-contract": "workspace:*",
+    "@langwatch/metric-contract": "workspace:*",
     "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
@@ -41,6 +43,7 @@
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/upgrade": "workspace:*",
     "@trpc/server": "catalog:",
     "zod": "catalog:"
   },

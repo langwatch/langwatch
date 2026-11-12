@@ -15,6 +15,7 @@ import { createLogger } from "@langwatch/observability";
 import { applyOtlpReceiverPolicy, parseOtlpLogs, parseOtlpTraces } from "@langwatch/otlp";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
+import type { TraceApi } from "@langwatch/trace-contract";
 import type {
   IExportLogsServiceRequest,
   IExportMetricsServiceRequest,
@@ -152,6 +153,8 @@ export type GovernanceIngestReceiverMembers = Readonly<{
   logCollection: GovernanceIngestLogCollectionChannel;
   /** The metric pipeline. */
   metricCollection: GovernanceIngestMetricCollectionChannel;
+  /** The plan's monthly allowance, the one the OTLP receivers ask before they ingest. */
+  allowance: Pick<TraceApi, "otlpUsageLimit">;
   /** The spend ledger a cost event is priced into. */
   spend: GovernanceIngestSpend;
   /**
@@ -203,6 +206,9 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
     const { source } = batch;
 
     if (!OTLP_SOURCE_TYPES.has(source.sourceType)) return { outcome: "wrong-endpoint" };
+
+    // Outside the guard below, which acknowledges every throw: the plan limit must reach the caller.
+    await this.landing.assertWithinAllowance(source);
 
     let bodyBytes = 0;
     let eventCount = 0;
@@ -283,6 +289,8 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
 
     if (!WEBHOOK_SOURCE_TYPES.has(source.sourceType)) return { outcome: "wrong-endpoint" };
 
+    await this.landing.assertWithinAllowance(source);
+
     const bodyBytes = input.body.length;
     const envelopeId = `envelope-${nowInstant().epochMilliseconds}-${Math.random().toString(36).slice(2, 10)}`;
     let handoffOk = false;
@@ -330,6 +338,8 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
    */
   async receiveLogs(batch: GovernanceIngestBatch): Promise<GovernanceIngestLogReceipt> {
     const { source } = batch;
+
+    await this.landing.assertWithinAllowance(source);
 
     let bodyBytes = 0;
     let logRecordCount = 0;

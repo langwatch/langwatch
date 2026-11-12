@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   breakdownGapMessage,
+  categoryRows,
   dailyBars,
   chartAxis,
   fullSeats,
@@ -198,5 +199,43 @@ describe("breakdownGapMessage", () => {
       /^The month by project /,
     );
     expect(breakdownGapMessage({ ...ok, isError: true })).toMatch(/by day and by project/);
+    expect(breakdownGapMessage({ ...ok, isByCategoryUnavailable: true })).toMatch(
+      /^The month by type /,
+    );
+  });
+
+  it("lists every failed part in page order", () => {
+    expect(
+      breakdownGapMessage({
+        isError: false,
+        isDailyUnavailable: true,
+        isByCategoryUnavailable: true,
+        isProjectsUnavailable: true,
+      }),
+    ).toMatch(/^The month by day, by type and by project could not be loaded\./);
+    expect(
+      breakdownGapMessage({ ...ok, isDailyUnavailable: true, isProjectsUnavailable: true }),
+    ).toMatch(/^The month by day and by project could not be loaded\./);
+  });
+});
+
+describe("categoryRows", () => {
+  it("labels each type, explains metrics and gives each its share", () => {
+    const rows = categoryRows([
+      { category: "spans", count: 3 },
+      { category: "metrics", count: 1 },
+      { category: "scenarios", count: 0 },
+    ]);
+    expect(rows).toEqual([
+      { category: "spans", label: "Spans", hint: null, count: 3, share: 0.75 },
+      {
+        category: "metrics",
+        label: "Metrics",
+        hint: "1 per series per hour",
+        count: 1,
+        share: 0.25,
+      },
+      { category: "scenarios", label: "Scenarios", hint: null, count: 0, share: 0 },
+    ]);
   });
 });
