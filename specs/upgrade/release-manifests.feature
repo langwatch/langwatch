@@ -58,7 +58,7 @@ Feature: Release manifests order every migration step release by release
     Given an image tree with two goose files that share a numeric prefix
     When the upgrade runs
     Then the run is recorded as failed, naming the shared step id and both files
-    And no step is registered on the ledger and nothing is applied
+    And none of the image's steps is registered and nothing is applied
 
   @unit
   Scenario: A step id two goose files share is found with every file behind it
