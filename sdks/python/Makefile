@@ -102,11 +102,13 @@ OPENAPI_PYTHON_CLIENT_VERSION := 0.28.4
 # committed; CI regenerates it and fails on a diff (the `openapi-clients` job).
 API_SPEC = ../../specs/api-reference/openapi-document.json
 
+# Generate into .tmp first and replace the committed client only once the
+# generator has produced one. Deleting it up front left the SDK with no
+# client (about 4,000 files) whenever the generator could not run.
 generate/api-client:
 	@cd ../.. && pnpm --filter @langwatch/platform-api run openapi:generate
-	@echo "Deleting old API client..."
-	@rm -rf src/langwatch/generated/langwatch_rest_api_client
 	@echo "Building API client..."
+	@rm -rf .tmp/api-client
 	@mkdir -p .tmp/api-client
 	@python3 scripts/spec-for-python-generator.py \
 		$(API_SPEC) \
@@ -116,9 +118,12 @@ generate/api-client:
 		--output-path .tmp/api-client \
 		--custom-template-path openapi-templates \
 		--overwrite
-	@echo "Copying necessary files to SDK..."
-	@mkdir -p src/langwatch/generated/langwatch_rest_api_client
-	@cp -R .tmp/api-client/lang_watch_api_client/. src/langwatch/generated/langwatch_rest_api_client/
+	@test -d .tmp/api-client/lang_watch_api_client || { echo "The generator produced no client; keeping the committed one."; exit 1; }
+	@echo "Replacing the old API client..."
+	@rm -rf src/langwatch/generated/langwatch_rest_api_client.new
+	@cp -R .tmp/api-client/lang_watch_api_client src/langwatch/generated/langwatch_rest_api_client.new
+	@rm -rf src/langwatch/generated/langwatch_rest_api_client
+	@mv src/langwatch/generated/langwatch_rest_api_client.new src/langwatch/generated/langwatch_rest_api_client
 	@echo "Cleaning up..."
 	@rm -rf .tmp/api-client .tmp/openapiLangWatch.python.json
 	@echo "Done! API client has been integrated into the SDK."
