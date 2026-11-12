@@ -60,6 +60,12 @@ const catalogShapes = LangWatchQLCatalogShapesService.create();
 /** A column no view exposes, so the grant must make it unreachable. */
 const OFF_CATALOG_COLUMN = "ProjectionId";
 
+/**
+ * Views read plainly over a superseding engine, because their writer appends each key once:
+ * SpanAnalyticsStore looks a span's key up first (ADR-034 amendment, 2026-11-12).
+ */
+const WRITTEN_ONCE_OVER_REPLACING: ReadonlySet<string> = new Set(["span_metrics"]);
+
 /** The eight expression positions the content-gating policy enumerates. */
 const GATED_COLUMN_POSITIONS = (database: string) =>
   [
@@ -285,10 +291,15 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
         source!.engine.includes("AggregatingMergeTree"),
         `${view.name} declares aggregating=${String(Boolean(view.dedup.aggregating))} over ${source!.engine}`,
       ).toBe(Boolean(view.dedup.aggregating));
+      const writtenOnce = WRITTEN_ONCE_OVER_REPLACING.has(view.name);
+      if (writtenOnce) {
+        expect(view.dedup.strategy, `${view.name} is read plainly`).toBe("none");
+        expect(view.dedup.versionColumn, `${view.name} is read plainly`).toBeUndefined();
+      }
       expect(
         source!.engine.includes("ReplacingMergeTree"),
         `${view.name} declares versionColumn=${String(view.dedup.versionColumn)} over ${source!.engine}`,
-      ).toBe(view.dedup.versionColumn !== undefined);
+      ).toBe(view.dedup.versionColumn !== undefined || writtenOnce);
 
       // And the *named* version column is the engine's own, which is the trap
       // `stored_spans` sets: it supersedes on `StartTime`, not `UpdatedAt`.

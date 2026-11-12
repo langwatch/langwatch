@@ -18,3 +18,13 @@ export function gatheredRows({ sql, columns }: { sql: string; columns: string[] 
     )) AS gathered
   )`;
 }
+
+/**
+ * The rows a scalar `gather` (a `SELECT groupArray(tuple(...))`) returns, unfolded by a select
+ * with no FROM: one query level fewer than `gatheredRows`, for a query near the nesting ceiling.
+ * The select also returns the `gathered` tuple, so it feeds a FROM, never an IN.
+ */
+export function unfoldedRows({ gather, columns }: { gather: string; columns: string[] }): string {
+  const picked = columns.map((column, index) => `gathered.${index + 1} AS ${column}`).join(", ");
+  return `SELECT arrayJoin((${gather})) AS gathered, ${picked}`;
+}

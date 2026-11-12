@@ -55,9 +55,12 @@ new MATERIALIZED column.
    content, not even a hash of it (#6856). `ErrorType` falls back from `exception.type` to
    `error.type`; `InputHash` is the first 8 bytes of the input's SHA-256, and 0 for a span with no
    input. The stock span widgets read `span_metrics`. Their presence checks still read `spans`,
-   since they look back 90 days, and so do the loop widgets, which compare `CapturedInput`, and
-   the step latency and voice call health, which read no map and ran out of memory on
-   `span_metrics` alone.
+   since they look back 90 days, and so do the loop widgets, which compare `CapturedInput`.
+   `span_metrics` reads `span_analytics` with no dedup (`strategy: "none"`): the map projection
+   writes each span once and a span's facts never change. Duplicates are rare (the ADR-034
+   amendment residuals), and a read counts them. Under the production pin (compatibility 25.10,
+   which turns `optimize_limit_by_in_order` off) a `LIMIT 1 BY` here held every span key of the
+   period and ran 11 stock widgets out of memory in under 3 seconds.
 6. **History by replay, not by mutation.** Two `defineProjectionReplayStep` steps, one per lane
    (`traceAnalytics`, `spanAnalytics`), replay the last 62 days (the longest stock period plus two)
    after old writers are gone. No goose file starts a mutation; the 00128 fill steps are gone.

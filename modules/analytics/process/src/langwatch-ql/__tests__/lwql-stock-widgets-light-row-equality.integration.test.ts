@@ -693,6 +693,9 @@ describe("given traces, spans and evaluations of each source that the stock quer
   it("counts a trace moved into the period in the queries dated inside the window", async () => {
     await moveAnchor({ trace: "before1", day: 0.5 });
 
-    expect((await differing(["application"])).toSorted()).toEqual(IN_WINDOW_DATED);
+    // `differing` skips the queries on the trace evaluations; the other suite moves a trace in.
+    expect((await differing(["application"])).toSorted()).toEqual(
+      IN_WINDOW_DATED.filter((label) => !ON_TRACE_EVALUATIONS.has(label)),
+    );
   });
 });

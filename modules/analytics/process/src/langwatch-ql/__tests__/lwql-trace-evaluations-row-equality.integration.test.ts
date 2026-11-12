@@ -248,10 +248,13 @@ const check = (trace: string, name: string, passed: boolean, n = 0): EvaluationS
   passed,
 });
 
-/** Reviewer checks on the thumbed traces: ten application ones, so agreement shows a row. */
+/** Reviewer checks on the thumbed traces: ten per source, the least agreement shows a row for. */
 const REVIEWED = ["a1", "a2", "a3", "a4", "c1", "l1"];
+const reviewerChecksOn = (trace: string) => (traceOf(trace).origin === "langy" ? 10 : 2);
 const REVIEWER_CHECKS = REVIEWED.flatMap((trace, index) =>
-  [0, 1].map((n) => check(trace, "Reviewer Check", (index + n) % 2 === 0, n)),
+  Array.from({ length: reviewerChecksOn(trace) }, (_, n) =>
+    check(trace, "Reviewer Check", (index + n) % 2 === 0, n),
+  ),
 );
 
 /** Each evaluation's first state. */
@@ -580,9 +583,9 @@ describe("given trace evaluations with unmerged retraction pairs beside main's f
       for (const { label, sql: before } of BEFORE) {
         const now = await run({ sql: sent(label), list });
         const moved = await run({ sql: before, list });
-        expect(now.error, `${label} now under ${list}`).toBeUndefined();
-        expect(moved.error, `${label} before the move under ${list}`).toBeUndefined();
-        if (now.rows !== moved.rows) differing.push(`${label} under ${list}`);
+        expect(now.error, `${label} now under ${list.join(", ")}`).toBeUndefined();
+        expect(moved.error, `${label} before the move under ${list.join(", ")}`).toBeUndefined();
+        if (now.rows !== moved.rows) differing.push(`${label} under ${list.join(", ")}`);
       }
     }
     expect(differing).toEqual([]);
@@ -682,7 +685,7 @@ describe("given trace evaluations with unmerged retraction pairs beside main's f
   it.each(EACH_MOVED_QUERY)("seeds rows for $label under $list", async ({ label, list }) => {
     const { count, error } = await run({ sql: sent(label), list });
     expect(error).toBeUndefined();
-    expect(count, `${label} under ${list}`).toBeGreaterThan(0);
+    expect(count, `${label} under ${list.join(", ")}`).toBeGreaterThan(0);
   });
 
   /** @scenario "An unmerged retraction pair counts the evaluation once, at its latest outcome" */

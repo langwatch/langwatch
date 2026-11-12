@@ -146,3 +146,24 @@ Shipped on branch `feat/event-sourced-graph-triggers` as a stack of phase-scoped
 - **Scenarios / experiments / suites** were originally built write-side only (Phase 7) and then **pulled back** during the 2026-07-07 stack review — see the Scope note under Shared fleet. Re-add each aggregate when a real consumer names its columns.
 - **UI**: dashboard "Add alert" + the `/analytics/custom` page repoint at the automations drawer pre-filled with `prefilledGraphId` + `prefilledSeriesName` (Phase 5.2 + 8). The legacy `AlertDrawer.tsx` was verified unreachable and **deleted** in the housekeeping pass at the end of the stack. Automations drawer disables non-notify action cards when source = customGraph (server-side validation rejects them too).
 - **Alert template data is graph-shaped, not trace-shaped**: `GraphAlertTemplateContext` carries the metric's recent numeric `history` (the buckets the threshold read — no extra query), a prebuilt `sparkline`, `previousValue` (preceding window, same aggregation), and a `graph.url` deep link pinned to the incident window. Preview, variable autocomplete, and test-fire render the same alert shape (`buildExampleGraphAlertTemplateContext` + `ALERT_TRIGGER_DEFAULTS`) so what the author sees matches what dispatch sends. Rendering the history as a PNG chart attachment was considered and deferred — it needs image hosting for Slack and CID inlining for email; `history` keeps that door open.
+
+## Amendment (2026-11-12): span_analytics is written once, at write time
+
+Owner decisions, 2026-11-12: "Re-sent spans: first copy wins." and "event projections are the architecture we use. Also, just don't use final."
+
+For `span_analytics`, this replaces the 2026-10-12 accepted-noise decision above (the rare double count from a re-run job). The stock span widgets read it with no `FINAL` and no `LIMIT 1 BY` (a read-time dedup exceeds 1 GB at 30 days), so a duplicate row would reach the widgets directly.
+
+- `SpanAnalyticsStore.bulkAppend` (the live map path and the replay path both call it) keeps the first row per `(TenantId, TraceId, SpanId)` within the batch. One dispatch carries up to 256 same-lane events and a replay chunk 5000, so a re-sent span and its original can share a batch and both miss the lookup.
+- The remaining rows are sorted by StartTime and sliced by 256. Each slice makes one `existingSpanKeys` point lookup on `span_analytics` bounded by `StartTime` from the slice minimum minus 7 days to the slice maximum plus 7 days, skips the spans found and inserts the rest in one insert. The bound keeps the lookup to a few weekly partitions. Measured on ClickHouse 26.8.36.3 (compatibility 25.10), 85M spans over 60 days, replay chunks of 5000 in 256-span slices: per-slice p95 127 to 160 ms with the 7-day margin, 47 ms with the slice bound alone.
+- First write wins. `stored_spans` keeps the latest copy under `FINAL`; `span_analytics` keeps the first.
+- A crash re-delivery of the same event carries the same StartTime, so it finds its own earlier row.
+- The replay path runs the same check. It is not free: replay pauses and drains the spanAnalytics lane per batch, so each 5000-span chunk lengthens each pause by about 20 slices × about 150 ms ≈ 3 s. The live-path cost (one ClickHouse read per dispatch before the insert) is unmeasured; replay slice p95 was 127 to 160 ms.
+
+Residuals, accepted:
+
+- Lagging replica: a copy not yet visible to the lookup (a lagging replica, an async insert not yet flushed) is written again. A lookup that errors fails the batch, so the queue retries it.
+- Redelivered job alongside the first run: delivery is at-least-once, so a job can run while its first run is still in flight; both can miss the lookup and both insert.
+- StartTime moved more than 7 days: a re-sent span outside the lookup bound is not found and is counted twice. This is the same gap main had: `FINAL` only collapsed copies inside one weekly partition (`toYearWeek(StartTime)`).
+- Backstop: within one weekly partition, `span_analytics` (`ReplacingMergeTree(ProjectedAt)`) merges residual duplicates and keeps the later copy. Parts merge only inside a partition, so the backstop does not reach across weeks.
+
+Consequence: `stored_spans` keeps the latest copy (read with `FINAL`) and `span_analytics` keeps the first. A re-sent span with a different cost can therefore differ between the stock widgets (span_analytics) and the trace view (stored_spans).

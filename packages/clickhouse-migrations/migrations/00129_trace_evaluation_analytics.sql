@@ -5,6 +5,7 @@
 -- (trace ADR-003). The traceAnalytics fold writes it: one live row per (TenantId, TraceId,
 -- EvaluationId); a change writes the old row again with Sign = -1 (same Revision) and the new
 -- row with Sign = +1 and the next Revision, so readers sum Sign and never need FINAL.
+-- A write that omits Sign defaults to 1 (live), so it is never silently dropped by the settled view.
 --
 -- trace_analytics gains the fold's evaluation outcomes (JSON) and the digest of the rows it last
 -- wrote, so its read-back skips the live-row read when nothing moved. Plain columns with a
@@ -45,7 +46,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.trace_evaluation_analytics
     MetadataFlow String DEFAULT '' CODEC(ZSTD(1)),
     MetadataSegment String DEFAULT '' CODEC(ZSTD(1)),
     MetadataPromptVersion String DEFAULT '' CODEC(ZSTD(1)),
-    Sign Int8,
+    Sign Int8 DEFAULT 1,
     Revision UInt64,
     _retention_days UInt16 DEFAULT 308 CODEC(Delta(2), ZSTD(1)),
     INDEX idx_trace_id TraceId TYPE bloom_filter(0.001) GRANULARITY 1

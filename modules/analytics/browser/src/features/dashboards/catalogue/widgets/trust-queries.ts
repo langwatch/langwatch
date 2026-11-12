@@ -78,31 +78,32 @@ export const HEALTH_FIELDS: readonly HealthField[] = [
 ];
 
 // Each field is a filter, never a column the result reads, so the completeness report does
-// not swap a missing field for a setup view: showing the gap is this widget's whole job. One
-// scan per view, one row per trace on its 128-bit hash holding a flag per field, then summed:
-// a set of ids per field ran out of memory over 60 days. A field no trace carries keeps its
-// row at 0; a period with no trace has no row, as before.
+// not swap a missing field for a setup view. One scan per view, a flag per field on each trace's
+// 128-bit hash, then summed: a set of ids per field ran out of memory over 60 days. The fields
+// unfold from a split string, as LangWatchQL allows no array literal. A field no trace carries
+// keeps its row at 0; a period with no trace has no row.
 const scan = ({ view, fields }: { view: string; fields: readonly Coverage[] }) => {
   const flagged = fields.filter(({ condition }) => condition);
-  const flags = flagged.map(({ key, condition }) => `max(${condition}) AS has_${key}`).join(",\n        ");
+  const flags = flagged
+    .map(({ key, condition }) => `max(${condition}) AS has_${key}`)
+    .join(",\n      ");
   const sums = flagged.map(({ key }) => `sum(has_${key}) AS has_${key}`).join(", ");
+  const keys = fields.map(({ key }) => key).join(",");
   const counts = fields
-    .map(({ key, condition }) => `('${key}', ${condition ? `has_${key}` : "traces"})`)
+    .map(({ key, condition }) => `field = '${key}', ${condition ? `has_${key}` : "total"}`)
     .join(", ");
-  return `SELECT counted.1 AS field, counted.2 AS traces
+  return `SELECT arrayJoin(splitByChar(',', '${keys}')) AS field,
+  multiIf(${counts}, 0) AS traces
 FROM (
-  SELECT arrayJoin([${counts}]) AS counted
+  SELECT count() AS total, ${sums}
   FROM (
-    SELECT count() AS traces, ${sums}
-    FROM (
-      SELECT sipHash128(TraceId) AS trace,
-        ${flags}
-      FROM ${view}
-      WHERE ${inPeriod("OccurredAt")}
-      GROUP BY trace
-    )
-    HAVING traces > 0
+    SELECT sipHash128(TraceId) AS trace,
+      ${flags}
+    FROM ${view}
+    WHERE ${inPeriod("OccurredAt")}
+    GROUP BY trace
   )
+  HAVING total > 0
 )`;
 };
 

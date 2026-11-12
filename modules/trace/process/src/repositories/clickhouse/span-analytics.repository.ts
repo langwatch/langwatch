@@ -1,12 +1,15 @@
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, toDate } from "@langwatch/time";
+import { z } from "zod";
 
 import type { SpanAnalyticsRow } from "../../eventing/span-analytics.projection.ts";
-import { SpanAnalyticsRepository } from "../span-analytics.repository.ts";
+import { type SpanAnalyticsKey, SpanAnalyticsRepository } from "../span-analytics.repository.ts";
 import type { TraceClickHouseWriteResolver } from "./clickhouse.trace-member-client.repository.ts";
 
 const TABLE_NAME = "span_analytics" as const;
+
+const spanKeysSchema = z.array(z.object({ TraceId: z.string(), SpanId: z.string() }));
 
 const logger = createLogger("langwatch:trace:span-analytics-repository");
 
@@ -101,7 +104,8 @@ export class SpanAnalyticsClickHouseRepository extends SpanAnalyticsRepository {
       }
     }
 
-    // The ReplacingMergeTree version: a later projection of the same span wins.
+    // The ReplacingMergeTree version. The store writes each span once (first copy wins);
+    // a residual duplicate merges to the later copy within its weekly partition.
     const projectedAt = toDate(nowInstant());
     try {
       const client = await this.options.resolveClient(tenantId);
@@ -119,6 +123,55 @@ export class SpanAnalyticsClickHouseRepository extends SpanAnalyticsRepository {
           error: error instanceof Error ? error.message : String(error),
         },
         "Failed to insert span_analytics rows into ClickHouse",
+      );
+      throw error;
+    }
+  }
+
+  async existingSpanKeys({
+    tenantId,
+    keys,
+    startTimeFromMs,
+    startTimeToMs,
+  }: {
+    tenantId: string;
+    keys: SpanAnalyticsKey[];
+    startTimeFromMs: number;
+    startTimeToMs: number;
+  }): Promise<SpanAnalyticsKey[]> {
+    if (keys.length === 0) return [];
+    EventUtils.validateTenantId({ tenantId }, "SpanAnalyticsClickHouseRepository.existingSpanKeys");
+    try {
+      const client = await this.options.resolveClient(tenantId);
+      // The StartTime bound keeps the lookup to the few weekly partitions the batch can sit in.
+      const result = await client.query({
+        query: `
+          SELECT TraceId, SpanId
+          FROM ${TABLE_NAME}
+          WHERE TenantId = {tenantId:String}
+            AND (TraceId, SpanId) IN arrayZip({traceIds:Array(String)}, {spanIds:Array(String)})
+            AND StartTime BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})
+        `,
+        query_params: {
+          tenantId,
+          traceIds: keys.map((key) => key.traceId),
+          spanIds: keys.map((key) => key.spanId),
+          fromMs: startTimeFromMs,
+          toMs: startTimeToMs,
+        },
+        format: "JSONEachRow",
+      });
+      return spanKeysSchema
+        .parse(await result.json())
+        .map((row) => ({ traceId: row.TraceId, spanId: row.SpanId }));
+    } catch (error) {
+      logger.warn(
+        {
+          tenantId,
+          count: keys.length,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Failed to look up existing span_analytics keys in ClickHouse",
       );
       throw error;
     }

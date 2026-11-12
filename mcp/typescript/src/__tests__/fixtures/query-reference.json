@@ -800,7 +800,7 @@
         {
           "name": "analytics.span_metrics",
           "description": "One row per span with its timing, status, cost and the LangWatch facts dashboards group by, and no attribute map. Holds spans from the span_analytics floor on.",
-          "grain": "one row per (TenantId, TraceId, SpanId), latest version only",
+          "grain": "one row per (TenantId, TraceId, SpanId)",
           "joinKeys": [
             "TenantId",
             "TraceId",

@@ -4,7 +4,7 @@
  * top-level span with nothing below it.
  */
 
-import { gatheredRows } from "../../templates/model/lwql-gathered.ts";
+import { unfoldedRows } from "../../templates/model/lwql-gathered.ts";
 import { bucketOf, END, inPeriod, MIDPOINT, START } from "../../templates/model/lwql-period.ts";
 
 // Typed span columns, never the SpanAttributes map, which runs out of memory on large projects.
@@ -111,9 +111,9 @@ const LOOP_CANDIDATES = `SELECT sipHash128(TraceId, SpanId)
 // Loops compare CapturedInput on the gated spans view: no analytics view holds input (#6856).
 // The candidate calls are gathered, input hashed, before any is grouped: grouped while the spans
 // view was still being read, the grouping spilled every block and ran out of memory.
-const LOOP_CALLS = gatheredRows({
-  sql: `SELECT TraceId, SpanName, sipHash128(CapturedInput) AS input, StartTime,
-        ifNull(Cost, 0) AS price, Cost IS NULL AS unpriced
+const LOOP_CALLS = unfoldedRows({
+  gather: `SELECT groupArray(tuple(TraceId, SpanName, sipHash128(CapturedInput), StartTime,
+        ifNull(Cost, 0), Cost IS NULL))
       FROM spans
       WHERE ${inPeriod("StartTime")}
         AND sipHash128(TraceId, SpanId) IN (
@@ -122,7 +122,7 @@ const LOOP_CALLS = gatheredRows({
   columns: ["TraceId", "SpanName", "input", "StartTime", "price", "unpriced"],
 });
 
-const LOOPS = `SELECT TraceId, min(StartTime) AS at, SpanName AS step,
+const LOOPS = `SELECT TraceId, min(StartTime) AS at, SpanName AS step, 1 AS looped,
     sum(price) - argMin(price, StartTime) AS cost,
     countIf(unpriced) AS uncosted
   FROM (${LOOP_CALLS})
@@ -136,7 +136,7 @@ const RETRY_PARTS = `TraceId, ifNull(ParentSpanId, ''), if(${SPAN_TYPE} = 'llm',
 const RETRY_GROUP = `sipHash128(${RETRY_PARTS})`;
 const RETRY_FILTER = `cityHash64(${RETRY_PARTS})`;
 
-const RETRIES = `SELECT trace AS TraceId, at, step, cost, uncosted
+const RETRIES = `SELECT trace AS TraceId, at, step, 0 AS looped, cost, uncosted
   FROM (
     SELECT any(TraceId) AS trace, minIf(StartTime, StatusCode = 2) AS at,
       anyIf(SpanName, StatusCode = 2) AS step,
@@ -156,14 +156,18 @@ const RETRIES = `SELECT trace AS TraceId, at, step, cost, uncosted
     HAVING countIf(StatusCode = 2) > 0 AND max(StartTime) > minIf(StartTime, StatusCode = 2)
   )`;
 
-const REPEAT_COLUMNS = ["TraceId", "at", "step", "cost", "uncosted"];
+const REPEAT_COLUMNS = ["TraceId", "at", "step", "looped", "cost", "uncosted"];
+
+const gatheredRepeats = (sql: string) =>
+  unfoldedRows({
+    gather: `SELECT groupArray(tuple(${REPEAT_COLUMNS.join(", ")})) FROM (${sql})`,
+    columns: REPEAT_COLUMNS,
+  });
 
 // Loops and retries are each gathered whole in turn, so their memory never adds up.
-const REPEATS = `SELECT TraceId, at, step, 1 AS looped, cost, uncosted
-  FROM (${gatheredRows({ sql: LOOPS, columns: REPEAT_COLUMNS })})
+const REPEATS = `${gatheredRepeats(LOOPS)}
   UNION ALL
-  SELECT TraceId, at, step, 0 AS looped, cost, uncosted
-  FROM (${gatheredRows({ sql: RETRIES, columns: REPEAT_COLUMNS })})`;
+  ${gatheredRepeats(RETRIES)}`;
 
 /** Looped and retried traces per bucket, and what the repeated calls cost. */
 export const REPEATS_BY_BUCKET_SQL = `SELECT ${bucketOf("at")} AS bucket,

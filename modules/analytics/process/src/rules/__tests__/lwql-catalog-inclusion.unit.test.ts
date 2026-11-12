@@ -280,10 +280,10 @@ describe("the LangWatchQL catalog is opt-in", () => {
     ];
 
     /** @scenario "The catalog view names match the pinned list" */
-    it("equals the pinned list of 131 views, in order", () => {
+    it("equals the pinned list of 133 views, in order", () => {
       const actual = LWQL_VIEW_CATALOG.map((view) => [view.name, view.sourceTable] as const);
       expect(actual).toEqual(PINNED_VIEWS);
-      expect(PINNED_VIEWS).toHaveLength(131);
+      expect(PINNED_VIEWS).toHaveLength(133);
     });
   });
 });

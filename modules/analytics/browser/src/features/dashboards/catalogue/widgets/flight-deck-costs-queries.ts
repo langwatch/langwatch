@@ -319,11 +319,11 @@ const GAPS_BY_TOPIC = `SELECT ${TOPIC} AS topic,
 
 /**
  * Per topic: conversations that ended and those that asked for something the agent cannot do,
- * with one such request and its trace. Most capability gaps first. The request's text is read
- * from `traces` for the shown traces only, so the primary key skips every other trace.
+ * with one such request and its trace, null when it has none. Most capability gaps first. The
+ * request's text is read from `traces` for the shown traces only.
  */
 export const CANNOT_SERVE_SQL = `SELECT g.topic AS topic, g.gaps AS gaps, g.closed AS closed,
-  x.input AS example, g.trace_id AS trace_id
+  x.input AS example, nullIf(g.trace_id, '') AS trace_id
 FROM (
   ${GAPS_BY_TOPIC}
 ) AS g

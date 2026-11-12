@@ -345,8 +345,6 @@ WHERE outcome != ''`;
 
 /** The clustered topic, else the app's, read from `trace_metrics` (tasks#1117). */
 const TOPIC = "coalesce(nullIf(p.TopicName, ''), nullIf(t.MetadataTopic, ''))";
-/** The same topic, read from the trace's columns on a `trace_evaluation_metrics` row. */
-const EVALUATION_TOPIC = "coalesce(nullIf(p.TopicName, ''), nullIf(e.MetadataTopic, ''))";
 
 const IN_PERIOD_WITH_TOPIC_FROM_TRACE_EVALUATIONS = tracesWithOutcome({
   window: inPeriod,
@@ -376,9 +374,9 @@ GROUP BY bucket, topic
 ORDER BY bucket`;
 
 /**
- * Checks exclude guardrails and the outcome judge: they say whether an answer was safe. Requests
- * count trace rows and checks count evaluations, each topped by its trace's columns, so the two
- * add up per topic with no join; outcomes come from the closed traces alone.
+ * Checks exclude guardrails and the outcome judge. Requests count trace rows and checks count
+ * evaluations, each topped by its trace's columns; outcomes come from the closed traces alone.
+ * Each side names topics once: a PostgreSQL-engine table lends a query two connections at most.
  */
 export const TOPIC_QUALITY_SQL = `SELECT r.topic AS topic,
   r.requests AS requests,
@@ -388,27 +386,26 @@ export const TOPIC_QUALITY_SQL = `SELECT r.topic AS topic,
   r.checks_passed AS checks_passed,
   r.checks_run AS checks_run
 FROM (
-  SELECT topic, sum(requests) AS requests, sum(checks_passed) AS checks_passed, sum(checks_run) AS checks_run
+  SELECT coalesce(nullIf(p.TopicName, ''), nullIf(u.meta_topic, '')) AS topic,
+    sum(u.requests) AS requests, sum(u.checks_passed) AS checks_passed, sum(u.checks_run) AS checks_run
   FROM (
-    SELECT ${TOPIC} AS topic,
+    SELECT ifNull(t.TopicId, '') AS topic_id, t.MetadataTopic AS meta_topic,
       count() AS requests, 0 AS checks_passed, 0 AS checks_run
     FROM trace_metrics AS t
-    LEFT JOIN topics AS p ON p.TopicId = t.TopicId
     WHERE ${inPeriod("t.OccurredAt")}
-      AND topic IS NOT NULL
-    GROUP BY topic
+    GROUP BY topic_id, meta_topic
     UNION ALL
-    SELECT ${EVALUATION_TOPIC} AS topic,
+    SELECT ifNull(e.TopicId, '') AS topic_id, e.MetadataTopic AS meta_topic,
       0 AS requests, countIf(e.Passed = 1) AS checks_passed, count() AS checks_run
     FROM trace_evaluation_metrics AS e
-    LEFT JOIN topics AS p ON p.TopicId = e.TopicId
     WHERE ${inPeriod("e.OccurredAt")} AND ${inPeriod("e.TraceOccurredAt")}
       AND e.Passed IS NOT NULL
       AND e.IsGuardrail = 0
       AND e.EvaluatorName != '${OUTCOME_JUDGE}'
-      AND topic IS NOT NULL
-    GROUP BY topic
-  )
+    GROUP BY topic_id, meta_topic
+  ) AS u
+  LEFT JOIN topics AS p ON p.TopicId = u.topic_id
+  WHERE topic IS NOT NULL
   GROUP BY topic
 ) AS r
 LEFT JOIN (
