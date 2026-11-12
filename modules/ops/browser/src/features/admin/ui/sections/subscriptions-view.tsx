@@ -39,6 +39,7 @@ interface AdminSubscription {
   lastPaymentFailedDate: string | null;
   maxMembers: number | null;
   maxMembersLite: number | null;
+  maxMembersDeveloper: number | null;
   maxTeams: number | null;
   maxProjects: number | null;
   maxWorkflows: number | null;
@@ -85,6 +86,7 @@ const LIMIT_FIELDS: {
 }[] = [
   { key: "maxMembers", label: "Max members", group: "Members" },
   { key: "maxMembersLite", label: "Max lite members", group: "Members" },
+  { key: "maxMembersDeveloper", label: "Max developer members", group: "Members" },
   { key: "maxTeams", label: "Max teams", group: "Members" },
 
   { key: "maxProjects", label: "Max projects", group: "Resources" },
@@ -257,6 +259,7 @@ function SeatRepairBadge({ subscription }: { subscription: AdminSubscription }) 
 type LimitKey =
   | "maxMembers"
   | "maxMembersLite"
+  | "maxMembersDeveloper"
   | "maxTeams"
   | "maxProjects"
   | "maxWorkflows"

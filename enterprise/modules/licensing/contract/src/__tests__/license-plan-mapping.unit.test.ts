@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_LIMIT, DEFAULT_MEMBERS_LITE, mapToPlanInfo } from "../index.ts";
+import {
+  DEFAULT_LIMIT,
+  DEFAULT_MEMBERS_DEVELOPER,
+  DEFAULT_MEMBERS_LITE,
+  mapToPlanInfo,
+} from "../index.ts";
 import type { LicenseData } from "../index.ts";
 
 describe("mapToPlanInfo", () => {
@@ -132,6 +137,20 @@ describe("mapToPlanInfo", () => {
     const result = mapToPlanInfo(oldLicenseData);
 
     expect(result.maxMembersLite).toBe(DEFAULT_MEMBERS_LITE);
+  });
+
+  /** @scenario A licence that states no Developer seats sells none */
+  it("allows no Developer seats when the licence states none", () => {
+    const result = mapToPlanInfo(createLicenseData());
+
+    expect(DEFAULT_MEMBERS_DEVELOPER).toBe(0);
+    expect(result.maxMembersDeveloper).toBe(0);
+  });
+
+  it("maps maxMembersDeveloper when provided", () => {
+    const result = mapToPlanInfo(createLicenseData({ maxMembersDeveloper: 6 }));
+
+    expect(result.maxMembersDeveloper).toBe(6);
   });
 
   it("maps usageUnit from license data", () => {

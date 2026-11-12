@@ -34,6 +34,8 @@ export const UNLIMITED = Number.MAX_SAFE_INTEGER;
 export const planLimitsSchema = z.object({
   members: planLimitSchema,
   membersLite: planLimitSchema,
+  /** Developer seats: paid per seat, so no plan gives them away. */
+  membersDeveloper: planLimitSchema,
   /** Metered volume per month, in the plan's own counting unit. */
   volume: planLimitSchema,
   /** Set only on seat-priced plans, where a seat is the thing sold. */
