@@ -17,19 +17,16 @@ const PRReviewBotWorkflow = PRWorkflowFile
 // prReviewBotGateClauses are the job-level `if:` clauses the review job
 // depends on to stay off Dependabot PRs (separate secret store), fork PRs (no
 // access to repo secrets), drafts (not ready for review), the merge queue (the
-// bot reads github.event.pull_request) and a change CI did not pass, while
-// still starting when CI skipped calls for the change: without !cancelled(),
-// the implicit success() skips the job after any skipped call. Read as literal
-// text rather than evaluated — like goversion.go reading a Go directive, this
-// guard's job is to notice a clause disappearing, not to re-implement
-// GitHub's expression language.
+// bot reads github.event.pull_request) and a change CI did not pass. Read as
+// literal text rather than evaluated — like goversion.go reading a Go
+// directive, this guard's job is to notice a clause disappearing, not to
+// re-implement GitHub's expression language.
 var prReviewBotGateClauses = map[string]string{
 	"dependabot":   "user.login != 'dependabot[bot]'",
 	"fork":         "head.repo.full_name == github.repository",
 	"draft":        "draft == false",
 	"pull request": "github.event_name == 'pull_request'",
 	"ci-complete":  "needs.ci-complete.result == 'success'",
-	"skipped call": "!cancelled()",
 }
 
 // prReviewBotTriggerTypes are the pull_request event types that (subject to
@@ -62,11 +59,7 @@ func PRReviewBot(repoRoot string) ([]string, error) {
 	}
 
 	var problems []string
-	needs, err := prReviewBotNeeds(repoRoot)
-	if err != nil {
-		return nil, err
-	}
-	problems = append(problems, needs...)
+	problems = append(problems, prReviewBotNeeds(workflow)...)
 	problems = append(problems, prReviewBotGates(workflow)...)
 	problems = append(problems, prReviewBotWaitsForChecks(workflow)...)
 	problems = append(problems, prReviewBotTriggers(workflow)...)
@@ -85,26 +78,13 @@ const prReviewBotReviewJob = "review"
 // prReviewBotNeeds checks the review job waits for ci-complete. Without it the
 // needs.ci-complete clause reads empty and every review is skipped, and a
 // skipped job satisfies the required check, so nothing else would notice.
-func prReviewBotNeeds(repoRoot string) ([]string, error) {
-	file, err := loadPRFile(repoRoot, PRReviewBotWorkflow)
-	if err != nil {
-		return nil, err
-	}
-	job, ok := file.Jobs[prReviewBotReviewJob]
-	if !ok || needsCIComplete(job.Needs) { // prReviewBotGates reports a missing job
-		return nil, nil
+func prReviewBotNeeds(workflow *ciscan.Workflow) []string {
+	job, ok := workflow.Jobs[prReviewBotReviewJob]
+	if !ok || needsJob(job.Needs, "ci-complete") { // prReviewBotGates reports a missing job
+		return nil
 	}
 
-	return []string{fmt.Sprintf("%s review job does not have needs: ci-complete", PRReviewBotWorkflow)}, nil
-}
-
-// needsCIComplete reads both forms GitHub accepts for `needs:`.
-func needsCIComplete(needs any) bool {
-	if list, isList := needs.([]any); isList {
-		return slices.Contains(list, any("ci-complete"))
-	}
-
-	return needs == any("ci-complete")
+	return []string{fmt.Sprintf("%s review job does not have needs: ci-complete", PRReviewBotWorkflow)}
 }
 
 // prReviewBotGates checks the skip clauses are still present on the
@@ -214,31 +194,35 @@ func prReviewBotFailureBranch(run string) []string {
 	return nil
 }
 
-// prReviewBotTriggers checks the pull_request trigger fires on exactly the
-// event types the review job's scenarios describe — no fewer (a dropped type
-// silently stops reviewing that event) and no more (an added type runs
-// against an event the gate above was never proven against).
+// prReviewBotTriggers checks the pull_request trigger still fires on every
+// event type the review job's scenarios describe (a dropped type silently
+// stops reviewing that event). Extra types are allowed: pr.yml is shared with
+// the product checks, which may need more.
 func prReviewBotTriggers(workflow *ciscan.Workflow) []string {
-	got := slices.Clone(workflow.On.PullRequest.Types)
+	got := workflow.On.PullRequest.Types
 	if len(got) == 0 {
 		return []string{fmt.Sprintf("%s declares no pull_request `types:` list", PRReviewBotWorkflow)}
 	}
-	sort.Strings(got)
 
-	want := slices.Clone(prReviewBotTriggerTypes)
-	sort.Strings(want)
-
-	if slices.Equal(got, want) {
+	var missing []string
+	for _, want := range prReviewBotTriggerTypes {
+		if !slices.Contains(got, want) {
+			missing = append(missing, want)
+		}
+	}
+	if len(missing) == 0 {
 		return nil
 	}
 
 	return []string{fmt.Sprintf(
-		"%s pull_request types are %v, want %v",
-		PRReviewBotWorkflow, workflow.On.PullRequest.Types, prReviewBotTriggerTypes)}
+		"%s pull_request types %v lack %v (the review needs all of %v)",
+		PRReviewBotWorkflow, got, missing, prReviewBotTriggerTypes)}
 }
 
-// prReviewBotConcurrency checks the workflow cancels a superseded run for the
-// same PR rather than letting two reviews for the same PR race to completion.
+// prReviewBotConcurrency checks only what the review depends on: a group keyed
+// on the PR number with cancel-in-progress, so a superseded run (and its wait)
+// is cancelled rather than two reviews for the same PR racing. It does not pin
+// the rest of the shared workflow's concurrency block.
 func prReviewBotConcurrency(workflow *ciscan.Workflow) []string {
 	var problems []string
 

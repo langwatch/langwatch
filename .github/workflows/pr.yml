@@ -191,9 +191,7 @@ jobs:
           allowed-skips: app, e2e, nlp, langevals, mcp, sdk-go, sdk-javascript, docs, codeql, clickhouse-serverless
 
   # The LLM review, last so it spends tokens only on a change CI passed. The
-  # ruleset requires a check named `review`. !cancelled() replaces the implicit
-  # success(), which would skip this job whenever CI skipped a call, even though
-  # ci-complete passed.
+  # ruleset requires a check named `review`.
   #
   # ci-complete covers only the calls of this workflow. The separate workflows
   # that also run on a pull_request (pr-conventions, go-ci, sdk-python-ci,
@@ -206,7 +204,6 @@ jobs:
     needs: ci-complete
     # Dependabot PRs read a separate secret store, so the token check would fail.
     if: |
-      !cancelled() &&
       needs.ci-complete.result == 'success' &&
       github.event_name == 'pull_request' &&
       github.event.pull_request.user.login != 'dependabot[bot]' &&

@@ -123,9 +123,11 @@ func usesLineComment(mapping *yaml.Node) string {
 // literal text rather than evaluated — a guard's job is to notice a gate
 // clause disappearing, not to re-implement GitHub's expression language.
 // Permissions is the job's own `permissions:` block, which GitHub uses to
-// replace (not merge with) the workflow-level block when present.
+// replace (not merge with) the workflow-level block when present. Needs stays
+// a yaml.Node because GitHub accepts a scalar or a list.
 type Job struct {
 	Name        string            `yaml:"name"`
+	Needs       yaml.Node         `yaml:"needs"`
 	If          string            `yaml:"if"`
 	Permissions Permissions       `yaml:"permissions"`
 	Env         map[string]string `yaml:"env"`

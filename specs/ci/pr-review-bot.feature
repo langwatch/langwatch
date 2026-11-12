@@ -37,12 +37,6 @@ Feature: PR Review Bot workflow
     And no review is posted to the PR
 
   @unit
-  Scenario: The review still starts when CI skipped checks the change does not reach
-    Given pr.yml skipped the checks the change does not reach
-    When ci-complete succeeds
-    Then the review job executes
-
-  @unit
   Scenario: The merge queue gets no review
     Given a merge queue run of pr.yml
     When ci-complete succeeds

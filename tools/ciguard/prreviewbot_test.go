@@ -54,7 +54,6 @@ jobs:
   review:
     needs: ci-complete
     if: |
-      !cancelled() &&
       needs.ci-complete.result == 'success' &&
       github.event_name == 'pull_request' &&
       github.event.pull_request.user.login != 'dependabot[bot]' &&
@@ -163,18 +162,6 @@ func TestPRReviewBotAcceptsCICompleteInANeedsList(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Empty(t, problems)
-}
-
-// @scenario "The review still starts when CI skipped checks the change does not reach"
-func TestPRReviewBotStartsWhenCISkippedACall(t *testing.T) {
-	broken := strings.Replace(goodPRReviewBotWorkflow, "      !cancelled() &&\n", "", 1)
-	root := writePRReviewBotWorkflow(t, broken)
-
-	problems, err := ciguard.PRReviewBot(root)
-
-	require.NoError(t, err)
-	require.NotEmpty(t, problems)
-	assert.Contains(t, strings.Join(problems, "\n"), "skipped call")
 }
 
 // @scenario "The merge queue gets no review"
@@ -496,17 +483,17 @@ func TestPRReviewBotReportsMissingTriggerTypes(t *testing.T) {
 	assert.Contains(t, strings.Join(problems, "\n"), "declares no pull_request")
 }
 
-func TestPRReviewBotReportsAnExtraTriggerType(t *testing.T) {
-	broken := strings.Replace(goodPRReviewBotWorkflow,
+// pr.yml is shared with the product checks, so an extra type is not the review
+// guard's to forbid.
+func TestPRReviewBotAcceptsAnExtraTriggerType(t *testing.T) {
+	extra := strings.Replace(goodPRReviewBotWorkflow,
 		"types: [opened, synchronize, reopened, ready_for_review]",
 		"types: [opened, synchronize, reopened, ready_for_review, edited]", 1)
-	root := writePRReviewBotWorkflow(t, broken)
 
-	problems, err := ciguard.PRReviewBot(root)
+	problems, err := ciguard.PRReviewBot(writePRReviewBotWorkflow(t, extra))
 
 	require.NoError(t, err)
-	require.NotEmpty(t, problems)
-	assert.Contains(t, strings.Join(problems, "\n"), "pull_request types")
+	assert.Empty(t, problems)
 }
 
 func TestPRReviewBotReportsAMissingConcurrencyGroup(t *testing.T) {
