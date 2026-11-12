@@ -2250,7 +2250,7 @@ async function checkRouteScope({
   return asked.named ? asked.target : null;
 }
 
-/** A route target after the first, with the scope its input named (ADR-185 §2). */
+/** A route target after the first, with the scope its input named (ADR-201 §2). */
 type FurtherTarget = Readonly<{
   permission: AuthzPermission;
   field: string;
@@ -2422,7 +2422,7 @@ async function callerOf({
 
 /**
  * Every permission the route asks, further targets' included, so a key door holds the key to its
- * own limits for each one and not only the first (ADR-185 §2). In declared order, each once.
+ * own limits for each one and not only the first (ADR-201 §2). In declared order, each once.
  */
 function credentialPermissions(route: RestTransportRoute<unknown>): readonly AuthzPermission[] {
   if (!route.furtherPermissions) return routePermissions(route);

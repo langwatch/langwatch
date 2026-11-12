@@ -1,5 +1,5 @@
 /**
- * ADR-185 §1: a braid is the shared span read, the second legal foreign placement.
+ * ADR-201 §1: a braid is the shared span read, the second legal foreign placement.
  * @see modules/authz/specs/braids.feature
  */
 import { BRAID_CONDITION_COMPILER_VERSION } from "@langwatch/authorization";

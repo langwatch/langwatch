@@ -12,7 +12,7 @@ import {
 } from "../index";
 
 /**
- * ADR-185 §1, §3, §5: a proof carries a reader's braids as `span` grants with their compiled
+ * ADR-201 §1, §3, §5: a proof carries a reader's braids as `span` grants with their compiled
  * condition; narrowing keeps them for the reader's own traces and never opens an owner's trace.
  */
 

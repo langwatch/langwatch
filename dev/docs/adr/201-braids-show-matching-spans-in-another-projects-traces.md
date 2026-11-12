@@ -1,4 +1,4 @@
-# ADR-185: Braids show one project's matching spans in another project's traces
+# ADR-201: Braids show one project's matching spans in another project's traces
 
 **Date:** 2026-10-21
 
@@ -397,14 +397,14 @@ per-braid option.
 ```prisma
 model Grant {
   // ...
-  /// ADR-185: a braid's condition gains `compiledWhere` ({ version, tree }) beside `where`.
+  /// ADR-201: a braid's condition gains `compiledWhere` ({ version, tree }) beside `where`.
   /// Shape: { type: "trace" | "span" | "log", where?, compiledWhere?, from?, until? }.
   condition Json?
-  /// ADR-185 §2: on a braid change's attach, the braid it replaces; null on every other grant.
+  /// ADR-201 §2: on a braid change's attach, the braid it replaces; null on every other grant.
   replacesGrantId String?
 }
 
-/// ADR-185: a project's key for signing the tags on its calls. Owned by the API key module.
+/// ADR-201: a project's key for signing the tags on its calls. Owned by the API key module.
 model SigningKey {
   id               String    @id
   organizationId   String
@@ -423,7 +423,7 @@ model SigningKey {
   @@index([organizationId])
 }
 
-/// ADR-185: an organisation's braid setting. Owned by authz; read into the organisation's snapshot.
+/// ADR-201: an organisation's braid setting. Owned by authz; read into the organisation's snapshot.
 model AuthzOrganizationPolicy {
   organizationId               String   @id
   braidsOrganizationAdminsOnly Boolean  @default(false)

@@ -384,7 +384,7 @@ listOrganizationMembers(input: { organizationId: string }, by: ApiKeyManagementC
 
 #### `findSigningKeys`
 
-ADR-185 §4: a project's braid signing keys with their last 24 hours; never a secret.
+ADR-201 §4: a project's braid signing keys with their last 24 hours; never a secret.
 
 ```typescript
 findSigningKeys(input: FindSigningKeysInput): Promise<SigningKey[]>;
@@ -830,7 +830,7 @@ Contract `../contract/src/signing-key.trpc.ts:16`, router `src/transport/signing
 | `signingKeys.projectSigning` | query    | Permission `traces:view`                                                | `signingKeyProjectInputSchema` | `projectSigningSchema`   |
 | `signingKeys.create`         | mutation | Permission `braids:manage`; Entitlement `enterprise` (feature `BRAIDS`) | `createSigningKeyInputSchema`  | `issuedSigningKeySchema` |
 | `signingKeys.rotate`         | mutation | Permission `braids:manage`; Entitlement `enterprise` (feature `BRAIDS`) | `signingKeyActionInputSchema`  | `issuedSigningKeySchema` |
-| `signingKeys.revoke`         | mutation | Permission `braids:manage`; Entitlement `enterprise` (feature `BRAIDS`) | `signingKeyActionInputSchema`  | `signingKeySchema`       |
+| `signingKeys.revoke`         | mutation | Permission `braids:manage`                                              | `signingKeyActionInputSchema`  | `signingKeySchema`       |
 
 ```typescript
 // signingKeys.list

@@ -71,7 +71,7 @@ export const GRANT_EVENT_SOURCES = [
 ] as const;
 /** ADR-185 §1: a braid's grant, a `span` read from the owner project to the reader project. */
 export const GRANT_SOURCE_BRAID = "braid" as const satisfies (typeof GRANT_EVENT_SOURCES)[number];
-/** ADR-185 §8: the audit log target kind of a braid's entries; the target id is its grant id. */
+/** ADR-201 §8: the audit log target kind of a braid's entries; the target id is its grant id. */
 export const BRAID_AUDIT_TARGET_KIND = "braid" as const;
 export const grantEventSourceSchema = z.enum(GRANT_EVENT_SOURCES);
 export type GrantEventSource = z.infer<typeof grantEventSourceSchema>;

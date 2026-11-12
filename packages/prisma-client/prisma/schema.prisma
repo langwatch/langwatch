@@ -4794,7 +4794,7 @@ model AuthzEngineSwitch {
   updatedAt      DateTime @default(now()) @updatedAt
 }
 
-/// ADR-185: an organisation's braid setting. Owned by authz; read into the organisation's snapshot.
+/// ADR-201: an organisation's braid setting. Owned by authz; read into the organisation's snapshot.
 model AuthzOrganizationPolicy {
   organizationId               String   @id
   braidsOrganizationAdminsOnly Boolean  @default(false)
@@ -5089,7 +5089,7 @@ model ApiKey {
   @@index([ingestionTemplateId])
 }
 
-/// ADR-185: a project's key for signing the tags on its calls. Owned by the API key module.
+/// ADR-201: a project's key for signing the tags on its calls. Owned by the API key module.
 model SigningKey {
   id               String    @id
   organizationId   String

@@ -1,6 +1,6 @@
 /**
  * Signs named baggage entries for a braid's signed calls, wire format v1 of
- * ADR-185 section 4 (dev/docs/adr/185-braids-show-matching-spans-in-another-projects-traces.md).
+ * ADR-201 section 4 (dev/docs/adr/201-braids-show-matching-spans-in-another-projects-traces.md).
  * @module braids/sign-baggage
  */
 

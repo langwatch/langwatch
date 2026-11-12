@@ -1,5 +1,5 @@
-# Decisions: dev/docs/adr/185-braids-show-matching-spans-in-another-projects-traces.md
-# (ADR-185) section 4, wire format version 1. The platform side: modules/trace/specs/signed-calls.feature.
+# Decisions: dev/docs/adr/201-braids-show-matching-spans-in-another-projects-traces.md
+# (ADR-201) section 4, wire format version 1. The platform side: modules/trace/specs/signed-calls.feature.
 # The same pinned vector is asserted in the Python and Go SDKs.
 
 @telemetry @braids

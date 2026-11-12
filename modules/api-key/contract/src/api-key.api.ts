@@ -334,7 +334,7 @@ export interface ApiKeyApi {
     input: { organizationId: string },
     by: ApiKeyManagementCaller,
   ): Promise<ApiKeyUser[]>;
-  /** ADR-185 §4: a project's braid signing keys with their last 24 hours; never a secret. */
+  /** ADR-201 §4: a project's braid signing keys with their last 24 hours; never a secret. */
   findSigningKeys(input: FindSigningKeysInput): Promise<SigningKey[]>;
   /** Whether a project signs its calls, for the braid dialog of whoever braids into it. */
   findProjectSigning(input: FindSigningKeysInput): Promise<ProjectSigning>;

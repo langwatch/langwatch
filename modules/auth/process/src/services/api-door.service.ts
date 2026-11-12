@@ -368,7 +368,7 @@ export class ApiDoorService {
     };
   }
 
-  /** ADR-185 §9: a project's plan is its organization's, read through the door's own resolver. */
+  /** ADR-201 §9: a project's plan is its organization's, read through the door's own resolver. */
   async #planOrganizationOf(scope: AuthzDeclaredScopeId): Promise<string | undefined> {
     if (scope.tier === "organization") return scope.id;
     if (scope.tier === "team") {

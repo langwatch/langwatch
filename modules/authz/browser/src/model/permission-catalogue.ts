@@ -20,7 +20,7 @@ export type AuthzAction = (typeof AUTHZ_ACTIONS)[keyof typeof AUTHZ_ACTIONS];
  */
 export const ORDERED_RESOURCES = [
   "traces",
-  // Sharing matching spans into another project's traces; manage is its only action (ADR-185 §2).
+  // Sharing matching spans into another project's traces; manage is its only action (ADR-201 §2).
   "braids",
   "cost",
   "scenarios",

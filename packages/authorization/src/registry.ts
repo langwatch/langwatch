@@ -212,7 +212,7 @@ export const AUTHZ_RESOURCES = {
     actions: ["view"],
     scopes: ["organization"],
   },
-  // ADR-185 §2: who may share matching spans into another project's traces.
+  // ADR-201 §2: who may share matching spans into another project's traces.
   // Its own resource, appended last: a `traces:braid` action would move every
   // later bitset index. Admin-only; `traces:share` stays the public share link.
   braids: {

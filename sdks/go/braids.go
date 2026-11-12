@@ -1,7 +1,7 @@
 package langwatch
 
-// Signed calls for braids, wire format version 1 of ADR-185 section 4
-// (dev/docs/adr/185-braids-show-matching-spans-in-another-projects-traces.md).
+// Signed calls for braids, wire format version 1 of ADR-201 section 4
+// (dev/docs/adr/201-braids-show-matching-spans-in-another-projects-traces.md).
 // The pinned test vector in the TypeScript and Python SDKs asserts the same signature.
 
 import (

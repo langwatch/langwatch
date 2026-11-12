@@ -1,4 +1,4 @@
--- ADR-185 §4: a project's braid signing keys, owned by the API key module. A new, empty table;
+-- ADR-201 §4: a project's braid signing keys, owned by the API key module. A new, empty table;
 -- no lock on any existing table. Column refs only, no foreign key. The secret rests sealed by the
 -- process encryption store in "secretCiphertext".
 CREATE TABLE IF NOT EXISTS "SigningKey" (

@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { PrismaSigningKeyRepository } from "../prisma.signing-key.repository.ts";
 
-/** The SDK's pinned test key (ADR-185 §4). */
+/** The SDK's pinned test key (ADR-201 §4). */
 const SECRET = "lwsk_testkid_testsecret";
 
 function cipherDouble(): SharedCredentialCipher {

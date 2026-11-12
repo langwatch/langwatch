@@ -41,8 +41,8 @@ export interface AuthzRepositories {
   readonly migration: AuthzMigrationRepository;
   /** What the ledger's read-your-writes hold and the grant writer read. */
   readonly ledgerReads: AuthzLedgerReadRepository;
-  /** Serialises braid writes into one reader (ADR-185 §1). */
+  /** Serialises braid writes into one reader (ADR-201 §1). */
   readonly braidLocks: AuthzBraidLockRepository;
-  /** An organisation's settings, read into its snapshot (ADR-185 §2). */
+  /** An organisation's settings, read into its snapshot (ADR-201 §2). */
   readonly organizationPolicies: AuthzOrganizationPolicyRepository;
 }

@@ -19768,7 +19768,7 @@
     {
       "name": "AuthzOrganizationPolicy",
       "tableName": "AuthzOrganizationPolicy",
-      "documentation": "ADR-185: an organisation's braid setting. Owned by authz; read into the organisation's snapshot.",
+      "documentation": "ADR-201: an organisation's braid setting. Owned by authz; read into the organisation's snapshot.",
       "primaryKey": [
         "organizationId"
       ],
@@ -20652,7 +20652,7 @@
     {
       "name": "SigningKey",
       "tableName": "SigningKey",
-      "documentation": "ADR-185: a project's key for signing the tags on its calls. Owned by the API key module.",
+      "documentation": "ADR-201: a project's key for signing the tags on its calls. Owned by the API key module.",
       "primaryKey": [
         "id"
       ],

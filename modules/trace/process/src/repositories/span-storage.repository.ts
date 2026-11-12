@@ -73,11 +73,11 @@ export type LangwatchSignalBucket = (typeof LANGWATCH_SIGNAL_BUCKETS)[number];
 export interface SpanLangwatchSignalsRow {
   spanId: string;
   signals: LangwatchSignalBucket[];
-  /** Set only on a span braided in from another project (ADR-185 §5); absent: the reader's own. */
+  /** Set only on a span braided in from another project (ADR-201 §5); absent: the reader's own. */
   ownerProjectId?: string;
 }
 
-/** The trace view reads `spans`, where a proof's braids apply; other reads, `traces` (ADR-185). */
+/** The trace view reads `spans`, where a proof's braids apply; other reads, `traces` (ADR-201). */
 export interface TraceViewRead {
   reads?: "spans" | "traces";
 }
@@ -94,7 +94,7 @@ export interface OccurredAtHint {
   occurredAtMs?: number;
 }
 
-/** One span by id; under braids `ownerProjectId` names its owner, else the reader (ADR-185). */
+/** One span by id; under braids `ownerProjectId` names its owner, else the reader (ADR-201). */
 export type SingleSpanParams = {
   authorization: Authorization;
   traceId: string;
