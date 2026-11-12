@@ -1,8 +1,7 @@
 /**
  * An own decision model's request and answer (ADR-182 decision 8). The Jev body is shared by
  * every System One host; OpenAI's Decisions API (also Azure and Fireworks) takes a list of named
- * questions, which is turned back into the Jev answer shape so one reader serves every wire.
- * Gemini's Decisions API answers in the Jev shape but takes `input` and named true/false sides.
+ * questions, turned back into the Jev answer shape; Gemini's answers in it natively.
  * @see specs/model-providers/instant-evals-decision-model.feature
  */
 
