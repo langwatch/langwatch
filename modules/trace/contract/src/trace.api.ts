@@ -573,16 +573,16 @@ export interface TraceApi extends TraceOtlpIngestApi {
     values: string[];
     window: TraceModelSpendWindow;
   }): Promise<TraceAttributeValueSpend[]>;
-  /** The project's traces carrying the attribute (or one of `values`), per value, model and day. */
+  /** Traces with the attribute (or one of `values`) across `projectIds`, per value, model, day. */
   findAttributeUsageBuckets(input: {
-    projectId: string;
+    projectIds: readonly string[];
     attributeKey: string;
     window: TraceModelSpendWindow;
     values?: string[];
   }): Promise<TraceAttributeUsageBucket[]>;
-  /** The project's newest traces carrying the attribute, at most `limit`; `model` is the first. */
+  /** Newest traces with the attribute across `projectIds`, at most `limit`; `model` is first. */
   findAttributedTraces(input: {
-    projectId: string;
+    projectIds: readonly string[];
     attributeKey: string;
     window: TraceModelSpendWindow;
     values?: string[];

@@ -535,18 +535,18 @@ findSpendByAttributeValue(input: { projectId: string; attributeKey: string; valu
 
 #### `findAttributeUsageBuckets`
 
-The project's traces carrying the attribute (or one of `values`), per value, model and day.
+Traces with the attribute (or one of `values`) across `projectIds`, per value, model, day.
 
 ```typescript
-findAttributeUsageBuckets(input: { projectId: string; attributeKey: string; window: TraceModelSpendWindow; values?: string[]; }): Promise<TraceAttributeUsageBucket[]>;
+findAttributeUsageBuckets(input: { projectIds: readonly string[]; attributeKey: string; window: TraceModelSpendWindow; values?: string[]; }): Promise<TraceAttributeUsageBucket[]>;
 ```
 
 #### `findAttributedTraces`
 
-The project's newest traces carrying the attribute, at most `limit`; `model` is the first.
+Newest traces with the attribute across `projectIds`, at most `limit`; `model` is first.
 
 ```typescript
-findAttributedTraces(input: { projectId: string; attributeKey: string; window: TraceModelSpendWindow; values?: string[]; model?: string; limit: number; }): Promise<TraceAttributedTrace[]>;
+findAttributedTraces(input: { projectIds: readonly string[]; attributeKey: string; window: TraceModelSpendWindow; values?: string[]; model?: string; limit: number; }): Promise<TraceAttributedTrace[]>;
 ```
 
 #### `getAttributedSpendComparison`
