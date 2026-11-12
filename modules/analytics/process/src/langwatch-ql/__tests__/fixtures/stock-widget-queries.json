@@ -825,7 +825,7 @@
  },
  {
   "label": "data-health/fields",
-  "sql": "SELECT field, uniqExact(TraceId) AS traces\nFROM trace_metrics\nARRAY JOIN ['all', 'model', 'cost', 'user', 'conversation', 'labels', 'outcome'] AS field\nWHERE trace_metrics.Source IN {dashboard_context_sources:Array(String)} AND ( OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}\n  AND (field = 'all'\n    OR field = 'model' AND notEmpty(Models)\n    OR field = 'cost' AND (TotalCost IS NOT NULL OR empty(Models))\n    OR field = 'user' AND UserId IS NOT NULL\n    OR field = 'conversation' AND ConversationId IS NOT NULL\n    OR field = 'labels' AND notEmpty(Labels)\n    OR field = 'outcome' AND MetadataOutcome != ''))\nGROUP BY field"
+  "sql": "SELECT field, uniqExactIf(TraceId, field = 'all'\n    OR field = 'model' AND notEmpty(Models)\n    OR field = 'cost' AND (TotalCost IS NOT NULL OR empty(Models))\n    OR field = 'user' AND UserId IS NOT NULL\n    OR field = 'conversation' AND ConversationId IS NOT NULL\n    OR field = 'labels' AND notEmpty(Labels)\n    OR field = 'outcome' AND MetadataOutcome != '') AS traces\nFROM trace_metrics\nARRAY JOIN ['all', 'model', 'cost', 'user', 'conversation', 'labels', 'outcome'] AS field\nWHERE trace_metrics.Source IN {dashboard_context_sources:Array(String)} AND ( OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime})\nGROUP BY field"
  },
  {
   "label": "noise/sources",

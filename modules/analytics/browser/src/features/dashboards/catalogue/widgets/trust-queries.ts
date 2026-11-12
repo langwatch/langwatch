@@ -79,15 +79,15 @@ export const HEALTH_FIELDS: readonly HealthField[] = [
 
 // Each field is a filter, never a column the result reads, so the completeness report does
 // not swap a missing field for a setup view: showing the gap is this widget's whole job. One
-// scan per view, its rows repeated per field: a view read per field ran out of memory.
+// scan per view, its rows repeated per field: a view read per field ran out of memory. The
+// condition is counted, not filtered, so a field no trace carries keeps its row at 0.
 const scan = ({ view, fields }: { view: string; fields: readonly Coverage[] }) =>
-  `SELECT field, uniqExact(TraceId) AS traces
+  `SELECT field, uniqExactIf(TraceId, ${fields
+    .map(({ key, condition }) => `field = '${key}'${condition ? ` AND ${condition}` : ""}`)
+    .join("\n    OR ")}) AS traces
 FROM ${view}
 ARRAY JOIN [${fields.map(({ key }) => `'${key}'`).join(", ")}] AS field
 WHERE ${inPeriod("OccurredAt")}
-  AND (${fields
-    .map(({ key, condition }) => `field = '${key}'${condition ? ` AND ${condition}` : ""}`)
-    .join("\n    OR ")})
 GROUP BY field`;
 
 interface Coverage {
