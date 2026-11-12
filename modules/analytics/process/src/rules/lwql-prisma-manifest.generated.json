@@ -18972,6 +18972,15 @@
           "documentation": ""
         },
         {
+          "name": "maxMembersDeveloper",
+          "columnName": "maxMembersDeveloper",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Developer seats the organization pays for; null falls to the plan's own cap."
+        },
+        {
           "name": "maxTeams",
           "columnName": "maxTeams",
           "type": "Int",

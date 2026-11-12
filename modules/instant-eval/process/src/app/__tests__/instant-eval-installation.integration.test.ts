@@ -84,6 +84,7 @@ function planFor({ free }: { free: boolean }): Plan {
     free,
     maxMembers: free ? 1 : 10,
     maxMembersLite: 0,
+    maxMembersDeveloper: 0,
     maxMessagesPerMonth: free ? 1_000 : 100_000,
     canPublish: !free,
     prices: { USD: free ? 0 : 199, EUR: free ? 0 : 199 },

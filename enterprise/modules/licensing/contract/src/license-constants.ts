@@ -18,6 +18,12 @@ export const DEFAULT_LIMIT = UNLIMITED;
 export const DEFAULT_MEMBERS_LITE = 1;
 
 /**
+ * Developer seats when the licence states none: a Developer seat is sold per seat,
+ * so a licence signed before the field existed sells none.
+ */
+export const DEFAULT_MEMBERS_DEVELOPER = 0;
+
+/**
  * Free-tier read-path visibility window: trace content older than this many
  * days is teaser-redacted for free plans. Visibility, not retention —
  * deletion stays at the org's retention policy.

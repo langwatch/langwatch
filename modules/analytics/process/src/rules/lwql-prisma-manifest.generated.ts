@@ -1761,6 +1761,7 @@ export interface LwqlPrismaRows {
     readonly maxWorkflows: "Int?";
     readonly maxRetentionDays: "Int?";
     readonly maxMembersLite: "Int?";
+    readonly maxMembersDeveloper: "Int?";
     readonly maxTeams: "Int?";
     readonly maxPrompts: "Int?";
     readonly maxEvaluators: "Int?";

@@ -5,6 +5,7 @@
  * a seat plan's retention from the started fact (round 37 D4).
  */
 import {
+  isDeveloperSeatPrice,
   isGrowthEventsPrice,
   isGrowthSeatEventPlan,
   isGrowthSeatPrice,
@@ -187,10 +188,14 @@ export class BillingSubscriptionLifecycleService {
     existing: BillingSubscriptionRecord;
   }): Promise<void> {
     const shouldNotify = existing.status !== SubscriptionStatus.ACTIVE;
-    const { usersQuantity, tracesQuantity } = this.quantitiesOf({ subscription, existing });
+    const { usersQuantity, tracesQuantity, developerQuantity } = this.quantitiesOf({
+      subscription,
+      existing,
+    });
     const quantitiesResult = await this.subscriptionRepository.updateQuantities({
       id: existing.id,
       ...planQuantities({ members: usersQuantity, messagesPerMonth: tracesQuantity }),
+      ...(developerQuantity === undefined ? {} : { maxMembersDeveloper: developerQuantity }),
     });
     if (quantitiesResult.outcome === "missing_subscription") {
       return;
@@ -232,17 +237,26 @@ export class BillingSubscriptionLifecycleService {
     });
   }
 
-  /** The seat and trace limits the subscription's own line items imply. */
+  /**
+   * The seat and trace limits the subscription's own line items imply. Developer seats
+   * are stated only on a seat-priced subscription, where no Developer line means none bought.
+   */
   private quantitiesOf({
     subscription,
     existing,
   }: {
     subscription: Stripe.Subscription;
     existing: BillingSubscriptionRecord;
-  }): { usersQuantity: number | null; tracesQuantity: number | null } {
+  }): {
+    usersQuantity: number | null;
+    tracesQuantity: number | null;
+    developerQuantity: number | undefined;
+  } {
     const prices = this.itemCalculator.prices;
     let tracesQuantity: number | null = null;
     let usersQuantity: number | null = null;
+    let seatPriced = false;
+    let developerLine = 0;
     const seatPrices = [
       prices.LAUNCH_USERS,
       prices.ACCELERATE_USERS,
@@ -261,6 +275,9 @@ export class BillingSubscriptionLifecycleService {
       // from the plan limits rather than from the line item.
       if (isGrowthSeatPrice(item.price.id, prices)) {
         usersQuantity = item.quantity ?? 0;
+        seatPriced = true;
+      } else if (isDeveloperSeatPrice(item.price.id, prices)) {
+        developerLine = item.quantity ?? 0;
       } else if (isGrowthEventsPrice(item.price.id, prices)) {
         continue;
       } else if (seatPrices.includes(item.price.id)) {
@@ -278,7 +295,11 @@ export class BillingSubscriptionLifecycleService {
       }
     }
 
-    return { usersQuantity, tracesQuantity };
+    return {
+      usersQuantity,
+      tracesQuantity,
+      developerQuantity: seatPriced ? developerLine : undefined,
+    };
   }
 
   // --- Private helpers ---

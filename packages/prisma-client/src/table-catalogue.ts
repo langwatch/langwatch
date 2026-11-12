@@ -2220,6 +2220,7 @@ export const prismaModelFieldCatalogue = {
     "maxWorkflows",
     "maxRetentionDays",
     "maxMembersLite",
+    "maxMembersDeveloper",
     "maxTeams",
     "maxPrompts",
     "maxEvaluators",

@@ -1,6 +1,6 @@
 import { planSeatsAndVolume } from "@langwatch/plans";
 
-import { DEFAULT_MEMBERS_LITE } from "./license-constants.ts";
+import { DEFAULT_MEMBERS_DEVELOPER, DEFAULT_MEMBERS_LITE } from "./license-constants.ts";
 import type { LicensePlanLimits } from "./license.ts";
 
 const KNOWN_USAGE_UNITS = ["traces", "events"] as const;
@@ -15,6 +15,7 @@ export type ResolvedPlanLimits = {
   name: string;
   maxMembers: number;
   maxMembersLite: number;
+  maxMembersDeveloper: number;
   maxMessagesPerMonth: number;
   canPublish: boolean;
   webhookEndpointsEnabled: boolean | undefined;
@@ -22,7 +23,7 @@ export type ResolvedPlanLimits = {
 };
 
 /**
- * Resolves enforced plan limits from a license, defaulting maxMembersLite
+ * Resolves enforced plan limits from a license, defaulting maxMembersLite, maxMembersDeveloper
  * and usageUnit but NOT webhookEndpointsEnabled — absence must stay
  * distinguishable from false, since the tier map decides it for older licenses.
  * @param plan - License plan limits (the signed payload)
@@ -35,6 +36,7 @@ export function resolvePlanDefaults(plan: LicensePlanLimits): ResolvedPlanLimits
     ...planSeatsAndVolume({
       members: plan.maxMembers,
       membersLite: plan.maxMembersLite ?? DEFAULT_MEMBERS_LITE,
+      membersDeveloper: plan.maxMembersDeveloper ?? DEFAULT_MEMBERS_DEVELOPER,
       messagesPerMonth: plan.maxMessagesPerMonth,
     }),
     canPublish: plan.canPublish,
