@@ -925,7 +925,7 @@ Periods are whole weeks. The presets round up so that the label is always covere
 | -------- | --------------------------------------------------------------------------------------- | ----------------------------- |
 | 1 month  | 35                                                                                      | Paid, Enterprise, self-hosted |
 | 2 months | 63                                                                                      | Paid, Enterprise, self-hosted |
-| 3 months | 91                                                                                      | Enterprise, self-hosted       |
+| 3 months | 91                                                                                      | Paid, Enterprise, self-hosted |
 | 1 year   | 371                                                                                     | Enterprise, self-hosted       |
 | 5 years  | 1827                                                                                    | Enterprise, self-hosted       |
 | Custom   | 49 days or more, in weeks, months (28 days) or years (364 days), rounded to whole weeks | Enterprise, self-hosted       |
@@ -65909,7 +65909,7 @@ tamper-evidence, requires an **Enterprise** license.
   default. It is not a period any of these frameworks prescribe.
 
   What you can set instead depends on the plan, per organization, team or
-  project. Paid cloud plans choose 35 or 63 days. Enterprise plans and licensed
+  project. Paid cloud plans choose 35, 63 or 91 days. Enterprise plans and licensed
   self-hosted deployments choose those or any whole number of weeks from 49
   days up, and a self-hosted platform administrator can keep data indefinitely.
   The free plan and an unlicensed self-hosted deployment stay on the default.
@@ -81278,9 +81278,9 @@ Retention controls how long your events are kept before they're automatically re
 | Plan | Default retention | Windows you can set |
 | --- | --- | --- |
 | Free | 49 days | None. Trace content older than 14 days is redacted until you upgrade |
-| Accelerate (legacy) | 49 days | 35 or 63 days |
-| Growth | 49 days | 35 or 63 days |
-| Enterprise | 49 days | 35 or 63 days, or any whole number of weeks from 49 days up |
+| Accelerate (legacy) | 49 days | 35, 63 or 91 days |
+| Growth | 49 days | 35, 63 or 91 days |
+| Enterprise | 49 days | 35, 63 or 91 days, or any whole number of weeks from 49 days up |
 
 Retention is set in whole weeks.
 
@@ -81328,7 +81328,7 @@ Self-hosted deployments keep the same 49-day default. An Enterprise license open
 </Accordion>
 
   <Accordion title="Can I customize how long my data is retained?">
-    On LangWatch Cloud every plan keeps events for 49 days by default. Paid plans set 35 or 63 days in **Settings → Data Retention**, per organization, team or project. Enterprise plans set any whole number of weeks from 49 days up, and a higher volume of stored events. Reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) to set up an Enterprise window or extra volume.
+    On LangWatch Cloud every plan keeps events for 49 days by default. Paid plans set 35, 63 or 91 days in **Settings → Data Retention**, per organization, team or project. Enterprise plans set any whole number of weeks from 49 days up, and a higher volume of stored events. Reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) to set up an Enterprise window or extra volume.
 
     Self-hosted, the data is in your own database and keeps the same 49-day default. A license adds per-scope retention policies, with a separate window for traces, scenarios and experiments.
   </Accordion>
