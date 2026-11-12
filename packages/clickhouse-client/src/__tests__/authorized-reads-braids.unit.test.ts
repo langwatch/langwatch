@@ -526,6 +526,61 @@ describe("the fence over a span read", () => {
         ).toEqual({ kind: "loose-latest-version-marker" });
       });
 
+      describe("when the election is not AND-ed into the fenced WHERE", () => {
+        const head =
+          "(TenantId, TraceId, SpanId, UpdatedAt) IN (SELECT TenantId, TraceId, SpanId, max(UpdatedAt)" +
+          ` FROM stored_spans WHERE ${tenantScopeForLatestVersion("StartTime")} GROUP BY TenantId, TraceId, SpanId)`;
+        const fenced = (between: string, after = "") =>
+          `SELECT SpanId FROM stored_spans WHERE ${tenantScopeWithConditions("StartTime")}${between}${head}${after}`;
+
+        /** @scenario "The latest-version election is only ever AND-ed into the fenced select" */
+        it.each([
+          ["a top-level OR", " OR ", ""],
+          ["an OR after an AND-ed term", " AND TraceId = {traceId:String} OR ", ""],
+          ["a NOT", " AND NOT ", ""],
+          ["a NOT after an AND-ed term", " AND TraceId = {traceId:String} AND NOT ", ""],
+          ["an OR in a group the election sits in", " AND (1 = 1 OR ", ")"],
+          ["an OR inside a closed group, then a top-level OR", " AND (1 = 1 OR 1 = 2) OR ", ""],
+          ["a BETWEEN whose upper bound is the election", " AND StartTime BETWEEN 1 AND ", ""],
+          ["a comment", " AND 1 = 1 -- \n AND ", ""],
+          ["no AND at all", " ", ""],
+        ])("refuses %s before the election", (_shape, between, after) => {
+          expect(refusalOf(fenced(between, after))).toEqual({
+            kind: "loose-latest-version-marker",
+          });
+        });
+
+        /** @scenario "The latest-version election is only ever AND-ed into the fenced select" */
+        it.each([
+          [
+            "the trace id and its id bound",
+            " AND TraceId = {traceId:String} {{idBound:stored_spans.TraceId:traceId}} AND ",
+          ],
+          ["one span id", " AND TraceId = {traceId:String} AND SpanId = {spanId:String} AND "],
+          [
+            "a span range",
+            " AND TraceId = {traceId:String} AND StartTime >= fromUnixTimestamp64Milli({spanFromMs:Int64})" +
+              " AND StartTime <= fromUnixTimestamp64Milli({spanToMs:Int64}) AND ",
+          ],
+          ["a since filter", " AND StartTime >= fromUnixTimestamp64Milli({sinceMs:Int64}) AND "],
+          [
+            "a cursor tuple",
+            " AND TraceId = {traceId:String} AND StartTime >= fromUnixTimestamp64Milli({cursorStart:Int64})" +
+              " AND (toUnixTimestamp64Milli(StartTime), SpanId, TenantId) >" +
+              " ({cursorStart:Int64}, {cursorSpan:String}, {cursorTenant:String}) AND ",
+          ],
+          ["an OR closed inside a group", " AND (SpanId = {a:String} OR SpanId = {b:String}) AND "],
+        ])("renders %s AND-ed before it, as the trace repositories write it", (_shape, between) => {
+          const rendered = expandStatement({
+            query: fenced(between),
+            queryParams: { traceId: "tr-1" },
+            fence,
+          });
+
+          expect(rendered.query).toContain(LATEST_VERSION_SUBQUERY);
+        });
+      });
+
       it("refuses it on a proof with no braids too", () => {
         expect(
           scopeErrorOf(() =>

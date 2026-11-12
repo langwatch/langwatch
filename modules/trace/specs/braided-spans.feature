@@ -104,6 +104,13 @@ Feature: Braided spans in the reader's traces
       And a latest-version election is accepted only in the WHERE of a select the conditions fence
 
     @unit
+    Scenario: The latest-version election is only ever AND-ed into the fenced select
+      Given a span read whose latest-version election follows its conditions marker
+      When the terms between them are joined by OR, put the election under NOT, or open a group around it
+      Then the statement is refused as a loose latest-version marker
+      And terms joined by AND alone, as every trace repository writes them, still render
+
+    @unit
     Scenario: A braid's activity counts only spans in traces the reader holds
       Given matching "specialists" spans in traces "orchestrator" holds and in traces it does not
       When the "orchestrator" Braids page counts the braid's activity

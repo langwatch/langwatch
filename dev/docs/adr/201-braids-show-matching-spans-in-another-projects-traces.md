@@ -617,3 +617,7 @@ not operations.
   the worker revoked the old one never revives the wider grant; removal also revokes that old grant
   under the reader's lock. A partial index on `Grant ("organizationId", "replacesGrantId")` serves the
   lookup (§2).
+- v1.15 (2026-11-12, from review, under the same ruling). The latest-version election is accepted only
+  AND-ed into the fenced WHERE: the text from the windowed marker to the election is an allow-listed
+  run of AND-joined terms, so an OR arm, a NOT or a group around the election is refused, and the
+  fence's property test generates those shapes (§3).

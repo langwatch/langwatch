@@ -1,7 +1,7 @@
 /**
- * ADR-201 v1.10: a property test over the fence. Every generated proof, resource and statement is
- * either refused by name or renders a statement where a braid owner is bound only inside its own
- * predicate clause under the held-trace semi-join, on an honoured span read. Seeded, no dependency.
+ * ADR-201 v1.10: every generated proof, resource and statement is refused by name, or renders a
+ * braid owner bound only in its own predicate clause under the held-trace semi-join on an honoured
+ * span read, with every election AND-ed into its select, never under OR or NOT. Seeded.
  */
 import {
   AccessNotGrantedError,
@@ -236,8 +236,20 @@ function proofOf({ random, conditioned }: { random: Random; conditioned: boolean
 
 const COLUMNS = [...TENANT_SCOPE_TIME_COLUMNS, "NotATimeColumn"] as const;
 
-const ELECTION_HEAD =
-  " AND (TenantId, TraceId, SpanId, UpdatedAt) IN (SELECT TenantId, TraceId, SpanId, max(UpdatedAt) FROM stored_spans WHERE ";
+const ELECTION_TUPLE =
+  "(TenantId, TraceId, SpanId, UpdatedAt) IN (SELECT TenantId, TraceId, SpanId, max(UpdatedAt) FROM stored_spans WHERE ";
+const ELECTION_HEAD = ` AND ${ELECTION_TUPLE}`;
+/** What may sit just before an election: AND makes a conjunct; the rest put it under OR or NOT. */
+const ELECTION_LEADS = [
+  [" AND ", ""],
+  [" AND TraceId = {traceId:String} AND ", ""],
+  [" OR ", ""],
+  [" AND TraceId = {traceId:String} OR ", ""],
+  [" AND NOT ", ""],
+  [" AND (1 = 1 OR ", ")"],
+  [" AND (1 = 1 OR 1 = 2) OR ", ""],
+  [" AND NOT (1 = 1 AND ", ")"],
+] as const;
 
 type StatementCase = {
   text: string;
@@ -278,8 +290,13 @@ function statementOf(random: Random): StatementCase {
       () => "1 = 1",
     ],
   })();
+  const mixedElection = () => {
+    const [lead, close] = pick({ random, from: ELECTION_LEADS });
+    return `${lead}${ELECTION_TUPLE}${tenantScopeForLatestVersion(column())} GROUP BY TenantId, TraceId, SpanId)${close}`;
+  };
   const extras = [
     () => election(),
+    mixedElection,
     () => ` AND SpanId IN (SELECT SpanId FROM stored_spans WHERE 1 = 1${election()})`,
     () => ` AND TraceId IN (SELECT TraceId FROM trace_summaries WHERE ${tenantSet()})`,
     () => ` AND TraceId IN (SELECT TraceId FROM trace_summaries WHERE ${tenantScope(column())})`,
@@ -380,6 +397,28 @@ function ownerSlotViolation({
   return undefined;
 }
 
+/** Every rendered election must filter its select: a conjunct of that select's WHERE, AND-ed in. */
+function electionViolation({ text }: { text: string }): string | undefined {
+  for (const match of text.matchAll(new RegExp(escapeRegExp(ELECTION_TUPLE), "g"))) {
+    const scopeStart = (enclosingGroups({ text, position: match.index }).at(-1) ?? -1) + 1;
+    let scope = text.slice(scopeStart, match.index);
+    for (let previous = ""; previous !== scope;) {
+      previous = scope;
+      scope = scope.replace(/\([^()]*\)/g, "G");
+    }
+    // A fragment is a WHERE's body: at its top level, the whole text before the election leads.
+    const where = [...scope.matchAll(/\bWHERE\b/g)].at(-1);
+    if (where === undefined && scopeStart > 0) return "an election inside a group of its WHERE";
+    const lead = where === undefined ? scope : scope.slice(where.index + "WHERE".length);
+    if (/\b(?:OR|NOT)\b/i.test(lead) || !/\bAND\s*$/.test(lead)) {
+      return `an election that is not a conjunct: ${lead.slice(-40)}`;
+    }
+  }
+  return undefined;
+}
+
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 type Outcome =
   | { kind: "refused"; reason: string }
   | { kind: "rendered"; text: string; params: Record<string, unknown> };
@@ -445,6 +484,8 @@ function violationsOf({
   const found: string[] = [];
   const literals = outcome.text.match(/lit_[a-z]+_\d+/g);
   if (literals !== null) found.push(`condition literal in the text: ${literals[0]}`);
+  const election = electionViolation({ text: outcome.text });
+  if (election !== undefined) found.push(election);
   for (const [param, value] of Object.entries(outcome.params)) {
     if (!/^(?:tenantScope|idBound)/.test(param) || !bindsOwner(value)) continue;
     if (reads !== "spans" || proof?.honoured !== true)

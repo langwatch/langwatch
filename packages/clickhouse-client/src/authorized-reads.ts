@@ -716,8 +716,8 @@ function refuseUnappliedBraids({
 
 /**
  * Owner rows leave only through the conditions marker (ADR-201 §3): under braids a plain marker
- * is refused, and a latest-version marker is accepted only as the election in the WHERE of a
- * select a windowed marker fences, so its keys filter that select and are never read themselves.
+ * is refused, and a latest-version marker is accepted only as the election AND-ed into the WHERE
+ * of a select a windowed marker fences, so its keys filter that select and are never read.
  */
 function refuseUnconditionedMarkers({ text, fence }: { text: string; fence: TenantFence }): void {
   if (
@@ -732,10 +732,41 @@ function refuseUnconditionedMarkers({ text, fence }: { text: string; fence: Tena
     const outer = head === null ? "" : before.slice(0, head.index);
     const fenced = [...outer.matchAll(WINDOWED_MARKER)].at(-1);
     const between = fenced === undefined ? undefined : outer.slice(fenced.index + fenced[0].length);
-    if (between === undefined || /\b(?:SELECT|FROM|UNION)\b/i.test(between)) {
+    if (between === undefined || !isConjunctionLeadingIn({ text: between })) {
       throw new StatementScopeError({ kind: "loose-latest-version-marker" });
     }
   }
+}
+
+/** A term the election may be AND-ed after: an operand, or two compared; a group is one operand. */
+const CONJUNCT_OPERAND = String.raw`(?:[A-Za-z_][\w.]*\s*)?§G|[A-Za-z_][\w.]*|\d+(?:\.\d+)?|§P`;
+const CONJUNCT_TERM = new RegExp(
+  String.raw`^\s*(?:${CONJUNCT_OPERAND})\s*(?:(?:=|!=|<>|<=|>=|<|>|\bIN\b)\s*(?:${CONJUNCT_OPERAND})\s*)?$`,
+  "i",
+);
+
+/**
+ * Allow-listed: the text from the windowed marker to the election is ` AND term AND term ... AND`,
+ * so the election is a conjunct of that WHERE, never an OR arm, under a NOT, or inside a group.
+ * Markers, parameters and quoted text are one operand each; a comment or a subquery refuses.
+ */
+function isConjunctionLeadingIn({ text }: { text: string }): boolean {
+  if (/--|\/\*|#|;|\b(?:SELECT|FROM|UNION)\b/i.test(text)) return false;
+  let flat = text
+    .replace(/\{\{[^{}]*\}\}/g, " ")
+    .replace(/\{[^{}]*\}/g, " §P ")
+    .replace(/'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`/g, " §P ");
+  if (/['"`{}]/.test(flat)) return false;
+  for (let previous = ""; previous !== flat;) {
+    previous = flat;
+    flat = flat.replace(/\([^()]*\)/g, " §G ");
+  }
+  if (/[()]/.test(flat) || /\b(?:OR|NOT|XOR)\b/i.test(flat)) return false;
+  const terms = flat.split(/\bAND\b/i);
+  const first = terms.shift();
+  const last = terms.pop();
+  if (first?.trim() !== "" || last?.trim() !== "") return false;
+  return terms.every((term) => CONJUNCT_TERM.test(term));
 }
 
 /**

@@ -62,7 +62,7 @@ function describe(violation: StatementScopeViolation): string {
     case "plain-marker-under-braids":
       return "The proof carries braids, so a {{tenantScope}} or {{tenantSet}} marker would read owner rows with no condition. Write {{tenantScopeWithConditions:<TimeColumn>}}, and {{tenantScopeForLatestVersion:<TimeColumn>}} in a latest-version election.";
     case "loose-latest-version-marker":
-      return "A {{tenantScopeForLatestVersion:<TimeColumn>}} marker sits outside a latest-version election on stored_spans, or its election is not in the WHERE a windowed marker fences.";
+      return "A {{tenantScopeForLatestVersion:<TimeColumn>}} marker sits outside a latest-version election on stored_spans, or its election is not AND-ed into the WHERE a windowed marker fences. Join every term between that marker and the election with AND alone: no OR, no NOT, no group around the election.";
     case "unsupported-condition-version":
       return `A braid's condition was compiled by compiler version ${violation.version}, which this reader cannot render.`;
     case "uncompiled-braid-condition":
