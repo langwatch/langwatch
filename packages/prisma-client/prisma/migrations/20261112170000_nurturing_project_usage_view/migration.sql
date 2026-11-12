@@ -3,7 +3,7 @@
 -- the per-email Customer.io traits. One peer fold per owner pipeline (a peer fold re-folds from
 -- one owner's log), so one row per project and owner; the folded usage as JSON. One more row
 -- per project, owner `evaluation`, holds its evaluation days, written at most once a day. Traces
--- are counted per day in NurturingProjectTraceDay (migration 20261110120000).
+-- are counted per day in NurturingProjectTraceDay (migration 20261112170100_nurturing_project_trace_day).
 --
 -- Expand only: a new table nobody else reads or writes. Nothing is altered or dropped.
 -- No foreign key: the rows are rebuilt from the owners' event logs by a projection replay

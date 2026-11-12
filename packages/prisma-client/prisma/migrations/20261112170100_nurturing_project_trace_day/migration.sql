@@ -2,8 +2,8 @@
 -- traceCount from trace's span_received (a root span is one trace), errorCount from trace's
 -- lw.trace.trace_failed (ARCHITECTURE §9). Each batch adds the traces it counted to the day's row; a
 -- redelivered batch can count a trace twice (accepted, issue 9378). The
--- per-email Customer.io traits sum an organization's last 30 days; rows are written only inside an
--- organization's trace counting window and dropped when it ends.
+-- per-email Customer.io traits sum an organization's rows; rows are written only inside an
+-- organization's trace counting window and dropped when it ends (the window-end sweep).
 --
 -- Expand only: a new table nobody else reads or writes. Nothing is altered or dropped.
 -- No foreign key: a deleted project's rows are never read again, and are dropped with the window.
