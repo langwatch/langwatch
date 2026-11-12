@@ -20126,6 +20126,15 @@
           "documentation": ""
         },
         {
+          "name": "replacesGrantId",
+          "columnName": "replacesGrantId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
           "name": "occurredAt",
           "columnName": "occurredAt",
           "type": "DateTime",
