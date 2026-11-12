@@ -71,9 +71,9 @@ personal project's owner) and `NurturingTracedProject` (a project that traced).
 It also owns `NurturingOrganization` (admin, milestone counts, coding signals,
 last trace), `NurturingProjectUsageView` (one peer fold row per project and
 owner), `NurturingProjectTraceDay` (trace counts per project and UTC day, kept 30
-days). A redelivered batch can count a trace twice; accepted (owner decision,
-issue 9378). Signals are events on the `nurturing` pipeline. A delivered signal is
-claimed in Redis for seven days under the process-wide idempotency key prefix,
+days). A redelivered batch can count a trace twice, and so can a root span stored
+more than once; accepted (owner decision, issue 9378). Signals are events on the
+`nurturing` pipeline. A delivered signal is claimed in Redis for seven days under the process-wide idempotency key prefix,
 so a redelivered event sends nothing.
 
 ## Runtime and registration

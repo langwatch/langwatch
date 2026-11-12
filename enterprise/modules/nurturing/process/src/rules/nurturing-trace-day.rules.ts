@@ -22,7 +22,8 @@ export type NurturingCountedTraceKind = "trace" | "failed";
 
 /**
  * One trace as nurturing counts it: its project and the fact's day and time; never its body.
- * Nothing de-duplicates: a redelivered batch can count a trace twice (accepted, issue 9378).
+ * Nothing de-duplicates: a redelivered batch or a root span stored again counts again (accepted,
+ * issue 9378).
  */
 export type NurturingCountedTrace = Readonly<{
   projectId: string;

@@ -269,9 +269,9 @@ function extractOrigin(attributes: z.output<typeof originAttributesSchema>): str
   return origin ? origin : undefined;
 }
 
-/** What the trace-day count reads of a span: its trace, root or not, and origin; no body. */
+/** What the trace-day count reads of a span: whether it is a root, and its origin; no body. */
 export type NurturingTraceSpanData = Readonly<{
-  span: Pick<SpanReceivedEventData["span"], "traceId" | "parentSpanId">;
+  span: Pick<SpanReceivedEventData["span"], "parentSpanId">;
   /** The explicit origin, the span's own before its resource's, as trace hoists it. */
   origin?: string;
 }>;
@@ -279,13 +279,13 @@ export type NurturingTraceSpanData = Readonly<{
 const traceSpanDataSchema = z
   .object({
     span: spanReceivedEventDataSchema.shape.span
-      .pick({ traceId: true, parentSpanId: true })
+      .pick({ parentSpanId: true })
       .extend({ attributes: originAttributesSchema }),
     resource: z.object({ attributes: originAttributesSchema }).nullish(),
   })
   .transform(
-    ({ span: { traceId, parentSpanId, attributes }, resource }): NurturingTraceSpanData => ({
-      span: { traceId, parentSpanId },
+    ({ span: { parentSpanId, attributes }, resource }): NurturingTraceSpanData => ({
+      span: { parentSpanId },
       origin: extractOrigin(attributes) ?? extractOrigin(resource?.attributes),
     }),
   );
@@ -357,11 +357,12 @@ async function copiedProjectOf({
 
 /**
  * Counts the batch's traces whose organization is inside its counting window, durably. A
- * redelivered batch counts again: accepted (owner decision, issue 9378). The placement copy has its own subscriber, so a new project's
- * traces can come first: an uncopied project fails the batch before anything is counted, so our own
- * retry never counts a placed project twice, and the queue retries, until its window from first seen runs out; then it drops, as does a placed project
- * whose organization has no creation copy. A project this process dropped is skipped with no read;
- * its copy landing forgets it.
+ * redelivered batch counts again: accepted (owner decision, issue 9378). The placement copy has
+ * its own subscriber, so a new project's traces can come first: an uncopied project fails the
+ * batch before anything is counted, so our own retry never counts a placed project twice, and the
+ * queue retries until its window from first seen runs out; then it drops, as does a placed project
+ * whose organization has no creation copy. A project this process dropped is skipped with no
+ * read; its copy landing forgets it.
  */
 async function countInWindow({
   traces,
@@ -414,8 +415,10 @@ export function traceDayGroupOf(event: Event): string {
 
 /**
  * One project's traces per UTC day: root spans of one project and day are coalesced, and each
- * batch adds its traces in one Postgres statement; a redelivered batch can count a trace twice
- * (accepted, issue 9378). Only organizations in their counting window count. Not a fold, so no replay rebuilds the rows. Child, sample and Langy spans mint no job; the handler
+ * batch adds its traces in one Postgres statement. Nothing de-duplicates: a redelivered batch
+ * counts a trace again, and so does a root span stored more than once (a re-emitted
+ * span_received), accepted (issue 9378). Only organizations in their counting window count. Not a
+ * fold, so no replay rebuilds the rows. Child, sample and Langy spans mint no job; the handler
  * drops any staged.
  */
 export function nurturingTraceDaySubscriber(
@@ -446,10 +449,10 @@ const failedTraceDataSchema = traceFailedEventDataSchema.pick({
 });
 
 /**
- * One project's failed traces per UTC day, from trace's own trace_failed fact (once per trace,
- * by trace's rule) on the day it was appended, added as the trace count is, so a redelivered
- * fact can count a failure twice (accepted, issue 9378). Sample and Langy failures mint no job;
- * the handler drops any staged.
+ * One project's failed traces per UTC day: errorCount counts trace's trace_failed facts on the
+ * day each was appended. Like the trace count, a redelivered or re-stored fact counts again
+ * (owner decision, issue 9378). Sample and Langy failures mint no job; the handler drops any
+ * staged.
  */
 export function nurturingFailedTraceDaySubscriber(
   deps: NurturingTraceCountingDeps,

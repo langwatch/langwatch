@@ -10,8 +10,8 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   traces are left out, as trace leaves them out of a project's first trace. Root spans and failed
   traces of one project and day are batched, and each batch adds its traces to that day's row in
   one Postgres statement: it counts the batch's traces and adds them, with no record of which
-  traces were counted before. A redelivered batch can count a trace twice; accepted (owner
-  decision, issue 9378).
+  traces were counted before. A redelivered batch can count a trace twice, and so can a root span
+  stored more than once (a re-emitted span_received); accepted (owner decision, issue 9378).
   Traces are counted only while their organization is inside its counting window (its creation
   plus the 14-day free window and a week), so the trace-day rows scale with new organizations'
   traffic alone. An hourly sweep (a scheduled process, since an organization that stopped tracing
@@ -160,7 +160,7 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   @unit
   Scenario: A redelivered batch can count a trace twice; accepted
     Given a trace's root span counted on its project's day
-    When its batch is delivered again
+    When its batch is delivered again, or the root span is stored again (a re-emitted span_received)
     Then the trace counts again; accepted (owner decision, issue 9378)
 
   @unit

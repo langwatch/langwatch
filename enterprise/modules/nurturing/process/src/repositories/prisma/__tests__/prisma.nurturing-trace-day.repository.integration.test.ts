@@ -24,6 +24,8 @@ const namespace = `test-nurturing-trace-day-${randomUUID()}`;
 const projectId = `${namespace}-project`;
 const otherProjectId = `${namespace}-other`;
 const projectIds = [projectId, otherProjectId];
+// Its own project, so its day stays out of the prune test's read of `projectIds`.
+const repeatedProjectId = `${namespace}-repeated`;
 const AT = Date.UTC(2026, 10, 19, 12);
 
 const trace = (overrides: Partial<NurturingCountedTrace> = {}): NurturingCountedTrace => ({
@@ -50,7 +52,7 @@ describe.skipIf(!databaseUrl)("given nurturing's trace-day rows", () => {
   afterAll(async () => {
     if (!connection) return;
     await connection.client.nurturingProjectTraceDay.deleteMany({
-      where: { projectId: { in: projectIds } },
+      where: { projectId: { in: [...projectIds, repeatedProjectId] } },
     });
     await connection.closeOnce();
   });
@@ -86,6 +88,22 @@ describe.skipIf(!databaseUrl)("given nurturing's trace-day rows", () => {
       const [counted] = await repository.findForProjects({
         projectIds: [projectId],
         afterDay: "2026-11-19",
+      });
+      expect(counted?.traceCount).toBe(2);
+    });
+  });
+
+  describe("when the same trace is counted twice", () => {
+    /** @scenario "A redelivered batch can count a trace twice; accepted" */
+    it("adds every trace it is given, the same one twice included", async () => {
+      await repository.countTraces([
+        trace({ projectId: repeatedProjectId }),
+        trace({ projectId: repeatedProjectId }),
+      ]);
+
+      const [counted] = await repository.findForProjects({
+        projectIds: [repeatedProjectId],
+        afterDay: "2026-11-18",
       });
       expect(counted?.traceCount).toBe(2);
     });
