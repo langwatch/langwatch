@@ -1117,7 +1117,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   # counts a view as drift only when it lacks a column this worker's catalog
   # declares, never for an extra one, so a newer deploy that added a column looks
   # healthy to an older worker, which leaves the newer view alone. Its grants are
-  # additive and never revoke, so a view only the newer catalog has keeps its
+  # additive and never revoke the reader role, so a view only the newer catalog has keeps its
   # SELECT. A newer deploy that only removed a column is put back to the older
   # view by an older worker, and the newer worker accepts the extra column: the
   # view settles on the union of the columns both catalogs need, so it stops
@@ -1136,7 +1136,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Given a newer deploy has converged views and approved views that added columns this worker's catalog does not declare
     When this worker's reconvergence check runs
     Then it finds no drift and runs no DDL
-    And repairing a missing or ungranted approved view grants SELECT on that view alone and never revokes
+    And repairing a missing or ungranted approved view grants SELECT on that view alone and never revokes the reader role
     And a deploy's converge still revokes and grants the reader role's whole set
 
   # A deploy converges views after the engine tables and stops at the first

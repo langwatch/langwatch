@@ -384,7 +384,7 @@ describe("convergeLwqlAccessModel", () => {
     });
 
     /** @scenario "An older worker never rewrites a newer view for columns it does not declare" */
-    it("creates only the absent approved view, grants SELECT on each gap and never revokes", async () => {
+    it("creates only the absent view, grants each gap and never revokes the reader", async () => {
       const [absent, ungranted, untouched] = approvedViews;
       if (!absent || !ungranted || !untouched) throw new Error("the catalog maps too few datasets");
       const postgres = postgresThat({ refuses: false });
@@ -409,7 +409,14 @@ describe("convergeLwqlAccessModel", () => {
       expect(grants).toContain(`GRANT SELECT ON "public"."${absent}"`);
       expect(grants).toContain(`GRANT SELECT ON "public"."${ungranted}"`);
       expect(grants).not.toContain(`"${untouched}" TO`);
-      expect(grants).not.toMatch(/REVOKE|ALTER ROLE|CREATE ROLE/);
+      expect(grants).not.toMatch(/ALTER ROLE|CREATE ROLE/);
+      expect(grants).not.toContain(`FROM "${LWQL_POSTGRES_READER_ROLE}"`);
+      const repaired = new RegExp(
+        `^REVOKE SELECT ON "public"\\."(${absent}|${ungranted})" FROM "lwql_scoped_reader"$`,
+      );
+      for (const revoke of grants.match(/REVOKE[^;']*/g) ?? []) {
+        expect(revoke).toMatch(repaired);
+      }
     });
 
     /** @scenario "An older worker never rewrites a newer view for columns it does not declare" */
