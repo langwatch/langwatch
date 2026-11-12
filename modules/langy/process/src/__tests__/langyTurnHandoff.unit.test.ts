@@ -22,7 +22,6 @@ const handoff = {
     organizationId: "organization-1",
   },
   runToken: "run-token",
-  permitReserved: false,
 };
 
 describe("LangyTurnHandoffRedisRepository", () => {

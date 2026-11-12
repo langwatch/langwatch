@@ -26,8 +26,11 @@ import type {
   LangyWorkerDispatchInput,
   LangyWorkerProbeInput,
 } from "../../../../channels/langy-worker.channel.ts";
+import { LangyGithubPrCountMemoryRepository } from "../../../../repositories/memory/memory.langy-github-pr-count.repository.ts";
 import { LangyGuidedKickoffService } from "../../../../services/langy-guided-kickoff.service.ts";
 import type { LangyConversationService } from "../../../conversation/services/langy-conversation.service.ts";
+import { LangyGithubPrPermitService } from "../../../github/services/langy-github-pr-permit.service.ts";
+import { LangyGithubPrQuotaService } from "../../../github/services/langy-github-pr-quota.service.ts";
 import { LangyTurnService, type StartConversationTurnInput } from "../langy-turn.service.ts";
 
 /**
@@ -65,11 +68,7 @@ function makeFixture(over: LangyTurnDepsOverrides = {}) {
       cancel: vi.fn(async () => undefined),
       warm: vi.fn(async () => undefined),
     },
-    permits: {
-      reserve: vi.fn(async () => ({ reserved: false, allowed: true, resetAt: 0 })),
-      release: vi.fn(async () => undefined),
-      check: vi.fn(async () => ({ allowed: true })),
-    },
+    permits: { check: vi.fn(async () => ({ allowed: true, resetAt: 0 })) },
     perDayPrCap: 5,
     sessionKeys: {
       mint: vi.fn(async () => ({ token: "session-key", apiKeyId: "key-1" })),
@@ -317,26 +316,25 @@ describe("LangyTurnPreparationService golden path", () => {
     });
 
     /** @scenario "Connecting GitHub resumes the turn without a duplicate message" */
-    it("re-drives it with the token in place, one permit and no second copy of the message", async () => {
-      const reserve = vi.fn(async () => ({ reserved: true, allowed: true, resetAt: 0 }));
-      const permits = { reserve, release: vi.fn(async () => undefined), check: vi.fn() };
+    it("re-drives it with the token in place, reading the cap once and no second copy of the message", async () => {
+      const check = vi.fn(async () => ({ allowed: true, resetAt: 0 }));
       const before = makeFixture({
         credentials: githubCredentials(undefined),
-        permits: { ...permits, check: vi.fn(async () => ({ allowed: true })) },
+        permits: { check },
       });
       await LangyTurnService.create(before.deps).startConversationTurn({ ...input });
-      expect(reserve).not.toHaveBeenCalled();
+      expect(check).not.toHaveBeenCalled();
 
       const after = makeFixture({
         credentials: githubCredentials("gh-token"),
-        permits: { ...permits, check: vi.fn(async () => ({ allowed: true })) },
+        permits: { check },
       });
       await LangyTurnService.create(after.deps).startConversationTurn({
         ...input,
         isRetry: true,
       });
 
-      expect(reserve).toHaveBeenCalledTimes(1);
+      expect(check).toHaveBeenCalledTimes(1);
       expect(after.acceptTurn).toHaveBeenCalledWith(
         expect.not.objectContaining({ userMessage: expect.anything() }),
       );
@@ -345,6 +343,39 @@ describe("LangyTurnPreparationService golden path", () => {
           credentials: expect.objectContaining({ githubToken: "gh-token" }),
         }),
       );
+    });
+  });
+
+  describe("given more code turns in a day than the pull request cap, none of which opened one", () => {
+    /** @scenario "A code turn that opens no pull request spends nothing of the daily cap" */
+    it("still hands the next turn the GitHub token", async () => {
+      const cap = LangyGithubPrPermitService.create(
+        LangyGithubPrQuotaService.create({ counts: LangyGithubPrCountMemoryRepository.create() }),
+      );
+      const permits = { check: (input: { userId: string }) => cap.check(input) };
+      const githubCredentials = {
+        getOrProvision: vi.fn(async () =>
+          workerCredentials({
+            organizationId: "organization-1",
+            githubToken: "gh-token",
+            githubLogin: "octocat",
+          }),
+        ),
+        findEgressAllowlist: vi.fn(async () => null),
+        resolveMirrorTier: vi.fn(async () => "content" as const),
+        findModelsAllowed: vi.fn(async () => null),
+      };
+
+      for (let turn = 0; turn < 25; turn += 1) {
+        const fixture = makeFixture({ credentials: githubCredentials, permits, perDayPrCap: 20 });
+        await LangyTurnService.create(fixture.deps).startConversationTurn({ ...input });
+        expect(fixture.dispatch).toHaveBeenCalledWith(
+          expect.objectContaining({
+            prompt: expect.not.stringContaining("USER PR CAP REACHED"),
+            credentials: expect.objectContaining({ githubToken: "gh-token" }),
+          }),
+        );
+      }
     });
   });
 
@@ -364,11 +395,7 @@ describe("LangyTurnPreparationService golden path", () => {
           resolveMirrorTier: vi.fn(async () => "content" as const),
           findModelsAllowed: vi.fn(async () => null),
         },
-        permits: {
-          reserve: vi.fn(async () => ({ reserved: false, allowed: false, resetAt: 0 })),
-          release: vi.fn(async () => undefined),
-          check: vi.fn(async () => ({ allowed: false })),
-        },
+        permits: { check: vi.fn(async () => ({ allowed: false, resetAt: 0 })) },
       });
 
       await LangyTurnService.create(fixture.deps).startConversationTurn({ ...input });
@@ -393,11 +420,7 @@ describe("LangyTurnPreparationService golden path", () => {
           resolveMirrorTier: vi.fn(async () => "content" as const),
           findModelsAllowed: vi.fn(async () => null),
         },
-        permits: {
-          reserve: vi.fn(async () => ({ reserved: false, allowed: false, resetAt: 0 })),
-          release: vi.fn(async () => undefined),
-          check: vi.fn(async () => ({ allowed: false })),
-        },
+        permits: { check: vi.fn(async () => ({ allowed: false, resetAt: 0 })) },
       });
 
       await LangyTurnService.create(fixture.deps).startConversationTurn({ ...input });
@@ -449,11 +472,11 @@ describe("LangyTurnPreparationService golden path", () => {
     expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ intent: "continue" }));
   });
 
-  it("finalizes the GitHub permit before probing the worker signature", async () => {
+  it("reads the GitHub pull request cap before probing the worker signature", async () => {
     const order: string[] = [];
-    const reserve = vi.fn(async () => {
+    const check = vi.fn(async () => {
       order.push("permit");
-      return { reserved: false, allowed: false, resetAt: Date.now() + 60_000 };
+      return { allowed: false, resetAt: Date.now() + 60_000 };
     });
     const probe = vi.fn(async ({ hasGithubAuth }: { hasGithubAuth: boolean }) => {
       order.push(`probe:${String(hasGithubAuth)}`);
@@ -473,11 +496,7 @@ describe("LangyTurnPreparationService golden path", () => {
         resolveMirrorTier: vi.fn(async () => "content" as const),
         findModelsAllowed: vi.fn(async () => null),
       },
-      permits: {
-        reserve,
-        release: vi.fn(async () => undefined),
-        check: vi.fn(async () => ({ allowed: true })),
-      },
+      permits: { check },
       worker: {
         probe,
         dispatch,
@@ -554,10 +573,10 @@ describe("LangyTurnPreparationService golden path", () => {
     expect(fixture.dispatch).not.toHaveBeenCalled();
   });
 
-  /** @scenario "Invalid modelOverride must NOT burn a permit" */
+  /** @scenario "Invalid modelOverride never reads the daily cap" */
   it("rejects a disallowed model and releases the admission", async () => {
     const abort = vi.fn(async () => undefined);
-    const reserve = vi.fn(async () => ({ reserved: false, allowed: true, resetAt: 0 }));
+    const check = vi.fn(async () => ({ allowed: true, resetAt: 0 }));
     const fixture = makeFixture({
       credentials: {
         getOrProvision: vi.fn(async () => workerCredentials({ organizationId: "organization-1" })),
@@ -565,11 +584,7 @@ describe("LangyTurnPreparationService golden path", () => {
         resolveMirrorTier: vi.fn(async () => "content" as const),
         findModelsAllowed: vi.fn(async () => ["openai/gpt-5-mini"]),
       },
-      permits: {
-        reserve,
-        release: vi.fn(async () => undefined),
-        check: vi.fn(async () => ({ allowed: true })),
-      },
+      permits: { check },
       admission: {
         claim: vi.fn(async () => ({
           kind: "claimed" as const,
@@ -591,7 +606,7 @@ describe("LangyTurnPreparationService golden path", () => {
     ).rejects.toMatchObject({ code: "langy_model_not_allowed", httpStatus: 400 });
 
     expect(abort).toHaveBeenCalledOnce();
-    expect(reserve).not.toHaveBeenCalled();
+    expect(check).not.toHaveBeenCalled();
   });
 
   it("rejects a resolved default that is not on the allowlist before dispatch", async () => {
@@ -612,10 +627,8 @@ describe("LangyTurnPreparationService golden path", () => {
     expect(fixture.dispatch).not.toHaveBeenCalled();
   });
 
-  /** @scenario "Permit must be released on every non-PR exit" */
-  it("revokes the key, releases the permit, and aborts when acceptance fails", async () => {
+  it("revokes the key and aborts when acceptance fails", async () => {
     const revoke = vi.fn(async () => undefined);
-    const release = vi.fn(async () => undefined);
     const abort = vi.fn(async () => undefined);
     const acceptTurn = vi.fn(async () => {
       throw new Error("event store failed");
@@ -646,11 +659,6 @@ describe("LangyTurnPreparationService golden path", () => {
         mint: vi.fn(async () => ({ token: "session-key", apiKeyId: "key-1" })),
         revoke,
       },
-      permits: {
-        reserve: vi.fn(async () => ({ reserved: true, allowed: true, resetAt: 0 })),
-        release,
-        check: vi.fn(async () => ({ allowed: true })),
-      },
       admission: {
         claim: vi.fn(async () => ({
           kind: "claimed" as const,
@@ -670,7 +678,6 @@ describe("LangyTurnPreparationService golden path", () => {
 
     expect(fixture.dispatch).not.toHaveBeenCalled();
     expect(revoke).toHaveBeenCalledWith({ apiKeyId: "key-1", projectId: "project-1" });
-    expect(release).toHaveBeenCalledWith({ userId: "user-1" });
     expect(abort).toHaveBeenCalledOnce();
   });
 

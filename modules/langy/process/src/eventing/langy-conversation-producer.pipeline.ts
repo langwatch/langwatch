@@ -149,6 +149,7 @@ function buildLangyConversationProducerPipeline(input: {
       projects: { findSummaryById: refuse("read a project for a notification") },
       notifications: { requestWebPushDelivery: refuse("request a Web Push delivery") },
     },
+    githubPrCounter: { recordOpened: refuse("count an opened pull request") },
   }).buildProcessing();
 }
 

@@ -58,9 +58,7 @@ function makeFixture(over: LangyTurnDepsOverrides = {}) {
       warm: vi.fn(async () => undefined),
     },
     permits: {
-      reserve: vi.fn(async () => ({ reserved: false, allowed: true, resetAt: 0 })),
-      release: vi.fn(async () => undefined),
-      check: vi.fn(async () => ({ allowed: true })),
+      check: vi.fn(async () => ({ allowed: true, resetAt: 0 })),
     },
     perDayPrCap: 5,
     sessionKeys: { mint, revoke: vi.fn(async () => undefined) },

@@ -68,7 +68,6 @@ function makeHandoff(overrides: Partial<LangyTurnHandoff> = {}): LangyTurnHandof
       organizationId: "org_1",
     },
     runToken: "run_token",
-    permitReserved: false,
     ...overrides,
   };
 }

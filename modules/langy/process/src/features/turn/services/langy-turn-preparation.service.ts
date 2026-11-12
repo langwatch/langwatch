@@ -90,11 +90,11 @@ export class LangyTurnPreparationService {
       args.credentials.disabledSkillIds = disabledSkills;
     }
     const runToken = this.requireRunnableTurn(args, results);
-    const permit = await this.reservePermit(args);
+    const capReachedNote = await this.checkPrCap(args);
     const lateProbe = () => earlyWorkerProbe ?? this.probeWorker(args, disabledSkills);
     await this.ensureWorkerAccess(args, lateProbe);
-    const prepared = this.buildPreparedTurn(args, results, permit.capReachedNote);
-    await this.stashPreparedTurn({ args, prepared, runToken, permitReserved: permit.reserved });
+    const prepared = this.buildPreparedTurn(args, results, capReachedNote);
+    await this.stashPreparedTurn({ args, prepared, runToken });
     await this.acceptPreparedTurn(args, prepared, mintedRunToken);
     await this.dispatchPreparedTurn(args, prepared, runToken);
     this.deps.metrics.count({ outcome: "accepted" });
@@ -203,13 +203,16 @@ export class LangyTurnPreparationService {
     return runTokenResult.value;
   }
 
-  private async reservePermit(
+  /**
+   * Reads how many pull requests the person opened today; a turn spends nothing here, since only
+   * a pull request that opened counts (the PR count subscriber records it from the answer).
+   */
+  private async checkPrCap(
     args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
-  ) {
+  ): Promise<string> {
     const permit = args.credentials.githubToken
-      ? await this.deps.permits.reserve({ userId: args.userId })
-      : { reserved: false, allowed: true, resetAt: 0 };
-    args.attempt.retainPermit(permit.reserved);
+      ? await this.deps.permits.check({ userId: args.userId })
+      : { allowed: true, resetAt: 0 };
     const capReachedNote = permit.allowed
       ? ""
       : [
@@ -230,7 +233,7 @@ export class LangyTurnPreparationService {
       stripGithubCredentials(args.credentials);
     }
 
-    return { reserved: permit.reserved, capReachedNote };
+    return capReachedNote;
   }
 
   private async probeWorker(
@@ -341,12 +344,10 @@ export class LangyTurnPreparationService {
     args,
     prepared,
     runToken,
-    permitReserved,
   }: {
     args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0];
     prepared: ReturnType<LangyTurnPreparationService["buildPreparedTurn"]>;
     runToken: string;
-    permitReserved: boolean;
   }) {
     try {
       await Promise.all([
@@ -367,7 +368,6 @@ export class LangyTurnPreparationService {
           modelOverride: args.turnModel,
           credentials: args.credentials,
           runToken,
-          permitReserved,
           ...(prepared.pendingHandoff ? { resumeToken: prepared.pendingHandoff.token } : {}),
         }),
       ]);

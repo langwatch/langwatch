@@ -1,8 +1,8 @@
 import { LangyGithubPrCountRepository } from "../langy-github-pr-count.repository.ts";
 
-/** The counter in process memory: the same counts, no expiry (a test outlives no day). */
+/** The day buckets in process memory: the same sets, no expiry (a test outlives no day). */
 export class LangyGithubPrCountMemoryRepository extends LangyGithubPrCountRepository {
-  private readonly counts = new Map<string, number>();
+  private readonly buckets = new Map<string, Set<string>>();
 
   static create(): LangyGithubPrCountMemoryRepository {
     return new LangyGithubPrCountMemoryRepository();
@@ -13,22 +13,13 @@ export class LangyGithubPrCountMemoryRepository extends LangyGithubPrCountReposi
   }
 
   count(key: string): Promise<number> {
-    return Promise.resolve(this.counts.get(key) ?? 0);
+    return Promise.resolve(this.buckets.get(key)?.size ?? 0);
   }
 
-  add({ key, amount }: { key: string; amount: number }): Promise<number> {
-    const next = (this.counts.get(key) ?? 0) + amount;
-    this.counts.set(key, next);
-    return Promise.resolve(next);
-  }
-
-  takeBack(key: string): Promise<void> {
-    this.counts.set(key, (this.counts.get(key) ?? 0) - 1);
-    return Promise.resolve();
-  }
-
-  release(key: string): Promise<void> {
-    this.counts.set(key, Math.max(0, (this.counts.get(key) ?? 0) - 1));
+  add({ key, pullRequests }: { key: string; pullRequests: readonly string[] }): Promise<void> {
+    const bucket = this.buckets.get(key) ?? new Set<string>();
+    for (const pullRequest of pullRequests) bucket.add(pullRequest);
+    this.buckets.set(key, bucket);
     return Promise.resolve();
   }
 }

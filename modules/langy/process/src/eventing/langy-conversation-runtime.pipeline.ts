@@ -38,6 +38,10 @@ import {
   type LangyFirstMessageSeenFacts,
 } from "./langy-first-message-seen.subscriber.ts";
 import {
+  createLangyGithubPrCountSubscriber,
+  type LangyGithubPrCounter,
+} from "./langy-github-pr-count.subscriber.ts";
+import {
   createGuidedOnboardingTurnFailedSubscriber,
   type GuidedOnboardingFacts,
   type GuidedOnboardingReader,
@@ -102,6 +106,8 @@ interface EventingLangyConversationAdapterOptions {
   };
   /** Who a notification goes to and whether they want it, and notification's Web Push. */
   webPush: Pick<LangyWebPushSubscriberDeps, "users" | "projects" | "notifications">;
+  /** Where the pull requests a turn opened count against its owner's daily cap. */
+  githubPrCounter: LangyGithubPrCounter;
 }
 
 /**
@@ -213,6 +219,11 @@ export class EventingLangyConversationAdapter {
       turns: options.localConnectTurn.turns,
     });
 
+    const githubPrCountSubscriber = createLangyGithubPrCountSubscriber({
+      conversations: conversationReader,
+      counter: options.githubPrCounter,
+    });
+
     const webPushSubscriber = createLangyWebPushSubscriber({
       ...langyWebPushReaders({
         conversations: conversationStore,
@@ -238,6 +249,7 @@ export class EventingLangyConversationAdapter {
         firstMessageSeenSubscriber,
         localConnectTurnSubscriber,
         webPushSubscriber,
+        githubPrCountSubscriber,
       ],
     });
   }

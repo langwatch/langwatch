@@ -169,9 +169,7 @@ function makeFixture({
       warm,
     },
     permits: {
-      reserve: vi.fn(async () => ({ reserved: true, allowed: true, resetAt: 0 })),
-      release: vi.fn(async () => undefined),
-      check: vi.fn(async () => ({ allowed: true })),
+      check: vi.fn(async () => ({ allowed: true, resetAt: 0 })),
     },
     perDayPrCap: 5,
     sessionKeys: { mint, revoke: vi.fn(async () => undefined) },

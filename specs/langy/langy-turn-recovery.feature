@@ -239,7 +239,7 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     And the user does not see a red error card
     And Langy offers a Connect button in the conversation, where the turn stopped
     And Langy does not retry on its own, because only the user can connect it
-    And the stalled turn gives back the daily pull-request permit it reserved
+    And the stalled turn counts nothing against the daily pull-request cap
 
   # The false-positive guard, and the reason this is not a blanket pre-flight:
   # most turns never touch GitHub, and stopping them all to demand a connection
@@ -264,7 +264,7 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     When the user connects their GitHub account from the card
     Then Langy re-drives the turn without the user retyping anything
     And the conversation holds exactly one copy of the user's message
-    And the resumed turn does not consume a second daily pull-request permit
+    And the resumed turn counts against the daily pull-request cap only the pull requests it opens
     And the resumed turn runs with the GitHub token in place
 
   @unit

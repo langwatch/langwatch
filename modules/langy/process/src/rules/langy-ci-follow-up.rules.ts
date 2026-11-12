@@ -10,7 +10,7 @@ export const LANGY_CI_FOLLOW_UPS_IN_A_ROW = 3;
  * The pull requests a turn opened: only a successful `gh pr create` call counts, read from the
  * URL it printed. A URL printed by any other command opens nothing.
  */
-function pullRequestsOpenedIn(
+export function pullRequestsOpenedIn(
   parts: readonly LangyMessagePart[],
 ): { repositoryFullName: string; prNumber: number }[] {
   const opened = new Map<string, { repositoryFullName: string; prNumber: number }>();

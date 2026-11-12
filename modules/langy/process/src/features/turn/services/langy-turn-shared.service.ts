@@ -55,15 +55,9 @@ abstract class LangyTurnContextRenderer {
   abstract render(input: { context: object; isUiActionSurfaceOpen: boolean }): string | null;
 }
 
-/** Checks and reserves GitHub pull-request capacity for Langy turns. */
+/** The daily pull request cap, read before a turn is handed the GitHub token. */
 export abstract class LangyGithubPermit {
-  abstract reserve(input: { userId: string }): Promise<{
-    reserved: boolean;
-    allowed: boolean;
-    resetAt: number;
-  }>;
-  abstract release(input: { userId: string }): Promise<void>;
-  abstract check(input: { userId: string }): Promise<{ allowed: boolean }>;
+  abstract check(input: { userId: string }): Promise<{ allowed: boolean; resetAt: number }>;
 }
 
 /** Ends what a turn left open on the developer's machine: its local calls and its cards. */

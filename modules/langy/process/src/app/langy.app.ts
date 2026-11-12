@@ -438,6 +438,9 @@ export class LangyModule implements LangyApiContract {
         projects: setup.dependencies.projects,
         notifications: setup.dependencies.notifications,
       },
+      githubPrCounter: LangyGithubPrQuotaService.create({
+        counts: setup.repositories.githubPrCounts,
+      }),
     });
     const longPoll = LocalControlLongPollService.create({ core });
     const sockets = LocalControlConnectionService.create({ core });
