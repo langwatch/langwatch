@@ -137,6 +137,36 @@ export abstract class TraceLegacyReadRepository {
     limit?: number;
   }): Promise<string[]>;
 
+  /** The traces holding a span with this id inside the window; at most `limit`. */
+  abstract resolveTraceIdsBySpanId(params: {
+    authorization: Authorization;
+    projectId: string;
+    spanId: string;
+    occurredAt: TraceOccurredAtRange;
+    limit: number;
+  }): Promise<string[]>;
+
+  /** The traces a scenario run produced (`scenario.run_id`) inside the window; at most `limit`. */
+  abstract resolveTraceIdsByScenarioRunId(params: {
+    authorization: Authorization;
+    projectId: string;
+    scenarioRunId: string;
+    occurredAt: TraceOccurredAtRange;
+    limit: number;
+  }): Promise<string[]>;
+
+  /**
+   * The trace built from its stored spans alone, for a trace whose summary is not written yet;
+   * empty when no span of it is stored inside the retention floor.
+   */
+  abstract findTraceFromStoredSpans(
+    params: TraceLegacySpanFloor & {
+      authorization: Authorization;
+      projectId: string;
+      traceId: string;
+    },
+  ): Promise<TraceLegacyRow[]>;
+
   abstract findSpanForPromptStudio(params: {
     projectId: string;
     spanId: string;

@@ -34,6 +34,7 @@ const iso = (ms: number | null) => (ms === null ? null : new Date(ms).toISOStrin
 
 describe("parseWindowValue()", () => {
   describe("when given a lookback", () => {
+    /** @scenario A lookback, a calendar word or a local date is a window bound */
     it("reads minutes, hours, days and weeks as that long before now", () => {
       expect(start("30m")).toBe(NOW - 30 * 60_000);
       expect(start("12h")).toBe(NOW - 12 * HOUR);

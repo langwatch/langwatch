@@ -66,6 +66,43 @@ export class ClickHouseTraceExistenceRepository extends TraceExistenceRepository
     }
   }
 
+  async findProjectsHoldingTrace({
+    projectIds,
+    traceId,
+  }: {
+    projectIds: readonly string[];
+    traceId: string;
+  }): Promise<string[]> {
+    const holding = await Promise.all(
+      [...new Set(projectIds)].map(async (projectId) => {
+        const client = await this.resolveClient(projectId);
+        const holds = async (query: string) => {
+          const result = await client.query({
+            query,
+            query_params: { tenantId: projectId, traceId },
+            format: "JSONEachRow",
+          });
+          return traceIdRowsSchema.parse(await result.json()).length > 0;
+        };
+        const found =
+          (await holds(`
+            SELECT TraceId FROM trace_summaries
+            WHERE TenantId = {tenantId:String}
+              AND TraceId = {traceId:String}
+              {{idBound:trace_summaries.TraceId:traceId}}
+            LIMIT 1`)) ||
+          (await holds(`
+            SELECT TraceId FROM stored_spans
+            WHERE TenantId = {tenantId:String}
+              AND TraceId = {traceId:String}
+              {{idBound:stored_spans.TraceId:traceId}}
+            LIMIT 1`));
+        return found ? projectId : null;
+      }),
+    );
+    return holding.filter((projectId): projectId is string => projectId !== null);
+  }
+
   async findTraceCosts({
     projectId,
     traceIds,

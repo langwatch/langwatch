@@ -61,6 +61,7 @@ import {
   type PromptStudioSpanRow,
   derivePromptStudioSpan,
 } from "../../rules/trace-legacy-prompt-studio-span.rules.ts";
+import { summaryFromStoredSpans } from "../../rules/trace-legacy-spans-only-summary.rules.ts";
 import { traceStartedAt } from "../../rules/trace-legacy-summary-mapping.rules.ts";
 import {
   TraceLegacyReadRepository,
@@ -982,6 +983,104 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         }
       },
     );
+  }
+
+  async resolveTraceIdsBySpanId({
+    authorization,
+    projectId,
+    spanId,
+    occurredAt,
+    limit,
+  }: {
+    authorization: Authorization;
+    projectId: string;
+    spanId: string;
+    occurredAt: { from: number; to: number };
+    limit: number;
+  }): Promise<string[]> {
+    const reader = this.reader({ authorization, projectId });
+    const result = await reader.query({
+      // ID_BOUND_SKIP: a span id has no id index; bounded by the window and the bloom index.
+      query: `
+        SELECT DISTINCT TraceId
+        FROM stored_spans
+        WHERE ${tenantScope("StartTime")}
+          AND SpanId = {spanId:String}
+          AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64})
+          AND StartTime <= fromUnixTimestamp64Milli({toMs:Int64})
+        LIMIT {limit:UInt32}
+      `,
+      query_params: { spanId, fromMs: occurredAt.from, toMs: occurredAt.to, limit },
+      format: "JSONEachRow",
+    });
+    return traceIdRowsSchema.parse(await result.json()).map((row) => row.TraceId);
+  }
+
+  async resolveTraceIdsByScenarioRunId({
+    authorization,
+    projectId,
+    scenarioRunId,
+    occurredAt,
+    limit,
+  }: {
+    authorization: Authorization;
+    projectId: string;
+    scenarioRunId: string;
+    occurredAt: { from: number; to: number };
+    limit: number;
+  }): Promise<string[]> {
+    const reader = this.reader({ authorization, projectId });
+    const result = await reader.query({
+      // ID_BOUND_SKIP: an attribute lookup, bounded by the caller's window.
+      query: `
+        SELECT TraceId
+        FROM trace_summaries
+        WHERE ${tenantScope("OccurredAt")}
+          AND Attributes['scenario.run_id'] = {scenarioRunId:String}
+          AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+          AND OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})
+        GROUP BY TraceId
+        ORDER BY min(OccurredAt) ASC
+        LIMIT {limit:UInt32}
+      `,
+      query_params: { scenarioRunId, fromMs: occurredAt.from, toMs: occurredAt.to, limit },
+      format: "JSONEachRow",
+    });
+    return traceIdRowsSchema.parse(await result.json()).map((row) => row.TraceId);
+  }
+
+  async findTraceFromStoredSpans({
+    authorization,
+    projectId,
+    traceId,
+    retentionDays,
+  }: {
+    authorization: Authorization;
+    projectId: string;
+    traceId: string;
+    retentionDays: RetentionDaysProvider | undefined;
+  }): Promise<TraceLegacyRow[]> {
+    const reader = this.reader({ authorization, projectId });
+    const spanRows = await this.readJoinedSpanRows({
+      reader,
+      projectId,
+      batchTraceIds: [traceId],
+      spanRange: undefined,
+      maxSpanRows: undefined,
+      retentionDays,
+    });
+    if (spanRows.length === 0) return [];
+    const spans = spanRows.map((row) => this.mapSpanRow(row, projectId));
+    return [
+      {
+        summary: summaryFromStoredSpans({
+          traceId,
+          spans,
+          nowMs: nowInstant().epochMilliseconds,
+        }),
+        spans,
+      },
+    ];
   }
 
   async findTracesByThreadId({

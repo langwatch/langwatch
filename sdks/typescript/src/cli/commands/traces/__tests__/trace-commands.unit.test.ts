@@ -275,6 +275,7 @@ describe("searchTracesCommand()", () => {
       return body.endDate - body.startDate;
     };
 
+    /** @scenario A trace read with no window reads the last 7 days */
     it("reads the last 7 days", async () => {
       mockSearch.mockResolvedValue({ traces: [{ traceId: "t1" }], pagination: { totalHits: 1 } });
 
@@ -284,6 +285,7 @@ describe("searchTracesCommand()", () => {
       expect(sentWindow(0)).toBe(7 * DAY);
     });
 
+    /** @scenario An empty default search widens once to 30 days and says so */
     it("widens once to 30 days when the default week is empty, and says so", async () => {
       mockSearch
         .mockResolvedValueOnce({ traces: [], pagination: { totalHits: 0 } })
@@ -338,6 +340,7 @@ describe("searchTracesCommand()", () => {
       mockSearch.mockResolvedValue({ traces: [], pagination: { totalHits: 0 } });
     });
 
+    /** @scenario An empty search names what was searched and the command to widen it */
     it("describes what was searched and the command that reads further back, as JSON", async () => {
       await searchTracesCommand({
         query: "refund",
@@ -574,6 +577,7 @@ describe("exportTracesCommand()", () => {
   });
 
   describe("when nothing matches", () => {
+    /** @scenario An empty export says what it read on stderr and keeps stdout the file */
     it("says on stderr what it read and how to export further back, leaving stdout the file", async () => {
       await exportTracesCommand({ query: "refund", format: "json" });
 
@@ -890,6 +894,76 @@ describe("getTraceCommand()", () => {
       mockGet.mockRejectedValue(new TracesApiError("Not found", "get trace"));
 
       await expect(getTraceCommand("nonexistent", {})).rejects.toThrow(ProcessExitError);
+    });
+  });
+
+  describe("when the trace is still arriving", () => {
+    const stillArriving = Object.assign(new Error("Trace not found"), {
+      code: "trace_not_found",
+      retryable: true,
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** @scenario The CLI retries a trace that is still arriving */
+    it("retries briefly and prints the trace once it lands", async () => {
+      vi.useFakeTimers();
+      mockGet
+        .mockRejectedValueOnce(stillArriving)
+        .mockRejectedValueOnce(stillArriving)
+        .mockResolvedValue({ trace_id: "trace_abc", spans: [] });
+
+      const run = getTraceCommand("trace_abc", { format: "json" });
+      await vi.advanceTimersByTimeAsync(10_000);
+      await run;
+
+      expect(mockGet).toHaveBeenCalledTimes(3);
+      expect(vi.mocked(console.log).mock.calls.flat().join("\n")).toContain("trace_abc");
+    });
+
+    it("gives up after the last retry and exits with code 1", async () => {
+      vi.useFakeTimers();
+      mockGet.mockRejectedValue(stillArriving);
+
+      const run = getTraceCommand("trace_abc", {}).catch((error: unknown) => error);
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      expect(await run).toBeInstanceOf(ProcessExitError);
+      expect(mockGet).toHaveBeenCalledTimes(4);
+    });
+
+    it("does not retry a failure the platform did not mark retryable", async () => {
+      mockGet.mockRejectedValue(
+        Object.assign(new Error("Trace in another project"), {
+          code: "trace_in_other_project",
+          retryable: false,
+        }),
+      );
+
+      await expect(getTraceCommand("trace_abc", {})).rejects.toThrow(ProcessExitError);
+      expect(mockGet).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when --format json is given", () => {
+    /** @scenario The CLI and the REST route answer the same for one id */
+    it("prints the REST route's document for that id unchanged", async () => {
+      const document = {
+        trace_id: "0123456789abcdef0123456789abcdef",
+        requested_id: "8f1c2d3e4a5b6c7d",
+        resolved_from: "span_id",
+        spans: [],
+        evaluations: [],
+      };
+      mockGet.mockResolvedValue(document);
+
+      await getTraceCommand("8f1c2d3e4a5b6c7d", { format: "json" });
+
+      expect(mockGet).toHaveBeenCalledWith("8f1c2d3e4a5b6c7d", { format: "json" });
+      const printed = JSON.parse(vi.mocked(console.log).mock.calls.at(-1)![0] as string);
+      expect(printed).toEqual(document);
     });
   });
 });

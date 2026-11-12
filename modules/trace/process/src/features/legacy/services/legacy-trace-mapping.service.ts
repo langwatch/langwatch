@@ -102,6 +102,35 @@ export class LegacyTraceMappingService {
     });
   }
 
+  /** One trace built from its stored spans while its summary is not written yet. */
+  async findTraceFromStoredSpans({
+    projectId,
+    authorization,
+    traceId,
+    protections,
+    opts,
+  }: {
+    authorization: Authorization;
+    projectId: string;
+    traceId: string;
+    protections: Protections;
+    opts?: { resolveBlobs?: boolean | undefined };
+  }): Promise<Trace[]> {
+    const rows = await this.repository.findTraceFromStoredSpans({
+      authorization,
+      projectId,
+      traceId,
+      retentionDays: this.retentionDays,
+    });
+    return this.resolveAndMerge({
+      projectId,
+      rows,
+      protections,
+      resolveBlobs: opts?.resolveBlobs,
+      failure: "Failed to build a trace from its stored spans",
+    });
+  }
+
   async findTracesByThreadId({
     authorization,
     projectId,

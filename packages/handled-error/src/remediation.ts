@@ -96,10 +96,24 @@ const registry = {
   // ---- traces ----
   trace_not_found: {
     tips: [
-      "Check the trace id; traces are deleted after the retention window",
       "If you just sent this trace, retry in a few seconds; ingestion is asynchronous",
+      "The id was looked up as a trace id, a trace id prefix, a span id and a scenario run id, in this project and every project of the organisation you can read",
+      'Find it by what it contained instead: `langwatch trace search -q "<text>" --since 30d`',
+      "Traces are deleted after the project's retention window",
     ],
     docsPath: "/platform/data-retention",
+  },
+  trace_in_other_project: {
+    tips: [
+      "Read it from the project that holds it: `langwatch trace get <traceId> --project <projectSlug>`",
+      "Or use an API key of that project",
+    ],
+  },
+  scenario_run_has_many_traces: {
+    tips: [
+      "Open one of the listed traces: `langwatch trace get <traceId>`",
+      'List them all: `langwatch trace search --filter "scenarioRun:<scenarioRunId>" --since 30d`',
+    ],
   },
   span_not_found: {
     tips: ["Check the span id; spans are deleted with their trace after the retention window"],
