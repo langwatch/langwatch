@@ -53,6 +53,13 @@ Feature: Large dataset storage
     And the rows written before the failure are removed
 
   @unit
+  Scenario: A create that cannot tell whether its dataset was saved keeps the rows
+    Given the save of a new dataset fails after its rows were written
+    When the dataset turns out to be saved, or checking for it fails too
+    Then the create fails
+    And the rows written for it are kept
+
+  @unit
   Scenario: A new dataset refuses two rows with the same id
     When I create a new dataset whose rows include the same id twice
     Then the create fails because the id is duplicated
