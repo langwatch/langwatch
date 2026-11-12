@@ -33,7 +33,7 @@ export class LangWatchQLViewDedupService {
   /**
    * The strategy one view is rendered with: its own where it pins one, and the caller's default
    * otherwise. The entry wins because the reason an entry pins a strategy is a property of its
-   * source table that no default can be right about — see `SHIPPED_LWQL_DEDUP`.
+   * source table that no default can be right about; see `SHIPPED_LWQL_DEDUP`.
    */
   strategyFor({
     view,
@@ -63,7 +63,7 @@ export class LangWatchQLViewDedupService {
       // Refuse at provisioning time rather than emit a view that collapses
       // nothing: this strategy exists to keep one version per key, and a source
       // with no version column has no survivor to pick. Reachable only if a
-      // dataset is given this strategy without declaring the column — the
+      // dataset is given this strategy without declaring the column: the
       // PostgreSQL-resident ones take the tenant-predicate branch instead.
       throw new Error(
         view.dedup.aggregating

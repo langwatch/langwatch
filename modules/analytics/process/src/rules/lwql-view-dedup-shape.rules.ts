@@ -1,6 +1,6 @@
 /**
  * How a LangWatchQL view keeps one row per logical record: the strategy and what it reads.
- * @see ../features/provisioning/services/langwatch-ql-view-dedup.service.ts — how each renders
+ * @see ../features/provisioning/services/langwatch-ql-view-dedup.service.ts: how each renders
  */
 
 /** How a view collapses its source's rows to one per logical record. */
@@ -20,7 +20,7 @@ export const FLOORED_DEDUP_STRATEGIES: ReadonlySet<LangWatchQLDedupStrategy> = n
 /** What identifies one row of a view, and how the source's versions collapse to it. */
 export interface LangWatchQLViewDedup {
   /**
-   * The source table's `ORDER BY` — the key its engine collapses on.
+   * The source table's `ORDER BY`: the key its engine collapses on.
    */
   readonly keyColumns: readonly string[];
   /**

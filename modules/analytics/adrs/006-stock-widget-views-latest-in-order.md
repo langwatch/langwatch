@@ -2,13 +2,13 @@
 
 **Date:** 2026-11-11
 
-**Status:** Proposed. Decisions 3 to 7 hold. Decision 1 (now `LIMIT 1 BY`) still measures above FINAL
-(below); keeping it over FINAL is the owner's call before release. It goes against
-`.claude/rules/database.md`, which asks for IN-tuple dedup (`GROUP BY key` + `max(UpdatedAt)`)
-rather than `LIMIT 1 BY` on tables with heavy columns, because `LIMIT 1 BY` materialises whole
-granules. Here the subquery reads only the view's columns, in sort-key order, and the four
-example queries peaked at 1.4 to 3.4 times before's memory (below); the rule's IN-tuple form was
-not measured for these views.
+**Status:** Accepted. The owner ruled out `FINAL` on the views the stock widgets read
+(2026-11-12), so decision 1 keeps `LIMIT 1 BY` on the eight views pinned to `latest-in-order`.
+It goes against `.claude/rules/database.md`, which asks for IN-tuple dedup (`GROUP BY key` +
+`max(UpdatedAt)`) rather than `LIMIT 1 BY` on tables with heavy columns, because `LIMIT 1 BY`
+materialises whole granules. Here the subquery reads only the view's columns, in sort-key order.
+Its measured cost: the four example queries peak at 1.4 to 3.4 times before's memory (below).
+The IN-tuple form was not measured for these views.
 
 ## Context
 

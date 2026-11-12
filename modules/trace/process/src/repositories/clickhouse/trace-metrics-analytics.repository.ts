@@ -104,7 +104,7 @@ type ClickHouseTraceAnalyticsWriteRecord = {
     // ── Read-back state (ADR-066, migration 00056) ─────────────────────────
     SpanCount: number;
     AnnotationIds: string[];
-    // UInt64 epoch-ms columns ride as strings, like TotalDurationMs — exact
+    // UInt64 epoch-ms columns ride as strings, like TotalDurationMs, exact
     // integer round-trip, TZ-immune (the fold compares these numerically).
     RootSpanStartTimeMs: string;
     TraceNameFromFallback: boolean;

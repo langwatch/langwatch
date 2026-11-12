@@ -1,5 +1,5 @@
 /**
- * LangWatchQL analytics SQL — sending a read bounded below on a view's floor column to the view's
+ * LangWatchQL analytics SQL: sending a read bounded below on a view's floor column to the view's
  * floored twin, whose dedup reads only the versions from that bound (analytics ADR-005).
  * @see specs/lwql/dedup-floor.feature
  */

@@ -1,6 +1,6 @@
 /**
- * @see ./catalog/lwql-views.ts — the catalog these statements are built from
- * @see ./provisioning.ts — the access model applied over them
+ * @see ./catalog/lwql-views.ts: the catalog these statements are built from
+ * @see ./provisioning.ts: the access model applied over them
  * @see specs/lwql/api.feature
  */
 
