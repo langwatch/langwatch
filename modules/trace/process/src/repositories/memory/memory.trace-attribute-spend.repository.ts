@@ -23,7 +23,7 @@ type AttributedTrace = Readonly<{
 }>;
 
 type Filter = {
-  tenantId: string;
+  tenantIds: readonly string[];
   attributeKey: string;
   window: TraceModelSpendWindow;
   values?: string[];
@@ -46,10 +46,10 @@ export class MemoryTraceAttributeSpendRepository extends TraceAttributeSpendRepo
   }
 
   async findSpendByAttributeValue(
-    input: Filter & { values: string[] },
+    input: Omit<Filter, "tenantIds"> & { tenantId: string; values: string[] },
   ): Promise<TraceAttributeValueSpend[]> {
     const byValue = new Map<string, { spent: number; requests: number }>();
-    for (const trace of this.#matching(input)) {
+    for (const trace of this.#matching({ ...input, tenantIds: [input.tenantId] })) {
       const value = trace.attributes[input.attributeKey] ?? "";
       const sum = byValue.get(value) ?? { spent: 0, requests: 0 };
       byValue.set(value, { spent: sum.spent + trace.costUsd, requests: sum.requests + 1 });
@@ -117,7 +117,7 @@ export class MemoryTraceAttributeSpendRepository extends TraceAttributeSpendRepo
     return [...this.#traces.values()].filter((trace) => {
       const value = trace.attributes[input.attributeKey] ?? "";
       return (
-        trace.tenantId === input.tenantId &&
+        input.tenantIds.includes(trace.tenantId) &&
         trace.occurredAtMs >= input.window.startMs &&
         trace.occurredAtMs < input.window.endMs &&
         (input.values ? input.values.includes(value) : value !== "")

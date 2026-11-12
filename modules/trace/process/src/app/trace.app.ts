@@ -3200,25 +3200,28 @@ export class TraceModule implements TraceApi, CollectorApp {
   }
 
   findAttributeUsageBuckets(input: {
-    projectId: string;
+    projectIds: readonly string[];
     attributeKey: string;
     window: TraceModelSpendWindow;
     values?: string[];
   }): Promise<TraceAttributeUsageBucket[]> {
-    const { projectId, ...query } = input;
-    return this.#attributeSpendRead().findAttributeUsageBuckets({ tenantId: projectId, ...query });
+    const { projectIds, ...query } = input;
+    return this.#attributeSpendRead().findAttributeUsageBuckets({
+      tenantIds: projectIds,
+      ...query,
+    });
   }
 
   findAttributedTraces(input: {
-    projectId: string;
+    projectIds: readonly string[];
     attributeKey: string;
     window: TraceModelSpendWindow;
     values?: string[];
     model?: string;
     limit: number;
   }): Promise<TraceAttributedTrace[]> {
-    const { projectId, ...query } = input;
-    return this.#attributeSpendRead().findAttributedTraces({ tenantId: projectId, ...query });
+    const { projectIds, ...query } = input;
+    return this.#attributeSpendRead().findAttributedTraces({ tenantIds: projectIds, ...query });
   }
 
   getAttributedSpendComparison(input: {
