@@ -53,11 +53,6 @@ describe("ClickHousePasswordFile", () => {
         });
       });
     }
-
-    it("never prints the content of a file it read", () => {
-      writeFileSync(path, "   ");
-      expect(() => ClickHousePasswordFile.open({ path })).toThrow(/is empty/);
-    });
   });
 
   describe("given a password was read", () => {

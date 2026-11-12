@@ -51,11 +51,19 @@ import { PrivateDataplaneRefusals } from "./private-dataplane-refusal.ts";
 class VendorClickHouseClientFactory extends ClickHouseClientFactory<ClickHouseClient> {
   private readonly logSink = createLogger("langwatch:clickhouse:driver");
 
-  constructor(
-    private readonly config: ClickHouseConfig,
-    private readonly sharedPasswordFile: ClickHousePasswordFile | undefined,
-  ) {
+  private readonly config: ClickHouseConfig;
+  private readonly sharedPasswordFile: ClickHousePasswordFile | undefined;
+
+  constructor({
+    config,
+    sharedPasswordFile,
+  }: {
+    config: ClickHouseConfig;
+    sharedPasswordFile: ClickHousePasswordFile | undefined;
+  }) {
     super();
+    this.config = config;
+    this.sharedPasswordFile = sharedPasswordFile;
   }
 
   create(input: ClickHouseClientCreationInput): ClickHouseClient {
@@ -304,7 +312,7 @@ export function buildClickHouse(options: {
 
   const connection = ClickHouseConnectionService.create({
     directory: options.directory,
-    clientFactory: new VendorClickHouseClientFactory(config, sharedPasswordFile),
+    clientFactory: new VendorClickHouseClientFactory({ config, sharedPasswordFile }),
     refusal: PrivateDataplaneRefusals.create().forClickHouse(),
     ...(config.maxTenantCacheEntries === undefined
       ? {}

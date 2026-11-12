@@ -16,7 +16,7 @@ const VARIABLE = "CLICKHOUSE_PASSWORD_FILE";
 
 /** The file named by `CLICKHOUSE_PASSWORD_FILE` could not give a password at boot. */
 export class ClickHousePasswordFileError extends Error {
-  constructor(path: string, reason: string) {
+  constructor({ path, reason }: { path: string; reason: string }) {
     super(`${VARIABLE} names "${path}", which ${reason}. Point it at a file holding one password.`);
     this.name = "ClickHousePasswordFileError";
   }
@@ -75,10 +75,10 @@ export class ClickHousePasswordFile {
     try {
       content = readFileSync(path, "utf8");
     } catch (error) {
-      throw new ClickHousePasswordFileError(path, unreadable(error));
+      throw new ClickHousePasswordFileError({ path, reason: unreadable(error) });
     }
     const read = passwordIn(content);
-    if ("reason" in read) throw new ClickHousePasswordFileError(path, read.reason);
+    if ("reason" in read) throw new ClickHousePasswordFileError({ path, reason: read.reason });
     return new ClickHousePasswordFile({ path, logger, now, refreshMs, initial: read.password });
   }
 
@@ -129,12 +129,11 @@ export function usernameOf(url: string): string {
 const STATEMENT_METHODS = new Set<PropertyKey>(["query", "insert", "command", "exec"]);
 
 type StatementParams = { auth?: unknown };
-type PingParams = StatementParams & { select?: boolean };
 
 /**
  * The client, with every statement logging in as `username` with the file's current password.
- * A statement that names its own `auth` keeps it. A plain `/ping` checks no credentials, so only
- * a `SELECT` ping is given them.
+ * A statement that names its own `auth` keeps it. The driver ignores per-request auth on ping, so
+ * a ping always uses the URL's credentials; use a statement to check the login.
  */
 export function authenticatedFromFile({
   client,
@@ -156,13 +155,6 @@ export function authenticatedFromFile({
       if (STATEMENT_METHODS.has(property)) {
         return async (params: StatementParams) =>
           value.call(target, { ...params, auth: params.auth ?? (await credentials()) });
-      }
-      if (property === "ping") {
-        return async (params?: PingParams) =>
-          value.call(
-            target,
-            params?.select ? { ...params, auth: params.auth ?? (await credentials()) } : params,
-          );
       }
       return value.bind(target);
     },
