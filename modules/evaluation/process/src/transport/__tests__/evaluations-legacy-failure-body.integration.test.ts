@@ -4,6 +4,7 @@
  */
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type * as observabilityModule from "@langwatch/observability";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -193,6 +194,79 @@ describe("given an evaluate call whose evaluator ran", () => {
       expect(response.status).toBe(503);
       // A platform fault: the envelope masks the code, and keeps the status and the retry hint.
       await expect(response.json()).resolves.toMatchObject({ retryable: true });
+    });
+  });
+});
+
+type EvaluatorError = Extract<SingleEvaluationResult, { status: "error" }>;
+
+describe("given an evaluate call whose evaluator answered an error", () => {
+  /** `details` is typed required but evaluators can omit it (#8507); the one cast lives here. */
+  const withoutDetails: Omit<EvaluatorError, "details"> = {
+    status: "error",
+    error_type: "EVALUATOR_ERROR",
+    traceback: [],
+  };
+  const evaluatorError = (details?: string): SingleEvaluationResult =>
+    details === undefined
+      ? (withoutDetails as EvaluatorError)
+      : { status: "error", error_type: "EVALUATOR_ERROR", details, traceback: [] };
+
+  const evaluate = async (result: SingleEvaluationResult) => {
+    const runEvaluator = vi.fn(() => Promise.resolve(result));
+    const runtime = createRestRuntime({
+      authorization: restTestAuthorization(),
+      identity: {
+        authenticate: () => ({
+          actor: { type: "user", id: "user-1" },
+          scope: { tier: "project", id: PROJECT_ID },
+        }),
+      },
+    });
+    const app = runtime.mount(evaluationsLegacyRest.router(), {
+      app: () =>
+        createApiFixture<EvaluationApi>({
+          findMonitorBySlug: () => Promise.resolve(null),
+          listCustomEvaluators: () => Promise.resolve([]),
+          findModelForFeature: () => Promise.resolve(null),
+          runEvaluator,
+          reportEvaluation: () => Promise.resolve(),
+        }),
+      onError: (error, context) => context.json({ error: String(error) }, 500),
+    });
+    const response = await app.fetch(
+      new Request("http://api.test/api/evaluations/langevals/valid_format/evaluate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ data: { input: "hi", output: "hello" }, settings: {} }),
+      }),
+    );
+    return { response, runEvaluator };
+  };
+
+  describe("when the error carries no details", () => {
+    it("answers the evaluator's error once, without a run failure", async () => {
+      loggerSpies.error.mockClear();
+
+      const { response, runEvaluator } = await evaluate(evaluatorError());
+
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as { status?: unknown; details?: unknown };
+      expect(body.status).toBe("error");
+      expect(body.details).toBeUndefined();
+      expect(runEvaluator).toHaveBeenCalledOnce();
+      expect(loggerSpies.error).not.toHaveBeenCalledWith(
+        expect.anything(),
+        "error running evaluation",
+      );
+    });
+  });
+
+  describe("when the error says the evaluator timed out", () => {
+    it("runs the evaluator once more", async () => {
+      const { runEvaluator } = await evaluate(evaluatorError("Evaluator request timed out"));
+
+      expect(runEvaluator).toHaveBeenCalledTimes(2);
     });
   });
 });
