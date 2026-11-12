@@ -1,7 +1,6 @@
 /**
  * One person's daily run on one board: the read, the three acts on it, and Run now. Each write
- * lands in the cached read first, since the worker folds the event a moment later; a refused
- * write puts the read back and says so. Run now opens Langy on the run once it started.
+ * lands in the cached read first; a refused write puts the read back and says so.
  * @see modules/insight/adrs/004-daily-run.md
  */
 
@@ -17,6 +16,8 @@ import { currentTimeZone, nowInstant } from "@langwatch/time";
 import { useEffect, useEffectEvent, useRef } from "react";
 
 import {
+  type DeadlineRead,
+  deadlineReadOf,
   defaultRunSettings,
   type InsightLastRun,
   requestedRunEndWords,
@@ -72,28 +73,28 @@ function showRequestedRun({
   }
 }
 
-type RequestedRun = NonNullable<ReturnType<typeof requestedRunOf>>;
+type RequestedRun = Extract<DeadlineRead, { kind: "run" }>["run"];
 type RunRequest = { requestId: string; requestedAt: number };
 type ReadResult = { data?: InsightDailyRunSetting | undefined; isError: boolean };
 
-/** The run the deadline's read shows for the request; a failed read shows none. */
+/** What the deadline's read shows for the request; a failed read shows no run. */
 function readRequestedRun({
   readOnce,
   request,
 }: {
   readOnce: () => Promise<ReadResult>;
   request: RunRequest;
-}): Promise<RequestedRun | undefined> {
+}): Promise<DeadlineRead> {
   // A failed read resolves with the data cached before it, which says nothing of this read.
   return readOnce().then(({ data, isError }) =>
-    data && !isError ? requestedRunOf({ setting: data, ...request }) : undefined,
+    data && !isError ? deadlineReadOf({ setting: data, ...request }) : { kind: "none" },
   );
 }
 
 /**
- * One deadline, not a poll: the spinner ends at the run's expiry, and the one read it fires gives
- * the verdict when it answers: a run opens, none or a failed read says the run could not be
- * started, no answer says nothing (ADR-004). A verdict owed dies with `cancelVerdict`.
+ * One deadline, not a poll: the spinner ends at the run's expiry and one read gives the verdict
+ * (ADR-004): a run opens; none or a failed read says it could not start; a late run or no answer
+ * says nothing. A verdict owed dies with `cancelVerdict`.
  */
 function useRequestedRunDeadline({
   request,
@@ -123,14 +124,15 @@ function useRequestedRunDeadline({
     verdictOwedTo.current = undefined;
   };
   const deliverVerdict = useEffectEvent(
-    (owedTo: RunRequest, firedAt: number, requested?: RequestedRun) => {
+    (owedTo: RunRequest, firedAt: number, read: DeadlineRead) => {
       if (verdictOwedTo.current !== owedTo) return;
       cancelVerdict();
       // A read that lands a whole run's life after the deadline says nothing of this request: the
       // run it shows may be the next scheduled one, and a hint that outran its row is not a loss.
       if (nowInstant().epochMilliseconds - firedAt > INSIGHT_DAILY_RUN_EXPIRY_MS) return;
-      if (requested) showRun(requested);
-      else sayLost();
+      // A run that started after the deadline is not the request's: it says nothing of it.
+      if (read.kind === "run") showRun(read.run);
+      else if (read.kind === "none") sayLost();
     },
   );
   useEffect(() => cancelVerdict, []);
@@ -140,8 +142,8 @@ function useRequestedRunDeadline({
       verdictOwedTo.current = request;
       const firedAt = nowInstant().epochMilliseconds;
       endWait();
-      void readRequestedRun({ readOnce: readLastTime, request }).then((requested) =>
-        deliverVerdict(request, firedAt, requested),
+      void readRequestedRun({ readOnce: readLastTime, request }).then((read) =>
+        deliverVerdict(request, firedAt, read),
       );
     }, INSIGHT_DAILY_RUN_EXPIRY_MS);
     return () => clearTimeout(deadline);

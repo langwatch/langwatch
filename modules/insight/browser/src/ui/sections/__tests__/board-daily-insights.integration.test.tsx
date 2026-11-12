@@ -1043,7 +1043,8 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
       read = new Promise<InsightDailyRunSetting>(() => void 0);
       await vi.advanceTimersByTimeAsync(60_000);
       await waitFor(() => expect(board.reads()).toHaveLength(READS_BEFORE_DEADLINE + 1));
-      await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS);
+      // A minute short of the full lifetime: the later read still lands inside the window.
+      await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS - 60_000);
 
       const waiting = await openDropdown(board.user);
       expect(waiting.queryByText("Starting a run.")).toBeNull();
@@ -1079,6 +1080,38 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
       await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS + 1_000);
 
       // The next scheduled run, which the member never asked for.
+      read = {
+        ...ON,
+        runInFlight: {
+          runId: "run-scheduled",
+          conversationId: "conversation-9",
+          startedAt: Date.now(),
+        },
+      };
+      await board.readHint();
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      expect(board.host.queries).toEqual([]);
+      expect(board.host.failures).toEqual([]);
+      expect(board.host.notices).toEqual([]);
+    });
+
+    /** @scenario "A run that started after the deadline gives no verdict" */
+    it("says nothing and opens nothing when a hint's read shows a scheduled run that started after the deadline", async () => {
+      let read: InsightDailyRunSetting | Promise<InsightDailyRunSetting> = ON;
+      const board = openBoard({
+        setting: () => read,
+        host: ASKER,
+        write: () => runNowAnswer(),
+      });
+      await aMinuteBeforeTheDeadline(board);
+
+      read = new Promise<InsightDailyRunSetting>(() => void 0);
+      await vi.advanceTimersByTimeAsync(60_000);
+      await waitFor(() => expect(board.reads()).toHaveLength(READS_BEFORE_DEADLINE + 1));
+      // Inside the window, so only the start time tells it from the request's own run.
+      await vi.advanceTimersByTimeAsync(30 * 60_000);
+
       read = {
         ...ON,
         runInFlight: {

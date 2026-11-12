@@ -5,6 +5,7 @@
 
 import {
   type InsightDailyRunSetting,
+  INSIGHT_DAILY_RUN_EXPIRY_MS,
   INSIGHT_RUN_SKIP_REASONS,
   INSIGHT_SCHEDULE_OFF_REASONS,
   type InsightRunReason,
@@ -12,6 +13,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import {
+  deadlineReadOf,
   defaultRunSettings,
   hourWords,
   type InsightLastRun,
@@ -336,6 +338,68 @@ describe("given a member chose Run now, and the server answered request-1", () =
     it("keeps waiting, with or without a run before", () => {
       expect(awaited(setting({}))).toBeUndefined();
       expect(awaited(setting({ lastRun: null }))).toBeUndefined();
+    });
+  });
+
+  describe("when the deadline fired its read and the verdict is owed", () => {
+    // The deadline on the server's clock, whatever the browser's says.
+    const OWED_SINCE = REQUESTED_AT + INSIGHT_DAILY_RUN_EXPIRY_MS;
+    const atDeadline = (read: InsightDailyRunSetting) =>
+      deadlineReadOf({
+        setting: read,
+        requestId: REQUEST,
+        requestedAt: REQUESTED_AT,
+      });
+
+    it("follows its own run by id, however late it started", () => {
+      const own = setting({
+        runInFlight: {
+          runId: REQUEST,
+          conversationId: "conversation-7",
+          startedAt: OWED_SINCE + 1_000,
+        },
+      });
+
+      expect(atDeadline(own)).toEqual({ kind: "run", run: { conversationId: "conversation-7" } });
+    });
+
+    it("follows a run that started before the deadline", () => {
+      const started = setting({
+        runInFlight: {
+          runId: "run-scheduled",
+          conversationId: "conversation-6",
+          startedAt: OWED_SINCE - 1_000,
+        },
+      });
+
+      expect(atDeadline(started)).toEqual({
+        kind: "run",
+        run: { conversationId: "conversation-6" },
+      });
+    });
+
+    it("says nothing of a run that started or settled after the deadline", () => {
+      const started = setting({
+        runInFlight: {
+          runId: "run-scheduled",
+          conversationId: "conversation-6",
+          startedAt: OWED_SINCE + 1_000,
+        },
+      });
+      const settled = setting({
+        lastRun: lastRun({
+          at: OWED_SINCE + 1_000,
+          runId: "run-scheduled",
+          conversationId: "conversation-6",
+        }),
+      });
+
+      expect(atDeadline(started)).toEqual({ kind: "unrelated" });
+      expect(atDeadline(settled)).toEqual({ kind: "unrelated" });
+    });
+
+    it("tells no run at all from a later one", () => {
+      expect(atDeadline(setting({}))).toEqual({ kind: "none" });
     });
   });
 });

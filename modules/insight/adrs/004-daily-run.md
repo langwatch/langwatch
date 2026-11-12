@@ -235,7 +235,7 @@ read, and the browser reads the board once more. That read gives the verdict, an
 if it shows the requested run the wait ends as for any other read, opening Langy or telling
 how the run ended; if it shows none, or fails, the browser says the run could not be started;
 if it never answers, nothing is said and no panel opens until a later hint's read, which
-replaces the stalled one, answers it: a run it shows then opens as above. The verdict is owed for one more `INSIGHT_DAILY_RUN_EXPIRY_MS` after the deadline: a read that answers later than that says nothing and opens nothing, since the run it shows may be the next scheduled one, and none it shows may only be a hint that outran its row. An answer after the page is gone, the request is turned off or a
+replaces the stalled one, answers it: a run it shows then opens as above. The verdict is owed for one more `INSIGHT_DAILY_RUN_EXPIRY_MS` after the deadline: a read that answers later than that says nothing and opens nothing, since a hint may only have outrun its row. Within that time, a run counts only if its `runId` is the request's, or it started, or settled, before the deadline, which is `requestedAt` plus `INSIGHT_DAILY_RUN_EXPIRY_MS`, both on the server's clock, so a browser clock that is off moves nothing. A run that is neither is one that started after the deadline, and says nothing of the request: it gives no verdict, not even "Couldn't start the run". No run at all still says the run could not be started. An answer after the page is gone, the request is turned off or a
 newer request was made acts on nothing. While a run is in flight the
 dropdown offers to open it instead.
 
