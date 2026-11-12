@@ -245,11 +245,11 @@ type Meter struct {
 
 // meterEvent is one accepted meter event.
 type meterEvent struct {
-	EventName  string `json:"event_name"`
-	Identifier string `json:"identifier"`
-	Customer   string `json:"customer"`
-	Value      int64  `json:"value"`
-	Timestamp  int64  `json:"timestamp"`
+	EventName  string  `json:"event_name"`
+	Identifier string  `json:"identifier"`
+	Customer   string  `json:"customer"`
+	Value      float64 `json:"value"`
+	Timestamp  int64   `json:"timestamp"`
 }
 
 // idem is one remembered idempotent answer.
@@ -463,12 +463,16 @@ type catalogFile struct {
 
 // catalogMeterEvents names the event each catalog meter counts; the file holds ids only.
 var catalogMeterEvents = map[string]string{
-	"BILLABLE_EVENTS":  "langwatch_billable_events",
-	"INSTANT_EVAL_USD": "langwatch_instant_eval_usd",
+	"BILLABLE_EVENTS":   "langwatch_billable_events",
+	"INSTANT_EVAL_USD":  "langwatch_instant_eval_usd",
+	"PII_REDACTION_USD": "langwatch_pii_redaction_usd",
 }
 
 // catalogMetered are priced per unit yet metered; the file does not say so.
-var catalogMetered = map[string]bool{"CONNECTED_HOSTED_USAGE_QUARTERLY": true}
+var catalogMetered = map[string]bool{"CONNECTED_HOSTED_USAGE_QUARTERLY": true, "GROWTH_PII_REDACTION_USD": true}
+
+// catalogMeteredOn names the meter a metered price counts when it is not BILLABLE_EVENTS.
+var catalogMeteredOn = map[string]string{"GROWTH_PII_REDACTION_USD": "PII_REDACTION_USD"}
 
 // seedCatalog puts every mapped price and meter of mode in the account under its
 // real id, so the product's price catalog resolves against paymentsim unchanged.
@@ -500,6 +504,9 @@ func (st *state) seedCatalog(raw []byte, mode string, now time.Time) error {
 			seed.Interval, seed.IntervalCount = r.Interval, r.IntervalCount
 			if detail.UnitAmount == nil || catalogMetered[name] {
 				seed.UsageType, seed.Meter = "metered", billable
+				if meter := file.Meters[catalogMeteredOn[name]][mode]; meter != "" {
+					seed.Meter = meter
+				}
 			}
 		}
 		if _, err := st.seedPrice(seed, now.Unix()); err != nil {

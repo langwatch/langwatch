@@ -43,6 +43,7 @@ class FixedEntitlementService implements Pick<EntitlementApi, "getActivePlan"> {
       free: false,
       maxMembers: 1,
       maxMembersLite: 1,
+      maxMembersDeveloper: 0,
       maxMessagesPerMonth: 1,
       canPublish: false,
       prices: { USD: 0, EUR: 0 },

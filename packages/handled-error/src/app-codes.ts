@@ -569,6 +569,7 @@ export const APP_ERROR_CODES = [
   "missing_slack_webhook",
   "model_default_scope_forbidden",
   "model_default_user_key_required",
+  "model_execution_unavailable",
   "model_not_configured",
   "model_provider_anchor_required",
   "model_provider_credentials_unreadable",

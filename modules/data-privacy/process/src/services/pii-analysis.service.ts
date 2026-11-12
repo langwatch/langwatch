@@ -42,6 +42,7 @@ export class PiiAnalysisService {
     projectId?: string | undefined;
     resolvedPiiLevel?: PiiLevel | undefined;
     spareNamesAndPlaces?: readonly boolean[] | undefined;
+    recordKey?: string | undefined;
   }): Promise<(string | null)[]> {
     const cleared = await this.model.findClearing(input);
     if (cleared) return cleared;

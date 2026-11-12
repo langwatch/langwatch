@@ -35,6 +35,7 @@ export type UsageRead = {
   usageUnit?: string;
   membersCount: number;
   membersLiteCount: number;
+  membersDeveloperCount: number;
   currentMonthMessagesCount: number | null;
   /** Seats used against the plan, counted the way enforcement counts them. */
   seatLimitInfo?: SeatLimitInfo;

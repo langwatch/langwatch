@@ -5745,6 +5745,7 @@ from .post_api_evaluations_by_evaluator_evaluate_response_404_meta import (
 )
 from .post_api_evaluators_body import PostApiEvaluatorsBody
 from .post_api_evaluators_body_config import PostApiEvaluatorsBodyConfig
+from .post_api_evaluators_body_type import PostApiEvaluatorsBodyType
 from .post_api_evaluators_response_200 import PostApiEvaluatorsResponse200
 from .post_api_evaluators_response_200_config_type_0 import PostApiEvaluatorsResponse200ConfigType0
 from .post_api_evaluators_response_200_created_by_type_0 import PostApiEvaluatorsResponse200CreatedByType0
@@ -12365,6 +12366,7 @@ __all__ = (
     "PostApiEvaluationsByEvaluatorEvaluateResponse404Meta",
     "PostApiEvaluatorsBody",
     "PostApiEvaluatorsBodyConfig",
+    "PostApiEvaluatorsBodyType",
     "PostApiEvaluatorsResponse200",
     "PostApiEvaluatorsResponse200ConfigType0",
     "PostApiEvaluatorsResponse200CreatedByType0",

@@ -107,6 +107,7 @@ function currentPlanFeaturesFor({
       planSeatsAndVolume({
         members: plan.maxMembers ?? 0,
         membersLite: plan.maxMembersLite ?? 0,
+        membersDeveloper: plan.maxMembersDeveloper ?? 0,
         messagesPerMonth: plan.maxMessagesPerMonth ?? 0,
       }),
     );

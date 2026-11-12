@@ -58,23 +58,29 @@ describe("InviteService resilience", () => {
           ? (arg as (tx: unknown) => unknown)(mockPrisma)
           : Promise.all(arg as Promise<unknown>[]),
       organizationInvite: {
-        findFirst: vi.fn(),
+        // An unscripted read finds no row, as Prisma answers; the seat reads (ADR-002) ask too.
+        findFirst: vi.fn().mockResolvedValue(null),
         findUnique: vi.fn(),
         findMany: vi.fn(),
         create: vi.fn(),
         update: vi.fn(),
         updateMany: vi.fn(),
       },
+      // Nobody here holds a seat hold (seat-rotation.feature).
+      seatHold: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        findMany: vi.fn().mockResolvedValue([]),
+      },
       // The acceptance claim and the revoke are SQL; the resend and extend
       // claims still go through `updateMany`.
       $executeRaw: vi.fn(),
       organizationUser: {
         createMany: vi.fn().mockResolvedValue({ count: 1 }),
-        findFirst: vi.fn(),
+        findFirst: vi.fn().mockResolvedValue(null),
         findUnique: vi.fn(),
       },
       organization: { findFirst: vi.fn() },
-      customRole: { findMany: vi.fn() },
+      customRole: { findMany: vi.fn().mockResolvedValue([]) },
     };
 
     service = InviteService.create({

@@ -13,6 +13,7 @@ import { explainHandledError } from "@langwatch/handled-error/presentation";
 import { parseCliJson } from "@langwatch/langy-contract";
 
 import { LIMIT_TYPE_LABELS } from "../../../../model/limit-type-labels.ts";
+import { cleanTerminalText, readShellFailure } from "./langy-terminal-output.ts";
 
 /** The plan allowance a failure ran into, in the customer's own words. */
 export interface LangyToolFailureLimit {
@@ -107,7 +108,7 @@ function rawFailureText(errorText: unknown): string | undefined {
   const value = asRecord(errorText);
   const text = readFailureText({ errorText, value });
   if (!text) return undefined;
-  const cleaned = text.replace(/\p{Cc}\[[0-9;]*m/gu, "").trim();
+  const cleaned = cleanTerminalText(text).trim();
   return cleaned.length > 0 ? cleaned : undefined;
 }
 
@@ -387,6 +388,31 @@ function buildNoDomainPresentation(
   };
 }
 
+/**
+ * A shell command on the developer's own machine that exited non-zero. Keyed on the text,
+ * which only the worker's local shell path writes: a folder-bound `bash` arrives named
+ * `bash`. The reader wrote that code, so its last error line, an exception too, is theirs.
+ */
+function buildShellPresentation({
+  title,
+  raw,
+}: {
+  title: string;
+  raw: string | undefined;
+}): LangyToolErrorPresentation | null {
+  const failure = raw ? readShellFailure(raw) : null;
+  if (!failure) return null;
+  return {
+    title: `${title} failed`,
+    message:
+      failure.exitCode === null
+        ? "The command stopped without an exit code."
+        : `The command stopped with exit code ${failure.exitCode}.`,
+    ...(failure.lastErrorLine ? { detail: failure.lastErrorLine } : {}),
+    raw,
+  };
+}
+
 /** Levels 1 and 2: a domain error document, structured into card copy. */
 function buildDomainPresentation({
   title,
@@ -458,6 +484,8 @@ export function presentLangyToolError({
 
   const notInstalled = githubAppNotInstalled({ toolName, raw });
   if (notInstalled) return notInstalled;
+  const shell = domain ? null : buildShellPresentation({ title, raw });
+  if (shell) return shell;
 
   return domain
     ? buildDomainPresentation({ title, domain, raw, toolName })
@@ -473,7 +501,8 @@ const TRACEBACK_SIGNALS = [
   /^\s*Traceback \(most recent call last\)/m,
   /^\s*File "[^"]+", line \d+/m,
   /^\s*at [\w$.<>[\] ]+ \(?[^\s]+:\d+:\d+\)?$/m,
-  /^[A-Za-z_][\w.]*(?:Error|Exception|Warning)\s*:/m,
+  // Warnings are not here: uv and Python print them on runs that went fine.
+  /^[A-Za-z_][\w.]*(?:Error|Exception)\s*:/m,
 ];
 
 /** Whether raw failure text is a stack trace rather than a sentence. */

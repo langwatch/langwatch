@@ -6,8 +6,8 @@ import { api } from "../../behavior/organization-api.ts";
 import { SEAT_TYPE_COPY } from "../../model/seat-type-copy.ts";
 
 /**
- * Each kind of seat in use. Developer seats (ADR-171) are counted with no limit; a
- * plan with no Lite seats and none taken (Free) shows no Lite card, not "0 / 0".
+ * Each kind of seat in use against the plan's cap. Free (no Lite seats, none taken) shows
+ * no Lite card; Developer seats always show, so a Developer over a cap of 0 reads as such.
  * Spec: specs/licensing/seat-reconciliation.feature, specs/members/developer-seat.feature
  */
 export function MemberSeatUsage({
@@ -45,6 +45,7 @@ export function MemberSeatUsage({
       <ResourceLimitRow
         label={SEAT_TYPE_COPY.developerSeatsLabel}
         current={usage.data.membersDeveloperCount}
+        max={activePlan.maxMembersDeveloper}
       />
     </SimpleGrid>
   );

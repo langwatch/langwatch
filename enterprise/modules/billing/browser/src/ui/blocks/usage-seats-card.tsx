@@ -20,7 +20,15 @@ function Value({ children }: { children: string }) {
   );
 }
 
-export function UsageSeatsCard({ fullSeats, lite }: { fullSeats: string; lite: LiteRow }) {
+export function UsageSeatsCard({
+  fullSeats,
+  developerSeats,
+  lite,
+}: {
+  fullSeats: string;
+  developerSeats: string | null;
+  lite: LiteRow;
+}) {
   return (
     <Card
       data-testid="usage-seats-card"
@@ -37,6 +45,11 @@ export function UsageSeatsCard({ fullSeats, lite }: { fullSeats: string; lite: L
         <SettingRow label="Full seats" data-testid="usage-full-seats">
           <Value>{fullSeats}</Value>
         </SettingRow>
+        {developerSeats !== null && (
+          <SettingRow label="Developer seats" data-testid="usage-developer-seats">
+            <Value>{developerSeats}</Value>
+          </SettingRow>
+        )}
         {lite.kind !== "none" && (
           <SettingRow label="Lite members" data-testid="usage-lite-members">
             {lite.kind === "on-growth" ? (

@@ -351,11 +351,27 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "organization:record-seat-peak-opening-snapshots",
+    "kind": "data",
+    "mode": "background",
+    "owner": "organization",
+    "description": "Records every organization's seat holders as they stand, to open its seat peak.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "project:record-created-facts",
     "kind": "data",
     "mode": "background",
     "owner": "project",
     "description": "Records every existing project as created, and each live project's department and presence setting.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "project:list-personal-owner-and-first-message-facts",
+    "kind": "data",
+    "mode": "background",
+    "owner": "project",
+    "description": "Lists every personal project's owner and every project that already received its first message, archived ones included.",
     "needsOldWritersGone": true
   },
   {

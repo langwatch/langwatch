@@ -13,6 +13,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./pii-redaction-spend": {
+      "types": "./dist/data-privacy.pii-redaction-spend.d.ts",
+      "default": "./src/data-privacy.pii-redaction-spend.ts"
     }
   },
   "scripts": {

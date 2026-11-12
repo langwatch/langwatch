@@ -6657,6 +6657,264 @@
       ]
     },
     {
+      "name": "OrganizationSeatPeak",
+      "tableName": "OrganizationSeatPeak",
+      "documentation": "Organization's monthly seat peak, folded from its seat changes (modules/organization, ADR-002).\nA read model, one row per organization: rebuildable by replaying the event log, so no relation.\nEpochs in milliseconds.\nOrganization's seat-peak counts (ADR-002): one row per organization once counting opened.",
+      "primaryKey": [
+        "organizationId"
+      ],
+      "fields": [
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The organization, which is also the aggregate id."
+        },
+        {
+          "name": "openedAt",
+          "columnName": "openedAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "When the opening snapshot was taken, epoch milliseconds."
+        },
+        {
+          "name": "fullSeats",
+          "columnName": "fullSeats",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "liteSeats",
+          "columnName": "liteSeats",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "developerSeats",
+          "columnName": "developerSeats",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "latestChangeAt",
+          "columnName": "latestChangeAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The latest change time applied to any holder; invitations expire up to it."
+        },
+        {
+          "name": "mismatches",
+          "columnName": "mismatches",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Changes whose `from` disagreed with the seat the fold held."
+        }
+      ]
+    },
+    {
+      "name": "OrganizationSeatPeakHolder",
+      "tableName": "OrganizationSeatPeakHolder",
+      "documentation": "One member's or pending invitation's seat as the seat peak last applied it (ADR-002).",
+      "primaryKey": [
+        "organizationId",
+        "holderKind",
+        "holderId"
+      ],
+      "fields": [
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "holderKind",
+          "columnName": "holderKind",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "`member`, `invitation` or `hold` (a seat held after somebody left)."
+        },
+        {
+          "name": "holderId",
+          "columnName": "holderId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The member's or the hold's userId, or the invitation's id."
+        },
+        {
+          "name": "seat",
+          "columnName": "seat",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "`full`, `lite`, `developer` or `none`."
+        },
+        {
+          "name": "lastChangedAt",
+          "columnName": "lastChangedAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "lastChangeId",
+          "columnName": "lastChangeId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Absent for a seat the opening snapshot recorded."
+        },
+        {
+          "name": "expiresAt",
+          "columnName": "expiresAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "An invitation's expiry; null for a member or an invitation that never expires."
+        },
+        {
+          "name": "expiredByFold",
+          "columnName": "expiredByFold",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The fold gave the invitation's seat back at `expiresAt`."
+        },
+        {
+          "name": "suppressedBy",
+          "columnName": "suppressedBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "A hold whose seat a live full invitation to its address took: that invitation's id."
+        },
+        {
+          "name": "restoredByFold",
+          "columnName": "restoredByFold",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The fold gave a suppressed hold its seat back when that invitation expired."
+        }
+      ]
+    },
+    {
+      "name": "OrganizationSeatPeakMonth",
+      "tableName": "OrganizationSeatPeakMonth",
+      "documentation": "One calendar month's (UTC) seat peaks for an organization (ADR-002).",
+      "primaryKey": [
+        "organizationId",
+        "month"
+      ],
+      "fields": [
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "month",
+          "columnName": "month",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "`YYYY-MM`."
+        },
+        {
+          "name": "fullPeak",
+          "columnName": "fullPeak",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "fullPeakAt",
+          "columnName": "fullPeakAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "litePeak",
+          "columnName": "litePeak",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "litePeakAt",
+          "columnName": "litePeakAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "fullAtEnd",
+          "columnName": "fullAtEnd",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "liteAtEnd",
+          "columnName": "liteAtEnd",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
       "name": "Project",
       "tableName": "Project",
       "documentation": "",
@@ -18972,6 +19230,15 @@
           "documentation": ""
         },
         {
+          "name": "maxMembersDeveloper",
+          "columnName": "maxMembersDeveloper",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Developer seats the organization pays for; null falls to the plan's own cap."
+        },
+        {
           "name": "maxTeams",
           "columnName": "maxTeams",
           "type": "Int",
@@ -20126,6 +20393,15 @@
           "documentation": ""
         },
         {
+          "name": "replacesGrantId",
+          "columnName": "replacesGrantId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
           "name": "occurredAt",
           "columnName": "occurredAt",
           "type": "DateTime",
@@ -20643,7 +20919,7 @@
     {
       "name": "NurturingProject",
       "tableName": "NurturingProject",
-      "documentation": "Nurturing's read model: which organization a project belongs to, from project's created event.",
+      "documentation": "Nurturing's read model: which organization a project belongs to, from project's created event.\nThe per-email usage places a project and lists an organization's projects from these rows only.",
       "primaryKey": [
         "projectId"
       ],
@@ -20661,6 +20937,118 @@
           "name": "organizationId",
           "columnName": "organizationId",
           "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "NurturingUncopiedProject",
+      "tableName": "NurturingUncopiedProject",
+      "documentation": "A project nurturing saw traces of with no placement copy, and when it first did: every worker\nretries its trace batches only within one window from then, across restarts. Deleted when the\ncopy lands.",
+      "primaryKey": [
+        "projectId"
+      ],
+      "fields": [
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "firstSeenAt",
+          "columnName": "firstSeenAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "NurturingOrganizationMember",
+      "tableName": "NurturingOrganizationMember",
+      "documentation": "Nurturing's own copy of each organization's members, from the owners' member facts (§9):\norganization's signed_up and invite_accepted and auth's sso_auto_added join, member_removed\nand member_disabled leave, member_enabled returns. Each column keeps its latest time.",
+      "primaryKey": [
+        "organizationId",
+        "userId"
+      ],
+      "fields": [
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "userId",
+          "columnName": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "joinedAt",
+          "columnName": "joinedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "leftAt",
+          "columnName": "leftAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "returnedAt",
+          "columnName": "returnedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "NurturingOrganizationCreated",
+      "tableName": "NurturingOrganizationCreated",
+      "documentation": "When an organization was created, from organization's created event: nurturing's own copy for\nthe per-email usage's day offsets. Its own table, so an early creation never adds an unseeded\nNurturingOrganization row.",
+      "primaryKey": [
+        "organizationId"
+      ],
+      "fields": [
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
           "kind": "scalar",
           "isList": false,
           "isOptional": false,
@@ -20797,6 +21185,201 @@
           "name": "updatedAt",
           "columnName": "updatedAt",
           "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "NurturingProjectUsageView",
+      "tableName": "NurturingProjectUsageView",
+      "documentation": "Nurturing's own per-project usage: a peer fold over the owners' prompt, evaluator, scenario\nand simulation-run events (ARCHITECTURE §9), one peer fold per owner pipeline, summed per\norganization for the per-email traits. Traces are counted in NurturingProjectTraceDay.",
+      "primaryKey": [
+        "projectId",
+        "owner"
+      ],
+      "fields": [
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "owner",
+          "columnName": "owner",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The owner pipeline whose peer fold wrote the row (prompt, evaluator, scenario, simulation),\nor `evaluation`: the project's evaluation days, written by a subscriber, at most once a day."
+        },
+        {
+          "name": "folded",
+          "columnName": "folded",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The project's usage as the fold folded it (NurturingProjectUsageState)."
+        },
+        {
+          "name": "appliedEventIds",
+          "columnName": "appliedEventIds",
+          "type": "String",
+          "kind": "scalar",
+          "isList": true,
+          "isOptional": false,
+          "documentation": "The event ids of the last delivery folded in, so a redelivery folds once."
+        },
+        {
+          "name": "projectionVersion",
+          "columnName": "projectionVersion",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "A row of another version reads as undecodable and is re-folded from the log."
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Event-derived, so a replayed row equals the row it rebuilds."
+        }
+      ]
+    },
+    {
+      "name": "NurturingProjectTraceDay",
+      "tableName": "NurturingProjectTraceDay",
+      "documentation": "Nurturing's own trace counts from trace's span_received and trace_failed (ARCHITECTURE §9), a\nroot span being one trace, one row per project and UTC day of append time, incremented in place\nby each batch. A redelivered batch can count a trace twice; accepted (issue 9378). Kept 30 days.",
+      "primaryKey": [
+        "projectId",
+        "day"
+      ],
+      "fields": [
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "day",
+          "columnName": "day",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "UTC `YYYY-MM-DD` of the root spans' append time."
+        },
+        {
+          "name": "traceCount",
+          "columnName": "traceCount",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "errorCount",
+          "columnName": "errorCount",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Traces trace recorded failed (lw.trace.trace_failed)."
+        },
+        {
+          "name": "lastTraceAt",
+          "columnName": "lastTraceAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Append time of the newest root span."
+        },
+        {
+          "name": "lastFailedTraceAt",
+          "columnName": "lastFailedTraceAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Append time of the newest trace_failed."
+        }
+      ]
+    },
+    {
+      "name": "NurturingPersonalProject",
+      "tableName": "NurturingPersonalProject",
+      "documentation": "Nurturing's copy of each personal project's owner, from organization's and project's facts.\nThe first owner recorded stays: a personal project's owner never changes.",
+      "primaryKey": [
+        "projectId"
+      ],
+      "fields": [
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "ownerUserId",
+          "columnName": "ownerUserId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "NurturingTracedProject",
+      "tableName": "NurturingTracedProject",
+      "documentation": "Nurturing's copy of each project that received a real trace, from trace's and project's facts.",
+      "primaryKey": [
+        "projectId"
+      ],
+      "fields": [
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
           "kind": "scalar",
           "isList": false,
           "isOptional": false,

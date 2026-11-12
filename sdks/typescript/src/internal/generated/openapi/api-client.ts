@@ -653,7 +653,7 @@ export interface paths {
         /** @description Get all evaluators for a project */
         get: operations["getApiEvaluators"];
         put?: never;
-        /** @description Create a new evaluator */
+        /** @description Create a new evaluator: a built-in one, a custom code evaluator (`type: "code"`) or one that wraps a workflow (`type: "workflow"`) */
         post: operations["postApiEvaluators"];
         delete?: never;
         options?: never;
@@ -9350,9 +9350,18 @@ export interface operations {
             content: {
                 "application/json": {
                     name: string;
+                    /**
+                     * @description The kind of evaluator. "evaluator" (the default) is a built-in type named by config.evaluatorType; "code" is a custom Python evaluator whose config carries code and inputs; "workflow" wraps the workflow named by workflowId.
+                     * @default evaluator
+                     * @enum {string}
+                     */
+                    type?: "evaluator" | "code" | "workflow";
+                    /** @description For a built-in evaluator: { evaluatorType, settings }. For a code evaluator: { code, inputs: [{ identifier, type }] }; outputs are the fixed passed, score, label and details. For a workflow evaluator: {}. */
                     config: {
                         [key: string]: unknown;
                     };
+                    /** @description The workflow a "workflow" evaluator wraps. Only for type "workflow". */
+                    workflowId?: string;
                 };
             };
         };

@@ -41,6 +41,7 @@ function tieredLimits({
   return {
     members: { value: members, unit: "members" },
     membersLite: { value: PAID_MEMBERS_LITE, unit: "members" },
+    membersDeveloper: { value: 0, unit: "members" },
     volume: { value: volume, unit: "messages-per-month" },
     seats: null,
     automationDailyDispatch: { value: automationDailyDispatch, unit: "dispatches-per-day" },
@@ -101,6 +102,7 @@ function growthSeatPlan({ period, type }: { period: "monthly" | "annual"; type: 
     limits: {
       members: { value: 20, unit: "members" },
       membersLite: { value: PAID_MEMBERS_LITE, unit: "members" },
+      membersDeveloper: { value: 0, unit: "members" },
       volume: { value: UNLIMITED_MESSAGES, unit: "events-per-month" },
       seats: { value: 20, unit: "seats" },
       automationDailyDispatch: { value: 500, unit: "dispatches-per-day" },
@@ -122,6 +124,7 @@ const FREE_PLAN: Plan = {
   limits: {
     members: { value: 2, unit: "members" },
     membersLite: { value: 0, unit: "members" },
+    membersDeveloper: { value: 0, unit: "members" },
     volume: { value: 50_000, unit: "messages-per-month" },
     seats: null,
     automationDailyDispatch: { value: 50, unit: "dispatches-per-day" },
@@ -165,6 +168,7 @@ const OPEN_SOURCE_PLAN: Plan = {
   limits: {
     members: { value: UNLIMITED, unit: "members" },
     membersLite: { value: UNLIMITED, unit: "members" },
+    membersDeveloper: { value: UNLIMITED, unit: "members" },
     volume: { value: UNLIMITED, unit: "messages-per-month" },
     seats: null,
     automationDailyDispatch: { value: UNLIMITED, unit: "dispatches-per-day" },

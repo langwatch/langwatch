@@ -9,10 +9,14 @@ import type { MoneyByCurrency } from "./plan-type.ts";
 // second definition of any of them is how two parts of the product come to
 // quote a self-hosted customer different seats. See drift.md.
 
-/** The seats a licence sells. `maxMembersLite` predates the split, so it is optional. */
+/**
+ * The seats a licence sells. `maxMembersLite` predates the split and `maxMembersDeveloper`
+ * the Developer seat, so both are optional; a licence without Developer seats sells none.
+ */
 export const licenseSeatsShape = {
   maxMembers: z.number(),
   maxMembersLite: z.number().optional(),
+  maxMembersDeveloper: z.number().optional(),
 } as const;
 
 /** The most lite seats an operator may state: the 32-bit seat column. Unlimited is a plan's. */
@@ -33,15 +37,24 @@ export const planPublishingShape = {
   canPublish: z.boolean(),
 } as const;
 
-/** The seats a licence sells, stated from parts. */
+/**
+ * The seats a licence sells, stated from parts. Developer seats are left out when
+ * unstated, so a licence selling none signs exactly as it did before the field existed.
+ */
 export function licenseSeats({
   members,
   membersLite,
+  membersDeveloper,
 }: {
   members: number;
   membersLite: number | undefined;
-}): { maxMembers: number; maxMembersLite: number | undefined } {
-  return { maxMembers: members, maxMembersLite: membersLite };
+  membersDeveloper?: number;
+}): { maxMembers: number; maxMembersLite: number | undefined; maxMembersDeveloper?: number } {
+  return {
+    maxMembers: members,
+    maxMembersLite: membersLite,
+    ...(membersDeveloper === undefined ? {} : { maxMembersDeveloper: membersDeveloper }),
+  };
 }
 
 /** The publishing entitlement, stated from a decision the caller already made. */
@@ -53,6 +66,7 @@ export function planPublishing({ publish }: { publish: boolean }): { canPublish:
 export const generatableLimitsShape = {
   maxMembers: z.number(),
   maxMembersLite: z.number().optional(),
+  maxMembersDeveloper: z.number().int().min(0).optional(),
   maxMessagesPerMonth: z.number().optional(),
 } as const;
 
@@ -194,6 +208,7 @@ export type LicensingQuotedPlan = {
   overrideAddingLimitations: boolean;
   maxMembers: number;
   maxMembersLite: number;
+  maxMembersDeveloper: number;
   maxMessagesPerMonth: number;
   canPublish: boolean;
   usageUnit: string;
@@ -213,6 +228,7 @@ export const OPEN_SOURCE_LICENSING_PLAN: LicensingQuotedPlan = {
   overrideAddingLimitations: true,
   maxMembers: UNLIMITED,
   maxMembersLite: UNLIMITED,
+  maxMembersDeveloper: UNLIMITED,
   maxMessagesPerMonth: UNLIMITED,
   canPublish: true,
   usageUnit: "traces",
@@ -232,6 +248,7 @@ export const CLOUD_FREE_LICENSING_PLAN: LicensingQuotedPlan = {
   overrideAddingLimitations: false,
   maxMembers: 1,
   maxMembersLite: 0,
+  maxMembersDeveloper: 0,
   maxMessagesPerMonth: 1_000,
   canPublish: false,
   usageUnit: "traces",
