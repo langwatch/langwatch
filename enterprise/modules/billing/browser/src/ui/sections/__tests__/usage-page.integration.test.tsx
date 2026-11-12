@@ -61,6 +61,8 @@ function month(days: Record<string, number>): UsageMonthBreakdown {
   return {
     resetsOn: "2026-12-01",
     isDailyUnavailable: false,
+    byCategory: null,
+    isByCategoryUnavailable: false,
     days: Array.from({ length: 30 }, (_, index) => {
       const date = `2026-11-${String(index + 1).padStart(2, "0")}`;
       return { date, count: days[date] ?? 0 };
@@ -294,6 +296,56 @@ describe("the usage page", () => {
     });
   });
 
+  describe("given an events-metered organization with spans, logs and metrics", () => {
+    const byCategory: UsageMonthBreakdown["byCategory"] = [
+      { category: "spans", count: 21_400 },
+      { category: "logs", count: 6_300 },
+      { category: "metrics", count: 2_900 },
+      { category: "evaluations", count: 1_100 },
+      { category: "experiments", count: 100 },
+      { category: "scenarios", count: 0 },
+    ];
+
+    /** @scenario "The month's events are split by type" */
+    it("lists every type in order with its count, metrics explained", () => {
+      given({ plan: FREE_PLAN, count: 31_800, breakdown: { ...month({}), byCategory } });
+      renderPage();
+
+      const card = screen.getByTestId("usage-types-card");
+      expect(within(card).getByText("By type")).toBeInTheDocument();
+      expect(screen.getAllByTestId("usage-type-row").map((row) => row.textContent)).toEqual([
+        "Spans21,400",
+        "Logs6,300",
+        "Metrics1 per series per hour2,900",
+        "Evaluations1,100",
+        "Experiments100",
+        "Scenarios0",
+      ]);
+      expect(screen.queryByTestId("usage-breakdown-unavailable")).not.toBeInTheDocument();
+    });
+
+    /** @scenario "The page says when the split by type cannot be read" */
+    it("says the split by type could not be loaded and keeps the day and project breakdowns", () => {
+      given({
+        plan: FREE_PLAN,
+        count: 31_800,
+        breakdown: {
+          ...month({ "2026-11-01": 3_100 }),
+          byCategory: null,
+          isByCategoryUnavailable: true,
+        },
+      });
+      renderPage();
+
+      expect(screen.getByTestId("usage-breakdown-unavailable")).toHaveTextContent(
+        "The month by type could not be loaded.",
+      );
+      expect(screen.queryByTestId("usage-types-card")).not.toBeInTheDocument();
+      expect(screen.getAllByTestId("daily-bar")).toHaveLength(30);
+      expect(screen.getAllByTestId("usage-project-row")).toHaveLength(3);
+    });
+  });
+
   describe("given a member who does not administer the organization", () => {
     beforeEach(() => {
       given({ plan: FREE_PLAN, count: 31_800 });
@@ -435,6 +487,14 @@ describe("the usage page", () => {
         within(screen.getByTestId("usage-events-card")).getByText("Traces this month"),
       ).toBeInTheDocument();
       expect(screen.queryAllByTestId("daily-bar")).toHaveLength(0);
+      expect(screen.queryByTestId("usage-breakdown-unavailable")).not.toBeInTheDocument();
+    });
+
+    /** @scenario "A trace-metered organization sees no split by type" */
+    it("shows no split by type and no unavailable note", () => {
+      renderPage();
+
+      expect(screen.queryByTestId("usage-types-card")).not.toBeInTheDocument();
       expect(screen.queryByTestId("usage-breakdown-unavailable")).not.toBeInTheDocument();
     });
 

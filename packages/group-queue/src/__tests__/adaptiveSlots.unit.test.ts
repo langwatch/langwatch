@@ -121,6 +121,19 @@ describe("AdaptiveSlots", () => {
       expect(changes).toEqual([125, 157, 125, 100]);
       expect(slots.current()).toBe(100);
     });
+
+    /** @scenario "A busy moment at the configured concurrency does not hold the count" */
+    it("grows on the next idle measurement when it was already at the floor", () => {
+      const { changes, loadIs, measure } = consumerOf({});
+      loadIs({ loop: 1, heap: 0.4 });
+      measure({ completedPerSecond: 100 });
+      expect(changes).toEqual([]);
+
+      loadIs(IDLE);
+      measure({ completedPerSecond: 100 });
+
+      expect(changes).toEqual([125]);
+    });
   });
 
   describe("when the heap is above four fifths of its limit", () => {

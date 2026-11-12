@@ -44,6 +44,9 @@ export class GovernanceIngestMetricReceiverService {
   async receiveMetrics(batch: GovernanceIngestBatch): Promise<GovernanceIngestMetricReceipt> {
     const { source } = batch;
 
+    // Before the guard below, which turns every throw into a hint: the plan limit must reach the caller.
+    await this.landing.assertWithinAllowance(source);
+
     let bodyBytes = 0;
     let metricCount = 0;
     let rejectedDataPoints = 0;

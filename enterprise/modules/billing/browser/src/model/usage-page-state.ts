@@ -4,7 +4,7 @@
  * @see specs/licensing/usage-page.feature
  */
 import { PlanTypes, UNLIMITED_MESSAGES } from "@langwatch/enterprise-billing-contract";
-import type { UsageDay } from "@langwatch/entitlement-contract";
+import type { UsageCategory, UsageCategoryCount, UsageDay } from "@langwatch/entitlement-contract";
 import numeral from "numeral";
 
 import {
@@ -208,21 +208,62 @@ export function projectShares(projects: readonly { count: number }[]): number[] 
   return projects.map((project) => (total > 0 ? project.count / total : 0));
 }
 
-/** Names the half of the month breakdown that failed, or null when both loaded. */
+/** Names the parts of the month breakdown that failed, or null when all loaded. */
 export function breakdownGapMessage({
   isError,
   isDailyUnavailable,
+  isByCategoryUnavailable = false,
   isProjectsUnavailable,
 }: {
   isError: boolean;
   isDailyUnavailable: boolean;
+  isByCategoryUnavailable?: boolean;
   isProjectsUnavailable: boolean;
 }): string | null {
   const retry = "Refresh the page to try again.";
-  if (isError || (isDailyUnavailable && isProjectsUnavailable)) {
-    return `The month by day and by project could not be loaded. ${retry}`;
-  }
-  if (isDailyUnavailable) return `The month by day could not be loaded. ${retry}`;
-  if (isProjectsUnavailable) return `The month by project could not be loaded. ${retry}`;
-  return null;
+  if (isError) return `The month by day and by project could not be loaded. ${retry}`;
+  const failed = [
+    isDailyUnavailable ? "by day" : null,
+    isByCategoryUnavailable ? "by type" : null,
+    isProjectsUnavailable ? "by project" : null,
+  ].filter((part): part is string => part !== null);
+  if (failed.length === 0) return null;
+  const parts =
+    failed.length === 1
+      ? failed[0]
+      : `${failed.slice(0, -1).join(", ")} and ${failed[failed.length - 1]}`;
+  return `The month ${parts} could not be loaded. ${retry}`;
+}
+
+const CATEGORY_LABELS: Record<UsageCategory, string> = {
+  spans: "Spans",
+  logs: "Logs",
+  metrics: "Metrics",
+  evaluations: "Evaluations",
+  experiments: "Experiments",
+  scenarios: "Scenarios",
+};
+
+const CATEGORY_HINTS: Partial<Record<UsageCategory, string>> = {
+  metrics: "1 per series per hour",
+};
+
+/** One row of the month by type, in the order the breakdown answers. */
+export type CategoryRow = {
+  category: UsageCategory;
+  label: string;
+  hint: string | null;
+  count: number;
+  share: number;
+};
+
+export function categoryRows(byCategory: readonly UsageCategoryCount[]): CategoryRow[] {
+  const shares = projectShares(byCategory);
+  return byCategory.map((entry, index) => ({
+    category: entry.category,
+    label: CATEGORY_LABELS[entry.category],
+    hint: CATEGORY_HINTS[entry.category] ?? null,
+    count: entry.count,
+    share: shares[index] ?? 0,
+  }));
 }

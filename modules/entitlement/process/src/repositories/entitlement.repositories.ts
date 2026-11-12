@@ -1,4 +1,5 @@
 import type { BillableEventsMeterRepository } from "./billable-events-meter.repository.ts";
+import type { BillableEventsTtlRepository } from "./billable-events-ttl.repository.ts";
 import type { MemberSeatRepository } from "./member-seat.repository.ts";
 import type { OrganizationSpendRepository } from "./organization-spend.repository.ts";
 import type { TenancyRepository } from "./tenancy.repository.ts";
@@ -16,6 +17,8 @@ export interface EntitlementRepositories {
   /** The billable-events meter and the trace count the month's count is read from. */
   readonly billableEvents: BillableEventsMeterRepository;
   readonly traces: TraceCountRepository;
+  /** The meter table's delete TTL, applied to existing parts by a background step. */
+  readonly billableEventsTtl: BillableEventsTtlRepository;
   /** Per-pod caches for the month's count and the meter decision enforcement asks per batch. */
   readonly usageCounts: UsageCacheRepository;
   readonly usageDecisions: UsageCacheRepository;

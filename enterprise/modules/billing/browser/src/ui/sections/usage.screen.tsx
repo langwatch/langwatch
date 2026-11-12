@@ -1,6 +1,7 @@
 /**
  * Organization usage at /settings/usage: on hosted, the plan strip, the month's events day by
- * day, each project's share and the seats; self-hosted keeps its licence tiles above the month.
+ * day and by type, each project's share and the seats; self-hosted keeps its licence tiles
+ * above the month.
  * @see specs/licensing/usage-page.feature
  */
 
@@ -40,6 +41,7 @@ import { UsageEventsCard, type UsageEventsCardState } from "../blocks/usage-even
 import { UsagePlanStrip } from "../blocks/usage-plan-strip.tsx";
 import { UsageProjectsCard } from "../blocks/usage-projects-card.tsx";
 import { UsageSeatsCard } from "../blocks/usage-seats-card.tsx";
+import { UsageTypesCard } from "../blocks/usage-types-card.tsx";
 import {
   mapLicenseStatusToLimits,
   mapUsageToLimits,
@@ -176,12 +178,14 @@ function HostedUsage({
   const currency = growth?.currency ?? detectedCurrency;
   const seatPriceCents = growth ? seatPrices[growth.currency][growth.billingInterval] : 0;
   const projects = breakdown.data?.projects ?? [];
+  const byCategory = breakdown.data?.byCategory ?? null;
   // When the count itself is unknown the events card already says so.
   const isCountKnown = usage.data !== undefined && usage.data.currentMonthMessagesCount !== null;
   const breakdownGap = isCountKnown
     ? breakdownGapMessage({
         isError: breakdown.isError,
         isDailyUnavailable: breakdown.data?.isDailyUnavailable === true,
+        isByCategoryUnavailable: breakdown.data?.isByCategoryUnavailable === true,
         isProjectsUnavailable: breakdown.data?.projects === null,
       })
     : null;
@@ -207,6 +211,9 @@ function HostedUsage({
         <Banner status="warning" data-testid="usage-breakdown-unavailable">
           {breakdownGap}
         </Banner>
+      )}
+      {byCategory && usage.data?.currentMonthMessagesCount !== 0 && (
+        <UsageTypesCard byCategory={byCategory} />
       )}
       {projects.length > 0 && usage.data?.currentMonthMessagesCount !== 0 && (
         <UsageProjectsCard projects={projects} />

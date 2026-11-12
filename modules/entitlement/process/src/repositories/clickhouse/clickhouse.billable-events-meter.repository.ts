@@ -5,6 +5,7 @@ import {
   BillableEventsMeterRepository,
   type BillableEventRecord,
   type DayMeterCount,
+  type EventTypeMeterCount,
   type MeterWindow,
   type ProjectMeterCount,
 } from "../billable-events-meter.repository.ts";
@@ -14,6 +15,7 @@ const TABLE_NAME = "billable_events" as const;
 type TotalRow = { total: string | number };
 type ProjectRow = { projectId: string; total: string | number };
 type DayRow = { day: string; total: string | number };
+type TypeRow = { eventType: string; total: string | number };
 
 /** ClickHouse twin of the meter, moved from billing under the same table and row shape. */
 export class BillableEventsMeterClickHouseRepository extends BillableEventsMeterRepository {
@@ -141,6 +143,42 @@ export class BillableEventsMeterClickHouseRepository extends BillableEventsMeter
       SKIP_TENANT_CHECK: true,
     });
     return result.rows.map((row) => ({ day: row.day, count: numberOf(row.total) }));
+  }
+
+  /** Counted `uniq` per type, as `countByDay` counts per day, so the page's figures agree. */
+  async countByType({
+    organizationId,
+    projectIds,
+    window,
+  }: {
+    organizationId: string;
+    projectIds: readonly string[];
+    window: MeterWindow;
+  }): Promise<EventTypeMeterCount[]> {
+    if (projectIds.length === 0) return [];
+    const result = await this.#clickhouse.query<TypeRow>({
+      tenantId: "",
+      organizationId,
+      sql: `
+      SELECT EventType as eventType, uniq(DeduplicationKeyHash) as total
+      FROM ${TABLE_NAME}
+      WHERE OrganizationId = {organizationId:String}
+        AND TenantId IN {projectIds:Array(String)}
+        AND EventTimestamp >= {startDate:DateTime64(3)}
+        AND EventTimestamp < {endDate:DateTime64(3)}
+      GROUP BY EventType
+      ORDER BY EventType
+    `,
+      params: {
+        organizationId,
+        projectIds: [...projectIds],
+        startDate: window.startDate,
+        endDate: window.endDate,
+      },
+      // The organization's meter counts every project the organization owns.
+      SKIP_TENANT_CHECK: true,
+    });
+    return result.rows.map((row) => ({ eventType: row.eventType, count: numberOf(row.total) }));
   }
 }
 

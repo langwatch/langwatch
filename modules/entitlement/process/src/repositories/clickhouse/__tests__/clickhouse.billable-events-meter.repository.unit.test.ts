@@ -99,3 +99,34 @@ describe("BillableEventsMeterClickHouseRepository.countByDay", () => {
     });
   });
 });
+
+describe("BillableEventsMeterClickHouseRepository.countByType", () => {
+  describe("given an organization metered in events", () => {
+    /** @scenario "The per-type meter read is an approximate distinct count grouped by event type" */
+    it("reads uniq keys per event type across the named projects", async () => {
+      const { meter, statements, organizationsResolved } = meterOver([
+        { eventType: "lw.obs.log.record_received", total: "5" },
+      ]);
+
+      await expect(meter.countByType(READ)).resolves.toEqual([
+        { eventType: "lw.obs.log.record_received", count: 5 },
+      ]);
+      const sql = statements[0]?.query.replace(/\s+/g, " ");
+      expect(sql).toContain(
+        "SELECT EventType as eventType, uniq(DeduplicationKeyHash) as total FROM billable_events",
+      );
+      expect(sql).toContain("WHERE OrganizationId = {organizationId:String}");
+      expect(sql).toContain("AND TenantId IN {projectIds:Array(String)}");
+      expect(sql).toContain("GROUP BY EventType");
+      expect(organizationsResolved).toEqual(["org_1"]);
+    });
+
+    /** @scenario "The per-type meter read is an approximate distinct count grouped by event type" */
+    it("asks nothing for an organization with no projects", async () => {
+      const { meter, statements } = meterOver([]);
+
+      await expect(meter.countByType({ ...READ, projectIds: [] })).resolves.toEqual([]);
+      expect(statements).toHaveLength(0);
+    });
+  });
+});

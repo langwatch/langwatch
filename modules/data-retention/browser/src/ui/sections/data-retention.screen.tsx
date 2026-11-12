@@ -323,13 +323,14 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
       </PageLayout.Header>
       <VStack gap={6} width="full" align="start" paddingTop={4}>
         <Text color="fg.muted">
-          How long your traces, scenarios and experiments are kept before deletion.
+          How long your traces, logs, metrics, scenarios and experiments are kept before deletion.
+          Logs and metrics follow the traces setting.
         </Text>
         {!canConfigureRetention && snapshot && !isSaaS && (
           <EnterpriseLock
             compact
             feature="Data retention"
-            description="Set how long traces, scenarios and experiments are kept, per organization, team or project."
+            description="Set how long traces, logs, metrics, scenarios and experiments are kept, per organization, team or project."
             canManage={host.hasPermission("organization:manage")}
             data-testid="retention-enterprise-upsell"
           />

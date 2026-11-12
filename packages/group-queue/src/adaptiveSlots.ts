@@ -152,10 +152,13 @@ export class AdaptiveSlots {
     return "stepped back";
   }
 
+  /** At the floor there is nothing to give back, so a busy moment there starts no hold. */
   private shrink(): void {
+    const next = Math.max(this.options.floor, Math.floor(this.#slots * 0.8));
+    if (next === this.#slots) return;
     this.#probe = undefined;
     this.#hold = HOLD_MEASUREMENTS;
-    this.set(Math.max(this.options.floor, Math.floor(this.#slots * 0.8)));
+    this.set(next);
   }
 
   private set(next: number): void {

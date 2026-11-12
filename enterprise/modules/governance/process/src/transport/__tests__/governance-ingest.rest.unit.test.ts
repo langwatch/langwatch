@@ -8,6 +8,7 @@ import type {
   GovernanceIngestionSource,
   GovernanceRestApi,
 } from "@langwatch/enterprise-governance-contract";
+import { PlanLimitExceededError } from "@langwatch/entitlement-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { resolveRequestBound } from "@langwatch/plans";
@@ -20,6 +21,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
+import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryOttlTransformChannel } from "../../channels/memory/memory.ottl-transform.channel.ts";
@@ -73,6 +75,7 @@ type World = {
   traceCollection?: GovernanceIngestTraceCollection;
   logCollection?: GovernanceIngestLogCollectionChannel;
   metricCollection?: GovernanceIngestMetricCollectionChannel;
+  otlpUsageLimit?: TraceApi["otlpUsageLimit"];
 };
 
 function mountIngest(world: World = {}) {
@@ -118,6 +121,9 @@ function mountIngest(world: World = {}) {
           acceptedDataPoints: 0,
           rejectedDataPoints: 0,
         }),
+      allowance: createApiFixture<TraceApi>({
+        otlpUsageLimit: world.otlpUsageLimit ?? (async () => {}),
+      }),
       spend: createApiFixture<GatewayApi>(),
       directory: GovernanceIngestPrincipalService.create({
         organizations: createApiFixture<OrganizationApi>(),
@@ -395,6 +401,91 @@ describe("the ingestion-source receivers", () => {
       await expect(response.json()).resolves.toMatchObject({ accepted: true, bytes: 15 });
       expect(logCollection).toHaveBeenCalledTimes(1);
       expect(api.ingestionSourceRecordEventReceived).toHaveBeenCalledWith(SOURCE_ID);
+    });
+  });
+
+  describe.each([
+    {
+      signal: "traces",
+      path: `/api/ingest/otel/${SOURCE_ID}`,
+      body: traceBody,
+      sourceType: "otel_generic",
+    },
+    {
+      signal: "logs",
+      path: `/api/ingest/otel/${SOURCE_ID}/v1/logs`,
+      body: logBody,
+      sourceType: "otel_generic",
+    },
+    {
+      signal: "metrics",
+      path: `/api/ingest/otel/${SOURCE_ID}/v1/metrics`,
+      body: metricBody,
+      sourceType: "otel_generic",
+    },
+    {
+      signal: "webhooks",
+      path: `/api/ingest/webhook/${SOURCE_ID}`,
+      body: '{"event":"run"}',
+      sourceType: "workato",
+    },
+  ])(
+    "given an organization past its monthly allowance pushing $signal",
+    ({ path, body, sourceType }) => {
+      /** @scenario "An ingestion source of an organization past its allowance is refused" */
+      it("refuses with ERR_PLAN_LIMIT and 402 and hands nothing to a pipeline", async () => {
+        const logCollection = vi.fn<GovernanceIngestLogCollectionChannel>();
+        const metricCollection = vi.fn<GovernanceIngestMetricCollectionChannel>();
+        const api = mountIngest({
+          source: { ...SOURCE, sourceType },
+          logCollection,
+          metricCollection,
+          otlpUsageLimit: async () => {
+            throw new PlanLimitExceededError(
+              "You reached the limit of 1000 events for this month",
+              {
+                currentMonthMessagesCount: 1_000,
+                maxMessagesPerMonth: 1_000,
+                activePlanName: "Free",
+              },
+            );
+          },
+        });
+
+        const response = await api.post(path, body);
+
+        expect(response.status).toBe(402);
+        await expect(response.json()).resolves.toMatchObject({ code: "ERR_PLAN_LIMIT" });
+        expect(api.traceCollection).not.toHaveBeenCalled();
+        expect(logCollection).not.toHaveBeenCalled();
+        expect(metricCollection).not.toHaveBeenCalled();
+        expect(api.ingestionSourceRecordEventReceived).not.toHaveBeenCalled();
+      });
+    },
+  );
+
+  describe("given an organization within its monthly allowance pushing logs", () => {
+    /** @scenario "An ingestion source within its allowance lands its batch" */
+    it("asks the allowance for the governance project, then hands the batch to the log pipeline", async () => {
+      const asked: Parameters<TraceApi["otlpUsageLimit"]>[0][] = [];
+      const logCollection = vi.fn<GovernanceIngestLogCollectionChannel>().mockResolvedValue(void 0);
+      const api = mountIngest({
+        logCollection,
+        otlpUsageLimit: async (input) => {
+          asked.push(input);
+        },
+      });
+
+      const response = await api.post(`/api/ingest/otel/${SOURCE_ID}/v1/logs`, logBody);
+
+      expect(response.status).toBe(202);
+      expect(asked).toEqual([
+        {
+          project: { id: "gov_project", teamId: "team_gov", organizationId: ORGANIZATION_ID },
+          customerTraceIds: [],
+        },
+      ]);
+      expect(logCollection).toHaveBeenCalledTimes(1);
     });
   });
 
