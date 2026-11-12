@@ -68,6 +68,9 @@ type SharedReadsEntry = {
   storedAt: number;
 };
 
+/** The reader's shared reads and when they were read from the ledger, cached or not. */
+type SharedReadsSnapshot = { rows: SharedReadRow[]; readAt: number };
+
 /** The door: evaluates a route's permission and mints the sealed proof its
  *  reads carry, with one shared grant per project shared with the caller's. */
 export class AuthorizationService {
@@ -187,15 +190,15 @@ export class AuthorizationService {
       role: PROJECT_READER_ROLE_KEY,
       permission,
     });
-    const rows = sharedPermitted
+    const snapshot = sharedPermitted
       ? await this.liveSharedReads({
           organizationId: scopeRef.organizationId,
           readerProjectId: scope.projectId,
           now,
         })
-      : [];
+      : { rows: [], readAt: now };
     const { shared, expiresAt } = sharedGrantsFrom({
-      rows,
+      ...snapshot,
       readerProjectId: scope.projectId,
       permission,
       now,
@@ -214,7 +217,7 @@ export class AuthorizationService {
   /**
    * The reader's live shared reads, cached per organisation epoch (ADR-177, Consequences). The
    * epoch is read before the rows, so a write landing between the two bumps it past the entry.
-   * Expiry and the reader naming itself are still applied per mint, against the rows.
+   * `readAt` is when the rows were read, which bounds a braid's proof (ADR-201 §8), never the mint.
    */
   private async liveSharedReads({
     organizationId,
@@ -224,15 +227,16 @@ export class AuthorizationService {
     organizationId: string;
     readerProjectId: string;
     now: number;
-  }): Promise<SharedReadRow[]> {
+  }): Promise<SharedReadsSnapshot> {
     const { epochReader, cacheEnabled, sharedReads } = this.deps;
     const epoch =
       epochReader && cacheEnabled?.() === true ? await epochReader({ organizationId }) : null;
     if (epoch === null) {
-      return sharedReads.findLiveSharedReads({
+      const rows = await sharedReads.findLiveSharedReads({
         organizationId,
         readerProjectId,
       });
+      return { rows, readAt: now };
     }
     const key = `${organizationId}:${readerProjectId}`;
     const cached = this.sharedReadsCache.get(key);
@@ -241,7 +245,7 @@ export class AuthorizationService {
       cached.epoch === epoch &&
       now - cached.storedAt < SHARED_READS_CACHE_MAX_AGE_MS
     ) {
-      return cached.rows;
+      return { rows: cached.rows, readAt: cached.storedAt };
     }
     const rows = await sharedReads.findLiveSharedReads({
       organizationId,
@@ -253,22 +257,24 @@ export class AuthorizationService {
       if (oldest !== undefined) this.sharedReadsCache.delete(oldest);
     }
     this.sharedReadsCache.set(key, { epoch, rows, storedAt: now });
-    return rows;
+    return { rows, readAt: now };
   }
 }
 
 /**
  * One shared grant per applicable row, and the earliest expiry among them under the ceiling. A
- * row that cannot be applied - a where clause, an expired grant, the reader naming itself, a
- * braid any row replaces, live or revoked (ADR-201 §2) - is left out; the read drops the last.
+ * row that cannot apply - a where clause, an expired grant, the reader naming itself, a replaced
+ * braid (ADR-201 §2), a braid read longer ago than the bound (§8) - is left out.
  */
 function sharedGrantsFrom({
   rows,
+  readAt,
   readerProjectId,
   permission,
   now,
 }: {
   rows: SharedReadRow[];
+  readAt: number;
   readerProjectId: string;
   permission: AuthzPermission;
   now: number;
@@ -277,28 +283,44 @@ function sharedGrantsFrom({
   let expiresAt = now + AUTHORIZATION_MAX_AGE_MS;
   const replaced = new Set(rows.map((row) => row.replacesGrantId));
   for (const row of rows) {
-    const condition =
-      row.condition === "unreadable" ? "not_applicable" : proofCondition(row.condition);
-    const expiry = row.expiresAt?.epochMilliseconds;
-    const applicable =
-      !replaced.has(row.grantId) &&
-      row.memberProjectId !== readerProjectId &&
-      condition !== "not_applicable" &&
-      (expiry === undefined || expiry > now);
-    if (!applicable) continue;
+    const applied = appliedRow({ row, replaced, readerProjectId, readAt, now });
+    if (applied === "not_applicable") continue;
     // A braid carries its own permission alone, which only the span read accepts (ADR-201 §3).
-    const isBraid = condition.type === "span";
     shared.push({
       projectId: row.memberProjectId,
-      permissions: isBraid ? [SPAN_BRAID_PERMISSION] : [permission],
+      permissions: applied.isBraid ? [SPAN_BRAID_PERMISSION] : [permission],
       via: [row.grantId],
       kind: "shared",
-      condition,
+      condition: applied.condition,
     });
-    if (expiry !== undefined) expiresAt = Math.min(expiresAt, expiry);
-    if (isBraid) expiresAt = Math.min(expiresAt, now + BRAID_REVOCATION_BOUND_MS);
+    expiresAt = Math.min(expiresAt, applied.until);
   }
   return { shared, expiresAt };
+}
+
+/** A row's proof condition and the latest a proof may carry it, when it applies at all. */
+function appliedRow({
+  row,
+  replaced,
+  readerProjectId,
+  readAt,
+  now,
+}: {
+  row: SharedReadRow;
+  replaced: ReadonlySet<SharedReadRow["replacesGrantId"]>;
+  readerProjectId: string;
+  readAt: number;
+  now: number;
+}): { condition: AuthorizationCondition; isBraid: boolean; until: number } | "not_applicable" {
+  const condition =
+    row.condition === "unreadable" ? "not_applicable" : proofCondition(row.condition);
+  const expiry = row.expiresAt?.epochMilliseconds ?? Number.POSITIVE_INFINITY;
+  if (condition === "not_applicable" || expiry <= now) return "not_applicable";
+  if (replaced.has(row.grantId) || row.memberProjectId === readerProjectId) return "not_applicable";
+  // Bounded from the ledger read, so a cached snapshot never stretches a removal past it (§8).
+  const isBraid = condition.type === "span";
+  const until = isBraid ? Math.min(expiry, readAt + BRAID_REVOCATION_BOUND_MS) : expiry;
+  return isBraid && until <= now ? "not_applicable" : { condition, isBraid, until };
 }
 
 /**

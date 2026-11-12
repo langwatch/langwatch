@@ -400,6 +400,20 @@ Feature: Braids
       And no proof carrying a braid is used after thirty seconds from its minting
 
     @unit
+    Scenario: A braid read from a cached snapshot ends thirty seconds after that read
+      Given the organisation's cached shared reads hold a live braid from "specialists" into "orchestrator"
+      And ana removes the braid but the organisation's epoch does not move
+      When sam's trace read is minted from the cached snapshot twenty-five seconds later
+      Then the proof carrying the braid ends within thirty seconds of the snapshot's read, not of the mint
+
+    @unit
+    Scenario: A braided read whose proof expires while its statement runs returns no row
+      Given sam's proof carries a braid from "specialists" into "orchestrator"
+      When the proof expires while a span read's statement is running
+      Then the read is refused as expired and returns no row
+      And the statement is sent with a time limit no longer than the proof's remaining life
+
+    @unit
     Scenario: A braid stops showing at its end date
       Given a braid from "specialists" into "orchestrator" that ends at a date
       When the date passes

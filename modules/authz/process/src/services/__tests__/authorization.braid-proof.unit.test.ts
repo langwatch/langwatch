@@ -22,7 +22,7 @@ import { AuthzMemoryStore } from "../../repositories/memory/authz-memory.store.t
 import { MemoryAuthzGrantProjectionRepository } from "../../repositories/memory/memory.authz-grant-projection.repository.ts";
 import { MemoryAuthzLedgerReadRepository } from "../../repositories/memory/memory.authz-ledger-read.repository.ts";
 import { MemoryAuthzReadRepository } from "../../repositories/memory/memory.authz-read.repository.ts";
-import { AuthorizationService } from "../authorization.service.ts";
+import { AuthorizationService, BRAID_REVOCATION_BOUND_MS } from "../authorization.service.ts";
 import type { AuthzCollectorService } from "../authz-collector.service.ts";
 import type { AuthzService } from "../authz.service.ts";
 
@@ -47,8 +47,9 @@ function spanCondition({ where, from = OCTOBER_1 }: { where?: string; from?: str
     : ({ type: "span", where, compiledWhere: compiledOf(where), from } satisfies GrantCondition);
 }
 
-/** The ledger's twin holding braids as the projection writes them, and a door minting over it. */
-function ledger({ now }: { now: () => number }) {
+/** The ledger's twin holding braids as the projection writes them, and a door minting over it.
+ *  With an `epoch`, the door caches the shared reads per that epoch, as production does. */
+function ledger({ now, epoch }: { now: () => number; epoch?: () => number }) {
   const memory = AuthzMemoryStore.create();
   const projection = MemoryAuthzGrantProjectionRepository.create({ memory });
   const reads = MemoryAuthzReadRepository.create({ memory });
@@ -111,6 +112,7 @@ function ledger({ now }: { now: () => number }) {
         }) as AuthzScopeRef,
     }),
     sharedReads: reads,
+    ...(epoch === undefined ? {} : { epochReader: async () => epoch(), cacheEnabled: () => true }),
     now,
   });
   const mint = (projectId: string, permission: ProofBearingPermission = "traces:view") =>
@@ -189,6 +191,38 @@ describe("the proof a reader's trace read carries", () => {
         includeRevoked: true,
       });
       expect(stored).toMatchObject({ isLive: true, revokedReason: null });
+    });
+  });
+
+  describe("given a braid removed while the organisation's epoch failed to move", () => {
+    /** @scenario "A braid read from a cached snapshot ends thirty seconds after that read" */
+    it("ends the proof carrying it thirty seconds after the cached read, not after the mint", async () => {
+      const readAt = Date.parse("2026-10-20T00:00:00Z");
+      let now = readAt;
+      const { braid, mint, projection } = ledger({ now: () => now, epoch: () => 7 });
+      await braid({
+        id: "grant_cached",
+        owner: SPECIALISTS,
+        reader: ORCHESTRATOR,
+        condition: spanCondition({ where: WEB }),
+      });
+      await mint(ORCHESTRATOR);
+      await projection.append({
+        kind: "grant.revoke",
+        organizationId: ORG,
+        grantId: "grant_cached",
+        reason: "braid_removed",
+        occurredAt: Temporal.Instant.fromEpochMilliseconds(readAt + 1),
+      });
+
+      now = readAt + 25_000;
+      const fromTheCache = await mint(ORCHESTRATOR);
+
+      expect(fromTheCache.grants.map((grant) => grant.projectId)).toEqual([
+        ORCHESTRATOR,
+        SPECIALISTS,
+      ]);
+      expect(fromTheCache.expiresAt).toBeLessThanOrEqual(readAt + BRAID_REVOCATION_BOUND_MS);
     });
   });
 
