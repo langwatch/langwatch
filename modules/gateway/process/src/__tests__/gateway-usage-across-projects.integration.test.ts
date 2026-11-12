@@ -9,6 +9,7 @@ import {
   ClickHouseOverloadErrorFactory,
   ClickHouseStatementAdmission,
 } from "@langwatch/clickhouse-client";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import {
   ClickHouseOverloadedError,
@@ -107,10 +108,7 @@ function usageService() {
       findMetaByIds: async () => [{ id: KEY_ID, name: "demo", displayPrefix: "lw_vk_demo" }],
     },
     chRepo: undefined,
-    traces: {
-      ...traces,
-      findSpendByProjectAndValue: () => Promise.reject(new Error("not read by the Usage page")),
-    },
+    traces: createApiFixture<TraceApi>(traces),
   });
   return { service, traces };
 }

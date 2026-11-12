@@ -86,8 +86,11 @@ function windowedAttributeFilter(input: {
   };
 }
 
-/** A spend rollup's ceiling on threads and runtime, as the tenant-set spend rollup reads it. */
-const SPEND_ROLLUP_SETTINGS = { max_threads: 2, max_execution_time: 45 };
+/**
+ * A spend rollup's ceiling on threads and runtime. The runtime cap stays under the client's 30 s
+ * request deadline, so a slow read ends with ClickHouse's own timeout, not a dropped request.
+ */
+const SPEND_ROLLUP_SETTINGS = { max_threads: 2, max_execution_time: 28 };
 
 /** Main's gateway `GatewayVirtualKeySpendRepository` reads; the usage reads span a tenant set. */
 export class ClickHouseTraceAttributeSpendRepository extends TraceAttributeSpendRepository {

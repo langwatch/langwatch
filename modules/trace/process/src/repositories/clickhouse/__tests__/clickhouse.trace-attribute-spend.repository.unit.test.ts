@@ -112,6 +112,8 @@ describe("ClickHouseTraceAttributeSpendRepository", () => {
       expect(queries[0]?.sql).toContain("TenantId IN ({tenantIds:Array(String)})");
       expect(queries[0]?.sql).toContain("GROUP BY TenantId, TraceId");
       expect(queries[0]?.params).toMatchObject({ tenantIds: ["project-1", "project-2"] });
+      // Under the client's 30 s request deadline, so ClickHouse ends a slow read first.
+      expect(Number(queries[0]?.settings?.max_execution_time)).toBeLessThan(30);
     });
 
     it("answers nothing without querying when the organization has no projects", async () => {
