@@ -18,6 +18,9 @@ import { ClickHouseTraceSpanRepository } from "../trace-span.repository.ts";
 const READER = "proj_orchestrator";
 const OWNER = "proj_specialists";
 const LATEST_VERSION = "SELECT TenantId, TraceId, SpanId, max(UpdatedAt)";
+const HELD_IN_TRACE =
+  "TraceId IN (SELECT TraceId FROM stored_spans WHERE TenantId IN ({tenantScope_own:Array(String)})" +
+  " AND StartTime >= fromUnixTimestamp64Milli({tenantScope_heldFrom:Int64}) AND TraceId = {traceId:String})";
 const WEB: CompiledWhere = {
   version: 1,
   tree: { kind: "attributeEquals", on: "span", key: "orchestrator", value: "web" },
@@ -120,6 +123,7 @@ describe("ClickHouseTraceSpanRepository braided reads", () => {
         const [outer = "", election = ""] = sql.split(LATEST_VERSION);
         expect(outer).toContain("{tenantScope_c0_ids:Array(String)}");
         expect(outer).toContain("SpanAttributes[{tenantScope_c0_0k:String}]");
+        expect(outer).toContain(HELD_IN_TRACE);
         expect(election).not.toContain("tenantScope_c0");
         expect(sql).not.toContain("'web'");
         expect(params).toMatchObject({

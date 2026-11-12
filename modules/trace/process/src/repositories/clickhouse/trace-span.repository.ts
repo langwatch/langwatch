@@ -3,6 +3,7 @@ import {
   type AuthorizedClickHouse,
   type IdBoundOptions,
   tenantScope,
+  tenantScopeForLatestVersion,
   tenantScopeWithConditions,
 } from "@langwatch/clickhouse-client";
 import { nowInstant } from "@langwatch/time";
@@ -109,7 +110,7 @@ const fencedDedupInTuple = (extraInnerWhere: string): string => `
   (TenantId, TraceId, SpanId, UpdatedAt) IN (
     SELECT TenantId, TraceId, SpanId, max(UpdatedAt)
     FROM ${STORED_SPANS_TABLE}
-    WHERE ${tenantScope("StartTime")}
+    WHERE ${tenantScopeForLatestVersion("StartTime")}
       AND TraceId = {traceId:String}
       ${extraInnerWhere}
     GROUP BY TenantId, TraceId, SpanId
@@ -295,7 +296,7 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
       query: `
         SELECT ${summarySelectFor(input.authorization)}
         FROM ${STORED_SPANS_TABLE}
-        WHERE ${tenantScopeWithConditions("StartTime")} AND TraceId = {traceId:String}
+        WHERE ${tenantScopeWithConditions("StartTime", { traceId: "traceId" })} AND TraceId = {traceId:String}
           ${STORED_SPANS_ID_BOUND}
           ${sinceFilter}
           AND ${fencedDedupInTuple(`${STORED_SPANS_ID_BOUND} ${sinceFilter}`)}
@@ -350,7 +351,7 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
       query: `
         SELECT ${summarySelectFor(input.authorization)}
         FROM ${STORED_SPANS_TABLE}
-        WHERE ${tenantScopeWithConditions("StartTime")} AND TraceId = {traceId:String}
+        WHERE ${tenantScopeWithConditions("StartTime", { traceId: "traceId" })} AND TraceId = {traceId:String}
           ${timeFilter}
           ${cursor}
           AND ${fencedDedupInTuple(timeFilter)}

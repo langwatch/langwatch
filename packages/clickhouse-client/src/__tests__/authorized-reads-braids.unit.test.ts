@@ -10,7 +10,12 @@ import {
   narrowAuthorization,
   sealAuthorization,
 } from "@langwatch/authorization";
-import { tenantScope, tenantScopeWithConditions, tenantSet } from "@langwatch/clickhouse-markers";
+import {
+  tenantScope,
+  tenantScopeForLatestVersion,
+  tenantScopeWithConditions,
+  tenantSet,
+} from "@langwatch/clickhouse-markers";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -102,10 +107,15 @@ const proof = (grants: GrantInput[]): Authorization =>
 const spanRead = (outer: string) =>
   `SELECT SpanId, SpanName FROM stored_spans WHERE ${outer} AND TraceId = {traceId:String}` +
   ` AND (TenantId, TraceId, SpanId, UpdatedAt) IN (SELECT TenantId, TraceId, SpanId, max(UpdatedAt)` +
-  ` FROM stored_spans WHERE ${tenantScope("StartTime")} AND TraceId = {traceId:String}` +
+  ` FROM stored_spans WHERE ${tenantScopeForLatestVersion("StartTime")} AND TraceId = {traceId:String}` +
   ` GROUP BY TenantId, TraceId, SpanId)`;
 
 const LATEST_VERSION_SUBQUERY = "(SELECT TenantId, TraceId, SpanId, max(UpdatedAt)";
+
+/** The held-trace semi-join the fence renders, narrowed as the read's marker names. */
+const held = (narrowed = "") =>
+  `TraceId IN (SELECT TraceId FROM stored_spans WHERE TenantId IN ({tenantScope_own:Array(String)})` +
+  ` AND StartTime >= fromUnixTimestamp64Milli({tenantScope_heldFrom:Int64})${narrowed})`;
 
 const expandSpanRead = (
   authorization: Authorization,
@@ -201,8 +211,8 @@ describe("the fence over a span read", () => {
         };
         expect(sql).toBe(
           `(TenantId IN ({tenantScope_all:Array(String)}) AND (TenantId IN ({tenantScope_own:Array(String)})` +
-            ` OR (${window(0)} AND (SpanAttributes[{tenantScope_c0_0k:String}] = {tenantScope_c0_0v:String}))` +
-            ` OR (${window(1)} AND (SpanName = {tenantScope_c1_0v:String}))))`,
+            ` OR (${held()} AND ((${window(0)} AND (SpanAttributes[{tenantScope_c0_0k:String}] = {tenantScope_c0_0v:String}))` +
+            ` OR (${window(1)} AND (SpanName = {tenantScope_c1_0v:String}))))))`,
         );
         expect(params).toEqual({
           tenantScope_all: [READER, OWNER],
@@ -216,6 +226,7 @@ describe("the fence over a span read", () => {
           tenantScope_c1_from: [5],
           tenantScope_c1_until: [0],
           tenantScope_c1_0v: "cli_agent",
+          tenantScope_heldFrom: 0,
         });
       });
 
@@ -284,7 +295,8 @@ describe("the fence over a span read", () => {
       });
     });
 
-    describe("when a statement or fragment carries no conditions marker", () => {
+    describe("when a statement or fragment carries a plain tenant marker", () => {
+      /** @scenario "A plain tenant marker under a braids fence is refused" */
       it("refuses the statement and sends nothing", async () => {
         const { execute, clickhouse } = clientWith();
         const reader = clickhouse.as(authorization, { reads: "spans" });
@@ -294,19 +306,35 @@ describe("the fence over a span read", () => {
             query: spanRead(tenantScope("StartTime")),
             query_params: { traceId: "tr-1" },
           }),
-        ).rejects.toMatchObject({ violation: { kind: "missing-condition-marker" } });
+        ).rejects.toMatchObject({ violation: { kind: "plain-marker-under-braids" } });
         expect(execute).not.toHaveBeenCalled();
       });
 
-      it("refuses it for a braid with no condition too, whose windows only that marker applies exactly", () => {
-        const empty = proof([own(), braid({ compiledWhere: undefined })]);
+      it("refuses the set-only marker beside the conditions marker", () => {
+        const fence = fenceFor({ authorization, reads: "spans" });
 
-        expect(scopeErrorOf(() => expandSpanRead(empty, tenantScope("StartTime")))).toEqual({
-          kind: "missing-condition-marker",
-        });
+        expect(
+          scopeErrorOf(() =>
+            expandStatement({
+              query: `${spanRead(tenantScopeWithConditions("StartTime"))} AND x IN (SELECT x FROM evals WHERE ${tenantSet()})`,
+              queryParams: { traceId: "tr-1" },
+              fence,
+            }),
+          ),
+        ).toEqual({ kind: "plain-marker-under-braids" });
       });
 
-      it("refuses a fragment that reaches the fence without it", () => {
+      it("accepts both plain markers on a proof with no braids", () => {
+        const { query } = expandStatement({
+          query: `SELECT 1 FROM stored_spans WHERE ${tenantScope("StartTime")} AND x IN (SELECT x FROM evals WHERE ${tenantSet()})`,
+          queryParams: {},
+          fence: fenceFor({ authorization: proof([own()]), reads: "spans" }),
+        });
+
+        expect(query).not.toContain("{{");
+      });
+
+      it("refuses a fragment that reaches the fence through one", () => {
         const fence = fenceFor({ authorization, reads: "spans" });
 
         expect(
@@ -317,7 +345,120 @@ describe("the fence over a span read", () => {
               fence,
             }),
           ),
-        ).toEqual({ kind: "missing-condition-marker" });
+        ).toEqual({ kind: "plain-marker-under-braids" });
+      });
+    });
+
+    describe("when the owner's spans are fenced to traces the reader holds", () => {
+      /** @scenario "The fence shows owner spans only in traces the reader holds" */
+      it("puts every braid clause under one semi-join on the reader's own spans", () => {
+        const { query, queryParams } = expandSpanRead(authorization);
+
+        expect(query.match(/TraceId IN \(SELECT TraceId FROM stored_spans/g)).toHaveLength(1);
+        expect(query).toContain(`OR (${held()} AND ((TenantId IN ({tenantScope_c0_ids`);
+        expect(queryParams).toMatchObject({ tenantScope_own: [READER], tenantScope_heldFrom: 0 });
+      });
+
+      it("binds the semi-join's lower bound to the earliest braid window", () => {
+        const fence = fenceFor({
+          authorization: proof([
+            own(),
+            braid({ from: 70 }),
+            braid({ compiledWhere: CLI, from: 30 }),
+          ]),
+          reads: "spans",
+        });
+
+        expect(conditionsExpression({ fence, column: "StartTime" }).params).toMatchObject({
+          tenantScope_heldFrom: 30,
+        });
+      });
+
+      it("narrows the semi-join by the read's trace id or its own lower bound", () => {
+        const fence = fenceFor({ authorization, reads: "spans" });
+        const narrowed = (marker: string) =>
+          expandStatement({
+            query: `SELECT SpanId FROM stored_spans WHERE ${marker}`,
+            queryParams: { traceId: "tr-1", sinceMs: 5 },
+            fence,
+          }).query;
+
+        expect(narrowed(tenantScopeWithConditions("StartTime", { traceId: "traceId" }))).toContain(
+          held(" AND TraceId = {traceId:String}"),
+        );
+        expect(narrowed(tenantScopeWithConditions("StartTime", { sinceMs: "sinceMs" }))).toContain(
+          held(" AND StartTime >= fromUnixTimestamp64Milli({sinceMs:Int64})"),
+        );
+      });
+
+      it("refuses a semi-join bound named with a reserved prefix", () => {
+        expect(
+          scopeErrorOf(() =>
+            expandSpanRead(
+              authorization,
+              tenantScopeWithConditions("StartTime", { traceId: "tenantScope_own" }),
+            ),
+          ),
+        ).toEqual({ kind: "reserved-param", param: "tenantScope_own" });
+      });
+
+      it("leaves a trace window beside the braids outside the semi-join", () => {
+        const { sql } = conditionsExpression({
+          fence: fenceFor({
+            authorization: proof([own(), memberWindow, braid({})]),
+            reads: "spans",
+          }),
+          column: "StartTime",
+        });
+
+        expect(sql.indexOf("{tenantScope_c1_ids:Array(String)}")).toBeLessThan(
+          sql.indexOf("TraceId IN (SELECT"),
+        );
+        expect(sql).toContain(`OR (${held()} AND ((TenantId IN ({tenantScope_c0_ids`);
+      });
+    });
+
+    describe("when a latest-version marker is written", () => {
+      const fence = fenceFor({ authorization, reads: "spans" });
+      const refusalOf = (query: string) =>
+        scopeErrorOf(() => expandStatement({ query, queryParams: { traceId: "tr-1" }, fence }));
+
+      it("refuses it outside a latest-version election", () => {
+        expect(
+          refusalOf(
+            `SELECT SpanId FROM stored_spans WHERE ${tenantScopeWithConditions("StartTime")}` +
+              ` AND SpanId IN (SELECT SpanId FROM stored_spans WHERE ${tenantScopeForLatestVersion("StartTime")})`,
+          ),
+        ).toEqual({ kind: "loose-latest-version-marker" });
+      });
+
+      /** @scenario "A plain tenant marker under a braids fence is refused" */
+      it("refuses an election whose select no windowed marker fences", () => {
+        const election = spanRead("1 = 1").replace(" WHERE 1 = 1 AND", " WHERE");
+
+        expect(
+          refusalOf(
+            `${election} AND 1 IN (SELECT 1 FROM stored_spans WHERE ${tenantScopeWithConditions("StartTime")})`,
+          ),
+        ).toEqual({ kind: "loose-latest-version-marker" });
+        expect(
+          refusalOf(
+            `SELECT 1 FROM stored_spans WHERE ${tenantScopeWithConditions("StartTime")}` +
+              ` UNION ALL ${election}`,
+          ),
+        ).toEqual({ kind: "loose-latest-version-marker" });
+      });
+
+      it("refuses it on a proof with no braids too", () => {
+        expect(
+          scopeErrorOf(() =>
+            expandStatement({
+              query: `SELECT SpanId FROM stored_spans WHERE ${tenantScopeForLatestVersion("StartTime")}`,
+              queryParams: {},
+              fence: fenceFor({ authorization: proof([own()]), reads: "spans" }),
+            }),
+          ),
+        ).toEqual({ kind: "loose-latest-version-marker" });
       });
     });
 

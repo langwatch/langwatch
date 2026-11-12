@@ -19,6 +19,9 @@ import { SpanStorageClickHouseRepository } from "../span-storage.repository.ts";
 const READER = "proj_orchestrator";
 const OWNER = "proj_specialists";
 const LATEST_VERSION = "SELECT TenantId, TraceId, SpanId, max(UpdatedAt)";
+const HELD_IN_TRACE =
+  "TraceId IN (SELECT TraceId FROM stored_spans WHERE TenantId IN ({tenantScope_own:Array(String)})" +
+  " AND StartTime >= fromUnixTimestamp64Milli({tenantScope_heldFrom:Int64}) AND TraceId = {traceId:String})";
 const WEB: CompiledWhere = {
   version: 1,
   tree: { kind: "attributeEquals", on: "span", key: "orchestrator", value: "web" },
@@ -107,6 +110,17 @@ describe("SpanStorageClickHouseRepository trace-view reads", () => {
             tenantScope_c0_0k: "orchestrator",
             tenantScope_c0_0v: "web",
           });
+        }
+      });
+
+      /** @scenario "The fence shows owner spans only in traces the reader holds" */
+      it("keeps the owner's spans to the read's trace when the reader holds it", async () => {
+        const statements = await statementsOf({ read, authorization, reads: "spans" });
+
+        for (const { sql, params } of statements) {
+          const [outer = ""] = sql.split(LATEST_VERSION);
+          expect(outer).toContain(HELD_IN_TRACE);
+          expect(params).toMatchObject({ tenantScope_own: [READER], traceId: at.traceId });
         }
       });
 

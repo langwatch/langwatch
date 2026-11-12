@@ -7,6 +7,7 @@ import {
   type TenantScopedReader,
   tenantScope,
   tenantScopeKey,
+  tenantScopeForLatestVersion,
   tenantScopeWithConditions,
   type WindowFallback,
 } from "@langwatch/clickhouse-client";
@@ -297,7 +298,7 @@ function dedupInTuple(extraInnerWhere: string): string {
   return `(TenantId, TraceId, SpanId, UpdatedAt) IN (
     SELECT TenantId, TraceId, SpanId, max(UpdatedAt)
     FROM ${TABLE_NAME}
-    WHERE ${tenantScope("StartTime")}
+    WHERE ${tenantScopeForLatestVersion("StartTime")}
       AND TraceId = {traceId:String}
       ${extraInnerWhere}
     GROUP BY TenantId, TraceId, SpanId
@@ -309,14 +310,14 @@ function dedupInTuple(extraInnerWhere: string): string {
  * condition on the outer select, the election fenced by tenants and windows alone. The fence
  * alone names tenants, so the caller keeps the owner's row.
  */
-const BRAIDED_SINGLE_SPAN_WHERE = `${tenantScopeWithConditions("StartTime")}
+const BRAIDED_SINGLE_SPAN_WHERE = `${tenantScopeWithConditions("StartTime", { traceId: "traceId" })}
   AND TraceId = {traceId:String}
   AND SpanId = {spanId:String}
   ${STORED_SPANS_ID_BOUND}
   AND (TenantId, TraceId, SpanId, UpdatedAt) IN (
     SELECT TenantId, TraceId, SpanId, max(UpdatedAt)
     FROM ${TABLE_NAME}
-    WHERE ${tenantScope("StartTime")}
+    WHERE ${tenantScopeForLatestVersion("StartTime")}
       AND TraceId = {traceId:String}
       AND SpanId = {spanId:String}
       ${STORED_SPANS_ID_BOUND}
@@ -351,7 +352,7 @@ const BRAIDED_SPAN_RANGE_QUERY = `
     toUnixTimestamp64Milli(min(StartTime)) AS FromMs,
     toUnixTimestamp64Milli(max(StartTime)) AS ToMs
   FROM ${TABLE_NAME}
-  WHERE ${tenantScopeWithConditions("StartTime")}
+  WHERE ${tenantScopeWithConditions("StartTime", { traceId: "traceId" })}
     AND TraceId = {traceId:String}
     ${STORED_SPANS_ID_BOUND}
     AND ${dedupInTuple(STORED_SPANS_ID_BOUND)}
@@ -360,7 +361,9 @@ const BRAIDED_SPAN_RANGE_QUERY = `
 
 /** The outer select's fence: under braids it carries the conditions, beside a bare election. */
 function outerScope(braided: boolean): string {
-  return braided ? tenantScopeWithConditions("StartTime") : tenantScope("StartTime");
+  return braided
+    ? tenantScopeWithConditions("StartTime", { traceId: "traceId" })
+    : tenantScope("StartTime");
 }
 
 /** A braided read selects each row's tenant to name its owner; any other read, nothing more. */

@@ -12,6 +12,7 @@ import {
   type AuthorizedClickHouse,
   braidConditionExpression,
   tenantScope,
+  tenantScopeForLatestVersion,
   tenantScopeWithConditions,
 } from "@langwatch/clickhouse-client";
 import { z } from "zod";
@@ -346,12 +347,12 @@ export class ClickHouseTraceBraidReadsRepository extends TraceBraidReadsReposito
       query: `
         SELECT TenantId, ${columns.windowed.map(({ name, sql }) => `countIf(${sql}) AS ${name}`).join(", ")}
         FROM stored_spans
-        WHERE ${tenantScopeWithConditions("StartTime")}
+        WHERE ${tenantScopeWithConditions("StartTime", { sinceMs: "sinceMs" })}
           AND StartTime >= ${millis("sinceMs")}
           AND (TenantId, TraceId, SpanId, UpdatedAt) IN (
             SELECT TenantId, TraceId, SpanId, max(UpdatedAt)
             FROM stored_spans
-            WHERE ${tenantScope("StartTime")}
+            WHERE ${tenantScopeForLatestVersion("StartTime")}
               AND StartTime >= ${millis("sinceMs")}
             GROUP BY TenantId, TraceId, SpanId
           )
@@ -392,12 +393,12 @@ export class ClickHouseTraceBraidReadsRepository extends TraceBraidReadsReposito
           sum(${attributeNumber("gen_ai.usage.cost")}) AS Cost,
           ${counts.join(",\n          ")}
         FROM stored_spans
-        WHERE ${tenantScopeWithConditions("StartTime")} AND TraceId = {traceId:String}
+        WHERE ${tenantScopeWithConditions("StartTime", { traceId: "traceId" })} AND TraceId = {traceId:String}
           {{idBound:stored_spans.TraceId:traceId}}
           AND (TenantId, TraceId, SpanId, UpdatedAt) IN (
             SELECT TenantId, TraceId, SpanId, max(UpdatedAt)
             FROM stored_spans
-            WHERE ${tenantScope("StartTime")} AND TraceId = {traceId:String}
+            WHERE ${tenantScopeForLatestVersion("StartTime")} AND TraceId = {traceId:String}
               {{idBound:stored_spans.TraceId:traceId}}
             GROUP BY TenantId, TraceId, SpanId
           )

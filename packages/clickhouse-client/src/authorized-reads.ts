@@ -33,7 +33,11 @@ import { nowInstant } from "@langwatch/time";
 import type { ClickHouseQueryClient } from "./client.ts";
 import type { IdBoundOptions } from "./idBound.ts";
 import { refuseOverBudget } from "./statementBudget.ts";
-import { StatementScopeError, TENANT_SCOPE_PARAM_PREFIX } from "./statementScopeError.ts";
+import {
+  ID_BOUND_PARAM_PREFIX,
+  StatementScopeError,
+  TENANT_SCOPE_PARAM_PREFIX,
+} from "./statementScopeError.ts";
 
 /** Resolves the routed client a project's reads are sent through. */
 export type ClickHouseClientResolver = (tenantId: string) => Promise<ClickHouseQueryClient>;
@@ -56,7 +60,14 @@ export type ReadResource = keyof typeof READ_RESOURCES;
 
 const MARKER = /\{\{tenantScope:([A-Za-z_][A-Za-z0-9_]*)\}\}/g;
 const SET_MARKER = /\{\{tenantSet\}\}/g;
-const CONDITIONS_MARKER = /\{\{tenantScopeWithConditions:([A-Za-z_][A-Za-z0-9_]*)\}\}/g;
+const CONDITIONS_MARKER =
+  /\{\{tenantScopeWithConditions:([A-Za-z_][A-Za-z0-9_]*)(?::(traceId|sinceMs)=([A-Za-z_][A-Za-z0-9_]*))?\}\}/g;
+const LATEST_VERSION_MARKER = /\{\{tenantScopeForLatestVersion:([A-Za-z_][A-Za-z0-9_]*)\}\}/g;
+/** A fence marker that windows its select: the latest-version election must sit in its WHERE. */
+const WINDOWED_MARKER = /\{\{tenantScope(?:WithConditions)?:[^}]*\}\}/g;
+/** The one shape a latest-version marker may follow; its select names keys and versions only. */
+const ELECTION_HEAD =
+  /\(\s*TenantId\s*,\s*TraceId\s*,\s*SpanId\s*,\s*UpdatedAt\s*\)\s+IN\s*\(\s*SELECT\s+TenantId\s*,\s*TraceId\s*,\s*SpanId\s*,\s*max\(\s*UpdatedAt\s*\)\s+FROM\s+stored_spans\s+WHERE\s+$/i;
 
 /**
  * A tenant predicate written by hand (`TenantId =`, `IN`, comparisons); a projection, a dedup
@@ -207,26 +218,32 @@ function windowsOf({
   };
 }
 
+/** The statement parameter a conditions marker names to narrow its held-trace semi-join. */
+type HeldTraceParam = { kind: "traceId" | "sinceMs"; param: string };
+
 /**
- * The conditions marker (ADR-201 §3): own projects outright, OR one bracketed clause per
- * distinct predicate holding its owners' windows AND the predicate, every key and literal bound.
- * The `OR` is the fence's, beneath its exact tenant set. With no braids it is the tenant marker.
+ * The conditions marker (ADR-201 §3): own projects outright, OR one clause per distinct predicate
+ * holding its owners' windows AND the predicate, every key and literal bound, the braid clauses
+ * only in traces an own project holds. The `OR` is the fence's, under its exact tenant set.
  */
 export function conditionsExpression({
   fence,
   column,
+  held,
 }: {
   fence: TenantFence;
   column: TenantScopeTimeColumn;
+  held?: HeldTraceParam | undefined;
 }): { sql: string; params: Record<string, unknown> } {
   const { braids } = fence;
   if (braids === undefined) return fenceExpression({ fence, column });
-  const params: Record<string, unknown> = { [fenceParam("all")]: tenantsOf(fence) };
+  const params: Record<string, unknown> = {
+    [fenceParam("all")]: tenantsOf(fence),
+    [fenceParam("own")]: [...fence.own],
+  };
   const picks: string[] = [];
-  if (fence.own.length > 0) {
-    params[fenceParam("own")] = [...fence.own];
-    picks.push(`TenantId IN (${slot("own", "Array(String)")})`);
-  }
+  if (fence.own.length > 0) picks.push(`TenantId IN (${slot("own", "Array(String)")})`);
+  const braided: string[] = [];
   braids.clauses.forEach((clause, index) => {
     const name = (part: string) => `c${index}_${part}`;
     const windowed = windowsOf({ column, windows: clause.windows, name });
@@ -242,12 +259,37 @@ export function conditionsExpression({
     });
     Object.assign(params, predicate.params);
     if (predicate.verifies) params[fenceParam("reader")] = braids.reader;
-    picks.push(`(${windowed.sql} AND (${predicate.sql}))`);
+    braided.push(`(${windowed.sql} AND (${predicate.sql}))`);
   });
+  if (braided.length > 0) {
+    params[fenceParam("heldFrom")] = Math.min(
+      ...braids.clauses
+        .filter((clause) => clause.compiledWhere !== undefined)
+        .flatMap((clause) => clause.windows.map((window) => window.from)),
+    );
+    picks.push(`(${heldTraceOf(held)} AND (${braided.join(" OR ")}))`);
+  }
   return {
     sql: `(TenantId IN (${slot("all", "Array(String)")}) AND (${picks.join(" OR ")}))`,
     params,
   };
+}
+
+/**
+ * The traces an own project holds: one semi-join on `stored_spans` from the earliest braid
+ * window's start, narrowed by the read's trace id or its own lower bound so it reads no wider than
+ * the outer read (ADR-201 §3). The fence binds the tenants; a statement names only its bound.
+ */
+function heldTraceOf(held: HeldTraceParam | undefined): string {
+  let narrowed = "";
+  if (held?.kind === "traceId") narrowed = ` AND TraceId = {${held.param}:String}`;
+  if (held?.kind === "sinceMs") {
+    narrowed = ` AND StartTime >= fromUnixTimestamp64Milli({${held.param}:Int64})`;
+  }
+  return (
+    `TraceId IN (SELECT TraceId FROM stored_spans WHERE TenantId IN (${slot("own", "Array(String)")})` +
+    ` AND StartTime >= fromUnixTimestamp64Milli(${slot("heldFrom", "Int64")})${narrowed})`
+  );
 }
 
 /**
@@ -586,7 +628,11 @@ function refuseTenantInText({
       throw new StatementScopeError({ kind: "reserved-param", param });
     }
   }
-  const bare = text.replace(MARKER, " ").replace(SET_MARKER, " ").replace(CONDITIONS_MARKER, " ");
+  const bare = text
+    .replace(MARKER, " ")
+    .replace(SET_MARKER, " ")
+    .replace(CONDITIONS_MARKER, " ")
+    .replace(LATEST_VERSION_MARKER, " ");
   if (HAND_WRITTEN_TENANT_PREDICATE.test(bare)) {
     throw new StatementScopeError({ kind: "hand-written-tenant-predicate" });
   }
@@ -606,6 +652,7 @@ export function expandStatement({
   fence: TenantFence;
 }): { query: string; queryParams: Record<string, unknown> } {
   refuseTenantInText({ text: query, queryParams });
+  refuseUnconditionedMarkers({ text: query, fence });
   const expanded = replaceMarkers({ text: query, queryParams, fence });
   if (expanded.windowed === 0) {
     throw new StatementScopeError({ kind: "missing-marker" });
@@ -632,6 +679,30 @@ function refuseUnappliedBraids({
 }
 
 /**
+ * Owner rows leave only through the conditions marker (ADR-201 §3): under braids a plain marker
+ * is refused, and a latest-version marker is accepted only as the election in the WHERE of a
+ * select a windowed marker fences, so its keys filter that select and are never read themselves.
+ */
+function refuseUnconditionedMarkers({ text, fence }: { text: string; fence: TenantFence }): void {
+  if (
+    fence.braids !== undefined &&
+    (text.search(MARKER) !== -1 || text.search(SET_MARKER) !== -1)
+  ) {
+    throw new StatementScopeError({ kind: "plain-marker-under-braids" });
+  }
+  for (const election of text.matchAll(LATEST_VERSION_MARKER)) {
+    const before = text.slice(0, election.index);
+    const head = ELECTION_HEAD.exec(before);
+    const outer = head === null ? "" : before.slice(0, head.index);
+    const fenced = [...outer.matchAll(WINDOWED_MARKER)].at(-1);
+    const between = fenced === undefined ? undefined : outer.slice(fenced.index + fenced[0].length);
+    if (between === undefined || /\b(?:SELECT|FROM|UNION)\b/i.test(between)) {
+      throw new StatementScopeError({ kind: "loose-latest-version-marker" });
+    }
+  }
+}
+
+/**
  * Expand a WHERE fragment's markers on its own, for the one legacy statement that embeds the
  * compiled trace filter; a repository reads through `as()` instead. The tenant-predicate and
  * reserved-prefix checks still apply; only the windowed-marker check is left to the caller.
@@ -646,6 +717,7 @@ export function expandFragment({
   fence: TenantFence;
 }): { sql: string; params: Record<string, unknown> } {
   refuseTenantInText({ text: fragment, queryParams });
+  refuseUnconditionedMarkers({ text: fragment, fence });
   const expanded = replaceMarkers({ text: fragment, queryParams, fence });
   refuseUnappliedBraids({ fence, expanded });
   return { sql: expanded.text, params: expanded.queryParams };
@@ -670,26 +742,45 @@ function replaceMarkers({
   let windowed = 0;
   let conditioned = 0;
   let sets = 0;
+  let elections = 0;
   const windowedBy =
-    (render: typeof fenceExpression, counts: () => void) => (_match: string, column: string) => {
+    (render: typeof conditionsExpression, counts: () => void) =>
+    (_match: string, column: string, ...groups: unknown[]) => {
       if (!isTimeColumn(column)) {
         throw new StatementScopeError({ kind: "unknown-time-column", column });
       }
-      windowed += 1;
+      // Only the conditions marker captures a bound; the others pass the offset here.
+      const [kind, param] = groups;
+      const held: HeldTraceParam | undefined =
+        (kind === "traceId" || kind === "sinceMs") && typeof param === "string"
+          ? { kind, param }
+          : undefined;
+      if (held !== undefined && reservesPrefix(held.param)) {
+        throw new StatementScopeError({ kind: "reserved-param", param: held.param });
+      }
       counts();
-      const expression = render({ fence, column });
+      const expression = render({ fence, column, held });
       merged = { ...merged, ...expression.params };
       return expression.sql;
     };
   const replaced = text
     .replace(
       MARKER,
-      windowedBy(fenceExpression, () => {}),
+      windowedBy(fenceExpression, () => {
+        windowed += 1;
+      }),
     )
     .replace(
       CONDITIONS_MARKER,
       windowedBy(conditionsExpression, () => {
+        windowed += 1;
         conditioned += 1;
+      }),
+    )
+    .replace(
+      LATEST_VERSION_MARKER,
+      windowedBy(fenceExpression, () => {
+        elections += 1;
       }),
     )
     .replace(SET_MARKER, () => {
@@ -698,8 +789,17 @@ function replaceMarkers({
       merged = { ...merged, ...expression.params };
       return expression.sql;
     });
-  return { text: replaced, queryParams: merged, windowed, conditioned, markers: windowed + sets };
+  return {
+    text: replaced,
+    queryParams: merged,
+    windowed,
+    conditioned,
+    markers: windowed + elections + sets,
+  };
 }
+
+const reservesPrefix = (param: string): boolean =>
+  param.startsWith(TENANT_SCOPE_PARAM_PREFIX) || param.startsWith(ID_BOUND_PARAM_PREFIX);
 
 function isTimeColumn(column: string): column is TenantScopeTimeColumn {
   return (TENANT_SCOPE_TIME_COLUMNS as readonly string[]).includes(column);

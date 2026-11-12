@@ -21,6 +21,8 @@ export type StatementScopeViolation =
   | { kind: "mixed-id-bounds" }
   | { kind: "unexpanded-id-bound" }
   | { kind: "missing-condition-marker" }
+  | { kind: "plain-marker-under-braids" }
+  | { kind: "loose-latest-version-marker" }
   | { kind: "unsupported-condition-version"; version: number }
   | { kind: "over-budget"; bytes: number; budget: number };
 
@@ -56,6 +58,10 @@ function describe(violation: StatementScopeViolation): string {
       return "Statement still carries an {{idBound}} marker; only a read through the client's query expands one.";
     case "missing-condition-marker":
       return "The proof carries braids, whose conditions only a {{tenantScopeWithConditions:<TimeColumn>}} marker on the outer select applies; this statement carries none.";
+    case "plain-marker-under-braids":
+      return "The proof carries braids, so a {{tenantScope}} or {{tenantSet}} marker would read owner rows with no condition. Write {{tenantScopeWithConditions:<TimeColumn>}}, and {{tenantScopeForLatestVersion:<TimeColumn>}} in a latest-version election.";
+    case "loose-latest-version-marker":
+      return "A {{tenantScopeForLatestVersion:<TimeColumn>}} marker sits outside a latest-version election on stored_spans, or its election is not in the WHERE a windowed marker fences.";
     case "unsupported-condition-version":
       return `A braid's condition was compiled by compiler version ${violation.version}, which this reader cannot render.`;
     case "over-budget":

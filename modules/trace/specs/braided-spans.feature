@@ -89,6 +89,26 @@ Feature: Braided spans in the reader's traces
       Then the span is read from "specialists"
       And selecting a span id that "orchestrator" also holds reads the "orchestrator" span
 
+    @unit
+    Scenario: The fence shows owner spans only in traces the reader holds
+      Given a "specialists" trace that "orchestrator" recorded nothing in, with spans matching the condition
+      When any span read for "orchestrator" is fenced
+      Then the fence admits a "specialists" span only in a trace "orchestrator" holds a span of
+      And that check is the fence's own, with "orchestrator" bound as a parameter
+
+    @unit
+    Scenario: A plain tenant marker under a braids fence is refused
+      Given a span read whose statement selects rows through a plain tenant marker
+      When it is read for "orchestrator" under the braid
+      Then the statement is refused by name and nothing is sent
+      And a latest-version election is accepted only in the WHERE of a select the conditions fence
+
+    @unit
+    Scenario: A braid's activity counts only spans in traces the reader holds
+      Given matching "specialists" spans in traces "orchestrator" holds and in traces it does not
+      When the "orchestrator" Braids page counts the braid's activity
+      Then only the spans in traces "orchestrator" holds are counted
+
   Rule: Each span keeps its owner's privacy
 
     @integration

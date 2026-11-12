@@ -183,8 +183,20 @@ Rendering rules, each a security property:
   owner-bound clauses; a condition itself still refuses it.
 - The latest version of each span is chosen first and the condition applied second, so an older version
   that matched cannot reappear after the span changed. The span reads choose the latest version in an
-  inner subquery that carries its own `{{tenantScope:StartTime}}`, so the conditions get a marker of their
-  own, written only on the outer select; the inner marker renders tenants and windows alone.
+  inner subquery that carries its own `{{tenantScopeForLatestVersion:StartTime}}`, so the conditions get a
+  marker of their own, written only on the outer select; the election marker renders tenants and windows
+  alone.
+- **Owner spans only in traces the reader holds, enforced by the fence.** The conditions marker puts every
+  braid clause under one semi-join, `TraceId IN (SELECT TraceId FROM stored_spans WHERE TenantId IN
+<own> AND StartTime >= <earliest braid window start> ...)`, the reader bound as a parameter. The marker
+  names the read's trace id (`traceId=`) or its own lower bound (`sinceMs=`), which narrows the
+  semi-join to no wider than the outer read. A trace window read beside braids stays outside it. A
+  trace counts as held when the reader has a span of it on or after the earliest braid window's start.
+- **Owner rows leave only through the conditions marker.** Under braids the client refuses a plain
+  `{{tenantScope}}` or `{{tenantSet}}` marker (`plain-marker-under-braids`), and accepts the election
+  marker only right after `(TenantId, TraceId, SpanId, UpdatedAt) IN (SELECT TenantId, TraceId, SpanId,
+max(UpdatedAt) FROM stored_spans WHERE`, in the WHERE of a select a windowed marker fences
+  (`loose-latest-version-marker`), so its keys only filter a conditioned select.
 - Every cache and log key that the fence feeds (`readScopeKeyOf`, `tenantScopeKey`, the discovery and facet
   caches) carries a digest of the compiled tree and the compiler version.
 - **Size is bounded at every level.** One condition holds at most `BRAID_CONDITION_MAX_LENGTH` characters
@@ -570,3 +582,7 @@ not operations.
   subscriber revokes the replaced grant once the attach lands. The ClickHouse fence also requires a trace
   the reader holds on every braid condition, and refuses a plain tenant marker under a braid filter.
   Each braided trace procedure is one trace operation that applies owner protections in a service.
+- v1.9 (2026-11-12, how ruling 1a landed). The fence itself keeps owner spans to traces the reader holds,
+  through a held-trace semi-join on every braid clause, so no span read can skip the check and the
+  reader's activity count is held-trace bounded too. Plain tenant markers are refused under braids; the
+  latest-version election has a marker of its own, accepted only in that shape (§3).
