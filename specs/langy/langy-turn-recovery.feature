@@ -258,6 +258,23 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     Then the turn completes normally
     And the user is never asked to connect anything
 
+  # A failed command is the agent's to read and work around: a missing label,
+  # file or tool also prints "not found". Only git or gh saying the GitHub App
+  # cannot reach the repository ends the turn on the repository card.
+  @unit
+  Scenario: A failed GitHub command that is not about repository access keeps the turn going
+    Given the user has connected GitHub
+    When Langy runs a GitHub command that fails because a label, file or tool is missing
+    Then the turn keeps going and Langy sees the failure
+    And the user is not told the repository isn't available to Langy
+
+  @unit
+  Scenario: Git or gh saying the repository cannot be reached ends the turn on the repository card
+    Given the user has connected GitHub
+    When git or gh reports the repository is not found or not writable for the GitHub App
+    Then the turn stops
+    And the user is told the repository isn't available to Langy
+
   @integration
   Scenario: Connecting GitHub resumes the turn without a duplicate message
     Given a turn stopped because GitHub was not connected
