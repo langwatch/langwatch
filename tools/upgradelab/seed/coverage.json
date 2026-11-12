@@ -210,6 +210,11 @@
       "seed": "unplanned",
       "note": "no seed door written yet"
     },
+    "organization:record-seat-peak-opening-snapshots": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs organizations with seat holders as the old release wrote them; no seed door written yet"
+    },
     "project:list-personal-owner-and-first-message-facts": {
       "status": "pending",
       "seed": "unplanned",
