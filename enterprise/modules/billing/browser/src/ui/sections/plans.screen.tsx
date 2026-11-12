@@ -10,8 +10,18 @@ import { billingApi } from "../../behavior/billing-api.ts";
 import { useBillingPricingService } from "../../behavior/use-billing-pricing-service.ts";
 import { useBillingHost } from "../../model/billing-host.ts";
 import { PlansComparisonPage } from "./plans-comparison.tsx";
+import { SaasPageOpened } from "./saas-page-opened.tsx";
 
 export default function PlansScreen() {
+  return (
+    <>
+      <SaasPageOpened page="settings_plans" />
+      <PlansContent />
+    </>
+  );
+}
+
+function PlansContent() {
   const organization = useBillingHost().organization();
   const pricing = useBillingPricingService();
   const activePlan = billingApi.plan.getActivePlan.useQuery(

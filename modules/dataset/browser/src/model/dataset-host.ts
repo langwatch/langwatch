@@ -56,6 +56,9 @@ export abstract class DatasetHostApi {
   /** The project the address is about. Datasets are project-scoped. */
   abstract project(): DatasetHostProject | undefined;
 
+  /** The signed-in reader, so a version they saved reads as theirs. */
+  abstract currentUserId(): string | undefined;
+
   /** A grant, for the scope this page is about. */
   abstract hasPermission(permission: string): boolean;
 

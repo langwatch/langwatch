@@ -19,6 +19,7 @@ import { MonitorService } from "../../services/monitor.service.ts";
 import { MemoryMonitorRepository } from "../memory/memory.monitor.repository.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
+const noPeople = { getProfiles: async () => [] };
 
 const stored: MonitorWithEvaluator = {
   id: "monitor_1",
@@ -54,6 +55,7 @@ function harness(
       repository,
       evaluators,
       featureFlags: new FakeRecoverySwitch(),
+      users: noPeople,
       generateId: () => options.id ?? "monitor_test",
     }),
   };
@@ -111,6 +113,7 @@ describe("MonitorService", () => {
           evaluator_1: { evaluatorType: "langevals/llm_boolean", prompt: "Polite?" },
         }),
         featureFlags: recoverySwitch,
+        users: noPeople,
         generateId: () => "monitor_test",
       });
 

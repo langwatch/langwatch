@@ -702,6 +702,68 @@ exports[`given the Slack notice registry > when scim-sync-summary / only deactiv
 }
 `;
 
+exports[`given the Slack notice registry > when seat-requested / an enterprise licence … is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "text": {
+        "emoji": true,
+        "text": "🌱 Seat requested",
+        "type": "plain_text",
+      },
+      "type": "header",
+    },
+    {
+      "text": {
+        "text": "*Acme Robotics* has someone waiting for a seat on *ENTERPRISE*.",
+        "type": "mrkdwn",
+      },
+      "type": "section",
+    },
+    {
+      "fields": [
+        {
+          "text": "*Seats now*
+25",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Seats needed*
+26",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "section",
+    },
+    {
+      "elements": [
+        {
+          "action_id": "seat-requested_0",
+          "style": "primary",
+          "text": {
+            "text": "Open org in admin",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://app.langwatch.ai/admin#/organizations/organization_acme",
+        },
+      ],
+      "type": "actions",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "🌱 Seat requested · Acme Robotics has someone waiting for a seat on ENTERPRISE. · Seats now: 25 · Seats needed: 26",
+}
+`;
+
 exports[`given the Slack notice registry > when self-hosted-signal / a known company is rendered > matches its stored rendering 1`] = `
 {
   "blocks": [

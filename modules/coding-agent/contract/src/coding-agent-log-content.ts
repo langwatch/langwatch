@@ -55,13 +55,14 @@ const CONTENT_KEYS_BY_EVENT: Readonly<Record<string, readonly LogContentKey[]>> 
   ],
   // A tool run: what it was asked to do, and what it answered. claude spells
   // the arguments `tool_input` / `tool_parameters`, codex `arguments`,
-  // gemini `function_args`; codex is the one that also carries the result.
+  // gemini `function_args`; codex carries the result as `output`, grok as `tool_output`.
   tool_result: [
     { key: "tool_input", category: "input" },
     { key: "tool_parameters", category: "input" },
     { key: "arguments", category: "input" },
     { key: "function_args", category: "input" },
     { key: "output", category: "output" },
+    { key: "tool_output", category: "output" },
     { key: BODY_ATTR, category: SESSION_FREE_TEXT },
   ],
   // A tool the human was asked to approve: the arguments are the whole point.

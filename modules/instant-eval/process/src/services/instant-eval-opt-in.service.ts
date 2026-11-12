@@ -15,10 +15,14 @@ import {
 import { ProjectNotFoundError } from "@langwatch/project-contract";
 
 import type { InstantEvalJudgeRoute } from "../rules/instant-eval-judge-choice.rules.ts";
-import type { InstantEvalPlanReader } from "./instant-eval-access.service.ts";
+import type {
+  InstantEvalHostedSwitchReader,
+  InstantEvalPlanReader,
+} from "./instant-eval-access.service.ts";
 
 /** The peers the offer and the switch ask, each narrowed to one question. */
-export interface InstantEvalOptInPeers extends InstantEvalPlanReader {
+export interface InstantEvalOptInPeers
+  extends InstantEvalPlanReader, InstantEvalHostedSwitchReader {
   findOrganizationId(projectId: string): Promise<string | undefined>;
   /** Whether this is the hosted service; a self-hosted install is never offered the switch. */
   isSaas(): boolean;
@@ -29,6 +33,7 @@ export interface InstantEvalOptInPeers extends InstantEvalPlanReader {
   /** The authority the switch's route declares (`organization:manage`), asked of the reader. */
   mayManageOrganization(input: { userId: string; organizationId: string }): Promise<boolean>;
   isReleased(input: { projectId: string }): Promise<boolean>;
+  isHostedReleased(input: { projectId: string }): Promise<boolean>;
   recordOptIn(input: { organizationId: string; userId: string }): Promise<void>;
 }
 
@@ -48,17 +53,18 @@ export class InstantEvalOptInService {
     userId: string;
   }): Promise<InstantEvalOptInAccess> {
     const organizationId = await this.organizationOf(projectId);
-    const [released, offer, viaConnect] = await Promise.all([
+    const [released, hostedReleased, offer, viaConnect] = await Promise.all([
       this.peers.isReleased({ projectId }),
-      this.offerFor({ organizationId, userId }),
+      this.peers.isHostedReleased({ projectId }),
+      this.offerFor({ projectId, organizationId, userId }),
       this.judgesThroughConnect(),
     ]);
-    return { released, offer, viaConnect };
+    return { released, hostedReleased, offer, viaConnect };
   }
 
   /**
-   * Refused, and nothing recorded, where the popover offers a word with us. The
-   * member's authority is the route's declared permission, so it is not asked again.
+   * Refused, and nothing recorded, where the popover offers a word with us or LangWatch switched
+   * hosted off. The member's authority is the route's declared permission, not asked again.
    */
   async optIn({
     projectId,
@@ -68,13 +74,16 @@ export class InstantEvalOptInService {
     userId: string;
   }): Promise<InstantEvalOptInAccess> {
     const organizationId = await this.organizationOf(projectId);
+    if (await this.isHostedOff({ projectId, organizationId })) {
+      throw new InstantEvalOptInNotOfferedError({ deployment: "hosted_off" });
+    }
     if (!(await this.switchOffered(organizationId))) {
       const deployment = this.peers.isSaas() ? "enterprise" : "self_hosted";
       throw new InstantEvalOptInNotOfferedError({ deployment });
     }
     await this.peers.recordOptIn({ organizationId, userId });
     // The switch is thrown on the hosted service only, which never judges through Connect.
-    return { released: true, offer: "enable", viaConnect: false };
+    return { released: true, hostedReleased: true, offer: "enable", viaConnect: false };
   }
 
   /** A self-hosted install judging through LangWatch: "can't run" then names its two hosts. */
@@ -84,13 +93,17 @@ export class InstantEvalOptInService {
   }
 
   private async offerFor({
+    projectId,
     organizationId,
     userId,
   }: {
+    projectId: string;
     organizationId: string;
     userId: string;
   }): Promise<InstantEvalOptInOffer> {
     if (!this.peers.isSaas()) return this.selfHostedOffer(organizationId);
+    // Never the switch: the popover then asks for an own model, and Evals Preview is not listed.
+    if (await this.isHostedOff({ projectId, organizationId })) return "contact_us";
     if (!(await this.switchOffered(organizationId))) return "contact_us";
     if (!(await this.peers.mayManageOrganization({ userId, organizationId }))) return "ask_admin";
     return "enable";
@@ -114,6 +127,12 @@ export class InstantEvalOptInService {
   private async switchOffered(organizationId: string): Promise<boolean> {
     if (!this.peers.isSaas()) return false;
     return !(await this.peers.isEnterprisePlan(organizationId));
+  }
+
+  /** Asked on the hosted service only: a self-hosted install's offer is its judge and license. */
+  private async isHostedOff(input: { projectId: string; organizationId: string }) {
+    if (!this.peers.isSaas()) return false;
+    return this.peers.isHostedOff(input);
   }
 
   /** A project deleted between the permission check and this read is a handled not-found. */

@@ -28,6 +28,11 @@ export interface RequestLogData {
   attribution?: RequestAttribution;
   /** Additional context to include in log */
   extra?: Record<string, unknown>;
+  /**
+   * Pins the level, ignoring status and fault. For a caller that samples a flood of one
+   * customer fault and writes the held-back repeats below `info`.
+   */
+  level?: "debug" | "info" | "warn" | "error";
 }
 
 /**
@@ -116,7 +121,7 @@ function attachCause({
 }: {
   logData: Record<string, unknown>;
   error: unknown;
-  level: "info" | "warn" | "error";
+  level: "debug" | "info" | "warn" | "error";
 }): void {
   if (level === "error") {
     logData.error = summarizeError(error);
@@ -145,7 +150,7 @@ function requestLogMessage({
   level,
 }: {
   error: unknown;
-  level: "info" | "warn" | "error";
+  level: "debug" | "info" | "warn" | "error";
 }): string {
   if (error) return "error handling request";
   return level === "error" ? "request failed without a cause attached" : "request handled";
@@ -166,7 +171,7 @@ export function logHttpRequest(logger: Logger, data: RequestLogData): void {
     userAgent: data.userAgent,
   };
 
-  const level = getLogLevelForRequest(data.error, data.statusCode);
+  const level = data.level ?? getLogLevelForRequest(data.error, data.statusCode);
 
   if (data.error) {
     attachCause({ logData, error: data.error, level });

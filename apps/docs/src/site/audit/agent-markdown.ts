@@ -1,3 +1,4 @@
+import { approximateTokens } from "../../lib/page-tokens.ts";
 import { unparseable } from "./code-syntax.ts";
 
 /** A gap on one page; `weight` orders the worst offenders (tokens, or how many blocks). */
@@ -7,12 +8,6 @@ type PageIssue = Omit<AgentIssue, "page">;
 type CodeBlock = { lang: string; lines: string[] };
 type Block = { kind: "code"; code: CodeBlock } | { kind: ProseKind; lines: string[] };
 type ProseKind = "heading" | "quote" | "list" | "table" | "component" | "image" | "paragraph";
-
-/** The named approximation: about four characters per token for English prose and code. */
-export const TOKENISER = "characters / 4";
-export function approximateTokens({ text }: { text: string }) {
-  return Math.ceil(text.length / 4);
-}
 
 const SHELL = new Set(["bash", "sh", "shell", "zsh", "console", "terminal", "fish", "powershell"]);
 const LANGUAGE_OF: Record<string, Language> = {

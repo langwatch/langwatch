@@ -1,5 +1,6 @@
 {{- if .Values.backup.enabled }}
 {{- $fullname := include "clickhouse-serverless.fullname" . }}
+{{- if include "clickhouse-serverless.backupCronJobs" . }}
 ---
 # Full backup — scripts are baked into the Docker image at /scripts/
 apiVersion: batch/v1
@@ -72,6 +73,13 @@ spec:
                   value: "full"
                 - name: BACKUP_DATABASE
                   value: {{ .Values.backup.database | quote }}
+                - name: STALE_BACKUP_HOURS
+                  value: {{ .Values.backup.staleHours | quote }}
+                - name: BACKUP_RETENTION_DAYS
+                  value: {{ .Values.backup.retentionDays | quote }}
+                # The chain limit follows the full cadence (ADR-199).
+                - name: BACKUP_FULL_SCHEDULE
+                  value: {{ .Values.backup.full.schedule | quote }}
 ---
 # Incremental backup
 apiVersion: batch/v1
@@ -144,8 +152,19 @@ spec:
                   value: "incremental"
                 - name: BACKUP_DATABASE
                   value: {{ .Values.backup.database | quote }}
+                - name: STALE_BACKUP_HOURS
+                  value: {{ .Values.backup.staleHours | quote }}
+                - name: BACKUP_RETENTION_DAYS
+                  value: {{ .Values.backup.retentionDays | quote }}
+                # The chain limit follows the full cadence (ADR-199).
+                - name: BACKUP_FULL_SCHEDULE
+                  value: {{ .Values.backup.full.schedule | quote }}
+{{- end }}
+{{- /* Dynamic-only has no password a Job could hold: restore with
+       kubectl exec into the access container (ADR-199). */}}
+{{- if not (include "clickhouse-serverless.dynamicOnly" .) }}
 ---
-# Restore template (suspended — manual trigger only)
+# Restore template, in every mode (suspended — manual trigger only)
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -208,12 +227,18 @@ spec:
                 - name: CLICKHOUSE_PASSWORD
                   valueFrom:
                     secretKeyRef:
+                      {{- if and (include "clickhouse-serverless.backupSidecar" .) .Values.backup.passwordSecret.name }}
+                      name: {{ .Values.backup.passwordSecret.name }}
+                      key: {{ .Values.backup.passwordSecret.key | default "password" }}
+                      {{- else }}
                       name: {{ include "clickhouse-serverless.secretName" . }}
                       key: {{ include "clickhouse-serverless.secretKey" . }}
+                      {{- end }}
                 - name: BACKUP_DATABASE
                   value: {{ .Values.backup.database | quote }}
                 - name: BACKUP_NAME
                   value: ""
                 - name: CONFIRM_RESTORE
                   value: "no"
+{{- end }}
 {{- end }}

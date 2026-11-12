@@ -154,7 +154,14 @@
       "Claude-SearchBot",
       "PerplexityBot",
       "Google-Extended",
-      "CCBot"
+      "CCBot",
+      "Perplexity-User",
+      "Applebot",
+      "Applebot-Extended",
+      "Meta-ExternalAgent",
+      "Amazonbot",
+      "DuckAssistBot",
+      "MistralAI-User"
     ],
     "known": {
       "code-missing-import": [
@@ -171,6 +178,7 @@
         "/api-reference/query/overview",
         "/api-reference/scenario-events/create-scenario-events",
         "/api-reference/triggers/create-triggers",
+        "/changelog",
         "/evaluations/experiments/sdk",
         "/features/webhooks",
         "/integration/cli",

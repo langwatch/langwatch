@@ -81,6 +81,7 @@ export async function composedAuth({ repositories }: { repositories: AuthReposit
       notifications: createApiFixture<NotificationService>(),
       sso: createApiFixture<SsoApi>({
         getSignInProviderMounts: async () => ({ socialProviders: {}, genericOAuthConfigs: [] }),
+        platformAllowed: async () => false,
       }),
       authz: createApiFixture<AuthzApi>({}),
       auditLog: createApiFixture<AuditLogApi>({

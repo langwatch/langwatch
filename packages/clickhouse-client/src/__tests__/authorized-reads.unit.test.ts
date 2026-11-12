@@ -117,6 +117,19 @@ describe("AuthorizedClickHouse", () => {
         expect(sent().SKIP_COLD_SCAN_CHECK).toBe(true);
       });
 
+      it("carries a read's timeout opt-out through to the routed client", async () => {
+        const { sent, clickhouse } = clientWith();
+        const reader = clickhouse.as(proof(), { reads: "traces" });
+
+        await reader.query({
+          query: `SELECT TraceId FROM trace_summaries WHERE ${tenantScope("OccurredAt")}`,
+          format: "JSONEachRow",
+          retryOnTimeout: false,
+        });
+
+        expect(sent().retryOnTimeout).toBe(false);
+      });
+
       // @scenario "The client adds the tenant set from the proof"
       it("restricts the query to tenants aggregate, A and B, and A and B to their windows", async () => {
         const { sent, resolveClient, clickhouse } = clientWith();

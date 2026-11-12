@@ -8,6 +8,8 @@ export interface AgentWorkflowTargetEditorDrawerProps {
   hasLookupFailed: boolean;
   workflowCard?: ReactNode;
   mappings: ReactNode;
+  /** The experiment target's deploy label picker. */
+  deployLabel?: ReactNode;
   onClose: () => void;
   onGoBack?: () => void;
 }
@@ -31,6 +33,7 @@ export function AgentWorkflowTargetEditorDrawer(props: AgentWorkflowTargetEditor
       }}
     >
       <VStack gap={4} align="stretch">
+        {props.deployLabel}
         {props.workflowCard && (
           <Field.Root>
             <Field.Label>Workflow</Field.Label>

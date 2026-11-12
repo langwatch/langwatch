@@ -2,9 +2,9 @@ package engine
 
 import (
 	"regexp"
-	"strings"
 
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
+	"github.com/langwatch/langwatch/services/nlpgo/app/engine/redact"
 )
 
 // secretRefRE matches a secret reference like `{{ secrets.NAME }}` with
@@ -65,13 +65,7 @@ func redactSecrets(s string, secrets map[string]string) string {
 	if s == "" || len(secrets) == 0 {
 		return s
 	}
-	for _, v := range secrets {
-		if v == "" {
-			continue
-		}
-		s = strings.ReplaceAll(s, v, "[redacted]")
-	}
-	return s
+	return redact.New(secrets).Redact(s)
 }
 
 // resolveAuthSecrets resolves secret references in the credential-bearing

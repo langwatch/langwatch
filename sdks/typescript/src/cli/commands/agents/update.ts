@@ -14,7 +14,7 @@ import { failSpinner } from "../../utils/spinnerError";
  */
 export const updateAgentCommand = async (
   id: string,
-  options: { name?: string; type?: string; config?: string },
+  options: { name?: string; type?: string; config?: string; commitMessage?: string },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
@@ -22,9 +22,15 @@ export const updateAgentCommand = async (
   const spinner = createSpinner(`Updating agent "${id}"...`).start();
 
   try {
-    const params: { name?: string; type?: string; config?: Record<string, unknown> } = {};
+    const params: {
+      name?: string;
+      type?: string;
+      config?: Record<string, unknown>;
+      commitMessage?: string;
+    } = {};
     if (options.name !== undefined) params.name = options.name;
     if (options.type !== undefined) params.type = options.type;
+    if (options.commitMessage !== undefined) params.commitMessage = options.commitMessage;
     if (options.config !== undefined) {
       params.config = JSON.parse(options.config) as Record<string, unknown>;
     }

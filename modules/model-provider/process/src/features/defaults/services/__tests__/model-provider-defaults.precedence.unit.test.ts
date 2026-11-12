@@ -8,6 +8,7 @@ import { ModelProviderDefaultsService } from "../model-provider-defaults.service
 const FEATURES = [
   { key: "prompt.create_default", role: "DEFAULT", displayName: "Prompts", description: "" },
   { key: "langy.chat", role: "LANGY", displayName: "Langy", description: "" },
+  { key: "scenarios.judge", role: "JUDGE", displayName: "Scenario judge", description: "" },
 ];
 
 const SCOPES = {
@@ -156,6 +157,45 @@ describe("ModelProviderDefaultsService precedence", () => {
           model: "chat-model",
           source: "feature_override",
         });
+      });
+    });
+  });
+
+  describe("given the scenario judge, which reads the Judge column", () => {
+    it("takes a Judge pick at a wider scope over the project's Default", async () => {
+      const effective = await effectiveFor([
+        config("c1", "ORGANIZATION", "organization-1", { JUDGE: "org-judge" }),
+        config("c2", "PROJECT", "project-1", { DEFAULT: "project-default" }),
+      ]);
+
+      expect(effective["scenarios.judge"]).toMatchObject({
+        model: "org-judge",
+        scope: "organization",
+      });
+      expect(effective.JUDGE).toMatchObject({ model: "org-judge" });
+    });
+
+    it("reads the Default column when Judge is unset at every scope", async () => {
+      const service = serviceOver([
+        config("c1", "ORGANIZATION", "organization-1", { DEFAULT: "org-default" }),
+      ]);
+
+      await expect(
+        service.getResolved({ projectId: "project-1", featureKey: "scenarios.judge" }),
+      ).resolves.toMatchObject({ model: "org-default", scope: "organization" });
+    });
+
+    it("keeps a pinned scenario judge override over the Default", async () => {
+      const effective = await effectiveFor([
+        config("c1", "PROJECT", "project-1", {
+          DEFAULT: "project-default",
+          "scenarios.judge": "pinned-judge",
+        }),
+      ]);
+
+      expect(effective["scenarios.judge"]).toMatchObject({
+        model: "pinned-judge",
+        source: "feature_override",
       });
     });
   });

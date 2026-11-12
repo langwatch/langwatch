@@ -4,6 +4,14 @@ import type {
   LwqlAccessModelOwner,
 } from "../rules/langwatch-ql-config-store.rules.ts";
 
+/** The collections a server holds and each PostgreSQL engine table's binding. */
+export interface LwqlCollectionState {
+  readonly available: readonly string[];
+  readonly bound: Readonly<Record<string, string>>;
+  /** The `available` ones a config file defines (`source = 'CONFIG'`): no statement writes them. */
+  readonly configDefined?: readonly string[];
+}
+
 /** One key-map row: a project's key hash and the project it resolves to. */
 export interface LwqlKeyMapInsertRow {
   readonly KeyHash: string;
@@ -30,6 +38,8 @@ export interface LwqlClickHouseInventory {
   readonly relations: readonly string[];
   /** Each present relation's comment, by name; empty where it has none. */
   readonly comments: Readonly<Record<string, string>>;
+  /** Each present relation's column names, by name. */
+  readonly columns: Readonly<Record<string, readonly string[]>>;
   /** The named SQL user-defined functions present. */
   readonly functions: readonly string[];
 }
@@ -64,12 +74,17 @@ export abstract class LangWatchQLProvisioningRepository {
     configStoreEntities?: readonly ConfigStoreLwqlEntity[];
     failureLevel?: ProvisioningFailureLevel;
   }): Promise<RunClickHouseStatementsResult>;
-  /** Two catalog reads; throws when ClickHouse is unreachable. */
+  /** Catalog reads of the relations, their columns and the functions; throws if unreachable. */
   abstract readInventory(input: {
     database: string;
     relations: readonly string[];
     functions: readonly string[];
   }): Promise<LwqlClickHouseInventory>;
+  /** Which candidate collections exist and each engine table's binding; empty where unreadable. */
+  abstract readCollectionState(input: {
+    database: string;
+    candidates: readonly string[];
+  }): Promise<LwqlCollectionState>;
   /**
    * Reads through the `postgresql` table function, which dials with the collection's values as
    * loaded now (never a table's cached pool); with `cluster`, on every replica. Throws on failure.
@@ -77,12 +92,18 @@ export abstract class LangWatchQLProvisioningRepository {
   abstract probePostgresCollection(input: {
     collection: string;
     relation: string;
+    /**
+     * The PostgreSQL schema holding the approved view. An unqualified name resolves through the
+     * role's search_path, which provisioning never sets, so the default can exclude this schema.
+     */
+    schema: string;
     cluster: string | undefined;
   }): Promise<void>;
   /** The same read with explicit values; throws when they do not authenticate. */
   abstract probePostgresCredentials(input: {
     credentials: LwqlPostgresCredentials;
     relation: string;
+    schema: string;
     cluster: string | undefined;
   }): Promise<void>;
   abstract inventoryConfigStore(input: {

@@ -15,13 +15,16 @@ import {
 } from "@langwatch/prisma-client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { LangWatchQLCollectionBindingService } from "../../features/provisioning/services/langwatch-ql-collection-binding.service.ts";
 import { LWQL_POSTGRES_READER_ROLE } from "../../features/provisioning/services/langwatch-ql-production-provisioning.service.ts";
 import { LangWatchQLSelfProvisioningService } from "../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import {
   type LangWatchQLClickHouseHarness,
   type LangWatchQLPostgresHarness,
+  removeNamedCollectionFile,
   startLangWatchQLClickHouse,
   startLangWatchQLPostgres,
+  writeNamedCollectionFile,
 } from "../../langwatch-ql/__tests__/lwql-clickhouse-harness.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
 import type { LwqlProvisioningDatabase } from "../../repositories/langwatch-ql-postgres.repository.ts";
@@ -41,6 +44,8 @@ class AllowTestQueries extends PrismaQueryGuard {
 }
 
 const selfProvisioning = LangWatchQLSelfProvisioningService.create();
+
+const collectionBinding = LangWatchQLCollectionBindingService.create();
 const SERVER_LOG = "/var/log/clickhouse-server/clickhouse-server.log";
 
 type LogMark = { at: string; bytes: number };
@@ -89,14 +94,19 @@ describe("given a rendered install whose engine tables were built on the reader'
       }),
   });
 
-  /** The SQL stand-in for the collection file the config store loads. */
+  /** The collection file the config store loads, rewritten and reloaded as production does. */
   const collectionHolds = (password: string) =>
-    harness.applyAsAdmin([
-      `DROP NAMED COLLECTION IF EXISTS ${collection}`,
-      `CREATE NAMED COLLECTION ${collection} AS host = '${postgres.container.getIpAddress("bridge")}', ` +
-        `port = 5432, database = '${postgres.container.getDatabase()}', ` +
-        `user = '${LWQL_POSTGRES_READER_ROLE}', password = '${password}'`,
-    ]);
+    writeNamedCollectionFile({
+      harness,
+      collection,
+      values: {
+        host: postgres.container.getIpAddress("bridge"),
+        port: 5432,
+        database: postgres.container.getDatabase(),
+        user: LWQL_POSTGRES_READER_ROLE,
+        password,
+      },
+    });
 
   const deploy = (readerPassword: string) =>
     convergeLwqlAccessModel({
@@ -230,7 +240,9 @@ describe("given a rendered install whose engine tables were built on the reader'
       }),
     );
     names = { ...harness.names, database: harness.factDatabase };
-    collection = selfProvisioning.namedCollection({ names });
+    // Per-suite name, never the server-global lwql_postgres: suites share one ClickHouse server,
+    // and the rendered binding takes the per-database name while no lwql_postgres exists.
+    collection = collectionBinding.namedCollection({ names, mode: "sql" });
     // A reused container keeps the facts database, so the app-owned objects go first.
     await harness.applyAsAdmin([
       ...LWQL_VIEW_CATALOG.map((view) => `DROP VIEW IF EXISTS ${names.database}.${view.name}`),
@@ -242,10 +254,11 @@ describe("given a rendered install whose engine tables were built on the reader'
 
   afterAll(async () => {
     // A reused container reloads each table at restart; one whose collection is gone never loads.
-    await harness?.applyAsAdmin([
-      ...ENGINE_TABLES.map((table) => `DROP TABLE IF EXISTS ${names.database}.${table}`),
-      `DROP NAMED COLLECTION IF EXISTS ${collection}`,
-    ]);
+    await harness?.applyAsAdmin(
+      ENGINE_TABLES.map((table) => `DROP TABLE IF EXISTS ${names.database}.${table}`),
+    );
+    if (harness) await removeNamedCollectionFile({ harness, collection });
+    await harness?.admin.command({ query: `DROP NAMED COLLECTION IF EXISTS ${collection}` });
     await connection?.closeOnce();
     await Promise.all([harness?.stop(), postgres?.stop()]);
   });
@@ -287,6 +300,32 @@ describe("given a rendered install whose engine tables were built on the reader'
 
       // Every probe sent the password as a body parameter, which ClickHouse never logs.
       expect(await loggedPasswords(logsFrom)).toEqual([]);
+    });
+  });
+
+  describe("when an sql-mode deploy runs twice with the reader's password rotated in between", () => {
+    /** @scenario "An sql-mode deploy rotates the reader password while engine tables use the collection" */
+    it("succeeds both times, and the engine tables answer on the new password", async () => {
+      // The SQL collection takes the same name, so the rendered install's tables and file go first.
+      await harness.applyAsAdmin(
+        ENGINE_TABLES.map((table) => `DROP TABLE IF EXISTS ${names.database}.${table}`),
+      );
+      await removeNamedCollectionFile({ harness, collection });
+      const sqlDeploy = (readerPassword: string) =>
+        convergeLwqlAccessModel({
+          database: database(),
+          plan: { ...plan(readerPassword), settings: { LWQL_ACCESS_MODEL_MODE: "sql" } },
+          failOnError: true,
+        });
+
+      await expect(sqlDeploy(FIRST_PASSWORD)).resolves.toBeUndefined();
+      // The second writes the collection while every engine table uses it: 26.8 refuses a DROP.
+      await expect(sqlDeploy(SECOND_PASSWORD)).resolves.toBeUndefined();
+
+      await endReaderConnections();
+      const answered = await answers();
+      expect(answered).toHaveLength(ENGINE_TABLES.length);
+      expect(answered.every((count) => Number.isInteger(count))).toBe(true);
     });
   });
 });

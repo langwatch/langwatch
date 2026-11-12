@@ -133,6 +133,14 @@ export abstract class UiRpc {
 
   abstract mutate(path: string, input: unknown): Promise<unknown>;
 
+  /**
+   * A write no read shows, such as a last-seen stamp. The shell's dispatcher sends it without
+   * marking every read stale, which `mutate` does; this fallback is for test doubles.
+   */
+  record(path: string, input: unknown): Promise<unknown> {
+    return this.mutate(path, input);
+  }
+
   /** A LIVE procedure, opened from outside React. Nothing is cached. */
   abstract subscribe(
     path: string,
@@ -219,6 +227,15 @@ export abstract class UiSession {
   /** Reads the signed-in reader again, e.g. after their name or photo changed. */
   refresh(): Promise<void> {
     return Promise.reject(new UiHostServiceUnavailableError("session refresh"));
+  }
+
+  /**
+   * Ends the session and leaves this page, as whoever owns sign-out decides.
+   * A port that does not publish it fails by name rather than letting a screen
+   * believe the reader left. Spec: specs/auth/sign-out-leaves-the-page.feature
+   */
+  signOut(): Promise<void> {
+    return Promise.reject(new UiHostServiceUnavailableError("session sign-out"));
   }
 }
 

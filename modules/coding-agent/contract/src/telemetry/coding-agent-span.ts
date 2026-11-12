@@ -5,6 +5,7 @@ const MODEL_CALL_SPAN_NAMES = new Set([
   "llm_call",
   "session_task.turn",
   "chat",
+  "pi.ai.request",
 ]);
 
 const MODEL_CALL_SPAN_EXCLUDES = new Set(["ai.streamText.doStream"]);

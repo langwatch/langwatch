@@ -1,19 +1,39 @@
 import {
+  datasetColumnsSchema,
   datasetRecordSchema,
   DatasetRecordNotFoundError,
+  type DatasetColumns,
   type DatasetRecord,
   type DatasetRecordInput,
 } from "@langwatch/dataset-contract";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import { type Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { prismaTables } from "@langwatch/prisma-client/ownership";
 
-import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
+import { lockedView } from "../../rules/dataset-record-lock.rules.ts";
+import type {
+  DatasetRecordRepository,
+  LockedDatasetRecords,
+} from "../dataset-record.repository.ts";
+import {
+  DATASET_MUTATION_TXN_MAX_WAIT_MS,
+  DATASET_MUTATION_TXN_TIMEOUT_MS,
+} from "./prisma.dataset-content.repository.ts";
 
 /**
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-type DatasetRecordDatabase = Pick<PrismaClient, "datasetRecord" | "$queryRaw">;
+type DatasetRecordDatabase = Pick<
+  PrismaClient,
+  "datasetRecord" | "dataset" | "$queryRaw" | "$executeRaw" | "$transaction"
+>;
+type DatasetRecordClient = Omit<DatasetRecordDatabase, "$transaction">;
+
+/** Entries written per statement while a dataset's entries are replaced. */
+const REPLACE_BATCH_SIZE = 500;
+/** A replace writes up to one whole read of entries, so it gets the dataset mutation's time. */
+const REPLACE_TXN_TIMEOUT_MS = 120_000;
 
 /**
  * Declared rather than inherited from `PrismaRepository.for`: the ordered reads
@@ -21,13 +41,36 @@ type DatasetRecordDatabase = Pick<PrismaClient, "datasetRecord" | "$queryRaw">;
  * `$queryRaw`. Prisma cannot sort by `id COLLATE "C"`, so the order is written here.
  */
 export class PrismaDatasetRecordRepository implements DatasetRecordRepository {
-  static readonly tables = prismaTables("DatasetRecord");
+  static readonly tables = prismaTables("DatasetRecord", "Dataset");
 
   static create({ prisma }: { prisma: DatasetRecordDatabase }): PrismaDatasetRecordRepository {
-    return new PrismaDatasetRecordRepository(prisma);
+    return new PrismaDatasetRecordRepository(prisma, prisma);
   }
 
-  private constructor(private readonly database: DatasetRecordDatabase) {}
+  private constructor(
+    private readonly database: DatasetRecordClient,
+    /** Absent on the instance bound to a lock's transaction. */
+    private readonly root: DatasetRecordDatabase | null,
+  ) {}
+
+  async withDatasetLock<T>(
+    input: { datasetId: string; projectId: string },
+    work: (locked: LockedDatasetRecords) => Promise<T>,
+  ): Promise<T> {
+    if (!this.root) throw new Error("withDatasetLock cannot nest");
+    return this.root.$transaction(
+      async (client) => {
+        await client.$executeRaw` ${skipTenantCheck({
+          // Advisory-lock helper, key is dataset-bounded.
+          SKIP_TENANT_CHECK: true,
+        })}
+SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${input.datasetId}`}, 0))`;
+        const records = new PrismaDatasetRecordRepository(client, null);
+        return work(lockedRecords({ records, client, ...input }));
+      },
+      { timeout: DATASET_MUTATION_TXN_TIMEOUT_MS, maxWait: DATASET_MUTATION_TXN_MAX_WAIT_MS },
+    );
+  }
 
   async count(input: { datasetId: string; projectId: string }): Promise<number> {
     return this.database.datasetRecord.count({ where: input });
@@ -167,6 +210,100 @@ export class PrismaDatasetRecordRepository implements DatasetRecordRepository {
     });
     return result.count;
   }
+
+  async replaceAll(input: {
+    datasetId: string;
+    projectId: string;
+    entries: (DatasetRecordInput & { id: string })[];
+  }): Promise<void> {
+    if (!this.root) return replaceEntries({ client: this.database, ...input });
+    await this.root.$transaction((client) => replaceEntries({ client, ...input }), {
+      timeout: REPLACE_TXN_TIMEOUT_MS,
+    });
+  }
+}
+
+/** A lock-bound record repository plus the dataset row's columns, read and written in it. */
+function lockedRecords({
+  records,
+  client,
+  datasetId,
+  projectId,
+}: {
+  records: PrismaDatasetRecordRepository;
+  client: DatasetRecordClient;
+  datasetId: string;
+  projectId: string;
+}): LockedDatasetRecords {
+  return lockedView({
+    records,
+    columns: {
+      columnTypes: async (): Promise<DatasetColumns> => {
+        const row = await client.dataset.findFirstOrThrow({
+          where: { id: datasetId, projectId },
+          select: { columnTypes: true },
+        });
+        return datasetColumnsSchema.parse(row.columnTypes);
+      },
+      setColumnTypes: async (columnTypes: DatasetColumns): Promise<void> => {
+        await client.dataset.updateMany({
+          where: { id: datasetId, projectId },
+          data: { columnTypes: columnTypes as Prisma.InputJsonValue },
+        });
+      },
+    },
+  });
+}
+
+/** Deletes the dataset's entries and writes these in their place, in the client's transaction. */
+async function replaceEntries({
+  client,
+  datasetId,
+  projectId,
+  entries,
+}: {
+  client: DatasetRecordClient;
+  datasetId: string;
+  projectId: string;
+  entries: (DatasetRecordInput & { id: string })[];
+}): Promise<void> {
+  const writtenAt = Date.now();
+  await client.datasetRecord.deleteMany({ where: { datasetId, projectId } });
+  for (let start = 0; start < entries.length; start += REPLACE_BATCH_SIZE) {
+    await client.datasetRecord.createMany({
+      data: entries.slice(start, start + REPLACE_BATCH_SIZE).map(({ id, ...entry }, offset) => {
+        const createdAt = replacedAt({
+          writtenAt,
+          position: start + offset,
+          count: entries.length,
+        });
+        return {
+          id,
+          datasetId,
+          projectId,
+          entry: entry as Prisma.InputJsonValue,
+          createdAt,
+          updatedAt: createdAt,
+        };
+      }),
+    });
+  }
+}
+
+/**
+ * Reads order entries by `createdAt`: a replacement stamps its entries one millisecond apart in
+ * the order given, ending before the write time, so an entry added after it still reads last.
+ */
+function replacedAt({
+  writtenAt,
+  position,
+  count,
+}: {
+  writtenAt: number;
+  position: number;
+  count: number;
+}): Date {
+  return new Date(writtenAt - (count - position));
 }
 
 function toDatasetRecord(row: unknown): DatasetRecord {

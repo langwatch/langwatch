@@ -34,7 +34,7 @@ export function assertStoredRowWithinLimit(entry: unknown, maxBytes = CHUNK_MAX_
  * reaches every row.
  */
 export function assertPageWithinLimit(input: {
-  records: readonly DatasetRecord[];
+  records: readonly Pick<DatasetRecord, "entry">[];
   page: number;
   limit: number;
   maxBytes: number;

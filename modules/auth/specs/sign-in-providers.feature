@@ -24,7 +24,7 @@ Feature: The deployment's sign-in providers mount on Better Auth
     Given AUTH_PROVIDER is "auth0" with its client id, secret and issuer set
     When enterprise SSO shapes the providers Better Auth mounts
     Then auth0 is mounted on the callback path customers registered
-    And its accounts stay under their stored issuer and its ID token must verify
+    And its ID token must verify
 
   @unit
   Scenario: A named provider without its secret mounts nothing

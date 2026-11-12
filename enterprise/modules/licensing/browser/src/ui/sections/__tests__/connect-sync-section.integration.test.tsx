@@ -46,7 +46,10 @@ class TestHost extends LicensingHostApi {
   }
 }
 
-function renderSync(sync: ConnectEnabledStatus["sync"]) {
+function renderSync(
+  sync: ConnectEnabledStatus["sync"],
+  refusal: ConnectEnabledStatus["refusal"] = null,
+) {
   const status: ConnectEnabledStatus = {
     deployment: "on",
     gatewayHost: "gateway.langwatch.ai",
@@ -54,7 +57,7 @@ function renderSync(sync: ConnectEnabledStatus["sync"]) {
     enabledServices: [],
     entitledServices: null,
     usage: null,
-    refusal: null,
+    refusal,
     isUsageUnavailable: false,
     sync,
   };
@@ -65,27 +68,29 @@ function renderSync(sync: ConnectEnabledStatus["sync"]) {
   );
 }
 
+const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
+
 afterEach(cleanup);
 
 describe("the license sync section", () => {
   describe("given an install whose license syncs", () => {
-    it("says when sync last succeeded", () => {
-      renderSync({ lastSyncAt: "2026-09-19T06:00:00.000Z", lastError: null });
+    /** @scenario "The sync line uses the same words on the Connect and License pages" */
+    it("says Last synced and how long ago", () => {
+      renderSync({ lastSyncAt: minutesAgo(5), lastError: null });
 
-      expect(screen.getByText("September 19, 2026")).toBeDefined();
+      expect(screen.getByTestId("connect-sync-line").textContent).toBe("Last synced 5 minutes ago");
       expect(screen.queryByTestId("connect-sync-failure")).toBeNull();
     });
   });
 
-  describe("given a sync that has been failing for a day", () => {
+  describe("given a sync that has been failing", () => {
     /** @scenario "A failing sync is visible from the first failure" */
     it("shows when it last succeeded and why it is failing", () => {
-      renderSync({
-        lastSyncAt: "2026-09-18T06:00:00.000Z",
-        lastError: { code: "connect_unreachable" },
-      });
+      renderSync({ lastSyncAt: minutesAgo(5), lastError: { code: "connect_unreachable" } });
 
-      expect(screen.getByText("September 18, 2026")).toBeDefined();
+      expect(screen.getByTestId("connect-sync-line").textContent).toBe(
+        "Last sync failed. Last synced 5 minutes ago.",
+      );
       expect(screen.getByTestId("connect-sync-failure").textContent).toBe(
         "LangWatch could not be reached",
       );
@@ -93,11 +98,27 @@ describe("the license sync section", () => {
   });
 
   describe("given an install that has not synced yet", () => {
-    it("says so rather than showing an empty date", () => {
+    /** @scenario "The sync line uses the same words on the Connect and License pages" */
+    it("says Not synced yet", () => {
       renderSync({ lastSyncAt: null, lastError: null });
 
-      expect(screen.getByText("It has not synced yet")).toBeDefined();
+      expect(screen.getByTestId("connect-sync-line").textContent).toBe("Not synced yet");
       expect(screen.queryByTestId("connect-sync-failure")).toBeNull();
+    });
+  });
+
+  describe("given a sync failure that is also the page's refusal", () => {
+    /** @scenario "A failure that is already the page's refusal is not shown twice" */
+    it("leaves the reason to the refusal banner", () => {
+      renderSync(
+        { lastSyncAt: null, lastError: { code: "connect_license_revoked" } },
+        { code: "connect_license_revoked" },
+      );
+
+      expect(screen.queryByTestId("connect-sync-failure")).toBeNull();
+      expect(screen.getByTestId("connect-sync-line").textContent).toBe(
+        "Last sync failed. Not synced yet.",
+      );
     });
   });
 });

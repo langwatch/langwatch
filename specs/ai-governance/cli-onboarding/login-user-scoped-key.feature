@@ -93,6 +93,25 @@ Feature: CLI login mints a user-scoped API key that inherits the user's permissi
 
   Rule: the user can customize scopes and permissions before approving
 
+    @unit
+    Scenario: a CLI login key never carries organization:delete
+      Given an organization admin approves a CLI login, with or without --management
+      When they open Customize, or set Organization to Write
+      Then the key's permission list keeps "organization:manage" when picked
+        but never "organization:delete"
+      And the approval and the exchange both drop "organization:delete" if a
+        client sends it anyway, so an older screen cannot put it on a key
+
+    @unit
+    Scenario: on the approval screen, Organization at Write means managing it, not deleting it
+      Given a CLI login key never carries "organization:delete"
+      When the approver opens Customize on a --management login and changes nothing
+      Then Organization shows at Write and the key keeps "organization:manage"
+      And a caller who may manage the organization but not delete it can still
+        pick Organization at Write
+      But a regular API key's Organization at Write still requires
+        "organization:delete" held directly
+
     @integration
     Scenario: narrowing the selection narrows the minted key
       Given the user deselects everything except one shared project

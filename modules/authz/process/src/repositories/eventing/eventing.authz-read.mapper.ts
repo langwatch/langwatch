@@ -1,8 +1,10 @@
 // The grant-head rows a decision reads, translated one way whichever backing read them.
 import {
+  BILLING_ROLE_KEY,
   type BindingRoleKey,
   type CollectedBinding,
   type GrantScopeTier,
+  GRANT_SOURCE_BRAID,
   PROJECT_READER_ROLE_KEY,
   STORED_PRINCIPAL_KIND,
   type StoredPrincipalKind,
@@ -67,11 +69,13 @@ export function collectBindings<TRow extends BindingGrantRow>({
   for (const row of rows) {
     if (!isBindingScope(row.scopeType)) continue;
     const { roleKey } = row;
-    if (!isBindingRoleKey(roleKey)) continue;
+    // Billing reaches a decision only from the organization; the matcher fences the rest.
+    const isBilling = roleKey === BILLING_ROLE_KEY && row.scopeType === "ORGANIZATION";
+    if (!isBilling && !isBindingRoleKey(roleKey)) continue;
     // Reported, never filtered: whether an elapsed end still grants is the collector's call.
     const expiresAtMs = row.expiresAt?.epochMilliseconds;
     bindings.push({
-      roleKey,
+      roleKey: isBilling ? BILLING_ROLE_KEY : (roleKey as BindingRoleKey),
       scopeType: row.scopeType,
       scopeId: row.scopeId,
       viaGroupId: viaGroupId(row),
@@ -138,6 +142,9 @@ export function shareLinkRowFrom({
     },
   ];
 }
+
+/** A braid is a shared read its own writer owns; the aggregate list, attach and revoke skip it. */
+export const NOT_A_BRAID = { source: { not: GRANT_SOURCE_BRAID } } as const;
 
 /** The rows that are one reader project's shared reads (ADR-177): the minter's read, and
  *  the ledger's list, revoke and attach. */

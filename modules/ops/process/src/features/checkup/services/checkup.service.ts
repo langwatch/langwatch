@@ -16,6 +16,8 @@ import type { CheckupFacts } from "../../../rules/checkup-facts.rules.ts";
 import {
   NOT_ASKED_FOR,
   hostOf,
+  isNetworkSyncRefusal,
+  syncRefusalSentence,
   reasonOf,
   withoutUserInfo,
 } from "../../../rules/checkup-text.rules.ts";
@@ -316,7 +318,17 @@ export class CheckupService {
         docsPath: CHECKUP_DOCS.connect,
       };
     }
-    if (!view.licensed || view.entitledServices.length === 0) {
+    if (view.licensed && view.entitledServices?.length === 0) {
+      return {
+        outcome: "unchecked",
+        detail:
+          "This license includes no hosted services, so there is no sync to check. " +
+          "Hosted services add Instant Evals judging and managed models.",
+        fix: "Ask LangWatch to add hosted services to your license if you want them.",
+        docsPath: CHECKUP_DOCS.connect,
+      };
+    }
+    if (!view.licensed) {
       return {
         outcome: "unchecked",
         detail:
@@ -328,12 +340,17 @@ export class CheckupService {
       };
     }
     if (view.lastSyncError) {
+      const host = hostOf(view.licenseHost);
+      const isNetwork = isNetworkSyncRefusal(view.lastSyncError);
       return {
         outcome: "refused",
         code: view.lastSyncError,
-        detail: `The last license sync with ${view.licenseHost} was refused as ${view.lastSyncError}.`,
-        fix: `Allow outbound HTTPS to ${view.licenseHost} and ${view.gatewayHost} on port 443, then wait for the next sync or restart.`,
+        detail: `The last license sync with ${host} failed: ${syncRefusalSentence(view.lastSyncError)}.`,
+        fix: isNetwork
+          ? `Allow outbound HTTPS to ${host} and ${hostOf(view.gatewayHost)} on port 443, then wait for the next sync or restart.`
+          : "Contact LangWatch with this message, or enter a new activation code on the License page.",
         docsPath: CHECKUP_DOCS.connect,
+        ...(isNetwork ? { meta: { host, port: 443 } } : {}),
       };
     }
     if (!view.lastSyncAt) {
@@ -345,7 +362,7 @@ export class CheckupService {
     }
     return {
       outcome: "verified",
-      detail: `Last sync ${view.lastSyncAt} with ${view.licenseHost}. Services: ${view.entitledServices.join(", ")}.`,
+      detail: `Last sync ${view.lastSyncAt} with ${view.licenseHost}.${servicesSentence(view.entitledServices)}`,
     };
   }
 
@@ -446,4 +463,9 @@ function licenseDay(iso: string | undefined, whenAbsent: string): string {
   } catch {
     return iso;
   }
+}
+
+/** The services the license names, or nothing when the entitlement read failed. */
+function servicesSentence(entitledServices: string[] | null): string {
+  return entitledServices === null ? "" : ` Services: ${entitledServices.join(", ")}.`;
 }

@@ -1375,6 +1375,78 @@
               "unit": null,
               "gates": [],
               "available": true
+            },
+            {
+              "name": "MetadataOutputAction",
+              "type": "String",
+              "description": "What the user did with the output, such as accepted or edited, from the trace's metadata.output_action. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetadataOutcome",
+              "type": "String",
+              "description": "How the conversation ended, such as resolved or handover, from the trace's metadata.outcome. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetadataSentToReview",
+              "type": "String",
+              "description": "Whether the output went to a person for review, as the text 'true' or 'false', from the trace's metadata.sent_to_review. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetadataDocumentType",
+              "type": "String",
+              "description": "The kind of document the trace handled, from the trace's metadata.document_type. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetadataFlow",
+              "type": "String",
+              "description": "The flow of the application that ran the trace, from the trace's metadata.flow. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetadataLanguage",
+              "type": "String",
+              "description": "The language of the conversation, from the trace's metadata.language. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetadataSegment",
+              "type": "String",
+              "description": "The customer segment the trace counts under, from the trace's metadata.segment. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetadataTeam",
+              "type": "String",
+              "description": "The team the trace counts under, from the trace's metadata.team. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetadataTopic",
+              "type": "String",
+              "description": "The topic the application gave the trace, from the trace's metadata.topic. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
             }
           ],
           "exampleSql": "SELECT TraceId, OccurredAt, UpdatedAt\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
@@ -4159,6 +4231,14 @@
               "unit": null,
               "gates": [],
               "available": true
+            },
+            {
+              "name": "Concurrency",
+              "type": "Nullable(UInt16)",
+              "description": "Concurrency",
+              "unit": null,
+              "gates": [],
+              "available": true
             }
           ],
           "exampleSql": "SELECT ProjectionId, RunId, ExperimentId\nFROM analytics.experiment_run_results\nWHERE StartedAt >= subtractDays(now(), 7)\nORDER BY StartedAt DESC\nLIMIT 100"
@@ -4843,6 +4923,14 @@
               "name": "ImageCount",
               "type": "UInt64",
               "description": "ImageCount",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "WebSearchRequests",
+              "type": "UInt64",
+              "description": "WebSearchRequests",
               "unit": null,
               "gates": [],
               "available": true
@@ -8186,7 +8274,9 @@
             "AgentId",
             "WorkflowId",
             "CopiedFromAgentId",
-            "OwnerUserId"
+            "OwnerUserId",
+            "CreatedById",
+            "UpdatedById"
           ],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
@@ -8277,6 +8367,22 @@
               "name": "ArchivedAt",
               "type": "Nullable(DateTime64(3))",
               "description": "ArchivedAt",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CreatedById",
+              "type": "Nullable(String)",
+              "description": "CreatedById",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "UpdatedById",
+              "type": "Nullable(String)",
+              "description": "UpdatedById",
               "unit": null,
               "gates": [],
               "available": true
@@ -10908,7 +11014,9 @@
             "TenantId",
             "EvaluatorId",
             "WorkflowId",
-            "CopiedFromEvaluatorId"
+            "CopiedFromEvaluatorId",
+            "CreatedById",
+            "UpdatedById"
           ],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
@@ -10983,6 +11091,22 @@
               "name": "ArchivedAt",
               "type": "Nullable(DateTime64(3))",
               "description": "ArchivedAt",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CreatedById",
+              "type": "Nullable(String)",
+              "description": "CreatedById",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "UpdatedById",
+              "type": "Nullable(String)",
+              "description": "UpdatedById",
               "unit": null,
               "gates": [],
               "available": true
@@ -14544,7 +14668,9 @@
             "TenantId",
             "MonitorId",
             "ExperimentId",
-            "EvaluatorId"
+            "EvaluatorId",
+            "CreatedById",
+            "UpdatedById"
           ],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
@@ -14709,6 +14835,30 @@
               "gates": [
                 "output"
               ],
+              "available": true
+            },
+            {
+              "name": "EvaluatorLabel",
+              "type": "Nullable(String)",
+              "description": "EvaluatorLabel",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CreatedById",
+              "type": "Nullable(String)",
+              "description": "CreatedById",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "UpdatedById",
+              "type": "Nullable(String)",
+              "description": "UpdatedById",
+              "unit": null,
+              "gates": [],
               "available": true
             }
           ],

@@ -1,0 +1,148 @@
+---
+title: Test AI agents with simulated users in pytest or vitest
+sidebarTitle: Simulated users
+keywords: langwatch, agent testing, simulated user, user simulator, llm as a judge, multi-turn testing, scenario, pytest, vitest, ci
+description: Scenario, LangWatch's open-source testing library, runs a simulated user against your agent inside pytest or vitest, and a judge grades each conversation.
+---
+
+To test an agent with simulated users, use [Scenario](https://github.com/langwatch/scenario), LangWatch's open-source testing library: a simulated user talks to your agent, and a judge model passes or fails the conversation against criteria you wrote.
+
+This page is the pytest and vitest tutorial, with `langwatch-scenario` for Python and `@langwatch/scenario` for TypeScript. The loop is one `scenario.run` call inside a normal test, so it runs in CI with the rest of your suite. For what agent testing covers and the other ways to run it, see the [agent testing overview](/agent-testing/overview). To start now, go to [Install Scenario](#1-install-scenario).
+
+## Why use a simulated user
+
+A conversation you write out and replay passes because you wrote the user's lines to fit your agent. Your customers word things in ways no fixture holds.
+
+A simulated user gets the situation instead of lines, and words it differently on every run. So a pass means the agent handles the situation, and the judge checks the outcome instead of an exact reply.
+
+## 1. Install Scenario
+
+```bash
+uv add langwatch-scenario pytest pytest-asyncio
+```
+
+For TypeScript, install `@langwatch/scenario` and `vitest` instead; [Scenarios in code](/agent-testing/scenarios-in-code) has the TypeScript version of every step.
+
+Scenario calls a model for the simulated user and the judge. Set that provider's key, and your LangWatch key so every run shows up in LangWatch:
+
+```bash title=".env"
+OPENAI_API_KEY="your-openai-key"
+LANGWATCH_API_KEY="your-langwatch-key"
+```
+
+Your LangWatch key is in your [project settings](https://app.langwatch.ai/settings). Without it the tests still run locally; you only lose the run history. Load the file in your test with `load_dotenv()` from `python-dotenv`, or export the variables in your shell.
+
+## 2. Write the first test
+
+An adapter tells Scenario how to call your agent. It receives the conversation so far and returns your agent's reply. Then `scenario.run` puts the three parties together:
+
+```python title="test_refund_agent.py"
+import pytest
+import scenario
+
+from my_app.agent import support_agent  # your agent
+
+scenario.configure(default_model="openai/gpt-6-luna")
+
+
+class SupportAgent(scenario.AgentAdapter):
+    async def call(self, input: scenario.AgentInput) -> scenario.AgentReturnTypes:
+        return await support_agent(input.messages)
+
+
+@pytest.mark.agent_test
+@pytest.mark.asyncio
+async def test_refund_for_damaged_item():
+    result = await scenario.run(
+        name="refund for a damaged item",
+        description="""
+            The customer received a damaged blender, order 1001, and wants
+            their money back. They are annoyed and short with the agent.
+        """,
+        agents=[
+            SupportAgent(),
+            scenario.UserSimulatorAgent(),
+            scenario.JudgeAgent(criteria=[
+                "The agent looks up order 1001 before it talks about a refund",
+                "The agent does not promise a refund before checking eligibility",
+                "The agent tells the customer what happens next",
+            ]),
+        ],
+    )
+
+    assert result.success, result.reasoning
+```
+
+Run it:
+
+```bash
+uv run pytest test_refund_agent.py -s
+```
+
+The simulated user opens the conversation, your agent answers, and they go back and forth until the judge has enough to decide. With `-s` you see the conversation in the terminal. If a criterion fails, `result.reasoning` says which one and why, and the test fails with it.
+
+## 3. Script the turns that matter
+
+Leave the conversation to the simulated user by default. When one moment matters, such as the first message or a tool the agent must call at a certain point, script it and let the simulation carry on from there:
+
+```python
+def order_looked_up(state: scenario.ScenarioState):
+    assert state.has_tool_call("lookup_order"), "the agent never looked up the order"
+
+
+result = await scenario.run(
+    name="refund for a damaged item",
+    description="The customer received a damaged blender, order 1001, and wants a refund.",
+    agents=[SupportAgent(), scenario.UserSimulatorAgent(), scenario.JudgeAgent(criteria=[
+        "The agent tells the customer what happens next",
+    ])],
+    script=[
+        scenario.user("my blender arrived broken, I want my money back"),
+        scenario.agent(),
+        order_looked_up,
+        scenario.proceed(),
+    ],
+)
+assert result.success, result.reasoning
+```
+
+The first user line is fixed, the check after the agent's first reply is plain Python, and `scenario.proceed()` hands the rest of the conversation back to the simulated user and the judge.
+
+## 4. Run it in CI and read the results
+
+Because a scenario is a test, your CI already runs it, and the job fails when a scenario fails. Both the agent and the simulated user are models, so one green run can be luck. Before a release, run the suite more than once and read the pass rate.
+
+With `LANGWATCH_API_KEY` set, every run appears on the [Results](/agent-testing/results) tab in LangWatch with the full conversation, the judge's reasoning per criterion and the pass rate over time.
+
+When a production conversation goes wrong, copy how that user opened it into a new scenario's description. The same mistake then fails a test before it reaches a customer again.
+
+## How this compares to other ways of testing agents
+
+| Approach | What it checks | What it misses |
+| --- | --- | --- |
+| Single-turn evaluations on a dataset | One input against one expected output | Anything that happens across turns |
+| Replayed conversation fixtures | The exact conversation you wrote | Every other way a user says the same thing |
+| Public agent benchmarks | A fixed set of tasks in a fixed domain | Your agent's own situations and rules |
+| Simulated users with a judge | Your situations, reworded every run, judged on the outcome | Runs cost model calls and need repeats to trust a pass rate |
+
+Evaluations still fit the steps inside the agent, such as retrieval or one prompt, and both run in the same LangWatch project. See [Agent testing vs evaluations](/agent-testing/overview#agent-testing-vs-evaluations).
+
+## Questions about Scenario
+
+### Which model should play the user and the judge in Scenario
+
+Start with a small, cheap model: `scenario.configure(default_model=...)` sets it for both roles. Pass a different model to `UserSimulatorAgent` or `JudgeAgent` when one role needs more.
+
+### Does Scenario work with my agent framework
+
+The adapter only needs a function that takes the messages and returns a reply, so it works with LangGraph, CrewAI, Pydantic AI, the OpenAI Agents SDK, Mastra, the Vercel AI SDK or your own code.
+
+### Can I test agents in LangWatch without writing code
+
+Yes. [Test from the platform](/agent-testing/test-from-the-platform) runs the same simulated user and judge against your agent's endpoint, with scenarios written in the LangWatch interface.
+
+### Can Scenario's simulated user attack my agent
+
+[Red teaming](/agent-testing/red-teaming) swaps the simulated user for a multi-turn attacker in the same loop.
+
+Next, [write scenarios in code](/agent-testing/scenarios-in-code) for the full Python and TypeScript setup, or paste the [scenarios prompt](/skills/directory) into your coding agent and let it add the first tests to your repository.

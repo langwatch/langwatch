@@ -4,7 +4,10 @@ API service layer for managing LangWatch evaluators via REST API.
 Provides access to project evaluators with computed fields.
 Uses the generated OpenAPI client for type-safe API communication.
 """
-from typing import Dict, List, Any
+import urllib.parse
+from typing import Any, Dict, List, Optional
+
+import httpx
 
 from langwatch.generated.langwatch_rest_api_client.client import (
     Client as LangWatchRestApiClient,
@@ -33,6 +36,26 @@ from langwatch.generated.langwatch_rest_api_client.models.post_api_evaluators_re
 from langwatch.utils.initialization import ensure_setup
 from langwatch.state import get_instance
 from langwatch.prompts.errors import unwrap_response
+from langwatch.utils.exceptions import extract_api_error_detail
+
+
+def _raise_for_status(response: httpx.Response, *, subject: str, op: str) -> None:
+    """Raise with the platform's error detail when the call failed."""
+    if response.is_success:
+        return
+    try:
+        detail = extract_api_error_detail(response.json())
+    except ValueError:
+        detail = response.text or ""
+    if response.status_code == 404:
+        raise ValueError(f"Evaluator not found ({subject}): {detail}")
+    raise RuntimeError(
+        f"Failed to {op} evaluator ({subject}), status {response.status_code}: {detail}"
+    )
+
+
+def _quote(value: str) -> str:
+    return urllib.parse.quote(value, safe="")
 
 
 def _response_to_dict(item: Any) -> Dict[str, Any]:
@@ -62,6 +85,9 @@ class EvaluatorApiService:
             )
         return cls(instance.rest_api_client)
 
+    def _http(self) -> httpx.Client:
+        return self._client.get_httpx_client()
+
     def get_all(self) -> List[Dict[str, Any]]:
         """Retrieve all evaluators for the project."""
         resp = get_api_evaluators.sync_detailed(client=self._client)
@@ -75,8 +101,28 @@ class EvaluatorApiService:
             raise RuntimeError("Failed to fetch evaluators")
         return [_response_to_dict(item) for item in items]
 
-    def get(self, id_or_slug: str) -> Dict[str, Any]:
-        """Retrieve a single evaluator by ID or slug."""
+    def get(
+        self,
+        id_or_slug: str,
+        *,
+        label: Optional[str] = None,
+        version: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Retrieve a single evaluator by ID or slug, at the latest version unless a label or a
+        version is given. The slug also takes a suffix: "toxicity:production" or "toxicity:2".
+        """
+        if label is not None or version is not None:
+            params: Dict[str, Any] = {}
+            if label is not None:
+                params["label"] = label
+            if version is not None:
+                params["version"] = version
+            response = self._http().get(
+                f"/api/v1/evaluators/{_quote(id_or_slug)}", params=params
+            )
+            _raise_for_status(response, subject=f'id_or_slug="{id_or_slug}"', op="fetch")
+            return response.json()
         resp = get_api_evaluators_by_id_or_slug.sync_detailed(
             id_or_slug=id_or_slug,
             client=self._client,
@@ -120,3 +166,33 @@ class EvaluatorApiService:
         if ok is None:
             raise RuntimeError(f"Failed to create evaluator with name={name}")
         return _response_to_dict(ok)
+
+    def list_versions(self, evaluator_id: str) -> Dict[str, Any]:
+        """
+        List an evaluator's versions, newest first, with the deploy labels on each.
+
+        Returns:
+            Dictionary with a 'data' list of versions and the 'labels' with their versions.
+        """
+        response = self._http().get(
+            f"/api/v1/evaluators/{_quote(evaluator_id)}/versions"
+        )
+        _raise_for_status(response, subject=f'id="{evaluator_id}"', op="list versions of")
+        return response.json()
+
+    def assign_label(self, evaluator_id: str, label: str, version: int) -> Dict[str, Any]:
+        """Point a deploy label, such as "production", at one of the evaluator's versions."""
+        response = self._http().put(
+            f"/api/v1/evaluators/{_quote(evaluator_id)}/labels/{_quote(label)}",
+            json={"version": version},
+        )
+        _raise_for_status(response, subject=f'id="{evaluator_id}"', op="deploy a label of")
+        return response.json()
+
+    def remove_label(self, evaluator_id: str, label: str) -> Dict[str, Any]:
+        """Remove a deploy label from the evaluator."""
+        response = self._http().delete(
+            f"/api/v1/evaluators/{_quote(evaluator_id)}/labels/{_quote(label)}"
+        )
+        _raise_for_status(response, subject=f'id="{evaluator_id}"', op="remove a label of")
+        return response.json()

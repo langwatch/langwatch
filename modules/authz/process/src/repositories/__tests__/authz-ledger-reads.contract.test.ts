@@ -37,6 +37,8 @@ type LedgerFixture = Readonly<{
   group: (input: { memberIds: readonly string[] }) => Promise<string>;
   apiKey: (input: { userId: string; revoked?: boolean }) => Promise<string>;
   invite: (email: string) => Promise<void>;
+  /** Turns the member into an EXTERNAL with a view-only custom role on a team binding. */
+  viewOnlyExternal: (input: { userId: string; teamId: string }) => Promise<void>;
   close: () => Promise<void>;
 }>;
 
@@ -120,6 +122,33 @@ function memoryLedgerFixture(): LedgerFixture {
     },
     invite: async (email) => {
       memory.organizationInvites.push({ organizationId, email, status: "PENDING" });
+    },
+    viewOnlyExternal: async ({ userId, teamId }) => {
+      const key = memory.membershipKey(organizationId, userId);
+      const membership = memory.memberships.get(key);
+      if (membership) memory.memberships.set(key, { ...membership, role: "EXTERNAL" });
+      const customRoleId = id("role");
+      memory.roles.push({
+        id: customRoleId,
+        organizationId,
+        name: customRoleId,
+        description: null,
+        kind: "custom",
+        permissions: ["traces:view"],
+        createdAt: at(T0),
+      });
+      memory.bindings.push({
+        id: id("binding"),
+        organizationId,
+        userId,
+        groupId: null,
+        apiKeyId: null,
+        role: "CUSTOM",
+        customRoleId,
+        scopeType: "TEAM",
+        scopeId: teamId,
+        createdAt: at(T0),
+      });
     },
     close: async () => {},
   };
@@ -207,6 +236,25 @@ async function postgresLedgerFixture(): Promise<LedgerFixture> {
         data: { email, inviteCode: id("invite"), organizationId, teamIds: "", role: "MEMBER" },
       });
     },
+    viewOnlyExternal: async ({ userId, teamId }) => {
+      await database.organizationUser.update({
+        where: { userId_organizationId: { userId, organizationId } },
+        data: { role: "EXTERNAL" },
+      });
+      const customRole = await database.customRole.create({
+        data: { organizationId, name: id("role"), permissions: ["traces:view"] },
+      });
+      await database.roleBinding.create({
+        data: {
+          organizationId,
+          userId,
+          role: "CUSTOM",
+          customRoleId: customRole.id,
+          scopeType: "TEAM",
+          scopeId: teamId,
+        },
+      });
+    },
     close: async () => {
       await cleanupTestRows(database, [
         ["organizationInvite", inOrganization],
@@ -254,6 +302,7 @@ function grantRow(input: GrantInput): GrantRowShape {
     createdByUserId: null,
     expiresAt: null,
     maxViews: null,
+    condition: null,
     occurredAt: at(T0),
     ...input,
   };
@@ -367,6 +416,36 @@ describe.each(backends)("given the ledger reads on the $name backend", (backend)
       ).toEqual([
         { grantId: windowed.id, memberProjectId: "member_a", condition },
         { grantId: malformed.id, memberProjectId: "member_b", condition: null },
+      ]);
+    });
+
+    /** @scenario "The aggregate reconciler never revokes or reattaches a braid" */
+    it("leaves a braid out of a reader's shared reads, so the aggregate reconciler never touches one", async () => {
+      const fixture = await open();
+      const { organizationId, repositories } = fixture;
+      const readerProjectId = id("project");
+      const sharedRead = (input: { scopeId: string; source: string }) =>
+        grantRow({
+          organizationId,
+          principalType: STORED_PRINCIPAL_KIND.project,
+          principalId: readerProjectId,
+          roleKey: PROJECT_READER_ROLE_KEY,
+          scopeType: "PROJECT",
+          condition: { type: "trace" },
+          ...input,
+        });
+      const aggregate = sharedRead({ scopeId: "member_a", source: "aggregate-reconciler" });
+      const braid = sharedRead({ scopeId: "member_b", source: "braid" });
+      await attach(fixture, aggregate);
+      await attach(fixture, braid);
+
+      expect(
+        await repositories.ledgerReads.findLiveSharedProjectGrants({
+          organizationId,
+          readerProjectId,
+        }),
+      ).toEqual([
+        { grantId: aggregate.id, memberProjectId: "member_a", condition: { type: "trace" } },
       ]);
     });
 
@@ -519,6 +598,7 @@ describe.each(backends)("given the ledger reads on the $name backend", (backend)
   });
 
   describe.skipIf(backend.skip)("when a member is offboarded", () => {
+    /** @scenario "Offboarding records whether the person held a full seat" */
     it("ends the seat, hands over the live grant ids and clears the legacy rows", async () => {
       const fixture = await open();
       const { organizationId, repositories } = fixture;
@@ -547,8 +627,27 @@ describe.each(backends)("given the ledger reads on the $name backend", (backend)
         legacyTeamMemberships: 1,
         pendingInvites: 1,
         organizationMembership: true,
+        heldFullSeat: true,
       });
       expect(await fixture.isMember(leaver)).toBe(false);
+    });
+
+    /** @scenario "Offboarding records whether the person held a full seat" */
+    it("reports no full seat for an external whose team roles only view", async () => {
+      const fixture = await open();
+      const { organizationId, repositories } = fixture;
+      const leaver = await fixture.user();
+      const teamId = await fixture.team();
+      await fixture.viewOnlyExternal({ userId: leaver, teamId });
+
+      const counts = await repositories.ledgerReads.offboardUser({
+        userId: leaver,
+        organizationId,
+        revoke: async () => {},
+        prove: async () => {},
+      });
+
+      expect(counts).toMatchObject({ organizationMembership: true, heldFullSeat: false });
     });
 
     it("keeps the seat when a live grant survives the revoke", async () => {

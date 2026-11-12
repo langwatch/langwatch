@@ -26,9 +26,7 @@ func defaultInput() *config.Input {
 }
 
 func defaultComputed() *config.Computed {
-	return &config.Computed{
-		CacheMaxSize: 1 << 30, // 1GB default for tests
-	}
+	return &config.Computed{}
 }
 
 func TestRender_ColdOnlyWithStaticCredentials(t *testing.T) {
@@ -59,10 +57,12 @@ func TestRender_ColdOnlyWithStaticCredentials(t *testing.T) {
 	assertContains(t, yaml, "path: /var/lib/clickhouse/data/")
 	assertContains(t, yaml, "keep_free_space_bytes: 1073741824")
 
-	// Check cache settings
-	assertContains(t, yaml, "cache_enabled: true")
-	assertContains(t, yaml, "cache_path: /var/lib/clickhouse/disks/object/cache/")
-	assertContains(t, yaml, "max_cache_size: 1073741824")
+	// ClickHouse does not read cache keys on an s3 disk and refuses to boot on unread elements
+	for _, key := range []string{"cache_enabled", "cache_path", "max_cache_size"} {
+		if strings.Contains(yaml, key) {
+			t.Errorf("object disk should not emit %s", key)
+		}
+	}
 
 	// Check policy
 	assertContains(t, yaml, "local_primary:")
@@ -145,7 +145,7 @@ func TestRender_ColdAndBackup(t *testing.T) {
 
 	// Should have object disk (cold)
 	assertContains(t, yaml, "type: s3")
-	assertContains(t, yaml, "cache_enabled: true")
+	assertContains(t, yaml, "metadata_path: /var/lib/clickhouse/disks/object/")
 
 	// Should have backups disk
 	assertContains(t, yaml, "type: s3_plain")

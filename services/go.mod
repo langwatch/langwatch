@@ -1,6 +1,6 @@
 module github.com/langwatch/langwatch/services
 
-go 1.27.3
+go 1.27.4
 
 require (
 	cloud.google.com/go v0.123.0 // indirect
@@ -132,7 +132,7 @@ require (
 // wins.
 
 require (
-	github.com/andybalholm/brotli v1.2.1
+	github.com/andybalholm/brotli v1.2.7
 	github.com/aws/aws-sdk-go-v2 v1.43.2
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.10
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.32
@@ -149,7 +149,7 @@ require (
 	github.com/go-chi/chi/v5 v5.2.4
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/hashicorp/golang-lru/v2 v2.0.7
-	github.com/klauspost/compress v1.18.7
+	github.com/klauspost/compress v1.20.2
 	github.com/langwatch/langwatch/pkg v0.0.0-00010101000000-000000000000
 	github.com/langwatch/langwatch/sdks/go v1.0.0
 	github.com/langwatch/scenario/go v0.0.0-00010101000000-000000000000

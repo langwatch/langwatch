@@ -10,6 +10,8 @@ app:
   - "pnpm-workspace.yaml"
   - "package.json"
   - ".npmrc"
+  - "infra/docker/prune-runtime-tree.sh"
+  - "infra/docker/image.pnpmfile.cjs"
   - ".github/workflows/langwatch-app-ci.yml"
   - ".github/workflows/nightly.yml"
   - ".github/workflows/codebase-health.yml"
@@ -65,7 +67,7 @@ e2e:
   - ".github/workflows/pr.yml"
   - ".github/pr-filters.yml"
 nlp:
-  - "infra/docker/Dockerfile.langwatch_nlp"
+  - "infra/docker/Dockerfile.go-services"
   - "services/nlpgo/**"
   - "cmd/service/**"
   - "pkg/**"
