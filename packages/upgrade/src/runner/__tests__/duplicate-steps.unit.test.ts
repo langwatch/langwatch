@@ -38,6 +38,18 @@ describe("duplicateSteps()", () => {
     });
   });
 
+  describe("when a released goose version gains a second file in the image", () => {
+    it("reports the version with both files although the shipped list names it once", () => {
+      const duplicates = duplicateSteps({
+        steps: [step("clickhouse:00003", "ClickHouse schema: a", "3.21.0")],
+        gooseFiles: ["00003_a.sql", "00003_b.sql"],
+      });
+      expect(duplicates).toEqual([
+        { id: "clickhouse:00003", sources: ["00003_a.sql", "00003_b.sql"] },
+      ]);
+    });
+  });
+
   describe("when a step id repeats without goose files behind it", () => {
     it("names each source by its release and description", () => {
       const duplicates = duplicateSteps({

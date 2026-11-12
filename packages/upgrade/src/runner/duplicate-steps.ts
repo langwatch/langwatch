@@ -11,8 +11,8 @@ const sourceOf = (step: RegisteredStep) =>
   `${step.release ?? "the image's tree"} (${step.description})`;
 
 /**
- * Every id the shipped list names more than once, each with what ships it: the goose files when
- * their shared prefix is the cause, else each step's release and description.
+ * Every id the shipped list names twice, and every goose version two files share even when a
+ * manifest already holds it, each with its sources: the files, else release and description.
  * Spec: packages/upgrade/specs/duplicate-steps.feature.
  */
 export function duplicateSteps({
@@ -24,12 +24,15 @@ export function duplicateSteps({
 }): DuplicateStep[] {
   const stepsById = new Map<string, RegisteredStep[]>();
   for (const step of steps) stepsById.set(step.id, [...(stepsById.get(step.id) ?? []), step]);
-  const filesById = new Map(
-    duplicateGooseVersions({ gooseFiles }).map(({ id, files }) => [id, files]),
-  );
-  return [...stepsById]
-    .filter(([, named]) => named.length > 1)
-    .map(([id, named]) => ({ id, sources: filesById.get(id) ?? named.map(sourceOf) }));
+  const byFiles = duplicateGooseVersions({ gooseFiles }).map(({ id, files }) => ({
+    id,
+    sources: files,
+  }));
+  const byFileIds = new Set(byFiles.map(({ id }) => id));
+  const bySteps = [...stepsById]
+    .filter(([id, named]) => named.length > 1 && !byFileIds.has(id))
+    .map(([id, named]) => ({ id, sources: named.map(sourceOf) }));
+  return [...byFiles, ...bySteps];
 }
 
 /** Preflight's refusal: the ledger registers every shipped step in one statement, by id. */
@@ -42,7 +45,7 @@ export function duplicateStepFailure({
   return new UpgradeRunFailure(
     "duplicate_step",
     `this image ships one step id twice: ${named.join("; ")}. ` +
-      "Give each migration its own prefix, then build the image again",
+      "Give each named migration file or declared step its own id, then build the image again",
     { steps: duplicates.map(({ id, sources }) => ({ id, sources: [...sources] })) },
   );
 }

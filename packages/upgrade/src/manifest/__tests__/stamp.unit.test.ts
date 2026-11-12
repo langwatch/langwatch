@@ -142,8 +142,9 @@ describe("duplicateGooseVersions()", () => {
 
   describe("when two prefixes differ only in zero padding", () => {
     it("reports them as one step id", () => {
-      expect(duplicateGooseVersions({ gooseFiles: ["125_a.sql", "00125_b.sql"] })).toEqual([
-        { id: "clickhouse:00125", files: ["00125_b.sql", "125_a.sql"] },
+      const gooseFiles = ["125_a.sql", "00125_b.sql", "000125_c.sql"];
+      expect(duplicateGooseVersions({ gooseFiles })).toEqual([
+        { id: "clickhouse:00125", files: ["000125_c.sql", "00125_b.sql", "125_a.sql"] },
       ]);
     });
   });
