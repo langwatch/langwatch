@@ -3,18 +3,15 @@
 /**
  * The event explorer on a real ClickHouse that sends 64-bit integers unquoted: event times still
  * come back as text, which the ops contract declares, and the search keeps numeric order.
+ * Spec: packages/eventing/specs/event-table-surfaces.feature
  */
 import { randomUUID } from "node:crypto";
 
-import {
-  ClickHouseQueryClient,
-  type QueryDriver,
-  type QueryRequest,
-  TenantGuard,
-} from "@langwatch/clickhouse-client";
+import { ClickHouseQueryClient, TenantGuard } from "@langwatch/clickhouse-client";
 import { startTestClickHouseEndpoints } from "@langwatch/clickhouse-client/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { clickHouseHttpDriver } from "../../../__tests__/support/clickhouse-http-driver.ts";
 import { EventingClickHouseEventExplorer } from "../event-explorer.clickhouse.ts";
 
 const tenantId = `${randomUUID()}-event-explorer`;
@@ -23,62 +20,6 @@ const OLDER_MS = 999_999_999_999;
 const NEWER_MS = 1_000_000_000_000;
 
 let clickhouse: ClickHouseQueryClient;
-
-/** The server's HTTP interface, pinned to unquoted 64-bit integers whatever its default. */
-function unquotedIntegersDriver(url: string): QueryDriver {
-  const endpoint = new URL(url);
-  const database = endpoint.pathname.replace(/^\//, "") || "default";
-  const authorization = `Basic ${btoa(`${decodeURIComponent(endpoint.username)}:${decodeURIComponent(endpoint.password)}`)}`;
-  const send = async (request: QueryRequest, body: string): Promise<string> => {
-    const search = new URLSearchParams({
-      database,
-      output_format_json_quote_64bit_integers: "0",
-    });
-    for (const [name, value] of Object.entries(request.params ?? {})) {
-      search.set(`param_${name}`, httpParam(value));
-    }
-    const response = await fetch(`${endpoint.origin}/?${search.toString()}`, {
-      method: "POST",
-      headers: { authorization },
-      body,
-    });
-    const text = await response.text();
-    if (!response.ok) throw new Error(text);
-    return text;
-  };
-  return {
-    async execute<Row>(request: QueryRequest) {
-      const text = await send(request, `${request.sql}\nFORMAT JSONEachRow`);
-      return {
-        rows: text
-          .split("\n")
-          .filter((line) => line.trim().length > 0)
-          .map((line) => JSON.parse(line) as Row),
-      };
-    },
-    async insert(request) {
-      const rows = request.rows.map((row) => JSON.stringify(row)).join("\n");
-      await send(
-        { tenantId: request.tenantId, sql: "" },
-        `INSERT INTO ${request.table} FORMAT JSONEachRow\n${rows}`,
-      );
-    },
-    async command(request) {
-      await send(request, request.sql);
-    },
-  };
-}
-
-/** One HTTP query parameter: arrays as ClickHouse literals, everything else as text. */
-function httpParam(value: unknown): string {
-  if (!Array.isArray(value)) return String(value);
-  const quoted = value.map((each) =>
-    typeof each === "number"
-      ? String(each)
-      : `'${String(each).replaceAll("\\", "\\\\").replaceAll("'", "\\'")}'`,
-  );
-  return `[${quoted.join(",")}]`;
-}
 
 function eventRow({ aggregateId, timestampMs }: { aggregateId: string; timestampMs: number }) {
   const eventId = `${aggregateId}-event`;
@@ -104,7 +45,11 @@ beforeAll(async () => {
     environment: process.env,
   });
   if (!endpoint) throw new Error("No ClickHouse endpoint was provisioned for the suite");
-  const driver = unquotedIntegersDriver(endpoint.url);
+  // Pinned whatever the server's default, so the raw column really arrives as a JSON number.
+  const driver = clickHouseHttpDriver({
+    url: endpoint.url,
+    pinnedSettings: { output_format_json_quote_64bit_integers: 0 },
+  });
   clickhouse = new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
   // The event log as goose 00002 and 00032 shape it.
   await driver.command({
@@ -149,6 +94,7 @@ describe("the event explorer over a server that sends 64-bit integers unquoted",
   });
 
   describe("when an operator searches a tenant's aggregates", () => {
+    /** @scenario "Event times come back as text, newest first, whatever the server's integer quoting" */
     it("returns each aggregate's last event time as text, newest first", async () => {
       const explorer = EventingClickHouseEventExplorer.create({ clickhouse });
 
@@ -164,6 +110,7 @@ describe("the event explorer over a server that sends 64-bit integers unquoted",
   });
 
   describe("when an operator opens one aggregate's history", () => {
+    /** @scenario "Event times come back as text, newest first, whatever the server's integer quoting" */
     it("returns each event's time as text", async () => {
       const explorer = EventingClickHouseEventExplorer.create({ clickhouse });
 
