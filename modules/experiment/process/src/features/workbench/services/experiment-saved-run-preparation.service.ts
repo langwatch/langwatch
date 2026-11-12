@@ -137,11 +137,14 @@ export class ExperimentSavedRunPreparationService {
       scope,
       runInputs,
       ...(boardRowIndices ? { boardRowIndices } : {}),
-      carriedOverCells: savedState.planSavedRunCarryOver({
-        prepared,
-        scope,
-        ...(boardRowIndices ? { boardRowIndices } : {}),
-      }),
+      // The board's cells belong to the saved dataset's rows; other rows carry none of them.
+      carriedOverCells: runsSavedDataset(runInputs)
+        ? savedState.planSavedRunCarryOver({
+            prepared,
+            scope,
+            ...(boardRowIndices ? { boardRowIndices } : {}),
+          })
+        : [],
     };
   }
 }

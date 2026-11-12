@@ -530,6 +530,39 @@ describe("given a saved experiment over a saved dataset", () => {
     });
   });
 
+  describe("when the board holds results for two rows and the run API runs one row", () => {
+    const boardOfTwoRows: SavedResults = {
+      targetOutputs: { target_a: ["board a", "board b"] },
+      targetMetadata: {},
+      evaluatorResults: {},
+      errors: {},
+    };
+    const prepareOneRow = (inputs: Record<string, unknown>) =>
+      harness({ dataset: new VersionedDataset(questions("a", "b")), results: boardOfTwoRows })
+        .prepare({ body: JSON.stringify({ row_indices: [0], ...inputs }) })
+        .then(({ carriedOverCells }) => carriedOverCells.map(({ rowIndex }) => rowIndex));
+
+    // The board's column is not one this run produces, so a saved-dataset run carries all of it.
+    it("carries the board when it runs the saved dataset", async () => {
+      expect(await prepareOneRow({})).toEqual([0, 1]);
+    });
+
+    /** @scenario "A run of rows sent in the request carries nothing from the board" */
+    it("carries nothing when it runs rows sent in the request", async () => {
+      expect(await prepareOneRow({ data: questions("x", "y") })).toEqual([]);
+    });
+
+    /** @scenario "A run of another dataset carries nothing from the board" */
+    it("carries nothing when it runs another dataset", async () => {
+      expect(await prepareOneRow({ dataset_id: "dataset-2" })).toEqual([]);
+    });
+
+    /** @scenario "A run with its own parameters carries nothing from the board" */
+    it("carries nothing when it runs with parameters of its own", async () => {
+      expect(await prepareOneRow({ parameters: { temperature: 0 } })).toEqual([]);
+    });
+  });
+
   describe("when no version is pinned", () => {
     it("writes back row for row, with no board mapping and no extra read", async () => {
       const dataset = new VersionedDataset(questions("a", "b"));

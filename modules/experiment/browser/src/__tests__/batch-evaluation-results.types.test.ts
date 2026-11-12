@@ -4,7 +4,10 @@ import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
  */
 import { describe, expect, it } from "vitest";
 
-import { transformBatchEvaluationData } from "../ui/sections/batch-evaluation-results.types.ts";
+import {
+  rowsInRun,
+  transformBatchEvaluationData,
+} from "../ui/sections/batch-evaluation-results.types.ts";
 import { WHOLE_RUN_COMPLETENESS } from "./run-completeness.fixture.ts";
 
 // Helper to create base timestamps
@@ -554,7 +557,8 @@ describe("transformBatchEvaluationData", () => {
   });
 
   describe("given multiple rows", () => {
-    it("handles sparse row indices correctly", () => {
+    /** @scenario "The results table shows only the rows a run holds, under their dataset numbers" */
+    it("keeps rows at their dataset positions and marks the ones the run does not hold", () => {
       const data: ExperimentRunWithItems = {
         experimentId: "exp-1",
         runId: "run-1",
@@ -571,12 +575,14 @@ describe("transformBatchEvaluationData", () => {
 
       const result = transformBatchEvaluationData(data);
 
-      // Should have 6 rows (0-5)
+      // Positional, so a comparison can line runs up by dataset row.
       expect(result.rows).toHaveLength(6);
       expect(result.rows[0]?.datasetEntry).toEqual({ input: "row0" });
-      expect(result.rows[1]?.datasetEntry).toEqual({}); // Missing row
+      expect(result.rows[1]?.datasetEntry).toEqual({});
       expect(result.rows[2]?.datasetEntry).toEqual({ input: "row2" });
       expect(result.rows[5]?.datasetEntry).toEqual({ input: "row5" });
+      expect(result.rows.filter((row) => row.notInRun).map((row) => row.index)).toEqual([1, 3, 4]);
+      expect(rowsInRun(result.rows).map((row) => row.index)).toEqual([0, 2, 5]);
     });
 
     it("builds evaluator names map correctly", () => {

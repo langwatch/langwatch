@@ -88,7 +88,16 @@ export type BatchResultRow = {
   datasetEntry: Record<string, unknown>;
   /** Target outputs keyed by target ID */
   targets: Record<string, BatchTargetOutput>;
+  /**
+   * A dataset position the run holds nothing for. Rows stay positional so runs line up by
+   * dataset row; a run of rows 10-14 keeps 0-9 here, and they are neither counted nor shown.
+   */
+  notInRun?: true;
 };
+
+/** The rows the run actually holds, without the placeholders that keep rows positional. */
+export const rowsInRun = (rows: BatchResultRow[]): BatchResultRow[] =>
+  rows.filter((row) => !row.notInRun);
 
 /**
  * Target column definition for the table
@@ -496,6 +505,7 @@ export const transformBatchEvaluationData = (data: ExperimentRunWithItems): Batc
   const evaluatorNames = evaluatorNamesOf(evaluations);
   const index = runIndexOf({ dataset, evaluations, isV3 });
   const rowCount = dataset.length > 0 ? Math.max(...dataset.map((d) => d.index)) + 1 : 0;
+  const heldRows = new Set(dataset.map((d) => d.index));
 
   const rows: BatchResultRow[] = Array.from({ length: rowCount }, (_, row) => ({
     index: row,
@@ -506,6 +516,7 @@ export const transformBatchEvaluationData = (data: ExperimentRunWithItems): Batc
         targetOutputOf({ index, row, targetId: column.id }),
       ]),
     ),
+    ...(heldRows.has(row) ? {} : { notInRun: true as const }),
   }));
 
   return {
