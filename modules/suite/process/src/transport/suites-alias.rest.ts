@@ -58,7 +58,14 @@ function storedTargetsRefusal(): ValidationError {
   return new ValidationError(message, { meta: { fieldErrors: { targets: [message] } } });
 }
 
-const PLAN_EXECUTION_FIELDS = ["targets", "repeatCount", "simulatorModel", "judgeModel"] as const;
+const PLAN_EXECUTION_FIELDS = [
+  "targets",
+  "repeatCount",
+  "simulatorModel",
+  "judgeModel",
+  "traceQuietPeriodMs",
+  "traceWaitTimeoutMs",
+] as const;
 
 /** A run plan runs its stored configuration: one refusal naming every execution field sent. */
 function refuseExecutionFields(
@@ -338,6 +345,12 @@ async function scheduleRun(params: {
             ...(input.repeatCount !== undefined && { repeatCount: input.repeatCount }),
             ...(input.simulatorModel !== undefined && { simulatorModel: input.simulatorModel }),
             ...(input.judgeModel !== undefined && { judgeModel: input.judgeModel }),
+            ...(input.traceQuietPeriodMs !== undefined && {
+              traceQuietPeriodMs: input.traceQuietPeriodMs,
+            }),
+            ...(input.traceWaitTimeoutMs !== undefined && {
+              traceWaitTimeoutMs: input.traceWaitTimeoutMs,
+            }),
           },
           idempotencyKey,
           ...(input.parameters !== undefined && { parameters: input.parameters }),

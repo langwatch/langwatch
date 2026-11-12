@@ -99,6 +99,20 @@ Feature: Judge trace wait settings
     Then every queued run records both settings in its reserved metadata
     And the execution reads them back as the plan's settings
 
+  @integration
+  Scenario: The run plans REST API takes and answers the judge trace wait settings
+    Given a run plan configuration with a quiet period and a trace wait
+    When it is run through the run plans REST API, or a test suite is run with them
+    Then every queued run carries both settings
+    And reading the plan back answers them, or null when the plan has none
+
+  @integration
+  Scenario: The run plans REST API refuses judge trace wait settings outside their bounds
+    When a run plan configuration is run with a quiet period above sixty seconds
+    And a trace wait below one second
+    Then it answers 422 validation_error naming each field
+    And nothing is scheduled
+
   @unit
   Scenario: The SDK asks the project's recommended settle settings
     Given a project API key with trace read access

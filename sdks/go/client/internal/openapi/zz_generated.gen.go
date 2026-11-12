@@ -50704,6 +50704,22 @@ type ListRunPlans200JSONResponseBody_Targets_ScenarioMappings_AdditionalProperti
 // ListRunPlans200JSONResponseBodyTargetsType defines parameters for ListRunPlans.
 type ListRunPlans200JSONResponseBodyTargetsType string
 
+// ListRunPlans200JSONResponseBodyTraceQuietPeriodMs0 defines parameters for ListRunPlans.
+type ListRunPlans200JSONResponseBodyTraceQuietPeriodMs0 = int
+
+// ListRunPlans200JSONResponseBody_TraceQuietPeriodMs defines parameters for ListRunPlans.
+type ListRunPlans200JSONResponseBody_TraceQuietPeriodMs struct {
+	union json.RawMessage
+}
+
+// ListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0 defines parameters for ListRunPlans.
+type ListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0 = int
+
+// ListRunPlans200JSONResponseBody_TraceWaitTimeoutMs defines parameters for ListRunPlans.
+type ListRunPlans200JSONResponseBody_TraceWaitTimeoutMs struct {
+	union json.RawMessage
+}
+
 // RunRunPlanJSONBody defines parameters for RunRunPlan.
 type RunRunPlanJSONBody struct {
 	// Config What this run covers and what it runs against. Written onto the run plan the name resolves.
@@ -50746,6 +50762,12 @@ type RunRunPlanJSONBody struct {
 			ScenarioMappings        *map[string]RunRunPlanJSONBody_Config_Targets_ScenarioMappings_AdditionalProperties `json:"scenarioMappings,omitempty"`
 			Type                    RunRunPlanJSONBodyConfigTargetsType                                                 `json:"type"`
 		} `json:"targets"`
+
+		// TraceQuietPeriodMs Milliseconds (0 to 60000) the agent's trace must stay unchanged before the judge reads it, for every scenario in the run. Overrides each scenario's own setting. Leave it out for the scenario setting or the project's recommendation.
+		TraceQuietPeriodMs *RunRunPlanJSONBody_Config_TraceQuietPeriodMs `json:"traceQuietPeriodMs,omitempty"`
+
+		// TraceWaitTimeoutMs Milliseconds (1000 to 300000) the judge waits for the agent's trace before a verdict, for every scenario in the run. Overrides each scenario's own setting. Leave it out for the scenario setting or the project's recommendation.
+		TraceWaitTimeoutMs *RunRunPlanJSONBody_Config_TraceWaitTimeoutMs `json:"traceWaitTimeoutMs,omitempty"`
 	} `json:"config"`
 
 	// IdempotencyKey Repeat the same key to make a retry join the batch the first call started instead of running everything again. Send the same request with it: the same key over a different configuration starts its own batch. Defaults to a new key per call.
@@ -50883,6 +50905,22 @@ type RunRunPlanJSONBody_Config_Targets_ScenarioMappings_AdditionalProperties str
 
 // RunRunPlanJSONBodyConfigTargetsType defines parameters for RunRunPlan.
 type RunRunPlanJSONBodyConfigTargetsType string
+
+// RunRunPlanJSONBodyConfigTraceQuietPeriodMs0 defines parameters for RunRunPlan.
+type RunRunPlanJSONBodyConfigTraceQuietPeriodMs0 = int
+
+// RunRunPlanJSONBody_Config_TraceQuietPeriodMs defines parameters for RunRunPlan.
+type RunRunPlanJSONBody_Config_TraceQuietPeriodMs struct {
+	union json.RawMessage
+}
+
+// RunRunPlanJSONBodyConfigTraceWaitTimeoutMs0 defines parameters for RunRunPlan.
+type RunRunPlanJSONBodyConfigTraceWaitTimeoutMs0 = int
+
+// RunRunPlanJSONBody_Config_TraceWaitTimeoutMs defines parameters for RunRunPlan.
+type RunRunPlanJSONBody_Config_TraceWaitTimeoutMs struct {
+	union json.RawMessage
+}
 
 // RunRunPlanJSONBodyParameters0 defines parameters for RunRunPlan.
 type RunRunPlanJSONBodyParameters0 = string
@@ -51048,6 +51086,22 @@ type GetRunPlan200JSONResponseBody_Targets_ScenarioMappings_AdditionalProperties
 
 // GetRunPlan200JSONResponseBodyTargetsType defines parameters for GetRunPlan.
 type GetRunPlan200JSONResponseBodyTargetsType string
+
+// GetRunPlan200JSONResponseBodyTraceQuietPeriodMs0 defines parameters for GetRunPlan.
+type GetRunPlan200JSONResponseBodyTraceQuietPeriodMs0 = int
+
+// GetRunPlan200JSONResponseBody_TraceQuietPeriodMs defines parameters for GetRunPlan.
+type GetRunPlan200JSONResponseBody_TraceQuietPeriodMs struct {
+	union json.RawMessage
+}
+
+// GetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0 defines parameters for GetRunPlan.
+type GetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0 = int
+
+// GetRunPlan200JSONResponseBody_TraceWaitTimeoutMs defines parameters for GetRunPlan.
+type GetRunPlan200JSONResponseBody_TraceWaitTimeoutMs struct {
+	union json.RawMessage
+}
 
 // RerunRunPlanJSONBody defines parameters for RerunRunPlan.
 type RerunRunPlanJSONBody struct {
@@ -53564,6 +53618,12 @@ type PostApiSuitesByIdRunJSONBody struct {
 		ScenarioMappings        *map[string]PostApiSuitesByIdRunJSONBody_Targets_ScenarioMappings_AdditionalProperties `json:"scenarioMappings,omitempty"`
 		Type                    PostApiSuitesByIdRunJSONBodyTargetsType                                                `json:"type"`
 	} `json:"targets,omitempty"`
+
+	// TraceQuietPeriodMs Milliseconds (0 to 60000) the agent's trace must stay unchanged before the judge reads it, for every scenario in the run. Used only when the id names a test suite.
+	TraceQuietPeriodMs *PostApiSuitesByIdRunJSONBody_TraceQuietPeriodMs `json:"traceQuietPeriodMs,omitempty"`
+
+	// TraceWaitTimeoutMs Milliseconds (1000 to 300000) the judge waits for the agent's trace before a verdict, for every scenario in the run. Used only when the id names a test suite.
+	TraceWaitTimeoutMs *PostApiSuitesByIdRunJSONBody_TraceWaitTimeoutMs `json:"traceWaitTimeoutMs,omitempty"`
 }
 
 // PostApiSuitesByIdRunJSONBodyParameters0 defines parameters for PostApiSuitesByIdRun.
@@ -53620,6 +53680,22 @@ type PostApiSuitesByIdRunJSONBody_Targets_ScenarioMappings_AdditionalProperties 
 
 // PostApiSuitesByIdRunJSONBodyTargetsType defines parameters for PostApiSuitesByIdRun.
 type PostApiSuitesByIdRunJSONBodyTargetsType string
+
+// PostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0 defines parameters for PostApiSuitesByIdRun.
+type PostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0 = int
+
+// PostApiSuitesByIdRunJSONBody_TraceQuietPeriodMs defines parameters for PostApiSuitesByIdRun.
+type PostApiSuitesByIdRunJSONBody_TraceQuietPeriodMs struct {
+	union json.RawMessage
+}
+
+// PostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0 defines parameters for PostApiSuitesByIdRun.
+type PostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0 = int
+
+// PostApiSuitesByIdRunJSONBody_TraceWaitTimeoutMs defines parameters for PostApiSuitesByIdRun.
+type PostApiSuitesByIdRunJSONBody_TraceWaitTimeoutMs struct {
+	union json.RawMessage
+}
 
 // PostApiSuitesByIdRun200JSONResponseBodyItemsTargetRunParameters0 defines parameters for PostApiSuitesByIdRun.
 type PostApiSuitesByIdRun200JSONResponseBodyItemsTargetRunParameters0 = string
@@ -53970,6 +54046,12 @@ type RunTestSuiteJSONBody struct {
 		ScenarioMappings        *map[string]RunTestSuiteJSONBody_Targets_ScenarioMappings_AdditionalProperties `json:"scenarioMappings,omitempty"`
 		Type                    RunTestSuiteJSONBodyTargetsType                                                `json:"type"`
 	} `json:"targets"`
+
+	// TraceQuietPeriodMs Milliseconds (0 to 60000) the agent's trace must stay unchanged before the judge reads it, for every scenario in the run. Overrides each scenario's own setting. Leave it out for the scenario setting or the project's recommendation.
+	TraceQuietPeriodMs *RunTestSuiteJSONBody_TraceQuietPeriodMs `json:"traceQuietPeriodMs,omitempty"`
+
+	// TraceWaitTimeoutMs Milliseconds (1000 to 300000) the judge waits for the agent's trace before a verdict, for every scenario in the run. Overrides each scenario's own setting. Leave it out for the scenario setting or the project's recommendation.
+	TraceWaitTimeoutMs *RunTestSuiteJSONBody_TraceWaitTimeoutMs `json:"traceWaitTimeoutMs,omitempty"`
 }
 
 // RunTestSuiteJSONBodyJudgeModel0 defines parameters for RunTestSuite.
@@ -54042,6 +54124,22 @@ type RunTestSuiteJSONBody_Targets_ScenarioMappings_AdditionalProperties struct {
 
 // RunTestSuiteJSONBodyTargetsType defines parameters for RunTestSuite.
 type RunTestSuiteJSONBodyTargetsType string
+
+// RunTestSuiteJSONBodyTraceQuietPeriodMs0 defines parameters for RunTestSuite.
+type RunTestSuiteJSONBodyTraceQuietPeriodMs0 = int
+
+// RunTestSuiteJSONBody_TraceQuietPeriodMs defines parameters for RunTestSuite.
+type RunTestSuiteJSONBody_TraceQuietPeriodMs struct {
+	union json.RawMessage
+}
+
+// RunTestSuiteJSONBodyTraceWaitTimeoutMs0 defines parameters for RunTestSuite.
+type RunTestSuiteJSONBodyTraceWaitTimeoutMs0 = int
+
+// RunTestSuiteJSONBody_TraceWaitTimeoutMs defines parameters for RunTestSuite.
+type RunTestSuiteJSONBody_TraceWaitTimeoutMs struct {
+	union json.RawMessage
+}
 
 // RunTestSuite200JSONResponseBodyItemsTargetRunParameters0 defines parameters for RunTestSuite.
 type RunTestSuite200JSONResponseBodyItemsTargetRunParameters0 = string
@@ -107705,6 +107803,78 @@ func (t *ListRunPlans200JSONResponseBody_Targets_ScenarioMappings_AdditionalProp
 	return err
 }
 
+// AsListRunPlans200JSONResponseBodyTraceQuietPeriodMs0 returns the union data inside the ListRunPlans200JSONResponseBody_TraceQuietPeriodMs as a ListRunPlans200JSONResponseBodyTraceQuietPeriodMs0
+func (t ListRunPlans200JSONResponseBody_TraceQuietPeriodMs) AsListRunPlans200JSONResponseBodyTraceQuietPeriodMs0() (ListRunPlans200JSONResponseBodyTraceQuietPeriodMs0, error) {
+	var body ListRunPlans200JSONResponseBodyTraceQuietPeriodMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromListRunPlans200JSONResponseBodyTraceQuietPeriodMs0 overwrites any union data inside the ListRunPlans200JSONResponseBody_TraceQuietPeriodMs as the provided ListRunPlans200JSONResponseBodyTraceQuietPeriodMs0
+func (t *ListRunPlans200JSONResponseBody_TraceQuietPeriodMs) FromListRunPlans200JSONResponseBodyTraceQuietPeriodMs0(v ListRunPlans200JSONResponseBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeListRunPlans200JSONResponseBodyTraceQuietPeriodMs0 performs a merge with any union data inside the ListRunPlans200JSONResponseBody_TraceQuietPeriodMs, using the provided ListRunPlans200JSONResponseBodyTraceQuietPeriodMs0
+func (t *ListRunPlans200JSONResponseBody_TraceQuietPeriodMs) MergeListRunPlans200JSONResponseBodyTraceQuietPeriodMs0(v ListRunPlans200JSONResponseBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t ListRunPlans200JSONResponseBody_TraceQuietPeriodMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *ListRunPlans200JSONResponseBody_TraceQuietPeriodMs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0 returns the union data inside the ListRunPlans200JSONResponseBody_TraceWaitTimeoutMs as a ListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0
+func (t ListRunPlans200JSONResponseBody_TraceWaitTimeoutMs) AsListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0() (ListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0, error) {
+	var body ListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0 overwrites any union data inside the ListRunPlans200JSONResponseBody_TraceWaitTimeoutMs as the provided ListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0
+func (t *ListRunPlans200JSONResponseBody_TraceWaitTimeoutMs) FromListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0(v ListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0 performs a merge with any union data inside the ListRunPlans200JSONResponseBody_TraceWaitTimeoutMs, using the provided ListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0
+func (t *ListRunPlans200JSONResponseBody_TraceWaitTimeoutMs) MergeListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0(v ListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t ListRunPlans200JSONResponseBody_TraceWaitTimeoutMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *ListRunPlans200JSONResponseBody_TraceWaitTimeoutMs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsRunRunPlanJSONBodyConfigEvaluatorsMappings0 returns the union data inside the RunRunPlanJSONBody_Config_Evaluators_Mappings_AdditionalProperties as a RunRunPlanJSONBodyConfigEvaluatorsMappings0
 func (t RunRunPlanJSONBody_Config_Evaluators_Mappings_AdditionalProperties) AsRunRunPlanJSONBodyConfigEvaluatorsMappings0() (RunRunPlanJSONBodyConfigEvaluatorsMappings0, error) {
 	var body RunRunPlanJSONBodyConfigEvaluatorsMappings0
@@ -108099,6 +108269,78 @@ func (t RunRunPlanJSONBody_Config_Targets_ScenarioMappings_AdditionalProperties)
 }
 
 func (t *RunRunPlanJSONBody_Config_Targets_ScenarioMappings_AdditionalProperties) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRunRunPlanJSONBodyConfigTraceQuietPeriodMs0 returns the union data inside the RunRunPlanJSONBody_Config_TraceQuietPeriodMs as a RunRunPlanJSONBodyConfigTraceQuietPeriodMs0
+func (t RunRunPlanJSONBody_Config_TraceQuietPeriodMs) AsRunRunPlanJSONBodyConfigTraceQuietPeriodMs0() (RunRunPlanJSONBodyConfigTraceQuietPeriodMs0, error) {
+	var body RunRunPlanJSONBodyConfigTraceQuietPeriodMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRunRunPlanJSONBodyConfigTraceQuietPeriodMs0 overwrites any union data inside the RunRunPlanJSONBody_Config_TraceQuietPeriodMs as the provided RunRunPlanJSONBodyConfigTraceQuietPeriodMs0
+func (t *RunRunPlanJSONBody_Config_TraceQuietPeriodMs) FromRunRunPlanJSONBodyConfigTraceQuietPeriodMs0(v RunRunPlanJSONBodyConfigTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRunRunPlanJSONBodyConfigTraceQuietPeriodMs0 performs a merge with any union data inside the RunRunPlanJSONBody_Config_TraceQuietPeriodMs, using the provided RunRunPlanJSONBodyConfigTraceQuietPeriodMs0
+func (t *RunRunPlanJSONBody_Config_TraceQuietPeriodMs) MergeRunRunPlanJSONBodyConfigTraceQuietPeriodMs0(v RunRunPlanJSONBodyConfigTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RunRunPlanJSONBody_Config_TraceQuietPeriodMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RunRunPlanJSONBody_Config_TraceQuietPeriodMs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRunRunPlanJSONBodyConfigTraceWaitTimeoutMs0 returns the union data inside the RunRunPlanJSONBody_Config_TraceWaitTimeoutMs as a RunRunPlanJSONBodyConfigTraceWaitTimeoutMs0
+func (t RunRunPlanJSONBody_Config_TraceWaitTimeoutMs) AsRunRunPlanJSONBodyConfigTraceWaitTimeoutMs0() (RunRunPlanJSONBodyConfigTraceWaitTimeoutMs0, error) {
+	var body RunRunPlanJSONBodyConfigTraceWaitTimeoutMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRunRunPlanJSONBodyConfigTraceWaitTimeoutMs0 overwrites any union data inside the RunRunPlanJSONBody_Config_TraceWaitTimeoutMs as the provided RunRunPlanJSONBodyConfigTraceWaitTimeoutMs0
+func (t *RunRunPlanJSONBody_Config_TraceWaitTimeoutMs) FromRunRunPlanJSONBodyConfigTraceWaitTimeoutMs0(v RunRunPlanJSONBodyConfigTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRunRunPlanJSONBodyConfigTraceWaitTimeoutMs0 performs a merge with any union data inside the RunRunPlanJSONBody_Config_TraceWaitTimeoutMs, using the provided RunRunPlanJSONBodyConfigTraceWaitTimeoutMs0
+func (t *RunRunPlanJSONBody_Config_TraceWaitTimeoutMs) MergeRunRunPlanJSONBodyConfigTraceWaitTimeoutMs0(v RunRunPlanJSONBodyConfigTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RunRunPlanJSONBody_Config_TraceWaitTimeoutMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RunRunPlanJSONBody_Config_TraceWaitTimeoutMs) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -108663,6 +108905,78 @@ func (t GetRunPlan200JSONResponseBody_Targets_ScenarioMappings_AdditionalPropert
 }
 
 func (t *GetRunPlan200JSONResponseBody_Targets_ScenarioMappings_AdditionalProperties) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetRunPlan200JSONResponseBodyTraceQuietPeriodMs0 returns the union data inside the GetRunPlan200JSONResponseBody_TraceQuietPeriodMs as a GetRunPlan200JSONResponseBodyTraceQuietPeriodMs0
+func (t GetRunPlan200JSONResponseBody_TraceQuietPeriodMs) AsGetRunPlan200JSONResponseBodyTraceQuietPeriodMs0() (GetRunPlan200JSONResponseBodyTraceQuietPeriodMs0, error) {
+	var body GetRunPlan200JSONResponseBodyTraceQuietPeriodMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetRunPlan200JSONResponseBodyTraceQuietPeriodMs0 overwrites any union data inside the GetRunPlan200JSONResponseBody_TraceQuietPeriodMs as the provided GetRunPlan200JSONResponseBodyTraceQuietPeriodMs0
+func (t *GetRunPlan200JSONResponseBody_TraceQuietPeriodMs) FromGetRunPlan200JSONResponseBodyTraceQuietPeriodMs0(v GetRunPlan200JSONResponseBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetRunPlan200JSONResponseBodyTraceQuietPeriodMs0 performs a merge with any union data inside the GetRunPlan200JSONResponseBody_TraceQuietPeriodMs, using the provided GetRunPlan200JSONResponseBodyTraceQuietPeriodMs0
+func (t *GetRunPlan200JSONResponseBody_TraceQuietPeriodMs) MergeGetRunPlan200JSONResponseBodyTraceQuietPeriodMs0(v GetRunPlan200JSONResponseBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetRunPlan200JSONResponseBody_TraceQuietPeriodMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetRunPlan200JSONResponseBody_TraceQuietPeriodMs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0 returns the union data inside the GetRunPlan200JSONResponseBody_TraceWaitTimeoutMs as a GetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0
+func (t GetRunPlan200JSONResponseBody_TraceWaitTimeoutMs) AsGetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0() (GetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0, error) {
+	var body GetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0 overwrites any union data inside the GetRunPlan200JSONResponseBody_TraceWaitTimeoutMs as the provided GetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0
+func (t *GetRunPlan200JSONResponseBody_TraceWaitTimeoutMs) FromGetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0(v GetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0 performs a merge with any union data inside the GetRunPlan200JSONResponseBody_TraceWaitTimeoutMs, using the provided GetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0
+func (t *GetRunPlan200JSONResponseBody_TraceWaitTimeoutMs) MergeGetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0(v GetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetRunPlan200JSONResponseBody_TraceWaitTimeoutMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetRunPlan200JSONResponseBody_TraceWaitTimeoutMs) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -116787,6 +117101,78 @@ func (t *PostApiSuitesByIdRunJSONBody_Targets_ScenarioMappings_AdditionalPropert
 	return err
 }
 
+// AsPostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0 returns the union data inside the PostApiSuitesByIdRunJSONBody_TraceQuietPeriodMs as a PostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0
+func (t PostApiSuitesByIdRunJSONBody_TraceQuietPeriodMs) AsPostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0() (PostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0, error) {
+	var body PostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0 overwrites any union data inside the PostApiSuitesByIdRunJSONBody_TraceQuietPeriodMs as the provided PostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0
+func (t *PostApiSuitesByIdRunJSONBody_TraceQuietPeriodMs) FromPostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0(v PostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0 performs a merge with any union data inside the PostApiSuitesByIdRunJSONBody_TraceQuietPeriodMs, using the provided PostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0
+func (t *PostApiSuitesByIdRunJSONBody_TraceQuietPeriodMs) MergePostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0(v PostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiSuitesByIdRunJSONBody_TraceQuietPeriodMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiSuitesByIdRunJSONBody_TraceQuietPeriodMs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0 returns the union data inside the PostApiSuitesByIdRunJSONBody_TraceWaitTimeoutMs as a PostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0
+func (t PostApiSuitesByIdRunJSONBody_TraceWaitTimeoutMs) AsPostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0() (PostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0, error) {
+	var body PostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0 overwrites any union data inside the PostApiSuitesByIdRunJSONBody_TraceWaitTimeoutMs as the provided PostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0
+func (t *PostApiSuitesByIdRunJSONBody_TraceWaitTimeoutMs) FromPostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0(v PostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0 performs a merge with any union data inside the PostApiSuitesByIdRunJSONBody_TraceWaitTimeoutMs, using the provided PostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0
+func (t *PostApiSuitesByIdRunJSONBody_TraceWaitTimeoutMs) MergePostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0(v PostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiSuitesByIdRunJSONBody_TraceWaitTimeoutMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiSuitesByIdRunJSONBody_TraceWaitTimeoutMs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsPostApiSuitesByIdRun200JSONResponseBodyItemsTargetRunParameters0 returns the union data inside the PostApiSuitesByIdRun200JSONResponseBody_Items_Target_RunParameters_AdditionalProperties as a PostApiSuitesByIdRun200JSONResponseBodyItemsTargetRunParameters0
 func (t PostApiSuitesByIdRun200JSONResponseBody_Items_Target_RunParameters_AdditionalProperties) AsPostApiSuitesByIdRun200JSONResponseBodyItemsTargetRunParameters0() (PostApiSuitesByIdRun200JSONResponseBodyItemsTargetRunParameters0, error) {
 	var body PostApiSuitesByIdRun200JSONResponseBodyItemsTargetRunParameters0
@@ -117615,6 +118001,78 @@ func (t RunTestSuiteJSONBody_Targets_ScenarioMappings_AdditionalProperties) Mars
 }
 
 func (t *RunTestSuiteJSONBody_Targets_ScenarioMappings_AdditionalProperties) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRunTestSuiteJSONBodyTraceQuietPeriodMs0 returns the union data inside the RunTestSuiteJSONBody_TraceQuietPeriodMs as a RunTestSuiteJSONBodyTraceQuietPeriodMs0
+func (t RunTestSuiteJSONBody_TraceQuietPeriodMs) AsRunTestSuiteJSONBodyTraceQuietPeriodMs0() (RunTestSuiteJSONBodyTraceQuietPeriodMs0, error) {
+	var body RunTestSuiteJSONBodyTraceQuietPeriodMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRunTestSuiteJSONBodyTraceQuietPeriodMs0 overwrites any union data inside the RunTestSuiteJSONBody_TraceQuietPeriodMs as the provided RunTestSuiteJSONBodyTraceQuietPeriodMs0
+func (t *RunTestSuiteJSONBody_TraceQuietPeriodMs) FromRunTestSuiteJSONBodyTraceQuietPeriodMs0(v RunTestSuiteJSONBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRunTestSuiteJSONBodyTraceQuietPeriodMs0 performs a merge with any union data inside the RunTestSuiteJSONBody_TraceQuietPeriodMs, using the provided RunTestSuiteJSONBodyTraceQuietPeriodMs0
+func (t *RunTestSuiteJSONBody_TraceQuietPeriodMs) MergeRunTestSuiteJSONBodyTraceQuietPeriodMs0(v RunTestSuiteJSONBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RunTestSuiteJSONBody_TraceQuietPeriodMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RunTestSuiteJSONBody_TraceQuietPeriodMs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRunTestSuiteJSONBodyTraceWaitTimeoutMs0 returns the union data inside the RunTestSuiteJSONBody_TraceWaitTimeoutMs as a RunTestSuiteJSONBodyTraceWaitTimeoutMs0
+func (t RunTestSuiteJSONBody_TraceWaitTimeoutMs) AsRunTestSuiteJSONBodyTraceWaitTimeoutMs0() (RunTestSuiteJSONBodyTraceWaitTimeoutMs0, error) {
+	var body RunTestSuiteJSONBodyTraceWaitTimeoutMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRunTestSuiteJSONBodyTraceWaitTimeoutMs0 overwrites any union data inside the RunTestSuiteJSONBody_TraceWaitTimeoutMs as the provided RunTestSuiteJSONBodyTraceWaitTimeoutMs0
+func (t *RunTestSuiteJSONBody_TraceWaitTimeoutMs) FromRunTestSuiteJSONBodyTraceWaitTimeoutMs0(v RunTestSuiteJSONBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRunTestSuiteJSONBodyTraceWaitTimeoutMs0 performs a merge with any union data inside the RunTestSuiteJSONBody_TraceWaitTimeoutMs, using the provided RunTestSuiteJSONBodyTraceWaitTimeoutMs0
+func (t *RunTestSuiteJSONBody_TraceWaitTimeoutMs) MergeRunTestSuiteJSONBodyTraceWaitTimeoutMs0(v RunTestSuiteJSONBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RunTestSuiteJSONBody_TraceWaitTimeoutMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RunTestSuiteJSONBody_TraceWaitTimeoutMs) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -179141,6 +179599,12 @@ type ListRunPlansResponse struct {
 			Type                    ListRunPlans200JSONResponseBodyTargetsType                                                `json:"type"`
 		} `json:"targets"`
 
+		// TraceQuietPeriodMs Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the scenario setting or the project's recommendation. Absent on servers that predate judge trace settings.
+		TraceQuietPeriodMs *ListRunPlans200JSONResponseBody_TraceQuietPeriodMs `json:"traceQuietPeriodMs,omitempty"`
+
+		// TraceWaitTimeoutMs Milliseconds the judge waits for the agent's trace before a verdict, or null for the scenario setting or the project's recommendation. Absent on servers that predate judge trace settings.
+		TraceWaitTimeoutMs *ListRunPlans200JSONResponseBody_TraceWaitTimeoutMs `json:"traceWaitTimeoutMs,omitempty"`
+
 		// UpdatedAt When the plan was last written.
 		UpdatedAt string `json:"updatedAt"`
 	}
@@ -179357,6 +179821,12 @@ type GetRunPlanResponse struct {
 			ScenarioMappings        *map[string]GetRunPlan200JSONResponseBody_Targets_ScenarioMappings_AdditionalProperties `json:"scenarioMappings,omitempty"`
 			Type                    GetRunPlan200JSONResponseBodyTargetsType                                                `json:"type"`
 		} `json:"targets"`
+
+		// TraceQuietPeriodMs Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the scenario setting or the project's recommendation. Absent on servers that predate judge trace settings.
+		TraceQuietPeriodMs *GetRunPlan200JSONResponseBody_TraceQuietPeriodMs `json:"traceQuietPeriodMs,omitempty"`
+
+		// TraceWaitTimeoutMs Milliseconds the judge waits for the agent's trace before a verdict, or null for the scenario setting or the project's recommendation. Absent on servers that predate judge trace settings.
+		TraceWaitTimeoutMs *GetRunPlan200JSONResponseBody_TraceWaitTimeoutMs `json:"traceWaitTimeoutMs,omitempty"`
 
 		// UpdatedAt When the plan was last written.
 		UpdatedAt string `json:"updatedAt"`
@@ -213167,6 +213637,12 @@ func ParseListRunPlansResponse(rsp *http.Response) (*ListRunPlansResponse, error
 				Type                    ListRunPlans200JSONResponseBodyTargetsType                                                `json:"type"`
 			} `json:"targets"`
 
+			// TraceQuietPeriodMs Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the scenario setting or the project's recommendation. Absent on servers that predate judge trace settings.
+			TraceQuietPeriodMs *ListRunPlans200JSONResponseBody_TraceQuietPeriodMs `json:"traceQuietPeriodMs,omitempty"`
+
+			// TraceWaitTimeoutMs Milliseconds the judge waits for the agent's trace before a verdict, or null for the scenario setting or the project's recommendation. Absent on servers that predate judge trace settings.
+			TraceWaitTimeoutMs *ListRunPlans200JSONResponseBody_TraceWaitTimeoutMs `json:"traceWaitTimeoutMs,omitempty"`
+
 			// UpdatedAt When the plan was last written.
 			UpdatedAt string `json:"updatedAt"`
 		}
@@ -213377,6 +213853,12 @@ func ParseGetRunPlanResponse(rsp *http.Response) (*GetRunPlanResponse, error) {
 				ScenarioMappings        *map[string]GetRunPlan200JSONResponseBody_Targets_ScenarioMappings_AdditionalProperties `json:"scenarioMappings,omitempty"`
 				Type                    GetRunPlan200JSONResponseBodyTargetsType                                                `json:"type"`
 			} `json:"targets"`
+
+			// TraceQuietPeriodMs Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the scenario setting or the project's recommendation. Absent on servers that predate judge trace settings.
+			TraceQuietPeriodMs *GetRunPlan200JSONResponseBody_TraceQuietPeriodMs `json:"traceQuietPeriodMs,omitempty"`
+
+			// TraceWaitTimeoutMs Milliseconds the judge waits for the agent's trace before a verdict, or null for the scenario setting or the project's recommendation. Absent on servers that predate judge trace settings.
+			TraceWaitTimeoutMs *GetRunPlan200JSONResponseBody_TraceWaitTimeoutMs `json:"traceWaitTimeoutMs,omitempty"`
 
 			// UpdatedAt When the plan was last written.
 			UpdatedAt string `json:"updatedAt"`

@@ -31,6 +31,12 @@ class RunTestSuiteBody:
             for the scenario or project default.
         judge_model (None | str | Unset): The model that judges every scenario in this run. Leave it out for the
             scenario or project default.
+        trace_quiet_period_ms (int | None | Unset): Milliseconds (0 to 60000) the agent's trace must stay unchanged
+            before the judge reads it, for every scenario in the run. Overrides each scenario's own setting. Leave it out
+            for the scenario setting or the project's recommendation.
+        trace_wait_timeout_ms (int | None | Unset): Milliseconds (1000 to 300000) the judge waits for the agent's trace
+            before a verdict, for every scenario in the run. Overrides each scenario's own setting. Leave it out for the
+            scenario setting or the project's recommendation.
         idempotency_key (str | Unset): Repeat the same key to make a retry join the batch the first call started instead
             of running everything again. Send the same request with it: the same key over a different configuration starts
             its own batch. Defaults to a new key per call.
@@ -46,6 +52,8 @@ class RunTestSuiteBody:
     repeat_count: int | Unset = UNSET
     simulator_model: None | str | Unset = UNSET
     judge_model: None | str | Unset = UNSET
+    trace_quiet_period_ms: int | None | Unset = UNSET
+    trace_wait_timeout_ms: int | None | Unset = UNSET
     idempotency_key: str | Unset = UNSET
     parameters: RunTestSuiteBodyParameters | Unset = UNSET
     note: str | Unset = UNSET
@@ -73,6 +81,18 @@ class RunTestSuiteBody:
         else:
             judge_model = self.judge_model
 
+        trace_quiet_period_ms: int | None | Unset
+        if isinstance(self.trace_quiet_period_ms, Unset):
+            trace_quiet_period_ms = UNSET
+        else:
+            trace_quiet_period_ms = self.trace_quiet_period_ms
+
+        trace_wait_timeout_ms: int | None | Unset
+        if isinstance(self.trace_wait_timeout_ms, Unset):
+            trace_wait_timeout_ms = UNSET
+        else:
+            trace_wait_timeout_ms = self.trace_wait_timeout_ms
+
         idempotency_key = self.idempotency_key
 
         parameters: dict[str, Any] | Unset = UNSET
@@ -96,6 +116,10 @@ class RunTestSuiteBody:
             field_dict["simulatorModel"] = simulator_model
         if judge_model is not UNSET:
             field_dict["judgeModel"] = judge_model
+        if trace_quiet_period_ms is not UNSET:
+            field_dict["traceQuietPeriodMs"] = trace_quiet_period_ms
+        if trace_wait_timeout_ms is not UNSET:
+            field_dict["traceWaitTimeoutMs"] = trace_wait_timeout_ms
         if idempotency_key is not UNSET:
             field_dict["idempotencyKey"] = idempotency_key
         if parameters is not UNSET:
@@ -140,6 +164,24 @@ class RunTestSuiteBody:
 
         judge_model = _parse_judge_model(d.pop("judgeModel", UNSET))
 
+        def _parse_trace_quiet_period_ms(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        trace_quiet_period_ms = _parse_trace_quiet_period_ms(d.pop("traceQuietPeriodMs", UNSET))
+
+        def _parse_trace_wait_timeout_ms(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        trace_wait_timeout_ms = _parse_trace_wait_timeout_ms(d.pop("traceWaitTimeoutMs", UNSET))
+
         idempotency_key = d.pop("idempotencyKey", UNSET)
 
         _parameters = d.pop("parameters", UNSET)
@@ -157,6 +199,8 @@ class RunTestSuiteBody:
             repeat_count=repeat_count,
             simulator_model=simulator_model,
             judge_model=judge_model,
+            trace_quiet_period_ms=trace_quiet_period_ms,
+            trace_wait_timeout_ms=trace_wait_timeout_ms,
             idempotency_key=idempotency_key,
             parameters=parameters,
             note=note,
