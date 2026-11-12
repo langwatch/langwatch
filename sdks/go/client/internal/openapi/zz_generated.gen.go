@@ -53911,6 +53911,7 @@ type GetApiTracesFacets200JSONResponseBody0 struct {
 
 // GetApiTracesFacets200JSONResponseBody0Facets0 defines parameters for GetApiTracesFacets.
 type GetApiTracesFacets200JSONResponseBody0Facets0 struct {
+	Deferred  *bool                                              `json:"deferred,omitempty"`
 	Group     GetApiTracesFacets200JSONResponseBody0Facets0Group `json:"group"`
 	Key       string                                             `json:"key"`
 	Kind      GetApiTracesFacets200JSONResponseBody0Facets0Kind  `json:"kind"`

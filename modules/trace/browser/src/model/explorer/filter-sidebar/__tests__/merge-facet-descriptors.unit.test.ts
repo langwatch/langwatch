@@ -7,7 +7,11 @@
 import type { FacetDescriptor } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { mergeFacetDescriptors } from "../merge-facet-descriptors.ts";
+import {
+  deferredFacetKeysToLoad,
+  fillDeferredFacets,
+  mergeFacetDescriptors,
+} from "../merge-facet-descriptors.ts";
 
 const categorical = (key: string, count: number): FacetDescriptor => ({
   key,
@@ -60,5 +64,55 @@ describe("given a counted payload", () => {
     });
 
     expect(merged.countState).toBe("stale");
+  });
+});
+
+const deferredSpanType: FacetDescriptor = {
+  key: "spanType",
+  kind: "categorical",
+  label: "Span type",
+  group: "span",
+  topValues: [],
+  totalDistinct: 0,
+  deferred: true,
+};
+
+describe("given a facet listed without values", () => {
+  /** @scenario "Span type is counted only once its section is opened" */
+  it("counts it only while its section is open", () => {
+    const descriptors = [categorical("status", 2), deferredSpanType];
+
+    expect(deferredFacetKeysToLoad({ descriptors, isOpen: () => false })).toEqual([]);
+    expect(deferredFacetKeysToLoad({ descriptors, isOpen: () => true })).toEqual(["spanType"]);
+  });
+
+  /** @scenario "Span type is counted only once its section is opened" */
+  it("takes the values its keyed read counted, still marked as a deferred facet", () => {
+    const filled = fillDeferredFacets({
+      descriptors: [categorical("status", 2), deferredSpanType],
+      loaded: [categorical("spanType", 4)],
+      loadedIsPlaceholder: false,
+    });
+
+    expect(filled).toEqual([
+      categorical("status", 2),
+      { ...categorical("spanType", 4), deferred: false },
+    ]);
+  });
+
+  /** @scenario "Span type is counted only once its section is opened" */
+  it("keeps it without values while the keyed read answers for another query", () => {
+    const descriptors = [deferredSpanType];
+
+    expect(
+      fillDeferredFacets({
+        descriptors,
+        loaded: [categorical("spanType", 4)],
+        loadedIsPlaceholder: true,
+      }),
+    ).toBe(descriptors);
+    expect(fillDeferredFacets({ descriptors, loaded: undefined, loadedIsPlaceholder: false })).toBe(
+      descriptors,
+    );
   });
 });

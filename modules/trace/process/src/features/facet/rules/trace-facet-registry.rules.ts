@@ -45,6 +45,11 @@ export interface ExpressionCategoricalDef extends BaseFacetDef {
    * In-memory accessor mirroring expression for filter compilation.
    */
   read?: CategoricalRead;
+  /**
+   * Too costly to count on every sidebar load: discovery lists it without
+   * values, and its values are read only when asked for by key.
+   */
+  deferred?: true;
 }
 
 export interface QueryBuilderCategoricalDef extends BaseFacetDef {

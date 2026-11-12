@@ -121185,6 +121185,9 @@
                                   },
                                   "totalDistinct": {
                                     "type": "number"
+                                  },
+                                  "deferred": {
+                                    "type": "boolean"
                                   }
                                 },
                                 "required": [

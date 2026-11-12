@@ -109,6 +109,11 @@ const categoricalFacetDescriptorSchema = z.object({
     }),
   ),
   totalDistinct: z.number(),
+  /**
+   * Listed without values, which cost too much to count on every load: a read
+   * naming the facet in `facetKeys` counts them.
+   */
+  deferred: z.boolean().optional(),
 });
 
 export type CategoricalFacetDescriptor = z.infer<typeof categoricalFacetDescriptorSchema>;

@@ -518,6 +518,8 @@ export type TracesListReader = Readonly<{
     authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     filterFor: FacetFilterResolver;
+    /** Count only these facets, deferred ones included. */
+    facetKeys?: readonly string[];
     /** Names what `filterFor` was built from, so a repeat shares a running count. */
     filterKey: string;
   }): Promise<FacetDescriptor[]>;
@@ -531,6 +533,12 @@ export type TracesListReader = Readonly<{
   getSuggestions(params: TraceSuggestionsParams): Promise<string[]>;
   resolveFacetKey(input: { field: string; protections: Protections }): string;
   getDiscover(params: TraceDiscoverReadParams): Promise<DiscoverResult>;
+  /** Deferred facets counted over the discovery window, cached alongside it. */
+  getDeferredDiscoverCounts(params: {
+    authorization: Authorization;
+    timeRange: { from: number; to: number };
+    facetKeys: readonly string[];
+  }): Promise<FacetDescriptor[]>;
   getFacetValues(params: TraceFacetValuesReadParams): Promise<FacetValuesResult>;
 }>;
 
@@ -1941,7 +1949,10 @@ export class TraceModule implements TraceApi, CollectorApp {
     };
     if (field === undefined) {
       return discoverResultSchema.parse(
-        await this.readDiscover({ authorization: input.authorization, timeRange }),
+        await this.#discoverWithDeferredCounted({
+          authorization: input.authorization,
+          timeRange,
+        }),
       );
     }
     const protections = await this.resolveApiKeyProtections({
@@ -1964,23 +1975,59 @@ export class TraceModule implements TraceApi, CollectorApp {
     });
   }
 
-  /** No `query` at all is the vocabulary read; a `query`, empty included, asks for counts. */
+  /**
+   * The REST payload promises each facet's top values, so the facets the
+   * sidebar defers are counted here over the discovery window. One the count
+   * cannot answer stays listed without values.
+   */
+  async #discoverWithDeferredCounted(input: {
+    authorization: Authorization;
+    timeRange: { from: number; to: number };
+  }): Promise<DiscoverResult> {
+    const discovered = await this.readDiscover({
+      authorization: input.authorization,
+      timeRange: input.timeRange,
+    });
+    const facetKeys = discovered.facets
+      .filter((facet) => facet.kind === "categorical" && facet.deferred === true)
+      .map((facet) => facet.key);
+    if (facetKeys.length === 0) return discovered;
+
+    const counted = await this.#dependencies.traces.list.getDeferredDiscoverCounts({
+      authorization: input.authorization,
+      timeRange: input.timeRange,
+      facetKeys,
+    });
+    const countedByKey = new Map(counted.map((facet) => [facet.key, facet]));
+
+    return {
+      ...discovered,
+      facets: discovered.facets.map((facet) => countedByKey.get(facet.key) ?? facet),
+    };
+  }
+
+  /**
+   * No `query` at all is the vocabulary read; a `query`, empty included, asks
+   * for counts, as do `facetKeys`, which narrow them to the facets named.
+   */
   async readDiscoverForQuery(input: {
     projectId: string;
     timeRange: { from: number; to: number; live?: boolean };
     query?: string | null;
     evalRuns?: Readonly<Record<string, InstantEvalRunReference>>;
+    facetKeys?: readonly string[];
     authorization: Authorization;
     protections?: Protections;
   }): Promise<DiscoverResult> {
-    if (input.query === null || input.query === undefined) {
+    if ((input.query === null || input.query === undefined) && !input.facetKeys) {
       return this.readDiscover({ authorization: input.authorization, timeRange: input.timeRange });
     }
     return this.readFilteredFacets({
       projectId: input.projectId,
       authorization: input.authorization,
       timeRange: input.timeRange,
-      query: input.query,
+      query: input.query ?? "",
+      ...(input.facetKeys ? { facetKeys: input.facetKeys } : {}),
       ...(input.protections ? { protections: input.protections } : {}),
       evalRuns: await this.findExplorerEvalRuns({
         projectId: input.projectId,
@@ -2747,6 +2794,8 @@ export class TraceModule implements TraceApi, CollectorApp {
     projectId: string;
     timeRange: { from: number; to: number; live?: boolean };
     query: string;
+    /** Count only these facets, deferred ones included. */
+    facetKeys?: readonly string[];
     evalRuns?: readonly ResolvedInstantEvalRun[];
     authorization: Authorization;
     protections?: Protections;
@@ -2773,6 +2822,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       authorization: input.authorization,
       timeRange: input.timeRange,
       filterFor,
+      ...(input.facetKeys ? { facetKeys: input.facetKeys } : {}),
       // Everything `filterFor` reads besides the proof and the window.
       filterKey: JSON.stringify([
         input.projectId,

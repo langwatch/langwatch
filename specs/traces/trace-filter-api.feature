@@ -76,6 +76,20 @@ Feature: The trace filter language and its value discovery over the API key surf
     When the caller gets the facets endpoint for field "model"
     Then the response carries the values with their counts, the distinct total, and whether more remain
 
+  # The sidebar defers span type; the public payload still promises its values.
+  @unit
+  Scenario: The REST facet listing still counts span type
+    When the caller gets the facets endpoint with no field
+    Then span type carries its top values, counted on its own over the same window
+    And if that count fails, span type is listed without values rather than failing the request
+    And a failed count is not run again for that window for thirty seconds
+
+  @unit
+  Scenario: Repeated REST facet listings share one span type count
+    Given the span type count for a window is still running
+    When another listing for the same window arrives
+    Then it is answered by the running count, not a second scan
+
   @unit
   Scenario: A prefix narrows a field's values
     When the caller gets the facets endpoint for field "model" with prefix "gpt"

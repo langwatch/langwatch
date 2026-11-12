@@ -117,6 +117,26 @@ describe("useFilteredTraceFacets", () => {
     });
   });
 
+  describe("given facet keys to count", () => {
+    /** @scenario "Span type is counted only once its section is opened" */
+    it("asks for only those facets under the active query", () => {
+      renderHook(() => useFilteredTraceFacets({ facetKeys: ["spanType"] }));
+      expect(lastInput()).toEqual({
+        projectId: "proj-1",
+        timeRange: { from: 10, to: 20, live: true },
+        query: "status:error",
+        facetKeys: ["spanType"],
+      });
+      expect(lastOpts()?.enabled).toBe(true);
+    });
+
+    /** @scenario "Span type is counted only once its section is opened" */
+    it("does not query at all when the list is empty", () => {
+      renderHook(() => useFilteredTraceFacets({ facetKeys: [] }));
+      expect(lastOpts()?.enabled).toBe(false);
+    });
+  });
+
   describe("given the sample preview", () => {
     it("does not query at all", () => {
       harness.samplePreview.value = true;

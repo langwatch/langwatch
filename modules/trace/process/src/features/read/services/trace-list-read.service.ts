@@ -67,6 +67,8 @@ interface FacetParams {
    * the same key count the same facets.
    */
   filterKey: string;
+  /** Count only these facets, deferred ones included; every other facet when absent. */
+  facetKeys?: readonly string[];
 }
 
 interface NewCountParams {
@@ -161,6 +163,18 @@ export class TraceListService {
   /** The cached facet discovery for the sidebar. */
   getDiscover(params: DiscoverParams): Promise<DiscoverResult> {
     return this.discover.getDiscover(params);
+  }
+
+  /** Deferred facets counted over the discovery window, cached alongside it. */
+  getDeferredDiscoverCounts(params: {
+    authorization: Authorization;
+    timeRange: { from: number; to: number };
+    facetKeys: readonly string[];
+  }): Promise<FacetDescriptor[]> {
+    return this.discover.getDeferredCounts({
+      params: { authorization: params.authorization, timeRange: params.timeRange },
+      facetKeys: params.facetKeys,
+    });
   }
 
   /** One facet's values, cached, for a sidebar drill-in. */
@@ -271,6 +285,7 @@ export class TraceListService {
       readScopeKeyOf(params.authorization),
       ...facetCountWindowKey(params.timeRange),
       params.filterKey,
+      params.facetKeys ?? null,
     ]);
     const running = this.#facetsInFlight.get(key);
     if (running) return running;
@@ -279,6 +294,7 @@ export class TraceListService {
       .getFilteredFacets({
         params: { authorization: params.authorization, timeRange: params.timeRange },
         filterFor: params.filterFor,
+        ...(params.facetKeys ? { facetKeys: params.facetKeys } : {}),
       })
       .finally(() => this.#facetsInFlight.delete(key));
     this.#facetsInFlight.set(key, run);
