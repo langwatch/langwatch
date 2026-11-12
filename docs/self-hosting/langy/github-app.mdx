@@ -192,7 +192,7 @@ If anything goes wrong, the audit log (`langy.github.install`, `langy.github.dis
 
 Langy cannot run a customer's agent in its sandbox, so the repository's CI is where its changes are measured. When every check on the head commit of a pull request Langy opened has finished, LangWatch starts a new Langy turn in the conversation that opened it, so Langy can read the result and fix, push or report.
 
-- **Which pull requests.** Only pull requests on a `langy/` branch of the repository itself, opened by a Langy turn, still open. A fork's pull request or a branch a person opened wakes nothing.
+- **Which pull requests.** Only pull requests on a `langy/` branch of the repository itself, opened by a Langy turn, still open. A fork's pull request or a branch a person opened starts no follow-up turn.
 - **Once per commit.** Re-running the checks on the same commit does not start a second turn. A new push starts a new run of CI, and its result can start the next follow-up.
 - **Capped.** After a few automatic follow-ups in a row on one pull request, LangWatch waits until the person sends a message in the conversation.
 - **What the turn holds.** It acts as the person who owns the conversation, as long as that person is still active and has Langy access. Its LangWatch key is view-only, and its GitHub token is minted for that one repository.

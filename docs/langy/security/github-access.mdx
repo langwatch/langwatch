@@ -46,7 +46,9 @@ Actions lets Langy read the workflow runs and logs on its pull requests and star
 
 The app subscribes to the `pull_request` and `check_suite` events, plus the installation lifecycle that GitHub sends automatically (`installation`, `installation_repositories`). The `pull_request` event is what links a pull request to the coding-agent sessions that worked on it.
 
-The `check_suite` event tells LangWatch that CI finished on a pull request. Only completed suites on a `langy/` branch of the repository itself are read, and only when every check on that commit has finished. LangWatch then starts a follow-up turn in the conversation that opened the pull request. That turn acts as the conversation's owner, can read but not change anything in LangWatch, and holds a GitHub token for that one repository. Automatic follow-ups stop after a few in a row until the person writes again.
+The `check_suite` event tells LangWatch that CI finished on a pull request. Only completed suites on a `langy/` branch of the repository itself are read, and only when every check on that commit has finished. LangWatch then starts a follow-up turn in the conversation that opened the pull request.
+
+That turn acts as the conversation's owner, can read but not change anything in LangWatch, and holds a GitHub token for that one repository. Automatic follow-ups stop after a few in a row until the person writes again.
 
 These are the fields the platform keeps from it:
 

@@ -566,6 +566,7 @@
 /api-reference/traces/get-transcript
 /api-reference/traces/overview
 /api-reference/traces/projection-dsl
+/api-reference/traces/recommended-trace-wait-for-a-scenario-judge
 /api-reference/traces/search
 /api-reference/traces/update-trace-metadata
 /api-reference/triggers
