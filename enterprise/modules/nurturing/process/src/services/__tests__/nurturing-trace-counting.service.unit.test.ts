@@ -3,11 +3,13 @@
  * @vitest-environment node
  * @see enterprise/modules/nurturing/specs/project-usage.feature
  */
+import { GroupQueueError } from "@langwatch/group-queue";
 import { describe, expect, it, vi } from "vitest";
 
 import {
   TRACE_COUNTING_WINDOW_MS,
   UNCOPIED_PROJECT_DROP_CACHE_TTL_MS,
+  UNCOPIED_PROJECT_RETRY_DELAY_MS,
   UNCOPIED_PROJECT_RETRY_WINDOW_MS,
 } from "../../rules/nurturing-project-usage.rules.ts";
 import type { NurturingCountedTrace } from "../../rules/nurturing-trace-day.rules.ts";
@@ -25,6 +27,16 @@ const traceOf = (at = NOON, projectId = "project-1"): NurturingCountedTrace => (
 });
 
 describe("NurturingTraceCountingService", () => {
+  /** @scenario "A new project whose copy lands within the retry window is counted" */
+  it("fails a batch waiting for a project's copy with a queue error naming the retry delay", async () => {
+    const counting = countingOver({ createdAt: DAY_BEFORE_NOON, copied: false });
+
+    const failure = await counting.countTraces({ traces: [traceOf()] }).catch((error) => error);
+
+    expect(failure).toBeInstanceOf(GroupQueueError);
+    expect(failure.retryAfterMs).toBe(UNCOPIED_PROJECT_RETRY_DELAY_MS);
+  });
+
   /** project-1's organization, created the day before NOON unless told otherwise. */
   function harness(createdAt = DAY_BEFORE_NOON) {
     const counting = countingOver({ createdAt });
