@@ -116,7 +116,7 @@ export class TraceBraidPreviewService {
   static create(deps: {
     reads: TraceBraidReadsRepository;
     readerSpans: BraidReaderSpans;
-    braids: Pick<AuthzApi, "listBraids"> | null;
+    braids: Pick<AuthzApi, "listBraids">;
     now?: () => number;
   }): TraceBraidPreviewService {
     return new TraceBraidPreviewService(deps);
@@ -124,13 +124,13 @@ export class TraceBraidPreviewService {
 
   readonly #reads: TraceBraidReadsRepository;
   readonly #readerSpans: BraidReaderSpans;
-  readonly #braids: Pick<AuthzApi, "listBraids"> | null;
+  readonly #braids: Pick<AuthzApi, "listBraids">;
   readonly #now: () => number;
 
   private constructor(deps: {
     reads: TraceBraidReadsRepository;
     readerSpans: BraidReaderSpans;
-    braids: Pick<AuthzApi, "listBraids"> | null;
+    braids: Pick<AuthzApi, "listBraids">;
     now?: () => number;
   }) {
     this.#reads = deps.reads;
@@ -241,7 +241,7 @@ export class TraceBraidPreviewService {
     authorization: Authorization;
     braidIds: readonly string[];
   }): Promise<BraidActivity> {
-    if (this.#braids === null || input.braidIds.length === 0) return { activity: [] };
+    if (input.braidIds.length === 0) return { activity: [] };
     const listed = await this.#braids.listBraids({ projectId: input.projectId });
     const nowMs = this.#now();
     const sinceMs = nowMs - BRAID_ACTIVITY_WINDOW_MS;

@@ -8,7 +8,7 @@ import type {
   TraceResourceInfoDto,
 } from "@langwatch/trace-contract";
 
-import { protectByOwner } from "./braided-span-owner.rules.ts";
+import { protectByOwner } from "../features/braid/rules/braided-span-owner.rules.ts";
 import { createAttributeRedactor } from "./trace-attribute-redaction.rules.ts";
 
 /**

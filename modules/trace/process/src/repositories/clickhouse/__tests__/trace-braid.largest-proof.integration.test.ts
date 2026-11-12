@@ -17,10 +17,10 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { braidedProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
+import { ClickHouseTraceBraidReadsRepository } from "../../../features/braid/repositories/clickhouse/clickhouse.trace-braid-reads.repository.ts";
 import { TraceBraidedTotalsService } from "../../../features/read/services/trace-braided-totals.service.ts";
 import { TraceSummaryService } from "../../../features/read/services/trace-summary-read.service.ts";
 import { SpanStorageClickHouseRepository } from "../span-storage.repository.ts";
-import { ClickHouseTraceBraidReadsRepository } from "../trace-braid-reads.repository.ts";
 import { ClickHouseTraceSpanRepository } from "../trace-span.repository.ts";
 import { TraceSummaryClickHouseRepository } from "../trace-summary.repository.ts";
 import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
@@ -173,7 +173,7 @@ beforeAll(async () => {
   });
   totals = TraceBraidedTotalsService.create({
     reads: ClickHouseTraceBraidReadsRepository.create({ clickhouse }),
-    prices: null,
+    prices: { estimateCost: () => 0 },
   });
   await ch.insert({
     table: "trace_summaries",

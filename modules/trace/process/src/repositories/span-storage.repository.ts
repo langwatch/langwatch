@@ -8,6 +8,7 @@ import type {
   TraceEventRollup,
   NormalizedSpan,
   ElasticSearchEvent,
+  OwnedSpan,
   Span,
   SpanInsertData,
 } from "@langwatch/trace-contract";
@@ -81,9 +82,6 @@ export interface SpanLangwatchSignalsRow {
 export interface TraceViewRead {
   reads?: "spans" | "traces";
 }
-
-/** A span as the trace view reads it: `ownerProjectId` set only on a braided owner's span. */
-export type OwnedSpan = Span & { ownerProjectId?: string };
 
 /**
  * Optional partition-pruning hint. stored_spans partitions by

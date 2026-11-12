@@ -11,11 +11,12 @@ import {
 import type { AuthzBraid } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { braidedProof, ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import {
-  EmptyTraceBraidReadsRepository,
-  type TraceBraidReadsRepository,
-} from "../../repositories/trace-braid-reads.repository.ts";
+  braidedProof,
+  ownProof,
+} from "../../../../__tests__/support/authorization-proofs.fixture.ts";
+import { MemoryNullTraceBraidReadsRepository } from "../../repositories/memory/memory.null-trace-braid-reads.repository.ts";
+import type { TraceBraidReadsRepository } from "../../repositories/trace-braid-reads.repository.ts";
 import {
   BRAID_PREVIEW_TRACE_CAP,
   type BraidReaderSpans,
@@ -67,7 +68,7 @@ function serviceOver({
   braids = [] as AuthzBraid[],
   exampleTraceId = null as string | null,
 } = {}) {
-  const reads: TraceBraidReadsRepository = EmptyTraceBraidReadsRepository.create();
+  const reads: TraceBraidReadsRepository = MemoryNullTraceBraidReadsRepository.create();
   const spies = {
     findReaderTraceIds: vi.spyOn(reads, "findReaderTraceIds").mockResolvedValue(traceIds),
     countOwnerSpansInTraces: vi.spyOn(reads, "countOwnerSpansInTraces").mockResolvedValue({

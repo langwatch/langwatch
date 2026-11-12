@@ -67,6 +67,7 @@ import {
 import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
+import type { AuthzAggregateReadAuditService } from "../features/read-audit/services/authz-aggregate-read-audit.service.ts";
 import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
 import type { AuthzLineageEpochRepository } from "../repositories/authz-lineage-epoch.repository.ts";
 import type { AuthzListingRepository } from "../repositories/authz-listing.repository.ts";
@@ -75,7 +76,6 @@ import type { AuthzOrganizationPolicyRepository } from "../repositories/authz-or
 import type { AuthzReadRepository } from "../repositories/authz-read.repository.ts";
 import { findPermissionsBeyondHeld } from "../rules/grant-escalation.rules.ts";
 import { AuthorizationService } from "./authorization.service.ts";
-import type { AuthzAggregateReadAuditService } from "./authz-aggregate-read-audit.service.ts";
 import { AuthzCollectorService } from "./authz-collector.service.ts";
 import { AuthzDecisionService } from "./authz-decision.service.ts";
 import { AuthzGrantReaderService } from "./authz-grant-reader.service.ts";

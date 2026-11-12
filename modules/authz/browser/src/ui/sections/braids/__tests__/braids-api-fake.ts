@@ -1,21 +1,11 @@
 // The authz api as the Braids screens use it, answering from a test's state and recording writes.
 
+import type { AuthzBraid as Braid } from "@langwatch/authz-contract";
 import { type Mock, vi } from "vitest";
 
 type MutationOptions = {
   onSuccess?: (data: unknown) => void;
   onError?: (error: unknown) => void;
-};
-
-type Braid = {
-  braidId: string;
-  ownerProjectId: string;
-  readerProjectId: string;
-  where: string | null;
-  fromMs: number;
-  expiresAtMs: number | null;
-  createdByUserId: string | null;
-  createdAtMs: number;
 };
 
 export type BraidsApiState = {

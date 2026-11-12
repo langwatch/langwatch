@@ -11,8 +11,8 @@ import type { Protections, SpanTreeNode, TraceApi } from "@langwatch/trace-contr
 import { describe, expect, it, vi } from "vitest";
 
 import { ownProof } from "../../../../__tests__/support/authorization-proofs.fixture.ts";
-import { EmptyTraceBraidReadsRepository } from "../../../../repositories/trace-braid-reads.repository.ts";
 import { traceReadMapperPorts } from "../../../../rules/trace-read-mapper-ports.rules.ts";
+import { MemoryNullTraceBraidReadsRepository } from "../../../braid/repositories/memory/memory.null-trace-braid-reads.repository.ts";
 import { TraceBraidDetailService } from "../trace-braid-detail.service.ts";
 import { TraceBraidedTotalsService } from "../trace-braided-totals.service.ts";
 import { TraceDrawerReadService } from "../trace-drawer-read.service.ts";
@@ -104,8 +104,8 @@ function drawer({ reader = readerSees, owner = ownerHides } = {}) {
       },
     }),
     totals: TraceBraidedTotalsService.create({
-      reads: EmptyTraceBraidReadsRepository.create(),
-      prices: null,
+      reads: MemoryNullTraceBraidReadsRepository.create(),
+      prices: { estimateCost: () => 0 },
     }),
     mappers: traceReadMapperPorts,
   });

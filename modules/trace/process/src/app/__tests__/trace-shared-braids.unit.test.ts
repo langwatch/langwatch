@@ -4,7 +4,7 @@ import { baseSpanSchema, type Span, type TraceSummaryData } from "@langwatch/tra
 import { describe, expect, it } from "vitest";
 
 import { braidedProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
-import { readsBraidedSpans } from "../../rules/braided-span-owner.rules.ts";
+import { readsBraidedSpans } from "../../features/braid/rules/braided-span-owner.rules.ts";
 import type { TraceAppDependencies } from "../trace.app.ts";
 import { createTraceAppHarness } from "./support/trace-app.harness.ts";
 

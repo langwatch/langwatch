@@ -17,6 +17,7 @@ import type {
   Protections,
   ContentPrivacy,
   DerivedTraceEvent,
+  OwnedSpan,
   Span,
   SpanBraid,
   SpanDetail,
@@ -38,7 +39,7 @@ import {
   traceTotalTokensOf,
 } from "@langwatch/trace-contract";
 
-import { protectByOwner } from "./braided-span-owner.rules.ts";
+import { protectByOwner } from "../features/braid/rules/braided-span-owner.rules.ts";
 import { readTruncatedAttributes } from "./trace-attribute-cap.rules.ts";
 import {
   createAttributeRedactor,
@@ -306,7 +307,7 @@ export function mapSpanDetailsByOwner({
   braids,
   ports,
 }: {
-  spans: (Span & { ownerProjectId?: string })[];
+  spans: OwnedSpan[];
   protections: Protections;
   owners: ReadonlyMap<string, Protections>;
   braids: readonly (SpanBraid | null)[];

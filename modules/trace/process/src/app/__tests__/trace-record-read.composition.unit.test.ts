@@ -35,6 +35,7 @@ import type {
 import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory.trace-span-dedup.repository.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import { TraceModule } from "../trace.app.ts";
+import { braidTwins } from "./support/trace-app.harness.ts";
 
 const PROJECT = "project-1";
 const ORGANIZATION = "organization-1";
@@ -110,6 +111,7 @@ function compose({
   });
 
   const deps = TraceModule.composeDependencies({
+    ...braidTwins(),
     repositories: {
       ...MemoryTraceRepositories.create(),
       legacyRead: TraceLegacyReadClickHouseRepository.create({

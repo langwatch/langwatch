@@ -9,6 +9,7 @@ import type {
   SpanSummaryRow,
   TraceEventRollup,
   SpanInsertData,
+  OwnedSpan,
 } from "@langwatch/trace-contract";
 
 import type {
@@ -16,27 +17,26 @@ import type {
   ModelUsageStatsRow,
   NormalizedSpanByIdParams,
   OccurredAtHint,
-  OwnedSpan,
   SpanLangwatchSignalsRow,
   SpanStorageRepository,
   StoredTraceSpan,
   TraceEventRollupParams,
   TraceViewRead,
 } from "../../../repositories/span-storage.repository.ts";
+import { hasEventRefs, parseSpanEventRefs } from "../../../rules/trace-event-ref-parsing.rules.ts";
+import { TraceOffloadResolutionService } from "../../../services/trace-offload-resolution.service.ts";
 import {
   braidedOwnerOf,
   readsOwnersSpans,
   singleSpanOwnerRead,
-} from "../../../rules/braided-span-owner.rules.ts";
-import { hasEventRefs, parseSpanEventRefs } from "../../../rules/trace-event-ref-parsing.rules.ts";
-import { redactSpanContent } from "../../../rules/trace-visibility-teaser.rules.ts";
-import { TraceOffloadResolutionService } from "../../../services/trace-offload-resolution.service.ts";
+} from "../../braid/rules/braided-span-owner.rules.ts";
 import type { TraceIOExtractionService } from "../../derivation/services/trace-io-extraction.service.ts";
 import {
   mapNormalizedSpanToSpan,
   mapNormalizedSpansToSpans,
 } from "../../legacy/rules/trace-legacy-span-mapping.rules.ts";
 import type { TraceBlobStoreService } from "../../media/services/trace-blob-store.service.ts";
+import { redactSpanContent } from "../rules/trace-visibility-teaser.rules.ts";
 
 /**
  * Optional blob-offload resolution dependencies for the v2 read path (ADR-022). When provided, the

@@ -6,8 +6,8 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { braidedProof, ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
-import { EmptyTraceBraidReadsRepository } from "../../repositories/trace-braid-reads.repository.ts";
-import { readsBraidedSpans } from "../../rules/braided-span-owner.rules.ts";
+import { MemoryNullTraceBraidReadsRepository } from "../../features/braid/repositories/memory/memory.null-trace-braid-reads.repository.ts";
+import { readsBraidedSpans } from "../../features/braid/rules/braided-span-owner.rules.ts";
 import type { TraceAppDependencies } from "../trace.app.ts";
 import { createTraceAppHarness } from "./support/trace-app.harness.ts";
 
@@ -75,7 +75,7 @@ function detailApp({ planType }: { planType?: PlanType }) {
         { getTraceAuthorization: async ({ authorization }) => authorization },
         "summary",
       ),
-      braidReads: Object.assign(EmptyTraceBraidReadsRepository.create(), {
+      braidReads: Object.assign(MemoryNullTraceBraidReadsRepository.create(), {
         countReaderBraidActivity: async ({ authorization }: { authorization: Authorization }) => {
           counted.push(authorization);
           return new Map([[BRAID_ID, honouredSpanBraidGrants(authorization).length > 0 ? 3 : 0]]);
@@ -157,7 +157,7 @@ describe("braided spans and the organisation's plan", () => {
     });
   });
 
-  describe("given a process composed without plans", () => {
+  describe("given an organisation on the free plan", () => {
     it("honours no braid", async () => {
       const { open } = detailApp({});
 

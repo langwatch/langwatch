@@ -490,7 +490,7 @@ isCodingAgentShapedSpan(span: Span): boolean;
 The reader's own spans get their coding-agent log content; a braided span shows as stored.
 
 ```typescript
-enrichSpansFromCodingAgentLogs(input: { projectId: string; traceId: string; spans: (Span & { ownerProjectId?: string })[]; occurredAtMs?: number; }): Promise<(Span & { ownerProjectId?: string })[]>;
+enrichSpansFromCodingAgentLogs(input: { projectId: string; traceId: string; spans: OwnedSpan[]; occurredAtMs?: number; }): Promise<OwnedSpan[]>;
 ```
 
 #### `enrichSpanFromCodingAgentLogs`
@@ -520,19 +520,19 @@ readSpanSummaries(input: { authorization: Authorization; traceId: string; occurr
 #### `readSpans`
 
 ```typescript
-readSpans(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; visibilityCutoffMs?: number | null; limit?: number; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */ reads?: "spans" | "traces"; }): Promise<(Span & { ownerProjectId?: string })[]>;
+readSpans(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; visibilityCutoffMs?: number | null; limit?: number; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */ reads?: "spans" | "traces"; }): Promise<OwnedSpan[]>;
 ```
 
 #### `readSpansPage`
 
 ```typescript
-readSpansPage(input: { authorization: Authorization; traceId: string; limit: number; offset: number; occurredAtMs?: number; visibilityCutoffMs?: number | null; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */ reads?: "spans" | "traces"; }): Promise<{ spans: (Span & { ownerProjectId?: string })[]; total: number }>;
+readSpansPage(input: { authorization: Authorization; traceId: string; limit: number; offset: number; occurredAtMs?: number; visibilityCutoffMs?: number | null; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */ reads?: "spans" | "traces"; }): Promise<{ spans: OwnedSpan[]; total: number }>;
 ```
 
 #### `readSpansSince`
 
 ```typescript
-readSpansSince(input: { authorization: Authorization; traceId: string; sinceStartTimeMs: number; occurredAtMs?: number; visibilityCutoffMs?: number | null; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */ reads?: "spans" | "traces"; }): Promise<(Span & { ownerProjectId?: string })[]>;
+readSpansSince(input: { authorization: Authorization; traceId: string; sinceStartTimeMs: number; occurredAtMs?: number; visibilityCutoffMs?: number | null; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */ reads?: "spans" | "traces"; }): Promise<OwnedSpan[]>;
 ```
 
 #### `findSpan`
@@ -1600,7 +1600,7 @@ interface Input {
   traceId: string;
   withEditOverlay?: boolean;
 }
-type Output = z.infer<typeof traceSchema>; // ../contract/src/trace-format.schemas.ts:855
+type Output = z.infer<typeof traceSchema>; // ../contract/src/trace-format.schemas.ts:858
 
 // traces.getEvaluations
 // Input: inline, ../contract/src/traces.trpc.ts:201

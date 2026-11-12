@@ -16,7 +16,10 @@ import {
 } from "@langwatch/trace-contract";
 import { z } from "zod";
 
-import { braidedOwnerOf, readsBraidedSpans } from "../../rules/braided-span-owner.rules.ts";
+import {
+  braidedOwnerOf,
+  readsBraidedSpans,
+} from "../../features/braid/rules/braided-span-owner.rules.ts";
 import {
   TraceProjectedReadRepository,
   type TraceIngestLagSample,

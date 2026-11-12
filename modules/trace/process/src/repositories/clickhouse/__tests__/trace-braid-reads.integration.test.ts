@@ -10,8 +10,8 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { braidedProof, ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
-import { TraceBraidPreviewService } from "../../../services/trace-braid-preview.service.ts";
-import { ClickHouseTraceBraidReadsRepository } from "../trace-braid-reads.repository.ts";
+import { ClickHouseTraceBraidReadsRepository } from "../../../features/braid/repositories/clickhouse/clickhouse.trace-braid-reads.repository.ts";
+import { TraceBraidPreviewService } from "../../../features/braid/services/trace-braid-preview.service.ts";
 import { ClickHouseTraceSpanRepository } from "../trace-span.repository.ts";
 import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
 import {

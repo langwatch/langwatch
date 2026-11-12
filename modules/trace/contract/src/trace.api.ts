@@ -91,7 +91,7 @@ import type {
   ModelUsageStatsRow,
   ModelSpanSampleRow,
 } from "./features/span/trace-span-read-model.ts";
-import type { Trace, Span, ElasticSearchEvent } from "./trace-format.schemas.ts";
+import type { Trace, Span, OwnedSpan, ElasticSearchEvent } from "./trace-format.schemas.ts";
 import type {
   TraceFullReadInput,
   TraceFullRecord,
@@ -519,9 +519,9 @@ export interface TraceApi extends TraceOtlpIngestApi {
   enrichSpansFromCodingAgentLogs(input: {
     projectId: string;
     traceId: string;
-    spans: (Span & { ownerProjectId?: string })[];
+    spans: OwnedSpan[];
     occurredAtMs?: number;
-  }): Promise<(Span & { ownerProjectId?: string })[]>;
+  }): Promise<OwnedSpan[]>;
   enrichSpanFromCodingAgentLogs(input: {
     span: Span;
     modelCallRefs: unknown;
@@ -559,7 +559,7 @@ export interface TraceApi extends TraceOtlpIngestApi {
     limit?: number;
     /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */
     reads?: "spans" | "traces";
-  }): Promise<(Span & { ownerProjectId?: string })[]>;
+  }): Promise<OwnedSpan[]>;
   readSpansPage(input: {
     authorization: Authorization;
     traceId: string;
@@ -569,7 +569,7 @@ export interface TraceApi extends TraceOtlpIngestApi {
     visibilityCutoffMs?: number | null;
     /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */
     reads?: "spans" | "traces";
-  }): Promise<{ spans: (Span & { ownerProjectId?: string })[]; total: number }>;
+  }): Promise<{ spans: OwnedSpan[]; total: number }>;
   readSpansSince(input: {
     authorization: Authorization;
     traceId: string;
@@ -578,7 +578,7 @@ export interface TraceApi extends TraceOtlpIngestApi {
     visibilityCutoffMs?: number | null;
     /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */
     reads?: "spans" | "traces";
-  }): Promise<(Span & { ownerProjectId?: string })[]>;
+  }): Promise<OwnedSpan[]>;
   findSpan(input: {
     authorization: Authorization;
     traceId: string;

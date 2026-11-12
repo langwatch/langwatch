@@ -8,10 +8,10 @@ import { HandledError } from "@langwatch/handled-error";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { AuthzAuditTrailRepository } from "../../repositories/authz-audit-trail.repository.ts";
-import type { LedgerBraidRow } from "../../repositories/authz-ledger-read.repository.ts";
-import { AuthzMemoryStore } from "../../repositories/memory/authz-memory.store.ts";
-import { MemoryAuthzAuditTrailRepository } from "../../repositories/memory/memory.authz-audit-trail.repository.ts";
+import { AuthzAuditTrailRepository } from "../../../../repositories/authz-audit-trail.repository.ts";
+import type { LedgerBraidRow } from "../../../../repositories/authz-ledger-read.repository.ts";
+import { AuthzMemoryStore } from "../../../../repositories/memory/authz-memory.store.ts";
+import { MemoryAuthzAuditTrailRepository } from "../../../../repositories/memory/memory.authz-audit-trail.repository.ts";
 import { AuthzBraidedReadAuditService } from "../authz-braided-read-audit.service.ts";
 
 const ORG = "org_acme";

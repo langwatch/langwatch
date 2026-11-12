@@ -10,11 +10,11 @@ import { compileBraidCondition } from "@langwatch/authz-contract/braid-condition
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { BRAID_CHANGE_SUBSCRIBER_NAME } from "../../eventing/authz-grant.pipeline.ts";
+import { BRAIDED_SPANS_VIEWED_ACTION } from "../../features/read-audit/services/authz-braided-read-audit.service.ts";
 import {
   AUTHORIZATION_MAX_AGE_MS,
   BRAID_REVOCATION_BOUND_MS,
 } from "../../services/authorization.service.ts";
-import { BRAIDED_SPANS_VIEWED_ACTION } from "../../services/authz-braided-read-audit.service.ts";
 import { BRAIDS_POLICY_CHANGED_ACTION } from "../../services/authz-organization-policy.service.ts";
 import {
   braidWorld,

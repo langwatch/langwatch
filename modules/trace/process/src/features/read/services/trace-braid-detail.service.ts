@@ -6,7 +6,7 @@ import type { BraidedOwner, SpanBraid } from "@langwatch/trace-contract";
 import {
   braidConditionsShownFor,
   type VerifiedMark,
-} from "../../../rules/braided-span-owner.rules.ts";
+} from "../../braid/rules/braided-span-owner.rules.ts";
 
 /** The peers a braided read asks about owners and audits through (ADR-201 §5, §8). */
 export interface TraceBraidDirectory {
@@ -16,13 +16,13 @@ export interface TraceBraidDirectory {
 
 /** What a braided span says about its owner, and the audit of reads that showed owner spans. */
 export class TraceBraidDetailService {
-  static create({ directory }: { directory: TraceBraidDirectory | null }): TraceBraidDetailService {
+  static create({ directory }: { directory: TraceBraidDirectory }): TraceBraidDetailService {
     return new TraceBraidDetailService(directory);
   }
 
-  readonly #directory: TraceBraidDirectory | null;
+  readonly #directory: TraceBraidDirectory;
 
-  private constructor(directory: TraceBraidDirectory | null) {
+  private constructor(directory: TraceBraidDirectory) {
     this.#directory = directory;
   }
 
@@ -44,16 +44,6 @@ export class TraceBraidDetailService {
     const directory = this.#directory;
     const signedKeys = signedKeysOf({ verifiedMarks, readerProjectId });
     const signedBy = await this.#signedByReader({ readerProjectId, signed: signedKeys.size > 0 });
-    if (directory === null) {
-      return {
-        ownerProjectId,
-        ownerName: ownerProjectId,
-        ownerProjectSlug: null,
-        canOpenOwner: false,
-        matchedConditions: [],
-        signedBy,
-      };
-    }
     const [owner, canReadOwner, braids] = await Promise.all([
       directory.projects.findSummaryById(ownerProjectId),
       directory.authz.hasPermission({
@@ -88,7 +78,7 @@ export class TraceBraidDetailService {
     signed: boolean;
   }): Promise<SpanBraid["signedBy"]> {
     if (!signed) return null;
-    const reader = await this.#directory?.projects.findSummaryById(readerProjectId);
+    const reader = await this.#directory.projects.findSummaryById(readerProjectId);
     return { projectId: readerProjectId, name: reader?.name ?? readerProjectId };
   }
 
@@ -103,7 +93,6 @@ export class TraceBraidDetailService {
     const directory = this.#directory;
     return Promise.all(
       ownerProjectIds.map(async (projectId): Promise<BraidedOwner> => {
-        if (directory === null) return { projectId, name: projectId, canOpen: false, slug: null };
         const [owner, canRead] = await Promise.all([
           directory.projects.findSummaryById(projectId),
           directory.authz.hasPermission({
@@ -149,11 +138,9 @@ export class TraceBraidDetailService {
     );
     const [owners, braids, signedBy] = await Promise.all([
       this.describeOwners({ ownerProjectIds, viewerUserId }),
-      this.#directory === null
-        ? Promise.resolve([])
-        : this.#directory.authz
-            .listBraids({ projectId: readerProjectId })
-            .then((listed) => listed.fromOtherProjects),
+      this.#directory.authz
+        .listBraids({ projectId: readerProjectId })
+        .then((listed) => listed.fromOtherProjects),
       this.#signedByReader({ readerProjectId, signed }),
     ]);
     const ownerById = new Map(owners.map((owner) => [owner.projectId, owner]));
@@ -188,9 +175,6 @@ export class TraceBraidDetailService {
   }): Promise<void> {
     const owners = [...new Set(ownerProjectIds.filter((id): id is string => !!id))];
     if (owners.length === 0) return;
-    if (this.#directory === null) {
-      throw new Error("Braided spans cannot be audited: this trace process composes no authz");
-    }
     await this.#directory.authz.recordBraidedSpansView({
       actor: authorization.actor,
       readerProjectId: ownProjectIdReadBy(authorization),

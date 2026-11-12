@@ -1,6 +1,7 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
+import { ClickHouseTraceBraidReadsRepository } from "../../features/braid/repositories/clickhouse/clickhouse.trace-braid-reads.repository.ts";
 import { TraceLegacyReadClickHouseRepository } from "../../features/legacy/repositories/clickhouse/trace-legacy-read.repository.ts";
 import { ClickHouseTraceAttributeSpendRepository } from "../clickhouse/clickhouse.trace-attribute-spend.repository.ts";
 import { ClickHouseTraceAttributedRollupRepository } from "../clickhouse/clickhouse.trace-attributed-rollup.repository.ts";
@@ -12,7 +13,6 @@ import { LogRecordStorageClickHouseRepository } from "../clickhouse/log-record-s
 import { SessionGroupsClickHouseRepository } from "../clickhouse/session-groups.repository.ts";
 import { SpanStorageClickHouseRepository } from "../clickhouse/span-storage.repository.ts";
 import { TraceAnalyticsRollupClickHouseRepository } from "../clickhouse/trace-analytics-rollup.repository.ts";
-import { ClickHouseTraceBraidReadsRepository } from "../clickhouse/trace-braid-reads.repository.ts";
 import { TraceDerivationSpanClickHouseRepository } from "../clickhouse/trace-derivation-span.repository.ts";
 import { ClickHouseTraceEvaluationRunsRepository } from "../clickhouse/trace-evaluation-runs.repository.ts";
 import { ClickHouseTraceExistenceRepository } from "../clickhouse/trace-existence.repository.ts";

@@ -9,9 +9,9 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { braidedProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
+import { ClickHouseTraceBraidReadsRepository } from "../../../features/braid/repositories/clickhouse/clickhouse.trace-braid-reads.repository.ts";
+import { braidedTraceSummaryOf } from "../../../features/braid/rules/braided-trace-totals.rules.ts";
 import { TraceBraidedTotalsService } from "../../../features/read/services/trace-braided-totals.service.ts";
-import { braidedTraceSummaryOf } from "../../../rules/braided-trace-totals.rules.ts";
-import { ClickHouseTraceBraidReadsRepository } from "../trace-braid-reads.repository.ts";
 import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,

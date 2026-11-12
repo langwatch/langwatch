@@ -1,12 +1,12 @@
 import { type Authorization, ownProjectIdReadBy } from "@langwatch/authorization";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 
-import type { TraceBraidReadsRepository } from "../../../repositories/trace-braid-reads.repository.ts";
-import { readsBraidedSpans } from "../../../rules/braided-span-owner.rules.ts";
+import type { TraceBraidReadsRepository } from "../../braid/repositories/trace-braid-reads.repository.ts";
+import { readsBraidedSpans } from "../../braid/rules/braided-span-owner.rules.ts";
 import {
   type BraidedOwnerTotals,
   braidedOwnerTotalsOf,
-} from "../../../rules/braided-trace-totals.rules.ts";
+} from "../../braid/rules/braided-trace-totals.rules.ts";
 
 /** The trace header's braided totals, read through the reader's own braided proof (ADR-201 §5). */
 export class TraceBraidedTotalsService {
@@ -15,17 +15,17 @@ export class TraceBraidedTotalsService {
     prices,
   }: {
     reads: TraceBraidReadsRepository;
-    prices: Pick<ModelProviderApi, "estimateCost"> | null;
+    prices: Pick<ModelProviderApi, "estimateCost">;
   }): TraceBraidedTotalsService {
     return new TraceBraidedTotalsService(reads, prices);
   }
 
   readonly #reads: TraceBraidReadsRepository;
-  readonly #prices: Pick<ModelProviderApi, "estimateCost"> | null;
+  readonly #prices: Pick<ModelProviderApi, "estimateCost">;
 
   private constructor(
     reads: TraceBraidReadsRepository,
-    prices: Pick<ModelProviderApi, "estimateCost"> | null,
+    prices: Pick<ModelProviderApi, "estimateCost">,
   ) {
     this.#reads = reads;
     this.#prices = prices;
@@ -47,7 +47,7 @@ export class TraceBraidedTotalsService {
     return braidedOwnerTotalsOf({
       groups,
       readerProjectId: ownProjectIdReadBy(authorization),
-      priceOf: (costInput) => prices?.estimateCost(costInput) ?? 0,
+      priceOf: (costInput) => prices.estimateCost(costInput),
     });
   }
 }

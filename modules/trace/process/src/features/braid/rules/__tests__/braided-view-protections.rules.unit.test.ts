@@ -6,13 +6,13 @@
 import type { Protections, SpanSummaryRow } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { mapLegacySpanSummaryToTreeNode } from "../../../../rules/trace-read-mappers.rules.ts";
+import { gateResources, resourceInfoOf } from "../../../../rules/trace-view-gates.rules.ts";
 import {
   braidConditionsShownFor,
   protectByOwner,
   verifiedMarksOf,
 } from "../braided-span-owner.rules.ts";
-import { mapLegacySpanSummaryToTreeNode } from "../trace-read-mappers.rules.ts";
-import { gateResources, resourceInfoOf } from "../trace-view-gates.rules.ts";
 
 const OWNER = "proj_specialists";
 const open: Protections = { canSeeCapturedInput: true, hiddenAttributes: [] };

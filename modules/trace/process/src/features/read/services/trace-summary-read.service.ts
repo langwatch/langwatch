@@ -16,8 +16,8 @@ import type {
   TraceSummaryRead,
   TraceSummaryRepository,
 } from "../../../repositories/trace-summary.repository.ts";
-import { readsBraidedSpans } from "../../../rules/braided-span-owner.rules.ts";
 import { TraceOffloadResolutionService } from "../../../services/trace-offload-resolution.service.ts";
+import { readsBraidedSpans } from "../../braid/rules/braided-span-owner.rules.ts";
 import type { TraceIOExtractionService } from "../../derivation/services/trace-io-extraction.service.ts";
 import type { TraceBlobStoreService } from "../../media/services/trace-blob-store.service.ts";
 

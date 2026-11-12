@@ -26,15 +26,16 @@ import {
   type SpanSummaryRow,
   type TraceEventRollup,
   listedTraceKey,
+  type OwnedSpan,
 } from "@langwatch/trace-contract";
 
-import { mapNormalizedSpansToSpans } from "../../features/legacy/rules/trace-legacy-span-mapping.rules.ts";
-import { computeSpanCost } from "../../features/span/rules/trace-span-cost-matching.rules.ts";
 import {
   braidedOwnerOf,
   readsOwnersSpans,
   singleSpanOwnerRead,
-} from "../../rules/braided-span-owner.rules.ts";
+} from "../../features/braid/rules/braided-span-owner.rules.ts";
+import { mapNormalizedSpansToSpans } from "../../features/legacy/rules/trace-legacy-span-mapping.rules.ts";
+import { computeSpanCost } from "../../features/span/rules/trace-span-cost-matching.rules.ts";
 import type { TraceClickHouseWriteResolver as ClickHouseClientResolver } from "./clickhouse.trace-member-client.repository.ts";
 /**
  * The insert shape of a row whose epoch-millisecond fields are written as
@@ -73,7 +74,6 @@ import {
   type ModelUsageStatsRow,
   type NormalizedSpanByIdParams,
   type OccurredAtHint,
-  type OwnedSpan,
   type SpanLangwatchSignalsRow,
   type TraceViewRead,
   type TraceEventRollupParams,

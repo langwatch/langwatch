@@ -3,7 +3,7 @@ import type { AuthzScopeRef } from "@langwatch/authz-contract";
 import type { EventingCommandSender } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 
-import type { RecordAggregateReadCommandData } from "../eventing/authz-aggregate-read.events.ts";
+import type { RecordAggregateReadCommandData } from "../../../eventing/authz-aggregate-read.events.ts";
 import {
   AuthzReadAuditWindowService,
   READ_AUDIT_WINDOW_MS,

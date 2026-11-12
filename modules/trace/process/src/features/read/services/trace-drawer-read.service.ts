@@ -7,6 +7,7 @@ import {
   traceSummaryReadSchema,
   type DerivedTraceEvent,
   type Protections,
+  type OwnedSpan,
   type Span,
   type SpanDetail,
   type SpanTreeDeltaInput,
@@ -19,12 +20,6 @@ import {
   type TraceResourceInfoDto,
 } from "@langwatch/trace-contract";
 
-import {
-  protectByOwner,
-  readsBraidedSpans,
-  verifiedMarksOf,
-} from "../../../rules/braided-span-owner.rules.ts";
-import { braidedTraceSummaryOf } from "../../../rules/braided-trace-totals.rules.ts";
 import {
   deriveTraceDropPrivacy,
   mapLegacySpanSummaryToTreeNode,
@@ -39,6 +34,12 @@ import {
   gateTreeCostByOwner,
   resourceInfoOf,
 } from "../../../rules/trace-view-gates.rules.ts";
+import {
+  protectByOwner,
+  readsBraidedSpans,
+  verifiedMarksOf,
+} from "../../braid/rules/braided-span-owner.rules.ts";
+import { braidedTraceSummaryOf } from "../../braid/rules/braided-trace-totals.rules.ts";
 import type { TraceBraidDetailService } from "./trace-braid-detail.service.ts";
 import type { TraceBraidedTotalsService } from "./trace-braided-totals.service.ts";
 
@@ -321,7 +322,7 @@ export class TraceDrawerReadService {
     reader,
   }: {
     viewerUserId: string;
-    spans: readonly (Span & { ownerProjectId?: string })[];
+    spans: readonly OwnedSpan[];
     reader: Protections;
   }): Promise<Span[]> {
     const owners = await this.ownerProtections({

@@ -212,6 +212,7 @@ import {
   type TraceHeader,
   type TraceDrawerReadInput,
   type TraceResourceInfoDto,
+  type OwnedSpan,
 } from "@langwatch/trace-contract";
 import type { ConversationView } from "@langwatch/trace-contract/conversation";
 import type { z } from "zod";
@@ -225,6 +226,12 @@ import {
 } from "../eventing/trace-project-milestones.pipeline.ts";
 import { TraceSummaryStore } from "../eventing/trace-summary.store.ts";
 import { EventingTraceTopicAssignment } from "../eventing/trace-topic-assignment.commands.ts";
+import type { TraceBraidReadsRepository } from "../features/braid/repositories/trace-braid-reads.repository.ts";
+import {
+  selectedSpanOwnerOf,
+  verifiedMarksOf,
+} from "../features/braid/rules/braided-span-owner.rules.ts";
+import { TraceBraidPreviewService } from "../features/braid/services/trace-braid-preview.service.ts";
 import {
   enrichSingleSpanWithClaudeLogContent,
   isCodingAgentShapedSpan,
@@ -358,17 +365,9 @@ import {
   type TraceClickHouseResolver,
 } from "../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import { ClickHouseTraceFullRecordRepository } from "../repositories/clickhouse/trace-full-record.repository.ts";
-import type {
-  OwnedSpan,
-  StoredTraceSpan,
-  TraceViewRead,
-} from "../repositories/span-storage.repository.ts";
+import type { StoredTraceSpan, TraceViewRead } from "../repositories/span-storage.repository.ts";
 import type { TraceAttributeSpendRepository } from "../repositories/trace-attribute-spend.repository.ts";
 import type { TraceAttributedRollupRepository } from "../repositories/trace-attributed-rollup.repository.ts";
-import {
-  EmptyTraceBraidReadsRepository,
-  type TraceBraidReadsRepository,
-} from "../repositories/trace-braid-reads.repository.ts";
 import type { TraceEvaluationRunsReadRepository } from "../repositories/trace-evaluation-runs.repository.ts";
 import type { TraceExistenceRepository } from "../repositories/trace-existence.repository.ts";
 import type { TraceModelSpendRepository } from "../repositories/trace-model-spend.repository.ts";
@@ -383,7 +382,6 @@ import {
 } from "../repositories/trace-summary.repository.ts";
 import type { TraceUsageCountRepository } from "../repositories/trace-usage-count.repository.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
-import { selectedSpanOwnerOf, verifiedMarksOf } from "../rules/braided-span-owner.rules.ts";
 import { gateEvaluationContent } from "../rules/evaluation-content-gate.rules.ts";
 import { mapTraceEvaluationsToLegacyEvaluations } from "../rules/trace-evaluation-mapping.rules.ts";
 import {
@@ -397,7 +395,6 @@ import { formatSpansDigest, formatSpansDigestBounded } from "../rules/trace-read
 import { buildTrackedEventSpan } from "../rules/tracked-event-span.rules.ts";
 import { PreconditionTraceDataService } from "../services/precondition-trace-data.service.ts";
 import { ScenarioRoleMetricsDerivationService } from "../services/scenario-role-metrics-derivation.service.ts";
-import { TraceBraidPreviewService } from "../services/trace-braid-preview.service.ts";
 import { TraceInstantEvalRunService } from "../services/trace-instant-eval-run.service.ts";
 import {
   TraceMetadataWriteService,
@@ -743,8 +740,8 @@ export interface TraceAppDependencies {
   annotationCommands?: TraceAnnotationCommands;
   traces: Readonly<{
     existence: TraceExistenceRepository;
-    /** The braid dialog's and Braids page's reads (ADR-201 §7); absent, they answer empty. */
-    braidReads?: TraceBraidReadsRepository | undefined;
+    /** The braid dialog's, Braids page's and header's reads (ADR-201 §7). */
+    braidReads: TraceBraidReadsRepository;
     /** The legacy trace read the `traces.*` and `spans.*` surfaces call. */
     read: TraceLegacyRead;
     list: TracesListReader;
@@ -786,12 +783,12 @@ export interface TraceAppDependencies {
    * carry the registry's enterprise ceiling.
    */
   requestBounds: Pick<EntitlementApi, "requestBound">;
-  /** The plan the merged read asks before honouring braids; absent, braids pause (ADR-201 §9). */
-  braidPlans?: Pick<EntitlementApi, "getActivePlan">;
-  /** Owner names, the viewer's standing on an owner and the read audit; absent, braids say less. */
-  braidDirectory?: TraceBraidDirectory;
-  /** Prices braided spans without a cost of their own for the header; absent, only stated costs. */
-  braidPrices?: Pick<ModelProviderApi, "estimateCost">;
+  /** The plan the merged read asks before honouring braids; below Enterprise they pause (§9). */
+  braidPlans: Pick<EntitlementApi, "getActivePlan">;
+  /** Owner names, the viewer's standing on an owner and the read audit (ADR-201 §5, §8). */
+  braidDirectory: TraceBraidDirectory;
+  /** Prices braided spans without a cost of their own for the header. */
+  braidPrices: Pick<ModelProviderApi, "estimateCost">;
   /**
    * The export download door's tier-effective rate window and in-flight
    * slots. Absent on a process that serves no export door; the door then
@@ -911,8 +908,8 @@ type TraceReaderCompositionOptions = {
    * only carry the registry's enterprise ceiling.
    */
   requestBounds: TraceAppDependencies["requestBounds"];
-  braidPlans?: TraceAppDependencies["braidPlans"];
-  braidDirectory?: TraceAppDependencies["braidDirectory"];
+  braidPlans: TraceAppDependencies["braidPlans"];
+  braidDirectory: TraceAppDependencies["braidDirectory"];
   /** The export door's rate window and in-flight slots, built by the app from its registry. */
   exportBounds: TraceAppDependencies["exportBounds"];
   shareReadLimiter?: TraceAppDependencies["shareReadLimiter"];
@@ -1282,8 +1279,8 @@ export class TraceModule implements TraceApi, CollectorApp {
       authorizeRead: ({ codePath, ...params }) =>
         foldReadAuthorizer({ authz: options.protections.authz, codePath })(params),
       requestBounds: options.requestBounds,
-      ...(options.braidPlans === undefined ? {} : { braidPlans: options.braidPlans }),
-      ...(options.braidDirectory === undefined ? {} : { braidDirectory: options.braidDirectory }),
+      braidPlans: options.braidPlans,
+      braidDirectory: options.braidDirectory,
       exportBounds: options.exportBounds,
       shareReadLimiter: options.shareReadLimiter,
       ...(options.apiKeys
@@ -1477,13 +1474,11 @@ export class TraceModule implements TraceApi, CollectorApp {
     });
     this.#exportProgress = TraceExportProgressService.create({ updates: this.#tenantUpdates });
     const { authorizeRead } = dependencies;
-    this.#braidPause = TraceBraidPauseService.create({ plans: dependencies.braidPlans ?? null });
-    this.#braidDetail = TraceBraidDetailService.create({
-      directory: dependencies.braidDirectory ?? null,
-    });
+    this.#braidPause = TraceBraidPauseService.create({ plans: dependencies.braidPlans });
+    this.#braidDetail = TraceBraidDetailService.create({ directory: dependencies.braidDirectory });
     this.#braidedTotals = TraceBraidedTotalsService.create({
-      reads: dependencies.traces.braidReads ?? EmptyTraceBraidReadsRepository.create(),
-      prices: dependencies.braidPrices ?? null,
+      reads: dependencies.traces.braidReads,
+      prices: dependencies.braidPrices,
     });
     this.#drawer = TraceDrawerReadService.create({
       reads: this,
@@ -1492,10 +1487,10 @@ export class TraceModule implements TraceApi, CollectorApp {
       mappers: traceReadMapperPorts,
     });
     this.#braidPreview = TraceBraidPreviewService.create({
-      reads: dependencies.traces.braidReads ?? EmptyTraceBraidReadsRepository.create(),
+      reads: dependencies.traces.braidReads,
       readerSpans: async (read) =>
         (await this.readSpanSummaries(read)).map(mapLegacySpanSummaryToTreeNode),
-      braids: dependencies.braidDirectory?.authz ?? null,
+      braids: dependencies.braidDirectory.authz,
     });
     this.#sharedRead =
       dependencies.protections && dependencies.shareReadLimiter && authorizeRead

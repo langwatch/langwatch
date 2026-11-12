@@ -17,6 +17,8 @@ import {
 } from "@langwatch/clickhouse-client";
 import { z } from "zod";
 
+import { ClickHouseTraceSpanRepository } from "../../../../repositories/clickhouse/trace-span.repository.ts";
+import type { TraceSpanSummaryRecord } from "../../../../repositories/trace-projected-read.repository.ts";
 import {
   NO_BRAID_TRACE_COUNTS,
   TraceBraidReadsRepository,
@@ -25,8 +27,6 @@ import {
   type BraidWindowRead,
   type TraceSpanTotalsGroup,
 } from "../trace-braid-reads.repository.ts";
-import type { TraceSpanSummaryRecord } from "../trace-projected-read.repository.ts";
-import { ClickHouseTraceSpanRepository } from "./trace-span.repository.ts";
 
 const count = z.coerce.number().int().min(0);
 const traceIdRowsSchema = z.array(z.looseObject({ TraceId: z.string() }));

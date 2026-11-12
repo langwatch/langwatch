@@ -6,9 +6,9 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { Temporal } from "@langwatch/time";
 
-import type { AuthzAuditTrailRepository } from "../repositories/authz-audit-trail.repository.ts";
-import type { AuthzLedgerReadRepository } from "../repositories/authz-ledger-read.repository.ts";
-import type { ScopeLineageRepository } from "../repositories/authz-read.repository.ts";
+import type { AuthzAuditTrailRepository } from "../../../repositories/authz-audit-trail.repository.ts";
+import type { AuthzLedgerReadRepository } from "../../../repositories/authz-ledger-read.repository.ts";
+import type { ScopeLineageRepository } from "../../../repositories/authz-read.repository.ts";
 import {
   AuthzReadAuditWindowService,
   READ_AUDIT_WINDOW_MS,

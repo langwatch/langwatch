@@ -19,7 +19,7 @@ import { z } from "zod";
 import {
   createAttributeRedactor,
   hiddenContentCategoryRules,
-} from "./trace-attribute-redaction.rules.ts";
+} from "../../../rules/trace-attribute-redaction.rules.ts";
 import { redactSpanContent, redactTraceContent } from "./trace-visibility-teaser.rules.ts";
 
 // Stable display order for the content categories a drop policy can strip, so

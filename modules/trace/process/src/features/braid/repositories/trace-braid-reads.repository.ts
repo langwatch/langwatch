@@ -1,7 +1,7 @@
 import type { Authorization, CompiledWhere } from "@langwatch/authorization";
 
+import type { TraceSpanSummaryRecord } from "../../../repositories/trace-projected-read.repository.ts";
 import type { BraidedSpanGroup } from "../rules/braided-trace-totals.rules.ts";
-import type { TraceSpanSummaryRecord } from "./trace-projected-read.repository.ts";
 
 /** A draft or saved braid's condition as one statement renders it (ADR-201 §7). */
 export type BraidConditionRead = Readonly<{
@@ -100,39 +100,4 @@ export abstract class TraceBraidReadsRepository {
     traceId: string;
     braids: readonly BraidWindowRead[];
   }): Promise<(TraceSpanSummaryRecord & { braided: boolean })[]>;
-}
-
-/** Reads nothing: the composition without ClickHouse answers every braid read empty. */
-export class EmptyTraceBraidReadsRepository extends TraceBraidReadsRepository {
-  static create(): EmptyTraceBraidReadsRepository {
-    return new EmptyTraceBraidReadsRepository();
-  }
-
-  findReaderTraceIds(): Promise<string[]> {
-    return Promise.resolve([]);
-  }
-
-  countOwnerSpansInTraces(): Promise<BraidOwnerTraceCounts> {
-    return Promise.resolve(NO_BRAID_TRACE_COUNTS);
-  }
-
-  findAttributeKeys(): Promise<{ key: string; spanCount: number }[]> {
-    return Promise.resolve([]);
-  }
-
-  countOwnerBraidActivity(): Promise<Map<string, number>> {
-    return Promise.resolve(new Map());
-  }
-
-  countReaderBraidActivity(): Promise<Map<string, number>> {
-    return Promise.resolve(new Map());
-  }
-
-  sumSpansInTrace(): Promise<TraceSpanTotalsGroup[]> {
-    return Promise.resolve([]);
-  }
-
-  findOwnerSpansMarked(): Promise<(TraceSpanSummaryRecord & { braided: boolean })[]> {
-    return Promise.resolve([]);
-  }
 }

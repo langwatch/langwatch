@@ -57,7 +57,16 @@ describe("TraceBraidDetailService.describeOwners", () => {
 describe("TraceBraidDetailService.describeSpans", () => {
   describe("given the reader's spans and a braided span", () => {
     it("describes the braided span only, aligned with the spans given", async () => {
-      const described = await TraceBraidDetailService.create({ directory: null }).describeSpans({
+      const detail = TraceBraidDetailService.create({
+        directory: {
+          authz: createApiFixture<AuthzApi>({
+            hasPermission: async () => false,
+            listBraids: async () => ({ intoOtherProjects: [], fromOtherProjects: [] }),
+          }),
+          projects,
+        },
+      });
+      const described = await detail.describeSpans({
         readerProjectId: "proj_orchestrator",
         viewerUserId: "sam",
         spans: [
@@ -71,7 +80,7 @@ describe("TraceBraidDetailService.describeSpans", () => {
         null,
         {
           ownerProjectId: "proj_specialists",
-          ownerName: "proj_specialists",
+          ownerName: "Specialists",
           ownerProjectSlug: null,
           canOpenOwner: false,
           matchedConditions: [],
@@ -112,19 +121,14 @@ describe("TraceBraidDetailService.recordView", () => {
     });
   });
 
-  describe("given no directory to audit through", () => {
-    it("refuses a read that shows owner spans", async () => {
-      await expect(
-        TraceBraidDetailService.create({ directory: null }).recordView({
-          authorization,
-          ownerProjectIds: ["proj_specialists"],
-        }),
-      ).rejects.toThrow(/cannot be audited/);
-    });
+  describe("given a read of the reader's own spans only", () => {
+    it("records nothing and lets the read through", async () => {
+      const detail = TraceBraidDetailService.create({
+        directory: { authz: createApiFixture<AuthzApi>({}), projects },
+      });
 
-    it("lets a read of the reader's own spans through", async () => {
       await expect(
-        TraceBraidDetailService.create({ directory: null }).recordView({
+        detail.recordView({
           authorization,
           ownerProjectIds: [null, undefined],
         }),

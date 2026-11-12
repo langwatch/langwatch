@@ -11,11 +11,14 @@ import {
 } from "@langwatch/clickhouse-client/testing";
 import { describe, expect, it, vi } from "vitest";
 
-import { braidedProof, ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
-import { TraceBraidedTotalsService } from "../../../features/read/services/trace-braided-totals.service.ts";
+import {
+  braidedProof,
+  ownProof,
+} from "../../../../../__tests__/support/authorization-proofs.fixture.ts";
+import { TRACE_ID_INDEXES } from "../../../../../repositories/clickhouse/clickhouse.trace-id-indexes.database.ts";
+import { TraceBraidedTotalsService } from "../../../../read/services/trace-braided-totals.service.ts";
 import type { BraidActivityRead, BraidWindowRead } from "../../trace-braid-reads.repository.ts";
-import { TRACE_ID_INDEXES } from "../clickhouse.trace-id-indexes.database.ts";
-import { ClickHouseTraceBraidReadsRepository } from "../trace-braid-reads.repository.ts";
+import { ClickHouseTraceBraidReadsRepository } from "../clickhouse.trace-braid-reads.repository.ts";
 
 const READER = "proj_orchestrator";
 const OWNER = "proj_specialists";
@@ -374,7 +377,10 @@ describe("ClickHouseTraceBraidReadsRepository", () => {
 
     it("sends no statement for a proof without braids", async () => {
       const { repo, read } = braidReads(rows);
-      const service = TraceBraidedTotalsService.create({ reads: repo, prices: null });
+      const service = TraceBraidedTotalsService.create({
+        reads: repo,
+        prices: { estimateCost: () => 0 },
+      });
 
       const totals = await service.ownerTotals({
         authorization: ownProof({ projectId: READER }),
