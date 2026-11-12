@@ -1,5 +1,6 @@
 import {
   type Authorization,
+  AuthorizationExpiredError,
   type AuthorizationInput,
   BRAID_CONDITION_MAX_LENGTH,
   BRAID_CONDITION_MAX_TERMS,
@@ -439,6 +440,51 @@ describe("the fence over a span read", () => {
           }),
         ),
       ).toMatchObject({ kind: "over-budget", budget: STATEMENT_BYTE_BUDGET });
+    });
+  });
+
+  describe("given a held reader whose proof expires between statements", () => {
+    const readerAt = ({
+      clock,
+      authorization,
+      reads,
+    }: {
+      clock: { now: number };
+      authorization: Authorization;
+      reads: "spans" | "traces";
+    }) => {
+      const execute = vi.fn<QueryDriver["execute"]>().mockResolvedValue({ rows: [] });
+      const client = new ClickHouseQueryClient({
+        tenantGuard: new TenantGuard(),
+        driver: { execute, insert: async () => {}, command: async () => {} },
+      });
+      return new AuthorizedClickHouse({
+        resolveClient: vi.fn().mockResolvedValue(client),
+        now: () => clock.now,
+      }).as(authorization, { reads });
+    };
+
+    it("cuts a braid's read at expiry, so a removed braid outlives no proof", async () => {
+      const clock = { now: NOW };
+      const reader = readerAt({ clock, authorization: proof([own(), braid({})]), reads: "spans" });
+      clock.now = NOW + 30_000;
+
+      await expect(
+        reader.query({
+          query: spanRead(tenantScopeWithConditions("StartTime")),
+          query_params: { traceId: "tr-1" },
+        }),
+      ).rejects.toBeInstanceOf(AuthorizationExpiredError);
+    });
+
+    it("keeps a reader with no braids, so a long export is not cut midway", async () => {
+      const clock = { now: NOW };
+      const reader = readerAt({ clock, authorization: proof([own()]), reads: "traces" });
+      clock.now = NOW + 30_000;
+
+      await expect(
+        reader.query({ query: `SELECT 1 FROM t WHERE ${tenantScope("StartTime")}` }),
+      ).resolves.toBeDefined();
     });
   });
 });

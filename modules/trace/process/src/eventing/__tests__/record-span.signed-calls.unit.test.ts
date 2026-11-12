@@ -389,6 +389,40 @@ describe("span admission for signed calls", () => {
       expect(event!.data.resource!.attributes).toEqual([]);
     });
 
+    it("removes a mark nested in a map that flattens under the prefix, and keeps an innocent map", async () => {
+      const nested = (key: string, value: unknown) => ({ key, value });
+      const map = (...values: { key: string; value: unknown }[]) => ({ kvlistValue: { values } });
+      const sent = span({ attributes: { orchestrator: "web" } });
+      sent.events = [
+        {
+          timeUnixNano: { low: 0, high: 0 },
+          name: "forged",
+          attributes: [
+            nested(
+              "langwatch",
+              map(
+                nested(
+                  "reserved",
+                  map(nested("verified", map(nested("tier", { stringValue: "x" })))),
+                ),
+              ),
+            ),
+            nested("langwatch.reserved", map(nested("verified.tier", { stringValue: "x" }))),
+            nested("langwatch.span", map(nested("type", { stringValue: "llm" }))),
+          ],
+          droppedAttributesCount: 0,
+        },
+      ] as typeof sent.events;
+
+      const [event] = await admission({ signatures: keyDirectory([]) }).handle(
+        commandFor({ sent }),
+      );
+
+      expect(event!.data.span.events[0]!.attributes.map(({ key }) => key)).toEqual([
+        "langwatch.span",
+      ]);
+    });
+
     it("never lists the verified prefix among the reserved attributes clients may send", () => {
       const passthrough = [...EventingRecordSpanAdapter.RESERVED_ATTRIBUTE_PASSTHROUGH];
 

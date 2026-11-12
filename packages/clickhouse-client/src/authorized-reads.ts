@@ -731,7 +731,8 @@ export class AuthorizedClickHouse {
       client: () => this.deps.resolveClient(ownProjectId),
       fence,
       tenantId,
-      expiresAt: proof.expiresAt,
+      // Only a braid's read is cut at expiry: a long export on any other proof keeps its reader.
+      ...(fence.braids === undefined ? {} : { expiresAt: proof.expiresAt }),
       now: () => this.deps.now?.() ?? nowInstant().epochMilliseconds,
     });
   }

@@ -30,6 +30,24 @@ import { getLangWatchTracer } from "langwatch";
 import { z } from "zod";
 
 import { clonePayload } from "../rules/payload-clone.rules.ts";
+
+const nestedValueSchema = z.union([
+  z.object({
+    kvlistValue: z.object({ values: z.array(z.object({ key: z.string(), value: z.unknown() })) }),
+  }),
+  z.object({ arrayValue: z.object({ values: z.array(z.unknown()) }) }),
+]);
+
+/** An OTLP map's or array's children, keyed as normalisation flattens them; none for a scalar. */
+function nestedValuesOf(value: unknown): { key: string; value: unknown }[] {
+  const parsed = nestedValueSchema.safeParse(value);
+  if (!parsed.success) return [];
+  if ("kvlistValue" in parsed.data) return parsed.data.kvlistValue.values;
+  return parsed.data.arrayValue.values.map((child, index) => ({
+    key: String(index),
+    value: child,
+  }));
+}
 import {
   capOversizedAttributes,
   MAX_RECORDED_ATTRIBUTE_VALUE_BYTES,
@@ -387,14 +405,34 @@ export class EventingRecordSpanAdapter implements CommandHandler<
     }
   }
 
+  /**
+   * Whether an attribute lands under the reserved prefix once its nested values are flattened to
+   * dotted keys, as normalisation does: a `langwatch` map holding `reserved.verified.k` forges one.
+   */
+  private static reachesReserved({ path, value }: { path: string; value: unknown }): boolean {
+    const prefix = EventingRecordSpanAdapter.RESERVED_ATTRIBUTE_PREFIX;
+    if (path.startsWith(prefix)) {
+      return !EventingRecordSpanAdapter.RESERVED_ATTRIBUTE_PASSTHROUGH.has(path);
+    }
+    if (!prefix.startsWith(`${path}.`)) return false;
+    const children = nestedValuesOf(value);
+    return children.some((child) =>
+      EventingRecordSpanAdapter.reachesReserved({
+        path: `${path}.${child.key}`,
+        value: child.value,
+      }),
+    );
+  }
+
   private stripReservedAttributes(span: OtlpSpan, resource: OtlpResource | null): void {
     const strip = (attributes: OtlpSpan["attributes"]): OtlpSpan["attributes"] =>
       attributes.filter((attribute) => {
         const reserved =
-          attribute.key.startsWith(EventingRecordSpanAdapter.RESERVED_ATTRIBUTE_PREFIX) ||
-          attribute.key === TRUNCATED_ATTRIBUTES_KEY;
-        const allowed = EventingRecordSpanAdapter.RESERVED_ATTRIBUTE_PASSTHROUGH.has(attribute.key);
-        if (!reserved || allowed) {
+          EventingRecordSpanAdapter.reachesReserved({
+            path: attribute.key,
+            value: attribute.value,
+          }) || attribute.key === TRUNCATED_ATTRIBUTES_KEY;
+        if (!reserved) {
           return true;
         }
 

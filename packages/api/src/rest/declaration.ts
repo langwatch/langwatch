@@ -1299,7 +1299,8 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
       !permissions &&
       !permissionBy &&
       !permissionPlatform &&
-      !this.state.permissionReach;
+      !this.state.permissionReach &&
+      !this.state.legacyKeyScopes;
 
     if (!composable) {
       throw new Error(
