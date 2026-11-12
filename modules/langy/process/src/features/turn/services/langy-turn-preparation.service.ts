@@ -22,6 +22,7 @@ import {
   startsWithGuidedKickoff,
 } from "../../../rules/langy-conversation-title.rules.ts";
 import { mintRunToken } from "../../../rules/langy-frame-auth.rules.ts";
+import { LANGY_LAST_REPLY_SAVING, LangyEndedTurnService } from "./langy-ended-turn.service.ts";
 import type { LangyTurnAttemptService } from "./langy-turn-attempt.service.ts";
 import { LangyTurnOverrideService } from "./langy-turn-override.service.ts";
 import {
@@ -40,7 +41,13 @@ const logger = createLogger("langwatch:langy:turn-start");
 export class LangyTurnPreparationService {
   private readonly override: LangyTurnOverrideService;
 
+  private readonly endedTurns: LangyEndedTurnService;
+
   private constructor(private readonly deps: LangyTurnServiceDependencies) {
+    this.endedTurns = LangyEndedTurnService.create({
+      tokenBuffer: deps.tokenBuffer,
+      ...deps.endedTurnWait,
+    });
     this.override = LangyTurnOverrideService.create({
       prompts: deps.prompts,
       projectId: deps.promptProjectId,
@@ -84,7 +91,10 @@ export class LangyTurnPreparationService {
     });
     const needsOwnKey = Boolean(args.credentials.githubToken) || args.readOnly;
     const earlyWorkerProbe = needsOwnKey ? null : this.probeWorker(args, disabledSkillsPromise);
-    const results = await this.readPreparation(args, mintedRunToken);
+    const results = await this.settleEndedTurnFold(
+      args,
+      await this.readPreparation(args, mintedRunToken),
+    );
     const disabledSkills = await disabledSkillsPromise;
     if (disabledSkills.length > 0) {
       args.credentials.disabledSkillIds = disabledSkills;
@@ -147,6 +157,40 @@ export class LangyTurnPreparationService {
         organizationId: credentials.organizationId,
       }),
     ]);
+  }
+
+  /**
+   * The fold may still read RUNNING for a turn whose live edge already ended: its terminal event
+   * is recorded but not folded yet. Waits for the fold rather than refusing the send as busy.
+   */
+  private async settleEndedTurnFold(
+    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
+    results: Awaited<ReturnType<LangyTurnPreparationService["readPreparation"]>>,
+  ): Promise<Awaited<ReturnType<LangyTurnPreparationService["readPreparation"]>>> {
+    const [current, ...rest] = results;
+    if (
+      current.status !== "fulfilled" ||
+      current.value?.status !== LANGY_CONVERSATION_STATUS.RUNNING
+    )
+      return results;
+    const heldTurnId = current.value.currentTurnId;
+    if (!heldTurnId || heldTurnId === args.turnId) return results;
+    const conversationId = args.conversation.id;
+    if (!(await this.endedTurns.hasEnded({ conversationId, turnId: heldTurnId }))) return results;
+    type Current = Awaited<
+      ReturnType<LangyTurnServiceDependencies["conversations"]["findByIdVisible"]>
+    >;
+    const look = await this.endedTurns.lookUntilFree<Current>(async () => {
+      const row = await this.deps.conversations.findByIdVisible({
+        id: conversationId,
+        projectId: args.projectId,
+        userId: args.userId,
+      });
+      if (row?.status === LANGY_CONVERSATION_STATUS.RUNNING) return { kind: "held" as const };
+      return { kind: "free" as const, value: row };
+    });
+    if (look.kind === "held") throw new LangyAgentUnavailableError(LANGY_LAST_REPLY_SAVING);
+    return [{ status: "fulfilled", value: look.value }, ...rest];
   }
 
   private requireRunnableTurn(

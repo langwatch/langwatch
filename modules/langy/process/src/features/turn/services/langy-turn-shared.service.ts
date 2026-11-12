@@ -129,6 +129,8 @@ export interface LangyTurnServiceDeps {
   handoffStore: LangyTurnHandoffRepository;
   localWork: LangyTurnLocalWork;
   messages: LangyMessageRepository | null;
+  /** How long a send waits out a turn that ended but still holds the conversation (tests). */
+  endedTurnWait?: { waitMs: number; pollMs: number };
 }
 
 export type LangyTurnServiceDependencies = LangyTurnServiceDeps & {

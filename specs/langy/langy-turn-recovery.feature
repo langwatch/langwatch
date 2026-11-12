@@ -568,3 +568,34 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     When the live error carries only the code langy_agent_errored
     Then the card is chosen from the durable record's reasons
     But a turn-start refusal with a different code is shown ahead of an older durable failure
+
+  # A reply ends for the person when its end frame reaches the panel. Its terminal event is folded
+  # and the conversation's admission released a moment later, by subscribers in the worker.
+  @unit @integration
+  Scenario: A message sent right after a reply ends waits for the reply to be saved
+    Given Langy's reply has ended on the panel
+    And the conversation's admission is still held by that reply
+    When the person sends a follow-up or clicks a card
+    Then the send waits for the reply to release the conversation, up to 10 seconds
+    And the follow-up runs without a "Langy is still replying" card
+
+  @unit
+  Scenario: A fold that still reads running for an ended turn does not refuse the send
+    Given Langy's reply has ended on the panel
+    And the conversation's record still says that reply is running
+    When the person sends a follow-up
+    Then the send waits for the record to catch up instead of refusing it as busy
+
+  @unit
+  Scenario: A reply whose save outlasts the wait answers retry shortly, not still replying
+    Given Langy's reply has ended on the panel
+    And the conversation is still held after 10 seconds
+    When the person sends a follow-up
+    Then the send is refused as temporarily unavailable, which the panel retries on its own
+    And it is never refused as "Langy is still replying"
+
+  @unit
+  Scenario: A send while Langy is still replying is refused at once
+    Given Langy is still writing its reply
+    When a second message is sent to the conversation
+    Then it is refused as "Langy is still replying" without waiting

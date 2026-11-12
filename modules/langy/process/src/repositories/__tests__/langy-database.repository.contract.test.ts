@@ -120,7 +120,7 @@ describe("given the memory tier's database rows", () => {
       });
 
       expect(first.kind).toBe("claimed");
-      expect(second.kind).toBe("busy");
+      expect(second).toEqual({ kind: "busy", conversationId: "conv_a", heldTurnId: "turn_1" });
       expect(reused.kind).toBe("mismatch");
       expect(await repositories.conversations.hasAdmittedTurn(send)).toBe(true);
     });
