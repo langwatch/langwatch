@@ -105,6 +105,46 @@ describe("given the scoped-reader group and the app's view provisioning", () => 
     });
   });
 
+  /** @scenario "A scoped view a deploy converge restores regains the scoped-reader group's SELECT" */
+  describe("when a look-alike replaces a granted view and a deploy restores it", () => {
+    const view = VIEW_NAMES[0] as string;
+    const deployConverge = () =>
+      harness.applyAll([
+        ...provisioning.postgresApprovedViewStatements({
+          schema: SCHEMA,
+          readerRole: SHARED_READER,
+        }),
+        ...provisioning.postgresReaderGrantStatements({ schema: SCHEMA, role: SHARED_READER }),
+        ...provisioning.postgresScopedReaderGrantStatements({ schema: SCHEMA }),
+      ]);
+    let afterGrant: string;
+    let afterReplace: string;
+
+    beforeAll(async () => {
+      await harness.provisionViews();
+      afterGrant = await canSelect(view);
+      await admin(`DROP VIEW ${q(SCHEMA)}.${q(view)}`);
+      await admin(`CREATE VIEW ${q(SCHEMA)}.${q(view)} AS SELECT 1 AS bogus_column`);
+      await admin(`GRANT SELECT ON ${q(SCHEMA)}.${q(view)} TO ${GROUP}`);
+      await grantAsApp();
+      afterReplace = await canSelect(view);
+      // No manual step: the deploy's own statements recreate the scoped view and re-grant it.
+      await deployConverge();
+    });
+
+    it("the group has SELECT on the scoped view first", () => {
+      expect(afterGrant).toBe("t");
+    });
+
+    it("the group loses SELECT on the unscoped look-alike", () => {
+      expect(afterReplace).toBe("f");
+    });
+
+    it("the group has SELECT again once the deploy converge restores the scoped view", async () => {
+      expect(await canSelect(view)).toBe("t");
+    });
+  });
+
   describe("when look-alike views carry the org-role lookup but no membership tie to the session user", () => {
     const withoutMembership = VIEW_NAMES[2] as string;
     const withoutSessionTie = VIEW_NAMES[3] as string;
