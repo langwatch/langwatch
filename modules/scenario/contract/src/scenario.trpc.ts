@@ -17,6 +17,10 @@ import { z } from "zod";
 
 import { runNoteSchema } from "./features/run/run-note.ts";
 import {
+  traceQuietPeriodMsSchema,
+  traceWaitTimeoutMsSchema,
+} from "./features/run/run-trace-wait.ts";
+import {
   SIMULATION_RUN_EVENT_TYPES,
   SIMULATION_SET_EVENT_TYPES,
 } from "./features/simulation/simulation-event.constants.ts";
@@ -84,6 +88,9 @@ const scenarioTrpcCreateSchemaDefinition = z.object({
   // default (scenarios.user_simulator / scenarios.judge).
   simulatorModel: z.string().nullish(),
   judgeModel: z.string().nullish(),
+  // How long the judge waits for the agent's trace; null leaves it to the project.
+  traceQuietPeriodMs: traceQuietPeriodMsSchema.nullish(),
+  traceWaitTimeoutMs: traceWaitTimeoutMsSchema.nullish(),
   // The parameters the scenario declares, each with an optional description
   // and default. A run supplies values for these names.
   parameters: scenarioParameterDefinitionsSchema.optional(),
@@ -113,6 +120,8 @@ const scenarioTrpcUpdateSchemaDefinition = z.object({
   labels: z.array(z.string()).optional(),
   simulatorModel: z.string().nullish(),
   judgeModel: z.string().nullish(),
+  traceQuietPeriodMs: traceQuietPeriodMsSchema.nullish(),
+  traceWaitTimeoutMs: traceWaitTimeoutMsSchema.nullish(),
   parameters: scenarioParameterDefinitionsSchema.optional(),
   maxTurns: z.number().int().min(1).max(100).nullish(),
   minTurns: z.number().int().min(0).max(100).nullish(),
