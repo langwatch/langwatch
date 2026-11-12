@@ -687,7 +687,8 @@ describe("the trace-day count", () => {
     await counting.placements.recordProject({ projectId: "project-2", organizationId: "org-1" });
     await counting.uncopiedProjects.copyLanded({ projectId: "project-2" });
     await subscriber.handleBatch([placed, uncopied]);
-    expect((await days()).map((day) => [day.projectId, day.traceCount]).sort()).toEqual([
+    const sorted = (await days()).toSorted((a, b) => a.projectId.localeCompare(b.projectId));
+    expect(sorted.map((day) => [day.projectId, day.traceCount])).toEqual([
       ["project-1", 1],
       ["project-2", 1],
     ]);
