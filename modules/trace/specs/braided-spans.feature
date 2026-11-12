@@ -336,6 +336,20 @@ Feature: Braided spans in the reader's traces
       Then each read records the braided spans viewed entry before it returns them
       And a read whose entry cannot be written fails and returns no "specialists" span
 
+    @integration
+    Scenario: Every view of a braided trace is audited, or refused
+      Given a live braid from "specialists" into "orchestrator"
+      When sam opens the span tree, full spans, resources, timeline or instrumentation badges of an "orchestrator" trace holding "specialists" spans
+      Then each read records one braided spans viewed entry before it returns them
+      And a read whose entry cannot be written fails and returns no "specialists" span
+
+    @unit
+    Scenario: A span read that skips the audit door cannot be written
+      Given the reads the trace module's span store answers
+      When any of them returns a "specialists" span
+      Then it returns only after the braided spans viewed entry is written, and fails when it cannot be
+      And a new span read cannot be called until it names how its result's owners are read
+
   Rule: The braid dialog previews what the reader will see
 
     @integration

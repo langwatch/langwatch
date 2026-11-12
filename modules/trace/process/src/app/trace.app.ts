@@ -231,6 +231,10 @@ import {
   selectedSpanOwnerOf,
   verifiedMarksOf,
 } from "../features/braid/rules/braided-span-owner.rules.ts";
+import {
+  TraceBraidAuditedSpanReadService,
+  type TraceSpanTreeReads,
+} from "../features/braid/services/trace-braid-audited-span-read.service.ts";
 import { TraceBraidPreviewService } from "../features/braid/services/trace-braid-preview.service.ts";
 import {
   enrichSingleSpanWithClaudeLogContent,
@@ -945,6 +949,13 @@ type TraceTreeCompositionOptions = {
   authorize: FoldReadAuthorizer;
 };
 
+/** The dependencies as the app holds them: the span store only behind the audited door (§8). */
+type TraceAppHeldDependencies = Omit<TraceAppDependencies, "traces"> & {
+  traces: Omit<TraceAppDependencies["traces"], "spans" | "tree"> & {
+    tree?: Omit<TraceService, keyof TraceSpanTreeReads> | undefined;
+  };
+};
+
 /** Trace implements its public API and the collector's internal transport seam. */
 export class TraceModule implements TraceApi, CollectorApp {
   static readonly contract = TraceApiToken;
@@ -1448,7 +1459,8 @@ export class TraceModule implements TraceApi, CollectorApp {
   #exportDownload: TraceExportDownloadService | null;
   #scenarioEventMedia: TraceScenarioEventMediaService;
   #legacyFilterMatching: LegacyFilterMatchingService;
-  #dependencies: TraceAppDependencies;
+  #dependencies: TraceAppHeldDependencies;
+  #spanReads: TraceBraidAuditedSpanReadService;
   #explorerEvals: TraceInstantEvalRunService | null;
   #aiQuery: TraceAiQueryService | null;
   #searchRouter: TraceSearchRouterService | null;
@@ -1476,6 +1488,12 @@ export class TraceModule implements TraceApi, CollectorApp {
     const { authorizeRead } = dependencies;
     this.#braidPause = TraceBraidPauseService.create({ plans: dependencies.braidPlans });
     this.#braidDetail = TraceBraidDetailService.create({ directory: dependencies.braidDirectory });
+    // The one holder of the span store: a span read returns an owner's span audited (ADR-201 §8).
+    this.#spanReads = TraceBraidAuditedSpanReadService.create({
+      spans: dependencies.traces.spans,
+      tree: dependencies.traces.tree,
+      audit: this.#braidDetail,
+    });
     this.#braidedTotals = TraceBraidedTotalsService.create({
       reads: dependencies.traces.braidReads,
       prices: dependencies.braidPrices,
@@ -1739,7 +1757,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     traceId: string;
     limit?: number;
   }): Promise<NormalizedSpan[]> {
-    return this.#dependencies.traces.spans.getNormalizedSpansByTraceId(input);
+    return this.#spanReads.read("getNormalizedSpansByTraceId", input);
   }
 
   getEvaluationSpans(
@@ -1948,23 +1966,14 @@ export class TraceModule implements TraceApi, CollectorApp {
       projectId: braidOwner ?? input.projectId,
       userId: input.viewerUserId,
     });
-    const [span, rawEvents] = await Promise.all([
-      this.findSpan({
-        authorization,
-        traceId: input.traceId,
-        spanId: input.spanId,
-        ownerProjectId: input.ownerProjectId,
-        visibilityCutoffMs: protections.visibilityCutoffMs,
-        occurredAtMs: input.occurredAtMs,
-      }),
-      this.readSpanEvents({
-        authorization,
-        traceId: input.traceId,
-        spanId: input.spanId,
-        ownerProjectId: input.ownerProjectId,
-        occurredAtMs: input.occurredAtMs,
-      }),
-    ]);
+    const { span, events: rawEvents } = await this.#spanReads.readSpanWithEvents({
+      authorization,
+      traceId: input.traceId,
+      spanId: input.spanId,
+      ownerProjectId: input.ownerProjectId,
+      visibilityCutoffMs: protections.visibilityCutoffMs,
+      ...occurredAtHint(input.occurredAtMs),
+    });
 
     if (!span) throw new SpanNotFoundError(input.spanId);
 
@@ -2059,10 +2068,6 @@ export class TraceModule implements TraceApi, CollectorApp {
         viewerUserId: input.viewerUserId,
         spanStartedAtMs: span.timestamps.started_at,
         verifiedMarks: verifiedMarksOf({ params: span.params }),
-      });
-      await this.#braidDetail.recordView({
-        authorization,
-        ownerProjectIds: [braidOwner],
       });
     }
 
@@ -2174,7 +2179,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     };
   }): Promise<unknown> {
     if (input.trace !== undefined) {
-      const spans = await this.#dependencies.traces.spans.findStoredSpansByTraceId({
+      const spans = await this.#spanReads.read("findStoredSpansByTraceId", {
         authorization: await this.authorizationForTrace(input.trace),
         traceId: input.trace.traceId,
         ...occurredAtHint(input.trace.occurredAtMs),
@@ -2483,7 +2488,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   #composed<K extends "scenarioRoleMetrics" | "topicClustering" | "topicAssignment">(
     key: K,
     capability: string,
-  ): NonNullable<TraceAppDependencies[K]> {
+  ): NonNullable<TraceAppHeldDependencies[K]> {
     const composed = this.#dependencies[key];
     if (!composed) {
       throw new Error(`${capability} reached Trace, but this process composed Trace without it`);
@@ -3100,7 +3105,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     occurredAtMs?: number;
     reads?: TraceViewRead["reads"];
   }): Promise<SpanSummaryRow[]> {
-    return this.#dependencies.traces.spans.getSpanSummaryByTraceId({
+    return this.#spanReads.read("getSpanSummaryByTraceId", {
       authorization: input.authorization,
       traceId: input.traceId,
       ...(input.reads !== undefined ? { reads: input.reads } : {}),
@@ -3117,7 +3122,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     limit?: number;
     reads?: TraceViewRead["reads"];
   }): Promise<OwnedSpan[]> {
-    return this.#dependencies.traces.spans.getSpansByTraceId({
+    return this.#spanReads.read("getSpansByTraceId", {
       authorization: input.authorization,
       traceId: input.traceId,
       ...(input.reads !== undefined ? { reads: input.reads } : {}),
@@ -3130,7 +3135,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   }
 
   /** One page of a trace's spans; a page showing owner spans is audited first (ADR-201 §8). */
-  async readSpansPage(input: {
+  readSpansPage(input: {
     authorization: Authorization;
     traceId: string;
     limit: number;
@@ -3139,7 +3144,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     visibilityCutoffMs?: number | null;
     reads?: TraceViewRead["reads"];
   }): Promise<{ spans: OwnedSpan[]; total: number }> {
-    const page = await this.#dependencies.traces.spans.getSpansPaginated({
+    return this.#spanReads.read("getSpansPaginated", {
       authorization: input.authorization,
       traceId: input.traceId,
       ...(input.reads !== undefined ? { reads: input.reads } : {}),
@@ -3150,15 +3155,10 @@ export class TraceModule implements TraceApi, CollectorApp {
         : {}),
       ...occurredAtHint(input.occurredAtMs),
     });
-    await this.#braidDetail.recordView({
-      authorization: input.authorization,
-      ownerProjectIds: page.spans.map((span) => span.ownerProjectId),
-    });
-    return page;
   }
 
   /** The spans of a live trace that have moved since the browser last looked; audited as a page. */
-  async readSpansSince(input: {
+  readSpansSince(input: {
     authorization: Authorization;
     traceId: string;
     sinceStartTimeMs: number;
@@ -3166,7 +3166,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     visibilityCutoffMs?: number | null;
     reads?: TraceViewRead["reads"];
   }): Promise<OwnedSpan[]> {
-    const spans = await this.#dependencies.traces.spans.getSpansSince({
+    return this.#spanReads.read("getSpansSince", {
       authorization: input.authorization,
       traceId: input.traceId,
       ...(input.reads !== undefined ? { reads: input.reads } : {}),
@@ -3176,11 +3176,6 @@ export class TraceModule implements TraceApi, CollectorApp {
         : {}),
       ...occurredAtHint(input.occurredAtMs),
     });
-    await this.#braidDetail.recordView({
-      authorization: input.authorization,
-      ownerProjectIds: spans.map((span) => span.ownerProjectId),
-    });
-    return spans;
   }
 
   /** One span, by id; a braided span by its owner and id. */
@@ -3192,7 +3187,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
   }): Promise<Span | null> {
-    return this.#dependencies.traces.spans.findSpanById({
+    return this.#spanReads.read("findSpanById", {
       authorization: input.authorization,
       traceId: input.traceId,
       spanId: input.spanId,
@@ -3212,7 +3207,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     ownerProjectId?: string | undefined;
     occurredAtMs?: number;
   }): Promise<ElasticSearchEvent[]> {
-    return this.#dependencies.traces.spans.getSpanEvents({
+    return this.#spanReads.read("getSpanEvents", {
       authorization: input.authorization,
       traceId: input.traceId,
       spanId: input.spanId,
@@ -3230,7 +3225,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   }): Promise<
     { spanId: string; signals: SpanLangwatchSignals["signals"]; ownerProjectId?: string }[]
   > {
-    return this.#dependencies.traces.spans.getLangwatchSignalsByTraceId({
+    return this.#spanReads.read("getLangwatchSignalsByTraceId", {
       authorization: input.authorization,
       traceId: input.traceId,
       ...(input.reads !== undefined ? { reads: input.reads } : {}),
@@ -3245,7 +3240,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     occurredAtMs?: number;
     reads?: TraceViewRead["reads"];
   }): Promise<SpanResourceInfo[]> {
-    return this.#dependencies.traces.spans.getSpanResourcesByTraceId({
+    return this.#spanReads.read("getSpanResourcesByTraceId", {
       authorization: input.authorization,
       traceId: input.traceId,
       ...(input.reads !== undefined ? { reads: input.reads } : {}),
@@ -3260,7 +3255,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     occurredAtMs?: number;
     reads?: TraceViewRead["reads"];
   }): Promise<DerivedTraceEvent[]> {
-    return this.#dependencies.traces.spans.getTraceEventsByTraceId({
+    return this.#spanReads.read("getTraceEventsByTraceId", {
       authorization: input.authorization,
       traceId: input.traceId,
       ...(input.reads !== undefined ? { reads: input.reads } : {}),
@@ -3274,7 +3269,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     traceIds: string[];
     timeRange: { from: number; to: number };
   }): Promise<Record<string, TraceEventRollup>> {
-    return this.#dependencies.traces.spans.getTraceEventRollupsByTraceIds({
+    return this.#spanReads.read("getTraceEventRollupsByTraceIds", {
       authorization: input.authorization,
       traceIds: input.traceIds,
       timeRange: input.timeRange,
@@ -3282,7 +3277,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   }
 
   // -------------------------------------------------------------------------
-  #getTree(): TraceService {
+  #getTree(): NonNullable<TraceAppHeldDependencies["traces"]["tree"]> {
     const tree = this.#dependencies.traces.tree;
     if (!tree) {
       throw new TraceCapabilityUnavailableError("this process", "the trace tree read");
@@ -3295,28 +3290,15 @@ export class TraceModule implements TraceApi, CollectorApp {
   // -------------------------------------------------------------------------
 
   /** One page of the span tree, in `(startTimeMs, spanId, owner)` order. */
-  async readSpanTreePage(
-    input: SpanTreeInput & { authorization: Authorization },
-  ): Promise<SpanTreePage> {
-    const page = await this.#getTree().getSpanTreePage(input);
-    // Opening a trace that shows owner spans is audited per owner (ADR-201 §8).
-    await this.#braidDetail.recordView({
-      authorization: input.authorization,
-      ownerProjectIds: page.nodes.map((node) => node.ownerProjectId),
-    });
-    return page;
+  readSpanTreePage(input: SpanTreeInput & { authorization: Authorization }): Promise<SpanTreePage> {
+    return this.#spanReads.readSpanTreePage(input);
   }
 
   /** The tree nodes of a live trace whose row version is newer than a mark; audited as a page. */
-  async readSpanTreeDelta(
+  readSpanTreeDelta(
     input: SpanTreeDeltaInput & { authorization: Authorization },
   ): Promise<SpanTreeNode[]> {
-    const nodes = await this.#getTree().getSpanTreeDelta(input);
-    await this.#braidDetail.recordView({
-      authorization: input.authorization,
-      ownerProjectIds: nodes.map((node) => node.ownerProjectId),
-    });
-    return nodes;
+    return this.#spanReads.readSpanTreeDelta(input);
   }
 
   /** The canonical trace record, closed under payload-parity review. */
@@ -3358,7 +3340,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     fromMs: number;
     limit: number;
   }): Promise<ModelUsageStatsRow[]> {
-    return this.#dependencies.traces.spans.getModelUsageStats({
+    return this.#spanReads.read("getModelUsageStats", {
       authorization: input.authorization,
       fromMs: input.fromMs,
       limit: input.limit,
@@ -3618,7 +3600,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     perModelLimit: number;
     limit: number;
   }): Promise<ModelSpanSampleRow[]> {
-    return this.#dependencies.traces.spans.getRecentSpansByModels({
+    return this.#spanReads.read("getRecentSpansByModels", {
       authorization: input.authorization,
       models: input.models,
       fromMs: input.fromMs,

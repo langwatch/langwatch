@@ -72,8 +72,8 @@ type OpenedTrace = Readonly<{ authorization: Authorization; protections: Protect
 
 /**
  * The drawer's views of a trace (ADR-201 §5): each braided item is protected by its owner's
- * protections and the reader's by theirs. The paged and live reads audit before they return an
- * owner's span (§8), so a view that cannot be audited fails rather than show it.
+ * protections and the reader's by theirs. Every span read audits before it returns an owner's
+ * span (§8), so a view that cannot be audited fails rather than show it.
  */
 export class TraceDrawerReadService {
   private constructor(private readonly deps: TraceDrawerReadDependencies) {}
