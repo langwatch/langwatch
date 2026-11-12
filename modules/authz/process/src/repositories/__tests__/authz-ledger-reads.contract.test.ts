@@ -469,9 +469,15 @@ describe.each(backends)("given the ledger reads on the $name backend", (backend)
         projectId: readerProjectId,
       });
 
-      expect(braids.map(({ grantId, replacesGrantId }) => ({ grantId, replacesGrantId }))).toEqual([
-        { grantId: older, replacesGrantId: null },
-        { grantId: changed, replacesGrantId: older },
+      expect(
+        braids.map(({ grantId, replacesGrantId, isReplaced }) => ({
+          grantId,
+          replacesGrantId,
+          isReplaced,
+        })),
+      ).toEqual([
+        { grantId: older, replacesGrantId: null, isReplaced: true },
+        { grantId: changed, replacesGrantId: older, isReplaced: false },
       ]);
     });
 

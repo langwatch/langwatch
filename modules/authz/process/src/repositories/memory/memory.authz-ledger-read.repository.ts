@@ -202,6 +202,7 @@ export class MemoryAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
     grantId?: string;
     includeRevoked?: boolean;
   }): Promise<LedgerBraidRow[]> {
+    const replaced = this.memory.replacedGrantIds({ organizationId });
     return this.memory.grants
       .filter(
         (row) =>
@@ -225,6 +226,7 @@ export class MemoryAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
         revokedReason: row.revokedReason ?? null,
         isLive: row.revokedAt === null,
         replacesGrantId: row.replacesGrantId ?? null,
+        isReplaced: replaced.has(row.id),
       }));
   }
 

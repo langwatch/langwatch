@@ -355,6 +355,16 @@ Feature: Braids
       And the braid list shows the replacement alone
 
     @unit
+    Scenario: Removing a changed braid before the worker revokes the old one never revives the old one
+      Given a braid from "specialists" into "orchestrator" changed from every span to a narrower condition
+      And the worker has not yet revoked the replaced grant
+      When ana removes the replacement braid
+      Then the replaced grant is revoked with braid_changed under the same lock
+      And a worker that runs later revokes nothing more
+      And a replaced grant whose replacement is revoked by any path never reads, lists or changes again
+      And "orchestrator"'s proof carries no braid from "specialists"
+
+    @unit
     Scenario: A change that would make a braid identical to another live braid is refused
       Given two live braids from "specialists" into "orchestrator" with different conditions
       When ana changes one braid's condition to the other's

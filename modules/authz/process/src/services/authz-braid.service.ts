@@ -134,6 +134,7 @@ export class AuthzBraidService {
         const replacement = live.find((row) => row.replacesGrantId === braidId);
         if (replacement && keyOf(replacement) === terms.key) return braidOf(replacement);
         if (replacement) throw new BraidChangedError({ braidId });
+        if (old.isReplaced) return this.refuseGone({ organizationId, braidId });
         if (keyOf(old) === terms.key) return braidOf(old);
         const others = withoutReplaced(live).filter((row) => row.grantId !== braidId);
         const identical = others.find((row) => keyOf(row) === terms.key);
@@ -209,6 +210,7 @@ export class AuthzBraidService {
           includeRevoked: true,
         });
         if (current?.isLive) {
+          await this.revokeWhatItReplaced({ organizationId, braid: current, actor });
           await this.deps.ledger.revokeBindings({
             organizationId,
             bindingIds: [braidId],
@@ -220,9 +222,30 @@ export class AuthzBraidService {
         if (current?.revokedReason !== BRAID_REMOVED_REASON) {
           return this.refuseGone({ organizationId, braidId });
         }
+        await this.revokeWhatItReplaced({ organizationId, braid: current, actor });
         await this.deps.epoch.bump({ organizationId });
         return { braidId };
       },
+    });
+  }
+
+  /** Removing a change's braid before the worker revoked the one it replaced revokes that one
+   *  too, as the worker would; a later worker run finds it revoked and does nothing. */
+  private async revokeWhatItReplaced({
+    organizationId,
+    braid,
+    actor,
+  }: {
+    organizationId: string;
+    braid: LedgerBraidRow;
+    actor: LedgerActor;
+  }): Promise<void> {
+    if (braid.replacesGrantId === null) return;
+    await this.revokeReplacedGrant({
+      organizationId,
+      grantId: braid.replacesGrantId,
+      actor,
+      commandId: `${BRAID_REMOVED_REASON}:${braid.grantId}:${braid.replacesGrantId}`,
     });
   }
 
@@ -367,11 +390,11 @@ export class AuthzBraidService {
   }
 }
 
-/** A live grant a change replaced is on its way out: it neither blocks, counts nor lists
- *  (ADR-201 §2). */
+/** A live grant a change replaced is on its way out, even once its replacement is removed: it
+ *  neither blocks, counts nor lists (ADR-201 §2). */
 function withoutReplaced(live: readonly LedgerBraidRow[]): LedgerBraidRow[] {
   const replaced = new Set(live.map((row) => row.replacesGrantId));
-  return live.filter((row) => !replaced.has(row.grantId));
+  return live.filter((row) => !row.isReplaced && !replaced.has(row.grantId));
 }
 
 /** A reader holds at most BRAID_MAX_DISTINCT_CONDITIONS distinct compiled conditions (§3). */

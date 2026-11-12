@@ -260,7 +260,7 @@ export class AuthorizationService {
 /**
  * One shared grant per applicable row, and the earliest expiry among them under the ceiling. A
  * row that cannot be applied - a where clause, an expired grant, the reader naming itself, a
- * braid a live row replaces whether or not the worker has revoked it (ADR-201 §2) - is left out.
+ * braid any row replaces, live or revoked (ADR-201 §2) - is left out; the read drops the last.
  */
 function sharedGrantsFrom({
   rows,

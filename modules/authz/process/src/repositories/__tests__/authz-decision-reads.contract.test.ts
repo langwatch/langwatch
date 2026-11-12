@@ -770,6 +770,39 @@ describe.each(backends)("given the decision reads on the $name backend", (backen
   });
 
   describe.skipIf(backend.skip)("when a reader project's live shared reads are read", () => {
+    /** @scenario "Removing a changed braid before the worker revokes the old one never revives the old one" */
+    it("leaves out a braid a change replaced, still once the replacement is revoked", async () => {
+      const fixture = await open();
+      const { organizationId } = fixture;
+      const readerProjectId = id("project");
+      const braid = (input: Partial<GrantRowShape>) =>
+        grantRow({
+          organizationId,
+          principalType: "PROJECT",
+          principalId: readerProjectId,
+          roleKey: "project-reader",
+          source: "braid",
+          scopeType: "PROJECT",
+          scopeId: "owner_project",
+          condition: { type: "span", from: "2026-10-01T00:00:00.000Z" },
+          ...input,
+        });
+      const older = braid({});
+      const changed = braid({ replacesGrantId: older.id, occurredAt: at(T0 + 1) });
+      await attach(fixture, older);
+      await attach(fixture, changed);
+      const read = async () =>
+        (
+          await fixture.repositories.read.findLiveSharedReads({ organizationId, readerProjectId })
+        ).map((row) => row.grantId);
+
+      const whileLive = await read();
+      await revoke(fixture, changed.id);
+
+      expect(whileLive).toEqual([changed.id]);
+      expect(await read()).toEqual([]);
+    });
+
     it("reads which braid a change replaced, and none on a braid attached before", async () => {
       const fixture = await open();
       const { organizationId } = fixture;
@@ -789,16 +822,18 @@ describe.each(backends)("given the decision reads on the $name backend", (backen
         });
       const older = braid({});
       const changed = braid({ replacesGrantId: older.id, occurredAt: at(T0 + 1) });
+      const plain = braid({ scopeId: "other_owner_project" });
       await attach(fixture, older);
       await attach(fixture, changed);
+      await attach(fixture, plain);
 
       const rows = await fixture.repositories.read.findLiveSharedReads({
         organizationId,
         readerProjectId,
       });
 
-      expect(rows.map((row) => row.grantId).toSorted()).toEqual([older.id, changed.id].toSorted());
-      expect(rows.find((row) => row.grantId === older.id)).not.toHaveProperty("replacesGrantId");
+      expect(rows.map((row) => row.grantId).toSorted()).toEqual([plain.id, changed.id].toSorted());
+      expect(rows.find((row) => row.grantId === plain.id)).not.toHaveProperty("replacesGrantId");
       expect(rows.find((row) => row.grantId === changed.id)).toMatchObject({
         replacesGrantId: older.id,
       });

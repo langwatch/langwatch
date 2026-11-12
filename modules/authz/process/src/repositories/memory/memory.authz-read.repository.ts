@@ -225,9 +225,11 @@ export class MemoryAuthzReadRepository extends AuthzReadRepository {
     readerProjectId: string;
   }): Promise<SharedReadRow[]> => {
     const wanted = sharedProjectReadsOf({ organizationId, readerProjectId });
+    const replaced = this.memory.replacedGrantIds({ organizationId });
     return this.memory.grants.flatMap((row) => {
       const matches =
         !row.revokedAt &&
+        !replaced.has(row.id) &&
         row.organizationId === wanted.organizationId &&
         row.principalType === wanted.principalType &&
         row.principalId === wanted.principalId &&

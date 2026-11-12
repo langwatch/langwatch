@@ -13,7 +13,7 @@ import {
   type ShareLinkRow,
 } from "../authz-read.repository.ts";
 import { RESOURCE_KIND_TO_DB } from "../prisma/prisma.authz-grant.mapper.ts";
-import { liveGrants, liveRoles } from "./eventing.authz-live-rows.mapper.ts";
+import { findReplacedGrantIds, liveGrants, liveRoles } from "./eventing.authz-live-rows.mapper.ts";
 import {
   BINDING_SCOPE_TYPES,
   type BindingGrantRow,
@@ -370,7 +370,13 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
       expiresAt: unknown;
       replacesGrantId: string | null;
     }[];
+    const replaced = await findReplacedGrantIds({
+      database: this.database,
+      organizationId,
+      grantIds: rows.map((row) => row.id),
+    });
     return rows.flatMap((row) => {
+      if (replaced.has(row.id)) return [];
       const condition = grantConditionSchema.safeParse(row.condition);
       if (!condition.success && row.replacesGrantId === null) return [];
       return [

@@ -19,6 +19,8 @@ export type LedgerBraidRow = Readonly<{
   isLive: boolean;
   /** The braid a change replaced; null on a created braid or one older than the column. */
   replacesGrantId: string | null;
+  /** Some braid, live or revoked, names this one as replaced: it never reads or lists again. */
+  isReplaced: boolean;
 }>;
 
 /** A binding's identity as the canonical Grant head stores it. */

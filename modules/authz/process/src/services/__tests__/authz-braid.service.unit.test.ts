@@ -53,6 +53,7 @@ function setup({ beyondCaller = [] as string[] } = {}) {
           revokedReason: null,
           isLive: true,
           replacesGrantId: input.replacesGrantId ?? null,
+          isReplaced: false,
         });
         return { grantId };
       },
@@ -79,14 +80,19 @@ function setup({ beyondCaller = [] as string[] } = {}) {
     ledger,
     reads: {
       findBraids: async ({ projectId, grantId, includeRevoked }) =>
-        rows.filter(
-          (row) =>
-            (includeRevoked || row.isLive) &&
-            (grantId === undefined || row.grantId === grantId) &&
-            (projectId === undefined ||
-              row.ownerProjectId === projectId ||
-              row.readerProjectId === projectId),
-        ),
+        rows
+          .filter(
+            (row) =>
+              (includeRevoked || row.isLive) &&
+              (grantId === undefined || row.grantId === grantId) &&
+              (projectId === undefined ||
+                row.ownerProjectId === projectId ||
+                row.readerProjectId === projectId),
+          )
+          .map((row) => ({
+            ...row,
+            isReplaced: rows.some((other) => other.replacesGrantId === row.grantId),
+          })),
     },
     lineage: {
       findProjectLineage: async ({ projectId }) => {
@@ -389,6 +395,79 @@ describe("AuthzBraidService", () => {
 
       expect(rows[0]).toMatchObject({ isLive: false, revokedReason: "braid_removed" });
       expect(epoch.bump).toHaveBeenCalledTimes(1);
+    });
+
+    describe("when the braid is a change whose replaced grant the worker has not yet revoked", () => {
+      /** @scenario "Removing a changed braid before the worker revokes the old one never revives the old one" */
+      it("revokes the replaced grant too, so a worker that never runs leaves nothing wider live", async () => {
+        const { create, service, rows, ledger } = setup();
+        const wide = await create();
+        const narrow = await service.changeBraid({
+          projectId: OWNER,
+          readerProjectId: READER,
+          braidId: wide.braidId,
+          where: 'name == "a"',
+          fromMs: FROM_MS,
+          actor: ANA,
+          caller: CALLER,
+        });
+
+        await service.removeBraid({
+          projectId: OWNER,
+          braidId: narrow.braidId,
+          actor: ANA,
+          caller: CALLER,
+        });
+        const afterRemoval = rows.map((row) => [row.grantId, row.isLive, row.revokedReason]);
+        await service.revokeReplacedGrant({
+          organizationId: ORG,
+          grantId: wide.braidId,
+          actor: ANA,
+          commandId: "evt_late",
+        });
+
+        expect(afterRemoval).toEqual([
+          [wide.braidId, false, "braid_changed"],
+          [narrow.braidId, false, "braid_removed"],
+        ]);
+        expect(ledger.revokeBindings).toHaveBeenCalledTimes(2);
+        expect((await service.listBraids({ projectId: READER })).fromOtherProjects).toEqual([]);
+      });
+    });
+  });
+
+  describe("given a braid whose replacement was revoked while it stayed live", () => {
+    /** @scenario "Removing a changed braid before the worker revokes the old one never revives the old one" */
+    it("neither lists it nor lets it be changed, as a replaced braid stays replaced", async () => {
+      const { create, service, rows } = setup();
+      const wide = await create();
+      const narrow = await service.changeBraid({
+        projectId: OWNER,
+        readerProjectId: READER,
+        braidId: wide.braidId,
+        where: 'name == "a"',
+        fromMs: FROM_MS,
+        actor: ANA,
+        caller: CALLER,
+      });
+      const replacement = rows.find((row) => row.grantId === narrow.braidId);
+      Object.assign(replacement ?? {}, { isLive: false, revokedReason: "braid_removed" });
+
+      const listed = await service.listOrganizationBraids({ organizationId: ORG });
+      const code = await refusalOf(
+        service.changeBraid({
+          projectId: OWNER,
+          readerProjectId: READER,
+          braidId: wide.braidId,
+          where: 'name == "b"',
+          fromMs: FROM_MS,
+          actor: ANA,
+          caller: CALLER,
+        }),
+      );
+
+      expect(listed).toEqual([]);
+      expect(code).toBe("braid_changed");
     });
   });
 

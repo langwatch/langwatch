@@ -121,7 +121,7 @@ function ledger({ now }: { now: () => number }) {
       scope: { projectId },
       purpose: ROUTE,
     });
-  return { memory, braid, mint };
+  return { memory, projection, braid, mint };
 }
 
 describe("the proof a reader's trace read carries", () => {
@@ -347,6 +347,37 @@ describe("the proof a reader's trace read carries", () => {
         reader: ORCHESTRATOR,
         condition: unreadable,
         replacesGrantId: "grant_wide",
+      });
+
+      const proof = await mint(ORCHESTRATOR);
+
+      expect(proof.grants.map(({ via }) => via)).toEqual([[]]);
+    });
+  });
+
+  describe("given a changed braid whose replacement is removed before the worker revokes the old one", () => {
+    /** @scenario "Removing a changed braid before the worker revokes the old one never revives the old one" */
+    it("never carries the old, wider grant again", async () => {
+      const { braid, mint, projection } = ledger({ now: () => Date.parse("2026-10-20T00:00:00Z") });
+      await braid({
+        id: "grant_wide",
+        owner: SPECIALISTS,
+        reader: ORCHESTRATOR,
+        condition: spanCondition({}),
+      });
+      await braid({
+        id: "grant_narrowed",
+        owner: SPECIALISTS,
+        reader: ORCHESTRATOR,
+        condition: spanCondition({ where: WEB }),
+        replacesGrantId: "grant_wide",
+      });
+      await projection.append({
+        kind: "grant.revoke",
+        organizationId: ORG,
+        grantId: "grant_narrowed",
+        reason: "braid_removed",
+        occurredAt: Temporal.Instant.fromEpochMilliseconds(Date.parse("2026-10-02T00:00:00Z")),
       });
 
       const proof = await mint(ORCHESTRATOR);

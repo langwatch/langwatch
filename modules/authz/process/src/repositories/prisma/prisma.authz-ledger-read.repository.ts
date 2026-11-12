@@ -18,7 +18,11 @@ import {
   type LedgerRoleDefinition,
 } from "../authz-ledger-read.repository.ts";
 import type { AuthzReadRepository } from "../authz-read.repository.ts";
-import { liveGrants, liveRoles } from "../eventing/eventing.authz-live-rows.mapper.ts";
+import {
+  findReplacedGrantIds,
+  liveGrants,
+  liveRoles,
+} from "../eventing/eventing.authz-live-rows.mapper.ts";
 import { NOT_A_BRAID, sharedProjectReadsOf } from "../eventing/eventing.authz-read.mapper.ts";
 import { EventingAuthzReadRepository } from "../eventing/eventing.authz-read.repository.ts";
 import {
@@ -229,6 +233,11 @@ export class PrismaAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
         ? await this.prisma.grant.findMany({ where, select, orderBy: { occurredAt: "asc" } })
         : await liveGrants(this.prisma).findMany({ where, select, orderBy: { occurredAt: "asc" } }),
     );
+    const replaced = await findReplacedGrantIds({
+      database: this.prisma,
+      organizationId,
+      grantIds: rows.map((row) => row.id),
+    });
     return rows.map((row) => ({
       grantId: row.id,
       ownerProjectId: row.scopeId,
@@ -240,6 +249,7 @@ export class PrismaAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
       revokedReason: row.revokedReason,
       isLive: row.revokedAt === null,
       replacesGrantId: row.replacesGrantId,
+      isReplaced: replaced.has(row.id),
     }));
   }
 

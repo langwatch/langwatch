@@ -4929,6 +4929,11 @@ model Grant {
   // selects the whole organization and the read degrades to a full scan on
   // every check.
   //
+  // Which grants a braid change replaced, live or revoked (ADR-201 §2), is
+  // served by "Grant_organizationId_replacesGrantId_idx", partial on
+  // `WHERE "replacesGrantId" IS NOT NULL`, from migration
+  // 20261112120003_braids_grant_replaced_lookup; undeclarable for the same reason.
+  //
   // "Grant_resource_terms_check" is an all-or-nothing CHECK over the tier's
   // four identity columns (token, permission, resourceKind, projectId), tied
   // to scopeType = 'RESOURCE'. Added over two columns in

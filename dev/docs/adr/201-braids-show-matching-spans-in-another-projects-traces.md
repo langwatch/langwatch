@@ -612,3 +612,8 @@ not operations.
   drawer procedure calls one `TraceApi` `read…ForViewer` operation; trace's drawer read service narrows
   the proof, resolves each owner's protections, gates cost per owner and builds the header's
   `braided` totals, and the paged and live reads still audit before they return an owner's span (§5, §8).
+- v1.14 (2026-11-12, from review, under the "never fail open" ruling). A braid any grant names as
+  replaced, live or revoked, never mints, lists or changes again, so removing a change's braid before
+  the worker revoked the old one never revives the wider grant; removal also revokes that old grant
+  under the reader's lock. A partial index on `Grant ("organizationId", "replacesGrantId")` serves the
+  lookup (§2).

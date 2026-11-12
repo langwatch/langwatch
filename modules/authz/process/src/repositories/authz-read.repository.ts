@@ -114,7 +114,7 @@ export abstract class AuthzReadRepository extends ScopeLineageRepository {
   }) => Promise<Map<string, { teamId: string; organizationId: string; kind: string }>>;
 
   /** The live `project-reader` grants a reader project holds (ADR-177); a window that does
-   *  not parse is left out. */
+   *  not parse is left out, and so is a braid any row, live or revoked, replaced (ADR-201 §2). */
   abstract findLiveSharedReads: (args: {
     organizationId: string;
     readerProjectId: string;

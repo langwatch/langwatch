@@ -344,6 +344,7 @@ function braidAudit() {
     revokedReason: null,
     isLive: true,
     replacesGrantId: grantId === "grant_v2" ? "grant_v1" : null,
+    isReplaced: grantId === "grant_v1",
   }));
   const adapter = EventingAuthzAuditAdapter.create({
     store,
