@@ -26,6 +26,7 @@ function declaringScenarios(queued: QueueSimulationRunInput[]): ScenarioApi {
         scenarioVersion: 1,
       }));
     },
+    assertSimulationRunAllowed: async () => {},
     queueSimulationRun: async (input) => {
       queued.push(input);
     },

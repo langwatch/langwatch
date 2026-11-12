@@ -10,6 +10,7 @@ import {
   simulationSetArchivedEventDataSchema,
   simulationTextMessageEndEventDataSchema,
   simulationTextMessageStartEventDataSchema,
+  simulationRunStartKey,
 } from "@langwatch/scenario-contract";
 
 /**
@@ -25,7 +26,8 @@ const StartRunCommand = defineCommand({
   aggregateType: "simulation_run",
   schema: simulationRunStartedEventDataSchema,
   aggregateId: (d) => d.scenarioRunId,
-  idempotencyKey: (d) => `${d.tenantId}:${d.scenarioRunId}:startRun`,
+  idempotencyKey: (d) =>
+    simulationRunStartKey({ projectId: d.tenantId, scenarioRunId: d.scenarioRunId }),
   spanAttributes: (d) => ({
     "payload.scenarioRun.id": d.scenarioRunId,
     "payload.scenario.id": d.scenarioId,

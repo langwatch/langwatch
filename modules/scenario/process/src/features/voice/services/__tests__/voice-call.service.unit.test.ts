@@ -2,6 +2,7 @@
  * @see specs/features/agents/voice-agents-v1.feature
  */
 
+import { LimitExceededError } from "@langwatch/enterprise-licensing-contract";
 import {
   VoicePhoneTransportUnavailableError,
   ScenarioRunStatus,
@@ -83,6 +84,7 @@ function fakePorts({
       turnTraceIds: record.turns.map((_, index) => `trace_${index}`),
     })),
     writeCallRun: vi.fn(async () => {}),
+    assertRunAllowed: vi.fn(async () => {}),
     // A scenario call resolves its set here; a drawer call never reaches it.
     // Individual tests override to assert it is or is not called.
     getScenarioSet: vi.fn(async () => ({ scenarioSetId: "set_x" })),
@@ -770,6 +772,64 @@ describe("finishVoiceSession", () => {
         expect(getScenarioSet).not.toHaveBeenCalled();
         expect(writeCallRun).not.toHaveBeenCalled();
         expect(result.scenarioSetId).toBeUndefined();
+      });
+    });
+
+    describe("when the Free run cap is reached", () => {
+      /** @scenario "A voice call past the run cap is refused before its run is written" */
+      it("refuses the call with the limit error and writes no run", async () => {
+        const runner = fakeRunner();
+        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(async () => {});
+        const assertRunAllowed = vi.fn(async () => {
+          throw new LimitExceededError("scenarioRuns", 100, 100);
+        });
+        const ports = fakePorts({ runner, over: { writeCallRun, assertRunAllowed } });
+
+        await expect(finishVoiceSession({ ports, ...SCENARIO_FINISH })).rejects.toBeInstanceOf(
+          LimitExceededError,
+        );
+        expect(assertRunAllowed).toHaveBeenCalledWith({
+          projectId: "p1",
+          scenarioRunId: expect.any(String),
+        });
+        expect(writeCallRun).not.toHaveBeenCalled();
+      });
+
+      it("does not ask the cap again when re-driving a half-written run", async () => {
+        const runner = fakeRunner();
+        const assertRunAllowed = vi.fn(async () => {});
+        const ports = fakePorts({
+          runner,
+          over: {
+            assertRunAllowed,
+            findExistingRun: vi.fn(async () => ({
+              status: ScenarioRunStatus.IN_PROGRESS,
+              agentId: "agent_row",
+              source: null,
+              audioUrl: null,
+              scenarioId: "scenario_1",
+              scenarioSetId: "set_x",
+            })),
+          },
+        });
+
+        await finishVoiceSession({ ports, ...SCENARIO_FINISH });
+
+        expect(assertRunAllowed).not.toHaveBeenCalled();
+      });
+
+      it("never asks the cap for a drawer call", async () => {
+        const runner = fakeRunner();
+        const assertRunAllowed = vi.fn(async () => {});
+        const ports = fakePorts({ runner, over: { assertRunAllowed } });
+
+        await finishVoiceSession({
+          ports,
+          ...FINISH_BASE,
+          token: { ...TOKEN, agentId: "agent_row" },
+        });
+
+        expect(assertRunAllowed).not.toHaveBeenCalled();
       });
     });
 

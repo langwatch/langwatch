@@ -28,6 +28,7 @@ function nurturing() {
     posthog,
   });
   const pipeline = buildNurturingPipeline({
+    organizationMembers: async () => ["user-1"],
     deliver: async (input) => {
       delivered.push(input.signal);
       await delivery.deliver(input);

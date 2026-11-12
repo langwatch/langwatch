@@ -38,7 +38,12 @@ import { MemoryTraceCountRepository } from "../../repositories/memory/memory.tra
 import { BillableEventsMeterAppendService } from "../../services/billable-events-meter-append.service.ts";
 import { TraceUsageService } from "../../services/trace-usage.service.ts";
 import { UsageCountingService } from "../../services/usage-counting.service.ts";
-import { CountMonthCommand, RecordLimitDecisionCommand } from "../usage.commands.ts";
+import {
+  CountMonthCommand,
+  CountScenarioRunsCommand,
+  RecordScenarioRunGraceEndedCommand,
+  RecordLimitDecisionCommand,
+} from "../usage.commands.ts";
 import { USAGE_AGGREGATE_TYPE } from "../usage.events.ts";
 import { buildUsagePipeline } from "../usage.pipeline.ts";
 
@@ -67,6 +72,12 @@ function metering({ send }: { send?: Parameters<typeof buildUsagePipeline>[0]["s
     getProjectPlacement: async () => ({ kind: "placed" as const, organizationId: ORGANIZATION }),
   };
   return buildUsagePipeline({
+    countScenarioRuns: CountScenarioRunsCommand.create({
+      runs: { computeMonthCount: async () => undefined },
+    }),
+    recordScenarioRunGraceEnded: RecordScenarioRunGraceEndedCommand.create({
+      runs: { isCapped: async () => false },
+    }),
     countMonth: CountMonthCommand.create({
       counting: UsageCountingService.create({
         meter: MemoryBillableEventsMeterRepository.create(),
@@ -285,6 +296,9 @@ describe("entitlement's stored names for the usage facts", () => {
         recordLimitDecision,
         countMonth: vi.fn(),
         recordUsageWarning: vi.fn(),
+        countScenarioRuns: vi.fn(),
+        recordScenarioRunsThreshold: vi.fn(),
+        recordScenarioRunGraceEnded: vi.fn(),
       }));
       const reached = { ...counted, billableEvents: 1_000 };
       const stored = { ...storedAsUsage({ id: "stored-2", type: "lw.usage.month_counted" }) };

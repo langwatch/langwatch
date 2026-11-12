@@ -24,9 +24,6 @@
   ],
   "references": [
     {
-      "path": "../../../../modules/insight/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../../modules/workflow/contract/tsconfig.build.json"
     },
     {
@@ -69,6 +66,9 @@
       "path": "../../../../modules/langy/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/insight/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/experiment/contract/tsconfig.build.json"
     },
     {
@@ -82,6 +82,9 @@
     },
     {
       "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/entitlement/contract/tsconfig.build.json"
     },
     {
       "path": "../../billing/contract/tsconfig.build.json"

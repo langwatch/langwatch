@@ -11,6 +11,7 @@ import {
   activationTrackInput,
   evaluationsCompletedEvent,
 } from "../rules/nurturing-posthog-activation.rules.ts";
+import { fireScenarioRunCapPostHog } from "../rules/nurturing-scenario-run-cap.rules.ts";
 import { fireOrganizationCreated } from "../rules/nurturing-signup-identification-service.rules.ts";
 import { fireSubscriptionStarted } from "../rules/nurturing-subscription-sync-service.rules.ts";
 import { isoOf } from "../rules/nurturing-time.rules.ts";
@@ -47,27 +48,8 @@ export class NurturingPostHogDeliveryService {
       });
     switch (signal.kind) {
       case "guided_onboarding_paths":
-        return posthog.track(
-          fireGuidedOnboardingPostHog({
-            userId: signal.userId,
-            organizationId: signal.organizationId,
-            event: signal.event,
-            payload: signal.payload ?? {},
-            paths: signal.paths,
-            currentPath: undefined,
-          }),
-        );
       case "guided_onboarding_progress":
-        return posthog.track(
-          fireGuidedOnboardingPostHog({
-            userId: signal.userId,
-            organizationId: signal.organizationId,
-            event: signal.event,
-            payload: signal.payload,
-            paths: signal.state.paths,
-            currentPath: signal.state.currentPath,
-          }),
-        );
+        return this.guidedOnboarding(signal);
       case "onboarding_variant_assigned":
         return posthog.track(fireOnboardingVariantAssignedPostHog(signal));
       case "scenario_created":
@@ -100,9 +82,27 @@ export class NurturingPostHogDeliveryService {
         return fireSubscriptionStarted(signal).forEach((event) => posthog.track(event));
       case "checkout_completed":
         return this.checkoutCompleted(signal);
+      case "scenario_runs_threshold_reached":
+      case "scenario_run_grace_ended":
+        return fireScenarioRunCapPostHog(signal).forEach((event) => posthog.track(event));
       default:
         return;
     }
+  }
+
+  private guidedOnboarding(
+    signal: NurturingSignalOf<"guided_onboarding_paths" | "guided_onboarding_progress">,
+  ): void {
+    const { userId, organizationId, event } = signal;
+    const rest =
+      signal.kind === "guided_onboarding_progress"
+        ? {
+            payload: signal.payload,
+            paths: signal.state.paths,
+            currentPath: signal.state.currentPath,
+          }
+        : { payload: signal.payload ?? {}, paths: signal.paths, currentPath: undefined };
+    this.posthog.track(fireGuidedOnboardingPostHog({ userId, organizationId, event, ...rest }));
   }
 
   /** Main's checkout webhook: the organization's event, then its group properties. */

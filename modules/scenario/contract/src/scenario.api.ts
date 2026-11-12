@@ -346,6 +346,11 @@ export interface ScenarioApi {
   prefetchExecution(
     input: ScenarioExecutionPrefetchInput,
   ): Promise<ScenarioExecutionPrefetchResult>;
+  /**
+   * Asks the plan's run cap once, so a caller about to queue a batch is refused before any run.
+   * @throws LimitExceededError (`scenarioRuns`) when the organization is past its run cap.
+   */
+  assertSimulationRunAllowed(input: { projectId: string }): Promise<void>;
   queueSimulationRun(input: QueueSimulationRunInput): Promise<void>;
   /** Queues a settled simulation trace's run metrics onto simulation_processing. */
   computeRunMetrics(input: ComputeRunMetricsCommandData): Promise<void>;

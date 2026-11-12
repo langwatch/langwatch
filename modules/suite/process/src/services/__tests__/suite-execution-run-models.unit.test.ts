@@ -28,6 +28,7 @@ async function queuedCommandFor(params: {
           secretParameters: {},
           scenarioVersion: 1,
         })),
+      assertSimulationRunAllowed: async () => {},
       queueSimulationRun: async (input) => {
         queued.push(input);
       },

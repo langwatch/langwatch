@@ -17,7 +17,9 @@ import type { ScenarioService } from "../scenario.service.ts";
 
 const SECRET = "voice-test-secret";
 
-function composeWithTraceCollector() {
+function composeWithTraceCollector({
+  runCap = async () => {},
+}: { runCap?: (input: { projectId: string }) => Promise<void> } = {}) {
   const recorded: RecordSpanCommandData[] = [];
   const service = VoiceSessionService.compose({
     peers: {
@@ -37,6 +39,7 @@ function composeWithTraceCollector() {
     },
     scenarios: createApiFixture<ScenarioService>({}),
     simulations: createApiFixture<SimulationService>({}),
+    runCap: { assertCountedRunAllowed: async () => {}, assertRunAllowed: runCap },
     signingSecret: SECRET,
     voicePublicBaseUrl: undefined,
     voiceCallMaxSeconds: undefined,
@@ -85,6 +88,49 @@ describe("VoiceSessionService.compose", () => {
         key: "gen_ai.input.messages",
         value: { stringValue: JSON.stringify([{ role: "user", content: "Hi" }]) },
       });
+    });
+  });
+
+  describe("given an organization past its run cap", () => {
+    const refused = new Error("scenario run cap reached");
+
+    it("refuses to open a scenario call", async () => {
+      const { service } = composeWithTraceCollector({
+        runCap: async () => {
+          throw refused;
+        },
+      });
+
+      await expect(
+        service.mint({
+          projectId: "project_1",
+          transport: "elevenlabs_convai",
+          agentId: "vendor_agent",
+          scenarioId: "scenario_1",
+          userId: "user_1",
+        }),
+      ).rejects.toBe(refused);
+    });
+
+    it("leaves a drawer call to open without asking the cap", async () => {
+      const asked: string[] = [];
+      const { service } = composeWithTraceCollector({
+        runCap: async ({ projectId }) => {
+          asked.push(projectId);
+          throw refused;
+        },
+      });
+
+      await service
+        .mint({
+          projectId: "project_1",
+          transport: "elevenlabs_convai",
+          agentId: "vendor_agent",
+          userId: "user_1",
+        })
+        .catch(() => undefined);
+
+      expect(asked).toEqual([]);
     });
   });
 });

@@ -8,32 +8,34 @@ import {
   mapToPlanInfo,
   UNLIMITED_PLAN,
 } from "@langwatch/enterprise-licensing-contract";
-import { planCreationCap } from "@langwatch/entitlement-contract";
+import { planCreationCap, planScenarioRunCap } from "@langwatch/entitlement-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryBillingStore } from "../../repositories/memory/memory.billing.store.ts";
 import { MemoryBillingSubscriptionRepository } from "../../repositories/memory/memory.subscription.repository.ts";
 import { SaaSPlanProviderService } from "../plan-provider.service.ts";
 
-const creationLimits = ["scenarios", "scenarioSets", "evaluators"] as const;
+const creationLimits = ["scenarios", "evaluators"] as const;
 
 const noSubscription = MemoryBillingSubscriptionRepository.create(new MemoryBillingStore());
 
 describe("cloud Free creation caps", () => {
   describe("given the cloud Free plan", () => {
-    it("caps scenarios, simulations and custom evaluators at 3", () => {
+    it("caps scenarios and custom evaluators at 3, and scenario runs at 100 a month after a 14-day grace", () => {
       expect(PLAN_LIMITS[PlanTypes.FREE]).toMatchObject({
         maxScenarios: 3,
-        maxScenarioSets: 3,
         maxEvaluators: 3,
+        maxScenarioRunsPerMonth: 100,
+        scenarioRunGraceDays: 14,
       });
     });
 
     it("keeps the caps in one place", () => {
       expect(FREE_PLAN_CREATION_CAPS).toEqual({
         maxScenarios: 3,
-        maxScenarioSets: 3,
         maxEvaluators: 3,
+        maxScenarioRunsPerMonth: 100,
+        scenarioRunGraceDays: 14,
       });
     });
 
@@ -56,6 +58,7 @@ describe("cloud Free creation caps", () => {
         for (const limitType of creationLimits) {
           expect(planCreationCap({ plan, limitType })).toEqual({ capped: false });
         }
+        expect(planScenarioRunCap({ plan })).toEqual({ capped: false });
       }
     });
   });
@@ -73,6 +76,8 @@ describe("cloud Free creation caps", () => {
           expect(planCreationCap({ plan, limitType })).toEqual({ capped: false });
           expect(planCreationCap({ plan: UNLIMITED_PLAN, limitType })).toEqual({ capped: false });
         }
+        expect(planScenarioRunCap({ plan })).toEqual({ capped: false });
+        expect(planScenarioRunCap({ plan: UNLIMITED_PLAN })).toEqual({ capped: false });
       });
     });
 
@@ -102,6 +107,7 @@ describe("cloud Free creation caps", () => {
         for (const limitType of creationLimits) {
           expect(planCreationCap({ plan, limitType })).toEqual({ capped: false });
         }
+        expect(planScenarioRunCap({ plan })).toEqual({ capped: false });
       });
     });
   });

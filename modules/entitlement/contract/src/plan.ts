@@ -27,8 +27,11 @@ const planSchemaDefinition = z.object({
   ...planSeatsAndVolumeShape,
   /** Cloud Free creation caps; absent means uncapped (plan-creation-caps.ts). */
   maxScenarios: z.number().optional(),
-  maxScenarioSets: z.number().optional(),
   maxEvaluators: z.number().optional(),
+  /** Cloud Free scenario runs per UTC month once the grace is over; absent means unlimited. */
+  maxScenarioRunsPerMonth: z.number().optional(),
+  /** Days after the organization's first scenario run during which no run cap applies. */
+  scenarioRunGraceDays: z.number().optional(),
   webhookEndpointsEnabled: z.boolean().optional(),
   ...planDispatchCeilingsShape,
   usageUnit: z.string().optional(),

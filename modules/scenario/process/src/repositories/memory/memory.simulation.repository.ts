@@ -885,14 +885,6 @@ export class MemorySimulationRepository extends SimulationRepository {
     return { runIds, reachedCap: runIds.length === RUN_ID_CAP };
   }
 
-  async findDistinctExternalSetIds({ projectIds }: { projectIds: string[] }): Promise<Set<string>> {
-    const setIds = this.runsOf(projectIds)
-      .filter(isVisible)
-      .map((run) => run.state.ScenarioSetId)
-      .filter((setId) => !setId.startsWith(INTERNAL_SET_PREFIX) && !isAgentTestSet(setId));
-    return new Set(setIds.map(normalizeSetId));
-  }
-
   async countRunsForExport(input: {
     projectId: string;
     scenarioSetId?: string;

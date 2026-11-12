@@ -36,7 +36,6 @@ import type {
   SimulationLastResultSummariesInput,
   SimulationLastResultSummary,
   SimulationProjectDateRangeInput,
-  SimulationProjectIdsInput,
   SimulationFinishRun,
   RecordEvaluationsCommandData,
   SimulationMessageSnapshot,
@@ -136,10 +135,6 @@ export class SimulationService extends SimulationServiceContract {
     input: SimulationScenarioSetInput,
   ): Promise<{ runIds: string[]; reachedCap: boolean }> {
     return this.repository.findAllRunIdsForSet(input);
-  }
-
-  getDistinctExternalSetIds(input: SimulationProjectIdsInput): Promise<Set<string>> {
-    return this.repository.findDistinctExternalSetIds(input);
   }
 
   countRunsForExport(input: SimulationExportFilterInput): Promise<number> {

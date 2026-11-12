@@ -197,7 +197,7 @@ interface ScenarioAppDependencies {
   /** One HTTP agent call from its editor, run by the workflow engine and traced. */
   httpAgentTesting: HttpAgentTestService;
   scenarios: ScenarioService;
-  /** The cloud Free caps on scenarios and simulations. */
+  /** The cloud Free caps on scenarios and scenario runs. */
   creationCaps: ScenarioCreationCapService;
   simulations: SimulationServiceContract;
   /** Validates a run against its target before anything is queued. */
@@ -321,7 +321,6 @@ export class ScenarioModule implements ScenarioApi {
       plans: setup.dependencies.plans,
       projects: setup.dependencies.projects,
       scenarios: repositories.scenarios,
-      simulations,
     });
     const generateBounds = ScenarioGenerateBoundsService.create({
       entitlement: setup.dependencies.plans,
@@ -435,6 +434,7 @@ export class ScenarioModule implements ScenarioApi {
         peers: setup.dependencies,
         scenarios,
         simulations,
+        runCap: creationCaps,
         signingSecret,
         voicePublicBaseUrl: config.voicePublicBaseUrl,
         voiceCallMaxSeconds: config.voiceCallMaxSeconds,
@@ -889,6 +889,11 @@ export class ScenarioModule implements ScenarioApi {
     return this.#dependencies.generateBounds.assertGenerateWithinBounds(input);
   }
 
+  /** Refuses a new run once the project's organization is past its plan's monthly run cap. */
+  assertSimulationRunAllowed(input: { projectId: string }): Promise<void> {
+    return this.#dependencies.creationCaps.assertRunAllowed({ projectId: input.projectId });
+  }
+
   /**
    * Dispatches the queued command, which is what writes QUEUED state before the execution job is
    * scheduled — the same order the suite execution port uses. The resolved parameters travel on the
@@ -923,6 +928,12 @@ export class ScenarioModule implements ScenarioApi {
       ...(Object.keys(input.parameters).length > 0 ? { parameters: input.parameters } : {}),
       ...(secretParameterNames.length > 0 ? { secretParameterNames } : {}),
     };
+
+    // Admitting counts the run, so it comes last: a target that fails to resolve keeps no slot.
+    await this.#dependencies.creationCaps.assertRunAllowed({
+      projectId: input.projectId,
+      scenarioRunId: input.scenarioRunId,
+    });
 
     await this.#dependencies.simulations.queueRun({
       tenantId: input.projectId,

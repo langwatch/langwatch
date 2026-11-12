@@ -13,7 +13,7 @@ import type { UpgradeModalVariant } from "../../../model/upgrade-modal-store.ts"
 const SEAT_LIMIT_TYPES = new Set(["members", "membersLite"]);
 
 /** Creation caps on the cloud Free plan: only one more is refused, what exists stays usable. */
-const CREATION_LIMIT_TYPES = new Set(["scenarios", "scenarioSets", "evaluators"]);
+const CREATION_LIMIT_TYPES = new Set(["scenarios", "evaluators"]);
 
 /** What the license holds: a self-hosted install meets its license's limit, never a plan's. */
 function limitWords({ isSaaS, isSeatLimit }: { isSaaS: boolean; isSeatLimit: boolean }): {
@@ -93,6 +93,12 @@ export function LimitContent({
           {CREATION_LIMIT_TYPES.has(variant.limitType) && (
             <Text color="fg.muted">
               Everything you already have keeps working and stays editable.
+            </Text>
+          )}
+          {variant.limitType === "scenarioRuns" && (
+            <Text color="fg.muted">
+              The count starts again on the 1st of next month (UTC). Paid plans run scenarios
+              without a cap.
             </Text>
           )}
           {SEAT_LIMIT_TYPES.has(variant.limitType) && (

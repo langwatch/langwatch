@@ -94,6 +94,20 @@ describe("<GlobalUpgradeModal/>", () => {
       expect(screen.queryByText(/disable a membership/i)).toBeNull();
     });
 
+    /** @scenario The upgrade modal names the cap that was reached */
+    it("names the cloud Free monthly run cap and when its count starts again", async () => {
+      renderGate(true);
+
+      act(() => {
+        useUpgradeModalStore.getState().open("scenarioRuns", 100, 100);
+      });
+
+      expect(await screen.findByText(/You've reached the limit of 100 /)).toBeInTheDocument();
+      expect(screen.getByText("Current usage: 100 / 100")).toBeInTheDocument();
+      expect(screen.getByText(/starts again on the 1st of next month \(UTC\)/)).toBeInTheDocument();
+      expect(screen.queryByText(/disable a membership/i)).toBeNull();
+    });
+
     /** @scenario "A self-hosted install that used every licensed seat is told so in license words" */
     it("speaks of the license, not a plan, on a self-hosted deployment", async () => {
       renderGate(false);

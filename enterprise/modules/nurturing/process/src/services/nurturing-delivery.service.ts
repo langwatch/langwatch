@@ -44,6 +44,7 @@ import {
   integrationMethodFor,
 } from "../rules/nurturing-product-interest-service.rules.ts";
 import { firePromptCreated } from "../rules/nurturing-prompt-creation-service.rules.ts";
+import { fireScenarioRunCapCustomerIo } from "../rules/nurturing-scenario-run-cap.rules.ts";
 import { fireSignup } from "../rules/nurturing-signup-identification-service.rules.ts";
 import { fireSubscriptionSync } from "../rules/nurturing-subscription-sync-service.rules.ts";
 import { NurturingClaimReleaseService } from "./nurturing-claim-release.service.ts";
@@ -311,6 +312,9 @@ export class NurturingDeliveryService {
         return this.sendCustomerIoCalls(fireGuidedOnboardingProgress(signal));
       case "subscription_changed":
         return this.sendCustomerIoCalls(fireSubscriptionSync(signal));
+      case "scenario_runs_threshold_reached":
+      case "scenario_run_grace_ended":
+        return this.sendCustomerIoCalls(fireScenarioRunCapCustomerIo(signal));
       case "self_hosted_crm":
         return this.selfHostedCrm(signal);
       default:

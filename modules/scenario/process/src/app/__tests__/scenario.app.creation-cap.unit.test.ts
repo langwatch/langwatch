@@ -1,6 +1,7 @@
-import type { AgentApi } from "@langwatch/agent-contract";
+import { type AgentApi, AgentNotFoundError } from "@langwatch/agent-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { LimitExceededError } from "@langwatch/enterprise-licensing-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
@@ -12,7 +13,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   scenarioExecutorPeers,
@@ -36,14 +37,17 @@ const CLOUD_FREE: Plan = {
   canPublish: true,
   prices: { USD: 0, EUR: 0 },
   maxScenarios: 3,
-  maxScenarioSets: 3,
+  maxScenarioRunsPerMonth: 100,
   maxEvaluators: 3,
 };
 
 const BY = { id: "user-1", label: "user" } as const;
 
 /** An organization on cloud Free whose two projects already hold 3 active scenarios. */
-async function organizationAtTheScenarioCap() {
+async function organizationAtTheScenarioCap({
+  runCap = async () => {},
+  agents = createApiFixture<AgentApi>(),
+}: { runCap?: EntitlementApi["assertScenarioRunAllowed"]; agents?: AgentApi } = {}) {
   const repositories = MemoryScenarioRepositories.create();
   for (let index = 0; index < 3; index++) {
     await repositories.scenarios.create({
@@ -61,14 +65,17 @@ async function organizationAtTheScenarioCap() {
     channels: MemoryScenarioChannels.create(),
     repositories,
     dependencies: {
-      agents: createApiFixture<AgentApi>(),
+      agents,
       evaluations: createApiFixture<EvaluationApi>(),
       users: createApiFixture<UserApi>(),
       projects: createApiFixture<ProjectApi>({
         getOrganizationId: async () => "organization-1",
         listIdsByOrganization: async () => ["project-1", "project-2"],
       }),
-      plans: createApiFixture<EntitlementApi>({ getActivePlan: async () => CLOUD_FREE }),
+      plans: createApiFixture<EntitlementApi>({
+        getActivePlan: async () => CLOUD_FREE,
+        assertScenarioRunAllowed: runCap,
+      }),
       modelProviders: createApiFixture<ModelProviderApi>(),
       presence: createApiFixture<PresenceApi>(),
       auditLog: createApiFixture<AuditLogApi>(),
@@ -133,6 +140,70 @@ describe("ScenarioModule on the cloud Free scenario cap", () => {
       );
 
       expect(updated.name).toBe("Renamed");
+    });
+  });
+});
+
+describe("ScenarioModule on the cloud Free scenario run cap", () => {
+  describe("given an organization past the month's run cap", () => {
+    /** @scenario Running a scenario from the app past the run cap opens the upgrade prompt */
+    it("refuses queueing a run with the upgrade shape", async () => {
+      const { app } = await organizationAtTheScenarioCap({
+        runCap: async () => {
+          throw new LimitExceededError("scenarioRuns", 100, 100);
+        },
+      });
+
+      await expect(
+        app.queueSimulationRun({
+          projectId: "project-1",
+          scenarioId: "scenario-0",
+          scenarioRunId: "scenariorun-1",
+          batchRunId: "batch-1",
+          setId: "set-1",
+          name: "Scenario 0",
+          target: { type: "http", referenceId: "agent-1" },
+          parameters: {},
+          secretParameters: {},
+          note: undefined,
+          scenarioVersion: undefined,
+        }),
+      ).rejects.toMatchObject({
+        code: "resource_limit_exceeded",
+        httpStatus: 403,
+        meta: { limitType: "scenarioRuns", current: 100, max: 100 },
+      });
+    });
+  });
+
+  describe("given a run whose connected target cannot be resolved", () => {
+    /** @scenario A run whose target cannot be resolved takes no run from the cap */
+    it("fails with the missing agent before asking the run cap", async () => {
+      const runCap = vi.fn<EntitlementApi["assertScenarioRunAllowed"]>(async () => {});
+      const agents = createApiFixture<AgentApi>({
+        getConnectedByNameAndEnvironment: async () => [],
+        getById: async ({ id, projectId }) => {
+          throw new AgentNotFoundError(id, projectId);
+        },
+      });
+      const { app } = await organizationAtTheScenarioCap({ runCap, agents });
+
+      await expect(
+        app.queueSimulationRun({
+          projectId: "project-1",
+          scenarioId: "scenario-0",
+          scenarioRunId: "scenariorun-2",
+          batchRunId: "batch-1",
+          setId: "set-1",
+          name: "Scenario 0",
+          target: { type: "connected", referenceId: "agent-missing" },
+          parameters: {},
+          secretParameters: {},
+          note: undefined,
+          scenarioVersion: undefined,
+        }),
+      ).rejects.toMatchObject({ code: "agent_not_found" });
+      expect(runCap).not.toHaveBeenCalled();
     });
   });
 });

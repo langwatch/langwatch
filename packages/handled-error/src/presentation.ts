@@ -227,7 +227,7 @@ const SEAT_LIMIT_LABELS: Record<string, string> = {
 /** Creation caps the cloud Free plan sets, named as the pricing page does. */
 const CREATION_LIMIT_LABELS: Record<string, string> = {
   scenarios: "scenarios",
-  scenarioSets: "simulations",
+  scenarioRuns: "scenario runs a month",
   evaluators: "custom evaluators",
 };
 
@@ -2811,6 +2811,11 @@ const presentations = {
     describe: (error) => {
       const limitType = str(error, "limitType", "");
       const creationLabel = CREATION_LIMIT_LABELS[limitType];
+      if (limitType === "scenarioRuns") {
+        const max = num(error, "max", 0);
+        const included = max > 0 ? `${max} ${creationLabel}` : "a monthly number of scenario runs";
+        return `Your plan includes ${included} and this month's are used. Upgrade your plan to keep running scenarios, or wait for the count to start again next month.`;
+      }
       if (creationLabel) {
         const max = num(error, "max", 0);
         const included = max > 0 ? `${max} ${creationLabel}` : creationLabel;

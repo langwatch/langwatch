@@ -278,6 +278,14 @@ launchRun(input: ScenarioLaunchRunInput): Promise<ScenarioRunScheduled>;
 prefetchExecution(input: ScenarioExecutionPrefetchInput): Promise<ScenarioExecutionPrefetchResult>;
 ```
 
+#### `assertSimulationRunAllowed`
+
+Asks the plan's run cap once, so a caller about to queue a batch is refused before any run.
+
+```typescript
+assertSimulationRunAllowed(input: { projectId: string }): Promise<void>;
+```
+
 #### `queueSimulationRun`
 
 ```typescript
@@ -683,14 +691,15 @@ Authenticated: The voice flag and scenarios:create are checked in the app; evalu
 Answers at `/api/voice/session`.
 
 ```typescript
-// Body: voiceSessionMintInputSchema, ../contract/src/voice/voice-session.schemas.ts:18
+// Body: voiceSessionMintInputSchema, ../contract/src/voice/voice-session.schemas.ts:20
 interface Body {
   projectId: string;
   transport: "elevenlabs_convai" | "phone";
   agentId: string;
   agentRowId?: string;
+  scenarioId?: string;
 }
-// Response: voiceSessionMintResultSchema, ../contract/src/voice/voice-session.schemas.ts:71
+// Response: voiceSessionMintResultSchema, ../contract/src/voice/voice-session.schemas.ts:73
 interface Response {
   transport: "elevenlabs_convai" | "phone";
   sessionToken: string;
@@ -710,12 +719,12 @@ Authenticated: The voice flag and scenarios:create are checked in the app; evalu
 Answers at `/api/voice/session/:sessionId/finish`.
 
 ```typescript
-// Params: voiceSessionFinishParamsSchema, ../contract/src/voice/voice-session.schemas.ts:58
+// Params: voiceSessionFinishParamsSchema, ../contract/src/voice/voice-session.schemas.ts:60
 interface Params {
   sessionId: string;
 }
-type Body = z.infer<typeof voiceSessionFinishInputSchema>; // ../contract/src/voice/voice-session.schemas.ts:50
-// Response: voiceSessionFinishResultSchema, ../contract/src/voice/voice-session.schemas.ts:88
+type Body = z.infer<typeof voiceSessionFinishInputSchema>; // ../contract/src/voice/voice-session.schemas.ts:52
+// Response: voiceSessionFinishResultSchema, ../contract/src/voice/voice-session.schemas.ts:90
 interface Response {
   runId: string;
   agentId: string;
@@ -736,11 +745,11 @@ Permission `scenarios:view`. Declared at `src/transport/scenario-voice.rest.ts:4
 Answers at `/api/voice/session/:conversationId/audio`.
 
 ```typescript
-// Params: voiceSessionAudioParamsSchema, ../contract/src/voice/voice-session.schemas.ts:107
+// Params: voiceSessionAudioParamsSchema, ../contract/src/voice/voice-session.schemas.ts:109
 interface Params {
   conversationId: string;
 }
-// Query: voiceSessionAudioQuerySchema, ../contract/src/voice/voice-session.schemas.ts:113
+// Query: voiceSessionAudioQuerySchema, ../contract/src/voice/voice-session.schemas.ts:115
 interface Query {
   projectId: string;
 }
@@ -757,11 +766,11 @@ Permission `scenarios:view`. Declared at `src/transport/scenario-voice.rest.ts:6
 Answers at `/api/voice/run/:scenarioRunId/audio`.
 
 ```typescript
-// Params: voiceRunAudioParamsSchema, ../contract/src/voice/voice-session.schemas.ts:128
+// Params: voiceRunAudioParamsSchema, ../contract/src/voice/voice-session.schemas.ts:130
 interface Params {
   scenarioRunId: string;
 }
-type Query = z.infer<typeof voiceSessionAudioQuerySchema>; // ../contract/src/voice/voice-session.schemas.ts:113
+type Query = z.infer<typeof voiceSessionAudioQuerySchema>; // ../contract/src/voice/voice-session.schemas.ts:115
 // Response: inline, src/transport/scenario-voice.rest.ts:67
 type Response = unknown;
 ```
@@ -1375,12 +1384,12 @@ interface Input {
 // Output: runConfigurationEntrySchema.array() (inline, ../contract/src/scenario.trpc.ts:487)
 
 // scenarios.mintVoiceSession
-type Input = z.infer<typeof voiceSessionMintInputSchema>; // ../contract/src/voice/voice-session.schemas.ts:18
-type Output = z.infer<typeof voiceSessionMintResultSchema>; // ../contract/src/voice/voice-session.schemas.ts:71
+type Input = z.infer<typeof voiceSessionMintInputSchema>; // ../contract/src/voice/voice-session.schemas.ts:20
+type Output = z.infer<typeof voiceSessionMintResultSchema>; // ../contract/src/voice/voice-session.schemas.ts:73
 
 // scenarios.finishVoiceSession
-type Input = z.infer<typeof voiceSessionFinishInputSchema>; // ../contract/src/voice/voice-session.schemas.ts:50
-type Output = z.infer<typeof voiceSessionFinishResultSchema>; // ../contract/src/voice/voice-session.schemas.ts:88
+type Input = z.infer<typeof voiceSessionFinishInputSchema>; // ../contract/src/voice/voice-session.schemas.ts:52
+type Output = z.infer<typeof voiceSessionFinishResultSchema>; // ../contract/src/voice/voice-session.schemas.ts:90
 
 // scenarios.testAgentTurn
 // Input: agentApiTestTurnInputSchema, ../../agent/contract/src/agent.schemas.ts:50

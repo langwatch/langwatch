@@ -20,6 +20,11 @@ export const SIMULATION_RUN_EVENT_TYPES = {
   HOOKS_RECORDED: "lw.simulation_run.hooks_recorded",
 } as const;
 
+/** The start event's idempotency key: the billable meter counts one run start per key. */
+export function simulationRunStartKey(input: { projectId: string; scenarioRunId: string }): string {
+  return `${input.projectId}:${input.scenarioRunId}:startRun`;
+}
+
 /**
  * Set-scoped events. The set is the aggregate; payloads reference the
  * runs the action applies to. See lw#3636.
