@@ -42,7 +42,7 @@ const actorSchema = z.discriminatedUnion("type", [
 ]);
 
 /** The window a shared grant opens. `from` and `until` are epoch milliseconds; `until` null
- *  means open-ended. Only a `span` condition (a braid, ADR-185 §3) carries `compiledWhere`, and
+ *  means open-ended. Only a `span` condition (a braid, ADR-201 §3) carries `compiledWhere`, and
  *  one with a non-empty `where` must, so no condition reaches a fence it cannot apply. */
 export const authorizationConditionSchema = z
   .object({
@@ -68,7 +68,7 @@ export type AuthorizationCondition = z.infer<typeof authorizationConditionSchema
 
 /**
  * ADR-177 / ADR-166: a SHARED grant's window as the ledger stores it. `where` is OTTL text only a
- * braid's `span` condition fills (ADR-185 §3), beside its `compiledWhere`; `from`/`until` are ISO
+ * braid's `span` condition fills (ADR-201 §3), beside its `compiledWhere`; `from`/`until` are ISO
  * instants. The minter turns this into an {@link AuthorizationCondition}.
  */
 export const grantConditionSchema = z.object({

@@ -647,7 +647,7 @@ Feature: Authorization grants
     And the platform is never an anonymous actor
 
   # ═══ Braid grants, read before they are written ═══════════════════════
-  # ADR-185 (Braids) writes a braid as a shared project-reader grant on a
+  # ADR-201 (Braids) writes a braid as a shared project-reader grant on a
   # span condition, with its compiled where and the braid a change replaces.
   # The release before it reads those facts, so a worker still on it during a
   # rolling upgrade folds a braid's attach rather than refusing and retrying
