@@ -867,7 +867,7 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `prometheus.server.configMapOverrideName`         | Override ConfigMap name for scrape config. | `""`                            |
 | `prometheus.server.image`                         | Image configuration.                       |                                 |
 | `prometheus.server.image.repository`              | Image repository.                          | `quay.io/prometheus/prometheus` |
-| `prometheus.server.image.tag`                     | Image tag.                                 | `v3.5.5`                        |
+| `prometheus.server.image.tag`                     | Image tag.                                 | `v3.11.3`                       |
 | `prometheus.server.replicaCount`                  | Number of Prometheus replicas.             | `1`                             |
 | `prometheus.server.global`                        | Global scrape/evaluation intervals.        |                                 |
 | `prometheus.server.global.scrape_interval`        | Scrape interval.                           | `15s`                           |
