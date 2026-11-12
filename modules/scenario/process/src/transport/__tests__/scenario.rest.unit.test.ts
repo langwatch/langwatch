@@ -118,6 +118,35 @@ describe("the scenarios REST declaration", () => {
     });
   });
 
+  describe("when creating and updating with judge trace settings", () => {
+    it("carries them back, refuses out-of-range values and clears with null", async () => {
+      const family = await buildScenarioFamily();
+      const createdResponse = await createScenario(family, {
+        name: "Trace wait Scenario",
+        situation: "User asks for a refund",
+        traceQuietPeriodMs: 12_000,
+        traceWaitTimeoutMs: 90_000,
+      });
+
+      expect(createdResponse.status).toBe(201);
+      const created = scenarioRestResponseWithPlatformUrlSchema.parse(await createdResponse.json());
+      expect(created).toMatchObject({ traceQuietPeriodMs: 12_000, traceWaitTimeoutMs: 90_000 });
+
+      const patch = (body: Record<string, unknown>) =>
+        family.request(`/api/scenarios/${created.id}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        });
+      expect((await patch({ traceWaitTimeoutMs: 300_001 })).status).toBe(422);
+      const cleared = await patch({ traceQuietPeriodMs: null });
+      await expect(cleared.json()).resolves.toMatchObject({
+        traceQuietPeriodMs: null,
+        traceWaitTimeoutMs: 90_000,
+      });
+    });
+  });
+
   describe("when a scenario is created with field values", () => {
     /** @scenario "The scenario API accepts and returns field values" */
     it("answers the fields on create and on read", async () => {

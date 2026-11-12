@@ -3,6 +3,10 @@ import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
+  traceQuietPeriodMsSchema,
+  traceWaitTimeoutMsSchema,
+} from "./features/run/run-trace-wait.ts";
+import {
   scenarioParameterDefinitionSchema,
   scenarioParameterDefinitionsSchema,
 } from "./scenario.parameters.ts";
@@ -42,6 +46,22 @@ const scenarioRestResponseSchemaDefinition = z.object({
     .optional()
     .describe(
       "The model that judges the run, or null for the project default. Absent on servers that predate model overrides on this family.",
+    ),
+  traceQuietPeriodMs: z
+    .number()
+    .int()
+    .nullable()
+    .optional()
+    .describe(
+      "Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the project's recommendation. Absent on servers that predate judge trace settings.",
+    ),
+  traceWaitTimeoutMs: z
+    .number()
+    .int()
+    .nullable()
+    .optional()
+    .describe(
+      "Milliseconds the judge waits for the agent's trace before a verdict, or null for the project's recommendation. Absent on servers that predate judge trace settings.",
     ),
   maxTurns: z
     .number()
@@ -182,6 +202,10 @@ const simulatorModelDescription =
   "Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the project default.";
 const judgeModelDescription =
   "Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default.";
+const traceQuietPeriodDescription =
+  "Milliseconds (0 to 60000) the agent's trace must stay unchanged before the judge reads it. Null uses the project's recommendation.";
+const traceWaitTimeoutDescription =
+  "Milliseconds (1000 to 300000) the judge waits for the agent's trace before a verdict. Null uses the project's recommendation.";
 const maxTurnsDescription =
   "Maximum conversation turns for a run of this scenario. Null uses the default.";
 const minTurnsDescription =
@@ -195,6 +219,8 @@ const scenarioRestCreateSchemaDefinition = z.object({
   parameters: scenarioParameterDefinitionsSchema.optional().describe(parametersDescription),
   simulatorModel: modelOverrideSchema.nullish().describe(simulatorModelDescription),
   judgeModel: modelOverrideSchema.nullish().describe(judgeModelDescription),
+  traceQuietPeriodMs: traceQuietPeriodMsSchema.nullish().describe(traceQuietPeriodDescription),
+  traceWaitTimeoutMs: traceWaitTimeoutMsSchema.nullish().describe(traceWaitTimeoutDescription),
   maxTurns: z.number().int().min(1).max(100).nullish().describe(maxTurnsDescription),
   minTurns: z.number().int().min(0).max(100).nullish().describe(minTurnsDescription),
   testSuiteId: z.string().nullish().describe(testSuiteIdDescription),
@@ -224,6 +250,8 @@ const scenarioRestUpdateSchemaDefinition = z
     parameters: scenarioParameterDefinitionsSchema.optional().describe(parametersDescription),
     simulatorModel: modelOverrideSchema.nullish().describe(simulatorModelDescription),
     judgeModel: modelOverrideSchema.nullish().describe(judgeModelDescription),
+    traceQuietPeriodMs: traceQuietPeriodMsSchema.nullish().describe(traceQuietPeriodDescription),
+    traceWaitTimeoutMs: traceWaitTimeoutMsSchema.nullish().describe(traceWaitTimeoutDescription),
     maxTurns: z.number().int().min(1).max(100).nullish().describe(maxTurnsDescription),
     minTurns: z.number().int().min(0).max(100).nullish().describe(minTurnsDescription),
     testSuiteId: z.string().nullish().describe(testSuiteIdDescription),
