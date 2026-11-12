@@ -173,7 +173,7 @@ func (j *JudgeAgent) Call(ctx context.Context, in AgentInput) (*AgentReturn, err
 		in:         in,
 		criteria:   criteria,
 		transcript: buildJudgeTranscript(msgs),
-		traces:     resolveTraceSettings(in.ScenarioConfig, j.cfg.TraceFetcher),
+		traces:     resolveJudgeTraceSettings(ctx, in.ScenarioConfig, j.cfg.TraceFetcher),
 		model:      model,
 	}
 	if j.includeTimeline(hasAudio) {
@@ -340,16 +340,18 @@ func (j *JudgeAgent) verdict(ctx context.Context, c judgeCall, forced, exhausted
 		ThreadID: c.in.ThreadID, TraceIDs: traceIDs, Collector: collector,
 		LangWatch: c.in.ScenarioConfig.LangWatch, QuietPeriod: ts.quietPeriod,
 	}
-	allSettled := true
+	settle := SettleOutcome{AllSettled: true}
 	switch {
 	case ts.fetch && len(traceIDs) > 0:
 		target.Timeout = ts.timeout
-		allSettled = ts.fetcher.SettleWait(ctx, target)
+		settle = ts.fetcher.SettleWait(ctx, target)
 	case ts.fetch:
 		logger().Warn("Remote trace fetching is on but no message carries a trace id; nothing to fetch")
 		ts.fetcher.RecordMissingTraceIDs(c.in.ThreadID, collector)
 	}
-	waitAvailable := ts.fetch && len(traceIDs) > 0 && !allSettled && ts.extension > 0
+	// The one extra wait is offered while the traces are incomplete or
+	// settled on the quiet period alone.
+	waitAvailable := ts.fetch && len(traceIDs) > 0 && (!settle.AllSettled || settle.Unconfirmed) && ts.extension > 0
 	waitedOnce := false
 
 	for {
@@ -360,6 +362,9 @@ func (j *JudgeAgent) verdict(ctx context.Context, c judgeCall, forced, exhausted
 		extra := ""
 		if c.in.JudgmentRequest != nil {
 			extra = additionalContextSection(c.in.JudgmentRequest.AdditionalContext)
+		}
+		if waitAvailable && settle.Unconfirmed {
+			extra += traceStatusSection(unconfirmedTraceNote)
 		}
 		content, large := judgeContent(c.in.ScenarioState.spanDigests(), spans, j.cfg.TokenThreshold, c.transcript, extra+c.extra)
 		system := buildVerdictSystemPrompt(c.criteria, c.in.ScenarioConfig.Description, ts.fetch)
@@ -407,7 +412,7 @@ func (j *JudgeAgent) verdict(ctx context.Context, c judgeCall, forced, exhausted
 		if waitAvailable && comp.called("wait_for_traces") {
 			waitAvailable, waitedOnce = false, true
 			target.Timeout = ts.extension
-			ts.fetcher.ExtendSettle(ctx, target)
+			settle = ts.fetcher.ExtendSettle(ctx, target)
 			continue
 		}
 		forcedNow := false

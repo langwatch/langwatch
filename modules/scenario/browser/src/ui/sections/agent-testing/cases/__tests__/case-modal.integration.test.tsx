@@ -633,6 +633,65 @@ describe("the scenario dialog", () => {
     });
   });
 
+  describe("given a scenario saved with a judge trace wait", () => {
+    const openStored = () => {
+      mockGetById.mockReturnValue({
+        data: storedCase({ traceQuietPeriodMs: null, traceWaitTimeoutMs: 45_000 }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+      openDrawerAs({ scenarioId: "case_1" });
+      renderWithDesignSystem(
+        <>
+          <AgentTestingCaseEditor />
+          <AgentTestingCaseEditorDrawer />
+        </>,
+      );
+    };
+
+    /** @scenario "The judge settings show the trace wait inputs in seconds" */
+    it("opens the models block with the advanced judge settings in seconds", async () => {
+      openStored();
+
+      const wait = (await screen.findByLabelText("Max trace wait")) as HTMLInputElement;
+      expect(wait.value).toBe("45");
+      const quiet = screen.getByLabelText("Quiet period") as HTMLInputElement;
+      expect(quiet.value).toBe("");
+      expect(quiet.placeholder).toBe("7");
+    });
+
+    describe("when the quiet period is set to 10 seconds and saved", () => {
+      it("sends both settings in milliseconds", async () => {
+        const user = userEvent.setup();
+        openStored();
+
+        await user.type(await screen.findByLabelText("Quiet period"), "10");
+        await user.click(screen.getByTestId("case-modal-save"));
+
+        expect(mockUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({ traceQuietPeriodMs: 10_000, traceWaitTimeoutMs: 45_000 }),
+        );
+      });
+    });
+
+    describe("when the max trace wait is out of range", () => {
+      it("refuses the save and says why under the input", async () => {
+        const user = userEvent.setup();
+        openStored();
+
+        const wait = await screen.findByLabelText("Max trace wait");
+        await user.clear(wait);
+        await user.type(wait, "301");
+        await user.click(screen.getByTestId("case-modal-save"));
+
+        expect(mockUpdate).not.toHaveBeenCalled();
+        expect(
+          screen.getByText("Max trace wait must be between 1 and 300 seconds"),
+        ).toBeInTheDocument();
+      });
+    });
+  });
+
   describe("given the caller voice block", () => {
     /** @scenario The caller voice is also offered in the Agent Testing scenario editor */
     it("offers a Caller voice chip alongside parameters, turns and models", async () => {

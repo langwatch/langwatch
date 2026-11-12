@@ -487,6 +487,38 @@ describe("<RunDialog/>", () => {
     );
   });
 
+  /** @scenario "The judge settings show the trace wait inputs in seconds" */
+  it("opens a stored plan's judge trace wait in seconds and runs it in milliseconds", async () => {
+    const user = userEvent.setup();
+    mockAgentsGetAll.mockReturnValue({ data: [ONLINE_AGENT] });
+    renderDialog(suiteSubject({ traceQuietPeriodMs: 15_000, traceWaitTimeoutMs: null }));
+
+    expect(screen.getByTestId("run-dialog-models")).toBeInTheDocument();
+    expect(screen.getByLabelText("Quiet period")).toHaveValue(15);
+    const wait = screen.getByLabelText("Max trace wait") as HTMLInputElement;
+    expect(wait.placeholder).toBe("30");
+
+    await user.type(wait, "500");
+    await user.click(screen.getByTestId("run-dialog-agent-agent_1"));
+    await user.click(screen.getByTestId("run-dialog-run"));
+    expect(mockSuitesRunPlan).not.toHaveBeenCalled();
+    expect(
+      screen.getByText("Max trace wait must be between 1 and 300 seconds"),
+    ).toBeInTheDocument();
+
+    await user.clear(wait);
+    await user.type(wait, "120");
+    await user.click(screen.getByTestId("run-dialog-run"));
+    expect(mockSuitesRunPlan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({
+          traceQuietPeriodMs: 15_000,
+          traceWaitTimeoutMs: 120_000,
+        }),
+      }),
+    );
+  });
+
   // --- Chips ---
 
   /** @scenario "The note chip adds a note field" */

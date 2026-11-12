@@ -19,6 +19,8 @@ export type StoredPlanRow = {
   targets: unknown;
   /** The evaluators the row attaches; a run plan's own extras. */
   evaluators?: unknown;
+  traceQuietPeriodMs?: number | null;
+  traceWaitTimeoutMs?: number | null;
 };
 
 export function scopeOfStoredPlan(plan: StoredPlanRow): RunScope {
@@ -53,6 +55,8 @@ export function storedPlanSubject(
       : {
           planName: plan.name,
           evaluators: parseEvaluatorAttachments(plan.evaluators),
+          traceQuietPeriodMs: plan.traceQuietPeriodMs ?? null,
+          traceWaitTimeoutMs: plan.traceWaitTimeoutMs ?? null,
         }),
     initialTarget: first ? { type: first.type, id: first.referenceId } : null,
     persistedTarget: first ?? null,

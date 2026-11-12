@@ -10,6 +10,10 @@ import (
 
 const remoteTraceJudgingRule = "Criteria about the agent's internal behavior (tool calls, database writes, API calls, retrievals) must be verified against the <opentelemetry_traces> section, not against claims in the transcript. If a span named langwatch.span_collection.error is present, read its reason: when no agent spans arrived, mark criteria that depend on internal behavior as inconclusive, never passed. When the trace is incomplete, criteria proven by the spans that are present may pass, and criteria whose evidence is missing stay inconclusive. Criteria about the conversation itself are unaffected by missing traces: judge them from the transcript as normal. Never mark internal-behavior criteria as passed based on the transcript alone."
 
+// unconfirmedTraceNote is shown with the evidence when a remote trace
+// stopped changing but has no wrapping agent span to prove it complete.
+const unconfirmedTraceNote = "The remote trace stopped changing, but nothing proves it is complete: spans may still be arriving, since exporters send spans in batches every few seconds. If a criterion depends on spans that are not shown, call wait_for_traces once before judging it."
+
 const decisionPhaseRule = "In this step, only decide whether the conversation has collected enough information to evaluate the criteria: call make_verdict when it has, or continue_test to let the conversation play out. Do not decide whether the criteria pass or fail now: that evaluation happens in a separate step after the conversation ends."
 
 const remoteTraceDecisionRule = "The agent's execution traces are fetched and verified at the verdict, after the conversation ends; they are not part of this decision. Do not continue the conversation only to wait for trace evidence, and do not end it early to see traces sooner."
@@ -17,7 +21,7 @@ const remoteTraceDecisionRule = "The agent's execution traces are fetched and ve
 // Field descriptions of the finish_test tool.
 const (
 	requirementDescription        = "This criterion restated as a positive requirement the agent must satisfy. A fail condition such as 'fail if X', 'fail only if X', 'pass unless X' or 'the agent must not X' becomes 'the agent does not X'."
-	criterionReasoningDescription = "What the conversation and the collected evidence show about this requirement alone, pointing at the moment that decides it. Written before the status. When the status is inconclusive, name the evidence that was missing."
+	criterionReasoningDescription = "What the conversation and the collected evidence show about this requirement alone, pointing at the moment that decides it. Written before the status. When the requirement depends on a number, date, count or duration, recompute it here from the evidence step by step and compare it with the agent's answer. When the status is inconclusive, name the evidence that was missing."
 	statusDescription             = "passed: the agent satisfied the requirement (for a fail condition, the condition did not happen). failed: the agent did not satisfy it (for a fail condition, the condition happened). inconclusive: the evidence to decide is not available."
 	summaryDescription            = "A short summary of the verdict across all criteria, written after judging each one."
 )
@@ -27,6 +31,8 @@ const (
 var perCriterionRules = [...]string{
 	"Judge each criterion on its own: restate it as a positive requirement, check the conversation and the collected evidence for that requirement alone, write the reasoning, then choose its status. The outcome of one criterion never decides another.",
 	`passed means the agent satisfied the requirement. A criterion phrased as a fail condition ("fail if X", "fail only if X", "pass unless X", "the agent must not X") passes when X did not happen and fails when X happened.`,
+	"Before grading a number, date, count or duration, recompute it from the evidence step by step in the reasoning, then compare the result with the agent's answer. A value that differs from the recomputed one fails the criterion, however confident or detailed the answer sounds.",
+	"Be strict about evidence, not wording: an answer that is equivalent to what the criterion asks for, or that follows from the evidence by a correct derivation (the 21st anniversary of an event first held in 1988 is 2009), satisfies it. Checking that arithmetic or derivation is part of judging the criterion.",
 	"When the evidence to decide a criterion is not available (the conversation ended before the moment it depends on, or it depends on internal behavior that left no trace), mark it inconclusive and name the missing evidence in its reasoning instead of guessing.",
 }
 
@@ -36,8 +42,8 @@ const (
 	makeVerdictDescription   = "The conversation has collected enough information to evaluate the criteria. End the conversation and move to the verdict."
 	waitForTracesDescription = "The remote trace evidence is still incomplete and the missing spans are essential for the verdict. Wait one more period for them to arrive. Available once: after this wait the verdict must be delivered on the evidence at hand. Only call this when a criterion genuinely depends on the missing spans; otherwise deliver the verdict now."
 	finishTestDescription    = "Complete the test with a verdict on each criterion, judged one by one"
-	expandTraceDescription   = "Expand one or more spans to see their full details (attributes, events, content). Use the span ID shown in brackets in the trace skeleton."
-	grepTraceDescription     = "Search across all span attributes, events, and content for a pattern (case-insensitive). Returns matching spans with context."
+	expandTraceDescription   = "Expand one or more spans to see their full details (attributes, events, content). Use the span ID shown in brackets in the trace skeleton. Long output comes in pages: pass the offset named at the end of a page to read the next one."
+	grepTraceDescription     = "Search across all span attributes, events, and content for a pattern (case-insensitive). Returns matching spans with the text around each match, even deep inside long values."
 )
 
 // Follow-up instructions of the verdict phase.
@@ -123,7 +129,7 @@ Your goal is to deliver the final verdict of the scenario below with the finish_
 
 <rules>
 - Be strict: a criterion passes only when the conversation or the collected evidence clearly shows it was met.
-- DO NOT make any judgment calls that are not explicitly listed in the success or failure criteria, withhold judgement if necessary
+- DO NOT make any judgment calls that are not explicitly listed in the success or failure criteria, withhold judgement if necessary. Recomputing a number or following a derivation that a criterion depends on is not an extra judgment call.
 ` + strings.Join(rules, "\n") + remoteRule + `
 </rules>
 `)
@@ -135,6 +141,10 @@ func judgeContentFrame(transcript, additionalContextSection string) (head, tail 
 	head = []string{"\n    <transcript>\n    ", transcript, "\n    </transcript>\n    <opentelemetry_traces>\n    "}
 	tail = []string{"\n    </opentelemetry_traces>", additionalContextSection, "\n    "}
 	return head, tail
+}
+
+func traceStatusSection(text string) string {
+	return "\n    <trace_status>\n    " + text + "\n    </trace_status>"
 }
 
 func additionalContextSection(text string) string {

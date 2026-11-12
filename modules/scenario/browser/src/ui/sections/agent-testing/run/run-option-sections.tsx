@@ -8,10 +8,15 @@ import { Box, Grid, HStack, Input, Text, VStack } from "@langwatch/design-system
 import { MAX_REPEAT_COUNT } from "@langwatch/suite-contract";
 
 import {
+  type JudgeTraceWaitInput,
+  judgeTraceWaitErrorsOf,
+} from "../../../../model/judge-trace-wait.ts";
+import {
   DIALOG_FIELD_STYLE,
   FieldLabel,
 } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
 import { RemoveBlockButton } from "../../../elements/agent-testing/shared/remove-block-button.tsx";
+import { JudgeTraceWaitSettings } from "../../../elements/judge-trace-wait-settings.tsx";
 import { SimulationModelSelect } from "../../scenarios/simulation-model-select.tsx";
 
 /** The model that plays the user, and the model that judges the runs. */
@@ -20,12 +25,16 @@ export function SimulationModelsSection({
   judgeModel,
   onSimulatorChange,
   onJudgeChange,
+  traceWait,
+  onTraceWaitChange,
   onRemove,
 }: {
   simulatorModel: string | null;
   judgeModel: string | null;
   onSimulatorChange: (model: string | null) => void;
   onJudgeChange: (model: string | null) => void;
+  traceWait: JudgeTraceWaitInput;
+  onTraceWaitChange: (traceWait: JudgeTraceWaitInput) => void;
   onRemove: () => void;
 }) {
   return (
@@ -54,6 +63,13 @@ export function SimulationModelsSection({
           />
         </Box>
       </Grid>
+      <Box marginTop={3}>
+        <JudgeTraceWaitSettings
+          value={traceWait}
+          errors={judgeTraceWaitErrorsOf(traceWait)}
+          onChange={onTraceWaitChange}
+        />
+      </Box>
     </VStack>
   );
 }
