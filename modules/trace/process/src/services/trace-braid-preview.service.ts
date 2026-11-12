@@ -54,7 +54,7 @@ function ownOf(authorization: Authorization): Own {
   const projectId = ownProjectIdReadBy(authorization);
   return {
     projectId,
-    authorization: narrowAuthorization({ authorization, projectId }) ?? authorization,
+    authorization: narrowAuthorization({ authorization, projectId }),
   };
 }
 

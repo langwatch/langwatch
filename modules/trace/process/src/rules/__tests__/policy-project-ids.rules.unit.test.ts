@@ -67,7 +67,6 @@ describe("policyProjectIdsOf", () => {
         authorization: proof({ shared: [A, B] }),
         projectId: A,
       });
-      if (!narrowed) throw new Error("narrowing to a named member failed");
 
       expect(policyProjectIdsOf({ projectId: AGG, authorization: narrowed })).toEqual([AGG, A]);
     });

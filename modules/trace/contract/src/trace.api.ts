@@ -870,7 +870,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
       params?: unknown;
     }[];
   }): Promise<(SpanBraid | null)[]>;
-  /** The header's `braided` totals and owners; `{}` for a trace or proof without braids. */
+  /** The header's `braided` totals and owners; `{}` for a trace or proof without braids. Each
+   *  owner's cost counts only where its own protections show this viewer cost. */
   readBraidedHeaderTotals(input: {
     authorization: Authorization;
     traceId: string;

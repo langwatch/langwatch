@@ -348,6 +348,7 @@ export class AuthzModule implements AuthzApi {
       bindings: repositories.bindings,
       permissions,
       offboarded: memberOffboardings,
+      policies: repositories.organizationPolicies,
     });
     const braids = AuthzBraidService.create({
       ledger,
@@ -694,10 +695,9 @@ export class AuthzModule implements AuthzApi {
   createBraid: AuthzApi["createBraid"] = (a) => this.braids().createBraid(a);
   changeBraid: AuthzApi["changeBraid"] = (a) => this.braids().changeBraid(a);
   removeBraid: AuthzApi["removeBraid"] = (a) => this.braids().removeBraid(a);
-  /** An app composing no audit trail records nothing; the read it audits carries on. */
-  recordBraidedSpansView: AuthzApi["recordBraidedSpansView"] = async (a) => {
-    await this.#braidedReads?.recordBraidedSpansView(a);
-  };
+  /** An app composing no audit trail refuses, so a braided read is never shown unaudited. */
+  recordBraidedSpansView: AuthzApi["recordBraidedSpansView"] = (a) =>
+    this.braidedReads().recordBraidedSpansView(a);
 
   listOrganizationBraids: AuthzApi["listOrganizationBraids"] = (a) =>
     this.braids().listOrganizationBraids(a);
@@ -708,6 +708,16 @@ export class AuthzModule implements AuthzApi {
     this.organizationPolicies().getOrganizationPolicy(a);
   setBraidsPolicy: AuthzApi["setBraidsPolicy"] = (a) =>
     this.organizationPolicies().setBraidsPolicy(a);
+
+  private braidedReads(): AuthzBraidedReadAuditService {
+    if (!this.#braidedReads) {
+      throw new Error(
+        "This AuthzModule was composed from already-built services, so it keeps no audit trail: " +
+          "compose it through AuthzModule.create to audit a braided read.",
+      );
+    }
+    return this.#braidedReads;
+  }
 
   private organizationPolicies(): AuthzOrganizationPolicyService {
     if (!this.#organizationPolicies) {

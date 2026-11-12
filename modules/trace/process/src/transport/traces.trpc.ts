@@ -531,8 +531,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
       const memberProtections = await app.resolveViewerProtections({
         projectId: input.projectId,
         userId: actor.id,
-        authorization:
-          narrowAuthorization({ authorization, projectId: summary.tenantId }) ?? authorization,
+        authorization: narrowAuthorization({ authorization, projectId: summary.tenantId }),
       });
       // Cost is gated by the viewer's own `cost:view` (via `protections`), the
       // same rule the detail-pane spans apply through `applySpanProtections`.

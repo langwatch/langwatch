@@ -75,6 +75,7 @@ describe("braidedOwnerTotalsOf", () => {
 
 describe("braidedTraceSummaryOf", () => {
   const owners = [{ projectId: "proj_specialists", name: "Specialists", canOpen: false }];
+  const costVisibleOwners = new Set(["proj_specialists"]);
   const totals = [
     {
       ownerProjectId: "proj_specialists",
@@ -91,7 +92,13 @@ describe("braidedTraceSummaryOf", () => {
     /** @scenario "The trace header's totals include braided spans and say so" */
     it("adds them to the trace's own totals and names their owners", () => {
       expect(
-        braidedTraceSummaryOf({ header: ownHeader, owners, totals, canSeeCosts: true }),
+        braidedTraceSummaryOf({
+          header: ownHeader,
+          owners,
+          totals,
+          canSeeCosts: true,
+          costVisibleOwners,
+        }),
       ).toEqual({
         owners,
         spanCount: 7,
@@ -106,8 +113,49 @@ describe("braidedTraceSummaryOf", () => {
   describe("given a viewer without cost:view", () => {
     it("shows no cost", () => {
       expect(
-        braidedTraceSummaryOf({ header: ownHeader, owners, totals, canSeeCosts: false }).cost,
+        braidedTraceSummaryOf({
+          header: ownHeader,
+          owners,
+          totals,
+          canSeeCosts: false,
+          costVisibleOwners,
+        }).cost,
       ).toBeNull();
+    });
+  });
+
+  describe("given a viewer who may see cost on the reader but not on one owner", () => {
+    const search = { ...totals[0]!, ownerProjectId: "proj_search", cost: 0.5 };
+    const summary = braidedTraceSummaryOf({
+      header: ownHeader,
+      owners,
+      totals: [...totals, search],
+      canSeeCosts: true,
+      costVisibleOwners: new Set(["proj_specialists"]),
+    });
+
+    /** @scenario "The header's cost adds braided spans only from owners that let the viewer see cost" */
+    it("adds only the cost of owners whose protections show it", () => {
+      expect(summary.cost).toBeCloseTo(0.05);
+    });
+
+    it("still counts the hidden owner's spans and tokens", () => {
+      expect(summary.spanCount).toBe(10);
+      expect(summary.inputTokens).toBe(2_200);
+    });
+  });
+
+  describe("given an owner whose protections were never read", () => {
+    it("adds none of its cost, never all of it", () => {
+      const summary = braidedTraceSummaryOf({
+        header: ownHeader,
+        owners,
+        totals,
+        canSeeCosts: true,
+        costVisibleOwners: new Set(),
+      });
+
+      expect(summary.cost).toBe(0.01);
     });
   });
 
@@ -118,6 +166,7 @@ describe("braidedTraceSummaryOf", () => {
         owners,
         totals: [{ ...totals[0]!, inputTokens: 0, outputTokens: 0 }],
         canSeeCosts: true,
+        costVisibleOwners,
       });
       expect(summary.inputTokens).toBeNull();
       expect(summary.outputTokens).toBeNull();

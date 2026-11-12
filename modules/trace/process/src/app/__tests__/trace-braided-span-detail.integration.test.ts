@@ -212,5 +212,15 @@ describe("TraceModule.readSpanDetailForViewer on a braided span", () => {
         ownerProjectIds: [OWNER],
       });
     });
+
+    it("fails the read rather than show the owner's span when the audit cannot be written", async () => {
+      const { open, recordBraidedSpansView } = spanPanel({
+        ownerPolicy: policyHiding(HIDDEN_FROM_EVERYONE),
+        held: { [READER]: ADMIN },
+      });
+      recordBraidedSpansView.mockRejectedValueOnce(new Error("audit store unreachable"));
+
+      await expect(open(OWNER)).rejects.toThrow("audit store unreachable");
+    });
   });
 });

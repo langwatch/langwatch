@@ -1,5 +1,8 @@
 import type { Actor } from "@langwatch/authorization";
-import type { AuthzRecordBraidedSpansViewInput } from "@langwatch/authz-contract";
+import {
+  AuthzScopeNotFoundError,
+  type AuthzRecordBraidedSpansViewInput,
+} from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
 import { Temporal } from "@langwatch/time";
 
@@ -45,7 +48,10 @@ export class AuthzBraidedReadAuditService {
     }>,
   ) {}
 
-  /** The audit never fails the read: a failure is logged and the read carries on. */
+  /**
+   * A read that cannot be audited is refused: a reader with no lineage as a known denial, a
+   * failed write as an infrastructure error, so braided spans are never shown unaudited.
+   */
   async recordBraidedSpansView({
     actor,
     readerProjectId,
@@ -54,24 +60,26 @@ export class AuthzBraidedReadAuditService {
     const owners = [...new Set(ownerProjectIds)].filter((id) => id !== readerProjectId);
     if (!isAudited(actor) || owners.length === 0) return;
     const who = whoOf(actor);
-    try {
-      const lineage = await this.deps.lineage.findProjectLineage({ projectId: readerProjectId });
-      if (!lineage) return;
-      const { organizationId } = lineage;
-      const results = await Promise.allSettled(
-        owners.map((ownerProjectId) =>
-          this.deps.window.once({
-            key: [who.type, who.id, readerProjectId, ownerProjectId].join("\u0000"),
-            send: () => this.write({ organizationId, actor, readerProjectId, ownerProjectId }),
-          }),
-        ),
-      );
-      for (const result of results) {
-        if (result.status === "rejected") throw result.reason;
-      }
-    } catch (error) {
-      logger.warn({ error, readerProjectId }, "braided read audit failed; the read carries on");
-    }
+    const lineage = await this.deps.lineage.findProjectLineage({ projectId: readerProjectId });
+    if (!lineage) throw new AuthzScopeNotFoundError({ projectId: readerProjectId });
+    const { organizationId } = lineage;
+    const results = await Promise.allSettled(
+      owners.map((ownerProjectId) =>
+        this.deps.window.once({
+          key: [who.type, who.id, readerProjectId, ownerProjectId].join("\u0000"),
+          send: () => this.write({ organizationId, actor, readerProjectId, ownerProjectId }),
+        }),
+      ),
+    );
+    const failed = results.filter((result) => result.status === "rejected");
+    if (failed.length === 0) return;
+    logger.error(
+      { errors: failed.map((result) => result.reason), readerProjectId },
+      "braided read audit failed; the read is refused",
+    );
+    throw new Error(`The braided read of ${readerProjectId} could not be audited`, {
+      cause: failed[0]?.reason,
+    });
   }
 
   private async write({

@@ -1,6 +1,7 @@
 /**
  * The owners the trace header names (ADR-201 §5). Spec: modules/trace/specs/braided-spans.feature
  */
+import { sealAuthorization } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -78,6 +79,56 @@ describe("TraceBraidDetailService.describeSpans", () => {
         },
         null,
       ]);
+    });
+  });
+});
+
+describe("TraceBraidDetailService.recordView", () => {
+  const authorization = sealAuthorization({
+    actor: { type: "user", id: "user_sam" },
+    principal: { type: "user", id: "user_sam" },
+    scope: { organizationId: "org_acme" },
+    grants: [
+      { projectId: "proj_orchestrator", permissions: ["traces:view"], via: [], kind: "own" },
+    ],
+    expiresAt: Date.now() + 30_000,
+    purpose: { kind: "route", route: "traces.spanTree" },
+  });
+
+  describe("given an audit that cannot be written", () => {
+    it("fails the read rather than show the owner's spans unaudited", async () => {
+      const detail = TraceBraidDetailService.create({
+        directory: {
+          authz: createApiFixture<AuthzApi>({
+            recordBraidedSpansView: () => Promise.reject(new Error("audit store unreachable")),
+          }),
+          projects,
+        },
+      });
+
+      await expect(
+        detail.recordView({ authorization, ownerProjectIds: ["proj_specialists"] }),
+      ).rejects.toThrow("audit store unreachable");
+    });
+  });
+
+  describe("given no directory to audit through", () => {
+    it("refuses a read that shows owner spans", async () => {
+      await expect(
+        TraceBraidDetailService.create({ directory: null }).recordView({
+          authorization,
+          ownerProjectIds: ["proj_specialists"],
+        }),
+      ).rejects.toThrow(/cannot be audited/);
+    });
+
+    it("lets a read of the reader's own spans through", async () => {
+      await expect(
+        TraceBraidDetailService.create({ directory: null }).recordView({
+          authorization,
+          ownerProjectIds: [null, undefined],
+        }),
+      ).resolves.toBeUndefined();
     });
   });
 });

@@ -524,9 +524,7 @@ describe("the fence over a span read", () => {
     it("keeps the braids when narrowed to the reader's own project", () => {
       const narrowed = narrowAuthorization({ authorization, projectId: READER });
 
-      expect(
-        narrowed && fenceFor({ authorization: narrowed, reads: "spans" }).braids?.clauses,
-      ).toHaveLength(1);
+      expect(fenceFor({ authorization: narrowed, reads: "spans" }).braids?.clauses).toHaveLength(1);
     });
   });
 

@@ -1,6 +1,7 @@
 import {
   type Authorization,
   narrowAuthorization,
+  narrowAuthorizationOrNotFound,
   ownProjectIdReadBy,
   projectIdsReadBy,
   withoutSpanBraids,
@@ -103,12 +104,11 @@ export class TraceSummaryService {
     if (projectId === undefined) {
       return authorization;
     }
-    const narrowed = narrowAuthorization({ authorization, projectId });
-    if (narrowed === null) {
-      throw new TraceNotFoundError(traceId);
-    }
-
-    return narrowed;
+    return narrowAuthorizationOrNotFound({
+      authorization,
+      tenantId: projectId,
+      notFound: () => new TraceNotFoundError(traceId),
+    });
   }
 
   async getByTraceId({
@@ -167,9 +167,6 @@ export class TraceSummaryService {
 
     try {
       const narrowed = narrowAuthorization({ authorization, projectId: summary.tenantId });
-      if (narrowed === null) {
-        return summary;
-      }
       const normalizedSpans = await deps.spanStorageRepository.findNormalizedSpansByTraceId({
         authorization: narrowed,
         traceId: summary.traceId,

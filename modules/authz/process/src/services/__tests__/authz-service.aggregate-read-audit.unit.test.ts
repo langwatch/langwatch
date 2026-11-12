@@ -11,6 +11,7 @@ import { StubAuthzListingRepository } from "../../repositories/__tests__/support
 import { StubAuthzManagedGrantRepository } from "../../repositories/__tests__/support/authz-managed-grant.stub.ts";
 import { makeReader } from "../../repositories/__tests__/support/authz-read.stub.ts";
 import type { SharedReadRow } from "../../repositories/authz-read.repository.ts";
+import { MemoryAuthzOrganizationPolicyRepository } from "../../repositories/memory/memory.authz-organization-policy.repository.ts";
 import { AuthzAggregateReadAuditService } from "../authz-aggregate-read-audit.service.ts";
 import { AuthzService } from "../authz.service.ts";
 
@@ -44,6 +45,7 @@ function harness() {
     },
   });
   const authz = AuthzService.create({
+    policies: MemoryAuthzOrganizationPolicyRepository.create(),
     isOnEngine: async () => true,
     repository: makeReader({
       findOrganizationMembership: vi.fn().mockResolvedValue({ role: "ADMIN", disabled: false }),

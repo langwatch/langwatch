@@ -161,6 +161,14 @@ Feature: Braids
       Then the braid is refused as a permission denial
       And ana's request for the same braid is accepted
 
+    @unit
+    Scenario: A braid decision whose organisation setting cannot be read is refused
+      Given tom is an admin of the team holding "specialists"
+      And the organisation's setting for who may braid cannot be read
+      When tom's permission to braid "specialists" is decided
+      Then the decision fails rather than allowing the braid
+      # Every composition reads the setting; none treats a missing or failed read as "off".
+
     @integration
     Scenario: Keeping braids to organisation admins leaves live braids in place
       Given a live braid from "specialists" into "orchestrator" that tom created
@@ -419,6 +427,15 @@ Feature: Braids
       Given a live braid from "specialists" into "orchestrator"
       When sam opens an "orchestrator" trace holding "specialists" spans
       Then the braided spans viewed entry is filed under "orchestrator"
+
+    @unit
+    Scenario: A braided read whose audit cannot be written is refused
+      Given a live braid from "specialists" into "orchestrator"
+      And the braided spans viewed entry cannot be written
+      When sam opens an "orchestrator" trace holding "specialists" spans
+      Then the read fails and no "specialists" span is shown
+      # A reader project with no lineage is refused as a known denial; a failed write as an
+      # infrastructure failure. Neither lets the read carry on unaudited.
 
     @integration
     Scenario: Opening traces with braided spans is audited once per five minutes

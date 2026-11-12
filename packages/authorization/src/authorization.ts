@@ -192,7 +192,7 @@ function isNarrowedToOwn(authorization: Authorization): boolean {
 /**
  * The same proof narrowed to one project its grants name, never widened: the own grant, that
  * project's, and the braids when it is the own one (ADR-201 §5). A project named by no grant or
- * by braids alone is `null`, as a braid never opens an owner's trace. A forged proof is refused.
+ * by braids alone throws `AccessNotGrantedError`, so no caller can fall back to the whole proof.
  */
 export function narrowAuthorization({
   authorization,
@@ -200,15 +200,15 @@ export function narrowAuthorization({
 }: {
   authorization: Authorization;
   projectId: string;
-}): Authorization | null {
+}): Authorization {
   if (!isSealedAuthorization(authorization)) {
     throw new ForgedAuthorizationError();
   }
   const names = (grant: AuthorizationGrant) =>
     grant.projectId === projectId && !isSpanBraidGrant(grant);
-  if (!authorization.grants.some(names)) return null;
+  if (!authorization.grants.some(names)) throw new AccessNotGrantedError("traces:view");
   if (authorization.narrowedTo === projectId) return authorization;
-  if (authorization.narrowedTo !== undefined) return null;
+  if (authorization.narrowedTo !== undefined) throw new AccessNotGrantedError("traces:view");
   const toOwn = authorization.grants.some(
     (grant) => grant.kind === "own" && grant.projectId === projectId,
   );
@@ -219,6 +219,26 @@ export function narrowAuthorization({
     ),
     narrowedTo: projectId,
   });
+}
+
+/** The proof narrowed to `tenantId` when a read names one, else the proof as it is. A project it
+ *  cannot narrow to throws the caller's `notFound`, so the refusal never says what exists. */
+export function narrowAuthorizationOrNotFound({
+  authorization,
+  tenantId,
+  notFound,
+}: {
+  authorization: Authorization;
+  tenantId: string | undefined;
+  notFound: () => Error;
+}): Authorization {
+  if (tenantId === undefined) return authorization;
+  try {
+    return narrowAuthorization({ authorization, projectId: tenantId });
+  } catch (error) {
+    if (error instanceof AccessNotGrantedError) throw notFound();
+    throw error;
+  }
 }
 
 /** The same proof without its braids, for a read that may not honour them (ADR-201 §5, §9).

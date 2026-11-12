@@ -1,7 +1,7 @@
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
   internalActor,
-  narrowAuthorization,
+  narrowAuthorizationOrNotFound,
   ownProjectIdReadBy,
   projectIdsReadBy,
   withoutSpanBraids,
@@ -1849,11 +1849,11 @@ export class TraceModule implements TraceApi, CollectorApp {
     /** The member whose conversation this is, on an aggregate: its turns and its policy. */
     tenantId?: string | undefined;
   }): Promise<TracesConversationContext> {
-    const authorization =
-      input.tenantId === undefined
-        ? input.authorization
-        : narrowAuthorization({ authorization: input.authorization, projectId: input.tenantId });
-    if (authorization === null) throw new TraceNotFoundError(input.conversationId);
+    const authorization = narrowAuthorizationOrNotFound({
+      authorization: input.authorization,
+      tenantId: input.tenantId,
+      notFound: () => new TraceNotFoundError(input.conversationId),
+    });
     const protections = await this.resolveViewerProtections({
       projectId: input.projectId,
       userId: input.viewerUserId,
@@ -3041,16 +3041,20 @@ export class TraceModule implements TraceApi, CollectorApp {
       occurredAtMs: input.occurredAtMs ?? input.header.timestamp,
     });
     if (totals.length === 0) return {};
-    const owners = await this.#braidDetail.describeOwners({
-      ownerProjectIds: totals.map((owner) => owner.ownerProjectId),
-      viewerUserId: input.viewerUserId,
-    });
+    const ownerProjectIds = totals.map((owner) => owner.ownerProjectId);
+    const [owners, ownerProtections] = await Promise.all([
+      this.#braidDetail.describeOwners({ ownerProjectIds, viewerUserId: input.viewerUserId }),
+      this.resolveBraidOwnerProtections({ viewerUserId: input.viewerUserId, ownerProjectIds }),
+    ]);
     return {
       braided: braidedTraceSummaryOf({
         header: input.header,
         owners,
         totals,
         canSeeCosts: input.canSeeCosts,
+        costVisibleOwners: new Set(
+          ownerProjectIds.filter((id) => ownerProtections.get(id)?.canSeeCosts === true),
+        ),
       }),
     };
   }
@@ -3064,11 +3068,11 @@ export class TraceModule implements TraceApi, CollectorApp {
     visibilityCutoffMs?: number | null;
     full?: boolean;
   }): Promise<TraceSummaryData> {
-    const authorization =
-      input.tenantId === undefined
-        ? input.authorization
-        : narrowAuthorization({ authorization: input.authorization, projectId: input.tenantId });
-    if (authorization === null) throw new TraceNotFoundError(input.traceId);
+    const authorization = narrowAuthorizationOrNotFound({
+      authorization: input.authorization,
+      tenantId: input.tenantId,
+      notFound: () => new TraceNotFoundError(input.traceId),
+    });
     return this.#dependencies.traces.summary.getByTraceId({
       authorization,
       traceId: input.traceId,

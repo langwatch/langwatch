@@ -3,9 +3,12 @@
  * window, naming the braids and never a span.
  * @see modules/authz/specs/braids.feature
  */
+import { AuthzScopeNotFoundError } from "@langwatch/authz-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
+import { AuthzAuditTrailRepository } from "../../repositories/authz-audit-trail.repository.ts";
 import type { LedgerBraidRow } from "../../repositories/authz-ledger-read.repository.ts";
 import { AuthzMemoryStore } from "../../repositories/memory/authz-memory.store.ts";
 import { MemoryAuthzAuditTrailRepository } from "../../repositories/memory/memory.authz-audit-trail.repository.ts";
@@ -15,6 +18,12 @@ const ORG = "org_acme";
 const READER = "proj_orchestrator";
 const OWNER = "proj_specialists";
 const SAM = { type: "user", id: "user_sam" } as const;
+const READER_LINEAGE = {
+  projectId: READER,
+  organizationId: ORG,
+  teamId: "team_web",
+  kind: "application",
+};
 
 function braid(grantId: string, ownerProjectId: string): LedgerBraidRow {
   return {
@@ -31,6 +40,12 @@ function braid(grantId: string, ownerProjectId: string): LedgerBraidRow {
   };
 }
 
+class UnreachableAuditTrail extends AuthzAuditTrailRepository {
+  async insert(): Promise<void> {
+    throw new Error("audit store unreachable");
+  }
+}
+
 function setup() {
   const memory = AuthzMemoryStore.create();
   let nowMs = Date.UTC(2026, 9, 21, 12, 0, 0);
@@ -38,9 +53,7 @@ function setup() {
     auditTrail: MemoryAuthzAuditTrailRepository.create({ memory }),
     lineage: {
       findProjectLineage: async ({ projectId }: { projectId: string }) =>
-        projectId === READER
-          ? { projectId, organizationId: ORG, teamId: "team_web", kind: "application" }
-          : null,
+        projectId === READER ? READER_LINEAGE : null,
     } as never,
     reads: {
       findBraids: async () => [braid("grant_web", OWNER), braid("grant_billing", "proj_billing")],
@@ -110,6 +123,44 @@ describe("AuthzBraidedReadAuditService", () => {
       });
 
       expect(rows().map((row) => row.metadata.ownerProjectId)).toEqual([OWNER, "proj_billing"]);
+    });
+  });
+
+  describe("when the audit row cannot be written", () => {
+    /** @scenario "A braided read whose audit cannot be written is refused" */
+    it("refuses with an infrastructure error rather than letting the read carry on", async () => {
+      const service = AuthzBraidedReadAuditService.create({
+        auditTrail: new UnreachableAuditTrail(),
+        lineage: { findProjectLineage: async () => READER_LINEAGE } as never,
+        reads: { findBraids: async () => [braid("grant_web", OWNER)] },
+      });
+
+      const read = service.recordBraidedSpansView({
+        actor: SAM,
+        readerProjectId: READER,
+        ownerProjectIds: [OWNER],
+      });
+
+      await expect(read).rejects.toThrow(/could not be audited/);
+      await expect(read).rejects.toMatchObject({
+        cause: expect.objectContaining({ message: "audit store unreachable" }),
+      });
+      await expect(read).rejects.not.toBeInstanceOf(HandledError);
+    });
+  });
+
+  describe("when the reader project has no lineage", () => {
+    it("refuses as a known denial and writes nothing", async () => {
+      const { service, rows } = setup();
+
+      await expect(
+        service.recordBraidedSpansView({
+          actor: SAM,
+          readerProjectId: "proj_gone",
+          ownerProjectIds: [OWNER],
+        }),
+      ).rejects.toBeInstanceOf(AuthzScopeNotFoundError);
+      expect(rows()).toHaveLength(0);
     });
   });
 

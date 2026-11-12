@@ -178,6 +178,7 @@ describe.skipIf(!clickHouseConfigured)("the trace header's braided totals", () =
         owners: [{ projectId: owner, name: "Specialists", canOpen: false }],
         totals,
         canSeeCosts: true,
+        costVisibleOwners: new Set([owner]),
       });
       expect(summary).toMatchObject({ spanCount: 3, durationMs: 1_500, inputTokens: 115 });
       expect(summary.cost).toBeCloseTo(0.85);

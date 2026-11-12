@@ -173,9 +173,9 @@ describe("AuthorizedClickHouse", () => {
             query_params: { tenantScope_all: ["proj_elsewhere"] },
           }),
         ).rejects.toMatchObject({ violation: { kind: "reserved-param" } });
-        expect(
+        expect(() =>
           narrowAuthorization({ authorization: proof(), projectId: "proj_elsewhere" }),
-        ).toBeNull();
+        ).toThrow(AccessNotGrantedError);
         expect(execute).not.toHaveBeenCalled();
       });
 
@@ -611,14 +611,8 @@ describe("AuthorizedClickHouse", () => {
   });
 
   describe("given an aggregate's proof narrowed to one member", () => {
-    const narrowedTo = (projectId: string): Authorization => {
-      const narrowed = narrowAuthorization({
-        authorization: proof(),
-        projectId,
-      });
-      if (!narrowed) throw new Error(`expected ${projectId} in the proof`);
-      return narrowed;
-    };
+    const narrowedTo = (projectId: string): Authorization =>
+      narrowAuthorization({ authorization: proof(), projectId });
 
     describe("when the fence is built", () => {
       it("fences that member alone, inside its grant's window", () => {

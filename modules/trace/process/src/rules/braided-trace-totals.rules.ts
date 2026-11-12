@@ -59,17 +59,23 @@ type OwnTotals = Pick<
   "timestamp" | "durationMs" | "spanCount" | "totalCost" | "inputTokens" | "outputTokens"
 >;
 
-/** The header's whole-trace totals: its own plus the braided spans the reader sees (ADR-201 §5). */
+/**
+ * The header's whole-trace totals: its own plus the braided spans the reader sees (ADR-201 §5).
+ * `canSeeCosts` gates the trace's own cost; an owner's cost is added only when that owner is in
+ * `costVisibleOwners`, so an owner whose protections were not read adds none.
+ */
 export function braidedTraceSummaryOf({
   header,
   owners,
   totals,
   canSeeCosts,
+  costVisibleOwners,
 }: {
   header: OwnTotals;
   owners: readonly BraidedOwner[];
   totals: readonly BraidedOwnerTotals[];
   canSeeCosts: boolean;
+  costVisibleOwners: ReadonlySet<string>;
 }): TraceBraidedSummary {
   const sum = (pick: (owner: BraidedOwnerTotals) => number) =>
     totals.reduce((acc, owner) => acc + pick(owner), 0);
@@ -87,7 +93,7 @@ export function braidedTraceSummaryOf({
     cost: canSeeCosts
       ? plus(
           header.totalCost,
-          sum((owner) => owner.cost),
+          sum((owner) => (costVisibleOwners.has(owner.ownerProjectId) ? owner.cost : 0)),
         )
       : null,
     inputTokens: plus(

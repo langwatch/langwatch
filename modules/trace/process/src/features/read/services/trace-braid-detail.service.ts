@@ -1,6 +1,5 @@
 import { type Authorization, ownProjectIdReadBy } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { BraidedOwner, SpanBraid } from "@langwatch/trace-contract";
 
@@ -22,7 +21,6 @@ export class TraceBraidDetailService {
   }
 
   readonly #directory: TraceBraidDirectory | null;
-  readonly #logger = createLogger("langwatch:trace:braid-detail");
 
   private constructor(directory: TraceBraidDirectory | null) {
     this.#directory = directory;
@@ -179,7 +177,8 @@ export class TraceBraidDetailService {
     });
   }
 
-  /** One audit call for a read that returned owner spans; an audit failure never fails the read. */
+  /** One audit call for a read that returned owner spans (ADR-201 §8); a read that cannot be
+   *  audited throws, so the caller never returns the owner's spans unaudited. */
   async recordView({
     authorization,
     ownerProjectIds,
@@ -188,17 +187,15 @@ export class TraceBraidDetailService {
     ownerProjectIds: readonly (string | null | undefined)[];
   }): Promise<void> {
     const owners = [...new Set(ownerProjectIds.filter((id): id is string => !!id))];
-    if (owners.length === 0 || this.#directory === null) return;
-    const readerProjectId = ownProjectIdReadBy(authorization);
-    try {
-      await this.#directory.authz.recordBraidedSpansView({
-        actor: authorization.actor,
-        readerProjectId,
-        ownerProjectIds: owners,
-      });
-    } catch (error) {
-      this.#logger.warn({ error, readerProjectId }, "braided spans view was not audited");
+    if (owners.length === 0) return;
+    if (this.#directory === null) {
+      throw new Error("Braided spans cannot be audited: this trace process composes no authz");
     }
+    await this.#directory.authz.recordBraidedSpansView({
+      actor: authorization.actor,
+      readerProjectId: ownProjectIdReadBy(authorization),
+      ownerProjectIds: owners,
+    });
   }
 }
 

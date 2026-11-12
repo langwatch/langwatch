@@ -100,8 +100,9 @@ type CheckArgs = {
 
 export type AuthzServiceOptions = {
   repository: AuthzReadRepository;
-  /** The organisation's settings read into each snapshot (ADR-201 §2); omitted = all off. */
-  policies?: Pick<AuthzOrganizationPolicyRepository, "getPolicy">;
+  /** The organisation's settings read into each snapshot (ADR-201 §2); required, never off by
+   *  omission. */
+  policies: Pick<AuthzOrganizationPolicyRepository, "getPolicy">;
   listing: AuthzListingRepository;
   bindings: AuthzManagedGrantRepository;
   /** Omitted = never cache. */
@@ -145,7 +146,7 @@ export class AuthzService {
     const collector = AuthzCollectorService.create({
       reader: options.repository,
       lineage: scopeLineage,
-      ...(options.policies ? { policies: options.policies } : {}),
+      policies: options.policies,
     });
 
     return new AuthzService({

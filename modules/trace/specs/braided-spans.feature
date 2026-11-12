@@ -141,6 +141,13 @@ Feature: Braided spans in the reader's traces
       Then the "orchestrator" spans show their cost
       And the "specialists" spans show none
 
+    @unit
+    Scenario: The header's cost adds braided spans only from owners that let the viewer see cost
+      Given sam may see costs on "orchestrator" but not on "specialists"
+      When sam opens the header of a trace holding spans from both
+      Then the header's cost adds the "orchestrator" spans alone
+      And a braided span whose owner's protections were not read adds no cost
+
   Rule: The trace view says where each span came from
 
     @integration
@@ -256,6 +263,13 @@ Feature: Braided spans in the reader's traces
       Then the trace route gate fails the build
       # Every content read takes the caller's proof, so the braids it carries reach
       # the read. Next to the route gate in specs/governance/aggregate-project.feature.
+
+    @unit
+    Scenario: A proof that cannot be narrowed to a project is refused, never read whole
+      Given sam's proof holds "orchestrator" and a braid from "specialists"
+      When a read narrows the proof to "specialists", or to a project the proof does not name
+      Then the narrowing is refused as access not granted
+      And no read falls back to the whole proof
 
   Rule: The braid dialog previews what the reader will see
 

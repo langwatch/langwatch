@@ -28,8 +28,8 @@ type AuthzCollectorOptions = {
   lineage?: Pick<ScopeLineageRepository, "findProjectLineage" | "findTeamOrganization">;
   /** Injected so binding and share-link liveness are testable at their exact boundary. */
   now?: () => Instant;
-  /** The organisation's settings (ADR-201 §2); omitted = every setting off. */
-  policies?: Pick<AuthzOrganizationPolicyRepository, "getPolicy">;
+  /** The organisation's settings (ADR-201 §2); required, so no composition reads them as off. */
+  policies: Pick<AuthzOrganizationPolicyRepository, "getPolicy">;
 };
 
 export class AuthzCollectorService {
@@ -321,7 +321,7 @@ export class AuthzCollectorService {
         userId: principal.id,
         organizationId,
       }),
-      this.policies?.getPolicy({ organizationId }),
+      this.policies.getPolicy({ organizationId }),
     ]);
 
     // Ended bindings drop here, once, for every principal: nothing is written when the moment
@@ -343,7 +343,7 @@ export class AuthzCollectorService {
       organizationRole: isOrgMember ? membership.role : null,
       isOrgMember,
       membershipDisabled: membership?.disabled ?? false,
-      ...(policy?.braidsOrganizationAdminsOnly ? { braidsOrganizationAdminsOnly: true } : {}),
+      ...(policy.braidsOrganizationAdminsOnly ? { braidsOrganizationAdminsOnly: true } : {}),
       bindings,
       customRolePermissions: await this.prefetchCustomRolePermissions({
         principal,

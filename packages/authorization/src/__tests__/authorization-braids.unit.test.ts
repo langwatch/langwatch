@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
+  AccessNotGrantedError,
   type AuthorizationInput,
   isSpanBraidGrant,
   narrowAuthorization,
@@ -96,16 +97,17 @@ describe("a proof carrying braids", () => {
         projectId: READER,
       });
 
-      expect(narrowed?.narrowedTo).toBe(READER);
-      expect(narrowed?.grants.map((grant) => grant.projectId)).toEqual([READER, OWNER]);
+      expect(narrowed.narrowedTo).toBe(READER);
+      expect(narrowed.grants.map((grant) => grant.projectId)).toEqual([READER, OWNER]);
     });
   });
 
   describe("when it is narrowed to a braid's owner", () => {
-    it("answers as not found, since a braid never opens the owner's trace", () => {
-      expect(
+    /** @scenario "A proof that cannot be narrowed to a project is refused, never read whole" */
+    it("refuses, since a braid never opens the owner's trace and the whole proof is never read", () => {
+      expect(() =>
         narrowAuthorization({ authorization: proof([own, braid()]), projectId: OWNER }),
-      ).toBeNull();
+      ).toThrow(AccessNotGrantedError);
     });
   });
 
@@ -114,7 +116,9 @@ describe("a proof carrying braids", () => {
       const stripped = withoutSpanBraids(proof([own, braid()]));
 
       expect(stripped.grants.map((grant) => grant.projectId)).toEqual([READER]);
-      expect(narrowAuthorization({ authorization: stripped, projectId: READER })).not.toBeNull();
+      expect(narrowAuthorization({ authorization: stripped, projectId: READER }).narrowedTo).toBe(
+        READER,
+      );
     });
 
     it("keeps the narrowing, so a narrowed proof stays on its project", () => {
@@ -123,7 +127,7 @@ describe("a proof carrying braids", () => {
         projectId: READER,
       });
 
-      expect(narrowed && withoutSpanBraids(narrowed).narrowedTo).toBe(READER);
+      expect(withoutSpanBraids(narrowed).narrowedTo).toBe(READER);
     });
 
     it("returns a proof with no braids as it is", () => {
@@ -182,7 +186,7 @@ describe("a proof carrying braids", () => {
         projectId: READER,
       });
 
-      expect(narrowed && readScopeKeyOf(narrowed)).toBe(readScopeKeyOf(proof([own, braid()])));
+      expect(readScopeKeyOf(narrowed)).toBe(readScopeKeyOf(proof([own, braid()])));
     });
   });
 });
