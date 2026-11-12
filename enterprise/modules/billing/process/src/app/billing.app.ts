@@ -45,6 +45,7 @@ import type { FeatureSetup } from "@langwatch/process";
 import { Temporal } from "@langwatch/time";
 
 import type { BillingStripeChannels } from "../channels/billing-stripe.channels.ts";
+import type { StripeSubscriptionsChannel } from "../channels/stripe-subscriptions.channel.ts";
 import type { BillingSubscriptionNotifier } from "../channels/billing-subscription-notifier.channel.ts";
 import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
 import type { BillingChannels } from "../channels/billing.channels.ts";
@@ -69,6 +70,7 @@ import { LicensePurchaseService } from "../features/license-purchase/services/li
 import { LicenseRenewalService } from "../features/license-purchase/services/license-renewal.service.ts";
 import { LicensingLicenseGeneratorService } from "../features/license-purchase/services/licensing-license-generator.service.ts";
 import type { BillingRepositories } from "../repositories/billing.repositories.ts";
+import { carriesPiiRedactionPrice } from "../rules/pii-redaction-meter.rules.ts";
 import { isStripeTestModeKey } from "../rules/stripe-mode.rules.ts";
 import {
   planLimitCooldown,
@@ -428,6 +430,7 @@ export class BillingModule
         usageWarnings,
         nodeEnvironment,
         usageReporting: isSaas ? usageReporting : void 0,
+        stripeSubscriptions: stripe?.channels.subscriptions,
       }),
     };
     if (!stripe) {
@@ -907,6 +910,7 @@ export class BillingModule
     usageWarnings,
     usageReporting,
     nodeEnvironment,
+    stripeSubscriptions,
   }: {
     repositories: Pick<
       BillingRepositories,
@@ -917,6 +921,8 @@ export class BillingModule
     usageWarnings: UsageWarningService;
     usageReporting: (() => UsageReportingService) | undefined;
     nodeEnvironment: string | undefined;
+    /** Absent where no Stripe key is held: nothing reports there, so the PII month waits. */
+    stripeSubscriptions: StripeSubscriptionsChannel | undefined;
   }): BillingReportingPipeline {
     const projects = {
       findProjectIds: (organizationId: string) => facts.findProjectIds(organizationId),
@@ -933,8 +939,9 @@ export class BillingModule
       sumSpendNanoUsdByRequestType: (input) =>
         repositories.gatewaySpend.sumSpendNanoUsdByRequestType(input),
     });
-    const meters = () =>
-      BillingPriceCatalogue.create(getStripeEnvironmentFromNodeEnv(nodeEnvironment)).meters;
+    const catalogue = () =>
+      BillingPriceCatalogue.create(getStripeEnvironmentFromNodeEnv(nodeEnvironment));
+    const meters = () => catalogue().meters;
     const ceiling = ConnectedUsageCeilingService.create({
       licensing: peers.licensing,
       gateway: repositories.gatewaySpend,
@@ -951,6 +958,14 @@ export class BillingModule
       isInstantEvalMeterProvisioned: () => meters().INSTANT_EVAL_USD !== undefined,
       queryPiiRedactionSpendTotal: (input) => piiRedactionSpend.queryPiiRedactionSpendTotal(input),
       isPiiRedactionMeterProvisioned: () => meters().PII_REDACTION_USD !== undefined,
+      hasPiiRedactionPrice: async ({ stripeCustomerId }) =>
+        stripeSubscriptions !== void 0 &&
+        carriesPiiRedactionPrice({
+          subscriptions: await stripeSubscriptions.listCustomerSubscriptions({
+            customerId: stripeCustomerId,
+          }),
+          priceId: catalogue().prices.GROWTH_PII_REDACTION_USD,
+        }),
       organizationCache: repositories.organizationCache,
       errorReporter: BillingErrorReporterService.create(),
       connectedUsageCeiling: async (input) => {

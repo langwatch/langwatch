@@ -47,6 +47,7 @@ function rollUp(
     isInstantEvalMeterProvisioned: () => true,
     queryPiiRedactionSpendTotal: async () => ({ outcome: "unavailable" }),
     isPiiRedactionMeterProvisioned: () => true,
+    hasPiiRedactionPrice: async () => true,
     organizationCache: repositories.organizationCache,
     errorReporter: BillingErrorReporterService.create(),
     connectedUsageCeiling: async () => null,

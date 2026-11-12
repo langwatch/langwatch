@@ -72,6 +72,7 @@ describe("LiveBillingRepositories", () => {
         isInstantEvalMeterProvisioned: () => true,
         queryPiiRedactionSpendTotal: async () => ({ outcome: "unavailable" }),
         isPiiRedactionMeterProvisioned: () => true,
+        hasPiiRedactionPrice: async () => true,
         selfDispatch: async () => {},
         errorReporter: BillingErrorReporterService.create(),
         connectedUsageCeiling: async () => null,

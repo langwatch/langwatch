@@ -1,6 +1,7 @@
 package paymentsim
 
 import (
+	"cmp"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -8,6 +9,7 @@ import (
 	"math"
 	"net/http"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -23,6 +25,7 @@ func (s *Server) apiRoutes(mux *http.ServeMux) {
 		"DELETE /v1/customers/{id}":                   s.deleteCustomer,
 		"GET /v1/prices":                              s.listPrices,
 		"POST /v1/subscriptions":                      s.createSubscription,
+		"GET /v1/subscriptions":                       s.listSubscriptions,
 		"GET /v1/subscriptions/{id}":                  s.getSubscription,
 		"POST /v1/subscriptions/{id}":                 s.updateSubscription,
 		"DELETE /v1/subscriptions/{id}":               s.cancelSubscription,
@@ -194,6 +197,32 @@ func (s *Server) createSubscription(_ *http.Request, p params) (any, error) {
 	anchor, _ := p.integer("billing_cycle_anchor")
 	sub, _, err := s.newSubscription("", cus, p.objects("items"), p.metadata(), p.str("collection_method"), days, anchor)
 	return sub, err
+}
+
+// listSubscriptions answers a customer's subscriptions newest first.
+func (s *Server) listSubscriptions(_ *http.Request, p params) (any, error) {
+	out := []*Subscription{}
+	for _, sub := range s.st.subscriptions {
+		if (p.str("customer") == "" || sub.Customer == p.str("customer")) && listedStatus(sub.Status, p.str("status")) {
+			out = append(out, sub)
+		}
+	}
+	slices.SortFunc(out, func(a, b *Subscription) int {
+		return cmp.Or(cmp.Compare(b.Created, a.Created), cmp.Compare(b.ID, a.ID))
+	})
+	return page(out, func(sub *Subscription) string { return sub.ID }, p, "/v1/subscriptions")
+}
+
+// listedStatus is Stripe's status filter: unset hides ended subscriptions, all shows every one.
+func listedStatus(status, want string) bool {
+	switch want {
+	case "all":
+		return true
+	case "":
+		return status != "canceled" && status != "incomplete_expired"
+	default:
+		return status == want
+	}
 }
 
 func (s *Server) getSubscription(r *http.Request, _ params) (any, error) {

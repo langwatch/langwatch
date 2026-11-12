@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -22,6 +23,8 @@ const (
 	catalog    = "../../../enterprise/modules/billing/contract/src/stripe-catalog.json"
 	seatPrice  = "price_1SzP11IMsTw08cudRhGETYNa" // GROWTH_SEAT_USD_MONTHLY, 3200 usd
 	eventsMtr  = "mtr_test_61UBL0fe0hM4Csg7x41IMsTw08cudQaG"
+	// GROWTH_PII_REDACTION_USD, 100 usd cents per dollar on the PII redaction meter
+	piiRedactionPrice = "price_1Uat9tIMsTw08cudpWWrZG4a"
 )
 
 var epoch = time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
@@ -340,6 +343,54 @@ func TestRenewalBillsUsage(t *testing.T) {
 	inv := list["data"].([]any)[0].(map[string]any)
 	// 2 seats x 3200 + (1500-1000) events x 2
 	if inv["billing_reason"] != "subscription_cycle" || inv["total"].(float64) != 7400 || inv["status"] != "paid" {
+		t.Fatalf("renewal invoice %v", inv)
+	}
+}
+
+// The catalog's PII redaction price is metered on the PII redaction meter, so a renewal
+// bills the dollars that meter summed, and a customer's subscriptions list shows the line.
+func TestRenewalBillsPiiRedactionUsage(t *testing.T) {
+	g := newRig(t)
+	_, cus := g.stripe(http.MethodPost, "/v1/customers", "name=Acme")
+	customer := cus["id"].(string)
+	form := url.Values{
+		"mode": {"subscription"}, "customer": {customer}, "success_url": {"http://app/ok"},
+		"line_items[0][price]": {seatPrice}, "line_items[0][quantity]": {"2"},
+		"line_items[1][price]": {piiRedactionPrice},
+	}
+	_, sess := g.stripe(http.MethodPost, "/v1/checkout/sessions", form.Encode())
+	_, done := g.control(http.MethodPost, "/_sim/api/checkout/"+sess["id"].(string)+"/complete", "")
+	subID := done["subscription"].(string)
+
+	status, list := g.stripe(http.MethodGet, "/v1/subscriptions", "customer="+customer+"&status=all&limit=100")
+	if status != http.StatusOK {
+		t.Fatalf("list subscriptions: %d %v", status, list)
+	}
+	subs := list["data"].([]any)
+	if len(subs) != 1 || subs[0].(map[string]any)["id"] != subID {
+		t.Fatalf("subscriptions %v", subs)
+	}
+	var prices []string
+	for _, it := range subs[0].(map[string]any)["items"].(map[string]any)["data"].([]any) {
+		prices = append(prices, it.(map[string]any)["price"].(map[string]any)["id"].(string))
+	}
+	if !slices.Contains(prices, piiRedactionPrice) {
+		t.Fatalf("subscription prices %v", prices)
+	}
+	_, other := g.stripe(http.MethodGet, "/v1/subscriptions", "customer=cus_nobody&status=all")
+	if len(other["data"].([]any)) != 0 {
+		t.Fatalf("another customer's subscriptions %v", other)
+	}
+
+	status, out := g.stripe(http.MethodPost, "/v1/billing/meter_events", "event_name=langwatch_pii_redaction_usd&payload[stripe_customer_id]="+customer+"&payload[value]=1.2345&identifier=pii1")
+	if status != http.StatusOK {
+		t.Fatalf("%d %v", status, out)
+	}
+	g.control(http.MethodPost, "/_sim/api/clock/advance", `{"seconds":2764800}`)
+	_, invoices := g.stripe(http.MethodGet, "/v1/invoices", "subscription="+subID+"&limit=1")
+	inv := invoices["data"].([]any)[0].(map[string]any)
+	// 2 seats x 3200 + 1.2345 dollars x 100 cents, to the cent
+	if inv["billing_reason"] != "subscription_cycle" || inv["total"].(float64) != 6523 {
 		t.Fatalf("renewal invoice %v", inv)
 	}
 }

@@ -29,6 +29,7 @@ export const STRIPE_PRICE_NAMES = [
   "GROWTH_EVENTS_USD_MONTHLY_UNTIL_MAR_2026",
   "GROWTH_EVENTS_USD_ANNUAL_UNTIL_MAR_2026",
   "GROWTH_INSTANT_EVAL_USD",
+  "GROWTH_PII_REDACTION_USD",
   "CONNECTED_HOSTED_USAGE_QUARTERLY",
   "DEVELOPER_SEAT_EUR_MONTHLY",
   "DEVELOPER_SEAT_EUR_ANNUAL",
@@ -45,6 +46,7 @@ export type StripePriceName = (typeof STRIPE_PRICE_NAMES)[number];
  */
 export const OPTIONAL_STRIPE_PRICE_NAMES: readonly StripePriceName[] = [
   "GROWTH_INSTANT_EVAL_USD",
+  "GROWTH_PII_REDACTION_USD",
   "CONNECTED_HOSTED_USAGE_QUARTERLY",
   "DEVELOPER_SEAT_EUR_MONTHLY",
   "DEVELOPER_SEAT_EUR_ANNUAL",
@@ -55,6 +57,7 @@ export const OPTIONAL_STRIPE_PRICE_NAMES: readonly StripePriceName[] = [
 /** Prices that are optional: absent until an operator provisions them in a mode. */
 type OptionalStripePriceName =
   | "GROWTH_INSTANT_EVAL_USD"
+  | "GROWTH_PII_REDACTION_USD"
   | "CONNECTED_HOSTED_USAGE_QUARTERLY"
   | "DEVELOPER_SEAT_EUR_MONTHLY"
   | "DEVELOPER_SEAT_EUR_ANNUAL"
@@ -81,9 +84,10 @@ export const OPTIONAL_STRIPE_METER_NAMES: readonly StripeMeterName[] = [
   "PII_REDACTION_USD",
 ];
 
+/** An optional meter may be mapped in one mode and not the other. */
 export type StripeMeterMapping = Record<
   StripeMeterName,
-  Record<StripeEnvironment, string> | undefined
+  Partial<Record<StripeEnvironment, string>> | undefined
 >;
 export type StripeMeterMap = Partial<Record<StripeMeterName, string>> &
   Record<Exclude<StripeMeterName, "INSTANT_EVAL_USD" | "PII_REDACTION_USD">, string>;
@@ -160,7 +164,7 @@ const stripeMeterMappingSchemaDefinition = z.object(
     STRIPE_METER_NAMES.map((key) => [
       key,
       OPTIONAL_STRIPE_METER_NAMES.includes(key)
-        ? stripeEnvironmentMappingSchema.optional()
+        ? stripeOptionalEnvironmentMappingSchema.optional()
         : stripeEnvironmentMappingSchema,
     ]),
   ) as Record<StripeMeterName, typeof stripeEnvironmentMappingSchema>,

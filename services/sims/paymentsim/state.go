@@ -469,7 +469,10 @@ var catalogMeterEvents = map[string]string{
 }
 
 // catalogMetered are priced per unit yet metered; the file does not say so.
-var catalogMetered = map[string]bool{"CONNECTED_HOSTED_USAGE_QUARTERLY": true}
+var catalogMetered = map[string]bool{"CONNECTED_HOSTED_USAGE_QUARTERLY": true, "GROWTH_PII_REDACTION_USD": true}
+
+// catalogMeteredOn names the meter a metered price counts when it is not BILLABLE_EVENTS.
+var catalogMeteredOn = map[string]string{"GROWTH_PII_REDACTION_USD": "PII_REDACTION_USD"}
 
 // seedCatalog puts every mapped price and meter of mode in the account under its
 // real id, so the product's price catalog resolves against paymentsim unchanged.
@@ -501,6 +504,9 @@ func (st *state) seedCatalog(raw []byte, mode string, now time.Time) error {
 			seed.Interval, seed.IntervalCount = r.Interval, r.IntervalCount
 			if detail.UnitAmount == nil || catalogMetered[name] {
 				seed.UsageType, seed.Meter = "metered", billable
+				if meter := file.Meters[catalogMeteredOn[name]][mode]; meter != "" {
+					seed.Meter = meter
+				}
 			}
 		}
 		if _, err := st.seedPrice(seed, now.Unix()); err != nil {

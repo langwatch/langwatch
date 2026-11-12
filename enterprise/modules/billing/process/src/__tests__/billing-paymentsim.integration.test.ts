@@ -24,6 +24,7 @@ import { composeHttpBillingStripe } from "../channels/http/http.billing-stripe.c
 import { HttpStripeWebhooksChannel } from "../channels/http/http.billing.channels.ts";
 import { MemoryBillingWebhookHostChannel } from "../channels/memory/memory.billing-webhook-host.channel.ts";
 import { ReportUsageForMonthCommandHandler } from "../eventing/report-usage-for-month.commands.ts";
+import { carriesPiiRedactionPrice } from "../rules/pii-redaction-meter.rules.ts";
 import { MemoryBillingOrganizationRepository } from "../repositories/memory/memory.billing-account-facts.repository.ts";
 import { MemoryBillingReportOrganizationRepository } from "../repositories/memory/memory.billing-report-organization.repository.ts";
 import { MemoryBillingWebhookOrganizationRepository } from "../repositories/memory/memory.billing-webhook-organization.repository.ts";
@@ -40,6 +41,8 @@ import { billingStripeWebhookRest } from "../transport/billing-stripe-webhook.re
 const SECRET_KEY = "sk_test_paymentsim";
 const WEBHOOK_SECRET = "whsec_paymentsim";
 const LAUNCH_PRICE = "price_1R9LHnIMsTw08cudoc9eO4L8";
+const GROWTH_SEAT_USD_MONTHLY = "price_1SzP11IMsTw08cudRhGETYNa";
+const GROWTH_PII_REDACTION_USD = "price_1Uat9tIMsTw08cudpWWrZG4a";
 const REPO_ROOT = fileURLToPath(new URL("../../../../../../", import.meta.url));
 const CATALOG = fileURLToPath(
   new URL("../../../contract/src/stripe-catalog.json", import.meta.url),
@@ -346,7 +349,8 @@ describe.skipIf(!goPresent)(
     }, 30_000);
 
     /** @scenario "The month's PII redaction total reaches the Stripe simulator" */
-    it("reports a month's PII redaction price on its own meter once, and a rerun adds nothing", async () => {
+    /** @scenario "Usage is held while the subscription carries no PII redaction price" */
+    it("holds the month until the subscription carries the PII redaction price, then reports it once", async () => {
       const organizationId = "org-pii";
       const customer = (await stripe("/customers", { name: organizationId })).id;
       store.organizations.set(organizationId, {
@@ -364,6 +368,22 @@ describe.skipIf(!goPresent)(
         plan: "GROWTH_SEAT_USD_MONTHLY",
       });
       await subscriptions.updateStatus({ id: pending.id, status: "ACTIVE" });
+      // A Growth subscription at the provider bought before the PII redaction price existed.
+      const session = await stripe("/checkout/sessions", {
+        mode: "subscription",
+        customer,
+        success_url: "http://langwatch.test/settings/subscription",
+        "line_items[0][price]": GROWTH_SEAT_USD_MONTHLY,
+        "line_items[0][quantity]": "1",
+      });
+      const completed = z
+        .object({ subscription: z.string() })
+        .parse(await control(`/checkout/${session.id}/complete`, { body: {} }));
+      const stripeChannels = composeHttpBillingStripe({
+        secretKey: SECRET_KEY,
+        nodeEnvironment: "test",
+        apiBase: simBase,
+      });
       const repositories = MemoryBillingRepositories.create();
       const errors: Error[] = [];
       const errorReporter = new (class extends BillingErrorReporter {
@@ -396,6 +416,13 @@ describe.skipIf(!goPresent)(
         queryPiiRedactionSpendTotal: (input) =>
           piiRedactionSpend.queryPiiRedactionSpendTotal(input),
         isPiiRedactionMeterProvisioned: () => true,
+        hasPiiRedactionPrice: async ({ stripeCustomerId }) =>
+          carriesPiiRedactionPrice({
+            subscriptions: await stripeChannels.subscriptions.listCustomerSubscriptions({
+              customerId: stripeCustomerId,
+            }),
+            priceId: GROWTH_PII_REDACTION_USD,
+          }),
         selfDispatch: async () => {},
         errorReporter,
         connectedUsageCeiling: async () => null,
@@ -409,12 +436,21 @@ describe.skipIf(!goPresent)(
         data: { organizationId, billingMonth, tenantId: organizationId, occurredAt: Date.now() },
       };
 
+      const piiUsage = async () =>
+        usageTotals.parse(
+          await control(`/usage?customer=${customer}&event_name=langwatch_pii_redaction_usd`),
+        ).totals;
+
+      await handler.handle(command);
+      expect(await piiUsage()).toEqual([]);
+
+      await stripe(`/subscriptions/${completed.subscription}`, {
+        "items[0][price]": GROWTH_PII_REDACTION_USD,
+      });
       await handler.handle(command);
       await handler.handle(command);
 
-      const { totals } = usageTotals.parse(
-        await control(`/usage?customer=${customer}&event_name=langwatch_pii_redaction_usd`),
-      );
+      const totals = await piiUsage();
       expect(errors).toEqual([]);
       expect(ledgerReads).toEqual([
         { requestType: "pii_redaction" },

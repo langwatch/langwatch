@@ -72,6 +72,17 @@
    usage-billed rule (ADR-174 decision 12). Until the catalog maps the meter in a mode, nothing
    is reported and the checkpoint stays; the first report after carries the month from zero.
    Creating the meter and its price in Stripe is what starts charging.
+10. **Reported only to a subscription that prices it.** Stripe accepts a meter event that no
+    subscription line prices and bills it at nothing, so a report would advance the checkpoint
+    and lose the charge. The PII meter first lists the customer's subscriptions at Stripe and
+    reports only when an active, past-due or trialing one has a line on
+    `GROWTH_PII_REDACTION_USD`. Otherwise nothing is read or written and the first report after
+    the line is added carries the month from zero. A failed read holds the month too and
+    schedules another report. The other meters do not wait on it.
+11. **Checkout adds the price.** A Growth checkout in dollars carries the metered
+    `GROWTH_PII_REDACTION_USD` line, like Instant Evals, wherever the mode maps it. Euros carry
+    none: the meter counts dollars. The price is $1.00 per meter unit (one dollar redacted),
+    monthly, mapped in test mode only until live is provisioned.
 
 ## Rationale / Trade-offs
 
@@ -84,6 +95,10 @@ invoice line honest and lets charging start independently of Instant Evals.
 
 - Rows land on `gateway_spend` from the first deploy; the monthly report sends nothing until
   the meter is in the catalog.
+- A subscription bought before the price existed holds its PII spend until the line is added
+  to it. Usage stays on the ledger, so nothing is lost while it waits.
+- The report makes one Stripe subscriptions read per organization with PII spend each time
+  it runs.
 - A spend page lists `pii_redaction` rows beside gateway and Instant Evals spend.
 - Open: a free monthly amount, a minimum per call, and how long the free list stays.
 
