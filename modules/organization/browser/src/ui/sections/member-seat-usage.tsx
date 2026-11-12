@@ -6,9 +6,6 @@ import { ResourceLimitRow } from "../../behavior/lent-resource-limit-row.tsx";
 import { api } from "../../behavior/organization-api.ts";
 import { SEAT_TYPE_COPY } from "../../model/seat-type-copy.ts";
 
-/** A cap the catalogue writes as "as many as you like" reads as Unlimited, not 9,999. */
-const shownCap = (max: number): number => (isUncappedSeats(max) ? Infinity : max);
-
 /**
  * Each kind of seat in use against the plan's cap. Free (no Lite seats, none taken) shows
  * no Lite card; Developer seats always show, so a Developer over a cap of 0 reads as such.
@@ -25,6 +22,10 @@ export function MemberSeatUsage({
 
   if (!usage.data) return null;
   const showsLite = activePlan.maxMembersLite > 0 || usage.data.membersLiteCount > 0;
+  const fromLicence = activePlan.planSource === "license";
+  /** The catalogue's stand-in for no cap reads as Unlimited, not 9,999. */
+  const shownCap = (cap: number): number =>
+    isUncappedSeats({ cap, fromLicence }) ? Infinity : cap;
 
   return (
     <SimpleGrid

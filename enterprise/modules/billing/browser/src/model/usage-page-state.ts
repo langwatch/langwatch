@@ -23,6 +23,8 @@ import { PricingModel } from "./prisma-types.ts";
 
 const formatCount = (value: number): string => numeral(value).format("0,0");
 
+const fromLicence = (plan: UsagePagePlan): boolean => plan.planSource === "license";
+
 /** The plan as the usage page reads it: the fields of an active plan it uses. */
 export type UsagePagePlan = {
   type: string;
@@ -188,7 +190,7 @@ export function liteRow({
   if (plan.free) return { kind: "on-growth" };
   const hasLiteSeats = plan.maxMembersLite > 0 && pricingModel === PricingModel.SEAT_EVENT;
   if (!hasLiteSeats) return { kind: "none" };
-  if (isUncappedSeats(plan.maxMembersLite)) {
+  if (isUncappedSeats({ cap: plan.maxMembersLite, fromLicence: fromLicence(plan) })) {
     return { kind: "count", value: formatCount(liteCount), note: "unlimited" };
   }
   return {
@@ -200,7 +202,9 @@ export function liteRow({
 
 /** Full seats in use against the plan's. */
 export function fullSeats({ used, plan }: { used: number; plan: UsagePagePlan }): string {
-  if (isUncappedSeats(plan.maxMembers)) return formatCount(used);
+  if (isUncappedSeats({ cap: plan.maxMembers, fromLicence: fromLicence(plan) })) {
+    return formatCount(used);
+  }
   return `${formatCount(used)} / ${formatCount(plan.maxMembers)}`;
 }
 
@@ -216,7 +220,9 @@ export function developerSeats({
   plan: UsagePagePlan;
 }): string | null {
   if (plan.maxMembersDeveloper === 0 && used === 0) return null;
-  if (isUncappedSeats(plan.maxMembersDeveloper)) return formatCount(used);
+  if (isUncappedSeats({ cap: plan.maxMembersDeveloper, fromLicence: fromLicence(plan) })) {
+    return formatCount(used);
+  }
   return `${formatCount(used)} / ${formatCount(plan.maxMembersDeveloper)}`;
 }
 

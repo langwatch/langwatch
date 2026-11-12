@@ -14,7 +14,7 @@ import { type PlanTypes as PlanType, PlanTypes } from "./plan-types.ts";
  */
 export const UNLIMITED_MESSAGES = NO_MESSAGE_CAP;
 
-/** Whether a seat cap means no cap; a finite licence cap such as 10,000 stays a number. */
+/** Whether a seat cap means no cap; a finite licence cap such as 9,999 or 10,000 stays a number. */
 export const isUncappedSeats = isNoSeatCap;
 
 /**

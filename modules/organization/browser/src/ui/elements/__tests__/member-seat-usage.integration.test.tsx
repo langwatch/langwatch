@@ -60,10 +60,19 @@ vi.mock("../../../behavior/organization-api.ts", () => ({
 
 import { MemberSeatUsage } from "../../sections/member-seat-usage.tsx";
 
-type SeatPlan = { maxMembers: number; maxMembersLite: number; maxMembersDeveloper?: number };
+type SeatPlan = {
+  maxMembers: number;
+  maxMembersLite: number;
+  maxMembersDeveloper?: number;
+  planSource?: "license" | "subscription" | "free";
+};
 
-const planWith = ({ maxMembers, maxMembersLite, maxMembersDeveloper = 0 }: SeatPlan) =>
-  ({ maxMembers, maxMembersLite, maxMembersDeveloper }) as any;
+const planWith = ({
+  maxMembers,
+  maxMembersLite,
+  maxMembersDeveloper = 0,
+  planSource = "subscription",
+}: SeatPlan) => ({ maxMembers, maxMembersLite, maxMembersDeveloper, planSource }) as any;
 
 const renderSeatUsage = (plan: SeatPlan) =>
   renderWithDesignSystem(<MemberSeatUsage organizationId="org_1" activePlan={planWith(plan)} />);
@@ -149,6 +158,15 @@ describe("given an organization with a seat allowance of each kind", () => {
 
       expect(await screen.findByText("members: 3 / 10000")).toBeInTheDocument();
       expect(screen.getByText("membersLite: 4 / Infinity")).toBeInTheDocument();
+    });
+
+    it("keeps a licence's 9,999 as a real cap", async () => {
+      mockUsageData.current = { membersCount: 3, membersLiteCount: 4, membersDeveloperCount: 0 };
+
+      renderSeatUsage({ maxMembers: 9_999, maxMembersLite: 9_999, planSource: "license" });
+
+      expect(await screen.findByText("members: 3 / 9999")).toBeInTheDocument();
+      expect(screen.getByText("membersLite: 4 / 9999")).toBeInTheDocument();
     });
   });
 

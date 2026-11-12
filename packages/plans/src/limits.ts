@@ -37,9 +37,16 @@ export const UNLIMITED = Number.MAX_SAFE_INTEGER;
 /** A licence writes "no cap" as a number of 1M or more. */
 const LICENCE_UNCAPPED_FROM = 1_000_000;
 
-/** Whether a seat cap means "as many as you like": the catalogue's stand-in exactly, or a licence's 1M+. */
-export function isUncappedSeats(cap: number): boolean {
-  return cap === UNLIMITED_SEATS || cap >= LICENCE_UNCAPPED_FROM;
+/** Whether a seat cap means "as many as you like". A licence's 9,999 is a real cap; only 1M+ is not. */
+export function isUncappedSeats({
+  cap,
+  fromLicence,
+}: {
+  cap: number;
+  fromLicence: boolean;
+}): boolean {
+  if (cap >= LICENCE_UNCAPPED_FROM) return true;
+  return !fromLicence && cap === UNLIMITED_SEATS;
 }
 
 export const planLimitsSchema = z.object({
