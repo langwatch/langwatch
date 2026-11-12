@@ -485,6 +485,15 @@ func (s *Server) handleListCheckSuites(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"total_count": len(suites), "check_suites": suites})
 }
 
+// failedConclusion is true for a finished check run that did not pass.
+func failedConclusion(conclusion string) bool {
+	switch conclusion {
+	case "", "success", "neutral", "skipped":
+		return false
+	}
+	return true
+}
+
 // suiteFor is the commit's suite, or nil when no check run names the commit. The caller holds s.mu.
 func (s *Server) suiteFor(repo, sha string) map[string]any {
 	count, status, conclusion := 0, "completed", "success"
@@ -496,7 +505,7 @@ func (s *Server) suiteFor(repo, sha string) map[string]any {
 		if c.Status != "completed" {
 			status = "in_progress"
 		}
-		if c.Conclusion != "" && c.Conclusion != "success" && c.Conclusion != "neutral" && c.Conclusion != "skipped" {
+		if failedConclusion(c.Conclusion) {
 			conclusion = "failure"
 		}
 	}
