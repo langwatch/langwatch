@@ -128,13 +128,19 @@ beforeAll(async () => {
       tenantId: owner,
       spanId: "owner-signed-by-reader",
       offsetMs: 90,
-      attributes: { [MARK]: reader },
+      attributes: { orchestrator: "signed", [MARK]: reader },
     }),
     spanRow({
       tenantId: owner,
       spanId: "owner-signed-by-third",
       offsetMs: 95,
-      attributes: { [MARK]: third },
+      attributes: { orchestrator: "signed", [MARK]: third },
+    }),
+    spanRow({
+      tenantId: owner,
+      spanId: "owner-mark-without-entry",
+      offsetMs: 97,
+      attributes: { [MARK]: reader },
     }),
     spanRow({ tenantId: reader, spanId: "paged-root", traceId: pagingTraceId, offsetMs: 0 }),
     spanRow({ tenantId: reader, spanId: "shared", traceId: pagingTraceId, offsetMs: 10 }),
@@ -266,6 +272,41 @@ describe.skipIf(!clickHouseConfigured)("ClickHouseTraceSpanRepository under a br
     },
   );
 
+  describe("when a page under a braid ends on the trace's last span", () => {
+    /** @scenario "A span tree page under a braid reads no span past its end" */
+    it("offers a next page because the page is full, and that page holds no span", async () => {
+      const page = (cursor?: SpanTreeCursor) =>
+        repo.listSummaryPage({
+          authorization: braidedProof({
+            projectId: reader,
+            braids: [{ owner, compiledWhere: WEB }],
+          }),
+          traceId: pagingTraceId,
+          limit: 4,
+          cursor,
+          occurredAtMs: base - 180_000,
+        });
+
+      const first = await page();
+      const last = first.rows.at(-1);
+      if (last === undefined) throw new Error("the first page held no span");
+      const next = await page({
+        startTimeMs: last.startTimeMs,
+        spanId: last.spanId,
+        ownerProjectId: last.ownerProjectId ?? null,
+      });
+
+      expect(first.rows.map((row) => row.spanId)).toEqual([
+        "paged-root",
+        "shared",
+        "shared",
+        "paged-tail",
+      ]);
+      expect(first.hasMore).toBe(true);
+      expect(next).toEqual({ rows: [], hasMore: false });
+    });
+  });
+
   describe("when a second owner is braided into the reader", () => {
     /** @scenario "Spans are matched per owner by trace id" */
     it("returns each owner's matching spans in the trace, each under its own project", async () => {
@@ -300,6 +341,13 @@ describe.skipIf(!clickHouseConfigured)("ClickHouseTraceSpanRepository under a br
       expect(await braidedIds([{ owner, compiledWhere: VERIFIED }])).toEqual([
         `owner-signed-by-reader@${owner}`,
       ]);
+    });
+
+    /** @scenario "Verified never matches a mark whose entry the span does not carry" */
+    it("never braids a span carrying the reader's mark without the orchestrator entry", async () => {
+      expect(await braidedIds([{ owner, compiledWhere: VERIFIED }])).not.toContain(
+        `owner-mark-without-entry@${owner}`,
+      );
     });
   });
 });

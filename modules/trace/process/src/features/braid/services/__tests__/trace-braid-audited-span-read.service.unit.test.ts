@@ -26,11 +26,14 @@ const READER = "proj_orchestrator";
 const OWNER = "proj_specialists";
 const ownerRow = { spanId: "owner-span", ownerProjectId: OWNER };
 const ownRow = { spanId: "reader-span" };
+/** Normalized spans name their project as `tenantId`, never an `ownerProjectId`. */
+const tenantRows = (...tenantIds: string[]) =>
+  tenantIds.map((tenantId, index) => ({ spanId: `span-${index}`, tenantId }));
 
 /** What each span read returns showing an owner's row; a read missing here fails the build. */
 const SHOWING_AN_OWNER = {
   getSpansByTraceId: [ownRow, ownerRow],
-  getNormalizedSpansByTraceId: [ownRow, ownerRow],
+  getNormalizedSpansByTraceId: tenantRows(READER, OWNER),
   findStoredSpansByTraceId: [ownRow, ownerRow],
   findSpanById: ownRow,
   getSpanEvents: [{ event_id: "event-1" }],
@@ -267,6 +270,31 @@ describe("TraceBraidAuditedSpanReadService", () => {
       });
 
       await door.read("getSpansByTraceId", { authorization, traceId: "trace-1" });
+
+      expect(recordView).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the normalized span read returns rows naming only their project", () => {
+    /** @scenario "A span read that skips the audit door cannot be written" */
+    it("records the braided spans viewed entry for each project not the reader's", async () => {
+      const { read, recordView, authorization } = doorOver({ results: SHOWING_AN_OWNER });
+
+      await read("getNormalizedSpansByTraceId");
+
+      expect(recordView).toHaveBeenCalledWith({
+        actor: authorization.actor,
+        readerProjectId: READER,
+        ownerProjectIds: [OWNER],
+      });
+    });
+
+    it("records nothing when every row is the reader's own", async () => {
+      const { read, recordView } = doorOver({
+        results: { getNormalizedSpansByTraceId: tenantRows(READER, READER) },
+      });
+
+      await read("getNormalizedSpansByTraceId");
 
       expect(recordView).not.toHaveBeenCalled();
     });

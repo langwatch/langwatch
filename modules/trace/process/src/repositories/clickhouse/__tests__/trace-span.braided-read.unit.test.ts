@@ -246,3 +246,73 @@ describe("ClickHouseTraceSpanRepository span tree cursor", () => {
     });
   });
 });
+
+describe("ClickHouseTraceSpanRepository span tree page end", () => {
+  const PAGE = 2;
+  const spans = (count: number, tenantId?: string) =>
+    Array.from({ length: count }, (_, index) =>
+      summaryRow({ spanId: `span-${index}`, ...(tenantId === undefined ? {} : { tenantId }) }),
+    );
+
+  async function pageOf({ authorization, rows }: { authorization: Authorization; rows: Row[] }) {
+    const { repo, spanRead } = treeRepository(rows);
+    const page = await repo.listSummaryPage({
+      authorization,
+      traceId: "trace-1",
+      limit: PAGE,
+      cursor: { startTimeMs: 1_699_999_999_000, spanId: "a" },
+    });
+    return { page, params: spanRead().params };
+  }
+
+  describe("when the reader holds a braid", () => {
+    const braided = braidedProof({
+      projectId: READER,
+      braids: [{ owner: OWNER, compiledWhere: WEB }],
+    });
+
+    /** @scenario "A span tree page under a braid reads no span past its end" */
+    it("reads no row past the page, so an owner's next span is never read before its audit", async () => {
+      const { params } = await pageOf({ authorization: braided, rows: [] });
+
+      expect(params).toMatchObject({ limit: PAGE });
+    });
+
+    /** @scenario "A span tree page under a braid reads no span past its end" */
+    it("offers a next page whenever the page is full", async () => {
+      const { page } = await pageOf({ authorization: braided, rows: spans(PAGE, READER) });
+
+      expect(page).toMatchObject({ hasMore: true });
+      expect(page.rows).toHaveLength(PAGE);
+    });
+
+    it("offers no next page when the page is short", async () => {
+      const { page } = await pageOf({ authorization: braided, rows: spans(PAGE - 1, READER) });
+
+      expect(page.hasMore).toBe(false);
+    });
+  });
+
+  describe("when the reader holds no braid", () => {
+    const own = ownProof({ projectId: READER });
+
+    it("reads one row past the page to learn whether another follows", async () => {
+      const { params } = await pageOf({ authorization: own, rows: [] });
+
+      expect(params).toMatchObject({ limit: PAGE + 1 });
+    });
+
+    it("offers no next page when the page is full and nothing follows", async () => {
+      const { page } = await pageOf({ authorization: own, rows: spans(PAGE) });
+
+      expect(page.hasMore).toBe(false);
+    });
+
+    it("offers a next page when a row follows the page, without returning it", async () => {
+      const { page } = await pageOf({ authorization: own, rows: spans(PAGE + 1) });
+
+      expect(page).toMatchObject({ hasMore: true });
+      expect(page.rows).toHaveLength(PAGE);
+    });
+  });
+});

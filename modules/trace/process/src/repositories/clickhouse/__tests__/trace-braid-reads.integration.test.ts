@@ -41,7 +41,7 @@ const trace = {
 };
 const web = { orchestrator: "web" };
 const app = { orchestrator: "app" };
-const signed = { ...web, "langwatch.reserved.verified.sig": reader };
+const signed = { ...web, sig: "signed", "langwatch.reserved.verified.sig": reader };
 const billing = { team: "billing" };
 const MINUTE_MS = 60 * 1000;
 /** A second pair: the reader already sees `web` spans through a braid that ended 20 minutes ago. */

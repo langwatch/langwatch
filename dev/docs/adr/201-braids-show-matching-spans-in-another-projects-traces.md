@@ -165,7 +165,7 @@ beside the text. The ClickHouse client renders the tree; nothing parses OTTL at 
 | `attributes["k"] == "v"`, `resource.attributes["k"] == "v"` | equality on the span's or its resource's attribute map           |
 | `name == "v"`                                               | equality on the span name                                        |
 | `attributes["k"] != nil`                                    | the key is present (`mapContains`), never a comparison with `''` |
-| `Verified("k")`                                             | §4's verified mark for `k`, made with a key of the **reader**    |
+| `Verified("k")`                                             | `k` present, and §4's verified mark for it by a **reader** key   |
 | `and`, parentheses                                          | conjunction                                                      |
 
 Refused on save, each with a fix the admin can act on: `or`, `not`, `IsMatch`, any comparison but string
@@ -631,3 +631,7 @@ not operations.
   where the value stored is the value signed: admission, the projection's preview and the stored row each
   drop a mark whose entry they changed, moved or removed; a paged read's total names the owners it counts
   and is audited for them, even on a page showing none of their spans (§4, §8).
+- v1.18 (2026-11-12, from the security re-review, under the same ruling). A span tree page under a
+  braid reads no row past its end and offers a next page whenever it is full, so an exact end costs
+  one empty page; rows naming their project rather than an owner are audited for every project not
+  the reader's; `Verified("k")` also requires entry k present, so a mark without it never matches (§3, §8).

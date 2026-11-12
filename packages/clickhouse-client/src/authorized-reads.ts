@@ -377,9 +377,12 @@ function predicateOf({
         return `SpanName = ${bind("v", term.value)}`;
       case "attributePresent":
         return `mapContains(SpanAttributes, ${bind("k", term.key)})`;
-      case "verified":
+      case "verified": {
         verifies = true;
-        return `SpanAttributes[${bind("k", `${VERIFIED_ATTRIBUTE_PREFIX}${term.key}`)}] = ${readerSlot}`;
+        // The signed entry must be present too: a mark on a row without its entry never matches.
+        const entry = `mapContains(SpanAttributes, ${bind("k", term.key)})`;
+        return `${entry} AND SpanAttributes[${bind("k", `${VERIFIED_ATTRIBUTE_PREFIX}${term.key}`)}] = ${readerSlot}`;
+      }
     }
   };
   const terms = braidConditionTermsOf(compiledWhere.tree);

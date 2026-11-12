@@ -352,6 +352,14 @@ Feature: Braided spans in the reader's traces
       And a read whose entry cannot be written fails and returns no total
 
     @integration
+    Scenario: A span tree page under a braid reads no span past its end
+      Given a live braid from "specialists" into "orchestrator"
+      When sam reads a full page of an "orchestrator" trace's span tree
+      Then the page reads no span past its last one, so a "specialists" span after it is never read before its audit
+      And the page offers a next page because it is full
+      And when the trace ends on that page's last span, the next page holds no span
+
+    @integration
     Scenario: Every view of a braided trace is audited, or refused
       Given a live braid from "specialists" into "orchestrator"
       When sam opens the header's braided totals, span tree, full spans, resources, timeline or instrumentation badges of an "orchestrator" trace holding "specialists" spans
@@ -363,6 +371,7 @@ Feature: Braided spans in the reader's traces
       Given the reads the trace module's span store and braid reads answer
       When any of them returns a "specialists" span, or totals or counts derived from one
       Then it returns only after the braided spans viewed entry is written, and fails when it cannot be
+      And a read whose rows name their project rather than an owner is audited for every project not the reader's
       And a new span read cannot be called until it names how its result's owners are read
 
     @integration

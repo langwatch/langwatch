@@ -14,6 +14,7 @@ import type { TracesSpanReader } from "#app/trace.app";
 import type { TraceService } from "../../../services/trace.service.ts";
 import type { TraceBraidDetailService } from "../../read/services/trace-braid-detail.service.ts";
 import type { TraceBraidReadsRepository } from "../repositories/trace-braid-reads.repository.ts";
+import { braidedOwnerOf } from "../rules/braided-span-owner.rules.ts";
 
 /** Every read the span store answers. */
 export type TraceSpanRead = keyof TracesSpanReader;
@@ -43,6 +44,20 @@ function braidOwnersOf(shown: readonly unknown[]): string[] {
 const rows = ({ result }: { result: readonly unknown[] }): Owners => braidOwnersOf(result);
 const values = ({ result }: { result: Readonly<Record<string, unknown>> }): Owners =>
   braidOwnersOf(Object.values(result));
+/** Rows that name their project, not an owner: each project not the reader's is one (§5). */
+const tenants = ({
+  params,
+  result,
+}: {
+  params: { authorization: Authorization };
+  result: readonly { tenantId: string }[];
+}): Owners => [
+  ...braidOwnersOf(result),
+  ...result.map(
+    ({ tenantId }) =>
+      braidedOwnerOf({ authorization: params.authorization, tenantId }).ownerProjectId,
+  ),
+];
 /** A read by owner and id: the owner it named, once it found anything. */
 const named = ({
   params,
@@ -63,7 +78,7 @@ const named = ({
  */
 const OWNERS_OF: { readonly [K in TraceSpanRead]: OwnerRule<K> } = {
   getSpansByTraceId: rows,
-  getNormalizedSpansByTraceId: rows,
+  getNormalizedSpansByTraceId: tenants,
   findStoredSpansByTraceId: rows,
   findSpanById: named,
   getSpanEvents: named,

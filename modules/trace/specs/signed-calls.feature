@@ -122,6 +122,13 @@ Feature: Signed calls
       When the trace is read for "orchestrator"
       Then the span is not braided
 
+    @integration
+    Scenario: Verified never matches a mark whose entry the span does not carry
+      Given a braid from "specialists" into "orchestrator" with the condition Verified("orchestrator")
+      And a stored "specialists" span carrying a mark naming "orchestrator" but no orchestrator entry
+      When the trace is read for "orchestrator"
+      Then the span is not braided
+
   Rule: The SDK signs on the calling side and copies on the called side
 
     @unit

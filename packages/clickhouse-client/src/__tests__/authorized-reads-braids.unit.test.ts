@@ -353,12 +353,13 @@ describe("the fence over a span read", () => {
         );
         expect(query).toContain("mapContains(SpanAttributes, {tenantScope_p0_k:Array(String)}[2])");
         expect(query).toContain(
-          "SpanAttributes[{tenantScope_p0_k:Array(String)}[3]] = {tenantScope_reader:String}",
+          "mapContains(SpanAttributes, {tenantScope_p0_k:Array(String)}[3]) AND SpanAttributes[{tenantScope_p0_k:Array(String)}[4]] = {tenantScope_reader:String}",
         );
         expect(queryParams).toMatchObject({
           tenantScope_p0_k: [
             "secret.key",
             "secret.present",
+            "secret.signed",
             "langwatch.reserved.verified.secret.signed",
           ],
           tenantScope_p0_v: ["secret-value"],

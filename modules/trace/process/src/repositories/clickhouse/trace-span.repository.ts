@@ -349,6 +349,9 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
       : "";
     // A cursor page is bounded by the cursor's own start, so it reads no index.
     const timeFilter = idBound === undefined ? "" : STORED_SPANS_ID_BOUND;
+    // The row past a page may be an owner's, read before any audit: under a braid none is read,
+    // and a full page offers the next one (ADR-201 §8, v1.18).
+    const peeks = !readsBraidedSpans(input.authorization);
     const result = await client.query({
       // ID_BOUND_SKIP: a first page carries the marker in timeFilter; a cursor page, its cursor.
       query: `
@@ -363,7 +366,7 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
       `,
       query_params: {
         traceId: input.traceId,
-        limit: input.limit + 1,
+        limit: peeks ? input.limit + 1 : input.limit,
         ...(input.cursor
           ? {
               cursorStart: Math.trunc(input.cursor.startTimeMs),
@@ -381,7 +384,7 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     );
     return {
       rows: mapped.slice(0, input.limit),
-      hasMore: mapped.length > input.limit,
+      hasMore: peeks ? mapped.length > input.limit : mapped.length >= input.limit,
     };
   }
 
