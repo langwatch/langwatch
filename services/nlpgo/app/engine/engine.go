@@ -304,7 +304,7 @@ func (e *Engine) runLayer(ctx context.Context, req ExecuteRequest, plan *planner
 			}
 			started := time.Now()
 			outputs, derr := e.dispatch(nodeCtx, req, node, inputs, ns)
-			ns.DurationMS = time.Since(started).Milliseconds()
+			ns.DurationMS = elapsedMS(started)
 			if derr != nil {
 				ns.Status = "error"
 				ns.Error = derr
@@ -1552,7 +1552,7 @@ func finalize(state *runState, traceID string, started time.Time, ctxErr error) 
 		TraceID:    traceID,
 		Nodes:      state.states,
 		TotalCost:  state.totalCost,
-		DurationMS: time.Since(started).Milliseconds(),
+		DurationMS: elapsedMS(started),
 	}
 	if ctxErr != nil {
 		res.Status = "error"
