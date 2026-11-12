@@ -73,6 +73,75 @@ describe("presentLangyToolError", () => {
     });
   });
 
+  describe("given the server's own permission_denied code", () => {
+    const denied = ({
+      code = "permission_denied",
+      denialReason,
+      permission = "scenarios:manage",
+      message = "Permission denied",
+    }: {
+      code?: string;
+      denialReason?: string;
+      permission?: string;
+      message?: string;
+    }) =>
+      present(
+        failureDocument({
+          code,
+          message,
+          httpStatus: 403,
+          meta: { permission, denialReason },
+          isHandled: true,
+        }),
+      );
+
+    /** @scenario "A failure card says what went wrong in the user's terms" */
+    it.each(["permission_denied", "project_permission_denied"])(
+      "names the missing access for %s",
+      (code) => {
+        expect(denied({ code, denialReason: "no-grant" }).message).toBe(
+          "You can't manage scenarios in this project.",
+        );
+      },
+    );
+
+    /** @scenario "A reader who lost access is told so" */
+    it.each(["no-membership", "membership-disabled"])(
+      "says access was removed for %s",
+      (denialReason) => {
+        const presentation = denied({ denialReason });
+        expect(presentation.message).toBe("You no longer have access to this project.");
+        expect(presentation.detail).toBe(
+          "Ask whoever manages access for your team if you need it back.",
+        );
+      },
+    );
+
+    /** @scenario "A reader who lost access is told so" */
+    it("names the one permission lost when the owner's access was reduced", () => {
+      expect(denied({ denialReason: "owner-ceiling" }).message).toBe(
+        "You can no longer manage scenarios in this project.",
+      );
+    });
+
+    /** @scenario "A reader who lost access is told so" */
+    it("keeps a reduced access to one action when the action has no plain words", () => {
+      expect(denied({ denialReason: "owner-ceiling", permission: "agents:deploy" }).message).toBe(
+        "This action isn't available to you any more in this project.",
+      );
+    });
+
+    /** @scenario "A seat limit keeps the platform's own sentence" */
+    it.each([
+      ["developer-restricted", "This is outside your Developer seat"],
+      ["lite-member-restricted", "This feature is not available for your account"],
+    ])("keeps the server's seat sentence for %s", (denialReason, sentence) => {
+      const presentation = denied({ denialReason, message: sentence });
+      expect(presentation.message).toBe(sentence);
+      expect(presentation.detail).toBe("Ask whoever manages seats for your team if you need it.");
+    });
+  });
+
   describe("given a denial that named no permission", () => {
     /** @scenario "A refused permission reads as a permissions problem" */
     it("still says the access does not cover it, with no invented detail", () => {

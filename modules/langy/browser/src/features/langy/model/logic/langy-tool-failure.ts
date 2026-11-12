@@ -160,9 +160,27 @@ const ACCESS_DENIAL_CODES = new Set([
   "api_key_permission_denied",
   "api_key_not_owned",
   "api_key_scope_violation",
-  // The CLI's own status-derived code, for a 403 that carried no body.
+  "permission_denied",
+  "project_permission_denied",
+  // From the governance CLI client; a body-less 403 becomes "unauthorized" in codeForStatus.
   "forbidden",
 ]);
+
+/**
+ * The denial reasons that mean the reader's own access was removed or reduced since the key
+ * was minted.
+ */
+const ACCESS_REMOVED_REASONS = new Set(["owner-ceiling", "no-membership", "membership-disabled"]);
+
+/** The denial reasons that mean the reader's seat does not include this; a grant cannot lift it. */
+const SEAT_LIMIT_REASONS = new Set(["developer-restricted", "lite-member-restricted"]);
+
+/** owner-ceiling is also a role change: it speaks of one action, never the whole project. */
+function removedAccessMessage({ reason, needed }: { reason: string; needed: string | undefined }) {
+  if (reason !== "owner-ceiling") return "You no longer have access to this project.";
+  if (needed) return `You can no longer ${needed} in this project.`;
+  return "This action isn't available to you any more in this project.";
+}
 
 /**
  * The codes that mean a CLI credential was missing or refused. In the sandbox that is
@@ -310,8 +328,24 @@ function describeFailure({
   }
 
   if (isAccessDenial(domain)) {
-    // ONE sentence for the fact, one for what to do.
     const needed = humanPermission(domain.meta.permission);
+    const reason = domain.meta.denialReason;
+    if (typeof reason === "string" && ACCESS_REMOVED_REASONS.has(reason)) {
+      return {
+        message: removedAccessMessage({ reason, needed }),
+        detail: "Ask whoever manages access for your team if you need it back.",
+        remediationApplies: false,
+      };
+    }
+    // The server's sentence already names the seat, so it stays; a grant cannot lift a seat limit.
+    if (typeof reason === "string" && SEAT_LIMIT_REASONS.has(reason)) {
+      return {
+        message: domain.message,
+        detail: "Ask whoever manages seats for your team if you need it.",
+        remediationApplies: false,
+      };
+    }
+    // ONE sentence for the fact, one for what to do.
     return {
       message: needed
         ? `You can't ${needed} in this project.`
