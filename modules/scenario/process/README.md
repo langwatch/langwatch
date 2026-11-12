@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The scenario application: what every scenario door calls, and what peer features such as Suite reach it by.
 
-Peers call these through the token, declared at `../contract/src/scenario.api.ts:251`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/scenario.api.ts:254`; nothing else in this package is public.
 
 #### `generateScenario`
 
@@ -1039,7 +1039,7 @@ Contract `../contract/src/scenario.trpc.ts:185`, router `src/transport/scenario.
 ```typescript
 // scenarios.create
 type Input = z.infer<typeof scenarioTrpcCreateSchema>; // ../contract/src/scenario.trpc.ts:105
-type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:63
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:71
 
 // scenarios.getAll
 // Input: projectSchema, ../contract/src/scenario.trpc.ts:67
@@ -1054,7 +1054,7 @@ interface Input {
   projectId: string;
   id: string;
 }
-type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:63
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:71
 
 // scenarios.getByIdIncludingArchived
 type Input = z.infer<typeof scenarioIdSchema>; // ../contract/src/scenario.trpc.ts:75
@@ -1062,11 +1062,11 @@ type Input = z.infer<typeof scenarioIdSchema>; // ../contract/src/scenario.trpc.
 
 // scenarios.update
 type Input = z.infer<typeof scenarioTrpcUpdateSchema>; // ../contract/src/scenario.trpc.ts:136
-type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:63
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:71
 
 // scenarios.archive
 type Input = z.infer<typeof scenarioIdSchema>; // ../contract/src/scenario.trpc.ts:75
-type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:63
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:71
 
 // scenarios.moveToTestSuite
 // Input: inline, ../contract/src/scenario.trpc.ts:214
@@ -1075,7 +1075,7 @@ interface Input {
   scenarioId: string;
   testSuiteId: string | null;
 }
-type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:63
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:71
 
 // scenarios.duplicate
 // Input: inline, ../contract/src/scenario.trpc.ts:223
@@ -1083,7 +1083,7 @@ interface Input {
   projectId: string;
   scenarioId: string;
 }
-type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:63
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:71
 
 // scenarios.batchArchive
 // Input: inline, ../contract/src/scenario.trpc.ts:227
@@ -1126,7 +1126,7 @@ interface Input {
   scenarioId: string;
   version: number;
 }
-type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:63
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:71
 
 // scenarios.run
 type Input = z.infer<typeof scenarioTrpcRunSchema>; // ../contract/src/scenario.trpc.ts:157
