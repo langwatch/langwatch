@@ -1,4 +1,10 @@
-import { isDeveloper, isFullMember, isLiteMember } from "@langwatch/entitlement-contract";
+import {
+  classifyMemberType,
+  isDeveloper,
+  isFullMember,
+  isLiteMember,
+  type MemberType,
+} from "@langwatch/entitlement-contract";
 import {
   type OrganizationMemberSeats,
   OrganizationUserRole,
@@ -6,7 +12,14 @@ import {
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
-import { OrganizationSeatRepository, type SeatLease } from "../organization-seat.repository.ts";
+import { seatKindOf } from "../../rules/seat-change.rules.ts";
+import { suppressedHoldings } from "../../rules/seat-holder.rules.ts";
+import {
+  type CountedSeatHold,
+  type OrganizationSeatHolding,
+  OrganizationSeatRepository,
+  type SeatLease,
+} from "../organization-seat.repository.ts";
 import type {
   MemoryOrganizationDatabase,
   MemoryOrganizationInviteRow,
@@ -35,16 +48,31 @@ function isLive(invite: MemoryOrganizationInviteRow, now: Instant): boolean {
   );
 }
 
-/** Whether a live invitation holds this seat: its assignments' roles merged, none if empty. */
+/** A live invitation's permissions: its assignments' roles merged; empty when it names none. */
+function mergedInvitePermissions(
+  invite: MemoryOrganizationInviteRow,
+  permissionsOf: PermissionsOf,
+): string[] {
+  const assignments = teamAssignmentsSchema.safeParse(invite.teamAssignments).data;
+  return defined((assignments ?? []).map((entry) => permissionsOf(entry.customRoleId))).flat();
+}
+
+/** The seat a live invitation takes: its merged permissions, none if it names no role. */
+function inviteMemberType(
+  invite: MemoryOrganizationInviteRow,
+  permissionsOf: PermissionsOf,
+): MemberType {
+  const merged = mergedInvitePermissions(invite, permissionsOf);
+  return classifyMemberType(invite.role, merged.length > 0 ? merged : undefined);
+}
+
+/** Whether a live invitation holds this seat. */
 function inviteHoldsSeat(
   invite: MemoryOrganizationInviteRow,
   permissionsOf: PermissionsOf,
   predicate: SeatPredicate,
 ): boolean {
-  const assignments = teamAssignmentsSchema.safeParse(invite.teamAssignments).data;
-  const merged = defined(
-    (assignments ?? []).map((entry) => permissionsOf(entry.customRoleId)),
-  ).flat();
+  const merged = mergedInvitePermissions(invite, permissionsOf);
   return predicate(invite.role, merged.length > 0 ? merged : undefined);
 }
 
@@ -129,10 +157,25 @@ export class MemoryOrganizationSeatRepository extends OrganizationSeatRepository
   }
 
   async countMemberSeats(organizationId: string): Promise<OrganizationMemberSeats> {
+    return {
+      fullMembers:
+        this.#count(organizationId, isFullMember) + this.#countedHolds({ organizationId }).length,
+      liteMembers: this.#count(organizationId, isLiteMember),
+      developers: this.#count(organizationId, isDeveloper),
+    };
+  }
+
+  /** A full seat stays counted until its hold ends, unless its person holds a full seat again. */
+  #countedHolds({
+    organizationId,
+    ignoringInviteId,
+  }: {
+    organizationId: string;
+    ignoringInviteId?: string;
+  }): MemoryOrganizationDatabase["seatHolds"] {
     const fullUserIds = new Set(
       this.#members(organizationId, isFullMember).map((member) => member.userId),
     );
-    // A full seat stays counted until its hold ends, unless a live full invitation takes it back.
     const now = nowInstant();
     const permissionsOf = this.#permissionsOf(organizationId);
     const invitedEmails = new Set(
@@ -140,27 +183,157 @@ export class MemoryOrganizationSeatRepository extends OrganizationSeatRepository
         .filter(
           (invite) =>
             invite.organizationId === organizationId &&
+            invite.id !== ignoringInviteId &&
             isLive(invite, now) &&
             inviteHoldsSeat(invite, permissionsOf, isFullMember),
         )
         .map((invite) => invite.email.toLowerCase()),
     );
-    const heldFullMembers = this.memory.seatHolds.filter(
+    return this.memory.seatHolds.filter(
       (hold) =>
         hold.organizationId === organizationId &&
         Temporal.Instant.compare(hold.heldUntil, now) > 0 &&
         !fullUserIds.has(hold.userId) &&
         !(hold.email && invitedEmails.has(hold.email.toLowerCase())),
-    ).length;
-    return {
-      fullMembers: this.#count(organizationId, isFullMember) + heldFullMembers,
-      liteMembers: this.#count(organizationId, isLiteMember),
-      developers: this.#count(organizationId, isDeveloper),
-    };
+    );
+  }
+
+  async findCountedHold({
+    organizationId,
+    userId,
+    ignoringInviteId,
+  }: {
+    organizationId: string;
+    userId: string;
+    ignoringInviteId?: string;
+  }): Promise<CountedSeatHold[]> {
+    return this.#countedHolds({ organizationId, ignoringInviteId })
+      .filter((hold) => hold.userId === userId)
+      .map((hold) => ({ userId, heldUntil: hold.heldUntil.epochMilliseconds }));
+  }
+
+  async findHoldUserIdsByEmail({
+    organizationId,
+    email,
+  }: {
+    organizationId: string;
+    email: string;
+  }): Promise<string[]> {
+    const now = nowInstant();
+    return this.memory.seatHolds
+      .filter(
+        (hold) =>
+          hold.organizationId === organizationId &&
+          hold.email?.toLowerCase() === email.toLowerCase() &&
+          Temporal.Instant.compare(hold.heldUntil, now) > 0,
+      )
+      .map((hold) => hold.userId);
   }
 
   async findFullSeatHolderIds(organizationId: string): Promise<string[]> {
     return this.#members(organizationId, isFullMember).map((member) => member.userId);
+  }
+
+  /** The live holds a live full invitation to their address stands in for. */
+  #suppressedHolds({
+    organizationId,
+    now,
+    permissionsOf,
+  }: {
+    organizationId: string;
+    now: Instant;
+    permissionsOf: PermissionsOf;
+  }): OrganizationSeatHolding[] {
+    return suppressedHoldings({
+      holds: this.memory.seatHolds
+        .filter(
+          (hold) =>
+            hold.organizationId === organizationId &&
+            Temporal.Instant.compare(hold.heldUntil, now) > 0,
+        )
+        .map((hold) => ({ ...hold, expiresAt: hold.heldUntil.epochMilliseconds })),
+      fullUserIds: new Set(
+        this.#members(organizationId, isFullMember).map((member) => member.userId),
+      ),
+      fullInvitations: [...this.memory.invites.values()].filter(
+        (invite) =>
+          invite.organizationId === organizationId &&
+          isLive(invite, now) &&
+          inviteHoldsSeat(invite, permissionsOf, isFullMember),
+      ),
+    });
+  }
+
+  async findSeatHolders(organizationId: string): Promise<OrganizationSeatHolding[]> {
+    const permissionsOf = this.#permissionsOf(organizationId);
+    const now = nowInstant();
+    return [
+      ...this.#countedHolds({ organizationId }).map((hold) => ({
+        holder: {
+          kind: "hold" as const,
+          userId: hold.userId,
+          expiresAt: hold.heldUntil.epochMilliseconds,
+        },
+        seat: "full" as const,
+      })),
+      ...this.#suppressedHolds({ organizationId, now, permissionsOf }),
+      ...this.memory.organizationUsers
+        .filter(
+          (member) =>
+            member.organizationId === organizationId &&
+            member.disabledAt === null &&
+            (this.memory.users.get(member.userId)?.deactivatedAt ?? null) === null,
+        )
+        .map((member) => ({
+          holder: { kind: "member" as const, userId: member.userId },
+          seat: seatKindOf(
+            classifyMemberType(member.role, this.#memberPermissions(member, permissionsOf)),
+          ),
+        })),
+      ...[...this.memory.invites.values()]
+        .filter((invite) => invite.organizationId === organizationId && isLive(invite, now))
+        .map((invite) => ({
+          holder: {
+            kind: "invitation" as const,
+            inviteId: invite.id,
+            expiresAt: invite.expiration?.epochMilliseconds ?? null,
+          },
+          seat: seatKindOf(inviteMemberType(invite, permissionsOf)),
+        })),
+    ];
+  }
+
+  async findMemberSeat({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<MemberType | null> {
+    const member = this.memory.organizationUsers.find(
+      (candidate) =>
+        candidate.organizationId === organizationId &&
+        candidate.userId === userId &&
+        candidate.disabledAt === null &&
+        (this.memory.users.get(userId)?.deactivatedAt ?? null) === null,
+    );
+    if (!member) return null;
+    const permissionsOf = this.#permissionsOf(organizationId);
+    return classifyMemberType(member.role, this.#memberPermissions(member, permissionsOf));
+  }
+
+  async findInvitationSeat({
+    organizationId,
+    inviteId,
+  }: {
+    organizationId: string;
+    inviteId: string;
+  }): Promise<MemberType | null> {
+    const invite = this.memory.invites.get(inviteId);
+    if (!invite || invite.organizationId !== organizationId || !isLive(invite, nowInstant())) {
+      return null;
+    }
+    return inviteMemberType(invite, this.#permissionsOf(organizationId));
   }
 
   #permissionsOf(organizationId: string): PermissionsOf {

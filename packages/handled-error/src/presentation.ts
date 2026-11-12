@@ -1642,6 +1642,13 @@ const presentations = {
     describe: () =>
       "No default model is set yet. Open Settings, then Default Models, and pick one for your organization.",
   },
+  model_execution_unavailable: {
+    // A codex model reached a process with no gateway road to run it; no retry
+    // changes that, so the copy points at picking a model from another provider.
+    title: "This model can't run this feature yet",
+    describe: () =>
+      "Codex models can't run this feature on this deployment yet. Pick a model from another provider for it in Default Models.",
+  },
   model_restricted_for_execution: {
     // The same licence as `model_restricted_for_feature`, hit at the other
     // end: a codex model arriving at a surface it cannot run on, which is

@@ -22,6 +22,8 @@ export interface VendorStatements {
   insert(params: {
     table: string;
     values: readonly Readonly<Record<string, unknown>>[];
+    /** As `@clickhouse/client`'s `InsertParams` declares it: a mutable non-empty tuple. */
+    columns?: [string, ...string[]];
     format: "JSONEachRow";
     clickhouse_settings?: Settings;
   }): Promise<unknown>;
@@ -61,6 +63,7 @@ export function vendorQueryClient({
       await vendor.insert({
         table: request.table,
         values: request.rows,
+        ...(request.columns === undefined ? {} : { columns: [...request.columns] }),
         format: "JSONEachRow",
         ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
       });

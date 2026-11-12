@@ -20,9 +20,21 @@ import {
   PROJECT_AGGREGATE_RULE_CHANGED_EVENT_VERSION,
   PROJECT_REVIVED_EVENT_TYPE,
   PROJECT_REVIVED_EVENT_VERSION,
+  PROJECT_PERSONAL_OWNER_LISTED_EVENT_TYPE,
+  PROJECT_PERSONAL_OWNER_LISTED_EVENT_VERSION,
+  PROJECT_FIRST_MESSAGE_LISTED_EVENT_TYPE,
+  PROJECT_FIRST_MESSAGE_LISTED_EVENT_VERSION,
 } from "@langwatch/project-contract";
 
 import {
+  RECORD_PROJECT_PERSONAL_OWNER_LISTED_COMMAND_TYPE,
+  RECORD_PROJECT_FIRST_MESSAGE_LISTED_COMMAND_TYPE,
+  type ProjectPersonalOwnerListedEvent,
+  type ProjectFirstMessageListedEvent,
+  type RecordProjectPersonalOwnerListedCommandData,
+  type RecordProjectFirstMessageListedCommandData,
+  recordProjectPersonalOwnerListedCommandDataSchema,
+  recordProjectFirstMessageListedCommandDataSchema,
   RECORD_PROJECT_AGGREGATE_RULE_CHANGED_COMMAND_TYPE,
   RECORD_PROJECT_REVIVED_COMMAND_TYPE,
   type ProjectAggregateRuleChangedEvent,
@@ -455,6 +467,96 @@ export class RecordProjectRevivedCommand implements CommandHandler<
 
   static getSpanAttributes(
     payload: RecordProjectRevivedCommandData,
+  ): Record<string, string | number | boolean> {
+    return {
+      "payload.project.id": payload.projectId,
+      "payload.organization.id": payload.organizationId,
+    };
+  }
+}
+
+/** Records a stored personal project's owner for the history listing; once per project. */
+export class RecordProjectPersonalOwnerListedCommand implements CommandHandler<
+  Command<RecordProjectPersonalOwnerListedCommandData>,
+  ProjectPersonalOwnerListedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_PROJECT_PERSONAL_OWNER_LISTED_COMMAND_TYPE,
+    recordProjectPersonalOwnerListedCommandDataSchema,
+    "List a stored personal project's owner",
+  );
+
+  async handle(
+    command: Command<RecordProjectPersonalOwnerListedCommandData>,
+  ): Promise<ProjectPersonalOwnerListedEvent[]> {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<ProjectPersonalOwnerListedEvent>({
+        aggregateType: PROJECT_AGGREGATE_TYPE,
+        aggregateId: data.projectId,
+        tenantId: createTenantId(command.tenantId),
+        type: PROJECT_PERSONAL_OWNER_LISTED_EVENT_TYPE,
+        version: PROJECT_PERSONAL_OWNER_LISTED_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        // A personal project's owner never changes, so a rerun collapses onto the first.
+        idempotencyKey: `${data.projectId}:personal_owner_listed`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordProjectPersonalOwnerListedCommandData): string {
+    return payload.projectId;
+  }
+
+  static getSpanAttributes(
+    payload: RecordProjectPersonalOwnerListedCommandData,
+  ): Record<string, string | number | boolean> {
+    return {
+      "payload.project.id": payload.projectId,
+      "payload.organization.id": payload.organizationId,
+    };
+  }
+}
+
+/** Records that a stored project already received its first message; once per project. */
+export class RecordProjectFirstMessageListedCommand implements CommandHandler<
+  Command<RecordProjectFirstMessageListedCommandData>,
+  ProjectFirstMessageListedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_PROJECT_FIRST_MESSAGE_LISTED_COMMAND_TYPE,
+    recordProjectFirstMessageListedCommandDataSchema,
+    "List a stored project that already received its first message",
+  );
+
+  async handle(
+    command: Command<RecordProjectFirstMessageListedCommandData>,
+  ): Promise<ProjectFirstMessageListedEvent[]> {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<ProjectFirstMessageListedEvent>({
+        aggregateType: PROJECT_AGGREGATE_TYPE,
+        aggregateId: data.projectId,
+        tenantId: createTenantId(command.tenantId),
+        type: PROJECT_FIRST_MESSAGE_LISTED_EVENT_TYPE,
+        version: PROJECT_FIRST_MESSAGE_LISTED_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        // The first message only ever goes from false to true, so a rerun collapses.
+        idempotencyKey: `${data.projectId}:first_message_listed`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordProjectFirstMessageListedCommandData): string {
+    return payload.projectId;
+  }
+
+  static getSpanAttributes(
+    payload: RecordProjectFirstMessageListedCommandData,
   ): Record<string, string | number | boolean> {
     return {
       "payload.project.id": payload.projectId,

@@ -925,7 +925,7 @@ Periods are whole weeks. The presets round up so that the label is always covere
 | -------- | --------------------------------------------------------------------------------------- | ----------------------------- |
 | 1 month  | 35                                                                                      | Paid, Enterprise, self-hosted |
 | 2 months | 63                                                                                      | Paid, Enterprise, self-hosted |
-| 3 months | 91                                                                                      | Enterprise, self-hosted       |
+| 3 months | 91                                                                                      | Paid, Enterprise, self-hosted |
 | 1 year   | 371                                                                                     | Enterprise, self-hosted       |
 | 5 years  | 1827                                                                                    | Enterprise, self-hosted       |
 | Custom   | 49 days or more, in weeks, months (28 days) or years (364 days), rounded to whole weeks | Enterprise, self-hosted       |
@@ -44086,8 +44086,12 @@ dashboard's scope.
 
 Every dashboard has an ask bar under its header, reading "What do you want to
 know?". On a stored dashboard, clicking it opens **Add a widget** with the cursor in
-its search. On a From LangWatch dashboard, the bar opens Langy when Langy is
-available, with the dashboard as context and no question sent yet.
+its search.
+
+On a From LangWatch dashboard, the bar opens **Add a widget** if you can create
+dashboards. Picking a widget makes a new dashboard with only that widget, named
+after it, and opens it. If you cannot create dashboards, the bar opens Langy when
+Langy is available, with the dashboard as context and no question sent yet.
 
 The picker lists suggested questions, grouped by the question tree, with a
 search and filters for the category and the agent type. Picking one adds that
@@ -47260,11 +47264,29 @@ class Code:
 
 From code you can:
 
+- **Create it**: `POST /api/evaluators` with `type: "code"` and a `config` carrying `code` (the program) and `inputs` (each an `identifier` and a `type`, for example `str`). The CLI does the same with `langwatch evaluator create "Contains answer" --code ./evaluator.py --input output --input expected_output`.
 - **Run it** like any saved evaluator: `POST /api/evaluations/evaluators/{slug}/evaluate`, with `data` holding one value per declared input.
 - **Find it**: `GET /api/evaluators` lists it with `type: "code"`, and `GET /api/evaluators/{idOrSlug}` returns its code and inputs in `config`.
 - **Monitor with it**: run it on incoming traces with `POST /api/monitors`, sending the evaluator's id as `evaluatorId` and `code/<evaluatorId>` as `checkType`, plus `mappings` from trace fields to its inputs.
 
-Creating a code evaluator and editing its code are done on the Evaluators page: `POST /api/evaluators` only creates built-in evaluator types.
+Creating one from code looks like this:
+
+```bash
+curl -X POST "https://app.langwatch.ai/api/evaluators" \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Contains answer",
+    "type": "code",
+    "config": {
+      "code": "class Code:\n    def __call__(self, output: str, expected_output: str):\n        passed = expected_output.lower() in output.lower()\n        return {\"passed\": passed}",
+      "inputs": [
+        { "identifier": "output", "type": "str" },
+        { "identifier": "expected_output", "type": "str" }
+      ]
+    }
+  }'
+```
 
 ## Using Saved Evaluators
 
@@ -65887,7 +65909,7 @@ tamper-evidence, requires an **Enterprise** license.
   default. It is not a period any of these frameworks prescribe.
 
   What you can set instead depends on the plan, per organization, team or
-  project. Paid cloud plans choose 35 or 63 days. Enterprise plans and licensed
+  project. Paid cloud plans choose 35, 63 or 91 days. Enterprise plans and licensed
   self-hosted deployments choose those or any whole number of weeks from 49
   days up, and a self-hosted platform administrator can keep data indefinitely.
   The free plan and an unlicensed self-hosted deployment stay on the default.
@@ -70249,7 +70271,9 @@ ingress:
 
 With `className: nginx` the chart adds these to the gateway Ingress only: `proxy-buffering: "off"`, `proxy-request-buffering: "off"`, `proxy-read-timeout: "3600"`, `proxy-send-timeout: "3600"` and `proxy-body-size: 32m`. They override the same keys from `ingress.annotations`. Keys in `ingress.gateway.annotations` override both.
 
-The chart matches on the value of `className`. If `className` is empty and the cluster default IngressClass is ingress-nginx, the gateway Ingress gets none of these settings. On ingress-nginx, set `className: nginx`.
+With `className: nginx` the app Ingress also gets `proxy-read-timeout: "120"` and `proxy-send-timeout: "120"`, so an analytics query can use its full 60 s; ingress-nginx's default is 60 s. Keys in `ingress.annotations` override them.
+
+The chart matches on the value of `className`, not on the controller. If `className` is empty, or names an ingress-nginx IngressClass other than `nginx`, neither Ingress gets these settings. Then either set `className: nginx`, if your cluster has that class, or keep your class and set the annotations yourself: the app's two timeouts of `"120"` in `ingress.annotations`, and the gateway's five settings in `ingress.gateway.annotations`.
 
 On another controller, set `className` to your IngressClass, or leave it empty for the cluster default. Put the gateway settings for that controller in `ingress.gateway.annotations`. Traefik works with `className: traefik` and no extra annotations for buffering. It can also serve the HTTPRoutes below through its Gateway API provider.
 
@@ -78709,6 +78733,7 @@ Two column families are gated rather than freely selectable: free-text carriers 
 |------|-------------|-------|-------|-------------|
 | `traces` | One row per trace, with its timing, token, cost and error rollups. | `input`, `output`, `costs` | one row per (TenantId, TraceId), latest version only | `OccurredAt` |
 | `spans` | One row per span, with its timing, status and attributes. | `input`, `output`, `costs` | one row per (TenantId, TraceId, SpanId), latest version only | `StartTime` |
+| `span_metrics` | One row per span with its timing, status, cost and the LangWatch facts dashboards group by, and no attribute map. Holds spans from the span_analytics floor on. | `costs` | one row per (TenantId, TraceId, SpanId); a duplicate span is counted | `StartTime` |
 | `logs` | Canonical OpenTelemetry log records: requests, responses and provider events, correlated to their trace and span. | `input`, `output` | one row per (TenantId, TraceId, TimeUnixMs, RecordId) | `TimeUnixMs` |
 | `log_ingestion_usage` | Per-tenant log ingestion usage estimates. | None | one row per (OrganizationId, RecordId), latest version only | `AcceptedAt` |
 | `metric_points` | Individual metric data points with gauges, sums, histograms, and summaries | `output` | one row per (SeriesId, TimeUnixMs, PointId) | `TimeUnixMs` |
@@ -78766,6 +78791,8 @@ Rollup views (`_by_minute`, `_rollups`) return **finalised values only**: figure
 | `model_usage_by_minute` | Span metrics summed per minute, per model and span type: span counts, costs and tokens. | `costs` | one merged row per (TenantId, BucketStart, Model, SpanType), every measure summed | `BucketStart` |
 | `evaluation_metrics` | One row per evaluation, its latest state, time-sorted, carrying its outcome, cost and the trace dimensions it inherited. | `costs` | one row per (TenantId, EvaluationId), latest version only | `OccurredAt` |
 | `evaluation_metrics_by_minute` | Evaluation outcomes summed per minute, per evaluator type and terminal status. Every measure is a sum: pass rate is PassCount over PassCount plus FailCount. | `costs` | one merged row per (TenantId, BucketStart, EvaluatorType, Status), every measure summed | `BucketStart` |
+| `trace_evaluation_metrics` | One row per evaluation of a trace, its live outcome, carrying the evaluated trace's time, source and dimensions, so a read by the trace's period needs no join. | None | one row per (TenantId, TraceId, EvaluationId): each revision grouped with its retractions, kept while its signs sum above zero | `OccurredAt` |
+| `trace_evaluation_checks` | Live evaluations of traces counted per trace, evaluator and outcome, carrying the evaluated trace's time and source. Sum Evaluations to count evaluations. | None | one row per (TenantId, TraceId, OccurredAt, TraceOccurredAt, EvaluatorName, Passed, IsGuardrail, Source, TraceSource), Evaluations summed | `OccurredAt` |
 | `metric_rollups` | Time-bucketed rollups of a metric series: per-bucket min, max, sum, count and histogram buckets. | None | one row per (SeriesId, BucketStart) | `BucketStart` |
 | `session_metrics` | Per-session time-series metrics with aggregate statistics | None | one row per (SessionId, SeriesId) | `AsOf` |
 | `simulation_metric_rollups` | Per-trace simulation cost and latency, merged from the aggregating rollup: total cost and per-role cost and latency maps. | `costs` | one row per (TenantId, ScenarioRunId, TraceId), latest version only | `OccurredAt` |
@@ -78920,36 +78947,36 @@ A query may call only the functions on the allowlist below. `GET /api/v1/query/s
 - `any`, `anyLast`, `argMax`, `argMin`, `arrayAll`, `arrayAvg`, `arrayConcat`, `arrayCount`, `arrayDistinct`, `arrayElement`
 - `arrayEnumerate`, `arrayExists`, `arrayFilter`, `arrayFirst`, `arrayFirstIndex`, `arrayJoin`, `arrayLast`, `arrayMap`, `arrayMax`, `arrayMin`
 - `arrayReverseSort`, `arraySlice`, `arraySort`, `arrayStringConcat`, `arraySum`, `arrayUniq`, `assumeNotNull`, `avg`, `caseWithExpression`, `caseWithoutExpression`
-- `CAST`, `ceil`, `ceiling`, `coalesce`, `concat`, `concatWithSeparator`, `count`, `date_trunc`, `dateDiff`, `dateTrunc`
-- `dense_rank`, `divide`, `empty`, `endsWith`, `equals`, `exists`, `exp`, `extract`, `extractAll`, `first_value`
-- `floor`, `formatDateTime`, `fromUnixTimestamp`, `globalIn`, `globalNotIn`, `greater`, `greaterOrEquals`, `greatest`, `groupArray`, `groupUniqArray`
-- `has`, `hasAll`, `hasAny`, `if`, `ifNull`, `ilike`, `in`, `indexOf`, `intDiv`, `intDivOrZero`
-- `isDistinctFrom`, `isNotDistinctFrom`, `isNotNull`, `isNull`, `isValidJSON`, `JSONExtract`, `JSONExtractArrayRaw`, `JSONExtractBool`, `JSONExtractFloat`, `JSONExtractInt`
-- `JSONExtractKeys`, `JSONExtractKeysAndValues`, `JSONExtractRaw`, `JSONExtractString`, `JSONExtractUInt`, `JSONHas`, `JSONLength`, `JSONType`, `lagInFrame`, `lambda`
-- `last_value`, `leadInFrame`, `least`, `left`, `length`, `lengthUTF8`, `less`, `lessOrEquals`, `like`, `ln`
-- `log`, `log10`, `log2`, `lower`, `lowerUTF8`, `map`, `mapContains`, `mapFilter`, `mapKeys`, `mapValues`
-- `match`, `max`, `median`, `medianExact`, `min`, `minus`, `modulo`, `moduloOrZero`, `multiIf`, `multiply`
-- `negate`, `not`, `notEmpty`, `notEquals`, `notILike`, `notIn`, `notLike`, `now`, `now64`, `nth_value`
-- `ntile`, `nullIf`, `or`, `plus`, `position`, `positionCaseInsensitive`, `pow`, `power`, `quantile`, `quantileExact`
-- `quantiles`, `quantilesExact`, `quantilesTDigest`, `quantilesTiming`, `quantileTDigest`, `quantileTiming`, `rank`, `replaceAll`, `replaceOne`, `replaceRegexpAll`
-- `replaceRegexpOne`, `right`, `round`, `row_number`, `sign`, `simpleJSONExtractBool`, `simpleJSONExtractFloat`, `simpleJSONExtractInt`, `simpleJSONExtractString`, `simpleJSONExtractUInt`
-- `simpleJSONHas`, `splitByChar`, `splitByString`, `sqrt`, `startsWith`, `stddevPop`, `stddevSamp`, `substring`, `substringUTF8`, `subtractDays`
-- `subtractHours`, `subtractMinutes`, `subtractMonths`, `subtractQuarters`, `subtractSeconds`, `subtractWeeks`, `subtractYears`, `sum`, `toBool`, `toDate`
-- `toDate32`, `toDate32OrDefault`, `toDate32OrNull`, `toDate32OrZero`, `toDateOrDefault`, `toDateOrNull`, `toDateOrZero`, `toDateTime`, `toDateTime64`, `toDateTime64OrDefault`
-- `toDateTime64OrNull`, `toDateTime64OrZero`, `toDateTimeOrDefault`, `toDateTimeOrNull`, `toDateTimeOrZero`, `today`, `toDayOfMonth`, `toDayOfWeek`, `toDayOfYear`, `toDecimal128`
-- `toDecimal128OrDefault`, `toDecimal128OrNull`, `toDecimal128OrZero`, `toDecimal256`, `toDecimal256OrDefault`, `toDecimal256OrNull`, `toDecimal256OrZero`, `toDecimal32`, `toDecimal32OrDefault`, `toDecimal32OrNull`
-- `toDecimal32OrZero`, `toDecimal64`, `toDecimal64OrDefault`, `toDecimal64OrNull`, `toDecimal64OrZero`, `toFloat32`, `toFloat32OrDefault`, `toFloat32OrNull`, `toFloat32OrZero`, `toFloat64`
-- `toFloat64OrDefault`, `toFloat64OrNull`, `toFloat64OrZero`, `toHour`, `toInt128`, `toInt128OrDefault`, `toInt128OrNull`, `toInt128OrZero`, `toInt16`, `toInt16OrDefault`
-- `toInt16OrNull`, `toInt16OrZero`, `toInt256`, `toInt256OrDefault`, `toInt256OrNull`, `toInt256OrZero`, `toInt32`, `toInt32OrDefault`, `toInt32OrNull`, `toInt32OrZero`
-- `toInt64`, `toInt64OrDefault`, `toInt64OrNull`, `toInt64OrZero`, `toInt8`, `toInt8OrDefault`, `toInt8OrNull`, `toInt8OrZero`, `toIntervalDay`, `toIntervalHour`
-- `toIntervalMinute`, `toIntervalMonth`, `toIntervalQuarter`, `toIntervalSecond`, `toIntervalWeek`, `toIntervalYear`, `toISOWeek`, `toLastDayOfMonth`, `toMinute`, `toMonday`
-- `toMonth`, `topK`, `toQuarter`, `toSecond`, `toStartOfDay`, `toStartOfFifteenMinutes`, `toStartOfFiveMinutes`, `toStartOfHour`, `toStartOfInterval`, `toStartOfISOWeek`
-- `toStartOfMinute`, `toStartOfMonth`, `toStartOfQuarter`, `toStartOfSecond`, `toStartOfTenMinutes`, `toStartOfWeek`, `toStartOfYear`, `toString`, `toTimeZone`, `toUInt128`
-- `toUInt128OrDefault`, `toUInt128OrNull`, `toUInt128OrZero`, `toUInt16`, `toUInt16OrDefault`, `toUInt16OrNull`, `toUInt16OrZero`, `toUInt256`, `toUInt256OrDefault`, `toUInt256OrNull`
-- `toUInt256OrZero`, `toUInt32`, `toUInt32OrDefault`, `toUInt32OrNull`, `toUInt32OrZero`, `toUInt64`, `toUInt64OrDefault`, `toUInt64OrNull`, `toUInt64OrZero`, `toUInt8`
-- `toUInt8OrDefault`, `toUInt8OrNull`, `toUInt8OrZero`, `toUnixTimestamp`, `toUUID`, `toUUIDOrDefault`, `toUUIDOrNull`, `toUUIDOrZero`, `toWeek`, `toYear`
-- `trim`, `trimBoth`, `trimLeft`, `trimRight`, `trunc`, `truncate`, `tuple`, `tupleElement`, `uniq`, `uniqCombined`
-- `uniqExact`, `upper`, `upperUTF8`, `varPop`, `varSamp`, `yesterday`
+- `CAST`, `ceil`, `ceiling`, `cityHash64`, `coalesce`, `concat`, `concatWithSeparator`, `count`, `date_trunc`, `dateDiff`
+- `dateTrunc`, `dense_rank`, `divide`, `empty`, `endsWith`, `equals`, `exists`, `exp`, `extract`, `extractAll`
+- `first_value`, `floor`, `formatDateTime`, `fromUnixTimestamp`, `globalIn`, `globalNotIn`, `greater`, `greaterOrEquals`, `greatest`, `groupArray`
+- `groupUniqArray`, `has`, `hasAll`, `hasAny`, `if`, `ifNull`, `ilike`, `in`, `indexOf`, `intDiv`
+- `intDivOrZero`, `isDistinctFrom`, `isNotDistinctFrom`, `isNotNull`, `isNull`, `isValidJSON`, `JSONExtract`, `JSONExtractArrayRaw`, `JSONExtractBool`, `JSONExtractFloat`
+- `JSONExtractInt`, `JSONExtractKeys`, `JSONExtractKeysAndValues`, `JSONExtractRaw`, `JSONExtractString`, `JSONExtractUInt`, `JSONHas`, `JSONLength`, `JSONType`, `lagInFrame`
+- `lambda`, `last_value`, `leadInFrame`, `least`, `left`, `length`, `lengthUTF8`, `less`, `lessOrEquals`, `like`
+- `ln`, `log`, `log10`, `log2`, `lower`, `lowerUTF8`, `map`, `mapContains`, `mapFilter`, `mapKeys`
+- `mapValues`, `match`, `max`, `median`, `medianExact`, `min`, `minus`, `modulo`, `moduloOrZero`, `multiIf`
+- `multiply`, `negate`, `not`, `notEmpty`, `notEquals`, `notILike`, `notIn`, `notLike`, `now`, `now64`
+- `nth_value`, `ntile`, `nullIf`, `or`, `plus`, `position`, `positionCaseInsensitive`, `pow`, `power`, `quantile`
+- `quantileExact`, `quantiles`, `quantilesExact`, `quantilesTDigest`, `quantilesTiming`, `quantileTDigest`, `quantileTiming`, `rank`, `replaceAll`, `replaceOne`
+- `replaceRegexpAll`, `replaceRegexpOne`, `right`, `round`, `row_number`, `sign`, `simpleJSONExtractBool`, `simpleJSONExtractFloat`, `simpleJSONExtractInt`, `simpleJSONExtractString`
+- `simpleJSONExtractUInt`, `simpleJSONHas`, `sipHash128`, `splitByChar`, `splitByString`, `sqrt`, `startsWith`, `stddevPop`, `stddevSamp`, `substring`
+- `substringUTF8`, `subtractDays`, `subtractHours`, `subtractMinutes`, `subtractMonths`, `subtractQuarters`, `subtractSeconds`, `subtractWeeks`, `subtractYears`, `sum`
+- `toBool`, `toDate`, `toDate32`, `toDate32OrDefault`, `toDate32OrNull`, `toDate32OrZero`, `toDateOrDefault`, `toDateOrNull`, `toDateOrZero`, `toDateTime`
+- `toDateTime64`, `toDateTime64OrDefault`, `toDateTime64OrNull`, `toDateTime64OrZero`, `toDateTimeOrDefault`, `toDateTimeOrNull`, `toDateTimeOrZero`, `today`, `toDayOfMonth`, `toDayOfWeek`
+- `toDayOfYear`, `toDecimal128`, `toDecimal128OrDefault`, `toDecimal128OrNull`, `toDecimal128OrZero`, `toDecimal256`, `toDecimal256OrDefault`, `toDecimal256OrNull`, `toDecimal256OrZero`, `toDecimal32`
+- `toDecimal32OrDefault`, `toDecimal32OrNull`, `toDecimal32OrZero`, `toDecimal64`, `toDecimal64OrDefault`, `toDecimal64OrNull`, `toDecimal64OrZero`, `toFloat32`, `toFloat32OrDefault`, `toFloat32OrNull`
+- `toFloat32OrZero`, `toFloat64`, `toFloat64OrDefault`, `toFloat64OrNull`, `toFloat64OrZero`, `toHour`, `toInt128`, `toInt128OrDefault`, `toInt128OrNull`, `toInt128OrZero`
+- `toInt16`, `toInt16OrDefault`, `toInt16OrNull`, `toInt16OrZero`, `toInt256`, `toInt256OrDefault`, `toInt256OrNull`, `toInt256OrZero`, `toInt32`, `toInt32OrDefault`
+- `toInt32OrNull`, `toInt32OrZero`, `toInt64`, `toInt64OrDefault`, `toInt64OrNull`, `toInt64OrZero`, `toInt8`, `toInt8OrDefault`, `toInt8OrNull`, `toInt8OrZero`
+- `toIntervalDay`, `toIntervalHour`, `toIntervalMinute`, `toIntervalMonth`, `toIntervalQuarter`, `toIntervalSecond`, `toIntervalWeek`, `toIntervalYear`, `toISOWeek`, `toLastDayOfMonth`
+- `toMinute`, `toMonday`, `toMonth`, `topK`, `toQuarter`, `toSecond`, `toStartOfDay`, `toStartOfFifteenMinutes`, `toStartOfFiveMinutes`, `toStartOfHour`
+- `toStartOfInterval`, `toStartOfISOWeek`, `toStartOfMinute`, `toStartOfMonth`, `toStartOfQuarter`, `toStartOfSecond`, `toStartOfTenMinutes`, `toStartOfWeek`, `toStartOfYear`, `toString`
+- `toTimeZone`, `toUInt128`, `toUInt128OrDefault`, `toUInt128OrNull`, `toUInt128OrZero`, `toUInt16`, `toUInt16OrDefault`, `toUInt16OrNull`, `toUInt16OrZero`, `toUInt256`
+- `toUInt256OrDefault`, `toUInt256OrNull`, `toUInt256OrZero`, `toUInt32`, `toUInt32OrDefault`, `toUInt32OrNull`, `toUInt32OrZero`, `toUInt64`, `toUInt64OrDefault`, `toUInt64OrNull`
+- `toUInt64OrZero`, `toUInt8`, `toUInt8OrDefault`, `toUInt8OrNull`, `toUInt8OrZero`, `toUnixTimestamp`, `toUUID`, `toUUIDOrDefault`, `toUUIDOrNull`, `toUUIDOrZero`
+- `toWeek`, `toYear`, `trim`, `trimBoth`, `trimLeft`, `trimRight`, `trunc`, `truncate`, `tuple`, `tupleElement`
+- `uniq`, `uniqCombined`, `uniqExact`, `upper`, `upperUTF8`, `varPop`, `varSamp`, `yesterday`
 
 ## Response ceilings
 
@@ -81256,9 +81283,9 @@ Retention controls how long your events are kept before they're automatically re
 | Plan | Default retention | Windows you can set |
 | --- | --- | --- |
 | Free | 49 days | None. Trace content older than 14 days is redacted until you upgrade |
-| Accelerate (legacy) | 49 days | 35 or 63 days |
-| Growth | 49 days | 35 or 63 days |
-| Enterprise | 49 days | 35 or 63 days, or any whole number of weeks from 49 days up |
+| Accelerate (legacy) | 49 days | 35, 63 or 91 days |
+| Growth | 49 days | 35, 63 or 91 days |
+| Enterprise | 49 days | 35, 63 or 91 days, or any whole number of weeks from 49 days up |
 
 Retention is set in whole weeks.
 
@@ -81306,7 +81333,7 @@ Self-hosted deployments keep the same 49-day default. An Enterprise license open
 </Accordion>
 
   <Accordion title="Can I customize how long my data is retained?">
-    On LangWatch Cloud every plan keeps events for 49 days by default. Paid plans set 35 or 63 days in **Settings → Data Retention**, per organization, team or project. Enterprise plans set any whole number of weeks from 49 days up, and a higher volume of stored events. Reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) to set up an Enterprise window or extra volume.
+    On LangWatch Cloud every plan keeps events for 49 days by default. Paid plans set 35, 63 or 91 days in **Settings → Data Retention**, per organization, team or project. Enterprise plans set any whole number of weeks from 49 days up, and a higher volume of stored events. Reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) to set up an Enterprise window or extra volume.
 
     Self-hosted, the data is in your own database and keeps the same 49-day default. A license adds per-scope retention policies, with a separate window for traces, scenarios and experiments.
   </Accordion>

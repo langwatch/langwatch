@@ -38,6 +38,13 @@ describe("the actor of a REST run", () => {
       expect(deriveRunActor({ userId: null, surfaceHeader: "cli" })).toBeUndefined();
       expect(deriveRunActor({ userId: undefined, surfaceHeader: undefined })).toBeUndefined();
     });
+
+    /** @scenario "A scenario run started with a service key is minted under that key" */
+    it("names only the key the request was sent with", () => {
+      expect(
+        deriveRunActor({ userId: null, surfaceHeader: null, apiKeyId: "service_key_1" }),
+      ).toEqual({ label: "api", apiKeyId: "service_key_1" });
+    });
   });
 });
 
@@ -48,6 +55,13 @@ describe("what an actor writes into the run metadata", () => {
       actorLabel: "user",
     });
     expect(withActor(undefined)).toEqual({});
+  });
+
+  /** @scenario "A scenario run started with a service key is minted under that key" */
+  it("writes only the starting key when no person is behind it", () => {
+    const actor = deriveRunActor({ userId: null, surfaceHeader: "cli", apiKeyId: "service_key_1" });
+
+    expect(withActor(actor)).toEqual({ actorApiKeyId: "service_key_1" });
   });
 
   /** @scenario "A scenario run started with a personal access token holds no more than that token" */

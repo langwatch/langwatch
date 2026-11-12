@@ -119,3 +119,46 @@ func TestFreshServerWithNoBackupLogHasNoHistory(t *testing.T) {
 		t.Error("a cluster read that found no backup_log passed as no history")
 	}
 }
+
+// @scenario "Exactly one replica runs backups, failing over to the next that answers"
+func TestReplicasCountsEachReplicaOnceWhenSystemClustersRepeatsIt(t *testing.T) {
+	// ClickHouse 26.8 on a three-replica cluster listed every replica twice.
+	// Counted by row, clickhouse-2 sat at position 4 of 6, where
+	// clusterAllReplicas never reports one, so no replica ran backups.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		q := string(body)
+		switch {
+		case strings.Contains(q, "FROM system.clusters"):
+			for _, row := range []string{
+				`{"shard_num":1,"replica_num":1,"is_self":0,"host":"ch-0"}`,
+				`{"shard_num":1,"replica_num":1,"is_self":0,"host":"ch-0"}`,
+				`{"shard_num":1,"replica_num":2,"is_self":0,"host":"ch-1"}`,
+				`{"shard_num":1,"replica_num":2,"is_self":0,"host":"ch-1"}`,
+				`{"shard_num":1,"replica_num":3,"is_self":1,"host":"ch-2"}`,
+				`{"shard_num":1,"replica_num":3,"is_self":1,"host":"ch-2"}`,
+			} {
+				_, _ = io.WriteString(w, row+"\n")
+			}
+		case strings.Contains(q, "clusterAllReplicas"):
+			_, _ = io.WriteString(w, "{\"replica_position\":3}\n{\"replica_position\":1}\n{\"replica_position\":2}\n")
+		}
+	}))
+	defer srv.Close()
+	s := &SQLStore{
+		Client:   &chclient.Client{BaseURL: srv.URL, Creds: chclient.Static{User: "u", Password: "p"}},
+		Database: "langwatch",
+		Tables:   Tables{Cluster: "langwatch"},
+	}
+
+	r, err := s.Replicas(context.Background())
+	if err != nil {
+		t.Fatalf("Replicas: %v", err)
+	}
+	if r.Total != 3 || r.Self != 2 {
+		t.Errorf("Replicas = total %d, self %d; want total 3, self 2", r.Total, r.Self)
+	}
+	if !IsRunner(r, 2, nil) {
+		t.Errorf("clickhouse-2 with BACKUP_RUNNER_ORDINAL=2 is not the runner: %+v", r)
+	}
+}

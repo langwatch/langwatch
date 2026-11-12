@@ -17,6 +17,7 @@ import { OtlpSpanCostEnrichmentService } from "../features/span/services/span-co
 import { OtlpSpanTokenEstimationService } from "../features/span/services/span-token-estimation.service.ts";
 import { TraceSpanNormalizationAdapterService } from "../features/span/services/trace-span-normalization-adapter.service.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
+import type { TraceEvaluationOutcomeService } from "../services/trace-evaluation-outcome.service.ts";
 import type { TraceProcessingCommandsService } from "../services/trace-processing-commands.service.ts";
 import {
   createDeferredOriginHandler,
@@ -32,9 +33,15 @@ import type {
   TraceSpanTokenEstimation,
 } from "./record-span.commands.ts";
 import { EventingRecordSpanAdapter } from "./record-span.commands.ts";
+import { SpanAnalyticsStore } from "./span-analytics.store.ts";
 import { createSpanStorageBroadcastHandler } from "./span-storage-broadcast.subscriber.ts";
 import { SpanStorageStore } from "./span-storage.store.ts";
 import { TraceAnalyticsStore } from "./trace-derived.store.ts";
+import { TraceEvaluationAnalyticsStore } from "./trace-evaluation-analytics.store.ts";
+import {
+  createTraceFailedHandler,
+  type TraceFailedSubscriberDeps,
+} from "./trace-failed.subscriber.ts";
 import { createTraceProcessingProducerPipeline } from "./trace-processing-producer.pipeline.ts";
 import type { TraceProcessingPipelineDefinition } from "./trace-processing-projections.pipeline.ts";
 import { EventingTracePipelineAdapter } from "./trace-processing-projections.pipeline.ts";
@@ -55,7 +62,10 @@ interface TraceProcessingPeers {
   >;
   featureFlags: FeatureFlagApi;
   modelProviders: Pick<ModelProviderApi, "listCosts">;
-  projects: Pick<ProjectApi, "findById" | "updateMetadata" | "resolveOrgAdmin">;
+  projects: Pick<
+    ProjectApi,
+    "findById" | "updateMetadata" | "resolveOrgAdmin" | "findOrganizationId"
+  >;
 }
 
 export interface TraceProcessingPipelineInput {
@@ -68,6 +78,8 @@ export interface TraceProcessingPipelineInput {
     | "summaryProjection"
     | "analyticsProjection"
     | "analyticsRollup"
+    | "evaluationAnalytics"
+    | "spanAnalytics"
     | "summaryFoldCache"
     | "analyticsFoldCache"
   >;
@@ -86,10 +98,12 @@ export interface TraceProcessingPipelineInput {
   recordTrackedEvent: TrackedEventSyncSubscriberDeps["recordTrackedEvent"];
   /** Tells a tenant's open tabs a trace moved; presence relays it in the serving process. */
   broadcast: Pick<PresenceApi, "publishProjectEvent">;
-  /** Where a project's first and later traces are recorded. */
-  milestones: ProjectMetadataSubscriberDeps["milestones"];
+  /** Where a project's first and later traces, and each trace that failed, are recorded. */
+  milestones: ProjectMetadataSubscriberDeps["milestones"] & TraceFailedSubscriberDeps["milestones"];
   /** Mints the own-only proof the summary and analytics fold stores read back through. */
   authorizeFoldRead: FoldReadAuthorizer;
+  /** Records evaluation's COMPLETED and REPORTED as outcomes on their traces (ADR-003). */
+  evaluationOutcomes?: Pick<TraceEvaluationOutcomeService, "recordCompleted" | "recordReported">;
   /** Test-only: overrides `WRITE_COMPACT_ORIGIN_JOBS`; production never passes it. */
   writeCompactOriginJobs?: boolean;
 }
@@ -130,12 +144,21 @@ export class TraceProcessingRuntimeAdapter {
       derivedStore: repositories.analyticsFoldCache.cached(
         TraceAnalyticsStore.create({
           storage: repositories.analyticsProjection,
+          evaluationAnalytics: TraceEvaluationAnalyticsStore.create({
+            storage: repositories.evaluationAnalytics,
+            defaultRetentionDays,
+            authorize: authorizeFoldRead,
+          }),
           defaultRetentionDays,
           authorize: authorizeFoldRead,
         }),
       ),
       rollupStore: TraceAnalyticsRollupStore.create({
         storage: repositories.analyticsRollup,
+        defaultRetentionDays,
+      }),
+      spanAnalyticsStore: SpanAnalyticsStore.create({
+        storage: repositories.spanAnalytics,
         defaultRetentionDays,
       }),
       canonicalisation,
@@ -155,6 +178,9 @@ export class TraceProcessingRuntimeAdapter {
         tokenEstimation: this.#tokenEstimation(),
         spool: this.#spool(),
       }),
+      ...(this.input.evaluationOutcomes
+        ? { evaluationOutcomes: this.input.evaluationOutcomes }
+        : {}),
     })
       .build()
       .withRetention({
@@ -208,6 +234,7 @@ export class TraceProcessingRuntimeAdapter {
         projects: peers.projects,
         milestones: this.input.milestones,
       }),
+      traceFailed: createTraceFailedHandler({ milestones: this.input.milestones }),
       spanStorageBroadcast: createSpanStorageBroadcastHandler({ broadcast: this.input.broadcast }),
       broadcastDisabled: false,
       writeCompactOriginJobs: this.input.writeCompactOriginJobs ?? WRITE_COMPACT_ORIGIN_JOBS,

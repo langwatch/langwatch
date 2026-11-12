@@ -233,6 +233,10 @@ export class LangWatchQLAccessModelService {
       `           max_result_rows = ${limits.maxResultRows} CONST,\n` +
       `           max_result_bytes = ${limits.maxResultBytes} CONST,\n` +
       `           result_overflow_mode = 'throw' CONST,\n` +
+      `           max_bytes_before_external_group_by = ${limits.maxBytesBeforeExternalGroupBy} CONST,\n` +
+      `           max_bytes_before_external_sort = ${limits.maxBytesBeforeExternalSort} CONST,\n` +
+      `           join_algorithm = '${limits.joinAlgorithm}' CONST,\n` +
+      `           max_bytes_in_join = ${limits.maxBytesInJoin} CONST,\n` +
       `           log_query_settings = 0 CONST,\n` +
       `           use_query_cache = 0 CONST,\n` +
       `           use_query_condition_cache = 0 CONST,\n` +

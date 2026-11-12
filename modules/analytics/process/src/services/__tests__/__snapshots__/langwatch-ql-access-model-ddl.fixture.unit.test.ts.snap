@@ -6,7 +6,7 @@ exports[`the definition-driven access DDL > given fixed names, password hash and
   SETTINGS custom_api_key_hash = '' CHANGEABLE_IN_READONLY,
            log_comment = '' CHANGEABLE_IN_READONLY,
            readonly = 1 CONST,
-           max_execution_time = 10 CONST,
+           max_execution_time = 60 CONST,
            max_memory_usage = 1000000000 CONST,
            max_threads = 4 CONST,
            max_concurrent_queries_for_user = 10 CONST,
@@ -16,6 +16,10 @@ exports[`the definition-driven access DDL > given fixed names, password hash and
            max_result_rows = 10000 CONST,
            max_result_bytes = 8000000 CONST,
            result_overflow_mode = 'throw' CONST,
+           max_bytes_before_external_group_by = 500000000 CONST,
+           max_bytes_before_external_sort = 500000000 CONST,
+           join_algorithm = 'grace_hash,parallel_hash,hash' CONST,
+           max_bytes_in_join = 200000000 CONST,
            log_query_settings = 0 CONST,
            use_query_cache = 0 CONST,
            use_query_condition_cache = 0 CONST,
@@ -28,6 +32,9 @@ exports[`the definition-driven access DDL > given fixed names, password hash and
   USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
   TO langwatch_lwql",
   "CREATE ROW POLICY OR REPLACE stored_spans_tenant ON langwatch.stored_spans
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE span_analytics_tenant ON langwatch.span_analytics
   USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
   TO langwatch_lwql",
   "CREATE ROW POLICY OR REPLACE evaluation_runs_tenant ON langwatch.evaluation_runs
@@ -46,6 +53,9 @@ exports[`the definition-driven access DDL > given fixed names, password hash and
   USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
   TO langwatch_lwql",
   "CREATE ROW POLICY OR REPLACE evaluation_analytics_rollup_tenant ON langwatch.evaluation_analytics_rollup
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE trace_evaluation_analytics_tenant ON langwatch.trace_evaluation_analytics
   USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
   TO langwatch_lwql",
   "CREATE ROW POLICY OR REPLACE coding_agent_sessions_tenant ON langwatch.coding_agent_sessions
@@ -409,15 +419,18 @@ exports[`the definition-driven access DDL > given fixed names, password hash and
   USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
   TO langwatch_lwql",
   "GRANT SELECT ON langwatch.lwql_api_key_tenant_map TO langwatch_lwql",
-  "GRANT SELECT(\`Attributes\`, \`ComputedInput\`, \`ComputedOutput\`, \`ContainsErrorStatus\`, \`ContainsOKStatus\`, \`ContainsPrompt\`, \`LastUsedPromptId\`, \`LastUsedPromptVersionId\`, \`LastUsedPromptVersionNumber\`, \`Models\`, \`OccurredAt\`, \`SatisfactionScore\`, \`SelectedPromptId\`, \`SourceType\`, \`SpanCount\`, \`SubTopicId\`, \`TenantId\`, \`TimeToFirstTokenMs\`, \`TimeToLastTokenMs\`, \`TokensEstimated\`, \`TokensPerSecond\`, \`TopicId\`, \`TotalCompletionTokenCount\`, \`TotalCost\`, \`TotalDurationMs\`, \`TotalPromptTokenCount\`, \`TraceId\`, \`TraceName\`, \`UnpricedModels\`, \`UnpricedSpanCount\`, \`UpdatedAt\`) ON langwatch.trace_summaries TO langwatch_lwql",
+  "GRANT SELECT(\`Attributes\`, \`ComputedInput\`, \`ComputedOutput\`, \`ContainsErrorStatus\`, \`ContainsOKStatus\`, \`ContainsPrompt\`, \`LastUsedPromptId\`, \`LastUsedPromptVersionId\`, \`LastUsedPromptVersionNumber\`, \`Models\`, \`OccurredAt\`, \`SatisfactionScore\`, \`SelectedPromptId\`, \`SourceType\`, \`SpanCount\`, \`SubTopicId\`, \`TenantId\`, \`TimeToFirstTokenMs\`, \`TimeToLastTokenMs\`, \`TokensEstimated\`, \`TokensPerSecond\`, \`TopicId\`, \`TotalCompletionTokenCount\`, \`TotalCost\`, \`TotalDurationMs\`, \`TotalPromptTokenCount\`, \`TraceId\`, \`TraceName\`, \`UnpricedModels\`, \`UnpricedSpanCount\`, \`UpdatedAt\`, \`Version\`) ON langwatch.trace_summaries TO langwatch_lwql",
   "GRANT SELECT(\`Cost\`, \`DurationMs\`, \`EndTime\`, \`NonBilledCost\`, \`ParentSpanId\`, \`ResourceAttributes\`, \`Sampled\`, \`ScopeName\`, \`ServiceName\`, \`SpanAttributes\`, \`SpanId\`, \`SpanKind\`, \`SpanName\`, \`StartTime\`, \`StatusCode\`, \`TenantId\`, \`TraceId\`) ON langwatch.stored_spans TO langwatch_lwql",
-  "GRANT SELECT(\`ArchivedAt\`, \`CompletedAt\`, \`Details\`, \`EvaluationId\`, \`EvaluatorId\`, \`EvaluatorName\`, \`EvaluatorType\`, \`Inputs\`, \`IsGuardrail\`, \`Label\`, \`Passed\`, \`ScheduledAt\`, \`Score\`, \`StartedAt\`, \`Status\`, \`TenantId\`, \`TraceId\`, \`UpdatedAt\`) ON langwatch.evaluation_runs TO langwatch_lwql",
-  "GRANT SELECT(\`ArchivedAt\`, \`BatchRunId\`, \`DurationMs\`, \`FinishedAt\`, \`InconclusiveCriteria\`, \`Messages.Content\`, \`Messages.Role\`, \`MetCriteria\`, \`Name\`, \`Reasoning\`, \`ScenarioId\`, \`ScenarioRunId\`, \`ScenarioSetId\`, \`StartedAt\`, \`Status\`, \`TenantId\`, \`TraceIds\`, \`UnmetCriteria\`, \`UpdatedAt\`, \`Verdict\`) ON langwatch.simulation_runs TO langwatch_lwql",
-  "GRANT SELECT(\`CacheReadTokens\`, \`CacheWriteTokens\`, \`CompletionTokens\`, \`ConversationId\`, \`CustomerId\`, \`HasError\`, \`Labels\`, \`Models\`, \`NonBilledCost\`, \`OccurredAt\`, \`Origin\`, \`PromptTokens\`, \`ReasoningTokens\`, \`SubTopicId\`, \`TenantId\`, \`TimeToFirstTokenMs\`, \`TokensPerSecond\`, \`TopicId\`, \`TotalCost\`, \`TotalDurationMs\`, \`TraceId\`, \`TraceName\`, \`UnpricedModels\`, \`UnpricedSpanCount\`, \`UpdatedAt\`, \`UserId\`) ON langwatch.trace_analytics TO langwatch_lwql",
+  "GRANT SELECT(\`Cost\`, \`DeploymentEnvironment\`, \`DurationMs\`, \`EndTime\`, \`ErrorType\`, \`NonBilledCost\`, \`ParentSpanId\`, \`RagContextCount\`, \`SpanId\`, \`SpanKind\`, \`SpanName\`, \`SpanType\`, \`StartTime\`, \`StatusCode\`, \`TenantId\`, \`TraceId\`) ON langwatch.span_analytics TO langwatch_lwql",
+  "GRANT SELECT(\`ArchivedAt\`, \`CompletedAt\`, \`Details\`, \`EvaluationId\`, \`EvaluatorId\`, \`EvaluatorName\`, \`EvaluatorType\`, \`Inputs\`, \`IsGuardrail\`, \`Label\`, \`Passed\`, \`ScheduledAt\`, \`Score\`, \`StartedAt\`, \`Status\`, \`TenantId\`, \`TraceId\`, \`UpdatedAt\`, \`Version\`) ON langwatch.evaluation_runs TO langwatch_lwql",
+  "GRANT SELECT(\`ArchivedAt\`, \`BatchRunId\`, \`DurationMs\`, \`FinishedAt\`, \`InconclusiveCriteria\`, \`Messages.Content\`, \`Messages.Role\`, \`MetCriteria\`, \`Name\`, \`Reasoning\`, \`ScenarioId\`, \`ScenarioRunId\`, \`ScenarioSetId\`, \`StartedAt\`, \`Status\`, \`TenantId\`, \`TraceIds\`, \`UnmetCriteria\`, \`UpdatedAt\`, \`Verdict\`, \`Version\`) ON langwatch.simulation_runs TO langwatch_lwql",
+  "GRANT SELECT(\`CacheReadTokens\`, \`CacheWriteTokens\`, \`CompletionTokens\`, \`ConversationId\`, \`CustomerId\`, \`HasError\`, \`Labels\`, \`MetadataDocumentType\`, \`MetadataEnvironment\`, \`MetadataFlow\`, \`MetadataLanguage\`, \`MetadataOutcome\`, \`MetadataOutcomeReason\`, \`MetadataOutputAction\`, \`MetadataPromptVersion\`, \`MetadataSegment\`, \`MetadataSentToReview\`, \`MetadataTeam\`, \`MetadataTopic\`, \`Models\`, \`NonBilledCost\`, \`OccurredAt\`, \`Origin\`, \`PromptTokens\`, \`ReasoningTokens\`, \`SubTopicId\`, \`TenantId\`, \`TimeToFirstTokenMs\`, \`TokensPerSecond\`, \`TopicId\`, \`TotalCost\`, \`TotalDurationMs\`, \`TraceId\`, \`TraceName\`, \`UnpricedModels\`, \`UnpricedSpanCount\`, \`UpdatedAt\`, \`UserId\`, \`Version\`) ON langwatch.trace_analytics TO langwatch_lwql",
   "GRANT SELECT(\`BucketStart\`, \`CacheReadTokensSum\`, \`CacheWriteTokensSum\`, \`CompletionTokensSum\`, \`CostSum\`, \`DurationSum\`, \`ErrorCount\`, \`Model\`, \`NonBilledCostSum\`, \`PromptTokensSum\`, \`ReasoningTokensSum\`, \`SpanCount\`, \`SpanType\`, \`TenantId\`, \`TraceCount\`) ON langwatch.trace_analytics_rollup TO langwatch_lwql",
   "GRANT SELECT(\`BucketStart\`, \`CacheReadTokensSum\`, \`CacheWriteTokensSum\`, \`CompletionTokensSum\`, \`CostSum\`, \`Model\`, \`NonBilledCostSum\`, \`PromptTokensSum\`, \`ReasoningTokensSum\`, \`SpanCount\`, \`SpanType\`, \`TenantId\`) ON langwatch.trace_analytics_rollup TO langwatch_lwql",
   "GRANT SELECT(\`Attributes\`, \`ConversationId\`, \`CustomerId\`, \`DurationMs\`, \`EvaluationId\`, \`EvaluatorName\`, \`EvaluatorType\`, \`IsGuardrail\`, \`Label\`, \`Model\`, \`NonBilledCost\`, \`OccurredAt\`, \`Origin\`, \`Passed\`, \`Score\`, \`Status\`, \`TenantId\`, \`TotalCost\`, \`TraceId\`, \`UpdatedAt\`, \`UserId\`) ON langwatch.evaluation_analytics TO langwatch_lwql",
   "GRANT SELECT(\`BucketStart\`, \`CostSum\`, \`DurationSum\`, \`ErrorCount\`, \`EvalCount\`, \`EvaluatorType\`, \`FailCount\`, \`NonBilledCostSum\`, \`PassCount\`, \`ScoreCount\`, \`ScoreSum\`, \`SkippedCount\`, \`Status\`, \`TenantId\`) ON langwatch.evaluation_analytics_rollup TO langwatch_lwql",
+  "GRANT SELECT(\`CustomerId\`, \`EvaluationId\`, \`EvaluatorName\`, \`IsGuardrail\`, \`Label\`, \`Labels\`, \`MetadataDocumentType\`, \`MetadataFlow\`, \`MetadataLanguage\`, \`MetadataPromptVersion\`, \`MetadataSegment\`, \`MetadataTeam\`, \`MetadataTopic\`, \`OccurredAt\`, \`Origin\`, \`Passed\`, \`Revision\`, \`Sign\`, \`Status\`, \`TenantId\`, \`TopicId\`, \`TraceId\`, \`TraceOccurredAt\`, \`TraceOrigin\`, \`UpdatedAt\`) ON langwatch.trace_evaluation_analytics TO langwatch_lwql",
+  "GRANT SELECT(\`EvaluatorName\`, \`IsGuardrail\`, \`OccurredAt\`, \`Origin\`, \`Passed\`, \`Sign\`, \`TenantId\`, \`TraceId\`, \`TraceOccurredAt\`, \`TraceOrigin\`) ON langwatch.trace_evaluation_analytics TO langwatch_lwql",
   "GRANT SELECT(\`ActiveTimeCliSec\`, \`ActiveTimeUserSec\`, \`Agent\`, \`AgentReportedCostUsd\`, \`AgentVersion\`, \`ApiErrors\`, \`AtMentions\`, \`Attempts\`, \`Auxiliary\`, \`BlockedOnUserMs\`, \`CacheCreationTokens\`, \`CacheReadTokens\`, \`CacheRebuildCount\`, \`Commits\`, \`CompactionTokensAfter\`, \`CompactionTokensBefore\`, \`CompactionTriggers\`, \`Compactions\`, \`CostUsd\`, \`EditsAccepted\`, \`EditsRejected\`, \`Entrypoint\`, \`ErrorTypes\`, \`FailedTools\`, \`FilesTouched\`, \`FinalRequestId\`, \`GitBranch\`, \`GitBranches\`, \`GitWorktree\`, \`HookMs\`, \`HooksBlocked\`, \`HooksCancelled\`, \`InputTokens\`, \`InternalErrors\`, \`IsFork\`, \`LanguagesEdited\`, \`LargestCacheRebuildTokens\`, \`LinesAdded\`, \`LinesRemoved\`, \`McpServers\`, \`McpTools\`, \`ModelCallMs\`, \`ModelCalls\`, \`Models\`, \`OutputTokens\`, \`ParentSessionId\`, \`PeakContextTokens\`, \`PermissionChanges\`, \`PermissionMode\`, \`PromptChars\`, \`Prompts\`, \`PullRequests\`, \`RateLimitEvents\`, \`RateLimited\`, \`RefusalCategories\`, \`Refusals\`, \`RepositoryHost\`, \`RepositoryName\`, \`RepositoryOwner\`, \`ResponseChars\`, \`RetriesExhausted\`, \`RetryMs\`, \`SessionId\`, \`SessionKeySource\`, \`Skills\`, \`SlashCommands\`, \`StartedAt\`, \`StopReason\`, \`SubAgentTypes\`, \`SubAgents\`, \`TenantId\`, \`TerminalType\`, \`Title\`, \`TitleSource\`, \`ToolCalls\`, \`ToolCounts\`, \`ToolDurationMs\`, \`ToolInputBytes\`, \`ToolMs\`, \`ToolResultBytes\`, \`ToolsAborted\`, \`ToolsDenied\`, \`TraceIds\`, \`Truncated\`, \`TtftMsTotal\`, \`TtftSamples\`, \`UpdatedAt\`, \`UserId\`) ON langwatch.coding_agent_sessions TO langwatch_lwql",
   "GRANT SELECT(\`Agent\`, \`AgentType\`, \`Attempt\`, \`Branch\`, \`CacheCreationTokens\`, \`CacheReadTokens\`, \`CompactionTrigger\`, \`CostUsd\`, \`Decision\`, \`DecisionSource\`, \`DurationMs\`, \`ErrorType\`, \`EventKind\`, \`EventSequence\`, \`InputTokens\`, \`Model\`, \`OutputTokens\`, \`PostTokens\`, \`PreTokens\`, \`PrecomputeReuse\`, \`PromptChars\`, \`PromptId\`, \`QuerySource\`, \`RateLimitCarrier\`, \`RecordId\`, \`RepositoryHost\`, \`RepositoryName\`, \`RepositoryOwner\`, \`RequestId\`, \`RetryDurationMs\`, \`SessionId\`, \`SessionKeySource\`, \`SpanId\`, \`Speed\`, \`StatusCode\`, \`StopReason\`, \`Success\`, \`TenantId\`, \`TimeUnixMs\`, \`ToolInputBytes\`, \`ToolName\`, \`ToolResultBytes\`, \`TotalTokens\`, \`TraceId\`, \`TtftMs\`, \`UpdatedAt\`) ON langwatch.coding_agent_session_events TO langwatch_lwql",
   "GRANT SELECT(\`SpanAttributes\`, \`SpanId\`, \`SpanName\`, \`StartTime\`, \`StatusCode\`, \`TenantId\`, \`TraceId\`) ON langwatch.stored_spans TO langwatch_lwql",
@@ -540,8 +553,12 @@ exports[`the definition-driven access DDL > given fixed names, password hash and
   "GRANT SELECT ON langwatch.workflow_versions_pg TO langwatch_lwql",
   "GRANT SELECT ON langwatch.workflows_pg TO langwatch_lwql",
   "GRANT SELECT(\`TenantId\`, \`CorrelationTraceId\`, \`EventName\`, \`ProviderSessionId\`, \`AttributesJson\`, \`TimeUnixMs\`) ON langwatch.log_records TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.evaluation_metrics__floor TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.trace_evaluation_metrics__floor TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.trace_evaluation_checks__floor TO langwatch_lwql",
   "GRANT SELECT ON langwatch.traces TO langwatch_lwql",
   "GRANT SELECT ON langwatch.spans TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.span_metrics TO langwatch_lwql",
   "GRANT SELECT ON langwatch.evaluations TO langwatch_lwql",
   "GRANT SELECT ON langwatch.simulations TO langwatch_lwql",
   "GRANT SELECT ON langwatch.trace_metrics TO langwatch_lwql",
@@ -549,6 +566,8 @@ exports[`the definition-driven access DDL > given fixed names, password hash and
   "GRANT SELECT ON langwatch.model_usage_by_minute TO langwatch_lwql",
   "GRANT SELECT ON langwatch.evaluation_metrics TO langwatch_lwql",
   "GRANT SELECT ON langwatch.evaluation_metrics_by_minute TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.trace_evaluation_metrics TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.trace_evaluation_checks TO langwatch_lwql",
   "GRANT SELECT ON langwatch.coding_sessions TO langwatch_lwql",
   "GRANT SELECT ON langwatch.coding_session_events TO langwatch_lwql",
   "GRANT SELECT ON langwatch.coding_tool_results TO langwatch_lwql",

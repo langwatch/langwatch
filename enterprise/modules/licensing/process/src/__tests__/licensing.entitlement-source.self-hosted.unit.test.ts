@@ -14,6 +14,7 @@ const enterpriseLicensePlan = (overrides: Partial<PlanInfo> = {}): PlanInfo => (
   overrideAddingLimitations: false,
   maxMembers: 100,
   maxMembersLite: 50,
+  maxMembersDeveloper: 0,
   maxMessagesPerMonth: 10_000_000,
   canPublish: true,
   usageUnit: "traces",

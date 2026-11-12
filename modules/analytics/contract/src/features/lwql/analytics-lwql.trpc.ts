@@ -119,6 +119,18 @@ export interface LwqlReadableProjectsSchema extends Named<
 export const lwqlReadableProjectsSchema: LwqlReadableProjectsSchema =
   lwqlReadableProjectsSchemaDefinition;
 
+/**
+ * Where the span widgets' history starts: `span_metrics` holds spans from `from` on, or all of
+ * them when null; `rebuilding` while its replay has not started yet (ADR-006).
+ */
+const lwqlSpanDataFloorSchemaDefinition = z.object({
+  from: z.string().nullable(),
+  rebuilding: z.boolean(),
+});
+export interface LwqlSpanDataFloorSchema extends Named<typeof lwqlSpanDataFloorSchemaDefinition> {}
+export const lwqlSpanDataFloorSchema: LwqlSpanDataFloorSchema = lwqlSpanDataFloorSchemaDefinition;
+export type LangWatchQLSpanDataFloor = z.infer<typeof lwqlSpanDataFloorSchema>;
+
 export const analyticsLwqlTrpc = defineTrpcContract("analytics.lwql")
   // Separate from `schema` because the catalog is answerable without an
   // executor, so a deployment with no LangWatchQL identity would describe a
@@ -136,6 +148,11 @@ export const analyticsLwqlTrpc = defineTrpcContract("analytics.lwql")
   .query("validate")
   .withInput(lwqlRunRequestSchema)
   .withOutput(lwqlValidationResultSchema)
+
+  /** Where span_metrics' history starts, so a span widget can say its data begins there. */
+  .query("spanDataFloor")
+  .withInput(lwqlProjectScopeSchema)
+  .withOutput(lwqlSpanDataFloorSchema)
 
   /** The projects of the organization this member may read, for the editor's project picker. */
   .query("readableProjects")

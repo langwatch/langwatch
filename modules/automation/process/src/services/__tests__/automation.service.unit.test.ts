@@ -298,6 +298,7 @@ const makeService = (
           free: true,
           maxMembers: 100,
           maxMembersLite: 0,
+          maxMembersDeveloper: 0,
           maxMessagesPerMonth: 1_000,
           canPublish: true,
           prices: { USD: 0, EUR: 0 },

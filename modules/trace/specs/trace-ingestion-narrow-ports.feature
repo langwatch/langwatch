@@ -13,8 +13,8 @@ Feature: Reading other features from the trace ingestion path
   still satisfies it, so nothing upstream changes.
 
   @unit
-  Scenario: The project metadata subscriber names three capabilities, not a service
-    Given a process holding only a project read, a metadata write and an org-admin lookup
+  Scenario: The project metadata subscriber names four capabilities, not a service
+    Given a process holding only a project read, a metadata write, an org-admin lookup and an organization lookup
     When the project metadata subscriber is composed
     Then it runs without a full project service
 
@@ -23,7 +23,7 @@ Feature: Reading other features from the trace ingestion path
   Scenario: The published project service still satisfies the narrowed port
     Given the published project service
     When it is passed where the narrow port is expected
-    Then every one of the three capabilities resolves through it
+    Then every one of the four capabilities resolves through it
 
   @unit
   Scenario: The evaluation trigger names one monitor read
