@@ -4,50 +4,49 @@
  * @see specs/lwql/query-origin.feature
  * @vitest-environment node
  */
-import type * as observabilityModule from "@langwatch/observability";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
+import type * as observabilityModule from "@langwatch/observability";
 import {
   createRecordingMeterProvider,
   type RecordingMeterProvider,
 } from "@langwatch/observability/metrics/testing";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { ProjectApi } from "@langwatch/project-contract";
+import type { TestLogLines } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, afterEach, beforeEach, vi } from "vitest";
 
-import { hashStatement } from "../../rules/lwql-statement-origin.rules.ts";
 import { loadStockStatements } from "../../langwatch-ql/__tests__/stock-statements.ts";
 import { analyticsProof } from "../../repositories/__tests__/analytics-proof.fixture.ts";
 import { MemoryAnalyticsRepositories } from "../../repositories/memory/memory.analytics.repositories.ts";
+import { hashStatement } from "../../rules/lwql-statement-origin.rules.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import { project } from "../../services/__tests__/project.fixture.ts";
 import { analyticsTestSecrets } from "./analytics-secrets.fixture.ts";
 
 const QUERY_FAILURE_LOGGER = "langwatch:analytics:lwql:query-failure";
-const errorLines = vi.hoisted(() => [] as { fields: Record<string, unknown>; message: string }[]);
+const failureLog = vi.hoisted(() => ({ lines: [] as unknown as TestLogLines }));
 
 // Only the failure logger is replaced, so the module's other loggers stay real.
 vi.mock("@langwatch/observability", async (importOriginal) => {
   const original = await importOriginal<typeof observabilityModule>();
+  const { createTestLogger } = await import("@langwatch/test-harness");
+  const { logger, lines } = createTestLogger();
+  failureLog.lines = lines;
   return {
     ...original,
     createLogger: (name: string) =>
-      name === QUERY_FAILURE_LOGGER
-        ? {
-            error: (fields: Record<string, unknown>, message: string) =>
-              errorLines.push({ fields, message }),
-          }
-        : original.createLogger(name),
+      name === QUERY_FAILURE_LOGGER ? logger : original.createLogger(name),
   };
 });
 
-// This package may run with `isolate: false`: reset so the import below binds the mock.
+// Reset so the dynamic import binds the mock even where files share a module graph.
 vi.resetModules();
 
 const { AnalyticsModule } = await import("../analytics.app.ts");
@@ -67,7 +66,7 @@ let meter: RecordingMeterProvider;
 beforeEach(() => {
   meter = createRecordingMeterProvider();
   meter.install();
-  errorLines.length = 0;
+  failureLog.lines.length = 0;
 });
 afterEach(() => meter.uninstall());
 
@@ -159,18 +158,21 @@ describe("given a stock statement on the workbench door", () => {
     expect(meter.valueOf(FAILURE_METRIC, { origin: "built_in" })).toBe(1);
   });
 
-  /** @scenario "A failed query on the tRPC door is reported with the statement exactly as sent" */
-  it("writes the built-in error line with the request's project id and statement hash", async () => {
+  it("writes the built-in error line on the app door with the request's project id and statement hash", async () => {
     const { runStock } = await harness();
 
     await runStock({ period: DASHBOARD_PERIOD });
 
+    const errorLines = failureLog.lines.filter((line) => line.level === 50);
     expect(errorLines).toHaveLength(1);
-    expect(errorLines[0]!.fields).toMatchObject({
+    expect(errorLines[0]).toMatchObject({
       origin: "built_in",
       projectId: AGGREGATE,
       statementHash: hashStatement({ sql: STOCK_SQL }),
     });
+    expect(errorLines[0]).not.toHaveProperty("sql");
+    expect(errorLines[0]).not.toHaveProperty("statement");
+    expect(errorLines[0]).not.toHaveProperty("parameters");
   });
 
   /** @scenario "A refusal of the caller's own parameter values is neither reported nor counted" */
