@@ -57,6 +57,25 @@ export const traceIngestWaitInputSchema: TraceIngestWaitInputSchema =
 
 export type TraceIngestWaitInput = z.infer<typeof traceIngestWaitInputSchema>;
 
+/**
+ * How long a judge waits for a project's trace at verdict time: the first wait, the one
+ * extension it may ask for, and how long the span set must hold still. See
+ * specs/scenarios/judge-trace-wait-settings.feature.
+ */
+const traceSettleSettingsSchemaDefinition = z
+  .object({
+    waitTimeoutMs: z.number().int().positive(),
+    waitExtensionMs: z.number().int().nonnegative(),
+    quietPeriodMs: z.number().int().nonnegative(),
+  })
+  .strict();
+export interface TraceSettleSettingsSchema extends Named<
+  typeof traceSettleSettingsSchemaDefinition
+> {}
+export const traceSettleSettingsSchema: TraceSettleSettingsSchema =
+  traceSettleSettingsSchemaDefinition;
+export type TraceSettleSettings = z.infer<typeof traceSettleSettingsSchema>;
+
 /** Canonical Trace summary lookup for internal feature callers. */
 const traceSummaryLookupInputSchemaDefinition = z
   .object({

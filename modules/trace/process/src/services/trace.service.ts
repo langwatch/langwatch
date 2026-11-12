@@ -25,6 +25,7 @@ import {
   type TraceQueryClassification,
   type TraceQueryClassificationInput,
   type TraceIngestWaitInput,
+  type TraceSettleSettings,
   type TraceByIdInput,
   type TraceDerivedEventsInput,
   type TraceRecord,
@@ -49,6 +50,11 @@ import {
 } from "../repositories/trace-projected-read.repository.ts";
 import type { TraceRecordRepository } from "../repositories/trace-record.repository.ts";
 import type { TraceSummaryReaderRepository } from "../repositories/trace-summary-reader.repository.ts";
+import {
+  DEFAULT_TRACE_SETTLE_SETTINGS,
+  MIN_INGEST_SAMPLE_COUNT,
+  settleSettingsFromSample,
+} from "../rules/trace-settle-settings.rules.ts";
 
 export interface TraceEventDerivation {
   derive(input: TraceDerivedEventsInput): Promise<DerivedTraceEvent[]>;
@@ -69,10 +75,6 @@ type TraceComposition = {
   authorize: FoldReadAuthorizer;
 };
 
-const DEFAULT_INGEST_WAIT_MS = 30_000;
-const MIN_INGEST_WAIT_MS = 10_000;
-const MAX_INGEST_WAIT_MS = 30_000;
-const MIN_INGEST_SAMPLE_COUNT = 20;
 const INGEST_WAIT_CACHE_TTL_MS = 60 * 60 * 1000;
 
 function gateCosts(nodes: SpanTreeNode[], canSeeCosts: boolean): SpanTreeNode[] {
@@ -85,7 +87,10 @@ function gateCosts(nodes: SpanTreeNode[], canSeeCosts: boolean): SpanTreeNode[] 
 
 export class TraceService {
   private readonly queryFieldCatalogue: TraceQueryFieldCatalogueService;
-  private readonly ingestWaitCache = new Map<string, { timeoutMs: number; expiresAt: number }>();
+  private readonly ingestWaitCache = new Map<
+    string,
+    { settings: TraceSettleSettings; expiresAt: number }
+  >();
 
   private constructor(private readonly composition: TraceComposition) {
     this.queryFieldCatalogue = TraceQueryFieldCatalogueService.create(composition.queryFieldValues);
@@ -218,11 +223,16 @@ export class TraceService {
   }
 
   async resolveIngestWaitTimeout(input: TraceIngestWaitInput): Promise<number> {
+    return (await this.resolveTraceSettleSettings(input)).waitTimeoutMs;
+  }
+
+  /** Measured settings are cached per project for an hour; defaults are never cached. */
+  async resolveTraceSettleSettings(input: TraceIngestWaitInput): Promise<TraceSettleSettings> {
     const parsed = traceIngestWaitInputSchema.parse(input);
     const now = nowInstant().epochMilliseconds;
     const cached = this.ingestWaitCache.get(parsed.projectId);
     if (cached && cached.expiresAt > now) {
-      return cached.timeoutMs;
+      return cached.settings;
     }
 
     if (cached) {
@@ -233,23 +243,22 @@ export class TraceService {
       const sample = await this.composition.repository.findIngestLag({
         authorization: await this.ownProof({
           projectId: parsed.projectId,
-          entry: "TraceService.resolveIngestWaitTimeout",
+          entry: "TraceService.resolveTraceSettleSettings",
         }),
       });
       if (!sample || sample.sampleCount < MIN_INGEST_SAMPLE_COUNT) {
-        return DEFAULT_INGEST_WAIT_MS;
+        return DEFAULT_TRACE_SETTLE_SETTINGS;
       }
 
-      const measured = Math.ceil(1.25 * sample.p95LagMs + 5_000);
-      const timeoutMs = Math.min(Math.max(measured, MIN_INGEST_WAIT_MS), MAX_INGEST_WAIT_MS);
+      const settings = settleSettingsFromSample(sample);
       this.ingestWaitCache.set(parsed.projectId, {
-        timeoutMs,
+        settings,
         expiresAt: now + INGEST_WAIT_CACHE_TTL_MS,
       });
 
-      return timeoutMs;
+      return settings;
     } catch {
-      return DEFAULT_INGEST_WAIT_MS;
+      return DEFAULT_TRACE_SETTLE_SETTINGS;
     }
   }
 

@@ -53,7 +53,7 @@ class TestTraceService implements AutomationEvaluationQueryClassification {
     return Promise.reject(new Error("unused trace capability"));
   }
 
-  resolveIngestWaitTimeout(): Promise<never> {
+  resolveTraceSettleSettings(): Promise<never> {
     return Promise.reject(new Error("unused trace capability"));
   }
 

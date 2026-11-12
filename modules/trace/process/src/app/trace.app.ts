@@ -95,6 +95,7 @@ import {
   type TopicCountsResult,
   type Trace,
   type TraceIngestWaitInput,
+  type TraceSettleSettings,
   type TraceCanonicalisationService,
   type TraceExportDownload,
   type TraceExportDownloadInput,
@@ -1718,8 +1719,8 @@ export class TraceModule implements TraceApi, CollectorApp {
     return this.#exportDownload.download(input);
   }
 
-  resolveIngestWaitTimeout(input: TraceIngestWaitInput): Promise<number> {
-    return this.#getTree().resolveIngestWaitTimeout(input);
+  resolveTraceSettleSettings(input: TraceIngestWaitInput): Promise<TraceSettleSettings> {
+    return this.#getTree().resolveTraceSettleSettings(input);
   }
 
   formatSpansDigest(input: { spans: Span[] }): Promise<string> {

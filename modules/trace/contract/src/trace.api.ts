@@ -125,6 +125,7 @@ import type {
   SpanTreeDeltaInput,
   SpanTreeInput,
   TraceIngestWaitInput,
+  TraceSettleSettings,
   TraceByIdInput,
   TraceDerivedEventsInput,
   TraceSummaryLookupInput,
@@ -243,7 +244,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
     traceId: string;
     limit?: number;
   }): Promise<NormalizedSpan[]>;
-  resolveIngestWaitTimeout(input: TraceIngestWaitInput): Promise<number>;
+  /** The project's recommended verdict-time trace wait, measured on its own span arrivals. */
+  resolveTraceSettleSettings(input: TraceIngestWaitInput): Promise<TraceSettleSettings>;
   getEvaluationSpans(input: EvaluationTraceReadInput): Promise<EvaluationTraceSpan[]>;
   getEvaluationEvents(input: EvaluationTraceReadInput): Promise<EvaluationTraceEvent[]>;
   /** The canonical trace record, closed under payload-parity review. */

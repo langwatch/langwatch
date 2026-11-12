@@ -142,6 +142,8 @@ type EvaluationEventRow = z.infer<typeof evaluationEventRowSchema>;
 const ingestLagRowSchema = z.looseObject({
   P95LagMs: numeric.nullable(),
   SampleCount: numeric,
+  P95ArrivalGapMs: numeric.nullable().optional(),
+  ArrivalGapSampleCount: numeric.optional(),
 });
 
 const ingestLagRowsSchema = z.array(ingestLagRowSchema);
@@ -236,32 +238,51 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     authorization: Authorization;
   }): Promise<TraceIngestLagSample | null> {
     const client = this.clickhouse.as(input.authorization, { reads: "traces" });
+    // Per span first, so a span stored twice before a merge counts once, at its first arrival.
     const result = await client.query({
       query: `
         SELECT
-          quantile(0.95)(SpanLagMs) AS P95LagMs,
-          count() AS SampleCount
+          quantileIf(0.95)(SpanLagMs, SpanLagMs >= 0) AS P95LagMs,
+          countIf(SpanLagMs >= 0) AS SampleCount,
+          quantileIf(0.95)(MaxArrivalGapMs, SpanCount >= 2) AS P95ArrivalGapMs,
+          countIf(SpanCount >= 2) AS ArrivalGapSampleCount
         FROM (
           SELECT
             TraceId,
-            dateDiff('millisecond', max(EndTime), max(CreatedAt)) AS SpanLagMs
-          FROM stored_spans
-          WHERE ${tenantScope("StartTime")}
-            AND StartTime >= now() - INTERVAL 7 DAY
+            dateDiff('millisecond', max(SpanEnd), max(LastArrival)) AS SpanLagMs,
+            count() AS SpanCount,
+            arrayMax(arrayDifference(arraySort(groupArray(FirstArrivalMs)))) AS MaxArrivalGapMs
+          FROM (
+            SELECT
+              TraceId,
+              SpanId,
+              max(EndTime) AS SpanEnd,
+              max(CreatedAt) AS LastArrival,
+              toUnixTimestamp64Milli(min(CreatedAt)) AS FirstArrivalMs
+            FROM stored_spans
+            WHERE ${tenantScope("StartTime")}
+              AND StartTime >= now() - INTERVAL 7 DAY
+            GROUP BY TraceId, SpanId
+          )
           GROUP BY TraceId
         )
-        WHERE SpanLagMs >= 0
       `,
       format: "JSONEachRow",
     });
     const rows = ingestLagRowsSchema.parse(await result.json());
     const row = rows[0];
+    const sampleCount = Number(row?.SampleCount ?? 0);
     const p95LagMs = Number(row?.P95LagMs ?? Number.NaN);
-    if (!Number.isFinite(p95LagMs)) return null;
+    if (sampleCount === 0 || !Number.isFinite(p95LagMs)) return null;
+    const arrivalGapSampleCount = Number(row?.ArrivalGapSampleCount ?? 0);
+    const p95ArrivalGapMs = Number(row?.P95ArrivalGapMs ?? Number.NaN);
 
     return {
       p95LagMs,
-      sampleCount: Number(row?.SampleCount ?? 0),
+      sampleCount,
+      p95ArrivalGapMs:
+        arrivalGapSampleCount > 0 && Number.isFinite(p95ArrivalGapMs) ? p95ArrivalGapMs : null,
+      arrivalGapSampleCount,
     };
   }
 
