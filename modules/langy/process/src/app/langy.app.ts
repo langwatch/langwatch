@@ -130,6 +130,7 @@ import { LangyConversationEventLogService } from "../features/conversation/servi
 import { LangyConversationUpdateService } from "../features/conversation/services/langy-conversation-update.service.ts";
 import { LangyConfirmationAnswersService } from "../features/delete-confirmation/services/langy-confirmation-answers.service.ts";
 import { LangyDeleteConfirmationService } from "../features/delete-confirmation/services/langy-delete-confirmation.service.ts";
+import { LangyCiFollowUpService } from "../features/github/services/langy-ci-follow-up.service.ts";
 import { LangyGithubPrPermitService } from "../features/github/services/langy-github-pr-permit.service.ts";
 import {
   LANGY_GITHUB_PRS_PER_DAY,
@@ -207,6 +208,8 @@ type LangyAppDependencies = {
   turnBounds: LangyTurnsBoundsService;
   /** Turns a module starts for a person who is not at the keyboard, read-only. */
   unattendedTurns: LangyUnattendedTurnService;
+  /** Turns CI starts on the pull requests Langy opened. */
+  ciFollowUps: LangyCiFollowUpService;
   virtualKeyProvisioning: LangyVirtualKeyProvisioningService;
   /** The rollout gate and key-owner bridge every key-authenticated door runs. */
   callers: LangyRestCallerService;
@@ -434,6 +437,10 @@ export class LangyModule implements LangyApiContract {
         projects: setup.dependencies.projects,
         notifications: setup.dependencies.notifications,
       },
+      pullRequestLinks: {
+        links: setup.repositories.pullRequestLinks,
+        projects: setup.dependencies.projects,
+      },
     });
     const longPoll = LocalControlLongPollService.create({ core });
     const sockets = LocalControlConnectionService.create({ core });
@@ -482,6 +489,13 @@ export class LangyModule implements LangyApiContract {
       unattendedTurns: LangyUnattendedTurnService.create({
         users: setup.dependencies.users,
         projects: setup.dependencies.projects,
+        featureFlags: setup.dependencies.featureFlags,
+        bounds: turnBounds,
+        turns: langy,
+      }),
+      ciFollowUps: LangyCiFollowUpService.create({
+        links: setup.repositories.pullRequestLinks,
+        users: setup.dependencies.users,
         featureFlags: setup.dependencies.featureFlags,
         bounds: turnBounds,
         turns: langy,
@@ -690,6 +704,7 @@ export class LangyModule implements LangyApiContract {
   maintenanceEventingPipeline(): StaticPipelineDefinition<never> {
     return buildLangyMaintenancePipeline({
       virtualKeyProvisioning: this.dependencies.virtualKeyProvisioning,
+      ciFollowUps: this.dependencies.ciFollowUps,
     });
   }
 

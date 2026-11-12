@@ -335,11 +335,12 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `github_lifecycle` (aggregate `github_installation`)
 
-Declared at `src/eventing/github-lifecycle.pipeline.ts:22`. Events: `githubInstallationConnectedEventSchema`.
+Declared at `src/eventing/github-lifecycle.pipeline.ts:28`. Events: `githubInstallationConnectedEventSchema`, `githubPullRequestChecksCompletedEventSchema`.
 
-| Kind    | Name                          | Handles | Declared at                                    |
-| ------- | ----------------------------- | ------- | ---------------------------------------------- |
-| command | `recordInstallationConnected` | –       | `src/eventing/github-lifecycle.pipeline.ts:27` |
+| Kind    | Name                               | Handles | Declared at                                    |
+| ------- | ---------------------------------- | ------- | ---------------------------------------------- |
+| command | `recordInstallationConnected`      | –       | `src/eventing/github-lifecycle.pipeline.ts:36` |
+| command | `recordPullRequestChecksCompleted` | –       | `src/eventing/github-lifecycle.pipeline.ts:37` |
 
 ### Pipeline `github_maintenance` (aggregate `global`)
 
@@ -353,7 +354,7 @@ Declared at `src/eventing/github-maintenance.pipeline.ts:42`.
 
 | Kind   | Leaf      | Environment variable       | Declared at                           |
 | ------ | --------- | -------------------------- | ------------------------------------- |
-| secret | `–`       | `GITHUB_LANGY_PRIVATE_KEY` | `src/app/github.app.ts:176`           |
+| secret | `–`       | `GITHUB_LANGY_PRIVATE_KEY` | `src/app/github.app.ts:222`           |
 | config | `appId`   | `GITHUB_LANGY_APP_ID`      | `../contract/src/github.config.ts:16` |
 | config | `host`    | `GITHUB_LANGY_HOST`        | `../contract/src/github.config.ts:17` |
 | config | `appSlug` | `GITHUB_LANGY_APP_SLUG`    | `../contract/src/github.config.ts:18` |

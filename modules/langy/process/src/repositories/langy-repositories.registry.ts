@@ -23,6 +23,7 @@ import type { LangyLocalControlRequestRepository } from "./langy-local-control-r
 import type { LangyLocalPresenceRepository } from "./langy-local-presence.repository.ts";
 import type { LangyLocalUserWaitRepository } from "./langy-local-user-wait.repository.ts";
 import type { LangyMessageRepository } from "./langy-message.repository.ts";
+import type { LangyPullRequestLinkRepository } from "./langy-pull-request-link.repository.ts";
 import type { LangyRateLimitRepository } from "./langy-rate-limit.repository.ts";
 import type { LangySessionKeyRepository } from "./langy-session-key.repository.ts";
 import type { LangyTokenBufferRepository } from "./langy-token-buffer.repository.ts";
@@ -49,6 +50,8 @@ export interface LangyRepositories extends LangyDatabaseRepositories {
   readonly deleteConfirmations: LangyDeleteConfirmationRepository;
   /** The per-user daily count of pull requests Langy opened. */
   readonly githubPrCounts: LangyGithubPrCountRepository;
+  /** Which conversation opened each pull request, and its automatic CI follow-ups. */
+  readonly pullRequestLinks: LangyPullRequestLinkRepository;
   /** When each person was last asked for feedback. */
   readonly feedbackPrompts: LangyFeedbackPromptRepository;
   /**

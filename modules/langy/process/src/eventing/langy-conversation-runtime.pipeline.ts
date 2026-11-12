@@ -46,6 +46,10 @@ import {
   type LocalConnectTurnPresence,
 } from "./langy-local-connect-turn.subscriber.ts";
 import {
+  createLangyPullRequestLinkSubscriber,
+  type LangyPullRequestLinkSubscriberDeps,
+} from "./langy-pull-request-link.subscriber.ts";
+import {
   createLangyWebPushSubscriber,
   langyWebPushReaders,
   type LangyWebPushSubscriberDeps,
@@ -99,6 +103,8 @@ interface EventingLangyConversationAdapterOptions {
   };
   /** Who a notification goes to and whether they want it, and notification's Web Push. */
   webPush: Pick<LangyWebPushSubscriberDeps, "users" | "projects" | "notifications">;
+  /** Where the pull requests a turn opened are linked to it, for CI to wake Langy there. */
+  pullRequestLinks: Omit<LangyPullRequestLinkSubscriberDeps, "conversations">;
 }
 
 /**
@@ -218,6 +224,11 @@ export class EventingLangyConversationAdapter {
       ...options.webPush,
     });
 
+    const pullRequestLinkSubscriber = createLangyPullRequestLinkSubscriber({
+      ...options.pullRequestLinks,
+      conversations: conversationReader,
+    });
+
     return buildLangyConversationPipeline({
       langyConversationProjectionStore: conversationStore,
       langyConversationTurnProjectionStore: options.langyConversationTurnProjectionStore,
@@ -233,6 +244,7 @@ export class EventingLangyConversationAdapter {
         firstMessageSeenSubscriber,
         localConnectTurnSubscriber,
         webPushSubscriber,
+        pullRequestLinkSubscriber,
       ],
     });
   }

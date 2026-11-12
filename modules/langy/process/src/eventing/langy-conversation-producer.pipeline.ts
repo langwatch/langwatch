@@ -143,6 +143,14 @@ function buildLangyConversationProducerPipeline(input: {
       projects: { findSummaryById: refuse("read a project for a notification") },
       notifications: { requestWebPushDelivery: refuse("request a Web Push delivery") },
     },
+    pullRequestLinks: {
+      links: {
+        link: refuse("link a pull request"),
+        isFollowUpTurn: refuse("read a CI follow-up turn"),
+        resetFollowUps: refuse("reset CI follow-ups"),
+      },
+      projects: { findIdentity: refuse("read a project's organization") },
+    },
   }).buildProcessing();
 }
 

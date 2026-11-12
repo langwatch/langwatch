@@ -590,3 +590,37 @@ describe("the window an unattended turn is counted in", () => {
     });
   });
 });
+
+describe("a CI follow-up turn", () => {
+  describe("given a pull request Langy opened, in a project with GitHub connected", () => {
+    /** @scenario "A follow-up turn holds a view-only key and a token for the one repository" */
+    it("mints the unattended key, a GitHub token for that repository only, and no UI action", async () => {
+      const keys = sessionKeysHolding([...LANGY_CANDIDATE_PERMISSIONS]);
+      const github = credentialsWithGithub();
+      const countTurn = vi.fn(async () => undefined);
+      const fixture = makeFixture({
+        sessionKeys: keys.service,
+        credentials: github.credentials,
+        existing: { origin: "interactive" },
+      });
+
+      await fixture.start({
+        ...replyIn("conversation-1"),
+        ciFollowUp: { repositoryFullName: "acme/shop", countTurn },
+      });
+
+      expect(keys.created).toEqual([[...LANGY_UNATTENDED_PERMISSIONS]]);
+      expect(fixture.mint).toHaveBeenCalledWith(expect.objectContaining({ ceiling: "unattended" }));
+      expect(github.findTurnTokens).toHaveBeenCalledWith(
+        expect.objectContaining({ repositoryFullName: "acme/shop" }),
+      );
+      expect(fixture.dispatch.mock.calls[0]![0].credentials).toMatchObject({
+        githubToken: "gh-token",
+      });
+      expect(fixture.render).toHaveBeenCalledWith(
+        expect.objectContaining({ isUiActionSurfaceOpen: false }),
+      );
+      expect(countTurn).toHaveBeenCalledTimes(1);
+    });
+  });
+});

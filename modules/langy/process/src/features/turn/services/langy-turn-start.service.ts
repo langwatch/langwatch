@@ -56,6 +56,7 @@ export class LangyTurnStartService {
         ...(input.adoptConversationId ? { adoptConversationId: true } : {}),
         ...(input.modelOverride ? { modelOverride: input.modelOverride } : {}),
         ...(input.unattended ? { unattended: true } : {}),
+        ...(input.ciFollowUp ? { ciFollowUpRepository: input.ciFollowUp.repositoryFullName } : {}),
       });
     const turnModel = this.requireTurnModel(input.modelOverride, resolvedModel);
     const admission = await this.deps.admission.claim({
@@ -244,6 +245,7 @@ export class LangyTurnStartService {
     try {
       // After the claim: a replay answered above, so the same turn asked again counts nothing.
       await input.unattended?.countTurn();
+      await input.ciFollowUp?.countTurn();
       const settled = await this.settleKickoff({
         input,
         request,

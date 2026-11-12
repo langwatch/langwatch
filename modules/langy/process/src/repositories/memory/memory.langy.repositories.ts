@@ -20,6 +20,7 @@ import { LangyLocalPresenceMemoryRepository } from "./memory.langy-local-presenc
 import { LangyLocalUserWaitMemoryRepository } from "./memory.langy-local-user-wait.repository.ts";
 import { MemoryLangyMessageProjectionRepository } from "./memory.langy-message-projection.repository.ts";
 import { MemoryLangyMessageRepository } from "./memory.langy-message.repository.ts";
+import { LangyPullRequestLinkMemoryRepository } from "./memory.langy-pull-request-link.repository.ts";
 import { MemoryLangyRateLimitRepository } from "./memory.langy-rate-limit.repository.ts";
 import { MemoryLangySessionKeyRepository } from "./memory.langy-session-key.repository.ts";
 import { LangyTokenBufferMemoryRepository } from "./memory.langy-token-buffer.repository.ts";
@@ -56,6 +57,7 @@ export class MemoryLangyRepositories {
       deleteConfirmations: LangyDeleteConfirmationMemoryRepository.create(),
       githubPrCounts: LangyGithubPrCountMemoryRepository.create(),
       feedbackPrompts: LangyFeedbackPromptMemoryRepository.create(),
+      pullRequestLinks: LangyPullRequestLinkMemoryRepository.create(),
       // Every call returns the twin over the SAME shared store, the way one
       // Redis serves every open() on the live tier; there is no connection to give back.
       tokenBuffer: {

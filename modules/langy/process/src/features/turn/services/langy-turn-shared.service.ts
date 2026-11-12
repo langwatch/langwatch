@@ -94,6 +94,11 @@ export interface StartConversationTurnInput {
    * asked once the turn is claimed, so a replay counts nothing.
    */
   unattended?: { title: string; countTurn: () => Promise<void> };
+  /**
+   * Set for a turn CI started on a pull request Langy opened: it continues that conversation
+   * with the unattended ceiling, plus a GitHub token for this one repository.
+   */
+  ciFollowUp?: { repositoryFullName: string; countTurn: () => Promise<void> };
 }
 
 export interface LangyTurnServiceDeps {

@@ -1352,17 +1352,18 @@ Declared at `src/eventing/langy-guided-onboarding.pipeline.ts:41`. Events: `guid
 
 ### Pipeline `langy_maintenance` (aggregate `global`)
 
-Declared at `src/eventing/langy-maintenance.pipeline.ts:30`.
+Declared at `src/eventing/langy-maintenance.pipeline.ts:37`.
 
-| Kind            | Name                         | Handles                                                      | Declared at                                     |
-| --------------- | ---------------------------- | ------------------------------------------------------------ | ----------------------------------------------- |
-| peer subscriber | `provisionProjectVirtualKey` | `lw.project.created` from [project](../../project/README.md) | `src/eventing/langy-maintenance.pipeline.ts:37` |
+| Kind            | Name                         | Handles                                                                         | Declared at                                     |
+| --------------- | ---------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------- |
+| peer subscriber | `provisionProjectVirtualKey` | `lw.project.created` from [project](../../project/README.md)                    | `src/eventing/langy-maintenance.pipeline.ts:44` |
+| peer subscriber | `langyCiFollowUp`            | `lw.github.pull_request_checks_completed` from [github](../../github/README.md) | `src/eventing/langy-maintenance.pipeline.ts:50` |
 
 ## Configuration
 
 | Kind   | Leaf                 | Environment variable        | Declared at                          |
 | ------ | -------------------- | --------------------------- | ------------------------------------ |
-| secret | `–`                  | `LANGY_INTERNAL_SECRET`     | `src/app/langy.app.ts:294`           |
+| secret | `–`                  | `LANGY_INTERNAL_SECRET`     | `src/app/langy.app.ts:297`           |
 | config | `agentUrl`           | `LANGY_AGENT_URL`           | `../contract/src/langy.config.ts:18` |
 | config | `workerCallbackUrl`  | `LANGY_WORKER_CALLBACK_URL` | `../contract/src/langy.config.ts:19` |
 | config | `workerGatewayUrl`   | `LANGY_WORKER_GATEWAY_URL`  | `../contract/src/langy.config.ts:20` |

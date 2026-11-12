@@ -231,6 +231,7 @@ describe("given the langy repository registry", () => {
         "localUserWaits",
         "messageStorage",
         "messages",
+        "pullRequestLinks",
         "rateLimits",
         "resourceLinks",
         "sessionKeys",

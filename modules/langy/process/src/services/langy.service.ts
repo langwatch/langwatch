@@ -232,6 +232,15 @@ export class LangyService {
     return this.turns.startConversationTurn(input);
   }
 
+  /** A turn CI started on a pull request Langy opened, in the conversation that opened it. */
+  startCiFollowUpTurn(
+    input: LangyStartConversationTurnInput & {
+      ciFollowUp: { repositoryFullName: string; countTurn: () => Promise<void> };
+    },
+  ): Promise<{ conversationId: string; turnId: string }> {
+    return this.turns.startConversationTurn(input);
+  }
+
   warmConversationWorker(input: {
     projectId: string;
     session: LangyCredentialSession;
