@@ -27,6 +27,7 @@ const plan: Plan = {
   free: true,
   maxMembers: 50,
   maxMembersLite: 10,
+  maxMembersDeveloper: 0,
   maxMessagesPerMonth: 1_000_000,
   canPublish: true,
   prices: { USD: 0, EUR: 0 },
