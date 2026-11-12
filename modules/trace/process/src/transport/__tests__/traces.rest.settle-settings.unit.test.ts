@@ -14,7 +14,7 @@ import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { settleSettingsFromSample } from "../../rules/trace-settle-settings.rules.ts";
+import { settleSettingsFromSample } from "../../features/read/rules/trace-settle-settings.rules.ts";
 import { tracesRest, tracesRestCredential } from "../traces.rest.ts";
 
 function mount() {
