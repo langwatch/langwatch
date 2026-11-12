@@ -3,7 +3,11 @@
  * Pure: the screen renders these and decides nothing itself.
  * @see specs/licensing/usage-page.feature
  */
-import { PlanTypes, UNLIMITED_MESSAGES } from "@langwatch/enterprise-billing-contract";
+import {
+  PlanTypes,
+  UNLIMITED_MESSAGES,
+  UNLIMITED_SEATS,
+} from "@langwatch/enterprise-billing-contract";
 import type { UsageDay } from "@langwatch/entitlement-contract";
 import numeral from "numeral";
 
@@ -18,9 +22,6 @@ import {
 import { PricingModel } from "./prisma-types.ts";
 
 const formatCount = (value: number): string => numeral(value).format("0,0");
-
-/** The cap the catalogue writes for "as many as you like". */
-const UNLIMITED_SEATS_FROM = 9_999;
 
 /** The plan as the usage page reads it: the fields of an active plan it uses. */
 export type UsagePagePlan = {
@@ -187,7 +188,7 @@ export function liteRow({
   if (plan.free) return { kind: "on-growth" };
   const hasLiteSeats = plan.maxMembersLite > 0 && pricingModel === PricingModel.SEAT_EVENT;
   if (!hasLiteSeats) return { kind: "none" };
-  if (plan.maxMembersLite >= UNLIMITED_SEATS_FROM) {
+  if (plan.maxMembersLite >= UNLIMITED_SEATS) {
     return { kind: "count", value: formatCount(liteCount), note: "unlimited" };
   }
   return {
@@ -199,7 +200,7 @@ export function liteRow({
 
 /** Full seats in use against the plan's. */
 export function fullSeats({ used, plan }: { used: number; plan: UsagePagePlan }): string {
-  if (plan.maxMembers >= UNLIMITED_SEATS_FROM) return formatCount(used);
+  if (plan.maxMembers >= UNLIMITED_SEATS) return formatCount(used);
   return `${formatCount(used)} / ${formatCount(plan.maxMembers)}`;
 }
 
@@ -215,7 +216,7 @@ export function developerSeats({
   plan: UsagePagePlan;
 }): string | null {
   if (plan.maxMembersDeveloper === 0 && used === 0) return null;
-  if (plan.maxMembersDeveloper >= UNLIMITED_SEATS_FROM) return formatCount(used);
+  if (plan.maxMembersDeveloper >= UNLIMITED_SEATS) return formatCount(used);
   return `${formatCount(used)} / ${formatCount(plan.maxMembersDeveloper)}`;
 }
 

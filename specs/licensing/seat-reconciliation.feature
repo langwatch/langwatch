@@ -164,6 +164,13 @@ Feature: Reconciling an organization down to its licensed seats
     Then the full member seats are shown against what the license covers
     And no Lite Member card reads "0 / 0"
 
+  @integration
+  Scenario: Uncapped Lite Member seats read as Unlimited on the member list
+    Given the plan allows as many Lite Member seats as the organization wants
+    When an admin opens the member list
+    Then the Lite Member seats in use are shown against "Unlimited"
+    And the card does not show the catalogue's stand-in number for no cap
+
   @integration @regression
   Scenario: Invitation changes refresh the visible seat usage
     Given an admin has the directory open with its current seat usage

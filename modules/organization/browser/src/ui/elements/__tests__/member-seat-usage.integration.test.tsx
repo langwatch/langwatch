@@ -123,6 +123,26 @@ describe("given an organization with a seat allowance of each kind", () => {
     });
   });
 
+  describe("when the plan allows as many Lite Member seats as the organization wants", () => {
+    /** @scenario Uncapped Lite Member seats read as Unlimited on the member list */
+    it("shows the Lite Member seats in use against an unlimited cap, not 9,999", async () => {
+      mockUsageData.current = { membersCount: 3, membersLiteCount: 4, membersDeveloperCount: 0 };
+
+      renderSeatUsage({ maxMembers: 3, maxMembersLite: 9_999 });
+
+      expect(await screen.findByText("membersLite: 4 / Infinity")).toBeInTheDocument();
+      expect(screen.queryByText(/9999/)).toBeNull();
+    });
+
+    it("keeps a real Lite cap as the number it is", async () => {
+      mockUsageData.current = { membersCount: 3, membersLiteCount: 4, membersDeveloperCount: 0 };
+
+      renderSeatUsage({ maxMembers: 3, maxMembersLite: 9_998 });
+
+      expect(await screen.findByText("membersLite: 4 / 9998")).toBeInTheDocument();
+    });
+  });
+
   describe("when the counts have not arrived yet", () => {
     it("renders nothing rather than a zero it does not know", () => {
       const { container } = renderSeatUsage({

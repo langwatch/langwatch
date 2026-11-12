@@ -1,9 +1,13 @@
 import { SimpleGrid } from "@langwatch/design-system/primitives";
+import { UNLIMITED_SEATS } from "@langwatch/enterprise-billing-contract";
 import type { Plan as PlanInfo } from "@langwatch/entitlement-contract";
 
 import { ResourceLimitRow } from "../../behavior/lent-resource-limit-row.tsx";
 import { api } from "../../behavior/organization-api.ts";
 import { SEAT_TYPE_COPY } from "../../model/seat-type-copy.ts";
+
+/** A cap the catalogue writes as "as many as you like" reads as Unlimited, not 9,999. */
+const shownCap = (max: number): number => (max >= UNLIMITED_SEATS ? Infinity : max);
 
 /**
  * Each kind of seat in use against the plan's cap. Free (no Lite seats, none taken) shows
@@ -33,19 +37,19 @@ export function MemberSeatUsage({
       <ResourceLimitRow
         limitType="members"
         current={usage.data.membersCount}
-        max={activePlan.maxMembers}
+        max={shownCap(activePlan.maxMembers)}
       />
       {showsLite && (
         <ResourceLimitRow
           limitType="membersLite"
           current={usage.data.membersLiteCount}
-          max={activePlan.maxMembersLite}
+          max={shownCap(activePlan.maxMembersLite)}
         />
       )}
       <ResourceLimitRow
         label={SEAT_TYPE_COPY.developerSeatsLabel}
         current={usage.data.membersDeveloperCount}
-        max={activePlan.maxMembersDeveloper}
+        max={shownCap(activePlan.maxMembersDeveloper)}
       />
     </SimpleGrid>
   );

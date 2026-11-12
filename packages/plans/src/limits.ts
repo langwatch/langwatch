@@ -28,6 +28,9 @@ export type PlanLimit = z.infer<typeof planLimitSchema>;
  */
 export const UNLIMITED_MESSAGES = 999_999_999;
 
+/** The seat count the cloud catalogue writes for "as many as you like": paid Lite seats. */
+export const UNLIMITED_SEATS = 9_999;
+
 /** The sentinel the self-hosted baseline uses. See drift.md: the two disagree. */
 export const UNLIMITED = Number.MAX_SAFE_INTEGER;
 

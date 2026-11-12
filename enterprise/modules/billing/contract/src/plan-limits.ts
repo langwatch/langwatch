@@ -3,6 +3,7 @@ import {
   planCatalogue,
   quotedLimitsOfPlan,
   UNLIMITED_MESSAGES as NO_MESSAGE_CAP,
+  UNLIMITED_SEATS as NO_SEAT_CAP,
 } from "@langwatch/plans";
 
 import { type PlanTypes as PlanType, PlanTypes } from "./plan-types.ts";
@@ -12,6 +13,9 @@ import { type PlanTypes as PlanType, PlanTypes } from "./plan-types.ts";
  * When a limit is set to this value, it means there is no limit.
  */
 export const UNLIMITED_MESSAGES = NO_MESSAGE_CAP;
+
+/** The seat cap the catalogue writes for "as many as you like"; at or above it, say unlimited. */
+export const UNLIMITED_SEATS = NO_SEAT_CAP;
 
 /**
  * One catalogue plan, in the field names a resolved plan is quoted under.
