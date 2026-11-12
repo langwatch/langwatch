@@ -613,7 +613,8 @@ export class TenantScopedReader {
       client: () => Promise<ClickHouseQueryClient>;
       fence: TenantFence;
       tenantId: string;
-      /** The proof's expiry, checked before every statement: a held reader outlives no proof. */
+      /** The proof's expiry, checked before every statement and again before its rows leave, and
+       *  sent as the statement's time limit: a held reader outlives no proof. */
       expiresAt?: number;
       now?: () => number;
     },
@@ -625,28 +626,52 @@ export class TenantScopedReader {
   }
 
   async query<Row = unknown>(params: ScopedQueryParams): Promise<{ json(): Promise<Row[]> }> {
-    const { expiresAt, now } = this.deps;
-    if (expiresAt !== undefined && expiresAt <= (now?.() ?? nowInstant().epochMilliseconds)) {
-      throw new AuthorizationExpiredError(expiresAt);
-    }
+    this.#refuseExpired();
     const expanded = expandStatement({
       query: params.query,
       queryParams: params.query_params ?? {},
       fence: this.deps.fence,
     });
     const client = await this.resolvedClient();
+    const settings = this.#settingsWithinProof(params.clickhouse_settings);
     // The client expands an `{{idBound}}` marker, reading the index under this fence's tenants.
     const result = await client.query<Row>({
       tenantId: this.deps.tenantId,
       tenantIds: tenantsOf(this.deps.fence),
       sql: expanded.query,
       params: expanded.queryParams,
-      ...(params.clickhouse_settings ? { settings: params.clickhouse_settings } : {}),
+      ...(settings ? { settings } : {}),
       ...(params.SKIP_COLD_SCAN_CHECK === true ? { SKIP_COLD_SCAN_CHECK: true } : {}),
       ...(params.idBound === undefined ? {} : { idBound: params.idBound }),
       ...(params.retryOnTimeout === false ? { retryOnTimeout: false } : {}),
     });
+    // A slow statement or a retry may outlast the proof: its rows are refused, never released.
+    this.#refuseExpired();
     return { json: async () => result.rows };
+  }
+
+  #now(): number {
+    return this.deps.now?.() ?? nowInstant().epochMilliseconds;
+  }
+
+  #refuseExpired(): void {
+    const { expiresAt } = this.deps;
+    if (expiresAt !== undefined && expiresAt <= this.#now()) {
+      throw new AuthorizationExpiredError(expiresAt);
+    }
+  }
+
+  /** The caller's settings with `max_execution_time` cut to the proof's remaining whole seconds,
+   *  at least one, since ClickHouse reads zero as no limit. */
+  #settingsWithinProof(
+    settings: Record<string, string | number> | undefined,
+  ): Record<string, string | number> | undefined {
+    const { expiresAt } = this.deps;
+    if (expiresAt === undefined) return settings;
+    const remaining = Math.max(1, Math.ceil((expiresAt - this.#now()) / 1000));
+    const asked = Number(settings?.max_execution_time ?? 0);
+    const limit = Number.isFinite(asked) && asked > 0 ? Math.min(asked, remaining) : remaining;
+    return { ...settings, max_execution_time: limit };
   }
 
   private async resolvedClient(): Promise<ClickHouseQueryClient> {
@@ -746,7 +771,148 @@ function refuseUnconditionedMarkers({ text, fence }: { text: string; fence: Tena
     if (between === undefined || !isConjunctionLeadingIn({ text: between })) {
       throw new StatementScopeError({ kind: "loose-latest-version-marker" });
     }
+    if (!isElectionClosedAsAConjunct({ text, from: election.index + election[0].length })) {
+      throw new StatementScopeError({ kind: "loose-latest-version-marker" });
+    }
   }
+}
+
+/** The words an election's own WHERE may use after its marker: keys, versions and their bounds. */
+const ELECTION_BODY_WORDS: ReadonlySet<string> = new Set([
+  "and",
+  "in",
+  "group",
+  "by",
+  "tenantid",
+  "traceid",
+  "spanid",
+  "starttime",
+  "updatedat",
+  "fromunixtimestamp64milli",
+  "tounixtimestamp64milli",
+]);
+const ELECTION_GROUP_BY = /\bGROUP\s+BY\s+TenantId\s*,\s*TraceId\s*,\s*SpanId\s*$/i;
+const WHERE_END = /\b(?:GROUP\s+BY|ORDER\s+BY|LIMIT|HAVING|SETTINGS)\b/i;
+const WORD = /[A-Za-z_]\w*/y;
+
+/**
+ * Allow-listed, after the marker: the election's own select AND-s key and version bounds and
+ * groups by the keys; after its close come AND-ed terms and the WHERE's end (a clause keyword, the
+ * enclosing select's close, the text's end). So nothing compares, negates or OR-s the election.
+ */
+function isElectionClosedAsAConjunct({ text, from }: { text: string; from: number }): boolean {
+  const body = flatScopeOf({ text, from });
+  if (body === undefined || body.end === text.length || !isKeysElection(body)) return false;
+  const after = flatScopeOf({ text, from: body.end + 1 });
+  if (after === undefined) return false;
+  const end = WHERE_END.exec(after.flat);
+  return isAndRun({ flat: end === null ? after.flat : after.flat.slice(0, end.index) });
+}
+
+/** The election's select after its marker: AND-ed key and version bounds, then the keys' group. */
+function isKeysElection({ flat, words }: { flat: string; words: readonly string[] }): boolean {
+  const unlisted = words.filter((word) => !ELECTION_BODY_WORDS.has(word.toLowerCase()));
+  const groupBy = ELECTION_GROUP_BY.exec(flat);
+  if (unlisted.length > 0 || groupBy === null) return false;
+  return isAndRun({ flat: flat.slice(0, groupBy.index) });
+}
+
+/** ` AND term AND term ...` or nothing: a run of conjuncts, each an allow-listed term. */
+function isAndRun({ flat }: { flat: string }): boolean {
+  if (/\b(?:OR|NOT|XOR|BETWEEN)\b/i.test(flat)) return false;
+  const terms = flat.split(/\bAND\b/i);
+  if (terms.shift()?.trim() !== "") return false;
+  return terms.every((term) => CONJUNCT_TERM.test(term));
+}
+
+type Scan = { flat: string; words: string[]; depth: number; at: number };
+type Token = { as: string; next: number; word?: string };
+
+/**
+ * The text from `from` to its group's close (or the text's end): a nested group reads `§G`, a
+ * parameter or literal `§P`, a marker or line comment a space; `words` holds every word outside
+ * them, nested ones included. A block or hash comment, a `;` or an open literal refuses.
+ */
+function flatScopeOf({
+  text,
+  from,
+}: {
+  text: string;
+  from: number;
+}): { flat: string; words: string[]; end: number } | undefined {
+  const scan: Scan = { flat: "", words: [], depth: 0, at: from };
+  while (scan.at < text.length) {
+    const step = stepOf({ text, scan });
+    if (step === "refused") return undefined;
+    if (step === "closed") return { flat: scan.flat, words: scan.words, end: scan.at };
+  }
+  return scan.depth === 0 ? { flat: scan.flat, words: scan.words, end: text.length } : undefined;
+}
+
+/** One token of the scan; only the top level reaches the flat text. */
+function stepOf({ text, scan }: { text: string; scan: Scan }): "refused" | "closed" | "next" {
+  const skipped = skippedFrom({ text, at: scan.at });
+  const token = skipped ?? tokenAt({ text, at: scan.at });
+  if (token === "refused") return "refused";
+  if (token.as === ")" && scan.depth === 0) return "closed";
+  if (token.word !== undefined) scan.words.push(token.word);
+  if (token.as === ")") {
+    scan.depth -= 1;
+  } else if (token.as === "(") {
+    if (scan.depth === 0) scan.flat += " §G ";
+    scan.depth += 1;
+  } else if (scan.depth === 0) {
+    scan.flat += token.as;
+  }
+  scan.at = token.next;
+  return "next";
+}
+
+/** A word, or one character; a block or hash comment or a `;` refuses. */
+function tokenAt({ text, at }: { text: string; at: number }): Token | "refused" {
+  const char = text.charAt(at);
+  if ((char === "/" && text.charAt(at + 1) === "*") || char === "#" || char === ";") {
+    return "refused";
+  }
+  WORD.lastIndex = at;
+  const word = /\w/.test(text.charAt(at - 1)) ? null : WORD.exec(text);
+  if (word === null) return { as: char, next: at + 1 };
+  return { as: word[0], next: at + word[0].length, word: word[0] };
+}
+
+/** A literal, parameter, marker or line comment at `at`: what it reads as, and what follows. */
+function skippedFrom({ text, at }: { text: string; at: number }): Token | "refused" | undefined {
+  const char = text.charAt(at);
+  if (char === "'" || char === '"' || char === "`") {
+    const end = literalEndOf({ text, open: at });
+    return end === undefined ? "refused" : { as: " §P ", next: end + 1 };
+  }
+  if (char === "{") return braceSkipped({ text, at });
+  if (char === "-" && text.charAt(at + 1) === "-") {
+    const end = text.indexOf("\n", at);
+    return { as: " ", next: end === -1 ? text.length : end };
+  }
+  return undefined;
+}
+
+/** Where a quoted literal opened at `open` closes: a backslash escapes, a doubled quote is one. */
+function literalEndOf({ text, open }: { text: string; open: number }): number | undefined {
+  const quote = text.charAt(open);
+  for (let at = open + 1; at < text.length; at += 1) {
+    const char = text.charAt(at);
+    if (char === "\\") at += 1;
+    else if (char === quote && text.charAt(at + 1) === quote) at += 1;
+    else if (char === quote) return at;
+  }
+  return undefined;
+}
+
+/** A `{{marker}}` reads as a space, a `{param:Type}` as one operand; an unclosed one refuses. */
+function braceSkipped({ text, at }: { text: string; at: number }): Token | "refused" {
+  const marker = text.charAt(at + 1) === "{";
+  const end = text.indexOf(marker ? "}}" : "}", at);
+  if (end === -1) return "refused";
+  return { as: marker ? " " : " §P ", next: end + (marker ? 2 : 1) };
 }
 
 /** A term the election may be AND-ed after: an operand, or two compared; a group is one operand. */

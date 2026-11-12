@@ -240,7 +240,8 @@ const COLUMNS = [...TENANT_SCOPE_TIME_COLUMNS, "NotATimeColumn"] as const;
 const ELECTION_TUPLE =
   "(TenantId, TraceId, SpanId, UpdatedAt) IN (SELECT TenantId, TraceId, SpanId, max(UpdatedAt) FROM stored_spans WHERE ";
 const ELECTION_HEAD = ` AND ${ELECTION_TUPLE}`;
-/** What may sit just before an election: AND makes a conjunct; the rest put it under OR or NOT. */
+/** What may sit around an election: AND makes a conjunct; the rest put it under OR or NOT, or
+ *  compare or OR it from behind. */
 const ELECTION_LEADS = [
   [" AND ", ""],
   [" AND TraceId = {traceId:String} AND ", ""],
@@ -250,6 +251,9 @@ const ELECTION_LEADS = [
   [" AND (1 = 1 OR ", ")"],
   [" AND (1 = 1 OR 1 = 2) OR ", ""],
   [" AND NOT (1 = 1 AND ", ")"],
+  [" AND ", " = 0"],
+  [" AND ", " OR 1 = 1"],
+  [" AND ", " AND 1 = 1 OR 1 = 2"],
 ] as const;
 
 type StatementCase = {
@@ -414,8 +418,28 @@ function electionViolation({ text }: { text: string }): string | undefined {
     if (/\b(?:OR|NOT)\b/i.test(lead) || !/\bAND\s*$/.test(lead)) {
       return `an election that is not a conjunct: ${lead.slice(-40)}`;
     }
+    const trail = trailOf({
+      text,
+      close: closingOf({ text, open: text.indexOf("(SELECT", match.index) }),
+    });
+    if (/\b(?:OR|NOT)\b/i.test(trail) || !/^\s*(?:AND\b|$)/i.test(trail)) {
+      return `an election that is compared or OR-ed after it: ${trail.slice(0, 40)}`;
+    }
   }
   return undefined;
+}
+
+/** What follows an election's close in its own scope, each nested group one `G`. */
+function trailOf({ text, close }: { text: string; close: number }): string {
+  let depth = 0;
+  let trail = "";
+  for (let index = close + 1; index < text.length; index += 1) {
+    if (text[index] === ")" && depth === 0) break;
+    if (text[index] === "(") depth += 1;
+    else if (text[index] === ")") depth -= 1;
+    else if (depth === 0) trail += text[index];
+  }
+  return trail;
 }
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

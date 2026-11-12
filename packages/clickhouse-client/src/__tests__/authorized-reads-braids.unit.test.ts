@@ -589,6 +589,80 @@ describe("the fence over a span read", () => {
         });
       });
 
+      describe("when what follows the election, or its own select, could change what it elects", () => {
+        const head =
+          "(TenantId, TraceId, SpanId, UpdatedAt) IN (SELECT TenantId, TraceId, SpanId, max(UpdatedAt)" +
+          ` FROM stored_spans WHERE ${tenantScopeForLatestVersion("StartTime")}`;
+        const KEYS = " GROUP BY TenantId, TraceId, SpanId";
+        const fenced = ({ inner = KEYS, after = "" }: { inner?: string; after?: string }) =>
+          `SELECT SpanId FROM stored_spans WHERE ${tenantScopeWithConditions("StartTime")}` +
+          ` AND ${head}${inner})${after}`;
+
+        /** @scenario "Nothing after the latest-version election can negate or widen it" */
+        it.each([
+          ["a comparison that negates it", " = 0"],
+          ["an OR after it", " OR 1 = 1"],
+          ["an OR after an AND-ed term", " AND TraceId = {traceId:String} OR 1 = 1"],
+          ["a ternary over the WHERE", " AND 1 = 1 ? 1 : 1"],
+          ["a block comment", " /* */ AND 1 = 1"],
+        ])("refuses %s", (_shape, after) => {
+          expect(refusalOf(fenced({ after }))).toEqual({ kind: "loose-latest-version-marker" });
+        });
+
+        /** @scenario "Nothing after the latest-version election can negate or widen it" */
+        it.each([
+          ["an OR", ` AND TraceId = {traceId:String} OR 1 = 1${KEYS}`],
+          [
+            "a filter on a column that changes between versions",
+            ` AND SpanName = {name:String}${KEYS}`,
+          ],
+          [
+            "a filter hidden in a function's argument",
+            ` AND StartTime >= toDateTime(SpanName)${KEYS}`,
+          ],
+          ["a grouping other than the keys", " GROUP BY TenantId, TraceId"],
+          ["a HAVING after the keys", `${KEYS} HAVING max(UpdatedAt) > 0`],
+          ["a subquery", ` AND TraceId IN (SELECT TraceId FROM stored_spans)${KEYS}`],
+        ])("refuses an election whose own select carries %s", (_shape, inner) => {
+          expect(refusalOf(fenced({ inner }))).toEqual({ kind: "loose-latest-version-marker" });
+        });
+
+        /** @scenario "Nothing after the latest-version election can negate or widen it" */
+        it.each([
+          ["the end of the WHERE", {}],
+          [
+            "AND-ed terms, then an order and a cap",
+            { after: " AND SpanId = {spanId:String} ORDER BY StartTime LIMIT 10" },
+          ],
+          ["a grouping", { after: "\n GROUP BY TenantId" }],
+          [
+            "a line comment, then the order",
+            { after: " -- ordered so a cap is stable\n ORDER BY StartTime" },
+          ],
+          [
+            "the trace id, its id bound and a since bound in its own select",
+            {
+              inner:
+                " AND TraceId = {traceId:String} {{idBound:stored_spans.TraceId:traceId}}" +
+                ` AND UpdatedAt > fromUnixTimestamp64Milli({sinceMs:Int64})${KEYS}`,
+            },
+          ],
+        ])("renders %s, as the trace repositories write it", (_shape, parts) => {
+          expect(
+            expandStatement({ query: fenced(parts), queryParams: { traceId: "tr-1" }, fence })
+              .query,
+          ).toContain(LATEST_VERSION_SUBQUERY);
+        });
+
+        it("renders an election closed by its enclosing select's close", () => {
+          const query = `SELECT SpanId FROM (${fenced({})}) ARRAY JOIN Events_Name AS name`;
+
+          expect(expandStatement({ query, queryParams: {}, fence }).query).toContain(
+            LATEST_VERSION_SUBQUERY,
+          );
+        });
+      });
+
       it("refuses it on a proof with no braids too", () => {
         expect(
           scopeErrorOf(() =>
@@ -806,12 +880,14 @@ describe("the fence over a span read", () => {
       clock,
       authorization,
       reads,
+      execute: sent,
     }: {
       clock: { now: number };
       authorization: Authorization;
       reads: "spans" | "traces";
+      execute?: ReturnType<typeof vi.fn<QueryDriver["execute"]>>;
     }) => {
-      const execute = vi.fn<QueryDriver["execute"]>().mockResolvedValue({ rows: [] });
+      const execute = sent ?? vi.fn<QueryDriver["execute"]>().mockResolvedValue({ rows: [] });
       const client = new ClickHouseQueryClient({
         tenantGuard: new TenantGuard(),
         driver: { execute, insert: async () => {}, command: async () => {} },
@@ -833,6 +909,44 @@ describe("the fence over a span read", () => {
           query_params: { traceId: "tr-1" },
         }),
       ).rejects.toBeInstanceOf(AuthorizationExpiredError);
+    });
+
+    describe("when the proof expires while a braid's statement is running", () => {
+      /** @scenario "A braided read whose proof expires while its statement runs returns no row" */
+      it("refuses the rows as expired rather than release them", async () => {
+        const clock = { now: NOW };
+        const authorization = proof([own(), braid({})]);
+        const execute = vi.fn<QueryDriver["execute"]>(async () => {
+          clock.now = authorization.expiresAt;
+          return { rows: [{ SpanId: "owner-span" }] };
+        });
+        const reader = readerAt({ clock, authorization, reads: "spans", execute });
+
+        await expect(
+          reader.query({
+            query: spanRead(tenantScopeWithConditions("StartTime")),
+            query_params: { traceId: "tr-1" },
+          }),
+        ).rejects.toBeInstanceOf(AuthorizationExpiredError);
+      });
+
+      /** @scenario "A braided read whose proof expires while its statement runs returns no row" */
+      it("sends it with a time limit no longer than the proof's remaining life", async () => {
+        const clock = { now: NOW };
+        const authorization = proof([own(), braid({})]);
+        const execute = vi.fn<QueryDriver["execute"]>().mockResolvedValue({ rows: [] });
+        const reader = readerAt({ clock, authorization, reads: "spans", execute });
+
+        await reader.query({
+          query: spanRead(tenantScopeWithConditions("StartTime")),
+          query_params: { traceId: "tr-1" },
+          clickhouse_settings: { max_execution_time: 600 },
+        });
+
+        expect(execute.mock.calls[0]?.[0].settings?.max_execution_time).toBe(
+          Math.ceil((authorization.expiresAt - NOW) / 1000),
+        );
+      });
     });
 
     it("keeps a reader with no braids, so a long export is not cut midway", async () => {
