@@ -95,6 +95,14 @@ Feature: The most seats an organization held at once in a month
       And it counts again once the invitation is revoked
 
     @unit
+    Scenario: A held seat counts again when the invitation that took its place expires
+      Given the organization holds 9 full seats and a seat held for a removed person
+      And an admin invited the same address to a full seat
+      When the invitation expires unaccepted while the hold has not ended
+      And an admin adds a full member
+      Then the organization holds 11 full seats
+
+    @unit
     Scenario: The opening count includes the seats held for people who left
       Given an organization with 2 full members and a seat held for a removed person
       When counting opens

@@ -53,7 +53,10 @@ counts, because the cap counts it. So does a seat held for 30 days after somebod
    (`countedSeatHolds`): not while its person holds a full seat again, as a member or through a
    live full invitation to their address. A write that moves a hold, or an invitation naming a held
    address, records the hold's change with the member's or the invitation's, a seat given back
-   before one taken, so a hold replacing a seat never raises the peak. The fold keeps each pending invitation's expiry and, before applying
+   before one taken, so a hold replacing a seat never raises the peak. A hold giving its seat to
+   an invitation records which one (`suppressedByInviteId`); when the fold expires that invitation
+   it hands the seat back to the hold, inferred like the expiry, and takes it again if a late real
+   change revives the invitation. The fold keeps each pending invitation's expiry and, before applying
    a change, gives back the seats of invitations that expired before the change happened. It uses the
    change's own time, never the clock, so a replay gives the same answer.
 4. **A month with no change carries the count.** The peak of a month nobody joined or left is the
@@ -106,8 +109,8 @@ ordered before its event is counted twice or not at all. That is one seat, once,
 
 - Every path that takes or gives back a seat records `seat_changed`; a new path that does not is a
   defect the spec's scenarios catch.
-- A hold whose invitation expires counts again with no change recorded; the next organization-wide
-  correction finds it. Until then the count is one seat low.
+- A directory offboarding that deletes an invitation which took another account's held seat
+  leaves that hold uncounted until the next organization-wide correction: one seat low, rarely.
 - Peaks are kept for full and Lite Member seats; developer seats are unmetered (ADR-171) and only
   pass through the fold.
 - The ops console shows the month's peak beside the licence's cap. The customer does not see it.

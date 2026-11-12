@@ -848,3 +848,90 @@ describe("given a held seat counts until its hold ends", () => {
     expect(state.counts.full).toBe(10);
   });
 });
+
+describe("given a full invitation took a held seat's place", () => {
+  /** A hold giving its seat to invitation `inviteId`, as the invitation's writer records it. */
+  function suppressed(userId: string, inviteId: string, occurredAt: number): SeatPeakFact {
+    const fact = change({ holder: hold(userId, DEC_1), from: "full", to: "none", occurredAt });
+    if (fact.type !== "seat_changed") throw new Error("a hold change is a seat change");
+    return { ...fact, data: { ...fact.data, suppressedByInviteId: inviteId } };
+  }
+
+  function invitedOverHold() {
+    return [
+      snapshot({
+        occurredAt: NOV_1,
+        full: 9,
+        extra: [{ holder: hold("left", DEC_1), seat: "full" }],
+      }),
+      suppressed("left", "inv-1", NOV_1 + 1),
+      change({
+        holder: invitation("inv-1", NOV_2),
+        from: "none",
+        to: "full",
+        occurredAt: NOV_1 + 2,
+      }),
+    ];
+  }
+
+  /** @scenario "A held seat counts again when the invitation that took its place expires" */
+  it("hands the seat back to the hold when the invitation expires unaccepted", () => {
+    const state = foldAll([
+      ...invitedOverHold(),
+      change({ holder: member("joiner"), from: "none", to: "full", occurredAt: NOV_3 }),
+    ]);
+
+    expect(state.invitations["inv-1"]?.seat).toBe("none");
+    expect(state.holds.left).toMatchObject({ seat: "full", restoredByFold: true });
+    expect(state.counts.full).toBe(11);
+    expect(novemberOf(state).fullPeak).toBe(11);
+  });
+
+  it("takes the seat back from the hold when a late extension revives the invitation", () => {
+    const state = foldAll([
+      ...invitedOverHold(),
+      change({ holder: member("joiner"), from: "none", to: "full", occurredAt: NOV_3 }),
+      change({
+        holder: invitation("inv-1", DEC_1),
+        from: "full",
+        to: "full",
+        occurredAt: NOV_2 - 1,
+      }),
+    ]);
+
+    expect(state.invitations["inv-1"]?.seat).toBe("full");
+    expect(state.holds.left?.seat).toBe("none");
+    expect(state.counts.full).toBe(11);
+    expect(state.mismatches).toBe(0);
+  });
+
+  it("leaves a hold that ended before the invitation expired without a seat", () => {
+    const state = foldAll([
+      snapshot({
+        occurredAt: NOV_1,
+        full: 9,
+        extra: [{ holder: hold("left", NOV_2), seat: "full" }],
+      }),
+      (() => {
+        const fact = change({
+          holder: hold("left", NOV_2),
+          from: "full",
+          to: "none",
+          occurredAt: NOV_1 + 1,
+        });
+        if (fact.type !== "seat_changed") throw new Error("a hold change is a seat change");
+        return { ...fact, data: { ...fact.data, suppressedByInviteId: "inv-1" } };
+      })(),
+      change({
+        holder: invitation("inv-1", NOV_3),
+        from: "none",
+        to: "full",
+        occurredAt: NOV_1 + 2,
+      }),
+      change({ holder: member("joiner"), from: "none", to: "full", occurredAt: NOV_3 + 1 }),
+    ]);
+
+    expect(state.holds.left?.seat).toBe("none");
+    expect(state.counts.full).toBe(10);
+  });
+});

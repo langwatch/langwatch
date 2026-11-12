@@ -23,11 +23,15 @@ CREATE TABLE IF NOT EXISTS "OrganizationSeatPeakHolder" (
     "lastChangeId" TEXT,
     "expiresAt" DOUBLE PRECISION,
     "expiredByFold" BOOLEAN NOT NULL DEFAULT false,
+    "suppressedBy" TEXT,
+    "restoredByFold" BOOLEAN NOT NULL DEFAULT false,
 
     CONSTRAINT "OrganizationSeatPeakHolder_pkey" PRIMARY KEY ("organizationId", "holderKind", "holderId")
 );
 
 CREATE INDEX IF NOT EXISTS "OrganizationSeatPeakHolder_organizationId_holderKind_seat_e_idx" ON "OrganizationSeatPeakHolder"("organizationId", "holderKind", "seat", "expiresAt");
+
+CREATE INDEX IF NOT EXISTS "OrganizationSeatPeakHolder_organizationId_suppressedBy_idx" ON "OrganizationSeatPeakHolder"("organizationId", "suppressedBy");
 
 CREATE TABLE IF NOT EXISTS "OrganizationSeatPeakMonth" (
     "organizationId" TEXT NOT NULL,

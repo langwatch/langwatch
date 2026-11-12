@@ -40,7 +40,31 @@ function holderData(row: SeatPeakHolderRow) {
     lastChangeId: row.holding.lastChangeId ?? null,
     expiresAt: row.kind === "member" ? null : row.holding.expiresAt,
     expiredByFold: row.kind === "member" ? false : row.holding.expiredByFold === true,
+    suppressedBy: row.kind === "member" ? null : (row.holding.suppressedBy ?? null),
+    restoredByFold: row.kind === "member" ? false : row.holding.restoredByFold === true,
   };
+}
+
+/** One stored holder row into the state, under its kind. */
+function placeHolder({ state, row }: { state: SeatPeakState; row: HolderRow }): void {
+  const holding = {
+    seat: seatOf(row),
+    lastChangedAt: row.lastChangedAt,
+    ...(row.lastChangeId === null ? {} : { lastChangeId: row.lastChangeId }),
+  };
+  if (row.holderKind === "member") {
+    state.members[row.holderId] = holding;
+    return;
+  }
+  const expiring = {
+    ...holding,
+    expiresAt: row.expiresAt,
+    ...(row.expiredByFold ? { expiredByFold: true } : {}),
+    ...(row.suppressedBy === null ? {} : { suppressedBy: row.suppressedBy }),
+    ...(row.restoredByFold ? { restoredByFold: true } : {}),
+  };
+  if (row.holderKind === "hold") state.holds[row.holderId] = expiring;
+  else state.invitations[row.holderId] = expiring;
 }
 
 /** Waiting on another fold of the same organization counts against this; Prisma's 5s is short. */
@@ -105,6 +129,16 @@ export class PrismaOrganizationSeatPeakRepository extends OrganizationSeatPeakRe
         expiresAt: { lt: Math.max(slice.dueBefore, counts.latestChangeAt) },
       },
     });
+    // A hold an invitation took its seat from moves when that invitation expires or comes back.
+    const invitationIds = [...named, ...due]
+      .filter((row) => row.holderKind === "invitation")
+      .map((row) => row.holderId);
+    const suppressed =
+      invitationIds.length > 0
+        ? await database.organizationSeatPeakHolder.findMany({
+            where: { organizationId, holderKind: "hold", suppressedBy: { in: invitationIds } },
+          })
+        : [];
     const months = await database.organizationSeatPeakMonth.findMany({ where: { organizationId } });
     const state: SeatPeakState = {
       openedAt: counts.openedAt,
@@ -118,24 +152,7 @@ export class PrismaOrganizationSeatPeakRepository extends OrganizationSeatPeakRe
         months.map(({ month, organizationId: _organizationId, ...values }) => [month, values]),
       ),
     };
-    for (const row of [...named, ...due]) {
-      const holding = {
-        seat: seatOf(row),
-        lastChangedAt: row.lastChangedAt,
-        ...(row.lastChangeId === null ? {} : { lastChangeId: row.lastChangeId }),
-      };
-      if (row.holderKind === "member") {
-        state.members[row.holderId] = holding;
-        continue;
-      }
-      const expiring = {
-        ...holding,
-        expiresAt: row.expiresAt,
-        ...(row.expiredByFold ? { expiredByFold: true } : {}),
-      };
-      if (row.holderKind === "hold") state.holds[row.holderId] = expiring;
-      else state.invitations[row.holderId] = expiring;
-    }
+    for (const row of [...named, ...due, ...suppressed]) placeHolder({ state, row });
     return state;
   }
 

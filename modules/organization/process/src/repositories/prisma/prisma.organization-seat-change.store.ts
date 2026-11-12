@@ -22,6 +22,8 @@ type OrganizationSeatChange = {
   to: SeatKind;
   cause: SeatChangeCause;
   actorUserId: string | null;
+  /** A hold giving its seat to a live full invitation to its address. */
+  suppressedByInviteId?: string;
 };
 
 /** A write that may move one holder's seat, run inside the writer's own transaction. */
@@ -112,6 +114,7 @@ export class PrismaOrganizationSeatChangeStore {
         userId,
         before: holdsBefore.get(userId),
         after: holdsAfter.get(userId),
+        suppressedBy: inviteId,
       }),
     );
     if (movesAnInvitationExpiry({ before, after })) {
@@ -144,7 +147,7 @@ export class PrismaOrganizationSeatChangeStore {
         organizationId: change.organizationId,
         userId,
       });
-      holds.push(...holdMoves({ change, userId, before, after }));
+      holds.push(...holdMoves({ change, userId, before, after, suppressedBy: inviteId }));
     }
     await this.#recordAll({
       transaction: change.transaction,
@@ -183,6 +186,9 @@ export class PrismaOrganizationSeatChangeStore {
           to: change.to,
           cause: change.cause,
           actorUserId: change.actorUserId,
+          ...(change.suppressedByInviteId === undefined
+            ? {}
+            : { suppressedByInviteId: change.suppressedByInviteId }),
           occurredAt: PrismaOrganizationSeatChangeStore.#stamp(),
           changeId: id.toString(),
         },
@@ -288,11 +294,14 @@ function holdMoves({
   userId,
   before,
   after,
+  suppressedBy,
 }: {
   change: Omit<SeatMovingWrite<unknown>, "write" | "transaction">;
   userId: string;
   before: CountedSeatHold | undefined;
   after: CountedSeatHold | undefined;
+  /** The invitation written, when it may be what took the hold's seat. */
+  suppressedBy?: string;
 }): OrganizationSeatChange[] {
   const heldUntil = after?.heldUntil ?? before?.heldUntil;
   if (heldUntil === undefined) return [];
@@ -304,6 +313,9 @@ function holdMoves({
       holder: { kind: "hold", userId, expiresAt: heldUntil },
       from: before ? "full" : "none",
       to: after ? "full" : "none",
+      ...(before && !after && suppressedBy !== undefined
+        ? { suppressedByInviteId: suppressedBy }
+        : {}),
     },
   ];
 }

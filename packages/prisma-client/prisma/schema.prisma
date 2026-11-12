@@ -1927,9 +1927,9 @@ model OrganizationSeatPeak {
 /// One member's or pending invitation's seat as the seat peak last applied it (ADR-002).
 model OrganizationSeatPeakHolder {
   organizationId String
-  /// `member` or `invitation`.
+  /// `member`, `invitation` or `hold` (a seat held after somebody left).
   holderKind     String
-  /// The member's userId or the invitation's id.
+  /// The member's or the hold's userId, or the invitation's id.
   holderId       String
   /// `full`, `lite`, `developer` or `none`.
   seat           String
@@ -1940,9 +1940,14 @@ model OrganizationSeatPeakHolder {
   expiresAt      Float?
   /// The fold gave the invitation's seat back at `expiresAt`.
   expiredByFold  Boolean @default(false)
+  /// A hold whose seat a live full invitation to its address took: that invitation's id.
+  suppressedBy   String?
+  /// The fold gave a suppressed hold its seat back when that invitation expired.
+  restoredByFold Boolean @default(false)
 
   @@id([organizationId, holderKind, holderId])
   @@index([organizationId, holderKind, seat, expiresAt])
+  @@index([organizationId, suppressedBy])
 }
 
 /// One calendar month's (UTC) seat peaks for an organization (ADR-002).

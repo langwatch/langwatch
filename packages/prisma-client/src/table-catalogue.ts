@@ -938,7 +938,9 @@ export const prismaModelFieldCatalogue = {
     "lastChangedAt",
     "lastChangeId",
     "expiresAt",
-    "expiredByFold"
+    "expiredByFold",
+    "suppressedBy",
+    "restoredByFold"
   ],
   "OrganizationSeatPeakMonth": [
     "organizationId",

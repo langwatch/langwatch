@@ -1929,7 +1929,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     since: Instant;
     holdUserIds: readonly string[];
   }): Promise<void> {
-    const userIds = [userId, ...holdUserIds];
+    const userIds = [...new Set([userId, ...holdUserIds])];
     await this.prisma.$transaction(async (tx) => {
       await tx.organizationUser.updateMany({
         where: { organizationId, userId },

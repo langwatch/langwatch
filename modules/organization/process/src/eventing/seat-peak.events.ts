@@ -46,6 +46,8 @@ export const recordSeatChangedCommandDataSchema = z.object({
   occurredAt: z.number().int().nonnegative(),
   /** Minted where the change was committed, so a redelivery records nothing new. */
   changeId: z.string().min(1),
+  /** A hold giving its seat to a live full invitation to its address: that invitation's id. */
+  suppressedByInviteId: z.string().min(1).optional(),
 });
 export type RecordSeatChangedCommandData = z.infer<typeof recordSeatChangedCommandDataSchema>;
 

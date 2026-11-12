@@ -61,8 +61,18 @@ export class MemoryOrganizationSeatPeakRepository extends OrganizationSeatPeakRe
       holds: {},
       months: Object.fromEntries(rows.months),
     };
-    for (const row of rows.holders.values()) {
-      if (!inSlice({ row, slice, dueBefore })) continue;
+    const loaded = [...rows.holders.values()].filter((row) => inSlice({ row, slice, dueBefore }));
+    // A hold an invitation took its seat from moves when that invitation expires or comes back.
+    const invitationIds = new Set(
+      loaded.filter((row) => row.kind === "invitation").map((row) => row.holderId),
+    );
+    const suppressed = [...rows.holders.values()].filter(
+      (row) =>
+        row.kind === "hold" &&
+        row.holding.suppressedBy !== undefined &&
+        invitationIds.has(row.holding.suppressedBy),
+    );
+    for (const row of [...loaded, ...suppressed]) {
       if (row.kind === "member") state.members[row.holderId] = row.holding;
       else if (row.kind === "hold") state.holds[row.holderId] = row.holding;
       else state.invitations[row.holderId] = row.holding;

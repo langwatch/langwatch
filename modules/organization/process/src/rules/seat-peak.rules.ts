@@ -49,6 +49,10 @@ const seatPeakInvitationSchema = z.object({
   expiresAt: z.number().nullable(),
   /** The fold gave its seat back at `expiresAt`: inferred, so it never outranks a real change. */
   expiredByFold: z.boolean().optional(),
+  /** A hold whose seat a live full invitation to its address took, by that invitation's id. */
+  suppressedBy: z.string().optional(),
+  /** The fold gave a suppressed hold its seat back when that invitation expired: inferred too. */
+  restoredByFold: z.boolean().optional(),
 });
 
 /**
@@ -187,7 +191,7 @@ function isStale({
 
 /**
  * Gives back the seats of invitations and seat holds that expired strictly before `until`, in
- * expiry order.
+ * expiry order. An invitation that expires hands its seat back to the hold it took it from.
  */
 export function expireInvitations({
   state,
@@ -196,16 +200,10 @@ export function expireInvitations({
   state: SeatPeakState;
   until: number;
 }): SeatPeakState {
-  const expired = EXPIRING_KINDS.flatMap((kind) =>
-    Object.entries(expiringOf({ state, kind })).map(([id, holding]) => ({ kind, id, holding })),
-  )
-    .filter(
-      ({ holding }) =>
-        holding.seat !== "none" && holding.expiresAt !== null && holding.expiresAt < until,
-    )
-    .toSorted((a, b) => (a.holding.expiresAt ?? 0) - (b.holding.expiresAt ?? 0));
   let next = state;
-  for (const { kind, id, holding } of expired) {
+  for (let due = nextDue({ state: next, until }); due; due = nextDue({ state: next, until })) {
+    const { kind, id, holding } = due;
+    const at = holding.expiresAt ?? until;
     const entries = {
       ...expiringOf({ state: next, kind }),
       [id]: { ...holding, seat: "none" as const, expiredByFold: true },
@@ -213,7 +211,64 @@ export function expireInvitations({
     next = record({
       state: withExpiring({ state: next, kind, entries }),
       counts: adjust({ counts: next.counts, seat: holding.seat, by: -1 }),
-      at: holding.expiresAt ?? until,
+      at,
+    });
+    if (kind === "invitation")
+      next = moveSuppressedHolds({ state: next, inviteId: id, at, to: "full" });
+  }
+  return next;
+}
+
+/** The seated invitation or hold expiring first before `until`; none when nothing is due. */
+function nextDue({ state, until }: { state: SeatPeakState; until: number }) {
+  return EXPIRING_KINDS.flatMap((kind) =>
+    Object.entries(expiringOf({ state, kind })).map(([id, holding]) => ({ kind, id, holding })),
+  )
+    .filter(
+      ({ holding }) =>
+        holding.seat !== "none" && holding.expiresAt !== null && holding.expiresAt < until,
+    )
+    .toSorted((a, b) => (a.holding.expiresAt ?? 0) - (b.holding.expiresAt ?? 0))
+    .at(0);
+}
+
+/** Only a hold still suppressed comes back, and only while it has not ended itself. */
+function restorable({ hold, at }: { hold: SeatPeakInvitation; at: number }): boolean {
+  if (hold.seat !== "none" || hold.restoredByFold === true) return false;
+  return (hold.expiresAt ?? 0) > at;
+}
+
+/**
+ * Hands the holds an invitation suppressed their seat back as it expires (`to: "full"`), or takes
+ * it again when a real change revives the invitation (`to: "none"`). Inferred, as an expiry is.
+ */
+function moveSuppressedHolds({
+  state,
+  inviteId,
+  at,
+  to,
+}: {
+  state: SeatPeakState;
+  inviteId: string;
+  at: number;
+  to: "full" | "none";
+}): SeatPeakState {
+  let next = state;
+  for (const [userId, hold] of Object.entries(state.holds)) {
+    if (hold.suppressedBy !== inviteId) continue;
+    const restoring = to === "full";
+    const moves = restoring
+      ? restorable({ hold, at })
+      : hold.restoredByFold === true && hold.seat === "full";
+    if (!moves) continue;
+    next = record({
+      state: {
+        ...next,
+        holds: { ...next.holds, [userId]: { ...hold, seat: to, restoredByFold: restoring } },
+      },
+      counts: adjust({ counts: next.counts, seat: "full", by: restoring ? 1 : -1 }),
+      at,
+      heldUntil: hold.expiresAt,
     });
   }
   return next;
@@ -280,11 +335,20 @@ function moveHolder({
     seat: change.to,
     by: 1,
   });
-  return record({
+  const moved = record({
     state: { ...withHolder({ state, change }), mismatches },
     counts,
     at: change.occurredAt,
     heldUntil: change.holder.kind === "member" ? null : change.holder.expiresAt,
+  });
+  // A real change reviving an invitation the fold expired takes back the holds it handed seats.
+  if (change.holder.kind !== "invitation" || change.to === "none") return moved;
+  if (!inferredExpiry({ state, holder: change.holder })) return moved;
+  return moveSuppressedHolds({
+    state: moved,
+    inviteId: change.holder.inviteId,
+    at: change.occurredAt,
+    to: "none",
   });
 }
 
@@ -298,7 +362,8 @@ function holdingOf({ state, holder }: { state: SeatPeakState; holder: SeatHolder
 
 function inferredExpiry({ state, holder }: { state: SeatPeakState; holder: SeatHolder }): boolean {
   if (holder.kind === "member") return false;
-  return expiringOf({ state, kind: holder.kind })[seatHolderId(holder)]?.expiredByFold === true;
+  const holding = expiringOf({ state, kind: holder.kind })[seatHolderId(holder)];
+  return holding?.expiredByFold === true || holding?.restoredByFold === true;
 }
 
 function heldSeat({ state, holder }: { state: SeatPeakState; holder: SeatHolder }): SeatKind {
@@ -317,9 +382,15 @@ function withHolder({
   if (holder.kind === "member") {
     return { ...state, members: { ...state.members, [holder.userId]: holding } };
   }
+  const suppressedBy =
+    holder.kind === "hold" && seat === "none" ? change.suppressedByInviteId : undefined;
   const entries = {
     ...expiringOf({ state, kind: holder.kind }),
-    [seatHolderId(holder)]: { ...holding, expiresAt: holder.expiresAt },
+    [seatHolderId(holder)]: {
+      ...holding,
+      expiresAt: holder.expiresAt,
+      ...(suppressedBy === undefined ? {} : { suppressedBy }),
+    },
   };
   return withExpiring({ state, kind: holder.kind, entries });
 }
