@@ -66,6 +66,12 @@ Feature: Large dataset storage
     Then the copy's rows are stored in object storage as chunks
     And the copy's rows are not stored in the Postgres records table
 
+  @unit
+  Scenario: Rows added to a dataset in object storage come back with the ids they were stored under
+    Given a dataset whose rows are kept in object storage
+    When I add rows without choosing their ids
+    Then each row I get back carries the id it was stored under
+
   @integration
   Scenario: A dataset still being prepared is not used as data
     Given a dataset that is still processing
