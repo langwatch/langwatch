@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { GroupQueueError } from "@langwatch/group-queue";
+
 import type { NurturingTraceDayRepository } from "../repositories/nurturing-trace-day.repository.ts";
-import { isTraceCounted } from "../rules/nurturing-project-usage.rules.ts";
+import {
+  isTraceCounted,
+  UNCOPIED_PROJECT_RETRY_DELAY_MS,
+} from "../rules/nurturing-project-usage.rules.ts";
 import type { NurturingCountedTrace } from "../rules/nurturing-trace-day.rules.ts";
 import type { NurturingCopiedProjectsService } from "./nurturing-copied-projects.service.ts";
 import type { NurturingUncopiedProjectsService } from "./nurturing-uncopied-projects.service.ts";
@@ -15,8 +20,10 @@ type TraceCountingDependencies = Readonly<{
  * Counts the batch's traces whose organization is inside its counting window, durably. A
  * redelivered batch counts again: accepted (owner decision, issue 9378). The placement copy has
  * its own subscriber, so a new project's traces can come first: an uncopied project fails the
- * batch before anything is counted, so our own retry never counts a placed project twice, and the
- * queue retries until its window from first seen runs out; then it drops, as does a placed project
+ * batch before anything is counted, so our own retry never counts a placed project twice. The
+ * failure is a GroupQueueError naming a retry delay, so the queue backs the whole batch off for
+ * that long instead of splitting it (it is one project's, with no culprit to find), and retries
+ * until the window from first seen runs out; then it drops, as does a placed project
  * whose organization has no creation copy. A project this process dropped is skipped with no
  * read; its copy landing forgets it.
  */
@@ -55,7 +62,12 @@ export class NurturingTraceCountingService {
     );
     const waiting = outcomes.flat();
     if (waiting.length > 0) {
-      throw new Error(`nurturing's placement copy of ${waiting.join(", ")} has not landed yet`);
+      throw new GroupQueueError({
+        queueName: "nurturing",
+        operation: "countTraces",
+        message: `nurturing's placement copy of ${waiting.join(", ")} has not landed yet`,
+        retryAfterMs: UNCOPIED_PROJECT_RETRY_DELAY_MS,
+      });
     }
     await traceDays.countTraces(
       traces.filter((trace) => {

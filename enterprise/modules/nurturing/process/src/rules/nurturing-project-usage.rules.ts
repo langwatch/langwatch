@@ -37,6 +37,12 @@ export function isTraceCounted({
  */
 export const UNCOPIED_PROJECT_RETRY_WINDOW_MS = 5 * 60 * 1000;
 
+/**
+ * The queue's delay before a batch waiting for its project's copy comes back. A named delay also
+ * stops the queue splitting the batch to find a culprit: there is none, only a copy not there yet.
+ */
+export const UNCOPIED_PROJECT_RETRY_DELAY_MS = 30 * 1000;
+
 /** How long a worker trusts its cached drop of a project before reading its placement copy again. */
 export const UNCOPIED_PROJECT_DROP_CACHE_TTL_MS = 10 * 60 * 1000;
 
