@@ -246,9 +246,14 @@ ARG LANGWATCH_CLI_VERSION=0.31.0
 # that belongs in the shell. Without these three names present, one session
 # lost `--jq`, then `jq`, then `python` in a row while `python3` sat installed
 # under a name it did not try.
+# `ripgrep` and `fd-find` back the harness's own grep and find tools, which
+# look for `rg` and `fd`/`fdfind` on PATH and otherwise try to download them
+# from GitHub, which the worker's egress policy refuses: without them every
+# code search in a cloned repository fails.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl git ca-certificates python3 python-is-python3 jq util-linux \
-    && rm -rf /var/lib/apt/lists/*
+    curl git ca-certificates python3 python-is-python3 jq util-linux ripgrep fd-find \
+    && rm -rf /var/lib/apt/lists/* \
+    && rg --version && fdfind --version
 # NOTE: `iptables` is no longer installed. The old loopback OWNER-match DROP
 # rule (services/langyagent/iptables.go) that closed the sibling-worker
 # exfiltration path is removed under ADR-033 Fix A′ — a worker has no listener
