@@ -554,7 +554,9 @@ jobs:
       - name: Migrate with head's tasks
         env:
           CLICKHOUSE_URL: ${{ env.CLICKHOUSE_BASE_URL }}/langwatch
-          # Head's auth preflight refuses NEXTAUTH_SECRET without a session URL.
+          # Boots the module tree, so it needs the n-minus-one step's env: auth needs
+          # NEXTAUTH_URL with NEXTAUTH_SECRET; hosted MCP needs BASE_HOST.
+          BASE_HOST: http://localhost:5560
           NEXTAUTH_URL: http://localhost:5560
         run: |
           set -euo pipefail
