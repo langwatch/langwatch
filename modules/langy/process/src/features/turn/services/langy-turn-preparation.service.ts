@@ -8,7 +8,6 @@ import {
   type LangyMessageRow,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import { Temporal } from "@langwatch/time";
 import { trace } from "@opentelemetry/api";
 
 import {
@@ -22,7 +21,11 @@ import {
   startsWithGuidedKickoff,
 } from "../../../rules/langy-conversation-title.rules.ts";
 import { mintRunToken } from "../../../rules/langy-frame-auth.rules.ts";
-import { LANGY_LAST_REPLY_SAVING, LangyEndedTurnService } from "./langy-ended-turn.service.ts";
+import {
+  langyDispatchIntentOf,
+  langyPrCapReachedNote,
+} from "../../../rules/langy-turn-dispatch.rules.ts";
+import { LangyEndedTurnService } from "./langy-ended-turn.service.ts";
 import type { LangyTurnAttemptService } from "./langy-turn-attempt.service.ts";
 import { LangyTurnOverrideService } from "./langy-turn-override.service.ts";
 import {
@@ -91,10 +94,8 @@ export class LangyTurnPreparationService {
     });
     const needsOwnKey = Boolean(args.credentials.githubToken) || args.readOnly;
     const earlyWorkerProbe = needsOwnKey ? null : this.probeWorker(args, disabledSkillsPromise);
-    const results = await this.settleEndedTurnFold(
-      args,
-      await this.readPreparation(args, mintedRunToken),
-    );
+    const read = await this.readPreparation(args, mintedRunToken);
+    const results = await this.settleEndedTurnFold(args, read);
     const disabledSkills = await disabledSkillsPromise;
     if (disabledSkills.length > 0) {
       args.credentials.disabledSkillIds = disabledSkills;
@@ -159,38 +160,22 @@ export class LangyTurnPreparationService {
     ]);
   }
 
-  /**
-   * The fold may still read RUNNING for a turn whose live edge already ended: its terminal event
-   * is recorded but not folded yet. Waits for the fold rather than refusing the send as busy.
-   */
+  /** A RUNNING read for a turn whose live edge already ended waits for its fold. */
   private async settleEndedTurnFold(
     args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
     results: Awaited<ReturnType<LangyTurnPreparationService["readPreparation"]>>,
   ): Promise<Awaited<ReturnType<LangyTurnPreparationService["readPreparation"]>>> {
     const [current, ...rest] = results;
-    if (
-      current.status !== "fulfilled" ||
-      current.value?.status !== LANGY_CONVERSATION_STATUS.RUNNING
-    )
-      return results;
-    const heldTurnId = current.value.currentTurnId;
-    if (!heldTurnId || heldTurnId === args.turnId) return results;
-    const conversationId = args.conversation.id;
-    if (!(await this.endedTurns.hasEnded({ conversationId, turnId: heldTurnId }))) return results;
-    type Current = Awaited<
-      ReturnType<LangyTurnServiceDependencies["conversations"]["findByIdVisible"]>
-    >;
-    const look = await this.endedTurns.lookUntilFree<Current>(async () => {
-      const row = await this.deps.conversations.findByIdVisible({
-        id: conversationId,
-        projectId: args.projectId,
-        userId: args.userId,
-      });
-      if (row?.status === LANGY_CONVERSATION_STATUS.RUNNING) return { kind: "held" as const };
-      return { kind: "free" as const, value: row };
+    if (current.status !== "fulfilled") return results;
+    const { conversation, projectId, userId, turnId } = args;
+    const value = await this.endedTurns.settleHeldRead({
+      conversationId: conversation.id,
+      admittedTurnId: turnId,
+      read: current.value,
+      reread: () =>
+        this.deps.conversations.findByIdVisible({ id: conversation.id, projectId, userId }),
     });
-    if (look.kind === "held") throw new LangyAgentUnavailableError(LANGY_LAST_REPLY_SAVING);
-    return [{ status: "fulfilled", value: look.value }, ...rest];
+    return [{ status: "fulfilled", value }, ...rest];
   }
 
   private requireRunnableTurn(
@@ -247,37 +232,15 @@ export class LangyTurnPreparationService {
     return runTokenResult.value;
   }
 
-  /**
-   * Reads how many pull requests the person opened today; a turn spends nothing here, since only
-   * a pull request that opened counts (the PR count subscriber records it from the answer).
-   */
+  /** Reads today's opened pull requests; only one that opened counts (the PR count subscriber). */
   private async checkPrCap(
     args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
   ): Promise<string> {
-    const permit = args.credentials.githubToken
-      ? await this.deps.permits.check({ userId: args.userId })
-      : { allowed: true, resetAt: 0 };
-    const capReachedNote = permit.allowed
-      ? ""
-      : [
-          "",
-          "USER PR CAP REACHED — the user has already opened the per-day maximum",
-          "of",
-          String(this.deps.perDayPrCap),
-          "GitHub pull requests via Langy today.",
-          "If the user asks you to open a PR, refuse politely, say the daily cap",
-          "is reached, and that it resets at",
-          Temporal.Instant.fromEpochMilliseconds(permit.resetAt).toString({
-            fractionalSecondDigits: 3,
-          }),
-          "UTC.",
-          "Do not call any tool that opens a PR.",
-        ].join(" ");
-    if (!permit.allowed) {
-      stripGithubCredentials(args.credentials);
-    }
-
-    return capReachedNote;
+    if (!args.credentials.githubToken) return "";
+    const permit = await this.deps.permits.check({ userId: args.userId });
+    if (permit.allowed) return "";
+    stripGithubCredentials(args.credentials);
+    return langyPrCapReachedNote({ perDayPrCap: this.deps.perDayPrCap, resetAt: permit.resetAt });
   }
 
   private async probeWorker(
@@ -498,7 +461,7 @@ export class LangyTurnPreparationService {
 
     void args.worker
       .dispatch({
-        intent: dispatchIntentOf({
+        intent: langyDispatchIntentOf({
           resumable: Boolean(prepared.pendingHandoff),
           hasApiKey: Boolean(args.credentials.langwatchApiKey),
         }),
@@ -529,15 +492,4 @@ export class LangyTurnPreparationService {
         );
       });
   }
-}
-
-function dispatchIntentOf({
-  resumable,
-  hasApiKey,
-}: {
-  resumable: boolean;
-  hasApiKey: boolean;
-}): "create" | "revive" | "continue" {
-  if (resumable) return "revive";
-  return hasApiKey ? "create" : "continue";
 }

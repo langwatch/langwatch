@@ -1,5 +1,6 @@
 import { clearTimeout, setTimeout } from "node:timers";
 
+import { LANGY_CONVERSATION_STATUS, LangyAgentUnavailableError } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type { LangyTokenBufferRepository } from "../../../repositories/langy-token-buffer.repository.ts";
@@ -69,6 +70,34 @@ export class LangyEndedTurnService {
       seen = await look();
     }
     return seen;
+  }
+
+  /**
+   * A conversation read that says RUNNING for another turn whose live edge already ended waits for
+   * the fold to let go, and refuses with the retry note once the wait runs out. Others pass as is.
+   */
+  async settleHeldRead<T extends { status?: string; currentTurnId?: string | null } | null>({
+    conversationId,
+    admittedTurnId,
+    read,
+    reread,
+  }: {
+    conversationId: string;
+    admittedTurnId: string;
+    read: T;
+    reread: () => Promise<T>;
+  }): Promise<T> {
+    if (read?.status !== LANGY_CONVERSATION_STATUS.RUNNING) return read;
+    const heldTurnId = read.currentTurnId;
+    if (!heldTurnId || heldTurnId === admittedTurnId) return read;
+    if (!(await this.hasEnded({ conversationId, turnId: heldTurnId }))) return read;
+    const look = await this.lookUntilFree<T>(async () => {
+      const row = await reread();
+      if (row?.status === LANGY_CONVERSATION_STATUS.RUNNING) return { kind: "held" as const };
+      return { kind: "free" as const, value: row };
+    });
+    if (look.kind === "held") throw new LangyAgentUnavailableError(LANGY_LAST_REPLY_SAVING);
+    return look.value;
   }
 
   private pause(ms: number): Promise<void> {
