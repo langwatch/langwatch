@@ -24,7 +24,6 @@ import { nowInstant } from "@langwatch/time";
 
 import { TASKS_APP_DIRECTORY } from "../gate/first-install-upgrade.ts";
 import {
-  assertUniqueStepIds,
   IMAGE_MIGRATION_DIRECTORIES,
   imagePrismaFolders,
   imageRelease,
@@ -34,7 +33,6 @@ import {
 import type { UpcastStepInput } from "../ledger.ts";
 import { loadReleases } from "../manifest/manifest-loader.ts";
 import type { ManifestStep } from "../manifest/manifest.ts";
-import type { ReleaseTreeSteps } from "../manifest/stamp.ts";
 import type { UpgradeClickHouse, UpgradePostgres } from "../ports.ts";
 import {
   isMigrationStep,
@@ -533,16 +531,13 @@ export type ImageUpgradeRunner = Readonly<{
  */
 export async function withImageUpgradeRunner<Result>({
   inputs,
-  tree: givenTree,
   use,
 }: {
   inputs: ImageUpgradeInputs;
-  /** The image tree, when the caller has already read it. */
-  tree?: ReleaseTreeSteps;
   use: (composed: ImageUpgradeRunner) => Promise<Result>;
 }): Promise<Result> {
   const releases = loadReleases();
-  const tree = givenTree ?? readImageTree({ codeSteps: inputs.steps.map(codeStepOf) });
+  const tree = readImageTree({ codeSteps: inputs.steps.map(codeStepOf) });
   const release = imageRelease({ manifests: releases.manifests, tree });
   const { targets } = clickhouseTargets(inputs);
   const sharedUrl = targets.find((target) => target.name === "shared")?.url;
@@ -557,6 +552,7 @@ export async function withImageUpgradeRunner<Result>({
         release,
         steps: imageSteps({ release: release ?? "0.0.0", tree }),
         prismaFolders: imagePrismaFolders(),
+        gooseFiles: tree.gooseFiles,
       },
       // Registered on the ledger, run only here: tenant steps are ops' pass (S6-WIRE).
       codeSteps: inputs.steps.filter(isMigrationStep),
@@ -588,10 +584,7 @@ export async function withImageUpgradeRunner<Result>({
   }
 }
 
-/**
- * One upgrade run, narrated from its first line to its closing lines; a failed run is an outcome.
- * Rejects only for a refused tree (shared step id), which read-only `status` must not hit.
- */
+/** One upgrade run, narrated from first line to closing lines; a failed run is an outcome. */
 export async function runImageUpgrade({
   inputs,
   signal,
@@ -599,11 +592,8 @@ export async function runImageUpgrade({
   inputs: ImageUpgradeInputs;
   signal: AbortSignal;
 }): Promise<UpgradeOutcome> {
-  const tree = readImageTree({ codeSteps: inputs.steps.map(codeStepOf) });
-  assertUniqueStepIds({ tree });
   return withImageUpgradeRunner({
     inputs,
-    tree,
     use: async ({ runner, withClickHouse }) => {
       if (!withClickHouse) writeUpgradeLine(noClickHouseLine());
       const outcome = await runner.run({ signal });

@@ -53,11 +53,19 @@ Feature: Release manifests order every migration step release by release
     When the manifests are loaded
     Then loading is refused naming the step id and both releases
 
-  @unit
+  @integration
   Scenario: Two goose files sharing a numeric prefix are refused before the upgrade registers steps
     Given an image tree with two goose files that share a numeric prefix
-    When the upgrade run asserts the tree's step ids are unique
-    Then it is refused with code duplicate_step, naming the shared step id and both files
+    When the upgrade runs
+    Then the run is recorded as failed, naming the shared step id and both files
+    And no step is registered on the ledger and nothing is applied
+
+  @unit
+  Scenario: A step id two goose files share is found with every file behind it
+    Given an image tree whose goose files map to one step id, such as 125_a.sql and 00125_b.sql
+    When its image steps are checked for a repeated id
+    Then the shared step id is found, naming every goose file that maps to it
+    And distinct prefixes and files that are not goose migrations are never named
 
   @unit
   Scenario: Listing the image steps of a tree with a shared prefix does not throw
