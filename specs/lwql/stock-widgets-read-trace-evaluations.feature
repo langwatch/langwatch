@@ -113,11 +113,11 @@ Feature: The stock evaluation widgets read the evaluations the trace fold writes
     @integration
     Scenario: A trace whose second trace_metrics row lands later in the period counts once
       Given a trace with a judge outcome and a topic whose anchor moved later inside the period
-      When all the moved queries are read
+      When all the moved queries are read, trace_metrics read once per trace at its latest row
       Then each returns the rows the query returned before the move
 
     @integration
     Scenario: A trace moved into the period from before it counts in the period
       Given a trace dated before the period whose anchor moved inside it, with outcome and check re-runs inside it
-      When all the moved queries are read
+      When all the moved queries are read, trace_metrics read once per trace at its latest row
       Then each returns the rows the query returned before the move

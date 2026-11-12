@@ -444,6 +444,45 @@ function moveWrites({
   ];
 }
 
+/**
+ * Creates `<database>_latest` holding trace_metrics read once per trace, at its latest row. A
+ * moved pre-freeze trace keeps two trace_metrics rows (ADR-071), so the moved-trace cases read
+ * it here in both forms and compare the evaluation side alone. Returns the database's name.
+ */
+async function provisionOneRowPerTrace({
+  harness,
+}: {
+  harness: LangWatchQLClickHouseHarness;
+}): Promise<string> {
+  const database = `${harness.names.database}_latest`;
+  const traceMetrics = LWQL_VIEW_CATALOG.find((view) => view.name === "trace_metrics");
+  if (!traceMetrics) throw new Error("no trace_metrics in the catalogue");
+  const onePerTrace = {
+    ...traceMetrics,
+    dedup: { ...traceMetrics.dedup, keyColumns: ["TenantId", "TraceId"] },
+  };
+  await harness.applyAsAdmin([
+    `DROP DATABASE IF EXISTS ${database}`,
+    `CREATE DATABASE ${database}`,
+    ...viewProvisioning.setupStatements({
+      names: { ...harness.names, database },
+      sourceDatabase: harness.factDatabase,
+      views: [onePerTrace],
+      dedup: SHIPPED_LWQL_DEDUP,
+    }),
+    `GRANT SELECT ON ${database}.* TO ${harness.names.restrictedUser}`,
+  ]);
+  return database;
+}
+
+/** The SQL with every FROM or JOIN of trace_metrics pointed at the one-row-per-trace view. */
+function readingOneRowPerTrace({ sql, database }: { sql: string; database: string }): string {
+  return sql.replace(
+    /\b(FROM|JOIN)(\s+)(?:analytics\.)?trace_metrics\b(?!\.)/gi,
+    (_match, keyword: string, space: string) => `${keyword}${space}${database}.trace_metrics`,
+  );
+}
+
 type SpanSeed = { trace: string; span: string; parent: string | null; contexts?: number };
 
 /** Searches that found nothing, found something, and one in a Langy trace. */
@@ -536,6 +575,7 @@ describe("given trace evaluations with unmerged retraction pairs beside main's f
   let postgres: LangWatchQLPostgresHarness;
   let client: ClickHouseClient;
   let finalTwins: string;
+  let oneRowPerTrace: string;
 
   /** The query's rows in a stable order, or its error, so one failure does not hide the rest. */
   async function run({
@@ -580,13 +620,14 @@ describe("given trace evaluations with unmerged retraction pairs beside main's f
     }
   }
 
-  /** Every moved query reads the moved trace as its pre-move form read it. */
+  /** Every moved query reads the moved trace as its pre-move form reads it once, at its latest. */
   async function expectMovedQueriesMatchBaseline(): Promise<void> {
+    const onePerTrace = (sql: string) => readingOneRowPerTrace({ sql, database: oneRowPerTrace });
     const differing: string[] = [];
     for (const { list } of LISTS) {
       for (const { label, sql: before } of BEFORE) {
-        const now = await run({ sql: sent(label), list });
-        const moved = await run({ sql: before, list });
+        const now = await run({ sql: onePerTrace(sent(label)), list });
+        const moved = await run({ sql: onePerTrace(before), list });
         expect(now.error, `${label} now under ${list.join(", ")}`).toBeUndefined();
         expect(moved.error, `${label} before the move under ${list.join(", ")}`).toBeUndefined();
         if (now.rows !== moved.rows) differing.push(`${label} under ${list.join(", ")}`);
@@ -621,6 +662,7 @@ describe("given trace evaluations with unmerged retraction pairs beside main's f
     );
     await harness.applyAccessModel({ views: LWQL_VIEW_CATALOG, sourceDatabase: facts });
     finalTwins = await provisionFinalTwins({ harness });
+    oneRowPerTrace = await provisionOneRowPerTrace({ harness });
     // The pairs stay unmerged, so the views must settle them on read (analytics ADR-007).
     await harness.applyAsAdmin([
       `SYSTEM STOP MERGES ${facts}.trace_evaluation_analytics`,

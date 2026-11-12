@@ -267,19 +267,30 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
         `${view.sourceTable} is not on the server — the migrations did not run`,
       ).toBeDefined();
 
+      // A settled source is a VersionedCollapsingMergeTree, which appends its version column to
+      // the sort key; the catalogue keeps that column out (analytics ADR-007). A settled view
+      // that sums its signs groups by its grain, so its key is that grain, not the source's.
+      const settled = view.dedup.strategy === "settled";
+      const groupedSettled = settled && view.dedup.aggregating === true;
+      const sortingKey = source!.sorting_key
+        .split(", ")
+        .filter((column) => !settled || column !== view.dedup.versionColumn);
+
       // The catalog names its keys as callers see them; the engine sorts by the source columns.
-      const sortingKey = source!.sorting_key.split(", ");
+      const declaredKey = view.dedup.keyColumns.map((key) =>
+        catalogShapes.physicalColumn(view, key),
+      );
       expect(
-        view.dedup.keyColumns.map((key) => catalogShapes.physicalColumn(view, key)),
+        groupedSettled ? sortingKey : declaredKey,
         `${view.name} declares a key its source does not sort by`,
       ).toEqual(sortingKey);
 
       // The grain can be narrower than the sort key — that is what a
       // time-leading analytics table is — but never something the engine does
       // not sort by, which would be a row identity no dedup shape can honour.
-      for (const column of catalogShapes
-        .grainColumns(view)
-        .map((key) => catalogShapes.physicalColumn(view, key))) {
+      for (const column of (groupedSettled ? [] : catalogShapes.grainColumns(view)).map((key) =>
+        catalogShapes.physicalColumn(view, key),
+      )) {
         expect(
           sortingKey,
           `${view.name} calls ${column} part of its grain, but ${view.sourceTable} does not sort by it`,
@@ -288,10 +299,12 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
 
       // The engine family, both ways round: an entry says its rows are summed
       // or superseded, and the table has to be the engine that does it.
+      // A settled view's rows are collapsed by sign: its aggregating flag and version column
+      // describe the view's GROUP BY, not an aggregating or replacing engine.
       expect(
         source!.engine.includes("AggregatingMergeTree"),
         `${view.name} declares aggregating=${String(Boolean(view.dedup.aggregating))} over ${source!.engine}`,
-      ).toBe(Boolean(view.dedup.aggregating));
+      ).toBe(Boolean(view.dedup.aggregating) && !settled);
       const writtenOnce = WRITTEN_ONCE_OVER_REPLACING.has(view.name);
       expect(
         writtenOnce ? [view.dedup.strategy, view.dedup.versionColumn] : ["none", undefined],
@@ -300,7 +313,11 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
       expect(
         source!.engine.includes("ReplacingMergeTree"),
         `${view.name} declares versionColumn=${String(view.dedup.versionColumn)} over ${source!.engine}`,
-      ).toBe(view.dedup.versionColumn !== undefined || writtenOnce);
+      ).toBe((view.dedup.versionColumn !== undefined && !settled) || writtenOnce);
+      expect(
+        source!.engine.includes("VersionedCollapsingMergeTree"),
+        `${view.name} declares strategy=${String(view.dedup.strategy)} over ${source!.engine}`,
+      ).toBe(settled);
 
       // And the *named* version column is the engine's own, which is the trap
       // `stored_spans` sets: it supersedes on `StartTime`, not `UpdatedAt`.
@@ -308,7 +325,12 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
       expect(
         engineArguments,
         `${view.name} reads ${source!.engine_full}, which supersedes on nothing`,
-      ).toEqual(expect.arrayContaining(view.dedup.versionColumn ? [view.dedup.versionColumn] : []));
+      ).toEqual(
+        expect.arrayContaining([
+          ...(view.dedup.versionColumn ? [view.dedup.versionColumn] : []),
+          ...(settled && view.dedup.signColumn ? [view.dedup.signColumn] : []),
+        ]),
+      );
     }
   });
 
@@ -387,7 +409,12 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
     ]);
     for (const view of twins) {
       const twin = flooredViewName(view.name);
-      await recordSeedControl({ harness, table: view.sourceTable, tenantColumn: "TenantId" });
+      await recordSeedControl({
+        harness,
+        table: view.sourceTable,
+        database: facts,
+        tenantColumn: "TenantId",
+      });
       const rows = await selectRows<{ TenantId: string }>(
         tenantA,
         `SELECT DISTINCT TenantId FROM ${database}.${twin}(lwql_floor = ${wholeHistory})`,
