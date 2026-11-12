@@ -241,8 +241,8 @@ type HeldTraceParam = { kind: "traceId" | "sinceMs"; param: string };
 
 /**
  * The conditions marker (ADR-201 §3): own projects outright, OR one clause per distinct predicate
- * holding its owners' windows AND the predicate, every key and literal bound, the braid clauses
- * only in traces an own project holds. The `OR` is the fence's, under its exact tenant set.
+ * holding its owners' windows AND the predicate, the braid clauses only in traces an own project
+ * holds. Each predicate binds its keys and literals once, as two arrays its layers share.
  */
 export function conditionsExpression({
   fence,
@@ -262,6 +262,7 @@ export function conditionsExpression({
   const picks: string[] = [];
   if (fence.own.length > 0) picks.push(`TenantId IN (${slot("own", "Array(String)")})`);
   const braided: string[] = [];
+  const predicates = new Map<string, number>();
   braids.clauses.forEach((clause, index) => {
     const name = (part: string) => `c${index}_${part}`;
     const windowed = windowsOf({ column, windows: clause.windows, name });
@@ -270,9 +271,11 @@ export function conditionsExpression({
       picks.push(`(${windowed.sql})`);
       return;
     }
+    const predicateIndex = predicates.get(clause.digest) ?? predicates.size;
+    predicates.set(clause.digest, predicateIndex);
     const predicate = predicateOf({
       compiledWhere: clause.compiledWhere,
-      param: (part) => fenceParam(name(part)),
+      param: (part) => fenceParam(`p${predicateIndex}_${part}`),
       readerSlot: slot("reader", "String"),
     });
     Object.assign(params, predicate.params);
@@ -338,14 +341,18 @@ export function braidConditionExpression({
   return { sql: `(${predicate.sql})`, params };
 }
 
-/** A compiled condition as one conjunction over the span's columns, each key and value bound. */
+/**
+ * A compiled condition as one conjunction over the span's columns. Keys bind as one array and
+ * values as another, each term reading its element, so a condition costs two parameters however
+ * many terms it has: ClickHouse refuses a request past `http_max_fields` (ADR-201 §3).
+ */
 function predicateOf({
   compiledWhere,
   param,
   readerSlot,
 }: {
   compiledWhere: CompiledWhere;
-  param: (part: string) => string;
+  param: (part: "k" | "v") => string;
   readerSlot: string;
 }): { sql: string; params: Record<string, unknown>; verifies: boolean } {
   if (compiledWhere.version !== BRAID_CONDITION_COMPILER_VERSION) {
@@ -354,30 +361,34 @@ function predicateOf({
       version: compiledWhere.version,
     });
   }
-  const params: Record<string, unknown> = {};
+  const bound = { k: [] as string[], v: [] as string[] };
   let verifies = false;
-  const bind = (part: string, value: string): string => {
-    params[param(part)] = value;
-    return `{${param(part)}:String}`;
+  const bind = (part: "k" | "v", value: string): string => {
+    bound[part].push(value);
+    return `{${param(part)}:Array(String)}[${bound[part].length}]`;
   };
-  const termSql = (term: BraidConditionTerm, index: number): string => {
+  const termSql = (term: BraidConditionTerm): string => {
     switch (term.kind) {
       case "attributeEquals": {
         const map = term.on === "span" ? "SpanAttributes" : "ResourceAttributes";
-        return `${map}[${bind(`${index}k`, term.key)}] = ${bind(`${index}v`, term.value)}`;
+        return `${map}[${bind("k", term.key)}] = ${bind("v", term.value)}`;
       }
       case "nameEquals":
-        return `SpanName = ${bind(`${index}v`, term.value)}`;
+        return `SpanName = ${bind("v", term.value)}`;
       case "attributePresent":
-        return `mapContains(SpanAttributes, ${bind(`${index}k`, term.key)})`;
+        return `mapContains(SpanAttributes, ${bind("k", term.key)})`;
       case "verified":
         verifies = true;
-        return `SpanAttributes[${bind(`${index}k`, `${VERIFIED_ATTRIBUTE_PREFIX}${term.key}`)}] = ${readerSlot}`;
+        return `SpanAttributes[${bind("k", `${VERIFIED_ATTRIBUTE_PREFIX}${term.key}`)}] = ${readerSlot}`;
     }
   };
   const terms = braidConditionTermsOf(compiledWhere.tree);
   // "Every span" is the empty conjunction, which is true.
   const sql = terms.length === 0 ? "1" : terms.map(termSql).join(" AND ");
+  const params: Record<string, unknown> = {};
+  for (const part of ["k", "v"] as const) {
+    if (bound[part].length > 0) params[param(part)] = bound[part];
+  }
   return { sql, params, verifies };
 }
 
@@ -694,7 +705,7 @@ export function expandStatement({
     throw new StatementScopeError({ kind: "missing-marker" });
   }
   refuseUnappliedBraids({ fence, expanded });
-  refuseOverBudget({ statement: expanded.text });
+  refuseOverBudget({ statement: expanded.text, params: expanded.queryParams });
   return { query: expanded.text, queryParams: expanded.queryParams };
 }
 

@@ -122,13 +122,13 @@ describe("ClickHouseTraceSpanRepository braided reads", () => {
         const { sql, params } = spanRead();
         const [outer = "", election = ""] = sql.split(LATEST_VERSION);
         expect(outer).toContain("{tenantScope_c0_ids:Array(String)}");
-        expect(outer).toContain("SpanAttributes[{tenantScope_c0_0k:String}]");
+        expect(outer).toContain("SpanAttributes[{tenantScope_p0_k:Array(String)}[1]]");
         expect(outer).toContain(HELD_IN_TRACE);
-        expect(election).not.toContain("tenantScope_c0");
+        expect(election).not.toMatch(/tenantScope_[cp]0/);
         expect(sql).not.toContain("'web'");
         expect(params).toMatchObject({
-          tenantScope_c0_0k: "orchestrator",
-          tenantScope_c0_0v: "web",
+          tenantScope_p0_k: ["orchestrator"],
+          tenantScope_p0_v: ["web"],
         });
       });
 

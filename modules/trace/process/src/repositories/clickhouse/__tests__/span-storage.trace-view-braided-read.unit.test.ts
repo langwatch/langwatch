@@ -102,13 +102,13 @@ describe("SpanStorageClickHouseRepository trace-view reads", () => {
         for (const { sql, params } of statements) {
           const [outer = "", election = ""] = sql.split(LATEST_VERSION);
           expect(outer).toContain("{tenantScope_c0_ids:Array(String)}");
-          expect(outer).toContain("SpanAttributes[{tenantScope_c0_0k:String}]");
-          expect(election).not.toContain("tenantScope_c0");
+          expect(outer).toContain("SpanAttributes[{tenantScope_p0_k:Array(String)}[1]]");
+          expect(election).not.toMatch(/tenantScope_[cp]0/);
           expect(sql).not.toContain("'web'");
           expect(sql).not.toContain("orchestrator");
           expect(params).toMatchObject({
-            tenantScope_c0_0k: "orchestrator",
-            tenantScope_c0_0v: "web",
+            tenantScope_p0_k: ["orchestrator"],
+            tenantScope_p0_v: ["web"],
           });
         }
       });

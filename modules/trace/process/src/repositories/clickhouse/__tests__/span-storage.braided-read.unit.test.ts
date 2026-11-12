@@ -117,11 +117,11 @@ describe("SpanStorageClickHouseRepository braided single-span reads", () => {
         const [statement] = spanReads();
         const [outer = "", election = ""] = statement?.sql.split(LATEST_VERSION) ?? [];
         expect(outer).toContain("{tenantScope_c0_ids:Array(String)}");
-        expect(election).not.toContain("tenantScope_c0");
+        expect(election).not.toMatch(/tenantScope_[cp]0/);
         expect(statement?.sql).not.toMatch(/ORDER BY UpdatedAt DESC\s+LIMIT 1/);
         expect(statement?.params).toMatchObject({
-          tenantScope_c0_0k: "orchestrator",
-          tenantScope_c0_0v: "web",
+          tenantScope_p0_k: ["orchestrator"],
+          tenantScope_p0_v: ["web"],
         });
       });
     });

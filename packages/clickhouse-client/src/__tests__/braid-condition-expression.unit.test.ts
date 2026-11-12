@@ -26,12 +26,11 @@ describe("braidConditionExpression", () => {
       });
 
       expect(rendered.sql).toBe(
-        "(SpanAttributes[{preview_0k:String}] = {preview_0v:String} AND SpanAttributes[{preview_1k:String}] = {preview_reader:String})",
+        "(SpanAttributes[{preview_k:Array(String)}[1]] = {preview_v:Array(String)}[1] AND SpanAttributes[{preview_k:Array(String)}[2]] = {preview_reader:String})",
       );
       expect(rendered.params).toEqual({
-        preview_0k: "orchestrator'",
-        preview_0v: "web'); DROP",
-        preview_1k: "langwatch.reserved.verified.orchestrator",
+        preview_k: ["orchestrator'", "langwatch.reserved.verified.orchestrator"],
+        preview_v: ["web'); DROP"],
         preview_reader: "proj_reader",
       });
       expect(rendered.sql).not.toContain("orchestrator");

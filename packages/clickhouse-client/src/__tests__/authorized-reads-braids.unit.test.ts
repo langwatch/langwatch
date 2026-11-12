@@ -34,7 +34,11 @@ import {
 } from "../authorized-reads.ts";
 import { ClickHouseQueryClient } from "../client.ts";
 import type { QueryDriver, QueryRequest } from "../query.ts";
-import { STATEMENT_BYTE_BUDGET } from "../statementBudget.ts";
+import {
+  CLICKHOUSE_HTTP_MAX_FIELDS,
+  STATEMENT_BYTE_BUDGET,
+  STATEMENT_PARAM_BUDGET,
+} from "../statementBudget.ts";
 import { StatementScopeError } from "../statementScopeError.ts";
 /**
  * ADR-201 §3: a span read applies each braid's compiled condition through the conditions marker
@@ -288,8 +292,8 @@ describe("the fence over a span read", () => {
         };
         expect(sql).toBe(
           `(TenantId IN ({tenantScope_all:Array(String)}) AND (TenantId IN ({tenantScope_own:Array(String)})` +
-            ` OR (${held()} AND ((${window(0)} AND (SpanAttributes[{tenantScope_c0_0k:String}] = {tenantScope_c0_0v:String}))` +
-            ` OR (${window(1)} AND (SpanName = {tenantScope_c1_0v:String}))))))`,
+            ` OR (${held()} AND ((${window(0)} AND (SpanAttributes[{tenantScope_p0_k:Array(String)}[1]] = {tenantScope_p0_v:Array(String)}[1]))` +
+            ` OR (${window(1)} AND (SpanName = {tenantScope_p1_v:Array(String)}[1]))))))`,
         );
         expect(params).toEqual({
           tenantScope_all: [READER, OWNER],
@@ -297,12 +301,12 @@ describe("the fence over a span read", () => {
           tenantScope_c0_ids: [OWNER],
           tenantScope_c0_from: [0],
           tenantScope_c0_until: [0],
-          tenantScope_c0_0k: "orchestrator",
-          tenantScope_c0_0v: "web",
+          tenantScope_p0_k: ["orchestrator"],
+          tenantScope_p0_v: ["web"],
           tenantScope_c1_ids: [OWNER],
           tenantScope_c1_from: [5],
           tenantScope_c1_until: [0],
-          tenantScope_c1_0v: "cli_agent",
+          tenantScope_p1_v: ["cli_agent"],
           tenantScope_heldFrom: 0,
         });
       });
@@ -329,7 +333,7 @@ describe("the fence over a span read", () => {
         expect(query.indexOf(LATEST_VERSION_SUBQUERY)).toBeGreaterThan(
           query.indexOf("SpanAttributes["),
         );
-        expect(inner).not.toMatch(/SpanAttributes|SpanName =|tenantScope_c\d/);
+        expect(inner).not.toMatch(/SpanAttributes|SpanName =|tenantScope_[cp]\d/);
         expect(inner).toContain("{tenantScope_ids:Array(String)}");
       });
 
@@ -344,16 +348,20 @@ describe("the fence over a span read", () => {
         );
 
         expect(query).not.toMatch(/secret|langwatch\.reserved/);
-        expect(query).toContain("ResourceAttributes[{tenantScope_c0_0k:String}]");
-        expect(query).toContain("mapContains(SpanAttributes, {tenantScope_c0_1k:String})");
         expect(query).toContain(
-          "SpanAttributes[{tenantScope_c0_2k:String}] = {tenantScope_reader:String}",
+          "ResourceAttributes[{tenantScope_p0_k:Array(String)}[1]] = {tenantScope_p0_v:Array(String)}[1]",
+        );
+        expect(query).toContain("mapContains(SpanAttributes, {tenantScope_p0_k:Array(String)}[2])");
+        expect(query).toContain(
+          "SpanAttributes[{tenantScope_p0_k:Array(String)}[3]] = {tenantScope_reader:String}",
         );
         expect(queryParams).toMatchObject({
-          tenantScope_c0_0k: "secret.key",
-          tenantScope_c0_0v: "secret-value",
-          tenantScope_c0_1k: "secret.present",
-          tenantScope_c0_2k: "langwatch.reserved.verified.secret.signed",
+          tenantScope_p0_k: [
+            "secret.key",
+            "secret.present",
+            "langwatch.reserved.verified.secret.signed",
+          ],
+          tenantScope_p0_v: ["secret-value"],
           tenantScope_reader: READER,
         });
       });
@@ -368,7 +376,7 @@ describe("the fence over a span read", () => {
 
         expect(sent().tenantId).toBe(READER);
         expect(sent().tenantIds).toEqual([READER, OWNER]);
-        expect(sent().sql).toContain("SpanAttributes[{tenantScope_c0_0k:String}]");
+        expect(sent().sql).toContain("SpanAttributes[{tenantScope_p0_k:Array(String)}[1]]");
       });
     });
 
@@ -652,6 +660,24 @@ describe("the fence over a span read", () => {
         { projectId: OTHER_OWNER, from: 0, until: null },
       ]);
     });
+
+    it("binds a predicate its layers share once", () => {
+      const fence = fenceFor({
+        authorization: proof([
+          own(),
+          braid({ from: 300, until: 400 }),
+          braid({ from: 0, until: 100 }),
+        ]),
+        reads: "spans",
+      });
+      const { sql, params } = conditionsExpression({ fence, column: "StartTime" });
+
+      expect(sql.match(/\{tenantScope_p0_k:Array\(String\)\}\[1\]/g)).toHaveLength(2);
+      expect(Object.keys(params).filter((name) => /^tenantScope_p\d/.test(name))).toEqual([
+        "tenantScope_p0_k",
+        "tenantScope_p0_v",
+      ]);
+    });
   });
 
   describe("given a proof narrowed for a detail read", () => {
@@ -728,6 +754,34 @@ describe("the fence over a span read", () => {
         BRAID_MAX_DISTINCT_CONDITIONS * BRAID_CONDITION_MAX_TERMS,
       );
       expect(Buffer.byteLength(query, "utf8")).toBeLessThanOrEqual(STATEMENT_BYTE_BUDGET);
+    });
+
+    it("binds fewer parameters than ClickHouse accepts as fields in one request", () => {
+      const { queryParams } = expandSpanRead(proof([own(), ...grants]));
+      const count = Object.keys(queryParams).length;
+
+      expect(STATEMENT_PARAM_BUDGET).toBeLessThan(CLICKHOUSE_HTTP_MAX_FIELDS);
+      expect(count).toBeLessThanOrEqual(STATEMENT_PARAM_BUDGET);
+      // Five per condition (three window arrays, keys, values), never one per term.
+      expect(count).toBeLessThanOrEqual(5 * BRAID_MAX_DISTINCT_CONDITIONS + 10);
+    });
+  });
+
+  describe("given an expanded statement binding more parameters than its budget", () => {
+    it("refuses it by name before anything is sent", () => {
+      const queryParams = Object.fromEntries(
+        Array.from({ length: STATEMENT_PARAM_BUDGET }, (_, index) => [`p${index}`, index]),
+      );
+
+      expect(
+        scopeErrorOf(() =>
+          expandStatement({
+            query: `SELECT 1 FROM stored_spans WHERE ${tenantScope("StartTime")}`,
+            queryParams,
+            fence: fenceFor({ authorization: proof([own()]), reads: "spans" }),
+          }),
+        ),
+      ).toMatchObject({ kind: "over-param-budget", budget: STATEMENT_PARAM_BUDGET });
     });
   });
 

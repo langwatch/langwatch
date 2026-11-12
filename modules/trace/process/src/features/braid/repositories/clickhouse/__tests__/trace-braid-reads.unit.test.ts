@@ -156,7 +156,10 @@ describe("ClickHouseTraceBraidReadsRepository", () => {
       expect(statement.sql).not.toMatch(/'(web|orchestrator|sig)'/);
       expect(statement.sql).not.toContain(READER);
       expect(statement.sql).toContain("argMax(");
-      expect(statement.params).toMatchObject({ braid_0k: "orchestrator", braid_0v: "web" });
+      expect(statement.params).toMatchObject({
+        braid_k: expect.arrayContaining(["orchestrator"]),
+        braid_v: ["web"],
+      });
     });
 
     describe("and the reader already has live braids from the owner", () => {
@@ -183,7 +186,7 @@ describe("ClickHouseTraceBraidReadsRepository", () => {
         expect(statement.params).toMatchObject({
           live0_fromMs: 1_600_000_000_000,
           live0_untilMs: 1_650_000_000_000,
-          live0_0v: "web",
+          live0_v: ["web"],
           live1_fromMs: 1_660_000_000_000,
           braid_fromMs: 1_700_000_000_000,
         });
@@ -227,7 +230,7 @@ describe("ClickHouseTraceBraidReadsRepository", () => {
       expect(fencedProjects(read())).toEqual([OWNER]);
       expect(read().sql).not.toMatch(/'(web|orchestrator|sig)'/);
       expect(read().params).toMatchObject({
-        a0_0v: "web",
+        a0_v: ["web"],
         a0_reader: READER,
         a0_fromMs: 1_700_000_000_000,
         a0_untilMs: 1_700_000_100_000,
@@ -306,9 +309,9 @@ describe("ClickHouseTraceBraidReadsRepository", () => {
       expect(fencedProjects(read())).toEqual([OWNER]);
       expect(read().params).toMatchObject({
         traceId: "trace-1",
-        braid0_0v: "web",
+        braid0_v: ["web"],
         braid0_untilMs: 1_650_000_000_000,
-        braid1_0v: "web",
+        braid1_v: ["web"],
         braid1_fromMs: 1_700_000_000_000,
       });
       expect(read().sql).not.toContain("'web'");

@@ -54,6 +54,7 @@ const KNOWN_REFUSALS: ReadonlySet<StatementScopeViolation["kind"]> = new Set([
   "loose-latest-version-marker",
   "unsupported-condition-version",
   "over-budget",
+  "over-param-budget",
 ]);
 
 type GrantInput = AuthorizationInput["grants"][number];
@@ -391,7 +392,7 @@ function ownerSlotViolation({
     const body = own === undefined ? "" : text.slice(own, closingOf({ text, open: own }));
     // "Every span" is stated as the always-true predicate; any other clause binds its terms.
     const everySpan = body.endsWith(" AND (1)");
-    if (!everySpan && !new RegExp(`\\{tenantScope_c${clause[1]}_\\d+[kv]:`).test(body))
+    if (!everySpan && !/\{tenantScope_p\d+_[kv]:Array\(String\)\}\[\d+\]/.test(body))
       return `clause ${clause[1]} carries no predicate`;
   }
   return undefined;
@@ -520,9 +521,13 @@ function runProperty({ conditioned }: { conditioned: boolean }) {
   return { tally, failures };
 }
 
-/** Over-budget needs the largest legal proof (its own test); a missing condition marker is
+/** Either budget needs the largest legal proof (its own test); a missing condition marker is
  *  refused earlier as a plain marker or a loose election. */
-const UNREACHED: ReadonlySet<string> = new Set(["over-budget", "missing-condition-marker"]);
+const UNREACHED: ReadonlySet<string> = new Set([
+  "over-budget",
+  "over-param-budget",
+  "missing-condition-marker",
+]);
 
 describe("the fence, over generated proofs and statements", () => {
   describe("given braids whose condition is compiled", () => {

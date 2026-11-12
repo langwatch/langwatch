@@ -432,7 +432,8 @@ describe.skipIf(!clickHouseConfigured)("braid reads against ClickHouse", () => {
       });
 
       expect(onOwnerPage).toEqual({ activity: [{ braidId: braid.braidId, spanCount: 4 }] });
-      expect(onReaderPage).toEqual({ activity: [{ braidId: braid.braidId, spanCount: 4 }] });
+      // o-alone matches but sits in trace.ownerOnly, which the reader does not hold (ADR-201 §3).
+      expect(onReaderPage).toEqual({ activity: [{ braidId: braid.braidId, spanCount: 3 }] });
     });
   });
 });

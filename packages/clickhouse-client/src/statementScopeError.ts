@@ -1,7 +1,7 @@
 /**
  * Why a reader refuses a statement before sending it: a missing or unknown `{{tenantScope}}` or
  * `{{idBound}}` marker, a hand-written tenant predicate, a reserved parameter name, a braid
- * condition the statement would not apply, or a statement over its byte budget.
+ * condition the statement would not apply, or a statement over its byte or parameter budget.
  */
 
 /** Every parameter the fence binds starts with this; callers may not. */
@@ -25,7 +25,8 @@ export type StatementScopeViolation =
   | { kind: "loose-latest-version-marker" }
   | { kind: "unsupported-condition-version"; version: number }
   | { kind: "uncompiled-braid-condition" }
-  | { kind: "over-budget"; bytes: number; budget: number };
+  | { kind: "over-budget"; bytes: number; budget: number }
+  | { kind: "over-param-budget"; params: number; budget: number };
 
 /** A statement the reader will not send. Named so a test can tell which
  *  refusal fired without reading prose. */
@@ -69,5 +70,7 @@ function describe(violation: StatementScopeViolation): string {
       return "A braid's condition reached the fence without its compiled form. Every span braid carries one; every span is stated, never implied.";
     case "over-budget":
       return `The expanded statement is ${violation.bytes} bytes, over the ${violation.budget}-byte budget ClickHouse parses.`;
+    case "over-param-budget":
+      return `The expanded statement binds ${violation.params} parameters, over the ${violation.budget} ClickHouse accepts in one request.`;
   }
 }
