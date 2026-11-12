@@ -733,6 +733,34 @@ describe("POST /search with a trace filter", () => {
       expect(body.meta.knownFields).toContain("status");
       expect(listTraces).not.toHaveBeenCalled();
     });
+
+    /** @scenario "An unknown field for the trace's text points at free-text search" */
+    it("tells a caller that guessed an input field to search the text with no field", async () => {
+      const { send } = mount();
+      const res = await send({
+        startDate: 1000,
+        endDate: 5000,
+        filter: 'input:"Who declared the state of emergency?"',
+      });
+      expect(res.status).toBe(422);
+      const body = (await res.json()) as { code: string; message: string; meta: { hint?: string } };
+      expect(body.code).toBe("filter_field_unknown");
+      expect(body.meta.hint).toMatch(/quoted phrase and no field/);
+      expect(body.message).toContain(body.meta.hint);
+    });
+
+    /** @scenario "An unknown field the language has under another name names that field" */
+    it("names @label to a caller that guessed metadata.labels", async () => {
+      const { send } = mount();
+      const res = await send({
+        startDate: 1000,
+        endDate: 5000,
+        filter: "metadata.labels:graphrag",
+      });
+      expect(res.status).toBe(422);
+      const body = (await res.json()) as { meta: { hint?: string } };
+      expect(body.meta.hint).toBe("Did you mean @label?");
+    });
   });
 
   describe("when a legacy filter that needs an evaluator key is sent as a flat list", () => {

@@ -63392,6 +63392,8 @@ langwatch trace facets <field> --start-date <from> --end-date <to> --format json
 
 Read the reference once per session. Use `trace facets` every time the concept maps to a field whose values you have not seen, because values differ per project: an event named `thumbs_up_down` in one project is `feedback` in another.
 
+A filter refused with `filter_field_unknown` carries `meta.hint`, the field it most likely meant, and `meta.knownFields`: fix the filter from them rather than dropping it for an unfiltered search.
+
 If any of these three is refused as an unknown command or an unknown option, the CLI on this worker is older than this skill. Say that, name the command that was refused and the version `langwatch --version` reports, and stop: an older CLI cannot list the fields or filter the search, so a search that runs without them would answer "none found" for a project that has results.
 
 ## Step 3: Search every form the concept can take
@@ -63401,8 +63403,8 @@ A concept can be recorded in several places. One empty search says one form is e
 1. **Events.** `langwatch trace facets event` lists the event names in the window. Thumbs down is the predefined event `thumbs_up_down` with a vote of `-1`: `event:thumbs_up_down AND event.attribute.event.metrics.vote:-1`. A custom event may carry the same meaning under another name or attribute, so read the facet values rather than assuming the predefined one.
 2. **Annotations.** Reviewers and end users also leave thumbs and comments as annotations: `langwatch trace facets annotation`, then `annotation:<value>`.
 3. **Evaluator results.** A sentiment, satisfaction or quality evaluator may already label the concept: `langwatch trace facets evaluatorLabel`, `evaluatorVerdict:fail`, `evaluator:<name>`.
-4. **Trace attributes and labels.** Applications often stamp their own field: `langwatch trace facets label`, and `langwatch trace facets` with no field, which lists every facet with its top values and the attribute keys in use. Filter on one with `trace.attribute.<key>:<value>`.
-5. **The text itself.** A phrase search with `-q "<phrase>"` when the concept shows up in what the user or the agent wrote.
+4. **Trace attributes and labels.** Applications often stamp their own field: `langwatch trace facets label`, and `langwatch trace facets` with no field, which lists every facet with its top values and the attribute keys in use. The metadata labels are `label:<name>`, not `metadata.labels`. Filter on any other attribute with `trace.attribute.<key>:<value>`.
+5. **The text itself.** No field holds the input or output text, so there is no `input:` or `output:`. Search it with `-q "<phrase>"`, or with a quoted phrase and no field inside `--filter`, when the concept shows up in what the user or the agent wrote.
 6. **A wider window.** When every form is empty in the page's window, run the best form again over 90 days. If it matches there, say so and offer the wider window; do not change the page's window without saying it.
 
 Then check the result is what it claims to be: read three of the matched traces with `langwatch trace get <traceId>` and confirm they show the concept. A filter that matches the wrong thing is worse than an empty one.

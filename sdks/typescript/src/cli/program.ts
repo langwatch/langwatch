@@ -3651,11 +3651,11 @@ function registerTraceCommands(program: Command): void {
       )
       .option(
         "-q, --query <query>",
-        "Text search query. Plain text only: AND, OR and NOT are matched as words, not as operators",
+        "Text search over the trace input, output and span names; no filter field holds the input or output text. Plain text only: AND, OR and NOT are matched as words, not as operators",
       )
       .option(
         "--filter <filter>",
-        'Trace filter, the language the Trace Explorer search bar speaks: "status:error AND model:gpt-*", "trace.attribute.langwatch.user_id:alice", "evaluatorVerdict:fail". Combined with -q and the other flags. `langwatch trace fields` lists every field',
+        'Trace filter, the language the Trace Explorer search bar speaks: "status:error AND model:gpt-*", "label:production" (the metadata labels), "trace.attribute.langwatch.user_id:alice", "evaluatorVerdict:fail", and a quoted phrase with no field for the input and output text. Combined with -q and the other flags. `langwatch trace fields` lists every field',
       )
       .option("--start-date <date>", startDateHelp())
       .option("--end-date <date>", endDateHelp())

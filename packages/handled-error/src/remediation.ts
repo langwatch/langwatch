@@ -147,7 +147,12 @@ const registry = {
     ],
   },
   filter_field_unknown: {
-    tips: ["Use one of the fields listed in meta.knownFields", "Field names are case-sensitive"],
+    tips: [
+      "Use one of the fields listed in meta.knownFields; meta.hint names the likely one",
+      "Field names are case-sensitive",
+      "Text in the trace input or output has no field: search it with a quoted phrase and no field, or -q",
+      "`label:<name>` matches the trace's metadata labels",
+    ],
   },
   filter_value_refused: {
     tips: [

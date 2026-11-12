@@ -502,7 +502,8 @@ const presentations = {
     title: "Unknown filter field",
     describe: (error) => {
       const field = str(error, "field", "");
-      return field ? `There's no field called "${field}".` : "";
+      const hint = str(error, "hint", "");
+      return field ? [`There's no field called "${field}".`, hint].filter(Boolean).join(" ") : "";
     },
   },
   filter_value_refused: {
