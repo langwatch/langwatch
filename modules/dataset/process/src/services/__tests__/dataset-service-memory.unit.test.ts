@@ -141,7 +141,7 @@ describe("DatasetService", () => {
   });
 
   it("routes object-backed reads and mutations through the content port", async () => {
-    const { dataset, repository, records } = seeded({
+    const { database, dataset, repository, records } = seeded({
       contentLayout: "s3_jsonl",
       rowCount: 1,
       chunkCount: 1,
@@ -184,6 +184,26 @@ describe("DatasetService", () => {
         calls.push("delete");
         throw new Error("not used");
       }
+      async createDataset({
+        projectId,
+        name,
+        slug,
+      }: {
+        projectId: string;
+        name: string;
+        slug: string;
+      }) {
+        calls.push("create");
+        const born = makeDataset({
+          id: "dataset_2",
+          projectId,
+          name,
+          slug,
+          contentLayout: "s3_jsonl",
+        });
+        database.putDataset({ ...born, sourceStoredObjectId: null });
+        return born;
+      }
       async copyDataset(): Promise<void> {
         calls.push("copy");
       }
@@ -217,7 +237,7 @@ describe("DatasetService", () => {
       targetProjectId: "project_2",
     });
 
-    expect(calls).toEqual(["read:dataset_1", "copy"]);
+    expect(calls).toEqual(["read:dataset_1", "create", "copy"]);
   });
 
   /** @scenario "Upload storage remains an injected Dataset seam" */
