@@ -63,8 +63,14 @@ Feature: Signing keys
     @unit
     Scenario: Signing keys need the Enterprise plan
       Given an organisation below Enterprise
-      When ana asks to create, rotate or revoke a signing key
+      When ana asks to create or rotate a signing key
       Then each is refused with enterprise_plan_required naming the Braids feature
+
+    @unit
+    Scenario: A signing key can be revoked on any plan
+      Given an organisation that dropped below Enterprise holding a leaked signing key
+      When ana revokes it
+      Then it is revoked, as stopping a braid is allowed on any plan
 
     @unit
     Scenario: Whoever may braid out of a project manages its signing keys

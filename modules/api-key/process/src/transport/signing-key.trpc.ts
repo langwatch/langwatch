@@ -38,8 +38,8 @@ export const signingKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof si
       app.rotateSigningKey({ projectId: input.projectId, keyId: input.keyId, userId: actor.id }),
     )
 
+    /** Any plan: revoking only narrows access, so a downgrade never strands a leaked key. */
     .procedure("revoke")
-    .withEntitlement("enterprise", { feature: "BRAIDS" })
     .withAudit(ORGANIZATION_OF_PROJECT)
     .withPermission("braids:manage")
     .handle(({ app, input }) =>

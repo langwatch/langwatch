@@ -93,7 +93,7 @@ const denied = { code: "FORBIDDEN" };
 describe("the signingKeys tRPC namespace", () => {
   describe("given an organisation below Enterprise", () => {
     /** @scenario "Signing keys need the Enterprise plan" */
-    it("refuses create, rotate and revoke naming BRAIDS, and writes nothing", async () => {
+    it("refuses create and rotate naming BRAIDS, and writes nothing", async () => {
       const { caller, app } = mount({ enterprise: false });
       const refused = { cause: { code: "enterprise_plan_required", meta: { feature: "BRAIDS" } } };
       const key = { projectId: ORCHESTRATOR, keyId: "key_1" };
@@ -102,10 +102,18 @@ describe("the signingKeys tRPC namespace", () => {
         caller.create({ projectId: ORCHESTRATOR, name: "Production" }),
       ).rejects.toMatchObject(refused);
       await expect(caller.rotate(key)).rejects.toMatchObject(refused);
-      await expect(caller.revoke(key)).rejects.toMatchObject(refused);
       expect(app.createSigningKey).not.toHaveBeenCalled();
       expect(app.rotateSigningKey).not.toHaveBeenCalled();
-      expect(app.revokeSigningKey).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A signing key can be revoked on any plan" */
+    it("revokes a key, so a downgrade never strands a leaked one", async () => {
+      const { caller, app } = mount({ enterprise: false });
+
+      await expect(
+        caller.revoke({ projectId: ORCHESTRATOR, keyId: "key_1" }),
+      ).resolves.toMatchObject({ status: "revoked" });
+      expect(app.revokeSigningKey).toHaveBeenCalledTimes(1);
     });
   });
 
