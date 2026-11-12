@@ -10,6 +10,9 @@ export const TENANT_SCOPE_PARAM_PREFIX = "tenantScope";
 /** Every parameter an `{{idBound}}` marker binds starts with this; callers may not. */
 export const ID_BOUND_PARAM_PREFIX = "idBound";
 
+/** Why a tenant marker is not a top-level AND conjunct of its WHERE. */
+export type LooseMarkerPlacement = "not-a-conjunct" | "outside-where" | "unreadable";
+
 export type StatementScopeViolation =
   | { kind: "missing-marker" }
   | { kind: "unknown-time-column"; column: string }
@@ -24,6 +27,7 @@ export type StatementScopeViolation =
   | { kind: "plain-marker-under-braids" }
   | { kind: "loose-latest-version-marker" }
   | { kind: "settings-under-braids" }
+  | { kind: "loose-tenant-marker"; marker: string; placement: LooseMarkerPlacement }
   | { kind: "unsupported-condition-version"; version: number }
   | { kind: "uncompiled-braid-condition" }
   | { kind: "over-budget"; bytes: number; budget: number }
@@ -67,6 +71,8 @@ function describe(violation: StatementScopeViolation): string {
       return "A {{tenantScopeForLatestVersion:<TimeColumn>}} marker sits outside a latest-version election on stored_spans, or its election is not AND-ed into the WHERE a windowed marker fences. Join every term between that marker and the election with AND alone: no OR, no NOT, no group around the election.";
     case "settings-under-braids":
       return "The proof carries braids, so a SETTINGS clause in the statement could lift the time limit the proof's expiry sets. Pass settings through the reader's clickhouse_settings instead.";
+    case "loose-tenant-marker":
+      return describeLooseMarker(violation);
     case "unsupported-condition-version":
       return `A braid's condition was compiled by compiler version ${violation.version}, which this reader cannot render.`;
     case "uncompiled-braid-condition":
@@ -75,5 +81,23 @@ function describe(violation: StatementScopeViolation): string {
       return `The expanded statement is ${violation.bytes} bytes, over the ${violation.budget}-byte budget ClickHouse parses.`;
     case "over-param-budget":
       return `The expanded statement binds ${violation.params} parameters, over the ${violation.budget} ClickHouse accepts in one request.`;
+  }
+}
+
+function describeLooseMarker({
+  marker,
+  placement,
+}: {
+  marker: string;
+  placement: LooseMarkerPlacement;
+}): string {
+  const write = `Write \`WHERE ${marker} AND (<your conditions>)\`, with any OR inside a bracket of its own.`;
+  switch (placement) {
+    case "not-a-conjunct":
+      return `${marker} is not a top-level AND conjunct of its WHERE: an OR, XOR or NOT at its level, a bracket holding an OR, or a function, comparison or CASE around it would let other tenants' rows through. ${write}`;
+    case "outside-where":
+      return `${marker} sits outside the WHERE of the select it fences (in a SELECT list, HAVING, ON or another clause), so it filters none of the rows read. ${write}`;
+    case "unreadable":
+      return `The fence cannot follow the statement around ${marker} with certainty (a marker in a comment or string literal, an unbalanced bracket, or a character it does not know), so it refuses it. ${write}`;
   }
 }

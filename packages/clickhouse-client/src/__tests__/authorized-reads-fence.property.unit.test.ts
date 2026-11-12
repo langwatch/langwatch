@@ -1,7 +1,7 @@
 /**
  * ADR-201 v1.10: every generated proof, resource and statement is refused by name, or renders a
- * braid owner bound only in its own predicate clause under the held-trace semi-join on an honoured
- * span read, with every election AND-ed into its select, never under OR or NOT. Seeded.
+ * braid owner bound only in its predicate clause under the held-trace semi-join on an honoured span
+ * read, every election and marker AND-ed into its select's WHERE, never under OR or NOT. Seeded.
  */
 import {
   AccessNotGrantedError,
@@ -35,7 +35,7 @@ import {
 import { StatementScopeError, type StatementScopeViolation } from "../statementScopeError.ts";
 
 const SEED = 0x5eed_b4a1;
-const CASES = 4000;
+const CASES = 6000;
 const NOW = 1_800_000_000_000;
 const READER = "proj_reader";
 const SECOND_OWN = "proj_reader_two";
@@ -52,6 +52,7 @@ const KNOWN_REFUSALS: ReadonlySet<StatementScopeViolation["kind"]> = new Set([
   "missing-condition-marker",
   "plain-marker-under-braids",
   "loose-latest-version-marker",
+  "loose-tenant-marker",
   "unsupported-condition-version",
   "over-budget",
   "over-param-budget",
@@ -256,11 +257,31 @@ const ELECTION_LEADS = [
   [" AND ", " AND 1 = 1 OR 1 = 2"],
 ] as const;
 
+/** Around a marker: AND-ed in a bracket stays a conjunct; the rest put it under OR, XOR or NOT. */
+const MARKER_WRAPS = {
+  conjunct: [
+    ["(", " AND 1 = 1)"],
+    ["1 = 1 AND ", ""],
+  ],
+  loose: [
+    ["NOT ", ""],
+    ["1 = 1 OR ", ""],
+    ["", " OR 1 = 1"],
+    ["(1 = 1 OR ", ")"],
+    ["(", " OR 1 = 1)"],
+    ["", " XOR 1 = 1"],
+    ["not(", ")"],
+    ["1 = 1 OR 1 = 1 AND ", ""],
+  ],
+} as const;
+
 type StatementCase = {
   text: string;
   queryParams: Record<string, unknown>;
   fragment: boolean;
   held: HeldTraceBound | undefined;
+  /** A marker was put under OR, XOR or NOT, or outside its WHERE: the fence must refuse it. */
+  loose: boolean;
 };
 
 /** A random mix of every marker the fence reads, in shapes it accepts and shapes it refuses. */
@@ -279,9 +300,20 @@ function statementOf(random: Random): StatementCase {
       { traceId: "tenantScope_own" },
     ] as const,
   });
-  const conditions = () => tenantScopeWithConditions(column(), held);
-  const election = () =>
-    `${ELECTION_HEAD}${tenantScopeForLatestVersion(column())} GROUP BY TenantId, TraceId, SpanId)`;
+  let loose = false;
+  const placed = (marker: string): string => {
+    const roll = random();
+    if (roll >= 0.12) return marker;
+    loose ||= roll < 0.08;
+    const [lead, trail] = pick({
+      random,
+      from: roll < 0.08 ? MARKER_WRAPS.loose : MARKER_WRAPS.conjunct,
+    });
+    return `${lead}${marker}${trail}`;
+  };
+  const conditions = () => placed(tenantScopeWithConditions(column(), held));
+  const latest = () => placed(tenantScopeForLatestVersion(column()));
+  const election = () => `${ELECTION_HEAD}${latest()} GROUP BY TenantId, TraceId, SpanId)`;
   const outer = pick({
     random,
     from: [
@@ -289,36 +321,44 @@ function statementOf(random: Random): StatementCase {
       conditions,
       conditions,
       conditions,
-      () => tenantScope(column()),
-      tenantSet,
-      () => tenantScopeForLatestVersion(column()),
+      () => placed(tenantScope(column())),
+      () => placed(tenantSet()),
+      latest,
       () => "1 = 1",
     ],
   })();
   const mixedElection = () => {
     const [lead, close] = pick({ random, from: ELECTION_LEADS });
-    return `${lead}${ELECTION_TUPLE}${tenantScopeForLatestVersion(column())} GROUP BY TenantId, TraceId, SpanId)${close}`;
+    return `${lead}${ELECTION_TUPLE}${latest()} GROUP BY TenantId, TraceId, SpanId)${close}`;
   };
   const extras = [
     () => election(),
     mixedElection,
     () => ` AND SpanId IN (SELECT SpanId FROM stored_spans WHERE 1 = 1${election()})`,
-    () => ` AND TraceId IN (SELECT TraceId FROM trace_summaries WHERE ${tenantSet()})`,
-    () => ` AND TraceId IN (SELECT TraceId FROM trace_summaries WHERE ${tenantScope(column())})`,
+    () => ` AND TraceId IN (SELECT TraceId FROM trace_summaries WHERE ${placed(tenantSet())})`,
+    () =>
+      ` AND TraceId IN (SELECT TraceId FROM trace_summaries WHERE ${placed(tenantScope(column()))})`,
     () => ` AND SpanId IN (SELECT SpanId FROM stored_spans WHERE ${conditions()})`,
     () => " AND TenantId = {tenant:String}",
     () => " AND a.TenantId = b.TenantId",
   ].filter(() => chance({ random, p: 0.12 }));
-  const body = `${outer}${extras.map((extra) => extra()).join("")}`;
-  const fragment = chance({ random, p: 0.25 });
+  // Now and then a marker in a clause that filters no row: HAVING, or the select list.
+  const clause = pick({ random, from: [...Array<string>(14).fill("where"), "having", "select"] });
+  const stray = pick({ random, from: [conditions, () => tenantScope(column()), tenantSet] });
+  loose ||= clause !== "where";
+  const having = clause === "having" ? ` GROUP BY SpanId HAVING ${stray()}` : "";
+  const selected = clause === "select" ? `${stray()} AS fenced, ` : "";
+  const body = `${outer}${extras.map((extra) => extra()).join("")}${having}`;
+  const fragment = clause !== "select" && chance({ random, p: 0.25 });
   const queryParams: Record<string, unknown> = { traceId: "tr-1", sinceMs: NOW - 60_000 };
   if (chance({ random, p: 0.05 }))
     queryParams[pick({ random, from: ["tenantScope_own", "idBound_x"] })] = "x";
   return {
-    text: fragment ? body : `SELECT SpanId, SpanName FROM stored_spans WHERE ${body}`,
+    text: fragment ? body : `SELECT SpanId, ${selected}SpanName FROM stored_spans WHERE ${body}`,
     queryParams,
     fragment,
     held,
+    loose,
   };
 }
 
@@ -507,6 +547,7 @@ function violationsOf({
   statement,
 }: ReturnType<typeof outcomeOf> & { outcome: Extract<Outcome, { kind: "rendered" }> }): string[] {
   const found: string[] = [];
+  if (statement.loose) found.push("a marker under OR, XOR or NOT, or outside its WHERE, rendered");
   const literals = outcome.text.match(/lit_[a-z]+_\d+/g);
   if (literals !== null) found.push(`condition literal in the text: ${literals[0]}`);
   const election = electionViolation({ text: outcome.text });

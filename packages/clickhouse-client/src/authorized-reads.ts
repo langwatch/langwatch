@@ -36,6 +36,7 @@ import type { IdBoundOptions } from "./idBound.ts";
 import { refuseOverBudget } from "./statementBudget.ts";
 import {
   ID_BOUND_PARAM_PREFIX,
+  type LooseMarkerPlacement,
   StatementScopeError,
   TENANT_SCOPE_PARAM_PREFIX,
 } from "./statementScopeError.ts";
@@ -728,6 +729,7 @@ export function expandStatement({
 }): { query: string; queryParams: Record<string, unknown> } {
   refuseTenantInText({ text: query, queryParams });
   refuseUnconditionedMarkers({ text: query, fence });
+  refuseLooseTenantMarkers({ text: query, fragment: false });
   const expanded = replaceMarkers({ text: query, queryParams, fence });
   if (expanded.windowed === 0) {
     throw new StatementScopeError({ kind: "missing-marker" });
@@ -958,10 +960,261 @@ function isConjunctionLeadingIn({ text }: { text: string }): boolean {
   return terms.every((term) => CONJUNCT_TERM.test(term));
 }
 
+type TokenKind = "word" | "operand" | "marker" | "open" | "close" | "operator";
+type MarkerToken = { kind: TokenKind; text: string };
+
+/** Any `{{tenantScope…}}` or `{{tenantSet…}}` text; broader than the expanded ones, so stricter. */
+const TENANT_MARKER = /\{\{tenant(?:Scope|Set)[^{}]*\}\}/g;
+const IS_TENANT_MARKER = /^\{\{tenant(?:Scope|Set)/;
+
+/** Each lexeme the reader knows, tried in order at the cursor; anything else is unreadable. */
+const LEXEMES: readonly (readonly [TokenKind | "space", RegExp])[] = [
+  ["space", /\s+|--[^\n]*|#[ !][^\n]*/y],
+  ["operand", /'(?:[^'\\]|\\.|'')*'|"(?:[^"\\]|\\.|"")*"|`(?:[^`\\]|\\.|``)*`/y],
+  ["marker", /\{\{[^{}]*\}\}/y],
+  ["operand", /\{\s*[A-Za-z_]\w*\s*:[^{}]*\}/y],
+  ["word", /[A-Za-z_]\w*/y],
+  ["operand", /\d[\w.]*/y],
+  ["open", /[([]/y],
+  ["close", /[)\]]/y],
+  ["operator", /::|->|<=|>=|<>|!=|==|\|\||[-+*/%=<>,;:?.]/y],
+];
+
+/** Where a `/* … *\/` comment opened at `open` ends; ClickHouse nests them. -1 when unclosed. */
+function blockCommentEnd({ text, open }: { text: string; open: number }): number {
+  let depth = 0;
+  for (let at = open; at < text.length - 1; at += 1) {
+    const pair = text.slice(at, at + 2);
+    if (pair === "/*") depth += 1;
+    if (pair === "*/") depth -= 1;
+    if (pair === "/*" || pair === "*/") at += 1;
+    if (depth === 0) return at + 1;
+  }
+  return -1;
+}
+
+function tokensOf(text: string): MarkerToken[] | undefined {
+  const tokens: MarkerToken[] = [];
+  for (let at = 0; at < text.length;) {
+    if (text.startsWith("/*", at)) {
+      const end = blockCommentEnd({ text, open: at });
+      if (end === -1) return undefined;
+      at = end;
+      continue;
+    }
+    const lexed = LEXEMES.map(([kind, pattern]) => {
+      pattern.lastIndex = at;
+      return { kind, match: pattern.exec(text)?.[0] };
+    }).find((each) => each.match !== undefined && each.match !== "");
+    if (lexed?.match === undefined) return undefined;
+    if (lexed.kind !== "space") tokens.push({ kind: lexed.kind, text: lexed.match });
+    at += lexed.match.length;
+  }
+  return tokens;
+}
+
+/** A bracket: its open and close token, its parent, and whether it is a subquery or an index. */
+type Group = {
+  open: number;
+  close: number;
+  parent: number;
+  kind: "root" | "select" | "plain" | "index";
+};
+
+type Shape = { tokens: MarkerToken[]; groups: Group[]; groupOf: number[]; closeOf: number[] };
+
+const ROOT = 0;
+
+/** A bracket's kind: an index or array, a subquery, or a plain group of an expression. */
+function groupKindOf({
+  open,
+  first,
+}: {
+  open: MarkerToken;
+  first: MarkerToken | undefined;
+}): Group["kind"] {
+  if (open.text === "[") return "index";
+  const word = first?.text.toUpperCase();
+  return word === "SELECT" || word === "WITH" ? "select" : "plain";
+}
+
+/** Closes the innermost bracket at `index`; false when it does not pair with the one open. */
+function closeGroup({ shape, stack, index }: { shape: Shape; stack: number[]; index: number }) {
+  const current = stack.at(-1) ?? ROOT;
+  const group = shape.groups[current];
+  const pairs = group?.kind === "index" ? "]" : ")";
+  if (current === ROOT || group === undefined || shape.tokens[index]?.text !== pairs) return false;
+  group.close = index;
+  shape.closeOf[group.open] = index;
+  stack.pop();
+  return true;
+}
+
+function shapeOf(text: string): Shape | undefined {
+  const tokens = tokensOf(text);
+  if (tokens === undefined) return undefined;
+  const root: Group = { open: -1, close: tokens.length, parent: -1, kind: "root" };
+  const shape: Shape = { tokens, groups: [root], groupOf: [], closeOf: [] };
+  const stack = [ROOT];
+  for (const [index, token] of tokens.entries()) {
+    const current = stack.at(-1) ?? ROOT;
+    shape.groupOf[index] = current;
+    if (token.kind === "close" && !closeGroup({ shape, stack, index })) return undefined;
+    if (token.kind !== "open") continue;
+    const kind = groupKindOf({ open: token, first: tokens[index + 1] });
+    shape.groups.push({ open: index, close: -1, parent: current, kind });
+    stack.push(shape.groups.length - 1);
+  }
+  return stack.length === 1 ? shape : undefined;
+}
+
+/** The units of one level from `from` to `to`: a token, or a whole bracket as its open token. */
+function unitsOf({ shape, from, to }: { shape: Shape; from: number; to: number }): number[] {
+  const units: number[] = [];
+  for (let at = from; at < to; at = (shape.closeOf[at] ?? at) + 1) units.push(at);
+  return units;
+}
+
+/** Clause words that open a clause of a select; only WHERE and PREWHERE filter the rows read. */
+const CLAUSE_WORDS = new Set(
+  (
+    "SELECT FROM JOIN ON USING PREWHERE WHERE GROUP HAVING ORDER LIMIT OFFSET SETTINGS UNION" +
+    " INTERSECT EXCEPT WINDOW QUALIFY FORMAT"
+  ).split(" "),
+);
+const FILTERING_CLAUSES = new Set(["WHERE", "PREWHERE"]);
+
+/** Words that bind looser than AND or hide one (`CASE … END`), never at a marker's level. */
+const LOOSE_WORDS = new Set(["OR", "XOR", "CASE", "WHEN", "THEN", "ELSE", "END", "AS"]);
+/** Operators that bind tighter than AND; a comma, `?:`, `->` or `;` refuses. */
+const CONJUNCT_OPERATORS = new Set([
+  "=",
+  "==",
+  "!=",
+  "<>",
+  "<",
+  ">",
+  "<=",
+  ">=",
+  "+",
+  "-",
+  "*",
+  "/",
+  "%",
+  "||",
+  ".",
+  "::",
+]);
+
+const wordOf = (token: MarkerToken | undefined): string | undefined =>
+  token?.kind === "word" ? token.text.toUpperCase() : undefined;
+
+/** Whether `unit` is a whole term of the conjunction `units`, every other term binding tighter. */
+function isConjunct({ shape, units, unit }: { shape: Shape; units: number[]; unit: number }) {
+  const terms: number[][] = [[]];
+  let between = false;
+  for (const at of units) {
+    const token = shape.tokens[at];
+    const word = wordOf(token);
+    if (word === "AND" && !between) {
+      terms.push([]);
+      continue;
+    }
+    if (word !== undefined && LOOSE_WORDS.has(word)) return false;
+    if (token?.kind === "operator" && !CONJUNCT_OPERATORS.has(token.text)) return false;
+    // A BETWEEN's own AND joins its bounds, not two terms.
+    if (word === "BETWEEN" || word === "AND") between = word === "BETWEEN";
+    terms.at(-1)?.push(at);
+  }
+  return terms.some((term) => term.length === 1 && term[0] === unit);
+}
+
+/** The units of the filtering clause `unit` sits in at its select's level; undefined if none. */
+function filteringClauseOf({
+  shape,
+  group,
+  unit,
+  fragment,
+}: {
+  shape: Shape;
+  group: Group;
+  unit: number;
+  fragment: boolean;
+}): number[] | undefined {
+  const units = unitsOf({ shape, from: group.open + 1, to: group.close });
+  const position = units.indexOf(unit);
+  const opens = units
+    .slice(0, position)
+    .findLastIndex((at) => CLAUSE_WORDS.has(wordOf(shape.tokens[at]) ?? ""));
+  // A fragment is a WHERE's body: at its top level, text before any clause word is that body.
+  const bare = opens === -1 && fragment && group.kind === "root";
+  const clause = wordOf(shape.tokens[units[opens] ?? -1]) ?? "";
+  if (!bare && !FILTERING_CLAUSES.has(clause)) return undefined;
+  const ends = units.findIndex(
+    (at, index) => index > position && CLAUSE_WORDS.has(wordOf(shape.tokens[at]) ?? ""),
+  );
+  return units.slice(opens + 1, ends === -1 ? units.length : ends);
+}
+
+/** Climbs from the marker through plain brackets of AND-ed terms to its select's WHERE. */
+function placementOf({
+  shape,
+  marker,
+  fragment,
+}: {
+  shape: Shape;
+  marker: number;
+  fragment: boolean;
+}): LooseMarkerPlacement | "conjunct" {
+  let unit = marker;
+  for (;;) {
+    const group = shape.groups[shape.groupOf[unit] ?? ROOT];
+    if (group === undefined || group.kind === "index") return "not-a-conjunct";
+    if (group.kind === "plain") {
+      const units = unitsOf({ shape, from: group.open + 1, to: group.close });
+      if (!isConjunct({ shape, units, unit })) return "not-a-conjunct";
+      unit = group.open;
+      continue;
+    }
+    const clause = filteringClauseOf({ shape, group, unit, fragment });
+    if (clause === undefined) return "outside-where";
+    return isConjunct({ shape, units: clause, unit }) ? "conjunct" : "not-a-conjunct";
+  }
+}
+
+/**
+ * Refuses a tenant marker that is not a top-level AND conjunct of the WHERE (or PREWHERE) of its
+ * own select, read on the caller's text so the fence's own OR is never seen. Allow-listed: text
+ * this reader cannot follow with certainty is refused too.
+ */
+function refuseLooseTenantMarkers({ text, fragment }: { text: string; fragment: boolean }): void {
+  const written = text.match(TENANT_MARKER) ?? [];
+  const [first] = written;
+  if (first === undefined) return;
+  const shape = shapeOf(text);
+  const markers = (shape?.tokens ?? []).flatMap((token, index) =>
+    token.kind === "marker" && IS_TENANT_MARKER.test(token.text) ? [index] : [],
+  );
+  // A marker the lexer did not read as one sits in a comment or a literal.
+  if (shape === undefined || markers.length !== written.length) {
+    throw new StatementScopeError({
+      kind: "loose-tenant-marker",
+      marker: first,
+      placement: "unreadable",
+    });
+  }
+  for (const marker of markers) {
+    const placement = placementOf({ shape, marker, fragment });
+    if (placement === "conjunct") continue;
+    const name = shape.tokens[marker]?.text ?? first;
+    throw new StatementScopeError({ kind: "loose-tenant-marker", marker: name, placement });
+  }
+}
+
 /**
  * Expand a WHERE fragment's markers on its own, for the one legacy statement that embeds the
- * compiled trace filter; a repository reads through `as()` instead. The tenant-predicate and
- * reserved-prefix checks still apply; only the windowed-marker check is left to the caller.
+ * compiled trace filter; a repository reads through `as()` instead. Every check but the
+ * windowed-marker one still applies, the fragment read as a WHERE's body.
  */
 export function expandFragment({
   fragment,
@@ -974,6 +1227,7 @@ export function expandFragment({
 }): { sql: string; params: Record<string, unknown> } {
   refuseTenantInText({ text: fragment, queryParams });
   refuseUnconditionedMarkers({ text: fragment, fence });
+  refuseLooseTenantMarkers({ text: fragment, fragment: true });
   const expanded = replaceMarkers({ text: fragment, queryParams, fence });
   refuseUnappliedBraids({ fence, expanded });
   return { sql: expanded.text, params: expanded.queryParams };

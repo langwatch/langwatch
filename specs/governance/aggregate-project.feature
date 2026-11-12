@@ -146,6 +146,16 @@ Feature: An aggregate project reads its member projects
     # Naming the column as a projected value or a dedup tuple member is
     # fine; only a predicate picks tenants, and only the client writes one.
 
+  @unit
+  Scenario: A tenant marker is only ever a top-level AND conjunct of its WHERE
+    Given a statement whose tenant marker sits under OR, XOR or NOT, inside a bracket holding an OR, or outside the WHERE of its select
+    When the store client expands it
+    Then the client refuses it and the refusal says to write the marker AND-ed into that WHERE
+    And no query runs
+    And a marker AND-ed into the WHERE of its own select or subquery renders as before
+    # Checked on the caller's text before expansion, so the fence's own OR
+    # between own projects and braid clauses is never seen.
+
   @integration
   Scenario: A plain project reads the same rows as before
     Given an ordinary project with traces
