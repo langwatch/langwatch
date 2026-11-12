@@ -1,9 +1,11 @@
 // Sealed proofs for tests that read ClickHouse through the authorized client (ADR-177 block C).
 import {
   type Authorization,
+  BRAID_CONDITION_EVERY_SPAN,
   type CompiledWhere,
   honourSpanBraids,
   sealAuthorization,
+  SPAN_BRAID_PERMISSION,
 } from "@langwatch/authorization";
 import {
   expandFragment,
@@ -92,13 +94,14 @@ export function braidedProof({
       { projectId, permissions: [...TEST_PERMISSIONS], via: [], kind: "own" },
       ...braids.map((braid, index) => ({
         projectId: braid.owner,
-        permissions: ["traces:view"],
+        permissions: [SPAN_BRAID_PERMISSION],
         via: [`braid_${index}`],
         kind: "shared" as const,
         condition: {
           type: "span" as const,
+          // A braid with no condition carries every span, stated, as the minter gives it.
           ...(braid.compiledWhere === undefined
-            ? {}
+            ? { compiledWhere: BRAID_CONDITION_EVERY_SPAN }
             : { where: "compiled", compiledWhere: braid.compiledWhere }),
           from: braid.from ?? 0,
           until: braid.until ?? null,

@@ -3,6 +3,7 @@ import {
   AUTHZ_RESOURCES,
   type AuthzPermission,
   type AuthzResource,
+  isGrantablePermission,
   permissionResource,
   permissionSatisfiedBy,
 } from "@langwatch/authorization";
@@ -301,15 +302,16 @@ export const PERMISSION_CATEGORIES: readonly PermissionCategory[] = [
 const RESOURCES_NEVER_ON_A_KEY: ReadonlySet<string> = new Set<AuthzResource>(["braids"]);
 
 /**
- * What the categories deliberately do NOT cover: the platform tier
- * (`scopes: ["platform"]`), grantable only to platform staff, and the
- * resources above. Enforced by permission-categories.unit.test.ts.
+ * What the categories deliberately do NOT cover: the platform tier (`scopes: ["platform"]`),
+ * grantable only to platform staff, a permission never granted at all (`spans:braided`), and
+ * the resources above. Enforced by permission-categories.unit.test.ts.
  */
 export function categorizablePermissions(): AuthzPermission[] {
   return [...ALL_PERMISSIONS].filter((permission) => {
     const resource = permissionResource(permission);
     const def = AUTHZ_RESOURCES[resource as AuthzResource];
     return (
+      isGrantablePermission(permission) &&
       !(def.scopes as readonly string[]).includes("platform") &&
       !RESOURCES_NEVER_ON_A_KEY.has(resource)
     );

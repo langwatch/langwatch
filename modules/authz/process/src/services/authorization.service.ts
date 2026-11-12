@@ -11,9 +11,11 @@ import {
   type AuthorizationCondition,
   type AuthorizationGrant,
   type AuthorizationPurpose,
+  BRAID_CONDITION_EVERY_SPAN,
   type GrantCondition,
   sealAuthorization,
   ProjectNotFoundError,
+  SPAN_BRAID_PERMISSION,
 } from "@langwatch/authorization";
 import {
   type AuthzPrincipalRef,
@@ -281,40 +283,56 @@ function sharedGrantsFrom({
       condition !== "not_applicable" &&
       (expiry === undefined || expiry > now);
     if (!applicable) continue;
+    // A braid carries its own permission alone, which only the span read accepts (ADR-201 §3).
+    const isBraid = condition.type === "span";
     shared.push({
       projectId: row.memberProjectId,
-      permissions: [permission],
+      permissions: isBraid ? [SPAN_BRAID_PERMISSION] : [permission],
       via: [row.grantId],
       kind: "shared",
       condition,
     });
     if (expiry !== undefined) expiresAt = Math.min(expiresAt, expiry);
-    if (condition.type === "span") expiresAt = Math.min(expiresAt, now + BRAID_REVOCATION_BOUND_MS);
+    if (isBraid) expiresAt = Math.min(expiresAt, now + BRAID_REVOCATION_BOUND_MS);
   }
   return { shared, expiresAt };
 }
 
 /**
- * The ledger's ISO window as the proof's epoch milliseconds. Only a span braid carries a `where`,
- * with its compiled form, which the proof keeps; any other `where`, or a window with no start
- * (the widest there is), keeps the row out of the proof rather than in it unfiltered.
+ * The ledger's ISO window as the proof's epoch milliseconds. A window with no start (the widest
+ * there is), or a condition with no compiled form it needs, keeps the row out of the proof rather
+ * than in it unfiltered.
  */
 function proofCondition(condition: GrantCondition): AuthorizationCondition | "not_applicable" {
-  const hasWhere = condition.where !== undefined && condition.where !== "";
-  const isBraid = condition.type === "span" && condition.compiledWhere !== undefined;
-  if (hasWhere !== isBraid) return "not_applicable";
-  if (condition.compiledWhere !== undefined && condition.type !== "span") return "not_applicable";
+  const compiled = compiledFormOf(condition);
+  if (compiled === "not_applicable") return "not_applicable";
   if (condition.from === undefined) return "not_applicable";
   const from = epochMillisecondsOf(condition.from);
   const until = condition.until === undefined ? null : epochMillisecondsOf(condition.until);
   if (from === "not_applicable" || until === "not_applicable") return "not_applicable";
 
-  return {
-    type: condition.type,
-    ...(isBraid ? { where: condition.where, compiledWhere: condition.compiledWhere } : {}),
-    from,
-    until,
-  };
+  return { type: condition.type, ...compiled, from, until };
+}
+
+/**
+ * Only a span braid carries a compiled form, and it always does (ADR-201 §3): its stored one
+ * under a `where`, the explicit "every span" form under none, rows stored before that form
+ * existed included. A `where` without its compiled form, or one on another type, is refused.
+ */
+function compiledFormOf(
+  condition: GrantCondition,
+): Pick<AuthorizationCondition, "where" | "compiledWhere"> | "not_applicable" {
+  const where = condition.where ?? "";
+  const { compiledWhere } = condition;
+  if (condition.type !== "span") {
+    return where === "" && compiledWhere === undefined ? {} : "not_applicable";
+  }
+  if (where === "") {
+    return compiledWhere === undefined
+      ? { compiledWhere: BRAID_CONDITION_EVERY_SPAN }
+      : "not_applicable";
+  }
+  return compiledWhere === undefined ? "not_applicable" : { where, compiledWhere };
 }
 
 function epochMillisecondsOf(iso: string): number | "not_applicable" {

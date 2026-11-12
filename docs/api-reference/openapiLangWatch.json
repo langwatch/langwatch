@@ -17089,7 +17089,8 @@
                                           "seatRequests:view",
                                           "seatRequests:manage",
                                           "members:view",
-                                          "braids:manage"
+                                          "braids:manage",
+                                          "spans:braided"
                                         ]
                                       }
                                     ]
@@ -17318,7 +17319,8 @@
                                     "seatRequests:view",
                                     "seatRequests:manage",
                                     "members:view",
-                                    "braids:manage"
+                                    "braids:manage",
+                                    "spans:braided"
                                   ]
                                 }
                               ]
@@ -17947,7 +17949,8 @@
                                                   "seatRequests:view",
                                                   "seatRequests:manage",
                                                   "members:view",
-                                                  "braids:manage"
+                                                  "braids:manage",
+                                                  "spans:braided"
                                                 ]
                                               }
                                             ]
@@ -18176,7 +18179,8 @@
                                             "seatRequests:view",
                                             "seatRequests:manage",
                                             "members:view",
-                                            "braids:manage"
+                                            "braids:manage",
+                                            "spans:braided"
                                           ]
                                         }
                                       ]
@@ -18626,7 +18630,8 @@
                                         "seatRequests:view",
                                         "seatRequests:manage",
                                         "members:view",
-                                        "braids:manage"
+                                        "braids:manage",
+                                        "spans:braided"
                                       ]
                                     }
                                   ]

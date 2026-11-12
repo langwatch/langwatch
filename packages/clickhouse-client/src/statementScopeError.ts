@@ -24,6 +24,7 @@ export type StatementScopeViolation =
   | { kind: "plain-marker-under-braids" }
   | { kind: "loose-latest-version-marker" }
   | { kind: "unsupported-condition-version"; version: number }
+  | { kind: "uncompiled-braid-condition" }
   | { kind: "over-budget"; bytes: number; budget: number };
 
 /** A statement the reader will not send. Named so a test can tell which
@@ -64,6 +65,8 @@ function describe(violation: StatementScopeViolation): string {
       return "A {{tenantScopeForLatestVersion:<TimeColumn>}} marker sits outside a latest-version election on stored_spans, or its election is not in the WHERE a windowed marker fences.";
     case "unsupported-condition-version":
       return `A braid's condition was compiled by compiler version ${violation.version}, which this reader cannot render.`;
+    case "uncompiled-braid-condition":
+      return "A braid's condition reached the fence without its compiled form. Every span braid carries one; every span is stated, never implied.";
     case "over-budget":
       return `The expanded statement is ${violation.bytes} bytes, over the ${violation.budget}-byte budget ClickHouse parses.`;
   }

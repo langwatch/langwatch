@@ -113,6 +113,7 @@ class GetApiV1QueryReferenceResponse200ExamplesItemRequiresGatesItemType1(str, E
     SECRETSMANAGE = "secrets:manage"
     SECRETSUPDATE = "secrets:update"
     SECRETSVIEW = "secrets:view"
+    SPANSBRAIDED = "spans:braided"
     SSOMANAGE = "sso:manage"
     SSOVIEW = "sso:view"
     SUBSCRIPTIONMANAGE = "subscription:manage"

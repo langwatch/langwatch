@@ -5,9 +5,12 @@
  */
 import {
   BRAID_CONDITION_COMPILER_VERSION,
+  BRAID_CONDITION_EVERY_SPAN,
   type GrantCondition,
   honourSpanBraids,
+  type ProofBearingPermission,
   readScopeKeyOf,
+  SPAN_BRAID_PERMISSION,
 } from "@langwatch/authorization";
 import type { AuthzScopeRef } from "@langwatch/authz-contract";
 import { compileBraidCondition } from "@langwatch/authz-contract/braid-condition-compiler";
@@ -88,7 +91,12 @@ function ledger({ now }: { now: () => number }) {
     });
   const door = AuthorizationService.create({
     authz: createApiFixture<Pick<AuthzService, "effectivePermissions">>({
-      effectivePermissions: async () => ["project:view", "traces:view"],
+      effectivePermissions: async () => [
+        "project:view",
+        "traces:view",
+        "analytics:view",
+        "cost:view",
+      ],
     }),
     collector: createApiFixture<Pick<AuthzCollectorService, "findScopeRef">>({
       findScopeRef: async ({ projectId }) =>
@@ -102,11 +110,11 @@ function ledger({ now }: { now: () => number }) {
     sharedReads: reads,
     now,
   });
-  const mint = (projectId: string) =>
+  const mint = (projectId: string, permission: ProofBearingPermission = "traces:view") =>
     door.authorize({
       actor: SAM,
       principal: SAM,
-      permission: "traces:view",
+      permission,
       scope: { projectId },
       purpose: ROUTE,
     });
@@ -209,7 +217,8 @@ describe("the proof a reader's trace read carries", () => {
 
   describe("given a braid saved with no condition", () => {
     /** @scenario "A braid with no condition braids every owner span in the reader's traces" */
-    it("carries the owner as a span window with no condition to narrow it", async () => {
+    /** @scenario "A braid stored with no condition is minted as every span, stated" */
+    it("carries the owner as a span window whose compiled form is every span, stated", async () => {
       const { braid, mint } = ledger({ now: () => Date.parse("2026-10-20T00:00:00Z") });
       await braid({
         id: "grant_unconditioned",
@@ -222,11 +231,73 @@ describe("the proof a reader's trace read carries", () => {
 
       expect(proof.grants[1]).toEqual({
         projectId: SPECIALISTS,
-        permissions: ["traces:view"],
+        permissions: [SPAN_BRAID_PERMISSION],
         via: ["grant_unconditioned"],
         kind: "shared",
-        condition: { type: "span", from: Date.parse(OCTOBER_1), until: null },
+        condition: {
+          type: "span",
+          compiledWhere: BRAID_CONDITION_EVERY_SPAN,
+          from: Date.parse(OCTOBER_1),
+          until: null,
+        },
       });
+    });
+  });
+
+  describe("given stored braids written before every condition carried its compiled form", () => {
+    /** @scenario "A braid stored with no condition is minted as every span, stated" */
+    it("states every span for an empty where and leaves out a where with no compiled form", async () => {
+      const { braid, mint } = ledger({ now: () => Date.parse("2026-10-20T00:00:00Z") });
+      await braid({
+        id: "grant_empty_where",
+        owner: SPECIALISTS,
+        reader: ORCHESTRATOR,
+        condition: { type: "span", where: "", from: OCTOBER_1 },
+      });
+      await braid({
+        id: "grant_uncompiled",
+        owner: FRONTDESK,
+        reader: ORCHESTRATOR,
+        condition: { type: "span", where: WEB, from: OCTOBER_1 },
+      });
+
+      const proof = await mint(ORCHESTRATOR);
+
+      expect(proof.grants.map(({ via, condition }) => ({ via, condition }))).toEqual([
+        { via: [], condition: undefined },
+        {
+          via: ["grant_empty_where"],
+          condition: {
+            type: "span",
+            compiledWhere: BRAID_CONDITION_EVERY_SPAN,
+            from: Date.parse(OCTOBER_1),
+            until: null,
+          },
+        },
+      ]);
+    });
+  });
+
+  describe("given a live braid and a proof minted on a trace, analytics or cost route", () => {
+    /** @scenario "A minted braid grant carries only the braid permission" */
+    it("carries spans:braided alone on the braid's grant, and on no other grant", async () => {
+      const { braid, mint } = ledger({ now: () => Date.parse("2026-10-20T00:00:00Z") });
+      await braid({
+        id: "grant_braid",
+        owner: SPECIALISTS,
+        reader: ORCHESTRATOR,
+        condition: spanCondition({ where: WEB }),
+      });
+
+      for (const permission of ["traces:view", "analytics:view", "cost:view"] as const) {
+        const [own, shared] = (await mint(ORCHESTRATOR, permission)).grants;
+
+        expect({ permission, braid: shared?.permissions }).toEqual({
+          permission,
+          braid: [SPAN_BRAID_PERMISSION],
+        });
+        expect(own?.permissions).not.toContain(SPAN_BRAID_PERMISSION);
+      }
     });
   });
 

@@ -132,6 +132,27 @@ Feature: Braided spans in the reader's traces
       Then every resource names all three, with no default
       And the resources that apply span windows are exactly the span read
 
+    @unit
+    Scenario: Across every read resource, a braid grant reaches only the span read
+      Given sam's honoured proof carries the braid, and an own grant holding every proof-bearing permission
+      When each read resource the ClickHouse fence knows is fenced for "orchestrator"
+      Then only the span read names "specialists"
+      And a braid grant carrying a read's own permission instead of spans:braided is refused when sealed
+
+    @unit
+    Scenario: A braid with no condition is fenced to the reader's held traces like any other
+      Given sam's honoured proof carries a braid whose condition is every span
+      When a span read is fenced for "orchestrator"
+      Then the braid's clause sits under the held-trace semi-join with a predicate that is always true
+      And its cache key differs from a braid with a condition and from a trace window
+
+    @unit
+    Scenario: Resealing a proof with other grants drops the honoured flag
+      Given the trace module's plan check honoured sam's braids
+      When the proof is sealed again, with its grants swapped or as it was
+      Then its braids reach no fence until the plan check honours it again
+      And narrowing it to "orchestrator" keeps the flag, since narrowing only removes grants
+
   Rule: Each span keeps its owner's privacy
 
     @integration

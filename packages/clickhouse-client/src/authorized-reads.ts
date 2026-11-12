@@ -20,6 +20,7 @@ import {
   type ProofBearingPermission,
   type SharedWindow,
   sharedWindowsReadBy,
+  SPAN_BRAID_PERMISSION,
   usableAuthorization,
   VERIFIED_ATTRIBUTE_PREFIX,
 } from "@langwatch/authorization";
@@ -46,9 +47,9 @@ export type ClickHouseClientResolver = (tenantId: string) => Promise<ClickHouseQ
 type WindowTreatment = "applies" | "excluded";
 
 /**
- * What a reader may be asked for: its proof-bearing permission, and how it treats a shared
- * window of every condition type, so a new resource or condition type does not compile until
- * someone chooses. Only `spans` takes a braid's `span` windows, held by a guard test (ADR-201 §3).
+ * A reader's proof-bearing permission and its treatment of every condition type's window, so a
+ * new resource or condition type does not compile until someone chooses. Only `spans` takes
+ * `span` windows, those of grants carrying `spans:braided`; a guard test holds both (ADR-201 §3).
  */
 export const READ_RESOURCES = {
   traces: {
@@ -125,15 +126,14 @@ const windowKey = (window: SharedWindow): string =>
   `${window.projectId}@${window.from}-${window.until ?? ""}`;
 
 /**
- * One bracketed clause of the conditions marker: owners and their windows under one compiled
- * predicate (none for a braid with no condition). An owner sits once per clause; a second
- * disjoint window under the same predicate goes in a clause of its own.
+ * One bracketed clause of the conditions marker: a trace window read beside braids, or owners
+ * and their windows under one braid's compiled predicate ("every span" stated). An owner sits
+ * once per clause; a second disjoint window under one predicate goes in a clause of its own.
  */
-type BraidClause = {
-  compiledWhere: CompiledWhere | undefined;
-  digest: string;
-  windows: readonly SharedWindow[];
-};
+type BraidClause = { digest: string; windows: readonly SharedWindow[] } & (
+  | { kind: "traceWindow" }
+  | { kind: "braid"; compiledWhere: CompiledWhere }
+);
 
 type TenantFence = {
   /**
@@ -266,7 +266,7 @@ export function conditionsExpression({
     const name = (part: string) => `c${index}_${part}`;
     const windowed = windowsOf({ column, windows: clause.windows, name });
     Object.assign(params, windowed.params);
-    if (clause.compiledWhere === undefined) {
+    if (clause.kind === "traceWindow") {
       picks.push(`(${windowed.sql})`);
       return;
     }
@@ -282,7 +282,7 @@ export function conditionsExpression({
   if (braided.length > 0) {
     params[fenceParam("heldFrom")] = Math.min(
       ...braids.clauses
-        .filter((clause) => clause.compiledWhere !== undefined)
+        .filter((clause) => clause.kind === "braid")
         .flatMap((clause) => clause.windows.map((window) => window.from)),
     );
     picks.push(`(${heldTraceOf(held)} AND (${braided.join(" OR ")}))`);
@@ -375,7 +375,9 @@ function predicateOf({
         return `SpanAttributes[${bind(`${index}k`, `${VERIFIED_ATTRIBUTE_PREFIX}${term.key}`)}] = ${readerSlot}`;
     }
   };
-  const sql = braidConditionTermsOf(compiledWhere.tree).map(termSql).join(" AND ");
+  const terms = braidConditionTermsOf(compiledWhere.tree);
+  // "Every span" is the empty conjunction, which is true.
+  const sql = terms.length === 0 ? "1" : terms.map(termSql).join(" AND ");
   return { sql, params, verifies };
 }
 
@@ -404,6 +406,8 @@ export function fenceFor({
 }): TenantFence {
   const { permission, windows } = READ_RESOURCES[reads];
   const applies = (type: AuthorizationConditionType): boolean => windows[type] === "applies";
+  // A braid carries `spans:braided` alone, so no resource reading `permission` picks one up.
+  const braids = (grant: AuthorizationGrant) => grant.permissions.includes(SPAN_BRAID_PERMISSION);
   const carries = (grant: AuthorizationGrant) => grant.permissions.includes(permission);
   const own = authorization.grants
     .filter((grant) => grant.kind === "own" && grant.projectId !== undefined)
@@ -414,7 +418,7 @@ export function fenceFor({
     ? sharedWindowsReadBy({ authorization, permission, condition: "trace" })
     : [];
   // A braid reaches the fence only on a proof the plan check honoured (ADR-201 §9).
-  const braided = applies("span") ? honouredSpanBraidGrants(authorization).filter(carries) : [];
+  const braided = applies("span") ? honouredSpanBraidGrants(authorization).filter(braids) : [];
   const [reader = ""] = own;
   const narrowedTo = authorization.narrowedTo;
   if (narrowedTo === undefined) return withBraids({ fence: { own, shared }, braided, reader });
@@ -450,23 +454,39 @@ function withBraids({
   reader: string;
 }): TenantFence {
   if (braided.length === 0) return fence;
-  // A trace window read beside braids is a clause with no predicate.
-  const entries = [
-    ...braided.map((grant) => ({
-      compiledWhere: grant.condition?.compiledWhere,
-      window: windowOf(grant),
-    })),
-    ...fence.shared.map((window) => ({ compiledWhere: undefined, window })),
-  ];
   const byPredicate = new Map<string, BraidClause>();
-  for (const { compiledWhere, window } of entries) {
-    const digest = compiledWhere === undefined ? "" : braidConditionDigest(compiledWhere);
-    const clause = byPredicate.get(digest) ?? { compiledWhere, digest, windows: [] };
-    byPredicate.set(digest, { ...clause, windows: [...clause.windows, window] });
+  const add = (clause: BraidClause, window: SharedWindow) => {
+    const held = byPredicate.get(clause.digest) ?? clause;
+    byPredicate.set(clause.digest, { ...held, windows: [...held.windows, window] });
+  };
+  for (const grant of braided) {
+    const compiledWhere = compiledWhereOf(grant);
+    const digest = braidConditionDigest(compiledWhere);
+    add({ kind: "braid", compiledWhere, digest, windows: [] }, windowOf(grant));
   }
+  // A trace window read beside braids is a clause of its own, with no predicate.
+  for (const window of fence.shared) add({ kind: "traceWindow", digest: "", windows: [] }, window);
   const clauses = [...byPredicate.values()].flatMap(layeredByOwner);
   const widest = mergedByOwner(braided.map(windowOf)).map(hullOf);
   return { ...fence, shared: [...fence.shared, ...widest], braids: { reader, clauses } };
+}
+
+/**
+ * A braid's compiled form, refused when absent or from another compiler version: "every span" is
+ * stated, never implied by a missing form, so the fence fails closed (ADR-201 §3).
+ */
+function compiledWhereOf(grant: AuthorizationGrant): CompiledWhere {
+  const compiledWhere = grant.condition?.compiledWhere;
+  if (compiledWhere === undefined) {
+    throw new StatementScopeError({ kind: "uncompiled-braid-condition" });
+  }
+  if (compiledWhere.version !== BRAID_CONDITION_COMPILER_VERSION) {
+    throw new StatementScopeError({
+      kind: "unsupported-condition-version",
+      version: compiledWhere.version,
+    });
+  }
+  return compiledWhere;
 }
 
 /** Each owner's windows, overlapping ones merged, earliest first. */

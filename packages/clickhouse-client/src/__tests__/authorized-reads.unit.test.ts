@@ -2,9 +2,11 @@ import {
   AccessNotGrantedError,
   type Authorization,
   AuthorizationExpiredError,
+  BRAID_CONDITION_EVERY_SPAN,
   ForgedAuthorizationError,
   narrowAuthorization,
   sealAuthorization,
+  SPAN_BRAID_PERMISSION,
 } from "@langwatch/authorization";
 import { tenantScope, tenantSet } from "@langwatch/clickhouse-markers";
 import { describe, expect, it, vi } from "vitest";
@@ -287,10 +289,15 @@ describe("AuthorizedClickHouse", () => {
             },
             {
               projectId: B,
-              permissions: ["traces:view"],
+              permissions: [SPAN_BRAID_PERMISSION],
               via: ["grant_b"],
               kind: "shared",
-              condition: { type: "span", from: 0, until: null },
+              condition: {
+                type: "span",
+                compiledWhere: BRAID_CONDITION_EVERY_SPAN,
+                from: 0,
+                until: null,
+              },
             },
           ],
         });

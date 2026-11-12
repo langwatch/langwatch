@@ -7,11 +7,13 @@ import {
   AccessNotGrantedError,
   type Authorization,
   type AuthorizationInput,
+  BRAID_CONDITION_EVERY_SPAN,
   type BraidConditionTerm,
   type CompiledWhere,
   honourSpanBraids,
   narrowAuthorization,
   sealAuthorization,
+  SPAN_BRAID_PERMISSION,
 } from "@langwatch/authorization";
 import {
   type HeldTraceBound,
@@ -110,7 +112,26 @@ function windowOf(random: Random): { from: number; until: number | null } {
   return { from, until: chance({ random, p: 0.5 }) ? null : from + 1 + Math.floor(random() * 1e6) };
 }
 
-function grantsOf({ random, conditioned }: { random: Random; conditioned: boolean }): GrantInput[] {
+/**
+ * A braid's compiled form: a generated tree when `conditioned`, else every span stated, and now
+ * and then none at all, which the seal must refuse.
+ */
+function braidCompiledWhereOf({
+  random,
+  conditioned,
+}: {
+  random: Random;
+  conditioned: boolean;
+}): CompiledWhere | undefined {
+  if (conditioned) return compiledWhereOf(random);
+  return chance({ random, p: 0.85 }) ? BRAID_CONDITION_EVERY_SPAN : undefined;
+}
+
+/** The generated grants, and whether a braid among them is malformed, which the seal refuses. */
+function grantsOf({ random, conditioned }: { random: Random; conditioned: boolean }): {
+  grants: GrantInput[];
+  malformed: boolean;
+} {
   const ownPermissions = chance({ random, p: 0.85 })
     ? [...new Set(["traces:view", ...subsetOf({ random, from: PERMISSIONS })])]
     : subsetOf({ random, from: PERMISSIONS });
@@ -141,24 +162,30 @@ function grantsOf({ random, conditioned }: { random: Random; conditioned: boolea
     });
   }
   const braids = Math.floor(random() * 4);
+  let malformed = false;
   for (let index = 0; index < braids; index += 1) {
     const owner = pick({ random, from: OWNERS });
-    const compiledWhere = conditioned ? compiledWhereOf(random) : undefined;
+    const compiledWhere = braidCompiledWhereOf({ random, conditioned });
+    // A braid carries the braid permission alone; now and then a read's own, which is refused.
+    const ownPermission = chance({ random, p: 0.95 });
+    const permissions = ownPermission
+      ? [SPAN_BRAID_PERMISSION]
+      : subsetOf({ random, from: PERMISSIONS });
+    malformed ||= compiledWhere === undefined || !ownPermission;
     grants.push({
       projectId: owner,
-      permissions: chance({ random, p: 0.8 })
-        ? [...PERMISSIONS]
-        : subsetOf({ random, from: PERMISSIONS }),
+      permissions,
       via: [`grant_${owner}_${index}`],
       kind: "shared",
       condition: {
         type: "span",
-        ...(compiledWhere === undefined ? {} : { where: "compiled", compiledWhere }),
+        ...(compiledWhere === BRAID_CONDITION_EVERY_SPAN ? {} : { where: "compiled" }),
+        ...(compiledWhere === undefined ? {} : { compiledWhere }),
         ...windowOf(random),
       },
     });
   }
-  return grants;
+  return { grants, malformed };
 }
 
 type ProofCase = {
@@ -167,10 +194,16 @@ type ProofCase = {
   narrowedTo: string | undefined;
 };
 
-/** The seal refused a generated proof: a refusal only where a braid holds no compiled condition. */
+/** The seal refused a generated proof: a refusal only where a generated braid is malformed. */
 class UnsealedProofError extends Error {}
 
-function sealed({ grants }: { grants: GrantInput[] }): Authorization {
+function sealed({
+  grants,
+  malformed,
+}: {
+  grants: GrantInput[];
+  malformed: boolean;
+}): Authorization {
   try {
     return sealAuthorization({
       actor: { type: "user", id: "ana" },
@@ -181,12 +214,13 @@ function sealed({ grants }: { grants: GrantInput[] }): Authorization {
       purpose: { kind: "route", route: "traces.get" },
     });
   } catch (cause) {
+    if (!malformed) throw cause;
     throw new UnsealedProofError("the seal refused the proof", { cause });
   }
 }
 
 function proofOf({ random, conditioned }: { random: Random; conditioned: boolean }): ProofCase {
-  const minted = sealed({ grants: grantsOf({ random, conditioned }) });
+  const minted = sealed(grantsOf({ random, conditioned }));
   const honoured = chance({ random, p: 0.7 });
   const authorization = honoured ? honourSpanBraids({ authorization: minted }) : minted;
   const narrowedTo = chance({ random, p: 0.3 })
@@ -338,7 +372,9 @@ function ownerSlotViolation({
     if (!text.startsWith(" AND (", semiJoinEnd + 1)) return "the semi-join is not a conjunct";
     const own = groups.findLast((open) => text.startsWith(`(TenantId IN ({${param}:`, open));
     const body = own === undefined ? "" : text.slice(own, closingOf({ text, open: own }));
-    if (!new RegExp(`\\{tenantScope_c${clause[1]}_\\d+[kv]:`).test(body))
+    // "Every span" is stated as the always-true predicate; any other clause binds its terms.
+    const everySpan = body.endsWith(" AND (1)");
+    if (!everySpan && !new RegExp(`\\{tenantScope_c${clause[1]}_\\d+[kv]:`).test(body))
       return `clause ${clause[1]} carries no predicate`;
   }
   return undefined;
@@ -384,7 +420,7 @@ function outcomeOf({ random, conditioned }: { random: Random; conditioned: boole
         statement,
       };
     }
-    if (error instanceof UnsealedProofError && !conditioned) {
+    if (error instanceof UnsealedProofError) {
       return { outcome: { kind: "refused", reason: "unsealed" }, proof, reads, statement };
     }
     if (error instanceof AccessNotGrantedError) {
@@ -464,11 +500,17 @@ describe("the fence, over generated proofs and statements", () => {
     });
   });
 
-  describe("given braids with no compiled condition", () => {
-    // ADR-201 v1.10: a span condition always carries its compiled form. Until the proof refuses
-    // one without, the fence reads such a braid's owner outside the semi-join; drop `.fails` then.
-    it.fails("never reads an owner's spans outside the held-trace semi-join", () => {
+  describe("given braids with no condition, stated as every span or left out", () => {
+    // ADR-201 v1.10: a span condition always carries its compiled form, "every span" included.
+    it("never reads an owner's spans outside the held-trace semi-join", () => {
       expect(runProperty({ conditioned: false }).failures).toEqual([]);
+    });
+
+    it("renders every-span braids and refuses the ones with no compiled form when sealed", () => {
+      const { tally } = runProperty({ conditioned: false });
+
+      expect(tally.get("owner-bound") ?? 0).toBeGreaterThan(100);
+      expect(tally.get("unsealed") ?? 0).toBeGreaterThan(0);
     });
   });
 });

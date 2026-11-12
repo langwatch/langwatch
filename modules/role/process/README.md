@@ -125,11 +125,11 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Dec
 Answers at `/api/roles`, `/api/v1/roles`; also, undocumented, `/api/roles/2026-08-07`, `/api/v1/roles/2026-08-07`, `/api/roles/latest`, `/api/v1/roles/latest`.
 
 ```typescript
-// Query: roleRestListQuerySchema, ../contract/src/role-rest.schemas.ts:68
+// Query: roleRestListQuerySchema, ../contract/src/role-rest.schemas.ts:75
 interface Query {
   builtIn?: "true" | "false";
 }
-// Response: roleRestListSchema, ../contract/src/role-rest.schemas.ts:72
+// Response: roleRestListSchema, ../contract/src/role-rest.schemas.ts:79
 interface Response {
   roles: {
     id: string;
@@ -152,13 +152,13 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Dec
 Answers at `/api/roles`, `/api/v1/roles`; also, undocumented, `/api/roles/2026-08-07`, `/api/v1/roles/2026-08-07`, `/api/roles/latest`, `/api/v1/roles/latest`.
 
 ```typescript
-// Body: roleRestCreateSchema, ../contract/src/role-rest.schemas.ts:84
+// Body: roleRestCreateSchema, ../contract/src/role-rest.schemas.ts:91
 interface Body {
   name: string;
   description?: string;
   permissions: string[];
 }
-// Response: roleRestSchema, ../contract/src/role-rest.schemas.ts:54
+// Response: roleRestSchema, ../contract/src/role-rest.schemas.ts:61
 interface Response {
   id: string;
   name: string;
@@ -179,7 +179,7 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Dec
 Answers at `/api/roles/permissions`, `/api/v1/roles/permissions`; also, undocumented, `/api/roles/2026-08-07/permissions`, `/api/v1/roles/2026-08-07/permissions`, `/api/roles/latest/permissions`, `/api/v1/roles/latest/permissions`.
 
 ```typescript
-// Response: rolePermissionCatalogSchema, ../contract/src/role-rest.schemas.ts:118
+// Response: rolePermissionCatalogSchema, ../contract/src/role-rest.schemas.ts:125
 interface Response {
   resources: {
     resource: string;
@@ -200,11 +200,11 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Dec
 Answers at `/api/roles/:id`, `/api/v1/roles/:id`; also, undocumented, `/api/roles/2026-08-07/:id`, `/api/v1/roles/2026-08-07/:id`, `/api/roles/latest/:id`, `/api/v1/roles/latest/:id`.
 
 ```typescript
-// Params: roleRestParamsSchema, ../contract/src/role-rest.schemas.ts:76
+// Params: roleRestParamsSchema, ../contract/src/role-rest.schemas.ts:83
 interface Params {
   id: string;
 }
-type Response = z.infer<typeof roleRestSchema>; // ../contract/src/role-rest.schemas.ts:54
+type Response = z.infer<typeof roleRestSchema>; // ../contract/src/role-rest.schemas.ts:61
 ```
 
 #### `PATCH /:id` · `updateRole`
@@ -216,14 +216,14 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Dec
 Answers at `/api/roles/:id`, `/api/v1/roles/:id`; also, undocumented, `/api/roles/2026-08-07/:id`, `/api/v1/roles/2026-08-07/:id`, `/api/roles/latest/:id`, `/api/v1/roles/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof roleRestParamsSchema>; // ../contract/src/role-rest.schemas.ts:76
-// Body: roleRestUpdateSchema, ../contract/src/role-rest.schemas.ts:93
+type Params = z.infer<typeof roleRestParamsSchema>; // ../contract/src/role-rest.schemas.ts:83
+// Body: roleRestUpdateSchema, ../contract/src/role-rest.schemas.ts:100
 interface Body {
   name?: string;
   description?: string | null;
   permissions?: string[];
 }
-type Response = z.infer<typeof roleRestSchema>; // ../contract/src/role-rest.schemas.ts:54
+type Response = z.infer<typeof roleRestSchema>; // ../contract/src/role-rest.schemas.ts:61
 ```
 
 #### `DELETE /:id` · `deleteRole`
@@ -235,8 +235,8 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Dec
 Answers at `/api/roles/:id`, `/api/v1/roles/:id`; also, undocumented, `/api/roles/2026-08-07/:id`, `/api/v1/roles/2026-08-07/:id`, `/api/roles/latest/:id`, `/api/v1/roles/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof roleRestParamsSchema>; // ../contract/src/role-rest.schemas.ts:76
-// Response: roleRestDeletedSchema, ../contract/src/role-rest.schemas.ts:97
+type Params = z.infer<typeof roleRestParamsSchema>; // ../contract/src/role-rest.schemas.ts:83
+// Response: roleRestDeletedSchema, ../contract/src/role-rest.schemas.ts:104
 interface Response {
   success: true;
 }

@@ -1,8 +1,10 @@
 /** ADR-177 decision 9: the policies come from the proof's grants, never the aggregate's rule. */
 import {
   type Authorization,
+  BRAID_CONDITION_EVERY_SPAN,
   narrowAuthorization,
   sealAuthorization,
+  SPAN_BRAID_PERMISSION,
 } from "@langwatch/authorization";
 import { describe, expect, it } from "vitest";
 
@@ -28,10 +30,15 @@ const proof = ({ shared, braided = [] }: { shared: string[]; braided?: string[] 
       })),
       ...braided.map((projectId, index) => ({
         projectId,
-        permissions: ["traces:view" as const],
+        permissions: [SPAN_BRAID_PERMISSION],
         via: [`braid_${index}`],
         kind: "shared" as const,
-        condition: { type: "span" as const, from: 0, until: null },
+        condition: {
+          type: "span" as const,
+          compiledWhere: BRAID_CONDITION_EVERY_SPAN,
+          from: 0,
+          until: null,
+        },
       })),
     ],
     expiresAt: Date.now() + 60_000,

@@ -136,7 +136,7 @@ describe("given a caller's own permissions bound what they may grant", () => {
   });
 
   describe("when an organization admin grants anything", () => {
-    it("finds only the platform permissions beyond the admin", async () => {
+    it("finds only the platform permissions and the never-granted braid one beyond the admin", async () => {
       const authz = authzFor({ userBindings: [onOrganization("admin")], membership: "ADMIN" });
 
       const missing = await authz.findPermissionsBeyondCaller({
@@ -146,7 +146,7 @@ describe("given a caller's own permissions bound what they may grant", () => {
         permissions: [...ALL_PERMISSIONS],
       });
 
-      expect(missing.toSorted()).toEqual(["ops:manage", "ops:view"]);
+      expect(missing.toSorted()).toEqual(["ops:manage", "ops:view", "spans:braided"]);
     });
   });
 

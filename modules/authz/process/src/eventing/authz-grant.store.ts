@@ -3,7 +3,11 @@
  * behind every grant mutation, waiting (bounded) for the projection to land
  * attach- and role-shaped writes before returning (ADR-007's breaker doctrine).
  */
-import type { GrantCondition, LedgerActor } from "@langwatch/authorization";
+import {
+  type GrantCondition,
+  isGrantablePermission,
+  type LedgerActor,
+} from "@langwatch/authorization";
 import {
   AuthzGrantNotConfirmedError,
   BILLING_ROLE_KEY,
@@ -155,6 +159,18 @@ function refusePlatformTenant(organizationId: string): void {
   if (organizationId === PLATFORM_TENANT_ID) {
     throw new GrantValidationError("The platform tier is not an organization", { organizationId });
   }
+}
+
+/**
+ * No role, custom or a key's own, may list a permission minted onto a proof and never granted
+ * (`spans:braided`, ADR-201 §3), whether the role listed it before or not.
+ */
+function refuseMintedOnlyPermissions(permissions: readonly string[]): void {
+  const minted = permissions.filter((permission) => !isGrantablePermission(permission));
+  if (minted.length === 0) return;
+  throw new GrantValidationError("A role cannot list a permission that is never granted", {
+    permissions: minted,
+  });
 }
 
 /**
@@ -926,6 +942,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     requireProjection?: boolean;
   }): Promise<void> {
     refusePlatformTenant(organizationId);
+    refuseMintedOnlyPermissions(permissions);
     if (kind === "custom") {
       await this.refuseAddedPlatformPermissions({ organizationId, roleId, permissions });
     }

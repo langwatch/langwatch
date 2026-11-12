@@ -261,6 +261,12 @@ const RESOURCE_COPY = {
     blurb: "Which experiments a project or organization is enrolled in.",
     area: "Organization",
   },
+  // Never offered or held: a braid's own grant carries it when a trace is read (ADR-201 §3).
+  spans: {
+    label: "Braided spans",
+    blurb: "What a braid shows in a trace. Nobody is granted this; braids carry it themselves.",
+    area: "Data and analysis",
+  },
 } as const satisfies Record<AuthzResource, ResourceCopy>;
 
 const UNKNOWN_RESOURCE: ResourceCopy = {

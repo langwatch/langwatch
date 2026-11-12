@@ -6,7 +6,7 @@
 import { z } from "zod";
 
 import { braidConditionDigest, compiledWhereSchema } from "./braid-condition.ts";
-import type { AuthzPermission } from "./registry.ts";
+import { type AuthzPermission, SPAN_BRAID_PERMISSION } from "./registry.ts";
 import { SYSTEM_ACTORS, type SystemActorName } from "./system-actors.ts";
 
 export const AUTHORIZATION_GRANT_KINDS = ["own", "shared"] as const;
@@ -42,8 +42,8 @@ const actorSchema = z.discriminatedUnion("type", [
 ]);
 
 /** The window a shared grant opens. `from` and `until` are epoch milliseconds; `until` null
- *  means open-ended. Only a `span` condition (a braid, ADR-201 §3) carries `compiledWhere`, and
- *  one with a non-empty `where` must, so no condition reaches a fence it cannot apply. */
+ *  means open-ended. A `span` condition (a braid, ADR-201 §3) always carries `compiledWhere`,
+ *  "every span" included, and no other condition does: nothing means "all" by being absent. */
 export const authorizationConditionSchema = z
   .object({
     type: z.enum(AUTHORIZATION_CONDITION_TYPES),
@@ -53,17 +53,10 @@ export const authorizationConditionSchema = z
     until: z.number().int().nullable(),
   })
   .strict()
-  .refine((condition) => condition.compiledWhere === undefined || condition.type === "span", {
-    message: "only a span condition carries a compiled where",
+  .refine((condition) => (condition.type === "span") === (condition.compiledWhere !== undefined), {
+    message: "a span condition carries its compiled form, and no other condition does",
     path: ["compiledWhere"],
-  })
-  .refine(
-    (condition) =>
-      condition.type !== "span" ||
-      (condition.where ?? "").trim() === "" ||
-      condition.compiledWhere !== undefined,
-    { message: "a span condition with a where carries its compiled form", path: ["compiledWhere"] },
-  );
+  });
 export type AuthorizationCondition = z.infer<typeof authorizationConditionSchema>;
 
 /**
@@ -99,7 +92,17 @@ export const authorizationGrantSchema = z
   .refine((grant) => grant.kind === "own" || grant.projectId !== undefined, {
     message: "a shared grant names the project it reads",
     path: ["projectId"],
-  });
+  })
+  .refine(
+    (grant) =>
+      grant.kind === "shared" && grant.condition?.type === "span"
+        ? grant.permissions.length === 1 && grant.permissions[0] === SPAN_BRAID_PERMISSION
+        : !grant.permissions.includes(SPAN_BRAID_PERMISSION),
+    {
+      message: `a braid grant carries ${SPAN_BRAID_PERMISSION} alone, and no other grant carries it`,
+      path: ["permissions"],
+    },
+  );
 export type AuthorizationGrant = z.infer<typeof authorizationGrantSchema>;
 
 export const authorizationPurposeSchema = z.discriminatedUnion("kind", [
@@ -165,15 +168,41 @@ function deepFreeze<T>(value: T): T {
   return Object.freeze(value);
 }
 
-/** Validate and seal a proof. Only `authz.authorize` and its equivalents
- *  for events and operators call this; a store client checks the seal. The
- *  proof is frozen all the way down before it is sealed, so the grants,
- *  their windows and the principal stay as they were minted. */
-export function sealAuthorization(input: AuthorizationInput): Authorization {
+/** Validate, freeze all the way down and seal, so the grants, their windows and the principal
+ *  stay as they were minted. */
+function sealProof(input: AuthorizationInput): Authorization {
   const parsed = authorizationSchema.parse(input);
   const frozen = deepFreeze(parsed) as Authorization;
   sealed.add(frozen);
   return frozen;
+}
+
+/** Validate and seal a proof. Only `authz.authorize` and its equivalents for events and
+ *  operators call this; a store client checks the seal. It never carries `braidsHonoured`, so a
+ *  reseal with other grants cannot keep it: only `honourSpanBraids` sets it (ADR-201 §9). */
+export function sealAuthorization(input: AuthorizationInput): Authorization {
+  const { braidsHonoured, ...unhonoured } = input;
+  return sealProof(braidsHonoured === undefined ? input : unhonoured);
+}
+
+/** A proof cut from `source`: it keeps the honoured flag only while every braid it carries is one
+ *  `source` carried, so cutting grants away never honours one the plan check did not see. */
+function resealCut({
+  source,
+  input,
+}: {
+  source: Authorization;
+  input: AuthorizationInput;
+}): Authorization {
+  const { braidsHonoured: _dropped, ...unhonoured } = input;
+  const keeps =
+    source.braidsHonoured === true &&
+    input.grants.every(
+      (grant) =>
+        !(grant.kind === "shared" && grant.condition?.type === "span") ||
+        source.grants.some((held) => held === grant),
+    );
+  return sealProof(keeps ? { ...unhonoured, braidsHonoured: true } : unhonoured);
 }
 
 export function isSealedAuthorization(value: unknown): value is Authorization {
@@ -217,12 +246,15 @@ export function narrowAuthorization({
   const toOwn = authorization.grants.some(
     (grant) => grant.kind === "own" && grant.projectId === projectId,
   );
-  return sealAuthorization({
-    ...authorization,
-    grants: authorization.grants.filter(
-      (grant) => grant.kind === "own" || names(grant) || (toOwn && isSpanBraidGrant(grant)),
-    ),
-    narrowedTo: projectId,
+  return resealCut({
+    source: authorization,
+    input: {
+      ...authorization,
+      grants: authorization.grants.filter(
+        (grant) => grant.kind === "own" || names(grant) || (toOwn && isSpanBraidGrant(grant)),
+      ),
+      narrowedTo: projectId,
+    },
   });
 }
 
@@ -262,13 +294,16 @@ export function honourSpanBraids({
   if (authorization.braidsHonoured === true || !authorization.grants.some(isSpanBraidGrant)) {
     return authorization;
   }
-  return sealAuthorization({ ...authorization, braidsHonoured: true });
+  return sealProof({ ...authorization, braidsHonoured: true });
 }
 
-/** The braids a span read's fence applies: none until `honourSpanBraids` set the flag. */
+/** The braids a span read's fence applies: none until `honourSpanBraids` set the flag, and only
+ *  those carrying the braid permission. */
 export function honouredSpanBraidGrants(authorization: Authorization): AuthorizationGrant[] {
   if (authorization.braidsHonoured !== true) return [];
-  return authorization.grants.filter(isSpanBraidGrant);
+  return authorization.grants.filter(
+    (grant) => isSpanBraidGrant(grant) && grant.permissions.includes(SPAN_BRAID_PERMISSION),
+  );
 }
 
 /** The same proof without its braids, for a read that may not honour them (ADR-201 §5, §9).
@@ -341,10 +376,11 @@ export function readScopeKeyOf(
 ): string {
   const { narrowedTo } = authorization;
   const braidsRead = narrowedTo === undefined || isNarrowedToOwn(authorization);
-  // A braid not honoured reads nothing, so it keys nothing (ADR-201 §9).
+  // A braid not honoured reads nothing, so it keys nothing (ADR-201 §9). An honoured one keys
+  // every read's scope, whatever `permission`: over-keying a cache never shows a row.
+  const braids = new Set(honouredSpanBraidGrants(authorization));
   return authorization.grants
-    .filter((grant) => !isSpanBraidGrant(grant) || authorization.braidsHonoured === true)
-    .filter((grant) => grant.permissions.includes(permission))
+    .filter((grant) => braids.has(grant) || grant.permissions.includes(permission))
     .filter(
       (grant) =>
         narrowedTo === undefined ||

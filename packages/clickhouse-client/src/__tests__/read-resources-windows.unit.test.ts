@@ -1,12 +1,19 @@
-import { AUTHORIZATION_CONDITION_TYPES } from "@langwatch/authorization";
+import {
+  AUTHORIZATION_CONDITION_TYPES,
+  BRAID_CONDITION_EVERY_SPAN,
+  honourSpanBraids,
+  PROOF_BEARING_PERMISSIONS,
+  sealAuthorization,
+  SPAN_BRAID_PERMISSION,
+} from "@langwatch/authorization";
 import { describe, expect, it } from "vitest";
 
-import { READ_RESOURCES, type ReadResource } from "../authorized-reads.ts";
+import { fenceFor, READ_RESOURCES, type ReadResource } from "../authorized-reads.ts";
 
 /**
- * Braid grants carry `traces:view`, `analytics:view` and `cost:view`, so a read resource that
- * applies `span` windows reads owners' spans. Each resource names every condition type; these
- * guards hold the choices that keep braids inert outside span reads.
+ * A braid grant carries `spans:braided` alone, and only `spans` applies `span` windows, so a
+ * braid reaches no other read even where the reader holds every proof-bearing permission. Each
+ * resource names every condition type; these guards hold both choices (ADR-201 §3).
  */
 
 const resources = Object.entries(READ_RESOURCES) as [
@@ -51,5 +58,56 @@ describe("the read resources the fence knows", () => {
         [],
       );
     });
+  });
+});
+
+describe("a braid grant across every read resource", () => {
+  const READER = "proj_reader";
+  const OWNER = "proj_owner";
+  const proofWith = (braidPermissions: string[]) =>
+    honourSpanBraids({
+      authorization: sealAuthorization({
+        actor: { type: "user", id: "ana" },
+        principal: { type: "user", id: "ana" },
+        scope: { organizationId: "org_acme" },
+        grants: [
+          { projectId: READER, permissions: [...PROOF_BEARING_PERMISSIONS], via: [], kind: "own" },
+          {
+            projectId: OWNER,
+            permissions: braidPermissions,
+            via: ["grant_braid"],
+            kind: "shared",
+            condition: {
+              type: "span",
+              compiledWhere: BRAID_CONDITION_EVERY_SPAN,
+              from: 0,
+              until: null,
+            },
+          },
+        ],
+        expiresAt: Date.now() + 30_000,
+        purpose: { kind: "route", route: "traces.get" },
+      }),
+    });
+
+  /** @scenario "Across every read resource, a braid grant reaches only the span read" */
+  it("reaches the span read and no other, whichever permissions the reader holds", () => {
+    const authorization = proofWith([SPAN_BRAID_PERMISSION]);
+    const reaching = resources
+      .map(([name]) => name)
+      .filter((reads) => {
+        const fence = fenceFor({ authorization, reads });
+        const named = [...fence.own, ...fence.shared.map((window) => window.projectId)];
+        return fence.braids !== undefined || named.includes(OWNER);
+      });
+
+    expect(reaching, OWNER_REVIEW).toEqual(["spans"]);
+  });
+
+  /** @scenario "Across every read resource, a braid grant reaches only the span read" */
+  it("is refused when sealed carrying a read's own permission instead", () => {
+    for (const permission of PROOF_BEARING_PERMISSIONS) {
+      expect(() => proofWith([permission]), permission).toThrow(/spans:braided alone/);
+    }
   });
 });

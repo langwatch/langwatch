@@ -3,7 +3,11 @@
  * each read takes, the pair's live braids beside the draft, and each braid's 24-hour window.
  * Spec: modules/trace/specs/braided-spans.feature, modules/authz/specs/braids-screen.feature
  */
-import { ownProjectIdReadBy, type CompiledWhere } from "@langwatch/authorization";
+import {
+  BRAID_CONDITION_EVERY_SPAN,
+  type CompiledWhere,
+  ownProjectIdReadBy,
+} from "@langwatch/authorization";
 import type { AuthzBraid } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -202,7 +206,12 @@ describe("TraceBraidPreviewService", () => {
       const spanRead = reads.countOwnerSpansInTraces.mock.calls[0]?.[0];
       expect(spanRead?.live).toEqual([
         { compiledWhere: WEB, readerProjectId: READER, fromMs: 100, untilMs: 900 },
-        { compiledWhere: undefined, readerProjectId: READER, fromMs: 300, untilMs: null },
+        {
+          compiledWhere: BRAID_CONDITION_EVERY_SPAN,
+          readerProjectId: READER,
+          fromMs: 300,
+          untilMs: null,
+        },
       ]);
       expect(spanRead?.draft).toMatchObject({ fromMs: 500, untilMs: null });
       expect(preview).toMatchObject({
@@ -258,7 +267,12 @@ describe("TraceBraidPreviewService", () => {
       expect(ownProjectIdReadBy(marked?.authorization ?? proofs.readerAuthorization)).toBe(OWNER);
       expect(marked?.braids).toEqual([
         { compiledWhere: WEB, readerProjectId: READER, fromMs: 100, untilMs: 900 },
-        { compiledWhere: undefined, readerProjectId: READER, fromMs: 300, untilMs: null },
+        {
+          compiledWhere: BRAID_CONDITION_EVERY_SPAN,
+          readerProjectId: READER,
+          fromMs: 300,
+          untilMs: null,
+        },
         expect.objectContaining({ readerProjectId: READER, fromMs: 500, untilMs: null }),
       ]);
       expect(tested.nodes).toContainEqual(

@@ -602,3 +602,9 @@ not operations.
   lint-guarded function sets (§9). Each read resource the ClickHouse client knows names how it treats
   every condition type, with no default, and a guard test holds the resources taking `span` windows to
   the span read alone (§3).
+- v1.12 (2026-11-12, how the braid permission and the compiled form landed, no decision of Alex's
+  changed). A braid grant carries `spans:braided` alone, appended last and declared at no scope, so no
+  role, custom role, key or binding confers it and no role holds it. "Every span" is an explicit
+  compiled form the minter gives a span braid with no `where`, rows stored earlier included; the stored
+  shape and the compiler version are unchanged. Resealing a proof drops `braidsHonoured`; narrowing,
+  which only removes grants, keeps it (§3, §9).

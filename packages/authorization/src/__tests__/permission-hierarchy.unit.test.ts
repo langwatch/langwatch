@@ -9,7 +9,10 @@ import {
   ALL_PERMISSIONS,
   authzPermissionSchema,
   findPermissionIndex,
+  grantablePermissionSchema,
+  isGrantablePermission,
   permissionSatisfiedBy,
+  SPAN_BRAID_PERMISSION,
 } from "../registry.ts";
 
 /** Every permission before `braids:manage`, at its bitset index. Never edit; append below it. */
@@ -272,10 +275,30 @@ describe("the append-only registry", () => {
     expect(authzPermissionSchema.validate("traces:rotate")).toBe(false);
   });
 
-  it("appends braids:manage last and moves no earlier index", () => {
+  it("keeps braids:manage after every earlier index and moves none of them", () => {
     expect(ALL_PERMISSIONS.slice(0, INDICES_BEFORE_BRAIDS.length)).toEqual(INDICES_BEFORE_BRAIDS);
-    expect(ALL_PERMISSIONS.at(-1)).toBe("braids:manage");
     expect(findPermissionIndex("braids:manage")).toBe(INDICES_BEFORE_BRAIDS.length);
+  });
+
+  /** @scenario "The braid permission is appended last in the registry and is never grantable" */
+  it("appends spans:braided last, right after braids:manage", () => {
+    expect(ALL_PERMISSIONS.at(-1)).toBe(SPAN_BRAID_PERMISSION);
+    expect(findPermissionIndex(SPAN_BRAID_PERMISSION)).toBe(INDICES_BEFORE_BRAIDS.length + 1);
+  });
+
+  /** @scenario "The braid permission is appended last in the registry and is never grantable" */
+  it("declares spans:braided at no scope, so no role, custom role or key may list it", () => {
+    expect(isGrantablePermission(SPAN_BRAID_PERMISSION)).toBe(false);
+    expect(grantablePermissionSchema.validate(SPAN_BRAID_PERMISSION)).toBe(false);
+    expect(grantablePermissionSchema.validate("braids:manage")).toBe(true);
+    expect(ALL_PERMISSIONS.filter((permission) => !isGrantablePermission(permission))).toEqual([
+      SPAN_BRAID_PERMISSION,
+    ]);
+  });
+
+  it("implies nothing to or from spans:braided", () => {
+    expect(satisfies([SPAN_BRAID_PERMISSION], "traces:view")).toBe(false);
+    expect(satisfies(["traces:view", "braids:manage"], SPAN_BRAID_PERMISSION)).toBe(false);
   });
 
   it("implies nothing from braids:manage beyond itself", () => {

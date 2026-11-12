@@ -6,7 +6,7 @@ import {
   braidConditionDigest,
   braidConditionTermsOf,
   compiledWhereSchema,
-  type BraidConditionNode,
+  type BraidConditionTree,
   type BraidConditionTerm,
 } from "@langwatch/authorization";
 import { describe, expect, it } from "vitest";
@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 import { BRAID_CONDITION_REFUSAL_CODES } from "../authz.errors.ts";
 import { compileBraidCondition } from "../braid-condition-compiler.ts";
 
-function compiled({ text }: { text: string }): BraidConditionNode {
+function compiled({ text }: { text: string }): BraidConditionTree {
   const result = compileBraidCondition({ text });
   if (!result.ok) throw new Error(`expected ${text} to compile, refused with ${result.code}`);
   if (!result.compiledWhere) throw new Error(`expected ${text} to yield a tree`);
@@ -28,7 +28,7 @@ function refusal({ text }: { text: string }) {
 }
 
 /** Every string a tree holds outside `kind` and `on`: what the fence binds as parameters. */
-function leafStrings(node: BraidConditionNode): string[] {
+function leafStrings(node: BraidConditionTree): string[] {
   return braidConditionTermsOf(node).flatMap((term) =>
     Object.entries(term)
       .filter(([field]) => field !== "kind" && field !== "on")

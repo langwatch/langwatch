@@ -52,11 +52,11 @@ describe("PERMISSION_CATEGORIES", () => {
       "Permissions claimed by more than one category — granting one category would hand over the other's resources",
     ).toEqual([]);
 
-    // The only permissions outside the categories are the platform tier and
-    // braiding, neither of which may ride on an API key, so no category names one.
+    // The only permissions outside the categories are the platform tier, braiding and
+    // the braid permission no grant confers; none may ride on an API key.
     const categorizable = new Set<string>(categorizablePermissions());
     const neverOnAKey = ALL_PERMISSIONS.filter((permission) => !categorizable.has(permission));
-    expect(neverOnAKey).toEqual(["ops:view", "ops:manage", "braids:manage"]);
+    expect(neverOnAKey).toEqual(["ops:view", "ops:manage", "braids:manage", "spans:braided"]);
 
     const neverOnAKeyInCategory = neverOnAKey.filter((permission) => owners.has(permission));
     expect(

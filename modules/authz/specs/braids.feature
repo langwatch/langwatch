@@ -95,6 +95,43 @@ Feature: Braids
       When a proof is minted for "frontdesk"
       Then it carries the braid from "orchestrator" and nothing braided into "orchestrator"
 
+  Rule: A braid's grant in a proof carries a permission of its own and its compiled condition
+
+    @unit
+    Scenario: The braid permission is appended last in the registry and is never grantable
+      When the permission registry is read
+      Then spans:braided is its last entry, right after braids:manage, and no earlier index moved
+      And it is declared at no scope, so nothing that grants permissions may list it
+
+    @unit
+    Scenario: No role, custom role or API key may list the braid permission
+      When ana defines a custom role listing spans:braided
+      Then the role is refused naming spans:braided
+      And an API key's own role listing it is refused the same way
+      And no built-in role holds it, an organisation admin included, and no binding confers it at any tier
+
+    @unit
+    Scenario: A minted braid grant carries only the braid permission
+      Given a live braid from "specialists" into "orchestrator"
+      When a proof is minted for "orchestrator" on a trace, analytics or cost route
+      Then the braid's grant carries spans:braided and no other permission
+      And no other grant in the proof carries spans:braided
+      And a proof whose braid grant carries any other permission is refused when sealed
+
+    @unit
+    Scenario: A span condition always carries its compiled form
+      When a proof is sealed with a span condition that carries no compiled form
+      Then the proof is refused, even when the condition has no where
+      And a braid with no condition is accepted only with the explicit every-span form
+
+    @unit
+    Scenario: A braid stored with no condition is minted as every span, stated
+      Given a live braid from "specialists" into "orchestrator" stored with an empty where and no compiled form
+      And a live braid from "frontdesk" into "orchestrator" stored with a where but no compiled form
+      When a proof is minted for "orchestrator"
+      Then the "specialists" braid carries the explicit every-span compiled form
+      And the "frontdesk" braid is left out of the proof
+
   Rule: Whoever holds braids:manage on the owner and can read the reader may braid
 
     @integration
@@ -240,6 +277,7 @@ Feature: Braids
       When ana saves a braid with a condition
       Then the stored condition carries the compiler version that compiled it
       And every cache key the fence feeds changes when the condition or the compiler version changes
+      And the fence refuses a condition from a compiler version it cannot render, before any key is taken
 
     @unit
     Scenario: A condition too large to read is refused

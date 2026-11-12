@@ -60,13 +60,29 @@ export const braidConditionNodeSchema = z.union([
 ]);
 export type BraidConditionNode = z.infer<typeof braidConditionNodeSchema>;
 
-/** The comparisons a tree holds, in order: the conjunction the fence renders. */
-export function braidConditionTermsOf(node: BraidConditionNode): BraidConditionTerm[] {
+/**
+ * A braid with no condition, stated: the empty conjunction, marked so it never reads as a tree
+ * left out (ADR-201 §3). Only a whole tree may be it; a conjunction never nests it.
+ */
+export const braidConditionEverySpanSchema = z.object({ kind: z.literal("everySpan") }).strict();
+export type BraidConditionEverySpan = z.infer<typeof braidConditionEverySpanSchema>;
+
+/** A compiled condition's whole tree: a node, or every span stated. */
+export const braidConditionTreeSchema = z.union([
+  braidConditionNodeSchema,
+  braidConditionEverySpanSchema,
+]);
+export type BraidConditionTree = z.infer<typeof braidConditionTreeSchema>;
+
+/** The comparisons a tree holds, in order: the conjunction the fence renders (none: every span). */
+export function braidConditionTermsOf(node: BraidConditionTree): BraidConditionTerm[] {
+  if (node.kind === "everySpan") return [];
   return node.kind === "and" ? node.terms.flatMap(braidConditionTermsOf) : [node];
 }
 
-/** Conjunctions nested along the deepest path; a lone term has none. */
-function depthOf(node: BraidConditionNode): number {
+/** Conjunctions nested along the deepest path; a lone term, or every span, has none. */
+function depthOf(node: BraidConditionTree): number {
+  if (node.kind === "everySpan") return 0;
   return node.kind === "and" ? 1 + Math.max(...node.terms.map(depthOf)) : 0;
 }
 
@@ -81,7 +97,7 @@ const charactersOf = (term: BraidConditionTerm): number =>
 export const compiledWhereSchema = z
   .object({
     version: z.number().int().min(1),
-    tree: braidConditionNodeSchema,
+    tree: braidConditionTreeSchema,
   })
   .strict()
   .refine(({ tree }) => braidConditionTermsOf(tree).length <= BRAID_CONDITION_MAX_TERMS, {
@@ -103,9 +119,21 @@ export const compiledWhereSchema = z
   );
 export type CompiledWhere = z.infer<typeof compiledWhereSchema>;
 
+/**
+ * The compiled form of a span braid that names no condition, which the minter gives every such
+ * row. The compiler never stores it, so the stored shape and `BRAID_CONDITION_COMPILER_VERSION`
+ * stay as they were (ADR-201 §3).
+ */
+export const BRAID_CONDITION_EVERY_SPAN: CompiledWhere = Object.freeze({
+  version: BRAID_CONDITION_COMPILER_VERSION,
+  tree: Object.freeze({ kind: "everySpan" as const }),
+});
+
 /** A canonical, injective form of a tree: arrays in a fixed order, strings JSON-escaped. */
-function canonicalOf(node: BraidConditionNode): unknown[] {
+function canonicalOf(node: BraidConditionTree): unknown[] {
   switch (node.kind) {
+    case "everySpan":
+      return [node.kind];
     case "and":
       return ["and", ...node.terms.map(canonicalOf)];
     case "attributeEquals":

@@ -2,6 +2,7 @@ import {
   type Authorization,
   AuthorizationExpiredError,
   type AuthorizationInput,
+  BRAID_CONDITION_EVERY_SPAN,
   BRAID_CONDITION_MAX_LENGTH,
   BRAID_CONDITION_MAX_TERMS,
   BRAID_MAX_DISTINCT_CONDITIONS,
@@ -10,6 +11,7 @@ import {
   honourSpanBraids,
   narrowAuthorization,
   sealAuthorization,
+  SPAN_BRAID_PERMISSION,
 } from "@langwatch/authorization";
 import {
   tenantScope,
@@ -72,17 +74,18 @@ const braid = ({
   until = null,
 }: {
   owner?: string;
-  compiledWhere?: CompiledWhere | undefined;
+  compiledWhere?: CompiledWhere;
   from?: number;
   until?: number | null;
 }): GrantInput => ({
   projectId: owner,
-  permissions: ["traces:view"],
+  permissions: [SPAN_BRAID_PERMISSION],
   via: [`grant_${owner}_${from}`],
   kind: "shared",
   condition: {
     type: "span",
-    ...(compiledWhere === undefined ? {} : { where: "compiled", compiledWhere }),
+    ...(compiledWhere === BRAID_CONDITION_EVERY_SPAN ? {} : { where: "compiled" }),
+    compiledWhere,
     from,
     until,
   },
@@ -113,7 +116,7 @@ const proof = (grants: GrantInput[]): Authorization =>
 
 const READ_RESOURCE_NAMES = Object.keys(READ_RESOURCES) as ReadResource[];
 
-/** A grant carrying every proof-bearing permission, as a braid grant does (ADR-201 §1). */
+/** An own or trace grant carrying every proof-bearing permission a route may mint for. */
 const everyRead = (grant: GrantInput): GrantInput => ({
   ...grant,
   permissions: ["traces:view", "analytics:view", "cost:view"],
@@ -196,7 +199,7 @@ describe("the fence over a span read", () => {
   });
 
   describe("given a proof whose braids the plan check never honoured", () => {
-    const braids = [braid({}), braid({ compiledWhere: CLI, from: 5 })].map(everyRead);
+    const braids = [braid({}), braid({ compiledWhere: CLI, from: 5 })];
     const authorization = unhonoured([everyRead(own()), everyRead(memberWindow), ...braids]);
     const withoutBraids = unhonoured([everyRead(own()), everyRead(memberWindow)]);
 
@@ -238,7 +241,7 @@ describe("the fence over a span read", () => {
   describe("given the same proof once the plan check honoured it", () => {
     /** @scenario "A proof the plan check honoured shows the braided spans" */
     it("adds the braids to a span read alone", () => {
-      const authorization = proof([own(), memberWindow, braid({})].map(everyRead));
+      const authorization = proof([everyRead(own()), everyRead(memberWindow), braid({})]);
 
       for (const reads of READ_RESOURCE_NAMES) {
         const clauses = fenceFor({ authorization, reads }).braids?.clauses ?? [];
@@ -545,8 +548,12 @@ describe("the fence over a span read", () => {
 
         expect(key([own(), braid({})])).toBe(base);
         expect(key([own(), braid({ compiledWhere: CLI })])).not.toBe(base);
-        expect(key([own(), braid({ compiledWhere: { ...WEB, version: 2 } })])).not.toBe(base);
+        expect(key([own(), braid({ compiledWhere: BRAID_CONDITION_EVERY_SPAN })])).not.toBe(base);
         expect(key([own(), braid({ from: 7 })])).not.toBe(base);
+        // A version this reader cannot render is refused before any key is taken.
+        expect(
+          scopeErrorOf(() => key([own(), braid({ compiledWhere: { ...WEB, version: 2 } })])),
+        ).toEqual({ kind: "unsupported-condition-version", version: 2 });
       });
     });
   });
@@ -603,13 +610,42 @@ describe("the fence over a span read", () => {
   });
 
   describe("given a braid compiled by a compiler this reader does not know", () => {
-    it("refuses the statement by name rather than read the owner's spans unconditioned", () => {
+    it("refuses the fence by name rather than read the owner's spans unconditioned", () => {
       const future = proof([own(), braid({ compiledWhere: { ...WEB, version: 99 } })]);
 
-      expect(scopeErrorOf(() => expandSpanRead(future))).toEqual({
+      expect(scopeErrorOf(() => fenceFor({ authorization: future, reads: "spans" }))).toEqual({
         kind: "unsupported-condition-version",
         version: 99,
       });
+    });
+  });
+
+  describe("given a braid whose condition is every span", () => {
+    const authorization = proof([own(), braid({ compiledWhere: BRAID_CONDITION_EVERY_SPAN })]);
+
+    /** @scenario "A braid with no condition is fenced to the reader's held traces like any other" */
+    it("renders it under the held-trace semi-join with an always-true predicate", () => {
+      const { sql, params } = conditionsExpression({
+        fence: fenceFor({ authorization, reads: "spans" }),
+        column: "StartTime",
+      });
+
+      expect(sql).toContain(`OR (${held()} AND ((TenantId IN ({tenantScope_c0_ids`);
+      expect(sql).toContain(" AND (1))))");
+      expect(sql).not.toMatch(/SpanAttributes|SpanName =/);
+      expect(params).toMatchObject({ tenantScope_c0_ids: [OWNER], tenantScope_heldFrom: 0 });
+    });
+
+    /** @scenario "A braid with no condition is fenced to the reader's held traces like any other" */
+    it("keys it apart from a braid with a condition and from a trace window", () => {
+      const key = tenantScopeKey({ authorization, reads: "spans" });
+
+      expect(key).not.toBe(
+        tenantScopeKey({ authorization: proof([own(), braid({})]), reads: "spans" }),
+      );
+      expect(fenceFor({ authorization, reads: "spans" }).braids?.clauses).toEqual([
+        expect.objectContaining({ kind: "braid", compiledWhere: BRAID_CONDITION_EVERY_SPAN }),
+      ]);
     });
   });
 

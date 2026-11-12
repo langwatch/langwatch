@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   AccessNotGrantedError,
   type AuthorizationInput,
+  BRAID_CONDITION_EVERY_SPAN,
   honourSpanBraids,
   honouredSpanBraidGrants,
   isSpanBraidGrant,
@@ -11,6 +12,7 @@ import {
   projectIdsReadBy,
   readScopeKeyOf,
   sealAuthorization,
+  SPAN_BRAID_PERMISSION,
   withoutSpanBraids,
 } from "../index";
 
@@ -44,7 +46,7 @@ const own: GrantInput = {
 
 const braid = (condition: Partial<NonNullable<GrantInput["condition"]>> = {}): GrantInput => ({
   projectId: OWNER,
-  permissions: ["traces:view"],
+  permissions: [SPAN_BRAID_PERMISSION],
   via: ["grant_braid"],
   kind: "shared",
   condition: {
@@ -88,10 +90,46 @@ describe("a proof carrying braids", () => {
       expect(() => proof([own, braid({ compiledWhere: undefined })])).toThrow(z.ZodError);
     });
 
-    it("accepts a braid with no condition", () => {
+    /** @scenario "A span condition always carries its compiled form" */
+    it("refuses a span condition with no compiled form, even with no where", () => {
+      expect(() => proof([own, braid({ where: undefined, compiledWhere: undefined })])).toThrow(
+        z.ZodError,
+      );
+    });
+
+    /** @scenario "A span condition always carries its compiled form" */
+    it("accepts a braid with no condition only as every span, stated", () => {
+      const sealed = proof([
+        own,
+        braid({ where: undefined, compiledWhere: BRAID_CONDITION_EVERY_SPAN }),
+      ]);
+
+      expect(sealed.grants[1]?.condition?.compiledWhere).toEqual(BRAID_CONDITION_EVERY_SPAN);
+    });
+
+    /** @scenario "A minted braid grant carries only the braid permission" */
+    it("refuses a braid grant carrying any permission but the braid one", () => {
+      for (const permissions of [["traces:view"], [SPAN_BRAID_PERMISSION, "traces:view"], []]) {
+        expect(() => proof([own, { ...braid(), permissions }]), permissions.join()).toThrow(
+          z.ZodError,
+        );
+      }
+    });
+
+    /** @scenario "A minted braid grant carries only the braid permission" */
+    it("refuses the braid permission on any grant but a braid", () => {
+      const trace: GrantInput = {
+        projectId: OWNER,
+        permissions: ["traces:view", SPAN_BRAID_PERMISSION],
+        via: ["grant_trace"],
+        kind: "shared",
+        condition: { type: "trace", from: 0, until: null },
+      };
+
       expect(() =>
-        proof([own, braid({ where: undefined, compiledWhere: undefined })]),
-      ).not.toThrow();
+        proof([{ ...own, permissions: ["traces:view", SPAN_BRAID_PERMISSION] }]),
+      ).toThrow(z.ZodError);
+      expect(() => proof([own, trace])).toThrow(z.ZodError);
     });
   });
 
@@ -177,12 +215,23 @@ describe("a proof carrying braids", () => {
       expect(readScopeKeyOf(honoured([own, braid()]))).toBe(key);
     });
 
-    it("keys a braid with no condition as a window alone, as before", () => {
+    it("keys a braid with no condition by the every-span form's digest", () => {
       const key = readScopeKeyOf(
-        honoured([own, braid({ where: undefined, compiledWhere: undefined })]),
+        honoured([own, braid({ where: undefined, compiledWhere: BRAID_CONDITION_EVERY_SPAN })]),
       );
 
-      expect(key).toBe(`${OWNER}@span:0-,${READER}`);
+      expect(key).toMatch(new RegExp(`^${OWNER}@span:0-#[0-9a-f]{64},${READER}$`));
+      expect(key).not.toBe(readScopeKeyOf(honoured([own, braid()])));
+    });
+
+    it("keys an honoured braid whichever permission the read asks, never under-keying", () => {
+      const analytics: GrantInput = { ...own, permissions: ["traces:view", "analytics:view"] };
+      const withBraid = honoured([analytics, braid()]);
+
+      expect(readScopeKeyOf(withBraid, "analytics:view")).not.toBe(
+        readScopeKeyOf(proof([analytics]), "analytics:view"),
+      );
+      expect(readScopeKeyOf(withBraid)).toContain(`${OWNER}@span`);
     });
 
     it("keeps the braids in the key of a proof narrowed to its own project", () => {
@@ -215,6 +264,23 @@ describe("a proof carrying braids", () => {
       expect(narrowAuthorization({ authorization: sealed, projectId: READER })).not.toBeNull();
     });
 
+    /** @scenario "Resealing a proof with other grants drops the honoured flag" */
+    it("drops the flag when the proof is sealed again, its grants swapped or not", () => {
+      const done = honoured([own, braid()]);
+      const swapped = sealAuthorization({
+        ...done,
+        grants: [own, braid({ compiledWhere: BRAID_CONDITION_EVERY_SPAN, where: undefined })],
+      });
+      const resealed = sealAuthorization({ ...done });
+
+      for (const sealed of [swapped, resealed]) {
+        expect(sealed.braidsHonoured).toBeUndefined();
+        expect(honouredSpanBraidGrants(sealed)).toEqual([]);
+      }
+      expect(honourSpanBraids({ authorization: swapped }).braidsHonoured).toBe(true);
+    });
+
+    /** @scenario "Resealing a proof with other grants drops the honoured flag" */
     it("keeps the flag through narrowing to the reader's own project", () => {
       const narrowed = narrowAuthorization({
         authorization: honoured([own, braid()]),
