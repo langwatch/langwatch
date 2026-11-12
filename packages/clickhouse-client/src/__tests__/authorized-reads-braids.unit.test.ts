@@ -623,8 +623,25 @@ describe("the fence over a span read", () => {
           ["a grouping other than the keys", " GROUP BY TenantId, TraceId"],
           ["a HAVING after the keys", `${KEYS} HAVING max(UpdatedAt) > 0`],
           ["a subquery", ` AND TraceId IN (SELECT TraceId FROM stored_spans)${KEYS}`],
+          [
+            "an upper bound on the version, electing a stale one",
+            ` AND UpdatedAt < {cut:DateTime64(9)}${KEYS}`,
+          ],
+          ["the same bound written reversed", ` AND {cut:DateTime64(9)} > UpdatedAt${KEYS}`],
+          [
+            "the same bound inside a function",
+            ` AND toUnixTimestamp64Milli(UpdatedAt) < {cutMs:Int64}${KEYS}`,
+          ],
+          ["an exact version", ` AND UpdatedAt = {at:DateTime64(9)}${KEYS}`],
         ])("refuses an election whose own select carries %s", (_shape, inner) => {
           expect(refusalOf(fenced({ inner }))).toEqual({ kind: "loose-latest-version-marker" });
+        });
+
+        /** @scenario "Nothing after the latest-version election can negate or widen it" */
+        it("refuses a SETTINGS clause, which could lift the proof's time limit", () => {
+          expect(refusalOf(fenced({ after: " SETTINGS max_execution_time = 0" }))).toEqual({
+            kind: "settings-under-braids",
+          });
         });
 
         /** @scenario "Nothing after the latest-version election can negate or widen it" */

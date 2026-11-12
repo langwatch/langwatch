@@ -756,6 +756,10 @@ function refuseUnappliedBraids({
  * of a select a windowed marker fences, so its keys filter that select and are never read.
  */
 function refuseUnconditionedMarkers({ text, fence }: { text: string; fence: TenantFence }): void {
+  // A SETTINGS clause would override the time limit the proof's expiry sets on the request.
+  if (fence.braids !== undefined && /\bSETTINGS\b/i.test(text)) {
+    throw new StatementScopeError({ kind: "settings-under-braids" });
+  }
   if (
     fence.braids !== undefined &&
     (text.search(MARKER) !== -1 || text.search(SET_MARKER) !== -1)
@@ -809,11 +813,16 @@ function isElectionClosedAsAConjunct({ text, from }: { text: string; from: numbe
   return isAndRun({ flat: end === null ? after.flat : after.flat.slice(0, end.index) });
 }
 
-/** The election's select after its marker: AND-ed key and version bounds, then the keys' group. */
+/**
+ * The election's select after its marker: AND-ed key and version bounds, then the keys' group.
+ * A version is bounded from below only (`UpdatedAt >`), so the newest version is still elected.
+ */
 function isKeysElection({ flat, words }: { flat: string; words: readonly string[] }): boolean {
   const unlisted = words.filter((word) => !ELECTION_BODY_WORDS.has(word.toLowerCase()));
   const groupBy = ELECTION_GROUP_BY.exec(flat);
   if (unlisted.length > 0 || groupBy === null) return false;
+  const versions = words.filter((word) => word.toLowerCase() === "updatedat").length;
+  if (versions !== (flat.match(/\bUpdatedAt\s*>/gi)?.length ?? 0)) return false;
   return isAndRun({ flat: flat.slice(0, groupBy.index) });
 }
 

@@ -23,6 +23,7 @@ export type StatementScopeViolation =
   | { kind: "missing-condition-marker" }
   | { kind: "plain-marker-under-braids" }
   | { kind: "loose-latest-version-marker" }
+  | { kind: "settings-under-braids" }
   | { kind: "unsupported-condition-version"; version: number }
   | { kind: "uncompiled-braid-condition" }
   | { kind: "over-budget"; bytes: number; budget: number }
@@ -64,6 +65,8 @@ function describe(violation: StatementScopeViolation): string {
       return "The proof carries braids, so a {{tenantScope}} or {{tenantSet}} marker would read owner rows with no condition. Write {{tenantScopeWithConditions:<TimeColumn>}}, and {{tenantScopeForLatestVersion:<TimeColumn>}} in a latest-version election.";
     case "loose-latest-version-marker":
       return "A {{tenantScopeForLatestVersion:<TimeColumn>}} marker sits outside a latest-version election on stored_spans, or its election is not AND-ed into the WHERE a windowed marker fences. Join every term between that marker and the election with AND alone: no OR, no NOT, no group around the election.";
+    case "settings-under-braids":
+      return "The proof carries braids, so a SETTINGS clause in the statement could lift the time limit the proof's expiry sets. Pass settings through the reader's clickhouse_settings instead.";
     case "unsupported-condition-version":
       return `A braid's condition was compiled by compiler version ${violation.version}, which this reader cannot render.`;
     case "uncompiled-braid-condition":
