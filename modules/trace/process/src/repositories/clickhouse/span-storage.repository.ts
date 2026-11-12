@@ -246,7 +246,7 @@ const numeric = z.union([z.number(), z.string()]);
 const modelSpanSampleQueryRowSchema = z.looseObject({
   TraceId: chString,
   SpanId: chString,
-  SpanName: chString,
+  LatestSpanName: chString,
   Model: chString,
   InputTokensRaw: chString,
   PromptTokensRaw: chString,
@@ -276,7 +276,7 @@ function mapModelSpanSampleRow(row: ModelSpanSampleQueryRow): ModelSpanSampleRow
   return {
     traceId: row.TraceId,
     spanId: row.SpanId,
-    spanName: row.SpanName,
+    spanName: row.LatestSpanName,
     model: row.Model,
     // Canonical key first, legacy alias as fallback, same coalesce order
     // as extractMetrics in span.mapper.ts.
@@ -423,17 +423,17 @@ function traceEventRollupQuery(): string {
   // ID_BOUND_SKIP: a page rollup, bounded by the page's own time range.
   return `
     SELECT
-      tenantId,
-      traceId,
+      TenantId,
+      TraceId,
       name,
       nameCount,
       firstTimestamp,
-      sum(nameCount) OVER (PARTITION BY tenantId, traceId) AS totalCount,
-      count() OVER (PARTITION BY tenantId, traceId) AS distinctCount
+      sum(nameCount) OVER (PARTITION BY TenantId, TraceId) AS totalCount,
+      count() OVER (PARTITION BY TenantId, TraceId) AS distinctCount
     FROM (
       SELECT
-        TenantId AS tenantId,
-        TraceId AS traceId,
+        TenantId,
+        TraceId,
         event_name AS name,
         count() AS nameCount,
         toUnixTimestamp64Milli(min(event_timestamp)) AS firstTimestamp
@@ -453,10 +453,10 @@ function traceEventRollupQuery(): string {
       ARRAY JOIN
         Events_Timestamp AS event_timestamp,
         Events_Name AS event_name
-      GROUP BY tenantId, traceId, name
+      GROUP BY TenantId, TraceId, name
     )
-    ORDER BY tenantId ASC, traceId ASC, firstTimestamp ASC, name ASC
-    LIMIT {maxNames:UInt32} BY tenantId, traceId
+    ORDER BY TenantId ASC, TraceId ASC, firstTimestamp ASC, name ASC
+    LIMIT {maxNames:UInt32} BY TenantId, TraceId
   `;
 }
 
@@ -469,8 +469,8 @@ function toTraceEventRollups(rows: TraceEventRollupRow[]): Record<string, TraceE
   const rollups: Record<string, TraceEventRollup> = {};
   for (const row of rows) {
     const key = listedTraceKey({
-      projectId: row.tenantId,
-      traceId: row.traceId,
+      projectId: row.TenantId,
+      traceId: row.TraceId,
     });
     const rollup = (rollups[key] ??= {
       names: [],
@@ -627,8 +627,8 @@ type EventRow = z.infer<typeof eventRowSchema>;
 
 const traceEventRowSchema = z.looseObject({
   TenantId: chString.optional(),
-  spanId: chString,
-  timestamp: numeric,
+  SpanId: chString,
+  timestampMs: numeric,
   name: chString,
   attributes: chStringMap,
 });
@@ -636,8 +636,8 @@ const traceEventRowSchema = z.looseObject({
 const traceEventRowsSchema = z.array(traceEventRowSchema);
 
 const traceEventRollupRowSchema = z.looseObject({
-  tenantId: chString,
-  traceId: chString,
+  TenantId: chString,
+  TraceId: chString,
   name: chString,
   nameCount: numeric,
   firstTimestamp: numeric,
@@ -1417,8 +1417,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           const result = await client.query({
             query: `
               SELECT
-                ${ownerColumn(braided, "                ")}SpanId AS spanId,
-                toUnixTimestamp64Milli(event_timestamp) AS timestamp,
+                ${ownerColumn(braided, "                ")}SpanId,
+                toUnixTimestamp64Milli(event_timestamp) AS timestampMs,
                 event_name AS name,
                 event_attrs AS attributes
               FROM (
@@ -1447,8 +1447,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
 
           const rows = traceEventRowsSchema.parse(await result.json());
           return rows.map((r) => ({
-            spanId: r.spanId,
-            timestamp: typeof r.timestamp === "string" ? parseInt(r.timestamp, 10) : r.timestamp,
+            spanId: r.SpanId,
+            timestamp:
+              typeof r.timestampMs === "string" ? parseInt(r.timestampMs, 10) : r.timestampMs,
             name: r.name,
             attributes: r.attributes ?? {},
             ...(braided ? braidedOwnerOf({ authorization, tenantId: r.TenantId }) : {}),
@@ -1960,7 +1961,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           TraceId,
           SpanId,
           ${MODEL_ATTR_SELECT} AS Model,
-          argMax(SpanName, UpdatedAt) AS SpanName,
+          argMax(SpanName, UpdatedAt) AS LatestSpanName,
           argMax(SpanAttributes['gen_ai.usage.input_tokens'], UpdatedAt) AS InputTokensRaw,
           argMax(SpanAttributes['gen_ai.usage.prompt_tokens'], UpdatedAt) AS PromptTokensRaw,
           argMax(SpanAttributes['gen_ai.usage.output_tokens'], UpdatedAt) AS OutputTokensRaw,

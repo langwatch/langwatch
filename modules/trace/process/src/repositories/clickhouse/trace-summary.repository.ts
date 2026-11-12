@@ -150,10 +150,10 @@ const summaryReadRowSchema = z.looseObject({
   TraceId: chString,
   Version: chString,
   Attributes: chStringMap,
-  OccurredAt: chNumber,
+  OccurredAtMs: chNumber,
   EarliestSpanStartMs: chNumber.optional(),
   CreatedAt: chNumber,
-  UpdatedAt: chNumber,
+  UpdatedAtMs: chNumber,
   LastEventOccurredAt: chNumber.optional(),
   ComputedIOSchemaVersion: chString,
   ComputedInput: chString.nullable(),
@@ -474,20 +474,20 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     // (ComputedInput, ComputedOutput, Attributes, etc.) for that one row.
     // See dev/docs/best_practices/clickhouse-queries.md.
 
-    // The windowed fence sits in the inner SELECT only: the outer `OccurredAt`
-    // is the projected integer, compared against a DateTime64 bound as seconds.
+    // The windowed fence sits in the inner SELECT only. No output takes a name
+    // the fence reads (ADR-201 §3), so those times leave as `OccurredAtMs` and `UpdatedAtMs`.
     const result = await client.query({
       query: `
         SELECT
           t.ProjectionId AS ProjectionId,
-          t.TenantId AS TenantId,
-          t.TraceId AS TraceId,
+          t.TenantId,
+          t.TraceId,
           t.Version AS Version,
           t.Attributes AS Attributes,
-          toUnixTimestamp64Milli(t.OccurredAt) AS OccurredAt,
+          toUnixTimestamp64Milli(t.OccurredAt) AS OccurredAtMs,
           t.EarliestSpanStartMs AS EarliestSpanStartMs,
           toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
-          toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
+          toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAtMs,
           t.ComputedIOSchemaVersion AS ComputedIOSchemaVersion,
           t.ComputedInput AS ComputedInput,
           t.ComputedOutput AS ComputedOutput,
@@ -593,12 +593,12 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       traceName: record.TraceName ?? "",
       attributes: record.Attributes ?? {},
       // Anchor is frozen; occurrence time from separate column for span baseline.
-      storageAnchorMs: record.OccurredAt,
+      storageAnchorMs: record.OccurredAtMs,
       occurredAt: isStorageAnchoredVersion(record.Version)
         ? Number(record.EarliestSpanStartMs ?? 0)
-        : record.OccurredAt,
+        : record.OccurredAtMs,
       createdAt: record.CreatedAt,
-      updatedAt: record.UpdatedAt,
+      updatedAt: record.UpdatedAtMs,
       LastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
     };
   }
