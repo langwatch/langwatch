@@ -10,6 +10,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { trace } from "@opentelemetry/api";
 
+import { langyPrCapReachedNote } from "../../../rules/langy-ci-follow-up.rules.ts";
 import {
   extractLangyConversationMemory,
   LANGY_REFERENT_POLICY,
@@ -21,10 +22,7 @@ import {
   startsWithGuidedKickoff,
 } from "../../../rules/langy-conversation-title.rules.ts";
 import { mintRunToken } from "../../../rules/langy-frame-auth.rules.ts";
-import {
-  langyDispatchIntentOf,
-  langyPrCapReachedNote,
-} from "../../../rules/langy-turn-dispatch.rules.ts";
+import { langyDispatchIntentOf } from "../../../rules/langy-worker-runtime.rules.ts";
 import { LangyEndedTurnService } from "./langy-ended-turn.service.ts";
 import type { LangyTurnAttemptService } from "./langy-turn-attempt.service.ts";
 import { LangyTurnOverrideService } from "./langy-turn-override.service.ts";

@@ -1,4 +1,5 @@
 import { githubProgressFromToolParts, type LangyMessagePart } from "@langwatch/langy-contract";
+import { Temporal } from "@langwatch/time";
 import { z } from "zod";
 
 const PULL_REQUEST_URL = /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/(\d+)$/;
@@ -100,4 +101,26 @@ export function withUserMessage(
   { isCiFollowUp }: { isCiFollowUp: boolean },
 ): LangyConversationPullRequestsData {
   return { ...state, FollowUpsInARow: isCiFollowUp ? state.FollowUpsInARow + 1 : 0 };
+}
+
+/** The prompt note for a person past the per-day pull request cap: refuse to open another. */
+export function langyPrCapReachedNote({
+  perDayPrCap,
+  resetAt,
+}: {
+  perDayPrCap: number;
+  resetAt: number;
+}): string {
+  return [
+    "",
+    "USER PR CAP REACHED — the user has already opened the per-day maximum",
+    "of",
+    String(perDayPrCap),
+    "GitHub pull requests via Langy today.",
+    "If the user asks you to open a PR, refuse politely, say the daily cap",
+    "is reached, and that it resets at",
+    Temporal.Instant.fromEpochMilliseconds(resetAt).toString({ fractionalSecondDigits: 3 }),
+    "UTC.",
+    "Do not call any tool that opens a PR.",
+  ].join(" ");
 }
