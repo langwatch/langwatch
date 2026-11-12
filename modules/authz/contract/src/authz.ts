@@ -171,6 +171,9 @@ const collectedBindingSchemaDefinition = z
     /** Reported, never filtered, by the reader: whether an elapsed one still grants is
      *  the collector's call. */
     expiresAtMs: z.number().int().nullable().optional(),
+    /** The stored grant carries a condition: only the proof narrows by one, so no yes/no
+     *  decision counts it (ADR-201 v1.10). */
+    conditioned: z.boolean().optional(),
   })
   .strict();
 export interface CollectedBindingSchema extends Named<typeof collectedBindingSchemaDefinition> {}

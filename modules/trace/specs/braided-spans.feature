@@ -294,6 +294,20 @@ Feature: Braided spans in the reader's traces
       Then the narrowing is refused as access not granted
       And no read falls back to the whole proof
 
+    @unit
+    Scenario: A trace no member holds narrows to the reader's own project, never the whole proof
+      Given an aggregate's proof that reads two members
+      When a per-trace read names no member and no member holds the trace
+      Then the proof is narrowed to the aggregate's own project, holding no member's grant
+      And a proof with no own project is answered as trace not found
+
+    @integration
+    Scenario: Paged and live span reads with braided spans are audited, or refused
+      Given a live braid from "specialists" into "orchestrator"
+      When sam pages through, or follows live, the spans of an "orchestrator" trace holding "specialists" spans
+      Then each read records the braided spans viewed entry before it returns them
+      And a read whose entry cannot be written fails and returns no "specialists" span
+
   Rule: The braid dialog previews what the reader will see
 
     @integration

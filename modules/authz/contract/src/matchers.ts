@@ -118,10 +118,12 @@ export function bindingGrants({
   grants,
   permission,
 }: {
-  binding: Pick<CollectedBinding, "roleKey" | "scopeType" | "viaGroupId">;
+  binding: Pick<CollectedBinding, "roleKey" | "scopeType" | "viaGroupId" | "conditioned">;
   grants: CollectedGrants;
   permission: string;
 }): boolean {
+  // ADR-201 v1.10: a conditioned grant narrows a proof, never answers yes/no.
+  if (binding.conditioned !== undefined && binding.conditioned !== false) return false;
   // ADR-021 fence: a team/project binding never grants an org-exclusive
   // permission, even through a custom role that lists it.
   if (

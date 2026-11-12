@@ -26,6 +26,8 @@ export type BindingGrantRow = {
   scopeType: string;
   scopeId: string;
   expiresAt: Instant | null;
+  /** Read so a conditioned row is refused; absent only where a backing never stores one. */
+  condition?: unknown;
 };
 
 /** The columns a share-link check selects off `Grant`. */
@@ -68,6 +70,8 @@ export function collectBindings<TRow extends BindingGrantRow>({
   const bindings: CollectedBinding[] = [];
   for (const row of rows) {
     if (!isBindingScope(row.scopeType)) continue;
+    // ADR-201 v1.10: a conditioned grant only narrows a proof; no yes/no decision counts it.
+    if (row.condition !== undefined && row.condition !== null) continue;
     const { roleKey } = row;
     // Billing reaches a decision only from the organization; the matcher fences the rest.
     const isBilling = roleKey === BILLING_ROLE_KEY && row.scopeType === "ORGANIZATION";

@@ -110,7 +110,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
         principalId: userId,
         scopeType: { in: [...BINDING_SCOPE_TYPES] },
       },
-      select: { roleKey: true, scopeType: true, scopeId: true, expiresAt: true },
+      select: { roleKey: true, scopeType: true, scopeId: true, expiresAt: true, condition: true },
     })) as StoredBindingGrantRow[];
     return collectBindings({ rows: rows.map(withStoredEnd), viaGroupId: () => null });
   };
@@ -147,6 +147,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
         scopeId: true,
         principalId: true,
         expiresAt: true,
+        condition: true,
       },
     })) as (StoredBindingGrantRow & { principalId: string })[];
     return collectBindings({
@@ -172,7 +173,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
         principalId: apiKeyId,
         scopeType: { in: [...BINDING_SCOPE_TYPES] },
       },
-      select: { roleKey: true, scopeType: true, scopeId: true, expiresAt: true },
+      select: { roleKey: true, scopeType: true, scopeId: true, expiresAt: true, condition: true },
     })) as StoredBindingGrantRow[];
     return collectBindings({ rows: rows.map(withStoredEnd), viaGroupId: () => null });
   };

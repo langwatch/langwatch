@@ -1,4 +1,5 @@
 import {
+  AccessNotGrantedError,
   type Authorization,
   narrowAuthorization,
   narrowAuthorizationOrNotFound,
@@ -38,6 +39,22 @@ type GetByTraceIdParams = FindByTraceIdParams & {
   full?: boolean;
 };
 
+/** The reader's own project; a proof with none answers as the trace not found. */
+function ownProjectIdOrNotFound({
+  authorization,
+  traceId,
+}: {
+  authorization: Authorization;
+  traceId: string;
+}): string {
+  try {
+    return ownProjectIdReadBy(authorization);
+  } catch (error) {
+    if (error instanceof AccessNotGrantedError) throw new TraceNotFoundError(traceId);
+    throw error;
+  }
+}
+
 export class TraceSummaryService {
   static create({
     repository,
@@ -59,7 +76,7 @@ export class TraceSummaryService {
   /**
    * The proof one trace's detail reads are fenced by (ADR-177): an aggregate's is narrowed to the
    * member holding the trace (named, else found by a light seek). A named project the proof does
-   * not read is not found; a trace no member holds keeps the proof as it is.
+   * not read is not found; a trace no member holds narrows to the reader's own project.
    */
   async getTraceAuthorization(input: {
     authorization: Authorization;
@@ -99,14 +116,12 @@ export class TraceSummaryService {
     if (tenantId === undefined && projectIdsReadBy(authorization).length === 1) {
       return authorization;
     }
-    const projectId =
+    const holder =
       tenantId ?? (await this.repository.findTenantIdsByTraceId({ authorization, traceId }))[0];
-    if (projectId === undefined) {
-      return authorization;
-    }
+    // A trace no member holds narrows to the reader's own project, never the whole proof.
     return narrowAuthorizationOrNotFound({
       authorization,
-      tenantId: projectId,
+      tenantId: holder ?? ownProjectIdOrNotFound({ authorization, traceId }),
       notFound: () => new TraceNotFoundError(traceId),
     });
   }

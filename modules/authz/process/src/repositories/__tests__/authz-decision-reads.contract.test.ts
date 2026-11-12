@@ -449,6 +449,39 @@ describe.each(backends)("given the decision reads on the $name backend", (backen
       ).resolves.toBeNull();
     });
 
+    /** @scenario "A grant carrying a condition never answers a yes/no decision" */
+    it("reads no binding from a user, group or key grant that carries a condition", async () => {
+      const fixture = await open();
+      const { organizationId } = fixture;
+      const userId = await fixture.user();
+      const groupId = await fixture.group({ memberIds: [userId] });
+      const apiKeyId = await fixture.apiKey({ userId });
+      const teamId = await fixture.team();
+      const projectId = await fixture.project({ teamId });
+      const condition = { type: "span", from: "2026-10-01T00:00:00.000Z" };
+      const conditioned = (input: Pick<GrantRowShape, "principalType" | "principalId">) =>
+        grantRow({ organizationId, scopeType: "PROJECT", scopeId: projectId, condition, ...input });
+      for (const roleKey of ["project-reader", "admin"]) {
+        await attach(fixture, {
+          ...conditioned({ principalType: "USER", principalId: userId }),
+          roleKey,
+        });
+        await attach(fixture, {
+          ...conditioned({ principalType: "GROUP", principalId: groupId }),
+          roleKey,
+        });
+        await attach(fixture, {
+          ...conditioned({ principalType: "API_KEY", principalId: apiKeyId }),
+          roleKey,
+        });
+      }
+
+      const { read } = fixture.repositories;
+      await expect(read.findUserBindings({ userId, organizationId })).resolves.toEqual([]);
+      await expect(read.findGroupBindings({ userId, organizationId })).resolves.toEqual([]);
+      await expect(read.findApiKeyBindings({ apiKeyId, organizationId })).resolves.toEqual([]);
+    });
+
     it("reads a group's grants stamped with the group, for this organization's groups only", async () => {
       const fixture = await open();
       const { organizationId } = fixture;

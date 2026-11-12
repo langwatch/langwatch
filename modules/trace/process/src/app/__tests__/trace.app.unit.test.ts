@@ -409,7 +409,8 @@ describe("TraceModule", () => {
         };
 
         await expect(app.readEvaluationRuns(input)).resolves.toEqual([]);
-        await expect(app.readEvaluations(input)).resolves.toEqual({});
+        // Narrowed to the aggregate's own project, which holds no verdict for the trace.
+        await expect(app.readEvaluations(input)).resolves.toEqual({ "trace-1": [] });
         expect(getEvaluationsMultiple).not.toHaveBeenCalled();
       });
     });

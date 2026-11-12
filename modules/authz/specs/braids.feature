@@ -35,6 +35,14 @@ Feature: Braids
       And its condition is of type span and carries the condition as written and in compiled form
 
     @unit
+    Scenario: A grant carrying a condition never answers a yes/no decision
+      Given a grant to sam, to a group sam is in, or to sam's API key, carrying a span condition
+      And the grant names project-reader or admin on "specialists"
+      When any permission on "specialists" is decided for sam or the key
+      Then the grant confers nothing, read from the store or met by the matcher
+      # Only the proof narrows by a condition (ADR-201 v1.10: braids never fail open).
+
+    @unit
     Scenario: A span condition with a compiled where is a legal shared placement
       When a project-reader grant with a span condition carrying a where and its compiled form is placed on a foreign project
       Then the grant is accepted
