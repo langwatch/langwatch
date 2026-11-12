@@ -121,3 +121,10 @@ Feature: The stock evaluation widgets read the evaluations the trace fold writes
       Given a trace dated before the period whose anchor moved inside it, with outcome and check re-runs inside it
       When all the moved queries are read, trace_metrics read once per trace at its latest row
       Then each returns the rows the query returned before the move
+
+    @integration
+    Scenario: A moved pre-freeze trace counts once, at its latest time, on the real views
+      Given a trace dated in the previous period with one passed check and one outcome
+      When its anchor moves into the period and ck-kpis reads the real views
+      Then its check and its outcome each count once, in the period
+      And neither counts in the previous period any more

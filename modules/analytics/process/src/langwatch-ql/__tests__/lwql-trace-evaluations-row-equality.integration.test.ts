@@ -139,6 +139,8 @@ const TRACES: TraceSeed[] = [
     topic: TOPIC_TWO,
     metadata: { topic: "refunds" },
   },
+  // mv1's shape with no outcome metadata, moved on the real views in its own test.
+  { trace: "mv2", day: -2.5, origin: "application", metadata: {} },
   { trace: "l1", day: 1.5, origin: "langy", promptVersion: "pv-9", metadata: { language: "de" } },
   { trace: "l2", day: 3, origin: "langy", topic: TOPIC_TWO, metadata: { outcome: "refusal" } },
 ];
@@ -273,6 +275,8 @@ const EVALUATIONS: EvaluationSeed[] = [
   { ...judge("old", "resolved"), after: 39 },
   { ...judge("mv1", "capability_gap"), after: 3 },
   { ...check("mv1", "Quality", true), after: 3 },
+  { ...judge("mv2", "capability_gap"), after: 3 },
+  { ...check("mv2", "Quality", true), after: 3 },
   check("a1", "Quality", true),
   check("a1", "Tone", false),
   check("a2", "Quality", true),
@@ -775,7 +779,7 @@ describe("given trace evaluations with unmerged retraction pairs beside main's f
     expect(Number(umbrella?.n)).toBe(3);
   });
 
-  // Both tests move traces for good, so they run after every test that reads the seeded data.
+  // These tests move traces for good, so they run after every test that reads the seeded data.
   /** @scenario "A trace whose second trace_metrics row lands later in the period counts once" */
   it("reads every moved query once for a trace moved later in the period", async () => {
     await moveTrace({ trace: "a1", day: 6.3 });
@@ -788,5 +792,37 @@ describe("given trace evaluations with unmerged retraction pairs beside main's f
     await moveTrace({ trace: "mv1", day: 4.5 });
     await expectTwoAnalyticsRows("mv1");
     await expectMovedQueriesMatchBaseline();
+  });
+
+  /** The query's one row under the application list, each count as a number. */
+  async function countsOf(label: string): Promise<Record<string, number>> {
+    const { rows, error } = await run({ sql: sent(label), list: ["application"] });
+    expect(error, label).toBeUndefined();
+    const [row = "{}"] = JSON.parse(rows ?? "[]") as string[];
+    const counts = JSON.parse(row) as Record<string, string | number>;
+    return Object.fromEntries(Object.entries(counts).map(([key, n]) => [key, Number(n)]));
+  }
+
+  // On the real views: main read the moved trace's two trace_metrics rows, so this differs from
+  // main by design. mv2 has one passed Quality check and one capability_gap judge, both in the
+  // period; moving its anchor from the previous period into this one moves each count by one.
+  /** @scenario "A moved pre-freeze trace counts once, at its latest time, on the real views" */
+  it("counts a moved pre-freeze trace once, at its latest time, on the real views", async () => {
+    const checks = await countsOf("ck-kpis/checks");
+    const outcomes = await countsOf("ck-kpis/outcomes");
+    await moveTrace({ trace: "mv2", day: 4.5 });
+    await expectTwoAnalyticsRows("mv2");
+    expect(await countsOf("ck-kpis/checks")).toEqual({
+      passed: checks.passed + 1,
+      judged: checks.judged + 1,
+      passed_prev: checks.passed_prev - 1,
+      judged_prev: checks.judged_prev - 1,
+    });
+    expect(await countsOf("ck-kpis/outcomes")).toEqual({
+      closed: outcomes.closed + 1,
+      resolved: outcomes.resolved,
+      closed_prev: outcomes.closed_prev - 1,
+      resolved_prev: outcomes.resolved_prev,
+    });
   });
 });
