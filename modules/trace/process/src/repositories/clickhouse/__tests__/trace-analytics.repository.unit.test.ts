@@ -432,3 +432,55 @@ describe("TraceAnalyticsClickHouseRepository insert settings", () => {
     });
   });
 });
+
+describe("TraceAnalyticsClickHouseRepository evaluation outcomes read-back", () => {
+  const committed = (evaluationOutcomes: string) => ({
+    TenantId: TENANT_ID,
+    TraceId: TRACE_ID,
+    Version: "v1",
+    OccurredAt: "2026-07-24 12:00:00.000",
+    CreatedAt: "2026-07-24 12:00:01.000",
+    UpdatedAt: "2026-07-24 12:00:02.500",
+    EvaluationOutcomes: evaluationOutcomes,
+  });
+
+  describe("given a committed row whose outcomes do not decode", () => {
+    describe("when the fold reads it back", () => {
+      /** @scenario "Unreadable stored outcomes are rebuilt from the trace's events, never stored over" */
+      it.each([
+        ["not json", "{not json"],
+        ["off schema", JSON.stringify({ "eval-1": { status: 1 } })],
+      ])("reports the row undecodable when the column is %s", async (_label, text) => {
+        const read = await makeRepositoryReturning(committed(text)).findByTraceId({
+          authorization: AUTHORIZATION,
+          traceId: TRACE_ID,
+        });
+
+        expect(read?.undecodable).toBe(true);
+      });
+    });
+  });
+
+  describe("given a committed row whose outcomes decode", () => {
+    describe("when the fold reads it back", () => {
+      it("returns them and reports the row readable", async () => {
+        const outcome = {
+          evaluatorName: "Faithfulness",
+          isGuardrail: false,
+          status: "processed",
+          passed: true,
+          label: null,
+          evaluationOccurredAt: 1_750_000_000_000,
+          sourceEventId: "evt-1",
+        };
+
+        const read = await makeRepositoryReturning(
+          committed(JSON.stringify({ "eval-1": outcome })),
+        ).findByTraceId({ authorization: AUTHORIZATION, traceId: TRACE_ID });
+
+        expect(read?.undecodable).toBeUndefined();
+        expect(read?.row.evaluationOutcomes).toEqual({ "eval-1": outcome });
+      });
+    });
+  });
+});

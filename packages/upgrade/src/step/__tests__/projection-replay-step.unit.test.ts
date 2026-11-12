@@ -6,6 +6,7 @@ import {
   PROJECTION_REPLAY_FROM_START,
   type LaneReplayer,
   defineProjectionReplayStep,
+  projectionReplaySinceOf,
 } from "../projection-replay-step.ts";
 
 const LANE = "directoryMembers";
@@ -153,12 +154,14 @@ describe("defineProjectionReplayStep", () => {
         {
           lane: LANE,
           replayedThrough: PROJECTION_REPLAY_FROM_START,
+          replayedSince: PROJECTION_REPLAY_FROM_START,
           done: 1,
           total: 2,
         },
         {
           lane: LANE,
           replayedThrough: PROJECTION_REPLAY_FROM_START,
+          replayedSince: PROJECTION_REPLAY_FROM_START,
           done: 2,
           total: 2,
         },
@@ -190,12 +193,14 @@ describe("defineProjectionReplayStep", () => {
         {
           lane: LANE,
           replayedThrough: PROJECTION_REPLAY_FROM_START,
+          replayedSince: PROJECTION_REPLAY_FROM_START,
           runReplaysThrough: CURSOR,
           lastTenantDone: "tenant-1",
         },
         {
           lane: LANE,
           replayedThrough: PROJECTION_REPLAY_FROM_START,
+          replayedSince: PROJECTION_REPLAY_FROM_START,
           runReplaysThrough: CURSOR,
           lastTenantDone: "tenant-2",
         },
@@ -248,7 +253,11 @@ describe("defineProjectionReplayStep", () => {
       const report = await runOnce({ replayer, resumeFrom: null, signal: stop.signal }).report;
 
       expect(calls).toEqual([]);
-      expect(report).toEqual({ lane: LANE, replayedThrough: PROJECTION_REPLAY_FROM_START });
+      expect(report).toEqual({
+        lane: LANE,
+        replayedThrough: PROJECTION_REPLAY_FROM_START,
+        replayedSince: PROJECTION_REPLAY_FROM_START,
+      });
     });
   });
 
@@ -266,7 +275,11 @@ describe("defineProjectionReplayStep", () => {
         replayedThrough: CURSOR,
       });
       expect(replayer.sinces).toEqual([PROJECTION_REPLAY_FROM_START, CURSOR]);
-      expect(saved.at(-1)).toEqual({ lane: LANE, replayedThrough: CURSOR });
+      expect(saved.at(-1)).toEqual({
+        lane: LANE,
+        replayedThrough: CURSOR,
+        replayedSince: PROJECTION_REPLAY_FROM_START,
+      });
     });
 
     /** @scenario "A trailing pass interrupted by a worker stop resumes from the first pass's cursor" */
@@ -324,6 +337,19 @@ describe("defineProjectionReplayStep", () => {
       await runOnce({ replayer, resumeFrom: null, signal: stop.signal, trailingPass: true }).report;
 
       expect(sinces).toEqual([PROJECTION_REPLAY_FROM_START]);
+    });
+  });
+  describe("given a step that ran before and resumes", () => {
+    /** @scenario "A replay step's report keeps the instant its lane was first replayed from" */
+    it("reports the first run's since, not the cursor it resumed from", async () => {
+      const replayer = replayerOverLog();
+      const first = await runOnce({ replayer, resumeFrom: null }).report;
+
+      const second = await runOnce({ replayer, resumeFrom: first }).report;
+
+      expect(projectionReplaySinceOf(first)).toBe(PROJECTION_REPLAY_FROM_START);
+      expect(projectionReplaySinceOf(second)).toBe(PROJECTION_REPLAY_FROM_START);
+      expect(second).toMatchObject({ replayedThrough: CURSOR });
     });
   });
 });

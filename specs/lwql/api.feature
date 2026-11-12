@@ -254,7 +254,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When a view whose source sorts by a column its write path moves is inspected
     Then it declares that one row is one record rather than one sort key
     And a view that declares a grain narrower than its engine's key declares a strategy that can deliver it
-    And the views whose sort keys hold still keep the shipped default
+    And the views whose sort keys hold still keep the shipped default, read their latest version in order without FINAL, read rows written once as written, or settle retraction pairs without FINAL
 
   @integration
   Scenario: A pre-aggregated view returns one merged row per bucket
@@ -304,6 +304,12 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When the restricted identity selects that record through the LangWatchQL view
     Then one row is returned
     And it carries the newer version's values
+
+  @integration
+  Scenario: A plain span_metrics read counts a residual duplicate span
+    Given span_analytics holds two copies of one span, a residual duplicate ADR-034 accepts
+    When the restricted identity selects that span through the span_metrics view
+    Then both copies are returned, because a plain read does not deduplicate
 
   @integration
   Scenario: A column no LangWatchQL view exposes is unreachable, not merely unselected
@@ -1437,6 +1443,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 #  views are usable at scale)
 #   → Scenario: A LangWatchQL view returns only the calling tenant's rows
 #   → Scenario: A LangWatchQL view returns one row per logical record, the latest version
+#   → Scenario: A plain span_metrics read counts a residual duplicate span
 #   → Scenario: A column no LangWatchQL view exposes is unreachable, not merely unselected
 #   → Scenario: Reading the physical fact table directly is policed the same way
 #   → Scenario: Row policies leave the application's own reads untouched

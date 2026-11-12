@@ -481,6 +481,12 @@ describe("given traces of each source carrying the metadata the widgets read", (
       format: "JSONEachRow",
       values: judged.map(evaluationRow),
     });
+    // The pass rates read the same verdicts beside their traces (analytics ADR-007).
+    await harness.admin.insert({
+      table: `${harness.factDatabase}.trace_evaluation_analytics`,
+      format: "JSONEachRow",
+      values: judged.map(traceEvaluationRow),
+    });
 
     const list = ["application"];
     const units = await rowsOf({ sql: STOCK.get("att-table/units") ?? "", list });
@@ -510,6 +516,38 @@ describe("given traces of each source carrying the metadata the widgets read", (
       Score: 1,
       TraceId: seed.trace,
       Origin: seed.origin ?? "",
+    };
+  }
+
+  /** The `trace_evaluation_analytics` row the trace fold writes for {@link evaluationRow}. */
+  function traceEvaluationRow(seed: Seed): Record<string, unknown> {
+    const metadata = (key: string) => seed.metadata[key] ?? "";
+    return {
+      TenantId: TENANT,
+      TraceId: seed.trace,
+      EvaluationId: `${seed.trace}-judge`,
+      OccurredAt: at(timeOf(seed)),
+      UpdatedAt: at(timeOf(seed)),
+      TraceOccurredAt: at(timeOf(seed)),
+      EvaluatorName: "Quality",
+      Status: "processed",
+      IsGuardrail: false,
+      Passed: true,
+      Label: null,
+      Origin: seed.origin ?? "",
+      TraceOrigin: seed.origin ?? "",
+      CustomerId: seed.customer ?? null,
+      TopicId: seed.topic ?? null,
+      Labels: seed.labels ?? [],
+      MetadataTopic: metadata("topic"),
+      MetadataDocumentType: metadata("document_type"),
+      MetadataLanguage: metadata("language"),
+      MetadataTeam: metadata("team"),
+      MetadataFlow: metadata("flow"),
+      MetadataSegment: metadata("segment"),
+      MetadataPromptVersion: metadata("prompt_version"),
+      Sign: 1,
+      Revision: 1,
     };
   }
 

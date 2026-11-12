@@ -2,6 +2,11 @@ import { scryptSync } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
+import {
+  baseViewName,
+  flooredViewName,
+  flooredViewNames,
+} from "../../../../rules/lwql-dedup-floor.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../../../rules/lwql-view-catalog.rules.ts";
 import type { LangWatchQLNames } from "../../../../services/langwatch-ql-access-model.service.ts";
 import { lwqlAppFunctionNames } from "../../../app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
@@ -545,7 +550,10 @@ describe("given the drift a reconvergence check converges", () => {
 
   /** @scenario "The reconvergence check converges the app-owned LangWatchQL objects it finds missing" */
   it("creates the key map and a function only when each drifted, and a drifted view alone", () => {
-    const view = relations.at(-1);
+    const twins = new Set(flooredViewNames(LWQL_VIEW_CATALOG));
+    const view = LWQL_VIEW_CATALOG.map(({ name }) => name)
+      .filter((name) => !twins.has(flooredViewName(name)))
+      .at(-1);
     const [appFunction] = lwqlAppFunctionNames();
     if (!view || !appFunction) throw new Error("the catalog declares no view or no function");
 
@@ -557,6 +565,18 @@ describe("given the drift a reconvergence check converges", () => {
     ]);
     expect(statementsFor([view])).toEqual([
       expect.stringMatching(new RegExp(`^CREATE OR REPLACE VIEW ${SOURCE_DATABASE}\\.${view}\\n`)),
+    ]);
+  });
+
+  /** @scenario "The reconvergence check converges the app-owned LangWatchQL objects it finds missing" */
+  it("re-creates a drifted floored twin together with the view it is cut from", () => {
+    const twin = flooredViewNames(LWQL_VIEW_CATALOG).at(-1);
+    if (!twin) throw new Error("the catalog declares no floored twin");
+    const base = baseViewName(twin);
+
+    expect(statementsFor([twin])).toEqual([
+      expect.stringMatching(new RegExp(`^CREATE OR REPLACE VIEW ${SOURCE_DATABASE}\\.${base}\\n`)),
+      expect.stringMatching(new RegExp(`^CREATE OR REPLACE VIEW ${SOURCE_DATABASE}\\.${twin}\\n`)),
     ]);
   });
 });

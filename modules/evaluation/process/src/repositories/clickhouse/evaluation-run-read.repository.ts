@@ -14,9 +14,12 @@ import {
   tenantSet,
 } from "@langwatch/clickhouse-client";
 import {
+  evaluationOutcomeSchema,
   evaluationRunDataSchema,
   EvaluationNotFoundError,
   traceEvaluationDataSchema,
+  type EvaluationOutcome,
+  type EvaluationOutcomeCursor,
   type EvaluationRunData,
   type TraceEvaluationData,
 } from "@langwatch/evaluation-contract";
@@ -35,6 +38,22 @@ import type { ClickHouseEvaluationRunRecord } from "./evaluation-run-write.repos
 const TABLE_NAME = "evaluation_runs" as const;
 const RESOLVER_RECENT_WINDOW_MS = 35 * 24 * 60 * 60 * 1000;
 const TRACE_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
+/** How long before its last event a finished run may have been scheduled and still be paged. */
+const OUTCOME_SCHEDULE_SLACK_MS = 24 * 60 * 60 * 1000;
+const outcomeFlagSchema = z.union([z.boolean(), z.number(), z.string()]);
+const outcomeRowsSchema = z.array(
+  z.object({
+    EvaluationId: z.string(),
+    LatestTraceId: z.string(),
+    LatestEvaluatorName: z.string().nullable(),
+    LatestIsGuardrail: outcomeFlagSchema,
+    LatestStatus: z.string(),
+    LatestPassed: outcomeFlagSchema.nullable(),
+    LatestLabel: z.string().nullable(),
+    LatestOccurredAt: z.union([z.number(), z.string()]),
+    LatestEventId: z.string(),
+  }),
+);
 const RUNS = "runs" as const;
 const inputsRowSchema = z.object({ TenantId: z.string(), Inputs: z.string().nullable() });
 const inputsRowsSchema = z.array(inputsRowSchema);
@@ -331,6 +350,68 @@ export class EvaluationRunClickHouseReadRepository {
       );
       throw error;
     }
+  }
+
+  /**
+   * Finished runs on a trace whose last event is at or after `sinceMs`, after the cursor, oldest
+   * first: each run's latest version by argMax over light columns. A run is scheduled before it
+   * finishes, so the partition bound reaches a day below the later of `sinceMs` and the cursor.
+   */
+  async findOutcomesSince(input: {
+    authorization: Authorization;
+    sinceMs: number;
+    after: EvaluationOutcomeCursor | null;
+    limit: number;
+  }): Promise<EvaluationOutcome[]> {
+    const client = this.options.clickhouse.as(input.authorization, { reads: "traces" });
+    const result = await client.query({
+      // ID_BOUND_SKIP: a page by time range, not a read by id.
+      query: `
+        SELECT
+          EvaluationId,
+          argMax(TraceId, UpdatedAt) AS LatestTraceId,
+          argMax(EvaluatorName, UpdatedAt) AS LatestEvaluatorName,
+          argMax(IsGuardrail, UpdatedAt) AS LatestIsGuardrail,
+          argMax(Status, UpdatedAt) AS LatestStatus,
+          argMax(Passed, UpdatedAt) AS LatestPassed,
+          argMax(Label, UpdatedAt) AS LatestLabel,
+          toUnixTimestamp64Milli(argMax(LastEventOccurredAt, UpdatedAt)) AS LatestOccurredAt,
+          argMax(LastProcessedEventId, UpdatedAt) AS LatestEventId
+        FROM ${TABLE_NAME}
+        WHERE ${tenantScope("ScheduledAt")}
+          AND ScheduledAt >= fromUnixTimestamp64Milli({scheduledFrom:Int64})
+        GROUP BY TenantId, EvaluationId
+        HAVING LatestStatus IN ('processed', 'error', 'skipped')
+          AND ifNull(LatestTraceId, '') != ''
+          AND LatestOccurredAt >= {since:Int64}
+          AND (LatestOccurredAt, EvaluationId) > ({afterOccurredAt:Int64}, {afterEvaluationId:String})
+        ORDER BY LatestOccurredAt ASC, EvaluationId ASC
+        LIMIT {limit:UInt32}
+      `,
+      query_params: {
+        scheduledFrom:
+          Math.max(input.sinceMs, input.after?.occurredAt ?? input.sinceMs) -
+          OUTCOME_SCHEDULE_SLACK_MS,
+        since: input.sinceMs,
+        afterOccurredAt: input.after?.occurredAt ?? -1,
+        afterEvaluationId: input.after?.evaluationId ?? "",
+        limit: input.limit,
+      },
+      format: "JSONEachRow",
+    });
+    return outcomeRowsSchema.parse(await result.json()).map((row) =>
+      evaluationOutcomeSchema.parse({
+        evaluationId: row.EvaluationId,
+        traceId: row.LatestTraceId,
+        evaluatorName: row.LatestEvaluatorName,
+        isGuardrail: isFlagSet(row.LatestIsGuardrail),
+        status: row.LatestStatus,
+        passed: row.LatestPassed === null ? null : isFlagSet(row.LatestPassed),
+        label: row.LatestLabel,
+        occurredAt: Number(row.LatestOccurredAt),
+        lastEventId: row.LatestEventId,
+      }),
+    );
   }
 
   /**

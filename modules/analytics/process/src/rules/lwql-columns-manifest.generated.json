@@ -4507,6 +4507,108 @@
       ]
     },
     {
+      "name": "span_analytics",
+      "engine": "ReplacingMergeTree",
+      "sortingKey": "TenantId, TraceId, SpanId",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "TraceId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "SpanId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "ParentSpanId",
+          "type": "Nullable(String)",
+          "comment": ""
+        },
+        {
+          "name": "StartTime",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "EndTime",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "DurationMs",
+          "type": "UInt64",
+          "comment": ""
+        },
+        {
+          "name": "SpanName",
+          "type": "LowCardinality(String)",
+          "comment": ""
+        },
+        {
+          "name": "SpanKind",
+          "type": "UInt8",
+          "comment": ""
+        },
+        {
+          "name": "StatusCode",
+          "type": "Nullable(UInt8)",
+          "comment": ""
+        },
+        {
+          "name": "Cost",
+          "type": "Nullable(Float64)",
+          "comment": ""
+        },
+        {
+          "name": "NonBilledCost",
+          "type": "Nullable(Float64)",
+          "comment": ""
+        },
+        {
+          "name": "SpanType",
+          "type": "LowCardinality(String)",
+          "comment": ""
+        },
+        {
+          "name": "ErrorType",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "RagContextCount",
+          "type": "UInt32",
+          "comment": ""
+        },
+        {
+          "name": "InputHash",
+          "type": "UInt64",
+          "comment": ""
+        },
+        {
+          "name": "DeploymentEnvironment",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "ProjectedAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "UInt16",
+          "comment": ""
+        }
+      ]
+    },
+    {
       "name": "stored_log_records",
       "engine": "ReplacingMergeTree",
       "sortingKey": "TenantId, TraceId, SpanId, ProjectionId",
@@ -5290,6 +5392,31 @@
           "name": "MetadataTopic",
           "type": "String",
           "comment": ""
+        },
+        {
+          "name": "MetadataOutcomeReason",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "MetadataPromptVersion",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "MetadataEnvironment",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "EvaluationOutcomes",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "EvaluationRowsDigest",
+          "type": "String",
+          "comment": ""
         }
       ]
     },
@@ -5376,6 +5503,143 @@
         {
           "name": "_retention_days",
           "type": "SimpleAggregateFunction(max, UInt16)",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "trace_evaluation_analytics",
+      "engine": "VersionedCollapsingMergeTree",
+      "sortingKey": "TenantId, OccurredAt, TraceId, EvaluationId, Revision",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "TraceId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "EvaluationId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "OccurredAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "UpdatedAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "TraceOccurredAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "EvaluatorName",
+          "type": "Nullable(String)",
+          "comment": ""
+        },
+        {
+          "name": "Status",
+          "type": "LowCardinality(String)",
+          "comment": ""
+        },
+        {
+          "name": "IsGuardrail",
+          "type": "Bool",
+          "comment": ""
+        },
+        {
+          "name": "Passed",
+          "type": "Nullable(Bool)",
+          "comment": ""
+        },
+        {
+          "name": "Label",
+          "type": "Nullable(String)",
+          "comment": ""
+        },
+        {
+          "name": "Origin",
+          "type": "Nullable(String)",
+          "comment": ""
+        },
+        {
+          "name": "TraceOrigin",
+          "type": "Nullable(String)",
+          "comment": ""
+        },
+        {
+          "name": "CustomerId",
+          "type": "Nullable(String)",
+          "comment": ""
+        },
+        {
+          "name": "TopicId",
+          "type": "Nullable(String)",
+          "comment": ""
+        },
+        {
+          "name": "Labels",
+          "type": "Array(String)",
+          "comment": ""
+        },
+        {
+          "name": "MetadataTopic",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "MetadataDocumentType",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "MetadataLanguage",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "MetadataTeam",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "MetadataFlow",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "MetadataSegment",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "MetadataPromptVersion",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "Sign",
+          "type": "Int8",
+          "comment": ""
+        },
+        {
+          "name": "Revision",
+          "type": "UInt64",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "UInt16",
           "comment": ""
         }
       ]

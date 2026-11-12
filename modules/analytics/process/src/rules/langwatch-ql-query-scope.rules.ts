@@ -230,6 +230,8 @@ const EVALUATION_VIEWS: readonly string[] = [
   "evaluations",
   "evaluation_metrics",
   "evaluation_metrics_by_minute",
+  "trace_evaluation_metrics",
+  "trace_evaluation_checks",
 ];
 
 /** Admits no row: a view the windows cannot be applied to reads nothing on an aggregate. */

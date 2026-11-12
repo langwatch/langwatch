@@ -17,6 +17,7 @@ import { OtlpSpanCostEnrichmentService } from "../features/span/services/span-co
 import { OtlpSpanTokenEstimationService } from "../features/span/services/span-token-estimation.service.ts";
 import { TraceSpanNormalizationAdapterService } from "../features/span/services/trace-span-normalization-adapter.service.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
+import type { TraceEvaluationOutcomeService } from "../services/trace-evaluation-outcome.service.ts";
 import type { TraceProcessingCommandsService } from "../services/trace-processing-commands.service.ts";
 import {
   createDeferredOriginHandler,
@@ -32,9 +33,11 @@ import type {
   TraceSpanTokenEstimation,
 } from "./record-span.commands.ts";
 import { EventingRecordSpanAdapter } from "./record-span.commands.ts";
+import { SpanAnalyticsStore } from "./span-analytics.store.ts";
 import { createSpanStorageBroadcastHandler } from "./span-storage-broadcast.subscriber.ts";
 import { SpanStorageStore } from "./span-storage.store.ts";
 import { TraceAnalyticsStore } from "./trace-derived.store.ts";
+import { TraceEvaluationAnalyticsStore } from "./trace-evaluation-analytics.store.ts";
 import {
   createTraceFailedHandler,
   type TraceFailedSubscriberDeps,
@@ -75,6 +78,8 @@ export interface TraceProcessingPipelineInput {
     | "summaryProjection"
     | "analyticsProjection"
     | "analyticsRollup"
+    | "evaluationAnalytics"
+    | "spanAnalytics"
     | "summaryFoldCache"
     | "analyticsFoldCache"
   >;
@@ -97,6 +102,8 @@ export interface TraceProcessingPipelineInput {
   milestones: ProjectMetadataSubscriberDeps["milestones"] & TraceFailedSubscriberDeps["milestones"];
   /** Mints the own-only proof the summary and analytics fold stores read back through. */
   authorizeFoldRead: FoldReadAuthorizer;
+  /** Records evaluation's COMPLETED and REPORTED as outcomes on their traces (ADR-003). */
+  evaluationOutcomes?: Pick<TraceEvaluationOutcomeService, "recordCompleted" | "recordReported">;
   /** Test-only: overrides `WRITE_COMPACT_ORIGIN_JOBS`; production never passes it. */
   writeCompactOriginJobs?: boolean;
 }
@@ -137,12 +144,21 @@ export class TraceProcessingRuntimeAdapter {
       derivedStore: repositories.analyticsFoldCache.cached(
         TraceAnalyticsStore.create({
           storage: repositories.analyticsProjection,
+          evaluationAnalytics: TraceEvaluationAnalyticsStore.create({
+            storage: repositories.evaluationAnalytics,
+            defaultRetentionDays,
+            authorize: authorizeFoldRead,
+          }),
           defaultRetentionDays,
           authorize: authorizeFoldRead,
         }),
       ),
       rollupStore: TraceAnalyticsRollupStore.create({
         storage: repositories.analyticsRollup,
+        defaultRetentionDays,
+      }),
+      spanAnalyticsStore: SpanAnalyticsStore.create({
+        storage: repositories.spanAnalytics,
         defaultRetentionDays,
       }),
       canonicalisation,
@@ -162,6 +178,9 @@ export class TraceProcessingRuntimeAdapter {
         tokenEstimation: this.#tokenEstimation(),
         spool: this.#spool(),
       }),
+      ...(this.input.evaluationOutcomes
+        ? { evaluationOutcomes: this.input.evaluationOutcomes }
+        : {}),
     })
       .build()
       .withRetention({

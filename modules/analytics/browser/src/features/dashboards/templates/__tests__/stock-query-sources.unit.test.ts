@@ -150,6 +150,28 @@ describe("given a query over a view that keeps an origin", () => {
   });
 });
 
+describe("given a query over a view that keeps both the evaluation's and the trace's source", () => {
+  /** @scenario "A stock query over the trace evaluations keeps both the evaluation's and its trace's source to the list" */
+  it.each([
+    ["trace_evaluation_metrics", "trace_evaluation_metrics"],
+    ["trace_evaluation_checks", "trace_evaluation_checks"],
+    ["trace_evaluation_metrics AS e", "e"],
+    ["analytics.trace_evaluation_checks c", "c"],
+  ])("keeps Source and TraceSource of %s in the list", (from, alias) => {
+    expect(readSources(`SELECT 1 FROM ${from} WHERE OccurredAt >= now() GROUP BY x`)).toBe(
+      `SELECT 1 FROM ${from} WHERE ${alias}.Source IN ${SOURCES} AND ` +
+        `${alias}.TraceSource IN ${SOURCES} AND ( OccurredAt >= now()) GROUP BY x`,
+    );
+  });
+
+  /** @scenario "A stock query over the trace evaluations keeps both the evaluation's and its trace's source to the list" */
+  it("refuses one joined directly, which a WHERE cannot keep to the sources", () => {
+    expect(() =>
+      readSources("SELECT 1 FROM trace_metrics JOIN trace_evaluation_metrics ON 1 = 1"),
+    ).toThrow("joins trace_evaluation_metrics directly");
+  });
+});
+
 describe("given text that only looks like a view reference", () => {
   /** @scenario "AC202 Stock widgets: every stock query that names an origin-bearing view reads the sources parameter" */
   it("leaves a comment, a string and a CTE named like a view as written", () => {

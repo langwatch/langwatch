@@ -1,6 +1,8 @@
 import { type Authorization, projectIdsReadBy } from "@langwatch/authorization";
 import {
   EvaluationNotFoundError,
+  type EvaluationOutcome,
+  type EvaluationOutcomeCursor,
   type EvaluationRunData,
   type TraceEvaluationData,
 } from "@langwatch/evaluation-contract";
@@ -98,6 +100,21 @@ export class MemoryEvaluationRunRepository extends EvaluationRunRepository {
       );
   }
 
+  async findOutcomesSince(input: {
+    authorization: Authorization;
+    sinceMs: number;
+    after: EvaluationOutcomeCursor | null;
+    limit: number;
+  }): Promise<EvaluationOutcome[]> {
+    return projectIdsReadBy(input.authorization)
+      .flatMap((projectId) => this.#tenantRuns(projectId))
+      .flatMap(outcomeOf)
+      .filter((outcome) => outcome.occurredAt >= input.sinceMs)
+      .filter((outcome) => isAfter({ outcome, after: input.after }))
+      .toSorted(byOccurredAtThenId)
+      .slice(0, input.limit);
+  }
+
   async findInputs(input: {
     authorization: Authorization;
     evaluationId: string;
@@ -117,4 +134,43 @@ export class MemoryEvaluationRunRepository extends EvaluationRunRepository {
       .filter(([key]) => key.startsWith(`${tenantId}\u0000`))
       .map(([, run]) => run);
   }
+}
+
+/** A finished run on a trace as its outcome; the memory tier keeps no last event id. */
+function outcomeOf(run: EvaluationRunData): EvaluationOutcome[] {
+  if (!run.traceId) return [];
+  const { status } = run;
+  if (status !== "processed" && status !== "error" && status !== "skipped") return [];
+  return [
+    {
+      evaluationId: run.evaluationId,
+      traceId: run.traceId,
+      evaluatorName: run.evaluatorName,
+      isGuardrail: run.isGuardrail,
+      status,
+      passed: run.passed,
+      label: run.label,
+      occurredAt: run.LastEventOccurredAt,
+      lastEventId: "",
+    },
+  ];
+}
+
+/** Whether an outcome sorts after the cursor, in (occurredAt, evaluationId) order. */
+function isAfter({
+  outcome,
+  after,
+}: {
+  outcome: EvaluationOutcome;
+  after: EvaluationOutcomeCursor | null;
+}): boolean {
+  if (after === null) return true;
+  if (outcome.occurredAt !== after.occurredAt) return outcome.occurredAt > after.occurredAt;
+  return outcome.evaluationId > after.evaluationId;
+}
+
+function byOccurredAtThenId(left: EvaluationOutcome, right: EvaluationOutcome): number {
+  if (left.occurredAt !== right.occurredAt) return left.occurredAt - right.occurredAt;
+  if (left.evaluationId === right.evaluationId) return 0;
+  return left.evaluationId < right.evaluationId ? -1 : 1;
 }

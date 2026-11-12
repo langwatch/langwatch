@@ -164,6 +164,16 @@ export interface TraceUsageCount {
   readonly spans: number;
 }
 
+/**
+ * Where the span widgets' history starts: `span_analytics` holds every span from `from` on, the
+ * instant its replay step recorded (analytics ADR-006); null when it is whole. `rebuilding` while
+ * no replay has recorded a start, when older span history may still be missing.
+ */
+export interface SpanAnalyticsFloor {
+  readonly from: string | null;
+  readonly rebuilding: boolean;
+}
+
 /** Public Trace operations shared by process peers after boot composition. */
 export interface TraceApi extends TraceOtlpIngestApi {
   extractInlineMediaFromEvent(input: {
@@ -197,6 +207,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
    * readable conversation at all, which is a different answer from an empty one.
    */
   renderTraceMessages(input: { trace: Trace; side: TraceMessagesSide }): Promise<string | null>;
+  /** Where the span widgets' history starts, from the span_analytics replay's recorded since. */
+  getSpanAnalyticsFloor(): Promise<SpanAnalyticsFloor>;
   /** One named span's chat messages as JSON, and whether the trace holds it. */
   renderSpanMessages(input: { trace: Trace; spanId: string }): Promise<TraceRenderedSpanMessages>;
   /** The whole trace as one JSON object, spans included. */
