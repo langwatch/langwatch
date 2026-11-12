@@ -26,12 +26,12 @@ export const spanBraidHonourOwnerRule = defineRule({
     honourOutsidePause: {
       what: "`{{name}}` is used in `{{path}}`, outside the trace module's braid pause.",
       why: "Braids show only on Enterprise; honouring them anywhere else skips that plan check.",
-      fix: "Pass the proof through `TraceApi.authorizationForTrace`, which asks the plan before it honours braids.",
+      fix: "Pass the proof through `TraceApi.authorizationForTrace`, which asks the plan before it honours braids; see the `authorization` skill.",
     },
     flagByHand: {
       what: "`{{path}}` writes `{{name}}` on an object by hand.",
       why: "Only `honourSpanBraids` may set the flag, after the plan check; a hand-set flag shows braids below Enterprise.",
-      fix: "Drop the key and pass the proof through `TraceApi.authorizationForTrace`.",
+      fix: "Drop the key and pass the proof through `TraceApi.authorizationForTrace`; see the `authorization` skill.",
     },
   },
   create(context, file) {
