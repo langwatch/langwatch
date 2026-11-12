@@ -106,7 +106,10 @@ describe("given the What users ask widgets", () => {
     const { sql } = buildOf("ask-cannot");
     expect(sql.topics).toContain("WHERE outcome = 'capability_gap'");
     expect(sql.topics).toContain("topK(1)(reason)[1] AS reason");
-    expect(sql.topics).toContain("nullIf(c.meta_topic, '')");
+    expect(sql.topics).toContain(
+      "any(coalesce(nullIf(p.TopicName, ''), nullIf(m.meta_topic, ''))) AS topic",
+    );
+    expect(sql.topics).toContain("LEFT JOIN topics AS p ON p.TopicId = m.topic_id");
     expect(sql.topics).toContain("MetadataOutcomeReason AS reason");
   });
 
