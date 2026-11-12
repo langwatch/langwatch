@@ -347,6 +347,15 @@ Feature: Langy asks how to reach the customer's code, once
       Then the GitHub section shows that Langy uses GitHub for code changes
       And clearing it makes the next code change ask again
 
+    # The person's own record checked the call against the id alone, which
+    # refused the choice it was carrying, so a ticked remember box failed with
+    # "Check your input" every time.
+    @unit
+    Scenario: The person's record stores and clears the remembered choice
+      Given a signed-in person
+      When the remembered choice is set to GitHub, then cleared
+      Then each call is accepted and reaches their record with the choice it carried
+
     @unit
     Scenario: The local folder is never remembered
       Given an open code access card

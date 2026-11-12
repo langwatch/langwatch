@@ -44,6 +44,7 @@ import {
   type UserProfilesInput,
   type UserSsoStatus,
   type UserTourPreference,
+  setUserCodeAccessPreferenceInputSchema,
   type UserCodeAccessPreference,
   type UserNotificationPreference,
   type UserNotificationTopicInput,
@@ -360,9 +361,9 @@ export class UserService {
   }
 
   async setLangyCodeAccessPreference(input: UserIdInput & UserCodeAccessPreference): Promise<void> {
-    const parsed = userIdInputSchema.parse(input);
+    const parsed = setUserCodeAccessPreferenceInputSchema.parse(input);
 
-    await this.repository.setLangyCodeAccessPreference(parsed.id, input.preference);
+    await this.repository.setLangyCodeAccessPreference(parsed.id, parsed.preference);
   }
 
   dismissTraceExplorerTour(input: UserIdInput): Promise<UserTourPreference> {

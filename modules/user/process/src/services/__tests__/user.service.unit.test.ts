@@ -642,6 +642,23 @@ describe("findByEmail()", () => {
   });
 });
 
+describe("setLangyCodeAccessPreference()", () => {
+  describe("given a person who ticks the remember box on the code access card", () => {
+    /** @scenario "The person's record stores and clears the remembered choice" */
+    it("stores GitHub, then clears it, with the choice each call carried", async () => {
+      const { service, repository } = createService();
+
+      await service.setLangyCodeAccessPreference({ id: user.id, preference: "github" });
+      await service.setLangyCodeAccessPreference({ id: user.id, preference: null });
+
+      expect(repository.setLangyCodeAccessPreference.mock.calls).toEqual([
+        [user.id, "github"],
+        [user.id, null],
+      ]);
+    });
+  });
+});
+
 describe("the lifecycle facts' clock", () => {
   /** @scenario "A user's lifecycle fact carries the time the database recorded" */
   it("stamps the row and the fact from the database clock, not this server's", async () => {
