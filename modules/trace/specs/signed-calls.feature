@@ -65,6 +65,21 @@ Feature: Signed calls
       And the signature is checked against the value the span is stored with, never another
 
     @unit
+    Scenario: A signed entry that admission redacts, rewrites or drops keeps no verified mark
+      Given "orchestrator" signed the entry metadata.user_id "ana@example.com" for a call into "specialists"
+      When PII redaction, an enrichment or the content drop changes or removes the entry before the span is stored
+      Then the span is stored without a verified mark for metadata.user_id
+      And an entry admission left exactly as signed keeps its mark
+
+    @unit
+    Scenario: A signed entry the store previews or canonicalises keeps no verified mark
+      Given a span admitted with entries marked verified
+      When the projection previews an entry too large to keep whole, or canonicalisation moves one to another key
+      Then the stored span keeps no verified mark for that entry
+      And a mark naming an entry the stored span does not carry is never stored
+      And an entry stored exactly as admitted keeps its mark
+
+    @unit
     Scenario: A client cannot send its own verified mark
       When a span arrives carrying an attribute under langwatch.reserved.verified
       Then the attribute is removed before the span is stored

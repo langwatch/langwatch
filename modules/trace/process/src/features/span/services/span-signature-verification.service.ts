@@ -3,11 +3,12 @@ import {
   BRAID_SIGNATURE_ATTRIBUTE,
   parseBraidSignature,
 } from "@langwatch/api-key-contract/signing-key-wire-format";
-import { VERIFIED_ATTRIBUTE_PREFIX } from "@langwatch/authorization";
 import { createLogger } from "@langwatch/observability";
 import type { OtlpSpan } from "@langwatch/otlp/trace-request";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { OtlpTraceRequestService } from "@langwatch/trace-contract/otlp-decoding";
+
+import type { VerifiedEntry } from "../rules/span-verified-mark.rules.ts";
 
 /** Longest a span waits on a signature check; past it the span is admitted unverified. */
 export const SPAN_SIGNATURE_VERIFICATION_TIMEOUT_MS = 1_000;
@@ -17,17 +18,15 @@ const ORGANIZATION_CACHE_MAX_ENTRIES = 10_000;
 
 const logger = createLogger("langwatch:trace:span-signature-verification");
 
-type SpanAttributes = OtlpSpan["attributes"];
-
 /** What a span offers for verification, copied before any later step changes the span. */
 type SpanSignature =
   | { kind: "signed"; signature: string; entries: Record<string, string> }
   | { kind: "unsigned" };
 
 /**
- * Verification at ingest (ADR-201 §4): only the API key module answering `verified` writes
- * `langwatch.reserved.verified.<k>` = the signing project, per signed entry. Any other answer,
- * an error or a timeout leaves the span unverified and never refuses it.
+ * Verification at ingest (ADR-201 §4): only the API key module answering `verified` yields an
+ * entry, with the value signed; admission marks it only where the stored value is still that.
+ * Any other answer, an error or a timeout leaves the span unverified and never refuses it.
  */
 export class SpanSignatureVerificationService {
   readonly #organizations = new Map<string, { organizationId: string | null; at: number }>();
@@ -80,20 +79,20 @@ export class SpanSignatureVerificationService {
     return { kind: "signed", signature, entries };
   }
 
-  /** The verified marks to add to a span; empty unless the API key module answers verified. */
-  async verifiedMarks({
+  /** The entries a span's signature verifies; empty unless the API key module answers verified. */
+  async verifiedEntries({
     span,
     projectId,
   }: {
     span: OtlpSpan;
     projectId: string;
-  }): Promise<SpanAttributes> {
+  }): Promise<VerifiedEntry[]> {
     // Before any await: the caller goes on changing the span once this returns.
     const signed = SpanSignatureVerificationService.signatureOf(span);
     if (signed.kind === "unsigned") return [];
     const { traceId } = span;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const timedOut = new Promise<SpanAttributes>((resolve) => {
+    const timedOut = new Promise<VerifiedEntry[]>((resolve) => {
       timer = setTimeout(() => {
         logger.warn({ projectId, traceId }, "signature check timed out; span stays unverified");
         resolve([]);
@@ -101,7 +100,7 @@ export class SpanSignatureVerificationService {
       timer.unref?.();
     });
     try {
-      return await Promise.race([this.#marks({ projectId, traceId, signed }), timedOut]);
+      return await Promise.race([this.#verified({ projectId, traceId, signed }), timedOut]);
     } catch (error) {
       logger.warn({ error, projectId, traceId }, "signature check failed; span stays unverified");
       return [];
@@ -110,7 +109,7 @@ export class SpanSignatureVerificationService {
     }
   }
 
-  async #marks({
+  async #verified({
     projectId,
     traceId,
     signed,
@@ -118,7 +117,7 @@ export class SpanSignatureVerificationService {
     projectId: string;
     traceId: string;
     signed: Extract<SpanSignature, { kind: "signed" }>;
-  }): Promise<SpanAttributes> {
+  }): Promise<VerifiedEntry[]> {
     const organizationId = await this.#organizationOf(projectId);
     if (organizationId === null) return [];
     const verdict = await this.deps.signatures.verifyBraidSignature({
@@ -128,12 +127,11 @@ export class SpanSignatureVerificationService {
       signature: signed.signature,
     });
     if (verdict.outcome !== "verified") return [];
-    return verdict.keys
-      .filter((key) => signed.entries[key] !== undefined)
-      .map((key) => ({
-        key: `${VERIFIED_ATTRIBUTE_PREFIX}${key}`,
-        value: { stringValue: verdict.signingProjectId },
-      }));
+    return verdict.keys.flatMap((key) => {
+      const value = signed.entries[key];
+      if (value === undefined) return [];
+      return [{ key, value, signingProjectId: verdict.signingProjectId }];
+    });
   }
 
   async #organizationOf(projectId: string): Promise<string | null> {

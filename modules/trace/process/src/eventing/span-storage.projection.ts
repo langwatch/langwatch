@@ -12,6 +12,7 @@ import {
   UNSTORABLE_SPAN_SKIPPED,
 } from "@langwatch/trace-contract";
 
+import { storedAttributesKeepingHeldMarks } from "../features/span/rules/span-verified-mark.rules.ts";
 import {
   spanStorageMapGroupKey,
   TRACE_SPAN_MAP_COALESCE_MAX_BATCH,
@@ -92,6 +93,11 @@ export class SpanStorageMapProjection
     const { cost, nonBilledCost } = this.spanCostService.deriveStorageCost(span);
     span.cost = cost;
     span.nonBilledCost = nonBilledCost;
+    // Last before the store (ADR-201 §4): a mark stays only beside the entry as admitted.
+    span.spanAttributes = storedAttributesKeepingHeldMarks({
+      admitted: event.data.span.attributes,
+      stored: span.spanAttributes,
+    });
     return span;
   }
 }

@@ -28,6 +28,9 @@ const ORG = "org-1";
 const TRACE = "0af7651916cd43dd8448eb211c80319c";
 const OTHER_TRACE = "4bf92f3577b34da6a3ce929d0e0e4736";
 const MARK = `${VERIFIED_ATTRIBUTE_PREFIX}orchestrator`;
+const USER_MARK = `${VERIFIED_ATTRIBUTE_PREFIX}metadata.user_id`;
+const EMAIL = "ana@example.com";
+const REDACTED = "[EMAIL_ADDRESS]";
 
 type SigningKey = {
   organizationId: string;
@@ -164,18 +167,32 @@ function commandFor({
   };
 }
 
+/** A step admission runs on the span after its signature is read, standing in for redaction. */
+type AdmissionStep = (span: OtlpSpan) => void;
+
 function admission({
   signatures,
   timeoutMs,
+  redact = () => undefined,
+  enrich = () => undefined,
+  drop = () => undefined,
 }: {
   signatures: Pick<ApiKeyApi, "verifyBraidSignature">;
   timeoutMs?: number;
+  redact?: AdmissionStep;
+  enrich?: AdmissionStep;
+  drop?: AdmissionStep;
 }) {
   return EventingRecordSpanAdapter.create({
-    piiRedaction: { redact: async () => undefined },
-    costEnrichment: { enrich: async () => undefined },
+    piiRedaction: { redact: async ({ span }) => redact(span) },
+    costEnrichment: { enrich: async (span) => enrich(span) },
     tokenEstimation: { estimate: async () => undefined },
-    contentDrop: { drop: async () => ({ droppedCount: 0, droppedCategories: [] }) },
+    contentDrop: {
+      drop: async (span) => {
+        drop(span);
+        return { droppedCount: 0, droppedCategories: [] };
+      },
+    },
     signatures: SpanSignatureVerificationService.create({
       signatures,
       projects,
@@ -433,6 +450,74 @@ describe("span admission for signed calls", () => {
 
       expect(verified[MARK]).toBe("orchestrator");
       expect(expired[MARK]).toBeUndefined();
+    });
+  });
+
+  describe("given admission changes a signed entry after its signature verified", () => {
+    const signedUser = () =>
+      sign({ key: orchestratorKey, traceId: TRACE, entries: { "metadata.user_id": EMAIL } });
+    const sentWithUser = () =>
+      span({
+        attributes: {
+          "metadata.user_id": EMAIL,
+          orchestrator: "web",
+          "langwatch.signature": signedUser(),
+        },
+      });
+    const setValue =
+      ({ key, value }: { key: string; value: string }): AdmissionStep =>
+      (sent) => {
+        sent.attributes = sent.attributes.map((attribute) =>
+          attribute.key === key ? { key, value: { stringValue: value } } : attribute,
+        );
+      };
+    const removeKey =
+      (key: string): AdmissionStep =>
+      (sent) => {
+        sent.attributes = sent.attributes.filter((attribute) => attribute.key !== key);
+      };
+
+    /** @scenario "A signed entry that admission redacts, rewrites or drops keeps no verified mark" */
+    it.each([
+      ["redaction rewrote", { redact: setValue({ key: "metadata.user_id", value: REDACTED }) }],
+      ["enrichment rewrote", { enrich: setValue({ key: "metadata.user_id", value: REDACTED }) }],
+      ["the content drop removed", { drop: removeKey("metadata.user_id") }],
+    ])("stores no mark for an entry %s", async (_step, steps) => {
+      const stored = await storedAttributes({
+        handler: admission({ signatures: keyDirectory([orchestratorKey]), ...steps }),
+        command: commandFor({ sent: sentWithUser() }),
+      });
+
+      expect(stored[USER_MARK]).toBeUndefined();
+    });
+
+    /** @scenario "A signed entry that admission redacts, rewrites or drops keeps no verified mark" */
+    it("keeps the mark of an entry admission left exactly as signed", async () => {
+      const stored = await storedAttributes({
+        handler: admission({
+          signatures: keyDirectory([orchestratorKey]),
+          redact: setValue({ key: "orchestrator", value: REDACTED }),
+        }),
+        command: commandFor({ sent: sentWithUser() }),
+      });
+
+      expect(stored[USER_MARK]).toBe("orchestrator");
+      expect(stored["metadata.user_id"]).toBe(EMAIL);
+    });
+
+    it("removes a mark a step between verification and the mark decision wrote", async () => {
+      const stored = await storedAttributes({
+        handler: admission({
+          signatures: keyDirectory([orchestratorKey]),
+          enrich: (sent) => {
+            sent.attributes.push({ key: MARK, value: { stringValue: "orchestrator" } });
+          },
+        }),
+        command: commandFor({ sent: sentWithUser() }),
+      });
+
+      expect(stored[MARK]).toBeUndefined();
+      expect(stored[USER_MARK]).toBe("orchestrator");
     });
   });
 
