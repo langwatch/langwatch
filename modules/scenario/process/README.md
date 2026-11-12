@@ -993,7 +993,7 @@ type Response = z.infer<typeof simulationBatchSummaryRestSchema>; // ../contract
 
 ### `scenarios`
 
-Contract `../contract/src/scenario.trpc.ts:185`, router `src/transport/scenario.trpc.ts:40`.
+Contract `../contract/src/scenario.trpc.ts:194`, router `src/transport/scenario.trpc.ts:40`.
 
 | Procedure                               | Kind         | Gate                                                                                                                                                                                                                                | Input                               | Output                               |
 | --------------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | ------------------------------------ |
@@ -1038,18 +1038,18 @@ Contract `../contract/src/scenario.trpc.ts:185`, router `src/transport/scenario.
 
 ```typescript
 // scenarios.create
-type Input = z.infer<typeof scenarioTrpcCreateSchema>; // ../contract/src/scenario.trpc.ts:105
+type Input = z.infer<typeof scenarioTrpcCreateSchema>; // ../contract/src/scenario.trpc.ts:112
 type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:71
 
 // scenarios.getAll
-// Input: projectSchema, ../contract/src/scenario.trpc.ts:67
+// Input: projectSchema, ../contract/src/scenario.trpc.ts:71
 interface Input {
   projectId: string;
 }
-// Output: scenarioSchema.array() (inline, ../contract/src/scenario.trpc.ts:193)
+// Output: scenarioSchema.array() (inline, ../contract/src/scenario.trpc.ts:202)
 
 // scenarios.getById
-// Input: scenarioIdSchema, ../contract/src/scenario.trpc.ts:75
+// Input: scenarioIdSchema, ../contract/src/scenario.trpc.ts:79
 interface Input {
   projectId: string;
   id: string;
@@ -1057,19 +1057,19 @@ interface Input {
 type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:71
 
 // scenarios.getByIdIncludingArchived
-type Input = z.infer<typeof scenarioIdSchema>; // ../contract/src/scenario.trpc.ts:75
-// Output: scenarioSchema.nullable() (inline, ../contract/src/scenario.trpc.ts:201)
+type Input = z.infer<typeof scenarioIdSchema>; // ../contract/src/scenario.trpc.ts:79
+// Output: scenarioSchema.nullable() (inline, ../contract/src/scenario.trpc.ts:210)
 
 // scenarios.update
-type Input = z.infer<typeof scenarioTrpcUpdateSchema>; // ../contract/src/scenario.trpc.ts:136
+type Input = z.infer<typeof scenarioTrpcUpdateSchema>; // ../contract/src/scenario.trpc.ts:145
 type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:71
 
 // scenarios.archive
-type Input = z.infer<typeof scenarioIdSchema>; // ../contract/src/scenario.trpc.ts:75
+type Input = z.infer<typeof scenarioIdSchema>; // ../contract/src/scenario.trpc.ts:79
 type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:71
 
 // scenarios.moveToTestSuite
-// Input: inline, ../contract/src/scenario.trpc.ts:214
+// Input: inline, ../contract/src/scenario.trpc.ts:223
 interface Input {
   projectId: string;
   scenarioId: string;
@@ -1078,7 +1078,7 @@ interface Input {
 type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:71
 
 // scenarios.duplicate
-// Input: inline, ../contract/src/scenario.trpc.ts:223
+// Input: inline, ../contract/src/scenario.trpc.ts:232
 interface Input {
   projectId: string;
   scenarioId: string;
@@ -1086,7 +1086,7 @@ interface Input {
 type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:71
 
 // scenarios.batchArchive
-// Input: inline, ../contract/src/scenario.trpc.ts:227
+// Input: inline, ../contract/src/scenario.trpc.ts:236
 interface Input {
   projectId: string;
   ids: string[];
@@ -1101,7 +1101,7 @@ interface Output {
 }
 
 // scenarios.listVersions
-// Input: inline, ../contract/src/scenario.trpc.ts:233
+// Input: inline, ../contract/src/scenario.trpc.ts:242
 interface Input {
   projectId: string;
   scenarioId: string;
@@ -1111,7 +1111,7 @@ interface Input {
 type Output = z.infer<typeof scenarioVersionPageSchema>; // ../contract/src/scenario.responses.ts:35
 
 // scenarios.getVersion
-// Input: inline, ../contract/src/scenario.trpc.ts:244
+// Input: inline, ../contract/src/scenario.trpc.ts:253
 interface Input {
   projectId: string;
   scenarioId: string;
@@ -1120,7 +1120,7 @@ interface Input {
 type Output = z.infer<typeof scenarioVersionDetailSchema>; // ../contract/src/scenario.version.ts:153
 
 // scenarios.restoreVersion
-// Input: inline, ../contract/src/scenario.trpc.ts:250
+// Input: inline, ../contract/src/scenario.trpc.ts:259
 interface Input {
   projectId: string;
   scenarioId: string;
@@ -1129,7 +1129,7 @@ interface Input {
 type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:71
 
 // scenarios.run
-type Input = z.infer<typeof scenarioTrpcRunSchema>; // ../contract/src/scenario.trpc.ts:157
+type Input = z.infer<typeof scenarioTrpcRunSchema>; // ../contract/src/scenario.trpc.ts:166
 // Output: scenarioRunScheduledSchema, ../contract/src/scenario.responses.ts:76
 interface Output {
   scheduled: true;
@@ -1139,7 +1139,7 @@ interface Output {
 }
 
 // scenarios.cancelJob
-// Input: inline, ../contract/src/scenario.trpc.ts:265
+// Input: inline, ../contract/src/scenario.trpc.ts:274
 interface Input {
   projectId: string;
   scenarioSetId: string;
@@ -1153,7 +1153,7 @@ interface Output {
 }
 
 // scenarios.cancelBatchRun
-// Input: inline, ../contract/src/scenario.trpc.ts:277
+// Input: inline, ../contract/src/scenario.trpc.ts:286
 interface Input {
   projectId: string;
   scenarioSetId: string;
@@ -1166,13 +1166,13 @@ interface Output {
 }
 
 // scenarios.getScenarioSetsData
-// Input: inline, ../contract/src/scenario.trpc.ts:283
+// Input: inline, ../contract/src/scenario.trpc.ts:292
 interface Input {
   projectId: string;
   startDate?: number;
   endDate?: number;
 }
-// Output: inline, ../contract/src/scenario.trpc.ts:284
+// Output: inline, ../contract/src/scenario.trpc.ts:293
 type Output = {
   scenarioSetId: string;
   scenarioCount: number;
@@ -1180,7 +1180,7 @@ type Output = {
 }[];
 
 // scenarios.getSuiteRunData
-// Input: inline, ../contract/src/scenario.trpc.ts:289
+// Input: inline, ../contract/src/scenario.trpc.ts:298
 interface Input {
   projectId: string;
   scenarioSetId?: string;
@@ -1193,17 +1193,17 @@ interface Input {
 type Output = z.infer<typeof simulationAllSuitesRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:342
 
 // scenarios.getLastResultSummaries
-// Input: inline, ../contract/src/scenario.trpc.ts:307
+// Input: inline, ../contract/src/scenario.trpc.ts:316
 interface Input {
   projectId: string;
   scenarioIds?: string[];
   startDate?: number;
   endDate?: number;
 }
-// Output: simulationLastResultSummarySchema.array() (inline, ../contract/src/scenario.trpc.ts:313)
+// Output: simulationLastResultSummarySchema.array() (inline, ../contract/src/scenario.trpc.ts:322)
 
 // scenarios.getSuiteRunFreshness
-// Input: inline, ../contract/src/scenario.trpc.ts:330
+// Input: inline, ../contract/src/scenario.trpc.ts:339
 interface Input {
   projectId: string;
   scenarioSetId?: string;
@@ -1216,7 +1216,7 @@ interface Output {
 }
 
 // scenarios.getScenarioSetRunData
-// Input: inline, ../contract/src/scenario.trpc.ts:336
+// Input: inline, ../contract/src/scenario.trpc.ts:345
 interface Input {
   projectId: string;
   scenarioSetId: string;
@@ -1228,17 +1228,17 @@ interface Input {
 type Output = z.infer<typeof simulationScenarioSetRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:369
 
 // scenarios.getAllScenarioSetRunData
-// Input: inline, ../contract/src/scenario.trpc.ts:348
+// Input: inline, ../contract/src/scenario.trpc.ts:357
 interface Input {
   projectId: string;
   scenarioSetId: string;
   startDate?: number;
   endDate?: number;
 }
-// Output: simulationRunDataSchema.array() (inline, ../contract/src/scenario.trpc.ts:349)
+// Output: simulationRunDataSchema.array() (inline, ../contract/src/scenario.trpc.ts:358)
 
 // scenarios.getRunState
-// Input: inline, ../contract/src/scenario.trpc.ts:352
+// Input: inline, ../contract/src/scenario.trpc.ts:361
 interface Input {
   projectId: string;
   scenarioRunId: string;
@@ -1246,7 +1246,7 @@ interface Input {
 type Output = z.infer<typeof simulationRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:208
 
 // scenarios.getScenarioSetBatchRunCount
-// Input: inline, ../contract/src/scenario.trpc.ts:356
+// Input: inline, ../contract/src/scenario.trpc.ts:365
 interface Input {
   projectId: string;
   scenarioSetId: string;
@@ -1259,7 +1259,7 @@ interface Output {
 }
 
 // scenarios.getScenarioSetBatchHistory
-// Input: inline, ../contract/src/scenario.trpc.ts:361
+// Input: inline, ../contract/src/scenario.trpc.ts:370
 interface Input {
   projectId: string;
   scenarioSetId: string;
@@ -1271,7 +1271,7 @@ interface Input {
 type Output = z.infer<typeof simulationBatchHistorySchema>; // ../contract/src/features/simulation/simulation.ts:308
 
 // scenarios.getBatchRunData
-// Input: inline, ../contract/src/scenario.trpc.ts:375
+// Input: inline, ../contract/src/scenario.trpc.ts:384
 interface Input {
   projectId: string;
   scenarioSetId: string;
@@ -1282,13 +1282,13 @@ interface Input {
 type Output = z.infer<typeof simulationBatchRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:323
 
 // scenarios.getExternalSetSummaries
-// Input: inline, ../contract/src/scenario.trpc.ts:393
+// Input: inline, ../contract/src/scenario.trpc.ts:402
 interface Input {
   projectId: string;
   startDate?: number;
   endDate?: number;
 }
-// Output: inline, ../contract/src/scenario.trpc.ts:394
+// Output: inline, ../contract/src/scenario.trpc.ts:403
 type Output = {
   scenarioSetId: string;
   passedCount: number;
@@ -1298,7 +1298,7 @@ type Output = {
 }[];
 
 // scenarios.getAllSuiteRunData
-// Input: inline, ../contract/src/scenario.trpc.ts:399
+// Input: inline, ../contract/src/scenario.trpc.ts:408
 interface Input {
   projectId: string;
   limit?: number;
@@ -1309,7 +1309,7 @@ interface Input {
 type Output = z.infer<typeof simulationAllSuitesRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:342
 
 // scenarios.onSimulationUpdate
-// Input: inline, ../contract/src/scenario.trpc.ts:415
+// Input: inline, ../contract/src/scenario.trpc.ts:424
 interface Input {
   projectId: string;
   tabKey?: string;
@@ -1322,21 +1322,21 @@ interface Output {
 }
 
 // scenarios.getCodeScenarios
-// Input: windowSchema, ../contract/src/scenario.trpc.ts:179
+// Input: windowSchema, ../contract/src/scenario.trpc.ts:188
 interface Input {
   projectId: string;
   startDate?: number;
   endDate?: number;
 }
-// Output: inline, ../contract/src/scenario.trpc.ts:430
+// Output: inline, ../contract/src/scenario.trpc.ts:439
 type Output = {
   key: string;
   name: string;
 }[];
 
 // scenarios.getRunTargets
-type Input = z.infer<typeof windowSchema>; // ../contract/src/scenario.trpc.ts:179
-// Output: inline, ../contract/src/scenario.trpc.ts:438
+type Input = z.infer<typeof windowSchema>; // ../contract/src/scenario.trpc.ts:188
+// Output: inline, ../contract/src/scenario.trpc.ts:447
 type Output = {
   key: string;
   referenceId: string | null;
@@ -1345,7 +1345,7 @@ type Output = {
 }[];
 
 // scenarios.getResultsOverview
-// Input: inline, ../contract/src/scenario.trpc.ts:449
+// Input: inline, ../contract/src/scenario.trpc.ts:458
 interface Input {
   projectId: string;
   startDate?: number;
@@ -1361,18 +1361,18 @@ interface Input {
 type Output = z.infer<typeof resultsOverviewSchema>; // ../contract/src/scenario.responses.ts:194
 
 // scenarios.getResultAtoms
-// Input: z.object({ ...resultsFilterSchema.shape, limit: z.number().int().min(1).max(MAX_ATOM_PAGE… (inline, ../contract/src/scenario.trpc.ts:466)
+// Input: z.object({ ...resultsFilterSchema.shape, limit: z.number().int().min(1).max(MAX_ATOM_PAGE… (inline, ../contract/src/scenario.trpc.ts:475)
 type Output = z.infer<typeof resultAtomsPageSchema>; // ../contract/src/scenario.responses.ts:145
 
 // scenarios.getRunConfigurations
-// Input: inline, ../contract/src/scenario.trpc.ts:480
+// Input: inline, ../contract/src/scenario.trpc.ts:489
 interface Input {
   projectId: string;
   startDate?: number;
   endDate?: number;
   limit?: number;
 }
-// Output: runConfigurationEntrySchema.array() (inline, ../contract/src/scenario.trpc.ts:487)
+// Output: runConfigurationEntrySchema.array() (inline, ../contract/src/scenario.trpc.ts:496)
 
 // scenarios.mintVoiceSession
 type Input = z.infer<typeof voiceSessionMintInputSchema>; // ../contract/src/voice/voice-session.schemas.ts:18
