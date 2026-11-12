@@ -54,10 +54,10 @@ import { EventingAuthzGrantRepository } from "../repositories/eventing/eventing.
 import { bindingWire } from "../rules/role-binding-read-back.rules.ts";
 import { AuthzAdmissionService } from "../services/authz-admission.service.ts";
 import { AuthzAggregateReadAuditService } from "../services/authz-aggregate-read-audit.service.ts";
+import { AuthzBillingRoleService } from "../services/authz-billing-role.service.ts";
 import { AuthzBraidTargetsService } from "../services/authz-braid-targets.service.ts";
 import { AuthzBraidService } from "../services/authz-braid.service.ts";
 import { AuthzBraidedReadAuditService } from "../services/authz-braided-read-audit.service.ts";
-import { AuthzBillingRoleService } from "../services/authz-billing-role.service.ts";
 import { AuthzCutoverGateService } from "../services/authz-cutover-gate.service.ts";
 import { AuthzGrantIdentityService } from "../services/authz-grant-identity.service.ts";
 import {
