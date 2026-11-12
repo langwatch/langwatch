@@ -195,6 +195,11 @@ export interface ModelProviderUsageCount {
 export type ModelProviderCustomKeys = Pick<ModelProvider, "id" | "provider" | "organizationId"> &
   Readonly<{ customKeys: Record<string, unknown> }>;
 
+/** A listed provider and the model ids its own model list answers with, null when unknown. */
+export type ModelProviderWithServedModels = ModelProviderSummary & {
+  servedModels: string[] | null;
+};
+
 /** Callable model-provider operations shared by process peers after composition. */
 export interface ModelProviderApi {
   estimateCost(input: ModelCostEstimateInput): number;
@@ -223,12 +228,12 @@ export interface ModelProviderApi {
     input: ModelProviderListProjectInput,
   ): Promise<Record<string, ModelProviderExecution>>;
   /**
-   * Per provider key the project runs on, the bare model ids that provider's own model list
-   * answers with (cached per credential); a provider not asked or not answering is absent.
+   * `listForProject`, each row carrying the bare ids its provider's own model list answers with
+   * (cached per credential), or null when the provider was not asked or did not answer.
    */
-  getServedModelsForProject(
+  listForProjectWithServedModels(
     input: ModelProviderListProjectInput,
-  ): Promise<Record<string, string[]>>;
+  ): Promise<ModelProviderWithServedModels[]>;
   prepareExecution(
     input: ModelProviderExecutionPrepareInput,
   ): Promise<ModelProviderExecutionParameters>;

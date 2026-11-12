@@ -59,9 +59,11 @@ describe("given a project with an OpenAI provider", () => {
         customKeys: { OPENAI_API_KEY: "sk-test" },
       });
 
-      await expect(app.getServedModelsForProject({ projectId: "project-1" })).resolves.toEqual({
-        openai: ["gpt-6-sol"],
-      });
+      const listed = await app.listForProjectWithServedModels({ projectId: "project-1" });
+
+      expect(listed.map(({ provider, servedModels }) => ({ provider, servedModels }))).toEqual([
+        { provider: "openai", servedModels: ["gpt-6-sol"] },
+      ]);
     });
   });
 
@@ -69,7 +71,9 @@ describe("given a project with an OpenAI provider", () => {
     it("answers no list, so the pickers keep the catalogue", async () => {
       const app = createModelProviderTestApp();
 
-      await expect(app.getServedModelsForProject({ projectId: "project-1" })).resolves.toEqual({});
+      const listed = await app.listForProjectWithServedModels({ projectId: "project-1" });
+
+      expect(listed.every(({ servedModels }) => servedModels === null)).toBe(true);
     });
   });
 });

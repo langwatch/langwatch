@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable model-provider operations shared by process peers after composition.
 
-Peers call these through the token, declared at `../contract/src/model-provider.api.ts:199`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/model-provider.api.ts:204`; nothing else in this package is public.
 
 #### `estimateCost`
 
@@ -66,12 +66,12 @@ findRowServingModel(input: { projectId: string; provider: string; model: string;
 getExecutionProviders(input: ModelProviderListProjectInput): Promise<Record<string, ModelProviderExecution>>;
 ```
 
-#### `getServedModelsForProject`
+#### `listForProjectWithServedModels`
 
-Per provider key the project runs on, the bare model ids that provider's own model list answers with (cached per credential); a provider not asked or not answering is absent.
+`listForProject`, each row carrying the bare ids its provider's own model list answers with (cached per credential), or null when the provider was not asked or did not answer.
 
 ```typescript
-getServedModelsForProject(input: ModelProviderListProjectInput): Promise<Record<string, string[]>>;
+listForProjectWithServedModels(input: ModelProviderListProjectInput): Promise<ModelProviderWithServedModels[]>;
 ```
 
 #### `prepareExecution`
@@ -909,8 +909,8 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                                         | Environment variable                           | Declared at                                   |
 | ------ | -------------------------------------------- | ---------------------------------------------- | --------------------------------------------- |
-| secret | `...ModelProviderModule.platformCredentials` | ≈ `...ModelProviderModule.platformCredentials` | `src/app/model-provider.app.ts:269`           |
-| secret | `...ModelProviderModule.operationalSecrets`  | ≈ `...ModelProviderModule.operationalSecrets`  | `src/app/model-provider.app.ts:270`           |
+| secret | `...ModelProviderModule.platformCredentials` | ≈ `...ModelProviderModule.platformCredentials` | `src/app/model-provider.app.ts:270`           |
+| secret | `...ModelProviderModule.operationalSecrets`  | ≈ `...ModelProviderModule.operationalSecrets`  | `src/app/model-provider.app.ts:271`           |
 | config | `blockLocalHttpCalls`                        | `BLOCK_LOCAL_HTTP_CALLS`                       | `../contract/src/model-provider.config.ts:31` |
 | config | `allowedProxyHosts`                          | `ALLOWED_PROXY_HOSTS`                          | `../contract/src/model-provider.config.ts:32` |
 | config | `defaultModel`                               | `LANGWATCH_DEFAULT_MODEL`                      | `../contract/src/model-provider.config.ts:33` |

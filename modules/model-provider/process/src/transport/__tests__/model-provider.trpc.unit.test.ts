@@ -252,13 +252,13 @@ describe("the modelProvider tRPC namespace", () => {
     /** @scenario Plaintext API keys never reach the browser through any provider query */
     it("uses the masking operations, never the decrypted execution one", async () => {
       const getForProject = vi.fn(async () => ({}));
-      const listForProject = vi.fn(async () => []);
+      const listForProjectWithServedModels = vi.fn(async () => []);
       const listForOrganization = vi.fn(async () => []);
       const getExecutionProviders = vi.fn(async () => ({}));
       const { caller } = mount({
         modelProviders: {
           getForProject: getForProject as never,
-          listForProject: listForProject as never,
+          listForProjectWithServedModels: listForProjectWithServedModels as never,
           listForOrganization: listForOrganization as never,
           getExecutionProviders: getExecutionProviders as never,
         },
@@ -270,7 +270,7 @@ describe("the modelProvider tRPC namespace", () => {
       await caller.listAllForOrganizationForFrontend({ organizationId: "org-1" });
 
       expect(getForProject).toHaveBeenCalledTimes(2);
-      expect(listForProject).toHaveBeenCalledTimes(1);
+      expect(listForProjectWithServedModels).toHaveBeenCalledTimes(1);
       expect(listForOrganization).toHaveBeenCalledTimes(1);
       // The one that hands back decrypted credentials. A tRPC answer lands in a
       // browser, so no procedure here may reach for it.
@@ -350,7 +350,7 @@ describe("the modelProvider tRPC namespace", () => {
       const { caller } = mount({
         modelProviders: {
           getForProject: (async () => ({ openai: saved })) as never,
-          listForProject: (async () => [saved]) as never,
+          listForProjectWithServedModels: (async () => [{ ...saved, servedModels: null }]) as never,
         },
       });
 
@@ -372,8 +372,10 @@ describe("the modelProvider tRPC namespace", () => {
       const anthropic = storedProvider({ id: "provider-anthropic", provider: "anthropic" });
       const { caller } = mount({
         modelProviders: {
-          listForProject: (async () => [openai, anthropic]) as never,
-          getServedModelsForProject: async () => ({ openai: ["gpt-6-sol"] }),
+          listForProjectWithServedModels: (async () => [
+            { ...openai, servedModels: ["gpt-6-sol"] },
+            { ...anthropic, servedModels: null },
+          ]) as never,
         },
       });
 

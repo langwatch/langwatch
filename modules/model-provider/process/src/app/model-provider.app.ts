@@ -60,6 +60,7 @@ import {
   type ModelProviderPlaygroundRequest,
   type ModelProviderListOrganizationInput,
   type ModelProviderListProjectInput,
+  type ModelProviderWithServedModels,
   type BuiltInModel,
   type DecisionModelResolution,
   type ModelProviderResolution,
@@ -606,11 +607,22 @@ export class ModelProviderModule implements ModelProviderApi {
     return this.#modelProviders.listForOrganization(input);
   }
 
-  /**
-   * Per provider key the project runs on, the bare ids that provider's own model list answers
-   * with (cached per credential); a provider not asked or not answering is absent.
-   */
-  async getServedModelsForProject(
+  /** `listForProject`, each row carrying the ids its provider's own model list answers with. */
+  async listForProjectWithServedModels(
+    input: ModelProviderListProjectInput,
+  ): Promise<ModelProviderWithServedModels[]> {
+    const [providers, served] = await Promise.all([
+      this.listForProject(input),
+      this.#servedModelsForProject(input),
+    ]);
+    return providers.map((provider) => ({
+      ...provider,
+      servedModels: served[provider.provider] ?? null,
+    }));
+  }
+
+  /** Per provider key the project runs on, its list's ids; absent when not asked or no answer. */
+  async #servedModelsForProject(
     input: ModelProviderListProjectInput,
   ): Promise<Record<string, string[]>> {
     if (!this.#servedModels) return {};
