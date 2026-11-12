@@ -1063,6 +1063,38 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
       expect(board.host.notices).toEqual([]);
     });
 
+    /** @scenario "A read that lands a run's lifetime after the deadline gives no verdict" */
+    it("says nothing and opens nothing when a hint's read lands after the run could have lasted", async () => {
+      let read: InsightDailyRunSetting | Promise<InsightDailyRunSetting> = ON;
+      const board = openBoard({
+        setting: () => read,
+        host: ASKER,
+        write: () => runNowAnswer(),
+      });
+      await aMinuteBeforeTheDeadline(board);
+
+      read = new Promise<InsightDailyRunSetting>(() => void 0);
+      await vi.advanceTimersByTimeAsync(60_000);
+      await waitFor(() => expect(board.reads()).toHaveLength(READS_BEFORE_DEADLINE + 1));
+      await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS + 1_000);
+
+      // The next scheduled run, which the member never asked for.
+      read = {
+        ...ON,
+        runInFlight: {
+          runId: "run-scheduled",
+          conversationId: "conversation-9",
+          startedAt: Date.now(),
+        },
+      };
+      await board.readHint();
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      expect(board.host.queries).toEqual([]);
+      expect(board.host.failures).toEqual([]);
+      expect(board.host.notices).toEqual([]);
+    });
+
     /** Opens a board whose deadline read is held until `answer` is called, with `shown`. */
     async function pastTheDeadlineWithReadHeld(
       write: (call: UiProcedureCall) => Promise<unknown>,

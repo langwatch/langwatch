@@ -13,7 +13,7 @@ import {
 } from "@langwatch/insight-contract";
 import { LANGY_CONVERSATION_PARAM } from "@langwatch/langy-contract";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
-import { currentTimeZone } from "@langwatch/time";
+import { currentTimeZone, nowInstant } from "@langwatch/time";
 import { useEffect, useEffectEvent, useRef } from "react";
 
 import {
@@ -122,20 +122,26 @@ function useRequestedRunDeadline({
   const cancelVerdict = () => {
     verdictOwedTo.current = undefined;
   };
-  const deliverVerdict = useEffectEvent((owedTo: RunRequest, requested?: RequestedRun) => {
-    if (verdictOwedTo.current !== owedTo) return;
-    cancelVerdict();
-    if (requested) showRun(requested);
-    else sayLost();
-  });
+  const deliverVerdict = useEffectEvent(
+    (owedTo: RunRequest, firedAt: number, requested?: RequestedRun) => {
+      if (verdictOwedTo.current !== owedTo) return;
+      cancelVerdict();
+      // A read that lands a whole run's life after the deadline says nothing of this request: the
+      // run it shows may be the next scheduled one, and a hint that outran its row is not a loss.
+      if (nowInstant().epochMilliseconds - firedAt > INSIGHT_DAILY_RUN_EXPIRY_MS) return;
+      if (requested) showRun(requested);
+      else sayLost();
+    },
+  );
   useEffect(() => cancelVerdict, []);
   useEffect(() => {
     if (!isAwaitingRun || !request) return;
     const deadline = setTimeout(() => {
       verdictOwedTo.current = request;
+      const firedAt = nowInstant().epochMilliseconds;
       endWait();
       void readRequestedRun({ readOnce: readLastTime, request }).then((requested) =>
-        deliverVerdict(request, requested),
+        deliverVerdict(request, firedAt, requested),
       );
     }, INSIGHT_DAILY_RUN_EXPIRY_MS);
     return () => clearTimeout(deadline);

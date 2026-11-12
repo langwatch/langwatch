@@ -1253,6 +1253,13 @@ Feature: The daily insights run
       And when a later hint's read replaces it and shows the run, Langy opens once on the run
 
     @integration
+    Scenario: A read that lands a run's lifetime after the deadline gives no verdict
+      Given a board that is on, and the member chose Run now
+      And the deadline fired its read and that read never answered
+      When a later hint's read answers more than a run's lifetime after the deadline
+      Then no failure, no notice and no Langy panel is shown, whatever that read shows
+
+    @integration
     Scenario: The deadline says the run could not be started when its last read finds none
       Given a board that is on, and the member chose Run now
       And the board has read no run for as long as a run can last
