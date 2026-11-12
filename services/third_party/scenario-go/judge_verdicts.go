@@ -2,6 +2,7 @@ package scenario
 
 import (
 	"encoding/json"
+	"slices"
 	"strconv"
 	"unicode/utf8"
 
@@ -171,12 +172,57 @@ func readAnswer(answer any) (CriterionResult, bool) {
 	return CriterionResult{}, false
 }
 
+// normalizeCriteriaArgs returns the finish_test criteria argument as an
+// object. Some models (Claude Haiku among them) intermittently send it as a
+// JSON string, which is parsed instead of counting every criterion missing.
+func normalizeCriteriaArgs(answers any) jsjson.Object {
+	if s, ok := answers.(string); ok {
+		v, err := jsjson.Parse(s)
+		if err != nil {
+			return nil
+		}
+		answers = v
+	}
+	obj, _ := answers.(jsjson.Object)
+	return obj
+}
+
+// unansweredCriteria returns the criteria the answers leave without a
+// readable verdict.
+func unansweredCriteria(criteria []string, answers any) []string {
+	obj := normalizeCriteriaArgs(answers)
+	names := criteriaParamNames(criteria)
+	var missing []string
+	for i, c := range criteria {
+		ans, _ := obj.Get(names[i])
+		if _, ok := readAnswer(ans); !ok {
+			missing = append(missing, c)
+		}
+	}
+	return missing
+}
+
+// mergeCriteriaArgs fills what the first answers left unreadable with the
+// retry's answers; the first call's readable answers win.
+func mergeCriteriaArgs(first, retry any) jsjson.Object {
+	merged := slices.Clone(normalizeCriteriaArgs(retry))
+	for _, m := range normalizeCriteriaArgs(first) {
+		if _, ok := readAnswer(m.Value); ok {
+			merged = merged.Set(m.Key, m.Value)
+		}
+	}
+	if merged == nil {
+		merged = jsjson.Object{}
+	}
+	return merged
+}
+
 // parseCriterionVerdicts maps the answers back onto the declared criteria by
 // schema key. Any failed criterion fails the run, otherwise any inconclusive
 // (or no criteria at all) makes it inconclusive. A missing answer fails
 // closed.
 func parseCriterionVerdicts(criteria []string, answers any) criterionVerdicts {
-	obj, _ := answers.(jsjson.Object)
+	obj := normalizeCriteriaArgs(answers)
 	names := criteriaParamNames(criteria)
 	v := criterionVerdicts{
 		criteria: make([]CriterionResult, len(criteria)),

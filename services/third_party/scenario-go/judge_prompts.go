@@ -10,6 +10,10 @@ import (
 
 const remoteTraceJudgingRule = "Criteria about the agent's internal behavior (tool calls, database writes, API calls, retrievals) must be verified against the <opentelemetry_traces> section, not against claims in the transcript. If a span named langwatch.span_collection.error is present, read its reason: when no agent spans arrived, mark criteria that depend on internal behavior as inconclusive, never passed. When the trace is incomplete, criteria proven by the spans that are present may pass, and criteria whose evidence is missing stay inconclusive. Criteria about the conversation itself are unaffected by missing traces: judge them from the transcript as normal. Never mark internal-behavior criteria as passed based on the transcript alone."
 
+// missingVerdictPrompt re-asks the criteria a finish_test call left without
+// a verdict.
+const missingVerdictPrompt = "Your finish_test call did not give a usable verdict for the criteria below. Call finish_test again with a requirement, a reasoning and a status for every criterion. Pass criteria as an object keyed by criterion, not as a string."
+
 // unconfirmedTraceNote is shown with the evidence when a remote trace
 // stopped changing but has no wrapping agent span to prove it complete.
 const unconfirmedTraceNote = "The remote trace stopped changing, but nothing proves it is complete: spans may still be arriving, since exporters send spans in batches every few seconds. If a criterion depends on spans that are not shown, call wait_for_traces once before judging it."
