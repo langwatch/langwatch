@@ -81,8 +81,16 @@ export async function startScopeHarness(): Promise<ScopeHarness> {
         : await pg.container.exec(
             [
               "psql",
-              ...["-h", "127.0.0.1", "-U", user, "-d", DATABASE],
-              ...["-v", "ON_ERROR_STOP=1", "-tAc", sql],
+              "-h",
+              "127.0.0.1",
+              "-U",
+              user,
+              "-d",
+              DATABASE,
+              "-v",
+              "ON_ERROR_STOP=1",
+              "-tAc",
+              sql,
             ],
             { env: { PGPASSWORD: PASSWORD } },
           );
@@ -115,7 +123,9 @@ export async function startScopeHarness(): Promise<ScopeHarness> {
         `SELECT '${name}' AS n, (SELECT coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb) FROM ${q(SCHEMA)}.${q(name)} x) AS r`,
     ).join(" UNION ALL ");
 
-    return JSON.parse(await runAs({ user, sql: `SELECT jsonb_object_agg(n, r) FROM (${union}) s` }));
+    return JSON.parse(
+      await runAs({ user, sql: `SELECT jsonb_object_agg(n, r) FROM (${union}) s` }),
+    );
   }
 
   async function baselineTenantIds(): Promise<Record<string, string[]>> {

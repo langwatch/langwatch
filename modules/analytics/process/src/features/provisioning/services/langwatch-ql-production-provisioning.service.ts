@@ -48,10 +48,8 @@ const LWQL_POSTGRES_SCHEMA = "public";
 export const LWQL_POSTGRES_READER_ROLE = LWQL_SHARED_READER_ROLE;
 
 /**
- * Runs `grant` only when the live view is the row-scoped one: a security barrier whose stored
- * definition carries the org-role lookup, the `pg_auth_members` join and `rolname = current_user`.
- * A stale unscoped view must never reach the scoped-reader group, so one failing the guard has
- * any existing `SELECT` revoked rather than left ungranted.
+ * Grants only on a live security-barrier view carrying the org-role lookup, `pg_auth_members`
+ * and `rolname = current_user`; any other view has `SELECT` revoked, so none goes unscoped.
  */
 function scopedViewGuard({
   qualifiedView,

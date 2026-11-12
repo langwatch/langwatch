@@ -172,7 +172,9 @@ describe("given a deployment where the scoped-reader group does not exist", () =
     });
 
     it("the group role is not created", async () => {
-      expect(await harness.admin(`SELECT count(*) FROM pg_roles WHERE rolname = '${GROUP}'`)).toBe("0");
+      expect(
+        await harness.admin(`SELECT count(*) FROM pg_roles WHERE rolname = '${GROUP}'`),
+      ).toBe("0");
     });
 
     it("the shared reader still reads every view", async () => {
