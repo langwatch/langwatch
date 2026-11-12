@@ -104,7 +104,6 @@ describe.skipIf(!databaseUrl)("given nurturing's trace-day rows", () => {
         `${otherProjectId}:2026-11-22`,
         `${projectId}:2026-11-19`,
         `${projectId}:2026-11-20`,
-        `${projectId}:2026-11-21`,
       ]);
 
       await repository.pruneBefore({ projectIds, beforeDay: "2026-10-21" });
