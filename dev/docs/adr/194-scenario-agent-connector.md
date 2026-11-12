@@ -1,6 +1,6 @@
 # ADR-194: Scenario Connector: a new agent type that LangWatch hosts
 
-**Date:** 2026-11-03
+**Date:** 2026-11-03 (updated 2026-11-12)
 
 **Status:** Proposed
 
@@ -21,7 +21,7 @@ The earlier draft of this ADR, and https://github.com/langwatch/langwatch/pull/9
 A scenario often needs test data that exists before the first turn and is removed after the last: a throwaway account, an order to refund. Today both ways to make it put code in the customer's hands:
 
 - **Connected agents** (ADR-180, [180-scenario-run-hooks.md](180-scenario-run-hooks.md)): setup and teardown are functions in the customer's process, which must stay online.
-- **HTTP agents** (ADR-188, proposed on https://github.com/langwatch/langwatch/pull/8956, built on https://github.com/langwatch/langwatch/pull/9193, https://github.com/langwatch/langwatch/pull/9194 and https://github.com/langwatch/langwatch/pull/9195; not on main): a hooks URL the customer hosts, signed by LangWatch.
+- **HTTP agents** (the HTTP hooks ADR, proposed on https://github.com/langwatch/langwatch/pull/8956, built on https://github.com/langwatch/langwatch/pull/9193, https://github.com/langwatch/langwatch/pull/9194 and https://github.com/langwatch/langwatch/pull/9195; not on main, and renumbered if reopened, since 188 is now taken on main): a hooks URL the customer hosts, signed by LangWatch.
 
 Epic: https://github.com/langwatch/tasks/issues/1063.
 
@@ -32,12 +32,12 @@ What main has, and the Connector reuses:
 - **The hook lifecycle is on main and is caller-agnostic.** `ScenarioRunHooksService.around` runs setup, the turns, then teardown in a `finally`, records each hook, and never lets teardown change the score (`apps/scenario-child/src/services/scenario-run-hooks.service.ts:100-115`). It calls hooks through a two-member interface, `ScenarioHookCaller { runState; callHook({ kind, timeoutMs }) }` (`:20-23`). Only the wiring picks connected agents: `hookTargetOf` returns null for any other agent type (`apps/scenario-child/src/services/scenario-child-execution.service.ts:209-222`).
 - **The record is on main.** `ScenarioHookResult` with statuses `ok | failed | timed_out | skipped | not_run`, the 60 s `DEFAULT_HOOK_TIMEOUT_MS`, and "Not scored" when setup is not `ok` (`modules/scenario/contract/src/features/execution/scenario-hooks.ts:11,17,56-59`); the `lw.simulation_run.hooks_recorded` event (`modules/scenario/process/src/eventing/simulation-processing.commands.ts:115`); the Setup and Teardown bands on the run.
 - **Code execution from a scenario run is on main.** A code agent's turn runs as a one-node `entry -> code -> end` workflow on nlpgo's `/go/studio/execute_sync` (`apps/scenario-child/src/channels/http/http.serialized-code-agent.channel.ts:208,376`), with project secrets as the `secrets` namespace, resolved by the prefetch (`modules/scenario/process/src/features/prefetch/services/scenario-target-prefetch.service.ts:175-192`) through `SecretApi.getValuesByName` (`modules/secret/contract/src/secret.api.ts:28`).
-- **Code-block isolation.** https://github.com/langwatch/langwatch/pull/9050 (merged) isolates one execution from another inside nlpgo. The app-level rule that a code block gets no network unless its workflow declares it is not built: `specs/security/tenant-aware-egress-isolation.feature` marks "A code block is denied network access by default" as `@unimplemented`. On cloud, the code-block runner's network is fenced by port at the infrastructure level; a fence by address is not built. Self-hosted, the Python subprocess runtime still lets a block open any socket (`specs/nlp-go/code-block.feature:336-340`). https://github.com/langwatch/langwatch/pull/8991 (open, not on main; its ADR-183) adds a WebAssembly runtime for JavaScript and TypeScript code blocks, but keeps Python on the subprocess runtime by default (WebAssembly is opt-in through `NLPGO_ENGINE_CODE_BLOCK_RUNTIME=wasm`).
+- **Code-block isolation.** https://github.com/langwatch/langwatch/pull/9050 (merged) isolates one execution from another inside nlpgo. The app-level rule that a code block gets no network unless its workflow declares it is not built: `specs/security/tenant-aware-egress-isolation.feature` marks "A code block is denied network access by default" as `@unimplemented`. On cloud, the code-block runner's network is fenced by port at the infrastructure level; a fence by address is not built. Self-hosted, the Python subprocess runtime still lets a block open any socket (`specs/nlp-go/code-block.feature:336-340`). https://github.com/langwatch/langwatch/pull/8991 (open, not on main; its ADR is renumbered on merge, since 183 is now taken on main) adds a WebAssembly runtime for JavaScript and TypeScript code blocks, but keeps Python on the subprocess runtime by default (WebAssembly is opt-in through `NLPGO_ENGINE_CODE_BLOCK_RUNTIME=wasm`).
 - **Datasets** are read through `DatasetApi.getDatasetPage` (`modules/dataset/contract/src/dataset.api.ts:153`).
 
 How agent types are defined today:
 
-- `agentTypeSchema` is an enum of six types, and `agentConfigSchema` is a discriminated union on `type` (`modules/agent/contract/src/config/index.ts`). Each type has its own config file beside it (`code.ts`, `http.ts`, `connected.ts`, `voice.ts`, `signature.ts`). `modules/agent/contract/src/agent.ts` repeats the `type` literal in its create and read shapes.
+- `agentTypeSchema` is an enum of six types, and `agentConfigSchema` is a discriminated union on `type` (`modules/agent/contract/src/config/index.ts`). Each type has its own config file beside it (`code.ts`, `http.ts`, `connected.ts`, `voice.ts`, `signature.ts`; `workflow` has none). `modules/agent/contract/src/agent.ts` repeats the `type` literal in its create and read shapes.
 - The scenario child picks a target from one table, `SERIALIZED_AGENT_RUNTIMES` (`apps/scenario-child/src/channels/serialized-agent-channels.registry.ts`). Each row names an input schema, a factory, a resource class and a stop signal. Its header says a new runtime is a new row. The data schemas live in `modules/scenario/contract/src/scenario-execution-data.ts`, the resource classes in `modules/scenario/contract/src/scenario-resource-class.ts`.
 - The UI lists types in `modules/agent/browser/src/ui/sections/agent-type-selector-drawer.tsx`; code and HTTP agents have their own editor drawers beside it.
 
@@ -67,7 +67,7 @@ LangWatch stores the blocks, hosts the wrapper around them, and runs them. The c
     teardown?: Block;
     secretNames: string[];   // project secrets the blocks may read; nothing else travels
     fixturesDatasetId?: string;
-    timeoutMs?: number;
+    timeoutMs?: number;      // caps each block run: setup, each call turn, teardown; default DEFAULT_HOOK_TIMEOUT_MS (60 s)
   }
   Block = { language: "python"; code: string }   // 64 KiB cap
   ```
@@ -79,14 +79,14 @@ LangWatch stores the blocks, hosts the wrapper around them, and runs them. The c
 
 1. Setup (if set) runs as a one-node code workflow on nlpgo's `/go/studio/execute_sync`, the transport a code agent turn uses. It returns `{ state, secrets? }`.
 2. Each turn runs the **call** block the same way, with the message, the history, the run state and the run-scoped secrets. It returns the reply text.
-3. Teardown (if set) runs in a `finally`, with the state setup returned, even when setup failed (with partial state), a turn failed, or the run was stopped.
+3. Teardown (if set) runs in a `finally`, with the state setup returned (null if setup returned none), even when setup failed, a turn failed, or the run was stopped while the child still runs. A killed child never reaches the `finally`; teardown for that case is https://github.com/langwatch/langwatch/issues/8781 (see Consequences).
 
 State and run-scoped secrets follow ADR-180 and the earlier draft of this ADR:
 
 - Setup returns `state` (a JSON object, 64 KiB cap). Call and teardown receive it. The simulated user and the judge may see it, so it holds ids, not credentials.
 - Setup may also return `secrets` (name to string). They override a project secret of the same name for this run only. Call and teardown receive them. They are never recorded and never shown to the simulated user or the judge, and are scrubbed from every error and transcript.
 - Any other top-level key in setup's answer fails setup with an error naming the key.
-- **State never chooses a host.** The customer's base URL is a config field or a project secret, never read from `state`, so setup cannot point the run's secrets at another host.
+- **LangWatch never sends a secret anywhere itself.** The customer's base URL is a config field or a project secret, never taken from `state` by LangWatch. The blocks are customer code and build their own requests, so nothing stops a block sending a secret to a host it reads from `state`; an allowed-host check comes with the address fence (follow-up, see Isolation and egress).
 - The input also carries `run`, `params`, `rows` (the fixture rows, 64 KiB cap, over it fails the step) and `idempotencyKey` `<scenarioRunId>:<attemptId>:<kind>`, so a block can tag the data it makes and a sweep can find leftovers.
 - Each block gets only the secrets in `secretNames`, fewer than a code agent gets today.
 
@@ -95,7 +95,7 @@ State and run-scoped secrets follow ADR-180 and the earlier draft of this ADR:
 This plugs into the lifecycle on main (ADR-180) and does not change it: `ScenarioRunHooksService.around`, the `ScenarioHookResult` record, the `lw.simulation_run.hooks_recorded` event and the Setup and Teardown bands.
 
 - Setup that fails or times out ends the run `ERROR` and Not scored. Teardown never changes the score.
-- Each hook has the 60 s budget (`DEFAULT_HOOK_TIMEOUT_MS`). The child aborts the execute call at the budget; the block's own `timeout_ms` is set 5 s under it, so nlpgo reports why. No retries.
+- Each block run has the `timeoutMs` budget, by default the 60 s hook budget (`DEFAULT_HOOK_TIMEOUT_MS`, `modules/scenario/contract/src/features/execution/scenario-hooks.ts:11`). The child aborts the execute call at the budget; the block's own `timeout_ms` is set 5 s under it, so nlpgo reports why. No retries.
 - **Rerun and keep data** skips teardown.
 - Each hook records status, duration, trace id, state or returned object, and the first 1,000 characters of the error, scrubbed of secrets.
 
@@ -103,7 +103,7 @@ This plugs into the lifecycle on main (ADR-180) and does not change it: `Scenari
 
 Blocks run only in nlpgo's code-block sandbox, never in the worker or the child. The Connector adds no egress exposure beyond a code agent: on cloud the code runner's network is fenced by port at the infrastructure level; a fence by address is not built. The app-level fence is not built (`specs/security/tenant-aware-egress-isolation.feature`, `@unimplemented`), and self-hosted Python can still open any socket. A fence is follow-up work. The WebAssembly runtime (https://github.com/langwatch/langwatch/pull/8991) is not a precondition.
 
-**Gate:** the product flag `release_scenario_connector_steps` (the owner asked for the Connector behind a feature flag). Whether it gates self-hosted too, and its cloud default, are open questions below. When off, the connector agent's hooks and calls record "Connector steps are not released for this project yet.", the run ends `ERROR` and Not scored, and no code-runner call is made.
+**Gate:** the product flag `release_scenario_connector_steps` (the owner asked for the Connector behind a feature flag). Whether it gates self-hosted too, and its cloud default, are open questions below. When off, the child records a failed setup with "Connector steps are not released for this project yet." for every connector run, with or without a setup block, so the existing Not-scored rule (`isRunNotScored`) applies: the run ends `ERROR` and Not scored, and no code-runner call is made.
 
 ### Open questions for the owner
 
@@ -125,7 +125,7 @@ They stay open. This ADR does not decide them.
 - `modules/agent/contract/src/config/api-agent.ts`: the right shape for the config (base URL, key, turn, setup, teardown, fixtures dataset). Rename to `connector`; add `secretNames`; the dataset reaches the blocks.
 - `apps/scenario-child/src/channels/http/http.serialized-api-agent.channel.ts` and `rules/api-agent.rules.ts`: the own-channel-for-a-new-type pattern, and the turn running as a block. The prototype's registry row, browser wiring (`agent-card.tsx`, `get-agent-editor-drawer.ts`) and `hookTargetOf` change are the file list for the new type.
 
-Not reused: the HTTP agent `connector` field, the `{{ state }}` turn templates in HTTP agents, and anything in the ADR-188 chain, which stays parked (see above).
+Not reused: the HTTP agent `connector` field, the `{{ state }}` turn templates in HTTP agents, and anything in the HTTP hooks chain, which stays parked (see above).
 
 ## Rationale / Trade-offs
 
@@ -137,7 +137,7 @@ Not reused: the HTTP agent `connector` field, the `{{ state }}` turn templates i
 
 **Named secrets only.** A block is code that anyone who can edit the agent can write, and it calls out of LangWatch by design. Sending only the secrets it names limits what a careless or hostile block can read.
 
-**It costs:** a sixth agent type to carry through the module, the child, the form and the docs; and a customer's API must be reachable from the code runner (public HTTPS on cloud). Test data that exists only inside a private network still needs a connected agent.
+**It costs:** a seventh agent type to carry through the module, the child, the form and the docs; and a customer's API must be reachable from the code runner (public HTTPS on cloud). Test data that exists only inside a private network still needs a connected agent.
 
 ## Consequences
 
@@ -164,7 +164,7 @@ On a haven stack with the sim model, no customer code:
 
 ## References
 
-- Related ADRs: ADR-128 ([128-connected-agents.md](128-connected-agents.md)), ADR-180 ([180-scenario-run-hooks.md](180-scenario-run-hooks.md)), ADR-188 (https://github.com/langwatch/langwatch/pull/8956), ADR-183 on https://github.com/langwatch/langwatch/pull/8991 (code blocks in WebAssembly).
+- Related ADRs: ADR-128 ([128-connected-agents.md](128-connected-agents.md)), ADR-180 ([180-scenario-run-hooks.md](180-scenario-run-hooks.md)), the HTTP hooks ADR (https://github.com/langwatch/langwatch/pull/8956) and the WebAssembly code-block ADR (https://github.com/langwatch/langwatch/pull/8991); both are renumbered on merge, since 188 and 183 are now taken on main.
 - Epic: https://github.com/langwatch/tasks/issues/1063. Earlier attempt: https://github.com/langwatch/langwatch/pull/9239.
 - Code-block isolation: https://github.com/langwatch/langwatch/pull/9050, `specs/nlp-go/code-block.feature`.
 - Specs: `modules/scenario/specs/scenario-run-hooks.feature`, `specs/scenarios/secret-run-parameters.feature`, `specs/scenarios/scenario-run-parameters.feature`.
