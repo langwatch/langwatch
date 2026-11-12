@@ -3642,6 +3642,29 @@ model LangyConversationTurnProjection {
   @@index([projectId, ConversationId, UpdatedAt])
 }
 
+/// Rebuildable fold of the pull requests a Langy conversation opened, one row per conversation:
+/// CI on one of them finds the conversation here to start a follow-up turn.
+model LangyConversationPullRequestsProjection {
+  id                String   @id @default(nanoid())
+  projectId         String
+  ConversationId    String   @map("conversationId")
+  /// `owner/repo#12`, repository lowercased: one per pull request, what CI looks up.
+  PullRequestKeys   String[] @map("pullRequestKeys")
+  /// [{ repositoryFullName, prNumber, linkedAt }]: each pull request and when it was opened.
+  PullRequests      Json     @map("pullRequests")
+  /// Automatic CI follow-up turns since the person last sent a message.
+  FollowUpsInARow   Int      @map("followUpsInARow")
+  CreatedAt         Float    @map("createdAt")
+  UpdatedAt         Float    @map("updatedAt")
+  OccurredAt        Float    @map("occurredAt")
+  AcceptedAt        Float    @map("acceptedAt")
+  LastEventId       String   @map("lastEventId")
+  ProjectionVersion String   @map("projectionVersion")
+
+  @@unique([projectId, ConversationId], map: "LangyConversationPullRequests_projectId_conversationId_key")
+  @@index([PullRequestKeys], type: Gin, map: "LangyConversationPullRequests_pullRequestKeys_idx")
+}
+
 /// Rebuildable operational message fact. One source event produces one row.
 model LangyMessageProjection {
   id             String @id @default(nanoid())

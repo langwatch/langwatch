@@ -14,6 +14,7 @@ import { UnavailableLangyWorkerChannel } from "../channels/unavailable.langy-wor
 import type { LangySessionKeyService } from "../features/session-key/services/langy-session-key.service.ts";
 import type { LangyTokenBufferRedisRepository } from "../repositories/redis/redis.langy-token-buffer.repository.ts";
 import type { LangyTurnHandoffRedisRepository } from "../repositories/redis/redis.langy-turn-handoff.repository.ts";
+import type { LangyConversationPullRequestsData } from "../rules/langy-ci-follow-up.rules.ts";
 import type { LangyTitleGenerator } from "../services/langy-title-generator.service.ts";
 import { LangyWorkerMetricsNullService } from "../services/langy-worker-metrics-null.service.ts";
 import type { LangyAnalyticsEventProjectionRecord } from "./langy-analytics-event.projection.ts";
@@ -116,6 +117,11 @@ function buildLangyConversationProducerPipeline(input: {
         processName,
         "langy conversation turn",
       ),
+    langyConversationPullRequestsProjectionStore:
+      new ProducerOnlyStateProjectionStore<LangyConversationPullRequestsData>(
+        processName,
+        "langy conversation pull requests",
+      ),
     langyMessageProjectionStore: new ProducerOnlyAppendStore<LangyMessageProjectionRecord>(
       processName,
       "langy message",
@@ -142,14 +148,6 @@ function buildLangyConversationProducerPipeline(input: {
       users: { getNotificationPreference: refuse("read a notification preference") },
       projects: { findSummaryById: refuse("read a project for a notification") },
       notifications: { requestWebPushDelivery: refuse("request a Web Push delivery") },
-    },
-    pullRequestLinks: {
-      links: {
-        link: refuse("link a pull request"),
-        isFollowUpTurn: refuse("read a CI follow-up turn"),
-        resetFollowUps: refuse("reset CI follow-ups"),
-      },
-      projects: { findIdentity: refuse("read a project's organization") },
     },
   }).buildProcessing();
 }

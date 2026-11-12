@@ -19,6 +19,7 @@ import {
 import type { LangyDeleteConfirmationRepository } from "../repositories/langy-delete-confirmation.repository.ts";
 import type { LangyFeedbackPromptRepository } from "../repositories/langy-feedback-prompt.repository.ts";
 import type { LangyDatabaseRepositories } from "../repositories/langy-repositories.registry.ts";
+import type { LangyConversationPullRequestsData } from "../rules/langy-ci-follow-up.rules.ts";
 import type { LangyBlockMetrics } from "./langy-block-metrics-otel.service.ts";
 import {
   LangyCredentialService,
@@ -61,6 +62,7 @@ type LangyCredentialComposition = {
 export class LangyEventingMembers {
   readonly langyConversationState: StateProjectionStore<LangyConversationStateData>;
   readonly langyConversationTurnState: StateProjectionStore<LangyConversationTurnData>;
+  readonly langyConversationPullRequests: StateProjectionStore<LangyConversationPullRequestsData>;
   readonly langyMessageStorage: AppendStore<LangyMessageProjectionRecord>;
   readonly langyTurnAdmission: LangyTurnAdmissionCapability;
   readonly trustedMessages: LangyTrustedMessage;
@@ -68,12 +70,14 @@ export class LangyEventingMembers {
   constructor(input: {
     langyConversationState: StateProjectionStore<LangyConversationStateData>;
     langyConversationTurnState: StateProjectionStore<LangyConversationTurnData>;
+    langyConversationPullRequests: StateProjectionStore<LangyConversationPullRequestsData>;
     langyMessageStorage: AppendStore<LangyMessageProjectionRecord>;
     langyTurnAdmission: LangyTurnAdmissionCapability;
     trustedMessages: LangyTrustedMessage;
   }) {
     this.langyConversationState = input.langyConversationState;
     this.langyConversationTurnState = input.langyConversationTurnState;
+    this.langyConversationPullRequests = input.langyConversationPullRequests;
     this.langyMessageStorage = input.langyMessageStorage;
     this.langyTurnAdmission = input.langyTurnAdmission;
     this.trustedMessages = input.trustedMessages;
@@ -108,6 +112,7 @@ export class LangyPostgresService {
     this.eventingCapabilities = new LangyEventingMembers({
       langyConversationState: this.repositories.conversationState,
       langyConversationTurnState: this.repositories.conversationTurnState,
+      langyConversationPullRequests: this.repositories.conversationPullRequests,
       langyMessageStorage: this.repositories.messageStorage,
       langyTurnAdmission: this.repositories.admission,
       trustedMessages: LangyMessageService.createTrustedMessageReader(this.repositories.messages),

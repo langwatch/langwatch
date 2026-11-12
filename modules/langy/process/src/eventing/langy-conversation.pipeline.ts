@@ -23,11 +23,13 @@ import type {
 
 import type { LangyModule } from "../app/langy.app.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
+import type { LangyConversationPullRequestsData } from "../rules/langy-ci-follow-up.rules.ts";
 import {
   LangyAnalyticsEventMapProjection,
   type LangyAnalyticsEventProjectionRecord,
 } from "./langy-analytics-event.projection.ts";
 import { LANGY_CONVERSATION_PROCESS_NAME } from "./langy-conversation-process.schemas.ts";
+import { LangyConversationPullRequestsFoldProjection } from "./langy-conversation-pull-requests.projection.ts";
 import {
   LangyConversationStateFoldProjection,
   LangyConversationStartedEventSchema,
@@ -91,6 +93,8 @@ export interface LangyConversationProcessingPipelineDeps {
    * state (status, answer parts, tool-call lifecycle) for one-read rendering.
    */
   langyConversationTurnProjectionStore: StateProjectionStore<LangyConversationTurnData>;
+  /** The pull requests each conversation opened, for CI to find the conversation to wake. */
+  langyConversationPullRequestsProjectionStore: StateProjectionStore<LangyConversationPullRequestsData>;
   langyMessageProjectionStore: AppendStore<LangyMessageProjectionRecord>;
   /** Content-free event-grain ClickHouse analytics; never an operational read. */
   langyAnalyticsEventProjectionStore: AppendStore<LangyAnalyticsEventProjectionRecord>;
@@ -162,6 +166,11 @@ export function buildLangyConversationPipeline(
     .withPostgresProjection(
       LangyConversationTurnFoldProjection.create({
         store: deps.langyConversationTurnProjectionStore,
+      }),
+    )
+    .withPostgresProjection(
+      LangyConversationPullRequestsFoldProjection.create({
+        store: deps.langyConversationPullRequestsProjectionStore,
       }),
     )
     .withClickHouseMapProjection(

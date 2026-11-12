@@ -57,6 +57,7 @@ function buildPipeline(overrides: Partial<LangyConversationProcessingPipelineDep
   const deps: LangyConversationProcessingPipelineDeps = {
     langyConversationProjectionStore: stateStore(),
     langyConversationTurnProjectionStore: stateStore(),
+    langyConversationPullRequestsProjectionStore: stateStore(),
     langyMessageProjectionStore: appendStore(),
     langyAnalyticsEventProjectionStore:
       appendStore<LangyAnalyticsEventProjectionRecord>(analyticsAppend),
@@ -99,10 +100,11 @@ const EXPECTED_COMMANDS = [
 describe("langy-conversation-processing pipeline shape", () => {
   describe("given the pipeline built from its public static definition", () => {
     describe("when inspecting the operational read models", () => {
-      it("registers conversation and turn as withProjection state projections, not folds", () => {
+      it("registers conversation, turn and pull requests as withProjection state projections, not folds", () => {
         const { pipeline } = buildPipeline();
 
         expect([...(pipeline.stateProjections?.keys() ?? [])].toSorted()).toEqual([
+          "langyConversationPullRequests",
           "langyConversationState",
           "langyConversationTurn",
         ]);

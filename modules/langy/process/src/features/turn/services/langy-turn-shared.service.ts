@@ -78,6 +78,14 @@ interface LangyChatMessageInput {
   parts: LangyMessagePart[];
 }
 
+/** The pull request commit whose finished checks started a turn, and how the turn is counted. */
+export interface LangyCiFollowUpTurn {
+  repositoryFullName: string;
+  prNumber: number;
+  headSha: string;
+  countTurn: () => Promise<void>;
+}
+
 export interface StartConversationTurnInput {
   projectId: string;
   idempotencyKey: string;
@@ -96,9 +104,10 @@ export interface StartConversationTurnInput {
   unattended?: { title: string; countTurn: () => Promise<void> };
   /**
    * Set for a turn CI started on a pull request Langy opened: it continues that conversation
-   * with the unattended ceiling, plus a GitHub token for this one repository.
+   * with the unattended ceiling, plus a GitHub token for this one repository. The recorded user
+   * message carries the pull request and commit, so the fold tells it from the person speaking.
    */
-  ciFollowUp?: { repositoryFullName: string; countTurn: () => Promise<void> };
+  ciFollowUp?: LangyCiFollowUpTurn;
 }
 
 export interface LangyTurnServiceDeps {

@@ -1325,6 +1325,20 @@ export interface LwqlPrismaRows {
     readonly LastEventId: "String";
     readonly ProjectionVersion: "String";
   };
+  readonly LangyConversationPullRequestsProjection: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly ConversationId: "String";
+    readonly PullRequestKeys: "String[]";
+    readonly PullRequests: "Json";
+    readonly FollowUpsInARow: "Int";
+    readonly CreatedAt: "Float";
+    readonly UpdatedAt: "Float";
+    readonly OccurredAt: "Float";
+    readonly AcceptedAt: "Float";
+    readonly LastEventId: "String";
+    readonly ProjectionVersion: "String";
+  };
   readonly LangyMessageProjection: {
     readonly id: "String";
     readonly projectId: "String";

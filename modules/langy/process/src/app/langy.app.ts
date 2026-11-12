@@ -405,6 +405,7 @@ export class LangyModule implements LangyApiContract {
     const conversationProcessing = EventingLangyConversationAdapter.create({
       langyConversationProjectionStore: persistence.langyConversationState,
       langyConversationTurnProjectionStore: persistence.langyConversationTurnState,
+      langyConversationPullRequestsProjectionStore: persistence.langyConversationPullRequests,
       langyMessageProjectionStore: persistence.langyMessageStorage,
       langyAnalyticsEventProjectionStore: LangyAnalyticsEventStorageService.create({
         sink: setup.repositories.analyticsEvents,
@@ -436,10 +437,6 @@ export class LangyModule implements LangyApiContract {
         users: setup.dependencies.users,
         projects: setup.dependencies.projects,
         notifications: setup.dependencies.notifications,
-      },
-      pullRequestLinks: {
-        links: setup.repositories.pullRequestLinks,
-        projects: setup.dependencies.projects,
       },
     });
     const longPoll = LocalControlLongPollService.create({ core });
@@ -494,7 +491,9 @@ export class LangyModule implements LangyApiContract {
         turns: langy,
       }),
       ciFollowUps: LangyCiFollowUpService.create({
-        links: setup.repositories.pullRequestLinks,
+        pullRequests: setup.repositories.conversationPullRequests,
+        conversations: persistence.langyConversationState,
+        projects: setup.dependencies.projects,
         users: setup.dependencies.users,
         featureFlags: setup.dependencies.featureFlags,
         bounds: turnBounds,

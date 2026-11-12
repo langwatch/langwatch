@@ -12,6 +12,7 @@ export interface LangyDatabase {
   readonly virtualKey: PrismaClient["virtualKey"];
   readonly langyConversationProjection: PrismaClient["langyConversationProjection"];
   readonly langyConversationTurnProjection: PrismaClient["langyConversationTurnProjection"];
+  readonly langyConversationPullRequestsProjection: PrismaClient["langyConversationPullRequestsProjection"];
   readonly langyMessageProjection: PrismaClient["langyMessageProjection"];
   readonly langyTurnRequest: PrismaClient["langyTurnRequest"];
   readonly langyActiveTurn: PrismaClient["langyActiveTurn"];

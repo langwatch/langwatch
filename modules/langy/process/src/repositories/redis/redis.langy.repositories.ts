@@ -10,7 +10,6 @@ import { LangyLocalCallRedisRepository } from "./redis.langy-local-call.reposito
 import { LangyLocalControlRequestRedisRepository } from "./redis.langy-local-control-request.repository.ts";
 import { LangyLocalPresenceRedisRepository } from "./redis.langy-local-presence.repository.ts";
 import { LangyLocalUserWaitRedisRepository } from "./redis.langy-local-user-wait.repository.ts";
-import { LangyPullRequestLinkRedisRepository } from "./redis.langy-pull-request-link.repository.ts";
 import { LangyResourceLinksRedisRepository } from "./redis.langy-resource-links.repository.ts";
 import { LangyTokenBufferRedisRepository } from "./redis.langy-token-buffer.repository.ts";
 import { LangyTurnAccessRedisRepository } from "./redis.langy-turn-access.repository.ts";
@@ -31,7 +30,6 @@ type LangyRedisRows = Pick<
   | "deleteConfirmations"
   | "githubPrCounts"
   | "feedbackPrompts"
-  | "pullRequestLinks"
   | "tokenBuffer"
   | "uiActions"
 >;
@@ -54,7 +52,6 @@ export class RedisLangyRepositories {
       deleteConfirmations: LangyDeleteConfirmationRedisRepository.create({ redis }),
       githubPrCounts: LangyGithubPrCountRedisRepository.create({ redis }),
       feedbackPrompts: LangyFeedbackPromptRedisRepository.create({ redis }),
-      pullRequestLinks: LangyPullRequestLinkRedisRepository.create({ redis }),
       // Every open builds a fresh buffer; a blocking tail duplicates a
       // connection of its own and gives it back on release.
       tokenBuffer: {

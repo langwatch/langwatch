@@ -606,7 +606,7 @@ describe("a CI follow-up turn", () => {
 
       await fixture.start({
         ...replyIn("conversation-1"),
-        ciFollowUp: { repositoryFullName: "acme/shop", countTurn },
+        ciFollowUp: { repositoryFullName: "acme/shop", prNumber: 12, headSha: "abc123", countTurn },
       });
 
       expect(keys.created).toEqual([[...LANGY_UNATTENDED_PERMISSIONS]]);
@@ -621,6 +621,30 @@ describe("a CI follow-up turn", () => {
         expect.objectContaining({ isUiActionSurfaceOpen: false }),
       );
       expect(countTurn).toHaveBeenCalledTimes(1);
+    });
+
+    it("records the pull request commit on the turn's user message, without the counter", async () => {
+      const fixture = makeFixture({
+        sessionKeys: sessionKeysHolding([...LANGY_CANDIDATE_PERMISSIONS]).service,
+        credentials: credentialsWithGithub().credentials,
+        existing: { origin: "interactive" },
+      });
+
+      await fixture.start({
+        ...replyIn("conversation-1"),
+        ciFollowUp: {
+          repositoryFullName: "acme/shop",
+          prNumber: 12,
+          headSha: "abc123",
+          countTurn: async () => undefined,
+        },
+      });
+
+      expect(fixture.acceptTurn.mock.calls[0]![0].userMessage?.ciFollowUp).toEqual({
+        repositoryFullName: "acme/shop",
+        prNumber: 12,
+        headSha: "abc123",
+      });
     });
   });
 });

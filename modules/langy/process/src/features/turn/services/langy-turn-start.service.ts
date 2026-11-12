@@ -15,6 +15,7 @@ import { LangyTurnAttemptService } from "./langy-turn-attempt.service.ts";
 import { LangyTurnBaseDependenciesService } from "./langy-turn-base-dependencies.service.ts";
 import { LangyTurnPreparationService } from "./langy-turn-preparation.service.ts";
 import {
+  type LangyCiFollowUpTurn,
   type LangyTurnServiceDependencies,
   type StartConversationTurnInput,
 } from "./langy-turn-shared.service.ts";
@@ -263,6 +264,7 @@ export class LangyTurnStartService {
         turnContext: input.turnContext,
         readOnly,
         ...(input.unattended ? { unattended: input.unattended } : {}),
+        ...(input.ciFollowUp ? { ciFollowUp: ciFollowUpRecordOf(input.ciFollowUp) } : {}),
         ...runtime,
         credentials,
         turnModel,
@@ -282,6 +284,11 @@ export class LangyTurnStartService {
       throw error;
     }
   }
+}
+
+/** What the recorded user message keeps of a CI follow-up: the pull request commit, no callback. */
+function ciFollowUpRecordOf({ repositoryFullName, prNumber, headSha }: LangyCiFollowUpTurn) {
+  return { repositoryFullName, prNumber, headSha };
 }
 
 function turnStartFailureOutcomeOf(error: unknown) {

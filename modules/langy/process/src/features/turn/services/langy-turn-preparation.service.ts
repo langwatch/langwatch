@@ -64,6 +64,7 @@ export class LangyTurnPreparationService {
     /** Keeps the unattended ceiling: an allowlisted key, no GitHub token, no UI action. */
     readOnly: boolean;
     unattended?: Pick<NonNullable<StartConversationTurnInput["unattended"]>, "title">;
+    ciFollowUp?: Omit<NonNullable<StartConversationTurnInput["ciFollowUp"]>, "countTurn">;
     worker: NonNullable<LangyTurnServiceDependencies["worker"]>;
     accessStore: LangyTurnServiceDependencies["accessStore"];
     handoffStore: LangyTurnServiceDependencies["handoffStore"];
@@ -138,9 +139,8 @@ export class LangyTurnPreparationService {
             projectId,
           }),
       this.override.resolve(),
-      // The live UI-action channel is flagged (`release_langy_ui_actions`), and
-      // the turn block may only advertise it while the dispatch route would
-      // answer.
+      // The live UI-action channel is flagged (`release_langy_ui_actions`), and the turn block
+      // may only advertise it while the dispatch route would answer.
       this.deps.uiActionSurface.resolve({
         userId,
         projectId,
@@ -420,6 +420,7 @@ export class LangyTurnPreparationService {
                 role: args.lastUserMessage.role,
                 parts: args.lastUserMessage.parts,
                 title,
+                ...(args.ciFollowUp ? { ciFollowUp: args.ciFollowUp } : {}),
               },
             }
           : {}),

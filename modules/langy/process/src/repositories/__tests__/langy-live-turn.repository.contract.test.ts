@@ -217,6 +217,7 @@ describe("given the langy repository registry", () => {
       expect(Object.keys(repositories).toSorted()).toEqual([
         "admission",
         "analyticsEvents",
+        "conversationPullRequests",
         "conversationState",
         "conversationTurnState",
         "conversations",
@@ -231,7 +232,6 @@ describe("given the langy repository registry", () => {
         "localUserWaits",
         "messageStorage",
         "messages",
-        "pullRequestLinks",
         "rateLimits",
         "resourceLinks",
         "sessionKeys",

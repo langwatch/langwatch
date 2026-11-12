@@ -19,6 +19,7 @@ import type { LangySessionKeyService } from "../features/session-key/services/la
 import { RedisLangyEffectRepository } from "../repositories/redis/redis.langy-effect.repository.ts";
 import type { LangyTokenBufferRedisRepository } from "../repositories/redis/redis.langy-token-buffer.repository.ts";
 import type { LangyTurnHandoffRedisRepository } from "../repositories/redis/redis.langy-turn-handoff.repository.ts";
+import type { LangyConversationPullRequestsData } from "../rules/langy-ci-follow-up.rules.ts";
 import type { ControlTurnStarter } from "../rules/langy-local-session-contract.rules.ts";
 import type { LangyTitleGenerator } from "../services/langy-title-generator.service.ts";
 import type { LangyAnalyticsEventProjectionRecord } from "./langy-analytics-event.projection.ts";
@@ -45,10 +46,6 @@ import {
   createLocalConnectTurnSubscriber,
   type LocalConnectTurnPresence,
 } from "./langy-local-connect-turn.subscriber.ts";
-import {
-  createLangyPullRequestLinkSubscriber,
-  type LangyPullRequestLinkSubscriberDeps,
-} from "./langy-pull-request-link.subscriber.ts";
 import {
   createLangyWebPushSubscriber,
   langyWebPushReaders,
@@ -80,6 +77,8 @@ interface EventingLangyConversationAdapterOptions {
   langyConversationProjectionStore: StateProjectionStore<LangyConversationStateData>;
   /** Direct Postgres per-turn operational projection. */
   langyConversationTurnProjectionStore: StateProjectionStore<LangyConversationTurnData>;
+  /** Direct Postgres fold of the pull requests each conversation opened. */
+  langyConversationPullRequestsProjectionStore: StateProjectionStore<LangyConversationPullRequestsData>;
   /** Postgres per-message operational projection. */
   langyMessageProjectionStore: AppendStore<LangyMessageProjectionRecord>;
   /** Content-free ClickHouse event-grain analytics. */
@@ -103,8 +102,6 @@ interface EventingLangyConversationAdapterOptions {
   };
   /** Who a notification goes to and whether they want it, and notification's Web Push. */
   webPush: Pick<LangyWebPushSubscriberDeps, "users" | "projects" | "notifications">;
-  /** Where the pull requests a turn opened are linked to it, for CI to wake Langy there. */
-  pullRequestLinks: Omit<LangyPullRequestLinkSubscriberDeps, "conversations">;
 }
 
 /**
@@ -224,14 +221,11 @@ export class EventingLangyConversationAdapter {
       ...options.webPush,
     });
 
-    const pullRequestLinkSubscriber = createLangyPullRequestLinkSubscriber({
-      ...options.pullRequestLinks,
-      conversations: conversationReader,
-    });
-
     return buildLangyConversationPipeline({
       langyConversationProjectionStore: conversationStore,
       langyConversationTurnProjectionStore: options.langyConversationTurnProjectionStore,
+      langyConversationPullRequestsProjectionStore:
+        options.langyConversationPullRequestsProjectionStore,
       langyMessageProjectionStore: options.langyMessageProjectionStore,
       langyAnalyticsEventProjectionStore: options.langyAnalyticsEventProjectionStore,
       ...(options.retention === undefined ? {} : { retention: options.retention }),
@@ -244,7 +238,6 @@ export class EventingLangyConversationAdapter {
         firstMessageSeenSubscriber,
         localConnectTurnSubscriber,
         webPushSubscriber,
-        pullRequestLinkSubscriber,
       ],
     });
   }
