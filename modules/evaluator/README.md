@@ -11,7 +11,7 @@ Evaluators: their definitions, and executing them as code or native checks with 
 | Classification | core (`modules/catalogue.json`)                                                                                |
 | Subjects       | evaluator                                                                                                      |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)                    |
-| Api token      | `EvaluatorApi` = `moduleApi<EvaluatorApi>()("evaluator")`, `contract/src/evaluator.api.ts:189` (33 operations) |
+| Api token      | `EvaluatorApi` = `moduleApi<EvaluatorApi>()("evaluator")`, `contract/src/evaluator.api.ts:194` (33 operations) |
 | Other token    | `EvaluatorBrowserApi`, `process/src/transport/evaluator.trpc.ts:33`                                            |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                     |
 
