@@ -199,6 +199,32 @@ describe("creating a dataset", () => {
   });
 });
 
+describe("adding rows to a dataset in object storage", () => {
+  describe("given rows that come without an id", () => {
+    /** @scenario "Rows added to a dataset in object storage come back with the ids they were stored under" */
+    it("answers each row with the id it was stored under", async () => {
+      const repositories = MemoryDatasetRepositories.create();
+      const app = createDatasetTestApp({ repositories });
+      const dataset = await app.upsertDataset({ projectId, name: "Added Rows", columnTypes });
+
+      const added = await app.batchCreateRecords({
+        projectId,
+        slugOrId: dataset.id,
+        entries: [{ question: "first" }, { question: "second" }],
+      });
+
+      const stored = await repositories.chunks.readChunk({
+        projectId,
+        datasetId: dataset.id,
+        index: 0,
+      });
+      expect(added.map((record) => record.id)).toEqual(
+        stored.map((line) => (line as { id: string }).id),
+      );
+    });
+  });
+});
+
 describe("copying a dataset kept in the Postgres records table", () => {
   /** @scenario "A copy of a dataset is created directly in object storage" */
   it("writes the copy's rows to object storage and none to the records table", async () => {
