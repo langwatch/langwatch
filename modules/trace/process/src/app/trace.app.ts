@@ -369,7 +369,11 @@ import {
   type TraceClickHouseResolver,
 } from "../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import { ClickHouseTraceFullRecordRepository } from "../repositories/clickhouse/trace-full-record.repository.ts";
-import type { StoredTraceSpan, TraceViewRead } from "../repositories/span-storage.repository.ts";
+import type {
+  PagedOwnedSpans,
+  StoredTraceSpan,
+  TraceViewRead,
+} from "../repositories/span-storage.repository.ts";
 import type { TraceAttributeSpendRepository } from "../repositories/trace-attribute-spend.repository.ts";
 import type { TraceAttributedRollupRepository } from "../repositories/trace-attributed-rollup.repository.ts";
 import type { TraceEvaluationRunsReadRepository } from "../repositories/trace-evaluation-runs.repository.ts";
@@ -603,7 +607,7 @@ export type TracesSpanReader = Readonly<{
   getSpansPaginated(
     params: ByTrace &
       TraceViewRead & { limit: number; offset: number; visibilityCutoffMs?: number | null },
-  ): Promise<{ spans: OwnedSpan[]; total: number }>;
+  ): Promise<PagedOwnedSpans>;
   getSpansSince(
     params: ByTrace &
       TraceViewRead & { sinceStartTimeMs: number; visibilityCutoffMs?: number | null },
@@ -3137,7 +3141,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   }
 
   /** One page of a trace's spans; a page showing owner spans is audited first (ADR-201 §8). */
-  readSpansPage(input: {
+  async readSpansPage(input: {
     authorization: Authorization;
     traceId: string;
     limit: number;
@@ -3146,7 +3150,8 @@ export class TraceModule implements TraceApi, CollectorApp {
     visibilityCutoffMs?: number | null;
     reads?: TraceViewRead["reads"];
   }): Promise<{ spans: OwnedSpan[]; total: number }> {
-    return this.#spanReads.read("getSpansPaginated", {
+    // The owners the total counts are the audit's alone; the page goes out as before.
+    const { spans, total } = await this.#spanReads.read("getSpansPaginated", {
       authorization: input.authorization,
       traceId: input.traceId,
       ...(input.reads !== undefined ? { reads: input.reads } : {}),
@@ -3157,6 +3162,7 @@ export class TraceModule implements TraceApi, CollectorApp {
         : {}),
       ...occurredAtHint(input.occurredAtMs),
     });
+    return { spans, total };
   }
 
   /** The spans of a live trace that have moved since the browser last looked; audited as a page. */

@@ -92,6 +92,16 @@ export interface OccurredAtHint {
   occurredAtMs?: number;
 }
 
+/**
+ * One page of a trace's spans and the count of all of them. Under braids the count holds owners'
+ * spans past the page too, so it names those owners for the audit (ADR-201 §8).
+ */
+export type PagedOwnedSpans = {
+  spans: OwnedSpan[];
+  total: number;
+  totalOwnerProjectIds: string[];
+};
+
 /** One span by id; under braids `ownerProjectId` names its owner, else the reader (ADR-201). */
 export type SingleSpanParams = {
   authorization: Authorization;
@@ -206,7 +216,7 @@ export abstract class SpanStorageRepository {
       offset: number;
     } & OccurredAtHint &
       TraceViewRead,
-  ): Promise<{ spans: OwnedSpan[]; total: number }>;
+  ): Promise<PagedOwnedSpans>;
   abstract findSpansSince(
     params: {
       authorization: Authorization;
@@ -344,8 +354,8 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
       limit: number;
       offset: number;
     } & OccurredAtHint,
-  ): Promise<{ spans: Span[]; total: number }> {
-    return { spans: [], total: 0 };
+  ): Promise<PagedOwnedSpans> {
+    return { spans: [], total: 0, totalOwnerProjectIds: [] };
   }
 
   async findSpansSince(

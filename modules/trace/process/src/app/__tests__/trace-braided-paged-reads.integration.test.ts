@@ -56,7 +56,7 @@ function braidedTrace({ withOwnerSpans = true } = {}) {
     traces: {
       spans: createApiFixture<TracesSpanReader>(
         {
-          getSpansPaginated: async () => ({ spans, total: spans.length }),
+          getSpansPaginated: async () => ({ spans, total: spans.length, totalOwnerProjectIds: [] }),
           getSpansSince: async () => spans,
         },
         "spans",

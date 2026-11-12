@@ -344,6 +344,14 @@ Feature: Braided spans in the reader's traces
       And a read whose entry cannot be written fails and returns no "specialists" span
 
     @integration
+    Scenario: A page's total counting an owner's spans is audited, even with none of them shown
+      Given a live braid from "specialists" into "orchestrator"
+      When sam asks for a page past the last span of an "orchestrator" trace holding "specialists" spans
+      Then the page's total names "specialists" among the projects it counts
+      And the read records the braided spans viewed entry naming "specialists" before it returns the total
+      And a read whose entry cannot be written fails and returns no total
+
+    @integration
     Scenario: Every view of a braided trace is audited, or refused
       Given a live braid from "specialists" into "orchestrator"
       When sam opens the header's braided totals, span tree, full spans, resources, timeline or instrumentation badges of an "orchestrator" trace holding "specialists" spans

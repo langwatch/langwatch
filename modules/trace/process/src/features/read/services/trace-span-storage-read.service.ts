@@ -17,6 +17,7 @@ import type {
   ModelUsageStatsRow,
   NormalizedSpanByIdParams,
   OccurredAtHint,
+  PagedOwnedSpans,
   SpanLangwatchSignalsRow,
   SpanStorageRepository,
   StoredTraceSpan,
@@ -323,9 +324,7 @@ export class SpanStorageService {
     return this.repository.findSpanResourcesByTraceId(params);
   }
 
-  async getSpansPaginated(
-    params: Paginated & VisibilityGate,
-  ): Promise<{ spans: OwnedSpan[]; total: number }> {
+  async getSpansPaginated(params: Paginated & VisibilityGate): Promise<PagedOwnedSpans> {
     const page = await this.repository.listSpansPaginated(params);
 
     return {

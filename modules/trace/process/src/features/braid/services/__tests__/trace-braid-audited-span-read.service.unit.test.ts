@@ -34,7 +34,7 @@ const SHOWING_AN_OWNER = {
   findStoredSpansByTraceId: [ownRow, ownerRow],
   findSpanById: ownRow,
   getSpanEvents: [{ event_id: "event-1" }],
-  getSpansPaginated: { spans: [ownRow, ownerRow], total: 2 },
+  getSpansPaginated: { spans: [ownRow, ownerRow], total: 2, totalOwnerProjectIds: [] },
   getSpansSince: [ownRow, ownerRow],
   getSpanSummaryByTraceId: [ownRow, ownerRow],
   getLangwatchSignalsByTraceId: [ownRow, ownerRow],
@@ -164,6 +164,35 @@ describe("TraceBraidAuditedSpanReadService", () => {
       recordView.mockRejectedValueOnce(new Error("audit store unreachable"));
 
       await expect(read(method)).rejects.toThrow("audit store unreachable");
+    });
+  });
+
+  describe("when a page past the last span returns a total counting an owner's spans", () => {
+    const pastTheEnd = { spans: [ownRow], total: 6, totalOwnerProjectIds: [OWNER] };
+
+    /** @scenario "A page's total counting an owner's spans is audited, even with none of them shown" */
+    it("records the braided spans viewed entry naming the owner before it returns", async () => {
+      const { read, recordView, authorization } = doorOver({
+        results: { ...SHOWING_AN_OWNER, getSpansPaginated: pastTheEnd },
+      });
+
+      await expect(read("getSpansPaginated")).resolves.toMatchObject({ total: 6 });
+
+      expect(recordView).toHaveBeenCalledWith({
+        actor: authorization.actor,
+        readerProjectId: READER,
+        ownerProjectIds: [OWNER],
+      });
+    });
+
+    /** @scenario "A page's total counting an owner's spans is audited, even with none of them shown" */
+    it("refuses rather than return the total when the entry cannot be written", async () => {
+      const { read, recordView } = doorOver({
+        results: { ...SHOWING_AN_OWNER, getSpansPaginated: pastTheEnd },
+      });
+      recordView.mockRejectedValueOnce(new Error("audit store unreachable"));
+
+      await expect(read("getSpansPaginated")).rejects.toThrow("audit store unreachable");
     });
   });
 

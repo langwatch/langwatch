@@ -627,3 +627,7 @@ not operations.
   election may compare, negate or OR it, and its own select only bounds keys and versions; a signature
   verifies against the attributes as stored, so a duplicated or shadowed signed key is never marked;
   the header's totals and every braid read pass the audited span-read door (§3, §4, §8).
+- v1.17 (2026-11-12, from the security re-review, under the same ruling). A verified mark is kept only
+  where the value stored is the value signed: admission, the projection's preview and the stored row each
+  drop a mark whose entry they changed, moved or removed; a paged read's total names the owners it counts
+  and is audited for them, even on a page showing none of their spans (§4, §8).

@@ -74,6 +74,7 @@ import {
   type ModelUsageStatsRow,
   type NormalizedSpanByIdParams,
   type OccurredAtHint,
+  type PagedOwnedSpans,
   type SpanLangwatchSignalsRow,
   type TraceViewRead,
   type TraceEventRollupParams,
@@ -344,11 +345,13 @@ const BRAIDED_SPAN_EVENTS_QUERY = `
 
 /**
  * A braided page's count and range: each span's latest version under its braid's condition, one
- * per project holding a span id, so an owner span the condition dropped is never counted.
+ * per project holding a span id, so an owner span the condition dropped is never counted. The
+ * projects counted come back too, so a total reached past the last page is audited (ADR-201 §8).
  */
 const BRAIDED_SPAN_RANGE_QUERY = `
   SELECT
     count(DISTINCT TenantId, SpanId) AS Total,
+    groupUniqArray(TenantId) AS Tenants,
     toUnixTimestamp64Milli(min(StartTime)) AS FromMs,
     toUnixTimestamp64Milli(max(StartTime)) AS ToMs
   FROM ${TABLE_NAME}
@@ -670,9 +673,15 @@ const signalsRowSchema = z.looseObject({
 
 const signalsRowsSchema = z.array(signalsRowSchema);
 
-/** A trace's distinct span count and the StartTime range its spans lie in, epoch ms. */
+/** A trace's distinct span count, the StartTime range its spans lie in (epoch ms), and, under
+ * braids, the projects the count holds spans of. */
 const spanRangeRowsSchema = z.array(
-  z.looseObject({ Total: numeric, FromMs: numeric, ToMs: numeric }),
+  z.looseObject({
+    Total: numeric,
+    FromMs: numeric,
+    ToMs: numeric,
+    Tenants: z.array(chString).optional(),
+  }),
 );
 
 const modelUsageRowSchema = z.looseObject({
@@ -1769,9 +1778,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     limit: number;
     offset: number;
   } & OccurredAtHint &
-    TraceViewRead): Promise<{ spans: OwnedSpan[]; total: number }> {
+    TraceViewRead): Promise<PagedOwnedSpans> {
     const braided = readsOwnersSpans({ authorization, reads });
-    return this.readTraceSpans<{ spans: OwnedSpan[]; total: number }>(
+    return this.readTraceSpans<PagedOwnedSpans>(
       { authorization, traceId, occurredAtMs },
       async (idBound) => {
         const client = this.readerOf(authorization, braided);
@@ -1795,7 +1804,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           idBound,
         });
         const [range] = spanRangeRowsSchema.parse(await rangeResult.json());
-        if (range === undefined) return { spans: [], total: 0 };
+        if (range === undefined) return { spans: [], total: 0, totalOwnerProjectIds: [] };
 
         const spanRange =
           "AND StartTime >= fromUnixTimestamp64Milli({spanFromMs:Int64}) " +
@@ -1827,6 +1836,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         return {
           spans: ownedSpansOf({ rows: pageRows, authorization, braided }),
           total: Number(range.Total),
+          totalOwnerProjectIds: (range.Tenants ?? []).flatMap(
+            (tenantId) => braidedOwnerOf({ authorization, tenantId }).ownerProjectId ?? [],
+          ),
         };
       },
     );

@@ -199,6 +199,32 @@ describe.skipIf(!clickHouseConfigured)(
 
         expect(page.total).toBe(4);
       });
+
+      /** @scenario "A page's total counting an owner's spans is audited, even with none of them shown" */
+      it("names the owners its total counts, on a page past the last span", async () => {
+        const page = await repo.listSpansPaginated({
+          authorization: authorization(),
+          reads: "spans",
+          ...at,
+          limit: 10,
+          offset: 50,
+        });
+
+        expect(page.spans).toEqual([]);
+        expect(page.total).toBe(4);
+        expect(page.totalOwnerProjectIds).toEqual([owner]);
+      });
+
+      it("names no owner when the read shows only the reader's own spans", async () => {
+        const page = await repo.listSpansPaginated({
+          authorization: authorization(),
+          ...at,
+          limit: 10,
+          offset: 50,
+        });
+
+        expect(page.totalOwnerProjectIds).toEqual([]);
+      });
     });
   },
 );

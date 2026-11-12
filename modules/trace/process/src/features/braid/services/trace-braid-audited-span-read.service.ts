@@ -67,7 +67,10 @@ const OWNERS_OF: { readonly [K in TraceSpanRead]: OwnerRule<K> } = {
   findStoredSpansByTraceId: rows,
   findSpanById: named,
   getSpanEvents: named,
-  getSpansPaginated: ({ result }) => braidOwnersOf(result.spans),
+  getSpansPaginated: ({ result }) => [
+    ...braidOwnersOf(result.spans),
+    ...result.totalOwnerProjectIds,
+  ],
   getSpansSince: rows,
   getSpanSummaryByTraceId: rows,
   getLangwatchSignalsByTraceId: rows,
