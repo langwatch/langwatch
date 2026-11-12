@@ -62,6 +62,19 @@ Feature: The public API creates every kind of evaluator the editor can
     And a create the application refuses leaves the workflow's flags as they were
 
   @unit
+  Scenario: The public API refuses a workflow evaluator for a workflow that does not exist
+    When the public API creates a workflow evaluator linked to an unknown workflow id
+    Then workflow_not_found is reported with status 404
+    And no evaluator is stored and no workflow's flags change
+
+  @unit
+  Scenario: The public API refuses a workflow evaluator for another project's workflow
+    Given a workflow that belongs to another project
+    When the public API creates a workflow evaluator in my project linked to it
+    Then workflow_not_found is reported with status 404
+    And no evaluator is stored and no workflow's flags change
+
+  @unit
   Scenario: The application refuses an evaluator kind that does not match its workflow link
     Given a caller that reaches the application without the REST schema
     When it creates a workflow evaluator with no workflowId, or a code or built-in one with a workflowId

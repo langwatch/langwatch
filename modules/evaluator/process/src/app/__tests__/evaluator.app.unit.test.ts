@@ -3,6 +3,7 @@
  */
 import { codeEvaluatorOutputFields, newEvaluatorId } from "@langwatch/evaluator-contract";
 import { ModelNotConfiguredError, type ModelProviderApi } from "@langwatch/model-provider-contract";
+import { WorkflowNotFoundError } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { createEvaluatorTestApp, testModelResolution } from "./evaluator.fixture.ts";
@@ -443,6 +444,59 @@ describe("EvaluatorModule", () => {
       ).rejects.toMatchObject({ code: "evaluator_workflow_evaluator_exists" });
 
       expect(setWorkflowFlags).not.toHaveBeenCalled();
+    });
+
+    describe("when the workflow is not one of the project's", () => {
+      // Only workflow-1 of project-1 exists, as the project-scoped workflow lookup answers.
+      const workflowsOfProjectOne = () => {
+        const setWorkflowFlags = vi.fn(async () => void 0);
+        const assertInProject = vi.fn(async (input: { workflowId: string; projectId: string }) => {
+          if (input.workflowId === "workflow-1" && input.projectId === "project-1") return;
+          throw new WorkflowNotFoundError(input.workflowId, input.projectId);
+        });
+        const { app, repository } = createEvaluatorTestApp({
+          workflows: { setWorkflowFlags, assertInProject },
+        });
+        return { app, repository, setWorkflowFlags };
+      };
+
+      /** @scenario The public API refuses a workflow evaluator for a workflow that does not exist */
+      it("refuses an unknown workflow id with workflow_not_found before storing anything", async () => {
+        const { app, repository, setWorkflowFlags } = workflowsOfProjectOne();
+        const create = vi.spyOn(repository, "create");
+
+        await expect(
+          app.createWithResolvedDefaults({
+            projectId: "project-1",
+            name: "Typo",
+            type: "workflow",
+            config: {},
+            workflowId: "workflow-typo",
+          }),
+        ).rejects.toMatchObject({ code: "workflow_not_found", httpStatus: 404 });
+
+        expect(create).not.toHaveBeenCalled();
+        expect(setWorkflowFlags).not.toHaveBeenCalled();
+      });
+
+      /** @scenario The public API refuses a workflow evaluator for another project's workflow */
+      it("refuses another project's workflow id with workflow_not_found before storing anything", async () => {
+        const { app, repository, setWorkflowFlags } = workflowsOfProjectOne();
+        const create = vi.spyOn(repository, "create");
+
+        await expect(
+          app.createWithResolvedDefaults({
+            projectId: "project-2",
+            name: "Borrowed",
+            type: "workflow",
+            config: {},
+            workflowId: "workflow-1",
+          }),
+        ).rejects.toMatchObject({ code: "workflow_not_found", httpStatus: 404 });
+
+        expect(create).not.toHaveBeenCalled();
+        expect(setWorkflowFlags).not.toHaveBeenCalled();
+      });
     });
 
     /** @scenario The application refuses an evaluator kind that does not match its workflow link */

@@ -531,7 +531,9 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
         ...(input.workflowId !== void 0 && { workflowId: input.workflowId }),
         caller: input.caller,
       });
-      // Flagged only once the row exists: a refused create leaves the workflow as it was.
+      // Flagged only once the row exists: a refused create (workflow_not_found included, from
+      // the create's project-scoped lookup) leaves the workflow as it was. A flag write that
+      // fails here leaves the evaluator listed as a component until the Studio switch is used.
       if (input.workflowId !== void 0) {
         await this.#dependencies.publications.markAsEvaluator({
           workflowId: input.workflowId,
