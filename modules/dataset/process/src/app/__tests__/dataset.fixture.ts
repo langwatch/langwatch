@@ -150,9 +150,7 @@ export function createDatasetTestInlineAttachments(
 }
 
 /**
- * The object-storage content a `DatasetService` test constructs with: the real
- * service over in-memory chunks. A new dataset's row goes to `datasets`, by
- * default a memory repository over `database`, so pass the test's own database
+ * The real content service over in-memory chunks. Pass the test's own `database`
  * when its repository has to see the datasets this creates.
  */
 export function createDatasetTestContent(
