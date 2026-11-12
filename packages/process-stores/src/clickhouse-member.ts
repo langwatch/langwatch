@@ -38,6 +38,11 @@ import type { LimiterStats } from "@langwatch/limiter";
 import { createLogger } from "@langwatch/observability";
 import { counter, histogram, observableGauge } from "@langwatch/observability/metrics";
 
+import {
+  authenticatedFromFile,
+  ClickHousePasswordFile,
+  usernameOf,
+} from "./clickhouse-password-file.ts";
 import type { ClickHouseConfig } from "./config.ts";
 import type { BuiltMember } from "./datastore-members.ts";
 import { PrivateDataplaneRefusals } from "./private-dataplane-refusal.ts";
@@ -46,14 +51,24 @@ import { PrivateDataplaneRefusals } from "./private-dataplane-refusal.ts";
 class VendorClickHouseClientFactory extends ClickHouseClientFactory<ClickHouseClient> {
   private readonly logSink = createLogger("langwatch:clickhouse:driver");
 
-  constructor(private readonly config: ClickHouseConfig) {
+  constructor(
+    private readonly config: ClickHouseConfig,
+    private readonly sharedPasswordFile: ClickHousePasswordFile | undefined,
+  ) {
     super();
   }
 
   create(input: ClickHouseClientCreationInput): ClickHouseClient {
-    return createClient(
+    const client = createClient(
       vendorClickHouseClientOptions({ config: this.config, input, logSink: this.logSink }),
     );
+    // Only the shared endpoint: a private route carries its own credentials in its URL.
+    if (input.instance !== "shared" || this.sharedPasswordFile === undefined) return client;
+    return authenticatedFromFile({
+      client,
+      username: usernameOf(input.url),
+      passwordFile: this.sharedPasswordFile,
+    });
   }
 }
 
@@ -269,6 +284,11 @@ export function buildClickHouse(options: {
 }): BuiltMember<ClickHouseQueryClient> {
   const { config } = options;
   const sharedUrl = config.url?.trim();
+  // Read before anything opens, so an unreadable file stops the boot by name.
+  const sharedPasswordFile =
+    sharedUrl && config.passwordFile
+      ? ClickHousePasswordFile.open({ path: config.passwordFile })
+      : undefined;
   const configuration = ClickHouseConfigService.create().resolve({
     ...(sharedUrl ? { shared: { url: sharedUrl, cluster: "shared" } } : {}),
     privateRoutes: (config.privateRoutes ?? []).map((route) => ({
@@ -284,7 +304,7 @@ export function buildClickHouse(options: {
 
   const connection = ClickHouseConnectionService.create({
     directory: options.directory,
-    clientFactory: new VendorClickHouseClientFactory(config),
+    clientFactory: new VendorClickHouseClientFactory(config, sharedPasswordFile),
     refusal: PrivateDataplaneRefusals.create().forClickHouse(),
     ...(config.maxTenantCacheEntries === undefined
       ? {}
