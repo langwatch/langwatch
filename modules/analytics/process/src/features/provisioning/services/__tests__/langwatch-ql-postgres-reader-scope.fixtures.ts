@@ -176,7 +176,11 @@ export async function startScopeHarness(): Promise<ScopeHarness> {
     for (const org of [ORG_A, ORG_B]) {
       await admin(`CREATE ROLE ${q(orgRole(org))} NOLOGIN`);
     }
-    const logins = [[READER_A, ORG_A], [READER_B, ORG_B], [READER_NONE, undefined]] as const;
+    const logins = [
+      [READER_A, ORG_A],
+      [READER_B, ORG_B],
+      [READER_NONE, undefined],
+    ] as const;
     for (const [login, org] of logins) {
       await admin(`CREATE ROLE ${login} LOGIN PASSWORD '${PASSWORD}'`);
       await admin(`GRANT ${GROUP} TO ${login} WITH INHERIT TRUE, SET FALSE`);
