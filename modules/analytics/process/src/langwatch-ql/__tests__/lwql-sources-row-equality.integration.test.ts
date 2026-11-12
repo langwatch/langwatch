@@ -72,9 +72,9 @@ const TWO_SETS = new RegExp(
   "g",
 );
 
-/** How many times the SQL selects from `traces` or `spans`. */
+/** How many times the SQL selects from `traces`, `spans` or `span_metrics`. */
 function traceViewReads(sql: string): number {
-  return [...sql.matchAll(/\bFROM\s+(?:analytics\.)?(?:traces|spans)\b/gi)].length;
+  return [...sql.matchAll(/\bFROM\s+(?:analytics\.)?(?:traces|spans|span_metrics)\b/gi)].length;
 }
 
 /** The views the SQL names after FROM or JOIN. */
@@ -95,12 +95,22 @@ function singleLookupForm(sql: string): { sql: string; replaced: number } {
   return { sql: before, replaced };
 }
 
-/** Main's SQL for the query, or the rebuilt single lookup for a query new since main. */
-function baselineOf({ label, sql }: StockQuery): string {
-  return ON_MAIN.get(label) ?? singleLookupForm(sql).sql;
+/** Whether two statements read the same views. */
+function readsSameViews(one: string, other: string): boolean {
+  const [a, b] = [one, other].map((sql) => [...new Set(namedViews(sql))].toSorted().join());
+  return a === b;
 }
 
-/** Every stock query kept to its sources that reads `traces` or `spans`, from the fixture. */
+/**
+ * Main's SQL for the query, or the rebuilt single lookup for a query new since main or moved to
+ * other views since (analytics ADR-006), so only the lookup differs from the query it checks.
+ */
+function baselineOf({ label, sql }: StockQuery): string {
+  const main = ON_MAIN.get(label);
+  return main !== undefined && readsSameViews(main, sql) ? main : singleLookupForm(sql).sql;
+}
+
+/** Every stock query kept to its sources that reads a trace or span view, from the fixture. */
 const COVERED = STOCK.filter(({ sql }) => sql.includes(SOURCES) && traceViewReads(sql) > 0);
 
 const labelsOf = (queries: readonly StockQuery[]) => queries.map(({ label }) => label);
@@ -108,9 +118,9 @@ const labelsOf = (queries: readonly StockQuery[]) => queries.map(({ label }) => 
 describe("given the stock queries that keep traces or spans to their sources", () => {
   /** @scenario "AC202d Stock widgets: a widget whose list did not change returns the same rows" */
   it("turns every one of their trace view reads back into the single lookup", () => {
-    // The stock queries that read traces or spans with the sources parameter:
-    // 58 before tasks#1117 moved 15 of them to trace_metrics.
-    expect(COVERED).toHaveLength(43);
+    // The stock queries that read traces, spans or span_metrics with the sources parameter: 58
+    // before tasks#1117 moved 15 to trace_metrics, 43 before analytics ADR-004 moved 20 more off.
+    expect(COVERED).toHaveLength(23);
 
     const missed = COVERED.flatMap(({ label, sql }) => {
       const { sql: before, replaced } = singleLookupForm(sql);
@@ -206,11 +216,16 @@ function seedRows(): Record<string, Record<string, unknown>[]> {
       LastUsedPromptVersionId: seed.prompt ?? null,
       Attributes: { "metadata.user_id": `user_${seed.trace}` },
     })),
-    spans: SEEDS.flatMap((seed) => [
-      span({ seed, id: "root", parent: null, status: failing(seed) ? 2 : 1, name: "agent" }),
-      span({ seed, id: "tool", parent: "root", status: 2, name: "tool.search" }),
-      span({ seed, id: "llm", parent: "root", status: 0, name: "llm.chat" }),
-    ]),
+    spans: SEEDS.flatMap((seed) => spansOf({ seed, failing: failing(seed) })),
+    // The same spans as span_metrics' typed columns.
+    span_metrics: SEEDS.flatMap((seed) =>
+      spansOf({ seed, failing: failing(seed) }).map(
+        ({ ServiceName: _service, SpanAttributes: _attributes, ...typed }) => ({
+          ...typed,
+          SpanType: String(typed.SpanName).split(".")[0],
+        }),
+      ),
+    ),
     evaluations: SEEDS.map((seed) => ({
       ...base(seed),
       EvaluationId: `eval_${seed.trace}`,
@@ -239,6 +254,23 @@ function seedRows(): Record<string, Record<string, unknown>[]> {
         Source: source,
       })),
     ),
+    // The same verdicts beside their trace's time, topic and source (analytics ADR-007).
+    trace_evaluation_metrics: SEEDS.flatMap((seed) =>
+      seed.sources.slice(0, 1).map((source) => ({
+        ...base(seed),
+        EvaluationId: `eval_${seed.trace}`,
+        OccurredAt: at(seed.time),
+        UpdatedAt: at(seed.time),
+        TraceOccurredAt: at(seed.time),
+        EvaluatorName: "Answered",
+        Status: "processed",
+        IsGuardrail: false,
+        Passed: !failing(seed),
+        Source: source,
+        TraceSource: source,
+        TopicId: topic(seed),
+      })),
+    ),
     topics: ["topic_billing", "topic_refunds"].map((id) => ({
       TenantId: "tenant",
       TopicId: id,
@@ -248,6 +280,15 @@ function seedRows(): Record<string, Record<string, unknown>[]> {
       UpdatedAt: at(OLD),
     })),
   };
+}
+
+/** A seed's root, tool and LLM spans. */
+function spansOf({ seed, failing }: { seed: Seed; failing: boolean }): Record<string, unknown>[] {
+  return [
+    span({ seed, id: "root", parent: null, status: failing ? 2 : 1, name: "agent" }),
+    span({ seed, id: "tool", parent: "root", status: 2, name: "tool.search" }),
+    span({ seed, id: "llm", parent: "root", status: 0, name: "llm.chat" }),
+  ];
 }
 
 function span({
@@ -340,7 +381,9 @@ describe.skipIf(!url)("given ordinary traces of each source beside the traces AC
     await admin.command({ query: `CREATE DATABASE ${DATABASE}` });
     client = createClient({ url: urlOnDatabase() });
 
-    const views = new Set(COVERED.flatMap(({ sql }) => namedViews(sql)));
+    const views = new Set(
+      COVERED.flatMap((query) => [...namedViews(query.sql), ...namedViews(baselineOf(query))]),
+    );
     for (const name of views) {
       const view = LWQL_VIEW_CATALOG.find((candidate) => candidate.name === name);
       if (!view) throw new Error(`a stock query reads "${name}", which the catalogue lacks`);
@@ -351,6 +394,8 @@ describe.skipIf(!url)("given ordinary traces of each source beside the traces AC
     }
 
     for (const [table, values] of Object.entries(seedRows())) {
+      // A seeded view no covered query or baseline reads has no table.
+      if (!views.has(table)) continue;
       await client.insert({ table: `${DATABASE}.${table}`, values, format: "JSONEachRow" });
     }
   });

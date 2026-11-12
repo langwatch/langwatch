@@ -35,6 +35,7 @@ import {
   type LangWatchQLAppFunctionCall,
   type LangWatchQLJudgementCall,
   type LangWatchQLSchema,
+  type LangWatchQLSpanDataFloor,
   type LangWatchQLService,
   type LangWatchQLKeyStatementRequest,
   type LangWatchQLTextHydrationInput,
@@ -1087,6 +1088,11 @@ export class AnalyticsModule
 
   validateLangWatchQL(input: LangWatchQLValidationInput): LangWatchQLAcceptedStatement {
     return this.#dependencies.langWatchQL.validate(input);
+  }
+
+  /** Where span_metrics' history starts, from trace's span_analytics replay (ADR-006). */
+  async spanDataFloor(): Promise<LangWatchQLSpanDataFloor> {
+    return this.#dependencies.traces.getSpanAnalyticsFloor();
   }
 
   /** The projects a card's editor may offer this member. */

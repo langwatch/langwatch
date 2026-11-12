@@ -10,6 +10,7 @@ import {
   type AnnotationRemovedEventData,
   type AssignTopicCommandData,
   type LogTraceContribution,
+  type RecordEvaluationOutcomeCommandData,
   type RecordMetricCorrelationCommandData,
   type RecordSpanCommandData,
   type ResolveOriginCommandData,
@@ -37,6 +38,7 @@ type TraceProcessingSenders = Readonly<{
   resolveOrigin: EventingCommandSender<ResolveOriginCommandData>;
   recordLogContribution: EventingCommandSender<LogTraceContribution>;
   recordMetricCorrelation: EventingCommandSender<RecordMetricCorrelationCommandData>;
+  recordEvaluationOutcome: EventingCommandSender<RecordEvaluationOutcomeCommandData>;
 }>;
 
 /** trace_processing's senders, bound on connect; unbound, each refuses by name. */
@@ -87,6 +89,15 @@ export class TraceProcessingCommandsService implements TraceProcessingCommands {
 
   async recordMetricCorrelations(data: RecordMetricCorrelationCommandData[]): Promise<void> {
     await this.#connected("recordMetricCorrelation").recordMetricCorrelation.sendBatch(data);
+  }
+
+  async recordEvaluationOutcome(data: RecordEvaluationOutcomeCommandData): Promise<void> {
+    await this.#connected("recordEvaluationOutcome").recordEvaluationOutcome.send(data);
+  }
+
+  /** The backfill's page in one send; the queue bounds each batch. */
+  async recordEvaluationOutcomes(data: RecordEvaluationOutcomeCommandData[]): Promise<void> {
+    await this.#connected("recordEvaluationOutcome").recordEvaluationOutcome.sendBatch(data);
   }
 
   #connected(command: string): TraceProcessingSenders {

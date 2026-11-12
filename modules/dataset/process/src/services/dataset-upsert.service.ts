@@ -7,6 +7,7 @@ import {
 } from "@langwatch/dataset-contract";
 import { ValidationError } from "@langwatch/handled-error";
 
+import type { DatasetContent, DatasetSeedRow } from "../app/dataset.app.ts";
 import type { LockedDatasetRecords } from "../repositories/dataset-record.repository.ts";
 import type { DatasetUpdateInput } from "../repositories/dataset.repository.ts";
 import { mapPreviousColumnsToNewColumns } from "../rules/dataset-chunk-lines.rules.ts";
@@ -169,13 +170,41 @@ export class DatasetUpsertService {
     }
   }
 
-  private async create({ parsed, name }: { parsed: ParsedUpsert; name: string }): Promise<Dataset> {
-    const { options } = this.deps;
-    const slug = datasetSlugOf(name);
-    const conflict = await options.repository.findBySlug({ projectId: parsed.projectId, slug });
+  /** A dataset born in object storage with rows whose files are already stored, as a copy's are. */
+  async createWithStoredRows(input: {
+    content: DatasetContent;
+    projectId: string;
+    name: string;
+    columnTypes: Dataset["columnTypes"];
+    rows: AsyncIterable<DatasetSeedRow>;
+  }): Promise<Dataset> {
+    const slug = await this.freeSlugOf({ projectId: input.projectId, name: input.name });
+
+    return input.content.createDataset({
+      projectId: input.projectId,
+      name: input.name,
+      slug,
+      columnTypes: input.columnTypes,
+      rows: input.rows,
+    });
+  }
+
+  private async freeSlugOf(input: { projectId: string; name: string }): Promise<string> {
+    const slug = datasetSlugOf(input.name);
+    const conflict = await this.deps.options.repository.findBySlug({
+      projectId: input.projectId,
+      slug,
+    });
     if (conflict) {
       throw new DatasetNameTakenError();
     }
+
+    return slug;
+  }
+
+  private async create({ parsed, name }: { parsed: ParsedUpsert; name: string }): Promise<Dataset> {
+    const { options } = this.deps;
+    const slug = await this.freeSlugOf({ projectId: parsed.projectId, name });
 
     if (parsed.datasetRecords && parsed.datasetRecords.length > 0) {
       const maxBytes = onceMaxBytes(() =>
@@ -197,6 +226,18 @@ export class DatasetUpsertService {
       });
     }
 
+    if (options.content) {
+      return options.content.createDataset({
+        projectId: parsed.projectId,
+        name,
+        slug,
+        columnTypes: parsed.columnTypes,
+        rows: (parsed.datasetRecords ?? []).map(({ id, ...entry }) => ({ id, entry })),
+      });
+    }
+
+    // Only a composition with no object storage (a unit test) still makes a
+    // Postgres-layout dataset.
     const created = await options.repository.create({
       projectId: parsed.projectId,
       name,

@@ -350,6 +350,14 @@ export const FEATURE_FLAGS = [
       "Minimising Langy sinks the panel to an edge peek of itself — a sliver of the card at the bottom edge (floating) or of the dock's spine at the right edge (sidebar) that rises on pointer proximity and opens on click (spec: specs/langy/langy-peek-dock.feature). Off = the classic corner launcher orb. Only the closed-state affordance changes; the panel and its Cmd/Ctrl+I activation are the same either way. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_langy_peek_dock_enabled.",
   },
   {
+    key: "release_ui_langy_share_command_names_asker",
+    scope: "PRODUCT",
+    defaultValue: false,
+    family: "Langy",
+    description:
+      "The code access card's share command names who asked with `--as <email>`, so a terminal signed in as someone else says so and offers to switch (spec: specs/langy/langy-code-access.feature). Turn on once the TypeScript SDK release that accepts `langwatch langy --as` is on npm: an older CLI refuses the unknown option. Off = the bare command. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_langy_share_command_names_asker.",
+  },
+  {
     key: "release_ui_agent_testing_v2_enabled",
     scope: "PRODUCT",
     defaultValue: true,

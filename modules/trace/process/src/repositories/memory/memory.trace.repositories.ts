@@ -19,6 +19,8 @@ import { MemoryNullTraceAttributedRollupRepository } from "./memory.null-trace-a
 import { MemoryNullTraceClusteringSampleRepository } from "./memory.null-trace-clustering-sample.repository.ts";
 import { MemoryNullTraceLegacyReadRepository } from "./memory.null-trace-legacy-read.repository.ts";
 import { MemoryNullTraceListRepository } from "./memory.null-trace-list.repository.ts";
+import { MemorySpanAnalyticsFloorRepository } from "./memory.span-analytics-floor.repository.ts";
+import { MemorySpanAnalyticsRepository } from "./memory.span-analytics.repository.ts";
 import { MemorySpanStorageRepository } from "./memory.span-storage.repository.ts";
 import { MemoryTraceAnalyticsRepository } from "./memory.trace-analytics-projection.repository.ts";
 import { MemoryTraceAnalyticsRollupRepository } from "./memory.trace-analytics-rollup.repository.ts";
@@ -27,6 +29,7 @@ import { MemoryTraceAnnotationsRepository } from "./memory.trace-annotations.rep
 import { MemoryTraceAttributeSpendRepository } from "./memory.trace-attribute-spend.repository.ts";
 import { MemoryTraceDerivationSpanRepository } from "./memory.trace-derivation-span.repository.ts";
 import { MemoryTraceEditOverlayRepository } from "./memory.trace-edit-overlay.repository.ts";
+import { MemoryTraceEvaluationAnalyticsRepository } from "./memory.trace-evaluation-analytics.repository.ts";
 import { MemoryTraceEvaluationRunsRepository } from "./memory.trace-evaluation-runs.repository.ts";
 import { MemoryTraceExistenceRepository } from "./memory.trace-existence.repository.ts";
 import { MemoryTraceExportSlotRepository } from "./memory.trace-export-slot.repository.ts";
@@ -148,6 +151,9 @@ export class MemoryTraceRepositories {
       summaryProjection: MemoryTraceSummaryProjectionRepository.create(),
       analyticsProjection: MemoryTraceAnalyticsRepository.create(),
       analyticsRollup: MemoryTraceAnalyticsRollupRepository.create(),
+      evaluationAnalytics: MemoryTraceEvaluationAnalyticsRepository.create(),
+      spanAnalytics: MemorySpanAnalyticsRepository.create(),
+      spanAnalyticsFloor: MemorySpanAnalyticsFloorRepository.create(),
       summaryFoldCache: MemoryTraceSummaryFoldCacheRepository.create(),
       analyticsFoldCache: MemoryTraceAnalyticsFoldCacheRepository.create(),
       spanStorage: MemorySpanStorageRepository.create(spans),

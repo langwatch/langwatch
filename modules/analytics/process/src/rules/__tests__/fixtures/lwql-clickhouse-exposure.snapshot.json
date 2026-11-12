@@ -53,6 +53,24 @@
     "CapturedInput <- SpanAttributes [input]",
     "CapturedOutput <- SpanAttributes [output]"
   ],
+  "span_metrics <- span_analytics": [
+    "TenantId <- TenantId",
+    "TraceId <- TraceId",
+    "SpanId <- SpanId",
+    "ParentSpanId <- ParentSpanId",
+    "StartTime <- StartTime",
+    "EndTime <- EndTime",
+    "DurationMs <- DurationMs",
+    "SpanName <- SpanName",
+    "SpanKind <- SpanKind",
+    "StatusCode <- StatusCode",
+    "Cost <- Cost [cost:view]",
+    "NonBilledCost <- NonBilledCost [cost:view]",
+    "SpanType <- SpanType",
+    "ErrorType <- ErrorType",
+    "RagContextCount <- RagContextCount",
+    "DeploymentEnvironment <- DeploymentEnvironment"
+  ],
   "evaluations <- evaluation_runs": [
     "TenantId <- TenantId",
     "EvaluationId <- EvaluationId",
@@ -131,7 +149,10 @@
     "MetadataLanguage <- MetadataLanguage",
     "MetadataSegment <- MetadataSegment",
     "MetadataTeam <- MetadataTeam",
-    "MetadataTopic <- MetadataTopic"
+    "MetadataTopic <- MetadataTopic",
+    "MetadataOutcomeReason <- MetadataOutcomeReason",
+    "MetadataPromptVersion <- MetadataPromptVersion",
+    "MetadataEnvironment <- MetadataEnvironment"
   ],
   "trace_metrics_by_minute <- trace_analytics_rollup": [
     "TenantId <- TenantId",
@@ -201,6 +222,43 @@
     "DurationSum <- DurationSum",
     "CostSum <- CostSum [cost:view]",
     "NonBilledCostSum <- NonBilledCostSum [cost:view]"
+  ],
+  "trace_evaluation_metrics <- trace_evaluation_analytics": [
+    "TenantId <- TenantId",
+    "TraceId <- TraceId",
+    "EvaluationId <- EvaluationId",
+    "OccurredAt <- OccurredAt",
+    "UpdatedAt <- UpdatedAt",
+    "TraceOccurredAt <- TraceOccurredAt",
+    "EvaluatorName <- EvaluatorName",
+    "Status <- Status",
+    "IsGuardrail <- IsGuardrail",
+    "Passed <- Passed",
+    "Label <- Label",
+    "Source <- Origin",
+    "TraceSource <- TraceOrigin",
+    "CustomerId <- CustomerId",
+    "TopicId <- TopicId",
+    "Labels <- Labels",
+    "MetadataTopic <- MetadataTopic",
+    "MetadataDocumentType <- MetadataDocumentType",
+    "MetadataLanguage <- MetadataLanguage",
+    "MetadataTeam <- MetadataTeam",
+    "MetadataFlow <- MetadataFlow",
+    "MetadataSegment <- MetadataSegment",
+    "MetadataPromptVersion <- MetadataPromptVersion"
+  ],
+  "trace_evaluation_checks <- trace_evaluation_analytics": [
+    "TenantId <- TenantId",
+    "TraceId <- TraceId",
+    "OccurredAt <- OccurredAt",
+    "TraceOccurredAt <- TraceOccurredAt",
+    "EvaluatorName <- EvaluatorName",
+    "Passed <- Passed",
+    "IsGuardrail <- IsGuardrail",
+    "Source <- Origin",
+    "TraceSource <- TraceOrigin",
+    "Evaluations <- Sign"
   ],
   "coding_sessions <- coding_agent_sessions": [
     "TenantId <- TenantId",

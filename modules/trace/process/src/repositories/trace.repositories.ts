@@ -11,6 +11,8 @@ import type { TraceTopicNamesReadRepository } from "../features/topic/repositori
 import type { TraceClickHouse } from "./clickhouse/clickhouse.trace-member-client.repository.ts";
 import type { LogRecordStorageRepository } from "./log-record-storage.repository.ts";
 import type { SessionGroupsRepository } from "./session-groups.repository.ts";
+import type { SpanAnalyticsFloorRepository } from "./span-analytics-floor.repository.ts";
+import type { SpanAnalyticsRepository } from "./span-analytics.repository.ts";
 import type { SpanStorageRepository } from "./span-storage.repository.ts";
 import type { TraceAnalyticsFoldCacheRepository } from "./trace-analytics-fold-cache.repository.ts";
 import type { TraceAnalyticsProjectionRepository } from "./trace-analytics-projection.repository.ts";
@@ -20,6 +22,7 @@ import type { TraceAnnotationsReadRepository } from "./trace-annotations.reposit
 import type { TraceAttributeSpendRepository } from "./trace-attribute-spend.repository.ts";
 import type { TraceAttributedRollupRepository } from "./trace-attributed-rollup.repository.ts";
 import type { TraceDerivationSpanReaderRepository } from "./trace-derivation-span-reader.repository.ts";
+import type { TraceEvaluationAnalyticsRepository } from "./trace-evaluation-analytics.repository.ts";
 import type { TraceEvaluationRunsReadRepository } from "./trace-evaluation-runs.repository.ts";
 import type { TraceExistenceRepository } from "./trace-existence.repository.ts";
 import type { TraceIndexMaterialisationRepository } from "./trace-index-materialisation.repository.ts";
@@ -46,6 +49,12 @@ export interface TraceRepositories {
   readonly summaryProjection: TraceSummaryProjectionRepository;
   readonly analyticsProjection: TraceAnalyticsProjectionRepository;
   readonly analyticsRollup: TraceAnalyticsRollupRepository;
+  /** Each evaluation's outcome beside its trace's columns (goose 00129), the fold's to write. */
+  readonly evaluationAnalytics: TraceEvaluationAnalyticsRepository;
+  /** The span facts the stock widgets read (goose 00128), appended per span. */
+  readonly spanAnalytics: SpanAnalyticsRepository;
+  /** The span_analytics replay step's ledger row: where the span widgets' history starts. */
+  readonly spanAnalyticsFloor: SpanAnalyticsFloorRepository;
   /** The two folds' warm state; without it a fold reads back a lossy row mid-trace. */
   readonly summaryFoldCache: TraceSummaryFoldCacheRepository;
   readonly analyticsFoldCache: TraceAnalyticsFoldCacheRepository;

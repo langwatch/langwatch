@@ -13,6 +13,7 @@ import {
 } from "@langwatch/analytics-contract/langwatch-ql-limits";
 import { describe, expect, it } from "vitest";
 
+import { LWQL_REQUEST_TIMEOUT_MS } from "../../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
 import {
   LangWatchQLAccessModelService,
   type LangWatchQLNames,
@@ -43,6 +44,10 @@ const LIMITS = {
   maxBytesToRead: 333_000,
   maxResultRows: 444_000,
   maxResultBytes: 555_000,
+  maxBytesBeforeExternalGroupBy: 666_000,
+  maxBytesBeforeExternalSort: 777_000,
+  joinAlgorithm: "grace_hash",
+  maxBytesInJoin: 888_000,
 };
 
 describe("given the LangWatchQL settings profile statement", () => {
@@ -69,6 +74,16 @@ describe("given the LangWatchQL settings profile statement", () => {
       );
     });
 
+    /** @scenario "The LangWatchQL profile spills a big GROUP BY, sort or join to disk" */
+    it("pins the spill thresholds and the grace hash join from the limits", () => {
+      const statement = accessModel.settingsProfileStatement({ names: NAMES, limits: LIMITS });
+
+      expect(statement).toContain("max_bytes_before_external_group_by = 666000 CONST");
+      expect(statement).toContain("max_bytes_before_external_sort = 777000 CONST");
+      expect(statement).toContain("join_algorithm = 'grace_hash' CONST");
+      expect(statement).toContain("max_bytes_in_join = 888000 CONST");
+    });
+
     /**
      * The tenant capability and the query log's comment are the settings the executor may
      * change, and the capability's empty default makes an absent context read zero rows.
@@ -89,6 +104,14 @@ describe("given the LangWatchQL settings profile statement", () => {
   });
 
   describe("when it is built from the shipped defaults", () => {
+    /** @scenario "A LangWatchQL query may run for up to 60 seconds" */
+    it("gives a query 60 seconds and the client 5 more before it gives up", () => {
+      expect(accessModel.settingsProfileStatement({ names: NAMES })).toContain(
+        "max_execution_time = 60 CONST",
+      );
+      expect(LWQL_REQUEST_TIMEOUT_MS).toBe(65_000);
+    });
+
     it("bounds the shared identity's aggregate concurrency, not only each query", () => {
       expect(accessModel.settingsProfileStatement({ names: NAMES })).toContain(
         `max_concurrent_queries_for_user = ${DEFAULT_LWQL_RESOURCE_LIMITS.maxConcurrentQueriesForUser} CONST`,
