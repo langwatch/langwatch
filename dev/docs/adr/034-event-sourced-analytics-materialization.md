@@ -157,7 +157,7 @@ For `span_analytics`, this replaces the 2026-10-12 accepted-noise decision above
 - The remaining rows are sorted by StartTime and sliced by 256. Each slice makes one `existingSpanKeys` point lookup on `span_analytics` bounded by `StartTime` from the slice minimum minus 7 days to the slice maximum plus 7 days, skips the spans found and inserts the rest in one insert. The bound keeps the lookup to a few weekly partitions. Measured on ClickHouse 26.8.36.3 (compatibility 25.10), 85M spans over 60 days, replay chunks of 5000 in 256-span slices: per-slice p95 127 to 160 ms with the 7-day margin, 47 ms with the slice bound alone.
 - First write wins. `stored_spans` keeps the latest copy under `FINAL`; `span_analytics` keeps the first.
 - A crash re-delivery of the same event carries the same StartTime, so it finds its own earlier row.
-- The replay path runs the same check. It is not free: replay pauses and drains the spanAnalytics lane per batch, so each 5000-span chunk lengthens each pause by about 20 slices × about 150 ms ≈ 3 s. The live-path cost (one ClickHouse read per dispatch before the insert) is unmeasured; replay slice p95 was 127 to 160 ms.
+- The replay path runs the same check, so replay fills missing spans only. It is not free: replay pauses and drains the spanAnalytics lane per batch, so each 5000-span chunk lengthens each pause by about 20 slices × about 150 ms ≈ 3 s. The live-path cost (one ClickHouse read per dispatch before the insert) is unmeasured; replay slice p95 was 127 to 160 ms.
 
 Residuals, accepted:
 
@@ -165,5 +165,7 @@ Residuals, accepted:
 - Redelivered job alongside the first run: delivery is at-least-once, so a job can run while its first run is still in flight; both can miss the lookup and both insert.
 - StartTime moved more than 7 days: a re-sent span outside the lookup bound is not found and is counted twice. This is the same gap main had: `FINAL` only collapsed copies inside one weekly partition (`toYearWeek(StartTime)`).
 - Backstop: within one weekly partition, `span_analytics` (`ReplacingMergeTree(ProjectedAt)`) merges residual duplicates and keeps the later copy. Parts merge only inside a partition, so the backstop does not reach across weeks.
+
+Replay consequence: because the replay path also goes through first-write-wins, a `spanAnalytics` replay only fills spans that are missing. It cannot correct a stored span, so a wrong stored row stays until it is deleted by an operator step.
 
 Consequence: `stored_spans` keeps the latest copy (read with `FINAL`) and `span_analytics` keeps the first. A re-sent span with a different cost can therefore differ between the stock widgets (span_analytics) and the trace view (stored_spans).

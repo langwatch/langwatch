@@ -1,4 +1,9 @@
-import type { AppendStore, BulkAppendContext, ProjectionStoreContext } from "@langwatch/eventing";
+import {
+  type AppendStore,
+  type BulkAppendContext,
+  type ProjectionStoreContext,
+  SecurityError,
+} from "@langwatch/eventing";
 
 import type { SpanAnalyticsRepository } from "../repositories/span-analytics.repository.ts";
 import type { SpanAnalyticsRow } from "./span-analytics.projection.ts";
@@ -30,6 +35,7 @@ export class SpanAnalyticsStore implements AppendStore<SpanAnalyticsRow> {
   }
 
   async bulkAppend(records: SpanAnalyticsRow[], context: BulkAppendContext): Promise<void> {
+    assertSingleTenant(records);
     const fresh = await this.withoutStoredSpans(firstRowPerSpan(records));
     await this.storage.insertRows({ rows: fresh, retentionDays: this.retentionDays(context) });
   }
@@ -53,22 +59,44 @@ export class SpanAnalyticsStore implements AppendStore<SpanAnalyticsRow> {
         startTimeFromMs: first.startTimeUnixMs - START_TIME_MARGIN_MS,
         startTimeToMs: last.startTimeUnixMs + START_TIME_MARGIN_MS,
       });
-      const storedKeys = new Set(stored.map(spanKey));
+      const storedKeys = new Set(stored.map((key) => spanKey({ tenantId: first.tenantId, ...key })));
       fresh.push(...slice.filter((row) => !storedKeys.has(spanKey(row))));
     }
     return fresh;
   }
 }
 
-function spanKey({ traceId, spanId }: { traceId: string; spanId: string }): string {
-  return `${traceId}:${spanId}`;
+/** The lookup runs under the first row's tenant, so a mixed batch would read the wrong tenant. */
+function assertSingleTenant(rows: SpanAnalyticsRow[]): void {
+  const [first] = rows;
+  if (!first) return;
+  const mismatch = rows.find((row) => row.tenantId !== first.tenantId);
+  if (!mismatch) return;
+  throw new SecurityError({
+    operation: "SpanAnalyticsStore.bulkAppend",
+    message: "all rows in a single batch must share the same tenantId",
+    tenantId: first.tenantId,
+    context: { mismatchedTenantId: mismatch.tenantId },
+  });
+}
+
+function spanKey({
+  tenantId,
+  traceId,
+  spanId,
+}: {
+  tenantId: string;
+  traceId: string;
+  spanId: string;
+}): string {
+  return `${tenantId}:${traceId}:${spanId}`;
 }
 
 /** A re-sent span can share a coalesced batch with its original, and neither is stored yet. */
 function firstRowPerSpan(rows: SpanAnalyticsRow[]): SpanAnalyticsRow[] {
   const seen = new Set<string>();
   return rows.filter((row) => {
-    const key = `${row.tenantId}:${spanKey(row)}`;
+    const key = spanKey(row);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;

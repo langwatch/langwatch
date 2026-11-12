@@ -52,6 +52,12 @@ Feature: A read bounded below on evaluation_metrics.OccurredAt deduplicates only
     Given a statement that names evaluation_metrics__floor by name, quoted, database-qualified, under an alias, in a subquery, behind a WITH of the same name, in a JOIN, in a UNION or as a table function
     Then the validator refuses it
 
+  @integration
+  Scenario: A floored twin returns only the calling tenant's rows
+    Given a floored twin of each view and rows seeded for two tenants
+    When the restricted identity of one tenant reads the twin from a floor before every seeded row
+    Then it returns rows, and every row is that tenant's
+
   @unit
   Scenario: A floored twin missing a column of its view is rebuilt
     Given a floored twin that ClickHouse reports lacking a catalog column of its view, or a twin with no column data beside a view that lacks one

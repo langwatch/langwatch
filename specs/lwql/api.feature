@@ -306,6 +306,12 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And it carries the newer version's values
 
   @integration
+  Scenario: A plain span_metrics read counts a residual duplicate span
+    Given span_analytics holds two copies of one span, a residual duplicate ADR-034 accepts
+    When the restricted identity selects that span through the span_metrics view
+    Then both copies are returned, because a plain read does not deduplicate
+
+  @integration
   Scenario: A column no LangWatchQL view exposes is unreachable, not merely unselected
     Given the restricted identity carries tenant-a's valid key-hash context
     When it references a column outside the LangWatchQL schema catalog
@@ -1437,6 +1443,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 #  views are usable at scale)
 #   → Scenario: A LangWatchQL view returns only the calling tenant's rows
 #   → Scenario: A LangWatchQL view returns one row per logical record, the latest version
+#   → Scenario: A plain span_metrics read counts a residual duplicate span
 #   → Scenario: A column no LangWatchQL view exposes is unreachable, not merely unselected
 #   → Scenario: Reading the physical fact table directly is policed the same way
 #   → Scenario: Row policies leave the application's own reads untouched

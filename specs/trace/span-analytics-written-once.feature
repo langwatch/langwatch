@@ -30,10 +30,34 @@ Feature: span_analytics holds each span once
     Then span_analytics holds two copies of the span
 
   @unit
-  Scenario: Each slice of 256 spans is looked up under its own start time bound
-    Given a batch of 600 spans over 60 days
+  Scenario: Spans stored at the slice edges of a 600-span batch are not written again
+    Given the spans at the slice edges of a 600-span batch stored by an earlier batch
+    When the 600-span batch is appended
+    Then span_analytics holds each of the 600 spans once
+
+  @unit
+  Scenario: A batch that mixes tenants is refused
+    Given a batch carrying spans of two tenants
     When the batch is appended
-    Then three lookups run, each bounded by its slice's start times plus or minus seven days
+    Then it is refused before any lookup runs
+
+  @unit
+  Scenario: Another tenant's span with the same ids is still written
+    Given a span stored for one tenant
+    When a later batch carries a span of another tenant with the same trace and span ids
+    Then the other tenant's span is written
+
+  @integration
+  Scenario: A re-sent span is written once in ClickHouse
+    Given a span stored in span_analytics
+    When the same span is re-sent, with the same and with a different start time inside the window
+    Then span_analytics holds one row for the span
+
+  @integration
+  Scenario: Another tenant's span with the same ids is not matched
+    Given a span stored for one tenant
+    When another tenant sends a span with the same trace and span ids
+    Then the other tenant's span is stored and each tenant holds one row
 
   @unit
   Scenario: A span redelivered after a failed insert is written once

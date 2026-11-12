@@ -13,6 +13,7 @@ import {
   SHIPPED_LWQL_DEDUP,
   LangWatchQLViewStatementsService,
 } from "../../features/provisioning/services/langwatch-ql-view-statements.service.ts";
+import { flooredViewName, flooredViewNames } from "../../rules/lwql-dedup-floor.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import type { LangWatchQLDedupStrategy } from "../../rules/lwql-view-dedup-shape.rules.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
@@ -370,6 +371,22 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
         harness,
         context: `${view.name} view`,
       });
+    }
+  });
+
+  /** @scenario "A floored twin returns only the calling tenant's rows" */
+  it("returns its own tenant's rows and none of the other tenant's, for every floored twin", async () => {
+    // A floor before every seeded row: the bound hides nothing, so an empty read fails the check.
+    const wholeHistory = "toDateTime64('1970-01-02 00:00:00', 3)";
+    const twins = LWQL_VIEW_CATALOG.filter((view) => flooredViewNames([view]).length > 0);
+    expect(twins.length, "no floored twin in the catalog to check").toBeGreaterThan(0);
+    for (const view of twins) {
+      const twin = flooredViewName(view.name);
+      const rows = await selectRows<{ TenantId: string }>(
+        tenantA,
+        `SELECT DISTINCT TenantId FROM ${database}.${twin}(lwql_floor = ${wholeHistory})`,
+      );
+      expectOnlyTenantA({ rows, tenantColumn: "TenantId", harness, context: `${twin} twin` });
     }
   });
 
@@ -1274,5 +1291,66 @@ describe("given traces assigned to topics when a caller asks for traffic by topi
       [`Topic ${a.tenantId} 1`, 3],
       [`Topic ${a.tenantId} 2`, 2],
     ]);
+  });
+});
+
+describe("given the LangWatchQL views provisioned over the shipped fact tables when a span's residual duplicate reached span_analytics", () => {
+  /**
+   * ADR-034 accepts a residual duplicate (a re-sent span missing the lookup), and span_metrics is
+   * read plainly, so a read counts it. This pins that behaviour so a future dedup is a visible change.
+   */
+  /** @scenario "A plain span_metrics read counts a residual duplicate span" */
+  it("returns both copies of the span through span_metrics", async () => {
+    const traceId = `${harness.tenantA.tenantId}-residual-duplicate-trace`;
+    const spanId = `${harness.tenantA.tenantId}-residual-duplicate-span`;
+    const at = SEED_RECENT_WEEK.from;
+    const copy = {
+      TenantId: harness.tenantA.tenantId,
+      TraceId: traceId,
+      SpanId: spanId,
+      StartTime: at,
+      EndTime: at,
+      DurationMs: 5,
+      SpanName: "residual duplicate",
+      SpanKind: 1,
+      ProjectedAt: at,
+    };
+    // Unmerged parts: a merge would hide the duplicate this case reads. Restarted in the finally.
+    await harness.admin.command({ query: `SYSTEM STOP MERGES ${facts}.span_analytics` });
+    try {
+      // Two inserts, so the copies are two parts: a single insert could be deduplicated on write.
+      await harness.admin.insert({
+        table: `${facts}.span_analytics`,
+        format: "JSONEachRow",
+        values: [copy],
+      });
+      await harness.admin.insert({
+        table: `${facts}.span_analytics`,
+        format: "JSONEachRow",
+        values: [{ ...copy, DurationMs: 7 }],
+      });
+
+      // The control: without it, "two rows" is satisfied by a table that never held two.
+      const stored = await selectRows<{ SpanId: string }>(
+        harness.admin,
+        `SELECT SpanId FROM ${facts}.span_analytics ` +
+          `WHERE TenantId = '${harness.tenantA.tenantId}' AND TraceId = '${traceId}'`,
+      );
+      expect(
+        stored,
+        "the source table holds one copy — this case is not being exercised",
+      ).toHaveLength(2);
+
+      const read = await selectRows<{ SpanId: string }>(
+        tenantA,
+        `SELECT SpanId FROM ${database}.span_metrics WHERE TraceId = '${traceId}'`,
+      );
+      expect(
+        read.map((row) => row.SpanId),
+        "span_metrics deduplicated a residual duplicate, which ADR-034 says a plain read does not do",
+      ).toEqual([spanId, spanId]);
+    } finally {
+      await harness.admin.command({ query: `SYSTEM START MERGES ${facts}.span_analytics` });
+    }
   });
 });

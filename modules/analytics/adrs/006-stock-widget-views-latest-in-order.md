@@ -57,11 +57,12 @@ new MATERIALIZED column.
    input. The stock span widgets read `span_metrics`. Their presence checks still read `spans`,
    since they look back 90 days, and so do the loop widgets, which compare `CapturedInput`.
    `span_metrics` reads `span_analytics` with no dedup (`strategy: "none"`): the map projection
-   writes each span once and a span's facts never change. Duplicates are rare (the ADR-034
+   writes each span once and keeps a span's first copy. Duplicates are rare (the ADR-034
    amendment residuals), and a read counts them. Under the production pin (compatibility 25.10,
    which turns `optimize_limit_by_in_order` off) a `LIMIT 1 BY` here held every span key of the
    period and ran 11 stock widgets out of memory in under 3 seconds.
-6. **History by replay, not by mutation.** Two `defineProjectionReplayStep` steps, one per lane
+6. **History by replay, not by mutation.** The `spanAnalytics` replay fills spans that are
+   missing; it goes through first-write-wins, so it cannot correct a stored span. Two `defineProjectionReplayStep` steps, one per lane
    (`traceAnalytics`, `spanAnalytics`), replay the last 62 days (the longest stock period plus two)
    after old writers are gone. No goose file starts a mutation; the 00128 fill steps are gone.
 7. **The span floor.** The replay step's report keeps the instant its lane was first replayed

@@ -1,4 +1,5 @@
 /** @see specs/trace/span-analytics-written-once.feature */
+import { SecurityError } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
 import { MemorySpanAnalyticsRepository } from "../../repositories/memory/memory.span-analytics.repository.ts";
@@ -63,12 +64,6 @@ function row(overrides: Partial<SpanAnalyticsRow> = {}): SpanAnalyticsRow {
   };
 }
 
-function startAt(starts: number[], index: number): number {
-  const start = starts[index];
-  if (start === undefined) throw new Error(`no start time at ${index}`);
-  return start;
-}
-
 function setup() {
   const repository = new RecordingRepository();
   const store = SpanAnalyticsStore.create({ storage: repository, defaultRetentionDays: () => 30 });
@@ -109,32 +104,40 @@ describe("SpanAnalyticsStore", () => {
     expect(repository.appended).toHaveLength(2);
   });
 
-  /** @scenario "Each slice of 256 spans is looked up under its own start time bound" */
-  it("looks each slice of 256 spans up under its own bound", async () => {
+  /** @scenario "Spans stored at the slice edges of a 600-span batch are not written again" */
+  it("stores every span of a 600-span batch once when the slice edges were already stored", async () => {
     const { repository, store, context } = setup();
     const rows = Array.from({ length: 600 }, (_, index) =>
       row({ spanId: `span-${index}`, startTimeUnixMs: BASE_MS + (599 - index) * 0.1 * DAY_MS }),
     );
+    const sorted = rows.toSorted((a, b) => a.startTimeUnixMs - b.startTimeUnixMs);
+    const edges = [0, 255, 256, 511, 512, 599].map((index) => {
+      const edge = sorted[index];
+      if (!edge) throw new Error(`no row at ${index}`);
+      return edge;
+    });
+    await store.bulkAppend(edges, context);
+
     await store.bulkAppend(rows, context);
-    const starts = rows.map((r) => r.startTimeUnixMs).toSorted((a, b) => a - b);
-    expect(repository.lookups).toEqual([
-      {
-        keys: 256,
-        startTimeFromMs: startAt(starts, 0) - 7 * DAY_MS,
-        startTimeToMs: startAt(starts, 255) + 7 * DAY_MS,
-      },
-      {
-        keys: 256,
-        startTimeFromMs: startAt(starts, 256) - 7 * DAY_MS,
-        startTimeToMs: startAt(starts, 511) + 7 * DAY_MS,
-      },
-      {
-        keys: 88,
-        startTimeFromMs: startAt(starts, 512) - 7 * DAY_MS,
-        startTimeToMs: startAt(starts, 599) + 7 * DAY_MS,
-      },
-    ]);
+
     expect(repository.appended).toHaveLength(600);
+    expect(new Set(repository.appended.map((stored) => stored.spanId)).size).toBe(600);
+  });
+
+  /** @scenario "Another tenant's span with the same ids is still written" */
+  it("writes another tenant's span that shares ids with a stored one", async () => {
+    const { repository, store, context } = setup();
+    await store.bulkAppend([row()], context);
+    await store.bulkAppend([row({ tenantId: "tenant-2" })], context);
+    expect(repository.appended.map((stored) => stored.tenantId)).toEqual(["tenant-1", "tenant-2"]);
+  });
+
+  it("refuses a batch that mixes tenants", async () => {
+    const { repository, store, context } = setup();
+    await expect(
+      store.bulkAppend([row(), row({ tenantId: "tenant-2", spanId: "span-2" })], context),
+    ).rejects.toThrow(SecurityError);
+    expect(repository.lookups).toHaveLength(0);
   });
 
   /** @scenario "A span redelivered after a failed insert is written once" */
