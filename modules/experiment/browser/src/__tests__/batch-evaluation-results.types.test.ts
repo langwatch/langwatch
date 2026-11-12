@@ -585,6 +585,27 @@ describe("transformBatchEvaluationData", () => {
       expect(rowsInRun(result.rows).map((row) => row.index)).toEqual([0, 2, 5]);
     });
 
+    /** @scenario "The results table shows only the rows a run holds, under their dataset numbers" */
+    it("holds a row that has an evaluation but no dataset entry yet", () => {
+      const data: ExperimentRunWithItems = {
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "proj-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
+        dataset: [{ index: 0, entry: { input: "row0" } }],
+        evaluations: [
+          { evaluator: "eval-1", status: "processed", index: 1 },
+          { evaluator: "eval-1", status: "processed", index: 3 },
+        ],
+        timestamps: createTimestamps(),
+      };
+
+      const result = transformBatchEvaluationData(data);
+
+      expect(result.rows).toHaveLength(4);
+      expect(rowsInRun(result.rows).map((row) => row.index)).toEqual([0, 1, 3]);
+    });
+
     it("builds evaluator names map correctly", () => {
       const data: ExperimentRunWithItems = {
         experimentId: "exp-1",
