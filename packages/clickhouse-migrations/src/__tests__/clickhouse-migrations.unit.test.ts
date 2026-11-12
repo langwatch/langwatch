@@ -9,7 +9,9 @@ describe("ClickHouse migrations", () => {
     const migrationDir = resolve(import.meta.dirname, "../../migrations");
     const versions = readdirSync(migrationDir)
       .map((file) => file.match(/^(\d+)_.*\.sql$/)?.[1])
-      .filter((version): version is string => version != null);
+      .filter((version): version is string => version != null)
+      // goose reads the prefix as a number, and the upgrade ledger pads it: 125 and 00125 collide.
+      .map((version) => Number(version));
 
     const duplicates = versions.filter((version, index) => versions.indexOf(version) !== index);
 

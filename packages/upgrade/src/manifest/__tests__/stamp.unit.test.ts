@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ManifestStep } from "../manifest.ts";
-import { ownerFromTables, stampRelease, tablesTouched } from "../stamp.ts";
+import { duplicateGooseVersions, ownerFromTables, stampRelease, tablesTouched } from "../stamp.ts";
 
 const codeStep: ManifestStep = {
   id: "dataset:content-to-object-storage",
@@ -125,6 +125,33 @@ ALTER TABLE "Project" ADD CONSTRAINT "x" FOREIGN KEY ("d") REFERENCES "Dataset"(
       expect(ownerFromTables({ tables: mixed, tableOwners })).toBeNull();
       expect([...unowned]).toEqual(["usage_meter"]);
       expect(ownerFromTables({ tables: unowned, tableOwners })).toBeNull();
+    });
+  });
+});
+
+describe("duplicateGooseVersions()", () => {
+  describe("when two goose files share a numeric prefix", () => {
+    /** @scenario "Two goose files sharing a numeric prefix are found as one duplicated step id" */
+    it("reports the step id with both files", () => {
+      const gooseFiles = ["00124_add_index.sql", "00125_b.sql", "00125_a.sql"];
+      expect(duplicateGooseVersions({ gooseFiles })).toEqual([
+        { id: "clickhouse:00125", files: ["00125_a.sql", "00125_b.sql"] },
+      ]);
+    });
+  });
+
+  describe("when two prefixes differ only in zero padding", () => {
+    it("reports them as one step id", () => {
+      expect(duplicateGooseVersions({ gooseFiles: ["125_a.sql", "00125_b.sql"] })).toEqual([
+        { id: "clickhouse:00125", files: ["00125_b.sql", "125_a.sql"] },
+      ]);
+    });
+  });
+
+  describe("when every prefix is distinct", () => {
+    it("reports nothing", () => {
+      const gooseFiles = ["00124_add_index.sql", "00125_a.sql", "README.md"];
+      expect(duplicateGooseVersions({ gooseFiles })).toEqual([]);
     });
   });
 });

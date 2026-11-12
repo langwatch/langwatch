@@ -1102,6 +1102,39 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
   });
 });
 
+describe.skipIf(!DB_URL)("the upgrade runner over an image shipping one step id twice", () => {
+  describe("when the image's tree holds two goose files sharing a numeric prefix", () => {
+    /** @scenario "An image shipping one step id twice fails preflight with duplicate_step naming it" */
+    it("fails preflight with duplicate_step naming the id and both files, registering nothing", async () => {
+      const applier = fakeApplier({ release: "3.21.0" });
+      const outcome = await run(
+        runnerFor({
+          release: "3.21.0",
+          applier,
+          image: {
+            release: null,
+            steps: [
+              ...shippedUpTo("3.21.0"),
+              step("clickhouse:00003", "clickhouse-schema"),
+              step("clickhouse:00003", "clickhouse-schema"),
+            ],
+            gooseFiles: ["00001_base.sql", "00002_add.sql", "00003_a.sql", "00003_b.sql"],
+          },
+        }),
+      );
+      expect(outcome).toMatchObject({
+        code: "duplicate_step",
+        exitCode: 1,
+        detail: { steps: [{ id: "clickhouse:00003", sources: ["00003_a.sql", "00003_b.sql"] }] },
+      });
+      expect(applier.calls).toEqual([]);
+      expect((await ledger().findSteps()).map((s) => s.id)).not.toContain("clickhouse:00003");
+      const upgrades = (await ledger().findRuns()).filter((r) => r.kind === "upgrade");
+      expect(upgrades.map((r) => r.outcome)).toEqual(["failed"]);
+    });
+  });
+});
+
 describe.skipIf(!DB_URL)("the upgrade runner on an unfinished or stale ledger", () => {
   describe("when the schema apply reports success but leaves an open schema step not done", () => {
     /** @scenario "A run whose schema apply left an open schema step not done fails with schema_failed naming it" */

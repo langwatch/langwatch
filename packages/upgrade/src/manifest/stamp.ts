@@ -30,6 +30,23 @@ export function gooseStepId({ file }: { file: string }): string | null {
   return match?.[1] ? `clickhouse:${match[1].padStart(5, "0")}` : null;
 }
 
+/** Goose files whose prefixes name one step id, files sorted; the ledger takes one row per id. */
+export function duplicateGooseVersions({
+  gooseFiles,
+}: {
+  gooseFiles: readonly string[];
+}): { id: string; files: string[] }[] {
+  const filesById = new Map<string, string[]>();
+  for (const file of gooseFiles) {
+    const id = gooseStepId({ file });
+    if (id) filesById.set(id, [...(filesById.get(id) ?? []), file]);
+  }
+  return [...filesById]
+    .filter(([, files]) => files.length > 1)
+    .map(([id, files]) => ({ id, files: files.toSorted() }))
+    .toSorted((left, right) => left.id.localeCompare(right.id));
+}
+
 /** Every step id a tree holds: the set a later release must not stamp again. */
 export function treeStepIds({ tree }: { tree: ReleaseTreeSteps }): Set<string> {
   return new Set([

@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { loadReleaseBaseline, type ReleaseBaseline } from "../manifest/baseline.ts";
 import type { ManifestStep, ReleaseManifest } from "../manifest/manifest.ts";
 import {
+  duplicateGooseVersions,
   gooseStepId,
   isPrismaMigrationFolder,
   prismaStepId,
@@ -124,7 +125,7 @@ export const STAMP_RELEASE_COMMAND =
 const LISTED_UNSTAMPED = 10;
 
 export type ReleaseIdentityRefusal = {
-  code: "manifest_missing" | "steps_unstamped" | "release_mismatch";
+  code: "manifest_missing" | "steps_unstamped" | "release_mismatch" | "duplicate_step";
   message: string;
 };
 
@@ -143,6 +144,14 @@ export function releaseIdentityRefusal({
   tree: ReleaseTreeSteps;
   baseline?: ReleaseBaseline;
 }): ReleaseIdentityRefusal | null {
+  const duplicates = duplicateGooseVersions({ gooseFiles: tree.gooseFiles });
+  if (duplicates.length > 0) {
+    const named = duplicates.map(({ id, files }) => `${id} by ${files.join(" and ")}`);
+    return {
+      code: "duplicate_step",
+      message: `goose files share a step id (${named.join("; ")}); give each its own prefix`,
+    };
+  }
   if (!manifests.some((manifest) => manifest.release === release)) {
     return {
       code: "manifest_missing",

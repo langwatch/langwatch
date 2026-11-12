@@ -22,6 +22,7 @@ export const UPGRADE_NEXT_ACTION: Readonly<Record<UpgradeOutcomeCode, string>> =
   lease_lost: `run ${RUN} again: it resumes from the ledger`,
   failed_prisma_migration: `in packages/prisma-client with DATABASE_URL set, run the \`prisma migrate resolve\` command the message names; a waiting worker then runs the upgrade again by itself within 10 s, or run ${RUN}`,
   prebuilt_index_differs: `drop or rename each index the message names (nothing drops it for you); a waiting worker then runs the upgrade again by itself, or run ${RUN}`,
+  duplicate_step: `the image ships one step id twice (two goose files with one numeric prefix): give each named file its own prefix, build the image again and run ${RUN} from it`,
   rerunnable_migration_failed: `fix what the named migration's error names (a lock another session holds: lock_timeout), then run ${RUN} again: it marks the migration rolled back and re-runs it itself`,
   schema_failed: `check the named target is reachable (DATABASE_URL, CLICKHOUSE_URL), fix it, then run ${RUN} again`,
   step_failed: `read the step's error with ${STATUS}, fix its cause, then run ${RUN} again: the step resumes from its checkpoint`,

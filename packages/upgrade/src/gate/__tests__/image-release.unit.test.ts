@@ -95,6 +95,19 @@ describe("releaseIdentityRefusal()", () => {
     });
   });
 
+  describe("when the tree holds two goose files sharing a numeric prefix", () => {
+    /** @scenario "A release whose tree holds two goose files sharing a prefix is refused at the release check" */
+    it("refuses with duplicate_step, naming the step id and both files", () => {
+      const tree = { ...stamped, gooseFiles: [...stamped.gooseFiles, "00001_second.sql"] };
+      const refusal = releaseIdentityRefusal({ release: "3.20.1", manifests, tree, baseline });
+
+      expect(refusal?.code).toBe("duplicate_step");
+      expect(refusal?.message).toContain("clickhouse:00001");
+      expect(refusal?.message).toContain("00001_first.sql");
+      expect(refusal?.message).toContain("00001_second.sql");
+    });
+  });
+
   describe("when the tree carries a manifest newer than its release", () => {
     /** @scenario "A release tree carrying a newer release's manifest fails the release check" */
     it("refuses with release_mismatch, naming the newer release", () => {

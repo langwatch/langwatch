@@ -552,6 +552,7 @@ export async function withImageUpgradeRunner<Result>({
         release,
         steps: imageSteps({ release: release ?? "0.0.0", tree }),
         prismaFolders: imagePrismaFolders(),
+        gooseFiles: tree.gooseFiles,
       },
       // Registered on the ledger, run only here: tenant steps are ops' pass (S6-WIRE).
       codeSteps: inputs.steps.filter(isMigrationStep),

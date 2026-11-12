@@ -29,6 +29,7 @@ import {
   type ContractArchiveEntry,
   ContractArchiveService,
 } from "./contract-archive/contract-archive.service.ts";
+import { duplicateStepFailure, duplicateSteps } from "./duplicate-steps.ts";
 import { blocksRelease, type HeldTargets, newlyHeld, withHeldReports } from "./held-targets.ts";
 import { UPGRADE_READ_HINT_PATH, type UpgradeReadHintPublish } from "./run-hint.ts";
 import { redactSecrets, resolveCommand, UPGRADE_RUN_COMMAND, UpgradeRunLog } from "./run-log.ts";
@@ -62,6 +63,8 @@ export interface UpgradeRunnerOptions {
     release: string | null;
     steps: readonly ManifestStep[];
     prismaFolders?: readonly string[];
+    /** Every goose file the image ships, to name the files behind a duplicated step id. */
+    gooseFiles?: readonly string[];
   };
   releases: { manifests: readonly ReleaseManifest[] };
   applier: UpgradeSchemaApplier;
@@ -590,6 +593,11 @@ export class UpgradeRunnerService {
     phases: RunPhases;
   }): Promise<Record<string, unknown>> {
     await phases.start({ name: "preflight" });
+    const duplicates = duplicateSteps({
+      steps: this.shipped,
+      gooseFiles: this.options.image.gooseFiles ?? [],
+    });
+    if (duplicates.length > 0) throw duplicateStepFailure({ duplicates });
     this.resolved = [];
     this.held = new Map();
     const retried = [...this.permit.retried].map((name) => `prisma:${name}`);
