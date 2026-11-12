@@ -364,6 +364,7 @@ export interface LwqlClickHouseRows {
     readonly _size_bytes: "UInt32";
     readonly ExpectedTargetResults: "Nullable(UInt32)";
     readonly ExpectedEvaluatorResults: "Nullable(UInt32)";
+    readonly Concurrency: "Nullable(UInt16)";
   };
   readonly gateway_budget_ledger_events: {
     readonly TenantId: "String";
@@ -1076,6 +1077,15 @@ export interface LwqlClickHouseRows {
     readonly LastEventOccurredAt: "UInt64";
     readonly AppliedEventIds: "Array(String)";
     readonly EarliestSpanStartMs: "UInt64";
+    readonly MetadataOutputAction: "String";
+    readonly MetadataOutcome: "String";
+    readonly MetadataSentToReview: "String";
+    readonly MetadataDocumentType: "String";
+    readonly MetadataFlow: "String";
+    readonly MetadataLanguage: "String";
+    readonly MetadataSegment: "String";
+    readonly MetadataTeam: "String";
+    readonly MetadataTopic: "String";
   };
   readonly trace_analytics_rollup: {
     readonly TenantId: "String";

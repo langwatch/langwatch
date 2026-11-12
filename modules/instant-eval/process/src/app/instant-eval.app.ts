@@ -28,6 +28,7 @@ import {
   isInstantEvalBounded,
 } from "@langwatch/instant-eval-contract";
 import {
+  INSTANT_EVALS_HOSTED_DISABLED_FLAG,
   type InstantEvalClassifierLimits,
   type InstantEvalJudgement,
   type InstantEvalQuestion,
@@ -70,7 +71,10 @@ import {
   toInstantEvalJudgmentWire,
   toInstantEvalRunWire,
 } from "../rules/instant-eval-wire.rules.ts";
-import { InstantEvalAccessService } from "../services/instant-eval-access.service.ts";
+import {
+  InstantEvalAccessService,
+  type InstantEvalHostedSwitchReader,
+} from "../services/instant-eval-access.service.ts";
 import { InstantEvalCancelService } from "../services/instant-eval-cancel.service.ts";
 import { InstantEvalClassifySearchService } from "../services/instant-eval-classify-search.service.ts";
 import { InstantEvalClassifyService } from "../services/instant-eval-classify.service.ts";
@@ -85,6 +89,7 @@ import {
 } from "../services/instant-eval-estimate.service.ts";
 import { InstantEvalFinishService } from "../services/instant-eval-finish.service.ts";
 import { InstantEvalFreeBudgetService } from "../services/instant-eval-free-budget.service.ts";
+import { InstantEvalHostedSwitchJudgeService } from "../services/instant-eval-hosted-switch-judge.service.ts";
 import { InstantEvalJudgeChoiceService } from "../services/instant-eval-judge-choice.service.ts";
 import { InstantEvalJudgePageService } from "../services/instant-eval-judge-page.service.ts";
 import { InstantEvalJudgeRowsService } from "../services/instant-eval-judge-rows.service.ts";
@@ -202,7 +207,14 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
   static async create(setup: InstantEvalSetup): Promise<InstantEvalModule> {
     const repositories = setup.repositories;
     // A project on its own decision model judges through the leaf with its key (ADR-182).
-    const hosted = InstantEvalModule.judgeOf(setup);
+    const hostedSwitch = InstantEvalModule.hostedSwitchOf(setup);
+    const hosted = InstantEvalHostedSwitchJudgeService.create({
+      hosted: InstantEvalModule.judgeOf(setup),
+      peers: {
+        findOrganizationId: (projectId) => setup.channels.projects.findOrganizationId(projectId),
+        isHostedOff: (input) => hostedSwitch.isHostedOff(input),
+      },
+    });
     const judge = InstantEvalDecisionModelJudgeService.create({
       hosted,
       own: setup.channels.judges,
@@ -235,8 +247,9 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
           (await setup.dependencies.modelProviders.resolveDecisionModel({ projectId })).kind ===
           "own",
       },
+      hostedSwitch,
     });
-    const optIns = InstantEvalModule.optInsOf({ setup, access });
+    const optIns = InstantEvalModule.optInsOf({ setup, access, hostedSwitch });
     const reads = InstantEvalReadsService.create({
       runs: repositories.runs,
       judgments: repositories.judgments,
@@ -327,7 +340,8 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
       access,
       optIns,
       classifications,
-      // The search bar stays on LangWatch's classifier whatever the column says (ADR-182).
+      // The search bar stays on LangWatch's classifier whatever the column says (ADR-182); where
+      // LangWatch switched hosted off, that classifier skips and the sentence is not routed.
       searchClassifications: InstantEvalClassifySearchService.create({
         classifications: InstantEvalClassifyService.create({ judge: hosted }),
         peers: {
@@ -406,13 +420,28 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
       isEnterpriseTier((await plans.getActivePlan({ organizationId })).type);
   }
 
+  /** LangWatch's own switch for its hosted model, read for the project within its organization. */
+  private static hostedSwitchOf(setup: InstantEvalSetup): InstantEvalHostedSwitchReader {
+    const { featureFlags } = setup.dependencies;
+    return {
+      isHostedOff: ({ projectId, organizationId }) =>
+        featureFlags.isEnabled(INSTANT_EVALS_HOSTED_DISABLED_FLAG, {
+          kind: "project",
+          projectId,
+          organizationId,
+        }),
+    };
+  }
+
   /** The offer and the switch, each peer narrowed to the one question it answers. */
   private static optInsOf({
     setup,
     access,
+    hostedSwitch,
   }: {
     setup: InstantEvalSetup;
     access: InstantEvalAccessService;
+    hostedSwitch: InstantEvalHostedSwitchReader;
   }): InstantEvalOptInService {
     const { organizations, authz } = setup.dependencies;
     const { projects, licensing } = setup.channels;
@@ -440,6 +469,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
           }),
         isReleased: (input) => access.isReleased(input),
         isHostedReleased: (input) => access.isHostedReleased(input),
+        isHostedOff: (input) => hostedSwitch.isHostedOff(input),
         recordOptIn: (input) => organizations.recordInstantEvalsOptIn(input),
       },
     });

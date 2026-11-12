@@ -177,6 +177,17 @@ model Session {
   @@index([identifierId])
 }
 
+/// One row per erased account, holding only its creation time: no id, name or address. It keeps
+/// the install's first-created account knowable after an erasure deletes that row.
+/// Spec: modules/user/specs/user.feature
+model UserErasure {
+  id               String   @id @default(nanoid())
+  accountCreatedAt DateTime
+  erasedAt         DateTime @default(now())
+
+  @@index([accountCreatedAt])
+}
+
 model User {
   id                            String                   @id @default(nanoid())
   name                          String?
@@ -1893,6 +1904,65 @@ model ScimSsoConnectionView {
   updatedAt         DateTime
 
   @@index([organizationId, createdAt])
+}
+
+/// Organization's monthly seat peak, folded from its seat changes (modules/organization, ADR-002).
+/// A read model, one row per organization: rebuildable by replaying the event log, so no relation.
+/// Epochs in milliseconds.
+/// Organization's seat-peak counts (ADR-002): one row per organization once counting opened.
+model OrganizationSeatPeak {
+  /// The organization, which is also the aggregate id.
+  organizationId String @id
+  /// When the opening snapshot was taken, epoch milliseconds.
+  openedAt       Float
+  fullSeats      Int
+  liteSeats      Int
+  developerSeats Int
+  /// The latest change time applied to any holder; invitations expire up to it.
+  latestChangeAt Float
+  /// Changes whose `from` disagreed with the seat the fold held.
+  mismatches     Int
+}
+
+/// One member's or pending invitation's seat as the seat peak last applied it (ADR-002).
+model OrganizationSeatPeakHolder {
+  organizationId String
+  /// `member`, `invitation` or `hold` (a seat held after somebody left).
+  holderKind     String
+  /// The member's or the hold's userId, or the invitation's id.
+  holderId       String
+  /// `full`, `lite`, `developer` or `none`.
+  seat           String
+  lastChangedAt  Float
+  /// Absent for a seat the opening snapshot recorded.
+  lastChangeId   String?
+  /// An invitation's expiry; null for a member or an invitation that never expires.
+  expiresAt      Float?
+  /// The fold gave the invitation's seat back at `expiresAt`.
+  expiredByFold  Boolean @default(false)
+  /// A hold whose seat a live full invitation to its address took: that invitation's id.
+  suppressedBy   String?
+  /// The fold gave a suppressed hold its seat back when that invitation expired.
+  restoredByFold Boolean @default(false)
+
+  @@id([organizationId, holderKind, holderId])
+  @@index([organizationId, holderKind, seat, expiresAt])
+  @@index([organizationId, suppressedBy])
+}
+
+/// One calendar month's (UTC) seat peaks for an organization (ADR-002).
+model OrganizationSeatPeakMonth {
+  organizationId String
+  /// `YYYY-MM`.
+  month          String
+  fullPeak       Int
+  fullPeakAt     Float
+  litePeak       Int
+  litePeakAt     Float
+  fullAtEnd      Int
+  liteAtEnd      Int
+
+  @@id([organizationId, month])
 }
 
 enum PlanTypes {
@@ -4647,6 +4717,8 @@ model Subscription {
   maxWorkflows          Int?
   maxRetentionDays      Int?
   maxMembersLite        Int?
+  /// Developer seats the organization pays for; null falls to the plan's own cap.
+  maxMembersDeveloper   Int?
   maxTeams              Int?
   maxPrompts            Int?
   maxEvaluators         Int?
@@ -4843,7 +4915,7 @@ model Grant {
   // lets a projection reloaded from these rows reconstruct the fact rather
   // than a lossy copy. Null on everything ledger-born; retired at cutover.
   legacyRole String? // ADMIN | MEMBER | VIEWER | CUSTOM
-  source     String // which writer emitted the fact: grants-service | scim | invite | join-request | read-through-mint | migration | aggregate-reconciler (the vocabulary is GRANT_EVENT_SOURCES in @langwatch/authz-process; ADR-110 folded backfill-b, genesis-import and cutover-import into `migration`)
+  source     String // which writer emitted the fact: grants-service | scim | invite | join-request | read-through-mint | migration | aggregate-reconciler | braid (the vocabulary is GRANT_EVENT_SOURCES in @langwatch/authz-process; ADR-110 folded backfill-b, genesis-import and cutover-import into `migration`)
 
   scopeType GrantScopeType
   scopeId   String
@@ -4870,9 +4942,15 @@ model Grant {
 
   // ADR-177 / ADR-166: what a SHARED grant lets its principal reach. Null on
   // every own grant. Shape: { type: "trace" | "span" | "log", where?: OTTL
-  // (empty in v1), from?: ISO date, until?: ISO date }. Owned by the fold
+  // (a braid's span condition alone), compiledWhere?: its compiled form, from?: ISO date,
+  // until?: ISO date }. Owned by the fold
   // like every other fact column; the proof minted at the door copies it.
   condition Json?
+
+  // ADR-185 §2: on a braid change's attach, the braid it replaces. Null on every other grant and
+  // on braids attached before the column; the fold writes it from the attach event, so a replay
+  // rebuilds it.
+  replacesGrantId String?
 
   occurredAt DateTime // business time of the fact (backfills carry the legacy row's createdAt)
   createdAt  DateTime @default(now())
@@ -5074,11 +5152,44 @@ model ProjectActiveDay {
 }
 
 /// Nurturing's read model: which organization a project belongs to, from project's created event.
+/// The per-email usage places a project and lists an organization's projects from these rows only.
 model NurturingProject {
   projectId      String @id
   organizationId String
 
   @@index([organizationId])
+}
+
+/// A project nurturing saw traces of with no placement copy, and when it first did: every worker
+/// retries its trace batches only within one window from then, across restarts. Deleted when the
+/// copy lands.
+model NurturingUncopiedProject {
+  projectId   String   @id
+  firstSeenAt DateTime @default(now())
+}
+
+/// Nurturing's own copy of each organization's members, from the owners' member facts (§9):
+/// organization's signed_up and invite_accepted and auth's sso_auto_added join, member_removed
+/// and member_disabled leave, member_enabled returns. Each column keeps its latest time.
+model NurturingOrganizationMember {
+  organizationId String
+  userId         String
+  joinedAt       DateTime?
+  leftAt         DateTime?
+  returnedAt     DateTime?
+
+  @@id([organizationId, userId])
+  @@index([userId])
+}
+
+/// When an organization was created, from organization's created event: nurturing's own copy for
+/// the per-email usage's day offsets. Its own table, so an early creation never adds an unseeded
+/// NurturingOrganization row.
+model NurturingOrganizationCreated {
+  organizationId String   @id
+  createdAt      DateTime
+
+  @@index([createdAt])
 }
 
 /// Nurturing's read model per organization: its admin and its milestone counts.
@@ -5102,6 +5213,60 @@ model NurturingOrganization {
   codingFirstDays      Int[]     @default([])
   lastTraceAt          DateTime? // moves forward only; told to a person joining later
   updatedAt            DateTime  @updatedAt
+}
+
+/// Nurturing's own per-project usage: a peer fold over the owners' prompt, evaluator, scenario
+/// and simulation-run events (ARCHITECTURE §9), one peer fold per owner pipeline, summed per
+/// organization for the per-email traits. Traces are counted in NurturingProjectTraceDay.
+model NurturingProjectUsageView {
+  projectId         String
+  /// The owner pipeline whose peer fold wrote the row (prompt, evaluator, scenario, simulation),
+  /// or `evaluation`: the project's evaluation days, written by a subscriber, at most once a day.
+  owner             String
+  /// The project's usage as the fold folded it (NurturingProjectUsageState).
+  folded            Json
+  /// The event ids of the last delivery folded in, so a redelivery folds once.
+  appliedEventIds   String[] @default([])
+  /// A row of another version reads as undecodable and is re-folded from the log.
+  projectionVersion String
+  /// Event-derived, so a replayed row equals the row it rebuilds.
+  updatedAt         DateTime
+
+  @@id([projectId, owner])
+}
+
+/// Nurturing's own trace counts from trace's span_received and trace_failed (ARCHITECTURE §9), a
+/// root span being one trace, one row per project and UTC day of append time, incremented in place
+/// by each batch. A redelivered batch can count a trace twice; accepted (issue 9378). Kept 30 days.
+model NurturingProjectTraceDay {
+  projectId         String
+  /// UTC `YYYY-MM-DD` of the root spans' append time.
+  day               String
+  traceCount        Int       @default(0)
+  /// Traces trace recorded failed (lw.trace.trace_failed).
+  errorCount        Int       @default(0)
+  /// Append time of the newest root span.
+  lastTraceAt       DateTime?
+  /// Append time of the newest trace_failed.
+  lastFailedTraceAt DateTime?
+
+  @@id([projectId, day])
+}
+
+/// Nurturing's copy of each personal project's owner, from organization's and project's facts.
+/// The first owner recorded stays: a personal project's owner never changes.
+model NurturingPersonalProject {
+  projectId      String @id
+  organizationId String
+  ownerUserId    String
+}
+
+/// Nurturing's copy of each project that received a real trace, from trace's and project's facts.
+model NurturingTracedProject {
+  projectId      String @id
+  organizationId String
+
+  @@index([organizationId])
 }
 
 model BillingMeterCheckpoint {

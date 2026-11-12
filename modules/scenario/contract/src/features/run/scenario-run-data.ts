@@ -14,7 +14,7 @@ import type {
   scenarioToolCallStartSchema,
 } from "../../schemas/index.ts";
 import type { SimulationRunData } from "../simulation/simulation.ts";
-import type { RunActor } from "./run-actor.ts";
+import type { RecordedRunActor } from "./run-actor.ts";
 import type { ScenarioRunStatus } from "./scenario-run.ts";
 
 // Type exports
@@ -80,7 +80,7 @@ export type BatchSummary = {
    * note is.
    * @see specs/scenarios/run-actor-on-runs.feature
    */
-  startedBy: RunActor | null;
+  startedBy: RecordedRunActor | null;
 };
 
 /**

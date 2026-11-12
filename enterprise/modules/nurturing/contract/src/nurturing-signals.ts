@@ -410,6 +410,12 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     userId: id,
     page: id,
   }),
+  z.object({
+    /** Langy completed an answer in a conversation the person owns; set once per person. */
+    kind: z.literal("langy_first_message_seen"),
+    ...signalSource,
+    userId: id,
+  }),
 ]);
 export interface NurturingSignalSchema extends Named<typeof nurturingSignalSchemaDefinition> {}
 export const nurturingSignalSchema: NurturingSignalSchema = nurturingSignalSchemaDefinition;

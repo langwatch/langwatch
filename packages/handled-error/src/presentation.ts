@@ -661,6 +661,11 @@ const presentations = {
     describe: () =>
       "This project doesn't have the SQL workbench enabled yet. Ask your administrator to switch it on.",
   },
+  lwql_not_provisioned: {
+    title: "Custom SQL isn't set up where this data lives",
+    describe: () =>
+      "Custom SQL isn't set up yet on the server that holds this organisation's data. Ask your workspace administrator, or contact support.",
+  },
   saved_workbench_chart_already_exists: {
     title: "That chart id is already taken",
     describe: () =>
@@ -1637,6 +1642,13 @@ const presentations = {
     describe: () =>
       "No default model is set yet. Open Settings, then Default Models, and pick one for your organization.",
   },
+  model_execution_unavailable: {
+    // A codex model reached a process with no gateway road to run it; no retry
+    // changes that, so the copy points at picking a model from another provider.
+    title: "This model can't run this feature yet",
+    describe: () =>
+      "Codex models can't run this feature on this deployment yet. Pick a model from another provider for it in Default Models.",
+  },
   model_restricted_for_execution: {
     // The same licence as `model_restricted_for_feature`, hit at the other
     // end: a codex model arriving at a surface it cannot run on, which is
@@ -1703,6 +1715,15 @@ const presentations = {
     describe: () =>
       "The provider didn't recognise it. Check you copied the whole key, and that it belongs to the right account.",
   },
+  provider_deployment_not_found: {
+    // The key and endpoint are fine; only the deployment name is wrong, so the
+    // copy names it rather than sending the customer to mint a new key.
+    title: "That deployment wasn't found",
+    describe: (error) =>
+      typeof error.meta.deployment === "string" && error.meta.deployment
+        ? `The key and endpoint work, but there is no deployment named "${error.meta.deployment}". Pick the model you deployed, or type the deployment name exactly as it appears in Azure.`
+        : "The key and endpoint work, but the deployment wasn't found. Type the deployment name exactly as it appears in Azure.",
+  },
   provider_endpoint_redirected: {
     // Not "we couldn't reach it" — something answered, and it wants us
     // somewhere else. Saying so is the difference between the customer
@@ -1755,9 +1776,14 @@ const presentations = {
     // fault: provider. It answered and said no, but not in terms we can map —
     // a 429 or a 503 is theirs to fix, so the copy must not send the customer
     // hunting through their own key settings.
+    // A 404 is the one refusal that never clears on a retry: the address is wrong.
     title: "The provider refused the check",
-    describe: () =>
-      "It answered, but wouldn't confirm the key. This is usually temporary — try again in a moment.",
+    titleFor: (error) =>
+      error.meta.status === 404 ? "Nothing answers at that address" : undefined,
+    describe: (error) =>
+      error.meta.status === 404
+        ? "The provider answered 404, so the key was not checked. Check the endpoint is the base URL of your resource, with no path after it."
+        : "It answered, but wouldn't confirm the key. This is usually temporary — try again in a moment.",
   },
   provider_service_disabled: {
     // The single most useful thing this whole flow says: the key is fine, the
@@ -3721,10 +3747,19 @@ const presentations = {
   },
   instant_eval_opt_in_not_offered: {
     title: "Ask us to switch Instant Evals on",
-    describe: (error) =>
-      error.meta.deployment === "self_hosted"
+    // Hosted off is not something to ask for: the organization's own decision model is the way.
+    titleFor: (error) =>
+      error.meta.deployment === "hosted_off"
+        ? "LangWatch's hosted model is off for this organization"
+        : undefined,
+    describe: (error) => {
+      if (error.meta.deployment === "hosted_off") {
+        return "Run Instant Evals on your own decision model: pick one in the Instant Evals column of Default models.";
+      }
+      return error.meta.deployment === "self_hosted"
         ? "A self-hosted install gets Instant Evals from its license, or from whoever runs it when it has its own judge key, never from this switch. Contact us to add them to your license."
-        : "LangWatch switches Instant Evals on for an enterprise plan. Contact us to get them.",
+        : "LangWatch switches Instant Evals on for an enterprise plan. Contact us to get them.";
+    },
   },
   instant_eval_query_budget_exceeded: {
     title: "That's too much text to judge in one query",

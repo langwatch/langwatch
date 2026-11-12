@@ -97,11 +97,14 @@ export class DeveloperSeatService {
           change,
         })
       : null;
-    const amountDueCents = preview ? quotedAmounts(preview).prorationCents : 0;
+    const { prorationCents: amountDueCents, taxCents } = preview
+      ? quotedAmounts(preview)
+      : { prorationCents: 0, taxCents: 0 };
     const format = formatterFor(line.currency);
     return {
       amountDueCents,
       formattedAmountDue: format(amountDueCents),
+      taxCents,
       formattedRecurringTotal: format(quantity * unitAmountCents),
       billingInterval: line.interval === "annual" ? "year" : "month",
       quotedAt: prorationDate,

@@ -9,7 +9,7 @@ import {
 import {
   AGENT_TEST_SET_SUFFIX,
   RUN_ACTOR_LABELS,
-  type RunActor,
+  type RecordedRunActor,
   VOICE_CALL_SCENARIO_SET_ID,
   SimulationRunStatus,
   type SimulationBatchHistory,
@@ -204,7 +204,7 @@ function groupRunsByBatch(runs: SimulationRunData[]): Map<string, SimulationRunD
 function deriveRunActor(params: {
   id: string | null | undefined;
   label: string | null | undefined;
-}): RunActor | null {
+}): RecordedRunActor | null {
   if (!params.id) return null;
   const label = RUN_ACTOR_LABELS.find((known) => known === params.label);
   return label ? { id: params.id, label } : null;

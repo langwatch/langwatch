@@ -11,7 +11,7 @@ import type { TenantRoute } from "@langwatch/clickhouse-client";
 import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
 
-import { TEST_RUN_TELEMETRY } from "../../app/__tests__/analytics.fixture.ts";
+import { ADMIT_EVERY_PLACEMENT, TEST_RUN_TELEMETRY } from "../../app/__tests__/analytics.fixture.ts";
 import { RoutedLangWatchQLExecutorRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-routed-executor.repository.ts";
 import {
   type LangWatchQLConnection,
@@ -109,6 +109,7 @@ function run({
   });
   const service = LangWatchQLService.create({
     runTelemetry: TEST_RUN_TELEMETRY,
+    placement: ADMIT_EVERY_PLACEMENT,
     executor: routed,
     database: SHARED.database,
   });
@@ -397,6 +398,7 @@ describe("given a statement saved without a run", () => {
 describe("given a deployment with no LangWatchQL identity", () => {
   const bare = LangWatchQLService.create({
     runTelemetry: TEST_RUN_TELEMETRY,
+    placement: ADMIT_EVERY_PLACEMENT,
     executor: null,
     database: SHARED.database,
   });
@@ -465,6 +467,7 @@ describe("given a run validated at its start", () => {
     });
     const service = LangWatchQLService.create({
       runTelemetry: TEST_RUN_TELEMETRY,
+      placement: ADMIT_EVERY_PLACEMENT,
       executor: routed,
       database: SHARED.database,
     });

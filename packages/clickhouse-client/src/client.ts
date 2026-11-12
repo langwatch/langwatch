@@ -29,7 +29,7 @@ import type { RetryPolicy } from "./retry.ts";
 import type { StatementOperation, StatementReporter } from "./statementReporting.ts";
 import { ID_BOUND_PARAM_PREFIX, StatementScopeError } from "./statementScopeError.ts";
 import { extractQueryType, extractTableName } from "./statementShape.ts";
-import type { PrivateRouteVariable, TenantRoute } from "./tenancy.ts";
+import type { ClickHouseTenantPlacement, PrivateRouteVariable, TenantRoute } from "./tenancy.ts";
 import type { TenantGuard } from "./tenantGuard.ts";
 import type { QueryTracer } from "./tracing.ts";
 
@@ -54,6 +54,8 @@ export interface ClickHouseQueryClientOptions {
   organizationOf?: ((tenantId: string) => Promise<string>) | undefined;
   /** Where a declared tenant set is answered, refusing as the connection does; shared if absent. */
   routeTenantSet?: TenantSetRouting | undefined;
+  /** The router's recorded placement and resolved server per tenant; none without a connection. */
+  placementOf?: ((tenantId: string) => Promise<ClickHouseTenantPlacement>) | undefined;
   /** Builds the handled refusal for a read whose server stopped answering; raw by default. */
   unavailableErrorFactory?: ClickHouseUnavailableErrorFactory | undefined;
   /** Builds the handled refusal for a read the server refused as overloaded; raw by default. */
@@ -116,6 +118,9 @@ export class ClickHouseQueryClient {
   private readonly routeVariables: readonly PrivateRouteVariable[];
   private readonly organizationOf: ((tenantId: string) => Promise<string>) | undefined;
   private readonly routeTenantSet: TenantSetRouting | undefined;
+  private readonly placement:
+    | ((tenantId: string) => Promise<ClickHouseTenantPlacement>)
+    | undefined;
   private readonly columnLists = new Map<string, ClickHouseColumns>();
   private readonly unavailable: ClickHouseUnavailableErrorFactory | undefined;
   private readonly overloaded: ClickHouseOverloadErrorFactory | undefined;
@@ -135,6 +140,7 @@ export class ClickHouseQueryClient {
     overloadErrorFactory,
     organizationOf,
     routeTenantSet,
+    placementOf,
     insertCoalesceMaxRows,
   }: ClickHouseQueryClientOptions) {
     this.driver = driver;
@@ -149,6 +155,7 @@ export class ClickHouseQueryClient {
     this.overloaded = overloadErrorFactory;
     this.organizationOf = organizationOf;
     this.routeTenantSet = routeTenantSet;
+    this.placement = placementOf;
     this.idIndexRegistry = new IdIndexRegistry(this);
     this.coalescer =
       limiter === undefined
@@ -187,6 +194,14 @@ export class ClickHouseQueryClient {
     }
     const organizationId = await this.organizationOf(tenantId);
     return this.routes.has(organizationId) ? organizationId : SHARED_CLICKHOUSE_TARGET;
+  }
+
+  /** The router's whole decision for a tenant, for a gate that refuses where its parts disagree. */
+  async placementOf({ tenantId }: { tenantId: string }): Promise<ClickHouseTenantPlacement> {
+    if (this.placement === undefined) {
+      throw new Error("A client built without its connection cannot name a tenant's placement.");
+    }
+    return this.placement(tenantId);
   }
 
   /**

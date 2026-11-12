@@ -152,9 +152,8 @@ describe("the shared provider form in its guided presentation", () => {
   });
 
   describe("when a provider without a model list is selected", () => {
-    /** @scenario "Azure, Bedrock and Custom take credentials and a typed model name" */
+    /** @scenario "Bedrock and Custom take credentials and a typed model name" */
     it.each([
-      ["azure", "Azure"],
       ["bedrock", "Bedrock"],
       ["custom", "Custom"],
     ] as const)("hints %s's model is typed", (key, name) => {
@@ -169,19 +168,184 @@ describe("the shared provider form in its guided presentation", () => {
       expect(screen.queryByRole("group", { name: "Default chat model" })).toBeNull();
     });
 
-    /** @scenario "Azure, Bedrock and Custom take credentials and a typed model name" */
-    it("connects Azure with the typed deployment as the chat model", async () => {
-      const { onSaved } = renderGuided("azure");
+    /** @scenario "Bedrock and Custom take credentials and a typed model name" */
+    it("connects Bedrock with the typed model id as the chat model", async () => {
+      const { onSaved } = renderGuided("bedrock");
       const user = userEvent.setup();
 
+      await user.type(screen.getByLabelText("Access key ID"), "AKIA-acme");
+      await user.type(screen.getByLabelText("Secret access key"), "secret");
+      await user.type(screen.getByLabelText("Region"), "us-east-1");
+      expect(screen.getByRole("button", { name: "Connect" })).toBeDisabled();
+      await user.type(screen.getByLabelText("Chat model"), "acme.model-v1");
+      await user.click(screen.getByRole("button", { name: "Connect" }));
+
+      await screen.findByRole("button", { name: "Connected" });
+      await waitFor(() => expect(onSaved).toHaveBeenCalledWith({ chatModel: "acme.model-v1" }));
+      expect(updateProvider).toHaveBeenCalledWith(
+        expect.objectContaining({
+          customModels: [expect.objectContaining({ modelId: "acme.model-v1" })],
+        }),
+      );
+    });
+  });
+
+  describe("when Azure is selected", () => {
+    const [recommended, other] = findRecommendedChatModels({ provider: "openai", limit: 4 });
+    let user: ReturnType<typeof userEvent.setup>;
+    let onSaved: ReturnType<typeof vi.fn>;
+
+    beforeEach(async () => {
+      ({ onSaved } = renderGuided("azure"));
+      user = userEvent.setup();
       await user.type(screen.getByLabelText("Endpoint"), "https://acme.openai.azure.com");
       await user.type(screen.getByLabelText("API key"), "azure-key");
-      expect(screen.getByRole("button", { name: "Connect" })).toBeDisabled();
-      await user.type(screen.getByLabelText("Chat model"), "acme-gpt");
+    });
+
+    /** @scenario "Azure offers OpenAI's chat models and an optional deployment name" */
+    it("offers OpenAI's chat models with the recommendation picked, and a deployment name", () => {
+      const group = screen.getByRole("group", { name: "Default chat model" });
+      const pills = within(group).getAllByRole("button");
+
+      expect(pills).toHaveLength(4);
+      expect(pills[0]).toHaveTextContent(`${recommended}recommended`);
+      expect(pills[0]).toHaveAttribute("aria-pressed", "true");
+      expect(screen.getByLabelText("Deployment name")).toHaveValue("");
+      expect(
+        screen.getByText(
+          "Pick the model you deployed. If your deployment has a different name, type it instead.",
+        ),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Connect" })).toBeEnabled();
+    });
+
+    /** @scenario "Azure connects with the picked model as the deployment" */
+    it("checks and saves the picked model as the deployment and Langy's model", async () => {
+      if (!other) throw new Error("OpenAI offers fewer than two chat models");
+      await user.click(screen.getByRole("button", { name: other }));
+      await user.click(screen.getByRole("button", { name: "Connect" }));
+
+      await screen.findByRole("button", { name: "Connected" });
+      await waitFor(() => expect(onSaved).toHaveBeenCalledWith({ chatModel: other }));
+      expect(validateApiKey).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: "azure", model: other }),
+      );
+      expect(updateProvider).toHaveBeenCalledWith(
+        expect.objectContaining({ customModels: [expect.objectContaining({ modelId: other })] }),
+      );
+      expect(assignRole).toHaveBeenCalledWith(expect.objectContaining({ model: `azure/${other}` }));
+    });
+
+    /** @scenario "A typed Azure deployment name wins over the picked model" */
+    it("uses a typed deployment name instead of the pill", async () => {
+      await user.type(screen.getByLabelText("Deployment name"), "acme-gpt");
+
+      const group = screen.getByRole("group", { name: "Default chat model" });
+      for (const pill of within(group).getAllByRole("button")) {
+        expect(pill).toHaveAttribute("aria-pressed", "false");
+      }
       await user.click(screen.getByRole("button", { name: "Connect" }));
 
       await screen.findByRole("button", { name: "Connected" });
       await waitFor(() => expect(onSaved).toHaveBeenCalledWith({ chatModel: "acme-gpt" }));
+      expect(validateApiKey).toHaveBeenCalledWith(expect.objectContaining({ model: "acme-gpt" }));
+      expect(assignRole).toHaveBeenCalledWith(expect.objectContaining({ model: "azure/acme-gpt" }));
+    });
+  });
+
+  describe("when an Azure row is already stored with its own models", () => {
+    /** @scenario "Connecting a stored Azure row keeps its own models" */
+    it("keeps the stored models and adds only the final pick", async () => {
+      const [recommended, other] = findRecommendedChatModels({ provider: "openai", limit: 4 });
+      if (!recommended || !other) throw new Error("OpenAI offers fewer than two chat models");
+      listing.rows = [
+        {
+          ...keyedRow({
+            providerKey: "azure",
+            apiKey: "AZURE_OPENAI_API_KEY",
+            baseUrl: "AZURE_OPENAI_ENDPOINT",
+            storedBaseUrl: "https://acme.openai.azure.com",
+          }),
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }],
+          customModels: [{ modelId: "acme-older", displayName: "acme-older", mode: "chat" }],
+        },
+      ];
+      renderGuided("azure");
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: other }));
+      await user.click(screen.getByRole("button", { name: "Connect" }));
+
+      await screen.findByRole("button", { name: "Connected" });
+      const saved = updateProvider.mock.calls.at(-1)?.[0] as {
+        customModels: { modelId: string }[];
+      };
+      expect(saved.customModels.map((entry) => entry.modelId)).toEqual(["acme-older", other]);
+    });
+
+    /** @scenario "A stored Azure deployment mapping names the deployment checked" */
+    it.each([
+      ["bare", (model: string) => model],
+      ["provider-prefixed", (model: string) => `azure/${model}`],
+    ])("checks the deployment a %s mapping key names", async (_shape, keyFor) => {
+      const [recommended] = findRecommendedChatModels({ provider: "openai", limit: 1 });
+      if (!recommended) throw new Error("OpenAI offers no chat models");
+      listing.rows = [
+        {
+          ...keyedRow({
+            providerKey: "azure",
+            apiKey: "AZURE_OPENAI_API_KEY",
+            baseUrl: "AZURE_OPENAI_ENDPOINT",
+            storedBaseUrl: "https://acme.openai.azure.com",
+          }),
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }],
+          deploymentMapping: { [keyFor(recommended)]: "acme-prod" },
+        },
+      ];
+      renderGuided("azure");
+      const user = userEvent.setup();
+      await user.type(screen.getByLabelText(/API key/i), "acme-new-key");
+      await user.click(screen.getByRole("button", { name: "Connect" }));
+
+      await screen.findByRole("button", { name: "Connected" });
+      expect(validateApiKey).toHaveBeenCalledWith(expect.objectContaining({ model: "acme-prod" }));
+    });
+  });
+
+  describe("when Azure has no deployment by the typed name", () => {
+    const refusal = {
+      code: "provider_deployment_not_found",
+      kind: "provider_deployment_not_found",
+      retryable: false,
+      meta: { provider: "azure", deployment: "acme-typo" },
+      httpStatus: 400,
+      fault: "customer" as const,
+      reasons: [],
+    };
+
+    /** @scenario "A missing Azure deployment is named and checked again once corrected" */
+    it("names the deployment, saves nothing, and checks a corrected name again", async () => {
+      validateApiKey.mockResolvedValueOnce({ valid: false, domainError: refusal });
+      renderGuided("azure");
+      const user = userEvent.setup();
+      await user.type(screen.getByLabelText("Endpoint"), "https://acme.openai.azure.com");
+      await user.type(screen.getByLabelText("API key"), "azure-key");
+      await user.type(screen.getByLabelText("Deployment name"), "acme-typo");
+      await user.click(screen.getByRole("button", { name: "Connect" }));
+
+      expect(await screen.findByText(/no deployment named "acme-typo"/)).toBeInTheDocument();
+      // The copy says the endpoint works, so the endpoint must not be the field marked wrong.
+      expect(screen.getByLabelText("Deployment name")).toHaveAttribute("aria-invalid", "true");
+      expect(screen.getByLabelText("Endpoint")).not.toHaveAttribute("aria-invalid");
+      expect(updateProvider).not.toHaveBeenCalled();
+
+      await user.clear(screen.getByLabelText("Deployment name"));
+      await user.type(screen.getByLabelText("Deployment name"), "acme-gpt");
+      await user.click(screen.getByRole("button", { name: "Connect" }));
+
+      await screen.findByRole("button", { name: "Connected" });
+      expect(validateApiKey).toHaveBeenLastCalledWith(
+        expect.objectContaining({ model: "acme-gpt" }),
+      );
     });
   });
 

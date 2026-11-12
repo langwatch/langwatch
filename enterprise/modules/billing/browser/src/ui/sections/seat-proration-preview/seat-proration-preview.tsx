@@ -7,8 +7,10 @@ import { Crown } from "lucide-react";
 import { useState } from "react";
 
 import { billingApi } from "../../../behavior/billing-api.ts";
+import { EXCLUDING_VAT } from "../../../model/billing-plans.ts";
 import {
   billingDay,
+  quoteVatSplit,
   type SeatQuote as ProrationQuote,
   seatQuoteOf as quoteOf,
 } from "../../../model/seat-change-summary.ts";
@@ -22,6 +24,7 @@ function PreviewBody({
   currentSeats: number;
   newSeats: number;
 }) {
+  const vatSplit = quote && quoteVatSplit(quote);
   return (
     <VStack gap={6} align="stretch" paddingY={2}>
       <HStack justify="space-between" paddingX={2}>
@@ -53,13 +56,20 @@ function PreviewBody({
           {/* Confirming charges this immediately, so it is the headline number
               rather than a footnote — the recurring total below is what the
               plan costs from the next invoice onwards. */}
-          <HStack justify="space-between" paddingX={2}>
+          <HStack justify="space-between" align="start" paddingX={2}>
             <Text fontWeight="semibold" fontSize="md">
               Due today
             </Text>
-            <Text fontWeight="semibold" fontSize="md">
-              {quote.formattedAmountDue}
-            </Text>
+            <VStack align="end" gap={0.5}>
+              <Text fontWeight="semibold" fontSize="md">
+                {quote.formattedAmountDue}
+              </Text>
+              {vatSplit && (
+                <Text fontSize="sm" color="fg.muted" data-testid="proration-vat-split">
+                  {vatSplit}
+                </Text>
+              )}
+            </VStack>
           </HStack>
 
           {/* Why "Due today" is smaller than the change itself. Without this
@@ -85,6 +95,9 @@ function PreviewBody({
             <Text fontWeight="normal" fontSize="md" color="fg.muted">
               {quote.formattedRecurringTotal}
               {formatBillingPeriod(quote.billingInterval)}
+              <Text as="span" fontSize="sm">
+                {` ${EXCLUDING_VAT}`}
+              </Text>
             </Text>
           </HStack>
         </VStack>

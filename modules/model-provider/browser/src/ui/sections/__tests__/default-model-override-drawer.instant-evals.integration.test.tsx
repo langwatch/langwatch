@@ -14,6 +14,7 @@ import { renderWithModelProviderHost } from "../../../testing.tsx";
 import { DefaultModelOverrideDrawer } from "../default-model-override-drawer.tsx";
 import "@testing-library/jest-dom/vitest";
 
+const mockInstantEvalAccess = vi.fn();
 const mockGetDefaultModels = vi.fn();
 const mockGetInheritedValues = vi.fn();
 const mockListAllForProjectForFrontend = vi.fn();
@@ -51,6 +52,7 @@ vi.mock("@langwatch/design-system/scope-chip-picker", async () => {
 
 vi.mock("../../../behavior/model-provider-api.ts", () => ({
   modelProviderApi: {
+    instantEval: { access: { useQuery: () => mockInstantEvalAccess() } },
     useUtils: () => ({ modelProvider: { invalidate: vi.fn() } }),
     modelProvider: {
       getDefaultModelsForProject: { useQuery: () => mockGetDefaultModels() },
@@ -138,6 +140,10 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
       isError: false,
     });
     mockListDecisionModels.mockReturnValue({ data: [HOSTED], isLoading: false });
+    mockInstantEvalAccess.mockReturnValue({
+      data: { hostedReleased: true, offer: "enable" },
+      isLoading: false,
+    });
   });
   afterEach(() => {
     flagsOn.clear();
@@ -164,6 +170,54 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
       const trigger = within(screen.getByTestId("role-row-instant_evals")).getByRole("combobox");
       expect(trigger).toHaveTextContent("Evals Preview");
       expect(trigger).not.toHaveTextContent("Not configured");
+    });
+  });
+
+  describe("given Evals Preview is neither released nor one switch away", () => {
+    beforeEach(() => {
+      flagsOn.add(OWN_MODEL_FLAG);
+      mockInstantEvalAccess.mockReturnValue({
+        data: { hostedReleased: false, offer: "contact_us" },
+        isLoading: false,
+      });
+      mockListDecisionModels.mockReturnValue({
+        data: [HOSTED, OPENAI_DECISIONS],
+        isLoading: false,
+      });
+    });
+
+    /** @scenario "Without Evals Preview, the drawer offers only the project's own decision models" */
+    it("never lists Evals Preview and offers the own decision model that would run", () => {
+      renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
+
+      const listbox = instantEvalsListbox();
+      expect(within(listbox).queryByText("Evals Preview")).not.toBeInTheDocument();
+      expect(pickable(instantEvalsOptions()).map((option) => option.textContent)).toEqual([
+        expect.stringContaining("Decisions API"),
+      ]);
+    });
+
+    /** @scenario "Without Evals Preview, the drawer offers only the project's own decision models" */
+    it("reads Not set as the value when nothing is set", () => {
+      renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
+
+      const trigger = within(screen.getByTestId("role-row-instant_evals")).getByRole("combobox");
+      expect(trigger).toHaveTextContent("Not set");
+      expect(trigger).not.toHaveTextContent("Evals Preview");
+    });
+
+    /** @scenario "Without Evals Preview, a config that pinned it reads Not set in the drawer" */
+    it("reads Not set when the config row pinned Evals Preview before", () => {
+      const pinned = { ...CONFIG_ROW, config: { INSTANT_EVALS: HOSTED.value } };
+      mockGetDefaultModels.mockReturnValue({
+        data: { ...PAYLOAD, configs: [pinned] },
+        isLoading: false,
+      });
+      renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
+
+      const trigger = within(screen.getByTestId("role-row-instant_evals")).getByRole("combobox");
+      expect(trigger).toHaveTextContent("Not set");
+      expect(trigger).not.toHaveTextContent("Evals Preview");
     });
   });
 

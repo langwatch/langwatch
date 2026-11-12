@@ -122,7 +122,16 @@
     "CacheReadTokens <- CacheReadTokens",
     "CacheWriteTokens <- CacheWriteTokens",
     "ReasoningTokens <- ReasoningTokens",
-    "HasError <- HasError"
+    "HasError <- HasError",
+    "MetadataOutputAction <- MetadataOutputAction",
+    "MetadataOutcome <- MetadataOutcome",
+    "MetadataSentToReview <- MetadataSentToReview",
+    "MetadataDocumentType <- MetadataDocumentType",
+    "MetadataFlow <- MetadataFlow",
+    "MetadataLanguage <- MetadataLanguage",
+    "MetadataSegment <- MetadataSegment",
+    "MetadataTeam <- MetadataTeam",
+    "MetadataTopic <- MetadataTopic"
   ],
   "trace_metrics_by_minute <- trace_analytics_rollup": [
     "TenantId <- TenantId",
@@ -462,7 +471,8 @@
     "_retention_days <- _retention_days",
     "_size_bytes <- _size_bytes",
     "ExpectedTargetResults <- ExpectedTargetResults",
-    "ExpectedEvaluatorResults <- ExpectedEvaluatorResults"
+    "ExpectedEvaluatorResults <- ExpectedEvaluatorResults",
+    "Concurrency <- Concurrency"
   ],
   "gateway_budget_ledger <- gateway_budget_ledger_events": [
     "TenantId <- TenantId",

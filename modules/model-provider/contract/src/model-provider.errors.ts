@@ -229,6 +229,33 @@ export class ModelRestrictedForExecutionError extends HandledError {
   }
 }
 
+/**
+ * A model this process has no road to execute: a codex model where no gateway handle was
+ * composed. Permanent, so background callers stop instead of retrying it.
+ */
+export class ModelExecutionUnavailableError extends HandledError {
+  declare readonly code: "model_execution_unavailable";
+
+  readonly model: string;
+  readonly featureKey: string;
+
+  constructor(input: { model: string; featureKey: string }) {
+    super(
+      "model_execution_unavailable",
+      `"${input.model}" cannot be executed by this process for "${input.featureKey}".`,
+      {
+        httpStatus: 400,
+        // The remedy is a settings change (another model for this feature), and no retry helps.
+        fault: "customer",
+        meta: { model: input.model, featureKey: input.featureKey },
+      },
+    );
+    this.name = "ModelExecutionUnavailableError";
+    this.model = input.model;
+    this.featureKey = input.featureKey;
+  }
+}
+
 export class ModelProviderNotFoundError extends HandledError {
   declare readonly code: "model_provider_not_found";
 
@@ -561,6 +588,17 @@ export class ProviderRefusedError extends HandledError {
       fault: "provider",
       httpStatus: 502,
       meta: { provider, status },
+    });
+  }
+}
+
+/** The key and endpoint answered, but no deployment by this name lives there. */
+export class ProviderDeploymentNotFoundError extends HandledError {
+  constructor({ provider, deployment }: { provider: string; deployment: string }) {
+    super("provider_deployment_not_found", `${provider} has no deployment named ${deployment}`, {
+      fault: "customer",
+      httpStatus: 400,
+      meta: { provider, deployment },
     });
   }
 }

@@ -1,6 +1,6 @@
 # ADR-003: A LangWatchQL statement counts the trace origins it reads from a reserved parameter
 
-**Date:** 2026-10-09 (rewritten 2026-10-29)
+**Date:** 2026-10-09 (rewritten 2026-10-29, trace lookup and its bound revised 2026-11-06)
 
 **Status:** Accepted
 
@@ -36,9 +36,66 @@ The views `trace_metrics` and `evaluation_metrics` carry a computed `Source` col
 So an unstamped trace is `application`'s and never NULL. The column is computed in the view; no
 ClickHouse migration is made. A statement keeps its rows with
 `WHERE Source IN {dashboard_context_sources:Array(String)}`. A view with a `TraceId` column
-reaches the origin through `(TenantId, TraceId) IN (SELECT TenantId, TraceId FROM trace_metrics
-WHERE Source IN {dashboard_context_sources:Array(String)})`, keyed by tenant so another
-project's trace never decides.
+reaches the origin through `trace_metrics`, keyed by tenant so another project's trace never
+decides. The stock widgets write that lookup in one of two fixed forms, by the view they read.
+
+`traces` and `spans` hold two sets, each with the switch in its own WHERE. Writing `S` for
+`{dashboard_context_sources:Array(String)}`, `k` for `(TenantId, TraceId)` and `<bound>` for the
+lookup's time bound:
+
+```sql
+(has(S, 'application')
+  OR k IN (SELECT TenantId, TraceId FROM trace_metrics
+           WHERE NOT has(S, 'application') AND Source IN S AND <bound>))
+AND k NOT IN (SELECT TenantId, TraceId FROM trace_metrics
+              WHERE has(S, 'application') AND Source NOT IN S AND <bound>)
+```
+
+| List                       | Excluded set (`NOT IN`) | Included set (`IN`) | Keeps                                            |
+| -------------------------- | ----------------------- | ------------------- | ------------------------------------------------ |
+| `['application']`          | traces of other sources | empty               | application traces and traces with no row        |
+| `['application', 'langy']` | traces of neither       | empty               | those two sources' traces and traces with no row |
+| `['langy']`                | empty                   | Langy's traces      | Langy's traces only                              |
+| `[]`                       | empty                   | empty               | nothing                                          |
+
+While the list holds `application`, the widget leaves out the traces of the other sources. On a
+large project those are the small set; the chosen ones took 30-day trace-list widgets over the query
+memory limit. A trace with no `trace_metrics` row is an unstamped trace, which is `application`'s,
+so it counts. Until its row is written, a brand-new trace of another source also has no row, so it
+counts too while the list holds `application`. While the list leaves `application` out, the widget
+keeps the traces of the list, and a trace with no row drops. Measured on prod, 30 days, one large
+project, a limit of about 1 GB: under `['application']` the excluded set used 571 MB where the
+included set failed at the limit; under `['langy']` the excluded set used 937 MB where the included
+set used 40 MB. Those figures are for the old single forms; the combined form is not yet measured
+on prod.
+
+Why the switch sits inside each subquery: the list is bound at run time, so the SQL cannot choose
+its form. An outer `if`, `AND` or `OR` round two subqueries may not stop either set being built: a
+local check on ClickHouse 25.10.2 with a 150 MB cap, run by hand and not in CI, read nothing from a
+30-million-row subquery with the guard and hit `MEMORY_LIMIT_EXCEEDED` without it. Each subquery's
+WHERE starts with a condition on the bound list alone, a constant, so the side that does not apply
+reads to no row and its set is empty. Only one set ever holds rows. No `notEmpty` guard is needed:
+an empty list fills neither set, so `has` is false, the `IN` is false, and no row is kept.
+
+The bound reaches as far back as the query scans, so every trace a query scans counts by its own
+source. It is one window back plus a day, which covers a query that compares with the previous
+period. A query that scans from `subtractDays({dashboard_context_period_start:DateTime}, N)` with a
+literal `N` gets `least(<one window back plus a day>, subtractDays(<period start>, N))`, the largest
+`N` when it has several; one day or less adds nothing. The changes widgets (`ck-trend`,
+`ext-cost-per-doc`) scan 90 days, so a prompt used earlier only by a Langy trace reads as new
+under `['application']` and as not new under `['langy']`. A trace older than the bound is outside
+the query's scan too. The lookup alone would count it while the list holds `application` and drop
+it while it does not, as it drops an evaluation.
+
+Consequences: a trace with rows of two sources (its anchor moved) drops under either source alone
+while the list holds `application`, and counts under either one while it does not. Each stock query
+over `traces` or `spans` returns the rows of the single lookup, apart from those traces and the
+traces with no row (`lwql-sources-row-equality.integration.test.ts`).
+
+`evaluations` and `annotations` keep `(TenantId, TraceId) IN (SELECT TenantId, TraceId FROM
+trace_metrics WHERE Source IN {dashboard_context_sources:Array(String)})`. Their trace id can be
+NULL, their rows often sit on old traces, which the complement would count whatever the source,
+and `annotations` reads PostgreSQL, a path the complement has not been measured on.
 
 The list is an enum checked at the door, and a caller cannot supply, assign or alias the
 reserved name in its own parameters. An empty list matches no row. Picking every source keeps

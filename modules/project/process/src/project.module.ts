@@ -60,4 +60,22 @@ export const projectProcessModule: PublishedProcessModule<"project", ProjectApi>
           return { ...report, dryRun };
         },
       }),
+      defineMigrationStep({
+        id: "project:list-personal-owner-and-first-message-facts",
+        kind: "data",
+        mode: "background",
+        // An old worker runs no subscriber of these facts' peers, so list once it is gone.
+        needsOldWritersGone: true,
+        description:
+          "Lists every personal project's owner and every project that already received its first message, archived ones included.",
+        run: async ({ checkpoint, dryRun, signal }) => {
+          const report = await app.sendHistoryFacts({
+            dryRun,
+            signal,
+            resumeFrom: checkpoint.resumeFrom,
+            onPageDone: (saved) => checkpoint.save({ report: saved }),
+          });
+          return { ...report, dryRun };
+        },
+      }),
     ]);

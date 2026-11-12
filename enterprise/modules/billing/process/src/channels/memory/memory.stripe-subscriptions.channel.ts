@@ -29,6 +29,8 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
   readonly portalSessions: { customerId: string; returnUrl: string; url: string }[] = [];
   readonly previews: { subscriptionId: string; change: BillingSubscriptionPreviewChange }[] = [];
   private readonly held = new Map<string, BillingSubscription>();
+  /** Which customer each seeded subscription bills; one seeded without a customer has none. */
+  private readonly customers = new Map<string, string>();
   private readonly lineItems = new Map<string, BillingPurchasedLineItem[]>();
   private readonly refusals = new Map<
     Operation,
@@ -47,9 +49,16 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
     return new MemoryStripeSubscriptionsChannel();
   }
 
-  /** Puts a subscription at the provider, as a test declares it. */
-  seed({ subscription }: { subscription: BillingSubscription }): void {
+  /** Puts a subscription at the provider, as a test declares it, for `customerId` when given. */
+  seed({
+    subscription,
+    customerId,
+  }: {
+    subscription: BillingSubscription;
+    customerId?: string;
+  }): void {
     this.held.set(subscription.id, subscription);
+    if (customerId !== void 0) this.customers.set(subscription.id, customerId);
   }
 
   /** Puts a completed checkout session's line items at the provider. */
@@ -106,6 +115,17 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
     this.throwIfRefused("getSubscription");
     this.reads.push(subscriptionId);
     return this.find(subscriptionId);
+  }
+
+  async listCustomerSubscriptions({
+    customerId,
+  }: {
+    customerId: string;
+  }): Promise<BillingSubscription[]> {
+    this.throwIfRefused("listCustomerSubscriptions");
+    return [...this.held.values()].filter(
+      (subscription) => this.customers.get(subscription.id) === customerId,
+    );
   }
 
   async updateSubscription({

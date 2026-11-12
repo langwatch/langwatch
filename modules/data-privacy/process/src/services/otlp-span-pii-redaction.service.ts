@@ -3,7 +3,7 @@
  * BYTE-FAITHFUL, SPAN HALF ONLY.
  */
 
-import type { ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
+import type { PiiLevel, ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
 import { PRIVACY_PII_INCOMPLETE_MARKER_ATTR } from "@langwatch/data-privacy-contract";
 import type { TenantId } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
@@ -170,6 +170,7 @@ export class OtlpSpanPiiRedactionService {
           lambda: {
             entities: lambda.entities,
             exceptPatterns: lambda.exceptPatterns,
+            resolvedPiiLevel: native.level,
           },
           projectId: tenantId,
         });
@@ -232,6 +233,7 @@ export class OtlpSpanPiiRedactionService {
     lambda?: {
       entities?: readonly string[];
       exceptPatterns?: readonly string[];
+      resolvedPiiLevel?: PiiLevel;
     };
   }): Promise<boolean> {
     const redaction = await this.policy.resolveRedactionOptions({
@@ -239,6 +241,7 @@ export class OtlpSpanPiiRedactionService {
       entities: lambda?.entities,
       exceptPatterns: lambda?.exceptPatterns,
       projectId: projectId,
+      resolvedPiiLevel: lambda?.resolvedPiiLevel,
     });
     // No options means the analysis pass was skipped (disabled, or the service
     // is not configured outside production) — report that it did not run so the
@@ -263,7 +266,10 @@ export class OtlpSpanPiiRedactionService {
       return true;
     }
 
-    const results = await this.policy.clearBatch(entries, options);
+    const results = await this.policy.clearBatch(entries, {
+      ...options,
+      recordKey: `${span.traceId}:${span.spanId}`,
+    });
 
     for (let i = 0; i < entries.length; i++) {
       const redacted = results[i];
@@ -434,6 +440,9 @@ export class OtlpSpanPiiRedactionService {
        * The real OTLP attribute name behind each key of `attributes`, where the two differ.
        */
       attributeNames?: Record<string, string>;
+
+      /** The record's own key; see `DataPrivacyLogRecord.recordKey`. */
+      recordKey?: string;
     },
     piiRedactionLevel: PIIRedactionLevel,
     tenantId?: TenantId,
@@ -451,6 +460,8 @@ export class OtlpSpanPiiRedactionService {
       attributes: Record<string, string>;
       resourceAttributes: Record<string, string>;
       attributeNames?: Record<string, string>;
+      /** The point's own key; see `DataPrivacyMetricAttributes.recordKey`. */
+      recordKey?: string;
     },
     piiRedactionLevel: PIIRedactionLevel,
     tenantId?: TenantId,

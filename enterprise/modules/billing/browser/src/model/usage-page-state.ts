@@ -8,6 +8,7 @@ import type { UsageDay } from "@langwatch/entitlement-contract";
 import numeral from "numeral";
 
 import {
+  EXCLUDING_VAT,
   formatPrice,
   GROWTH_INCLUDED_EVENTS,
   growthOverageCentsPer100k,
@@ -28,6 +29,7 @@ export type UsagePagePlan = {
   free: boolean;
   maxMembers: number;
   maxMembersLite: number;
+  maxMembersDeveloper: number;
   maxMessagesPerMonth: number;
   planSource?: "license" | "subscription" | "free";
 };
@@ -73,7 +75,11 @@ export function planStrip({
       cents: seatPriceCents * plan.maxMembers,
       currency: growth.currency,
     });
-    return { title: planTitle(plan), summary: `${total}${period} · ${seats}`, action: "manage" };
+    return {
+      title: planTitle(plan),
+      summary: `${total}${period} ${EXCLUDING_VAT} · ${seats}`,
+      action: "manage",
+    };
   }
   return { title: planTitle(plan), summary: seats, action: "manage" };
 }
@@ -195,6 +201,22 @@ export function liteRow({
 export function fullSeats({ used, plan }: { used: number; plan: UsagePagePlan }): string {
   if (plan.maxMembers >= UNLIMITED_SEATS_FROM) return formatCount(used);
   return `${formatCount(used)} / ${formatCount(plan.maxMembers)}`;
+}
+
+/**
+ * Developer seats in use against those paid for, or null when the plan has none and
+ * nobody holds one, so a plan that never sold Developer seats shows no row.
+ */
+export function developerSeats({
+  used,
+  plan,
+}: {
+  used: number;
+  plan: UsagePagePlan;
+}): string | null {
+  if (plan.maxMembersDeveloper === 0 && used === 0) return null;
+  if (plan.maxMembersDeveloper >= UNLIMITED_SEATS_FROM) return formatCount(used);
+  return `${formatCount(used)} / ${formatCount(plan.maxMembersDeveloper)}`;
 }
 
 /** Each project's share of the month's total, for the bar beside its count. */

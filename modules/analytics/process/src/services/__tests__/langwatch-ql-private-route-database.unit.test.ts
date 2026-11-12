@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { TEST_RUN_TELEMETRY } from "../../app/__tests__/analytics.fixture.ts";
+import { ADMIT_EVERY_PLACEMENT, TEST_RUN_TELEMETRY } from "../../app/__tests__/analytics.fixture.ts";
 import { RoutedLangWatchQLExecutorRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-routed-executor.repository.ts";
 import {
   type LangWatchQLConnection,
@@ -67,6 +67,7 @@ function privateRun(input: {
   });
   const service = LangWatchQLService.create({
     runTelemetry: TEST_RUN_TELEMETRY,
+    placement: ADMIT_EVERY_PLACEMENT,
     executor: routed,
     database: SHARED.database,
   });

@@ -626,6 +626,7 @@ export class ModelProviderModule implements ModelProviderApi {
     return this.#credentialProbe.probe({
       provider: input.provider,
       customKeys: input.customKeys,
+      model: input.model,
     });
   }
 

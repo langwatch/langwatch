@@ -1142,6 +1142,25 @@ describe("instant_eval_opt_in_not_offered", () => {
       );
     });
   });
+
+  describe("when LangWatch's hosted model is switched off for the organization", () => {
+    /** @scenario "A hosted-off refusal never sends the reader to the enterprise plan" */
+    it("says the hosted model is off and names the own decision model, never the plan", () => {
+      const { title, description } = explainHandledError(
+        shape({
+          code: "instant_eval_opt_in_not_offered",
+          httpStatus: 403,
+          meta: { deployment: "hosted_off" },
+        }),
+      );
+
+      expect(title).toBe("LangWatch's hosted model is off for this organization");
+      expect(description).toBe(
+        "Run Instant Evals on your own decision model: pick one in the Instant Evals column of Default models.",
+      );
+      expect(description).not.toMatch(/enterprise/i);
+    });
+  });
 });
 
 describe("agent_test_refused", () => {
@@ -1282,6 +1301,32 @@ describe("budget_exceeded", () => {
       expect(copy.description).toBe(
         "Requests are blocked until the limit is raised. An admin can raise it in AI Gateway budgets.",
       );
+    });
+  });
+});
+
+describe("provider_refused", () => {
+  const refused = (status: number) =>
+    explainHandledError(
+      shape({ code: "provider_refused", fault: "provider", meta: { provider: "azure", status } }),
+    );
+
+  describe("when the provider answered 404", () => {
+    it("points at the address instead of calling it temporary", () => {
+      const copy = refused(404);
+
+      expect(copy.title).toBe("Nothing answers at that address");
+      expect(copy.description).toContain("Check the endpoint");
+      expect(copy.description).not.toContain("temporary");
+    });
+  });
+
+  describe("when the provider refused with any other status", () => {
+    it("keeps the try-again copy", () => {
+      const copy = refused(503);
+
+      expect(copy.title).toBe("The provider refused the check");
+      expect(copy.description).toContain("try again");
     });
   });
 });

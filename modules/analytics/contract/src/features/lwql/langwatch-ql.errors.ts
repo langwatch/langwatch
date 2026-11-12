@@ -27,6 +27,26 @@ export class LangWatchQLNotEnabledError extends HandledError {
 }
 
 /**
+ * The organisation's data is on a server LangWatchQL is not provisioned on: its own ClickHouse,
+ * or an install with no access model yet. Refused before any SQL runs (ADR-200).
+ */
+export class LangWatchQLNotProvisionedError extends HandledError {
+  declare readonly code: "lwql_not_provisioned";
+
+  constructor() {
+    super(
+      "lwql_not_provisioned",
+      "LangWatchQL is not provisioned on the server that holds this organisation's data.",
+      {
+        httpStatus: 403,
+        ...remediation("lwql_not_provisioned"),
+      },
+    );
+    this.name = "LangWatchQLNotProvisionedError";
+  }
+}
+
+/**
  * The result is larger than one response carries: refused outright, never cut. Raised from the
  * profile's `max_result_rows` / `max_result_bytes` backstop (TOO_MANY_ROWS_OR_BYTES); the raw
  * driver error rides in `reasons` for the logs only. `customer` fault, 413.

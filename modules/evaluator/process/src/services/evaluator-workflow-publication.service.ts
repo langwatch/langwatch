@@ -6,6 +6,7 @@ import {
 import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 
 import type { EvaluatorCreationCapService } from "./evaluator-creation-cap.service.ts";
+import type { EvaluatorLifecycleFactsService } from "./evaluator-lifecycle-facts.service.ts";
 import type { EvaluatorVersionService } from "./evaluator-version.service.ts";
 import type { EvaluatorService } from "./evaluator.service.ts";
 
@@ -20,6 +21,7 @@ export class EvaluatorWorkflowPublicationService {
     evaluators: Pick<EvaluatorService, "findByWorkflow" | "create" | "update" | "archive">;
     creationCaps: Pick<EvaluatorCreationCapService, "assertCreationAllowed">;
     versions: Pick<EvaluatorVersionService, "assertDeletable">;
+    lifecycleFacts: Pick<EvaluatorLifecycleFactsService, "recordEvaluatorCreated">;
   }): EvaluatorWorkflowPublicationService {
     return new EvaluatorWorkflowPublicationService(deps);
   }
@@ -64,6 +66,19 @@ export class EvaluatorWorkflowPublicationService {
   }
 
   /**
+   * Flags a workflow that just gained an evaluator through the public API the way the
+   * Studio switch does, so the workflow side lists it as an evaluator and not a component.
+   */
+  async markAsEvaluator(input: { workflowId: string; projectId: string }): Promise<void> {
+    await this.deps.workflows.setWorkflowFlags({
+      workflowId: input.workflowId,
+      projectId: input.projectId,
+      isEvaluator: true,
+      isComponent: false,
+    });
+  }
+
+  /**
    * Nothing keeps an evaluator pointing at a workflow that no longer offers itself as one. A
    * deployed evaluator needs `evaluators:deploy` of `caller`, asked before any flag changes.
    */
@@ -100,7 +115,7 @@ export class EvaluatorWorkflowPublicationService {
       return this.deps.evaluators.update({ id: existing.id, projectId, data: { name } });
     }
 
-    return this.deps.evaluators.create({
+    const created = await this.deps.evaluators.create({
       id: newEvaluatorId(),
       projectId,
       name,
@@ -108,5 +123,7 @@ export class EvaluatorWorkflowPublicationService {
       config: {},
       workflowId,
     });
+    await this.deps.lifecycleFacts.recordEvaluatorCreated({ projectId, evaluatorId: created.id });
+    return created;
   }
 }

@@ -13,27 +13,38 @@ import {
 
 import type { LangyModule } from "../app/langy.app.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
-import { RecordGuidedOnboardingTurnFailedCommand } from "./langy-guided-onboarding.commands.ts";
+import {
+  RecordGuidedOnboardingTurnFailedCommand,
+  RecordLangyFirstMessageSeenCommand,
+} from "./langy-guided-onboarding.commands.ts";
 import {
   guidedOnboardingTurnFailedEventSchema,
   type GuidedOnboardingTurnFailedEvent,
+  langyFirstMessageSeenEventSchema,
+  type LangyFirstMessageSeenEvent,
   type RecordGuidedOnboardingTurnFailedCommandData,
+  type RecordLangyFirstMessageSeenCommandData,
 } from "./langy-guided-onboarding.events.ts";
 
 export type LangyGuidedOnboardingPipeline = StaticPipelineDefinition<
-  GuidedOnboardingTurnFailedEvent,
+  GuidedOnboardingTurnFailedEvent | LangyFirstMessageSeenEvent,
   Record<string, Projection>,
-  { name: "recordGuidedOnboardingTurnFailed"; payload: RecordGuidedOnboardingTurnFailedCommandData }
+  | {
+      name: "recordGuidedOnboardingTurnFailed";
+      payload: RecordGuidedOnboardingTurnFailedCommandData;
+    }
+  | { name: "recordLangyFirstMessageSeen"; payload: RecordLangyFirstMessageSeenCommandData }
 >;
 
-/** langy_guided_onboarding: langy records its guided onboarding facts; peers react (§9). */
+/** langy_guided_onboarding: langy records its onboarding facts; peers react (§9). */
 export function buildLangyGuidedOnboardingPipeline(): LangyGuidedOnboardingPipeline {
   return definePipeline({
     name: LANGY_GUIDED_ONBOARDING_PIPELINE_NAME,
     aggregate: defineAggregate({ type: LANGY_GUIDED_ONBOARDING_AGGREGATE_TYPE }),
   })
-    .withEvents([guidedOnboardingTurnFailedEventSchema])
+    .withEvents([guidedOnboardingTurnFailedEventSchema, langyFirstMessageSeenEventSchema])
     .withCommand("recordGuidedOnboardingTurnFailed", RecordGuidedOnboardingTurnFailedCommand)
+    .withCommand("recordLangyFirstMessageSeen", RecordLangyFirstMessageSeenCommand)
     .build();
 }
 

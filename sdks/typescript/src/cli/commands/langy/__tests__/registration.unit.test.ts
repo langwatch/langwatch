@@ -28,6 +28,13 @@ describe("given the CLI program", () => {
       const flags = langy?.options.map((option) => option.long) ?? [];
       expect(flags).toContain("--share-control");
     });
+
+    /** @scenario "A login that is not the asker's offers to sign in as the asker" */
+    it("takes --as with the asker's email", () => {
+      const langy = commandNamed({ parent: program, name: "langy" });
+      const as = langy?.options.find((option) => option.long === "--as");
+      expect(as?.flags).toBe("--as <email>");
+    });
   });
 
   describe("when structured output is asked for", () => {

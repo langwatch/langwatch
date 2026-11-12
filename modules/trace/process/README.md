@@ -6,7 +6,7 @@ The server half of [trace](../README.md). Traces: ingestion and canonicalisation
 
 ## Installation
 
-`defineProcessModule("trace").withRepositories(traceRepositories).withChannels(traceChannels).withApi(TraceModule).withTransports(tracesTrpcTransport, sharedTraceTrpcTransport, spansTrpcTransport, exportProgressTrpcTransport, traceEditOverlayTrpcTransport, traceExportRest, traceLegacyRest, tracesRest, trackedEventRest, trackedEventLegacyPathRest, collectorRest, otlpIngestRest).provideMiddlewareContext(…).withDoors(…).withEventing(traceProcessingEventing).withEventing(traceProjectMilestonesEventing).withEventing(traceCollectorEvaluationsEventing).withEventing(traceIngestSourceBillingEventing).withMigrations(…).withIdIndexes(TRACE_ID_INDEXES, …)`, `src/trace.module.ts:37`.
+`defineProcessModule("trace").withRepositories(traceRepositories).withChannels(traceChannels).withApi(TraceModule).withTransports(tracesTrpcTransport, sharedTraceTrpcTransport, spansTrpcTransport, exportProgressTrpcTransport, traceEditOverlayTrpcTransport, traceExportRest, traceLegacyRest, tracesRest, trackedEventRest, trackedEventLegacyPathRest, collectorRest, otlpIngestRest).provideMiddlewareContext(…).withDoors(…).withEventing(traceProcessingEventing).withEventing(traceProjectMilestonesEventing).withEventing(traceCollectorEvaluationsEventing).withEventing(traceIngestSourceBillingEventing).withMigrations(…).withIdIndexes(TRACE_ID_INDEXES, …)`, `src/trace.module.ts:40`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -1053,20 +1053,20 @@ type Response = unknown;
 
 |             |                                         |
 | ----------- | --------------------------------------- |
-| Declared at | `src/transport/otlp-ingest.rest.ts:275` |
+| Declared at | `src/transport/otlp-ingest.rest.ts:272` |
 | Base URL    | none: each route's path is its address  |
 | Addressing  | literal                                 |
 | Credential  | otlp_ingest                             |
 
 #### `POST /api/otel/v1/traces` · `ingestOtlpTraces`
 
-Authenticated: the OTLP ingest door's resolved key is the whole gate, as on main. Credential `otlp_ingest`. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:281`.
+Authenticated: the OTLP ingest door's resolved key is the whole gate, as on main. Credential `otlp_ingest`. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:278`.
 
 Answers at `/api/otel/v1/traces`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:285)
-// Response: inline, src/transport/otlp-ingest.rest.ts:288
+// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:282)
+// Response: inline, src/transport/otlp-ingest.rest.ts:285
 type Response = unknown;
 ```
 
@@ -1968,14 +1968,16 @@ Declared at `src/eventing/trace-processing-projections.pipeline.ts:104`. Events:
 
 ### Pipeline `trace_project_milestones` (aggregate `trace_project_milestone`)
 
-Declared at `src/eventing/trace-project-milestones.pipeline.ts:24`. Events: `firstTraceRecordedEventSchema`, `traceReceivedEventSchema`, `monthTraceIdsListedEventSchema`.
+Declared at `src/eventing/trace-project-milestones.pipeline.ts:28`. Events: `firstTraceRecordedEventSchema`, `traceReceivedEventSchema`, `monthTraceIdsListedEventSchema`, `traceFailedEventSchema`, `projectTracedEventSchema`.
 
 | Kind      | Name                  | Handles | Declared at                                            |
 | --------- | --------------------- | ------- | ------------------------------------------------------ |
-| command   | `recordFirstTrace`    | –       | `src/eventing/trace-project-milestones.pipeline.ts:33` |
-| command   | `recordTraceReceived` | –       | `src/eventing/trace-project-milestones.pipeline.ts:34` |
-| command   | `recordMonthTraceIds` | –       | `src/eventing/trace-project-milestones.pipeline.ts:35` |
-| retention | `≈ retention`         | –       | `src/eventing/trace-project-milestones.pipeline.ts:36` |
+| command   | `recordFirstTrace`    | –       | `src/eventing/trace-project-milestones.pipeline.ts:39` |
+| command   | `recordTraceReceived` | –       | `src/eventing/trace-project-milestones.pipeline.ts:40` |
+| command   | `recordMonthTraceIds` | –       | `src/eventing/trace-project-milestones.pipeline.ts:41` |
+| command   | `recordTraceFailed`   | –       | `src/eventing/trace-project-milestones.pipeline.ts:42` |
+| command   | `recordProjectTraced` | –       | `src/eventing/trace-project-milestones.pipeline.ts:43` |
+| retention | `≈ retention`         | –       | `src/eventing/trace-project-milestones.pipeline.ts:44` |
 
 ### Pipeline `trace_collector_evaluations` (aggregate `trace_collector_evaluation`)
 

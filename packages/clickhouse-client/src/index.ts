@@ -133,6 +133,8 @@ export type {
   RoutingTable,
   TenantDirectory,
   TenantRoute,
+  ClickHouseTenantPlacement,
+  TenantPlacement,
   TenantRouter,
   TenantRouterOptions,
 } from "./tenancy.ts";

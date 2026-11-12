@@ -101,6 +101,8 @@ describe("PlansComparisonPage", () => {
         })) {
           expect(within(column("growth")).getByText(line)).toBeInTheDocument();
         }
+        expect(within(column("growth")).getByText("excl. VAT")).toBeInTheDocument();
+        expect(within(column("free")).queryByText("excl. VAT")).not.toBeInTheDocument();
 
         fireEvent.click(screen.getByTestId("currency-toggle"));
 

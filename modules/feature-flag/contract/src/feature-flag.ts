@@ -152,6 +152,20 @@ export const FEATURE_FLAGS = [
 
   // ----- PRODUCT -----
   {
+    key: "release_pii_redaction_model_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Sends an organization's strict PII analysis to the PII redaction model instead of Presidio. Off by default; enable per organization through an operator rule. Only takes effect where the deployment names the model (PII_REDACTION_MODEL_ENDPOINT, a Lambda ARN or an HTTP address). Any failure of the model falls back to Presidio, then Google DLP, exactly as an organization with the flag off.",
+  },
+  {
+    key: "release_pii_redaction_model_free",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Records an organization's PII redaction model calls at a price of zero, our own cost still kept (ADR-201). Off by default; enable per organization through an operator rule for organizations that use the model for free. It does not let an organization use the model: release_pii_redaction_model_enabled does that.",
+  },
+  {
     key: "release_instant_evals",
     scope: "PRODUCT",
     defaultValue: false,
@@ -164,6 +178,13 @@ export const FEATURE_FLAGS = [
     defaultValue: true,
     description:
       "Lets an organization run Instant Evals on its own decision model and key, picked in the Instant Evals column of Default models (ADR-182). On by default; switch it off fleet-wide or per organization. A run on an own key is never metered or capped. Off, the column offers LangWatch Evals Preview only, new picks of any other model are refused, and a project that already picked one skips its Instant Evals as not configured; it is never moved onto the billed LangWatch model.",
+  },
+  {
+    key: "instant_evals_hosted_disabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Switches LangWatch's hosted Instant Evals model (Evals Preview) off for an organization, whatever its plan. Off by default; turn it on for one organization with a targeting rule { organizationId }. On, the organization is never released onto the hosted model: not by release_instant_evals, its own Instant Evals switch, or a license. It is offered no switch, Default models does not list Evals Preview, and no run, judged query, search-bar route or LLM-judge evaluation calls the hosted classifier. Its own decision models, picked in the Instant Evals column of Default models, keep running.",
   },
   {
     key: "release_instant_evals_judge_router",
@@ -327,6 +348,14 @@ export const FEATURE_FLAGS = [
     family: "Langy",
     description:
       "Minimising Langy sinks the panel to an edge peek of itself — a sliver of the card at the bottom edge (floating) or of the dock's spine at the right edge (sidebar) that rises on pointer proximity and opens on click (spec: specs/langy/langy-peek-dock.feature). Off = the classic corner launcher orb. Only the closed-state affordance changes; the panel and its Cmd/Ctrl+I activation are the same either way. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_langy_peek_dock_enabled.",
+  },
+  {
+    key: "release_ui_langy_share_command_names_asker",
+    scope: "PRODUCT",
+    defaultValue: false,
+    family: "Langy",
+    description:
+      "The code access card's share command names who asked with `--as <email>`, so a terminal signed in as someone else says so and offers to switch (spec: specs/langy/langy-code-access.feature). Turn on once the TypeScript SDK release that accepts `langwatch langy --as` is on npm: an older CLI refuses the unknown option. Off = the bare command. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_langy_share_command_names_asker.",
   },
   {
     key: "release_ui_agent_testing_v2_enabled",

@@ -653,7 +653,7 @@ export interface paths {
         /** @description Get all evaluators for a project */
         get: operations["getApiEvaluators"];
         put?: never;
-        /** @description Create a new evaluator */
+        /** @description Create a new evaluator: a built-in one, a custom code evaluator (`type: "code"`) or one that wraps a workflow (`type: "workflow"`) */
         post: operations["postApiEvaluators"];
         delete?: never;
         options?: never;
@@ -9343,9 +9343,18 @@ export interface operations {
             content: {
                 "application/json": {
                     name: string;
+                    /**
+                     * @description The kind of evaluator. "evaluator" (the default) is a built-in type named by config.evaluatorType; "code" is a custom Python evaluator whose config carries code and inputs; "workflow" wraps the workflow named by workflowId.
+                     * @default evaluator
+                     * @enum {string}
+                     */
+                    type?: "evaluator" | "code" | "workflow";
+                    /** @description For a built-in evaluator: { evaluatorType, settings }. For a code evaluator: { code, inputs: [{ identifier, type }] }; outputs are the fixed passed, score, label and details. For a workflow evaluator: {}. */
                     config: {
                         [key: string]: unknown;
                     };
+                    /** @description The workflow a "workflow" evaluator wraps. Only for type "workflow". */
+                    workflowId?: string;
                 };
             };
         };
@@ -9839,6 +9848,8 @@ export interface operations {
                         status: "running";
                         /** @description Number of cells this run will execute */
                         total: number;
+                        /** @description Cells this run executes at once: the request's `concurrency`, else the server default */
+                        concurrency?: number;
                         /** @description Link to the run in the LangWatch app */
                         runUrl?: string;
                     };
@@ -9893,6 +9904,8 @@ export interface operations {
                         progress: number;
                         /** @description Cells in the run */
                         total: number;
+                        /** @description Cells the run executes at once, as it was fixed when the run started */
+                        concurrency?: number;
                         /** @description Unix milliseconds */
                         startedAt?: number;
                         /** @description Unix milliseconds; set once the run is no longer running */
