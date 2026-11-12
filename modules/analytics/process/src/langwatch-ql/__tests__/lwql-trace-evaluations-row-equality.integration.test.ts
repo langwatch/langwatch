@@ -794,13 +794,22 @@ describe("given trace evaluations with unmerged retraction pairs beside main's f
     await expectMovedQueriesMatchBaseline();
   });
 
-  /** The query's one row under the application list, each count as a number. */
-  async function countsOf(label: string): Promise<Record<string, number>> {
+  /** The query's one row under the application list; each expected key as a number. */
+  async function countsOf<K extends string>(
+    label: string,
+    keys: readonly K[],
+  ): Promise<Record<K, number>> {
     const { rows, error } = await run({ sql: sent(label), list: ["application"] });
     expect(error, label).toBeUndefined();
     const [row = "{}"] = JSON.parse(rows ?? "[]") as string[];
     const counts = JSON.parse(row) as Record<string, string | number>;
-    return Object.fromEntries(Object.entries(counts).map(([key, n]) => [key, Number(n)]));
+    const result = {} as Record<K, number>;
+    for (const key of keys) {
+      const value = counts[key];
+      if (value === undefined) throw new Error(`${label} has no ${key}`);
+      result[key] = Number(value);
+    }
+    return result;
   }
 
   // On the real views: main read the moved trace's two trace_metrics rows, so this differs from
@@ -808,17 +817,19 @@ describe("given trace evaluations with unmerged retraction pairs beside main's f
   // period; moving its anchor from the previous period into this one moves each count by one.
   /** @scenario "A moved pre-freeze trace counts once, at its latest time, on the real views" */
   it("counts a moved pre-freeze trace once, at its latest time, on the real views", async () => {
-    const checks = await countsOf("ck-kpis/checks");
-    const outcomes = await countsOf("ck-kpis/outcomes");
+    const checkKeys = ["passed", "judged", "passed_prev", "judged_prev"] as const;
+    const outcomeKeys = ["closed", "resolved", "closed_prev", "resolved_prev"] as const;
+    const checks = await countsOf("ck-kpis/checks", checkKeys);
+    const outcomes = await countsOf("ck-kpis/outcomes", outcomeKeys);
     await moveTrace({ trace: "mv2", day: 4.5 });
     await expectTwoAnalyticsRows("mv2");
-    expect(await countsOf("ck-kpis/checks")).toEqual({
+    expect(await countsOf("ck-kpis/checks", checkKeys)).toEqual({
       passed: checks.passed + 1,
       judged: checks.judged + 1,
       passed_prev: checks.passed_prev - 1,
       judged_prev: checks.judged_prev - 1,
     });
-    expect(await countsOf("ck-kpis/outcomes")).toEqual({
+    expect(await countsOf("ck-kpis/outcomes", outcomeKeys)).toEqual({
       closed: outcomes.closed + 1,
       resolved: outcomes.resolved,
       closed_prev: outcomes.closed_prev - 1,
