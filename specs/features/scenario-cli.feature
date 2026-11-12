@@ -144,6 +144,13 @@ Feature: Scenario CLI Commands
     And the platform files the scenario into the project's Default suite
 
   @unit
+  Scenario: The create help tells the caller to pick a test suite and never to leave it out
+    When I read the help of "langwatch scenario create"
+    Then the command description and the --test-suite help both say to run "langwatch test-suite list" first
+    And they say to file the scenario in the suite that fits, or to ask the user which suite when none fits
+    And neither offers leaving --test-suite out
+
+  @unit
   Scenario: Create a scenario with a test suite that does not exist
     When I run "langwatch scenario create 'Login Flow' --situation 'User logs in' --test-suite nonexistent-id"
     Then I see an error that the test suite was not found

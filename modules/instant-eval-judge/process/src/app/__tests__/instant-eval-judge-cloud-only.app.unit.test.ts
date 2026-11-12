@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 
 import { HttpInstantEvalJudgeChannels } from "../../channels/http/http.instant-eval-judge.channels.ts";
 import { MemoryInstantEvalJudgeChannels } from "../../channels/memory/memory.instant-eval-judge.channels.ts";
+import { MemoryInstantEvalProviderSpendChannel } from "../../channels/memory/memory.instant-eval-provider-spend.channel.ts";
 import { MemoryInstantEvalJudgeRepositories } from "../../repositories/memory/memory.instant-eval-judge.repositories.ts";
 import { InstantEvalJudgeModule } from "../instant-eval-judge.app.ts";
 
@@ -33,6 +34,8 @@ async function judgeAppWith({
     classifierModel: undefined,
     globalTokensPerSecond: 300_000,
     tenantTokensPerSecond: 150_000,
+    judgeRoutes: undefined,
+    judgeRoutePricing: undefined,
     isSaas: isCloud,
     nodeEnvironment,
   };
@@ -42,7 +45,11 @@ async function judgeAppWith({
   );
   const channels =
     tier === "live"
-      ? await HttpInstantEvalJudgeChannels.create({ config, secrets })
+      ? await HttpInstantEvalJudgeChannels.create({
+          config,
+          secrets,
+          bound: { spend: MemoryInstantEvalProviderSpendChannel.create() },
+        })
       : MemoryInstantEvalJudgeChannels.create();
   return InstantEvalJudgeModule.create({
     dependencies: {},

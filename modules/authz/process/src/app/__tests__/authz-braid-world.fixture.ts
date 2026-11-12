@@ -16,6 +16,7 @@ import type { AuthzRepositories } from "../../repositories/authz.repositories.ts
 import { AuthzMemoryStore } from "../../repositories/memory/authz-memory.store.ts";
 import { MemoryAuthzAdmissionRepository } from "../../repositories/memory/memory.authz-admission.repository.ts";
 import { MemoryAuthzAuditTrailRepository } from "../../repositories/memory/memory.authz-audit-trail.repository.ts";
+import { MemoryAuthzBillingGrantRepository } from "../../repositories/memory/memory.authz-billing-grant.repository.ts";
 import { MemoryAuthzBraidLockRepository } from "../../repositories/memory/memory.authz-braid-lock.repository.ts";
 import { MemoryAuthzGrantProjectionRepository } from "../../repositories/memory/memory.authz-grant-projection.repository.ts";
 import { MemoryAuthzLedgerReadRepository } from "../../repositories/memory/memory.authz-ledger-read.repository.ts";
@@ -71,6 +72,7 @@ function repositoriesOver(memory: AuthzMemoryStore): AuthzRepositories {
     listing: MemoryAuthzListingRepository.create({ memory }),
     migration: MemoryAuthzMigrationRepository.create({ memory }),
     ledgerReads: MemoryAuthzLedgerReadRepository.create({ memory }),
+    billingGrants: MemoryAuthzBillingGrantRepository.create({ memory }),
     braidLocks: MemoryAuthzBraidLockRepository.create(),
     organizationPolicies: MemoryAuthzOrganizationPolicyRepository.create(),
   };

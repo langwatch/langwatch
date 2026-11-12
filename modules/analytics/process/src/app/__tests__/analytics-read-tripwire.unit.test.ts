@@ -31,6 +31,7 @@ import {
 } from "../../repositories/analytics.repository.ts";
 import { MemoryAnalyticsRepositories } from "../../repositories/memory/memory.analytics.repositories.ts";
 import { AnalyticsModule } from "../analytics.app.ts";
+import { analyticsTestSecrets } from "./analytics-secrets.fixture.ts";
 
 const PROJECT_ID = "project-tripwire";
 const TRIPWIRE_FLAG = "release_event_sourced_analytics_read_tripwire";
@@ -105,13 +106,14 @@ async function harness(tripwireOn: boolean, { kind = "application" }: { kind?: s
         postgresHost: void 0,
         accessModelMode: void 0,
         sqlSingleNode: void 0,
+        clickhouseCluster: void 0,
         aggregateMaxMembers: void 0,
       },
       tenantAnalyticsConcurrency: 4,
       publicBaseUrl: "https://app.langwatch.test",
     },
     resources: { own: () => void 0, ownService: () => void 0 },
-    secrets: {} as never,
+    secrets: analyticsTestSecrets(),
   });
 
   return { app, repository, flagReads };

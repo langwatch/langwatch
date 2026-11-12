@@ -9,6 +9,7 @@ import { isRecord, sha256 } from "./canonical-log-value.rules.ts";
 
 const CLAUDE_CODE_EVENT_SCOPE = "com.anthropic.claude_code.events";
 const CODEX_EVENT_NAME_PREFIX = "codex.";
+const GROK_EVENT_SCOPE = "ai.xai.grok_code";
 
 export function normalizeId(value: unknown): string {
   if (value === undefined || value === null) return "";
@@ -41,6 +42,8 @@ export function synthesizeCorrelation(args: {
   let providerKind: LogProviderKind;
   if (args.scopeName === CLAUDE_CODE_EVENT_SCOPE) {
     providerKind = "claude_code";
+  } else if (args.scopeName === GROK_EVENT_SCOPE) {
+    providerKind = "grok";
   } else if (eventName.startsWith(CODEX_EVENT_NAME_PREFIX)) {
     providerKind = "codex";
   } else {
@@ -55,8 +58,10 @@ export function synthesizeCorrelation(args: {
     };
   }
   const sessionId = attributes["session.id"] ?? "";
-  if (providerKind === "claude_code" && sessionId) {
-    return claudeSynthesizedCorrelation({
+  // Grok keys a turn on the same session.id and prompt.id as Claude (ADR-192).
+  if ((providerKind === "claude_code" || providerKind === "grok") && sessionId) {
+    return sessionTurnSynthesizedCorrelation({
+      providerKind,
       sessionId,
       wireTraceId,
       wireSpanId,
@@ -77,7 +82,8 @@ export function synthesizeCorrelation(args: {
   return { traceId: "", spanId: "", source: "none", providerKind };
 }
 
-function claudeSynthesizedCorrelation(args: {
+function sessionTurnSynthesizedCorrelation(args: {
+  providerKind: "claude_code" | "grok";
   sessionId: string;
   wireTraceId: string;
   wireSpanId: string;
@@ -89,7 +95,7 @@ function claudeSynthesizedCorrelation(args: {
   source: LogCorrelationSource;
   providerKind: LogProviderKind;
 } {
-  const { sessionId, wireTraceId, wireSpanId, eventName, attributes } = args;
+  const { providerKind, sessionId, wireTraceId, wireSpanId, eventName, attributes } = args;
   const promptId = attributes["prompt.id"] ?? "";
   const turnKey = promptId ? `${sessionId}:${promptId}` : sessionId;
   const traceId = validTraceId(wireTraceId) ? wireTraceId : sha256(turnKey).slice(0, 32);
@@ -102,8 +108,8 @@ function claudeSynthesizedCorrelation(args: {
   return {
     traceId,
     spanId,
-    source: "claude_synthesized",
-    providerKind: "claude_code",
+    source: providerKind === "grok" ? "grok_synthesized" : "claude_synthesized",
+    providerKind,
   };
 }
 

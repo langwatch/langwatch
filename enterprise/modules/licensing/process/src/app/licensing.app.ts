@@ -639,6 +639,10 @@ export class LicensingModule implements LicensingApiContract {
     return this.#sync.verify(input);
   }
 
+  verifyLicenceTokenForSync(input: ConnectPresentedCredential): Promise<ConnectLicenceCaller> {
+    return this.#sync.verifyForSync(input);
+  }
+
   verifyActivationCode(input: ConnectPresentedCredential): Promise<ConnectActivationCaller> {
     return this.#activation.verifyPresented(input);
   }
@@ -741,6 +745,10 @@ export class LicensingModule implements LicensingApiContract {
 
   getContractTerms(input: { organizationId: string }): Promise<ContractTerms> {
     return this.#contractBudgets.termsOf(input.organizationId);
+  }
+
+  countFullSeatsInUse(input: { organizationId: string }): Promise<number> {
+    return this.#service.countFullSeatsInUse(input.organizationId);
   }
 
   getConnectedSeats(input: { organizationId: string }): Promise<ConnectedSeats> {

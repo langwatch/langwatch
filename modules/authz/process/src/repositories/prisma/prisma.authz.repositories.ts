@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { AuthzRepositories } from "../authz.repositories.ts";
+import { EventingAuthzBillingGrantRepository } from "../eventing/eventing.authz-billing-grant.repository.ts";
 import { EventingAuthzListingRepository } from "../eventing/eventing.authz-listing.repository.ts";
 import { EventingAuthzPlatformGrantRepository } from "../eventing/eventing.authz-platform-grant.repository.ts";
 import { EventingAuthzReadRepository } from "../eventing/eventing.authz-read.repository.ts";
@@ -36,6 +37,7 @@ export class PostgresAuthzRepositories {
       userStandings: PrismaAuthzUserStandingRepository.create({ database: prisma }),
       auditTrail: PrismaAuthzAuditRepository.create(prisma),
       platformGrants: EventingAuthzPlatformGrantRepository.create(prisma),
+      billingGrants: EventingAuthzBillingGrantRepository.create(prisma),
       membershipStamps: PrismaAuthzMembershipStampRepository.create({ database: prisma }),
       grantProjection: PrismaAuthzProjectionRepository.create(prisma),
       revocation: PrismaAuthzRevocationRepository.create({ database: prisma }),

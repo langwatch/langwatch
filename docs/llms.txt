@@ -17,10 +17,13 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [LangWatch CLI](https://langwatch.ai/docs/integration/cli.md): The `langwatch` CLI is a single tool that drives LangWatch from the terminal, for you and for your coding assistant. Instrument code, version prompts, run scenarios, inspect traces, query analytics, and more.
 - [LangWatch MCP Server](https://langwatch.ai/docs/integration/mcp.md): Use the LangWatch MCP Server to extend your coding assistant with deep LangWatch insights for tracing, testing, and agent evaluations.
+- [Debug LLM traces from your coding assistant with MCP](https://langwatch.ai/docs/integration/mcp-debug-traces.md): The LangWatch MCP server lets Claude Code, Cursor or Copilot search and read your agent's traces themselves.
+- [Changelog](https://langwatch.ai/docs/changelog.md): What changed in each recent LangWatch release, from the release notes in the repository.
 
 ## Agent Testing
 
 - [Agent Testing](https://langwatch.ai/docs/agent-testing/overview.md): Test your agents through multi-turn conversations with a simulated user to capture issues before production and prevent regressions.
+- [Test AI agents with simulated users in pytest or vitest](https://langwatch.ai/docs/agent-testing/simulated-users.md): Scenario, LangWatch's open-source testing library, runs a simulated user against your agent inside pytest or vitest, and a judge grades each conversation.
 
 ### Get started
 
@@ -62,11 +65,12 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [Voice Agents](https://langwatch.ai/docs/agent-testing/voice-agents.md): Test a voice agent over real audio. A simulated caller talks to your agent, and a judge scores the call against your criteria.
 - [Red Teaming](https://langwatch.ai/docs/agent-testing/red-teaming.md): RedTeamAgent replaces the user simulator with a multi-turn attacker, in the same scenario.run() loop and the same judge as your functional tests.
+- [Red team AI agents with an open-source multi-turn attacker](https://langwatch.ai/docs/agent-testing/red-team-open-source.md): Scenario, LangWatch's open-source testing library, attacks your agent over dozens of turns inside pytest or vitest and fails the test when it breaks.
 
 ## Observability
 
 - [Observability & Tracing](https://langwatch.ai/docs/observability/overview.md): Monitor, debug, and optimize your LLM applications with comprehensive observability and tracing capabilities
-- [Quick Start](https://langwatch.ai/docs/integration/quick-start.md)
+- [Quick Start](https://langwatch.ai/docs/integration/quick-start.md): Send your first traces to LangWatch in a few minutes, with a coding agent or by hand, in Python, TypeScript or any OpenTelemetry stack.
 - [Concepts](https://langwatch.ai/docs/concepts.md): Explore core concepts of LLM tracing, observability, datasets, and evaluations in LangWatch to design reliable AI agent testing workflows.
 
 ### User Events
@@ -78,7 +82,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Custom Events](https://langwatch.ai/docs/user-events/custom.md): Track custom user events in your LLM application using LangWatch to support analytics, evaluations, and agent testing workflows.
 
 - [Querying your data](https://langwatch.ai/docs/features/querying-your-data.md): LangWatch answers two query languages, analytics SQL and the trace filter. One endpoint describes both, and the CLI runs either without a browser.
-- [Dashboards](https://langwatch.ai/docs/features/dashboards.md): Build boards of charts over your LangWatch data, or start one from the Agent health template for an at-a-glance view of your project.
+- [Dashboards](https://langwatch.ai/docs/features/dashboards.md): Build dashboards of charts over your LangWatch data, or start one from the Agent health template for an at-a-glance view of your project.
 - [Alerts and Automations](https://langwatch.ai/docs/features/automations.md): Configure Alerts and Automations in LangWatch to detect regressions, notify teams, and enforce automated guardrails for AI agent testing.
 - [Braids](https://langwatch.ai/docs/features/braids.md): Show another project's matching spans inside your traces, so an agent that calls agents in other projects can follow each call all the way down. The spans stay where they were recorded.
 - [Topic clustering](https://langwatch.ai/docs/features/topic-clustering.md): Group your traces into topics and subtopics automatically, choose the model it uses, and run it on demand from Settings.
@@ -95,17 +99,18 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 #### Via UI
 
-- [Answer Correctness: check LLM answers against the expected output](https://langwatch.ai/docs/evaluations/experiments/ui/answer-correctness.md): Score every answer against the expected output in your dataset with the Exact Match or the LLM Answer Match evaluator, and compare runs as you change the prompt.
-- [LLM-as-a-Judge: score outputs on criteria without expected answers](https://langwatch.ai/docs/evaluations/experiments/ui/llm-as-a-judge.md): Score outputs against written criteria with an LLM-as-a-Judge evaluator when your dataset has inputs but no expected answers, and read the reason behind each verdict.
-- [Pairwise Comparison: judge prompts, models or agents head-to-head](https://langwatch.ai/docs/evaluations/experiments/ui/pairwise-compare.md): Use the Comparison evaluator to judge two or more candidate outputs against each other, with built-in position-bias mitigation, and rank three or more candidates on a Bradley-Terry leaderboard.
+- [Answer Correctness: check answers against expected output](https://langwatch.ai/docs/evaluations/experiments/ui/answer-correctness.md): Score every answer against the expected output in your dataset with the Exact Match or the LLM Answer Match evaluator, and compare runs as you change the prompt.
+- [LLM-as-a-Judge: score outputs without expected answers](https://langwatch.ai/docs/evaluations/experiments/ui/llm-as-a-judge.md): Score outputs against written criteria with an LLM-as-a-Judge evaluator when your dataset has inputs but no expected answers, and read the reason behind each verdict.
+- [Pairwise Comparison: judge candidates head-to-head](https://langwatch.ai/docs/evaluations/experiments/ui/pairwise-compare.md): Use the Comparison evaluator to judge two or more candidate outputs against each other, with built-in position-bias mitigation, and rank three or more candidates on a Bradley-Terry leaderboard.
 
 - [Running Experiments in CI/CD](https://langwatch.ai/docs/evaluations/experiments/ci-cd.md): Automate LLM quality gates by running experiments in your CI/CD pipelines.
-- [Multimodal Evaluation: images, PDFs and vision models in experiments](https://langwatch.ai/docs/evaluations/experiments/multimodal-evaluation.md): Evaluate image generation, document parsing, and other multimodal AI pipelines with LLM-as-a-Judge vision models.
+- [Versions and Deploy Labels](https://langwatch.ai/docs/evaluations/experiments/versions-and-deploy-labels.md): Save agent and evaluator versions, point a deploy label such as production at one, and roll back by moving the label, with no code change.
+- [Multimodal Evaluation: images, PDFs and vision models](https://langwatch.ai/docs/evaluations/experiments/multimodal-evaluation.md): Evaluate image generation, document parsing, and other multimodal AI pipelines with LLM-as-a-Judge vision models.
 
 ### Online Evaluation
 
 - [Online Evaluation Overview](https://langwatch.ai/docs/evaluations/online-evaluation/overview.md): Score your production traffic as it arrives with monitors that run an evaluator on every matching trace or thread, and read the results on the trace, in the list and in analytics.
-- [Online Evaluations: set up a monitor on your production traffic](https://langwatch.ai/docs/evaluations/online-evaluation/setup-monitors.md): Create an online evaluation that scores every incoming trace or thread with an evaluator, filter and sample the traffic it runs on, and read the results on the trace and in analytics.
+- [Online Evaluations: monitor your production traffic](https://langwatch.ai/docs/evaluations/online-evaluation/setup-monitors.md): Create an online evaluation that scores every incoming trace or thread with an evaluator, filter and sample the traffic it runs on, and read the results on the trace and in analytics.
 
 ### Instant Evals
 
@@ -114,6 +119,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Instant Evals targets and statements](https://langwatch.ai/docs/features/instant-evals/targets.md): What one judged row is, how the time window and the trace filter narrow the rows, the LangWatchQL statement each target writes for you, and how to write your own.
 - [Reading Instant Eval results](https://langwatch.ai/docs/features/instant-evals/results.md): Page through a run's verdicts, read the text the judge saw beside each one, and query the judgments dataset with LangWatchQL to join verdicts to your traces.
 - [Instant Evals limits, cost and billing](https://langwatch.ai/docs/features/instant-evals/limits-and-cost.md): How many rows and questions a run takes, how long it runs, what a run costs, how to read the cost before you start, the free budget, where the spend shows up, and where the judged text goes.
+- [Run Instant Evals on your own decision model](https://langwatch.ai/docs/features/instant-evals/own-model.md): Run Instant Evals on a decision model in your own provider account, set up Azure, and read the rows your model cannot judge.
 - [Instant Evals CLI reference](https://langwatch.ai/docs/features/instant-evals/cli.md): Every langwatch instant-eval subcommand and flag, what each prints, and the exit codes a script can read.
 
 ### Guardrails
@@ -132,7 +138,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ### Datasets
 
 - [Datasets](https://langwatch.ai/docs/datasets/overview.md): Create a dataset by hand, from a CSV or JSON file, or from your traces, edit it in the grid, and run an experiment on it.
-- [Datasets: programmatic access from the SDKs, CLI and MCP server](https://langwatch.ai/docs/datasets/programmatic-access.md): Manage datasets from the Python and TypeScript SDKs, the CLI and the MCP server for offline evaluations and automated workflows.
+- [Datasets: programmatic access from SDKs, CLI and MCP](https://langwatch.ai/docs/datasets/programmatic-access.md): Manage datasets from the Python and TypeScript SDKs, the CLI and the MCP server for offline evaluations and automated workflows.
 - [Automations: build a dataset from your traces](https://langwatch.ai/docs/datasets/automatically-from-traces.md): Create an automation that adds every new trace matching a filter to a dataset, mapped to the columns you choose.
 - [Threads in datasets](https://langwatch.ai/docs/datasets/dataset-threads.md): Add whole conversations to a dataset, one row per thread, with every trace of the thread in one column.
 - [Images and files in datasets](https://langwatch.ai/docs/datasets/dataset-images.md): Upload a picture or a document into a dataset cell, or enter a URL, and send it to a prompt or an agent in an experiment.
@@ -216,7 +222,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Pricing](https://langwatch.ai/docs/pricing.md): How LangWatch Cloud pricing works, with events, data retention, and answers to common questions.
 - [What counts as a billable event](https://langwatch.ai/docs/pricing/billable-events.md): The complete list of events LangWatch Cloud bills for, what is never billed, and how deduplication works
 - [Troubleshooting and Support](https://langwatch.ai/docs/support.md): Get troubleshooting help, FAQs, and technical support paths for LangWatch so you can quickly resolve issues in observability, evaluations, and agent testing setups.
-- [Status Page](https://langwatch.ai/docs/status.md): Something wrong? Check our status page
+- [Status Page](https://langwatch.ai/docs/status.md): Check the LangWatch status page for the current state of the platform, ongoing incidents and scheduled maintenance.
 
 # Observability
 
@@ -246,7 +252,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Debugging and Troubleshooting](https://langwatch.ai/docs/integration/typescript/tutorials/debugging-typescript.md): Debug TypeScript SDK integrations with LangWatch to fix tracing gaps, evaluation mismatches, and agent testing issues.
 - [Semantic Conventions](https://langwatch.ai/docs/integration/typescript/tutorials/semantic-conventions.md): Learn about OpenTelemetry semantic conventions and LangWatch's custom attributes for consistent observability
 
-### Go
+### Go SDK
 
 - [Go Integration Guide](https://langwatch.ai/docs/integration/go/guide.md): Use the LangWatch Go SDK to trace LLM calls, measure performance, and support observability-driven AI agent testing.
 - [Go SDK API Reference](https://langwatch.ai/docs/integration/go/reference.md): Complete API reference for the LangWatch Go SDK, including the exporter, tracer, span helpers, provider instrumentations, data capture and the REST client.
@@ -320,6 +326,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ### LangGraph
 
+- [Trace a LangGraph agent node by node](https://langwatch.ai/docs/integration/langgraph-tracing.md): Pass the LangWatch callback to your graph's invoke and every node, tool call and LLM call becomes a span you can open.
 - [LangGraph Instrumentation](https://langwatch.ai/docs/integration/python/integrations/langgraph.md): Instrument LangGraph applications with the LangWatch Python SDK to trace graph nodes, analyze workflows, and support AI agent testing.
 - [LangGraph Instrumentation](https://langwatch.ai/docs/integration/typescript/integrations/langgraph.md): Instrument LangGraph applications with the LangWatch TypeScript SDK for deep observability and agent testing workflows.
 
@@ -332,6 +339,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ### DSPy Optimization
 
 - [DSPy Visualization Quickstart](https://langwatch.ai/docs/dspy-visualization/quickstart.md): Quickly visualize DSPy notebooks and optimization experiments in LangWatch to support debugging and agent evaluation.
+- [Track DSPy optimization (MIPROv2, GEPA) in a UI](https://langwatch.ai/docs/dspy-visualization/follow-optimization-in-a-ui.md): One call to `langwatch.dspy.init` streams every optimizer step to LangWatch, with the score, the instructions, the examples, the LLM calls and the cost.
 - [Tracking Custom DSPy Optimizer](https://langwatch.ai/docs/dspy-visualization/custom-optimizer.md): Track custom DSPy optimizer logic in LangWatch to visualize optimization steps and improve AI agent testing workflows.
 - [RAG Visualization](https://langwatch.ai/docs/dspy-visualization/rag-visualization.md): Visualize DSPy RAG optimization steps in LangWatch to better understand performance and support AI agent testing.
 
@@ -419,6 +427,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [LangWatch AI Gateway](https://langwatch.ai/docs/ai-gateway/overview.md): One OpenAI- and Anthropic-compatible endpoint for every LLM call in your company, with provider keys kept in LangWatch, a virtual key per application, team or person, budgets that block or warn, and a trace for every request.
 - [Quickstart](https://langwatch.ai/docs/ai-gateway/quickstart.md): Create a virtual key, send one request through the LangWatch AI Gateway with the OpenAI SDK, open the trace and see the spend on the key.
+- [AI gateway budgets: cap LLM spend with virtual keys](https://langwatch.ai/docs/ai-gateway/cap-spend-per-team.md): The LangWatch AI Gateway gives each app, team or person a virtual key with a USD budget that blocks at the limit.
 - [Concepts](https://langwatch.ai/docs/ai-gateway/concepts.md): The nouns of the LangWatch AI Gateway, each defined once, virtual key, scope, provider credential, routing policy, budget, spend event and gateway request id.
 
 ## SDK Integration
@@ -430,6 +439,14 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ### TypeScript
 
 - [TypeScript](https://langwatch.ai/docs/ai-gateway/sdks/typescript.md): Call the LangWatch AI Gateway from TypeScript with the OpenAI SDK, the Anthropic SDK, the Vercel AI SDK or LangChain.js, and link the gateway span to your own trace.
+
+### Go SDK
+
+- [Go](https://langwatch.ai/docs/ai-gateway/sdks/go.md): Call the LangWatch AI Gateway from Go with the OpenAI SDK or the Anthropic SDK, and link the gateway span to your own trace.
+
+### HTTP and other clients
+
+- [Any OpenAI-compatible client](https://langwatch.ai/docs/ai-gateway/sdks/http.md): Call the LangWatch AI Gateway with curl or any client that lets you set an OpenAI base URL and API key, and link the gateway span to your own trace.
 
 ## Virtual Keys & Budgets
 
@@ -469,6 +486,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Groq](https://langwatch.ai/docs/ai-gateway/providers/groq.md): Add a Groq API key under Settings, Model Providers and call Groq models through the LangWatch AI Gateway.
 - [Cerebras](https://langwatch.ai/docs/ai-gateway/providers/cerebras.md): Add a Cerebras API key under Settings, Model Providers and call Cerebras models through the LangWatch AI Gateway.
 - [DeepSeek](https://langwatch.ai/docs/ai-gateway/providers/deepseek.md): Add a DeepSeek API key under Settings, Model Providers and call DeepSeek models through the LangWatch AI Gateway.
+- [Doubleword](https://langwatch.ai/docs/ai-gateway/providers/doubleword.md): Add a Doubleword API key under Settings, Model Providers and call Doubleword's hosted open-weight models through the LangWatch AI Gateway.
 - [Voyage AI](https://langwatch.ai/docs/ai-gateway/providers/voyage.md): Add a Voyage AI API key under Settings, Model Providers and call Voyage embedding models through the LangWatch AI Gateway.
 - [ElevenLabs](https://langwatch.ai/docs/ai-gateway/providers/elevenlabs.md): Add an ElevenLabs API key under Settings, Model Providers and call speech and transcription through the LangWatch AI Gateway with the OpenAI audio routes or the ElevenLabs SDKs.
 - [OpenAI account](https://langwatch.ai/docs/ai-gateway/providers/openai-account.md): Sign in with a ChatGPT account under Settings, Model Providers and call the Responses API through the LangWatch AI Gateway on that subscription.
@@ -504,6 +522,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [POST /v1/messages](https://langwatch.ai/docs/ai-gateway/api/messages.md): Anthropic-compatible Messages endpoint through the LangWatch AI Gateway.
 - [POST /v1/responses](https://langwatch.ai/docs/ai-gateway/api/responses.md): OpenAI Responses API through the LangWatch AI Gateway, for OpenAI, Azure OpenAI and codex models.
 - [POST /v1/embeddings](https://langwatch.ai/docs/ai-gateway/api/embeddings.md): OpenAI-compatible embeddings endpoint through the LangWatch AI Gateway.
+- [POST /v1/decisions](https://langwatch.ai/docs/ai-gateway/api/decisions.md): OpenAI Decisions API through the LangWatch AI Gateway.
 - [POST /v1/audio/*](https://langwatch.ai/docs/ai-gateway/api/audio.md): Speech synthesis and transcription through the LangWatch AI Gateway on OpenAI's wire, served by OpenAI and ElevenLabs.
 - [POST /v1/images/*](https://langwatch.ai/docs/ai-gateway/api/images.md): Image generation and editing through the LangWatch AI Gateway, on OpenAI's wire.
 - [ElevenLabs API paths](https://langwatch.ai/docs/ai-gateway/api/elevenlabs.md): ElevenLabs' own synthesis, transcription, single-use token and post-call webhook paths, served by the LangWatch AI Gateway so an ElevenLabs SDK is metered by changing only its base URL and key.
@@ -598,9 +617,10 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Get Started
 
-- [Coding Agent Monitoring and Cost Tracking](https://langwatch.ai/docs/coding-agents/overview.md): Track what Claude Code, Codex, Copilot, Gemini CLI and opencode really do and cost, per session, per pull request and per team, with privacy controls built for tracking people's tools.
+- [Coding Agent Monitoring and Cost Tracking](https://langwatch.ai/docs/coding-agents/overview.md): Track what Claude Code, Codex, Copilot, Gemini CLI, opencode, Grok CLI and pi really do and cost, per session, per pull request and per team, with privacy controls built for tracking people's tools.
 - [Coding Agent Quickstart](https://langwatch.ai/docs/coding-agents/quickstart.md): Connect Claude Code, Codex, Copilot, Gemini CLI or opencode to LangWatch with one command.
 - [Track Your Claude Code Usage](https://langwatch.ai/docs/coding-agents/claude-code-usage.md): See Claude Code usage per session: what you spent, which model took each turn, how much context came back from cache, and what the agent actually did. Works on Claude Max and Pro plans, and on pay-per-token API keys.
+- [Track Claude Code usage and cost across a team](https://langwatch.ai/docs/coding-agents/claude-code-team.md): Send every engineer's Claude Code telemetry to LangWatch and see cost per session, engineer, project and pull request, without reading anyone's prompts.
 
 ## Set Up Your Agent
 
@@ -623,6 +643,14 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ### OpenCode
 
 - [OpenCode Monitoring with OpenTelemetry](https://langwatch.ai/docs/coding-agents/opencode.md): Monitor opencode with OpenTelemetry. Send sessions, cost and traces to LangWatch with the LangWatch command-line tool.
+
+### Grok CLI
+
+- [Grok CLI Monitoring with OpenTelemetry](https://langwatch.ai/docs/coding-agents/grok-cli.md): Monitor the Grok CLI with OpenTelemetry. Send sessions, cost and prompts to LangWatch with the LangWatch command-line tool.
+
+### pi
+
+- [pi Monitoring with OpenTelemetry](https://langwatch.ai/docs/coding-agents/pi.md): Monitor the pi coding agent with OpenTelemetry. Send sessions, cost and traces to LangWatch with the LangWatch command-line tool.
 
 ## See Your Usage
 
@@ -693,8 +721,8 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [First run](https://langwatch.ai/docs/self-hosting/first-run.md): From a fresh install to single sign-on: the first account, the license and the identity provider connection.
 - [Editions and licensing](https://langwatch.ai/docs/self-hosting/licensing.md): What self-hosted LangWatch gives you for free, what an Enterprise license adds, and how to activate one
 - [Connect: hosted services for a self-hosted install](https://langwatch.ai/docs/self-hosting/connect.md): Let a licensed install call LangWatch-hosted services over two outbound hosts, metered against your contract and capped from Settings
-- [Data and telemetry: every outbound connection of a self-hosted install](https://langwatch.ai/docs/self-hosting/data-and-telemetry.md): Every connection a self-hosted install can open to LangWatch and to third parties, what each one carries, and the switch that stops it
-- [Usage report dictionary: every field a self-hosted install sends](https://langwatch.ai/docs/self-hosting/usage-report-dictionary.md): The fields of the daily usage report, their category, their window, why each is collected, and what is never collected. Generated from the dictionary the install reports from.
+- [Data and telemetry: every outbound connection](https://langwatch.ai/docs/self-hosting/data-and-telemetry.md): Every connection a self-hosted install can open to LangWatch and to third parties, what each one carries, and the switch that stops it
+- [Usage report dictionary: every field an install sends](https://langwatch.ai/docs/self-hosting/usage-report-dictionary.md): The fields of the daily usage report, their category, their window, why each is collected, and what is never collected. Generated from the dictionary the install reports from.
 - [Hybrid Setup](https://langwatch.ai/docs/hybrid-setup/overview.md): Use LangWatch Cloud with your own data plane, keep full data ownership while using LangWatch's managed control plane.
 - [Checkup](https://langwatch.ai/docs/self-hosting/checkup.md): Check that a self-hosted install is wired correctly, and see what it sends to LangWatch
 - [Troubleshooting & FAQ](https://langwatch.ai/docs/self-hosting/troubleshooting.md): Common issues and solutions for LangWatch self-hosting
@@ -704,6 +732,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Environment Variables](https://langwatch.ai/docs/self-hosting/configuration/environment-variables.md): Complete environment variable reference for LangWatch self-hosting
 - [Sizing & Scaling](https://langwatch.ai/docs/self-hosting/configuration/sizing-and-scaling.md): Resource requirements, size profiles, and scaling recommendations for LangWatch
 - [Backups](https://langwatch.ai/docs/self-hosting/configuration/backups.md): Backup and restore strategies for LangWatch data stores
+- [ClickHouse access](https://langwatch.ai/docs/self-hosting/configuration/clickhouse-access.md): Give people and tools their own ClickHouse logins: access tiers, rolling passwords and OIDC token logins
 - [Object Storage Lifecycle](https://langwatch.ai/docs/self-hosting/configuration/object-storage-lifecycle.md): The lifecycle rules to create on your bucket or container, and the one setting that confirms them
 - [SSO Configuration](https://langwatch.ai/docs/self-hosting/configuration/sso.md): Set up Single Sign-On for LangWatch with your identity provider
 - [Email](https://langwatch.ai/docs/self-hosting/configuration/email.md): Configure the gateway LangWatch sends alerts, invitations and password resets through
@@ -729,7 +758,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Security](https://langwatch.ai/docs/self-hosting/security.md): Security model, encryption, secrets management, and hardening for LangWatch
 - [Self-hosting compliance](https://langwatch.ai/docs/self-hosting/compliance.md): What works in self-hosted LangWatch under the Apache 2.0 license vs what requires an Enterprise license. Persona-aware coverage map across SOC 2, ISO 27001, GDPR, HIPAA, EU AI Act, plus the substrate primitives behind each.
 - [Releases and support](https://langwatch.ai/docs/self-hosting/releases.md): How LangWatch is versioned, which releases get fixes, and why you can upgrade to the latest release from any version.
-- [Upgrade Guide](https://langwatch.ai/docs/self-hosting/upgrade.md): How to upgrade LangWatch to the latest version
+- [Upgrade Guide](https://langwatch.ai/docs/self-hosting/upgrade.md): How to upgrade a self-hosted LangWatch to the latest version: what to check first, how migrations run and how to confirm they finished.
 - [Migrate to v3](https://langwatch.ai/docs/self-hosting/upgrade-v3.md): Step-by-step guide to upgrade LangWatch from v1.x or v2.x to v3.0
 - [Dataset Storage Migration](https://langwatch.ai/docs/self-hosting/upgrade-dataset-storage.md): Upgrade guide for Helm deployments: datasets move to object storage, with a one-time migration you run once
 
@@ -739,7 +768,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Ops Dashboard](https://langwatch.ai/docs/self-hosting/ops/dashboard.md): Real-time pipeline health monitoring with throughput, latency, and error tracking
 - [Queue Management](https://langwatch.ai/docs/self-hosting/ops/queue-management.md): Manage error groups, blocked queues, dead letter queue redriving, and draining
 - [Projection Replay](https://langwatch.ai/docs/self-hosting/ops/projection-replay.md): Rebuild projection state by replaying events from ClickHouse
-- [Deja View](https://langwatch.ai/docs/self-hosting/ops/dejaview.md): Time-travel debugger for event-sourced aggregates
+- [Deja View](https://langwatch.ai/docs/self-hosting/ops/dejaview.md): Deja View is a time-travel debugger for event-sourced aggregates: search an aggregate, read its events and compute any projection at any point.
 - [The Foundry](https://langwatch.ai/docs/self-hosting/ops/foundry.md): Interactive trace playground for building and sending synthetic traces
 
 ## Langy
@@ -760,7 +789,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ## Traces
 
 - [Overview](https://langwatch.ai/docs/api-reference/traces/overview.md): Search, retrieve, and share LangWatch traces via the REST API. Traces capture the full execution of your LLM pipelines including all spans, evaluations, and metadata.
-- [Discover what the trace filter fields hold](https://langwatch.ai/docs/api-reference/traces/discover-what-the-trace-filter-fields-ho.md)
+- [Discover what the trace filter fields hold](https://langwatch.ai/docs/api-reference/traces/discover-what-the-trace-filter-fields-hold.md)
 - [Search traces](https://langwatch.ai/docs/api-reference/traces/search.md)
 - [Get trace details](https://langwatch.ai/docs/api-reference/traces/get-trace.md)
 - [Get Transcript](https://langwatch.ai/docs/api-reference/traces/get-transcript.md)
@@ -775,19 +804,23 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [List all non-archived datasets for the project](https://langwatch.ai/docs/api-reference/datasets/list-dataset.md)
 - [Create a new dataset](https://langwatch.ai/docs/api-reference/datasets/create-dataset.md)
 - [Create Attachments](https://langwatch.ai/docs/api-reference/datasets/create-attachments.md)
-- [Create an upload for an image or file cell](https://langwatch.ai/docs/api-reference/datasets/create-an-upload-for-an-image-or-file-ce.md)
+- [Create an upload for an image or file cell](https://langwatch.ai/docs/api-reference/datasets/create-an-upload-for-an-image-or-file-cell.md)
 - [Evaluate a dataset](https://langwatch.ai/docs/api-reference/datasets/evaluate-a-dataset.md)
 - [Create a dataset from an uploaded file](https://langwatch.ai/docs/api-reference/datasets/create-a-dataset-from-an-uploaded-file.md)
 - [Create a new dataset from an uploaded file](https://langwatch.ai/docs/api-reference/datasets/create-upload.md)
 - [List entries of a dataset](https://langwatch.ai/docs/api-reference/datasets/get-entries.md)
 - [Get a dataset by its slug or id](https://langwatch.ai/docs/api-reference/datasets/get-dataset.md)
 - [List records for a dataset](https://langwatch.ai/docs/api-reference/datasets/get-records.md)
+- [List dataset versions](https://langwatch.ai/docs/api-reference/datasets/list-dataset-versions.md)
+- [Get a dataset version](https://langwatch.ai/docs/api-reference/datasets/get-a-dataset-version.md)
 - [Update a dataset by its slug or id](https://langwatch.ai/docs/api-reference/datasets/update-dataset.md)
 - [Update or create a record in a dataset](https://langwatch.ai/docs/api-reference/datasets/update-records.md)
-- [Add dataset entries programmatically using the LangWatch API to build evaluation sets for LLM testing and agent validation.](https://langwatch.ai/docs/api-reference/datasets/post-dataset-entries.md)
+- [Add dataset entries](https://langwatch.ai/docs/api-reference/datasets/post-dataset-entries.md)
 - [Import an uploaded file into a dataset](https://langwatch.ai/docs/api-reference/datasets/import-an-uploaded-file-into-a-dataset.md)
 - [Create records in a dataset in batch](https://langwatch.ai/docs/api-reference/datasets/action-records.md)
 - [Upload a file](https://langwatch.ai/docs/api-reference/datasets/action-upload.md)
+- [Save a dataset version](https://langwatch.ai/docs/api-reference/datasets/save-a-dataset-version.md)
+- [Restore a dataset version](https://langwatch.ai/docs/api-reference/datasets/restore-a-dataset-version.md)
 - [Archive a dataset](https://langwatch.ai/docs/api-reference/datasets/delete-dataset.md)
 - [Delete records from a dataset by IDs](https://langwatch.ai/docs/api-reference/datasets/delete-records.md)
 
@@ -796,8 +829,11 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Overview](https://langwatch.ai/docs/api-reference/evaluators-config/overview.md): Manage evaluator configurations for your project. Create, update, and organize evaluators used for online evaluations, guardrails, and experiments.
 - [Get all evaluators for a project](https://langwatch.ai/docs/api-reference/evaluators-config/list-evaluators.md)
 - [Create a new evaluator](https://langwatch.ai/docs/api-reference/evaluators-config/create-evaluators.md)
+- [Get Versions](https://langwatch.ai/docs/api-reference/evaluators-config/get-versions.md)
 - [Get a specific evaluator by ID or slug](https://langwatch.ai/docs/api-reference/evaluators-config/get-evaluators.md)
+- [Update Labels](https://langwatch.ai/docs/api-reference/evaluators-config/update-labels.md)
 - [Update an existing evaluator](https://langwatch.ai/docs/api-reference/evaluators-config/update-evaluators.md)
+- [Remove a deploy label from an evaluator](https://langwatch.ai/docs/api-reference/evaluators-config/delete-labels.md)
 - [Archive an evaluator](https://langwatch.ai/docs/api-reference/evaluators-config/delete-evaluators.md)
 
 ## Built-in Evaluators
@@ -991,11 +1027,14 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Create Agents](https://langwatch.ai/docs/api-reference/agents/create-agents.md)
 - [Create Frames](https://langwatch.ai/docs/api-reference/agents/create-frames.md)
 - [Create Register](https://langwatch.ai/docs/api-reference/agents/create-register.md)
+- [List an agent's versions](https://langwatch.ai/docs/api-reference/agents/list-an-agent-s-versions.md)
 - [Get Agents](https://langwatch.ai/docs/api-reference/agents/get-agents.md)
+- [Point a deploy label at an agent version](https://langwatch.ai/docs/api-reference/agents/point-a-deploy-label-at-an-agent-version.md)
 - [Update Agents (PATCH)](https://langwatch.ai/docs/api-reference/agents/update-agents.md)
 - [Update Agents (PUT)](https://langwatch.ai/docs/api-reference/agents/put-update-agents.md)
 - [Create Call](https://langwatch.ai/docs/api-reference/agents/action-call.md)
 - [Create Test](https://langwatch.ai/docs/api-reference/agents/action-test.md)
+- [Remove a deploy label from an agent](https://langwatch.ai/docs/api-reference/agents/remove-a-deploy-label-from-an-agent.md)
 - [Archive an agent](https://langwatch.ai/docs/api-reference/agents/delete-agents.md)
 
 ## Coding Agents
@@ -1039,13 +1078,27 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Dashboards
 
-- [Overview](https://langwatch.ai/docs/api-reference/dashboards/overview.md): Manage custom analytics dashboards. Create, reorder, and organize dashboards with custom graphs.
-- [List Dashboards](https://langwatch.ai/docs/api-reference/dashboards/list-dashboards.md)
-- [Create a new dashboard](https://langwatch.ai/docs/api-reference/dashboards/create-dashboards.md)
-- [Get a dashboard by its id, including its graphs](https://langwatch.ai/docs/api-reference/dashboards/get-dashboards.md)
-- [Update Reorder](https://langwatch.ai/docs/api-reference/dashboards/put-update-reorder-reorder.md)
-- [Rename a dashboard](https://langwatch.ai/docs/api-reference/dashboards/update-dashboards.md)
-- [Delete a dashboard and its graphs](https://langwatch.ai/docs/api-reference/dashboards/delete-dashboards.md)
+- [Overview](https://langwatch.ai/docs/api-reference/dashboards/overview.md): Create and manage dashboards and the widgets on them. Each widget holds a LangWatchQL query and a chart setup.
+- [List dashboards](https://langwatch.ai/docs/api-reference/dashboards/list-dashboards.md)
+- [Create a dashboard](https://langwatch.ai/docs/api-reference/dashboards/create-a-dashboard.md)
+- [Get a dashboard](https://langwatch.ai/docs/api-reference/dashboards/get-a-dashboard.md)
+- [List a dashboard's widgets](https://langwatch.ai/docs/api-reference/dashboards/list-a-dashboard-s-widgets.md)
+- [Get a widget on a dashboard](https://langwatch.ai/docs/api-reference/dashboards/get-a-widget-on-a-dashboard.md)
+- [Update a dashboard](https://langwatch.ai/docs/api-reference/dashboards/update-a-dashboard.md)
+- [Update a widget on a dashboard](https://langwatch.ai/docs/api-reference/dashboards/update-a-widget-on-a-dashboard.md)
+- [Create a widget on a dashboard](https://langwatch.ai/docs/api-reference/dashboards/create-a-widget-on-a-dashboard.md)
+- [Delete a dashboard](https://langwatch.ai/docs/api-reference/dashboards/delete-a-dashboard.md)
+- [Delete a widget on a dashboard](https://langwatch.ai/docs/api-reference/dashboards/delete-a-widget-on-a-dashboard.md)
+
+## Reports
+
+- [Overview](https://langwatch.ai/docs/api-reference/reports/overview.md): Manage the Analytics Reports dashboards. Create, reorder, and organize dashboards with custom graphs.
+- [List Reports](https://langwatch.ai/docs/api-reference/reports/list-reports.md)
+- [Create a new dashboard](https://langwatch.ai/docs/api-reference/reports/create-reports.md)
+- [Get a dashboard by its id, including its graphs](https://langwatch.ai/docs/api-reference/reports/get-reports.md)
+- [Update Reorder](https://langwatch.ai/docs/api-reference/reports/update-reorder.md)
+- [Rename a dashboard](https://langwatch.ai/docs/api-reference/reports/update-reports.md)
+- [Delete a dashboard and its graphs](https://langwatch.ai/docs/api-reference/reports/delete-reports.md)
 
 ## Graphs
 
@@ -1100,11 +1153,19 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Create project](https://langwatch.ai/docs/api-reference/projects/create-project.md)
 - [Get project](https://langwatch.ai/docs/api-reference/projects/get-project.md)
 - [Get project API key](https://langwatch.ai/docs/api-reference/projects/get-api-key.md)
-- [List Dashboards boards](https://langwatch.ai/docs/api-reference/projects/list-dashboards-boards.md)
-- [Get a Dashboards board](https://langwatch.ai/docs/api-reference/projects/get-a-dashboards-board.md)
+- [List dashboards (deprecated path)](https://langwatch.ai/docs/api-reference/projects/list-dashboards-boards.md)
+- [Get a dashboard (deprecated path)](https://langwatch.ai/docs/api-reference/projects/get-a-dashboard-boards.md)
+- [List dashboard widgets](https://langwatch.ai/docs/api-reference/projects/list-dashboard-widgets.md)
+- [Get a dashboard widget](https://langwatch.ai/docs/api-reference/projects/get-a-dashboard-widget.md)
+- [List dashboards](https://langwatch.ai/docs/api-reference/projects/list-dashboards.md)
+- [Get a dashboard](https://langwatch.ai/docs/api-reference/projects/get-a-dashboard.md)
 - [Update project](https://langwatch.ai/docs/api-reference/projects/update-project.md)
+- [Update a dashboard widget](https://langwatch.ai/docs/api-reference/projects/update-a-dashboard-widget.md)
 - [Regenerate project API key](https://langwatch.ai/docs/api-reference/projects/regenerate-api-key.md)
+- [Create a dashboard widget](https://langwatch.ai/docs/api-reference/projects/create-a-dashboard-widget.md)
+- [Add a dashboard widget to a dashboard](https://langwatch.ai/docs/api-reference/projects/add-a-dashboard-widget-to-a-dashboard.md)
 - [Archive project](https://langwatch.ai/docs/api-reference/projects/archive-project.md)
+- [Delete a dashboard widget](https://langwatch.ai/docs/api-reference/projects/delete-a-dashboard-widget.md)
 
 ## Teams
 

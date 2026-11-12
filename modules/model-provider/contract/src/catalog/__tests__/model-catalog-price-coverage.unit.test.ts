@@ -14,7 +14,7 @@ import {
   overlayOverriddenModelIds,
 } from "../model-catalog.ts";
 import type { LLMModelEntry } from "../model-catalog.types.ts";
-import { getStaticModelCostRates } from "../static-model-costs.ts";
+import { getStaticModelCostRates, isVariablePriceRouter } from "../static-model-costs.ts";
 
 const getStaticModelCosts = getStaticModelCostRates;
 
@@ -41,18 +41,13 @@ const KNOWN_UNPRICED: Record<string, string> = {
     "Music generation billed per 30-second clip at $0.04. Both upstream sources report zero per token and the catalog has no per-clip unit.",
   "gemini/lyria-3-pro-preview":
     "Music generation billed per song at $0.08, same missing per-clip unit.",
-  "inclusionai/ling-3.1-flash":
-    "Upstream lists it at zero per token for input and output; no other source prices it yet.",
-  "nvidia/switchyard":
-    "A router, like openrouter/auto: upstream reports -1 per token and the price is the routed model's.",
   "stealth/space-bunny-alpha":
     "Anonymous preview model offered free of charge upstream, so zero per token is its real rate.",
-  "typesafe/jev-router":
-    "A router, like openrouter/auto: upstream reports -1 per token and the price is the routed model's.",
 };
 
 const isPricedElsewhere = (modelId: string) =>
-  PRICED_ELSEWHERE.some((pattern) => pattern.test(modelId));
+  PRICED_ELSEWHERE.some((pattern) => pattern.test(modelId)) ||
+  isVariablePriceRouter(llmModels.models[modelId]?.pricing);
 
 /** One unit of every quantity the cost path can price. */
 const ONE_OF_EVERYTHING = {

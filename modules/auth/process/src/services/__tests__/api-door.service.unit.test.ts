@@ -11,9 +11,14 @@ import type { RestIdentity } from "@langwatch/api/hosting";
 import { ForbiddenError } from "@langwatch/api/rest";
 import { AuthzScopeNotFoundError, type AuthzApi } from "@langwatch/authz-contract";
 import type { Plan } from "@langwatch/entitlement-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { ApiDoorService, type ApiDoorPeers } from "../api-door.service.ts";
+
+/** Every legacy key in this suite keeps full access; the default is legacy-project-key-scope's. */
+const KEEPS_FULL_ACCESS = createApiFixture<FeatureFlagApi>({ isEnabled: async () => true });
 
 const PROJECT = {
   id: "project-1",
@@ -72,6 +77,7 @@ const peers: ApiDoorPeers = {
       ),
     markUsed: () => {},
   },
+  featureFlags: KEEPS_FULL_ACCESS,
   cliProjects: {
     getCliAccessProject: ({ authorization }) =>
       authorization === "Bearer lw_at_bound"

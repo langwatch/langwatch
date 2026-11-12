@@ -27,6 +27,12 @@ export const TRACE_EXPORT_API_KEY_NAME = "Gateway trace export";
 export const CHECKUP_CANARY_API_KEY_NAME = "Checkup canary";
 
 /**
+ * Name of the five-minute key the documentation playground holds for one member in one project
+ * (ADR-185). Always system-managed, so the stored mark, not the name, hides it.
+ */
+export const DOCS_SESSION_API_KEY_NAME = "Docs session";
+
+/**
  * Name prefix of the key a `langwatch login` device session carries,
  * matched with the device label for re-login replacement and by the hourly
  * sweep alone. NOT hidden: a customer can name a key this way too.
@@ -46,6 +52,7 @@ export const RESERVED_SYSTEM_KEY_NAMES: readonly string[] = [
   WORKFLOW_RUN_API_KEY_NAME,
   TRACE_EXPORT_API_KEY_NAME,
   CHECKUP_CANARY_API_KEY_NAME,
+  DOCS_SESSION_API_KEY_NAME,
 ];
 
 /** A key LangWatch minted for itself: hidden from listings and never updated or revoked by hand. */

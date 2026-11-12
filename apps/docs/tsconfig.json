@@ -1,0 +1,36 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "es2023",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "types": ["vite/client", "node"],
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "paths": {
+      "virtual:docs-nav": ["./src/app/virtual/docs-nav.d.ts"],
+      "virtual:docs-operations": ["./src/app/virtual/docs-operations.d.ts"],
+      "virtual:docs-pages": ["./src/app/virtual/docs-pages.d.ts"]
+    },
+    "incremental": true,
+    "tsBuildInfoFile": ".tsbuild/tsconfig.tsbuildinfo"
+  },
+  "include": ["src", "vite.config.ts", "vitest.config.ts"],
+  "references": [
+    {
+      "path": "../../packages/design-system"
+    },
+    {
+      "path": "../../packages/vitest-config"
+    },
+    {
+      "path": "../../packages/time"
+    }
+  ]
+}

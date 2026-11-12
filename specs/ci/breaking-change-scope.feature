@@ -5,7 +5,7 @@ Feature: A breaking change belongs to one release component
 
   # release-please decides which components a commit affects by path, then
   # applies the WHOLE commit message to every one of them. It has no way to say
-  # "this break is only about the Go SDK". `release-scope-guard` is what keeps
+  # "this break is only about the Go SDK". The `pr-conventions` check is what keeps
   # that from happening, by refusing a pull request whose breaking marker spans
   # components.
   #

@@ -33,8 +33,50 @@ cold:
 # Backups: native ClickHouse BACKUP/RESTORE to S3 (requires objectStorage)
 backup:
   enabled: false
+  # Who takes the backups (ADR-199):
+  #   cronjob          CronJobs below, as before (the default)
+  #   sidecar          the ch-config sidecar in every ClickHouse pod, on one
+  #                    elected runner; no backup CronJobs render
+  #   cronjob-observe  CronJobs back up; the sidecar only decides and exports
+  #                    metrics, so its alerts can be checked before switching
+  mode: cronjob
   database: "langwatch"
   user: "default" # ClickHouse user for backup/restore operations
+  # Sidecar mode: the Secret key holding backup.user's password, mounted as a
+  # file. Empty uses the chart's credentials Secret (the default password).
+  passwordSecret:
+    name: ""
+    key: ""
+  # How long the backups prefix is kept (the object store's lifecycle rule).
+  # Set it to match that rule. Every backup restores for at least this less
+  # two full intervals plus 2h (26h on the default schedule), so set the rule
+  # that much longer than the window you need.
+  retentionDays: 7
+  # Sidecar mode: max_backup_bandwidth in bytes per second (0 = unlimited).
+  maxBandwidth: 0
+  # A backup in flight for longer than this many hours is overrunning: the
+  # sidecar flags it (ClickHouseBackupOverrunning) and a one-shot run stops
+  # waiting. It still blocks a second backup of its mode at any age.
+  staleHours: 12
+  sidecar:
+    # Pod ordinal that runs backups while it answers; else the next one that does.
+    runnerOrdinal: 0
+    # /metrics, /status and /healthz, on the pod IP.
+    metricsPort: 8125
+    # Used when access is off; with access on the shared container takes
+    # access.sidecar.resources.
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
+    # A prometheus-operator PodMonitor for the sidecar's /metrics.
+    podMonitor:
+      enabled: false
+      interval: 60s
+      labels: {}
   # Resource requests + limits for the backup/restore Job containers.
   # Both are required by clusters that enforce a "limits and requests must
   # be set" policy (Gatekeeper/Kyverno) — a Job without them is denied.
@@ -116,10 +158,25 @@ backup:
         cronjob: backup-incremental
         staleAfterHours: 3 # schedule is hourly
 
+    # Sidecar and cronjob-observe modes: rules on the sidecar's own metrics,
+    # one stale alert per mode. Needs the sidecar's /metrics scraped (see
+    # backup.sidecar.podMonitor). `targets` above applies while CronJobs render.
+    sidecar:
+      staleAfterHours:
+        full: 26
+        incremental: 3
+      # PromQL label matchers for the sidecar's series; empty matches this
+      # release's pods: namespace="<ns>", pod=~"<fullname>-[0-9]+".
+      selector: ""
+
 # Authentication
 auth:
   password: "" # Used as autogen seed when autogen.enabled=true and this is unset
   clusterSecret: "" # Used as autogen seed when autogen.enabled=true and this is unset
+  # Apply clusterSecret to remote_servers (replicas>1). Recommended; off keeps
+  # the earlier no-secret cluster. Turning it on mid-roll mixes pods with and
+  # without it, so see the README (Cluster secret) before enabling.
+  clusterSecretEnabled: false
   existingSecret: "" # Operator-owned Secret name. Required when autogen.enabled=false.
   secretKeys:
     passwordKey: "password"
@@ -158,7 +215,7 @@ autogen:
 # A startup guard inside the Job fails fast if jq is missing from the image.
 preflight:
   enabled: true
-  image: alpine/k8s:1.30.0
+  image: alpine/k8s:1.34.9
   imagePullPolicy: IfNotPresent
   activeDeadlineSeconds: 60
 
@@ -227,6 +284,56 @@ extraVolumeMounts: []
 # a standalone install of this subchart renders no LWQL mount.
 lwqlAccess:
   secretName: ""
+
+# Deprecated, no effect: documented earlier but never rendered. Use `access`.
+# Accepted so existing values files keep working; removed in the next major.
+users: ""
+
+# Users, tiers and logins from an access file (ADR-198). Off by default: the
+# server then has only its default user plus whatever extraVolumes mount.
+# On, a sidecar container keeps the users current and verifies OIDC token
+# logins on 127.0.0.1 inside the pod. See the README's "Access" section.
+access:
+  enabled: false
+  # The access file itself: issuers and users. Rolling users name a directory
+  # under /etc/clickhouse-access/secrets/<Secret name> (see passwordSecrets).
+  config: {}
+  # More files next to access.yaml, at /etc/clickhouse-access/config/<name>:
+  # an issuer's private CA for ca_file, say.
+  extraFiles: {}
+  # Or an existing ConfigMap with an `access.yaml` key (every key is mounted);
+  # `config` and `extraFiles` are then ignored.
+  existingConfigMap: ""
+  # Secrets mounted as password directories, each at
+  # /etc/clickhouse-access/secrets/<name>. Every key is one valid password;
+  # `<key>.valid_until` (RFC 3339) ends `<key>`. Add a key, move the client,
+  # remove the old key: the sidecar applies each change within ~10 seconds.
+  passwordSecrets: []
+  # Dynamic-only mode (ADR-198): no static password anywhere in ClickHouse.
+  # Every person and workload logs in with a short-lived OIDC token; default
+  # is locked; the only password is a local admin generated at every start
+  # into an in-memory volume, valid from inside the pod only. Needs
+  # access.enabled, token users only (no passwordSecrets), and
+  # auth.clusterSecretEnabled when replicas > 1. Backups run only as
+  # backup.mode=sidecar and only with replicas: 1. The chart adds
+  # `mode: dynamic-only` to access.config; with existingConfigMap, set it there.
+  # Clients mount a projected service-account token and re-read it for every
+  # connection, for example:
+  #   volumes:
+  #     - name: clickhouse-token
+  #       projected:
+  #         sources:
+  #           - serviceAccountToken: {audience: clickhouse, expirationSeconds: 600, path: token}
+  dynamicOnly:
+    enabled: false
+  sidecar:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
 
 # Scheduling
 scheduling:

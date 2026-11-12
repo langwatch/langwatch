@@ -172,7 +172,7 @@ export const insightRunSettingsSchema: InsightRunSettingsSchema =
   insightRunSettingsSchemaDefinition;
 export type InsightRunSettings = z.infer<typeof insightRunSettingsSchema>;
 
-/** `undecided`: the person was never asked, or closed the offer without an answer. */
+/** `undecided`: the person has not turned the run on or off yet. */
 export const INSIGHT_SCHEDULE_STATES = ["undecided", "off", "on"] as const;
 export const insightScheduleStateSchema = z.enum(INSIGHT_SCHEDULE_STATES);
 export type InsightScheduleState = z.infer<typeof insightScheduleStateSchema>;
@@ -247,7 +247,7 @@ export const configureInsightDailyRunInputSchema: ConfigureInsightDailyRunInputS
   configureInsightDailyRunInputSchemaDefinition;
 export type ConfigureInsightDailyRunInput = z.infer<typeof configureInsightDailyRunInputSchema>;
 
-/** Turns a board's daily run off; also what "No thanks" on the offer stores. */
+/** Turns a board's daily run off. */
 const turnOffInsightDailyRunInputSchemaDefinition = z.object({
   ...insightProjectScopeSchema.shape,
   board: insightRunBoardSchema,

@@ -6,7 +6,7 @@ import { createTrpcRuntime } from "@langwatch/api/trpc";
  * every procedure throws. Spec: specs/projects/projects-browser-door.feature
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
-import type { AuthzApi } from "@langwatch/authz-contract";
+import type { AuthzApi, AuthzCanBatchByIdsInput } from "@langwatch/authz-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
@@ -111,6 +111,7 @@ type PermissionQuestion = {
 function application(
   options: {
     permits?: (question: PermissionQuestion) => boolean;
+    manages?: (projectId: string) => boolean;
     record?: AuditLogApi["record"];
     revoked?: (payload: unknown) => Promise<void>;
   } = {},
@@ -128,11 +129,23 @@ function application(
   );
 
   const asked: PermissionQuestion[] = [];
+  const batched: AuthzCanBatchByIdsInput[] = [];
   const permits = options.permits ?? (() => true);
+  const manages = options.manages ?? (() => true);
   const authorization = createApiFixture<AuthzApi>({
     hasPermission: async (question: PermissionQuestion) => {
       asked.push(question);
       return permits(question);
+    },
+    canBatchByIds: async (question: AuthzCanBatchByIdsInput) => {
+      batched.push(question);
+      return {
+        teams: new Map(question.teams.map(({ teamId }) => [teamId, true])),
+        projects: new Map(
+          question.projects.map(({ projectId }) => [projectId, manages(projectId)]),
+        ),
+        organizationRole: null,
+      };
     },
   });
 
@@ -171,7 +184,7 @@ function application(
     recordProjectRevived: { send: async () => undefined },
   });
 
-  return { app, database, asked, logged: reported.entries };
+  return { app, database, asked, batched, logged: reported.entries };
 }
 
 /**
@@ -189,6 +202,7 @@ function mount(options: Parameters<typeof application>[0] = {}) {
     archiveOtherProject: (input) => app.archiveOtherProject(input),
     revokeProjectApiKey: (input) => app.revokeProjectApiKey(input),
     getLegacyKeyStatus: (input) => app.getLegacyKeyStatus(input),
+    legacyKeys: (input) => app.legacyKeys(input),
     updateAggregateRule: (input) => app.updateAggregateRule(input),
     aggregateMemberCandidates: (input) => app.aggregateMemberCandidates(input),
   };
@@ -259,6 +273,7 @@ describe("the project tRPC namespace over the application the composition builds
 
       await expect(caller.getLegacyKeyStatus({ projectId: "project_1" })).resolves.toEqual({
         present: true,
+        lastUsedAt: null,
       });
       const answer = await caller.revokeProjectApiKey({ projectId: "project_1" });
 
@@ -266,6 +281,7 @@ describe("the project tRPC namespace over the application the composition builds
       expect(JSON.stringify(answer)).not.toContain(LEGACY_KEY);
       await expect(caller.getLegacyKeyStatus({ projectId: "project_1" })).resolves.toEqual({
         present: false,
+        lastUsedAt: null,
       });
       expect(database.findProject("project_1")?.apiKey).not.toBe(LEGACY_KEY);
       expect(await app.findIdByLegacyApiKey({ token: LEGACY_KEY })).toBeNull();
@@ -285,6 +301,22 @@ describe("the project tRPC namespace over the application the composition builds
       });
     });
 
+    /** @scenario The legacy key status answers when the key was last used */
+    it("answers when the legacy key last authenticated, and forgets it once revoked", async () => {
+      const { app, caller } = mount();
+
+      await app.markLegacyApiKeyUsed({ projectId: "project_1" });
+      const status = await caller.getLegacyKeyStatus({ projectId: "project_1" });
+
+      expect(status.present).toBe(true);
+      expect(status.lastUsedAt).toBeInstanceOf(Date);
+      await caller.revokeProjectApiKey({ projectId: "project_1" });
+      await expect(caller.getLegacyKeyStatus({ projectId: "project_1" })).resolves.toEqual({
+        present: false,
+        lastUsedAt: null,
+      });
+    });
+
     /** @scenario Revoking the legacy project key again succeeds and changes nothing a caller can use */
     it("answers a second revocation as revoked, and the status stays absent", async () => {
       const { caller } = mount();
@@ -296,6 +328,7 @@ describe("the project tRPC namespace over the application the composition builds
       });
       await expect(caller.getLegacyKeyStatus({ projectId: "project_1" })).resolves.toEqual({
         present: false,
+        lastUsedAt: null,
       });
     });
 
@@ -318,6 +351,54 @@ describe("the project tRPC namespace over the application the composition builds
 
       await expect(caller.revokeProjectApiKey({ projectId: "missing" })).rejects.toBeDefined();
       expect(record).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the organisation is asked for its live legacy keys", () => {
+    it("asks project:manage once for every project it read, each with its team", async () => {
+      const { caller, batched } = mount();
+
+      const keys = await caller.legacyKeys({ organizationId: ORGANIZATION_ID });
+
+      expect(keys.map((key) => key.projectId)).toEqual([OTHER_PROJECT_ID, "project_1"]);
+      expect(batched).toHaveLength(1);
+      expect(batched[0]).toEqual({
+        principal: { type: "user", id: ACTOR_ID },
+        permission: "project:manage",
+        organizationId: ORGANIZATION_ID,
+        teams: [],
+        projects: [
+          { projectId: OTHER_PROJECT_ID, teamId: "team-1" },
+          { projectId: "project_1", teamId: "team-1" },
+        ],
+      });
+    });
+
+    it("drops the projects the decision refuses", async () => {
+      const { caller } = mount({ manages: (projectId) => projectId === "project_1" });
+
+      const keys = await caller.legacyKeys({ organizationId: ORGANIZATION_ID });
+
+      expect(keys.map((key) => key.projectId)).toEqual(["project_1"]);
+    });
+
+    it("answers nothing, and asks nothing, when no project holds a live key", async () => {
+      const { caller, batched } = mount();
+
+      await caller.revokeProjectApiKey({ projectId: "project_1" });
+      await caller.revokeProjectApiKey({ projectId: OTHER_PROJECT_ID });
+      batched.length = 0;
+
+      await expect(caller.legacyKeys({ organizationId: ORGANIZATION_ID })).resolves.toEqual([]);
+      expect(batched).toHaveLength(0);
+    });
+
+    it("never carries the owning team out to the caller", async () => {
+      const { caller } = mount();
+
+      const keys = await caller.legacyKeys({ organizationId: ORGANIZATION_ID });
+
+      expect(keys.every((key) => !("teamId" in key))).toBe(true);
     });
   });
 

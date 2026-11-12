@@ -23,8 +23,11 @@ anything; the process mounts every installed module's declarations.
    `defineTrpcRouter(<Name>Api, <ns>Trpc)`. The browser derives its client from the contract.
 2. **REST is one complete endpoint per route** (`defineRestRouter(<Name>Api)`), with `.withInput` or
    `.withParams`/`.withQuery`, and `.withOutput` (or `.responds({ ... })` for several statuses).
-3. **Output schemas are required.** A tRPC member with no `.withOutput` answers nothing and a handler
-   that returns data is refused. A REST route declares `.withOutput` or `.responds` (mandatory, record section 8).
+3. **Output schemas are required.** A tRPC member with no `.withOutput` answers nothing: a value its
+   handler returns is logged at error and dropped (a subscription without one is refused). A REST
+   route declares `.withOutput` or `.responds` (mandatory, record section 8). An answer its schema
+   refuses is logged at error and still sent, with every key and every wrong-typed value the
+   schema does not allow removed (`packages/api/src/output-salvage.ts`).
 4. **A handler receives `{ input, app, actor, scope, signal }`, calls one `*Api` operation, returns a
    plain value or throws.** The route's declarations add typed members: `target` (the scope the door
    authorised, from `.withPermission(perm, { at })`), `session` (from `.withCredential("cli_token", { session })`)

@@ -32,12 +32,13 @@ import {
   SquarePen,
   Waves,
 } from "lucide-react";
-import { Profiler, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { Profiler, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   attachedContextToChip,
   type LangyPanelEffect,
   type LangyPanelMode,
+  selectConversationOpenIn,
   useLangyStore,
 } from "../../../../behavior/langy.store.ts";
 import { useGlobalLangyShortcut } from "../../../../behavior/use-global-langy-shortcut.ts";
@@ -88,6 +89,7 @@ import {
 import {
   useLangyHistoryError,
   useLangyListError,
+  useReleaseTurnOfLostConversation,
 } from "../../behavior/panel/use-langy-panel-errors.ts";
 import {
   useLangyDevInspector,
@@ -234,7 +236,7 @@ function LangyPanel({
   const isOpen = useLangyStore((s) => s.isOpen);
   const closePanel = useLangyStore((s) => s.closePanel);
   const pickModel = useLangyStore((s) => s.pickModel);
-  const activeConversationId = useLangyStore((s) => s.activeConversationId);
+  const activeConversationId = useLangyStore((s) => selectConversationOpenIn(s, projectId));
   const pendingPrompt = useLangyStore((s) => s.pendingPrompt);
   const pendingKickoff = useLangyStore((s) => s.pendingKickoff);
   const guidedTourRunning = useGuidedTour().useRunning();
@@ -277,6 +279,7 @@ function LangyPanel({
   const model = useLangyComposerModel({ projectId });
   const makeDefault = useLangyMakeDefault({ resolvedDefault: model.resolvedDefault });
   const engine = useLangyChatEngine({ transport });
+  refs.sendStrandedRef.current = () => engine.applyHistoryToEngine([]);
   const isBusy = engine.status === "submitted" || engine.status === "streaming";
   useLangyWarmWorker({
     projectId,
@@ -319,13 +322,13 @@ function LangyPanel({
     activeConversationId,
     historyMessages: history.messages,
     isFetchingHistory: history.isFetching,
-    applyHistoryToEngine: engine.applyHistoryToEngine,
   };
-  useLangyEngineHistorySync(historySync);
+  useLangyEngineHistorySync({ ...historySync, loadStoredHistory: engine.loadStoredHistory });
   useLangyForeignTurnRehydration({
     ...historySync,
     isBusy,
     engineMessageCount: engine.messages.length,
+    applyHistoryToEngine: engine.applyHistoryToEngine,
   });
   useLangyAdoptedTurnResume({
     dispatchedTurnIdRef: refs.dispatchedTurnIdRef,
@@ -398,6 +401,10 @@ function LangyPanel({
     retryEngineTurn: engine.retryTurn,
     restoreDraftOnFailure,
   });
+  useReleaseTurnOfLostConversation({
+    errorKinds: [failure.turnError?.kind, historyError.presentation?.kind],
+    stopEngine: engine.stop,
+  });
   useLangyOutlivedTurnError({
     error: engine.error,
     transcriptMessages: history.messages,
@@ -415,6 +422,11 @@ function LangyPanel({
     sendMessage: engine.sendMessage,
     restoreDraftOnFailure,
   });
+  // Stable like `send`: only what the member types or picks here counts as a question asked.
+  const sendFromComposer = useCallback(
+    (text: string) => void send(text, { askedFrom: "composer" }),
+    [send],
+  );
   const navigation = useLangyConversationNavigation({
     projectId,
     isBusy,
@@ -694,7 +706,8 @@ function LangyPanel({
                         empty: {
                           panelWidth: placement.floatingPanelWidth,
                           suggestions: emptySuggestions,
-                          onPick: (prompt) => void send(prompt),
+                          // A picked suggestion is the member's question, asked from the composer.
+                          onPick: sendFromComposer,
                         },
                       })}
                       transcript={transcript}
@@ -731,7 +744,7 @@ function LangyPanel({
                         pickModel(picked);
                         makeDefault.offer(picked);
                       }}
-                      onSend={send}
+                      onSend={sendFromComposer}
                       onStop={handleStop}
                       variant={floating ? "floating" : "sidebar"}
                       disabled={!projectId}

@@ -5,6 +5,7 @@ import { getMappingSurfaceInputs, studioWorkflowSchema } from "@langwatch/workfl
 import type { AgentBrowser } from "../model/agent-client.ts";
 import { useAgentManagementHost } from "../model/agent-management-host.ts";
 import { agentApi } from "./agent-api.ts";
+import { useRefreshSavedAgent } from "./use-refresh-saved-agent.ts";
 import type { WorkflowAgentEditorOptions } from "./use-workflow-agent-editor.ts";
 
 const textField = (identifier: string): Field => ({ identifier, type: "str" });
@@ -52,7 +53,7 @@ export function useRoutedWorkflowAgent({
 }) {
   const host = useAgentManagementHost();
   const projectId = host.project()?.id ?? "";
-  const utils = agentApi.useUtils();
+  const refreshSavedAgent = useRefreshSavedAgent({ projectId });
   const agentQuery = agentApi.agents.getById.useQuery(
     { id: agentId ?? "", projectId },
     { enabled: Boolean(agentId && projectId) },
@@ -78,7 +79,7 @@ export function useRoutedWorkflowAgent({
     onUpdate: (input) => {
       void update.mutateAsync({ ...input, projectId }).then(
         async (agent) => {
-          await utils.agents.getAll.invalidate({ projectId });
+          await refreshSavedAgent({ agentId: agent.id });
           onSave?.(agent);
           close();
         },

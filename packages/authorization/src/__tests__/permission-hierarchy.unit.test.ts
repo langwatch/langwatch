@@ -146,6 +146,13 @@ const INDICES_BEFORE_BRAIDS = [
   "governanceCost:view",
   "sso:view",
   "sso:manage",
+  "agents:deploy",
+  "evaluators:deploy",
+  "subscription:upgrade",
+  "subscription:manage",
+  "seatRequests:view",
+  "seatRequests:manage",
+  "members:view",
 ] as const;
 
 const satisfies = (granted: readonly string[], requested: string): boolean =>
@@ -177,6 +184,25 @@ describe("given a bag of granted permissions", () => {
     it.concurrent("does not reach a different resource", () => {
       expect(satisfies(["datasets:manage"], "workflows:view")).toBe(false);
       expect(satisfies(["datasets:manage"], "workflows:manage")).toBe(false);
+    });
+  });
+
+  describe("when the bag holds organization:manage but not organization:delete", () => {
+    /** @scenario "Deleting the organization is never implied by managing it" */
+    it.concurrent("refuses organization:delete — deleting the org is an explicit grant only", () => {
+      expect(satisfies(["organization:manage"], "organization:delete")).toBe(false);
+    });
+
+    /** @scenario "Deleting the organization is never implied by managing it" */
+    it.concurrent("still satisfies view on the organization", () => {
+      expect(satisfies(["organization:manage"], "organization:view")).toBe(true);
+    });
+
+    /** @scenario "Deleting the organization is never implied by managing it" */
+    it.concurrent("satisfies organization:delete when it is granted directly", () => {
+      expect(satisfies(["organization:manage", "organization:delete"], "organization:delete")).toBe(
+        true,
+      );
     });
   });
 

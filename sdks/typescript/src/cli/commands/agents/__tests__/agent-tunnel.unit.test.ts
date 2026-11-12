@@ -3,42 +3,15 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  type Mock,
-  vi,
-} from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
-// The tunnel path verifies the binary on every start. Tests pin platform/arch to
-// darwin-x64, a named UNVERIFIED_PLATFORMS exception, so verification skips deterministically.
-const realPlatform = process.platform;
-const realArch = process.arch;
-beforeAll(() => {
-  Object.defineProperty(process, "platform", {
-    value: "darwin",
-    configurable: true,
-  });
-  Object.defineProperty(process, "arch", {
-    value: "x64",
-    configurable: true,
-  });
-});
-afterAll(() => {
-  Object.defineProperty(process, "platform", {
-    value: realPlatform,
-    configurable: true,
-  });
-  Object.defineProperty(process, "arch", {
-    value: realArch,
-    configurable: true,
-  });
-});
+// Binary verification and the tunnel process have their own tests
+// (cloudflared-binary, cloudflared-process); these exercise the session flow,
+// so both are stubbed out and nothing is downloaded or spawned.
+const ensureBinaryMock = vi.hoisted(() => vi.fn(async () => undefined));
+vi.mock("../tunnel/cloudflared-binary", () => ({
+  ensureCloudflaredBinary: ensureBinaryMock,
+}));
 
 vi.mock("@/client-sdk/services/agents/agents-api.service", async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -66,10 +39,8 @@ vi.mock("ora", () => ({
 
 const fakeTunnels: EventEmitter[] = [];
 const quickMock = vi.hoisted(() => vi.fn());
-vi.mock("cloudflared", () => ({
-  use: vi.fn(),
-  install: vi.fn(),
-  Tunnel: { quick: quickMock },
+vi.mock("../tunnel/cloudflared-process", () => ({
+  launchQuickTunnel: quickMock,
 }));
 
 import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
@@ -113,8 +84,10 @@ describe("agent tunnel session", () => {
     quickMock.mockImplementation(() => {
       const tunnel = new EventEmitter() as EventEmitter & {
         stop: () => boolean;
+        recentLog: () => string;
       };
       tunnel.stop = vi.fn(() => true);
+      tunnel.recentLog = () => "";
       fakeTunnels.push(tunnel);
       setImmediate(() => tunnel.emit("url", TUNNEL_URL));
       return tunnel;
@@ -239,23 +212,17 @@ describe("agent tunnel session", () => {
     });
   });
 
-  describe("when the platform has no pinned cloudflared digest", () => {
-    it("refuses to start rather than running an unverified binary", async () => {
-      Object.defineProperty(process, "platform", {
-        value: "freebsd",
-        configurable: true,
-      });
-      try {
-        await expect(
-          startAgentTunnelSession({ port: "8000", agent: "agent_abc123" }),
-        ).rejects.toThrow(ProcessExitError);
-        expect(mockUpdate).not.toHaveBeenCalled();
-      } finally {
-        Object.defineProperty(process, "platform", {
-          value: "darwin",
-          configurable: true,
-        });
-      }
+  describe("when the cloudflared binary fails verification", () => {
+    it("refuses to start before touching the agent", async () => {
+      ensureBinaryMock.mockRejectedValueOnce(
+        new Error("No pinned cloudflared release for freebsd-x64."),
+      );
+
+      await expect(
+        startAgentTunnelSession({ port: "8000", agent: "agent_abc123" }),
+      ).rejects.toThrow(ProcessExitError);
+      expect(quickMock).not.toHaveBeenCalled();
+      expect(mockUpdate).not.toHaveBeenCalled();
     });
   });
 

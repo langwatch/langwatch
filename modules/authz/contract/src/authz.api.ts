@@ -16,6 +16,7 @@ import { generate } from "@langwatch/ksuid";
 import { moduleApi } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 
+import type * as Billing from "./authz-billing-role.commands.ts";
 import type * as Braids from "./authz-braids.commands.ts";
 import type * as authzGrantEventsModule from "./authz-grant.events.ts";
 import type * as Grants from "./authz-grants-rest.schemas.ts";
@@ -34,11 +35,13 @@ import type { Authorized, AuthzDecision, AuthzPrincipalRef, AuthzScopeRef } from
 export interface AuthzCaller {
   readonly id: string;
 }
+/** `organizationPermissions` is the same caller's set at the scope's organization. */
 export type EffectivePermissions =
-  | Readonly<{ scope: null; permissions: string[] }>
+  | Readonly<{ scope: null; permissions: string[]; organizationPermissions: string[] }>
   | Readonly<{
       scope: Readonly<{ type: AuthzScopeRef["type"]; id: string }>;
       permissions: Queries.AuthzEffectivePermissionsOutput;
+      organizationPermissions: Queries.AuthzEffectivePermissionsOutput;
     }>;
 
 /**
@@ -272,6 +275,12 @@ export interface AuthzApi {
   revokePlatformOperator(args: Platform.AuthzRevokePlatformOperatorInput): Promise<void>;
   /** Every live platform operator, oldest first. */
   listPlatformOperators(): Promise<Platform.AuthzListPlatformOperatorsOutput>;
+  /** Who holds the Billing role on an enabled membership, oldest grant first. */
+  listBillingMembers(
+    args: Billing.AuthzListBillingMembersInput,
+  ): Promise<readonly Billing.AuthzBillingMember[]>;
+  /** Grants or revokes the Billing role; idempotent. Refuses a person with no membership. */
+  setBillingRole(args: Billing.AuthzSetBillingRoleInput): Promise<void>;
   /** The escalation rule every door shares: what of these the caller lacks at that scope. */
   findPermissionsBeyondCaller(
     args: Grants.AuthzFindPermissionsBeyondCallerInput,

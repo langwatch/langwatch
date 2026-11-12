@@ -196,7 +196,7 @@ export class ActivationCodeService {
 
     const now = this.#now();
     const claimed = await this.#claim({ row, instanceId, at: now });
-    if (!claimed) throw await this.#whyTheClaimLost({ row, at: now });
+    if (!claimed) throw await this.#whyTheClaimLost({ row, instanceId, at: now });
 
     try {
       return await this.#mint({ row, instanceId, now });
@@ -228,13 +228,26 @@ export class ActivationCodeService {
 
   /** Why a claim found no row: read back rather than guessed, since it can
    *  only lose to a change between the read and the write. */
-  async #whyTheClaimLost({ row, at }: { row: ActivationCodeRecord; at: Instant }): Promise<Error> {
+  async #whyTheClaimLost({
+    row,
+    instanceId,
+    at,
+  }: {
+    row: ActivationCodeRecord;
+    instanceId: string;
+    at: Instant;
+  }): Promise<Error> {
     const current = await this.collaborators.repository.findById(row.id);
     if (!current || current.revokedAt) return new ActivationCodeNotFoundError();
     if (Temporal.Instant.compare(at, current.expiresAt) >= 0) {
       return new ActivationCodeExpiredError();
     }
-    return new ActivationCodeAlreadyRedeemedError();
+    // The caller already holds the code and names its own install, so whether
+    // the claim was its own tells it nothing about anyone else.
+    const claimer = current.redeemedByInstanceId;
+    return new ActivationCodeAlreadyRedeemedError(
+      claimer === null ? {} : { sameInstall: claimer === instanceId },
+    );
   }
 
   /** The license this code describes, signed and handed over once. */

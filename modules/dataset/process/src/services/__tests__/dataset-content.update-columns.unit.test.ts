@@ -69,4 +69,61 @@ describe("DatasetContentService.updateColumns", () => {
       expect(updated).not.toHaveProperty("sourceStoredObjectId");
     });
   });
+
+  describe("when one save deletes a column and renames another, naming the rename", () => {
+    /** @scenario "A save that deletes one column and renames another keeps the renamed column's values" */
+    it("writes the renamed column's own values and drops the deleted column's", async () => {
+      const before = datasetSchema.parse({
+        ...dataset,
+        columnTypes: [
+          { name: "first", type: "string" },
+          { name: "second", type: "string" },
+        ],
+        rowCount: 1,
+        chunkCount: 1,
+        chunkOffsets: [{ index: 0, startRow: 0, endRow: 1, byteSize: 10 }],
+      });
+      const columnTypes = [{ name: "renamed", type: "string" as const }];
+      const row: DatasetRow = { ...before, sourceStoredObjectId: null };
+      const writeChunks = vi.fn(async () => []);
+      const tx = createApiFixture<DatasetContentRepository>(
+        {
+          getOne: vi.fn(async () => row),
+          updateContent: vi.fn(async () => ({ ...row, columnTypes })),
+        },
+        "dataset content tx",
+      );
+      const service = DatasetContentService.create({
+        datasets: createApiFixture<DatasetContentRepository>(
+          { withDatasetLock: async (_id, mutate) => mutate(tx) },
+          "dataset content",
+        ),
+        storage: createApiFixture<DatasetChunkRepository>(
+          {
+            readChunk: vi.fn(async () => [
+              { id: "record_1", entry: { first: "deleted value", second: "kept value" } },
+            ]),
+            writeChunks,
+            deleteChunksFrom: vi.fn(async () => undefined),
+          },
+          "dataset chunks",
+        ),
+      });
+
+      await service.updateColumns({
+        dataset: before,
+        projectId: "p1",
+        name: before.name,
+        slug: before.slug,
+        columnTypes,
+        columnRenames: [{ from: "second", to: "renamed" }],
+      });
+
+      expect(writeChunks).toHaveBeenCalledWith(
+        expect.objectContaining({
+          records: [{ id: "record_1", entry: { renamed: "kept value" } }],
+        }),
+      );
+    });
+  });
 });

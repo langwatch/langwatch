@@ -90,6 +90,8 @@ class HostServiceApiKeyHost extends ApiKeyHostApi {
       ) => void;
       navigate: (to: string) => void;
       replace: (to: string) => void;
+      /** Whoever owns sign-out ends the session and takes the reader off this page. */
+      signOut: () => Promise<void>;
       succeeded: (notice: ApiKeySuccessNotice) => void;
       failed: (failure: ApiKeyFailureNotice) => void;
       openDrawer: ReturnType<typeof useDrawer>["openDrawer"];
@@ -172,7 +174,7 @@ class HostServiceApiKeyHost extends ApiKeyHostApi {
   }
 
   signOut(): void {
-    if (typeof window !== "undefined") window.location.assign("/api/auth/logout");
+    void this.deps.signOut();
   }
 
   recordLeadSourceIfAbsent(source: string): void {
@@ -232,6 +234,7 @@ export default function ApiKeyHostMount({ children }: { children?: ReactNode }) 
         setQuery: (next, options) => route.setQuery(next, options),
         navigate: (to) => navigation.navigate(to),
         replace: (to) => navigation.replace(to),
+        signOut: () => session.signOut(),
         succeeded: (notice) => feedback.succeeded(notice),
         failed: (failure) => feedback.failed(failure),
         openDrawer,

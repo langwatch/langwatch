@@ -1,9 +1,12 @@
 import {
   DashboardWidgetDefinitionInvalidError,
   DashboardWidgetNotFoundError,
+  type LangWatchQLKeyReach,
+  LangWatchQLProjectNotFoundError,
   type AnalyticsApi,
   type DashboardWidget,
 } from "@langwatch/analytics-contract";
+import type { DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import {
   DASHBOARD_WIDGET_DEFINITION_VERSION,
   dashboardWidgetDefinitionSchema,
@@ -27,9 +30,16 @@ import type {
   DashboardWidgetLayoutsInput,
 } from "#repositories/dashboard-widget.repository";
 
+import { mergeQuerySources, withNewQuerySources } from "../rules/widget-query-sources.rules.ts";
 import type { DashboardAccessService } from "./dashboard-access.service.ts";
 
 type Viewed = Readonly<{ viewer?: DashboardViewer }>;
+
+/** The API key a write arrives with, when it is one. */
+type Keyed = Readonly<{ keyReach?: LangWatchQLKeyReach | undefined }>;
+
+/** A widget addressed under one board's path: on any other board, or none, it is not found. */
+type OnBoard = Readonly<{ onDashboardId?: string }>;
 
 /** An update's code and queries, each optional; the repository merges them into the stored half. */
 const definitionUpdateSchema = dashboardWidgetDefinitionSchema.partial();
@@ -74,15 +84,20 @@ export class DashboardWidgetService {
     return rows.map((row) => this.#present(row));
   }
 
-  async getById(input: DashboardWidgetScope & Viewed): Promise<DashboardWidget> {
+  async getById(input: DashboardWidgetScope & Viewed & OnBoard): Promise<DashboardWidget> {
     await this.#assertEnabled(input);
     return this.#present(await this.#visibleRow(input));
   }
 
   async createWidget(
-    input: Omit<CreateDashboardWidgetInput, "id"> & Viewed,
+    input: Omit<CreateDashboardWidgetInput, "id"> & Viewed & Keyed,
   ): Promise<DashboardWidget> {
-    const { viewer, ...fields } = input;
+    const { viewer, keyReach, ...given } = input;
+    // A new widget's unset query stores application (AC200o).
+    const fields = {
+      ...given,
+      input: { ...given.input, queries: withNewQuerySources(given.input.queries) },
+    };
     await this.#assertEnabled(fields);
     if (fields.dashboardId !== undefined) {
       await this.#assertBoardWritable({ ...fields, dashboardId: fields.dashboardId, viewer });
@@ -95,16 +110,43 @@ export class DashboardWidgetService {
         version: DASHBOARD_WIDGET_DEFINITION_VERSION,
       }),
     );
+    await this.#assertProjectsReadable({
+      projectId: fields.projectId,
+      queries: fields.input.queries,
+      viewer,
+      keyReach,
+    });
     return this.#present(await this.#repository.createWidget({ ...fields, id }));
   }
 
-  /** The repository merges the halves given into the stored half, which it parses first. */
-  async updateWidget(input: UpdateDashboardWidgetInput & Viewed): Promise<DashboardWidget> {
-    const { viewer: _viewer, ...fields } = input;
+  /**
+   * The repository merges the halves given into the stored half. Queries come with their
+   * sources already merged over the stored ones, so a query sent without a list keeps its own.
+   * The read and the write are two steps: like every other widget field, the last write wins.
+   */
+  async updateWidget(
+    input: UpdateDashboardWidgetInput & Viewed & Keyed & OnBoard,
+  ): Promise<DashboardWidget> {
+    const { viewer, keyReach, onDashboardId: _onBoard, ...fields } = input;
     await this.#assertEnabled(fields);
-    await this.#visibleRow(input);
+    const row = await this.#visibleRow(input);
     this.#assertWritable(input.id, definitionUpdateSchema.safeParse(input.input));
-    return this.#present(await this.#repository.updateWidget(fields));
+    const sent = fields.input.queries;
+    const queries =
+      sent === undefined
+        ? undefined
+        : mergeQuerySources({ sent, stored: this.#present(row).definition.queries });
+    // The merged queries are what gets stored, so they are what must be readable: a query sent
+    // without a list keeps the projects it had.
+    await this.#assertProjectsReadable({
+      projectId: fields.projectId,
+      queries: queries ?? [],
+      viewer,
+      keyReach,
+    });
+    const merged =
+      queries === undefined ? fields : { ...fields, input: { ...fields.input, queries } };
+    return this.#present(await this.#repository.updateWidget(merged));
   }
 
   async assignToDashboard(input: AssignDashboardWidgetInput & Viewed): Promise<DashboardWidget> {
@@ -115,7 +157,7 @@ export class DashboardWidgetService {
     return this.#present(await this.#repository.assignToDashboard(fields));
   }
 
-  async deleteWidget(input: DashboardWidgetScope & Viewed): Promise<void> {
+  async deleteWidget(input: DashboardWidgetScope & Viewed & OnBoard): Promise<void> {
     await this.#assertEnabled(input);
     await this.#visibleRow(input);
     return this.#repository.deleteWidget({ projectId: input.projectId, id: input.id });
@@ -128,6 +170,54 @@ export class DashboardWidgetService {
     await this.#repository.updateLayouts({
       projectId: input.projectId,
       layouts: input.layouts.filter(({ graphId }) => !hidden.has(graphId)),
+    });
+  }
+
+  /**
+   * A query stores only projects its writer can read: a member by the `analytics:view` they
+   * hold on each, a project credential by naming its own project alone. A project that is
+   * missing, foreign or unreadable gets the one id-free answer (AC210c).
+   */
+  async #assertProjectsReadable({
+    projectId,
+    queries,
+    viewer,
+    keyReach,
+  }: {
+    projectId: string;
+  } & Viewed &
+    Keyed & {
+      queries: readonly DashboardWidgetQuery[];
+    }): Promise<void> {
+    // One check over the ids all queries name, once each: the schema already holds each query's
+    // list to the cap, and a repeated id costs one permission read.
+    const named = [...new Set(queries.flatMap((query) => query.projects ?? []))];
+    if (named.length === 0) return;
+    await this.#assertListReadable({ projectId, named, viewer, keyReach });
+  }
+
+  async #assertListReadable({
+    projectId,
+    named,
+    viewer,
+    keyReach,
+  }: { projectId: string; named: readonly string[] } & Viewed & Keyed): Promise<void> {
+    if (keyReach?.kind === "apiKey") {
+      await this.#analytics.assertProjectsReadable({
+        reach: keyReach,
+        projectIds: named,
+        anchorProjectId: projectId,
+      });
+      return;
+    }
+    if (viewer === undefined) {
+      if (named.some((id) => id !== projectId)) throw new LangWatchQLProjectNotFoundError();
+      return;
+    }
+    await this.#analytics.assertProjectsReadable({
+      userId: viewer.userId,
+      projectIds: named,
+      anchorProjectId: projectId,
     });
   }
 
@@ -149,9 +239,12 @@ export class DashboardWidgetService {
     return rows.filter((row) => row.dashboardId === input.dashboardId);
   }
 
-  async #visibleRow(input: DashboardWidgetScope & Viewed): Promise<DashboardWidgetRow> {
+  async #visibleRow(input: DashboardWidgetScope & Viewed & OnBoard): Promise<DashboardWidgetRow> {
     const row = await this.#repository.getById({ projectId: input.projectId, id: input.id });
     const onBoard = row.dashboardId;
+    if (input.onDashboardId !== undefined && onBoard !== input.onDashboardId) {
+      throw new DashboardWidgetNotFoundError();
+    }
     const hidden =
       onBoard !== null &&
       (await this.#boards.isHidden({
@@ -176,7 +269,7 @@ export class DashboardWidgetService {
     input: { projectId: string; dashboardId: string } & Viewed,
   ): Promise<void> {
     const found = await this.#boards.findReadable(input);
-    if (!found) throw new DashboardWidgetNotFoundError();
+    if (!found) throw new DashboardNotFoundError(input.projectId);
     if (found.standing === "guest") throw new DashboardReadOnlyHereError(input.projectId);
   }
 

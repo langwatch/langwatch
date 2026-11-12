@@ -18,7 +18,11 @@ export const UI_EFFECTIVE_PERMISSIONS_PROCEDURE = "authz.effectivePermissions";
  */
 const GRANTS_STALE_TIME_MS = 30_000;
 
-export type UiEffectivePermissionsRead = { readonly permissions: readonly string[] };
+/** `organizationPermissions` is the same read's answer at the scope's organization. */
+export type UiEffectivePermissionsRead = {
+  readonly permissions: readonly string[];
+  readonly organizationPermissions?: readonly string[];
+};
 
 /**
  * What the caller may do in one scope — the narrower id wins: a project

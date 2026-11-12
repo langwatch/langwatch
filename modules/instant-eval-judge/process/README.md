@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The judge call and the cloud classifier behind it (ADR-174 decisions 10, 13). It calls no peer: what it checks before each call comes from its own copies of its peers' facts.
 
-Peers call these through the token, declared at `../contract/src/instant-eval-judge.api.ts:15`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/instant-eval-judge.api.ts:20`; nothing else in this package is public.
 
 #### `isClassifierConfigured`
 
@@ -46,6 +46,14 @@ Prices and records what an Instant Evals run or judged query spent, under the or
 
 ```typescript
 recordSpend(input: InstantEvalJudgeSpendRecord): Promise<void>;
+```
+
+#### `queryHoldPricing`
+
+The rates a judged query's budget hold is priced at: the dearest base input rate a routed call could reach, never below the classifier's. A best-effort hold, not a hard cap: a routed query re-sends text and pays output and long-context rates, so it can spend past it (ADR-190 d7).
+
+```typescript
+queryHoldPricing(): Promise<InstantEvalPricing>;
 ```
 
 #### `copyLedgerSpend`
@@ -89,14 +97,19 @@ Declared at `src/eventing/instant-eval-judge-spend.pipeline.ts:41`. Events: `ins
 
 ## Configuration
 
-| Kind   | Leaf                    | Environment variable                    | Declared at                                       |
-| ------ | ----------------------- | --------------------------------------- | ------------------------------------------------- |
-| secret | `classifierApiKey`      | `JEV_API_KEY`                           | `src/app/instant-eval-judge.app.ts:63`            |
-| config | `classifierBaseUrl`     | `JEV_BASE_URL`                          | `../contract/src/instant-eval-judge.config.ts:10` |
-| config | `classifierModel`       | `JEV_MODEL`                             | `../contract/src/instant-eval-judge.config.ts:18` |
-| config | `globalTokensPerSecond` | `INSTANT_EVAL_GLOBAL_TOKENS_PER_SECOND` | `../contract/src/instant-eval-judge.config.ts:20` |
-| config | `tenantTokensPerSecond` | `INSTANT_EVAL_TENANT_TOKENS_PER_SECOND` | `../contract/src/instant-eval-judge.config.ts:25` |
-| config | `isSaas`                | `IS_SAAS`                               | `../contract/src/instant-eval-judge.config.ts:30` |
-| config | `nodeEnvironment`       | `NODE_ENV`                              | `../contract/src/instant-eval-judge.config.ts:32` |
+| Kind   | Leaf                      | Environment variable                    | Declared at                                       |
+| ------ | ------------------------- | --------------------------------------- | ------------------------------------------------- |
+| secret | `classifierApiKey`        | `JEV_API_KEY`                           | `src/app/instant-eval-judge.app.ts:78`            |
+| secret | `hostedDecisionsApiKey`   | `INSTANT_EVAL_DECISIONS_API_KEY`        | `src/app/instant-eval-judge.app.ts:79`            |
+| secret | `llmJudgeAnthropicApiKey` | `INSTANT_EVAL_ANTHROPIC_API_KEY`        | `src/app/instant-eval-judge.app.ts:80`            |
+| secret | `llmJudgeOpenAiApiKey`    | `INSTANT_EVAL_OPENAI_API_KEY`           | `src/app/instant-eval-judge.app.ts:81`            |
+| config | `classifierBaseUrl`       | `JEV_BASE_URL`                          | `../contract/src/instant-eval-judge.config.ts:32` |
+| config | `classifierModel`         | `JEV_MODEL`                             | `../contract/src/instant-eval-judge.config.ts:40` |
+| config | `globalTokensPerSecond`   | `INSTANT_EVAL_GLOBAL_TOKENS_PER_SECOND` | `../contract/src/instant-eval-judge.config.ts:42` |
+| config | `tenantTokensPerSecond`   | `INSTANT_EVAL_TENANT_TOKENS_PER_SECOND` | `../contract/src/instant-eval-judge.config.ts:47` |
+| config | `judgeRoutes`             | `INSTANT_EVAL_JUDGE_ROUTES`             | `../contract/src/instant-eval-judge.config.ts:52` |
+| config | `judgeRoutePricing`       | `INSTANT_EVAL_JUDGE_PRICING`            | `../contract/src/instant-eval-judge.config.ts:54` |
+| config | `isSaas`                  | `IS_SAAS`                               | `../contract/src/instant-eval-judge.config.ts:59` |
+| config | `nodeEnvironment`         | `NODE_ENV`                              | `../contract/src/instant-eval-judge.config.ts:61` |
 
 <!-- readme:generated:end -->

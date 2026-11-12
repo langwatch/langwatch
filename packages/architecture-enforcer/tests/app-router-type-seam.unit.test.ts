@@ -15,11 +15,11 @@ import { createWorkspaceModuleResolver, moduleImports } from "../src/workspace/m
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 /**
- * 1,540 with `pnpm ensure:built` (#8795) once ops imports system-migrations types only.
- * 1,562 for braids: seven of its own contract files (signing keys, braid commands and schemas).
- * A ceiling, not a target. Lower it when earned; never raise it without saying why.
- */
-const CEILING = 1_562;
+ * A ceiling, lowered when earned: 1,540 with `pnpm ensure:built` (#8795); 1,561-1,569 ADR-185,
+ * -190, -192, -188 and agent/evaluator versions; 1,570 `dataset-version.ts`; 1,576 seat requests;
+ * 1,578 `langy-call-stopped.ts`, the Grok canonicaliser; 1,583 trace-limit usage cache,
+ * coalescer, `entitlement.errors.ts`, client-fault telemetry; 1,588 braids' contract files. */
+const CEILING = 1_588;
 
 /** Every browser file that declares a module's typed procedures through `createModuleApi`. */
 function moduleApiDeclarations(): string[] {

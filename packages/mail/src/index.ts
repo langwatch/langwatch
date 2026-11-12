@@ -9,6 +9,7 @@ export {
   type MailSender,
 } from "./email-sender.ts";
 export { MailRender } from "./mail-render.ts";
+export { withLinkMarker, type LinkMarker } from "./link-marker.ts";
 export { mailTemplates } from "./templates/index.ts";
 export { digestUpdateSchema } from "./templates/digest-parts.tsx";
 export type { DigestUpdate } from "./templates/digest-parts.tsx";
@@ -16,6 +17,7 @@ export { propsFormSchema, renderMailTemplate } from "./templates/registry.ts";
 export type { MailFixture, MailTemplate } from "./templates/registry.ts";
 export { expressive } from "./templates/email-layout.tsx";
 export type { UpgradeAlertEmailProps } from "./templates/upgrade-alert-email.tsx";
+export type { MonitorAutoPausedEmailProps } from "./templates/monitor-auto-paused-email.tsx";
 export { ReactEmailMailRenderer } from "./adapters/react-email.render.adapter.ts";
 export {
   renderTriggerDigestEmail,
@@ -48,6 +50,11 @@ export {
   sendConnectedStatementEmail,
   type ConnectedStatementEmailProps,
 } from "./templates/connected-statement-email.tsx";
+export {
+  sendIdpRefusedSignInEmail,
+  sendSeatRequestEmail,
+  type SeatRequestProps,
+} from "./templates/seat-request-emails.tsx";
 export { sendLicenseEmail } from "./templates/license-email.tsx";
 export { sendResetPasswordEmail } from "./templates/reset-password-email.tsx";
 export { sendSignUpVerificationEmail } from "./templates/sign-up-verification-email.tsx";

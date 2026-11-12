@@ -44,8 +44,9 @@ langwatch.setup(
     instrumentors=[SmolagentsInstrumentor()]
 )
 
-# LiteLLMModel reads OPENAI_API_KEY from the environment
-model = LiteLLMModel(model_id="openai/gpt-5")
+# LiteLLMModel reads OPENAI_API_KEY from the environment. drop_params drops the
+# stop sequences CodeAgent sends, which gpt-6 refuses
+model = LiteLLMModel(model_id="openai/gpt-6-luna", drop_params=True)
 
 # Create your agent
 agent = CodeAgent(
@@ -85,7 +86,7 @@ langwatch.setup(
 
 agent = CodeAgent(
     tools=[],
-    model=LiteLLMModel(model_id="openai/gpt-5"),
+    model=LiteLLMModel(model_id="openai/gpt-6-luna", drop_params=True),
     name="hello_agent",
     instructions="You are a helpful assistant. Always be friendly and concise.",
 )
@@ -100,7 +101,7 @@ def run_agent_interaction(user_message: str):
                 "user_id": "user_123",
                 "session_id": "session_abc",
                 "agent_name": "hello_agent",
-                "model": "gpt-5"
+                "model": "gpt-6-luna"
             }
         )
 
@@ -153,7 +154,7 @@ def my_custom_agent(input_message: str):
     # Your SmolAgents code here
     agent = CodeAgent(
         tools=[],
-        model=LiteLLMModel(model_id="openai/gpt-5"),
+        model=LiteLLMModel(model_id="openai/gpt-6-luna", drop_params=True),
         name="custom_agent",
         instructions="Your custom instructions",
     )
@@ -166,7 +167,7 @@ def my_custom_agent(input_message: str):
                 "user_id": "user_123",
                 "session_id": "session_abc",
                 "agent_name": "custom_agent",
-                "model": "gpt-5"
+                "model": "gpt-6-luna"
             }
         )
 

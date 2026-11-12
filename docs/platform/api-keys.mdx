@@ -40,14 +40,17 @@ An [ingestion template](/ai-governance/ingestion-templates) mints an ingestion k
     Go to [Settings > API Keys](https://app.langwatch.ai/settings/api-keys) and click **Create new secret key**.
   </Step>
 
-<Step title="Fill in the drawer">
-  - **Key type**: shown to organization admins only. Pick **Personal**. Other members always create
-  a personal key. - **Name**: for example `Local dev` or `MCP key` - **Description**: optional -
-  **Scope**: the projects, teams or the organization the key can access - **Permissions**: **All**
-  gives the key your own permissions on each scope. **Restricted** lets you pick read or write per
-  [permission category](#permission-categories) - **Expiration**: **No expiration**, 7, 30, 60 or 90
-  days, or **Custom**
-</Step>
+  <Step title="Fill in the drawer">
+    - **Key type**: shown to organization admins only, with a picker for the member who owns a personal key. Other members always create a personal key for themselves
+    - **Name**: for example `Local dev` or `MCP key`
+    - **Scope**: the projects, teams or the organization the key can access. The current project is picked for you
+    - **Expiration**: **No expiration** by default, or 7, 30, 60 or 90 days, or **Custom**
+
+    That is all a first key needs: it gets all of its owner's permissions on that scope. The owner is you, or the member an admin picked, and the key never holds more than they do. Open **Advanced** to change the rest:
+
+    - **Description**: optional
+    - **Permissions**: **All** gives the key its owner's permissions on each scope. **Restricted** lets you pick read or write per [permission category](#permission-categories)
+  </Step>
 
   <Step title="Copy the key">
     Click **Create secret key**. The key is shown once, as `sk-lw-<id>_<secret>`, with ready-made `.env`, HTTP header, terminal and MCP snippets whose copy buttons carry the real key. Copy it now; the table never shows it again.
@@ -85,10 +88,12 @@ Service keys are for automated systems: CI/CD pipelines, production services and
 
   <Step title="Fill in the drawer">
     - **Key type**: **Service**
-    - **Name** and optional **Description**
+    - **Name**
     - **Scope**: the projects, teams or the organization the key can access
-    - **Permissions**: **All** gives Admin on every scope you picked. **Restricted** gives only the categories you tick
     - **Expiration**
+    - Under **Advanced**:
+      - **Description**: optional
+      - **Permissions**: **All** gives Admin on every scope you picked. **Restricted** gives only the categories you tick
 
     <Warning>
       A service key scoped to the organization with **All** permissions is an organization-wide Admin. Scope service keys to the projects they serve.
@@ -117,10 +122,8 @@ LANGWATCH_PROJECT_ID="your-project-id"
 import langwatch
 
 # LANGWATCH_PROJECT_ID comes from the environment
-
 langwatch.setup(api_key="sk-lw-...")
-
-````
+```
 </Tab>
 <Tab title="TypeScript">
 ```typescript
@@ -128,7 +131,7 @@ import { LangWatch } from 'langwatch';
 
 // LANGWATCH_PROJECT_ID comes from the environment
 const langwatch = new LangWatch({ apiKey: 'sk-lw-...' });
-````
+```
 
 </Tab>
 </Tabs>
@@ -217,9 +220,12 @@ A service key has no owner. Its permissions come from its scope and permission m
 
 **Settings > API Keys** lists every key with **Name**, **Status**, **Secret Key** (the prefix only), **Created**, **Last Used**, **Type** (the owner's email, or **Service**), **Scope** and **Permissions**. A scope filter above the table narrows the list to one project, team or the organization.
 
+Click a key to open its details: owner, scope, permissions, expiry, creation date and last use. The secret is never shown again after it is created.
+
 The key's owner and organization admins can:
 
 - **Edit** the name, description, permission mode, categories and scope
+- **Rotate** the key to get a new secret with the same settings. After you confirm, the new secret is shown once and the old secret is refused at once; there is no overlap period. The key keeps its name, owner, scope, permissions, expiry and usage history. An expired or revoked key cannot be rotated
 - **Revoke** the key. A revoked key is refused at once and cannot be restored
 
 The **Ingestion keys** table on the same page lists ingestion keys; organization admins revoke them.

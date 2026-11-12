@@ -25,7 +25,7 @@ describe("given the Can I trust my numbers? widgets", () => {
       "AND UserId IS NOT NULL",
       "AND ConversationId IS NOT NULL",
       "AND notEmpty(Labels)",
-      "AND Attributes['metadata.outcome'] != ''",
+      "AND MetadataOutcome != ''",
     ]) {
       expect(sql.fields).toContain(filter);
     }

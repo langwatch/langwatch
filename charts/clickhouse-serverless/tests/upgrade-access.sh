@@ -707,7 +707,7 @@ load_images() {
   # pull from the network; side-load them so the run is offline and the pull
   # never eats an activeDeadlineSeconds budget.
   local aux auxtar
-  for aux in busybox:1.37.0 "${PREFLIGHT_IMAGE:-alpine/k8s:1.30.0}"; do
+  for aux in busybox:1.37.0 "${PREFLIGHT_IMAGE:-alpine/k8s:1.34.9}"; do
     docker image inspect "$aux" >/dev/null 2>&1 \
       || docker pull --platform "$PLATFORM" "$aux" >/dev/null 2>&1 || true
     auxtar="${RUN_DIR}/$(tr -c 'a-zA-Z0-9._-' '_' <<< "$aux").tar"

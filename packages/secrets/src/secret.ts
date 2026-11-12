@@ -7,6 +7,12 @@ export interface SecretSchema<Value> {
   parse(value: string): Value;
 }
 
+/** Hands a secret's value to `build`; only what `build` returns leaves (ScopedSecrets.into). */
+export type Into = <Value, Out>(
+  handle: SecretHandle<Value>,
+  build: (value: Value) => Out | Promise<Out>,
+) => Promise<Out>;
+
 export class SecretHandle<Value = string> {
   declare readonly resolvesTo: Value;
   /** Answers every name under `id` as a prefix, name to value, rather than one value. */

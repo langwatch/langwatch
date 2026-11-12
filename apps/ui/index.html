@@ -67,7 +67,7 @@
         }
         function retrying(stuckReloads) {
           var n = Math.max(stuckReloads, 1);
-          return "Slow connection, retrying (" + n + " of " + MAX_STUCK + ")...";
+          return "Still loading, retrying (" + n + " of " + MAX_STUCK + ")...";
         }
         // API answers arrive on every load, so only code counts as progress.
         function fetchedSomething() {
@@ -97,7 +97,10 @@
           }
           write(null);
           dropSplashNote();
-          say("Could not load. Check your connection.", true);
+          say(
+            "LangWatch could not load. Reload the page, or try another browser if it keeps happening.",
+            true,
+          );
         }
         // The loading screen's note (vite/boot-splash.ts) may say "Connected"; it must not
         // stand under the failure. Before the body is parsed, wait for the note to exist.
@@ -106,13 +109,16 @@
           if (splashNote) return splashNote.remove();
           document.addEventListener("DOMContentLoaded", dropSplashNote, { once: true });
         }
-        // Only the tags the server sent count: the parser has inserted them all by
-        // "interactive", and no script of ours has run yet.
+        // Only the application's own files the server sent count, marked by the build
+        // (vite/boot-tags.ts); the parser has inserted them all by "interactive". A script a
+        // proxy or the edge adds is not the app's code and must not reload the page.
         function isBootTag(el) {
           var tag = el && el.tagName;
-          var boot =
-            (tag === "SCRIPT" && el.src) || (tag === "LINK" && /\bstylesheet\b/.test(el.rel));
-          return Boolean(boot) && (parsed === null || parsed.indexOf(el) !== -1);
+          var url =
+            (tag === "SCRIPT" && el.src) ||
+            (tag === "LINK" && /\bstylesheet\b/.test(el.rel) && el.href);
+          if (!url || !el.hasAttribute("data-lw-boot")) return false;
+          return parsed === null || parsed.indexOf(el) !== -1;
         }
         function onResourceError(event) {
           if (isBootTag(event.target)) retry();

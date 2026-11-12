@@ -1,5 +1,6 @@
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
+  keyCredentialOfDoor,
   organizationCredentialOfRequest,
   principalOfCredential,
   projectCredentialOfRequest,
@@ -9,6 +10,7 @@ import { defineProcessModule, type PublishedProcessModule } from "@langwatch/pro
 import { ApiKeyModule } from "./app/api-key.app.ts";
 import { apiKeyEventing } from "./eventing/api-key.pipeline.ts";
 import { apiKeyRepositories } from "./repositories/api-key-repositories.registry.ts";
+import { apiKeyDocsSessionRest } from "./transport/api-key-docs-session.rest.ts";
 import { apiKeyOrganizationsRest } from "./transport/api-key-organizations.rest.ts";
 import { apiKeyProjectsRest } from "./transport/api-key-projects.rest.ts";
 import { apiKeyRest } from "./transport/api-key.rest.ts";
@@ -28,6 +30,7 @@ export const apiKeyProcessModule: PublishedProcessModule<"api-key", ApiKeyApi> =
       apiKeyRest,
       apiKeyProjectsRest,
       apiKeyOrganizationsRest,
+      apiKeyDocsSessionRest,
       apiKeyTrpcTransport,
       signingKeyTrpcTransport,
     )
@@ -51,5 +54,8 @@ export const apiKeyProcessModule: PublishedProcessModule<"api-key", ApiKeyApi> =
               : credential.organizationId,
         };
       },
+      docsSessionPresentedKey: (request) => ({
+        apiKeyId: keyCredentialOfDoor({ door: "project", request }).apiKeyId,
+      }),
     })
     .withEventing(apiKeyEventing);

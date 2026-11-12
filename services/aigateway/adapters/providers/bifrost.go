@@ -306,6 +306,10 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 		return r.dispatchEmbeddings(ctx, req, provider, model, cred)
 	}
 
+	if req.Type == domain.RequestTypeDecisions {
+		return r.dispatchDecisions(ctx, req, provider, model, cred)
+	}
+
 	if req.Type == domain.RequestTypeSpeech {
 		return r.dispatchSpeech(ctx, req, provider, model, cred)
 	}
@@ -1238,12 +1242,13 @@ func usageFromRawJSON(body []byte, reqType domain.RequestType) domain.Usage {
 		if isImage {
 			return domain.Usage{ImageCount: imageCountFromRawJSON(body)}
 		}
-		return domain.Usage{}
+		return domain.Usage{WebSearchRequests: webSearchRequestsFromRawJSON(body)}
 	}
 	u := domain.Usage{
-		PromptTokens:     firstInt(usage, "input_tokens", "prompt_tokens"),
-		CompletionTokens: firstInt(usage, "output_tokens", "completion_tokens"),
-		TotalTokens:      int(usage.Get("total_tokens").Int()),
+		WebSearchRequests: webSearchRequestsFromRawJSON(body),
+		PromptTokens:      firstInt(usage, "input_tokens", "prompt_tokens"),
+		CompletionTokens:  firstInt(usage, "output_tokens", "completion_tokens"),
+		TotalTokens:       int(usage.Get("total_tokens").Int()),
 		CacheReadTokens: firstInt(usage,
 			"input_tokens_details.cached_tokens", "prompt_tokens_details.cached_tokens"),
 		ReasoningTokens: firstInt(usage,
@@ -1282,6 +1287,17 @@ func imageCountFromRawJSON(body []byte) int {
 		return 0
 	}
 	return len(data.Array())
+}
+
+// webSearchRequestsFromRawJSON counts the server-side web searches a raw
+// provider body reports: Anthropic states the count in
+// usage.server_tool_use.web_search_requests, an OpenAI Responses answer
+// carries one web_search_call item per search in its output.
+func webSearchRequestsFromRawJSON(body []byte) int {
+	if n := gjson.GetBytes(body, "usage.server_tool_use.web_search_requests"); n.Type == gjson.Number {
+		return max(int(n.Int()), 0)
+	}
+	return int(gjson.GetBytes(body, `output.#(type=="web_search_call")#`).Get("#").Int())
 }
 
 // firstInt returns the first of the paths that resolves to a number under
@@ -1533,11 +1549,12 @@ func credentialToBifrostKey(cred domain.Credential, provider bfschemas.ModelProv
 		// may legitimately be empty (unauthenticated self-hosted server).
 		k.Value = envVar(cred.APIKey)
 		url := credBaseURL(cred)
-		if url == "" && cred.ProviderID == domain.ProviderDeepSeek {
-			// DeepSeek rides the openai-compat path (no Bifrost-native
-			// provider) but is a hosted API, not a customer endpoint —
-			// customers configure only an API key, so default the URL.
-			url = deepseekBaseURL
+		if url == "" {
+			// DeepSeek and Doubleword ride the openai-compat path (no
+			// Bifrost-native provider) but are hosted APIs, not customer
+			// endpoints: customers configure only an API key, so default
+			// the URL.
+			url = hostedOpenAICompatBaseURLs[cred.ProviderID]
 		}
 		k.VLLMKeyConfig = &bfschemas.VLLMKeyConfig{
 			URL: envVar(normalizeOpenAICompatBaseURL(url)),
@@ -1693,11 +1710,11 @@ func mapProvider(cred domain.Credential) bfschemas.ModelProvider {
 			return anthropicCompatProviderKey(cred)
 		}
 		return bfschemas.Anthropic
-	case domain.ProviderDeepSeek:
-		// DeepSeek is not in Bifrost's ModelProvider enum; its API is
-		// OpenAI-compatible, so route it through the vLLM adapter. The
-		// base URL defaults to DeepSeek's public endpoint in
-		// credentialToBifrostKey.
+	case domain.ProviderDeepSeek, domain.ProviderDoubleword:
+		// DeepSeek and Doubleword are not in Bifrost's ModelProvider enum;
+		// their APIs are OpenAI-compatible, so route them through the vLLM
+		// adapter. The base URL defaults to the provider's public endpoint
+		// in credentialToBifrostKey.
 		return bfschemas.VLLM
 	case domain.ProviderCustom:
 		// Customer-hosted OpenAI-compatible endpoint. Bifrost's vLLM
@@ -1724,6 +1741,18 @@ func mapProvider(cred domain.Credential) bfschemas.ModelProvider {
 // deepseekBaseURL is DeepSeek's public OpenAI-compatible endpoint, used
 // when a DeepSeek credential arrives without an explicit base URL.
 const deepseekBaseURL = "https://api.deepseek.com"
+
+// doublewordBaseURL is Doubleword's public OpenAI-compatible endpoint, used
+// when a Doubleword credential arrives without an explicit base URL.
+const doublewordBaseURL = "https://api.doubleword.ai"
+
+// hostedOpenAICompatBaseURLs maps the hosted providers that dispatch through
+// the vLLM (openai-compat) adapter to their public endpoint. Each URL is the
+// host root: Bifrost's vLLM provider appends "/v1/..." itself.
+var hostedOpenAICompatBaseURLs = map[domain.ProviderID]string{
+	domain.ProviderDeepSeek:   deepseekBaseURL,
+	domain.ProviderDoubleword: doublewordBaseURL,
+}
 
 // credBaseURL returns the customer-configured endpoint override for
 // OpenAI-compatible credentials. The control-plane wire names it
@@ -2069,18 +2098,25 @@ func extractUsage(resp *bfschemas.BifrostChatResponse) domain.Usage {
 // input/output/total_tokens (not prompt/completion) — same numeric
 // content, different names.
 func extractResponsesUsage(resp *bfschemas.BifrostResponsesResponse) domain.Usage {
-	if resp == nil || resp.Usage == nil {
+	if resp == nil {
 		return domain.Usage{}
 	}
+	if resp.Usage == nil {
+		return domain.Usage{WebSearchRequests: countWebSearchCalls(resp.Output)}
+	}
 	u := domain.Usage{
-		PromptTokens:     resp.Usage.InputTokens,
-		CompletionTokens: resp.Usage.OutputTokens,
-		TotalTokens:      resp.Usage.TotalTokens,
+		PromptTokens:      resp.Usage.InputTokens,
+		CompletionTokens:  resp.Usage.OutputTokens,
+		TotalTokens:       resp.Usage.TotalTokens,
+		WebSearchRequests: countWebSearchCalls(resp.Output),
 	}
 	var split domain.AudioTokenSplit
 	if d := resp.Usage.InputTokensDetails; d != nil {
 		u.CacheReadTokens = d.CachedReadTokens
 		u.CacheCreationTokens = d.CachedWriteTokens
+		if d.CachedWriteTokenDetails != nil {
+			u.CacheCreation1hTokens = d.CachedWriteTokenDetails.CachedWriteTokens1h
+		}
 		split.InputAudio = d.AudioTokens
 		split.InputText = d.TextTokens
 	}
@@ -2089,7 +2125,19 @@ func extractResponsesUsage(resp *bfschemas.BifrostResponsesResponse) domain.Usag
 		split.OutputAudio = d.AudioTokens
 		split.OutputText = d.TextTokens
 	}
-	return u.SplitAudioTokens(split)
+	return u.ReconcileCacheWrites().SplitAudioTokens(split)
+}
+
+// countWebSearchCalls is how many web searches a Responses answer ran: one
+// web_search_call output item per query, which is what OpenAI bills.
+func countWebSearchCalls(output []bfschemas.ResponsesMessage) int {
+	count := 0
+	for _, item := range output {
+		if item.Type != nil && *item.Type == bfschemas.ResponsesMessageTypeWebSearchCall {
+			count++
+		}
+	}
+	return count
 }
 
 // extractEmbeddingUsage maps Bifrost's embedding usage block. Embedding
@@ -2243,6 +2291,7 @@ func (it *bifrostStreamIterator) mergePassthroughUsage(u domain.Usage) {
 	keepNonZero(&it.usage.InputAudioTokens, u.InputAudioTokens)
 	keepNonZero(&it.usage.OutputAudioTokens, u.OutputAudioTokens)
 	keepNonZero(&it.usage.ReasoningTokens, u.ReasoningTokens)
+	keepNonZero(&it.usage.WebSearchRequests, u.WebSearchRequests)
 	// Prefer the parser's total: Gemini's totalTokenCount can exceed
 	// prompt+completion (thinking tokens). Anthropic reports none on the wire.
 	if u.TotalTokens > 0 {
@@ -2404,6 +2453,7 @@ func parseAnthropicPassthroughUsage(body []byte) (domain.Usage, bool) {
 				// Present only when the request asked for the extended
 				// TTL; absent leaves it zero and they price short-lived.
 				usage.CacheCreation1hTokens = int(m.Get("cache_creation.ephemeral_1h_input_tokens").Int())
+				usage.WebSearchRequests = int(m.Get("server_tool_use.web_search_requests").Int())
 				usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
 				matched = true
 			}
@@ -2413,6 +2463,12 @@ func parseAnthropicPassthroughUsage(body []byte) (domain.Usage, bool) {
 				// message_delta only updates output_tokens; preserve the
 				// input-side counters captured at message_start (carried
 				// in the caller's it.usage via last-seen semantics).
+				// The searches run while the answer streams, so the
+				// running count arrives on message_delta.
+				if searches := int(u.Get("server_tool_use.web_search_requests").Int()); searches > 0 {
+					usage.WebSearchRequests = searches
+					matched = true
+				}
 				out := int(u.Get("output_tokens").Int())
 				if out > 0 {
 					usage.CompletionTokens = out

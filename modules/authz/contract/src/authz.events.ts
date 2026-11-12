@@ -34,6 +34,8 @@ const authzMemberOffboardedEventDataSchemaDefinition = z.object({
   /** The person who offboarded them; null when a surface such as SCIM did. */
   offboardedByUserId: z.string().min(1).nullable(),
   occurredAt: z.number().int().nonnegative(),
+  /** Whether the person held a full seat just before; absent on facts from before it was read. */
+  heldFullSeat: z.boolean().optional(),
 });
 export interface AuthzMemberOffboardedEventDataSchema extends Named<
   typeof authzMemberOffboardedEventDataSchemaDefinition

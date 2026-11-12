@@ -86,6 +86,25 @@ export function credentialPrincipalOfToken(
 }
 
 /**
+ * The key-door principal of an API key a project door resolved: the one mapping, so a run at the
+ * key door and a write at a project door judge the same key the same way. None for other kinds.
+ */
+export function keyPrincipalOfApiKey(
+  resolved: RestResolvedProjectCredential,
+): Extract<RestKeyCredentialPrincipal, { kind: "apiKey" }> | undefined {
+  if (resolved.type !== "apiKey") return undefined;
+
+  return {
+    kind: "apiKey",
+    apiKeyId: resolved.apiKeyId,
+    userId: resolved.userId,
+    organizationId: resolved.organizationId,
+    resolvedProject: { id: resolved.project.id, teamId: resolved.project.teamId },
+    ...(resolved.isLangySessionKey ? { isLangySessionKey: true } : {}),
+  };
+}
+
+/**
  * Who authz checks a project credential as: a project-bound access token is its user, a project
  * key or legacy access token its own key row. None for a legacy API key, which predates RBAC
  * and carries full project access by its class alone.
@@ -170,6 +189,7 @@ const organizationCredentials = new WeakMap<Request, RestResolvedOrganizationCre
 const scimCredentials = new WeakMap<Request, RestResolvedScimCredential>();
 const keyCredentials = new WeakMap<Request, RestKeyDoorPrincipal>();
 const browserCallers = new WeakMap<Request, RestBrowserCaller>();
+const routeTemplates = new WeakMap<Request, string>();
 
 /** The project door states what it resolved, once per request. */
 export function recordProjectCredential(
@@ -203,6 +223,16 @@ export function recordKeyCredential(request: Request, credential: RestKeyDoorPri
 /** The byte door states who it verified, once per request. */
 export function recordBrowserCaller(request: Request, caller: RestBrowserCaller): void {
   browserCallers.set(request, caller);
+}
+
+/** The runtime states the route a request matched, as `METHOD /path/:template`, before its door. */
+export function recordRouteTemplate(request: Request, template: string): void {
+  routeTemplates.set(request, template);
+}
+
+/** The route template the runtime recorded, never the concrete URL; outside a route, says so. */
+export function routeTemplateOf(request: Request): string {
+  return routeTemplates.get(request) ?? `${request.method} (no route template)`;
 }
 
 /**

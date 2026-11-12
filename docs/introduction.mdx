@@ -13,7 +13,7 @@ import AgentReportNotice from "/snippets/agent-report-notice.mdx";
 
 ## Quick Start
 
-The fastest way to set up your agent with LangWatch and get started is by using LangWatch Skills via a coding assistant. If your agent is already set up, check out the skills to monitor performance and improve your agent.
+Already set up? The [LangWatch Skills](/skills/directory) also help you monitor and improve an agent that is running.
 
 <CardGroup cols={2}>
   <Card title="Get Started Using a Code Assistant" icon="terminal" href="/skills/directory">
@@ -23,6 +23,8 @@ The fastest way to set up your agent with LangWatch and get started is by using 
     See PM & Domain Expert Skills to collaborate with your team
   </Card>
 </CardGroup>
+
+<WhatsNew />
 
 ## What is LangWatch?
 
@@ -36,23 +38,23 @@ LangWatch provides the missing operations platform for AI applications. Every LL
 
 LangWatch has four areas, and you can use each one on its own.
 
+<figure>
+  <img className="docs-product-shot" src="/images/coding-agents/optimized/session-detail-1024.webp" srcSet="/images/coding-agents/optimized/session-detail-640.webp 640w, /images/coding-agents/optimized/session-detail-1024.webp 1024w, /images/coding-agents/optimized/session-detail-1560.webp 1560w" sizes="(min-width: 1280px) calc(100vw - 620px), (min-width: 1024px) calc(100vw - 380px), calc(100vw - 40px)" width="1560" height="900" alt="A Claude Code session inside LangWatch, showing cost, tools, context and cache health." />
+  <figcaption>From a coding session to every model call. <a href="/coding-agents/overview">Track Claude Code, Codex and your team's agents →</a></figcaption>
+</figure>
+
 <CardGroup cols={2}>
   <Card title="LLM Ops" icon="chart-network" href="/observability/overview">
-    Everything you need to ship and improve an LLM application:
-
-    - [Observability](/observability/overview): every LLM call, tool call and user interaction as a trace.
-    - [Agent Testing](/agent-testing/overview): multi-turn conversations against your agent with a simulated user.
-    - [Evaluations](/evaluations/overview): experiments on datasets, and monitors on production traffic.
-    - [Prompt Management](/prompt-management/overview): versioned prompts your code loads at runtime.
+    Tracing, agent testing, evaluations and prompt management for the LLM apps you build.
   </Card>
   <Card title="Coding Agents" icon="terminal" href="/coding-agents/overview">
-    What Claude Code, Codex, Copilot, Gemini CLI and opencode do and cost, per session, per pull request and per team, with privacy controls for the people who use them.
+    What Claude Code, Codex and other coding agents do and cost, per session and per team.
   </Card>
   <Card title="LangWatch AI Gateway" icon="route" href="/ai-gateway/overview">
-    One OpenAI and Anthropic compatible endpoint for every LLM call in the company. Your provider keys, including Azure and Bedrock, stay in LangWatch. Each caller gets a virtual key with its own budget, and every request lands as a trace.
+    One OpenAI and Anthropic compatible endpoint, with virtual keys, budgets and a trace per call.
   </Card>
   <Card title="AI Governance" icon="shield-halved" href="/ai-governance/overview">
-    An inventory of every AI tool and source in the company, the people who use them, anomaly rules on their activity, and a personal home page for each developer.
+    An inventory of the AI tools in your company, who uses them, and alerts on unusual activity.
   </Card>
 </CardGroup>
 

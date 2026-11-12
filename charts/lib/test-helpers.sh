@@ -68,6 +68,23 @@ cleanup_cluster() {
   kind delete cluster --name "${CLUSTER_NAME}" 2>/dev/null || true
 }
 
+# Side-load one image into the Kind cluster as the docker host's platform.
+# `kind load docker-image` imports with --all-platforms and dies when the
+# docker containerd store holds only the native child of a multi-platform
+# list (e.g. alpine/k8s); saving one platform and loading the archive works.
+# Runs in a subshell so its EXIT trap removes the archive even on failure,
+# without replacing the caller's trap.
+kind_side_load() (
+  set -euo pipefail
+  local ref="$1" platform dir
+  platform="linux/$(docker version --format '{{.Server.Arch}}' 2>/dev/null || echo amd64)"
+  dir="$(mktemp -d)"
+  trap 'rm -rf "$dir"' EXIT
+  docker image inspect "$ref" >/dev/null 2>&1 || docker pull --platform "$platform" "$ref" >/dev/null
+  docker save --platform "$platform" -o "$dir/image.tar" "$ref"
+  kind load image-archive "$dir/image.tar" --name "$CLUSTER_NAME"
+)
+
 # ─── Kubectl / Helm wrappers ────────────────────────────────────────────────
 
 kc() {

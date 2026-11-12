@@ -46,7 +46,7 @@ export interface InsightApi {
    * board the reader cannot open answers `dashboard_not_found`, like one that does not exist.
    */
   configureDailyRun(input: ConfigureInsightDailyRunInput & Reader): Promise<void>;
-  /** Turns the reader's daily run off for a board; "No thanks" on the offer stores the same. */
+  /** Turns the reader's daily run off for a board. */
   turnOffDailyRun(input: TurnOffInsightDailyRunInput & Reader): Promise<void>;
   /**
    * Every person's daily run that is on or off, in every project, for the operator's list: the

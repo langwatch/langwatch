@@ -51,6 +51,16 @@ describe("auth's lifecycle events", () => {
   });
 });
 
+describe("auth's domain auto-join with a role", () => {
+  it("carries the admitted role onto the signal", () => {
+    const data = { ...org, userId: "user_ada", organizationName: "Acme", role: "MEMBER" };
+    expect(ssoAutoAddedSignal({ data, aggregateId: "user_ada" })).toMatchObject({
+      kind: "sso_auto_added",
+      role: "MEMBER",
+    });
+  });
+});
+
 describe("organization's lifecycle events", () => {
   /** @scenario "Team member invite updates member count and fires event" */
   it("raise one invitation batch with a role per invite and the member count", () => {
@@ -91,6 +101,20 @@ describe("organization's lifecycle events", () => {
       organizationName: "Acme",
       signUpData: { yourRole: "engineer" },
       primaryIntent: "LLM_OPS",
+    });
+  });
+
+  it("carry the role the invitation granted onto the accepted-invite signal", () => {
+    const data = {
+      ...org,
+      userId: "user_new",
+      inviteId: "invite_1",
+      organizationName: "Acme",
+      role: "EXTERNAL",
+    };
+    expect(inviteAcceptedSignal({ data, aggregateId: "org_acme" })).toMatchObject({
+      kind: "invite_accepted",
+      role: "EXTERNAL",
     });
   });
 

@@ -52,6 +52,12 @@ describe("braid conditions", () => {
         "verified",
       ]);
     });
+
+    it("accepts the top-level conjunction plus the deepest nesting the text allows", () => {
+      expect(
+        compiledWhereSchema.validate({ version: 1, tree: nested(BRAID_CONDITION_MAX_DEPTH + 1) }),
+      ).toBe(true);
+    });
   });
 
   describe("given a tree past a bound", () => {
@@ -66,9 +72,6 @@ describe("braid conditions", () => {
     });
 
     it("refuses conjunctions nested deeper than the text may nest", () => {
-      expect(
-        compiledWhereSchema.validate({ version: 1, tree: nested(BRAID_CONDITION_MAX_DEPTH + 1) }),
-      ).toBe(true);
       expect(
         compiledWhereSchema.validate({ version: 1, tree: nested(BRAID_CONDITION_MAX_DEPTH + 2) }),
       ).toBe(false);

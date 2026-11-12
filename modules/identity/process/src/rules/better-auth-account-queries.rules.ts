@@ -147,8 +147,12 @@ const byIssuerSubject: AccountQueryShape = (where) => {
 
 // `userId` is a refinement, not decoration: the pair is unique, but answering a query that
 // named a user with another user's row is the cross-tenant miss this module refuses to make.
+// Better Auth 1.7.3+ sends it without the `issuer` clause 1.7.0 added.
 const byUserProviderSubject: AccountQueryShape = (where) => {
-  if (!only(where, "accountId", "issuer", "providerId", "userId")) return [];
+  const shaped =
+    only(where, "accountId", "providerId", "userId") ||
+    only(where, "accountId", "issuer", "providerId", "userId");
+  if (!shaped) return [];
   const accountId = valueOf(where, "accountId");
   const providerId = valueOf(where, "providerId");
   const userId = valueOf(where, "userId");

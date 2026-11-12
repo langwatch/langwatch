@@ -81,17 +81,17 @@ describe("the built-in roles", () => {
     const granted = (teamRole: "ADMIN" | "MEMBER" | "VIEWER") =>
       new Set<string>(builtinRoleGrantedPermissions(teamRole));
 
-    /** @scenario A predefined role card describes the role it actually is */
+    /** @scenario A predefined role row describes the role it actually is */
     it("says Viewer changes nothing, and Viewer can change nothing", () => {
       const viewer = BUILTIN_ROLE_CARDS.find((card) => card.teamRole === "VIEWER");
 
-      expect(viewer?.description).toContain("change none of it");
+      expect(viewer?.description).toContain("changes none of it");
       for (const permission of granted("VIEWER")) {
         expect(permission.endsWith(":view")).toBe(true);
       }
     });
 
-    /** @scenario A predefined role card describes the role it actually is */
+    /** @scenario A predefined role row describes the role it actually is */
     it("says Member creates and changes the work, and stops short of the team", () => {
       const member = granted("MEMBER");
 
@@ -106,7 +106,7 @@ describe("the built-in roles", () => {
       expect(member.has("project:delete")).toBe(false);
     });
 
-    /** @scenario A predefined role card describes the role it actually is */
+    /** @scenario A predefined role row describes the role it actually is */
     it("says Admin holds the team, its projects and the gateway, and it does", () => {
       const admin = granted("ADMIN");
 
@@ -117,7 +117,7 @@ describe("the built-in roles", () => {
       expect(admin.has("gatewayBudgets:manage")).toBe(true);
     });
 
-    /** @scenario A predefined role card describes the role it actually is */
+    /** @scenario A predefined role row describes the role it actually is */
     it("leads each tier above the base with something the tier below lacks", () => {
       for (const card of BUILTIN_ROLE_CARDS) {
         const below = BUILTIN_ROLE_CARDS.find((candidate) => candidate.name === card.inheritsFrom);

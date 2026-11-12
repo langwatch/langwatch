@@ -306,7 +306,7 @@ describe("a board's scope in the browser", () => {
       const { user } = open({ server: scopeServer({ boards }), withSidebar: true });
 
       await user.click(await screen.findByRole("button", { name: "Actions for Quality" }));
-      await screen.findByRole("menuitem", { name: "Star" });
+      await screen.findByRole("menuitem", { name: "Pin" });
 
       expect(screen.queryAllByRole("menuitemradio")).toEqual([]);
     });
@@ -334,14 +334,14 @@ describe("a board's scope in the browser", () => {
     };
 
     /** @scenario "AC179 Scope change: it asks first only when someone loses the board" */
-    it("says how many other people starred it before anything changes", async () => {
+    it("says how many other people pinned it before anything changes", async () => {
       const server = scopeServer({ boards: [WEEKLY], otherStars: 2 });
       const { user } = open({ server });
 
       await pick(user, "Project", "Only me");
 
       expect(await screen.findByText('Make "Weekly review" visible only to you?')).toBeVisible();
-      expect(screen.getByText(/2 other people starred it\./)).toBeInTheDocument();
+      expect(screen.getByText(/2 other people pinned it\./)).toBeInTheDocument();
       expect(inputsTo(server, "boards.setScope")).toEqual([]);
     });
 
@@ -467,7 +467,7 @@ describe("a board's scope in the browser", () => {
     });
 
     /** @scenario "AC181 Sidebar: scope marks and the organization's group" */
-    it("lists other projects' boards under From <organization>, by name, after Starred", async () => {
+    it("lists other projects' boards under From <organization>, by name, after Pinned", async () => {
       open({ server: scopeServer({ boards }), withSidebar: true });
 
       expect({
@@ -476,7 +476,7 @@ describe("a board's scope in the browser", () => {
         yours: await listNames("Your dashboards"),
       }).toEqual({
         fromOrganization: ["Adoption", "Quality"],
-        order: ["Your dashboards", "Starred dashboards", "From Acme", "From LangWatch"],
+        order: ["Your dashboards", "Pinned dashboards", "From Acme", "From LangWatch"],
         yours: ["My dashboard", "Spend", "Weekly review"],
       });
     });
@@ -633,10 +633,10 @@ describe("a board's scope in the browser", () => {
       const { user } = open({ server: withWidget(), withSidebar: true });
 
       await user.click(await screen.findByRole("button", { name: "Actions for Quality" }));
-      await screen.findByRole("menuitem", { name: "Star" });
+      await screen.findByRole("menuitem", { name: "Pin" });
 
       expect(screen.getAllByRole("menuitem").map((item) => item.textContent?.trim())).toEqual([
-        "Star",
+        "Pin",
         "Duplicate to edit",
       ]);
     });
@@ -692,13 +692,13 @@ describe("a board's scope in the browser", () => {
       const { user } = open({ server: withWidget(), withSidebar: true, permissions: VIEWER });
 
       await user.click(await screen.findByRole("button", { name: "Actions for Quality" }));
-      await screen.findByRole("menuitem", { name: "Star" });
+      await screen.findByRole("menuitem", { name: "Pin" });
 
       expect({
         header: screen.queryByRole("button", { name: "Duplicate to edit" }),
         menu: screen.getAllByRole("menuitem").map((item) => item.textContent?.trim()),
         newBoard: screen.queryByRole("button", { name: "New dashboard" }),
-      }).toEqual({ header: null, menu: ["Star"], newBoard: null });
+      }).toEqual({ header: null, menu: ["Pin"], newBoard: null });
     });
   });
 

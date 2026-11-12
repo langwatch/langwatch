@@ -46,6 +46,9 @@ const loginUsedByThisRequest = (): { permissions: string[] | undefined } | undef
   return { permissions };
 };
 
+/** Whether this request authenticated with the login recorded on this machine, not a given key. */
+export const usesLoginCredential = (): boolean => loginUsedByThisRequest() !== undefined;
+
 /**
  * The extra line for an authorization failure, or nothing when there is nothing true to add. Only
  * when the request used the LOGIN key: `--api-key`/`LANGWATCH_API_KEY` carry permissions never

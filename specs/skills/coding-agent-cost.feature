@@ -49,6 +49,7 @@ Feature: Coding agent cost and context skill
   Scenario: One project is narrowed with a TenantId filter in the query
     Given the rendered skill
     Then it tells the agent to add a TenantId filter to every query for one project
+    And it takes the project id from LANGWATCH_PROJECT_ID when set, without running whoami
     And it names personal_project.id from langwatch whoami as the user's own project id
-    And it tells the agent to ask for the project id when whoami has no personal_project
+    And it tells the agent to ask for the project id when whoami is not logged in or has no personal_project
     And its one-project instruction no longer tells the agent to pass --project

@@ -66,3 +66,8 @@ f483fe302e7c3dfb100e1d6fa9c99b6d9a049c20:specs/server/feature-configuration.feat
 # fixture now reads "Incorrect API key provided." with no key, so the tree is
 # clean and only this pull request's history still carries the literal.
 785058250c14fe307ce07f37644f3668c23cea47:services/langyagent/adapters/otelrelay/llmproxy_credit_test.go:generic-api-key:129
+# The monitor error-rate redaction test quoted a made-up OpenAI-style key to
+# prove the email and pause reason drop it. It was never a credential; the
+# fixture now uses a low-entropy marker, so only this pull request's history
+# still carries the literal.
+1a9993210beeb0dbe75b66591570721e16d484b1:modules/evaluation/process/src/rules/__tests__/monitor-error-rate.rules.unit.test.ts:generic-api-key:18

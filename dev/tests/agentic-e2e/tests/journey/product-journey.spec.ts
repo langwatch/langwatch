@@ -26,6 +26,8 @@ const SUITE_NAME = `Journey Suite ${RUN}`;
 const SCENARIO_TITLE = `Journey Scenario ${RUN}`;
 const WORKFLOW_NAME = `Journey Workflow ${RUN}`;
 const PROMPT_HANDLE = `journey-prompt-${RUN}`;
+// modules/auth/browser/src/behavior/held-address-proof.ts
+const HELD_ADDRESS_PROOF_KEY = "langwatch.auth.signUpAddressProof";
 
 // One input, so the monitor that runs it has one field to map and the run's
 // own output is the whole of it.
@@ -509,6 +511,8 @@ async function openSignUp(): Promise<void> {
   try {
     await heading.waitFor({ state: "visible", timeout: 45000 });
   } catch {
+    // A reload restores the address proof an earlier sign-up held in this tab.
+    await page.evaluate((key) => window.sessionStorage.removeItem(key), HELD_ADDRESS_PROOF_KEY);
     await page.reload({ waitUntil: "domcontentloaded" });
     await heading.waitFor({ state: "visible", timeout: 90000 });
   }

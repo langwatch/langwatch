@@ -1,5 +1,6 @@
 // Screens ask application port; plan for Enterprise surfaces; the query holds the open tab.
 
+import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
 import { createContext, useContext } from "react";
 
 // Route and writes guard on organization:manage; prevents leaked organization data.
@@ -73,6 +74,12 @@ export abstract class AuthzHostApi {
     next: Readonly<Record<string, string | undefined>>,
     options?: { replace?: boolean },
   ): void;
+
+  /** Opens one of this module's routed drawers; the address carries its props. */
+  abstract openOverlay<Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>): void;
+
+  /** Closes the open drawer. */
+  abstract closeOverlay(): void;
 
   abstract succeeded(notice: AuthzSuccessNotice): void;
 

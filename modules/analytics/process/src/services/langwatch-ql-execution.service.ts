@@ -9,6 +9,7 @@ import {
   type LangWatchQLMemberWindow,
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
+  type LangWatchQLRunTelemetry,
   type LangWatchQLTimeWindow,
 } from "@langwatch/analytics-contract";
 import { createLogger } from "@langwatch/observability";
@@ -28,6 +29,7 @@ import {
 import type { LangWatchQLViewDefinition } from "./langwatch-ql-catalog-shapes.service.ts";
 import { LangWatchQLDiagnosticsService } from "./langwatch-ql-diagnostics.service.ts";
 import type { LangWatchQLExtractionService } from "./langwatch-ql-extraction.service.ts";
+import type { LangWatchQLRunTelemetryService } from "./langwatch-ql-run-telemetry.service.ts";
 import type { LangWatchQLGranularityResolution } from "./langwatch-ql-time-window.service.ts";
 
 const lwqlDiagnostics = LangWatchQLDiagnosticsService.create();
@@ -43,6 +45,8 @@ type LangWatchQLExecutionDependencies = {
   /** Milliseconds on a monotonic clock, for the elapsed time hydration and judging add. */
   readonly stopwatch: () => number;
   readonly extraction: Pick<LangWatchQLExtractionService, "hydrate">;
+  /** Counts each answered run; the app's one instance, which counts its doors' refusals too. */
+  readonly runTelemetry: Pick<LangWatchQLRunTelemetryService, "recordAnswered" | "fieldsFor">;
 };
 
 type LangWatchQLExecutionInput = {
@@ -53,13 +57,13 @@ type LangWatchQLExecutionInput = {
   readonly validation: ValidatedLangWatchQL;
   readonly granularity: LangWatchQLGranularityResolution;
   readonly tenantCapability: string;
-  /** The origins the surface leaves out of every view the statement reads. */
-  readonly excludeOrigins: readonly string[];
   /** An aggregate's members and where each is read from; absent on a plain project. */
   readonly memberWindows?: readonly LangWatchQLMemberWindow[];
   /** The window the statement follows, which bounds the origin lookup; absent, none does. */
   readonly timeWindow?: LangWatchQLTimeWindow;
   readonly signal?: AbortSignal;
+  /** Who ran it: the caller and the widget's ids on the log line, the caller on the metrics. */
+  readonly telemetry?: LangWatchQLRunTelemetry | undefined;
 };
 
 export class LangWatchQLExecutionService {
@@ -78,11 +82,12 @@ export class LangWatchQLExecutionService {
     projects,
     protections,
     signal,
+    telemetry,
     ...run
   }: LangWatchQLExecutionInput): Promise<LangWatchQLQueryResult> {
     const { database, views } = this.deps;
-    const { validation, granularity, excludeOrigins, memberWindows } = run;
-    const execution = await this.runRestricted(run);
+    const { validation, granularity, memberWindows } = run;
+    const execution = await this.runRestricted({ ...run, projects });
     const hydrationStartedMs = this.deps.stopwatch();
     const answer = await this.deps.extraction.hydrate({
       projects: hydratableProjects({ projects, memberWindows }),
@@ -109,8 +114,16 @@ export class LangWatchQLExecutionService {
       ...(answer.appFunctions ? { appFunctions: answer.appFunctions } : {}),
     });
 
+    const outcome = this.deps.runTelemetry.recordAnswered({
+      telemetry,
+      rowsReturned: answer.rows.length,
+      rowsRead: execution.statistics.rowsRead,
+      elapsedMs,
+    });
     logger.info(
       {
+        ...this.deps.runTelemetry.fieldsFor({ telemetry, sql: run.sql }),
+        outcome,
         projectIds: projects.map((project) => project.id),
         tables: validation.tables,
         rowsReturned: answer.rows.length,
@@ -119,7 +132,7 @@ export class LangWatchQLExecutionService {
         diagnostics: diagnostics.map((diagnostic) => diagnostic.code),
         followsTimeWindow: validation.followsTimeWindow,
         followsGranularity: granularity.followsGranularity,
-        excludeOrigins,
+        followsSources: validation.followsSources,
       },
       "LangWatchQL executed",
     );
@@ -144,16 +157,16 @@ export class LangWatchQLExecutionService {
   /** The statement as the database runs it, refused when its rows outgrow `maxResultBytes`. */
   private async runRestricted({
     executor,
+    projects,
     sql,
     validation,
     granularity,
     tenantCapability,
-    excludeOrigins,
     memberWindows,
     timeWindow,
   }: Omit<
     LangWatchQLExecutionInput,
-    "projects" | "protections" | "signal"
+    "protections" | "signal" | "telemetry"
   >): Promise<LangWatchQLExecutionResult> {
     const { database, views, limits } = this.deps;
     // The resolved record plus the step this run was bucketed at, when the
@@ -163,10 +176,9 @@ export class LangWatchQLExecutionService {
 
     const execution = await executor.execute({
       // The submitted statement with a default `LIMIT` when the caller named none, so an
-      // unbounded query is capped rather than streamed, and the origins the surface left out.
+      // unbounded query is capped rather than streamed.
       sql: scopeLangWatchQL({
         sql: langWatchQLRowLimitedSql({ sql, validation, maxRows: limits.maxRows }),
-        excludeOrigins,
         database,
         views,
         ...(timeWindow ? { timeWindow } : {}),
@@ -178,6 +190,7 @@ export class LangWatchQLExecutionService {
       // granularity merge, so passing it drops `period_granularity_seconds`.
       ...(Object.keys(executionParameters).length > 0 ? { parameters: executionParameters } : {}),
       tenantCapability,
+      projectIds: projects.map(({ id }) => id),
     });
     // Refused rather than cut: a body that looks whole but is missing its tail is the worse
     // failure for an analytics caller. The row count is already bounded by the LIMIT above.

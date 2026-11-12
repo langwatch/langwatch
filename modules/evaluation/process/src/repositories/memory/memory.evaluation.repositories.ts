@@ -11,6 +11,7 @@ import { ObjectStorageEvaluationLangevalsStagingRepository } from "../object-sto
 import { MemoryEvaluationCostRepository } from "./memory.evaluation-cost.repository.ts";
 import { MemoryEvaluationInputRepository } from "./memory.evaluation-input.repository.ts";
 import { MemoryEvaluationRunRepository } from "./memory.evaluation-run.repository.ts";
+import { MemoryMonitorErrorRateRepository } from "./memory.monitor-error-rate.repository.ts";
 
 /** The trend over no traces: nothing in this module writes the rows it folds. */
 class MemoryMonitorPerformanceRepository extends MonitorPerformanceRepository {
@@ -49,6 +50,7 @@ export class MemoryEvaluationRepositories {
       runs: MemoryEvaluationRunRepository.create(),
       monitorPerformance: MemoryMonitorPerformanceRepository.create(),
       analyticsFoldCache: MemoryEvaluationAnalyticsFoldCacheRepository.create(),
+      monitorErrorRates: MemoryMonitorErrorRateRepository.create(),
       inputs: MemoryEvaluationInputRepository.create(),
       langevalsStaging: ObjectStorageEvaluationLangevalsStagingRepository.create({
         objectStorage: memoryObjectStorage(),

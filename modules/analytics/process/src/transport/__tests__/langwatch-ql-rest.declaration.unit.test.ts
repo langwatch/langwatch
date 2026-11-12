@@ -68,17 +68,21 @@ describe("given the query REST family", () => {
       expect(reference?.access?.kind).toBe("authenticated");
     });
 
-    it("asks the process for the key it authenticated on every route, and nothing else", () => {
+    it("asks the process for the key it authenticated on every route, and the run for its client", () => {
       expect(
         declaration.routes.map((route) =>
           (route.middleware ?? []).map((middleware) => middleware.name),
         ),
-      ).toEqual([["langWatchQLKeyReach"], ["langWatchQLKeyReach"], ["langWatchQLKeyReach"]]);
+      ).toEqual([
+        ["langWatchQLKeyReach", "langWatchQLKeyDoor"],
+        ["langWatchQLKeyReach"],
+        ["langWatchQLKeyReach"],
+      ]);
     });
 
     /** @scenario "The OpenAPI descriptions for both query routes name the any-key scope rule" */
     it("describes the any-key scope rule on both the run and the schema door", () => {
-      for (const operation of ["postApiV1Query", "getApiV1QuerySchema"]) {
+      for (const operation of ["getApiV1QuerySchema"]) {
         const description =
           declaration.routes.find((route) => route.operation === operation)?.docs?.description ??
           "";
@@ -137,7 +141,8 @@ describe("given the query REST family", () => {
       expect(routeOf("getApiV1QuerySchema")?.input).toBeUndefined();
       expect(runDescription).toContain("`projectId`");
       expect(runDescription).toContain("project_not_found");
-      expect(runDescription).toContain("Without `projectId` the run spans every project");
+      expect(runDescription).toContain("must name the projects to read in `projects`");
+      expect(runDescription).toContain("`projects_required` (422)");
     });
 
     it("advertises no truncated flag and no RESULT_TRUNCATED diagnostic", () => {

@@ -1,10 +1,11 @@
-import { grantConditionSchema } from "@langwatch/authorization";
+import { grantConditionSchema, OrganizationUserRole } from "@langwatch/authorization";
 import {
   type AuthzSharedProjectGrant,
   GRANT_SOURCE_BRAID,
   OffboardIncompleteError,
   PROJECT_READER_ROLE_KEY,
 } from "@langwatch/authz-contract";
+import { isFullMember } from "@langwatch/entitlement-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { type Instant, fromDate, toDate } from "@langwatch/time";
 import { z } from "zod";
@@ -18,7 +19,7 @@ import {
 } from "../authz-ledger-read.repository.ts";
 import type { AuthzReadRepository } from "../authz-read.repository.ts";
 import { liveGrants, liveRoles } from "../eventing/eventing.authz-live-rows.mapper.ts";
-import { sharedProjectReadsOf } from "../eventing/eventing.authz-read.mapper.ts";
+import { NOT_A_BRAID, sharedProjectReadsOf } from "../eventing/eventing.authz-read.mapper.ts";
 import { EventingAuthzReadRepository } from "../eventing/eventing.authz-read.repository.ts";
 import {
   GRANT_ROW_COLUMNS,
@@ -178,7 +179,7 @@ export class PrismaAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
   }): Promise<AuthzSharedProjectGrant[]> {
     const rows = sharedProjectGrantRowsSchema.parse(
       await liveGrants(this.prisma).findMany({
-        where: sharedProjectReadsOf({ organizationId, readerProjectId }),
+        where: { ...sharedProjectReadsOf({ organizationId, readerProjectId }), ...NOT_A_BRAID },
         select: { id: true, scopeId: true, condition: true },
         orderBy: { scopeId: "asc" },
       }),
@@ -385,8 +386,10 @@ export class PrismaAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
     legacyTeamMemberships: number;
     pendingInvites: number;
     organizationMembership: boolean;
+    heldFullSeat: boolean;
   }> {
     return this.prisma.$transaction(async (tx) => {
+      const heldFullSeat = await heldFullSeatIn({ tx, organizationId, userId });
       // The membership row goes first: its lock serializes the grant snapshot
       // below with a stamped attach, whose projection now fails its stamp check.
       const organizationMembership = await tx.organizationUser.deleteMany({
@@ -433,7 +436,49 @@ export class PrismaAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
         legacyTeamMemberships: legacyTeamMemberships.count,
         pendingInvites: pendingInvites.count,
         organizationMembership: organizationMembership.count > 0,
+        heldFullSeat,
       };
     }, OFFBOARD_MEMBERSHIP_TXN_OPTIONS);
   }
+}
+
+const permissionsSchema = z.array(z.string());
+
+/**
+ * Whether the person holds a FULL seat now, classified as organization's seat count does: an
+ * active member's role, and for an external member the custom roles of its team bindings.
+ */
+async function heldFullSeatIn({
+  tx,
+  organizationId,
+  userId,
+}: {
+  tx: Pick<PrismaClient, "organizationUser" | "roleBinding" | "customRole">;
+  organizationId: string;
+  userId: string;
+}): Promise<boolean> {
+  const membership = await tx.organizationUser.findFirst({
+    where: { organizationId, userId, disabledAt: null, user: { deactivatedAt: null } },
+    select: { role: true },
+  });
+  if (!membership) return false;
+  if (membership.role !== OrganizationUserRole.EXTERNAL) {
+    return isFullMember(membership.role, undefined);
+  }
+  const bindings = await tx.roleBinding.findMany({
+    where: { organizationId, userId, scopeType: "TEAM", customRoleId: { not: null } },
+    select: { customRoleId: true },
+  });
+  const customRoleIds = bindings.flatMap((binding) =>
+    binding.customRoleId ? [binding.customRoleId] : [],
+  );
+  if (customRoleIds.length === 0) return isFullMember(membership.role, undefined);
+  const roles = await tx.customRole.findMany({
+    where: { organizationId, id: { in: customRoleIds } },
+    select: { permissions: true },
+  });
+  const permissions = roles.flatMap(
+    (role) => permissionsSchema.safeParse(role.permissions).data ?? [],
+  );
+  return isFullMember(membership.role, permissions.length > 0 ? permissions : undefined);
 }

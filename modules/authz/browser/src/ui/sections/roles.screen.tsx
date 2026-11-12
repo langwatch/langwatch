@@ -1,9 +1,7 @@
-import { Link } from "@langwatch/browser-host/link";
-import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { EnterpriseLock } from "@langwatch/browser-host/enterprise-lock";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 // Roles screen; three-state plan gate; grant asked twice for future reuse.
-import { Button, Skeleton, VStack } from "@langwatch/design-system/primitives";
-import { Lock } from "lucide-react";
+import { Skeleton, VStack } from "@langwatch/design-system/primitives";
 
 import { AUTHZ_MANAGE_PERMISSION, useAuthzHost } from "../../model/authz-host.ts";
 import { RolesPanel } from "./roles-panel.tsx";
@@ -30,17 +28,12 @@ export default function RolesScreen() {
     return (
       <>
         <RolesHeader />
-        <NoDataInfoBlock
-          size="page"
-          icon={<Lock />}
-          title="Roles & access is included in Enterprise"
+        <EnterpriseLock
+          feature="Roles & access"
           description="Define your own roles and choose exactly what each person or group may do, and where."
-          testId="roles-enterprise-upsell"
-          primaryAction={
-            <Button asChild colorPalette="orange" size="sm">
-              <Link href="/settings/plans">See plans</Link>
-            </Button>
-          }
+          canManage={host.hasPermission("organization:manage")}
+          canSeePlans={host.hasPermission("organization:view")}
+          data-testid="roles-enterprise-upsell"
         />
       </>
     );

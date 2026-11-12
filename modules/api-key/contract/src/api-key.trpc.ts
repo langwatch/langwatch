@@ -4,21 +4,28 @@
  * reads the same names as types — the mounted namespace, never respelled.
  */
 
-// `create` is the ONLY procedure that ever returns the plaintext token — once,
-// at minting; every read hands back a five-character `lookupIdPrefix` and
+// `create`, `rotate` and `mintDocsSessionKey` are the only procedures that return a plaintext
+// token — once, at minting; every read hands back a five-character `lookupIdPrefix` and
 // nothing more. `nameById` answers null identically for an unknown id and one
 // in another organization, so it cannot enumerate. `orgProjects` / `orgTeams`
 // / `orgMembers` feed the pickers the drawers render.
 
 import { defineTrpcContract } from "@langwatch/module";
+import { z } from "zod";
 
 import {
   apiKeyTrpcCreateInputSchema,
+  apiKeyTrpcGrantableInputSchema,
   apiKeyTrpcNameByIdInputSchema,
   apiKeyTrpcOrganizationScopeSchema,
   apiKeyTrpcRevokeInputSchema,
+  apiKeyTrpcRotateInputSchema,
   apiKeyTrpcUpdateInputSchema,
 } from "./api-key-trpc.schemas.ts";
+import {
+  apiKeyTrpcMintDocsSessionKeyInputSchema,
+  docsSessionKeyMintedSchema,
+} from "./api-key.docs-session.ts";
 import { apiKeyListEntrySchema, namedApiKeyBindingSchema } from "./api-key.list.ts";
 import {
   apiKeyMintedSchema,
@@ -34,6 +41,11 @@ export const apiKeyTrpc = defineTrpcContract("apiKey")
   .query("myBindings")
   .withInput(apiKeyTrpcOrganizationScopeSchema)
   .withOutput(namedApiKeyBindingSchema.array())
+
+  // What a restricted key's rows may offer: read off the same resolver the mint checks with.
+  .query("grantablePermissions")
+  .withInput(apiKeyTrpcGrantableInputSchema)
+  .withOutput(z.string().array())
 
   .query("nameById")
   .withInput(apiKeyTrpcNameByIdInputSchema)
@@ -55,6 +67,11 @@ export const apiKeyTrpc = defineTrpcContract("apiKey")
   .withInput(apiKeyTrpcRevokeInputSchema)
   .withOutput(apiKeyRevokedSchema)
 
+  // Swaps the key's secret and answers the new token once; the old secret stops at once.
+  .mutation("rotate")
+  .withInput(apiKeyTrpcRotateInputSchema)
+  .withOutput(apiKeyMintedSchema)
+
   .query("orgProjects")
   .withInput(apiKeyTrpcOrganizationScopeSchema)
   .withOutput(apiKeyProjectSchema.array())
@@ -66,5 +83,10 @@ export const apiKeyTrpc = defineTrpcContract("apiKey")
   .query("orgMembers")
   .withInput(apiKeyTrpcOrganizationScopeSchema)
   .withOutput(apiKeyUserSchema.array())
+
+  // The docs consent page's Allow (ADR-185): the second place a plaintext token is answered.
+  .mutation("mintDocsSessionKey")
+  .withInput(apiKeyTrpcMintDocsSessionKeyInputSchema)
+  .withOutput(docsSessionKeyMintedSchema)
 
   .build();

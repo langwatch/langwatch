@@ -61,6 +61,10 @@ export function langyTurnDeps(over: LangyTurnDepsOverrides = {}): LangyTurnServi
     handoffStore: over.handoffStore
       ? createApiFixture(over.handoffStore, "handoffStore")
       : rows.turnHandoff,
+    localWork: createApiFixture(
+      over.localWork ?? { cancelTurn: async () => undefined },
+      "localWork",
+    ),
     messages: nullable(over.messages, "messages"),
   };
 }

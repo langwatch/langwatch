@@ -92,7 +92,10 @@ export interface GrantRowShape {
   occurredAt: Instant;
 }
 
-/** Exactly the columns a {@link GrantRowShape} holds, for a read that feeds one. */
+/**
+ * The columns a {@link GrantRowShape} holds, for a read that feeds one. `replacesGrantId` is left
+ * out: on this release the fold writes it and nothing reads it back (ADR-185 §2).
+ */
 export const GRANT_ROW_COLUMNS = {
   id: true,
   organizationId: true,

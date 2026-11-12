@@ -40,7 +40,7 @@ That has happened repeatedly:
 another component, land the incidental part in a separate non-breaking PR. That is
 the only thing that keeps one component's break out of another's release.
 
-`release-scope-guard` enforces this on every PR. It fails when the PR title or any
+The `pr-conventions` check enforces this on every PR. It fails when the PR title or any
 of its commits carries a breaking marker and the changed files span more than one
 component. If the break really does apply to all of them, add the
 **`multi-component-major`** label and the check passes. Reach for that label only
@@ -94,7 +94,7 @@ several components, open one PR per component. #3627 pinned six at once from a
 single branch and predates that being understood; do not copy it.
 
 A pin fixes a version release-please got wrong. It does **not** scope a breaking
-change — see the previous section — so `release-scope-guard` reads pins only to
+change — see the previous section — so the `pr-conventions` check reads pins only to
 report them, and a breaking PR that spans components fails whether or not it pins
 anything. The guard still requires both halves of a pin and binds them by version:
 the component's shim has to be among the changed files, and some commit has to

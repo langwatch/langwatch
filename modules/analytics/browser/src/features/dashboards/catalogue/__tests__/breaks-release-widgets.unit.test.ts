@@ -159,7 +159,7 @@ describe("given the Release check widgets", () => {
   /** @scenario "AC70 Release check: the test set is weighted to the topic mix of real traffic" */
   it("weights each run's topic pass rates by production's topic shares", () => {
     const { code, sql } = buildOf("rag-dataset-versions");
-    expect(sql.main).toContain("Origin IN ('', 'application')");
+    expect(sql.main).not.toContain("Origin IN");
     expect(sql.main).toContain("weighted_rate");
     expect(code).toContain("weighted to real traffic");
   });

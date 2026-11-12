@@ -1,4 +1,5 @@
 import {
+  ApiKeyAlreadyRevokedError,
   CLI_LOGIN_KEY_NAME_PREFIX,
   isSystemApiKey,
   type ApiKeyRevocationCause,
@@ -36,6 +37,7 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
       createdByDeviceLabel: data.createdByDeviceLabel ?? null,
       parentApiKeyId: data.parentApiKeyId ?? null,
       isSystemManaged: data.isSystemManaged ?? false,
+      createdByBrowserSessionId: data.createdByBrowserSessionId ?? null,
       id: generate(API_KEY_KSUID_RESOURCE).toString(),
       expiresAt: expiresAt ? toDate(expiresAt) : null,
       revokedAt: startsDisabled ? now : null,
@@ -114,6 +116,23 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
     );
   }
 
+  async rotateSecret(input: {
+    id: string;
+    organizationId: string;
+    lookupId: string;
+    hashedSecret: string;
+  }): Promise<ApiKeyRow> {
+    const live = this.#find(
+      (key) => key.id === input.id && key.organizationId === input.organizationId && !key.revokedAt,
+    );
+    if (!live) throw new ApiKeyAlreadyRevokedError(input.id);
+    return this.update({
+      id: input.id,
+      hashedSecret: input.hashedSecret,
+      lookupId: input.lookupId,
+    });
+  }
+
   async updateLastUsedAt(input: { id: string }): Promise<void> {
     await this.update({ id: input.id, lastUsedAt: nowInstant() });
   }
@@ -149,6 +168,22 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
         key.revokedAt === null &&
         input.apiKeyIds.includes(key.id),
     );
+  }
+
+  async findLiveBySessions(input: {
+    userId: string;
+    name: string;
+    browserSessionIds: readonly string[];
+  }): Promise<{ id: string; organizationId: string }[]> {
+    const rows = this.#list(
+      (key) =>
+        key.userId === input.userId &&
+        key.name === input.name &&
+        key.isSystemManaged === true &&
+        key.revokedAt === null &&
+        input.browserSessionIds.includes(key.createdByBrowserSessionId ?? ""),
+    );
+    return rows.map(({ id, organizationId }) => ({ id, organizationId }));
   }
 
   async findIngestKeysForUser(input: {

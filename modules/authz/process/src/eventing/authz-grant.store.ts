@@ -6,6 +6,7 @@
 import type { GrantCondition, LedgerActor } from "@langwatch/authorization";
 import {
   AuthzGrantNotConfirmedError,
+  BILLING_ROLE_KEY,
   bindingScopeCanGrantPermission,
   GRANT_SOURCE_BRAID,
   GrantValidationError,
@@ -1101,6 +1102,86 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
       actor,
       ...(reason ? { reason } : {}),
     });
+  }
+
+  /**
+   * Attach one Billing grant: the user at their organization's own scope, fenced to the
+   * membership's lifetime. Who may grant it is the route's; the service decides whether to.
+   */
+  async attachBillingGrant({
+    organizationId,
+    grantId,
+    userId,
+    actor,
+    source,
+    commandId,
+  }: {
+    organizationId: string;
+    grantId: string;
+    userId: string;
+    actor: LedgerActor;
+    source: LedgerWriteSource;
+    commandId: string;
+  }): Promise<void> {
+    refusePlatformTenant(organizationId);
+    const [stamp] = await this.options.membershipStamps.findLockedStamps({
+      organizationId,
+      userIds: [userId],
+    });
+    if (!stamp) throw new BindingMissingError();
+    const occurredAtMs = this.now();
+    await (
+      await this.commands()
+    ).commands.attachGrant.send({
+      tenantId: organizationId,
+      organizationId,
+      commandId,
+      grant: {
+        grantId,
+        principal: { type: "user", id: userId },
+        roleKey: BILLING_ROLE_KEY,
+        scope: { type: "ORGANIZATION", id: organizationId },
+        source,
+        actor,
+        occurredAtMs,
+        membershipStamp: stamp.membershipStamp,
+      },
+    });
+    await this.awaitProjection({
+      what: `attach of billing grant ${grantId}`,
+      organizationId,
+      check: async () =>
+        (await this.options.reads.countLandedGrants({
+          organizationId,
+          grants: [
+            {
+              id: grantId,
+              principalType: "USER",
+              principalId: userId,
+              roleKey: BILLING_ROLE_KEY,
+              scopeType: "ORGANIZATION",
+              scopeId: organizationId,
+            },
+          ],
+          occurredSince: Temporal.Instant.fromEpochMilliseconds(occurredAtMs),
+        })) === 1,
+    });
+    await this.options.epoch.bump({ organizationId });
+  }
+
+  /** Revoke Billing grants by id; the deny lands synchronously, as every revoke's does. */
+  async revokeBillingGrants({
+    organizationId,
+    grantIds,
+    actor,
+  }: {
+    organizationId: string;
+    grantIds: string[];
+    actor: LedgerActor;
+  }): Promise<void> {
+    refusePlatformTenant(organizationId);
+    if (grantIds.length === 0) return;
+    await this.appendGrantRevocation({ organizationId, bindingIds: grantIds, actor });
   }
 
   /**

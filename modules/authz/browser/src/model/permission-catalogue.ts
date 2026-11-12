@@ -8,6 +8,7 @@ export const AUTHZ_ACTIONS = {
   DELETE: "delete",
   MANAGE: "manage",
   SHARE: "share",
+  DEPLOY: "deploy",
 } as const;
 
 export type AuthzAction = (typeof AUTHZ_ACTIONS)[keyof typeof AUTHZ_ACTIONS];
@@ -31,6 +32,9 @@ export const ORDERED_RESOURCES = [
   "workflows",
   "experiments",
   "prompts",
+  // Deploy labels of agents and evaluators; editing them stays under evaluations.
+  "agents",
+  "evaluators",
   "secrets",
   "auditLog",
   "team",
@@ -70,6 +74,7 @@ export function validActionsForResource(resource: AuthzResource): AuthzAction[] 
   if (VIEW_ONLY.includes(resource)) return [AUTHZ_ACTIONS.VIEW];
   if (MANAGE_ONLY.includes(resource)) return [AUTHZ_ACTIONS.MANAGE];
   if (resource === "traces") return [AUTHZ_ACTIONS.VIEW, AUTHZ_ACTIONS.SHARE];
+  if (resource === "agents" || resource === "evaluators") return [AUTHZ_ACTIONS.DEPLOY];
   if (VIEW_AND_MANAGE.includes(resource)) return [AUTHZ_ACTIONS.VIEW, AUTHZ_ACTIONS.MANAGE];
   return [
     AUTHZ_ACTIONS.MANAGE,

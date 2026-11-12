@@ -26,6 +26,8 @@ const storedRow = {
   archivedAt: null,
   createdAt: CREATED_AT,
   updatedAt: CREATED_AT,
+  createdById: null,
+  updatedById: null,
   project: { id: "project_1", name: "Generated relation" },
 };
 

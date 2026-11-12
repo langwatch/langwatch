@@ -1,7 +1,14 @@
 /**
- * The host patterns refused unconditionally, whatever the local-address policy says. FROZEN
- * TWIN of `platform/app/src/utils/ssrfConstants.ts`.
+ * The host patterns refused whatever the local-address policy says. The Go scenario runner
+ * carries the same lists in `services/scenariorunner/egress/validator.go`; change both together.
  */
+
+/**
+ * The BLOCKED_CLOUD_DOMAINS suffixes the allowlist may lift for one exact host: private
+ * infrastructure, no ambient credentials. Every other suffix stays refused before the allowlist
+ * is read. Extend only with suffixes meaningless outside a private network.
+ */
+export const ON_PREMISE_SUFFIXES = [".local", ".localhost"] as const;
 
 /**
  * Cloud provider internal domain patterns to block. Matched as suffixes, so `.amazonaws.com`
@@ -15,8 +22,9 @@ export const BLOCKED_CLOUD_DOMAINS = [
 
   // Generic internal domains (catch-all for misconfigured services)
   ".internal",
-  ".local",
-  ".localhost",
+
+  // Blocked by default; ALLOWED_PROXY_HOSTS may name one exact host under them.
+  ...ON_PREMISE_SUFFIXES,
 ] as const;
 
 /**

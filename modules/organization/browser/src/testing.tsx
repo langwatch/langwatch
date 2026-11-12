@@ -211,16 +211,24 @@ export function renderWithOrganizationHost(
   host: FakeOrganizationHost = new FakeOrganizationHost(),
   { analytics }: { analytics?: UiAnalytics } = {},
 ) {
+  const wrap = (currentHost: FakeOrganizationHost) => (
+    <DesignSystemTestProvider>
+      <UiHostServicesContextProvider
+        value={{ ...billingLendsContactSales, ...(analytics ? { analytics } : {}) }}
+      >
+        <OrganizationHostProvider value={currentHost}>{element}</OrganizationHostProvider>
+      </UiHostServicesContextProvider>
+    </DesignSystemTestProvider>
+  );
+  const result = render(wrap(host));
   return {
     host,
-    ...render(
-      <DesignSystemTestProvider>
-        <UiHostServicesContextProvider
-          value={{ ...billingLendsContactSales, ...(analytics ? { analytics } : {}) }}
-        >
-          <OrganizationHostProvider value={host}>{element}</OrganizationHostProvider>
-        </UiHostServicesContextProvider>
-      </DesignSystemTestProvider>,
-    ),
+    ...result,
+    /**
+     * Hands the mounted screen a different host, the way switching
+     * organization does: the context changes under a screen that stays
+     * mounted, so any state it seeded from the old one is still there.
+     */
+    rerenderWithHost: (nextHost: FakeOrganizationHost) => result.rerender(wrap(nextHost)),
   };
 }

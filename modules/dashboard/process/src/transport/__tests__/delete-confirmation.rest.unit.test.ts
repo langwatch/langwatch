@@ -14,6 +14,7 @@ import { MemoryDashboardWidgetRepository } from "../../repositories/memory/memor
 import { MemoryDashboardDatabase } from "../../repositories/memory/memory.dashboard.database.ts";
 import { MemoryDashboardRepository } from "../../repositories/memory/memory.dashboard.repository.ts";
 import { MemorySavedViewRepository } from "../../repositories/memory/memory.saved-view.repository.ts";
+import { boardRest } from "../board.rest.ts";
 import { dashboardWidgetRest } from "../dashboard-widget.rest.ts";
 import { dashboardRest } from "../dashboard.rest.ts";
 import { graphRest } from "../graph.rest.ts";
@@ -65,13 +66,16 @@ async function namesFor({
   app,
   mark,
   id,
+  input = {},
 }: {
   app: DashboardApi;
   mark: ReturnType<typeof markOf>;
   id: string;
+  /** The route's own input, as the runtime hands it to the mark. */
+  input?: Readonly<Record<string, unknown>>;
 }) {
   const nameFor = (ownerUserId: string | null) =>
-    mark.name({ app, projectId: PROJECT, id, ownerUserId });
+    mark.name({ app, projectId: PROJECT, id, ownerUserId, input });
   // A name means a card; undefined means gone, and the handler would answer for it alone.
   return {
     owner: await nameFor(OWNER.userId),
@@ -167,6 +171,32 @@ describe("a Langy key's delete card for a record on its owner's Only me board", 
     });
   });
 
+  describe("when the record is an Only me Dashboards board", () => {
+    /** @scenario "A Langy key's delete card names the key owner's own Only me records" */
+    it("names it for its owner, and for nobody else", async () => {
+      const { app } = appWithDatabase();
+      const board = await app.createBoard({
+        projectId: PROJECT,
+        name: "Private",
+        createdById: OWNER.userId,
+      });
+      await app.setDashboardScope({
+        projectId: PROJECT,
+        dashboardId: board.id,
+        scope: "PRIVATE",
+        viewer: OWNER,
+      });
+
+      const names = await namesFor({
+        app,
+        mark: markOf(boardRest.router(), "board"),
+        id: board.id,
+      });
+
+      expect(names).toEqual({ owner: "Private", other: undefined, nobody: undefined });
+    });
+  });
+
   describe("when the record is a widget on an Only me Dashboards board", () => {
     /** @scenario "A Langy key's delete card names the key owner's own Only me records" */
     it("names it for its owner, and for nobody else", async () => {
@@ -199,5 +229,38 @@ describe("a Langy key's delete card for a record on its owner's Only me board", 
 
       expect(names).toEqual({ owner: "Traces", other: undefined, nobody: undefined });
     });
+  });
+});
+
+describe("a Langy key's delete card for a widget at /api/v1/dashboards/{dashboardId}/widgets/{widgetId}", () => {
+  /**
+   * @scenario "The card reads the item through the path the delete acts on"
+   * @scenario "AC199p Split: a board's widgets are a sub-resource of the board"
+   */
+  it("names it through its own board, and reads it as gone through another board", async () => {
+    const { app } = appWithDatabase();
+    const holding = await app.createBoard({ projectId: PROJECT, name: "Holding" });
+    const other = await app.createBoard({ projectId: PROJECT, name: "Other" });
+    const widget = await app.createDashboardWidget({
+      projectId: PROJECT,
+      dashboardId: holding.id,
+      name: "Traces",
+      code: "export default () => null;",
+      queries: [],
+    });
+    const mark = markOf(boardRest.router(), "dashboard widget");
+    const nameThrough = (boardId: string) =>
+      mark.name({
+        app,
+        projectId: PROJECT,
+        id: widget.id,
+        ownerUserId: null,
+        input: { dashboardId: boardId, widgetId: widget.id },
+      });
+
+    expect({
+      own: await nameThrough(holding.id),
+      other: await nameThrough(other.id),
+    }).toEqual({ own: "Traces", other: undefined });
   });
 });

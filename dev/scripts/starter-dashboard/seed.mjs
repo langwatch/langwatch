@@ -67,7 +67,7 @@ assertSecureEndpoint(endpoint);
 const apiKey = requireEnv("LW_API_KEY");
 const projectId = requireEnv("PROJECT_ID");
 
-const dashboardsUrl = `${endpoint}/api/dashboards`;
+const dashboardsUrl = `${endpoint}/api/v1/dashboards`;
 const widgetsUrl = `${endpoint}/api/v1/projects/${projectId}/analytics/dashboard-widgets`;
 
 async function getJson(url) {

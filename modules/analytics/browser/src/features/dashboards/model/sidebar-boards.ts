@@ -56,6 +56,28 @@ export function sameStar(left: DashboardStar, right: DashboardStar): boolean {
   return false;
 }
 
+/**
+ * The whole star order after the `shown` stars at `from` and `to` swap; null past either end.
+ * A star the section does not show (My dashboard) keeps its index, so it never moves (AC155b).
+ */
+export function swapShownStars({
+  all,
+  shown,
+  from,
+  to,
+}: {
+  all: readonly DashboardStar[];
+  shown: readonly DashboardStar[];
+  from: number;
+  to: number;
+}): DashboardStar[] | null {
+  if (from < 0 || from >= shown.length || to < 0 || to >= shown.length) return null;
+  const swapped = [...shown];
+  [swapped[from], swapped[to]] = [swapped[to]!, swapped[from]!];
+  let next = 0;
+  return all.map((ref) => (shown.some((each) => sameStar(each, ref)) ? swapped[next++]! : ref));
+}
+
 const byName = (a: SidebarBoard, b: SidebarBoard) => a.name.localeCompare(b.name);
 
 export function sidebarGroups({

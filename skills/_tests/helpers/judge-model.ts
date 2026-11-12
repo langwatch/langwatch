@@ -8,5 +8,5 @@ export function createSkillJudgeModel() {
     return google("gemini-2.5-flash-lite");
   }
 
-  return openai("gpt-5-mini");
+  return openai("gpt-6-luna");
 }

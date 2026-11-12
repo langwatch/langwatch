@@ -225,6 +225,7 @@ export function buildSessionContextLogPayload({
   trace,
   title,
   name,
+  parentSessionId,
 }: {
   sessionId: string;
   agent: string;
@@ -236,6 +237,8 @@ export function buildSessionContextLogPayload({
   title?: string | null;
   /** The session's own name, as the harness itself holds it. */
   name?: string | null;
+  /** The session that spawned this one, for an agent whose telemetry names no parent. */
+  parentSessionId?: string | null;
 }): OtlpLogsPayload {
   const attributes: OtlpKeyValue[] = [
     attribute({ key: "event.name", value: SESSION_CONTEXT_EVENT_NAME }),
@@ -263,6 +266,9 @@ export function buildSessionContextLogPayload({
   }
   if (name) {
     attributes.push(attribute({ key: SESSION_NAME_ATTR, value: name }));
+  }
+  if (parentSessionId) {
+    attributes.push(attribute({ key: "parent_session_id", value: parentSessionId }));
   }
 
   return {

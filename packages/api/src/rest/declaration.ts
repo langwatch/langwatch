@@ -566,6 +566,24 @@ export function routeTargetField(target: Readonly<{ param: string; field?: strin
   return target.field ?? target.param;
 }
 
+/**
+ * The operator flags that open the permission to a legacy project key whose project they list,
+ * on top of ingestion and full access: one flag, or several where any of them opens it.
+ */
+export type RestLegacyKeyScopes = string | readonly [string, ...string[]];
+
+/**
+ * Where the permission is asked, and the legacy key scopes that open it. The scopes ride on the
+ * permission they open, so a route that asks none has nowhere to name them.
+ */
+export type RestPermissionOptions<
+  Where extends RestPermissionTarget | RestPermissionReach =
+    | RestPermissionTarget
+    | RestPermissionReach,
+> =
+  | (Where & Readonly<{ legacyKey?: RestLegacyKeyScopes }>)
+  | Readonly<{ at?: never; legacyKey: RestLegacyKeyScopes }>;
+
 export type RestTransportRoute<Api> = Readonly<{
   readonly method: HttpMethod;
   readonly path: string;
@@ -617,6 +635,8 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly mintsCredential?: AuthzPermission;
   /** Present exactly when the route is refused on an aggregate though its permission is exempt. */
   readonly refusedOnAggregate?: true;
+  /** Present exactly when operator flags open the route to a legacy project key. */
+  readonly legacyKeyScopes?: readonly [string, ...string[]];
   /** Present exactly when the route's create is replayable under a caller key. */
   readonly idempotency?: RestIdempotency;
   /** Present exactly when the route writes its own body instead of a schema's. */
@@ -666,6 +686,8 @@ export type RestTransportDeclaration<
   readonly addressing: RestAddressing;
   /** Whether the family's `dated` addresses also answer under `/api/v1`. */
   readonly v1Twin: boolean;
+  /** Every answer at the bare `/api/<namespace>` path names the `/api/v1` twin as successor. */
+  readonly bareDeprecated?: true;
   /** The generation a `v1-in-path` family names in its own path. */
   readonly generation: string;
   /**
@@ -701,6 +723,7 @@ type RouteState = Readonly<{
   entitlement?: EntitlementGate;
   mintsCredential?: AuthzPermission;
   refusedOnAggregate?: true;
+  legacyKeyScopes?: readonly [string, ...string[]];
   idempotency?: RestIdempotency;
   rawResponse?: RestRawResponse;
   /** Present exactly when the route declared the kind of answer it gives. */
@@ -1190,23 +1213,25 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
    * A proof-bearing permission: the door mints the proof and the handler is handed it. A second
    * call at another route target composes (ADR-185 §2): both asked, one proof per target.
    */
-  withPermission<const Target extends RestPermissionTarget | undefined = undefined>(
+  withPermission<
+    const Target extends RestPermissionOptions<RestPermissionTarget> | undefined = undefined,
+  >(
     permission: ProofBearingPermission,
     target?: Target,
   ): RouteBuilder<Api, Permitted<S, { permission: true; proof: true }, TargetField<Target>>>;
   /**
    * The permission this route demands, and where it is asked. `{ at: "route", param }` asks at
    * the scope the route's own path names, for a credential one tier wider than the resource.
-   * `{ at: "grants" }` and `{ at: "organization" }` are the key door's (RestPermissionReach).
+   * `{ at: "grants" | "organization" }` are the key door's; `legacyKey` opens it to a legacy key.
    */
   withPermission(
     permission: AuthzPermission,
-    target?: RestPermissionTarget | RestPermissionReach,
+    target?: RestPermissionOptions,
   ): RouteBuilder<Api, Permitted<S, { permission: true }, never>>;
   /** Every one of them, asked in this order before the handler; naming an array says AND (E2). */
   withPermission(
     permissions: readonly [AuthzPermission, AuthzPermission, ...AuthzPermission[]],
-    target?: RestPermissionTarget | RestPermissionReach,
+    target?: RestPermissionOptions,
   ): RouteBuilder<Api, With<S, { permission: true }>>;
   /**
    * The permission the parsed input chooses (`permissionBy`, E3): the door only identifies, and
@@ -1226,17 +1251,21 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
   ): RouteBuilder<Api, With<S, { permission: true }>>;
   withPermission(
     declared: AuthzPermission | readonly AuthzPermission[] | InputPermission,
-    target?: RestPermissionTarget | RestPermissionReach | RestPermissionPlatform,
+    target?: RestPermissionOptions | RestPermissionPlatform,
   ): unknown {
     const { permission, permissions, permissionBy, permissionPlatform } = this.state;
     if (permission ?? permissions ?? permissionBy ?? permissionPlatform) {
+      if (target && "legacyKey" in target && target.legacyKey !== undefined) {
+        throw new Error(`REST ${this.operation}: legacyKey rides on the first permission only`);
+      }
       return this.#furtherPermission(declared, target);
     }
 
     if (target?.at === "platform") return this.#platformPermission(declared, target);
 
     const reach = target?.at === "grants" || target?.at === "organization" ? target.at : void 0;
-    const scoped = target && "param" in target ? target : void 0;
+    const scoped = target && "param" in target ? withoutLegacyKey(target) : void 0;
+    const legacyKey = target?.legacyKey;
 
     if (typeof declared === "string") {
       assertNotPlatformPermission({ address: `REST ${this.operation}`, permissions: [declared] });
@@ -1252,6 +1281,7 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
         ...permissionParts({ operation: this.operation, declared, reach }),
         ...(scoped ? { permissionTarget: scoped } : {}),
         ...(reach ? { permissionReach: reach } : {}),
+        ...(legacyKey ? { legacyKeyScopes: legacyKeyScopesOf(legacyKey) } : {}),
       },
     });
   }
@@ -1259,7 +1289,7 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
   /** A second permission composes only as one more route target, beside a first that names one. */
   #furtherPermission(
     declared: AuthzPermission | readonly AuthzPermission[] | InputPermission,
-    target: RestPermissionTarget | RestPermissionReach | RestPermissionPlatform | undefined,
+    target: RestPermissionOptions | RestPermissionPlatform | undefined,
   ): RouteBuilder<Api, S> {
     const { permissionTarget: first, permissions, permissionBy, permissionPlatform } = this.state;
     const composable =
@@ -1968,12 +1998,26 @@ function declaredParts(state: RouteState): Partial<RestTransportRoute<unknown>> 
   };
 }
 
+/** Where the permission is asked, without the legacy key scopes that ride beside it. */
+function withoutLegacyKey(
+  target: RestPermissionTarget & Readonly<{ legacyKey?: RestLegacyKeyScopes }>,
+): RestPermissionTarget {
+  const { legacyKey: _, ...where } = target;
+  return where;
+}
+
+/** The legacy key scopes as the route stores them: always a non-empty list. */
+function legacyKeyScopesOf(scopes: RestLegacyKeyScopes): readonly [string, ...string[]] {
+  return typeof scopes === "string" ? [scopes] : scopes;
+}
+
 /** What the door reads of a route beyond its permission: gates, credential, audit. */
 function doorParts(state: RouteState): Partial<RestTransportRoute<unknown>> {
   return {
     ...(state.entitlement ? { entitlement: state.entitlement } : {}),
     ...(state.mintsCredential ? { mintsCredential: state.mintsCredential } : {}),
     ...(state.refusedOnAggregate ? { refusedOnAggregate: state.refusedOnAggregate } : {}),
+    ...(state.legacyKeyScopes ? { legacyKeyScopes: state.legacyKeyScopes } : {}),
     ...(state.credential ? { credential: state.credential } : {}),
     ...(state.key ? { key: state.key } : {}),
     ...(state.keyKinds ? { keyKinds: state.keyKinds } : {}),
@@ -2037,6 +2081,7 @@ class RestTransportRouter<
   private root = false;
   private generation = DEFAULT_GENERATION;
   private deprecated: RestDeprecation | undefined;
+  private bareDeprecated = false;
 
   private readonly api: FeatureApiWitness<Api>;
   readonly namespace: string;
@@ -2090,6 +2135,7 @@ class RestTransportRouter<
     router.root = this.root;
     router.generation = this.generation;
     router.deprecated = this.deprecated;
+    router.bareDeprecated = this.bareDeprecated;
 
     return router;
   }
@@ -2113,6 +2159,7 @@ class RestTransportRouter<
     this.v1Twin = options.v1Twin ?? true;
     this.root = options.root ?? false;
     this.generation = options.generation ?? DEFAULT_GENERATION;
+    this.bareDeprecated = options.bareDeprecated ?? false;
 
     return this;
   }
@@ -2139,6 +2186,7 @@ class RestTransportRouter<
       version: this.version,
       addressing: this.addressing,
       v1Twin: this.v1Twin,
+      ...(this.bareDeprecated ? { bareDeprecated: true as const } : {}),
       generation: this.generation,
       credential: this.credential,
       ...(this.deprecated ? { deprecated: this.deprecated } : {}),

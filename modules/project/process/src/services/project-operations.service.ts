@@ -8,9 +8,11 @@ import {
   type Project,
   type SetTraceSharingInput,
   type UpdateProjectInput,
+  type ProjectLegacyKey,
   type ProjectLegacyKeyStatus,
   type AggregateRule,
 } from "@langwatch/project-contract";
+import { toDate } from "@langwatch/time";
 
 import type {
   ProjectStorageSettings,
@@ -23,10 +25,24 @@ import {
 import type { ProjectCreatedNoticeService } from "./project-created-notice.service.ts";
 import type { ProjectService } from "./project.service.ts";
 
+/**
+ * A live legacy key before anyone's standing is asked about, carrying the owning
+ * team so one batched decision covers the read without a lineage lookup per project.
+ * The team never reaches the wire: the request service projects it off.
+ */
+export type LegacyKeyCandidate = ProjectLegacyKey & Readonly<{ teamId: string }>;
+
 /** The four project operations these use cases orchestrate, and nothing else. */
 export type ProjectOperationsDirectory = Pick<
   ProjectService,
-  "create" | "findWithTeam" | "update" | "archive" | "getById" | "rotateLegacyApiKey"
+  | "create"
+  | "findWithTeam"
+  | "update"
+  | "archive"
+  | "getById"
+  | "rotateLegacyApiKey"
+  | "findLegacyApiKeyLastUsedAt"
+  | "findLiveLegacyKeys"
 >;
 
 type ProjectOperationsDependencies = Readonly<{
@@ -194,8 +210,28 @@ export class ProjectOperationsService {
     input: Readonly<{ projectId: string }>,
   ): Promise<ProjectLegacyKeyStatus> {
     const project = await this.dependencies.projects.getById(input.projectId);
+    if (isLegacyKeyRevoked(project.apiKey)) return { present: false, lastUsedAt: null };
+    const lastUsedAt = await this.dependencies.projects.findLegacyApiKeyLastUsedAt({
+      projectId: input.projectId,
+    });
 
-    return { present: !isLegacyKeyRevoked(project.apiKey) };
+    return { present: true, lastUsedAt: lastUsedAt && toDate(lastUsedAt) };
+  }
+
+  /**
+   * Every live legacy key in the organisation, as the organisation-wide screen
+   * needs them: one revoke speaks for its own project only.
+   */
+  async findLegacyKeys(input: Readonly<{ organizationId: string }>): Promise<LegacyKeyCandidate[]> {
+    const live = await this.dependencies.projects.findLiveLegacyKeys(input);
+
+    return live.map((entry) => ({
+      projectId: entry.projectId,
+      teamId: entry.teamId,
+      projectName: entry.projectName,
+      projectSlug: entry.projectSlug,
+      lastUsedAt: entry.lastUsedAt && toDate(entry.lastUsedAt),
+    }));
   }
 
   /** Idempotent: a project with no legacy key is left with a fresh unusable one. */

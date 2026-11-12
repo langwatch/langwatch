@@ -34,6 +34,12 @@ spec:
   # until conversation-sticky routing exists. No HPA for the same reason.
   replicas: {{ .Values.replicaCount }}
   revisionHistoryLimit: 5
+  {{- with .Values.progressDeadlineSeconds }}
+  # How long a rollout may take before the Deployment reports
+  # ProgressDeadlineExceeded. Raise it where a cold sandboxed node routinely
+  # needs longer than the 600s default to become ready.
+  progressDeadlineSeconds: {{ . }}
+  {{- end }}
   strategy:
     # Recreate, not RollingUpdate: a second pod briefly running alongside the
     # old one provides no benefit (in-memory sessions don't migrate) and just
@@ -43,7 +49,7 @@ spec:
     matchLabels: {{- include "langyagent.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      labels: {{- include "langyagent.selectorLabels" . | nindent 8 }}
+      labels: {{- include "langyagent.podLabels" . | nindent 8 }}
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
@@ -88,6 +94,16 @@ spec:
                   name: {{ . }}
                   key: {{ $.Values.mirror.traceKeyKey }}
             {{- end }}
+            {{- $owned := splitList "," (include "langyagent.ownedEnvNames" .) }}
+            {{- range .Values.extraEnvs }}
+            {{- if has .name $owned }}
+            {{- fail (printf "langyagent.extraEnvs sets %s, which the chart sets itself; use the chart value that controls it instead of extraEnvs" .name) }}
+            {{- end }}
+            {{- end }}
+            {{- with .Values.extraEnvs }}
+            # Operator-supplied environment, appended after the chart's own.
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           readinessProbe:
             httpGet:
               path: /health
@@ -116,7 +132,10 @@ spec:
           emptyDir: {{- toYaml .Values.workspaceVolume | nindent 12 }}
         - name: tmp
           emptyDir:
-            sizeLimit: {{ .Values.scratchSizeLimit }}
+            {{- with .Values.scratchSizeLimit }}
+            sizeLimit: {{ . }}
+            {{- else }} {}
+            {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector: {{- toYaml . | nindent 8 }}
       {{- end }}

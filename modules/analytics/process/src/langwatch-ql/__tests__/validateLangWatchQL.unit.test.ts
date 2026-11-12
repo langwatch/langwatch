@@ -194,6 +194,23 @@ describe("validateLangWatchQL given a SETTINGS clause", () => {
   ])("refuses one %s", (_case, sql) => {
     expect(codesOf(validate(sql))).toContain("SETTINGS_CLAUSE");
   });
+
+  /** @scenario "The query log names the tenant without the raw key or its hash" */
+  it.each([
+    [
+      "trailing the statement",
+      "SELECT TraceId FROM traces SETTINGS log_comment = 'lwql:project=b'",
+    ],
+    [
+      "in a subquery",
+      "SELECT TraceId FROM (SELECT TraceId FROM traces SETTINGS log_comment = 'lwql:project=b')",
+    ],
+  ])(
+    "refuses a log_comment naming another tenant %s, so the executor's is the only one",
+    (_case, sql) => {
+      expect(codesOf(validate(sql))).toContain("SETTINGS_CLAUSE");
+    },
+  );
 });
 
 describe("validateLangWatchQL given a clause that redirects output", () => {

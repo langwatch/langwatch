@@ -26,6 +26,7 @@ import {
   mapTraceMetadata,
   withoutEventReferences,
 } from "../../rules/trace-full-record.rules.ts";
+import { offloadedFieldKey } from "../../rules/trace-offload-recall.rules.ts";
 import { TraceFullRecordRepository } from "../trace-full-record.repository.ts";
 import type { TracePayloadReaderRepository } from "../trace-payload-reader.repository.ts";
 import type {
@@ -93,8 +94,6 @@ const storedSpanRowSchema: z.ZodType<StoredSpanRow> = z.looseObject({
 });
 
 const storedSpanRowsSchema = z.array(storedSpanRowSchema);
-
-type PayloadReference = { traceId: string; eventId: string; field: string };
 
 /** Full-record reader with package-owned normalized mapping and bounded recall. */
 export class ClickHouseTraceFullRecordRepository extends TraceFullRecordRepository {
@@ -280,38 +279,26 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
       row,
       original: deserializeStoredAttributes(row.SpanAttributes),
     }));
-    const reads = new Map<string, PayloadReference>();
-    for (const plan of plans) {
-      for (const reference of ClickHouseTraceFullRecordRepository.eventReferences(plan.original)) {
-        reads.set(ClickHouseTraceFullRecordRepository.referenceKey(plan.row.TraceId, reference), {
-          traceId: plan.row.TraceId,
-          eventId: reference.eventId,
-          field: reference.field,
-        });
-      }
-    }
-    const values = new Map<string, string | null>();
-    await ClickHouseTraceFullRecordRepository.mapWithConcurrency(
-      [...reads.entries()],
-      PAYLOAD_READ_CONCURRENCY,
-      async ([key, reference]) => {
-        try {
-          values.set(key, await this.payloads.read({ tenantId, ...reference }));
-        } catch {
-          values.set(key, null);
-        }
-      },
+    const references = plans.flatMap(({ row, original }) =>
+      ClickHouseTraceFullRecordRepository.eventReferences(original).map(({ eventId, field }) => ({
+        traceId: row.TraceId,
+        eventId,
+        field,
+      })),
     );
+    const outcomes = await this.payloads.recall({
+      tenantId,
+      references,
+      concurrency: PAYLOAD_READ_CONCURRENCY,
+    });
 
     return plans.map(({ row, original }) => {
       const attributes = withoutEventReferences(original);
       let recalled = false;
       for (const reference of ClickHouseTraceFullRecordRepository.eventReferences(original)) {
-        const value = values.get(
-          ClickHouseTraceFullRecordRepository.referenceKey(row.TraceId, reference),
-        );
-        if (value !== null && value !== void 0) {
-          attributes[reference.attrKey] = deserializeStoredValue(value);
+        const outcome = outcomes.get(offloadedFieldKey({ traceId: row.TraceId, ...reference }));
+        if (outcome?.ok) {
+          attributes[reference.attrKey] = deserializeStoredValue(outcome.value);
           recalled = true;
         }
       }
@@ -354,13 +341,6 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
   private static ownString(value: object, key: string): string | null {
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     return typeof descriptor?.value === "string" ? descriptor.value : null;
-  }
-
-  private static referenceKey(
-    traceId: string,
-    reference: { eventId: string; field: string },
-  ): string {
-    return `${traceId}\u0000${reference.eventId}\u0000${reference.field}`;
   }
 
   private static summaryContent(value: string | null): { type: string; value: string } | null {

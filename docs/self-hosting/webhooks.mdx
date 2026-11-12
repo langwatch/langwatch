@@ -26,7 +26,7 @@ If your network requires an egress allowlist at the firewall, the platform's del
 
 Development setups and some internal architectures legitimately need receivers on private addresses. The escape hatch:
 
-```
+```bash
 WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS=1
 ```
 
@@ -38,7 +38,7 @@ An endpoint can deliver to an Amazon SQS queue instead of an HTTPS receiver ([ho
 
 It can also run on **this deployment's own AWS identity** (an instance role, IRSA, or a developer's SSO session), which needs an explicit opt-in:
 
-```
+```bash
 WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS=1
 ```
 
@@ -61,7 +61,7 @@ Webhook and billing REST surfaces authenticate with an **organization API key** 
 
 A gateway request that was admitted but never confirmed is settled after a grace window and delivered as `gateway.request.settled` with unknown cost (see [settled semantics](/ai-gateway/billing-events#event-lifecycle)). The default grace is **30 minutes**. Tune it with:
 
-```
+```bash
 LW_SPEND_SETTLEMENT_GRACE_MS=1800000
 ```
 

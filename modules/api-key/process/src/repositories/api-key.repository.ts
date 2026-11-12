@@ -25,6 +25,8 @@ export type ApiKeyCreateRecord = {
   ingestionTemplateId: string | null;
   /** Minted by LangWatch for itself; hides the key and keeps it out of customers' hands. */
   isSystemManaged?: boolean;
+  /** The browser session minting a docs session key, so its sign-out revokes it. */
+  createdByBrowserSessionId?: string | null;
   startsDisabled: boolean;
   grants: ApiKeyScope[];
 };
@@ -37,6 +39,7 @@ export type ApiKeyUpdateRecord = {
   revokedAt?: Instant | null;
   lastUsedAt?: Instant;
   hashedSecret?: string;
+  lookupId?: string;
 };
 
 /** Private persistence boundary for the API-key aggregate. */
@@ -61,6 +64,16 @@ export abstract class ApiKeyRepository {
     id: string;
     organizationId: string;
     cause: ApiKeyRevocationCause;
+  }): Promise<ApiKeyRow>;
+  /**
+   * Swaps a live key's secret for a new lookup id and hash, fenced on `revokedAt` like
+   * `revoke`. Throws `ApiKeyAlreadyRevokedError` when no live key of that id is in the org.
+   */
+  abstract rotateSecret(input: {
+    id: string;
+    organizationId: string;
+    lookupId: string;
+    hashedSecret: string;
   }): Promise<ApiKeyRow>;
   abstract updateLastUsedAt(input: { id: string }): Promise<void>;
   abstract upgradeHash(input: { id: string; hashedSecret: string }): Promise<void>;
@@ -108,6 +121,15 @@ export abstract class ApiKeyRepository {
   abstract findLivenessById(input: {
     id: string;
   }): Promise<{ revokedAt: Instant | null; expiresAt: Instant | null } | null>;
+  /**
+   * One member's live keys of one system-managed name that the named browser sessions minted,
+   * across every organization they belong to: sign-out knows the person, not the organization.
+   */
+  abstract findLiveBySessions(input: {
+    userId: string;
+    name: string;
+    browserSessionIds: readonly string[];
+  }): Promise<{ id: string; organizationId: string }[]>;
   /** One organization's unrevoked CLI login keys past their session at `now`. */
   abstract findElapsedLoginKeys(input: {
     organizationId: string;

@@ -479,7 +479,7 @@ void describe("breaking-change scope guard", () => {
 
     void it("leaves the label override where it lives, ahead of the script", () => {
       const workflow = readFileSync(
-        resolve(repoRoot, ".github/workflows/release-scope-guard.yml"),
+        resolve(repoRoot, ".github/workflows/pr-conventions.yml"),
         "utf8",
       );
       const label = workflow.indexOf(

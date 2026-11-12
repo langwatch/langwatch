@@ -180,9 +180,9 @@ func TestCredentialFromHeaders_Gemini(t *testing.T) {
 }
 
 func TestCredentialFromHeaders_GenericAPIKeyProviders(t *testing.T) {
-	// xai/groq/cerebras/deepseek share the Generic slot; Provider
+	// xai/groq/cerebras/deepseek/doubleword share the Generic slot; Provider
 	// disambiguates and maps 1:1 onto the domain provider id.
-	for _, provider := range []string{"xai", "groq", "cerebras", "deepseek"} {
+	for _, provider := range []string{"xai", "groq", "cerebras", "deepseek", "doubleword"} {
 		t.Run(provider, func(t *testing.T) {
 			hdr := encodeCreds(t, inlineCreds{
 				Provider: provider,

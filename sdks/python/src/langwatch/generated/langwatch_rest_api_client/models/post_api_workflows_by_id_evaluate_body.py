@@ -24,6 +24,8 @@ class PostApiWorkflowsByIdEvaluateBody:
         data (list[PostApiWorkflowsByIdEvaluateBodyDataItem] | Unset): Inline rows to evaluate instead of the workflow's
             attached dataset
         dataset_id (str | Unset): Platform dataset id to evaluate; mutually exclusive with data
+        dataset_version (int | Unset): Version of the saved dataset to evaluate (dataset_id, else the workflow's
+            attached dataset); defaults to its current content
         parameters (PostApiWorkflowsByIdEvaluateBodyParameters | Unset): Constant entry inputs applied to every row,
             e.g. a feature flag or PR number
         row_indices (list[int] | Unset): Subset of dataset row indices to evaluate
@@ -32,6 +34,7 @@ class PostApiWorkflowsByIdEvaluateBody:
     version_id: str | Unset = UNSET
     data: list[PostApiWorkflowsByIdEvaluateBodyDataItem] | Unset = UNSET
     dataset_id: str | Unset = UNSET
+    dataset_version: int | Unset = UNSET
     parameters: PostApiWorkflowsByIdEvaluateBodyParameters | Unset = UNSET
     row_indices: list[int] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
@@ -47,6 +50,8 @@ class PostApiWorkflowsByIdEvaluateBody:
                 data.append(data_item)
 
         dataset_id = self.dataset_id
+
+        dataset_version = self.dataset_version
 
         parameters: dict[str, Any] | Unset = UNSET
         if not isinstance(self.parameters, Unset):
@@ -65,6 +70,8 @@ class PostApiWorkflowsByIdEvaluateBody:
             field_dict["data"] = data
         if dataset_id is not UNSET:
             field_dict["dataset_id"] = dataset_id
+        if dataset_version is not UNSET:
+            field_dict["dataset_version"] = dataset_version
         if parameters is not UNSET:
             field_dict["parameters"] = parameters
         if row_indices is not UNSET:
@@ -93,6 +100,8 @@ class PostApiWorkflowsByIdEvaluateBody:
 
         dataset_id = d.pop("dataset_id", UNSET)
 
+        dataset_version = d.pop("dataset_version", UNSET)
+
         _parameters = d.pop("parameters", UNSET)
         parameters: PostApiWorkflowsByIdEvaluateBodyParameters | Unset
         if isinstance(_parameters, Unset):
@@ -106,6 +115,7 @@ class PostApiWorkflowsByIdEvaluateBody:
             version_id=version_id,
             data=data,
             dataset_id=dataset_id,
+            dataset_version=dataset_version,
             parameters=parameters,
             row_indices=row_indices,
         )

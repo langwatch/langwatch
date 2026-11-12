@@ -79,6 +79,9 @@ func buildMessagesResponsesRequest(
 	if len(anthReq.Messages) == 0 {
 		return nil, fmt.Errorf("anthropic messages body has no messages")
 	}
+	if provider == bfschemas.Bedrock {
+		anthReq.Messages = inlineMidConversationSystem(anthReq.Messages)
+	}
 
 	bfReq := anthReq.ToBifrostResponsesRequest(bfCtx)
 	if bfReq == nil {
@@ -158,6 +161,10 @@ func (r *BifrostRouter) dispatchMessagesTranslated(
 		return nil, epErr
 	} else if endpoint != "" {
 		return r.dispatchMessagesTranslatedBedrockVPCE(ctx, bfCtx, bfReq, model, cred, endpoint)
+	}
+
+	if err := carryBedrockCacheTTL(bfCtx, bfReq, req.Body); err != nil {
+		return nil, anthropicUpstreamError(http.StatusBadRequest, err.Error())
 	}
 
 	resp, berr := r.bf.ResponsesRequest(bfCtx, bfReq)
@@ -242,6 +249,10 @@ func (r *BifrostRouter) dispatchMessagesTranslatedStream(
 		return nil, epErr
 	} else if endpoint != "" {
 		return r.dispatchMessagesTranslatedBedrockVPCEStream(ctx, bfCtx, bfReq, req, model, cred, endpoint)
+	}
+
+	if err := carryBedrockCacheTTL(bfCtx, bfReq, req.Body); err != nil {
+		return nil, anthropicUpstreamError(http.StatusBadRequest, err.Error())
 	}
 
 	ch, berr := r.bf.ResponsesStreamRequest(bfCtx, bfReq)

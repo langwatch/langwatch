@@ -231,6 +231,31 @@ const RESOURCE_COPY = {
     blurb: "How people sign in, and the directory that provisions them.",
     area: "Organization",
   },
+  agents: {
+    label: "Agent deploys",
+    blurb: "Which version of an agent each deploy label, such as production, points at.",
+    area: "Building",
+  },
+  evaluators: {
+    label: "Evaluator deploys",
+    blurb: "Which version of an evaluator each deploy label, such as production, points at.",
+    area: "Building",
+  },
+  subscription: {
+    label: "Subscription",
+    blurb: "The organization's paid plan, its seats and its invoices.",
+    area: "Organization",
+  },
+  seatRequests: {
+    label: "Seat requests",
+    blurb: "Requests to give a seat to someone the seat limit held back.",
+    area: "Organization",
+  },
+  members: {
+    label: "Members",
+    blurb: "Who is in the organization and which roles they hold.",
+    area: "Organization",
+  },
   featureFlags: {
     label: "Feature flag experiments",
     blurb: "Which experiments a project or organization is enrolled in.",
@@ -274,6 +299,11 @@ const ACTION_COPY = {
   },
   attach: { label: "Attach", blurb: "Put one in place." },
   detach: { label: "Detach", blurb: "Take one out of place." },
+  deploy: {
+    label: "Deploy",
+    blurb: "Move a deploy label to another version, and archive one that carries a label.",
+  },
+  upgrade: { label: "Upgrade", blurb: "Start a paid plan and pay for it." },
   viewOtherPersonal: {
     label: "View everyone's personal keys",
     blurb: "See the personal keys other people own.",

@@ -44,6 +44,7 @@ import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
+import { ProjectApi } from "@langwatch/project-contract";
 import { openAiApiKey, Secret } from "@langwatch/secrets";
 import { nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
@@ -68,6 +69,7 @@ import { EvaluatorModelEnvService } from "../features/evaluators/services/evalua
 import { LangevalsClusteringService } from "../features/evaluators/services/langevals-clustering.service.ts";
 import { LangevalsEvaluatorService } from "../features/evaluators/services/langevals-evaluator.service.ts";
 import { LangevalsPiiDetectionService } from "../features/evaluators/services/langevals-pii-detection.service.ts";
+import { LangevalsProviderSpendService } from "../features/evaluators/services/langevals-provider-spend.service.ts";
 import { WorkflowEvaluationService } from "../features/evaluators/services/workflow-evaluation.service.ts";
 import { EvaluationCostService } from "../features/execution/services/evaluation-cost.service.ts";
 import { EvaluationExecutionIntentService } from "../features/execution/services/evaluation-execution-intent.service.ts";
@@ -81,11 +83,13 @@ import {
   EVAL_INPUTS_PREVIEW_BYTES,
   EvaluationInputsOffloadService,
 } from "../features/execution/services/evaluation-inputs-offload.service.ts";
+import { EvaluationJudgeRoutingService } from "../features/execution/services/evaluation-judge-routing.service.ts";
 import { EvaluationLoopMetricsService } from "../features/execution/services/evaluation-loop-metrics.service.ts";
 import { EvaluationModelCascadeService } from "../features/execution/services/evaluation-model-cascade.service.ts";
 import { EvaluationSettingsRecoverySwitchService } from "../features/execution/services/evaluation-settings-recovery-switch.service.ts";
 import { EvaluationSpanDigestService } from "../features/execution/services/evaluation-span-digest.service.ts";
 import { EvaluationMonitorLookupService } from "../features/monitors/services/evaluation-monitor-lookup.service.ts";
+import { MonitorErrorRateService } from "../features/monitors/services/monitor-error-rate.service.ts";
 import { MonitorTrendService } from "../features/monitors/services/monitor-trend.service.ts";
 import type { EvaluationRepositories } from "../repositories/evaluation.repositories.ts";
 import type { EvaluationRetentionLookup } from "../repositories/evaluation.repository.ts";
@@ -270,6 +274,8 @@ export class EvaluationModule implements EvaluationApiContract {
     judges: InstantEvalJudgeApi,
     /** Mints the own-only proof each evaluation_runs read is fenced by; a leaf (AGG-EVAL-PROOF). */
     authz: AuthzApi,
+    /** A project's organization, so the judge router flag is read with its organization rule. */
+    projects: ProjectApi,
   };
   static readonly secrets = {
     openAi: openAiApiKey,
@@ -395,6 +401,7 @@ export class EvaluationModule implements EvaluationApiContract {
       },
     });
     const { langevals } = channels;
+    const providerSpend = LangevalsProviderSpendService.create({ spend: channels.spend });
     const staging = repositories.langevalsStaging;
     const telemetry = EvaluationExecutionMetricsService.create();
     const unavailable = createUnavailableEvaluationInfrastructure(EVALUATION_PROCESS_NAME);
@@ -430,11 +437,16 @@ export class EvaluationModule implements EvaluationApiContract {
           timeoutMs: LANGEVALS_TIMEOUT_MS,
         },
         telemetry,
+        spend: providerSpend,
       }),
       evaluators: dependencies.evaluators,
       workflowExecutor: WorkflowEvaluationService.create(dependencies.workflows),
       judges: dependencies.judges,
       decisionModels: dependencies.modelProviders,
+      judgeRouting: EvaluationJudgeRoutingService.create({
+        flags: dependencies.featureFlags,
+        projects: dependencies.projects,
+      }),
       installEnvironment: environment.read(),
       telemetry,
     });
@@ -489,6 +501,7 @@ export class EvaluationModule implements EvaluationApiContract {
         endpoint: config.langevalsEndpoint,
         langevals,
         staging,
+        spend: providerSpend,
       }),
       piiDetection: LangevalsPiiDetectionService.create({
         endpoint: config.langevalsEndpoint,
@@ -510,6 +523,10 @@ export class EvaluationModule implements EvaluationApiContract {
         }),
         retryWindowMs: config.evaluatorRetryWindowMinutes * 60_000,
         retries: commands,
+        monitorErrorRates: MonitorErrorRateService.create({
+          counts: repositories.monitorErrorRates,
+          lifecycle,
+        }),
       }),
       eventing: EvaluationProcessingStoresAdapter.create({
         runs: EvaluationRunProjectionService.create({

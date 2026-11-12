@@ -34,7 +34,7 @@ import {
   type SectionNavItemData,
 } from "../../model/section-nav-items.ts";
 import {
-  isSettingsMenuItemActive,
+  isSettingsMenuItemActiveAmong,
   OPS_ATTENTION_HREF,
   type SettingsMenuGroup,
 } from "../../model/settings-menu.ts";
@@ -184,7 +184,9 @@ function DetourMenuBody({
   showExpanded: boolean;
   badgeFor?: (href: string) => number | undefined;
 }) {
-  const pathname = useNavigationHost().pathname();
+  const host = useNavigationHost();
+  const pathname = host.pathname();
+  const search = host.search();
 
   return (
     <>
@@ -201,7 +203,12 @@ function DetourMenuBody({
               icon={item.icon}
               label={item.label}
               href={item.href}
-              isActive={isSettingsMenuItemActive({ item, pathname })}
+              isActive={isSettingsMenuItemActiveAmong({
+                item,
+                siblings: group.items,
+                pathname,
+                search,
+              })}
               showLabel={showExpanded}
               badgeNumber={badgeFor?.(item.href)}
               isLocked={item.isLocked}
@@ -323,8 +330,8 @@ function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
 }
 
 /**
- * The member's starred dashboards in every other product's sidebar, for a member who can reach
- * Dashboards; Dashboards lists its stars itself, and Settings is no product.
+ * The Dashboards section analytics lends, in the LLM Ops sidebar only and for a member who can
+ * reach Dashboards: the owner wants it in the project's sidebar, not everywhere.
  */
 function StarredDashboardsGroup({
   surface,
@@ -334,7 +341,7 @@ function StarredDashboardsGroup({
   showExpanded: boolean;
 }) {
   const { reachableProducts } = useReachableProducts();
-  if (!showExpanded || surface === "dashboards" || surface === "settings") return null;
+  if (!showExpanded || surface !== "llm-ops") return null;
   if (!reachableProducts.includes("dashboards")) return null;
   return <StarredDashboards />;
 }
