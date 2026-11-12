@@ -6755,7 +6755,7 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": false,
-          "documentation": "`member` or `invitation`."
+          "documentation": "`member`, `invitation` or `hold` (a seat held after somebody left)."
         },
         {
           "name": "holderId",
@@ -6764,7 +6764,7 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": false,
-          "documentation": "The member's userId or the invitation's id."
+          "documentation": "The member's or the hold's userId, or the invitation's id."
         },
         {
           "name": "seat",
@@ -6810,6 +6810,24 @@
           "isList": false,
           "isOptional": false,
           "documentation": "The fold gave the invitation's seat back at `expiresAt`."
+        },
+        {
+          "name": "suppressedBy",
+          "columnName": "suppressedBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "A hold whose seat a live full invitation to its address took: that invitation's id."
+        },
+        {
+          "name": "restoredByFold",
+          "columnName": "restoredByFold",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The fold gave a suppressed hold its seat back when that invitation expired."
         }
       ]
     },

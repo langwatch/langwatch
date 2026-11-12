@@ -646,6 +646,8 @@ export interface LwqlPrismaRows {
     readonly lastChangeId: "String?";
     readonly expiresAt: "Float?";
     readonly expiredByFold: "Boolean";
+    readonly suppressedBy: "String?";
+    readonly restoredByFold: "Boolean";
   };
   readonly OrganizationSeatPeakMonth: {
     readonly organizationId: "String";
