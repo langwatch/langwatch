@@ -621,3 +621,9 @@ not operations.
   AND-ed into the fenced WHERE: the text from the windowed marker to the election is an allow-listed
   run of AND-joined terms, so an OR arm, a NOT or a group around the election is refused, and the
   fence's property test generates those shapes (§3).
+- v1.16 (2026-11-12, from the final security review, under the same ruling). A braid's proof ends
+  `BRAID_REVOCATION_BOUND_MS` after the snapshot it was read in, not after the mint; a read re-checks
+  expiry before releasing rows and sends the remaining life as its time limit; nothing after the
+  election may compare, negate or OR it, and its own select only bounds keys and versions; a signature
+  verifies against the attributes as stored, so a duplicated or shadowed signed key is never marked;
+  the header's totals and every braid read pass the audited span-read door (§3, §4, §8).
