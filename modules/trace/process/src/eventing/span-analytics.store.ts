@@ -40,7 +40,7 @@ export class SpanAnalyticsStore implements AppendStore<SpanAnalyticsRow> {
     await this.storage.insertRows({ rows: fresh, retentionDays: this.retentionDays(context) });
   }
 
-  private retentionDays(context: ProjectionStoreContext): number {
+  private retentionDays(context: BulkAppendContext): number {
     return context.retentionPolicy?.traces ?? this.defaultRetentionDays();
   }
 
