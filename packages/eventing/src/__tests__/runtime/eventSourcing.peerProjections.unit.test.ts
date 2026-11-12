@@ -199,6 +199,52 @@ describe("a peer fold projection", () => {
     await eventSourcing.close();
   });
 
+  /** @scenario "A peer fold's subscriber reacts to its committed state" */
+  it("hands its subscriber the event and the state with that event folded in", async () => {
+    const { store } = memoryFoldStore();
+    const seen: { eventId: string; costs: number[] }[] = [];
+    const eventSourcing = runtime();
+    const owner = eventSourcing.register(ownerPipeline());
+    eventSourcing.register(
+      definePipeline({ name: "host", aggregate: defineAggregate({ type: "global" }) })
+        .withEvents([])
+        .withPeerFoldProjection(
+          {
+            events: peerSpan,
+            fold: {
+              name: "costTotals",
+              version: "2026-10-07",
+              eventTypes: [SPAN_RECEIVED],
+              init: () => ({ costs: [], LastEventOccurredAt: 0 }),
+              apply: (state, event: PeerEvent<typeof peerSpan>) => ({
+                costs: [...state.costs, event.data.cost],
+                LastEventOccurredAt: Math.max(state.LastEventOccurredAt, event.occurredAt),
+              }),
+              store,
+              LastEventOccurredAtKey: "LastEventOccurredAt",
+            },
+          },
+          [
+            {
+              name: "onTotals",
+              handler: async (event, { state }) => {
+                seen.push({ eventId: event.id, costs: [...state.costs] });
+              },
+            },
+          ],
+        )
+        .build(),
+    );
+
+    await owner.service.storeEvents(
+      [span({ id: "e1", aggregateId: "trace-a", cost: 7, occurredAt: 10 })],
+      { tenantId },
+    );
+
+    await vi.waitFor(() => expect(seen).toEqual([{ eventId: "e1", costs: [7] }]));
+    await eventSourcing.close();
+  });
+
   /** @scenario "A peer projection over an event no registered pipeline declares is refused" */
   it("refuses to start routing when no registered pipeline declares the owner's event type", async () => {
     const eventSourcing = runtime();

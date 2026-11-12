@@ -37,6 +37,10 @@ import { EventingRecordSpanAdapter } from "./record-span.commands.ts";
 import { createSpanStorageBroadcastHandler } from "./span-storage-broadcast.subscriber.ts";
 import { SpanStorageStore } from "./span-storage.store.ts";
 import { TraceAnalyticsStore } from "./trace-derived.store.ts";
+import {
+  createTraceFailedHandler,
+  type TraceFailedSubscriberDeps,
+} from "./trace-failed.subscriber.ts";
 import { createTraceProcessingProducerPipeline } from "./trace-processing-producer.pipeline.ts";
 import type { TraceProcessingPipelineDefinition } from "./trace-processing-projections.pipeline.ts";
 import { EventingTracePipelineAdapter } from "./trace-processing-projections.pipeline.ts";
@@ -59,7 +63,10 @@ interface TraceProcessingPeers {
   >;
   featureFlags: FeatureFlagApi;
   modelProviders: Pick<ModelProviderApi, "listCosts">;
-  projects: Pick<ProjectApi, "findById" | "findIdentity" | "updateMetadata" | "resolveOrgAdmin">;
+  projects: Pick<
+    ProjectApi,
+    "findById" | "findIdentity" | "updateMetadata" | "resolveOrgAdmin" | "findOrganizationId"
+  >;
 }
 
 export interface TraceProcessingPipelineInput {
@@ -90,8 +97,8 @@ export interface TraceProcessingPipelineInput {
   recordTrackedEvent: TrackedEventSyncSubscriberDeps["recordTrackedEvent"];
   /** Tells a tenant's open tabs a trace moved; presence relays it in the serving process. */
   broadcast: Pick<PresenceApi, "publishProjectEvent">;
-  /** Where a project's first and later traces are recorded. */
-  milestones: ProjectMetadataSubscriberDeps["milestones"];
+  /** Where a project's first and later traces, and each trace that failed, are recorded. */
+  milestones: ProjectMetadataSubscriberDeps["milestones"] & TraceFailedSubscriberDeps["milestones"];
   /** Mints the own-only proof the summary and analytics fold stores read back through. */
   authorizeFoldRead: FoldReadAuthorizer;
   /** Test-only: overrides `WRITE_COMPACT_ORIGIN_JOBS`; production never passes it. */
@@ -216,6 +223,7 @@ export class TraceProcessingRuntimeAdapter {
         projects: peers.projects,
         milestones: this.input.milestones,
       }),
+      traceFailed: createTraceFailedHandler({ milestones: this.input.milestones }),
       spanStorageBroadcast: createSpanStorageBroadcastHandler({ broadcast: this.input.broadcast }),
       broadcastDisabled: false,
       writeCompactOriginJobs: this.input.writeCompactOriginJobs ?? WRITE_COMPACT_ORIGIN_JOBS,

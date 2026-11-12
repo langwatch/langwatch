@@ -359,6 +359,14 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "project:list-personal-owner-and-first-message-facts",
+    "kind": "data",
+    "mode": "background",
+    "owner": "project",
+    "description": "Lists every personal project's owner and every project that already received its first message, archived ones included.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "prompt:seed-tags-for-untagged-organizations",
     "kind": "tenant",
     "mode": "background",

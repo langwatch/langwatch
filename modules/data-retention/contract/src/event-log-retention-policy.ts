@@ -26,6 +26,7 @@ export const INDEFINITE_EVENT_TYPES = [
   "lw.insight.daily_schedule.configured",
   "lw.insight.daily_schedule.turned_off",
   "lw.trace.first_trace_recorded",
+  "lw.trace.project_traced",
   "lw.evaluation.ran",
   "lw.obs.ingestion_pull.configured",
   "lw.obs.ingestion_pull.disabled",

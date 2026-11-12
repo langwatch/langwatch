@@ -4932,7 +4932,7 @@ model Grant {
   // Which grants a braid change replaced, live or revoked (ADR-201 §2), is
   // served by "Grant_organizationId_replacesGrantId_idx", partial on
   // `WHERE "replacesGrantId" IS NOT NULL`, from migration
-  // 20261112120003_braids_grant_replaced_lookup; undeclarable for the same reason.
+  // 20261112180003_braids_grant_replaced_lookup; undeclarable for the same reason.
   //
   // "Grant_resource_terms_check" is an all-or-nothing CHECK over the tier's
   // four identity columns (token, permission, resourceKind, projectId), tied
@@ -5123,11 +5123,44 @@ model ProjectActiveDay {
 }
 
 /// Nurturing's read model: which organization a project belongs to, from project's created event.
+/// The per-email usage places a project and lists an organization's projects from these rows only.
 model NurturingProject {
   projectId      String @id
   organizationId String
 
   @@index([organizationId])
+}
+
+/// A project nurturing saw traces of with no placement copy, and when it first did: every worker
+/// retries its trace batches only within one window from then, across restarts. Deleted when the
+/// copy lands.
+model NurturingUncopiedProject {
+  projectId   String   @id
+  firstSeenAt DateTime @default(now())
+}
+
+/// Nurturing's own copy of each organization's members, from the owners' member facts (§9):
+/// organization's signed_up and invite_accepted and auth's sso_auto_added join, member_removed
+/// and member_disabled leave, member_enabled returns. Each column keeps its latest time.
+model NurturingOrganizationMember {
+  organizationId String
+  userId         String
+  joinedAt       DateTime?
+  leftAt         DateTime?
+  returnedAt     DateTime?
+
+  @@id([organizationId, userId])
+  @@index([userId])
+}
+
+/// When an organization was created, from organization's created event: nurturing's own copy for
+/// the per-email usage's day offsets. Its own table, so an early creation never adds an unseeded
+/// NurturingOrganization row.
+model NurturingOrganizationCreated {
+  organizationId String   @id
+  createdAt      DateTime
+
+  @@index([createdAt])
 }
 
 /// Nurturing's read model per organization: its admin and its milestone counts.
@@ -5151,6 +5184,60 @@ model NurturingOrganization {
   codingFirstDays      Int[]     @default([])
   lastTraceAt          DateTime? // moves forward only; told to a person joining later
   updatedAt            DateTime  @updatedAt
+}
+
+/// Nurturing's own per-project usage: a peer fold over the owners' prompt, evaluator, scenario
+/// and simulation-run events (ARCHITECTURE §9), one peer fold per owner pipeline, summed per
+/// organization for the per-email traits. Traces are counted in NurturingProjectTraceDay.
+model NurturingProjectUsageView {
+  projectId         String
+  /// The owner pipeline whose peer fold wrote the row (prompt, evaluator, scenario, simulation),
+  /// or `evaluation`: the project's evaluation days, written by a subscriber, at most once a day.
+  owner             String
+  /// The project's usage as the fold folded it (NurturingProjectUsageState).
+  folded            Json
+  /// The event ids of the last delivery folded in, so a redelivery folds once.
+  appliedEventIds   String[] @default([])
+  /// A row of another version reads as undecodable and is re-folded from the log.
+  projectionVersion String
+  /// Event-derived, so a replayed row equals the row it rebuilds.
+  updatedAt         DateTime
+
+  @@id([projectId, owner])
+}
+
+/// Nurturing's own trace counts from trace's span_received and trace_failed (ARCHITECTURE §9), a
+/// root span being one trace, one row per project and UTC day of append time, incremented in place
+/// by each batch. A redelivered batch can count a trace twice; accepted (issue 9378). Kept 30 days.
+model NurturingProjectTraceDay {
+  projectId         String
+  /// UTC `YYYY-MM-DD` of the root spans' append time.
+  day               String
+  traceCount        Int       @default(0)
+  /// Traces trace recorded failed (lw.trace.trace_failed).
+  errorCount        Int       @default(0)
+  /// Append time of the newest root span.
+  lastTraceAt       DateTime?
+  /// Append time of the newest trace_failed.
+  lastFailedTraceAt DateTime?
+
+  @@id([projectId, day])
+}
+
+/// Nurturing's copy of each personal project's owner, from organization's and project's facts.
+/// The first owner recorded stays: a personal project's owner never changes.
+model NurturingPersonalProject {
+  projectId      String @id
+  organizationId String
+  ownerUserId    String
+}
+
+/// Nurturing's copy of each project that received a real trace, from trace's and project's facts.
+model NurturingTracedProject {
+  projectId      String @id
+  organizationId String
+
+  @@index([organizationId])
 }
 
 model BillingMeterCheckpoint {
