@@ -29,6 +29,10 @@ type Step struct {
 	With map[string]any    `yaml:"with"`
 	Env  map[string]string `yaml:"env"`
 
+	// ContinueOnError is a bool or an expression string; a guard that needs a
+	// step to fail the job treats anything but a literal false as set.
+	ContinueOnError any `yaml:"continue-on-error"`
+
 	// UsesComment is the trailing `# <version>` comment on the `uses:` line.
 	// yaml keeps it on the node but drops it from Uses, and the pin guard needs
 	// it to assert every SHA pin documents the version it points at. Empty when

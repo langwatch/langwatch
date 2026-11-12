@@ -129,19 +129,24 @@ func prReviewBotGates(workflow *ciscan.Workflow) []string {
 
 // prReviewBotWaitCommand is what the review job's wait step runs: it blocks
 // until every other check run on the head commit finished and exits non-zero
-// (failing the job) when one failed or the wait timed out. Its behaviour is
+// (failing the job) when one failed or the wait timed out. Its behavior is
 // tested in tools/waitforchecks; this guard only notices it going missing.
 const prReviewBotWaitCommand = "go run ./cmd/waitforchecks"
 
 // prReviewBotBotAction is the action that spends the tokens.
 const prReviewBotBotAction = "langwatch/langwatch-pr-review-bot@"
 
+// swallowedFailure matches a run line that turns the wait's non-zero exit into
+// success: `|| true`, `|| :`, `|| exit 0`, `; true`, or `set +e`.
+var swallowedFailure = regexp.MustCompile(`(?m)(\|\||;)\s*(true|:|exit\s+0)\s*(;|$)|set\s+\+e`)
+
 // prReviewBotWaitsForChecks checks the review job still waits for the checks of
 // the separate workflows (ci-complete covers only pr.yml's own calls) before
-// the bot step. A failed wait fails the job, so the bot never runs after it. Like
-// the gate clauses, it reads literal text: a wait that vanished, or moved after
-// the bot, would let the review start on a PR whose other checks are still
-// running or red, and nothing else would notice.
+// the bot step. A failed wait fails the job, so the bot never runs after it
+// unless the step is made unable to fail. Like the gate clauses, it reads
+// literal text: a wait that vanished, moved after the bot, or was defanged
+// would let the review start on a PR whose other checks are still running or
+// red, and nothing else would notice.
 func prReviewBotWaitsForChecks(workflow *ciscan.Workflow) []string {
 	job, ok := workflow.Jobs[prReviewBotReviewJob]
 	if !ok { // prReviewBotGates reports a missing job
@@ -156,12 +161,41 @@ func prReviewBotWaitsForChecks(workflow *ciscan.Workflow) []string {
 			"%s review job has no step running %q to wait for the other checks", PRReviewBotWorkflow, prReviewBotWaitCommand)}
 	}
 
-	bot := slices.IndexFunc(job.Steps, func(step ciscan.Step) bool {
+	problems := waitStepProblems(job.Steps[waits])
+
+	return append(problems, botOrderProblems(job.Steps, waits)...)
+}
+
+// waitStepProblems reports every way the wait step can pass while the checks
+// it waits for have not: a swallowed failure, or a condition that skips it.
+func waitStepProblems(step ciscan.Step) []string {
+	var problems []string
+	if coe := step.ContinueOnError; coe != nil && fmt.Sprint(coe) != "false" {
+		problems = append(problems, fmt.Sprintf(
+			"%s review job's wait step sets continue-on-error, so a failed check would not stop the bot", PRReviewBotWorkflow))
+	}
+	if strings.TrimSpace(step.If) != "" {
+		problems = append(problems, fmt.Sprintf(
+			"%s review job's wait step has an `if:` of its own, so it can be skipped", PRReviewBotWorkflow))
+	}
+	if swallowedFailure.MatchString(step.Run) {
+		problems = append(problems, fmt.Sprintf(
+			"%s review job's wait step swallows its exit status (|| true, ; true, set +e)", PRReviewBotWorkflow))
+	}
+
+	return problems
+}
+
+// botOrderProblems requires the bot step, after the wait step.
+func botOrderProblems(steps []ciscan.Step, waits int) []string {
+	bot := slices.IndexFunc(steps, func(step ciscan.Step) bool {
 		return strings.HasPrefix(step.Uses, prReviewBotBotAction)
 	})
-	if bot >= 0 && bot < waits {
-		return []string{fmt.Sprintf(
-			"%s review job runs the bot before the wait for the other checks", PRReviewBotWorkflow)}
+	switch {
+	case bot < 0:
+		return []string{fmt.Sprintf("%s review job has no %s step after the wait", PRReviewBotWorkflow, prReviewBotBotAction)}
+	case bot < waits:
+		return []string{fmt.Sprintf("%s review job runs the bot before the wait for the other checks", PRReviewBotWorkflow)}
 	}
 
 	return nil
@@ -194,7 +228,7 @@ func prReviewBotTriggers(workflow *ciscan.Workflow) []string {
 
 // prReviewBotConcurrency checks only what the review depends on: a group keyed
 // on the PR number with cancel-in-progress, so a superseded run (and its wait)
-// is cancelled rather than two reviews for the same PR racing. It does not pin
+// is canceled rather than two reviews for the same PR racing. It does not pin
 // the rest of the shared workflow's concurrency block.
 func prReviewBotConcurrency(workflow *ciscan.Workflow) []string {
 	var problems []string

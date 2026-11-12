@@ -232,6 +232,7 @@ jobs:
         with:
           go-version-file: go.work
           cache: true
+          cache-dependency-path: "*/go.sum"
       # A failed or timed-out wait fails this job, so the review step below
       # never runs on a red or unfinished change (tools/waitforchecks).
       - name: Wait for every other check on the head commit

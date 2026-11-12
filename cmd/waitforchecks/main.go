@@ -6,7 +6,7 @@
 //	go run ./cmd/waitforchecks
 //
 // It reads GITHUB_REPOSITORY, SHA and GH_TOKEN, and the name of the check to
-// ignore (the caller's own) from EXCLUDE_CHECK.
+// ignore (the caller's own) from EXCLUDE_CHECK. All four are required.
 //
 // Spec: specs/ci/pr-review-bot.feature
 package main
@@ -33,8 +33,8 @@ func main() {
 		Timeout:    45 * time.Minute,
 		Log:        os.Stdout,
 	}
-	if w.Repository == "" || w.SHA == "" || w.Token == "" {
-		fmt.Fprintln(os.Stderr, "waitforchecks: GITHUB_REPOSITORY, SHA and GH_TOKEN are required")
+	if err := w.Validate(); err != nil {
+		fmt.Fprintf(os.Stderr, "::error::waitforchecks: %v\n", err)
 		os.Exit(2)
 	}
 	if err := w.Wait(context.Background()); err != nil {

@@ -268,7 +268,9 @@ func TestPRReviewBotWaitsForTheOtherChecks(t *testing.T) {
 // to run before the wait.
 // @scenario "The review does not start when another check failed"
 func TestPRReviewBotRunsTheWaitBeforeTheBot(t *testing.T) {
-	bot := goodPRReviewBotWorkflow[strings.Index(goodPRReviewBotWorkflow, "      - uses: langwatch"):]
+	botAt := strings.Index(goodPRReviewBotWorkflow, "      - uses: langwatch")
+	require.GreaterOrEqual(t, botAt, 0)
+	bot := goodPRReviewBotWorkflow[botAt:]
 	moved := strings.Replace(goodPRReviewBotWorkflow, bot, "", 1)
 	moved = strings.Replace(moved, prReviewBotWaitStep, bot+prReviewBotWaitStep, 1)
 	require.NotEqual(t, goodPRReviewBotWorkflow, moved)
@@ -279,6 +281,70 @@ func TestPRReviewBotRunsTheWaitBeforeTheBot(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, problems)
 	assert.Contains(t, strings.Join(problems, "\n"), "runs the bot before the wait")
+}
+
+// A wait that cannot fail, or can be skipped, lets the bot run on a red change.
+// @scenario "The review does not start when another check failed"
+func TestPRReviewBotRejectsAWaitThatCannotFailTheJob(t *testing.T) {
+	const wait = "go run ./cmd/waitforchecks"
+	cases := map[string]struct{ step, want string }{
+		"continue-on-error": {
+			step: "      - continue-on-error: true\n        run: " + wait + "\n",
+			want: "continue-on-error",
+		},
+		"continue-on-error expression": {
+			step: "      - continue-on-error: ${{ always() }}\n        run: " + wait + "\n",
+			want: "continue-on-error",
+		},
+		"own if": {
+			step: "      - if: always()\n        run: " + wait + "\n",
+			want: "`if:` of its own",
+		},
+		"or true": {
+			step: "      - run: " + wait + " || true\n",
+			want: "swallows",
+		},
+		"or colon": {
+			// Quoted: a bare `|| :` is invalid YAML in a plain scalar.
+			step: "      - run: '" + wait + " || :'\n",
+			want: "swallows",
+		},
+		"semicolon true": {
+			step: "      - run: " + wait + "; true\n",
+			want: "swallows",
+		},
+		"or exit 0": {
+			step: "      - run: " + wait + " || exit 0\n",
+			want: "swallows",
+		},
+		"set +e": {
+			step: "      - run: |\n          set +e\n          " + wait + "\n",
+			want: "swallows",
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			broken := strings.Replace(goodPRReviewBotWorkflow, prReviewBotWaitStep, tc.step, 1)
+			require.NotEqual(t, goodPRReviewBotWorkflow, broken)
+
+			problems, err := ciguard.PRReviewBot(writePRReviewBotWorkflow(t, broken))
+
+			require.NoError(t, err)
+			assert.Contains(t, strings.Join(problems, "\n"), tc.want)
+		})
+	}
+}
+
+// @scenario "The review does not start when another check failed"
+func TestPRReviewBotRequiresTheBotStepAfterTheWait(t *testing.T) {
+	botAt := strings.Index(goodPRReviewBotWorkflow, "      - uses: langwatch")
+	require.GreaterOrEqual(t, botAt, 0)
+	broken := goodPRReviewBotWorkflow[:botAt]
+
+	problems, err := ciguard.PRReviewBot(writePRReviewBotWorkflow(t, broken))
+
+	require.NoError(t, err)
+	assert.Contains(t, strings.Join(problems, "\n"), "has no langwatch/langwatch-pr-review-bot@ step after the wait")
 }
 
 // @scenario "Review does not run on other pull request event types"

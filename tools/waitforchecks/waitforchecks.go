@@ -50,21 +50,51 @@ type checkRunsPage struct {
 
 // statusError is a non-2xx answer from the API.
 type statusError struct {
-	Code int
-	Body string
+	Code        int
+	Body        string
+	RateLimited bool // Retry-After or X-RateLimit-Remaining: 0 came with it
 }
 
-func (e *statusError) Error() string { return fmt.Sprintf("GitHub API answered %d: %s", e.Code, e.Body) }
+// Error names the status code and the (truncated) body GitHub answered with.
+func (e *statusError) Error() string {
+	return fmt.Sprintf("GitHub API answered %d: %s", e.Code, e.Body)
+}
 
-// transient reports whether retrying could help: a network error, a 5xx, or a
-// rate limit (GitHub answers 403 as well as 429 for those).
+// transient reports whether retrying could help: a network error, a 5xx, a 429,
+// or a 403 that is a rate limit. GitHub answers rate limits with 403 as well,
+// but a plain 403 (missing permission) never heals by waiting.
 func transient(err error) bool {
 	var status *statusError
 	if !errors.As(err, &status) {
 		return true
 	}
 
-	return status.Code >= 500 || status.Code == http.StatusForbidden || status.Code == http.StatusTooManyRequests
+	return status.Code >= 500 || status.Code == http.StatusTooManyRequests ||
+		(status.Code == http.StatusForbidden && status.RateLimited)
+}
+
+// Validate reports every input Wait cannot run without, so a misconfigured job
+// fails at once instead of polling until the deadline. Exclude is required:
+// without it the job would wait on its own check run.
+func (w Waiter) Validate() error {
+	var missing []string
+	if w.Repository == "" {
+		missing = append(missing, "GITHUB_REPOSITORY")
+	}
+	if w.SHA == "" {
+		missing = append(missing, "SHA")
+	}
+	if w.Token == "" {
+		missing = append(missing, "GH_TOKEN")
+	}
+	if w.Exclude == "" {
+		missing = append(missing, "EXCLUDE_CHECK")
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("missing required input: %s", strings.Join(missing, ", "))
 }
 
 // summary is one poll's reading of the check runs.
@@ -94,6 +124,9 @@ func summarize(runs []checkRun) summary {
 // naming the failed checks, and at the deadline naming the pending ones. API
 // errors that may pass are retried with backoff until the deadline.
 func (w Waiter) Wait(ctx context.Context) error {
+	if err := w.Validate(); err != nil {
+		return err
+	}
 	ctx, cancel := context.WithTimeout(ctx, w.Timeout)
 	defer cancel()
 
@@ -125,6 +158,7 @@ func (w Waiter) poll(ctx context.Context, p *pollState) (delay time.Duration, do
 	runs, err := w.list(ctx)
 	if err == nil {
 		p.failures = 0
+		p.lastErr = nil // a recovered error must not be blamed at the deadline
 		p.last = summarize(runs)
 		done, verdict = w.judge(p.last)
 
@@ -200,8 +234,14 @@ func (w Waiter) fetch(ctx context.Context, page int) (checkRunsPage, error) {
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
 
-		return got, &statusError{Code: resp.StatusCode, Body: strings.TrimSpace(string(body))}
+		return got, &statusError{
+			Code:        resp.StatusCode,
+			Body:        strings.TrimSpace(string(body)),
+			RateLimited: resp.Header.Get("Retry-After") != "" || resp.Header.Get("X-RateLimit-Remaining") == "0",
+		}
 	}
 
-	return got, json.NewDecoder(resp.Body).Decode(&got)
+	err = json.NewDecoder(resp.Body).Decode(&got)
+
+	return got, err
 }
