@@ -28,17 +28,17 @@ We will:
 2. **Keep the Developer out of every shared project.** A Developer holds no role binding anywhere except their personal team. That includes the organisation-scoped binding every `ADMIN` and `MEMBER` receives at invite, join and role change: it is never written for a Developer. Invites, role changes and CLI login all enforce it. Downgrading Full to Developer deletes the person's shared team bindings and their organisation-scoped binding, and keeps their personal project, traces and keys. This deletion is new code; today's role-change recompute only corrects team roles, it never removes a binding.
    - Keys need no revocation. A user-owned key is clamped at check time to what its owner may do right now (ADR-092 §9, `decideWithCeiling`), so a key on a shared project stops working the moment the downgrade lands. The one exception is the project's own shared key, which has no owner and no ceiling; that is today's behaviour for any leaver and is out of scope here.
    - SCIM never produces `DEVELOPER`; its group mappings keep resolving to `ADMIN` or `MEMBER`. A sync leaves an existing `DEVELOPER` row alone and never rewrites its role (v3, fact 2). A SCIM group mapping that lands people as Developers is a follow-up.
-3. **Count Developers, never cap them.** `member-classification.ts` gains a third member type. The plan page shows three counters. No plan limit applies to Developers.
+3. **Count Developers against a cap of their own.** `member-classification.ts` gains a third member type. The plan page shows three counters. Developers were first counted and never capped; since v7 they have a cap of their own, `maxMembersDeveloper`, shown against the count. Admission enforces it in a later change.
 4. **Let the organisation choose the joiner seat.** A new `Organization` column names the role given to self-service (domain) joiners and SSO-admitted users: `MEMBER` or `DEVELOPER`. Default `MEMBER`, so existing organisations behave exactly as before. It is changed only on the organisation settings page, never inside the join flow.
 5. **Ship the seat alone.** Traces appearing inside the shared project is a later change, built on the "project may read project" rule once it lands on `main`, whether from the open pull request or from our own implementation of the same idea. Until then a Developer's project stays visible to its owner only, exactly as personal projects are today.
 
 ## Constants
 
-| Name                                 | Value    | Where                                         |
-| ------------------------------------ | -------- | --------------------------------------------- |
-| Joiner seat default                  | `MEMBER` | `Organization` column default                 |
-| Developer plan limit                 | none     | `MemberTypeLimits` carries no Developer field |
-| Developer team role on personal team | `ADMIN`  | personal team provisioning, unchanged         |
+| Name                                 | Value                              | Where                                                                      |
+| ------------------------------------ | ---------------------------------- | -------------------------------------------------------------------------- |
+| Joiner seat default                  | `MEMBER`                           | `Organization` column default                                              |
+| Developer plan limit                 | 0 cloud, uncapped open source (v7) | `membersDeveloper` plan limit, `Subscription.maxMembersDeveloper` override |
+| Developer team role on personal team | `ADMIN`                            | personal team provisioning, unchanged                                      |
 
 ## Invariants
 
