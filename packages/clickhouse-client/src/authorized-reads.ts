@@ -1436,7 +1436,67 @@ function readsTable({
   return reads;
 }
 
-/** `x IN table` reads the whole table; a set is a bracket, a parameter or a function's value. */
+/** The function forms of IN, whose last argument is the set; `in(x, t)` reads `t` as a table. */
+const SET_FUNCTIONS = new Set(
+  "IN NOTIN GLOBALIN GLOBALNOTIN NULLIN NOTNULLIN GLOBALNULLIN GLOBALNOTNULLIN".split(" "),
+);
+/** Functions that read a Join table or a dictionary by name, which no tenant marker fences. */
+const TABLE_READING_FUNCTION = /^(?:JOINGET\w*|DICT\w+)$/;
+
+/** Whether `tokens[from, to)` is a table's name alone, `t` or `db.t`, and not a CTE's. */
+function namesTable({
+  tokens,
+  from,
+  to,
+  ctes,
+}: {
+  tokens: readonly MarkerToken[];
+  from: number;
+  to: number;
+  ctes: ReadonlySet<string>;
+}): boolean {
+  const parts = tokens.slice(from, to);
+  if (parts.length % 2 === 0) return false;
+  const named = parts.every((token, at) =>
+    at % 2 === 0 ? identifierOf(token) !== undefined : token.text === ".",
+  );
+  return named && !(parts.length === 1 && ctes.has(identifierOf(parts[0]) ?? ""));
+}
+
+/** The bracket closing the one at `open`, and its last top-level comma; -1 when unbalanced. */
+function bracketAt({ tokens, open }: { tokens: readonly MarkerToken[]; open: number }) {
+  let depth = 0;
+  let comma = -1;
+  for (let at = open; at < tokens.length; at += 1) {
+    const text = tokens[at]?.text;
+    if (text === "(" || text === "[") depth += 1;
+    else if (text === ")" || text === "]") depth -= 1;
+    else if (text === "," && depth === 1) comma = at;
+    if (depth === 0) return { close: at, comma };
+  }
+  return { close: -1, comma };
+}
+
+type SetAt = { tokens: readonly MarkerToken[]; index: number; ctes: ReadonlySet<string> };
+
+/** Whether the bare `IN name` at `index` reads a table; `IN f(x)` is a function's value. */
+function bareSetIsTable({ tokens, index, ctes }: SetAt): boolean {
+  const name = identifierOf(tokens[index + 1]);
+  return name !== undefined && tokens[index + 2]?.text !== "(" && !ctes.has(name);
+}
+
+/** Whether the bracketed set at `index`, `IN (t)` or `in(x, t)`, is only a table's name. */
+function bracketedSetIsTable({ tokens, index, ctes }: SetAt): boolean {
+  // A subquery set is a select, which the coverage check fences on its own.
+  const head = wordOf(tokens[index + 2]);
+  if (head === "SELECT" || head === "WITH") return false;
+  const { close, comma } = bracketAt({ tokens, open: index + 1 });
+  if (close === -1) throw unfenced("unreadable");
+  if (namesTable({ tokens, from: index + 2, to: close, ctes })) return true;
+  return comma !== -1 && namesTable({ tokens, from: comma + 1, to: close, ctes });
+}
+
+/** `x IN t`, `x IN (t)` and `in(x, t)` read the whole table; so do joinGet and dictGet. */
 function refuseTablesInSets({
   tokens,
   ctes,
@@ -1445,10 +1505,14 @@ function refuseTablesInSets({
   ctes: ReadonlySet<string>;
 }): void {
   for (const [index, token] of tokens.entries()) {
-    if (wordOf(token) !== "IN") continue;
-    const name = identifierOf(tokens[index + 1]);
-    if (name === undefined || tokens[index + 2]?.text === "(" || ctes.has(name)) continue;
-    throw unfenced("table-in");
+    const word = wordOf(token) ?? "";
+    const opens = tokens[index + 1]?.text === "(";
+    if (opens && TABLE_READING_FUNCTION.test(word)) throw unfenced("table-function");
+    const set = { tokens, index, ctes };
+    const bare = word === "IN" && !opens && bareSetIsTable(set);
+    if (bare || (opens && SET_FUNCTIONS.has(word) && bracketedSetIsTable(set))) {
+      throw unfenced("table-in");
+    }
   }
 }
 

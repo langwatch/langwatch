@@ -68,6 +68,27 @@ describe("a select reading a table", () => {
       ],
       ["a comma join", `SELECT SpanId FROM stored_spans, trace_summaries WHERE ${C}`, "table-join"],
       ["an IN over a table by name", `${SPANS} AND TraceId IN trace_summaries`, "table-in"],
+      ["an IN over a bracketed table", `${SPANS} AND TraceId IN (trace_summaries)`, "table-in"],
+      ["an IN over a database's table", `${SPANS} AND TraceId IN (db.trace_summaries)`, "table-in"],
+      ["in() over a table", `${SPANS} AND in(TraceId, trace_summaries)`, "table-in"],
+      ["globalIn() over a table", `${SPANS} AND globalIn(TraceId, trace_summaries)`, "table-in"],
+      ["notIn() over a table", `${SPANS} AND notIn(TraceId, trace_summaries)`, "table-in"],
+      ["nullIn() over a table", `${SPANS} AND nullIn(TraceId, trace_summaries)`, "table-in"],
+      [
+        "in() over a table in the select list",
+        `SELECT in('t', trace_summaries) AS q FROM stored_spans WHERE ${C}`,
+        "table-in",
+      ],
+      [
+        "a joinGet",
+        `SELECT joinGet('j', 'v', SpanId) AS v FROM stored_spans WHERE ${C}`,
+        "table-function",
+      ],
+      [
+        "a dictGet",
+        `SELECT dictGet('d', 'v', SpanId) AS v FROM stored_spans WHERE ${C}`,
+        "table-function",
+      ],
       ["a table function", `SELECT toString(number) FROM numbers(10) WHERE ${C}`, "table-function"],
       [
         "a table function in a UNION arm",
@@ -113,6 +134,12 @@ describe("a select reading a table", () => {
           ` ${SPANS} AND TraceId IN (SELECT TraceId FROM t)`,
       ],
       ["a select with no FROM", `${SPANS} AND 1 IN (SELECT 1)`],
+      [
+        "an IN over the statement's own CTE",
+        `WITH t AS (SELECT TraceId FROM trace_summaries WHERE ${tenantScope("OccurredAt")})` +
+          ` ${SPANS} AND TraceId IN (t)`,
+      ],
+      ["an IN over bound values", `${SPANS} AND TraceId IN ({ids:Array(String)})`],
       ["a FROM inside trim", `SELECT trim(BOTH '"' FROM SpanName) FROM stored_spans WHERE ${C}`],
       [
         "an ARRAY JOIN with its own alias",
