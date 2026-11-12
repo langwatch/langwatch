@@ -5,7 +5,7 @@
  */
 import { HandledError } from "@langwatch/handled-error";
 import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { isCodexModel, type ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 
 import { normalizeLangyConversationTitle } from "../rules/langy-conversation-title.rules.ts";
@@ -46,8 +46,11 @@ const TITLE_SYSTEM_PROMPT = [
 type LangyTitleGeneratorDeps = Readonly<{
   /** The transcript, off the conversation's own message projection. */
   messages: LangyTrustedMessageReader;
-  /** The project's model for the title key, and the completion run on it. */
-  models: Pick<ModelProviderApi, "resolveModelForFeature" | "generateText">;
+  /** The title model, the completion run on it, and the connected providers. */
+  models: Pick<
+    ModelProviderApi,
+    "resolveModelForFeature" | "generateText" | "getExecutionProviders"
+  >;
 }>;
 
 /** Nothing to retry: this project has no model to ask. */
@@ -70,7 +73,10 @@ export class LangyTitleGeneratorService {
     return (input) => this.generate(input);
   }
 
-  /** Every failure but an unconfigured model throws, so the process outbox retries it. */
+  /**
+   * Two exits leave the title unchanged without throwing: no model configured, and a fallback
+   * model whose provider is not connected. Every other failure throws so the outbox retries it.
+   */
   async generate(input: {
     projectId: string;
     conversationId: string;
@@ -87,6 +93,29 @@ export class LangyTitleGeneratorService {
 
     try {
       const model = await this.titleModel(projectId);
+      if (model.steppedOverCodexModel) {
+        logger.info(
+          {
+            projectId,
+            conversationId,
+            configuredModel: model.steppedOverCodexModel,
+            substitutedModel: model.name,
+          },
+          "Langy title model is a Codex model this process cannot run; using the cheap default instead",
+        );
+      }
+      if (model.fallback && !(await this.providerAvailable({ projectId, model: model.name }))) {
+        logger.warn(
+          {
+            projectId,
+            conversationId,
+            reason: model.steppedOverCodexModel ? "codex_stepped_over" : "no_model_configured",
+          },
+          "cheap default model's provider is not available for Langy titles; leaving title unchanged",
+        );
+
+        return UNCHANGED;
+      }
       const { text } = await this.deps.models.generateText({
         projectId,
         featureKey: LANGY_TITLE_FEATURE_KEY,
@@ -103,20 +132,43 @@ export class LangyTitleGeneratorService {
       if (!isModelNotConfigured(error)) throw error;
       logger.warn(
         { projectId, conversationId },
-        "no cheap model configured for Langy titles — leaving title unchanged",
+        "no cheap model configured for Langy titles; leaving title unchanged",
       );
 
       return UNCHANGED;
     }
   }
 
-  /** The project's model for titles, else the cheap default so titles work out of the box. */
-  private async titleModel(projectId: string): Promise<{ name: string; fallback: boolean }> {
+  /** Whether the project has the model's provider connected and enabled. */
+  private async providerAvailable(input: { projectId: string; model: string }): Promise<boolean> {
+    const providers = await this.deps.models.getExecutionProviders({ projectId: input.projectId });
+    const provider = providers[input.model.split("/")[0] ?? ""];
+
+    return Boolean(provider?.enabled);
+  }
+
+  /**
+   * The project's model for titles, else the cheap default so titles work out of the box.
+   * A Codex model is stepped over the same way: this process cannot execute Codex models.
+   */
+  private async titleModel(projectId: string): Promise<{
+    name: string;
+    fallback: boolean;
+    steppedOverCodexModel?: string;
+  }> {
     try {
       const resolved = await this.deps.models.resolveModelForFeature({
         projectId,
         featureKey: LANGY_TITLE_FEATURE_KEY,
       });
+
+      if (isCodexModel(resolved.model)) {
+        return {
+          name: LANGY_TITLE_GENERATION.MODEL,
+          fallback: true,
+          steppedOverCodexModel: resolved.model,
+        };
+      }
 
       return { name: resolved.model, fallback: false };
     } catch (error) {

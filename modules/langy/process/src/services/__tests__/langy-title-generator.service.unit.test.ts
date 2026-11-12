@@ -1,8 +1,9 @@
 import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
-import type {
-  ModelDefaultResolveInput,
-  ModelProviderApi,
-  ModelProviderTextGenerationInput,
+import {
+  type ModelDefaultResolveInput,
+  type ModelProviderApi,
+  type ModelProviderExecution,
+  type ModelProviderTextGenerationInput,
 } from "@langwatch/model-provider-contract";
 /**
  * @vitest-environment node
@@ -14,6 +15,7 @@ import { describe, expect, it } from "vitest";
 
 import type { LangyTrustedMessageReader } from "../langy-message.service.ts";
 import { LangyTitleGeneratorService } from "../langy-title-generator.service.ts";
+import { executionProvider } from "./execution-provider.fixture.ts";
 
 const PROJECT_ID = "project-1";
 const CONVERSATION_ID = "conversation-1";
@@ -30,6 +32,9 @@ function messagesOf(records: { role: "user" | "assistant"; content: string }[]) 
 function generatorOver(input: {
   records: { role: "user" | "assistant"; content: string }[];
   text?: string;
+  resolvedModel?: string;
+  generateFailure?: Error;
+  providers?: Record<string, ModelProviderExecution>;
 }) {
   const resolved: ModelDefaultResolveInput[] = [];
   const completions: ModelProviderTextGenerationInput[] = [];
@@ -37,7 +42,7 @@ function generatorOver(input: {
     resolveModelForFeature: async (request) => {
       resolved.push(request);
       return {
-        model: "openai/gpt-5-mini",
+        model: input.resolvedModel ?? "openai/gpt-5-mini",
         source: "role_default",
         scope: "project",
         feature: {
@@ -48,8 +53,11 @@ function generatorOver(input: {
         },
       };
     },
+    getExecutionProviders: async () =>
+      input.providers ?? { openai: executionProvider({ provider: "openai", enabled: true }) },
     generateText: async (request) => {
       completions.push(request);
+      if (input.generateFailure) throw input.generateFailure;
       return { text: input.text ?? "A Title" };
     },
   });
@@ -132,6 +140,50 @@ describe("given a conversation the customer never named", () => {
       expect("title" in generated && generated.title.length).toBe(
         LANGY_TITLE_GENERATION.MAX_TITLE_CHARS,
       );
+    });
+  });
+
+  describe("when the title model resolves to a Codex model", () => {
+    const records = [{ role: "user" as const, content: "hello" }];
+
+    /** @scenario "A Codex title model falls back to the cheap default" */
+    it("generates the title with the cheap default model instead", async () => {
+      const { service, completions } = generatorOver({
+        records,
+        resolvedModel: "openai_codex/gpt-5.6-terra",
+      });
+
+      const generated = await service.generate(call);
+
+      expect(completions[0]?.model).toBe(LANGY_TITLE_GENERATION.MODEL);
+      expect(generated).toEqual({
+        outcome: "generated",
+        title: "A title",
+        model: LANGY_TITLE_GENERATION.MODEL,
+      });
+    });
+
+    /** @scenario "A Codex title model whose cheap default fails is retried" */
+    it("raises a cheap-default provider blip so the outbox retries it", async () => {
+      const { service } = generatorOver({
+        records,
+        resolvedModel: "openai_codex/gpt-5.6-terra",
+        generateFailure: new Error("provider down"),
+      });
+
+      await expect(service.generate(call)).rejects.toThrow("provider down");
+    });
+
+    /** @scenario "A Codex title model with no cheap default is not retried" */
+    it("leaves the title unchanged without asking the model when the cheap default's provider is not connected", async () => {
+      const { service, completions } = generatorOver({
+        records,
+        resolvedModel: "openai_codex/gpt-5.6-terra",
+        providers: {},
+      });
+
+      await expect(service.generate(call)).resolves.toEqual({ outcome: "unchanged" });
+      expect(completions).toHaveLength(0);
     });
   });
 });

@@ -14,6 +14,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { LangyMessageRecord, LangyTrustedMessageReader } from "../langy-message.service.ts";
 import { LangyTitleGeneratorService } from "../langy-title-generator.service.ts";
+import { executionProvider } from "./execution-provider.fixture.ts";
 
 const records: LangyMessageRecord[] = [
   { id: "msg_1", role: "user", content: "instrument my traces with langwatch" },
@@ -52,6 +53,9 @@ function modelProviders(
   const generateText = vi.fn(answers.generateText ?? (async () => ({ text: "A title" })));
   const api = createApiFixture<ModelProviderApi>({
     resolveModelForFeature: answers.resolveModelForFeature ?? (async () => RESOLVED),
+    getExecutionProviders: async () => ({
+      openai: executionProvider({ provider: "openai", enabled: true }),
+    }),
     generateText,
   });
   return { api, generateText };
