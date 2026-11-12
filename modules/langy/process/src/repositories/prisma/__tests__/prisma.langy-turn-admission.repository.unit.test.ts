@@ -124,7 +124,6 @@ describe("PrismaLangyTurnAdmissionRepository.claim", () => {
     });
 
     describe("when the racing send is still preparing", () => {
-      /** @scenario A send that clashes with a copy still being prepared is refused as Langy unavailable */
       it("retries and answers pending", async () => {
         const { database, calls } = fakeDatabase(
           [uniqueKeyClash()],
