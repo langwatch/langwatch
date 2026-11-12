@@ -23,6 +23,20 @@ Feature: Model pickers offer only ids a call can name
     Then GPT-6 Sol Pro is not offered
     And GPT-5.5 Pro, which OpenAI serves under that id, is offered
 
+  # Langy calls OpenAI models on the Responses API, streamed, at a medium
+  # reasoning effort. OpenAI answers 400 unsupported_value when a model does not
+  # take that effort: GPT-5 Pro takes only high. Probed on the real API: GPT-5.2
+  # Pro, GPT-5.4 Pro, GPT-5.5 Pro, o3 Pro and GPT-5.3 Codex all answer a
+  # medium-effort streamed call, so they stay.
+
+  @unit
+  Scenario: A model that refuses Langy's reasoning effort is not offered to Langy
+    Given an OpenAI provider and the catalogue's GPT-5 Pro, which takes only a high effort
+    When Langy's model picker options are built
+    Then GPT-5 Pro is not offered and cannot be the Langy default
+    And GPT-5.2 Pro, o3 Pro and GPT-5.3 Codex are offered
+    And other surfaces still offer GPT-5 Pro
+
   # The catalogue lists what a provider has ever priced, not what this credential
   # can call: on an OpenAI-only key about half its ids answered 404 (retired,
   # never on the API) or were refused by a chat call (audio, realtime, image).
