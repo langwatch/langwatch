@@ -294,7 +294,10 @@ describe("when the Responses SDK serialises a catalogue-derived model", () => {
         reasoning: "medium",
         maxRetries: 0,
         fetch: async (_input, init) => {
-          payload = JSON.parse(String(init?.body));
+          if (typeof init?.body !== "string") {
+            throw new Error("expected a JSON request body");
+          }
+          payload = JSON.parse(init.body);
           return new Response(
             JSON.stringify({
               error: { message: "Offline transport capture", type: "invalid_request_error" },
