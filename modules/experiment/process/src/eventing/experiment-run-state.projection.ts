@@ -22,9 +22,12 @@ import {
   traceMetricsComputedEventSchema,
 } from "./experiment-run-events.process.ts";
 
-/** Clamps a nullable duration to a non-negative value; clock skew can make one negative. */
+/**
+ * Whole, non-negative milliseconds: the columns are unsigned integers, so ClickHouse
+ * refuses a fractional value and clock skew can make one negative.
+ */
 export function normalizeDurationMs(duration: number | null | undefined): number | null {
-  return duration != null ? Math.max(0, duration) : null;
+  return duration != null ? Math.max(0, Math.round(duration)) : null;
 }
 
 /**
