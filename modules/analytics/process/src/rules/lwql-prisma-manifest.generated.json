@@ -13938,7 +13938,7 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": false,
-          "documentation": "LangyOpenedPullRequest[]: each pull request and when the conversation opened it."
+          "documentation": "[{ repositoryFullName, prNumber, linkedAt }]: each pull request and when it was opened."
         },
         {
           "name": "FollowUpsInARow",
