@@ -23,11 +23,12 @@ const statements = provisioning.postgresApprovedViewStatements({ schema: "public
 describe("given the generated approved Postgres views", () => {
   describe("when rendered for the public schema", () => {
     it("matches the approved snapshot", async () => {
-      const text =
-        `-- approved views: ${names.length}\n` +
-        statements.map((statement, index) => `\n-- view: ${names[index]}\n${statement};\n`).join("");
+      const blocks = statements.map((s, i) => `\n-- view: ${names[i]}\n${s};\n`);
+      const text = `-- approved views: ${names.length}\n` + blocks.join("");
 
-      await expect(text).toMatchFileSnapshot("./__snapshots__/approved-postgres-views.snapshot.sql");
+      await expect(text).toMatchFileSnapshot(
+        "./__snapshots__/approved-postgres-views.snapshot.sql",
+      );
     });
 
     it("yields one statement per approved view", () => {

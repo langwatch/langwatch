@@ -84,7 +84,10 @@ export class LangWatchQLPostgresViewsService {
         joins,
         ...(view.postgres.rowFilter !== undefined ? { rowFilter: view.postgres.rowFilter } : {}),
         ...(readerRole !== undefined ? { readerRole } : {}),
-        rowScope: { sharedReaderRole, tenant: { alias: tenantAlias, column: view.postgres.tenantSourceColumn } },
+        rowScope: {
+          sharedReaderRole,
+          tenant: { alias: tenantAlias, column: view.postgres.tenantSourceColumn },
+        },
         columns: view.columns.map((column) => ({
           exposed: column.name,
           // The tenant column is the one rename every mapping performs; the rest

@@ -98,9 +98,8 @@ export const LWQL_ORG_SCOPE_FRAGMENT = `${postgresLiteral(ORG_ROLE_PREFIX)}::tex
 
 /**
  * Lower-cased fragments a scoped view's stored definition must also carry: the membership catalog
- * the org-role lookup joins, and the comparison tying that membership to the session user (the
- * definition deparses `current_user` upper-case, hence lower-cased matching). A view that looks
- * the org role up without both is not row-scoped to the reader.
+ * and the session-user comparison (deparsed upper-case, hence lower-cased matching). Without
+ * both, the org-role lookup is not row-scoped to the reader.
  */
 export const LWQL_ORG_MEMBERSHIP_FRAGMENT = "pg_auth_members";
 export const LWQL_SESSION_USER_FRAGMENT = "rolname = current_user";
