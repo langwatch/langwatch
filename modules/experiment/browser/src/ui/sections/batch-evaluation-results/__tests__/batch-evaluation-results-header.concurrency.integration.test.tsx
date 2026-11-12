@@ -41,10 +41,10 @@ afterEach(cleanup);
 describe("the results page title", () => {
   describe("given the selected run recorded concurrency 1", () => {
     /** @scenario "The selected run's title shows the concurrency it used" */
-    it("reads Concurrency 1 beside the run id", () => {
+    it("shows a Concurrency 1 badge beside the run id", () => {
       renderHeader(1);
 
-      expect(screen.getByTestId("shown-run-concurrency")).toHaveTextContent("· Concurrency 1");
+      expect(screen.getByTestId("shown-run-concurrency")).toHaveTextContent(/^Concurrency 1$/);
       expect(screen.getByText(/cool-bold-fox/)).toBeInTheDocument();
     });
   });
@@ -56,6 +56,20 @@ describe("the results page title", () => {
 
       expect(screen.queryByTestId("shown-run-concurrency")).toBeNull();
       expect(screen.getByText(/cool-bold-fox/)).toBeInTheDocument();
+    });
+  });
+
+  describe("given the selected run recorded concurrency 1 or 10", () => {
+    /** @scenario "The concurrency badge explains what it counts" */
+    it.each([
+      [1, "Ran one cell at a time. A cell is one row against one target."],
+      [10, "Ran up to 10 cells at once. A cell is one row against one target."],
+    ])("describes the focusable concurrency %i badge", (concurrency, explanation) => {
+      renderHeader(concurrency);
+
+      const badge = screen.getByTestId("shown-run-concurrency");
+      expect(badge).toHaveAttribute("tabindex", "0");
+      expect(badge).toHaveAccessibleDescription(explanation);
     });
   });
 });

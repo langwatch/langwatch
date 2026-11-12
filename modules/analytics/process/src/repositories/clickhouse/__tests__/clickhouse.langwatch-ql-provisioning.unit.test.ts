@@ -623,7 +623,7 @@ describe("readCollectionState", () => {
         },
       }).readCollectionState({ database: NAMES.database, candidates });
 
-      expect(server).toEqual({ available: [], bound: {} });
+      expect(server).toEqual({ available: [], bound: {}, configDefined: [] });
       expect(collectionBinding.renderedCollectionFor({ names: NAMES, table, server })).toBe(
         "lwql_postgres",
       );
@@ -640,7 +640,7 @@ describe("readCollectionState", () => {
         },
       }).readCollectionState({ database: NAMES.database, candidates });
 
-      expect(server).toEqual({ available: [alias], bound: {} });
+      expect(server).toEqual({ available: [alias], bound: {}, configDefined: [] });
       expect(collectionBinding.renderedCollectionFor({ names: NAMES, table, server })).toBe(alias);
     });
   });

@@ -205,6 +205,20 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
       expect(trigger).toHaveTextContent("Not set");
       expect(trigger).not.toHaveTextContent("Evals Preview");
     });
+
+    /** @scenario "Without Evals Preview, a config that pinned it reads Not set in the drawer" */
+    it("reads Not set when the config row pinned Evals Preview before", () => {
+      const pinned = { ...CONFIG_ROW, config: { INSTANT_EVALS: HOSTED.value } };
+      mockGetDefaultModels.mockReturnValue({
+        data: { ...PAYLOAD, configs: [pinned] },
+        isLoading: false,
+      });
+      renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
+
+      const trigger = within(screen.getByTestId("role-row-instant_evals")).getByRole("combobox");
+      expect(trigger).toHaveTextContent("Not set");
+      expect(trigger).not.toHaveTextContent("Evals Preview");
+    });
   });
 
   describe("given own decision models are on and the project's OpenAI decision model would run", () => {

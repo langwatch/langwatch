@@ -167,8 +167,8 @@ describe("given a rendered install whose config store has not mounted the named 
     // and the rendered binding takes the per-database name while no lwql_postgres exists.
     collection = collectionBinding.namedCollection({ names, mode: "sql" });
     // A reused container keeps the facts database, so the app-owned objects go first.
+    await harness.dropNamedCollection(collection);
     await harness.applyAsAdmin([
-      `DROP NAMED COLLECTION IF EXISTS ${collection}`,
       ...LWQL_VIEW_CATALOG.map((view) => `DROP VIEW IF EXISTS ${names.database}.${view.name}`),
       ...ENGINE_TABLES.map((table) => `DROP TABLE IF EXISTS ${names.database}.${table}`),
     ]);
@@ -176,10 +176,10 @@ describe("given a rendered install whose config store has not mounted the named 
 
   afterAll(async () => {
     // A reused container reloads each table at restart; one whose collection is gone never loads.
-    await harness?.applyAsAdmin([
-      ...ENGINE_TABLES.map((table) => `DROP TABLE IF EXISTS ${names.database}.${table}`),
-      `DROP NAMED COLLECTION IF EXISTS ${collection}`,
-    ]);
+    await harness?.applyAsAdmin(
+      ENGINE_TABLES.map((table) => `DROP TABLE IF EXISTS ${names.database}.${table}`),
+    );
+    await harness?.dropNamedCollection(collection);
     await connection?.closeOnce();
     await Promise.all([harness?.stop(), postgres?.stop()]);
   });

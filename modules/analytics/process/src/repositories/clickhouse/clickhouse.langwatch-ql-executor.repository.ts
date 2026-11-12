@@ -1,7 +1,7 @@
 /**
  * The LangWatchQL executor over a real ClickHouse endpoint.
  */
-import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import { type ClickHouseClient, ClickHouseLogLevel, createClient } from "@clickhouse/client";
 import {
   LangWatchQLAppFunctionUnavailableError,
   LangWatchQLBusyError,
@@ -19,6 +19,10 @@ import {
 import { nowInstant } from "@langwatch/time";
 
 import { lwqlAppFunctionNames } from "../../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
+import {
+  withoutTenantCapability,
+  withTenantCapability,
+} from "../../rules/langwatch-ql-tenant-capability.rules.ts";
 import {
   type LangWatchQLConnection,
   type LangWatchQLExecutionRequest,
@@ -49,6 +53,24 @@ const LWQL_REQUEST_TIMEOUT_MS = (DEFAULT_LWQL_RESOURCE_LIMITS.maxExecutionTimeSe
  * Sockets this process may hold open against the LangWatchQL endpoint at once.
  */
 const LWQL_MAX_OPEN_CONNECTIONS = 10;
+
+/**
+ * A copy of the driver's error with the capability taken out of its message, stack and text
+ * fields, keeping its code, type, status and cause: ClickHouse quotes the failing statement back,
+ * so no refusal's reasons, and no log of them, may hold the original. The driver's is untouched.
+ */
+function withoutCapability({ error, capability }: { error: unknown; capability: string }): unknown {
+  if (!(error instanceof Error) || capability === "") return error;
+  const scrub = (text: string) => withoutTenantCapability({ text, capability });
+  const scrubbed = new Error(scrub(error.message), { cause: error.cause });
+  scrubbed.name = error.name;
+  if (error.stack !== undefined) scrubbed.stack = scrub(error.stack);
+  const fields = Object.entries(error).map(([key, value]) => [
+    key,
+    typeof value === "string" ? scrub(value) : value,
+  ]);
+  return Object.assign(scrubbed, Object.fromEntries(fields));
+}
 
 /** ClickHouse reports elapsed time in seconds; the response speaks milliseconds. */
 function elapsedMs(elapsedSeconds: number | undefined): number {
@@ -139,6 +161,9 @@ export class ClickHouseLangWatchQLExecutorRepository extends LangWatchQLExecutor
         database: connection.database,
         request_timeout: LWQL_REQUEST_TIMEOUT_MS,
         max_open_connections: LWQL_MAX_OPEN_CONNECTIONS,
+        // The driver's own logger prints a failed statement's server text, capability included;
+        // a refusal reaches the app only through the scrubbed error.
+        log: { level: ClickHouseLogLevel.OFF },
       }),
     );
   }
@@ -154,16 +179,22 @@ export class ClickHouseLangWatchQLExecutorRepository extends LangWatchQLExecutor
     sql,
     parameters,
     tenantCapability,
+    projectIds,
   }: LangWatchQLExecutionRequest): Promise<LangWatchQLExecutionResult> {
+    const statement = withTenantCapability({
+      sql,
+      setting: this.connection.tenantSetting,
+      capability: tenantCapability,
+      projectIds,
+    });
     const startedAt = nowInstant().epochMilliseconds;
 
     try {
       const resultSet = await this.client.query({
-        // The statement the service handed down. The only thing the transport
-        // adds is the `FORMAT` the driver appends to read the response.
-        query: sql,
+        // The statement the service handed down and the capability's clause; the driver adds only
+        // the `FORMAT` it reads the response in.
+        query: statement,
         format: "JSON",
-        clickhouse_settings: { [this.connection.tenantSetting]: tenantCapability },
         query_params: parameters as Record<string, unknown> | undefined,
       });
       const response = await resultSet.json<Record<string, unknown>>();
@@ -180,7 +211,11 @@ export class ClickHouseLangWatchQLExecutorRepository extends LangWatchQLExecutor
         },
       };
     } catch (error) {
-      throw refusalFor({ error, durationMs: nowInstant().epochMilliseconds - startedAt, sql });
+      throw refusalFor({
+        error: withoutCapability({ error, capability: tenantCapability }),
+        durationMs: nowInstant().epochMilliseconds - startedAt,
+        sql,
+      });
     }
   }
 

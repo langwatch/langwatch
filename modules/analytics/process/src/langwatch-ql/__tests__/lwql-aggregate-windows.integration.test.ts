@@ -8,7 +8,10 @@
 import { LangWatchQLShadowedViewError } from "@langwatch/analytics-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { TEST_RUN_TELEMETRY } from "../../app/__tests__/analytics.fixture.ts";
+import {
+  ADMIT_EVERY_PLACEMENT,
+  TEST_RUN_TELEMETRY,
+} from "../../app/__tests__/analytics.fixture.ts";
 import { LangWatchQLViewProvisioningService } from "../../features/provisioning/services/langwatch-ql-view-provisioning.service.ts";
 import { SHIPPED_LWQL_DEDUP } from "../../features/provisioning/services/langwatch-ql-view-statements.service.ts";
 import { ClickHouseLangWatchQLExecutorRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
@@ -116,6 +119,7 @@ describe("given an aggregate over project A for its whole history and project B 
 
     service = LangWatchQLService.create({
       runTelemetry: TEST_RUN_TELEMETRY,
+      placement: ADMIT_EVERY_PLACEMENT,
       executor: ClickHouseLangWatchQLExecutorRepository.create({
         connection: {
           ...harness.restrictedConnection(),
