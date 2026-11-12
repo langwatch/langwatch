@@ -451,18 +451,25 @@ describe("given a token has just been minted", () => {
       renderDialog();
       const copyButton = screen.getByRole("button", { name: "Copy API key" });
 
-      vi.useFakeTimers();
+      // Other widgets in the dialog schedule their own timers; follow only the 2s reset.
+      const setSpy = vi.spyOn(globalThis, "setTimeout");
+      const clearSpy = vi.spyOn(globalThis, "clearTimeout");
       try {
-        const baseline = vi.getTimerCount();
         fireEvent.click(copyButton);
-        await act(async () => {
-          await vi.advanceTimersByTimeAsync(0);
-        });
+        await vi.waitFor(() => expect(copyButton.querySelector("svg.lucide-check")).not.toBeNull());
+
+        const resetIds = setSpy.mock.calls
+          .map((call, index) => (call[1] === 2000 ? setSpy.mock.results[index]!.value : undefined))
+          .filter((id) => id !== undefined);
+        expect(resetIds).not.toHaveLength(0);
+
         cleanup();
 
-        expect(vi.getTimerCount()).toBe(baseline);
+        const clearedIds = clearSpy.mock.calls.map(([id]) => id);
+        for (const id of resetIds) expect(clearedIds).toContain(id);
       } finally {
-        vi.useRealTimers();
+        setSpy.mockRestore();
+        clearSpy.mockRestore();
       }
     });
 
