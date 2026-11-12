@@ -29,6 +29,31 @@ Feature: A health probe that fails says what broke
     Then the probe fails with the health check code
     And the upstream status is carried for the alert to read
 
+  @regression @unit
+  Scenario: A canary refused by a pod that is shutting down is sent again
+    Given the canary POST is refused by a pod that is shutting down
+    And the refusal says no handler saw the request
+    When a probe sends it
+    Then the probe sends the canary again
+    And the probe passes when the next attempt is accepted
+    # A rollout drains one pod at a time, and the load balancer can still
+    # route to a draining pod for a few seconds. That is not a broken platform.
+
+  @regression @unit
+  Scenario: A canary refused by a pod that is shutting down on every attempt still fails
+    Given every canary POST is refused by a pod that is shutting down
+    When a probe sends it
+    Then the probe fails with the health check code after its last attempt
+
+  @regression @unit
+  Scenario: A canary refused after a handler ran is not sent again
+    Given the canary POST is refused with a 503 a handler answered
+    When a probe sends it
+    Then the probe sends the canary once
+    And the probe fails with the health check code
+    # A handler may have stored the canary already; only a refusal no handler
+    # saw is safe to resend.
+
   @unit
   Scenario: A canary that hangs is not waited on forever
     Given an upstream that never answers
