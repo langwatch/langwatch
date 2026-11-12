@@ -184,7 +184,6 @@ async function readRowPassRates({
     read: () => service.getRunResults({ runId, experimentSlug: slug }),
     waitSeconds: PASS_RATE_READ_SECONDS,
     pollMs: 2000,
-    onPoll: () => {},
   });
   return rowPassRatesOf({ results, repeat });
 }

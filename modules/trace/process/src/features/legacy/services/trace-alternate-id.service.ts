@@ -1,5 +1,6 @@
 /**
- * Finds the trace an id names when it is not the exact trace id: a prefix, a scenario run or a span.
+ * Finds the trace an id names when it is not the exact trace id: a prefix, a scenario run
+ * or a span.
  * @see modules/trace/specs/trace-lookup-by-id.feature
  */
 import type { Authorization } from "@langwatch/authorization";

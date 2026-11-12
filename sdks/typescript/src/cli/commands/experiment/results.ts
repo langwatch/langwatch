@@ -87,7 +87,7 @@ export const readUntilComplete = async ({
   read: () => Promise<ExperimentRunResultsResponse>;
   waitSeconds: number;
   pollMs: number;
-  onPoll: PollListener;
+  onPoll?: PollListener;
 }): Promise<ExperimentRunResultsResponse> => {
   const deadline = Date.now() + waitSeconds * 1000;
   for (;;) {
@@ -100,7 +100,7 @@ export const readUntilComplete = async ({
       if (expired || !isRunNotFound(error)) throw error;
     }
     if (results && (expired || completenessOf(results).complete)) return results;
-    onPoll(results ? completenessOf(results) : null);
+    onPoll?.(results ? completenessOf(results) : null);
     await sleep(Math.min(pollMs, Math.max(deadline - Date.now(), 0)));
   }
 };

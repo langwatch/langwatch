@@ -5,6 +5,9 @@
  */
 process.env.LANGWATCH_NO_DAEMON ??= "1";
 
-/** A session's own tool config (a Claude Code or Codex session running the suite) never leaks in. */
+/**
+ * A session's own tool config (a Claude Code or Codex session running the suite) never
+ * leaks in.
+ */
 delete process.env.CLAUDE_CONFIG_DIR;
 delete process.env.CODEX_HOME;
