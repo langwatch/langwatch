@@ -201,14 +201,9 @@ function CriterionIcon({ tone }: { tone: CriterionTone }) {
   }
 }
 
-/**
- * One criterion row: the tone's icon, the criterion, the requirement the judge
- * checked when it restated the criterion, and the judge's reasoning for it.
- */
+/** One criterion row: the tone's icon, the criterion and the judge's reasoning for it. */
 function CriterionRow({ result }: { result: ScenarioCriterionResult }) {
   const tone = result.status;
-  const requirement = result.requirement?.trim();
-  const showsRequirement = !!requirement && requirement !== result.criterion.trim();
   const reasoning = result.reasoning.trim();
   return (
     <HStack align="start" gap={2} data-testid={`run-verdict-criterion-${tone}`}>
@@ -219,16 +214,6 @@ function CriterionRow({ result }: { result: ScenarioCriterionResult }) {
         <Text textStyle="caption" fontWeight="medium">
           {result.criterion}
         </Text>
-        {showsRequirement ? (
-          <Text
-            textStyle="micro"
-            color="fg.subtle"
-            lineHeight="short"
-            data-testid="run-verdict-criterion-requirement"
-          >
-            Checked as: {requirement}
-          </Text>
-        ) : null}
         {reasoning ? (
           <Text
             textStyle="caption"

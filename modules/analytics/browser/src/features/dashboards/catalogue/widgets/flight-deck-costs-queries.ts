@@ -7,6 +7,7 @@
 import {
   bucketOf,
   END,
+  firstTraceMetricsRow,
   inPeriod,
   inPeriodAndPrevious,
   MIDPOINT,
@@ -261,18 +262,19 @@ ORDER BY bucket`;
 
 /** One row when any trace sent an output action lately. */
 export const OUTPUT_ACTIONS_SEEN_SQL = `SELECT 1 AS present
-FROM traces
+FROM trace_metrics
 WHERE OccurredAt >= ${RECENT_START}
-  AND Attributes['metadata.output_action'] != ''
+  AND MetadataOutputAction != ''
 LIMIT 1`;
 
 /** What users did with each generated output, per bucket, from its `output_action` metadata. */
 export const OUTPUT_ACTIONS_SQL = `SELECT ${bucketOf("OccurredAt")} AS bucket,
-  Attributes['metadata.output_action'] AS action,
-  count() AS outputs
-FROM traces
+  MetadataOutputAction AS action,
+  uniqExact(TraceId) AS outputs
+FROM trace_metrics
 WHERE ${inPeriod("OccurredAt")}
-  AND Attributes['metadata.output_action'] != ''
+  AND ${firstTraceMetricsRow()}
+  AND MetadataOutputAction != ''
 GROUP BY bucket, action
 ORDER BY bucket`;
 
