@@ -430,6 +430,8 @@ export class PrismaProjectRepository
         createdAt: true,
         teamId: true,
         isPersonal: true,
+        ownerUserId: true,
+        firstMessage: true,
         departmentId: true,
         presenceEnabled: true,
         archivedAt: true,
@@ -466,6 +468,8 @@ export class PrismaProjectRepository
           presenceEnabled: row.presenceEnabled,
           isArchived: row.archivedAt !== null,
           adminUserId: organization.members[0]?.userId ?? null,
+          ownerUserId: row.ownerUserId,
+          firstMessage: row.firstMessage,
         },
       };
     });

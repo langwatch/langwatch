@@ -78,6 +78,9 @@
       "path": "../../../../modules/evaluation/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/evaluator/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../saas/contract/tsconfig.build.json"
     },
     {

@@ -430,7 +430,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
         "id", "organizationId", "principalType", "principalId", "roleKey",
         "legacyRole", "source", "scopeType", "scopeId", "token", "permission",
         "resourceKind", "projectId", "createdByUserId", "expiresAt",
-        "maxViews", "condition", "occurredAt", "updatedAt"
+        "maxViews", "condition", "replacesGrantId", "occurredAt", "updatedAt"
       ) SELECT
         ${row.id}, ${row.organizationId},
         ${row.principalType}::"GrantPrincipalType", ${row.principalId},
@@ -439,7 +439,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
         ${row.permission}, ${row.resourceKind}, ${row.projectId},
         ${row.createdByUserId}, ${row.expiresAt ? toDate(row.expiresAt) : null}, ${row.maxViews},
         ${row.condition == null ? null : JSON.stringify(row.condition)}::jsonb,
-        ${toDate(row.occurredAt)}, NOW()
+        ${row.replacesGrantId ?? null}, ${toDate(row.occurredAt)}, NOW()
       WHERE (
         ${stamp}::text IS NULL
         OR ${row.principalType}::text <> 'USER'
@@ -491,6 +491,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
         "expiresAt"       = EXCLUDED."expiresAt",
         "maxViews"        = EXCLUDED."maxViews",
         "condition"       = EXCLUDED."condition",
+        "replacesGrantId" = EXCLUDED."replacesGrantId",
         "occurredAt"      = EXCLUDED."occurredAt",
         "updatedAt"       = NOW()
       WHERE "Grant"."occurredAt" < EXCLUDED."occurredAt"

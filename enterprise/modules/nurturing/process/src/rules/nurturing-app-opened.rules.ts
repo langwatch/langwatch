@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { AppPageOpenedEventData } from "@langwatch/auth-contract";
 import type { NurturingSignal, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
+import type { LangyFirstMessageSeenEventData } from "@langwatch/langy-contract";
 
 /**
  * A page open, against the opening person's own profile,
@@ -33,4 +34,20 @@ function pageSignals(
     default:
       return page satisfies never;
   }
+}
+
+/** Langy's first-answer fact as the person's signal; the person, never the conversation's words. */
+export function langyFirstMessageSeenSignal({
+  data,
+}: Readonly<{
+  data: LangyFirstMessageSeenEventData;
+}>): NurturingSignalOf<"langy_first_message_seen"> {
+  const { userId, tenantId, occurredAt } = data;
+  return {
+    kind: "langy_first_message_seen",
+    sourceEventId: `langy-first-message-seen:${userId}`,
+    tenantId,
+    occurredAt,
+    userId,
+  };
 }

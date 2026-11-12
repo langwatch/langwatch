@@ -12,7 +12,7 @@ vi.mock("@langwatch/observability", () => ({
 }));
 
 /** Trace's milestone commands; the subscriber never reaches a product-analytics client itself. */
-const mockRecordSignal = vi.fn(async () => undefined);
+const mockRecordSignal = vi.fn(async (_milestone: RecordedMilestone): Promise<void> => undefined);
 
 import { createTenantId, type TriggerContext } from "@langwatch/eventing";
 import { type OtlpSpan } from "@langwatch/otlp/trace-request";
@@ -28,7 +28,7 @@ import {
   createProjectMetadataHandler,
   isRealFirstIngest,
 } from "../project-metadata.subscriber.ts";
-import { milestonesOver } from "./project-milestones.test-helpers.ts";
+import { milestonesOver, type RecordedMilestone } from "./project-milestones.test-helpers.ts";
 
 function createFoldState(overrides: Partial<TraceSummaryData> = {}): TraceSummaryData {
   return {
@@ -139,6 +139,9 @@ function createMockProjectService() {
       organizationId: "org-1",
       firstMessage: false,
     }),
+    findOrganizationId: vi.fn<(projectId: string) => Promise<string | undefined>>(
+      async () => "org-1",
+    ),
     repo: {} as any,
   };
 }
@@ -196,13 +199,14 @@ describe("createProjectMetadataHandler()", () => {
       });
     });
 
-    /** @scenario The project metadata subscriber names three capabilities, not a service */
-    it("runs over a project read, a metadata write and an org-admin lookup alone", async () => {
+    /** @scenario The project metadata subscriber names four capabilities, not a service */
+    it("runs over a project read, a metadata write, an org-admin and an organization lookup alone", async () => {
       const subscriber = createProjectMetadataHandler({
         projects: {
           findById: (id) => mockProjects.findById(id),
           updateMetadata: (input) => mockProjects.updateMetadata(input),
           resolveOrgAdmin: (id) => mockProjects.resolveOrgAdmin(id),
+          findOrganizationId: (id) => mockProjects.findOrganizationId(id),
         },
         milestones: milestonesOver(mockRecordSignal),
       });
@@ -233,7 +237,9 @@ describe("createProjectMetadataHandler()", () => {
 
       await subscriber(event, createContext(tenantId, state));
 
-      expect(mockRecordSignal).toHaveBeenCalledTimes(1);
+      expect(
+        mockRecordSignal.mock.calls.filter(([milestone]) => milestone.recorded === "firstTrace"),
+      ).toHaveLength(1);
       expect(mockRecordSignal).toHaveBeenCalledWith({
         recorded: "firstTrace",
         tenantId,
@@ -242,7 +248,37 @@ describe("createProjectMetadataHandler()", () => {
         projectId: tenantId,
         sdkLanguage: "python",
         sdkFramework: "openai",
+        organizationId: "org-1",
       });
+    });
+
+    /** @scenario "A project's first trace's fact names the admin's organization" */
+    it("names the admin's organization on the first-trace record", async () => {
+      const subscriber = createProjectMetadataHandler(deps);
+
+      await subscriber(createEvent(tenantId), createContext(tenantId, createFoldState()));
+
+      expect(mockRecordSignal).toHaveBeenCalledWith(
+        expect.objectContaining({ recorded: "firstTrace", organizationId: "org-1" }),
+      );
+    });
+
+    /** @scenario "A project's first trace's fact names the admin's organization" */
+    it("records the first trace with no organization when the lookup names none", async () => {
+      mockProjects.resolveOrgAdmin.mockResolvedValue({
+        userId: "admin-user-1",
+        organizationId: null,
+        firstMessage: false,
+      });
+      const subscriber = createProjectMetadataHandler(deps);
+
+      await subscriber(createEvent(tenantId), createContext(tenantId, createFoldState()));
+
+      const [firstTrace] = mockRecordSignal.mock.calls
+        .map(([milestone]) => milestone)
+        .filter((milestone) => milestone.recorded === "firstTrace");
+      expect(firstTrace).toBeDefined();
+      expect(firstTrace).not.toHaveProperty("organizationId");
     });
 
     /** @scenario Recording never fails the trace that caused it */
@@ -306,7 +342,162 @@ describe("createProjectMetadataHandler()", () => {
 
       await subscriber(event, createContext(tenantId, createFoldState()));
 
-      expect(mockRecordSignal).not.toHaveBeenCalled();
+      expect(mockRecordSignal).not.toHaveBeenCalledWith(
+        expect.objectContaining({ recorded: "firstTrace" }),
+      );
+    });
+  });
+
+  describe("when a project receives its first real trace", () => {
+    beforeEach(() => {
+      mockProjects.findById.mockResolvedValue({
+        id: tenantId,
+        firstMessage: false,
+        integrated: false,
+      });
+      mockProjects.updateMetadata.mockResolvedValue(undefined);
+    });
+
+    const projectTraced = () =>
+      mockRecordSignal.mock.calls
+        .map(([milestone]) => milestone)
+        .filter((milestone) => milestone.recorded === "projectTraced");
+
+    /** @scenario "A project's first real trace records it as traced, with its organization" */
+    it("records the project as traced once, with its organization", async () => {
+      const subscriber = createProjectMetadataHandler(deps);
+      const event = createEvent(tenantId);
+
+      await subscriber(event, createContext(tenantId, createFoldState()));
+
+      expect(projectTraced()).toEqual([
+        {
+          recorded: "projectTraced",
+          tenantId,
+          projectId: tenantId,
+          organizationId: "org-1",
+          occurredAt: event.occurredAt,
+        },
+      ]);
+    });
+
+    /** @scenario "A project with no organization admin is still recorded as traced" */
+    it("records the project as traced when the organization has no admin", async () => {
+      mockProjects.resolveOrgAdmin.mockResolvedValue({
+        userId: null,
+        organizationId: "org-without-admin",
+        firstMessage: false,
+      });
+      mockProjects.findOrganizationId.mockResolvedValue("org-without-admin");
+      const subscriber = createProjectMetadataHandler(deps);
+
+      await subscriber(createEvent(tenantId), createContext(tenantId, createFoldState()));
+
+      expect(projectTraced()).toEqual([
+        expect.objectContaining({ projectId: tenantId, organizationId: "org-without-admin" }),
+      ]);
+      expect(mockRecordSignal).not.toHaveBeenCalledWith(
+        expect.objectContaining({ recorded: "firstTrace" }),
+      );
+    });
+
+    /** @scenario "A project with no organization is recorded as traced with none" */
+    it("records the project as traced with no organization when its team is gone", async () => {
+      mockProjects.resolveOrgAdmin.mockResolvedValue({
+        userId: null,
+        organizationId: null,
+        firstMessage: false,
+      });
+      mockProjects.findOrganizationId.mockResolvedValue(undefined);
+      const subscriber = createProjectMetadataHandler(deps);
+
+      await subscriber(createEvent(tenantId), createContext(tenantId, createFoldState()));
+
+      expect(projectTraced()).toEqual([
+        expect.objectContaining({ projectId: tenantId, organizationId: null }),
+      ]);
+    });
+
+    /** @scenario "A failed organization lookup records no project traced fact" */
+    it("records nothing as traced when the organization lookup fails", async () => {
+      // resolveOrgAdmin swallows the same failure as "no organization"; that must not be recorded.
+      mockProjects.resolveOrgAdmin.mockResolvedValue({
+        userId: null,
+        organizationId: null,
+        firstMessage: false,
+      });
+      mockProjects.findOrganizationId.mockRejectedValue(new Error("database unavailable"));
+      const subscriber = createProjectMetadataHandler(deps);
+
+      await expect(
+        subscriber(createEvent(tenantId), createContext(tenantId, createFoldState())),
+      ).resolves.toBeUndefined();
+
+      expect(projectTraced()).toEqual([]);
+      expect(mockProjects.updateMetadata).toHaveBeenCalledWith({
+        id: tenantId,
+        data: expect.objectContaining({ firstMessage: true }),
+      });
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId }),
+        expect.stringContaining("traced"),
+      );
+    });
+
+    /** @scenario "A failed traced record still records the first trace" */
+    it("still marks the project and records the first trace when the traced record fails", async () => {
+      // The traced record is sent first, before the admin lookup decides the first trace.
+      mockRecordSignal.mockRejectedValueOnce(new Error("milestone pipeline down"));
+      const subscriber = createProjectMetadataHandler(deps);
+
+      await expect(
+        subscriber(createEvent(tenantId), createContext(tenantId, createFoldState())),
+      ).resolves.toBeUndefined();
+
+      expect(mockProjects.updateMetadata).toHaveBeenCalledWith({
+        id: tenantId,
+        data: expect.objectContaining({ firstMessage: true }),
+      });
+      expect(mockRecordSignal).toHaveBeenCalledWith(
+        expect.objectContaining({ recorded: "firstTrace", projectId: tenantId }),
+      );
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId }),
+        expect.stringContaining("traced"),
+      );
+    });
+
+    /** @scenario "Only a project's first real trace records it as traced" */
+    it("records nothing as traced for a sample trace or a Langy turn", async () => {
+      const subscriber = createProjectMetadataHandler(deps);
+
+      for (const origin of ["sample", "langy"]) {
+        await subscriber(
+          createEvent(tenantId),
+          createContext(tenantId, createFoldState({ attributes: { "langwatch.origin": origin } })),
+        );
+      }
+
+      expect(projectTraced()).toEqual([]);
+    });
+  });
+
+  describe("when a project that already received its first message receives another trace", () => {
+    /** @scenario "Only a project's first real trace records it as traced" */
+    it("records nothing as traced", async () => {
+      mockProjects.findById.mockResolvedValue({
+        id: tenantId,
+        firstMessage: true,
+        integrated: false,
+      });
+      mockProjects.updateMetadata.mockResolvedValue(undefined);
+      const subscriber = createProjectMetadataHandler(deps);
+
+      await subscriber(createEvent(tenantId), createContext(tenantId, createFoldState()));
+
+      expect(mockRecordSignal).not.toHaveBeenCalledWith(
+        expect.objectContaining({ recorded: "projectTraced" }),
+      );
     });
   });
 
@@ -421,6 +612,7 @@ describe("createProjectMetadataHandler()", () => {
     });
 
     /** @scenario "A later trace tells nurturing against the organization's admin" */
+    /** @scenario "A later trace's fact names the admin's organization" */
     it("tells nurturing a later trace against the org admin", async () => {
       expect(mockRecordSignal).toHaveBeenCalledWith({
         recorded: "traceReceived",
@@ -428,6 +620,7 @@ describe("createProjectMetadataHandler()", () => {
         occurredAt: expect.any(Number),
         userId: "admin-user-1",
         projectId: tenantId,
+        organizationId: "org-1",
       });
     });
   });

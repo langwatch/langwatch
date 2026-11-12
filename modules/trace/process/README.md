@@ -1980,14 +1980,16 @@ Declared at `src/eventing/trace-processing-projections.pipeline.ts:132`. Events:
 
 ### Pipeline `trace_project_milestones` (aggregate `trace_project_milestone`)
 
-Declared at `src/eventing/trace-project-milestones.pipeline.ts:24`. Events: `firstTraceRecordedEventSchema`, `traceReceivedEventSchema`, `monthTraceIdsListedEventSchema`.
+Declared at `src/eventing/trace-project-milestones.pipeline.ts:28`. Events: `firstTraceRecordedEventSchema`, `traceReceivedEventSchema`, `monthTraceIdsListedEventSchema`, `traceFailedEventSchema`, `projectTracedEventSchema`.
 
 | Kind      | Name                  | Handles | Declared at                                            |
 | --------- | --------------------- | ------- | ------------------------------------------------------ |
-| command   | `recordFirstTrace`    | –       | `src/eventing/trace-project-milestones.pipeline.ts:33` |
-| command   | `recordTraceReceived` | –       | `src/eventing/trace-project-milestones.pipeline.ts:34` |
-| command   | `recordMonthTraceIds` | –       | `src/eventing/trace-project-milestones.pipeline.ts:35` |
-| retention | `≈ retention`         | –       | `src/eventing/trace-project-milestones.pipeline.ts:36` |
+| command   | `recordFirstTrace`    | –       | `src/eventing/trace-project-milestones.pipeline.ts:39` |
+| command   | `recordTraceReceived` | –       | `src/eventing/trace-project-milestones.pipeline.ts:40` |
+| command   | `recordMonthTraceIds` | –       | `src/eventing/trace-project-milestones.pipeline.ts:41` |
+| command   | `recordTraceFailed`   | –       | `src/eventing/trace-project-milestones.pipeline.ts:42` |
+| command   | `recordProjectTraced` | –       | `src/eventing/trace-project-milestones.pipeline.ts:43` |
+| retention | `≈ retention`         | –       | `src/eventing/trace-project-milestones.pipeline.ts:44` |
 
 ### Pipeline `trace_collector_evaluations` (aggregate `trace_collector_evaluation`)
 

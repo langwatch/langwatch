@@ -49,6 +49,7 @@ function consumer({ resolveDeferredOrigin }: Pick<Reactions, "resolveDeferredOri
     trackedEventSync: noop,
     traceUpdateBroadcast: noop,
     projectMetadata: noop,
+    traceFailed: noop,
     spanStorageBroadcast: noop,
     broadcastDisabled: false,
     writeCompactOriginJobs: false,

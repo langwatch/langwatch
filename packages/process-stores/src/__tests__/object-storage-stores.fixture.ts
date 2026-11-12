@@ -45,6 +45,7 @@ export async function openObjectStorage(options: {
     queueTenantCap: undefined,
     queueGlobalBudget: undefined,
     clickhouseStatementLaneReserveShare: undefined,
+    clickhousePasswordFile: undefined,
     clickhousePool: {
       override: undefined,
       replicas: undefined,
