@@ -200,3 +200,43 @@ export const githubInstallationConnectedEventDataSchema: GithubInstallationConne
 export type GithubInstallationConnectedEventData = z.infer<
   typeof githubInstallationConnectedEventDataSchema
 >;
+
+/** The branch prefix Langy opens pull requests from; only these branches announce their checks. */
+export const GITHUB_AGENT_BRANCH_PREFIX = "langy/" as const;
+
+export const GITHUB_PULL_REQUEST_CHECKS_COMPLETED_EVENT_TYPE =
+  "lw.github.pull_request_checks_completed" as const;
+export const GITHUB_PULL_REQUEST_CHECKS_COMPLETED_EVENT_VERSION = "2026-11-12" as const;
+
+const githubFinishedCheckSchemaDefinition = z.object({
+  name: z.string(),
+  conclusion: z.string(),
+  url: z.string().nullable(),
+});
+
+/**
+ * Every check on the head commit of an open agent-branch pull request has finished. Carries
+ * what GitHub reported, so a peer can act without asking again: the checks that did not pass
+ * (at most 20) and the overall conclusion.
+ */
+const githubPullRequestChecksCompletedEventDataSchemaDefinition = z.object({
+  tenantId: z.string().min(1),
+  organizationId: z.string().min(1),
+  installationId: z.string().min(1),
+  repositoryHost: z.string().min(1),
+  repositoryFullName: z.string().min(1),
+  headBranch: z.string().min(1),
+  headSha: z.string().min(1),
+  pullRequestNumbers: z.array(z.number().int().positive()).min(1),
+  conclusion: z.enum(["success", "failure"]),
+  failedChecks: z.array(githubFinishedCheckSchemaDefinition).max(20),
+  occurredAt: z.number().int().nonnegative(),
+});
+export interface GithubPullRequestChecksCompletedEventDataSchema extends Named<
+  typeof githubPullRequestChecksCompletedEventDataSchemaDefinition
+> {}
+export const githubPullRequestChecksCompletedEventDataSchema: GithubPullRequestChecksCompletedEventDataSchema =
+  githubPullRequestChecksCompletedEventDataSchemaDefinition;
+export type GithubPullRequestChecksCompletedEventData = z.infer<
+  typeof githubPullRequestChecksCompletedEventDataSchema
+>;

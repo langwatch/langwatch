@@ -87,6 +87,9 @@ class FakeAppTokens implements GithubAppTokenCache {
   getPullRequest(): Promise<GithubPullRequestSummary> {
     throw new Error("not used");
   }
+  readCommitChecks(): ReturnType<GithubAppTokenCache["readCommitChecks"]> {
+    throw new Error("not used");
+  }
 }
 
 class FakeRepository extends GithubPullRequestsRepository {

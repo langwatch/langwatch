@@ -30,6 +30,7 @@ import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/pr
 
 import type { GithubChannels } from "../channels/github.channels.ts";
 import type { GithubRepositories } from "../repositories/github.repositories.ts";
+import { parseAgentCheckSuiteCompleted } from "../rules/github-check-suite-event.rules.ts";
 import { githubHostOf, type GithubHostConfig } from "../rules/github-host.rules.ts";
 import { installErrorHtml, installSuccessHtml } from "../rules/github-install-response.rules.ts";
 import { parsePullRequestEvent } from "../rules/github-pull-request-event.rules.ts";
@@ -48,6 +49,7 @@ import {
   type GithubLifecycleSenders,
 } from "../services/github-installation-facts.service.ts";
 import { GithubInstallationsService } from "../services/github-installations.service.ts";
+import { GithubPullRequestChecksService } from "../services/github-pull-request-checks.service.ts";
 import { GithubPullRequestMappingService } from "../services/github-pull-request-mapping.service.ts";
 import { GithubPullRequestStatusService } from "../services/github-pull-request-status.service.ts";
 import { GithubFeatureService } from "../services/github.service.ts";
@@ -66,6 +68,26 @@ export type GithubInstallationDetails = {
   repositorySelection: string;
   /** When GitHub says the installation was created; null when it does not say. */
   createdAt: string | null;
+  /** The repository permissions the installation granted, by name (`contents: "write"`). */
+  permissions: Record<string, string>;
+};
+
+/** One check suite on a commit, as GitHub lists it. */
+export type GithubCheckSuiteSummary = {
+  id: number;
+  status: string;
+  conclusion: string | null;
+  appName: string;
+  /** Zero for a suite GitHub created for an app that never ran anything on the commit. */
+  checkRunCount: number;
+};
+
+/** One check run on a commit, as GitHub lists it. */
+export type GithubCheckRunSummary = {
+  name: string;
+  status: string;
+  conclusion: string | null;
+  detailsUrl: string | null;
 };
 
 export type GithubPullRequestSummary = {
@@ -85,6 +107,8 @@ export type MintInstallationTokenInput = {
   installationId: string;
   repositoryIds?: string[];
   permissions?: Record<string, string>;
+  /** Asked for only as far as the installation granted them; see `permissionsWithinGrant`. */
+  optionalPermissions?: Record<string, string>;
 };
 
 /** The raw GitHub App HTTP client this feature needs, keyed by an App JWT. */
@@ -106,6 +130,18 @@ export interface GithubAppClient {
     repo: string;
     number: number;
   }): Promise<GithubPullRequestSummary>;
+  listCommitCheckSuites(input: {
+    token: string;
+    owner: string;
+    repo: string;
+    sha: string;
+  }): Promise<GithubCheckSuiteSummary[]>;
+  listCommitCheckRuns(input: {
+    token: string;
+    owner: string;
+    repo: string;
+    sha: string;
+  }): Promise<GithubCheckRunSummary[]>;
 }
 
 /** The shared cache in front of the raw client's App JWT and installation tokens. */
@@ -128,6 +164,14 @@ export interface GithubAppTokenCache {
     repo: string;
     number: number;
   }): Promise<GithubPullRequestSummary>;
+  /** Every check suite and the latest check runs on one commit, read with a checks token. */
+  readCommitChecks(input: {
+    installationId: string;
+    repositoryId: string;
+    owner: string;
+    repo: string;
+    sha: string;
+  }): Promise<{ suites: GithubCheckSuiteSummary[]; runs: GithubCheckRunSummary[] }>;
   computeRepoScopeKey(input: {
     repositoryIds?: string[];
     permissions?: Record<string, string>;
@@ -153,6 +197,8 @@ type GithubComposition = Readonly<{
     signingKey: string;
   };
   hostConfig?: GithubHostConfig;
+  /** Where the webhook's facts are recorded; one per process, shared with the module. */
+  facts?: GithubInstallationFactsService;
 }>;
 
 /** What the fleet-wide branch sweep needs beside its rows. */
@@ -252,6 +298,12 @@ export class GithubModule implements GithubApiContract {
       appTokens,
       cache: parts.repositories.pullRequestStatusCache,
     });
+    const checks = GithubPullRequestChecksService.create({
+      installations: installationAccess,
+      appTokens,
+      facts: parts.facts ?? GithubInstallationFactsService.create(),
+      host,
+    });
 
     return GithubFeatureService.create({
       installations,
@@ -268,6 +320,8 @@ export class GithubModule implements GithubApiContract {
       }),
       installResponse: { successHtml: installSuccessHtml, errorHtml: installErrorHtml },
       pullRequestEvents: { parse: parsePullRequestEvent },
+      checks,
+      checkSuiteEvents: { parse: parseAgentCheckSuiteCompleted },
     });
   }
 
@@ -304,6 +358,7 @@ export class GithubModule implements GithubApiContract {
     config,
     dependencies,
   }: GithubSetup): Promise<GithubModule> {
+    const installationFacts = GithubInstallationFactsService.create();
     const signingKey = await secrets.into(GithubModule.secrets.signingKey, (credentials) =>
       secrets.into(
         GithubModule.secrets.signingKeyFallback,
@@ -333,6 +388,7 @@ export class GithubModule implements GithubApiContract {
           signingKey,
         },
         ...hostConfig,
+        facts: installationFacts,
       }),
       // `github_maintenance` (ADR-144), ported from the deleted
       // `GithubWorkerFeatureInstaller`: composed here, not received, so the
@@ -346,7 +402,7 @@ export class GithubModule implements GithubApiContract {
       permissions: dependencies.permissions,
       auth: dependencies.auth,
       auditLog: dependencies.auditLog,
-      installationFacts: GithubInstallationFactsService.create(),
+      installationFacts,
     });
   }
 
