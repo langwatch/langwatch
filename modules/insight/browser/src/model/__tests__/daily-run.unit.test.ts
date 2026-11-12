@@ -398,7 +398,7 @@ describe("given a member chose Run now, and the server answered request-1", () =
       expect(atDeadline(settled)).toEqual({ kind: "unrelated" });
     });
 
-    it("tells no run at all from a later one", () => {
+    it("says no run when the read shows none", () => {
       expect(atDeadline(setting({}))).toEqual({ kind: "none" });
     });
   });

@@ -1079,15 +1079,8 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
       await waitFor(() => expect(board.reads()).toHaveLength(READS_BEFORE_DEADLINE + 1));
       await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS + 1_000);
 
-      // The next scheduled run, which the member never asked for.
-      read = {
-        ...ON,
-        runInFlight: {
-          runId: "run-scheduled",
-          conversationId: "conversation-9",
-          startedAt: Date.now(),
-        },
-      };
+      // No run in the read: a hint that outran its row, not a loss to report.
+      read = ON;
       await board.readHint();
       await vi.advanceTimersByTimeAsync(1_000);
 

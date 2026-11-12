@@ -127,8 +127,8 @@ function useRequestedRunDeadline({
     (owedTo: RunRequest, firedAt: number, read: DeadlineRead) => {
       if (verdictOwedTo.current !== owedTo) return;
       cancelVerdict();
-      // A read that lands a whole run's life after the deadline says nothing of this request: the
-      // run it shows may be the next scheduled one, and a hint that outran its row is not a loss.
+      // A read that lands a whole run's life after the deadline says nothing: a hint may only
+      // have outrun its row.
       if (nowInstant().epochMilliseconds - firedAt > INSIGHT_DAILY_RUN_EXPIRY_MS) return;
       // A run that started after the deadline is not the request's: it says nothing of it.
       if (read.kind === "run") showRun(read.run);
