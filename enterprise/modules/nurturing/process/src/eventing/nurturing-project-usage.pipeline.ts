@@ -307,10 +307,8 @@ export function isCountedTrace(data: NurturingTraceSpanData): boolean {
 
 /** A root span as its count takes it: its project (the tenant) and append day. */
 export function countedTraceOf({
-  data,
   context,
 }: Readonly<{
-  data: NurturingTraceSpanData;
   context: Pick<PeerSubscriberContext, "tenantId" | "createdAt">;
 }>): NurturingCountedTrace {
   return {
@@ -360,8 +358,8 @@ async function copiedProjectOf({
 /**
  * Counts the batch's traces whose organization is inside its counting window, durably. A
  * redelivered batch counts again: accepted (owner decision, issue 9378). The placement copy has its own subscriber, so a new project's
- * traces can come first: an uncopied project fails the batch after the rest are counted, and the
- * queue retries, until its window from first seen runs out; then it drops, as does a placed project
+ * traces can come first: an uncopied project fails the batch before anything is counted, so our own
+ * retry never counts a placed project twice, and the queue retries, until its window from first seen runs out; then it drops, as does a placed project
  * whose organization has no creation copy. A project this process dropped is skipped with no read;
  * its copy landing forgets it.
  */
@@ -383,15 +381,6 @@ async function countInWindow({
   );
   const projectOf = (trace: NurturingCountedTrace) =>
     projects.get(trace.projectId) ?? { outcome: "unplaced" as const };
-  await deps.traceDays.countTraces(
-    traces.filter((trace) => {
-      const project = projectOf(trace);
-      return (
-        project.outcome === "placed" &&
-        isTraceCounted({ organizationCreatedAt: project.organizationCreatedAt, at: trace.at })
-      );
-    }),
-  );
   const outcomes = await Promise.all(
     [...projects].map(async ([projectId, project]) =>
       project.outcome === "unplaced" &&
@@ -404,6 +393,15 @@ async function countInWindow({
   if (waiting.length > 0) {
     throw new Error(`nurturing's placement copy of ${waiting.join(", ")} has not landed yet`);
   }
+  await deps.traceDays.countTraces(
+    traces.filter((trace) => {
+      const project = projectOf(trace);
+      return (
+        project.outcome === "placed" &&
+        isTraceCounted({ organizationCreatedAt: project.organizationCreatedAt, at: trace.at })
+      );
+    }),
+  );
 }
 
 /** Most root spans of one project and day the queue drains into one batch, one upsert. */
@@ -436,7 +434,7 @@ export function nurturingTraceDaySubscriber(
         ...deps,
         traces: items
           .filter(({ data }) => isCountedTrace(data))
-          .map(({ data, context }) => countedTraceOf({ data, context })),
+          .map(({ context }) => countedTraceOf({ context })),
       }),
   };
 }

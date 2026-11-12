@@ -8,10 +8,7 @@ import type {
 } from "../../rules/nurturing-trace-day.rules.ts";
 import type { NurturingTraceDayRepository } from "../nurturing-trace-day.repository.ts";
 
-type NurturingTraceDayDatabase = Pick<
-  PrismaClient,
-  "nurturingProjectTraceDay" | "$executeRaw"
->;
+type NurturingTraceDayDatabase = Pick<PrismaClient, "nurturingProjectTraceDay" | "$executeRaw">;
 
 /**
  * Nurturing's trace counts in Postgres: one `NurturingProjectTraceDay` row per project and UTC
@@ -57,6 +54,7 @@ export class PrismaNurturingTraceDayRepository
         ${traces.map(({ day }) => day)}::text[],
         ${traces.map(({ at }) => at)}::double precision[]
       ) AS incoming("projectId", "kind", "day", "at")
+      WHERE incoming."projectId" = ANY(${[...new Set(traces.map(({ projectId }) => projectId))]}::text[])
       GROUP BY incoming."projectId", incoming."day"
       ON CONFLICT ("projectId", "day") DO UPDATE SET
         "traceCount" = counted."traceCount" + EXCLUDED."traceCount",

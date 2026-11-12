@@ -665,8 +665,32 @@ describe("the trace-day count", () => {
     counting.advance(30_000);
     await counting.landCopies();
     await subscriber.handleBatch([itemOf(OK, "trace-1")]);
-    await subscriber.handleBatch([itemOf(OK, "trace-1")]);
     expect((await days()).map((day) => day.traceCount)).toEqual([1]);
+  });
+
+  /** @scenario "A new project whose copy lands within the retry window is counted" */
+  it("counts nothing from a batch that waits for a project's copy, then each trace once on the retry", async () => {
+    const counting = countingOver({ createdAt: NOON - 86_400_000 });
+    const subscriber = nurturingTraceDaySubscriber(counting);
+    const projectIds = ["project-1", "project-2"];
+    const days = () => counting.traceDays.findForProjects({ projectIds, afterDay: "" });
+    const placed = itemOf(OK, "trace-1");
+    const uncopied = {
+      ...itemOf(OK, "trace-2"),
+      context: { ...itemOf(OK, "trace-2").context, tenantId: createTenantId("project-2") },
+    };
+
+    await expect(subscriber.handleBatch([placed, uncopied])).rejects.toThrow("has not landed yet");
+    expect(await days()).toEqual([]);
+
+    counting.advance(30_000);
+    await counting.placements.recordProject({ projectId: "project-2", organizationId: "org-1" });
+    await counting.uncopiedProjects.copyLanded({ projectId: "project-2" });
+    await subscriber.handleBatch([placed, uncopied]);
+    expect((await days()).map((day) => [day.projectId, day.traceCount]).sort()).toEqual([
+      ["project-1", 1],
+      ["project-2", 1],
+    ]);
   });
 
   /** @scenario "A new project whose copy lands within the retry window is counted" */
