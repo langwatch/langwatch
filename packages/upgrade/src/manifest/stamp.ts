@@ -30,7 +30,7 @@ export function gooseStepId({ file }: { file: string }): string | null {
   return match?.[1] ? `clickhouse:${match[1].padStart(5, "0")}` : null;
 }
 
-/** Goose files sharing a version, read as a number like goose does (125 is 00125 is 000125). */
+/** Goose files sharing a version, leading zeros dropped as goose does (125 is 00125 is 000125). */
 export function duplicateGooseVersions({
   gooseFiles,
 }: {
@@ -40,7 +40,7 @@ export function duplicateGooseVersions({
   for (const file of gooseFiles) {
     const version = GOOSE_FILE.exec(file)?.[1];
     if (!version) continue;
-    const id = `clickhouse:${String(Number(version)).padStart(5, "0")}`;
+    const id = `clickhouse:${version.replace(/^0+(?=\d)/, "").padStart(5, "0")}`;
     filesById.set(id, [...(filesById.get(id) ?? []), file]);
   }
   return [...filesById]

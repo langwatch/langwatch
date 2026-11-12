@@ -149,6 +149,13 @@ describe("duplicateGooseVersions()", () => {
     });
   });
 
+  describe("when two prefixes differ only past the safe integer range", () => {
+    it("reports nothing", () => {
+      const gooseFiles = ["9007199254740992_a.sql", "9007199254740993_b.sql"];
+      expect(duplicateGooseVersions({ gooseFiles })).toEqual([]);
+    });
+  });
+
   describe("when every prefix is distinct", () => {
     it("reports nothing", () => {
       const gooseFiles = ["00124_add_index.sql", "00125_a.sql", "README.md"];
