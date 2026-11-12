@@ -200,15 +200,17 @@ export function createDatasetRest(): Readonly<{
           "Create a new dataset, optionally with its first rows in `entries`, written in the same call.",
       })
       .handle(async ({ app, input, scope, actor }, project) => {
-        const dataset = await app.upsertDataset({
-          projectId: scope.id,
-          name: input.name,
-          columnTypes: input.columnTypes,
-          ...(input.entries && input.entries.length > 0
-            ? { datasetRecords: input.entries, enforceBatchBound: true }
-            : {}),
-          editedBy: datasetAuthorOf({ actor }),
-        });
+        const dataset = await app
+          .upsertDataset({
+            projectId: scope.id,
+            name: input.name,
+            columnTypes: input.columnTypes,
+            ...(input.entries && input.entries.length > 0
+              ? { datasetRecords: input.entries, enforceBatchBound: true }
+              : {}),
+            editedBy: datasetAuthorOf({ actor }),
+          })
+          .catch(rethrowColumnRefusal);
 
         return {
           id: dataset.id,

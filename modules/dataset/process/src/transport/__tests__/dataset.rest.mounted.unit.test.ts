@@ -328,19 +328,29 @@ describe("the mounted dataset REST family", () => {
       expect(stub.batchCreateRecords).not.toHaveBeenCalled();
     });
 
-    /** @scenario "Creating a dataset over REST refuses a row with a column the dataset does not define" */
-    it("refuses an entry naming a column the column types leave out", async () => {
-      const { send, stub } = mount();
+    it("answers an unknown column with the 400 an append gets", async () => {
+      const refuse = vi.fn(async () => {
+        throw new InvalidColumnError({
+          columnName: "expected",
+          datasetName: "QA",
+          validColumns: ["input"],
+        });
+      });
+      const entries = [{ input: "hello", expected: "hi" }];
 
-      const response = await send("POST", "/api/dataset", {
+      const create = await mount({ upsertDataset: refuse as never }).send("POST", "/api/dataset", {
         name: "QA",
         columnTypes: [{ name: "input", type: "string" }],
-        entries: [{ input: "hello", expected: "hi" }],
+        entries,
       });
+      const append = await mount({ batchCreateRecords: refuse as never }).send(
+        "POST",
+        "/api/dataset/qa/records",
+        { entries },
+      );
 
-      expect(response.status).toBe(422);
-      await expect(response.json()).resolves.toMatchObject({ code: "validation_error" });
-      expect(stub.upsertDataset).not.toHaveBeenCalled();
+      expect(create.status).toBe(400);
+      expect(create.status).toBe(append.status);
     });
 
     it("refuses more entries than the batch ceiling", async () => {

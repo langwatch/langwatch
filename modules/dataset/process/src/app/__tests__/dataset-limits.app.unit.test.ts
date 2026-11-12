@@ -136,6 +136,24 @@ describe("the dataset limits an application answers", () => {
       expect(listed.data).toHaveLength(0);
     });
 
+    /** @scenario "Creating a dataset over REST refuses a row with a column the dataset does not define" */
+    it("refuses a row naming a column the column types lack, before the dataset exists", async () => {
+      const app = createDatasetTestApp();
+
+      await expect(
+        app.upsertDataset({
+          projectId: "project-1",
+          name: "Seeded",
+          columnTypes: [{ name: "text", type: "string" }],
+          datasetRecords: [{ text: "row", expected: "hi" }],
+          enforceBatchBound: true,
+          editedBy: { kind: "user", id: "user-1" },
+        }),
+      ).rejects.toMatchObject({ code: "dataset_invalid_column" });
+      const listed = await app.listDatasets({ projectId: "project-1" });
+      expect(listed.data).toHaveLength(0);
+    });
+
     it("writes exactly 1000 rows", async () => {
       const app = createDatasetTestApp();
 

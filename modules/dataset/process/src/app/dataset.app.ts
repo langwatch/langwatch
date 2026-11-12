@@ -95,6 +95,7 @@ import {
   type DatasetVersionsDefinition,
 } from "../eventing/dataset-versions.pipeline.ts";
 import type { DatasetRepositories } from "../repositories/dataset.repositories.ts";
+import { assertKnownColumns } from "../rules/dataset-columns.rules.ts";
 import { datasetPlatformUrl } from "../rules/dataset-platform-url.rules.ts";
 import { versionAuthorUserIds, withAuthorNames } from "../rules/dataset-version-author.rules.ts";
 import { DatasetAttachmentReferenceService } from "../services/dataset-attachment-reference.service.ts";
@@ -175,7 +176,10 @@ interface DatasetUpsertInput {
   columnTypes?: DatasetColumns;
   datasetRecords?: UpsertDatasetInput["datasetRecords"];
   columnRenames?: UpsertDatasetInput["columnRenames"];
-  /** Refuse `datasetRecords` above the plan's batch bound, as an append does. */
+  /**
+   * Refuse `datasetRecords` as an append does: above the plan's batch bound, or naming a
+   * column `columnTypes` lacks.
+   */
   enforceBatchBound?: boolean;
 }
 
@@ -334,6 +338,13 @@ export class DatasetModule implements DatasetApi {
   async upsertDataset(input: DatasetUpsertInput & EditedBy): Promise<Dataset> {
     if (input.enforceBatchBound && input.datasetRecords?.length) {
       await this.#requestBounds.assertBatchSize(input.projectId, input.datasetRecords.length);
+      if (input.columnTypes) {
+        assertKnownColumns({
+          datasetName: input.name ?? "",
+          columns: input.columnTypes.map((column) => column.name),
+          entries: input.datasetRecords,
+        });
+      }
     }
     const target = input.datasetId ?? input.slugOrId;
     if (target === undefined) {

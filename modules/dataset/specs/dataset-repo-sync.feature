@@ -20,7 +20,7 @@ Feature: Keeping a dataset in sync with files held in a repository
   @unit
   Scenario: Creating a dataset over REST refuses a row with a column the dataset does not define
     When a client posts to /api/dataset entries holding a column missing from the column types
-    Then the answer is 422 with code "validation_error"
+    Then the application refuses with code "dataset_invalid_column", answered 400 as an append is
     And no dataset is created
 
   @unit
