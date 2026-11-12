@@ -17007,6 +17007,22 @@
               "available": true
             },
             {
+              "name": "TraceQuietPeriodMs",
+              "type": "Nullable(Int32)",
+              "description": "TraceQuietPeriodMs",
+              "unit": "ms",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TraceWaitTimeoutMs",
+              "type": "Nullable(Int32)",
+              "description": "TraceWaitTimeoutMs",
+              "unit": "ms",
+              "gates": [],
+              "available": true
+            },
+            {
               "name": "MaxTurns",
               "type": "Nullable(Int32)",
               "description": "MaxTurns",
@@ -17439,6 +17455,22 @@
               "type": "Nullable(String)",
               "description": "JudgeModel",
               "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TraceQuietPeriodMs",
+              "type": "Nullable(Int32)",
+              "description": "TraceQuietPeriodMs",
+              "unit": "ms",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TraceWaitTimeoutMs",
+              "type": "Nullable(Int32)",
+              "description": "TraceWaitTimeoutMs",
+              "unit": "ms",
               "gates": [],
               "available": true
             },
