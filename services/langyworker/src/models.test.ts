@@ -1,3 +1,4 @@
+import { OPENAI_MODELS } from "@earendil-works/pi-ai/providers/openai.models";
 import { describe, expect, it } from "vitest";
 
 import type { LangyWorkerModelConfig } from "./config.js";
@@ -192,6 +193,62 @@ describe("buildModelsJson", () => {
     it("leaves an older Claude on the manager's config alone", () => {
       for (const id of ["anthropic/claude-opus-4-20250514", "anthropic/claude-3-7-sonnet-latest"]) {
         expect(claude(id).compat, id).toBeUndefined();
+      }
+    });
+  });
+
+  describe("when an OpenAI Responses model meets pi's catalog", () => {
+    const env = { OPENAI_BASE_URL: "http://127.0.0.1:41234/v1", OPENAI_API_KEY: "k" };
+    const openai = (id: string): Record<string, unknown> => {
+      const provider = buildModelsJson({
+        model: {
+          id,
+          api: "openai-responses",
+          baseUrlEnv: "OPENAI_BASE_URL",
+          apiKeyEnv: "OPENAI_API_KEY",
+          reasoning: true,
+          compat: { supportsLongCacheRetention: true },
+        },
+        env,
+      }).providers[PROVIDER_ID] as { models: Record<string, unknown>[] };
+      return provider.models[0] as Record<string, unknown>;
+    };
+
+    /** @scenario A model that does not reason is never sent reasoning fields */
+    it("takes the catalog's reasoning flag over the lane's blanket one", () => {
+      const notReasoning = Object.entries(OPENAI_MODELS)
+        .filter(([, entry]) => entry.api === "openai-responses" && entry.reasoning === false)
+        .map(([id]) => `openai/${id}`);
+      expect(notReasoning.length).toBeGreaterThan(0);
+      for (const id of notReasoning) {
+        expect(openai(id).reasoning, id).toBe(false);
+      }
+      expect(openai("openai/gpt-5.6-luna").reasoning).toBe(true);
+    });
+
+    /** @scenario A GPT newer than pi's catalog gets its newest sibling's shape */
+    it("gives a GPT newer than the catalog the newest same-tier sibling's shape", () => {
+      const sibling = openai("openai/gpt-5.6-luna");
+      for (const id of ["openai/gpt-6-luna", "openai/gpt-6.1-luna"]) {
+        const entry = openai(id);
+        expect(entry.id, id).toBe(id);
+        expect(entry.reasoning, id).toBe(true);
+        expect(entry.contextWindow, id).toBe(sibling.contextWindow);
+        expect(entry.thinkingLevelMap, id).toEqual(sibling.thinkingLevelMap);
+        expect(entry.input, id).toEqual(sibling.input);
+        expect(entry.compat, id).toMatchObject({ supportsLongCacheRetention: true });
+        expect(entry.name, id).toBeUndefined();
+        expect(entry.cost, id).toBeUndefined();
+      }
+      expect(openai("openai/gpt-6-terra").contextWindow).toBe(
+        openai("openai/gpt-5.6-terra").contextWindow,
+      );
+    });
+
+    /** @scenario A GPT newer than pi's catalog gets its newest sibling's shape */
+    it("leaves ids with no newer sibling to the manager's config", () => {
+      for (const id of ["openai/gpt-6-astra", "openai/gpt-6-sol-pro", "openai/my-finetune"]) {
+        expect(openai(id).contextWindow, id).toBeUndefined();
       }
     });
   });

@@ -191,7 +191,5 @@ export async function createLangySession({
   });
   installModelRetry({ session });
 
-  installModelRetry({ session });
-
   return { session, resumed };
 }
