@@ -1,4 +1,4 @@
-import type { SeatHolder } from "../../rules/seat-holder.rules.ts";
+import { type SeatHolder, seatHolderId } from "../../rules/seat-holder.rules.ts";
 import {
   type SeatPeakCountsRow,
   type SeatPeakHolderRow,
@@ -58,18 +58,20 @@ export class MemoryOrganizationSeatPeakRepository extends OrganizationSeatPeakRe
       ...rows.counts,
       members: {},
       invitations: {},
+      holds: {},
       months: Object.fromEntries(rows.months),
     };
     for (const row of rows.holders.values()) {
       if (!inSlice({ row, slice, dueBefore })) continue;
       if (row.kind === "member") state.members[row.holderId] = row.holding;
+      else if (row.kind === "hold") state.holds[row.holderId] = row.holding;
       else state.invitations[row.holderId] = row.holding;
     }
     return state;
   }
 }
 
-/** Whether a holder row loads for the slice: named, or a seated invitation due to expire. */
+/** Whether a holder row loads: named, or a seated invitation or hold due to expire. */
 function inSlice({
   row,
   slice,
@@ -89,6 +91,5 @@ function inSlice({
 }
 
 function names({ holder, row }: { holder: SeatHolder; row: SeatPeakHolderRow }): boolean {
-  if (holder.kind === "member") return row.kind === "member" && row.holderId === holder.userId;
-  return row.kind === "invitation" && row.holderId === holder.inviteId;
+  return row.kind === holder.kind && row.holderId === seatHolderId(holder);
 }

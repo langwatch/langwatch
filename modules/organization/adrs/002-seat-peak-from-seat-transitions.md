@@ -24,10 +24,11 @@ record no event at all. The events that do exist (`member_removed`, `member_disa
 
 We will record the highest number of full seats, and of Lite Member seats, an organization held at
 once in each calendar month, and show it to our own team on the ops console. A pending invitation
-counts, because the cap counts it.
+counts, because the cap counts it. So does a seat held for 30 days after somebody leaves
+(seat-rotation.feature): the cap and the bill count it (accepted by the user, 2026-11-12).
 
 1. **Every seat change is an event that names the seat on both sides.** Each path above records
-   `lw.organization.seat_changed` with the holder (a member or a pending invitation), the seat it
+   `lw.organization.seat_changed` with the holder (a member, a pending invitation or a seat hold), the seat it
    held before and the seat it holds after (`full`, `lite`, `developer` or `none`) and when. A change
    that moves no seat (an admin made from a member) records nothing. Organization classifies the
    seat with the same rule the cap counts by (`classifyMemberType`), so the peak and the cap cannot
@@ -47,7 +48,12 @@ counts, because the cap counts it.
    the invitations due to expire by then and the months, and writes back only the rows it moved,
    under a per-organization lock, so its cost does not grow with the organization.
 3. **An invitation's expiry is folded by event time.** An invitation stops holding its seat when it
-   expires, and no event says so. The fold keeps each pending invitation's expiry and, before applying
+   expires, and no event says so. A seat hold is a holder of its own, keyed by its person, holding
+   a full seat until its end, and expires the same way. It counts by the cap's rule
+   (`countedSeatHolds`): not while its person holds a full seat again, as a member or through a
+   live full invitation to their address. A write that moves a hold, or an invitation naming a held
+   address, records the hold's change with the member's or the invitation's, a seat given back
+   before one taken, so a hold replacing a seat never raises the peak. The fold keeps each pending invitation's expiry and, before applying
    a change, gives back the seats of invitations that expired before the change happened. It uses the
    change's own time, never the clock, so a replay gives the same answer.
 4. **A month with no change carries the count.** The peak of a month nobody joined or left is the
@@ -100,6 +106,8 @@ ordered before its event is counted twice or not at all. That is one seat, once,
 
 - Every path that takes or gives back a seat records `seat_changed`; a new path that does not is a
   defect the spec's scenarios catch.
+- A hold whose invitation expires counts again with no change recorded; the next organization-wide
+  correction finds it. Until then the count is one seat low.
 - Peaks are kept for full and Lite Member seats; developer seats are unmetered (ADR-171) and only
   pass through the fold.
 - The ops console shows the month's peak beside the licence's cap. The customer does not see it.

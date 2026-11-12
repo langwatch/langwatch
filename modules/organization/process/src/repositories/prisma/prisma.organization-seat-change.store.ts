@@ -11,6 +11,7 @@ import {
   seatKindOf,
 } from "../../rules/seat-change.rules.ts";
 import type { SeatHolder, SeatKind } from "../../rules/seat-holder.rules.ts";
+import type { CountedSeatHold } from "../organization-seat.repository.ts";
 import { PrismaOrganizationSeatRepository } from "./prisma.organization-seat.repository.ts";
 
 /** One holder's seat on each side of a write, as the repository that made it knows them. */
@@ -49,18 +50,42 @@ export class PrismaOrganizationSeatChangeStore {
 
   private constructor(private readonly database: PrismaClient) {}
 
-  /** Reads the member's seat, runs the write, reads it again and records the move. */
+  /**
+   * Reads the member's seat and their seat hold, runs the write, reads both again and records
+   * each move, a seat given back before one taken so a hold replacing a seat never peaks.
+   */
   async movingMember<T>({
     userId,
     write,
     ...change
   }: SeatMovingWrite<T> & { userId: string }): Promise<T> {
-    const from = await this.#memberSeat({ ...change, userId });
+    const before = await this.#personSeats({ ...change, userId });
     const result = await write();
-    const to = await this.#memberSeat({ ...change, userId });
-    await this.record({
+    const after = await this.#personSeats({ ...change, userId });
+    await this.#recordAll({
       transaction: change.transaction,
-      change: { ...change, holder: { kind: "member", userId }, from, to },
+      changes: [
+        { ...change, holder: { kind: "member", userId }, from: before.member, to: after.member },
+        ...holdMoves({ change, userId, before: before.hold, after: after.hold }),
+      ],
+    });
+    return result;
+  }
+
+  /** Runs a write that moves several people's seat holds and records each hold's move. */
+  async movingHolds<T>({
+    userIds,
+    write,
+    ...change
+  }: SeatMovingWrite<T> & { userIds: readonly string[] }): Promise<T> {
+    const before = await this.#holds({ ...change, userIds });
+    const result = await write();
+    const after = await this.#holds({ ...change, userIds });
+    await this.#recordAll({
+      transaction: change.transaction,
+      changes: userIds.flatMap((userId) =>
+        holdMoves({ change, userId, before: before.get(userId), after: after.get(userId) }),
+      ),
     });
     return result;
   }
@@ -75,16 +100,28 @@ export class PrismaOrganizationSeatChangeStore {
     ...change
   }: SeatMovingWrite<T> & { inviteId: string }): Promise<T> {
     const before = await this.#invitation({ ...change, inviteId });
+    const holdsBefore = await this.#holds({ ...change, userIds: before.heldUserIds });
     const result = await write();
     const after = await this.#invitation({ ...change, inviteId });
+    const userIds = [...new Set([...before.heldUserIds, ...after.heldUserIds])];
+    const holdsAfter = await this.#holds({ ...change, userIds });
     const moved = { ...change, holder: after.holder, from: before.seat, to: after.seat };
+    const holds = userIds.flatMap((userId) =>
+      holdMoves({
+        change,
+        userId,
+        before: holdsBefore.get(userId),
+        after: holdsAfter.get(userId),
+      }),
+    );
     if (movesAnInvitationExpiry({ before, after })) {
       await this.#append({
         transaction: change.transaction,
         change: { ...moved, cause: "invited" },
       });
+      await this.#recordAll({ transaction: change.transaction, changes: holds });
     } else {
-      await this.record({ transaction: change.transaction, change: moved });
+      await this.#recordAll({ transaction: change.transaction, changes: [moved, ...holds] });
     }
     return result;
   }
@@ -94,10 +131,24 @@ export class PrismaOrganizationSeatChangeStore {
     inviteId,
     ...change
   }: Omit<SeatMovingWrite<void>, "write"> & { inviteId: string }): Promise<void> {
-    const { holder, seat } = await this.#invitation({ ...change, inviteId });
-    await this.record({
+    const { holder, seat, heldUserIds } = await this.#invitation({ ...change, inviteId });
+    const holds: OrganizationSeatChange[] = [];
+    for (const userId of heldUserIds) {
+      // Its person's hold counted until this invitation was written.
+      const [before] = await this.#seats(change.transaction).findCountedHold({
+        organizationId: change.organizationId,
+        userId,
+        ignoringInviteId: inviteId,
+      });
+      const [after] = await this.#seats(change.transaction).findCountedHold({
+        organizationId: change.organizationId,
+        userId,
+      });
+      holds.push(...holdMoves({ change, userId, before, after }));
+    }
+    await this.#recordAll({
       transaction: change.transaction,
-      change: { ...change, holder, from: "none", to: seat },
+      changes: [{ ...change, holder, from: "none", to: seat }, ...holds],
     });
   }
 
@@ -150,7 +201,24 @@ export class PrismaOrganizationSeatChangeStore {
     return stamped;
   }
 
-  async #memberSeat({
+  /** Records each change that moves a seat, those giving a seat back first. */
+  async #recordAll({
+    transaction,
+    changes,
+  }: {
+    transaction: Prisma.TransactionClient;
+    changes: readonly OrganizationSeatChange[];
+  }): Promise<void> {
+    const ordered = changes.toSorted((a, b) => Number(a.to !== "none") - Number(b.to !== "none"));
+    for (const change of ordered) await this.record({ transaction, change });
+  }
+
+  #seats(transaction: Prisma.TransactionClient): PrismaOrganizationSeatRepository {
+    return PrismaOrganizationSeatRepository.create(transaction);
+  }
+
+  /** The person's member seat and their counted hold, read together. */
+  async #personSeats({
     transaction,
     organizationId,
     userId,
@@ -158,12 +226,34 @@ export class PrismaOrganizationSeatChangeStore {
     transaction: Prisma.TransactionClient;
     organizationId: string;
     userId: string;
-  }): Promise<SeatKind> {
-    const seats = PrismaOrganizationSeatRepository.create(transaction);
-    return seatKindOf(await seats.findMemberSeat({ organizationId, userId }));
+  }): Promise<{ member: SeatKind; hold: CountedSeatHold | undefined }> {
+    const seats = this.#seats(transaction);
+    const member = seatKindOf(await seats.findMemberSeat({ organizationId, userId }));
+    const [hold] = await seats.findCountedHold({ organizationId, userId });
+    return { member, hold };
   }
 
-  /** The invitation as a holder and the seat it holds; `none` once settled or expired. */
+  async #holds({
+    transaction,
+    organizationId,
+    userIds,
+  }: {
+    transaction: Prisma.TransactionClient;
+    organizationId: string;
+    userIds: readonly string[];
+  }): Promise<Map<string, CountedSeatHold>> {
+    const held = new Map<string, CountedSeatHold>();
+    for (const userId of userIds) {
+      const [hold] = await this.#seats(transaction).findCountedHold({ organizationId, userId });
+      if (hold) held.set(userId, hold);
+    }
+    return held;
+  }
+
+  /**
+   * The invitation as a holder and the seat it holds (`none` once settled or expired), and the
+   * people whose seat hold its address names: a live full invitation takes such a hold's place.
+   */
   async #invitation({
     transaction,
     organizationId,
@@ -172,13 +262,16 @@ export class PrismaOrganizationSeatChangeStore {
     transaction: Prisma.TransactionClient;
     organizationId: string;
     inviteId: string;
-  }): Promise<{ holder: SeatHolder; seat: SeatKind }> {
-    const seats = PrismaOrganizationSeatRepository.create(transaction);
+  }): Promise<{ holder: SeatHolder; seat: SeatKind; heldUserIds: string[] }> {
+    const seats = this.#seats(transaction);
     const row = await transaction.organizationInvite.findFirst({
       where: { id: inviteId, organizationId },
-      select: { expiration: true },
+      select: { expiration: true, email: true },
     });
     return {
+      heldUserIds: row?.email
+        ? await seats.findHoldUserIdsByEmail({ organizationId, email: row.email })
+        : [],
       holder: {
         kind: "invitation",
         inviteId,
@@ -187,4 +280,30 @@ export class PrismaOrganizationSeatChangeStore {
       seat: seatKindOf(await seats.findInvitationSeat({ organizationId, inviteId })),
     };
   }
+}
+
+/** One person's counted hold before and after a write, as changes: none when it never held one. */
+function holdMoves({
+  change,
+  userId,
+  before,
+  after,
+}: {
+  change: Omit<SeatMovingWrite<unknown>, "write" | "transaction">;
+  userId: string;
+  before: CountedSeatHold | undefined;
+  after: CountedSeatHold | undefined;
+}): OrganizationSeatChange[] {
+  const heldUntil = after?.heldUntil ?? before?.heldUntil;
+  if (heldUntil === undefined) return [];
+  return [
+    {
+      organizationId: change.organizationId,
+      cause: change.cause,
+      actorUserId: change.actorUserId,
+      holder: { kind: "hold", userId, expiresAt: heldUntil },
+      from: before ? "full" : "none",
+      to: after ? "full" : "none",
+    },
+  ];
 }

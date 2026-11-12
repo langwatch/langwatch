@@ -72,6 +72,12 @@ function organization({
         );
         return MEMBER_TYPE_OF_SEAT[held?.seat ?? "none"];
       },
+      findCountedHold: async ({ userId }) =>
+        seats.flatMap(({ holder, seat }) =>
+          holder.kind === "hold" && holder.userId === userId && seat === "full"
+            ? [{ userId, heldUntil: holder.expiresAt }]
+            : [],
+        ),
     },
     peaks: { getState: async () => state },
     organizationIdsForMember: async () => [ORG],
@@ -266,6 +272,57 @@ describe("SeatPeakCorrectionService", () => {
         ["full", "none", LATER],
         ["none", "full", LATER + 60_000],
       ]);
+    });
+  });
+
+  describe("given a directory offboarding that kept the person's seat in a hold", () => {
+    it("moves their seat onto the hold, so the next full member raises the peak", async () => {
+      const heldUntil = LATER + 30 * 24 * 60 * 60 * 1000;
+      const held: OrganizationSeatHolding = {
+        holder: { kind: "hold", userId: "leaver", expiresAt: heldUntil },
+        seat: "full",
+      };
+      const org = organization({ opening: [...fullMembers(9), member("leaver", "full")] });
+      org.seatsNow([...fullMembers(9), held]);
+
+      await org.service.correctMember({
+        organizationId: ORG,
+        userId: "leaver",
+        source: source("removed"),
+      });
+
+      expect(org.sent).toMatchObject([
+        { holder: { kind: "member", userId: "leaver" }, from: "full", to: "none" },
+        {
+          holder: { kind: "hold", userId: "leaver", expiresAt: heldUntil },
+          from: "none",
+          to: "full",
+        },
+      ]);
+      expect(org.counts().full).toBe(10);
+      expect(org.month()?.fullPeak).toBe(10);
+    });
+
+    it("moves the held seat back onto the person who returns, giving the hold up first", async () => {
+      const heldUntil = LATER + 30 * 24 * 60 * 60 * 1000;
+      const held: OrganizationSeatHolding = {
+        holder: { kind: "hold", userId: "back", expiresAt: heldUntil },
+        seat: "full",
+      };
+      const org = organization({ opening: [...fullMembers(9), held] });
+      org.seatsNow([...fullMembers(9), member("back", "full")]);
+
+      await org.service.correctMember({
+        organizationId: ORG,
+        userId: "back",
+        source: source("directory_created"),
+      });
+
+      expect(org.sent.map(({ holder, to }) => [holder.kind, to])).toEqual([
+        ["hold", "none"],
+        ["member", "full"],
+      ]);
+      expect(org.month()?.fullPeak).toBe(10);
     });
   });
 

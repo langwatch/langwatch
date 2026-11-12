@@ -21,6 +21,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
+  type CountedSeatHold,
   type OrganizationSeatHolding,
   OrganizationSeatRepository,
   type SeatLease,
@@ -82,6 +83,18 @@ class DelayedCountSeatRepository extends OrganizationSeatRepository {
 
   findMemberSeat(input: { organizationId: string; userId: string }): Promise<MemberType | null> {
     return this.inner.findMemberSeat(input);
+  }
+
+  findCountedHold(input: {
+    organizationId: string;
+    userId: string;
+    ignoringInviteId?: string;
+  }): Promise<CountedSeatHold[]> {
+    return this.inner.findCountedHold(input);
+  }
+
+  findHoldUserIdsByEmail(input: { organizationId: string; email: string }): Promise<string[]> {
+    return this.inner.findHoldUserIdsByEmail(input);
   }
 
   findInvitationSeat(input: {

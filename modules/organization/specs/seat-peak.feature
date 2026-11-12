@@ -2,8 +2,8 @@ Feature: The most seats an organization held at once in a month
 
   A seat frees the moment its holder leaves, so one seat can be passed round many people.
   Our team needs to see, at renewal, the most full and Lite Member seats an organization held
-  at once in each calendar month, not only how many it holds today. A pending invitation holds
-  its seat, as it does for the cap. The decision is ADR-002 (../adrs/002-seat-peak-from-seat-transitions.md).
+  at once in each calendar month, not only how many it holds today. A pending invitation and a
+  seat held for 30 days after somebody leaves both count, as they do for the cap. The decision is ADR-002 (../adrs/002-seat-peak-from-seat-transitions.md).
 
   Background:
     Given an organization whose seats were counted when seat counting started
@@ -63,6 +63,42 @@ Feature: The most seats an organization held at once in a month
       Given the organization holds 10 full seats
       When an admin makes a member an admin
       Then the month's full seat peak is 10
+
+  Rule: a held seat counts until its hold ends, as it does for the cap
+
+    @unit
+    Scenario: A removed member's held seat keeps counting toward the peak
+      Given the organization holds 10 full seats
+      When an admin removes a full member, whose seat is held for 30 days
+      And an admin adds a full member
+      Then the organization holds 11 full seats
+      And the month's full seat peak is 11
+
+    @unit
+    Scenario: A held seat is given back from the moment its hold ends
+      Given the organization holds 9 full seats and a seat held until yesterday
+      When an admin adds a full member today
+      Then the month's full seat peak is 10
+
+    @unit
+    Scenario: A person back within their hold takes their held seat, not a second one
+      Given the organization holds 9 full seats and a seat held for a removed person
+      When the person is admitted again
+      Then the organization holds 10 full seats
+      And the month's full seat peak is 10
+
+    @unit
+    Scenario: A full invitation to a held person's address takes the hold's place
+      Given a seat held for a removed person
+      When an admin invites the same address to a full seat
+      Then the hold no longer counts toward the full seats
+      And it counts again once the invitation is revoked
+
+    @unit
+    Scenario: The opening count includes the seats held for people who left
+      Given an organization with 2 full members and a seat held for a removed person
+      When counting opens
+      Then the opening count holds 3 full seats
 
   Rule: every way a seat is taken or given back is counted
 

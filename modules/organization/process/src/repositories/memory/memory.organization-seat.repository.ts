@@ -14,6 +14,7 @@ import { z } from "zod";
 
 import { seatKindOf } from "../../rules/seat-change.rules.ts";
 import {
+  type CountedSeatHold,
   type OrganizationSeatHolding,
   OrganizationSeatRepository,
   type SeatLease,
@@ -155,10 +156,25 @@ export class MemoryOrganizationSeatRepository extends OrganizationSeatRepository
   }
 
   async countMemberSeats(organizationId: string): Promise<OrganizationMemberSeats> {
+    return {
+      fullMembers:
+        this.#count(organizationId, isFullMember) + this.#countedHolds({ organizationId }).length,
+      liteMembers: this.#count(organizationId, isLiteMember),
+      developers: this.#count(organizationId, isDeveloper),
+    };
+  }
+
+  /** A full seat stays counted until its hold ends, unless its person holds a full seat again. */
+  #countedHolds({
+    organizationId,
+    ignoringInviteId,
+  }: {
+    organizationId: string;
+    ignoringInviteId?: string;
+  }): MemoryOrganizationDatabase["seatHolds"] {
     const fullUserIds = new Set(
       this.#members(organizationId, isFullMember).map((member) => member.userId),
     );
-    // A full seat stays counted until its hold ends, unless a live full invitation takes it back.
     const now = nowInstant();
     const permissionsOf = this.#permissionsOf(organizationId);
     const invitedEmails = new Set(
@@ -166,23 +182,51 @@ export class MemoryOrganizationSeatRepository extends OrganizationSeatRepository
         .filter(
           (invite) =>
             invite.organizationId === organizationId &&
+            invite.id !== ignoringInviteId &&
             isLive(invite, now) &&
             inviteHoldsSeat(invite, permissionsOf, isFullMember),
         )
         .map((invite) => invite.email.toLowerCase()),
     );
-    const heldFullMembers = this.memory.seatHolds.filter(
+    return this.memory.seatHolds.filter(
       (hold) =>
         hold.organizationId === organizationId &&
         Temporal.Instant.compare(hold.heldUntil, now) > 0 &&
         !fullUserIds.has(hold.userId) &&
         !(hold.email && invitedEmails.has(hold.email.toLowerCase())),
-    ).length;
-    return {
-      fullMembers: this.#count(organizationId, isFullMember) + heldFullMembers,
-      liteMembers: this.#count(organizationId, isLiteMember),
-      developers: this.#count(organizationId, isDeveloper),
-    };
+    );
+  }
+
+  async findCountedHold({
+    organizationId,
+    userId,
+    ignoringInviteId,
+  }: {
+    organizationId: string;
+    userId: string;
+    ignoringInviteId?: string;
+  }): Promise<CountedSeatHold[]> {
+    return this.#countedHolds({ organizationId, ignoringInviteId })
+      .filter((hold) => hold.userId === userId)
+      .map((hold) => ({ userId, heldUntil: hold.heldUntil.epochMilliseconds }));
+  }
+
+  async findHoldUserIdsByEmail({
+    organizationId,
+    email,
+  }: {
+    organizationId: string;
+    email: string;
+  }): Promise<string[]> {
+    const now = nowInstant();
+    return this.memory.seatHolds
+      .filter(
+        (hold) =>
+          hold.organizationId === organizationId &&
+          hold.email?.toLowerCase() === email.toLowerCase() &&
+          Temporal.Instant.compare(hold.heldUntil, now) > 0,
+      )
+      .map((hold) => hold.userId);
   }
 
   async findFullSeatHolderIds(organizationId: string): Promise<string[]> {
@@ -193,6 +237,14 @@ export class MemoryOrganizationSeatRepository extends OrganizationSeatRepository
     const permissionsOf = this.#permissionsOf(organizationId);
     const now = nowInstant();
     return [
+      ...this.#countedHolds({ organizationId }).map((hold) => ({
+        holder: {
+          kind: "hold" as const,
+          userId: hold.userId,
+          expiresAt: hold.heldUntil.epochMilliseconds,
+        },
+        seat: "full" as const,
+      })),
       ...this.memory.organizationUsers
         .filter(
           (member) =>

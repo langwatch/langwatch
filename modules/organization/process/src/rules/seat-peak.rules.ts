@@ -9,7 +9,12 @@ import type {
   RecordSeatChangedCommandData,
   RecordSeatSnapshotCommandData,
 } from "../eventing/seat-peak.events.ts";
-import { type SeatHolder, type SeatKind, seatKindSchema } from "./seat-holder.rules.ts";
+import {
+  type SeatHolder,
+  seatHolderId,
+  type SeatKind,
+  seatKindSchema,
+} from "./seat-holder.rules.ts";
 
 export const seatCountsSchema = z.object({
   full: z.number().int().nonnegative(),
@@ -61,6 +66,8 @@ export const seatPeakStateSchema = z.object({
   members: z.record(z.string(), seatPeakMemberSchema),
   /** The loaded invitations' seats and expiries, by inviteId. */
   invitations: z.record(z.string(), seatPeakInvitationSchema),
+  /** The loaded seat holds' seats and ends, by userId; a hold expires as an invitation does. */
+  holds: z.record(z.string(), seatPeakInvitationSchema),
   /** Keyed `YYYY-MM`, only the months an event touched; a read fills the gaps. */
   months: z.record(z.string(), seatPeakMonthSchema),
   /** Changes whose `from` disagreed with the seat the fold held: drift made visible. */
@@ -81,9 +88,36 @@ export function emptySeatPeak(): SeatPeakState {
     latestChangeAt: Number.NEGATIVE_INFINITY,
     members: {},
     invitations: {},
+    holds: {},
     months: {},
     mismatches: 0,
   };
+}
+
+/** The holders that expire on their own: pending invitations and seat holds. */
+type ExpiringKind = "invitation" | "hold";
+const EXPIRING_KINDS = ["invitation", "hold"] as const satisfies readonly ExpiringKind[];
+
+function expiringOf({
+  state,
+  kind,
+}: {
+  state: SeatPeakState;
+  kind: ExpiringKind;
+}): Record<string, SeatPeakInvitation> {
+  return kind === "invitation" ? state.invitations : state.holds;
+}
+
+function withExpiring({
+  state,
+  kind,
+  entries,
+}: {
+  state: SeatPeakState;
+  kind: ExpiringKind;
+  entries: Record<string, SeatPeakInvitation>;
+}): SeatPeakState {
+  return kind === "invitation" ? { ...state, invitations: entries } : { ...state, holds: entries };
 }
 
 /** The UTC calendar month an instant falls in, as `YYYY-MM`. */
@@ -151,7 +185,10 @@ function isStale({
   return holding.lastChangeId === undefined || change.changeId <= holding.lastChangeId;
 }
 
-/** Gives back the seats of invitations that expired strictly before `until`, in expiry order. */
+/**
+ * Gives back the seats of invitations and seat holds that expired strictly before `until`, in
+ * expiry order.
+ */
 export function expireInvitations({
   state,
   until,
@@ -159,23 +196,24 @@ export function expireInvitations({
   state: SeatPeakState;
   until: number;
 }): SeatPeakState {
-  const expired = Object.entries(state.invitations)
+  const expired = EXPIRING_KINDS.flatMap((kind) =>
+    Object.entries(expiringOf({ state, kind })).map(([id, holding]) => ({ kind, id, holding })),
+  )
     .filter(
-      ([, invitation]) =>
-        invitation.seat !== "none" && invitation.expiresAt !== null && invitation.expiresAt < until,
+      ({ holding }) =>
+        holding.seat !== "none" && holding.expiresAt !== null && holding.expiresAt < until,
     )
-    .toSorted(([, a], [, b]) => (a.expiresAt ?? 0) - (b.expiresAt ?? 0));
+    .toSorted((a, b) => (a.holding.expiresAt ?? 0) - (b.holding.expiresAt ?? 0));
   let next = state;
-  for (const [inviteId, invitation] of expired) {
-    const at = invitation.expiresAt ?? until;
-    const invitations = {
-      ...next.invitations,
-      [inviteId]: { ...invitation, seat: "none" as const, expiredByFold: true },
+  for (const { kind, id, holding } of expired) {
+    const entries = {
+      ...expiringOf({ state: next, kind }),
+      [id]: { ...holding, seat: "none" as const, expiredByFold: true },
     };
     next = record({
-      state: { ...next, invitations },
-      counts: adjust({ counts: next.counts, seat: invitation.seat, by: -1 }),
-      at,
+      state: withExpiring({ state: next, kind, entries }),
+      counts: adjust({ counts: next.counts, seat: holding.seat, by: -1 }),
+      at: holding.expiresAt ?? until,
     });
   }
   return next;
@@ -189,16 +227,23 @@ function openSnapshot({
   snapshot: RecordSeatSnapshotCommandData;
 }): SeatPeakState {
   const members: SeatPeakState["members"] = {};
-  const invitations: Record<string, SeatPeakInvitation> = {};
+  const expiring = { invitation: {}, hold: {} } as Record<
+    ExpiringKind,
+    Record<string, SeatPeakInvitation>
+  >;
   let counts: SeatCounts = { full: 0, lite: 0, developer: 0 };
   const lastChangedAt = snapshot.occurredAt;
   for (const { holder, seat } of snapshot.holders) {
     if (seat === "none") continue;
-    if (holder.kind === "invitation") {
-      if (holder.expiresAt !== null && holder.expiresAt < snapshot.occurredAt) continue;
-      invitations[holder.inviteId] = { seat, expiresAt: holder.expiresAt, lastChangedAt };
-    } else {
+    if (holder.kind === "member") {
       members[holder.userId] = { seat, lastChangedAt };
+    } else {
+      if (holder.expiresAt !== null && holder.expiresAt < snapshot.occurredAt) continue;
+      expiring[holder.kind][seatHolderId(holder)] = {
+        seat,
+        expiresAt: holder.expiresAt,
+        lastChangedAt,
+      };
     }
     counts = adjust({ counts, seat, by: 1 });
   }
@@ -208,7 +253,8 @@ function openSnapshot({
       openedAt: snapshot.occurredAt,
       latestChangeAt: snapshot.occurredAt,
       members,
-      invitations,
+      invitations: expiring.invitation,
+      holds: expiring.hold,
     },
     counts,
     at: snapshot.occurredAt,
@@ -223,8 +269,8 @@ function moveHolder({
   change: RecordSeatChangedCommandData;
 }): SeatPeakState {
   const held = heldSeat({ state, holder: change.holder });
-  if (change.from === change.to && held === change.to && change.holder.kind === "invitation") {
-    // An extended invitation keeps its seat; only its expiry moves.
+  if (change.from === change.to && held === change.to && change.holder.kind !== "member") {
+    // An extended invitation or hold keeps its seat; only its expiry moves.
     return withHolder({ state, change });
   }
   const agrees = held === change.from || inferredExpiry({ state, holder: change.holder });
@@ -238,7 +284,7 @@ function moveHolder({
     state: { ...withHolder({ state, change }), mismatches },
     counts,
     at: change.occurredAt,
-    heldUntil: change.holder.kind === "invitation" ? change.holder.expiresAt : null,
+    heldUntil: change.holder.kind === "member" ? null : change.holder.expiresAt,
   });
 }
 
@@ -247,11 +293,12 @@ const UNSEEN = { seat: "none", lastChangedAt: Number.NEGATIVE_INFINITY } as cons
 
 function holdingOf({ state, holder }: { state: SeatPeakState; holder: SeatHolder }): Holding {
   if (holder.kind === "member") return state.members[holder.userId] ?? UNSEEN;
-  return state.invitations[holder.inviteId] ?? UNSEEN;
+  return expiringOf({ state, kind: holder.kind })[seatHolderId(holder)] ?? UNSEEN;
 }
 
 function inferredExpiry({ state, holder }: { state: SeatPeakState; holder: SeatHolder }): boolean {
-  return holder.kind === "invitation" && state.invitations[holder.inviteId]?.expiredByFold === true;
+  if (holder.kind === "member") return false;
+  return expiringOf({ state, kind: holder.kind })[seatHolderId(holder)]?.expiredByFold === true;
 }
 
 function heldSeat({ state, holder }: { state: SeatPeakState; holder: SeatHolder }): SeatKind {
@@ -270,8 +317,11 @@ function withHolder({
   if (holder.kind === "member") {
     return { ...state, members: { ...state.members, [holder.userId]: holding } };
   }
-  const invitation = { ...holding, expiresAt: holder.expiresAt };
-  return { ...state, invitations: { ...state.invitations, [holder.inviteId]: invitation } };
+  const entries = {
+    ...expiringOf({ state, kind: holder.kind }),
+    [seatHolderId(holder)]: { ...holding, expiresAt: holder.expiresAt },
+  };
+  return withExpiring({ state, kind: holder.kind, entries });
 }
 
 function adjust({
@@ -386,8 +436,9 @@ export interface SeatPeakMonthRead extends SeatPeakMonth {
 }
 
 /**
- * The state as of `now`: invitations expired by then give back their seats, and every month from
- * the opening to `now` is present, a month nobody touched carrying the count it began with.
+ * The state as of `now`: invitations and holds expired by then give back their seats, and every
+ * month from the opening to `now` is present, a month nobody touched carrying the count it began
+ * with.
  */
 export function seatPeakAsOf({ state, now }: { state: SeatPeakState; now: number }): Readonly<{
   counts: SeatCounts;

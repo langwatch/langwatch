@@ -18,10 +18,10 @@ export type SeatPeakCountsRow = Readonly<{
   mismatches: number;
 }>;
 
-/** One holder's row; an invitation carries its expiry, a member carries none. */
+/** One holder's row; an invitation or a hold carries its expiry, a member carries none. */
 export type SeatPeakHolderRow =
   | Readonly<{ kind: "member"; holderId: string; holding: SeatPeakMember }>
-  | Readonly<{ kind: "invitation"; holderId: string; holding: SeatPeakInvitation }>;
+  | Readonly<{ kind: "invitation" | "hold"; holderId: string; holding: SeatPeakInvitation }>;
 
 export type SeatPeakWrites = Readonly<{
   /** Null when the counts row did not move, or counting has not opened. */
@@ -50,6 +50,10 @@ export function seatPeakWrites({
     ...Object.entries(after.invitations).map(([holderId, holding]) => ({
       row: { kind: "invitation" as const, holderId, holding },
       was: before.invitations[holderId],
+    })),
+    ...Object.entries(after.holds).map(([holderId, holding]) => ({
+      row: { kind: "hold" as const, holderId, holding },
+      was: before.holds[holderId],
     })),
   ];
   const months = Object.entries(after.months)

@@ -66,6 +66,11 @@ describe("InviteService resilience", () => {
         update: vi.fn(),
         updateMany: vi.fn(),
       },
+      // Nobody here holds a seat hold (seat-rotation.feature).
+      seatHold: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        findMany: vi.fn().mockResolvedValue([]),
+      },
       // The acceptance claim and the revoke are SQL; the resend and extend
       // claims still go through `updateMany`.
       $executeRaw: vi.fn(),

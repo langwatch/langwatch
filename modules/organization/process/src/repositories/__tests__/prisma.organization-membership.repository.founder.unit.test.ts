@@ -33,6 +33,7 @@ function founderRepository({ attach }: { attach: () => Promise<never> }) {
       update: vi.fn(async (args: { data: unknown }) => void enabled.push(args.data)),
       findFirst: vi.fn(async () => null),
     },
+    seatHold: { findFirst: vi.fn(async () => null) },
     team: {
       create: vi.fn(async () => ({ id: FOUNDER.teamId, slug: FOUNDER.teamSlug, name: "Acme" })),
     },

@@ -1929,13 +1929,20 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     since: Instant;
     holdUserIds: readonly string[];
   }): Promise<void> {
+    const userIds = [userId, ...holdUserIds];
     await this.prisma.$transaction(async (tx) => {
       await tx.organizationUser.updateMany({
         where: { organizationId, userId },
         data: { fullSeatSince: toDate(since) },
       });
-      await tx.seatHold.deleteMany({
-        where: { organizationId, userId: { in: [userId, ...holdUserIds] } },
+      // A hold another account of theirs kept is taken back with the seat.
+      await this.seatChanges.movingHolds({
+        transaction: tx,
+        organizationId,
+        userIds,
+        cause: "invitation_accepted",
+        actorUserId: null,
+        write: () => tx.seatHold.deleteMany({ where: { organizationId, userId: { in: userIds } } }),
       });
     });
   }
@@ -2011,9 +2018,12 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         userId,
         cause: "removed",
         actorUserId: actingUserId ?? null,
-        write: () => this.deleteMembershipRow({ tx, organizationId, userId }),
+        // The hold is written with the removal, so its seat replaces theirs without a peak.
+        write: async () => {
+          await this.deleteMembershipRow({ tx, organizationId, userId });
+          if (input.seatHold) await writeSeatHold({ tx, hold: input.seatHold });
+        },
       });
-      if (input.seatHold) await writeSeatHold({ tx, hold: input.seatHold });
       // As main's offboard: a kept group or team row would hand the access back on a rejoin.
       await tx.groupMembership.deleteMany({ where: { userId, group: { organizationId } } });
       await tx.teamUser.deleteMany({ where: { userId, team: { organizationId } } });
@@ -2148,16 +2158,16 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
 
   async admitWaitingMember(input: AdmitWaitingMemberInput): Promise<boolean> {
     const { organizationId, userId, pendingAdmissionId, seat } = input;
-    return this.prisma.$transaction(async (tx) => {
-      // A held admission's release takes the seat it waited for.
-      const admitted = await this.seatChanges.movingMember({
+    return this.prisma.$transaction((tx) =>
+      // A held admission's release takes the seat it waited for, its hold's included.
+      this.seatChanges.movingMember({
         transaction: tx,
         organizationId,
         userId,
         cause: "enabled",
         actorUserId: input.actorUserId ?? null,
-        write: () =>
-          tx.organizationUser.updateMany({
+        write: async () => {
+          const admitted = await tx.organizationUser.updateMany({
             where: {
               organizationId,
               userId,
@@ -2170,18 +2180,19 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
               seatPendingSince: null,
               pendingSsoGrantId: pendingAdmissionId,
             },
-          }),
-      });
-      if (admitted.count === 0) return false;
-      const seatColumns = await applySeatTransition({ tx, organizationId, userId, seat });
-      if ("fullSeatSince" in seatColumns) {
-        await tx.organizationUser.update({
-          where: { userId_organizationId: { userId, organizationId } },
-          data: seatColumns,
-        });
-      }
-      return true;
-    });
+          });
+          if (admitted.count === 0) return false;
+          const seatColumns = await applySeatTransition({ tx, organizationId, userId, seat });
+          if ("fullSeatSince" in seatColumns) {
+            await tx.organizationUser.update({
+              where: { userId_organizationId: { userId, organizationId } },
+              data: seatColumns,
+            });
+          }
+          return true;
+        },
+      }),
+    );
   }
 
   async setMemberDisabled(input: SetMemberDisabledInput): Promise<void> {
@@ -2199,13 +2210,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
 
       if (disabled) await assertDisableKeepsAnAdmin({ tx, organizationId, role: member.role });
 
-      const seatColumns = await applySeatTransition({
-        tx,
-        organizationId,
-        userId,
-        seat: input.seat,
-      });
-      // Disabling gives the seat back; re-enabling takes it.
+      // Disabling gives the seat back (to a hold, if one keeps it); re-enabling takes it.
       await this.seatChanges.movingMember({
         transaction: tx,
         organizationId,
@@ -2213,15 +2218,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         cause: disabled ? "disabled" : "enabled",
         actorUserId: input.actorUserId ?? null,
         write: () =>
-          tx.organizationUser.update({
-            where: { userId_organizationId: { userId, organizationId } },
-            data: {
-              disabledAt: disabled ? new Date() : null,
-              // Enabled is admitted: nobody waits on a seat they hold.
-              ...(disabled ? {} : { seatPendingSince: null }),
-              ...seatColumns,
-            },
-          }),
+          writeMemberDisabled({ tx, organizationId, userId, disabled, seat: input.seat }),
       });
     });
   }
@@ -2267,28 +2264,25 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
             where: { organizationId_userId: { organizationId, userId } },
           })
         : null;
-      const seatColumns = await applySeatTransition({
-        tx,
-        organizationId,
-        userId,
-        seat: input.seat,
-      });
-      await this.seatChanges.movingMember({
+      const seatColumns = await this.seatChanges.movingMember({
         transaction: tx,
         organizationId,
         userId,
         cause: "role_changed",
         actorUserId: input.currentUserId ?? null,
-        write: () =>
-          tx.organizationUser.update({
-            where: {
-              userId_organizationId: {
-                userId,
-                organizationId,
-              },
-            },
-            data: { role, ...seatColumns },
-          }),
+        write: async () => {
+          const columns = await applySeatTransition({
+            tx,
+            organizationId,
+            userId,
+            seat: input.seat,
+          });
+          await tx.organizationUser.update({
+            where: { userId_organizationId: { userId, organizationId } },
+            data: { role, ...columns },
+          });
+          return columns;
+        },
       });
 
       plans.push(await planOrganizationSeatBinding({ tx, organizationId, userId, role }));
@@ -2426,15 +2420,15 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     const seatMoved = "fullSeatSince" in previous.seatColumns;
     if (previous.role === role && !seatMoved) return;
     await this.prisma.$transaction(async (tx) => {
-      // The seat goes back with the role, so the change recorded with it is undone too.
-      const restored = await this.seatChanges.movingMember({
+      // The seat and its hold go back with the role, so the changes recorded with them are undone.
+      await this.seatChanges.movingMember({
         transaction: tx,
         organizationId,
         userId,
         cause: "role_changed",
         actorUserId,
-        write: () =>
-          tx.organizationUser.updateMany({
+        write: async () => {
+          const restored = await tx.organizationUser.updateMany({
             where: {
               organizationId,
               userId,
@@ -2445,11 +2439,12 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
               role: previous.role,
               ...(seatMoved ? { fullSeatSince: previous.fullSeatSince } : {}),
             },
-          }),
+          });
+          if (restored.count === 0 || !seatMoved) return;
+          await tx.seatHold.deleteMany({ where: { organizationId, userId } });
+          if (previous.hold) await tx.seatHold.create({ data: previous.hold });
+        },
       });
-      if (restored.count === 0 || !seatMoved) return;
-      await tx.seatHold.deleteMany({ where: { organizationId, userId } });
-      if (previous.hold) await tx.seatHold.create({ data: previous.hold });
     });
   }
 
@@ -2690,6 +2685,32 @@ async function writeSeatHold({
   });
 }
 
+/** The disabled flag and the seat transition it carries, written together. */
+async function writeMemberDisabled({
+  tx,
+  organizationId,
+  userId,
+  disabled,
+  seat,
+}: {
+  tx: Prisma.TransactionClient;
+  organizationId: string;
+  userId: string;
+  disabled: boolean;
+  seat: SeatTransition | undefined;
+}): Promise<void> {
+  const seatColumns = await applySeatTransition({ tx, organizationId, userId, seat });
+  await tx.organizationUser.update({
+    where: { userId_organizationId: { userId, organizationId } },
+    data: {
+      disabledAt: disabled ? new Date() : null,
+      // Enabled is admitted: nobody waits on a seat they hold.
+      ...(disabled ? {} : { seatPendingSince: null }),
+      ...seatColumns,
+    },
+  });
+}
+
 /** Applies a seat transition and answers the membership columns it sets. */
 async function applySeatTransition({
   tx,
@@ -2747,8 +2768,8 @@ async function writeAdmission({
     userId,
     cause: "admitted",
     actorUserId: input.actorUserId ?? null,
-    write: () =>
-      tx.organizationUser.create({
+    write: async () => {
+      await tx.organizationUser.create({
         data: {
           userId,
           organizationId,
@@ -2758,9 +2779,11 @@ async function writeAdmission({
           fullSeatSince: seatTakenAt ? toDate(seatTakenAt) : null,
           pendingSsoGrantId: seat === "DEVELOPER" || pending ? null : input.pendingAdmissionId,
         },
-      }),
+      });
+      // A person back within their hold takes the held seat, not a second one.
+      if (seatTakenAt) await tx.seatHold.deleteMany({ where: { organizationId, userId } });
+    },
   });
-  if (seatTakenAt) await tx.seatHold.deleteMany({ where: { organizationId, userId } });
   // A Developer gets no grant, so its admission is audited here (ADR-171).
   if (seat !== "DEVELOPER") return;
   await audit.append({

@@ -1,5 +1,6 @@
 import {
   classifyMemberType,
+  countedSeatHolds,
   countMemberSeats,
   isFullMember,
   type MemberType,
@@ -28,6 +29,7 @@ import { z } from "zod";
 
 import { seatKindOf } from "../../rules/seat-change.rules.ts";
 import {
+  type CountedSeatHold,
   type OrganizationSeatHolding,
   OrganizationSeatRepository,
   type SeatLease,
@@ -244,7 +246,33 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
   /** Every holder classified by the rule the counts above use, so the two cannot disagree. */
   async findSeatHolders(organizationId: string): Promise<OrganizationSeatHolding[]> {
     const context = await this.getMemberClassificationContext(organizationId);
+    const holds = countedSeatHolds({
+      holders: [
+        ...context.users.map((user) => ({
+          role: user.role,
+          permissions: context.userPermissionsMap.get(user.userId),
+          userId: user.userId,
+        })),
+        ...context.pendingInvites.map((invite) => ({
+          role: invite.role,
+          email: invite.email,
+          permissions: this.getInvitePermissions(invite.teamAssignments, context.customRoleMap),
+        })),
+      ],
+      holds: await this.prisma.seatHold.findMany({
+        where: { organizationId, heldUntil: { gt: new Date() } },
+        select: { userId: true, email: true, heldUntil: true },
+      }),
+    });
     return [
+      ...holds.map((hold) => ({
+        holder: {
+          kind: "hold" as const,
+          userId: hold.userId,
+          expiresAt: fromDate(hold.heldUntil).epochMilliseconds,
+        },
+        seat: "full" as const,
+      })),
       ...context.users.map((user) => ({
         holder: { kind: "member" as const, userId: user.userId },
         seat: seatKindOf(
@@ -285,6 +313,58 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
       await this.getCustomRoleMap(organizationId),
     );
     return classifyMemberType(user.role, permissions.get(userId));
+  }
+
+  /** The person's live hold, unless they hold a full seat again as a member or by invitation. */
+  async findCountedHold({
+    organizationId,
+    userId,
+    ignoringInviteId,
+  }: {
+    organizationId: string;
+    userId: string;
+    ignoringInviteId?: string;
+  }): Promise<CountedSeatHold[]> {
+    const hold = await this.prisma.seatHold.findFirst({
+      where: { organizationId, userId, heldUntil: { gt: new Date() } },
+      select: { email: true, heldUntil: true },
+    });
+    if (hold === null) return [];
+    if ((await this.findMemberSeat({ organizationId, userId })) === "FullMember") return [];
+    const invites = hold.email
+      ? await this.prisma.organizationInvite.findMany({
+          where: {
+            organizationId,
+            email: { equals: hold.email, mode: "insensitive" },
+            ...(ignoringInviteId === undefined ? {} : { id: { not: ignoringInviteId } }),
+            ...seatHoldingInvitation(),
+          },
+          select: { id: true },
+        })
+      : [];
+    for (const invite of invites) {
+      const seat = await this.findInvitationSeat({ organizationId, inviteId: invite.id });
+      if (seat === "FullMember") return [];
+    }
+    return [{ userId, heldUntil: fromDate(hold.heldUntil).epochMilliseconds }];
+  }
+
+  async findHoldUserIdsByEmail({
+    organizationId,
+    email,
+  }: {
+    organizationId: string;
+    email: string;
+  }): Promise<string[]> {
+    const holds = await this.prisma.seatHold.findMany({
+      where: {
+        organizationId,
+        email: { equals: email, mode: "insensitive" },
+        heldUntil: { gt: new Date() },
+      },
+      select: { userId: true },
+    });
+    return holds.map((hold) => hold.userId);
   }
 
   /** One invitation's seat by the rule the count uses; null when it holds none. */

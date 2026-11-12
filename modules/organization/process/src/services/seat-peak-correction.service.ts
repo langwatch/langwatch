@@ -7,13 +7,13 @@ import type {
 import type { OrganizationSeatPeakRepository } from "../repositories/organization-seat-peak.repository.ts";
 import type { OrganizationSeatRepository } from "../repositories/organization-seat.repository.ts";
 import { organizationSeatCorrections, seatKindOf } from "../rules/seat-change.rules.ts";
-import type { SeatHolder, SeatKind } from "../rules/seat-holder.rules.ts";
+import { type SeatHolder, seatHolderId, type SeatKind } from "../rules/seat-holder.rules.ts";
 import type { SeatPeakState } from "../rules/seat-peak.rules.ts";
 
 type SeatChangeSender = Pick<EventingCommandSender<RecordSeatChangedCommandData>, "send">;
 
 type SeatPeakCorrectionDependencies = Readonly<{
-  seats: Pick<OrganizationSeatRepository, "findSeatHolders" | "findMemberSeat">;
+  seats: Pick<OrganizationSeatRepository, "findSeatHolders" | "findMemberSeat" | "findCountedHold">;
   peaks: Pick<OrganizationSeatPeakRepository, "getState">;
   /** The organizations a person holds an active membership in. */
   organizationIdsForMember: (input: { userId: string }) => Promise<string[]>;
@@ -51,7 +51,10 @@ export class SeatPeakCorrectionService {
   }): Promise<void> {
     const state = await this.dependencies.peaks.getState({
       organizationId,
-      holders: [{ kind: "member", userId }],
+      holders: [
+        { kind: "member", userId },
+        { kind: "hold", userId, expiresAt: 0 },
+      ],
       dueBefore: 0,
     });
     // Counting has not started: the opening snapshot reads every seat as it stands.
@@ -59,13 +62,43 @@ export class SeatPeakCorrectionService {
     const live = seatKindOf(
       await this.dependencies.seats.findMemberSeat({ organizationId, userId }),
     );
-    await this.#record({
-      organizationId,
-      holder: { kind: "member", userId },
-      from: recordedSeat({ state, holder: { kind: "member", userId } }),
-      to: live,
-      source,
-    });
+    const changes = [
+      {
+        holder: { kind: "member", userId } as const,
+        from: recordedSeat({ state, holder: { kind: "member", userId } }),
+        to: live,
+      },
+      ...(await this.#holdCorrection({ organizationId, userId, state })),
+    ];
+    // A seat given back goes first, so a hold replacing a seat never raises the peak.
+    for (const change of changes.toSorted(
+      (a, b) => Number(a.to !== "none") - Number(b.to !== "none"),
+    )) {
+      await this.#record({ organizationId, ...change, source });
+    }
+  }
+
+  /** A seat kept by a hold moves with its person: a departure outside organization's writes. */
+  async #holdCorrection({
+    organizationId,
+    userId,
+    state,
+  }: {
+    organizationId: string;
+    userId: string;
+    state: SeatPeakState;
+  }): Promise<{ holder: SeatHolder; from: SeatKind; to: SeatKind }[]> {
+    const [hold] = await this.dependencies.seats.findCountedHold({ organizationId, userId });
+    const recorded = state.holds[userId];
+    if (hold === undefined && recorded?.seat !== "full") return [];
+    const expiresAt = hold?.heldUntil ?? recorded?.expiresAt ?? 0;
+    return [
+      {
+        holder: { kind: "hold", userId, expiresAt },
+        from: recorded?.seat ?? "none",
+        to: hold ? "full" : "none",
+      },
+    ];
   }
 
   /**
@@ -159,7 +192,7 @@ export class SeatPeakCorrectionService {
     to: SeatKind;
     source: CorrectionSource;
   }): Promise<void> {
-    const holderKey = holder.kind === "member" ? holder.userId : holder.inviteId;
+    const holderKey = `${holder.kind === "hold" ? "hold:" : ""}${seatHolderId(holder)}`;
     await this.dependencies.changes().send({
       tenantId: organizationId,
       organizationId,
@@ -176,5 +209,6 @@ export class SeatPeakCorrectionService {
 
 function recordedSeat({ state, holder }: { state: SeatPeakState; holder: SeatHolder }): SeatKind {
   if (holder.kind === "member") return state.members[holder.userId]?.seat ?? "none";
+  if (holder.kind === "hold") return state.holds[holder.userId]?.seat ?? "none";
   return state.invitations[holder.inviteId]?.seat ?? "none";
 }

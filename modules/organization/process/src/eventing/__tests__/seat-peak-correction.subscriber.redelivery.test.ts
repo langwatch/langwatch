@@ -44,7 +44,11 @@ function setup({ foldLags }: { foldLags: boolean }) {
     state = foldSeatPeak({ state, fact });
   };
   const corrections = SeatPeakCorrectionService.create({
-    seats: { findSeatHolders: async () => [], findMemberSeat: async () => null },
+    seats: {
+      findSeatHolders: async () => [],
+      findMemberSeat: async () => null,
+      findCountedHold: async () => [],
+    },
     peaks: { getState: async () => state },
     organizationIdsForMember: async () => [ORG],
     changes: () => ({

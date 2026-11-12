@@ -60,6 +60,7 @@ function setup({
         throw new Error("a directory create reads the one member, not the whole organization");
       },
       findMemberSeat: async () => live,
+      findCountedHold: async () => [],
     },
     peaks: { getState: async () => state },
     organizationIdsForMember: async () => [ORG],

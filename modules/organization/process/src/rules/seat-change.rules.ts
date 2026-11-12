@@ -33,7 +33,10 @@ export function movesASeat({ from, to }: { from: SeatKind; to: SeatKind }): bool
 
 type HeldSeat = Readonly<{ holder: SeatHolder; seat: SeatKind }>;
 
-/** A live invitation whose expiry moved keeps its seat, but the fold must learn the new expiry. */
+/**
+ * A live invitation or hold whose expiry moved keeps its seat, but the fold must learn the new
+ * expiry.
+ */
 export function movesAnInvitationExpiry({
   before,
   after,
@@ -41,7 +44,7 @@ export function movesAnInvitationExpiry({
   before: HeldSeat;
   after: HeldSeat;
 }): boolean {
-  if (before.holder.kind !== "invitation" || after.holder.kind !== "invitation") return false;
+  if (before.holder.kind === "member" || after.holder.kind !== before.holder.kind) return false;
   if (before.seat !== after.seat || after.seat === "none") return false;
   return before.holder.expiresAt !== after.holder.expiresAt;
 }

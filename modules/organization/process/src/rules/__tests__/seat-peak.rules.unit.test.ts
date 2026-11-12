@@ -766,3 +766,85 @@ describe("seatPeakMonthOf", () => {
     expect(seatPeakMonthOf(at("2026-11-01T00:00:00Z"))).toBe("2026-11");
   });
 });
+
+function hold(userId: string, expiresAt: number): SeatHolder {
+  return { kind: "hold", userId, expiresAt };
+}
+
+const DEC_1 = at("2026-12-01T09:00:00Z");
+
+describe("given a held seat counts until its hold ends", () => {
+  /** @scenario "A removed member's held seat keeps counting toward the peak" */
+  it("moves the removed member's seat onto the hold, so the next joiner raises the peak", () => {
+    const state = foldAll([
+      snapshot({ occurredAt: NOV_1, full: 10 }),
+      change({ holder: member("full-0"), from: "full", to: "none", occurredAt: NOV_2 }),
+      change({ holder: hold("full-0", DEC_1), from: "none", to: "full", occurredAt: NOV_2 + 1 }),
+      change({ holder: member("joiner"), from: "none", to: "full", occurredAt: NOV_3 }),
+    ]);
+
+    expect(state.counts.full).toBe(11);
+    expect(novemberOf(state).fullPeak).toBe(11);
+  });
+
+  /** @scenario "A held seat is given back from the moment its hold ends" */
+  it("gives the held seat back at the hold's end, before the next change is folded", () => {
+    const state = foldAll([
+      snapshot({
+        occurredAt: NOV_1,
+        full: 9,
+        extra: [{ holder: hold("left", NOV_2), seat: "full" }],
+      }),
+      change({ holder: member("joiner"), from: "none", to: "full", occurredAt: NOV_3 }),
+    ]);
+
+    expect(state.holds).toEqual({
+      left: { seat: "none", expiresAt: NOV_2, lastChangedAt: NOV_1, expiredByFold: true },
+    });
+    expect(state.counts.full).toBe(10);
+    expect(novemberOf(state).fullPeak).toBe(10);
+  });
+
+  it("reads a hold ended since the last change as given back", () => {
+    const state = foldAll([
+      snapshot({
+        occurredAt: NOV_1,
+        full: 9,
+        extra: [{ holder: hold("left", NOV_2), seat: "full" }],
+      }),
+    ]);
+
+    expect(seatPeakAsOf({ state, now: NOV_3 }).counts.full).toBe(9);
+  });
+
+  /** @scenario "A person back within their hold takes their held seat, not a second one" */
+  it("moves the held seat back onto the member without raising the peak", () => {
+    const state = foldAll([
+      snapshot({
+        occurredAt: NOV_1,
+        full: 9,
+        extra: [{ holder: hold("back", DEC_1), seat: "full" }],
+      }),
+      change({ holder: hold("back", DEC_1), from: "full", to: "none", occurredAt: NOV_2 }),
+      change({ holder: member("back"), from: "none", to: "full", occurredAt: NOV_2 + 1 }),
+    ]);
+
+    expect(state.counts.full).toBe(10);
+    expect(novemberOf(state).fullPeak).toBe(10);
+  });
+
+  it("counts no mismatch when a hold the fold ended is given back by its writer", () => {
+    const state = foldAll([
+      snapshot({
+        occurredAt: NOV_1,
+        full: 9,
+        extra: [{ holder: hold("left", NOV_2), seat: "full" }],
+      }),
+      change({ holder: member("joiner"), from: "none", to: "full", occurredAt: NOV_3 }),
+      change({ holder: hold("left", NOV_2), from: "full", to: "none", occurredAt: NOV_3 + 1 }),
+    ]);
+
+    expect(state.mismatches).toBe(0);
+    expect(state.counts.full).toBe(10);
+  });
+});

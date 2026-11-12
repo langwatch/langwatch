@@ -1,7 +1,7 @@
 import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { type SeatKind, seatKindSchema } from "../../rules/seat-holder.rules.ts";
+import { seatHolderId, type SeatKind, seatKindSchema } from "../../rules/seat-holder.rules.ts";
 import { type SeatPeakHolderRow, seatPeakWrites } from "../../rules/seat-peak-writes.rules.ts";
 import { emptySeatPeak, type SeatPeakState } from "../../rules/seat-peak.rules.ts";
 import {
@@ -29,11 +29,7 @@ function holderWhere({
   if (holders === "seated") return { organizationId, seat: { not: "none" } };
   return {
     organizationId,
-    OR: holders.map((holder) =>
-      holder.kind === "member"
-        ? { holderKind: "member", holderId: holder.userId }
-        : { holderKind: "invitation", holderId: holder.inviteId },
-    ),
+    OR: holders.map((holder) => ({ holderKind: holder.kind, holderId: seatHolderId(holder) })),
   };
 }
 
@@ -42,8 +38,8 @@ function holderData(row: SeatPeakHolderRow) {
     seat: row.holding.seat,
     lastChangedAt: row.holding.lastChangedAt,
     lastChangeId: row.holding.lastChangeId ?? null,
-    expiresAt: row.kind === "invitation" ? row.holding.expiresAt : null,
-    expiredByFold: row.kind === "invitation" ? row.holding.expiredByFold === true : false,
+    expiresAt: row.kind === "member" ? null : row.holding.expiresAt,
+    expiredByFold: row.kind === "member" ? false : row.holding.expiredByFold === true,
   };
 }
 
@@ -104,7 +100,7 @@ export class PrismaOrganizationSeatPeakRepository extends OrganizationSeatPeakRe
     const due = await database.organizationSeatPeakHolder.findMany({
       where: {
         organizationId,
-        holderKind: "invitation",
+        holderKind: { in: ["invitation", "hold"] },
         seat: { not: "none" },
         expiresAt: { lt: Math.max(slice.dueBefore, counts.latestChangeAt) },
       },
@@ -117,6 +113,7 @@ export class PrismaOrganizationSeatPeakRepository extends OrganizationSeatPeakRe
       mismatches: counts.mismatches,
       members: {},
       invitations: {},
+      holds: {},
       months: Object.fromEntries(
         months.map(({ month, organizationId: _organizationId, ...values }) => [month, values]),
       ),
@@ -129,13 +126,15 @@ export class PrismaOrganizationSeatPeakRepository extends OrganizationSeatPeakRe
       };
       if (row.holderKind === "member") {
         state.members[row.holderId] = holding;
-      } else {
-        state.invitations[row.holderId] = {
-          ...holding,
-          expiresAt: row.expiresAt,
-          ...(row.expiredByFold ? { expiredByFold: true } : {}),
-        };
+        continue;
       }
+      const expiring = {
+        ...holding,
+        expiresAt: row.expiresAt,
+        ...(row.expiredByFold ? { expiredByFold: true } : {}),
+      };
+      if (row.holderKind === "hold") state.holds[row.holderId] = expiring;
+      else state.invitations[row.holderId] = expiring;
     }
     return state;
   }

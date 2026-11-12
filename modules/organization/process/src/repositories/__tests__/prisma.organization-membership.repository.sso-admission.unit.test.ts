@@ -24,6 +24,7 @@ const transactionClient = prismaDouble({
     findUnique: memberFindUnique,
     findFirst: async () => null,
   },
+  seatHold: { findFirst: async () => null, findMany: async () => [] },
   auditLog: { create: auditLogCreate },
   processManagerOutbox: { createMany: outboxCreateMany },
 });
