@@ -45,6 +45,12 @@ Feature: Suites Page Metrics Display
     Then it displays a pass rate circle showing the percentage
     And does not show latency or cost labels
 
+  @integration
+  Scenario: Accordion header circle reads amber for a partial pass rate
+    Given a run group where half the runs passed
+    When the accordion header renders
+    Then the pass rate circle reads in the orange of a partial pass rate
+
   # ---------------------------------------------------------------------------
   # List view scenario rows
   # ---------------------------------------------------------------------------

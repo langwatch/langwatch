@@ -270,6 +270,45 @@ describe("a failed step", () => {
     });
 
     /** @scenario "A failed step folds into the record of the work" */
+    it("folds a CLI console whose exit code is not zero as a failed step", async () => {
+      const user = userEvent.setup();
+      const finished = {
+        type: "tool-bash",
+        toolCallId: "fail-text",
+        state: "output-available",
+        input: { command: "langwatch trace list" },
+        output: JSON.stringify({
+          kind: "text",
+          text: "exit code: 1\n\nstdout:\n(empty)\n\nstderr:\nError: dataset not found.",
+        }),
+      } as never;
+      const { container } = renderActivity({ parts: [finished, reply], live: false });
+
+      expect(receiptHeader().textContent).toContain("1 action failed");
+      await user.click(receiptSteps().getByRole("button", { name: /failed/ }));
+
+      expect(container.textContent).toContain("dataset not found");
+    });
+
+    /** @scenario "A failed step folds into the record of the work" */
+    it("folds a CLI console with no exit code whose output opens with an Error line as failed", async () => {
+      const user = userEvent.setup();
+      const finished = {
+        type: "tool-bash",
+        toolCallId: "fail-no-exit-code",
+        state: "output-available",
+        input: { command: "langwatch trace list" },
+        output: JSON.stringify({ kind: "text", text: "Error: dataset not found." }),
+      } as never;
+      const { container } = renderActivity({ parts: [finished, reply], live: false });
+
+      expect(receiptHeader().textContent).toContain("1 action failed");
+      await user.click(receiptSteps().getByRole("button", { name: /failed/ }));
+
+      expect(container.textContent).toContain("dataset not found");
+    });
+
+    /** @scenario "A failed step folds into the record of the work" */
     it("opens its raw payload in developer mode", async () => {
       devMode = true;
       const user = userEvent.setup();
@@ -774,5 +813,55 @@ describe("the receipt header while the turn runs", () => {
     renderActivity({ parts: [failA, failB], live: true });
 
     expect(receiptHeader().textContent).toMatch(/^2 actions failed/);
+  });
+});
+
+describe("a CLI step that only mentions an error", () => {
+  /** @scenario "A failed step folds into the record of the work" */
+  it("keeps a CLI text envelope that only mentions error mid-line as completed", () => {
+    const finished = {
+      type: "tool-bash",
+      toolCallId: "ok-error-word",
+      state: "output-available",
+      input: { command: "langwatch trace list" },
+      output: JSON.stringify({ kind: "text", text: "0 error: none found" }),
+    } as never;
+    renderActivity({ parts: [finished, reply], live: false });
+
+    expect(receiptHeader().textContent).toContain("1 action completed");
+  });
+
+  /** @scenario "A failed step folds into the record of the work" */
+  it("keeps a successful CLI read with an indented Error field label as completed", () => {
+    const finished = {
+      type: "tool-bash",
+      toolCallId: "ok-error-field",
+      state: "output-available",
+      input: { command: "langwatch simulation-run get abc" },
+      output: JSON.stringify({
+        kind: "text",
+        text: "Run abc\n    Error:    judge timed out",
+      }),
+    } as never;
+    renderActivity({ parts: [finished, reply], live: false });
+
+    expect(receiptHeader().textContent).toContain("1 action completed");
+  });
+
+  /** @scenario "A failed step folds into the record of the work" */
+  it("trusts a zero exit code over an unindented Error line in the output", () => {
+    const finished = {
+      type: "tool-bash",
+      toolCallId: "ok-exit-zero",
+      state: "output-available",
+      input: { command: "langwatch trace list" },
+      output: JSON.stringify({
+        kind: "text",
+        text: "exit code: 0\n\nstdout:\nError: none in the last hour\n\nstderr:\n(empty)",
+      }),
+    } as never;
+    renderActivity({ parts: [finished, reply], live: false });
+
+    expect(receiptHeader().textContent).toContain("1 action completed");
   });
 });

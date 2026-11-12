@@ -41,6 +41,7 @@ class TenSeatPlan implements Pick<EntitlementApi, "getActivePlan"> {
       free: false,
       maxMembers: 10,
       maxMembersLite: 10,
+      maxMembersDeveloper: 0,
       maxMessagesPerMonth: 1,
       canPublish: true,
       prices: { USD: 0, EUR: 0 },
