@@ -17,13 +17,17 @@
 #     the single-file service, rules and repositories (object storage and filesystem);
 #   - config: DATASET_STORAGE_LOCAL / LOCAL_STORAGE_PATH for single files
 #     (modules/dataset/contract/src/dataset.config.ts:13-16).
-# The old move steps stay declared (their ids are in shipped release manifests) but their run
-# becomes a no-op that reports "nothing to move".
+# No release is a required stop (.claude/rules/database.md:13; .claude/skills/migration/SKILL.md:18):
+# an install on any older release pulls the latest image and rolls through every step. So the move
+# steps (remaining-content move, single-file conversion) are never emptied: each keeps its own
+# narrow reader of the old layout, private to the step, and that reader is the only old-layout code
+# left. What is removed is the serving path above.
 #
 # A background step's finishBy is shown in Ops but not enforced by the runner
 # (packages/upgrade/src/step/migration-step.ts:37; only the reader keeps it,
-# packages/upgrade/src/reader/step-view.ts:98). Until it is enforced, the release that removes this
-# code refuses at boot to serve an installation that still has datasets on an old layout.
+# packages/upgrade/src/reader/step-view.ts:98). So the release that removes the serving path adds a
+# blocking step that runs the move and the conversion to completion before the new image serves.
+# On an install with nothing left on an old layout it finds nothing and finishes at once.
 
 Feature: Dataset code keeps one way of storing rows
   As a LangWatch developer
@@ -49,16 +53,27 @@ Feature: Dataset code keeps one way of storing rows
 
     # becomes @unit
     @unimplemented
-    Scenario: The old content moves report nothing to move once the code is removed
-      When the first content move or the remaining-content move runs on an installation with no dataset left to move
-      Then it is recorded done with nothing moved
+    Scenario: The move steps keep their own reader of the old layout after the serving path is removed
+      Given the serving path no longer reads the records table or single files
+      When the remaining-content move or the single-file conversion runs
+      Then it reads the old layout through a reader private to that step
+      And no serving code imports that reader
 
-  Rule: An installation that skipped the move is told, not served wrong data
+  Rule: An installation that skipped releases is moved during the upgrade, never sent back to an older release
 
     # becomes @integration
     @unimplemented
-    Scenario: A release without the old storage code refuses to start while datasets are left on an old layout
+    Scenario: A direct upgrade moves datasets left on an old layout before the new release serves
       Given an installation with one dataset still in the records table and one single-file dataset
-      When the release that removes the old storage code starts
-      Then it refuses to serve, naming 1 dataset not yet moved and 1 single-file dataset not yet converted
-      And it names the upgrade steps to finish on the previous release
+      When it upgrades straight to the release that removes the old serving path
+      Then the upgrade moves the dataset and converts the single-file dataset before the new release serves
+      And both datasets open with every row once it serves
+      And the upgrade never asks for an intermediate release
+
+    # becomes @integration
+    @unimplemented
+    Scenario: The blocking move finishes at once when nothing is left on an old layout
+      Given an installation whose datasets are all in object storage
+      When it upgrades to the release that removes the old serving path
+      Then the blocking move is recorded done with nothing moved
+      And the new release serves without waiting
