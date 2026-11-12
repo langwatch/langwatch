@@ -18,7 +18,13 @@ const outboxCreateMany = vi.fn(async (_input?: { data: OutboxRow[] | OutboxRow }
 }));
 
 const transactionClient = prismaDouble({
-  organizationUser: { create: memberCreate, findUnique: memberFindUnique },
+  // The seat reads around the admission (ADR-002); seatless here, so no seat change is appended.
+  organizationUser: {
+    create: memberCreate,
+    findUnique: memberFindUnique,
+    findFirst: async () => null,
+  },
+  seatHold: { findFirst: async () => null, findMany: async () => [] },
   auditLog: { create: auditLogCreate },
   processManagerOutbox: { createMany: outboxCreateMany },
 });

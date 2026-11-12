@@ -770,6 +770,7 @@ describe("OrganizationMembershipService", () => {
           userId: "user-456",
           disabled: true,
           seat: { kind: "unchanged" },
+          actorUserId: "admin-789",
         });
         expect(mockInvalidateOrganization).toHaveBeenCalledWith({ organizationId: "org-123" });
       });
@@ -963,6 +964,7 @@ describe("OrganizationMembershipService", () => {
           userId: "user-456",
           disabled: true,
           seat: { kind: "unchanged" },
+          actorUserId: "admin-789",
         });
         // Disabling frees a seat, so consulting the seat limit here would
         // refuse the very action that makes room. Named, or a regression that
@@ -1096,6 +1098,7 @@ describe("OrganizationMembershipService", () => {
           userId: "user-456",
           disabled: false,
           seat: { kind: "unchanged" },
+          actorUserId: "admin-789",
         });
       });
     });

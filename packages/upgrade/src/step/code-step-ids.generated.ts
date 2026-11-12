@@ -45,6 +45,7 @@ export type CodeStepId =
   | "ops:seed-platform-operators"
   | "ops:fill-event-log-id-index"
   | "organization:record-presence-settings"
+  | "organization:record-seat-peak-opening-snapshots"
   | "project:record-created-facts"
   | "project:list-personal-owner-and-first-message-facts"
   | "prompt:seed-tags-for-untagged-organizations"

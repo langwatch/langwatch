@@ -27,16 +27,19 @@ function founderRepository({ attach }: { attach: () => Promise<never> }) {
   const enabled: unknown[] = [];
   const tx = prismaDouble({
     organization: { create: vi.fn(async () => ({ id: FOUNDER.orgId, name: FOUNDER.orgName })) },
-    organizationUser: { create: vi.fn(async () => ({ membershipStamp: "stamp_1" })) },
+    organizationUser: {
+      create: vi.fn(async () => ({ membershipStamp: "stamp_1" })),
+      // The enable commits with the founder's seat change (ADR-002), read around it.
+      update: vi.fn(async (args: { data: unknown }) => void enabled.push(args.data)),
+      findFirst: vi.fn(async () => null),
+    },
+    seatHold: { findFirst: vi.fn(async () => null) },
     team: {
       create: vi.fn(async () => ({ id: FOUNDER.teamId, slug: FOUNDER.teamSlug, name: "Acme" })),
     },
   });
   const prisma = prismaDouble({
     $transaction: vi.fn(async (work: (client: typeof tx) => unknown) => work(tx)),
-    organizationUser: {
-      update: vi.fn(async (args: { data: unknown }) => void enabled.push(args.data)),
-    },
   });
   const repository = PrismaOrganizationMembershipRepository.create({
     database: prisma,
