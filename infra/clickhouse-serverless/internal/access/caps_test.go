@@ -200,7 +200,7 @@ func TestSyncer_KeepsTheLastGoodUsersWhenACapLoosensATier(t *testing.T) {
 // @scenario "An access file without caps renders as it did before caps existed"
 func TestPlan_WithoutCapsRendersAsBefore(t *testing.T) {
 	// Captured from the image before caps existed.
-	const before = "profiles:\n" +
+	before := "profiles:\n" +
 		"    access_monitor:\n" +
 		"        profile: tier_read\n" +
 		"        max_execution_time: 10\n" +
@@ -215,7 +215,7 @@ func TestPlan_WithoutCapsRendersAsBefore(t *testing.T) {
 		"    monitor:\n" +
 		"        auth_methods:\n" +
 		"            password_1:\n" +
-		"                password_sha256_hex: 30c952fab122c3f9759f02a6d95c3758b246b4fee239957b2d4fee46e26170c4\n" +
+		"                password_sha256_hex: " + sha("pw") + "\n" +
 		"        grants:\n" +
 		"            query:\n" +
 		"                - GRANT tier_read\n" +
