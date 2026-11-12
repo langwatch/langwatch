@@ -524,6 +524,7 @@ function postgresStatements({
         readerPassword: plan.request.postgresReaderPassword,
         schema,
       }),
+      ...lwqlProvisioning.postgresScopedReaderGrantStatements({ schema }),
     ];
   }
   const absent = gaps.filter((gap) => gap.absent).map((gap) => gap.view);

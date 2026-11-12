@@ -60,7 +60,11 @@ describe("given the approved views live in a PostgreSQL schema other than public
       ...[...new Set(relations)].map(
         (relation) => `CREATE TABLE ${ALT_SCHEMA}."${relation}" AS TABLE public."${relation}"`,
       ),
-      ...postgresViews.approvedViewStatements({ schema: ALT_SCHEMA, views: [mapped] }),
+      ...postgresViews.approvedViewStatements({
+        schema: ALT_SCHEMA,
+        views: [mapped],
+        sharedReaderRole: postgres.readerRole,
+      }),
       ...postgresMapping.readerRoleStatements({
         reader: {
           role: postgres.readerRole,
