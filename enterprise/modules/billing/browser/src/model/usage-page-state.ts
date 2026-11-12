@@ -4,9 +4,9 @@
  * @see specs/licensing/usage-page.feature
  */
 import {
+  isUncappedSeats,
   PlanTypes,
   UNLIMITED_MESSAGES,
-  UNLIMITED_SEATS,
 } from "@langwatch/enterprise-billing-contract";
 import type { UsageDay } from "@langwatch/entitlement-contract";
 import numeral from "numeral";
@@ -188,7 +188,7 @@ export function liteRow({
   if (plan.free) return { kind: "on-growth" };
   const hasLiteSeats = plan.maxMembersLite > 0 && pricingModel === PricingModel.SEAT_EVENT;
   if (!hasLiteSeats) return { kind: "none" };
-  if (plan.maxMembersLite >= UNLIMITED_SEATS) {
+  if (isUncappedSeats(plan.maxMembersLite)) {
     return { kind: "count", value: formatCount(liteCount), note: "unlimited" };
   }
   return {
@@ -200,7 +200,7 @@ export function liteRow({
 
 /** Full seats in use against the plan's. */
 export function fullSeats({ used, plan }: { used: number; plan: UsagePagePlan }): string {
-  if (plan.maxMembers >= UNLIMITED_SEATS) return formatCount(used);
+  if (isUncappedSeats(plan.maxMembers)) return formatCount(used);
   return `${formatCount(used)} / ${formatCount(plan.maxMembers)}`;
 }
 
@@ -216,7 +216,7 @@ export function developerSeats({
   plan: UsagePagePlan;
 }): string | null {
   if (plan.maxMembersDeveloper === 0 && used === 0) return null;
-  if (plan.maxMembersDeveloper >= UNLIMITED_SEATS) return formatCount(used);
+  if (isUncappedSeats(plan.maxMembersDeveloper)) return formatCount(used);
   return `${formatCount(used)} / ${formatCount(plan.maxMembersDeveloper)}`;
 }
 

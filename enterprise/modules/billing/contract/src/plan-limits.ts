@@ -1,9 +1,9 @@
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import {
+  isUncappedSeats as isNoSeatCap,
   planCatalogue,
   quotedLimitsOfPlan,
   UNLIMITED_MESSAGES as NO_MESSAGE_CAP,
-  UNLIMITED_SEATS as NO_SEAT_CAP,
 } from "@langwatch/plans";
 
 import { type PlanTypes as PlanType, PlanTypes } from "./plan-types.ts";
@@ -14,8 +14,8 @@ import { type PlanTypes as PlanType, PlanTypes } from "./plan-types.ts";
  */
 export const UNLIMITED_MESSAGES = NO_MESSAGE_CAP;
 
-/** The seat cap the catalogue writes for "as many as you like"; at or above it, say unlimited. */
-export const UNLIMITED_SEATS = NO_SEAT_CAP;
+/** Whether a seat cap means no cap; a finite licence cap such as 10,000 stays a number. */
+export const isUncappedSeats = isNoSeatCap;
 
 /**
  * One catalogue plan, in the field names a resolved plan is quoted under.

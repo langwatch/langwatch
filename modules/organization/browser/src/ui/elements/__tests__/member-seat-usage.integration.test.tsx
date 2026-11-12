@@ -141,6 +141,15 @@ describe("given an organization with a seat allowance of each kind", () => {
 
       expect(await screen.findByText("membersLite: 4 / 9998")).toBeInTheDocument();
     });
+
+    it("keeps a finite licence cap above the stand-in as the number it is", async () => {
+      mockUsageData.current = { membersCount: 3, membersLiteCount: 4, membersDeveloperCount: 0 };
+
+      renderSeatUsage({ maxMembers: 10_000, maxMembersLite: 9_999 });
+
+      expect(await screen.findByText("members: 3 / 10000")).toBeInTheDocument();
+      expect(screen.getByText("membersLite: 4 / Infinity")).toBeInTheDocument();
+    });
   });
 
   describe("when the counts have not arrived yet", () => {

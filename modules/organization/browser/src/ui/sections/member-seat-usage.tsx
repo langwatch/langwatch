@@ -1,5 +1,5 @@
 import { SimpleGrid } from "@langwatch/design-system/primitives";
-import { UNLIMITED_SEATS } from "@langwatch/enterprise-billing-contract";
+import { isUncappedSeats } from "@langwatch/enterprise-billing-contract";
 import type { Plan as PlanInfo } from "@langwatch/entitlement-contract";
 
 import { ResourceLimitRow } from "../../behavior/lent-resource-limit-row.tsx";
@@ -7,7 +7,7 @@ import { api } from "../../behavior/organization-api.ts";
 import { SEAT_TYPE_COPY } from "../../model/seat-type-copy.ts";
 
 /** A cap the catalogue writes as "as many as you like" reads as Unlimited, not 9,999. */
-const shownCap = (max: number): number => (max >= UNLIMITED_SEATS ? Infinity : max);
+const shownCap = (max: number): number => (isUncappedSeats(max) ? Infinity : max);
 
 /**
  * Each kind of seat in use against the plan's cap. Free (no Lite seats, none taken) shows

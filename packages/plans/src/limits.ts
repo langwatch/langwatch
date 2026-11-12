@@ -34,6 +34,14 @@ export const UNLIMITED_SEATS = 9_999;
 /** The sentinel the self-hosted baseline uses. See drift.md: the two disagree. */
 export const UNLIMITED = Number.MAX_SAFE_INTEGER;
 
+/** A licence writes "no cap" as a number of 1M or more. */
+const LICENCE_UNCAPPED_FROM = 1_000_000;
+
+/** Whether a seat cap means "as many as you like": the catalogue's stand-in exactly, or a licence's 1M+. */
+export function isUncappedSeats(cap: number): boolean {
+  return cap === UNLIMITED_SEATS || cap >= LICENCE_UNCAPPED_FROM;
+}
+
 export const planLimitsSchema = z.object({
   members: planLimitSchema,
   membersLite: planLimitSchema,
