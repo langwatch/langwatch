@@ -113,6 +113,22 @@ Feature: Judge trace wait settings
     Then it answers 422 validation_error naming each field
     And nothing is scheduled
 
+  @integration
+  Scenario: The run history offers back the judge trace wait settings a plan ran with
+    Given a run plan that ran once with a quiet period and a trace wait and once without
+    When the previous configurations of its scope are read
+    Then they are two configurations
+    And the newer one carries both settings, the older one carries neither
+
+  @integration
+  Scenario: Choosing a previous configuration restores its judge trace wait settings
+    Given the run dialog offers a previous configuration that ran with a quiet period and a trace wait
+    When the person chooses it
+    Then the dropdown row names both settings
+    And the judge settings open with both inputs filled in seconds
+    And the run starts with both settings
+    And choosing a configuration that set neither clears them
+
   @unit
   Scenario: The SDK asks the project's recommended settle settings
     Given a project API key with trace read access

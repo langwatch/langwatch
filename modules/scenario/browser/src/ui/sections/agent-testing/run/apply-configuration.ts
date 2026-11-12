@@ -11,7 +11,7 @@ import {
   type ParameterRow,
   rowsFromLine,
 } from "../../../../model/agent-testing/run/parameter-rows.ts";
-import { hasJudgeTraceWait } from "../../../../model/judge-trace-wait.ts";
+import { hasJudgeTraceWait, judgeTraceWaitInputOf } from "../../../../model/judge-trace-wait.ts";
 import type { CompareRow } from "../run-compare/compare-rows.ts";
 import type { RunConfigurationEntry } from "./run-configuration.ts";
 import type { RunDialogFields } from "./use-run-dialog-form.ts";
@@ -106,10 +106,10 @@ export function applyConfigurationTo({
   planFields.setShowRepeat(configuration.repeatCount > 1);
   planFields.setSimulatorModel(configuration.simulatorModel);
   planFields.setJudgeModel(configuration.judgeModel);
+  const traceWait = judgeTraceWaitInputOf(configuration);
+  planFields.setTraceWait(traceWait);
   planFields.setShowModels(
-    !!configuration.simulatorModel ||
-      !!configuration.judgeModel ||
-      hasJudgeTraceWait(planFields.traceWait),
+    !!configuration.simulatorModel || !!configuration.judgeModel || hasJudgeTraceWait(traceWait),
   );
 
   if (entry.usesNote) fields.setShowNote(true);
