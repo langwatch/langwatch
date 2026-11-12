@@ -2721,6 +2721,9 @@ importers:
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../../../packages/clickhouse-client
+      '@langwatch/data-privacy-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/data-privacy/contract
       '@langwatch/enterprise-billing-contract':
         specifier: workspace:*
         version: link:../contract
@@ -7264,6 +7267,9 @@ importers:
       '@langwatch/aws-client':
         specifier: workspace:*
         version: link:../../../packages/aws-client
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../../packages/config
       '@langwatch/data-privacy-contract':
         specifier: workspace:*
         version: link:../contract
@@ -9297,6 +9303,9 @@ importers:
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-client
+      '@langwatch/data-privacy-contract':
+        specifier: workspace:*
+        version: link:../../data-privacy/contract
       '@langwatch/egress':
         specifier: workspace:*
         version: link:../../../packages/egress
