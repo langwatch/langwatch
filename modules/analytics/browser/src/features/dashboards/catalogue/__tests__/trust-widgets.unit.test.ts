@@ -31,7 +31,9 @@ describe("given the Can I trust my numbers? widgets", () => {
     }
     expect(sql.fields).toContain("field = 'all', total");
     // The result reads only the field and its count, never a trace column.
-    expect(sql.fields).toMatch(/^SELECT arrayJoin\(splitByChar\(',', '[a-z,]+'\)\) AS field,\n  multiIf\(/);
+    expect(sql.fields).toMatch(
+      /^SELECT arrayJoin\(splitByChar\(',', '[a-z,]+'\)\) AS field,\n  multiIf\(/,
+    );
     expect(code).toContain("Missing on ");
     expect(code).toContain("Sending it unlocks: ");
     expect(code).toContain('<AllGood title="Every field arrives"');

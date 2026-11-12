@@ -293,10 +293,10 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
         `${view.name} declares aggregating=${String(Boolean(view.dedup.aggregating))} over ${source!.engine}`,
       ).toBe(Boolean(view.dedup.aggregating));
       const writtenOnce = WRITTEN_ONCE_OVER_REPLACING.has(view.name);
-      if (writtenOnce) {
-        expect(view.dedup.strategy, `${view.name} is read plainly`).toBe("none");
-        expect(view.dedup.versionColumn, `${view.name} is read plainly`).toBeUndefined();
-      }
+      expect(
+        writtenOnce ? [view.dedup.strategy, view.dedup.versionColumn] : ["none", undefined],
+        `${view.name} is read plainly`,
+      ).toEqual(["none", undefined]);
       expect(
         source!.engine.includes("ReplacingMergeTree"),
         `${view.name} declares versionColumn=${String(view.dedup.versionColumn)} over ${source!.engine}`,

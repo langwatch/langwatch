@@ -59,7 +59,9 @@ export class SpanAnalyticsStore implements AppendStore<SpanAnalyticsRow> {
         startTimeFromMs: first.startTimeUnixMs - START_TIME_MARGIN_MS,
         startTimeToMs: last.startTimeUnixMs + START_TIME_MARGIN_MS,
       });
-      const storedKeys = new Set(stored.map((key) => spanKey({ tenantId: first.tenantId, ...key })));
+      const storedKeys = new Set(
+        stored.map((key) => spanKey({ tenantId: first.tenantId, ...key })),
+      );
       fresh.push(...slice.filter((row) => !storedKeys.has(spanKey(row))));
     }
     return fresh;

@@ -428,9 +428,9 @@ const SPAN_METRICS: UngatedViewDefinition = {
   joinKeys: ["TenantId", "TraceId", "SpanId"],
   timeColumn: "StartTime",
   freshness: PROJECTION_FRESHNESS,
-  // SpanAnalyticsStore looks a span's key up before appending, so a re-sent span keeps its first copy.
-  // Duplicates are rare (ADR-034 amendment residuals) and a read counts them. A dedup here held every
-  // span key of the period in memory (analytics ADR-006).
+  // SpanAnalyticsStore looks a span's key up before appending, so a re-sent span keeps its
+  // first copy. Duplicates are rare (ADR-034 amendment residuals) and a read counts them. A
+  // dedup here held every span key of the period in memory (analytics ADR-006).
   dedup: {
     keyColumns: ["TenantId", "TraceId", "SpanId"],
     strategy: "none",
