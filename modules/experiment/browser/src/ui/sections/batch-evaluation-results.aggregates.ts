@@ -3,12 +3,13 @@ import { computeMetricStats, type MetricStats } from "@langwatch/experiment-cont
 /**
  * Compute aggregate statistics from batch evaluation data.
  */
-import type {
-  BatchEvaluationData,
-  BatchEvaluatorResult,
-  BatchResultRow,
-  BatchTargetColumn,
-  BatchTargetOutput,
+import {
+  type BatchEvaluationData,
+  type BatchEvaluatorResult,
+  type BatchResultRow,
+  type BatchTargetColumn,
+  type BatchTargetOutput,
+  rowsInRun,
 } from "./batch-evaluation-results.types.ts";
 
 /**
@@ -124,7 +125,7 @@ export const computeBatchTargetAggregates = (
   return {
     targetId,
     completedRows,
-    totalRows: rows.length,
+    totalRows: rowsInRun(rows).length,
     errorRows: outputs.filter((o) => !!o.error).length,
     evaluators: evaluatorAggregates,
     overallPassRate: totalPassFail > 0 ? (totalPassed / totalPassFail) * 100 : null,
