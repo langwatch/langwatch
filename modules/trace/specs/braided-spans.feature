@@ -109,6 +109,29 @@ Feature: Braided spans in the reader's traces
       When the "orchestrator" Braids page counts the braid's activity
       Then only the spans in traces "orchestrator" holds are counted
 
+  Rule: Braids reach a read only once the Enterprise plan check honoured them
+
+    @unit
+    Scenario: A proof the plan check never honoured shows no braided spans in any read
+      Given sam's proof carries the braid but never passed the trace module's plan check
+      When any read resource is fenced for "orchestrator" with that proof
+      Then no "specialists" span, window or condition reaches the statement
+      And the read is fenced and keyed exactly as a proof without the braid
+
+    @unit
+    Scenario: A proof the plan check honoured shows the braided spans
+      Given the trace module's plan check honoured sam's braids on the Enterprise plan
+      When a span read is fenced for "orchestrator"
+      Then the "specialists" spans matching the condition are admitted
+      And every other read resource still fences without them
+
+    @unit
+    Scenario: Only span reads take a braid's windows, and every read names each window type
+      Given the read resources the ClickHouse fence knows
+      When each one's treatment of trace, span and log windows is read
+      Then every resource names all three, with no default
+      And the resources that apply span windows are exactly the span read
+
   Rule: Each span keeps its owner's privacy
 
     @integration

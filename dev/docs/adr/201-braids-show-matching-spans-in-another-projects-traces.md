@@ -327,7 +327,10 @@ that project's organisation for the plan gate (today a project-scoped plan gate 
 what Braids does and offers a conversation. After a downgrade, braids **pause** and are kept (decided by
 Alex, 2026-10-21): the trace module, which owns the merged read, asks `EntitlementApi` (cached per
 organisation) before honouring `span` braids; the rows stay, and an upgrade shows them again. Authz never
-asks entitlement (record §7, "Plans").
+asks entitlement (record §7, "Plans"). Honouring is a sealed flag on the proof, `braidsHonoured`, set only
+by `honourSpanBraids`, which only the trace module's pause service imports
+(`langwatch/span-braid-honour-owner`). The fence reads a proof without the flag as carrying no braid, so
+a new read that skips the plan check shows none.
 
 ### 10. Order of work
 
@@ -377,6 +380,7 @@ per-braid option.
 | Only matching spans leave the owner   | An owner span that fails the condition, or falls outside the window, is never read for the reader |
 | Only into the reader's own traces     | An owner trace with no span in the reader is never listed or opened from the reader in release 1  |
 | A `span` window opens only span reads | A braid never widens a trace list, summary, analytics or log read (v4.9)                          |
+| Braids fail closed below Enterprise   | A proof the trace module's plan check did not honour reads no braid, whatever read it reaches     |
 | No forged verified mark               | A client-sent `langwatch.reserved.verified.*` is stripped; only verification at ingest writes one |
 | A signature is bound to its trace     | A signature copied into another trace does not verify; within its trace it travels down the chain |
 | Braid writes are serialised by reader | Concurrent writes into one reader run one at a time; a change replaces the braid it names or none |
@@ -593,3 +597,8 @@ not operations.
   no default, narrowing refuses rather than widening, yes/no decisions ignore conditioned grants, a span
   condition always carries its compiled form ("every span" is explicit), a property test ranges over the
   fence, and an architecture policy keeps span tables behind it. All land with the feature.
+- v1.11 (2026-11-12, how locks A and C landed). Two conventions became constructions.
+  The fence applies braids only on a proof the trace module's plan check honoured, a sealed flag one
+  lint-guarded function sets (§9). Each read resource the ClickHouse client knows names how it treats
+  every condition type, with no default, and a guard test holds the resources taking `span` windows to
+  the span read alone (§3).

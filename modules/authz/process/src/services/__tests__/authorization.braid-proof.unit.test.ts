@@ -6,6 +6,7 @@
 import {
   BRAID_CONDITION_COMPILER_VERSION,
   type GrantCondition,
+  honourSpanBraids,
   readScopeKeyOf,
 } from "@langwatch/authorization";
 import type { AuthzScopeRef } from "@langwatch/authz-contract";
@@ -235,7 +236,8 @@ describe("the proof a reader's trace read carries", () => {
       const keyOf = async (condition: GrantCondition) => {
         const { braid, mint } = ledger({ now: () => Date.parse("2026-10-20T00:00:00Z") });
         await braid({ id: "grant_keyed", owner: SPECIALISTS, reader: ORCHESTRATOR, condition });
-        return readScopeKeyOf(await mint(ORCHESTRATOR));
+        // Keyed as the span read keys it, once the trace module's plan check honoured the braid.
+        return readScopeKeyOf(honourSpanBraids({ authorization: await mint(ORCHESTRATOR) }));
       };
       const web = spanCondition({ where: WEB });
       const nextCompiler: GrantCondition = {

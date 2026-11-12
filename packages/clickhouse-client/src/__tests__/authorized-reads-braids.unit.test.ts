@@ -7,6 +7,7 @@ import {
   BRAID_MAX_DISTINCT_CONDITIONS,
   type BraidConditionTerm,
   type CompiledWhere,
+  honourSpanBraids,
   narrowAuthorization,
   sealAuthorization,
 } from "@langwatch/authorization";
@@ -25,6 +26,8 @@ import {
   expandStatement,
   fenceExpression,
   fenceFor,
+  READ_RESOURCES,
+  type ReadResource,
   tenantScopeKey,
 } from "../authorized-reads.ts";
 import { ClickHouseQueryClient } from "../client.ts";
@@ -93,7 +96,8 @@ const memberWindow: GrantInput = {
   condition: { type: "trace", from: NOW - 1000, until: null },
 };
 
-const proof = (grants: GrantInput[]): Authorization =>
+/** The route's proof, before the trace module's plan check has honoured any braid. */
+const unhonoured = (grants: GrantInput[]): Authorization =>
   sealAuthorization({
     actor: { type: "user", id: "ana" },
     principal: { type: "user", id: "ana" },
@@ -102,6 +106,18 @@ const proof = (grants: GrantInput[]): Authorization =>
     expiresAt: NOW + 30_000,
     purpose: { kind: "route", route: "traces.get" },
   });
+
+/** The proof as the Enterprise plan check hands it to a span read. */
+const proof = (grants: GrantInput[]): Authorization =>
+  honourSpanBraids({ authorization: unhonoured(grants) });
+
+const READ_RESOURCE_NAMES = Object.keys(READ_RESOURCES) as ReadResource[];
+
+/** A grant carrying every proof-bearing permission, as a braid grant does (ADR-201 §1). */
+const everyRead = (grant: GrantInput): GrantInput => ({
+  ...grant,
+  permissions: ["traces:view", "analytics:view", "cost:view"],
+});
 
 /** A span read in the shape the trace repositories use: latest version elected inside. */
 const spanRead = (outer: string) =>
@@ -176,6 +192,64 @@ describe("the fence over a span read", () => {
           tenantScopeKey({ authorization, reads: "traces" }),
         );
       }
+    });
+  });
+
+  describe("given a proof whose braids the plan check never honoured", () => {
+    const braids = [braid({}), braid({ compiledWhere: CLI, from: 5 })].map(everyRead);
+    const authorization = unhonoured([everyRead(own()), everyRead(memberWindow), ...braids]);
+    const withoutBraids = unhonoured([everyRead(own()), everyRead(memberWindow)]);
+
+    /** @scenario "A proof the plan check never honoured shows no braided spans in any read" */
+    it("fences every read resource as if it carried no braid", () => {
+      for (const reads of READ_RESOURCE_NAMES) {
+        const fence = fenceFor({ authorization, reads });
+
+        expect(fence.braids).toBeUndefined();
+        expect(fence).toEqual(fenceFor({ authorization: withoutBraids, reads }));
+        expect(tenantScopeKey({ authorization, reads })).toBe(
+          tenantScopeKey({ authorization: withoutBraids, reads }),
+        );
+      }
+    });
+
+    it("sends a span read with no owner in its tenant set or its statement", async () => {
+      const { sent, clickhouse } = clientWith();
+
+      await clickhouse.as(authorization, { reads: "spans" }).query({
+        query: spanRead(tenantScopeWithConditions("StartTime")),
+        query_params: { traceId: "tr-1" },
+      });
+
+      expect(sent().tenantIds).toEqual([READER, MEMBER]);
+      expect(sent().sql).not.toMatch(/SpanAttributes\[|SpanName =|tenantScope_c\d/);
+      expect(Object.values(sent().params ?? {}).flat()).not.toContain(OWNER);
+    });
+
+    it("keeps braids out once narrowed to the reader's own project", () => {
+      const narrowed = narrowAuthorization({ authorization, projectId: READER });
+
+      expect(narrowed && fenceFor({ authorization: narrowed, reads: "spans" }).braids).toBe(
+        undefined,
+      );
+    });
+  });
+
+  describe("given the same proof once the plan check honoured it", () => {
+    /** @scenario "A proof the plan check honoured shows the braided spans" */
+    it("adds the braids to a span read alone", () => {
+      const authorization = proof([own(), memberWindow, braid({})].map(everyRead));
+
+      for (const reads of READ_RESOURCE_NAMES) {
+        const clauses = fenceFor({ authorization, reads }).braids?.clauses ?? [];
+        expect({ reads, braided: clauses.length > 0 }).toEqual({
+          reads,
+          braided: reads === "spans",
+        });
+      }
+      expect(fenceFor({ authorization, reads: "spans" }).shared).toContainEqual(
+        expect.objectContaining({ projectId: OWNER }),
+      );
     });
   });
 

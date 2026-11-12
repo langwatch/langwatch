@@ -16,7 +16,7 @@ import {
   type BraidConditionTerm,
   braidConditionTermsOf,
   type CompiledWhere,
-  isSpanBraidGrant,
+  honouredSpanBraidGrants,
   type ProofBearingPermission,
   type SharedWindow,
   sharedWindowsReadBy,
@@ -42,19 +42,37 @@ import {
 /** Resolves the routed client a project's reads are sent through. */
 export type ClickHouseClientResolver = (tenantId: string) => Promise<ClickHouseQueryClient>;
 
+/** Whether a shared grant's window of one condition type opens a read; there is no default. */
+type WindowTreatment = "applies" | "excluded";
+
 /**
- * What a reader may be asked for: the proof-bearing permission each needs, and the resources a
- * shared grant's window must apply to. Trace, analytics and cost reads take `trace` windows
- * (ADR-177 v4.9, v4.15); span reads also take a braid's `span` ones (ADR-201).
+ * What a reader may be asked for: its proof-bearing permission, and how it treats a shared
+ * window of every condition type, so a new resource or condition type does not compile until
+ * someone chooses. Only `spans` takes a braid's `span` windows, held by a guard test (ADR-201 §3).
  */
-const READ_RESOURCES = {
-  traces: { permission: "traces:view", conditions: ["trace"] },
-  analytics: { permission: "analytics:view", conditions: ["trace"] },
-  cost: { permission: "cost:view", conditions: ["trace"] },
-  spans: { permission: "traces:view", conditions: ["trace", "span"] },
+export const READ_RESOURCES = {
+  traces: {
+    permission: "traces:view",
+    windows: { trace: "applies", span: "excluded", log: "excluded" },
+  },
+  analytics: {
+    permission: "analytics:view",
+    windows: { trace: "applies", span: "excluded", log: "excluded" },
+  },
+  cost: {
+    permission: "cost:view",
+    windows: { trace: "applies", span: "excluded", log: "excluded" },
+  },
+  spans: {
+    permission: "traces:view",
+    windows: { trace: "applies", span: "applies", log: "excluded" },
+  },
 } as const satisfies Record<
   string,
-  { permission: ProofBearingPermission; conditions: readonly AuthorizationConditionType[] }
+  {
+    permission: ProofBearingPermission;
+    windows: { readonly [Type in AuthorizationConditionType]: WindowTreatment };
+  }
 >;
 export type ReadResource = keyof typeof READ_RESOURCES;
 
@@ -384,21 +402,19 @@ export function fenceFor({
   authorization: Authorization;
   reads: ReadResource;
 }): TenantFence {
-  const { permission, conditions } = READ_RESOURCES[reads];
-  const opens = (type: AuthorizationConditionType | undefined) =>
-    (conditions as readonly AuthorizationConditionType[]).some((each) => each === type);
+  const { permission, windows } = READ_RESOURCES[reads];
+  const applies = (type: AuthorizationConditionType): boolean => windows[type] === "applies";
   const carries = (grant: AuthorizationGrant) => grant.permissions.includes(permission);
   const own = authorization.grants
     .filter((grant) => grant.kind === "own" && grant.projectId !== undefined)
     .filter(carries)
     .map((grant) => grant.projectId as string);
   if (own.length === 0) throw new AccessNotGrantedError(permission);
-  const shared = (conditions as readonly AuthorizationConditionType[]).includes("trace")
+  const shared = applies("trace")
     ? sharedWindowsReadBy({ authorization, permission, condition: "trace" })
     : [];
-  const braided = authorization.grants
-    .filter((grant) => isSpanBraidGrant(grant) && opens(grant.condition?.type))
-    .filter(carries);
+  // A braid reaches the fence only on a proof the plan check honoured (ADR-201 §9).
+  const braided = applies("span") ? honouredSpanBraidGrants(authorization).filter(carries) : [];
   const [reader = ""] = own;
   const narrowedTo = authorization.narrowedTo;
   if (narrowedTo === undefined) return withBraids({ fence: { own, shared }, braided, reader });

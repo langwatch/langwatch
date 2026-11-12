@@ -2,6 +2,7 @@
 import {
   type Authorization,
   type CompiledWhere,
+  honourSpanBraids,
   sealAuthorization,
 } from "@langwatch/authorization";
 import {
@@ -68,17 +69,22 @@ export function aggregateProof({
   });
 }
 
-/** A reader's proof carrying braids (ADR-201): own on the reader, one `span` grant per braid. */
+/**
+ * A reader's proof carrying braids (ADR-201): own on the reader, one `span` grant per braid,
+ * honoured as the Enterprise plan check honours it unless `honoured` is false.
+ */
 export function braidedProof({
   projectId,
   braids,
+  honoured = true,
   now = Date.now(),
 }: {
   projectId: string;
   braids: { owner: string; compiledWhere?: CompiledWhere; from?: number; until?: number | null }[];
+  honoured?: boolean;
   now?: number;
 }): Authorization {
-  return sealAuthorization({
+  const authorization = sealAuthorization({
     actor: TEST_ACTOR,
     principal: TEST_ACTOR,
     scope: { organizationId: TEST_ORGANIZATION_ID },
@@ -102,6 +108,7 @@ export function braidedProof({
     expiresAt: now + TEST_PROOF_LIFETIME_MS,
     purpose: { kind: "route", route: "test" },
   });
+  return honoured ? honourSpanBraids({ authorization }) : authorization;
 }
 
 /** A statement with markers, expanded for one own project, for a test with a raw client. */

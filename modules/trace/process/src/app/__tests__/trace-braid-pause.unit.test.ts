@@ -1,4 +1,5 @@
-import type { Authorization } from "@langwatch/authorization";
+import { type Authorization, honouredSpanBraidGrants } from "@langwatch/authorization";
+import { fenceFor } from "@langwatch/clickhouse-client";
 import { planSchema } from "@langwatch/entitlement-contract";
 import type { PlanType } from "@langwatch/plans";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -77,7 +78,7 @@ function detailApp({ planType }: { planType?: PlanType }) {
       braidReads: Object.assign(EmptyTraceBraidReadsRepository.create(), {
         countReaderBraidActivity: async ({ authorization }: { authorization: Authorization }) => {
           counted.push(authorization);
-          return new Map([[BRAID_ID, readsBraidedSpans(authorization) ? 3 : 0]]);
+          return new Map([[BRAID_ID, honouredSpanBraidGrants(authorization).length > 0 ? 3 : 0]]);
         },
       }),
     },
@@ -89,7 +90,10 @@ function detailApp({ planType }: { planType?: PlanType }) {
   return { open, countActivity, counted, asked };
 }
 
-const braided = () => braidedProof({ projectId: READER, braids: [{ owner: OWNER }] });
+/** The route's proof: braids carried, not yet honoured by the plan check. */
+const braided = () =>
+  braidedProof({ projectId: READER, braids: [{ owner: OWNER }], honoured: false });
+const spanFenceOf = (authorization: Authorization) => fenceFor({ authorization, reads: "spans" });
 
 describe("braided spans and the organisation's plan", () => {
   describe("given an organisation below Enterprise", () => {
@@ -101,6 +105,7 @@ describe("braided spans and the organisation's plan", () => {
 
       expect(readsBraidedSpans(proof)).toBe(false);
       expect(proof.grants.map((grant) => grant.projectId)).toEqual([READER]);
+      expect(spanFenceOf(proof).braids).toBeUndefined();
     });
 
     /** @scenario A paused braid counts no braided spans on the reader's Braids page */
@@ -115,10 +120,15 @@ describe("braided spans and the organisation's plan", () => {
   });
 
   describe("given an Enterprise organisation", () => {
-    it("honours the braids", async () => {
+    /** @scenario "A proof the plan check honoured shows the braided spans" */
+    it("honours the braids, so the span fence reads the owner", async () => {
       const { open } = detailApp({ planType: "ENTERPRISE" });
 
-      expect(readsBraidedSpans(await open(braided()))).toBe(true);
+      const proof = await open(braided());
+
+      expect(proof.braidsHonoured).toBe(true);
+      expect(spanFenceOf(proof).braids?.clauses).toHaveLength(1);
+      expect(spanFenceOf(braided()).braids).toBeUndefined();
     });
 
     it("counts the reader's Braids page activity through the braids", async () => {
@@ -151,7 +161,10 @@ describe("braided spans and the organisation's plan", () => {
     it("honours no braid", async () => {
       const { open } = detailApp({});
 
-      expect(readsBraidedSpans(await open(braided()))).toBe(false);
+      const proof = await open(braided());
+
+      expect(readsBraidedSpans(proof)).toBe(false);
+      expect(spanFenceOf(proof).braids).toBeUndefined();
     });
   });
 });

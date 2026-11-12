@@ -1,4 +1,4 @@
-import { type Authorization, withoutSpanBraids } from "@langwatch/authorization";
+import { type Authorization, honourSpanBraids, withoutSpanBraids } from "@langwatch/authorization";
 import { type EntitlementApi, isEnterpriseTier } from "@langwatch/entitlement-contract";
 import { nowInstant } from "@langwatch/time";
 
@@ -9,8 +9,8 @@ type BraidPlans = Pick<EntitlementApi, "getActivePlan">;
 
 /**
  * Braids pause below Enterprise and are kept (ADR-201 §9): the trace module, which owns the
- * merged read, asks the plan before honouring them. The answer is cached per organisation for no
- * longer than the proof that asked lives; a process composed without plans honours none.
+ * merged read, asks the plan, and only it may honour them; a proof it never saw reads none. Cached
+ * per organisation for no longer than the proof that asked lives; no plans composed honours none.
  */
 export class TraceBraidPauseService {
   static create(deps: { plans: BraidPlans | null }): TraceBraidPauseService {
@@ -21,11 +21,11 @@ export class TraceBraidPauseService {
 
   private constructor(private readonly plans: BraidPlans | null) {}
 
-  /** The proof as the read may honour it: without its braids while the plan is below Enterprise. */
+  /** The proof as the read may honour it: braids honoured on Enterprise, stripped below it. */
   async honoured({ authorization }: { authorization: Authorization }): Promise<Authorization> {
     if (!readsBraidedSpans(authorization)) return authorization;
     const enterprise = await this.isEnterprise(authorization);
-    return enterprise ? authorization : withoutSpanBraids(authorization);
+    return enterprise ? honourSpanBraids({ authorization }) : withoutSpanBraids(authorization);
   }
 
   private async isEnterprise(authorization: Authorization): Promise<boolean> {

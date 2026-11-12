@@ -131,6 +131,11 @@ export const authorizationSchema = z
      * cannot read a same-id trace of another member. Absent: every project its grants name.
      */
     narrowedTo: z.string().min(1).optional(),
+    /**
+     * Set only by `honourSpanBraids`, once the plan allows braids (ADR-201 §9). Absent: the fence
+     * reads none of the proof's braids, so a read that skipped the plan check fails closed.
+     */
+    braidsHonoured: z.literal(true).optional(),
   })
   .strict()
   .refine(
@@ -241,6 +246,31 @@ export function narrowAuthorizationOrNotFound({
   }
 }
 
+/**
+ * The same proof with its braids honoured, the one way they reach a span read's fence
+ * (ADR-201 §9). Only the trace module's plan check calls it (`langwatch/span-braid-honour-owner`).
+ * A proof with no braids is returned as it is; a forged proof is refused.
+ */
+export function honourSpanBraids({
+  authorization,
+}: {
+  authorization: Authorization;
+}): Authorization {
+  if (!isSealedAuthorization(authorization)) {
+    throw new ForgedAuthorizationError();
+  }
+  if (authorization.braidsHonoured === true || !authorization.grants.some(isSpanBraidGrant)) {
+    return authorization;
+  }
+  return sealAuthorization({ ...authorization, braidsHonoured: true });
+}
+
+/** The braids a span read's fence applies: none until `honourSpanBraids` set the flag. */
+export function honouredSpanBraidGrants(authorization: Authorization): AuthorizationGrant[] {
+  if (authorization.braidsHonoured !== true) return [];
+  return authorization.grants.filter(isSpanBraidGrant);
+}
+
 /** The same proof without its braids, for a read that may not honour them (ADR-201 §5, §9).
  *  A proof with none is returned as it is; a forged proof is refused. */
 export function withoutSpanBraids(authorization: Authorization): Authorization {
@@ -304,14 +334,16 @@ export function ownProjectIdReadBy(authorization: Authorization): string {
 }
 
 /** A stable key for the projects and windows a proof reads in under `permission`; an aggregate
- *  and a member never share one. A braid's window carries its condition's digest (ADR-201 §3). */
+ *  and a member never share one. An honoured braid's window carries its condition's digest. */
 export function readScopeKeyOf(
   authorization: Authorization,
   permission: ProofBearingPermission = "traces:view",
 ): string {
   const { narrowedTo } = authorization;
   const braidsRead = narrowedTo === undefined || isNarrowedToOwn(authorization);
+  // A braid not honoured reads nothing, so it keys nothing (ADR-201 §9).
   return authorization.grants
+    .filter((grant) => !isSpanBraidGrant(grant) || authorization.braidsHonoured === true)
     .filter((grant) => grant.permissions.includes(permission))
     .filter(
       (grant) =>

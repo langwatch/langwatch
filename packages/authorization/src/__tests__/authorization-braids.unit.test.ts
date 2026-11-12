@@ -4,6 +4,8 @@ import { z } from "zod";
 import {
   AccessNotGrantedError,
   type AuthorizationInput,
+  honourSpanBraids,
+  honouredSpanBraidGrants,
   isSpanBraidGrant,
   narrowAuthorization,
   projectIdsReadBy,
@@ -64,6 +66,9 @@ const proof = (grants: GrantInput[]) =>
     expiresAt: NOW + 30_000,
     purpose: { kind: "route", route: "traces.get" },
   });
+
+/** The proof as the trace module's Enterprise plan check hands it on. */
+const honoured = (grants: GrantInput[]) => honourSpanBraids({ authorization: proof(grants) });
 
 describe("a proof carrying braids", () => {
   describe("when it is sealed", () => {
@@ -153,9 +158,9 @@ describe("a proof carrying braids", () => {
 
   describe("when a cache key is taken", () => {
     it("carries the condition's digest, so a changed tree or compiler version keys apart", () => {
-      const key = readScopeKeyOf(proof([own, braid()]));
+      const key = readScopeKeyOf(honoured([own, braid()]));
       const otherTree = readScopeKeyOf(
-        proof([
+        honoured([
           own,
           braid({
             compiledWhere: { ...compiledWhere, tree: { ...compiledWhere.tree, value: "cli" } },
@@ -163,18 +168,18 @@ describe("a proof carrying braids", () => {
         ]),
       );
       const otherVersion = readScopeKeyOf(
-        proof([own, braid({ compiledWhere: { ...compiledWhere, version: 2 } })]),
+        honoured([own, braid({ compiledWhere: { ...compiledWhere, version: 2 } })]),
       );
 
       expect(key).toMatch(new RegExp(`^${OWNER}@span:0-#[0-9a-f]{64},${READER}$`));
       expect(otherTree).not.toBe(key);
       expect(otherVersion).not.toBe(key);
-      expect(readScopeKeyOf(proof([own, braid()]))).toBe(key);
+      expect(readScopeKeyOf(honoured([own, braid()]))).toBe(key);
     });
 
     it("keys a braid with no condition as a window alone, as before", () => {
       const key = readScopeKeyOf(
-        proof([own, braid({ where: undefined, compiledWhere: undefined })]),
+        honoured([own, braid({ where: undefined, compiledWhere: undefined })]),
       );
 
       expect(key).toBe(`${OWNER}@span:0-,${READER}`);
@@ -182,11 +187,57 @@ describe("a proof carrying braids", () => {
 
     it("keeps the braids in the key of a proof narrowed to its own project", () => {
       const narrowed = narrowAuthorization({
-        authorization: proof([own, braid()]),
+        authorization: honoured([own, braid()]),
         projectId: READER,
       });
 
-      expect(readScopeKeyOf(narrowed)).toBe(readScopeKeyOf(proof([own, braid()])));
+      expect(readScopeKeyOf(narrowed)).toBe(readScopeKeyOf(honoured([own, braid()])));
+    });
+
+    it("keys a proof whose braids were never honoured as one without them", () => {
+      expect(readScopeKeyOf(proof([own, braid()]))).toBe(readScopeKeyOf(proof([own])));
+    });
+  });
+
+  describe("when its braids are honoured", () => {
+    it("is unhonoured as minted, so its braids reach no fence", () => {
+      const minted = proof([own, braid()]);
+
+      expect(minted.braidsHonoured).toBeUndefined();
+      expect(honouredSpanBraidGrants(minted)).toEqual([]);
+    });
+
+    it("returns a sealed proof whose braids reach the fence", () => {
+      const sealed = honoured([own, braid()]);
+
+      expect(sealed.braidsHonoured).toBe(true);
+      expect(honouredSpanBraidGrants(sealed).map((grant) => grant.projectId)).toEqual([OWNER]);
+      expect(narrowAuthorization({ authorization: sealed, projectId: READER })).not.toBeNull();
+    });
+
+    it("keeps the flag through narrowing to the reader's own project", () => {
+      const narrowed = narrowAuthorization({
+        authorization: honoured([own, braid()]),
+        projectId: READER,
+      });
+
+      expect(narrowed?.braidsHonoured).toBe(true);
+    });
+
+    it("returns a proof with no braids, or one already honoured, as it is", () => {
+      const plain = proof([own]);
+      const done = honoured([own, braid()]);
+
+      expect(honourSpanBraids({ authorization: plain })).toBe(plain);
+      expect(honourSpanBraids({ authorization: done })).toBe(done);
+    });
+
+    it("refuses a forged proof", () => {
+      const forged = { ...proof([own, braid()]) };
+
+      expect(() => honourSpanBraids({ authorization: forged })).toThrow(
+        expect.objectContaining({ code: "authorization_forged" }),
+      );
     });
   });
 });
