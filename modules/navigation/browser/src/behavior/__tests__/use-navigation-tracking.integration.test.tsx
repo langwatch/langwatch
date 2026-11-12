@@ -7,6 +7,7 @@ import { renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { writeDashboardsSidebarHint } from "../../model/dashboards-sidebar-hint.ts";
 import { NavigationHostProvider } from "../../model/navigation-host.ts";
 import { readLastVisitedProduct } from "../../model/product-memory.ts";
 import { resolveSettingsBackTarget } from "../../model/resolve-settings-back-target.ts";
@@ -58,6 +59,34 @@ describe("useNavigationTracking", () => {
 
       navigateTo(rerender, "/governance/departments");
       expect(readLastVisitedProduct({ organizationId: "org_1" })).toBe("governance");
+    });
+  });
+
+  describe("when a dashboard is opened from LLM Ops", () => {
+    /** @scenario The remembered product is the sidebar drawn */
+    it("remembers LLM Ops, the sidebar shown, not Dashboards", () => {
+      const { rerender } = renderTrackingAt("/acme-app/messages");
+      navigateTo(rerender, "/acme-app/dashboards/agent-flight-deck");
+
+      expect(readLastVisitedProduct({ organizationId: "org_1" })).toBe("llm-ops");
+    });
+
+    /** @scenario Choosing Dashboards in the product switcher or icon rail draws the Dashboards sidebar */
+    it("remembers Dashboards once the switcher chose it", () => {
+      const { rerender } = renderTrackingAt("/acme-app/messages");
+      writeDashboardsSidebarHint({ hint: "dashboards" });
+      navigateTo(rerender, "/acme-app/dashboards");
+
+      expect(readLastVisitedProduct({ organizationId: "org_1" })).toBe("dashboards");
+    });
+
+    /** @scenario Leaving for Gateway resets the hint */
+    it("resets the hint on a Gateway page", () => {
+      const { rerender } = renderTrackingAt("/acme-app/messages");
+      navigateTo(rerender, "/gateway/budgets");
+      navigateTo(rerender, "/acme-app/dashboards");
+
+      expect(readLastVisitedProduct({ organizationId: "org_1" })).toBe("dashboards");
     });
   });
 

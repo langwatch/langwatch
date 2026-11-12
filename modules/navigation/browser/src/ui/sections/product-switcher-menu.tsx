@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 
 import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
 import { useReachableProducts } from "../../behavior/use-reachable-products.ts";
+import { writeDashboardsSidebarHint } from "../../model/dashboards-sidebar-hint.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import {
   OPERATIONS_CONSOLE,
@@ -75,6 +76,8 @@ export function ProductSwitcherMenu({ activeProductId }: { activeProductId: Prod
     if (product.id === activeProductId) return;
     const home = product.homeHref({ projectSlug });
     if (!home) return;
+    // Choosing Dashboards means its own sidebar, whatever page the reader left.
+    if (product.id === "dashboards") writeDashboardsSidebarHint({ hint: "dashboards" });
     host.navigate(home);
   };
 

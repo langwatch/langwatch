@@ -6,8 +6,13 @@
 import { useBreakpointValue } from "@langwatch/design-system/primitives";
 import { FrontendFlags, type FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
 import type { NavigationProject, NavigationUser } from "@langwatch/navigation-contract";
+import { useSyncExternalStore } from "react";
 
 import { belongsToNoOrganization } from "../model/belongs-to-no-organization.ts";
+import {
+  readDashboardsSidebarHint,
+  subscribeToDashboardsSidebarHint,
+} from "../model/dashboards-sidebar-hint.ts";
 import { showsDevelopmentIndicator, useNavigationHost } from "../model/navigation-host.ts";
 import type { ProductId } from "../model/products.ts";
 import {
@@ -68,6 +73,11 @@ export function useNavigationShellState({
   const isSmallScreen = useBreakpointValue({ base: true, lg: false }, { fallback: "lg" });
   const isMobile = useIsMobileViewport();
   const host = useNavigationHost();
+  const sidebarHint = useSyncExternalStore(
+    subscribeToDashboardsSidebarHint,
+    readDashboardsSidebarHint,
+    () => null,
+  );
 
   const user = host.currentUser();
   const project = host.project();
@@ -92,6 +102,7 @@ export function useNavigationShellState({
     isOrgScope,
     isOnOwnPersonalProject: !!team?.isPersonal && team.ownerUserId === user?.id,
     organizationRole: host.organizationRole(),
+    sidebarHint,
   });
 
   if (user && route.isResolverRoute && isOrgless(host)) {

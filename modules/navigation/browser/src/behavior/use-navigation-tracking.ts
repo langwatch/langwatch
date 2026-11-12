@@ -1,9 +1,30 @@
 import { useEffect, useRef } from "react";
 
+import {
+  readDashboardsSidebarHint,
+  writeDashboardsSidebarHint,
+} from "../model/dashboards-sidebar-hint.ts";
 import { useNavigationHost } from "../model/navigation-host.ts";
 import { writeLastVisitedProduct } from "../model/product-memory.ts";
-import { productFromPathname } from "../model/products.ts";
+import { type ProductId, productFromPathname } from "../model/products.ts";
 import { captureSettingsReturnPath } from "../model/resolve-settings-back-target.ts";
+
+/** Remembers the sidebar drawn, not the address, and keeps the Dashboards sidebar hint current. */
+function trackProduct({
+  product,
+  organizationId,
+}: {
+  product: ProductId;
+  organizationId: string | undefined;
+}): void {
+  const shownProduct =
+    product === "dashboards" && readDashboardsSidebarHint() === "llm-ops" ? "llm-ops" : product;
+  if (organizationId) writeLastVisitedProduct({ organizationId, productId: shownProduct });
+  // Dashboards pages keep the hint they arrived with; every other product page resets it.
+  if (product !== "dashboards") {
+    writeDashboardsSidebarHint({ hint: product === "llm-ops" ? "llm-ops" : "dashboards" });
+  }
+}
 
 /**
  * The navigation write points, mounted once in InnerProviders: keep the
@@ -23,9 +44,7 @@ export function useNavigationTracking(): void {
     previousRef.current = { pathname, search };
 
     const product = productFromPathname(pathname);
-    if (product && organizationId) {
-      writeLastVisitedProduct({ organizationId, productId: product });
-    }
+    if (product) trackProduct({ product, organizationId });
 
     const enteringSettings = pathname === "/settings" || pathname.startsWith("/settings/");
     if (enteringSettings && previous) {
