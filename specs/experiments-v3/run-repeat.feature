@@ -112,6 +112,33 @@ Feature: Repeat every dataset row of an experiment run
     And a repetition whose evaluators returned no pass or fail verdict is left out of the count
 
   # ==========================================================================
+  # MCP
+  # ==========================================================================
+
+  @unit
+  Scenario: The MCP run tool passes its repeat on the run
+    When an agent calls platform_run_experiment for "my-evaluation" with a repeat of 3
+    Then the run request body carries a repeat of 3
+    And the tool's answer says every dataset row runs 3 times
+
+  @unit
+  Scenario Outline: The MCP run tool refuses a repeat that is not a whole number from 1 to 5
+    When an agent calls platform_run_experiment for "my-evaluation" with a repeat of <repeat>
+    Then the tool input is refused on its repeat
+    And no run is started
+
+    Examples:
+      | repeat |
+      | 0      |
+      | 6      |
+      | 1.5    |
+
+  @unit
+  Scenario: The MCP run tool tells an agent to repeat rows to tell noise from real failures
+    When an agent lists the MCP tools
+    Then the platform_run_experiment description tells it to run again with a repeat before calling a failing row a real failure
+
+  # ==========================================================================
   # Results page
   # ==========================================================================
 

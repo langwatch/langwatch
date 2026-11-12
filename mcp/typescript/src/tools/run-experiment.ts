@@ -1,4 +1,5 @@
 import { LangWatchApiError, makeRequest } from "../langwatch-api.ts";
+import type { RunExperimentParams } from "../schemas/run-experiment.ts";
 import { deriveRunStatus } from "./experiment-run-status.ts";
 
 interface EvaluationRunResponse {
@@ -24,14 +25,15 @@ interface EvaluationStatusResponse {
   };
 }
 
-export async function handleRunExperiment(params: {
-  slug: string;
-  concurrency?: number;
-}): Promise<string> {
+export async function handleRunExperiment(params: RunExperimentParams): Promise<string> {
+  const body = {
+    ...(params.concurrency !== undefined ? { concurrency: params.concurrency } : {}),
+    ...(params.repeat !== undefined ? { repeat: params.repeat } : {}),
+  };
   const result = (await makeRequest(
     "POST",
     `/api/v1/experiments/${encodeURIComponent(params.slug)}/run`,
-    params.concurrency !== undefined ? { concurrency: params.concurrency } : undefined,
+    Object.keys(body).length > 0 ? body : undefined,
   )) as EvaluationRunResponse;
 
   const lines: string[] = [];
@@ -39,6 +41,9 @@ export async function handleRunExperiment(params: {
   lines.push(`**Run ID**: ${result.runId}`);
   lines.push(`**Status**: ${result.status}`);
   lines.push(`**Total cells**: ${result.total}`);
+  if (params.repeat !== undefined && params.repeat > 1) {
+    lines.push(`**Repeat**: every dataset row runs ${params.repeat} times`);
+  }
   if (result.runUrl) lines.push(`**View at**: ${result.runUrl}`);
   lines.push("");
   lines.push(
