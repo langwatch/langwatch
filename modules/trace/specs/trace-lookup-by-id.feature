@@ -93,3 +93,18 @@ Feature: Looking up a trace by id never fails for a trace that exists
   Scenario: The CLI and the REST route answer the same for one id
     When I get a trace with `langwatch trace get <id> --format json`
     Then the CLI prints the REST route's document for that id
+
+  @unit
+  Scenario: A miss reads only what the id can be
+    Given no trace in the project holds the id
+    When I get a trace by a full trace id
+    Then the read checks the summaries once and the stored spans once
+    And no span id scan runs, since the id is not shaped like a span id
+    And a span id scan runs only for an OTel span id or an SDK span id, since the retention floor
+
+  @integration
+  Scenario: A miss checks every readable project in one read per table
+    Given the key's organisation has many projects and none holds the trace
+    When the by-id read looks for the trace in the other projects
+    Then it reads each table once over the whole project set
+    And a trace id the id index has never seen reads no source rows

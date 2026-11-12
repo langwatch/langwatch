@@ -2,6 +2,8 @@ import type { Trace } from "@langwatch/trace-contract";
 
 const HEX_ONLY = /^[0-9a-f]+$/i;
 const SCENARIO_RUN_ID_PREFIX = "scenariorun_";
+const OTEL_SPAN_ID = /^[0-9a-f]{16}$/;
+const SDK_SPAN_ID_PREFIX = "span_";
 
 /** How a by-id read found the trace when the id was not its exact trace id. */
 export type TraceLookupResolvedFrom = "trace_id_prefix" | "span_id" | "scenario_run_id";
@@ -28,4 +30,9 @@ export function isHexId(id: string): boolean {
 
 export function isScenarioRunId(id: string): boolean {
   return id.startsWith(SCENARIO_RUN_ID_PREFIX);
+}
+
+/** An OTel span id (16 hex) or an SDK one (`span_...`): the only ids worth a span scan. */
+export function looksLikeSpanId(id: string): boolean {
+  return OTEL_SPAN_ID.test(id) || id.startsWith(SDK_SPAN_ID_PREFIX);
 }

@@ -989,28 +989,31 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     authorization,
     projectId,
     spanId,
-    occurredAt,
+    retentionDays,
     limit,
   }: {
     authorization: Authorization;
     projectId: string;
     spanId: string;
-    occurredAt: { from: number; to: number };
+    retentionDays: RetentionDaysProvider | undefined;
     limit: number;
   }): Promise<string[]> {
     const reader = this.reader({ authorization, projectId });
+    const fromMs = await this.floorOver(retentionDays).getFloorMs({
+      tenantId: projectId,
+      table: "stored_spans",
+    });
     const result = await reader.query({
-      // ID_BOUND_SKIP: a span id has no id index; bounded by the window and the bloom index.
+      // ID_BOUND_SKIP: a span id has no id index; TenantId prunes, idx_span_id skips granules.
       query: `
         SELECT DISTINCT TraceId
         FROM stored_spans
         WHERE ${tenantScope("StartTime")}
           AND SpanId = {spanId:String}
           AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64})
-          AND StartTime <= fromUnixTimestamp64Milli({toMs:Int64})
         LIMIT {limit:UInt32}
       `,
-      query_params: { spanId, fromMs: occurredAt.from, toMs: occurredAt.to, limit },
+      query_params: { spanId, fromMs, limit },
       format: "JSONEachRow",
     });
     return traceIdRowsSchema.parse(await result.json()).map((row) => row.TraceId);

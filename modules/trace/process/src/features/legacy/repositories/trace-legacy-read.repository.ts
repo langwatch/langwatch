@@ -137,12 +137,12 @@ export abstract class TraceLegacyReadRepository {
     limit?: number;
   }): Promise<string[]>;
 
-  /** The traces holding a span with this id inside the window; at most `limit`. */
+  /** The traces holding a span with this id since the retention floor; at most `limit`. */
   abstract resolveTraceIdsBySpanId(params: {
     authorization: Authorization;
     projectId: string;
     spanId: string;
-    occurredAt: TraceOccurredAtRange;
+    retentionDays: RetentionDaysProvider | undefined;
     limit: number;
   }): Promise<string[]>;
 

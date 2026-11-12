@@ -201,7 +201,7 @@ describe.skipIf(!clickHouseConfigured)("TraceLegacyReadClickHouseRepository look
           authorization,
           projectId: tenantId,
           spanId: knownSpanId,
-          occurredAt: window,
+          retentionDays: undefined,
           limit: 1,
         }),
       ).resolves.toEqual([spannedTraceId]);

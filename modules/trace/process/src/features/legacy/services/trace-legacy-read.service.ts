@@ -32,6 +32,7 @@ import type { TraceLegacyReadRepository } from "../repositories/trace-legacy-rea
 import {
   isHexId,
   isScenarioRunId,
+  looksLikeSpanId,
   normaliseTraceLookupId,
   type TraceByIdRead,
   type TraceLookupResolvedFrom,
@@ -211,6 +212,7 @@ export class TraceLegacyReadService {
 
         const [alternate] = await findAlternateTraceIds({
           store: this.clickHouseService,
+          mapping: this.mapping,
           authorization,
           projectId,
           traceId,
@@ -483,12 +485,14 @@ export class TraceLegacyReadService {
  */
 async function findAlternateTraceIds({
   store,
+  mapping,
   authorization,
   projectId,
   traceId,
   onAmbiguousPrefix,
 }: {
   store: TraceLegacyReadRepository;
+  mapping: Pick<LegacyTraceMappingService, "findTraceIdsBySpanId">;
   authorization: Authorization;
   projectId: string;
   traceId: string;
@@ -529,11 +533,11 @@ async function findAlternateTraceIds({
     return runTraces.map((id) => ({ traceId: id, resolvedFrom: "scenario_run_id" as const }));
   }
 
-  const holding = await store.resolveTraceIdsBySpanId({
+  if (!looksLikeSpanId(traceId)) return [];
+  const holding = await mapping.findTraceIdsBySpanId({
     authorization,
     projectId,
     spanId: traceId,
-    occurredAt: window,
     limit: 1,
   });
   return holding.map((id) => ({ traceId: id, resolvedFrom: "span_id" as const }));

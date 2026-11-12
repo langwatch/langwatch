@@ -28,6 +28,7 @@ const at = new Date().toISOString().replace("T", " ").replace("Z", "");
 
 let ch: ClickHouseClient;
 let repo: ClickHouseTraceExistenceRepository;
+let statements: string[] = [];
 
 async function insert(table: string, row: Record<string, unknown>) {
   await ch.insert({
@@ -68,6 +69,7 @@ describe.skipIf(!testClickHouseConfigured())(
         indexes: TRACE_ID_INDEXES,
         driver: {
           async execute(request: QueryRequest) {
+            statements.push(request.sql);
             const result = await ch.query({
               query: request.sql,
               format: "JSONEachRow",
@@ -79,6 +81,7 @@ describe.skipIf(!testClickHouseConfigured())(
       });
       repo = ClickHouseTraceExistenceRepository.create({
         resolveClient: MemberTraceClickHouseClientRepository.resolverFor(member),
+        clickhouse: member,
       });
       await insert("trace_summaries", {
         ProjectionId: `proj-${nanoid()}`,
@@ -117,6 +120,26 @@ describe.skipIf(!testClickHouseConfigured())(
         });
 
         expect(holding.toSorted()).toEqual([summarised, spansOnly].toSorted());
+      });
+    });
+
+    describe("given a trace id no project holds", () => {
+      /** @scenario "A miss checks every readable project in one read per table" */
+      it("reads each table's id index once over the whole set, and no source", async () => {
+        const projectIds = Array.from(
+          { length: 100 },
+          (_, index) => `holding-miss-${run}-${index}`,
+        );
+        statements = [];
+
+        const holding = await repo.findProjectsHoldingTrace({
+          projectIds: [summarised, spansOnly, ...projectIds],
+          traceId: `trace-${nanoid()}`,
+        });
+
+        expect(holding).toEqual([]);
+        expect(statements).toHaveLength(2);
+        expect(statements.every((sql) => sql.includes("_id_index"))).toBe(true);
       });
     });
   },

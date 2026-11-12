@@ -84,7 +84,6 @@ function makeService(): TraceLegacyReadService {
     traceRead: createApiFixture<TraceLegacyReadRepository>(
       {
         resolveTraceIdByPrefix: mockResolveTraceIdByPrefix,
-        resolveTraceIdsBySpanId: mockBySpanId,
         resolveTraceIdsByScenarioRunId: mockByScenarioRunId,
         findTraceSummaries: vi.fn(),
         findCustomersAndLabels: vi.fn(),
@@ -98,6 +97,7 @@ function makeService(): TraceLegacyReadService {
       {
         findTracesWithSpans: mockGetTracesWithSpans,
         findTraceFromStoredSpans: mockFromStoredSpans,
+        findTraceIdsBySpanId: mockBySpanId,
         findTracesWithSpansByThreadIds: vi.fn(),
         listAllTracesForProject: vi.fn(),
         findTracesByThreadId: vi.fn(),
@@ -305,6 +305,50 @@ describe("given a project with traces stored in ClickHouse", () => {
 
       expect(result?.trace_id).toBe(FULL_TRACE_ID);
       expect(result?.lookup).toEqual({ requestedId: spanId, resolvedFrom: "span_id" });
+    });
+  });
+
+  describe("when no read finds the id", () => {
+    const reads = () => ({
+      exact: mockGetTracesWithSpans.mock.calls.length,
+      fromSpans: mockFromStoredSpans.mock.calls.length,
+      prefix: mockResolveTraceIdByPrefix.mock.calls.length,
+      scenarioRun: mockByScenarioRunId.mock.calls.length,
+      spanId: mockBySpanId.mock.calls.length,
+    });
+
+    /** @scenario A miss reads only what the id can be */
+    it("reads a full trace id once and its stored spans once, and scans no span ids", async () => {
+      await makeService().findById({
+        authorization: OWN_READ,
+        projectId: PROJECT_ID,
+        traceId: "f".repeat(32),
+        protections,
+      });
+
+      expect(reads()).toEqual({ exact: 1, fromSpans: 1, prefix: 0, scenarioRun: 0, spanId: 0 });
+    });
+
+    it("scans span ids only for an id shaped like one", async () => {
+      await makeService().findById({
+        authorization: OWN_READ,
+        projectId: PROJECT_ID,
+        traceId: "trace-from-a-custom-sdk",
+        protections,
+      });
+
+      expect(reads()).toEqual({ exact: 1, fromSpans: 1, prefix: 0, scenarioRun: 0, spanId: 0 });
+    });
+
+    it("scans span ids for an OTel span id, after its prefix read", async () => {
+      await makeService().findById({
+        authorization: OWN_READ,
+        projectId: PROJECT_ID,
+        traceId: "8f1c2d3e4a5b6c7d",
+        protections,
+      });
+
+      expect(reads()).toEqual({ exact: 1, fromSpans: 1, prefix: 1, scenarioRun: 0, spanId: 1 });
     });
   });
 
