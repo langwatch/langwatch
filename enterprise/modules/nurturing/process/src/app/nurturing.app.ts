@@ -16,13 +16,14 @@ import { UserApi } from "@langwatch/user-contract";
 import type { NurturingChannels } from "../channels/nurturing.channels.ts";
 import { buildNurturingPipeline, type NurturingPipeline } from "../eventing/nurturing.pipeline.ts";
 import type { NurturingRepositories } from "../repositories/nurturing.repositories.ts";
-import type { UncopiedProjectOutcome } from "../rules/nurturing-project-usage.rules.ts";
+import type { NurturingCountedTrace } from "../rules/nurturing-trace-day.rules.ts";
 import { NurturingCodingMilestonesService } from "../services/nurturing-coding-milestones.service.ts";
 import { NurturingDeliveryService } from "../services/nurturing-delivery.service.ts";
 import { NurturingMemberFactsService } from "../services/nurturing-member-facts.service.ts";
 import { NurturingMilestonesService } from "../services/nurturing-milestones.service.ts";
 import { NurturingOrganizationUsageService } from "../services/nurturing-organization-usage.service.ts";
 import { NurturingProjectFactsService } from "../services/nurturing-project-facts.service.ts";
+import { NurturingTraceCountingService } from "../services/nurturing-trace-counting.service.ts";
 import { NurturingUncopiedProjectsService } from "../services/nurturing-uncopied-projects.service.ts";
 import { NurturingUserErasureService } from "../services/nurturing-user-erasure.service.ts";
 import { NurturingService } from "../services/nurturing.service.ts";
@@ -47,20 +48,24 @@ export class NurturingModule implements NurturingApi {
   readonly #pipeline: NurturingPipeline;
   readonly #organizationUsage: NurturingOrganizationUsageService | undefined;
   readonly #uncopiedProjects: NurturingUncopiedProjectsService;
+  readonly #traceCounting: NurturingTraceCountingService;
   #commands: EventingCommands<NurturingPipeline> | undefined;
 
   private constructor({
     pipeline,
     organizationUsage,
     uncopiedProjects,
+    traceCounting,
   }: Readonly<{
     pipeline: NurturingPipeline;
     organizationUsage: NurturingOrganizationUsageService | undefined;
     uncopiedProjects: NurturingUncopiedProjectsService;
+    traceCounting: NurturingTraceCountingService;
   }>) {
     this.#pipeline = pipeline;
     this.#organizationUsage = organizationUsage;
     this.#uncopiedProjects = uncopiedProjects;
+    this.#traceCounting = traceCounting;
   }
 
   static async create({
@@ -125,6 +130,12 @@ export class NurturingModule implements NurturingApi {
       uncopiedProjects: repositories.uncopiedProjects,
       clock: { nowMs: () => nowInstant().epochMilliseconds },
     });
+    const traceCounting = NurturingTraceCountingService.create({
+      traceDays: repositories.traceDays,
+      placements: repositories.placements,
+      organizationsCreated: repositories.organizationsCreated,
+      uncopiedProjects,
+    });
     return new NurturingModule({
       pipeline: buildNurturingPipeline({
         deliver: (input) => delivery.deliver(input),
@@ -140,6 +151,7 @@ export class NurturingModule implements NurturingApi {
       }),
       organizationUsage,
       uncopiedProjects,
+      traceCounting,
     });
   }
 
@@ -162,14 +174,9 @@ export class NurturingModule implements NurturingApi {
     await this.#organizationUsage?.tracesChanged(input);
   }
 
-  /** Whether this process already dropped a project with no placement copy. */
-  uncopiedProjectDropped(input: Readonly<{ projectId: string }>): boolean {
-    return this.#uncopiedProjects.isDropped(input);
-  }
-
-  /** A trace batch of a project nurturing has no placement copy of: retried, or dropped. */
-  uncopiedProjectOutcome(input: Readonly<{ projectId: string }>): Promise<UncopiedProjectOutcome> {
-    return this.#uncopiedProjects.outcomeOf(input);
+  /** Counts the traces whose organization is inside its window; rejects while a copy is awaited. */
+  countTraces(input: Readonly<{ traces: readonly NurturingCountedTrace[] }>): Promise<void> {
+    return this.#traceCounting.countTraces(input);
   }
 
   /** A project's placement copy was written: it is no longer uncopied. */

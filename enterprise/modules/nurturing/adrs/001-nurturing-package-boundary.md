@@ -24,8 +24,8 @@ Nurturing is its own enterprise module and is event driven:
   in nurturing's own tables.
 - The events follow the existing conventions: each is declared in its owner's
   contract with a Zod schema, typed `lw.<module>.<fact>`, carries its tenant and
-  `occurredAt`, and is parsed by that schema on arrival. A copy is idempotent, so
-  a redelivered or late event changes nothing.
+  `occurredAt`, and is parsed by that schema on arrival. Each copy is idempotent,
+  except the trace-day counts (see Persistence).
 
 An owner that pushes a fact may call `NurturingApi.recordSignal` with a signal
 from one Zod discriminated union by kind; the command lands as an event on

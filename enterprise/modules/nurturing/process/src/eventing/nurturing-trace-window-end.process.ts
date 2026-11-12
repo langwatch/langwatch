@@ -5,7 +5,10 @@
  * Spec: enterprise/modules/nurturing/specs/project-usage.feature
  */
 import type { IntentSpec, WakeHandler } from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
+
+const nurturingLogger = createLogger("langwatch:nurturing");
 
 export const TRACE_WINDOW_END_PROCESS_NAME = "nurturingTraceWindowEnd";
 
@@ -64,6 +67,9 @@ export function runTraceWindowEnd(
         processName: TRACE_WINDOW_END_PROCESS_NAME,
         before: startedAt - SWEEP_ROW_RETENTION_MS,
       })
-      .catch(() => 0);
+      .catch((error: unknown) => {
+        nurturingLogger.warn({ error }, "the trace window sweep's outbox rows could not be pruned");
+        return 0;
+      });
   };
 }

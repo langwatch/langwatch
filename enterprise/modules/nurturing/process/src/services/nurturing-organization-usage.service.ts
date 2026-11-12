@@ -19,6 +19,7 @@ import {
   windowStartDayOf,
 } from "../rules/nurturing-project-usage.rules.ts";
 import { traceCountsOf } from "../rules/nurturing-trace-day.rules.ts";
+import { copiedProjectOf } from "./nurturing-copied-project.ts";
 
 /** Members read and identified per request, so a large organization never opens a burst. */
 const MEMBER_BATCH_SIZE = 100;
@@ -84,15 +85,12 @@ export class NurturingOrganizationUsageService {
   private async copiedOrganizationOf({
     projectId,
   }: Readonly<{ projectId: string }>): Promise<CopiedOrganization | undefined> {
-    const { placements, organizationsCreated } = this.dependencies;
     if (projectId === "") return undefined;
-    const placement = await placements.getPlacement({ projectId });
-    if (placement.outcome !== "known") return undefined;
-    const { organizationId } = placement;
-    const { organizationCreatedAt } = await organizationsCreated.findOrganizationCreatedAt({
-      organizationId,
-    });
-    return organizationCreatedAt === null ? undefined : { organizationId, organizationCreatedAt };
+    const { placements, organizationsCreated } = this.dependencies;
+    const project = await copiedProjectOf({ projectId, placements, organizationsCreated });
+    if (project.outcome !== "placed" || project.organizationCreatedAt === null) return undefined;
+    const { organizationId, organizationCreatedAt } = project;
+    return { organizationId, organizationCreatedAt };
   }
 
   private async syncOrganization({

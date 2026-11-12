@@ -18,7 +18,7 @@ export const PROJECT_USAGE_TRIAL_WINDOW_MS = 14 * DAY_MS;
 /**
  * How long after an organization's creation its traces are counted, and its trace traits sent:
  * the free window plus a week for the emails that follow it. Past it nothing reads the counts, so
- * none is kept: the per-trace dedup rows then scale with new organizations' traffic alone.
+ * none is kept: trace-day rows and Customer.io traits only matter while the emails run.
  */
 export const TRACE_COUNTING_WINDOW_MS = PROJECT_USAGE_TRIAL_WINDOW_MS + 7 * DAY_MS;
 
