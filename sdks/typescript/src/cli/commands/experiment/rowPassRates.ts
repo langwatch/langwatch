@@ -7,23 +7,27 @@ export interface RowPassRate {
   targetId: string | null;
   targetName: string | null;
   passed: number;
-  /** Repetitions that reached a pass or fail verdict, errors included. */
+  /** Repetitions that reached a pass or fail verdict. */
   graded: number;
+  /** Repetitions whose target or evaluator errored, left out of `graded` as the run Score is. */
+  errors: number;
   repeat: number;
 }
 
-/** A repetition's verdict: an error or a failed verdict fails it; no verdict leaves it out. */
+type Verdict = boolean | "error" | null | undefined;
+
+/** A repetition's verdict: a fail fails it, else an error marks it errored; no verdict is null. */
 function repetitionVerdict({
   errored,
   verdicts,
 }: {
   errored: boolean;
-  verdicts: (boolean | null | undefined)[];
-}): boolean | null {
-  if (errored) return false;
-  const graded = verdicts.filter((verdict): verdict is boolean => typeof verdict === "boolean");
-  if (graded.length === 0) return null;
-  return graded.every(Boolean);
+  verdicts: Verdict[];
+}): "passed" | "failed" | "errored" | null {
+  if (errored) return "errored";
+  if (verdicts.includes(false)) return "failed";
+  if (verdicts.includes("error")) return "errored";
+  return verdicts.includes(true) ? "passed" : null;
 }
 
 const keyOf = (index: number, targetId: string | null | undefined) => `${index}:${targetId ?? ""}`;
@@ -40,10 +44,16 @@ function cellsOf(
   return cells;
 }
 
-function count({ rate, verdict }: { rate: RowPassRate; verdict: boolean | null }): void {
-  if (verdict === null) return;
-  rate.graded += 1;
-  if (verdict) rate.passed += 1;
+function count({
+  rate,
+  verdict,
+}: {
+  rate: RowPassRate;
+  verdict: ReturnType<typeof repetitionVerdict>;
+}): void {
+  if (verdict === "errored") rate.errors += 1;
+  if (verdict === "passed" || verdict === "failed") rate.graded += 1;
+  if (verdict === "passed") rate.passed += 1;
 }
 
 /**
@@ -64,11 +74,11 @@ export function rowPassRatesOf({
   const errored = new Set(
     results.dataset.filter((entry) => !!entry.error).map((e) => keyOf(e.index, e.targetId)),
   );
-  const verdicts = new Map<string, (boolean | null | undefined)[]>();
+  const verdicts = new Map<string, Verdict[]>();
   for (const evaluation of results.evaluations) {
     if (evaluation.status === "skipped") continue;
     const key = keyOf(evaluation.index, evaluation.targetId);
-    const verdict = evaluation.status === "error" ? false : evaluation.passed;
+    const verdict = evaluation.status === "error" ? "error" : evaluation.passed;
     verdicts.set(key, [...(verdicts.get(key) ?? []), verdict]);
   }
 
@@ -82,6 +92,7 @@ export function rowPassRatesOf({
       targetName: cell.targetId ? (names.get(cell.targetId) ?? null) : null,
       passed: 0,
       graded: 0,
+      errors: 0,
       repeat,
     };
     count({
@@ -99,9 +110,12 @@ export function rowPassRatesOf({
   );
 }
 
-/** "2/3 passed (67%)", or "no pass or fail verdict" for a row nothing graded. */
+/** "2/3 passed (67%)", "2/2 passed (100%), 1 error", or "no pass or fail verdict". */
 export function passRateText(rate: RowPassRate): string {
-  if (rate.graded === 0) return "no pass or fail verdict";
+  const errors = rate.errors > 0 ? `${rate.errors} ${rate.errors === 1 ? "error" : "errors"}` : "";
+  if (rate.graded === 0)
+    return errors ? `no pass or fail verdict, ${errors}` : "no pass or fail verdict";
   const percent = Math.round((rate.passed / rate.graded) * 100);
-  return `${rate.passed}/${rate.graded} passed (${percent}%)`;
+  const passRate = `${rate.passed}/${rate.graded} passed (${percent}%)`;
+  return errors ? `${passRate}, ${errors}` : passRate;
 }

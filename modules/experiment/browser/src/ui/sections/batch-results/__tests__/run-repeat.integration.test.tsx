@@ -124,6 +124,28 @@ describe("a repeated run's results", () => {
     });
   });
 
+  describe("given a repeated run where one repetition's evaluator call errored", () => {
+    /** @scenario "The results page leaves an errored evaluation out of a row's pass rate" */
+    it("counts the error apart from the row's pass rate", () => {
+      const repeated = run({ repeat: 3 });
+      const evaluations = repeated.evaluations.map((evaluation) =>
+        evaluation.index === 1
+          ? { ...evaluation, status: "error" as const, passed: undefined }
+          : evaluation,
+      );
+      renderWithDesignSystem(
+        <BatchEvaluationResultsTable
+          data={transformBatchEvaluationData({ ...repeated, evaluations })}
+          isLoading={false}
+          disableVirtualization
+        />,
+      );
+
+      expect(screen.getAllByTestId("row-pass-rate-0")[0]).toHaveTextContent(/^2\/2 · 1 error$/);
+      expect(screen.getAllByTestId("row-pass-rate-1")[0]).toHaveTextContent(/^3\/3$/);
+    });
+  });
+
   describe("given a run with no repeat", () => {
     /** @scenario "The results page shows an unrepeated run as before" */
     it("shows no Pass rate column and numbers rows 1, 2, 3", () => {

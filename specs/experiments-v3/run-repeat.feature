@@ -104,11 +104,16 @@ Feature: Repeat every dataset row of an experiment run
     Then the output lists dataset row 1 at "2/3 passed (67%)" and dataset row 2 at "3/3 passed (100%)"
     And the JSON output carries the same pass rates under rowPassRates
 
+  # The run's Score counts pass and fail verdicts only and leaves an errored
+  # evaluation out. The pass rate follows it, so the two never disagree.
+
   @unit
-  Scenario: A run that errors counts as a failed repetition
+  Scenario: An errored repetition is left out of the pass rate and counted as an error
     Given a repeated run where one repetition of a row errored in its target
+    And another repetition's evaluator call errored
     When the pass rates are counted
-    Then that repetition counts as failed
+    Then neither errored repetition counts as passed or failed
+    And the pass rate counts them as errors, such as "1/1 passed (100%), 2 errors"
     And a repetition whose evaluators returned no pass or fail verdict is left out of the count
 
   # ==========================================================================
@@ -149,6 +154,12 @@ Feature: Repeat every dataset row of an experiment run
     Then every run row is numbered by its dataset row and repetition, such as "1 · 2/3"
     And a "Pass rate" column shows each row's dataset row pass rate per target, such as "2/3"
     And the run's title and its run list entry read "Repeat 3"
+
+  @integration
+  Scenario: The results page leaves an errored evaluation out of a row's pass rate
+    Given a run with a repeat of 3 where one repetition's evaluator call errored
+    When the results page shows that run
+    Then that dataset row's pass rate counts the error apart, such as "2/2 · 1 error"
 
   @integration
   Scenario: The results page shows an unrepeated run as before

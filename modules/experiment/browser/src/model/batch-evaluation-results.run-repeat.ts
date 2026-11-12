@@ -23,8 +23,11 @@ export function repetitionLabel({ index, repeat }: { index: number; repeat: numb
   return `${datasetRow + 1} · ${repetition + 1}/${repeat}`;
 }
 
-/** How often one dataset row passed against one target, over its repetitions. */
-export type RowPassRate = { passed: number; graded: number };
+/**
+ * How often one dataset row passed against one target, over its repetitions. An errored
+ * repetition is counted apart and left out of `graded`, as the run's Score leaves it out.
+ */
+export type RowPassRate = { passed: number; graded: number; errors: number };
 
 /** One run row's outcome against one target, as the table holds it. */
 type RepetitionOutcome = {
@@ -33,16 +36,17 @@ type RepetitionOutcome = {
   evaluatorResults: { status: string; passed?: boolean | null }[];
 };
 
-/** A repetition's verdict: an error or a failed verdict fails it; no verdict leaves it out. */
-export function repetitionVerdict(outcome: RepetitionOutcome): boolean | null {
-  if (outcome.error || outcome.domainError) return false;
-  const verdicts = outcome.evaluatorResults.flatMap((result) => {
-    if (result.status === "error") return [false];
-    if (result.status === "skipped") return [];
-    return typeof result.passed === "boolean" ? [result.passed] : [];
-  });
-  if (verdicts.length === 0) return null;
-  return verdicts.every(Boolean);
+/** A repetition's verdict: a fail fails it, else an error marks it errored; no verdict is null. */
+export function repetitionVerdict(
+  outcome: RepetitionOutcome,
+): "passed" | "failed" | "errored" | null {
+  if (outcome.error || outcome.domainError) return "errored";
+  const graded = outcome.evaluatorResults.filter((result) => result.status !== "skipped");
+  if (graded.some((result) => result.status !== "error" && result.passed === false)) {
+    return "failed";
+  }
+  if (graded.some((result) => result.status === "error")) return "errored";
+  return graded.some((result) => result.passed === true) ? "passed" : null;
 }
 
 /** The pass rate of every dataset row and target, keyed `${datasetRow}:${targetId}`. */
@@ -59,19 +63,21 @@ export function rowPassRatesOf({
     for (const [targetId, outcome] of Object.entries(row.targets)) {
       const verdict = repetitionVerdict(outcome);
       const key = `${datasetRow}:${targetId}`;
-      const rate = rates.get(key) ?? { passed: 0, graded: 0 };
-      if (verdict !== null) {
-        rate.graded += 1;
-        if (verdict) rate.passed += 1;
-      }
+      const rate = rates.get(key) ?? { passed: 0, graded: 0, errors: 0 };
+      if (verdict === "errored") rate.errors += 1;
+      if (verdict === "passed" || verdict === "failed") rate.graded += 1;
+      if (verdict === "passed") rate.passed += 1;
       rates.set(key, rate);
     }
   }
   return rates;
 }
 
-/** "2/3", or "-" for a row nothing graded. */
+/** "2/3", "2/2 · 1 error", or "-" for a row nothing graded or errored. */
 export function passRateText(rate: RowPassRate | undefined): string {
-  if (!rate || rate.graded === 0) return "-";
-  return `${rate.passed}/${rate.graded}`;
+  if (!rate) return "-";
+  const errors = rate.errors > 0 ? `${rate.errors} ${rate.errors === 1 ? "error" : "errors"}` : "";
+  if (rate.graded === 0) return errors || "-";
+  const passRate = `${rate.passed}/${rate.graded}`;
+  return errors ? `${passRate} · ${errors}` : passRate;
 }

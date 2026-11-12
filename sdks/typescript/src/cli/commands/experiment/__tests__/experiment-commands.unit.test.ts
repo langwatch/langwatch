@@ -33,7 +33,7 @@ vi.mock("ora", () => ({
 
 import type * as experimentsApiServiceModule from "@/client-sdk/services/experiments/experiments-api.service";
 
-import { rowPassRatesOf } from "../rowPassRates";
+import { passRateText, rowPassRatesOf } from "../rowPassRates";
 import { runExperimentCommand } from "../run";
 import { experimentStatusCommand } from "../status";
 
@@ -225,8 +225,8 @@ describe("runExperimentCommand()", () => {
       expect(printed).toContain("3/3 passed (100%)");
       expect(result?.data).toMatchObject({
         rowPassRates: [
-          { row: 1, targetId: "target_a", passed: 2, graded: 3, repeat: 3 },
-          { row: 2, targetId: "target_a", passed: 3, graded: 3, repeat: 3 },
+          { row: 1, targetId: "target_a", passed: 2, graded: 3, errors: 0, repeat: 3 },
+          { row: 2, targetId: "target_a", passed: 3, graded: 3, errors: 0, repeat: 3 },
         ],
       });
     });
@@ -337,16 +337,17 @@ describe("experimentStatusCommand()", () => {
 });
 
 describe("rowPassRatesOf()", () => {
-  describe("given a repetition whose target errored and one with no pass or fail verdict", () => {
-    /** @scenario "A run that errors counts as a failed repetition" */
-    it("counts the error as failed and leaves the ungraded repetition out", () => {
+  describe("given repetitions whose target or evaluator errored and one with no verdict", () => {
+    /** @scenario "An errored repetition is left out of the pass rate and counted as an error" */
+    it("counts the errors apart and leaves them and the ungraded repetition out", () => {
       const rates = rowPassRatesOf({
-        repeat: 3,
+        repeat: 4,
         results: {
           dataset: [
             { index: 0, targetId: "target_a", entry: {} },
             { index: 1, targetId: "target_a", entry: {}, error: "timed out" },
             { index: 2, targetId: "target_a", entry: {} },
+            { index: 3, targetId: "target_a", entry: {} },
           ],
           evaluations: [
             {
@@ -357,6 +358,7 @@ describe("rowPassRatesOf()", () => {
               passed: true,
             },
             { evaluator: "score", targetId: "target_a", status: "processed", index: 2, score: 0.4 },
+            { evaluator: "judge", targetId: "target_a", status: "error", index: 3 },
           ],
         },
       });
@@ -367,10 +369,12 @@ describe("rowPassRatesOf()", () => {
           targetId: "target_a",
           targetName: null,
           passed: 1,
-          graded: 2,
-          repeat: 3,
+          graded: 1,
+          errors: 2,
+          repeat: 4,
         },
       ]);
+      expect(passRateText(rates[0]!)).toBe("1/1 passed (100%), 2 errors");
     });
   });
 });

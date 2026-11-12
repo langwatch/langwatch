@@ -202,5 +202,5 @@ function printRowPassRates({ rates }: { rates: RowPassRate[] }): void {
 
 function passRateColour(rate: RowPassRate): (text: string) => string {
   if (rate.graded === 0) return chalk.gray;
-  return rate.passed === rate.graded ? chalk.green : chalk.yellow;
+  return rate.passed === rate.graded && rate.errors === 0 ? chalk.green : chalk.yellow;
 }
