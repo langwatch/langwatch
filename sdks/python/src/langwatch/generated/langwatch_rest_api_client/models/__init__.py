@@ -2339,6 +2339,11 @@ from .get_api_traces_facets_response_401 import GetApiTracesFacetsResponse401
 from .get_api_traces_facets_response_403 import GetApiTracesFacetsResponse403
 from .get_api_traces_facets_response_422 import GetApiTracesFacetsResponse422
 from .get_api_traces_facets_response_500 import GetApiTracesFacetsResponse500
+from .get_api_traces_settle_settings_response_200 import GetApiTracesSettleSettingsResponse200
+from .get_api_traces_settle_settings_response_400 import GetApiTracesSettleSettingsResponse400
+from .get_api_traces_settle_settings_response_401 import GetApiTracesSettleSettingsResponse401
+from .get_api_traces_settle_settings_response_422 import GetApiTracesSettleSettingsResponse422
+from .get_api_traces_settle_settings_response_500 import GetApiTracesSettleSettingsResponse500
 from .get_api_triggers_by_id_fires_response_200 import GetApiTriggersByIdFiresResponse200
 from .get_api_triggers_by_id_fires_response_200_fires_item import GetApiTriggersByIdFiresResponse200FiresItem
 from .get_api_triggers_by_id_fires_response_404 import GetApiTriggersByIdFiresResponse404
@@ -10753,6 +10758,11 @@ __all__ = (
     "GetApiTracesFacetsResponse403",
     "GetApiTracesFacetsResponse422",
     "GetApiTracesFacetsResponse500",
+    "GetApiTracesSettleSettingsResponse200",
+    "GetApiTracesSettleSettingsResponse400",
+    "GetApiTracesSettleSettingsResponse401",
+    "GetApiTracesSettleSettingsResponse422",
+    "GetApiTracesSettleSettingsResponse500",
     "GetApiTriggersByIdFiresResponse200",
     "GetApiTriggersByIdFiresResponse200FiresItem",
     "GetApiTriggersByIdFiresResponse404",

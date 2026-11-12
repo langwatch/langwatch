@@ -100711,6 +100711,32 @@
                           "null"
                         ]
                       },
+                      "traceQuietPeriodMs": {
+                        "description": "Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the project's recommendation. Absent on servers that predate judge trace settings.",
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "traceWaitTimeoutMs": {
+                        "description": "Milliseconds the judge waits for the agent's trace before a verdict, or null for the project's recommendation. Absent on servers that predate judge trace settings.",
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
                       "maxTurns": {
                         "description": "The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family.",
                         "anyOf": [
@@ -100914,6 +100940,32 @@
                       "type": [
                         "string",
                         "null"
+                      ]
+                    },
+                    "traceQuietPeriodMs": {
+                      "description": "Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the project's recommendation. Absent on servers that predate judge trace settings.",
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "traceWaitTimeoutMs": {
+                      "description": "Milliseconds the judge waits for the agent's trace before a verdict, or null for the project's recommendation. Absent on servers that predate judge trace settings.",
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
                       ]
                     },
                     "maxTurns": {
@@ -101130,6 +101182,32 @@
                       }
                     ]
                   },
+                  "traceQuietPeriodMs": {
+                    "description": "Milliseconds (0 to 60000) the agent's trace must stay unchanged before the judge reads it. Null uses the project's recommendation.",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 60000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "traceWaitTimeoutMs": {
+                    "description": "Milliseconds (1000 to 300000) the judge waits for the agent's trace before a verdict. Null uses the project's recommendation.",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1000,
+                        "maximum": 300000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "maxTurns": {
                     "description": "Maximum conversation turns for a run of this scenario. Null uses the default.",
                     "anyOf": [
@@ -101308,6 +101386,32 @@
                       "type": [
                         "string",
                         "null"
+                      ]
+                    },
+                    "traceQuietPeriodMs": {
+                      "description": "Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the project's recommendation. Absent on servers that predate judge trace settings.",
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "traceWaitTimeoutMs": {
+                      "description": "Milliseconds the judge waits for the agent's trace before a verdict, or null for the project's recommendation. Absent on servers that predate judge trace settings.",
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
                       ]
                     },
                     "maxTurns": {
@@ -101543,6 +101647,32 @@
                         "null"
                       ]
                     },
+                    "traceQuietPeriodMs": {
+                      "description": "Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the project's recommendation. Absent on servers that predate judge trace settings.",
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "traceWaitTimeoutMs": {
+                      "description": "Milliseconds the judge waits for the agent's trace before a verdict, or null for the project's recommendation. Absent on servers that predate judge trace settings.",
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "maxTurns": {
                       "description": "The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family.",
                       "anyOf": [
@@ -101753,6 +101883,32 @@
                         "type": "string",
                         "maxLength": 200,
                         "pattern": "^[a-zA-Z0-9_-]+(?:\\/[^\\s/]+)+$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "traceQuietPeriodMs": {
+                    "description": "Milliseconds (0 to 60000) the agent's trace must stay unchanged before the judge reads it. Null uses the project's recommendation.",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 60000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "traceWaitTimeoutMs": {
+                    "description": "Milliseconds (1000 to 300000) the judge waits for the agent's trace before a verdict. Null uses the project's recommendation.",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1000,
+                        "maximum": 300000
                       },
                       {
                         "type": "null"
@@ -101959,6 +102115,32 @@
                         "null"
                       ]
                     },
+                    "traceQuietPeriodMs": {
+                      "description": "Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the project's recommendation. Absent on servers that predate judge trace settings.",
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "traceWaitTimeoutMs": {
+                      "description": "Milliseconds the judge waits for the agent's trace before a verdict, or null for the project's recommendation. Absent on servers that predate judge trace settings.",
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "maxTurns": {
                       "description": "The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family.",
                       "anyOf": [
@@ -102169,6 +102351,32 @@
                         "type": "string",
                         "maxLength": 200,
                         "pattern": "^[a-zA-Z0-9_-]+(?:\\/[^\\s/]+)+$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "traceQuietPeriodMs": {
+                    "description": "Milliseconds (0 to 60000) the agent's trace must stay unchanged before the judge reads it. Null uses the project's recommendation.",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 60000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "traceWaitTimeoutMs": {
+                    "description": "Milliseconds (1000 to 300000) the judge waits for the agent's trace before a verdict. Null uses the project's recommendation.",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1000,
+                        "maximum": 300000
                       },
                       {
                         "type": "null"
@@ -121033,6 +121241,153 @@
               }
             }
           }
+        }
+      }
+    },
+    "/api/v1/traces/settle-settings": {
+      "get": {
+        "operationId": "getApiTracesSettleSettings",
+        "responses": {
+          "200": {
+            "description": "The recommended wait, extension and quiet period, in milliseconds",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "waitTimeoutMs": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "waitExtensionMs": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "quietPeriodMs": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "waitTimeoutMs",
+                    "waitExtensionMs",
+                    "quietPeriodMs"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "description": "How long a scenario judge should wait for this project's traces before a verdict: the first wait, the one extension it may ask for, and how long the span set must hold still. Measured on the project's own ingest; defaults without history.",
+        "summary": "Recommended trace wait for a scenario judge",
+        "tags": [
+          "Traces"
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "traces:view"
+          ]
         }
       }
     },
