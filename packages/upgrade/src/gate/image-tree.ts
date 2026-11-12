@@ -200,7 +200,8 @@ export function stampTreeRelease({
 
 /**
  * The first step id the image declares twice (two goose files with one numeric prefix), with the
- * goose files behind it: the ledger registers ids in one upsert, which Postgres rejects on a repeat.
+ * goose files behind it: the ledger registers ids in one upsert, which Postgres rejects on a
+ * repeat.
  */
 export function duplicateStep({
   steps,
