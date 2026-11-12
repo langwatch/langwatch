@@ -52,7 +52,7 @@ describe("given the ClickHouse member in front of a server that records logins",
     rmSync(root, { recursive: true, force: true });
   });
 
-  const withMember = async (
+  const sendingThrough = async (
     config: ClickHouseConfig,
     use: (send: () => Promise<unknown>) => Promise<void>,
   ) => {
@@ -74,7 +74,7 @@ describe("given the ClickHouse member in front of a server that records logins",
   describe("when CLICKHOUSE_PASSWORD_FILE is not set", () => {
     /** @scenario "Without a password file the client logs in with the URL's credentials" */
     it("logs in with the URL's user and password", async () => {
-      await withMember({ url: `http://app:url-password@${host}/langwatch` }, async (send) => {
+      await sendingThrough({ url: `http://app:url-password@${host}/langwatch` }, async (send) => {
         await send();
       });
 
@@ -87,7 +87,7 @@ describe("given the ClickHouse member in front of a server that records logins",
     it("logs in with the URL's user and the file's password", async () => {
       writeFileSync(passwordPath, "file-password\n");
 
-      await withMember(
+      await sendingThrough(
         { url: `http://app:stale-password@${host}/langwatch`, passwordFile: passwordPath },
         async (send) => {
           await send();
@@ -101,7 +101,7 @@ describe("given the ClickHouse member in front of a server that records logins",
     it("logs in with a rotated password once the refresh window has passed", async () => {
       writeFileSync(passwordPath, "first-password");
 
-      await withMember(
+      await sendingThrough(
         { url: `http://app@${host}/langwatch`, passwordFile: passwordPath },
         async (send) => {
           await send();
@@ -117,8 +117,9 @@ describe("given the ClickHouse member in front of a server that records logins",
     it("logs in as default when the URL names no user", async () => {
       writeFileSync(passwordPath, "file-password");
 
-      await withMember({ url: `http://${host}/langwatch`, passwordFile: passwordPath }, (send) =>
-        send().then(() => undefined),
+      await sendingThrough(
+        { url: `http://${host}/langwatch`, passwordFile: passwordPath },
+        (send) => send().then(() => undefined),
       );
 
       expect(logins).toEqual(["default:file-password"]);
@@ -128,7 +129,7 @@ describe("given the ClickHouse member in front of a server that records logins",
     it("leaves a private route's own credentials alone", async () => {
       writeFileSync(passwordPath, "file-password");
 
-      await withMember(
+      await sendingThrough(
         {
           url: `http://app@${host}/langwatch`,
           passwordFile: passwordPath,
