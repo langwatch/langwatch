@@ -1,7 +1,7 @@
 import type { PlanGates } from "./gates.ts";
 import { ENTERPRISE_CAPABILITIES } from "./gates.ts";
 import type { PlanLimits } from "./limits.ts";
-import { UNLIMITED, UNLIMITED_MESSAGES } from "./limits.ts";
+import { UNLIMITED, UNLIMITED_MESSAGES, UNLIMITED_SEATS } from "./limits.ts";
 import type { MoneyByCurrency, PlanType } from "./plan-type.ts";
 import type { Plan } from "./plan.ts";
 
@@ -27,7 +27,7 @@ const ALL_GATES: PlanGates = {
 };
 
 /** Lite seats are uncapped on every paid cloud plan; the free tier sells none. */
-const PAID_MEMBERS_LITE = 9_999;
+const PAID_MEMBERS_LITE = UNLIMITED_SEATS;
 
 function tieredLimits({
   automationDailyDispatch,
