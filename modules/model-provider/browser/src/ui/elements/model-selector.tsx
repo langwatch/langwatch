@@ -507,6 +507,11 @@ export function ModelSelector({
           </Box>
         </Field.Root>
         <Select.List data-testid="model-selector-list">
+          {filteredGroups.length === 0 && modelSearch ? (
+            <Text paddingX={2} paddingY={2} color="fg.muted" textStyle="xs">
+              No models match your search.
+            </Text>
+          ) : null}
           {filteredGroups.map((group) => (
             <ModelOptionGroup key={group.provider} group={group} size={size} />
           ))}
