@@ -89,7 +89,7 @@ export class DatasetBirthService {
     }
   }
 
-  /** A failed insert may still have committed, so its chunks go only once the row is known absent. */
+  /** A failed insert may still have committed: its chunks go only once the row is known absent. */
   private async discardChunksUnlessSaved(input: {
     projectId: string;
     datasetId: string;
