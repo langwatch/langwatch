@@ -1,7 +1,7 @@
 /**
  * The topic model store against Postgres: the bulk upsert round-trips every
- * column, a store that fails partway converges on replay, and an id another
- * project owns is never overwritten.
+ * column in any session time zone, a store that fails partway converges on
+ * replay, and an id another project owns fails the store, never overwritten.
  */
 import { randomUUID } from "node:crypto";
 
@@ -12,6 +12,7 @@ import {
   PrismaConnectionService,
   PrismaTenancyGuardService,
   type PrismaConnection,
+  skipTenantCheck,
 } from "@langwatch/prisma-client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -161,7 +162,7 @@ describe.skipIf(!databaseUrl)("Prisma topic model projection store", () => {
   });
 
   describe("when a store fails partway and the event replays", () => {
-    /** @scenario "A store that fails partway leaves the cursor for a replay" */
+    /** @scenario "Replaying a store that failed partway converges to the new model" */
     it("keeps the old cursor, then converges to the new model on replay", async () => {
       const next = model("event-2", { parents: 30, children: 270 });
       const previous = model("event-1", { parents: 50, children: 450 });
@@ -181,9 +182,25 @@ describe.skipIf(!databaseUrl)("Prisma topic model projection store", () => {
     });
   });
 
+  describe("when the session runs in a time zone other than UTC", () => {
+    /** @scenario "Recorded times are stored the same in any session time zone" */
+    it("stores each topic's recorded time unshifted", async () => {
+      const topics = model("event-tz", { parents: 2, children: 4 });
+
+      await connection.client.$transaction(async (tx) => {
+        // A session setting, not a tenant query: it touches no rows.
+        await tx.$executeRaw`${skipTenantCheck({ SKIP_TENANT_CHECK: true })}SET LOCAL TIME ZONE 'Pacific/Chatham'`;
+        const inZone = PrismaTopicModelProjectionRepository.create({ database: tx });
+        await inZone.store(projection("event-tz", topics), context);
+      });
+
+      expect(await storedTopics()).toEqual(topics.toSorted(byId));
+    });
+  });
+
   describe("when an id belongs to another project", () => {
     /** @scenario "A topic id from another project never overwrites that project's topic" */
-    it("leaves the other project's row unchanged", async () => {
+    it("fails the store and leaves the other project's row unchanged", async () => {
       const prisma = connection.client;
       const foreignId = `${namespace}-foreign`;
       await prisma.topic.create({
@@ -201,7 +218,10 @@ describe.skipIf(!databaseUrl)("Prisma topic model projection store", () => {
       });
 
       const forged = { ...topic("foreign", null, "event-3"), name: "Ours" };
-      await repository.store(projection("event-3", [forged]), context);
+      await expect(
+        repository.store(projection("event-3", [topic("p0", null, "event-3"), forged]), context),
+      ).rejects.toThrow("Stored 1 of 2 topics");
+      expect(await cursorEventId()).not.toBe("event-3");
 
       const after = await prisma.topic.findUnique({
         where: { id: foreignId, projectId: otherProjectId },

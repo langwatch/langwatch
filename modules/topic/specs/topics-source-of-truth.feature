@@ -113,7 +113,25 @@ Feature: Topic clustering owns the topic model
     Given the projection has stored an earlier model
     When storing the next model fails after some topics were written
     Then the projection cursor still names the earlier event
-    And replaying the event converges to the next model exactly
+    And no stale topic has been deleted
+
+  @integration
+  Scenario: Replaying a store that failed partway converges to the new model
+    Given storing the next model failed after some topics were written
+    When the event is stored again
+    Then the stored topics are exactly the next model
+    And the projection cursor names the next event
+
+  @unit
+  Scenario: A topic id recorded twice in one model is stored once
+    When the projection stores a model that lists one topic id twice
+    Then the topic is written once, with its last entry
+
+  @integration
+  Scenario: Recorded times are stored the same in any session time zone
+    Given a database session in a time zone other than UTC
+    When the projection stores a model
+    Then each topic's recorded time reads back unshifted
 
   @unit
   Scenario: Stale subtopics are removed before their parents
@@ -125,4 +143,5 @@ Feature: Topic clustering owns the topic model
   Scenario: A topic id from another project never overwrites that project's topic
     Given another project holds a topic with a given id
     When this project's model carries a topic with the same id
-    Then the other project's topic is unchanged
+    Then the store fails and the projection cursor does not move
+    And the other project's topic is unchanged

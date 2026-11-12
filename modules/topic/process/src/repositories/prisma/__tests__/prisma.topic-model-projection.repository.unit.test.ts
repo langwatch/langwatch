@@ -46,15 +46,22 @@ function projection(topics: ProjectedTopic[]): StoredProjection<TopicModelData> 
   };
 }
 
+type BoundRows = { ids: string[]; names: string[]; parentIds: (string | null)[] };
+
 /** The bound arrays of one bulk upsert, in the statement's unnest order. */
-function boundRows(values: unknown[]): { ids: string[]; parentIds: (string | null)[] } {
+function boundRows(values: unknown[]): BoundRows {
   const arrays = values.filter((value) => Array.isArray(value)) as unknown[][];
-  return { ids: arrays[0] as string[], parentIds: arrays[2] as (string | null)[] };
+  return {
+    ids: arrays[0] as string[],
+    names: arrays[1] as string[],
+    parentIds: arrays[2] as (string | null)[],
+  };
 }
 
-function makeDatabase(options: { failOnUpsertChunk?: number } = {}) {
+/** `rowsRefused` stands for rows whose ids another project owns: the update skips them. */
+function makeDatabase(options: { failOnUpsertChunk?: number; rowsRefused?: number } = {}) {
   const calls: string[] = [];
-  const chunks: { ids: string[]; parentIds: (string | null)[] }[] = [];
+  const chunks: BoundRows[] = [];
   let upsertChunk = 0;
   const transaction = vi.fn();
   const executeRaw = vi.fn(async (_sql: TemplateStringsArray, ...values: unknown[]) => {
@@ -62,7 +69,7 @@ function makeDatabase(options: { failOnUpsertChunk?: number } = {}) {
     if (upsertChunk === options.failOnUpsertChunk) throw new Error("connection reset");
     calls.push("upsert topics");
     chunks.push(boundRows(values));
-    return boundRows(values).ids.length;
+    return boundRows(values).ids.length - (options.rowsRefused ?? 0);
   });
   const deleteMany = vi.fn(async (args?: { where?: { parentId?: unknown } }) => {
     calls.push(args?.where?.parentId ? "delete stale children" : "delete stale topics");
@@ -130,6 +137,38 @@ describe("PrismaTopicModelProjectionRepository.store", () => {
       await expect(repository.store(projection(largeModel()), context)).rejects.toThrow(
         "connection reset",
       );
+
+      expect(deleteMany).not.toHaveBeenCalled();
+      expect(cursorUpsert).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the model carries the same id twice", () => {
+    /** @scenario "A topic id recorded twice in one model is stored once" */
+    it("writes the id once, keeping its last entry", async () => {
+      const { database, chunks } = makeDatabase();
+      const repository = PrismaTopicModelProjectionRepository.create({ database });
+
+      await repository.store(
+        projection([topic("a"), { ...topic("b"), name: "first" }, { ...topic("b"), name: "last" }]),
+        context,
+      );
+
+      expect(chunks).toHaveLength(1);
+      expect(chunks[0]?.ids).toEqual(["a", "b"]);
+      expect(chunks[0]?.names).toEqual(["Topic a", "last"]);
+    });
+  });
+
+  describe("when another project owns one of the ids", () => {
+    /** @scenario "A topic id from another project never overwrites that project's topic" */
+    it("fails the store and leaves the cursor for a replay", async () => {
+      const { database, cursorUpsert, deleteMany } = makeDatabase({ rowsRefused: 1 });
+      const repository = PrismaTopicModelProjectionRepository.create({ database });
+
+      await expect(
+        repository.store(projection([topic("ours"), topic("theirs")]), context),
+      ).rejects.toThrow("Stored 1 of 2 topics");
 
       expect(deleteMany).not.toHaveBeenCalled();
       expect(cursorUpsert).not.toHaveBeenCalled();

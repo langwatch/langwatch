@@ -88,7 +88,8 @@ export class PrismaTopicModelProjectionRepository implements StateProjectionStor
     context: ProjectionStoreContext,
   ): Promise<void> {
     const projectId = String(context.tenantId);
-    const topics = projection.state.Topics;
+    // One INSERT ... ON CONFLICT cannot touch a row twice; the last entry wins, as it did per row.
+    const topics = [...new Map(projection.state.Topics.map((t) => [t.id, t])).values()];
     const keptIds = topics.map((t) => t.id);
     const cursorData = {
       CreatedAt: projection.createdAt,
@@ -138,8 +139,8 @@ export class PrismaTopicModelProjectionRepository implements StateProjectionStor
   }
 
   /**
-   * One statement per chunk. The update only lands on a row the project owns,
-   * so an id carried from another project never overwrites that project's row.
+   * One statement per chunk. The update only lands on a row the project owns, so an
+   * id another project owns is refused loudly and never overwrites that project's row.
    * createdAt is the recorded time: the batch cadence gate reads it under replay.
    */
   private async upsertTopics(input: {
@@ -149,15 +150,15 @@ export class PrismaTopicModelProjectionRepository implements StateProjectionStor
   }): Promise<void> {
     const { projectId, topics, writtenAt } = input;
     if (topics.length === 0) return;
-    await this.prisma.$executeRaw`
+    const written = await this.prisma.$executeRaw`
       INSERT INTO "Topic" (
         "id", "projectId", "name", "parentId", "embeddings_model", "centroid",
         "p95Distance", "automaticallyGenerated", "createdAt", "updatedAt", "lastEventId"
       )
       SELECT
-        row."id", ${projectId}, row."name", row."parentId", row."embeddingsModel",
-        row."centroid"::jsonb, row."p95Distance", row."automaticallyGenerated",
-        to_timestamp(row."createdAtMs" / 1000.0) AT TIME ZONE 'UTC', ${writtenAt}, row."lastEventId"
+        incoming."id", ${projectId}, incoming."name", incoming."parentId", incoming."embeddingsModel",
+        incoming."centroid"::jsonb, incoming."p95Distance", incoming."automaticallyGenerated",
+        to_timestamp(incoming."createdAtMs" / 1000.0) AT TIME ZONE 'UTC', ${writtenAt}, incoming."lastEventId"
       FROM unnest(
         ${topics.map((t) => t.id)}::text[],
         ${topics.map((t) => t.name)}::text[],
@@ -168,7 +169,7 @@ export class PrismaTopicModelProjectionRepository implements StateProjectionStor
         ${topics.map((t) => t.automaticallyGenerated)}::boolean[],
         ${topics.map((t) => t.firstRecordedAt)}::double precision[],
         ${topics.map((t) => t.recordedByEventId)}::text[]
-      ) AS row(
+      ) AS incoming(
         "id", "name", "parentId", "embeddingsModel", "centroid",
         "p95Distance", "automaticallyGenerated", "createdAtMs", "lastEventId"
       )
@@ -183,7 +184,11 @@ export class PrismaTopicModelProjectionRepository implements StateProjectionStor
         "updatedAt" = EXCLUDED."updatedAt",
         "lastEventId" = EXCLUDED."lastEventId"
       WHERE "Topic"."projectId" = ${projectId}
-        AND EXCLUDED."projectId" = "Topic"."projectId"
     `;
+    if (written !== topics.length) {
+      throw new Error(
+        `Stored ${written} of ${topics.length} topics: the rest have ids another project owns.`,
+      );
+    }
   }
 }
