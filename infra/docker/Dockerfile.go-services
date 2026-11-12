@@ -24,7 +24,7 @@ FROM public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1 AS lambda-adapter
 # to TARGETARCH natively. This avoids QEMU emulation when buildx is producing
 # images for an arch different from the host, which is the difference between
 # a 30-second compile and a 30-minute one.
-FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS go-build
+FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine AS go-build
 WORKDIR /src
 RUN apk add --no-cache git ca-certificates
 

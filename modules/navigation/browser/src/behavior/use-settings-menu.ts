@@ -19,6 +19,7 @@ export function useSettingsMenu(): SettingsMenuGroup[] {
 
   return settingsMenu({
     hasPermission: (permission) => host.hasPermission(permission),
+    hasOrganizationPermission: (permission) => host.hasOrganizationPermission(permission),
     isSaaS: host.deployment().isSaaS,
     hasCloudOps: host.deployment().hasCloudOps,
     hosting: hostingOf(host.deployment()),

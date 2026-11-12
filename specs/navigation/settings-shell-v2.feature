@@ -32,6 +32,8 @@ Feature: Settings shell
   PEOPLE & ACCESS holds Users and Roles. Users consolidates Members,
   Teams & Projects, Groups and Access as tabs, while Roles holds Role Bindings
   as its second tab. Their old addresses forward to the corresponding tabs.
+  Teams & Projects also has its own entry, right under Users, that opens the
+  Users page on that tab: readers could not find it as a tab alone.
   Users is offered on every plan and is named for what it holds rather
   than for the provisioning protocol it speaks. Authentication remains in
   ORGANIZATION because it controls how everyone in the organization signs in;
@@ -101,7 +103,14 @@ Feature: Settings shell
 
   @integration
   Scenario: A detail page keeps its owning entry lit
-    Given I open a team's own page under /settings/teams
+    Given I may manage my organization
+    And I open a team's own page under /settings/teams
+    Then the Teams & projects entry is marked as the open one
+
+  @unit @integration
+  Scenario: A team page lights Users for whoever may not manage the organization
+    Given I may view teams but may not manage my organization
+    When I open a team's own page under /settings/teams
     Then the Users entry is marked as the open one
 
   @unit
@@ -131,6 +140,27 @@ Feature: Settings shell
     Given I open Settings
     Then API keys comes right after General in the Organization group
     And the People & access group does not hold it
+
+  @unit @integration
+  Scenario: Teams & projects has its own entry under Users
+    Given I may manage my organization
+    When the settings sidebar renders
+    Then People & access offers Teams & projects right after Users
+    And it opens the Users page on its Teams & projects tab
+    And while that tab is open, Teams & projects is the only entry marked
+    And on any other tab of the Users page, Users is the one marked
+
+  @unit
+  Scenario: Teams & projects is offered only to whoever may manage the organization
+    Given I may not manage my organization
+    When the settings menu is built
+    Then People & access offers no Teams & projects entry
+
+  @unit @integration
+  Scenario: Teams & projects asks who may manage the organization the way its tab does
+    Given I may manage my organization, though not through the project I have open
+    When the settings sidebar renders
+    Then People & access offers Teams & projects, as the Users page offers its Teams tab
 
   @integration
   Scenario: The menu marks the page that is open
