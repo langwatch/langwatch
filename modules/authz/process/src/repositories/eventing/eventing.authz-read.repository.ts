@@ -372,12 +372,12 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     }[];
     return rows.flatMap((row) => {
       const condition = grantConditionSchema.safeParse(row.condition);
-      if (!condition.success) return [];
+      if (!condition.success && row.replacesGrantId === null) return [];
       return [
         {
           grantId: row.id,
           memberProjectId: row.scopeId,
-          condition: condition.data,
+          condition: condition.success ? condition.data : ("unreadable" as const),
           expiresAt: row.expiresAt instanceof Date ? fromDate(row.expiresAt) : null,
           ...(row.replacesGrantId === null ? {} : { replacesGrantId: row.replacesGrantId }),
         },

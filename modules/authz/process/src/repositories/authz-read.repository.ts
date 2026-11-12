@@ -73,11 +73,12 @@ export type AuthzDatabase = Readonly<{
 }>;
 
 /** One shared read as the minter needs it: the grant, the member project and its window, and
- *  the braid a change replaced, absent on every other grant (ADR-201 §2). */
+ *  the braid a change replaced, absent on every other grant (ADR-201 §2). An `unreadable`
+ *  condition reads nothing but still shuts out the grant it replaces. */
 export type SharedReadRow = {
   grantId: string;
   memberProjectId: string;
-  condition: GrantCondition;
+  condition: GrantCondition | "unreadable";
   expiresAt: Instant | null;
   replacesGrantId?: string;
 };

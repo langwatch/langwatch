@@ -234,12 +234,12 @@ export class MemoryAuthzReadRepository extends AuthzReadRepository {
         row.scopeType === wanted.scopeType &&
         row.roleKey === wanted.roleKey;
       const condition = grantConditionSchema.safeParse(row.condition);
-      if (!matches || !condition.success) return [];
+      if (!matches || (!condition.success && !row.replacesGrantId)) return [];
       return [
         {
           grantId: row.id,
           memberProjectId: row.scopeId,
-          condition: condition.data,
+          condition: condition.success ? condition.data : ("unreadable" as const),
           expiresAt: row.expiresAt,
           ...(row.replacesGrantId ? { replacesGrantId: row.replacesGrantId } : {}),
         },

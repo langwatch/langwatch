@@ -277,7 +277,8 @@ function sharedGrantsFrom({
   let expiresAt = now + AUTHORIZATION_MAX_AGE_MS;
   const replaced = new Set(rows.map((row) => row.replacesGrantId));
   for (const row of rows) {
-    const condition = proofCondition(row.condition);
+    const condition =
+      row.condition === "unreadable" ? "not_applicable" : proofCondition(row.condition);
     const expiry = row.expiresAt?.epochMilliseconds;
     const applicable =
       !replaced.has(row.grantId) &&

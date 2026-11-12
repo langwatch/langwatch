@@ -329,6 +329,30 @@ describe("the proof a reader's trace read carries", () => {
         { via: ["grant_narrowed"], where: WEB },
       ]);
     });
+
+    /** @scenario "A replaced braid reads nothing once its replacement is live, even before the worker revokes it" */
+    it("shuts the old grant out even when the replacement's stored condition cannot be read", async () => {
+      // wrong-typed input: a stored condition no schema version can read
+      const unreadable = { type: "unknown" } as unknown as GrantCondition;
+      const { braid, mint } = ledger({ now: () => Date.parse("2026-10-20T00:00:00Z") });
+      await braid({
+        id: "grant_wide",
+        owner: SPECIALISTS,
+        reader: ORCHESTRATOR,
+        condition: spanCondition({}),
+      });
+      await braid({
+        id: "grant_unreadable",
+        owner: SPECIALISTS,
+        reader: ORCHESTRATOR,
+        condition: unreadable,
+        replacesGrantId: "grant_wide",
+      });
+
+      const proof = await mint(ORCHESTRATOR);
+
+      expect(proof.grants.map(({ via }) => via)).toEqual([[]]);
+    });
   });
 
   describe("given braids whose compiled conditions differ in tree or compiler version", () => {
