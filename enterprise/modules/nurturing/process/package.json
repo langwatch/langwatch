@@ -30,6 +30,7 @@
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/experiment-contract": "workspace:*",
+    "@langwatch/group-queue": "workspace:*",
     "@langwatch/insight-contract": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/module": "workspace:*",

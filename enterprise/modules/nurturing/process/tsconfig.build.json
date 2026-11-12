@@ -75,6 +75,9 @@
       "path": "../../../../packages/eventing/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/group-queue/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/evaluation/contract/tsconfig.build.json"
     },
     {
