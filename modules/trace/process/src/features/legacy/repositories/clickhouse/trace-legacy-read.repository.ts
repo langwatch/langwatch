@@ -426,14 +426,12 @@ function buildSearchFilter({
     "lower(ifNull(ts.TraceName, ''))",
   ];
 
-  // Non-root span names live in `stored_spans`, probed with the same
-  // correlated EXISTS shape the span filters in `filter-conditions.ts`
-  // use, bound to the tenant itself so the tenant guard sees its own read scoped.
-  // The StartTime bound keeps it partition-pruned, matching `buildSpanTimeBound`.
-  const spanNameSearch = `EXISTS (
-                    SELECT 1 FROM stored_spans sp
+  // Non-root span names live in `stored_spans`, collected as a set of trace ids: under this
+  // OR a correlated EXISTS becomes a join that carries every trace's captured I/O before
+  // filtering. Tenant-bound for the guard; StartTime-bound to prune, like `buildSpanTimeBound`.
+  const spanNameSearch = `ts.TraceId IN (
+                    SELECT sp.TraceId FROM stored_spans sp
                     WHERE sp.TenantId = {tenantId:String}
-                      AND sp.TraceId = ts.TraceId
                       AND sp.StartTime >= fromUnixTimestamp64Milli({startDate:UInt64})
                       AND sp.StartTime <= fromUnixTimestamp64Milli({endDate:UInt64})
                       AND lower(sp.SpanName) LIKE {searchQuery:String}
