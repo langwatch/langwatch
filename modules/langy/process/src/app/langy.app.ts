@@ -341,6 +341,7 @@ export class LangyModule implements LangyApiContract {
       events: commands,
       buffer,
       onAnswered: (wait) => confirmationAnswers.recordAnswer(wait),
+      users: setup.dependencies.users,
     });
     const built = LangyModule.#composeInfrastructure({
       setup,

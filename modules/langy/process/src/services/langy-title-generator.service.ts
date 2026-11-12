@@ -55,6 +55,11 @@ function isModelNotConfigured(error: unknown): boolean {
   return HandledError.isHandled(error) && error.code === "model_not_configured";
 }
 
+/** Nothing to retry either: the title model is one this deployment cannot execute. */
+function isModelExecutionUnavailable(error: unknown): boolean {
+  return HandledError.isHandled(error) && error.code === "model_execution_unavailable";
+}
+
 /**
  * The generator, bound to one message reader and one model gateway.
  */
@@ -70,7 +75,7 @@ export class LangyTitleGeneratorService {
     return (input) => this.generate(input);
   }
 
-  /** Every failure but an unconfigured model throws, so the process outbox retries it. */
+  /** Every failure but a permanent model refusal throws, so the process outbox retries it. */
   async generate(input: {
     projectId: string;
     conversationId: string;
@@ -100,6 +105,14 @@ export class LangyTitleGeneratorService {
 
       return title ? { outcome: "generated", title, model: model.name } : UNCHANGED;
     } catch (error) {
+      if (isModelExecutionUnavailable(error)) {
+        logger.warn(
+          { projectId, conversationId, code: "model_execution_unavailable" },
+          "Langy title model cannot be executed on this deployment — leaving title unchanged",
+        );
+
+        return UNCHANGED;
+      }
       if (!isModelNotConfigured(error)) throw error;
       logger.warn(
         { projectId, conversationId },

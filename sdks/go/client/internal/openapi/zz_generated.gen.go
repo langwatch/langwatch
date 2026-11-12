@@ -15636,6 +15636,27 @@ func (e PostApiEvaluationsByEvaluatorBySubpathEvaluate200JSONResponseBody2Status
 	}
 }
 
+// Defines values for PostApiEvaluatorsJSONBodyType.
+const (
+	PostApiEvaluatorsJSONBodyTypeCode      PostApiEvaluatorsJSONBodyType = "code"
+	PostApiEvaluatorsJSONBodyTypeEvaluator PostApiEvaluatorsJSONBodyType = "evaluator"
+	PostApiEvaluatorsJSONBodyTypeWorkflow  PostApiEvaluatorsJSONBodyType = "workflow"
+)
+
+// Valid indicates whether the value is a known member of the PostApiEvaluatorsJSONBodyType enum.
+func (e PostApiEvaluatorsJSONBodyType) Valid() bool {
+	switch e {
+	case PostApiEvaluatorsJSONBodyTypeCode:
+		return true
+	case PostApiEvaluatorsJSONBodyTypeEvaluator:
+		return true
+	case PostApiEvaluatorsJSONBodyTypeWorkflow:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DeleteApiEvaluatorsLabel200JSONResponseBodyRemoved.
 const (
 	DeleteApiEvaluatorsLabel200JSONResponseBodyRemovedTrue DeleteApiEvaluatorsLabel200JSONResponseBodyRemoved = true
@@ -46941,9 +46962,19 @@ type GetApiEvaluators200JSONResponseBody_Version struct {
 
 // PostApiEvaluatorsJSONBody defines parameters for PostApiEvaluators.
 type PostApiEvaluatorsJSONBody struct {
+	// Config For a built-in evaluator: { evaluatorType, settings }. For a code evaluator: { code, inputs: [{ identifier, type }] }; outputs are the fixed passed, score, label and details. For a workflow evaluator: {}.
 	Config map[string]interface{} `json:"config"`
 	Name   string                 `json:"name"`
+
+	// Type The kind of evaluator. "evaluator" (the default) is a built-in type named by config.evaluatorType; "code" is a custom Python evaluator whose config carries code and inputs; "workflow" wraps the workflow named by workflowId.
+	Type *PostApiEvaluatorsJSONBodyType `json:"type,omitempty"`
+
+	// WorkflowId The workflow a "workflow" evaluator wraps. Only for type "workflow".
+	WorkflowId *string `json:"workflowId,omitempty"`
 }
+
+// PostApiEvaluatorsJSONBodyType defines parameters for PostApiEvaluators.
+type PostApiEvaluatorsJSONBodyType string
 
 // PostApiEvaluators200JSONResponseBodyCreatedBy0 defines parameters for PostApiEvaluators.
 type PostApiEvaluators200JSONResponseBodyCreatedBy0 struct {

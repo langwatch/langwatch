@@ -210,6 +210,11 @@
       "seed": "unplanned",
       "note": "no seed door written yet"
     },
+    "project:list-personal-owner-and-first-message-facts": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs personal projects and projects that already received a first message, as the old release wrote them; no seed door written yet"
+    },
     "project:record-created-facts": {
       "status": "seeded",
       "seed": "heavy:product.org",

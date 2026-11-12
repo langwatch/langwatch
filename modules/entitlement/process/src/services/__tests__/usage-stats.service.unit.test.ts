@@ -22,6 +22,7 @@ function planWith(maxMessagesPerMonth: number): Plan {
     free: true,
     maxMembers: 5,
     maxMembersLite: 5,
+    maxMembersDeveloper: 0,
     maxMessagesPerMonth,
     canPublish: false,
     prices: { USD: 0, EUR: 0 },

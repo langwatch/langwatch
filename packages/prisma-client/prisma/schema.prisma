@@ -4658,6 +4658,8 @@ model Subscription {
   maxWorkflows          Int?
   maxRetentionDays      Int?
   maxMembersLite        Int?
+  /// Developer seats the organization pays for; null falls to the plan's own cap.
+  maxMembersDeveloper   Int?
   maxTeams              Int?
   maxPrompts            Int?
   maxEvaluators         Int?

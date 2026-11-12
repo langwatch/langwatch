@@ -1,6 +1,7 @@
 import {
   LicenseGenerationCapability,
   buildMintedPlan,
+  DEFAULT_MEMBERS_DEVELOPER,
   type GenerateLicenseInput,
   type GenerateLicenseOutput,
   type LicenseData,
@@ -31,6 +32,7 @@ export class LicenseGenerationService extends LicenseGenerationCapability {
     planType,
     maxMembers,
     maxMembersLite,
+    maxMembersDeveloper,
     maxMessagesPerMonth,
     expiresAt: requestedExpiresAt,
     connectServices,
@@ -67,9 +69,12 @@ export class LicenseGenerationService extends LicenseGenerationCapability {
         ...quotedPlanLimits({
           members: seats,
           membersLite: resolveMembersLite({ planType, maxMembersLite }),
+          membersDeveloper: maxMembersDeveloper ?? DEFAULT_MEMBERS_DEVELOPER,
           messagesPerMonth: maxMessagesPerMonth ?? template.maxMessagesPerMonth,
           publish: template.canPublish,
         }),
+        // Only a stated count is signed; see buildMintedPlan.
+        maxMembersDeveloper,
         webhookEndpointsEnabled: template.webhookEndpointsEnabled,
         usageUnit: template.usageUnit,
       }),

@@ -109,6 +109,9 @@ describe("given a value a plan may or may not persist", () => {
     expect(() =>
       DataRetentionPolicyService.assertPlanAllowsRetentionValue(capped, 63),
     ).not.toThrow();
+    expect(() =>
+      DataRetentionPolicyService.assertPlanAllowsRetentionValue(capped, 91),
+    ).not.toThrow();
     expect(
       refusalOf(() => DataRetentionPolicyService.assertPlanAllowsRetentionValue(capped, 98)),
     ).toMatchObject({ code: "data_retention_length_not_on_plan", httpStatus: 403 });
