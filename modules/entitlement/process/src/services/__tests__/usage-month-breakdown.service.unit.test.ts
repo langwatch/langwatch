@@ -4,12 +4,15 @@
  */
 
 import type { UsageUnit } from "@langwatch/entitlement-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
+import type { BillableEventsMeterRepository } from "../../repositories/billable-events-meter.repository.ts";
 import { MemoryBillableEventsMeterRepository } from "../../repositories/memory/memory.billable-events-meter.repository.ts";
 import { MemoryEntitlementDatabase } from "../../repositories/memory/memory.entitlement.database.ts";
 import { MemoryTenancyRepository } from "../../repositories/memory/memory.tenancy.repository.ts";
+import type { TenancyRepository } from "../../repositories/tenancy.repository.ts";
 import {
   USAGE_UNKNOWN,
   type ProjectUsageCounts,
@@ -163,12 +166,12 @@ describe("UsageMonthBreakdownService", () => {
       const meter = await meterWith(EVENTS);
       const service = UsageMonthBreakdownService.create({
         counter: counterOver({ meter, usageUnit: "events" }),
-        meter: {
+        meter: createApiFixture<BillableEventsMeterRepository>({
           countByDay: async () => {
             throw new Error("ClickHouse is unreachable");
           },
           countByType: (input) => meter.countByType(input),
-        },
+        }),
         tenancy: tenancyWith(),
         now: () => NOW,
       });
@@ -208,7 +211,10 @@ describe("UsageMonthBreakdownService", () => {
       const service = UsageMonthBreakdownService.create({
         counter: counterOver({ meter, usageUnit: "events" }),
         meter,
-        tenancy: { findProjectIds: unreachable, findProjectNames: unreachable },
+        tenancy: createApiFixture<TenancyRepository>({
+          findProjectIds: unreachable,
+          findProjectNames: unreachable,
+        }),
         now: () => NOW,
       });
 
@@ -229,12 +235,12 @@ describe("UsageMonthBreakdownService", () => {
       const meter = await meterWith(EVENTS);
       const service = UsageMonthBreakdownService.create({
         counter: counterOver({ meter, usageUnit: "events" }),
-        meter: {
+        meter: createApiFixture<BillableEventsMeterRepository>({
           countByDay: (input) => meter.countByDay(input),
           countByType: async () => {
             throw new Error("ClickHouse is unreachable");
           },
-        },
+        }),
         tenancy: tenancyWith(),
         now: () => NOW,
       });

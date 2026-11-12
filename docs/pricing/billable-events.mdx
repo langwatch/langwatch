@@ -34,7 +34,9 @@ Spans dominate the count whenever your app sends traces. A single trace of an ag
 
 Each log record counts as one event, however it reaches LangWatch.
 
-Metrics count per series, not per data point. A series is one metric name with one set of attribute values, for example `http.server.duration` with `route=/chat` and `status=200`. A series counts one event for each UTC clock hour in which it sent at least one point, however many points it sent in that hour. A counter exported every 10 seconds is one event an hour, so about 720 events in a 30-day month. The same metric with a second `route` value is a second series and counts separately.
+Metrics count per series, not per data point. A series is one metric name with one set of attribute values, for example `http.server.duration` with `route=/chat` and `status=200`.
+
+A series counts one event for each UTC clock hour in which it sent at least one point, however many points it sent in that hour. A counter exported every 10 seconds is one event an hour, so about 720 events in a 30-day month. The same metric with a second `route` value is a second series and counts separately.
 
 ### Reading an experiment's cost
 

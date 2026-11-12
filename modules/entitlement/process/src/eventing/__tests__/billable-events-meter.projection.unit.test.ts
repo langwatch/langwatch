@@ -5,6 +5,7 @@
 import { createTenantId, type Event, EventUtils } from "@langwatch/eventing";
 import { CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE } from "@langwatch/log-contract";
 import { METRIC_DATA_POINT_RECEIVED_EVENT_TYPE } from "@langwatch/metric-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import {
   LOG_CONTRIBUTED_EVENT_TYPE,
@@ -13,11 +14,17 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { MemoryBillableEventsMeterRepository } from "../../repositories/memory/memory.billable-events-meter.repository.ts";
+import type { TenancyRepository } from "../../repositories/tenancy.repository.ts";
 import { BillableEventsMeterAppendService } from "../../services/billable-events-meter-append.service.ts";
 import { BillableEventsMeterProjection } from "../billable-events-meter.projection.ts";
 
 const SERIES_A = "a".repeat(64);
 const SERIES_B = "b".repeat(64);
+
+/** Every project placed in org_1, fail-closed on any other tenancy read. */
+const placedProjects = createApiFixture<TenancyRepository>({
+  getProjectPlacement: async () => ({ kind: "placed" as const, organizationId: "org_1" }),
+});
 
 function eventOf({
   type,
@@ -95,9 +102,7 @@ describe("BillableEventsMeterProjection.deduplicationKey", () => {
       const meter = MemoryBillableEventsMeterRepository.create();
       const append = BillableEventsMeterAppendService.create({
         meter,
-        projects: {
-          getProjectPlacement: async () => ({ kind: "placed" as const, organizationId: "org_1" }),
-        },
+        projects: placedProjects,
       });
       const projection = BillableEventsMeterProjection.create(append).build();
       for (const point of points) {
@@ -168,8 +173,6 @@ const MemoryBillableEventsMeterAppendStore = {
   create: () =>
     BillableEventsMeterAppendService.create({
       meter: MemoryBillableEventsMeterRepository.create(),
-      projects: {
-        getProjectPlacement: async () => ({ kind: "placed" as const, organizationId: "org_1" }),
-      },
+      projects: placedProjects,
     }),
 };

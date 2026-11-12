@@ -3,9 +3,25 @@ import { resolve } from "node:path";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// Fail closed: a client method the test did not configure throws by name. The package has no
+// test-harness dependency, so this stands in for `createApiFixture`.
 const clickhouseMocks = vi.hoisted(() => {
-  const client = { query: vi.fn(), command: vi.fn(), close: vi.fn() };
-  return { client, createClient: vi.fn(() => client) };
+  const unconfigured = (method: string) => () => {
+    throw new Error(`ClickHouse client.${method} is not configured for this test`);
+  };
+  const methods = {
+    query: vi.fn(unconfigured("query")),
+    command: vi.fn(unconfigured("command")),
+    close: vi.fn(unconfigured("close")),
+  };
+  const client = new Proxy(methods, {
+    get(target, property, receiver) {
+      if (Reflect.has(target, property)) return Reflect.get(target, property, receiver);
+      if (property === "then" || typeof property === "symbol") return undefined;
+      return unconfigured(String(property));
+    },
+  });
+  return { client, methods, createClient: vi.fn(() => client) };
 });
 
 vi.mock("@clickhouse/client", () => ({

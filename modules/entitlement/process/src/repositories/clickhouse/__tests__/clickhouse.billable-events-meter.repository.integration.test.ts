@@ -16,12 +16,16 @@ import { metricSeriesHourKey } from "../../../rules/billable-event.rules.ts";
 import type { BillableEventRecord } from "../../billable-events-meter.repository.ts";
 import { BillableEventsMeterClickHouseRepository } from "../clickhouse.billable-events-meter.repository.ts";
 
-/** `TEST_CLICKHOUSE_URL` names its own database; `CI_CLICKHOUSE_URL` is the job's migrated one. */
+/**
+ * `TEST_CLICKHOUSE_URL` names its own database; the native test server
+ * (`LANGWATCH_TEST_CLICKHOUSE_URL`) and the CI job's server carry the migrated `test_langwatch`.
+ */
 function testClickHouseUrl(): URL | null {
-  const configured = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
-  if (!configured) return null;
-  const url = new URL(configured);
-  if (!process.env.TEST_CLICKHOUSE_URL) url.pathname = "/test_langwatch";
+  if (process.env.TEST_CLICKHOUSE_URL) return new URL(process.env.TEST_CLICKHOUSE_URL);
+  const server = process.env.LANGWATCH_TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
+  if (!server) return null;
+  const url = new URL(server);
+  url.pathname = "/test_langwatch";
   return url;
 }
 
@@ -58,7 +62,11 @@ function metricRow({ seriesId, iso }: { seriesId: string; iso: string }): Billab
 
 beforeAll(async () => {
   if (!clickHouseUrl) return;
-  ch = createClient({ url: clickHouseUrl });
+  // The managed client parses ISO timestamps the same way; a server default may not.
+  ch = createClient({
+    url: clickHouseUrl,
+    clickhouse_settings: { date_time_input_format: "best_effort" },
+  });
   meter = BillableEventsMeterClickHouseRepository.create(
     vendorQueryClient({ vendor: ch, indexes: [] }),
   );

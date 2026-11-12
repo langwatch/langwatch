@@ -7,6 +7,7 @@ import {
 export class MemoryBillableEventsTtlRepository extends BillableEventsTtlRepository {
   readonly #mutations: TtlMutation[] = [];
   #started = 0;
+  #nextStartError: Error | null = null;
 
   static create(): MemoryBillableEventsTtlRepository {
     return new MemoryBillableEventsTtlRepository();
@@ -32,7 +33,20 @@ export class MemoryBillableEventsTtlRepository extends BillableEventsTtlReposito
     return [...this.#mutations];
   }
 
+  /** Makes the next start throw before ClickHouse accepts it, as a dropped connection would. */
+  failNextStart(error: Error): void {
+    this.#nextStartError = error;
+  }
+
+  /** Forgets every listed mutation, as ClickHouse does once it prunes finished ones. */
+  prune(): void {
+    this.#mutations.length = 0;
+  }
+
   async materialiseTtl(): Promise<void> {
+    const error = this.#nextStartError;
+    this.#nextStartError = null;
+    if (error) throw error;
     this.#started += 1;
     this.record({
       mutationId: `mutation_ttl_${this.#started}.txt`,
