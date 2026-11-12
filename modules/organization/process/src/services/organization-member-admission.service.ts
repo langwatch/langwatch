@@ -158,6 +158,7 @@ export class OrganizationMemberAdmissionService {
           pending: decided.pending,
           ...(origin === undefined ? {} : { origin }),
           ...(hold ? { seatTakenAt: hold.seatTakenAt } : {}),
+          actorUserId: admittedBy?.actor.type === "user" ? admittedBy.actor.id : null,
         });
       },
     });

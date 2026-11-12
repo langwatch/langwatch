@@ -351,6 +351,14 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "organization:record-seat-peak-opening-snapshots",
+    "kind": "data",
+    "mode": "background",
+    "owner": "organization",
+    "description": "Records every organization's seat holders as they stand, to open its seat peak.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "project:record-created-facts",
     "kind": "data",
     "mode": "background",
