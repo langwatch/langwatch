@@ -18,6 +18,7 @@ import { buildNurturingPipeline, type NurturingPipeline } from "../eventing/nurt
 import type { NurturingRepositories } from "../repositories/nurturing.repositories.ts";
 import type { NurturingCountedTrace } from "../rules/nurturing-trace-day.rules.ts";
 import { NurturingCodingMilestonesService } from "../services/nurturing-coding-milestones.service.ts";
+import { NurturingCopiedProjectsService } from "../services/nurturing-copied-projects.service.ts";
 import { NurturingDeliveryService } from "../services/nurturing-delivery.service.ts";
 import { NurturingMemberFactsService } from "../services/nurturing-member-facts.service.ts";
 import { NurturingMilestonesService } from "../services/nurturing-milestones.service.ts";
@@ -103,10 +104,15 @@ export class NurturingModule implements NurturingApi {
       organizations: dependencies.organizations,
       clock: { nowMs: () => nowInstant().epochMilliseconds },
     });
+    const copiedProjects = NurturingCopiedProjectsService.create({
+      placements: repositories.placements,
+      organizationsCreated: repositories.organizationsCreated,
+    });
     const organizationUsage = customerIo
       ? NurturingOrganizationUsageService.create({
           projectUsage: repositories.projectUsage,
           traceDays: repositories.traceDays,
+          copiedProjects,
           placements: repositories.placements,
           organizationsCreated: repositories.organizationsCreated,
           milestones: repositories.milestones,
@@ -132,8 +138,7 @@ export class NurturingModule implements NurturingApi {
     });
     const traceCounting = NurturingTraceCountingService.create({
       traceDays: repositories.traceDays,
-      placements: repositories.placements,
-      organizationsCreated: repositories.organizationsCreated,
+      copiedProjects,
       uncopiedProjects,
     });
     return new NurturingModule({

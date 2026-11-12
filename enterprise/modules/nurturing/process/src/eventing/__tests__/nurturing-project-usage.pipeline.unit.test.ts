@@ -39,6 +39,7 @@ import { MemoryNurturingProjectUsageRepository } from "../../repositories/memory
 import { MemoryNurturingTraceDayRepository } from "../../repositories/memory/memory.nurturing-trace-day.repository.ts";
 import type { NurturingProjectUsageOwner } from "../../repositories/nurturing-project-usage.repository.ts";
 import { countingOver } from "../../services/__tests__/nurturing-trace-counting.test-helpers.ts";
+import { NurturingCopiedProjectsService } from "../../services/nurturing-copied-projects.service.ts";
 import { NurturingOrganizationUsageService } from "../../services/nurturing-organization-usage.service.ts";
 import {
   evaluationDayKeyOf,
@@ -319,15 +320,18 @@ describe("the trace syncs", () => {
       seeded: false,
     });
     const sent: CioBatchCall[] = [];
+    const placements = MemoryNurturingProjectPlacementRepository.create({
+      placed: new Map(projectIds.map((projectId) => [projectId, "org-1"])),
+    });
+    const organizationsCreated = MemoryNurturingOrganizationCreatedRepository.create({
+      createdAt: new Map([["org-1", OCCURRED_AT]]),
+    });
     const usage = NurturingOrganizationUsageService.create({
       projectUsage: MemoryNurturingProjectUsageRepository.create(),
       traceDays: MemoryNurturingTraceDayRepository.create(),
-      placements: MemoryNurturingProjectPlacementRepository.create({
-        placed: new Map(projectIds.map((projectId) => [projectId, "org-1"])),
-      }),
-      organizationsCreated: MemoryNurturingOrganizationCreatedRepository.create({
-        createdAt: new Map([["org-1", OCCURRED_AT]]),
-      }),
+      copiedProjects: NurturingCopiedProjectsService.create({ placements, organizationsCreated }),
+      placements,
+      organizationsCreated,
       milestones,
       members,
       sendBatch: async (calls) => {

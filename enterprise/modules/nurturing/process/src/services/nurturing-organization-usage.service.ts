@@ -19,7 +19,7 @@ import {
   windowStartDayOf,
 } from "../rules/nurturing-project-usage.rules.ts";
 import { traceCountsOf } from "../rules/nurturing-trace-day.rules.ts";
-import { copiedProjectOf } from "./nurturing-copied-project.service.ts";
+import type { NurturingCopiedProjectsService } from "./nurturing-copied-projects.service.ts";
 
 /** Members read and identified per request, so a large organization never opens a burst. */
 const MEMBER_BATCH_SIZE = 100;
@@ -27,12 +27,13 @@ const MEMBER_BATCH_SIZE = 100;
 type OrganizationUsageDependencies = Readonly<{
   projectUsage: NurturingProjectUsageReadRepository;
   traceDays: NurturingTraceDayReadRepository;
+  copiedProjects: Pick<NurturingCopiedProjectsService, "copiedProjectOf">;
   /** Nurturing's own copy of each project's organization, from project's creation facts. */
-  placements: Pick<NurturingProjectPlacementRepository, "getPlacement" | "findProjectIds">;
+  placements: Pick<NurturingProjectPlacementRepository, "findProjectIds">;
   /** Nurturing's own copy of each organization's creation, from organization's facts. */
   organizationsCreated: Pick<
     NurturingOrganizationCreatedRepository,
-    "findOrganizationCreatedAt" | "findOrganizationIdsCreatedBetween"
+    "findOrganizationIdsCreatedBetween"
   >;
   milestones: Pick<NurturingMilestonesRepository, "findOrganization">;
   /** Nurturing's own copy of the organizations' members, from the owners' member facts. */
@@ -86,8 +87,7 @@ export class NurturingOrganizationUsageService {
     projectId,
   }: Readonly<{ projectId: string }>): Promise<CopiedOrganization | undefined> {
     if (projectId === "") return undefined;
-    const { placements, organizationsCreated } = this.dependencies;
-    const project = await copiedProjectOf({ projectId, placements, organizationsCreated });
+    const project = await this.dependencies.copiedProjects.copiedProjectOf({ projectId });
     if (project.outcome !== "placed" || project.organizationCreatedAt === null) return undefined;
     const { organizationId, organizationCreatedAt } = project;
     return { organizationId, organizationCreatedAt };

@@ -1,16 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { NurturingOrganizationCreatedRepository } from "../repositories/nurturing-organization-created.repository.ts";
-import type { NurturingProjectPlacementRepository } from "../repositories/nurturing-project-placement.repository.ts";
 import type { NurturingTraceDayRepository } from "../repositories/nurturing-trace-day.repository.ts";
 import { isTraceCounted } from "../rules/nurturing-project-usage.rules.ts";
 import type { NurturingCountedTrace } from "../rules/nurturing-trace-day.rules.ts";
-import { copiedProjectOf } from "./nurturing-copied-project.service.ts";
+import type { NurturingCopiedProjectsService } from "./nurturing-copied-projects.service.ts";
 import type { NurturingUncopiedProjectsService } from "./nurturing-uncopied-projects.service.ts";
 
 type TraceCountingDependencies = Readonly<{
   traceDays: NurturingTraceDayRepository;
-  placements: Pick<NurturingProjectPlacementRepository, "getPlacement">;
-  organizationsCreated: Pick<NurturingOrganizationCreatedRepository, "findOrganizationCreatedAt">;
+  copiedProjects: Pick<NurturingCopiedProjectsService, "copiedProjectOf">;
   uncopiedProjects: Pick<NurturingUncopiedProjectsService, "isDropped" | "outcomeOf">;
 }>;
 
@@ -34,7 +31,7 @@ export class NurturingTraceCountingService {
     traces,
   }: Readonly<{ traces: readonly NurturingCountedTrace[] }>): Promise<void> {
     if (traces.length === 0) return;
-    const { traceDays, placements, organizationsCreated, uncopiedProjects } = this.dependencies;
+    const { traceDays, copiedProjects, uncopiedProjects } = this.dependencies;
     const projectIds = [...new Set(traces.map(({ projectId }) => projectId))].filter(
       (projectId) => !uncopiedProjects.isDropped({ projectId }),
     );
@@ -42,10 +39,7 @@ export class NurturingTraceCountingService {
       await Promise.all(
         projectIds.map(
           async (projectId) =>
-            [
-              projectId,
-              await copiedProjectOf({ projectId, placements, organizationsCreated }),
-            ] as const,
+            [projectId, await copiedProjects.copiedProjectOf({ projectId })] as const,
         ),
       ),
     );

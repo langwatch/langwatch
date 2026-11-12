@@ -24,6 +24,7 @@ import type {
   NurturingCountedTrace,
   NurturingTraceDay,
 } from "../../rules/nurturing-trace-day.rules.ts";
+import { NurturingCopiedProjectsService } from "../nurturing-copied-projects.service.ts";
 import { NurturingOrganizationUsageService } from "../nurturing-organization-usage.service.ts";
 
 /** The service's logger, to read what it reported. */
@@ -74,11 +75,14 @@ async function serviceOver({
     seeded: false,
   });
   const sent: CioBatchCall[][] = [];
+  const placements = MemoryNurturingProjectPlacementRepository.create({ placed });
+  const organizationsCreated = MemoryNurturingOrganizationCreatedRepository.create({ createdAt });
   const service = NurturingOrganizationUsageService.create({
     projectUsage,
     traceDays,
-    placements: MemoryNurturingProjectPlacementRepository.create({ placed }),
-    organizationsCreated: MemoryNurturingOrganizationCreatedRepository.create({ createdAt }),
+    copiedProjects: NurturingCopiedProjectsService.create({ placements, organizationsCreated }),
+    placements,
+    organizationsCreated,
     milestones,
     members,
     sendBatch: async (calls) => {

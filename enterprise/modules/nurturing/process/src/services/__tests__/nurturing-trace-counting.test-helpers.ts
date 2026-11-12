@@ -3,6 +3,7 @@ import { MemoryNurturingOrganizationCreatedRepository } from "../../repositories
 import { MemoryNurturingProjectPlacementRepository } from "../../repositories/memory/memory.nurturing-project-placement.repository.ts";
 import { MemoryNurturingTraceDayRepository } from "../../repositories/memory/memory.nurturing-trace-day.repository.ts";
 import { MemoryNurturingUncopiedProjectRepository } from "../../repositories/memory/memory.nurturing-uncopied-project.repository.ts";
+import { NurturingCopiedProjectsService } from "../nurturing-copied-projects.service.ts";
 import { NurturingTraceCountingService } from "../nurturing-trace-counting.service.ts";
 import { NurturingUncopiedProjectsService } from "../nurturing-uncopied-projects.service.ts";
 
@@ -36,8 +37,7 @@ export function countingOver({
   });
   const service = NurturingTraceCountingService.create({
     traceDays,
-    placements,
-    organizationsCreated,
+    copiedProjects: NurturingCopiedProjectsService.create({ placements, organizationsCreated }),
     uncopiedProjects,
   });
   return {
