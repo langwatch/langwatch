@@ -586,3 +586,10 @@ not operations.
   through a held-trace semi-join on every braid clause, so no span read can skip the check and the
   reader's activity count is held-trace bounded too. Plain tenant markers are refused under braids; the
   latest-version election has a marker of its own, accepted only in that shape (§3).
+- v1.10 (2026-11-12, Alex: braids "never fail open", and new features inherit that). A braided read
+  whose audit entry cannot be written is refused, not shown (§8). Braid grants carry an internal
+  permission of their own that only the span read accepts. The fence honours braids only on a proof
+  the Enterprise pause marked, every read resource declares its treatment of each condition type with
+  no default, narrowing refuses rather than widening, yes/no decisions ignore conditioned grants, a span
+  condition always carries its compiled form ("every span" is explicit), a property test ranges over the
+  fence, and an architecture policy keeps span tables behind it. All land with the feature.
