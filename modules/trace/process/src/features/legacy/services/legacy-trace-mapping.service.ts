@@ -132,24 +132,13 @@ export class LegacyTraceMappingService {
   }
 
   /** The traces holding a span with this id, since the project's retention floor. */
-  async findTraceIdsBySpanId({
-    authorization,
-    projectId,
-    spanId,
-    limit,
-  }: {
+  findTraceIdsBySpanId(input: {
     authorization: Authorization;
     projectId: string;
     spanId: string;
     limit: number;
   }): Promise<string[]> {
-    return this.repository.resolveTraceIdsBySpanId({
-      authorization,
-      projectId,
-      spanId,
-      retentionDays: this.retentionDays,
-      limit,
-    });
+    return this.repository.resolveTraceIdsBySpanId({ ...input, retentionDays: this.retentionDays });
   }
 
   async findTracesByThreadId({

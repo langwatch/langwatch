@@ -36,10 +36,8 @@ import { MemoryTraceEditOverlayRepository } from "../../../../repositories/memor
 import { TraceEditOverlayService } from "../../../edit-overlay/services/trace-edit-overlay.service.ts";
 import type { TraceLegacyReadRepository } from "../../repositories/trace-legacy-read.repository.ts";
 import type { LegacyTraceMappingService } from "../legacy-trace-mapping.service.ts";
-import {
-  AmbiguousTraceIdPrefixError,
-  TraceLegacyReadService,
-} from "../trace-legacy-read.service.ts";
+import { AmbiguousTraceIdPrefixError } from "../trace-alternate-id.service.ts";
+import { TraceLegacyReadService } from "../trace-legacy-read.service.ts";
 
 const PROJECT_ID = "project_test";
 const OWN_READ = ownProof({ projectId: PROJECT_ID });

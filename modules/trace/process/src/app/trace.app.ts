@@ -317,8 +317,8 @@ import {
 } from "../features/legacy/rules/trace-legacy-search-body.rules.ts";
 import { LegacyFilterMatchingService } from "../features/legacy/services/legacy-filter-matching.service.ts";
 import { LegacyTraceMappingService } from "../features/legacy/services/legacy-trace-mapping.service.ts";
+import { AmbiguousTraceIdPrefixError } from "../features/legacy/services/trace-alternate-id.service.ts";
 import {
-  AmbiguousTraceIdPrefixError,
   TraceLegacyReadService,
   type BlobResolutionDeps,
 } from "../features/legacy/services/trace-legacy-read.service.ts";
