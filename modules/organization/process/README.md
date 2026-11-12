@@ -6,13 +6,13 @@ The server half of [organization](../README.md). Organisations and who is in the
 
 ## Installation
 
-`defineProcessModule("organization").withRepositories(organizationRepositories).withChannels(organizationChannels).withApi(OrganizationModule).withTransports(organizationTrpcTransport, inviteTrpcTransport, teamTrpcTransport, groupTrpcTransport, licenseEnforcementTrpcTransport, personalWorkspaceFeaturesTrpcTransport, seatRequestTrpcTransport, organizationManagementRest, organizationsProvisioningRest, groupsRest, teamsRest).provideMiddlewareContext(…).withEventing(seatLimitEventing).withEventing(organizationLifecycleEventing).withEventing(organizationAuditEventing).withEventing(privateDataplaneRecorderEventing).withEventing(seatHoldCheckEventing).withMigrations(…)`, `src/organization.module.ts:31`.
+`defineProcessModule("organization").withRepositories(organizationRepositories).withChannels(organizationChannels).withApi(OrganizationModule).withTransports(organizationTrpcTransport, inviteTrpcTransport, teamTrpcTransport, groupTrpcTransport, licenseEnforcementTrpcTransport, personalWorkspaceFeaturesTrpcTransport, seatRequestTrpcTransport, seatPeakTrpcTransport, organizationManagementRest, organizationsProvisioningRest, groupsRest, teamsRest).provideMiddlewareContext(…).withEventing(seatLimitEventing).withEventing(seatPeakEventing).withEventing(organizationLifecycleEventing).withEventing(organizationAuditEventing).withEventing(privateDataplaneRecorderEventing).withEventing(seatHoldCheckEventing).withMigrations(…)`, `src/organization.module.ts:33`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`OrganizationApi`)
 
-Peers call these through the token, declared at `../contract/src/organization.api.ts:262`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/organization.api.ts:263`; nothing else in this package is public.
 
 #### `createAndAssign`
 
@@ -964,6 +964,14 @@ The people who held a seat since `since`: today's full-seat members, and everyon
 
 ```typescript
 findSeatOccupantsSince(input: Readonly<{ organizationId: string; since: number }>): Promise<OrganizationSeatOccupants>;
+```
+
+#### `getSeatPeak`
+
+The most full and Lite Member seats held at once in each month, beside the plan's caps (ADR-002). For our own team on the ops console; `counted: false` until counting opened.
+
+```typescript
+getSeatPeak(input: Readonly<{ organizationId: string }>): Promise<OrganizationSeatPeak>;
 ```
 
 #### `checkLimit`
@@ -2291,6 +2299,23 @@ type Input = z.infer<typeof personalWorkspaceFeaturesScopeSchema>; // ../contrac
 type Output = z.infer<typeof personalFeaturesSchema>; // ../contract/src/personal-workspace.ts:101
 ```
 
+### `organizationSeatPeak`
+
+Contract `../contract/src/seat-peak.ts:58`, router `src/transport/seat-peak.trpc.ts:14`.
+
+| Procedure                  | Kind  | Gate                             | Input  | Output                       |
+| -------------------------- | ----- | -------------------------------- | ------ | ---------------------------- |
+| `organizationSeatPeak.get` | query | Platform permission `ops:manage` | inline | `organizationSeatPeakSchema` |
+
+```typescript
+// organizationSeatPeak.get
+// Input: inline, ../contract/src/seat-peak.ts:60
+interface Input {
+  organizationId: string;
+}
+type Output = z.infer<typeof organizationSeatPeakSchema>; // ../contract/src/seat-peak.ts:54
+```
+
 ### `seatRequest`
 
 Contract `../contract/src/features/seat-request/seat-request.trpc.ts:14`, router `src/transport/seat-request.trpc.ts:18`.
@@ -2502,11 +2527,22 @@ Declared at `src/eventing/seat-limit.pipeline.ts:18`. Events: `seatLimitReachedE
 | ------- | ------------------------ | ------- | ---------------------------------------- |
 | command | `recordSeatLimitReached` | –       | `src/eventing/seat-limit.pipeline.ts:23` |
 
+### Pipeline `organization_seat_peak` (aggregate `organization_seat_peak`)
+
+Declared at `src/eventing/seat-peak.pipeline.ts:66`. Events: `seatChangedEventSchema`, `seatSnapshotTakenEventSchema`.
+
+| Kind            | Name                   | Handles                                                                                                                   | Declared at                             |
+| --------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| command         | `recordSeatChanged`    | –                                                                                                                         | `src/eventing/seat-peak.pipeline.ts:71` |
+| command         | `recordSeatSnapshot`   | –                                                                                                                         | `src/eventing/seat-peak.pipeline.ts:72` |
+| process manager | `organizationSeatPeak` | every 1 d (`SEAT_PEAK_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneSeatChanges`, `recordSeatChanged` (outbox) | `src/eventing/seat-peak.pipeline.ts:74` |
+| subscriber      | `seatPeakFold`         | –                                                                                                                         | `src/eventing/seat-peak.pipeline.ts:73` |
+
 ## Configuration
 
 | Kind   | Leaf                          | Environment variable      | Declared at                                 |
 | ------ | ----------------------------- | ------------------------- | ------------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:324`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:332`           |
 | config | `signUp.mode`                 | `SIGN_UP_MODE`            | `../contract/src/organization.config.ts:18` |
 | config | `signUp.allowedDomains`       | `SIGN_UP_ALLOWED_DOMAINS` | `../contract/src/organization.config.ts:19` |
 | config | `signUp.adminEmails`          | `ADMIN_EMAILS`            | `../contract/src/organization.config.ts:20` |

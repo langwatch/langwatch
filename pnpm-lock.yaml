@@ -12182,6 +12182,9 @@ importers:
       '@langwatch/ops-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/organization-contract':
+        specifier: workspace:*
+        version: link:../../organization/contract
       '@langwatch/prompt-client':
         specifier: workspace:*
         version: link:../../prompt/client
@@ -12780,6 +12783,9 @@ importers:
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/licensing/contract
+      '@langwatch/enterprise-scim-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/scim/contract
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract

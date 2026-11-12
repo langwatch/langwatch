@@ -198,6 +198,10 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // SCIM's peer fold of identity's SSO connection facts, one row per connection carrying its
   // `organizationId`; written by the row id, read by organization.
   ScimSsoConnectionView: {},
+  // Organization's seat peak (ADR-002): counts, holders and months, each keyed by it.
+  OrganizationSeatPeak: {},
+  OrganizationSeatPeakHolder: {},
+  OrganizationSeatPeakMonth: {},
   // Trace's fold of governance's coding-assistant billing fact, one row per
   // (organizationId, sourceType); every read and write names its organization.
   TraceIngestSourceBilling: {},

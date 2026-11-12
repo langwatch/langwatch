@@ -1906,6 +1906,60 @@ model ScimSsoConnectionView {
   @@index([organizationId, createdAt])
 }
 
+/// Organization's monthly seat peak, folded from its seat changes (modules/organization, ADR-002).
+/// A read model, one row per organization: rebuildable by replaying the event log, so no relation.
+/// Epochs in milliseconds.
+/// Organization's seat-peak counts (ADR-002): one row per organization once counting opened.
+model OrganizationSeatPeak {
+  /// The organization, which is also the aggregate id.
+  organizationId String @id
+  /// When the opening snapshot was taken, epoch milliseconds.
+  openedAt       Float
+  fullSeats      Int
+  liteSeats      Int
+  developerSeats Int
+  /// The latest change time applied to any holder; invitations expire up to it.
+  latestChangeAt Float
+  /// Changes whose `from` disagreed with the seat the fold held.
+  mismatches     Int
+}
+
+/// One member's or pending invitation's seat as the seat peak last applied it (ADR-002).
+model OrganizationSeatPeakHolder {
+  organizationId String
+  /// `member` or `invitation`.
+  holderKind     String
+  /// The member's userId or the invitation's id.
+  holderId       String
+  /// `full`, `lite`, `developer` or `none`.
+  seat           String
+  lastChangedAt  Float
+  /// Absent for a seat the opening snapshot recorded.
+  lastChangeId   String?
+  /// An invitation's expiry; null for a member or an invitation that never expires.
+  expiresAt      Float?
+  /// The fold gave the invitation's seat back at `expiresAt`.
+  expiredByFold  Boolean @default(false)
+
+  @@id([organizationId, holderKind, holderId])
+  @@index([organizationId, holderKind, seat, expiresAt])
+}
+
+/// One calendar month's (UTC) seat peaks for an organization (ADR-002).
+model OrganizationSeatPeakMonth {
+  organizationId String
+  /// `YYYY-MM`.
+  month          String
+  fullPeak       Int
+  fullPeakAt     Float
+  litePeak       Int
+  litePeakAt     Float
+  fullAtEnd      Int
+  liteAtEnd      Int
+
+  @@id([organizationId, month])
+}
+
 enum PlanTypes {
   FREE
   PRO

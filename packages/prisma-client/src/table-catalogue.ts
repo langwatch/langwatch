@@ -46,6 +46,9 @@ export const prismaTableCatalogue = {
   "ScimDirectoryUser": "ScimDirectoryUser",
   "ScimSyncState": "ScimSyncState",
   "ScimSsoConnectionView": "ScimSsoConnectionView",
+  "OrganizationSeatPeak": "OrganizationSeatPeak",
+  "OrganizationSeatPeakHolder": "OrganizationSeatPeakHolder",
+  "OrganizationSeatPeakMonth": "OrganizationSeatPeakMonth",
   "Project": "Project",
   "Department": "Department",
   "DepartmentMembershipHistory": "DepartmentMembershipHistory",
@@ -917,6 +920,35 @@ export const prismaModelFieldCatalogue = {
     "projectionVersion",
     "createdAt",
     "updatedAt"
+  ],
+  "OrganizationSeatPeak": [
+    "organizationId",
+    "openedAt",
+    "fullSeats",
+    "liteSeats",
+    "developerSeats",
+    "latestChangeAt",
+    "mismatches"
+  ],
+  "OrganizationSeatPeakHolder": [
+    "organizationId",
+    "holderKind",
+    "holderId",
+    "seat",
+    "lastChangedAt",
+    "lastChangeId",
+    "expiresAt",
+    "expiredByFold"
+  ],
+  "OrganizationSeatPeakMonth": [
+    "organizationId",
+    "month",
+    "fullPeak",
+    "fullPeakAt",
+    "litePeak",
+    "litePeakAt",
+    "fullAtEnd",
+    "liteAtEnd"
   ],
   "Project": [
     "id",
@@ -3372,6 +3404,9 @@ export const prismaRelationCatalogue = {
   "ScimDirectoryUser": {},
   "ScimSyncState": {},
   "ScimSsoConnectionView": {},
+  "OrganizationSeatPeak": {},
+  "OrganizationSeatPeakHolder": {},
+  "OrganizationSeatPeakMonth": {},
   "Project": {
     "team": "Team",
     "checks": "Monitor",

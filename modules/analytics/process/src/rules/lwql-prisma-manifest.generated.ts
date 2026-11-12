@@ -628,6 +628,35 @@ export interface LwqlPrismaRows {
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
+  readonly OrganizationSeatPeak: {
+    readonly organizationId: "String";
+    readonly openedAt: "Float";
+    readonly fullSeats: "Int";
+    readonly liteSeats: "Int";
+    readonly developerSeats: "Int";
+    readonly latestChangeAt: "Float";
+    readonly mismatches: "Int";
+  };
+  readonly OrganizationSeatPeakHolder: {
+    readonly organizationId: "String";
+    readonly holderKind: "String";
+    readonly holderId: "String";
+    readonly seat: "String";
+    readonly lastChangedAt: "Float";
+    readonly lastChangeId: "String?";
+    readonly expiresAt: "Float?";
+    readonly expiredByFold: "Boolean";
+  };
+  readonly OrganizationSeatPeakMonth: {
+    readonly organizationId: "String";
+    readonly month: "String";
+    readonly fullPeak: "Int";
+    readonly fullPeakAt: "Float";
+    readonly litePeak: "Int";
+    readonly litePeakAt: "Float";
+    readonly fullAtEnd: "Int";
+    readonly liteAtEnd: "Int";
+  };
   readonly Project: {
     readonly id: "String";
     readonly name: "String";

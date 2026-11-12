@@ -28,6 +28,8 @@ const transactionScript = {
     delete: memberDelete,
     update: memberUpdate,
     updateMany: memberUpdateMany,
+    // The seat reads around each write (ADR-002); a seatless member records no change here.
+    findFirst: async () => null,
   },
   team: { findMany: teamFindMany, updateMany: teamUpdateMany },
   project: { updateMany: projectUpdateMany },

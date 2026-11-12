@@ -1,4 +1,9 @@
-import { countMemberSeats, isFullMember } from "@langwatch/entitlement-contract";
+import {
+  classifyMemberType,
+  countMemberSeats,
+  isFullMember,
+  type MemberType,
+} from "@langwatch/entitlement-contract";
 import {
   type OrganizationMemberSeats,
   SeatChangeBusyError,
@@ -18,9 +23,15 @@ import {
   RoleBindingScopeType,
 } from "@langwatch/prisma-client/generated";
 import { prismaTables } from "@langwatch/prisma-client/ownership";
+import { fromDate } from "@langwatch/time";
 import { z } from "zod";
 
-import { OrganizationSeatRepository, type SeatLease } from "../organization-seat.repository.ts";
+import { seatKindOf } from "../../rules/seat-change.rules.ts";
+import {
+  type OrganizationSeatHolding,
+  OrganizationSeatRepository,
+  type SeatLease,
+} from "../organization-seat.repository.ts";
 
 /** Only what this repository needs, named so a caller never names Prisma's own types. */
 type PrismaOrganizationSeatDatabase = PrismaClient | Prisma.TransactionClient;
@@ -82,10 +93,27 @@ interface MemberClassificationContext {
   customRoleMap: Map<string, string[]>;
   userPermissionsMap: Map<string, string[]>;
   pendingInvites: {
+    id: string;
+    expiresAt: number | null;
     role: OrganizationUserRole;
     email: string;
     teamAssignments: TeamAssignment[] | null;
   }[];
+}
+
+/**
+ * A membership that holds a seat: a disabled membership and a deactivated person hold no access,
+ * so they hold no seat; billing for them would be charging for a locked door.
+ * See seat-reconciliation.feature.
+ */
+const SEAT_HOLDING_MEMBER = { disabledAt: null, user: { deactivatedAt: null } } as const;
+
+/** A pending invitation holds its seat until it expires. */
+function seatHoldingInvitation(): Prisma.OrganizationInviteWhereInput {
+  return {
+    status: INVITE_STATUS.PENDING,
+    OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
+  };
 }
 
 /** Seat counts over organization's own membership and invitation rows. */
@@ -213,6 +241,75 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
       .map((user) => user.userId);
   }
 
+  /** Every holder classified by the rule the counts above use, so the two cannot disagree. */
+  async findSeatHolders(organizationId: string): Promise<OrganizationSeatHolding[]> {
+    const context = await this.getMemberClassificationContext(organizationId);
+    return [
+      ...context.users.map((user) => ({
+        holder: { kind: "member" as const, userId: user.userId },
+        seat: seatKindOf(
+          classifyMemberType(user.role, context.userPermissionsMap.get(user.userId)),
+        ),
+      })),
+      ...context.pendingInvites.map((invite) => ({
+        holder: { kind: "invitation" as const, inviteId: invite.id, expiresAt: invite.expiresAt },
+        seat: seatKindOf(
+          classifyMemberType(
+            invite.role,
+            this.getInvitePermissions(invite.teamAssignments, context.customRoleMap),
+          ),
+        ),
+      })),
+    ];
+  }
+
+  /** One member's seat by the rule the count uses; null when they hold none. */
+  async findMemberSeat({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<MemberType | null> {
+    const user = await this.prisma.organizationUser.findFirst({
+      where: { organizationId, userId, ...SEAT_HOLDING_MEMBER },
+      select: { userId: true, role: true },
+    });
+    if (user === null) return null;
+    if (user.role !== OrganizationUserRole.EXTERNAL) {
+      return classifyMemberType(user.role, undefined);
+    }
+    const permissions = await this.getUserPermissionsMap(
+      organizationId,
+      [user],
+      await this.getCustomRoleMap(organizationId),
+    );
+    return classifyMemberType(user.role, permissions.get(userId));
+  }
+
+  /** One invitation's seat by the rule the count uses; null when it holds none. */
+  async findInvitationSeat({
+    organizationId,
+    inviteId,
+  }: {
+    organizationId: string;
+    inviteId: string;
+  }): Promise<MemberType | null> {
+    const invite = await this.prisma.organizationInvite.findFirst({
+      where: { id: inviteId, organizationId, ...seatHoldingInvitation() },
+      select: { role: true, teamAssignments: true },
+    });
+    if (invite === null) return null;
+    const teamAssignments = teamAssignmentsSchema.safeParse(invite.teamAssignments).data ?? null;
+    if (teamAssignments === null || teamAssignments.length === 0) {
+      return classifyMemberType(invite.role, undefined);
+    }
+    return classifyMemberType(
+      invite.role,
+      this.getInvitePermissions(teamAssignments, await this.getCustomRoleMap(organizationId)),
+    );
+  }
+
   /**
    * Fetches all data needed for member classification.
    * Shared between getMemberCount and getMembersLiteCount.
@@ -220,11 +317,8 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
   private async getMemberClassificationContext(
     organizationId: string,
   ): Promise<MemberClassificationContext> {
-    // A disabled membership and a deactivated person hold no access, so they
-    // hold no seat: billing for them would be charging for a locked door.
-    // See seat-reconciliation.feature.
     const users = await this.prisma.organizationUser.findMany({
-      where: { organizationId, disabledAt: null, user: { deactivatedAt: null } },
+      where: { organizationId, ...SEAT_HOLDING_MEMBER },
       select: { userId: true, role: true },
     });
 
@@ -236,12 +330,8 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
     );
 
     const pendingInvites = await this.prisma.organizationInvite.findMany({
-      where: {
-        organizationId,
-        status: INVITE_STATUS.PENDING,
-        OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
-      },
-      select: { role: true, teamAssignments: true, email: true },
+      where: { organizationId, ...seatHoldingInvitation() },
+      select: { id: true, expiration: true, role: true, teamAssignments: true, email: true },
     });
 
     return {
@@ -249,6 +339,8 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
       customRoleMap,
       userPermissionsMap,
       pendingInvites: pendingInvites.map((i) => ({
+        id: i.id,
+        expiresAt: i.expiration ? fromDate(i.expiration).epochMilliseconds : null,
         role: i.role,
         email: i.email,
         teamAssignments: teamAssignmentsSchema.safeParse(i.teamAssignments).data ?? null,

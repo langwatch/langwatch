@@ -5,7 +5,7 @@
  * @see modules/organization/specs/seat-requests.feature
  */
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
-import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
+import type { EntitlementApi, MemberType, Plan } from "@langwatch/entitlement-contract";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationMemberSeats } from "@langwatch/organization-contract";
 import {
@@ -21,6 +21,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
+  type OrganizationSeatHolding,
   OrganizationSeatRepository,
   type SeatLease,
 } from "../../repositories/organization-seat.repository.ts";
@@ -73,6 +74,21 @@ class DelayedCountSeatRepository extends OrganizationSeatRepository {
 
   findFullSeatHolderIds(organizationId: string): Promise<string[]> {
     return this.inner.findFullSeatHolderIds(organizationId);
+  }
+
+  findSeatHolders(organizationId: string): Promise<OrganizationSeatHolding[]> {
+    return this.inner.findSeatHolders(organizationId);
+  }
+
+  findMemberSeat(input: { organizationId: string; userId: string }): Promise<MemberType | null> {
+    return this.inner.findMemberSeat(input);
+  }
+
+  findInvitationSeat(input: {
+    organizationId: string;
+    inviteId: string;
+  }): Promise<MemberType | null> {
+    return this.inner.findInvitationSeat(input);
   }
 
   withSeatLock<T>(input: {
