@@ -18614,6 +18614,24 @@
           "documentation": ""
         },
         {
+          "name": "traceQuietPeriodMs",
+          "columnName": "traceQuietPeriodMs",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "traceWaitTimeoutMs",
+          "columnName": "traceWaitTimeoutMs",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
           "name": "maxTurns",
           "columnName": "maxTurns",
           "type": "Int",
@@ -18993,6 +19011,24 @@
           "name": "judgeModel",
           "columnName": "judgeModel",
           "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "traceQuietPeriodMs",
+          "columnName": "traceQuietPeriodMs",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "traceWaitTimeoutMs",
+          "columnName": "traceWaitTimeoutMs",
+          "type": "Int",
           "kind": "scalar",
           "isList": false,
           "isOptional": true,

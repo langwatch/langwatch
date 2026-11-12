@@ -2511,9 +2511,63 @@ describe("prefetchWithFixture, when the prefetcher sizes the trace wait budget",
       expect(result.success).toBe(true);
       if (!result.success) return;
       expect(result.data.traceWaitTimeoutMs).toBe(45_000);
+      expect(result.data.traceQuietPeriodMs).toBe(7_000);
       expect(deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs).toHaveBeenCalledWith({
         projectId: "proj_123",
       });
+    });
+  });
+
+  describe("given trace wait settings on the plan or the scenario", () => {
+    const withScenario = (budgetMs: number, scenario: Record<string, number | null>) => {
+      const deps = httpDeps(budgetMs);
+      deps.traceWaitBudgetResolver.quietPeriodMs = 9_000;
+      deps.scenarioFetcher = {
+        getById: vi.fn().mockResolvedValue({
+          id: "scen_123",
+          name: "Test Scenario",
+          situation: "User asks for help",
+          criteria: ["Responds helpfully"],
+          labels: [],
+          ...scenario,
+        }),
+      };
+      return deps;
+    };
+    const target = { type: "http" as const, referenceId: "agent_http" };
+
+    /** @scenario "A run plan's trace wait settings win over the scenario's" */
+    it("takes the plan's quiet period over the scenario's", async () => {
+      const deps = withScenario(30_000, { traceQuietPeriodMs: 10_000 });
+
+      const result = await prefetchWithFixture({
+        context: defaultContext,
+        target,
+        plan: { traceQuietPeriodMs: 20_000 },
+        deps,
+      });
+
+      expect(result.success && result.data.traceQuietPeriodMs).toBe(20_000);
+    });
+
+    /** @scenario "A scenario's trace wait settings win over the project's recommendation" */
+    it("takes the scenario's trace wait over the project's", async () => {
+      const deps = withScenario(30_000, { traceWaitTimeoutMs: 90_000 });
+
+      const result = await prefetchWithFixture({ context: defaultContext, target, deps });
+
+      expect(result.success && result.data.traceWaitTimeoutMs).toBe(90_000);
+      expect(result.success && result.data.traceQuietPeriodMs).toBe(9_000);
+    });
+
+    /** @scenario "Unset trace wait settings fall back to the project's recommendation" */
+    it("falls back to the project's recommendation for each unset setting", async () => {
+      const deps = withScenario(25_000, { traceQuietPeriodMs: null, traceWaitTimeoutMs: null });
+
+      const result = await prefetchWithFixture({ context: defaultContext, target, deps });
+
+      expect(result.success && result.data.traceWaitTimeoutMs).toBe(25_000);
+      expect(result.success && result.data.traceQuietPeriodMs).toBe(9_000);
     });
   });
 
@@ -2539,6 +2593,7 @@ describe("prefetchWithFixture, when the prefetcher sizes the trace wait budget",
       expect(result.success).toBe(true);
       if (!result.success) return;
       expect(result.data.traceWaitTimeoutMs).toBeUndefined();
+      expect(result.data.traceQuietPeriodMs).toBeUndefined();
       expect(deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs).not.toHaveBeenCalled();
     });
   });
@@ -2566,6 +2621,7 @@ describe("prefetchWithFixture, when the prefetcher sizes the trace wait budget",
       expect(result.success).toBe(true);
       if (!result.success) return;
       expect(result.data.traceWaitTimeoutMs).toBeUndefined();
+      expect(result.data.traceQuietPeriodMs).toBeUndefined();
       expect(deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs).not.toHaveBeenCalled();
     });
   });

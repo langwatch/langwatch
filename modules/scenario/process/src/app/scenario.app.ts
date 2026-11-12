@@ -950,6 +950,12 @@ export class ScenarioModule implements ScenarioApi {
         ...withActor(input.actor),
         ...(input.simulatorModel ? { simulatorModel: input.simulatorModel } : {}),
         ...(input.judgeModel ? { judgeModel: input.judgeModel } : {}),
+        ...(input.traceQuietPeriodMs != null
+          ? { traceQuietPeriodMs: input.traceQuietPeriodMs }
+          : {}),
+        ...(input.traceWaitTimeoutMs != null
+          ? { traceWaitTimeoutMs: input.traceWaitTimeoutMs }
+          : {}),
         ...withResolvedModels(input.resolvedModels),
         ...(input.keepData ? { keepData: true } : {}),
       },

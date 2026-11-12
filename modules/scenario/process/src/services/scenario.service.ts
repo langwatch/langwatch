@@ -227,6 +227,8 @@ export class ScenarioService {
       parameters: scenarioParameterDefinitionsSchema.nullable().parse(original.parameters),
       simulatorModel: original.simulatorModel,
       judgeModel: original.judgeModel,
+      traceQuietPeriodMs: original.traceQuietPeriodMs,
+      traceWaitTimeoutMs: original.traceWaitTimeoutMs,
       maxTurns: original.maxTurns,
       minTurns: original.minTurns,
       testSuiteId: original.testSuiteId,

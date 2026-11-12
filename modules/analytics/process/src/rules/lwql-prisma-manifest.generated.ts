@@ -1732,6 +1732,8 @@ export interface LwqlPrismaRows {
     readonly parameters: "Json?";
     readonly simulatorModel: "String?";
     readonly judgeModel: "String?";
+    readonly traceQuietPeriodMs: "Int?";
+    readonly traceWaitTimeoutMs: "Int?";
     readonly maxTurns: "Int?";
     readonly minTurns: "Int?";
     readonly fields: "Json?";
@@ -1767,6 +1769,8 @@ export interface LwqlPrismaRows {
     readonly labels: "String[]";
     readonly simulatorModel: "String?";
     readonly judgeModel: "String?";
+    readonly traceQuietPeriodMs: "Int?";
+    readonly traceWaitTimeoutMs: "Int?";
     readonly kind: "String";
     readonly scope: "Json?";
     readonly fields: "Json?";

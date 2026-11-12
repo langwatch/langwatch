@@ -299,6 +299,8 @@ export class SuiteService {
       labels: source.labels,
       simulatorModel: source.simulatorModel,
       judgeModel: source.judgeModel,
+      traceQuietPeriodMs: source.traceQuietPeriodMs,
+      traceWaitTimeoutMs: source.traceWaitTimeoutMs,
       id: this.newSuiteId(),
       slug,
     });

@@ -10,8 +10,11 @@ import {
   runParameterValuesSchema,
   runSecretCiphertextSchema,
   ScenarioRunStatus,
+  traceQuietPeriodMsSchema,
+  traceWaitTimeoutMsSchema,
+  type RunPlanModels,
+  type SimulationProcessingEvent,
 } from "@langwatch/scenario-contract";
-import type { RunPlanModels, SimulationProcessingEvent } from "@langwatch/scenario-contract";
 import { z } from "zod";
 
 import {
@@ -462,11 +465,18 @@ function wakeEvaluating(
   };
 }
 
-/** The plan models a suite records in the queued event's reserved namespace; empty for none. */
+/** The plan models and judge trace wait a suite records in the reserved namespace; {} for none. */
 function getRunPlanModels(reserved: Record<string, unknown>): RunPlanModels {
   const simulatorModel = typeof reserved.simulatorModel === "string" ? reserved.simulatorModel : "";
   const judgeModel = typeof reserved.judgeModel === "string" ? reserved.judgeModel : "";
-  return { ...(simulatorModel && { simulatorModel }), ...(judgeModel && { judgeModel }) };
+  const quiet = traceQuietPeriodMsSchema.safeParse(reserved.traceQuietPeriodMs);
+  const wait = traceWaitTimeoutMsSchema.safeParse(reserved.traceWaitTimeoutMs);
+  return {
+    ...(simulatorModel && { simulatorModel }),
+    ...(judgeModel && { judgeModel }),
+    ...(quiet.success && { traceQuietPeriodMs: quiet.data }),
+    ...(wait.success && { traceWaitTimeoutMs: wait.data }),
+  };
 }
 
 /**

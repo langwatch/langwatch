@@ -4573,6 +4573,11 @@ model Scenario {
   // DEFAULT-role models. See specs/scenarios/scenario-model-selection.feature.
   simulatorModel  String?
   judgeModel      String?
+  // The judge's verdict-time trace wait: how long the span set must hold still
+  // and the first wait budget, in ms. Null resolves the project's measured
+  // value. See specs/scenarios/judge-trace-wait-settings.feature.
+  traceQuietPeriodMs Int?
+  traceWaitTimeoutMs Int?
   maxTurns        Int?
   minTurns        Int?
   // The value this scenario carries for each field its test suite declares,
@@ -4665,6 +4670,10 @@ model SimulationSuite {
   // specs/suites/suite-model-selection.feature.
   simulatorModel     String?
   judgeModel         String?
+  // The plan-wide judge trace wait in ms, winning over each scenario's own
+  // the way the models do. See specs/scenarios/judge-trace-wait-settings.feature.
+  traceQuietPeriodMs Int?
+  traceWaitTimeoutMs Int?
   // "test_suite" | "run_plan" (see SUITE_KINDS in server/suites/types.ts). A
   // test suite groups scenarios through Scenario.testSuiteId; a run plan is
   // hand-assembled. String rather than a Prisma enum so a new kind needs no

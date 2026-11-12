@@ -117,6 +117,8 @@ export class PrismaSuiteRepository extends SuiteRepository {
         labels: input.labels,
         simulatorModel: input.simulatorModel ?? null,
         judgeModel: input.judgeModel ?? null,
+        traceQuietPeriodMs: input.traceQuietPeriodMs ?? null,
+        traceWaitTimeoutMs: input.traceWaitTimeoutMs ?? null,
       },
     });
     return mapSuite(row);
@@ -257,6 +259,8 @@ export class PrismaSuiteRepository extends SuiteRepository {
       repeatCount: input.config.repeatCount ?? 1,
       simulatorModel: input.config.simulatorModel ?? null,
       judgeModel: input.config.judgeModel ?? null,
+      traceQuietPeriodMs: input.config.traceQuietPeriodMs ?? null,
+      traceWaitTimeoutMs: input.config.traceWaitTimeoutMs ?? null,
       scenarioIds: input.scenarioIds,
       ...(input.config.evaluators === undefined ? {} : { evaluators: input.config.evaluators }),
     };

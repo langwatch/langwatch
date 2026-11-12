@@ -59,8 +59,9 @@ describe("buildRemoteTraceRunConfig", () => {
 
     describe("when the verdict reads the trace", () => {
       /** @scenario "The child process passes the quiet period through" */
-      it("passes a two second quiet period for every remote-fetching target", () => {
-        expect(TRACE_QUIET_PERIOD_MS).toBe(2_000);
+      /** @scenario "The child process passes the default quiet period when the job names none" */
+      it("passes a seven second quiet period for every remote-fetching target", () => {
+        expect(TRACE_QUIET_PERIOD_MS).toBe(7_000);
         for (const targetType of ["http", "connected"] as const) {
           expect(buildRemoteTraceRunConfig({ ...base, targetType })).toMatchObject({
             traceQuietPeriodMs: TRACE_QUIET_PERIOD_MS,
@@ -89,6 +90,30 @@ describe("buildRemoteTraceRunConfig", () => {
     });
   });
 
+  describe("when the job carries the resolved quiet period and trace wait", () => {
+    /** @scenario "The child process passes the job's quiet period and trace wait through" */
+    it("passes both through and keeps the extension at the cap", () => {
+      expect(
+        buildRemoteTraceRunConfig({
+          ...base,
+          targetType: "http",
+          traceWaitTimeoutMs: 90_000,
+          traceQuietPeriodMs: 12_000,
+        }),
+      ).toMatchObject({
+        traceWaitTimeoutMs: 90_000,
+        traceQuietPeriodMs: 12_000,
+        traceWaitExtensionMs: TRACE_WAIT_CAP_MS,
+      });
+    });
+
+    it("passes a zero quiet period through rather than the default", () => {
+      expect(
+        buildRemoteTraceRunConfig({ ...base, targetType: "http", traceQuietPeriodMs: 0 }),
+      ).toMatchObject({ traceQuietPeriodMs: 0 });
+    });
+  });
+
   describe("given a connected target", () => {
     /** @scenario "A connected target is judged from its remote traces" */
     it("fetches remote traces the way it does for an http target", () => {
@@ -101,15 +126,16 @@ describe("buildRemoteTraceRunConfig", () => {
     });
   });
 
-  describe("given a prompt, code or workflow target", () => {
+  describe("given a prompt, code, workflow or voice target", () => {
     /** @scenario "Only http targets run with remote fetching" */
     it("contributes nothing to the run configuration", () => {
-      for (const targetType of ["prompt", "code", "workflow"] as const) {
+      for (const targetType of ["prompt", "code", "workflow", "voice"] as const) {
         expect(
           buildRemoteTraceRunConfig({
             ...base,
             targetType,
             traceWaitTimeoutMs: 45_000,
+            traceQuietPeriodMs: 12_000,
           }),
         ).toEqual({});
       }
@@ -132,6 +158,7 @@ describe("scenario child process wiring", () => {
       // Remote fetching arrives through the run configuration alone.
       expect(source).toContain("...buildRemoteTraceRunConfig({");
       expect(source).toContain("traceWaitTimeoutMs: jobData.traceWaitTimeoutMs");
+      expect(source).toContain("traceQuietPeriodMs: jobData.traceQuietPeriodMs");
     });
   });
 });
