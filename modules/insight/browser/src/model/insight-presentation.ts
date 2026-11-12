@@ -54,27 +54,6 @@ export function replayCaption({
   return fromBoard ? `${replayed} The board as it was set when Langy filed this.` : replayed;
 }
 
-/**
- * An insight as plain text, to paste into Slack or an email: title, body with its headers as
- * plain lines, the fixed period with its year, and the board. The numbers are the ones Langy
- * wrote into the body; an insight keeps what to run, never a result, so nothing is replayed.
- */
-export function insightPlainText(entry: InsightEntry): string {
-  const { replay, board } = entry;
-  const body = insightBodyBlocks(entry.body)
-    .map((block) => block.text)
-    .join("\n\n");
-
-  const origin: string[] = [];
-  if (replay) {
-    const days = `${replayDays(replay)}, ${format(replay.end - 1, "yyyy")}`;
-    origin.push(`Period: ${replayWords({ replay, days })}`);
-  }
-  if (board) origin.push(`From: ${boardTrailWords(board)}`);
-
-  return [entry.title, body, origin.join("\n")].filter((part) => part.length > 0).join("\n\n");
-}
-
 /** "Board › Widget", or the board alone: the pointer's names as they were filed. */
 export function boardTrailWords(board: InsightBoard): string {
   return board.widget ? `${board.name} › ${board.widget.name}` : board.name;
