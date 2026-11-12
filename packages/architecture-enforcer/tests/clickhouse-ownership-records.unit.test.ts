@@ -5,6 +5,8 @@ import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  clickhouseScanAt,
+  clickhouseTableOwners,
   collectClickhouseOwnershipFindings,
   DECLARED_OWNERSHIP,
   type DeclaredOwnership,
@@ -117,6 +119,7 @@ function fixture(declared: DeclaredOwnership = DECLARED) {
     write,
     messages: () =>
       collectClickhouseOwnershipFindings(root, CATALOGUE, declared).map((item) => item.message),
+    owners: () => clickhouseTableOwners({ scan: clickhouseScanAt(root, CATALOGUE), declared }),
   };
 }
 
@@ -137,6 +140,84 @@ describe("ClickHouse ownership records", () => {
     /** @scenario "A table recorded as legacy owned is not an ownerless table" */
     it("reports no ownerless stored_objects once it is recorded", () => {
       expect(fixture().messages()).not.toContain("Table stored_objects has no module owner.");
+    });
+  });
+
+  describe("given a table reserved for a module", () => {
+    const RESERVED: DeclaredOwnership = {
+      ...DECLARED,
+      records: [
+        ...DECLARED.records,
+        { table: "eval_results", owner: "reserved", writer: "instant-eval", reason: "step 1" },
+      ],
+    };
+    const reserved = () => {
+      const world = fixture(RESERVED);
+      world.write(
+        "packages/clickhouse-migrations/migrations/00005_eval_results.sql",
+        create("eval_results"),
+      );
+      return world;
+    };
+
+    /** @scenario "A table reserved for a module is not an ownerless table" */
+    it("reports nothing before the module writes it", () => {
+      expect(reserved().messages()).toEqual([]);
+    });
+
+    /** @scenario "The reserved module's first write asks for the record to be deleted" */
+    it("asks for the record to be deleted once the module writes it", () => {
+      const world = reserved();
+      world.write(
+        "modules/instant-eval/process/src/repositories/clickhouse/clickhouse.eval-results.repository.ts",
+        writer("eval_results"),
+      );
+
+      expect(world.messages()).toEqual([
+        "instant-eval writes eval_results, reserved for it. Delete the record: the write owns the table now.",
+      ]);
+    });
+
+    /** @scenario "Another module writing a reserved table is reported" */
+    it("reports another module writing it", () => {
+      const world = reserved();
+      world.write(
+        "modules/trace/process/src/repositories/clickhouse/clickhouse.eval-results.repository.ts",
+        writer("eval_results"),
+      );
+
+      expect(world.messages()).toEqual([
+        "trace writes eval_results, recorded as reserved owned (instant-eval: step 1).",
+      ]);
+    });
+
+    /** @scenario "Another module reading a reserved table is reported" */
+    it("reports another module reading it", () => {
+      const world = reserved();
+      world.write(
+        "modules/trace/process/src/repositories/clickhouse/clickhouse.eval-results.repository.ts",
+        reader("eval_results"),
+      );
+
+      expect(world.messages()).toEqual(["trace reads eval_results, owned by instant-eval."]);
+    });
+
+    /** @scenario "Another module writing and reading a reserved table is reported once" */
+    it("reports another module writing and reading it once", () => {
+      const world = reserved();
+      world.write(
+        "modules/trace/process/src/repositories/clickhouse/clickhouse.eval-results.repository.ts",
+        writer("eval_results") + reader("eval_results"),
+      );
+
+      expect(world.messages()).toEqual([
+        "trace writes eval_results, recorded as reserved owned (instant-eval: step 1).",
+      ]);
+    });
+
+    /** @scenario "A reserved table's owner is its named writer" */
+    it("lists the named writer as its owner", () => {
+      expect(reserved().owners().get("eval_results")).toBe("instant-eval");
     });
   });
 
@@ -281,6 +362,7 @@ describe("ClickHouse ownership records", () => {
         "stored_objects",
         "automation_audit",
         "langy_messages",
+        "eval_results",
       ]);
       expect(DECLARED_OWNERSHIP.exceptions).toHaveLength(3);
       expect(DECLARED_OWNERSHIP.shared.map((item) => item.table)).toEqual([

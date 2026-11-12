@@ -1729,6 +1729,9 @@ owner declares a table shared for reading by named modules in that policy, which
 and no write. Trace writes `trace_analytics` and `trace_analytics_rollup` and shares both with
 analytics; trace drops its copy of the has-signal predicate. The policy records `event_log` as
 framework owned and the six legacy tables with no TypeScript writer as legacy owned; nothing is dropped.
+A record may also reserve a table for the module that will write it (ADR-189: `eval_results` for
+instant-eval): the table counts as that module's, so another module's read or write is a finding, and the
+module's first write asks for the record to be deleted.
 
 **Shared reads over copies, Postgres too** (Alex, 2026-10-07, R40): a module needing another's stored data
 reads the owner's table through a declared share, never a copy, unless a ruling names a reason. The

@@ -62,4 +62,5 @@ export const TIME_PARTITIONED_TABLES = {
   // prunes nothing: `RunId` sits behind `TenantId` and nothing bounds the
   // partition, so every read ranges on `CreatedAt` too.
   instant_eval_judgments: ["CreatedAt"],
+  eval_results: ["OccurredAt"],
 } as const satisfies Record<string, readonly string[]>;

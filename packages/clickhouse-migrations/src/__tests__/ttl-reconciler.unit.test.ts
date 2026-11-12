@@ -322,6 +322,7 @@ describe("ttlReconciler", () => {
         "governance_cost_rollup_restatement_index",
         "instant_eval_judgments",
         "instant_eval_runs",
+        "eval_results",
       ]);
     });
 
