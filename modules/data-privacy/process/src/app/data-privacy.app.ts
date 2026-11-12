@@ -1,5 +1,5 @@
-import { ConfigParseError } from "@langwatch/config";
 import { AuthzApi } from "@langwatch/authz-contract";
+import { ConfigParseError } from "@langwatch/config";
 import {
   DATA_PRIVACY_PRESIDIO_TIMEOUT_MS,
   DataPrivacyApi,

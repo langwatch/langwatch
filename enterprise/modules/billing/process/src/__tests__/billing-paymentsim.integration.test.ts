@@ -24,7 +24,6 @@ import { composeHttpBillingStripe } from "../channels/http/http.billing-stripe.c
 import { HttpStripeWebhooksChannel } from "../channels/http/http.billing.channels.ts";
 import { MemoryBillingWebhookHostChannel } from "../channels/memory/memory.billing-webhook-host.channel.ts";
 import { ReportUsageForMonthCommandHandler } from "../eventing/report-usage-for-month.commands.ts";
-import { carriesPiiRedactionPrice } from "../rules/pii-redaction-meter.rules.ts";
 import { MemoryBillingOrganizationRepository } from "../repositories/memory/memory.billing-account-facts.repository.ts";
 import { MemoryBillingReportOrganizationRepository } from "../repositories/memory/memory.billing-report-organization.repository.ts";
 import { MemoryBillingWebhookOrganizationRepository } from "../repositories/memory/memory.billing-webhook-organization.repository.ts";
@@ -32,6 +31,7 @@ import { MemoryBillingWebhookSubscriptionRepository } from "../repositories/memo
 import { MemoryBillingRepositories } from "../repositories/memory/memory.billing.repositories.ts";
 import { MemoryBillingStore } from "../repositories/memory/memory.billing.store.ts";
 import { MemoryBillingSubscriptionRepository } from "../repositories/memory/memory.subscription.repository.ts";
+import { carriesPiiRedactionPrice } from "../rules/pii-redaction-meter.rules.ts";
 import { BillingErrorReporter } from "../services/billing-error-reporter.service.ts";
 import { PiiRedactionSpendQueryService } from "../services/pii-redaction-spend-query.service.ts";
 import type { ResourceLimitAlertService } from "../services/resource-limit-alert.service.ts";
