@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
- * Nurturing's own trace counts, one row per project and UTC day, incremented in place by the
- * traces its counted-trace rows had not yet counted.
+ * Nurturing's own trace counts, one row per project and UTC day, incremented in place by each
+ * batch.
  * Spec: enterprise/modules/nurturing/specs/project-usage.feature
  */
 import { randomUUID } from "node:crypto";
@@ -28,7 +28,6 @@ const AT = Date.UTC(2026, 10, 19, 12);
 
 const trace = (overrides: Partial<NurturingCountedTrace> = {}): NurturingCountedTrace => ({
   projectId,
-  traceId: randomUUID(),
   kind: "trace",
   day: "2026-11-19",
   at: AT,
@@ -51,9 +50,6 @@ describe.skipIf(!databaseUrl)("given nurturing's trace-day rows", () => {
   afterAll(async () => {
     if (!connection) return;
     await connection.client.nurturingProjectTraceDay.deleteMany({
-      where: { projectId: { in: projectIds } },
-    });
-    await connection.client.nurturingProjectCountedTrace.deleteMany({
       where: { projectId: { in: projectIds } },
     });
     await connection.closeOnce();
@@ -79,29 +75,6 @@ describe.skipIf(!databaseUrl)("given nurturing's trace-day rows", () => {
       ]);
     });
 
-    /** @scenario "A trace stored twice counts once" */
-    it("counts a trace once per kind, in one batch, across batches and from two writers", async () => {
-      const once = trace({ day: "2026-11-21", traceId: "stored-twice" });
-      const failed = { ...once, kind: "failed" as const, at: AT + 5000 };
-
-      await repository.countTraces([once, { ...once, at: AT + 1000 }]);
-      await Promise.all([
-        repository.countTraces([once, failed]),
-        repository.countTraces([once, failed]),
-      ]);
-
-      const [counted] = await repository.findForProjects({
-        projectIds: [projectId],
-        afterDay: "2026-11-20",
-      });
-      expect(counted).toMatchObject({
-        traceCount: 1,
-        errorCount: 1,
-        lastTraceAt: AT,
-        lastFailedTraceAt: AT + 5000,
-      });
-    });
-
     it("loses no count when two writers add different traces to one day at once", async () => {
       const day = "2026-11-20";
 
@@ -122,7 +95,7 @@ describe.skipIf(!databaseUrl)("given nurturing's trace-day rows", () => {
     /** @scenario "Trace days older than the window are deleted" */
     it("reads the projects' days after the window's start and deletes the older ones", async () => {
       await repository.countTraces([
-        trace({ day: "2026-10-01", traceId: "old" }),
+        trace({ day: "2026-10-01" }),
         trace({ projectId: otherProjectId, day: "2026-11-22" }),
       ]);
 
@@ -137,17 +110,12 @@ describe.skipIf(!databaseUrl)("given nurturing's trace-day rows", () => {
       await repository.pruneBefore({ projectIds, beforeDay: "2026-10-21" });
       const kept = await repository.findForProjects({ projectIds, afterDay: "2000-01-01" });
       expect(kept.map((day) => day.day)).not.toContain("2026-10-01");
-      await expect(
-        connection.client.nurturingProjectCountedTrace.findMany({
-          where: { projectId, traceId: "old" },
-        }),
-      ).resolves.toEqual([]);
     });
   });
 
   describe("when an organization's window ends", () => {
     /** @scenario "The trace traits are removed once when an organization's window ends" */
-    it("drops every day and counted trace of its projects, and none of another's", async () => {
+    it("drops every day of its projects, and none of another's", async () => {
       await repository.countTraces([trace({ projectId: otherProjectId, day: "2026-11-23" })]);
 
       await repository.pruneProjects({ projectIds: [projectId] });
@@ -155,9 +123,6 @@ describe.skipIf(!databaseUrl)("given nurturing's trace-day rows", () => {
       await expect(
         repository.findForProjects({ projectIds: [projectId], afterDay: "2000-01-01" }),
       ).resolves.toEqual([]);
-      await expect(
-        connection.client.nurturingProjectCountedTrace.count({ where: { projectId } }),
-      ).resolves.toBe(0);
       const other = await repository.findForProjects({
         projectIds: [otherProjectId],
         afterDay: "2000-01-01",

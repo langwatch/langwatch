@@ -21,12 +21,11 @@ export type NurturingTraceDay = Readonly<{
 export type NurturingCountedTraceKind = "trace" | "failed";
 
 /**
- * One trace as nurturing counts it, once per kind: its project, id and the fact's day and time;
- * never its body. A re-stored trace or a redelivered fact carries the same project, id and kind.
+ * One trace as nurturing counts it: its project and the fact's day and time; never its body.
+ * Nothing de-duplicates: a redelivered batch can count a trace twice (accepted, issue 9378).
  */
 export type NurturingCountedTrace = Readonly<{
   projectId: string;
-  traceId: string;
   kind: NurturingCountedTraceKind;
   /** UTC `YYYY-MM-DD` of the fact's append time. */
   day: string;
@@ -85,13 +84,6 @@ export function traceDayIncrementsOf(
     days.set(key, addCountedTrace(days.get(key) ?? emptyTraceDay(), trace));
   }
   return [...days.values()];
-}
-
-/** The key a trace is counted once by: its project, id and kind. */
-export function countedTraceKeyOf(
-  trace: Pick<NurturingCountedTrace, "projectId" | "traceId" | "kind">,
-): string {
-  return JSON.stringify([trace.projectId, trace.traceId, trace.kind]);
 }
 
 /** The days after `windowStartDay`, summed into the organization's trace counts. */

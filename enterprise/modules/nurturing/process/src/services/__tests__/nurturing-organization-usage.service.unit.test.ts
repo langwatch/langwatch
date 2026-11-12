@@ -103,7 +103,7 @@ const traitsOf = (call: CioBatchCall | undefined) =>
 
 const storeContext = (key: string) => ({ aggregateId: key, tenantId: createTenantId(key), key });
 
-/** Arranges one project's trace day by counting its traces and failures, each a new trace. */
+/** Arranges one project's trace day by counting its traces and failures, each a trace. */
 async function seedTraceDay(
   traceDays: MemoryNurturingTraceDayRepository,
   {
@@ -118,9 +118,8 @@ async function seedTraceDay(
     },
 ) {
   const traces = (kind: NurturingCountedTrace["kind"], count: number, at: number) =>
-    Array.from({ length: count }, (_, n) => ({
+    Array.from({ length: count }, () => ({
       projectId,
-      traceId: `${projectId}:${day}:${n}`,
       kind,
       day,
       at,
@@ -484,7 +483,7 @@ describe("NurturingOrganizationUsageService", () => {
     });
 
     /** @scenario "The trace traits are removed once when an organization's window ends" */
-    it("drops the organization's trace days and counted traces", async () => {
+    it("drops the organization's trace days", async () => {
       const { service, traceDays } = await serviceOver({
         placed: new Map([["project-1", "org-1"]]),
         createdAt: new Map([["org-1", ended]]),

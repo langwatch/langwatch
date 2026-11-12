@@ -1,32 +1,23 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import {
-  countedTraceKeyOf,
   type NurturingCountedTrace,
   type NurturingTraceDay,
   traceDayIncrementsOf,
 } from "../../rules/nurturing-trace-day.rules.ts";
 import type { NurturingTraceDayRepository } from "../nurturing-trace-day.repository.ts";
 
-/** Nurturing's trace-day rows in memory, counted once per trace as the Postgres write counts. */
+/** Nurturing's trace-day rows in memory, incremented as the Postgres write increments them. */
 export class MemoryNurturingTraceDayRepository implements NurturingTraceDayRepository {
   static create(): MemoryNurturingTraceDayRepository {
     return new MemoryNurturingTraceDayRepository();
   }
 
   readonly #days = new Map<string, NurturingTraceDay>();
-  /** Each counted trace's key, with its project and day for the prunes. */
-  readonly #counted = new Map<string, Readonly<{ projectId: string; day: string }>>();
 
   private constructor() {}
 
   async countTraces(traces: readonly NurturingCountedTrace[]): Promise<void> {
-    const fresh = traces.filter((trace) => {
-      const key = countedTraceKeyOf(trace);
-      if (this.#counted.has(key)) return false;
-      this.#counted.set(key, { projectId: trace.projectId, day: trace.day });
-      return true;
-    });
-    for (const increment of traceDayIncrementsOf(fresh)) {
+    for (const increment of traceDayIncrementsOf(traces)) {
       const key = JSON.stringify([increment.projectId, increment.day]);
       const known = this.#days.get(key);
       const lastTimes = [known?.lastTraceAt ?? null, increment.lastTraceAt].filter(
@@ -67,19 +58,11 @@ export class MemoryNurturingTraceDayRepository implements NurturingTraceDayRepos
     for (const [key, day] of this.#days) {
       if (projectIds.includes(day.projectId) && day.day < beforeDay) this.#days.delete(key);
     }
-    for (const [key, counted] of this.#counted) {
-      if (projectIds.includes(counted.projectId) && counted.day < beforeDay) {
-        this.#counted.delete(key);
-      }
-    }
   }
 
   async pruneProjects({ projectIds }: Readonly<{ projectIds: readonly string[] }>): Promise<void> {
     for (const [key, day] of this.#days) {
       if (projectIds.includes(day.projectId)) this.#days.delete(key);
-    }
-    for (const [key, counted] of this.#counted) {
-      if (projectIds.includes(counted.projectId)) this.#counted.delete(key);
     }
   }
 }

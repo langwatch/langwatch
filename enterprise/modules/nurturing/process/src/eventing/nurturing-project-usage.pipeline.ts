@@ -2,7 +2,7 @@
 /**
  * Nurturing's own per-project usage (§9): one peer fold per owner pipeline (prompt, evaluator,
  * scenario, simulation run), a row per project each, and subscribers on trace's span_received and
- * trace_failed counting each trace and failed trace once into its project's UTC day, one statement
+ * trace_failed adding each trace and failed trace to its project's UTC day, one statement
  * a batch, while the organization is inside its counting window.
  * Evaluations add a day per project a day. Each change syncs the organization as one Customer.io
  * group call, mirrored onto each member whose latest organization it is (the emails read person
@@ -305,7 +305,7 @@ export function isCountedTrace(data: NurturingTraceSpanData): boolean {
   return isRootSpan(data) && isCustomerOrigin(data.origin);
 }
 
-/** A root span as its count takes it: its project (the tenant), trace and append day. */
+/** A root span as its count takes it: its project (the tenant) and append day. */
 export function countedTraceOf({
   data,
   context,
@@ -315,7 +315,6 @@ export function countedTraceOf({
 }>): NurturingCountedTrace {
   return {
     projectId: String(context.tenantId),
-    traceId: data.span.traceId,
     kind: "trace",
     day: utcDayOf(context.createdAt),
     at: context.createdAt,
@@ -359,8 +358,8 @@ async function copiedProjectOf({
 }
 
 /**
- * Counts the batch's traces whose organization is inside its counting window, each once, durably
- * (the repository's per-trace rows). The placement copy has its own subscriber, so a new project's
+ * Counts the batch's traces whose organization is inside its counting window, durably. A
+ * redelivered batch counts again: accepted (owner decision, issue 9378). The placement copy has its own subscriber, so a new project's
  * traces can come first: an uncopied project fails the batch after the rest are counted, and the
  * queue retries, until its window from first seen runs out; then it drops, as does a placed project
  * whose organization has no creation copy. A project this process dropped is skipped with no read;
@@ -417,9 +416,8 @@ export function traceDayGroupOf(event: Event): string {
 
 /**
  * One project's traces per UTC day: root spans of one project and day are coalesced, and each
- * batch counts its traces once each in one Postgres statement, so a re-stored trace or a
- * redelivered batch counts nothing again. Only organizations in their counting window count. Not
- * a fold, so no replay rebuilds the rows. Child, sample and Langy spans mint no job; the handler
+ * batch adds its traces in one Postgres statement; a redelivered batch can count a trace twice
+ * (accepted, issue 9378). Only organizations in their counting window count. Not a fold, so no replay rebuilds the rows. Child, sample and Langy spans mint no job; the handler
  * drops any staged.
  */
 export function nurturingTraceDaySubscriber(
@@ -443,18 +441,17 @@ export function nurturingTraceDaySubscriber(
   };
 }
 
-/** What the failed-trace count reads of trace_failed: its project, trace and origin. */
+/** What the failed-trace count reads of trace_failed: its project and origin. */
 const failedTraceDataSchema = traceFailedEventDataSchema.pick({
   projectId: true,
-  traceId: true,
   origin: true,
 });
 
 /**
  * One project's failed traces per UTC day, from trace's own trace_failed fact (once per trace,
- * by trace's rule) on the day it was appended, counted once per trace as the trace count is, so a
- * redelivered fact counts nothing again. Sample and Langy failures mint no job; the handler drops
- * any staged.
+ * by trace's rule) on the day it was appended, added as the trace count is, so a redelivered
+ * fact can count a failure twice (accepted, issue 9378). Sample and Langy failures mint no job;
+ * the handler drops any staged.
  */
 export function nurturingFailedTraceDaySubscriber(
   deps: NurturingTraceCountingDeps,
@@ -474,7 +471,6 @@ export function nurturingFailedTraceDaySubscriber(
           .filter(({ data }) => isCustomerOrigin(data.origin))
           .map(({ data, context }) => ({
             projectId: data.projectId,
-            traceId: data.traceId,
             kind: "failed" as const,
             day: utcDayOf(context.createdAt),
             at: context.createdAt,

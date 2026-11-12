@@ -626,14 +626,16 @@ describe("the trace-day count", () => {
     expect((await days()).map((day) => day.traceCount)).toEqual([1]);
   });
 
-  /** @scenario "A trace stored twice counts once" */
-  it("counts a re-stored or redelivered root span once", async () => {
+  /** @scenario "A redelivered batch can count a trace twice; accepted" */
+  it("counts a redelivered batch again, as the owner accepted (issue 9378)", async () => {
     const { subscriber, days } = harness();
 
-    await subscriber.handleBatch([itemOf(OK, "trace-1"), itemOf(OK, "trace-1", NOON + 1000)]);
+    await subscriber.handleBatch([itemOf(OK, "trace-1")]);
     await subscriber.handleBatch([itemOf(OK, "trace-1", NOON + 2000)]);
 
-    expect(await days()).toEqual([expect.objectContaining({ traceCount: 1, lastTraceAt: NOON })]);
+    expect(await days()).toEqual([
+      expect.objectContaining({ traceCount: 2, lastTraceAt: NOON + 2000 }),
+    ]);
   });
 
   /** @scenario "An organization past its counting window writes no counts" */
@@ -777,32 +779,19 @@ describe("the failed-trace count", () => {
     const subscriber = nurturingFailedTraceDaySubscriber(counting);
     const days = () =>
       counting.traceDays.findForProjects({ projectIds: ["project-1"], afterDay: "" });
-    /** One delivery; a redelivery carries a new event id but trace's idempotency key. */
-    const itemOf = (traceId: string, origin?: string, createdAt = NOON, delivery = 1) => ({
+    const itemOf = (traceId: string, origin?: string, createdAt = NOON) => ({
       data: subscriber.data.parse(failedData(traceId, origin)),
       context: {
         tenantId: createTenantId("project-1"),
         aggregateId: `project-1:${traceId}`,
         createdAt,
         occurredAt: createdAt,
-        eventId: `${traceId}-failed-${delivery}`,
+        eventId: `${traceId}-failed`,
         idempotencyKey: `project-1:trace_failed:${traceId}`,
       },
     });
     return { subscriber, days, itemOf };
   }
-
-  /** @scenario "A redelivered trace_failed counts its failure once" */
-  it("counts a trace's failure once however often its fact is delivered", async () => {
-    const { subscriber, days, itemOf } = harness();
-
-    await subscriber.handleBatch([itemOf("trace-1"), itemOf("trace-1", undefined, NOON, 2)]);
-    await subscriber.handleBatch([itemOf("trace-1", undefined, NOON + 1000, 3)]);
-
-    expect(await days()).toEqual([
-      expect.objectContaining({ errorCount: 1, lastFailedTraceAt: NOON }),
-    ]);
-  });
 
   /** @scenario "An organization past its counting window writes no counts" */
   it("counts no failure of an organization past its window", async () => {

@@ -5170,7 +5170,7 @@ model NurturingProjectUsageView {
 
 /// Nurturing's own trace counts from trace's span_received and trace_failed (ARCHITECTURE §9), a
 /// root span being one trace, one row per project and UTC day of append time, incremented in place
-/// by the traces NurturingProjectCountedTrace had not yet counted. Kept 30 days.
+/// by each batch. A redelivered batch can count a trace twice; accepted (issue 9378). Kept 30 days.
 model NurturingProjectTraceDay {
   projectId         String
   /// UTC `YYYY-MM-DD` of the root spans' append time.
@@ -5184,24 +5184,6 @@ model NurturingProjectTraceDay {
   lastFailedTraceAt DateTime?
 
   @@id([projectId, day])
-}
-
-/// Each trace nurturing counted into NurturingProjectTraceDay, once per kind, so a re-stored
-/// trace or a redelivered fact counts once. Written only for organizations inside their trace
-/// counting window, so rows scale with new organizations' traffic; kept 30 days, as the days.
-model NurturingProjectCountedTrace {
-  projectId  String
-  traceId    String
-  /// `trace` (its root span) or `failed` (its trace_failed).
-  kind       String
-  /// UTC `YYYY-MM-DD` of the fact's append time; the prune reads it.
-  day        String
-  /// The fact's append time.
-  appendedAt DateTime
-  createdAt  DateTime @default(now())
-
-  @@id([projectId, traceId, kind])
-  @@index([day])
 }
 
 /// Nurturing's copy of each personal project's owner, from organization's and project's facts.

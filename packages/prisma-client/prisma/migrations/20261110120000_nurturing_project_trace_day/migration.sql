@@ -1,7 +1,7 @@
 -- Nurturing's own trace counts per project and UTC day of append time, owned by nurturing:
 -- traceCount from trace's span_received (a root span is one trace), errorCount from trace's
--- lw.trace.trace_failed (ARCHITECTURE §9). Each batch adds only the traces it newly inserted into
--- NurturingProjectCountedTrace (migration 20261112120000), so a redelivery counts once. The
+-- lw.trace.trace_failed (ARCHITECTURE §9). Each batch adds the traces it counted to the day's row; a
+-- redelivered batch can count a trace twice (accepted, issue 9378). The
 -- per-email Customer.io traits sum an organization's last 30 days; rows are written only inside an
 -- organization's trace counting window and dropped when it ends.
 --

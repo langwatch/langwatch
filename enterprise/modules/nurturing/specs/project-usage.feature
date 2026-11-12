@@ -8,12 +8,12 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   Failed traces are counted from trace's own lw.trace.trace_failed fact, recorded once per trace
   by trace's rule (any span's error), so nurturing keeps no copy of that rule. Sample and Langy
   traces are left out, as trace leaves them out of a project's first trace. Root spans and failed
-  traces of one project and day are batched, and each batch counts its traces once each in one
-  Postgres statement: a row per counted trace and kind (NurturingProjectCountedTrace) is inserted
-  unless it exists, and only the rows inserted are added to that day's row, so a trace stored in
-  two versions, a redelivered batch or a redelivered trace_failed counts once (issue 9378 AC 3).
+  traces of one project and day are batched, and each batch adds its traces to that day's row in
+  one Postgres statement: it counts the batch's traces and adds them, with no record of which
+  traces were counted before. A redelivered batch can count a trace twice; accepted (owner
+  decision, issue 9378).
   Traces are counted only while their organization is inside its counting window (its creation
-  plus the 14-day free window and a week), so the per-trace rows scale with new organizations'
+  plus the 14-day free window and a week), so the trace-day rows scale with new organizations'
   traffic alone. An hourly sweep (a scheduled process, since an organization that stopped tracing
   syncs no more) sends each organization's trace traits once as null when its window ends, so
   Customer.io removes them and a rolling trait never says "active" for ever; later syncs leave
@@ -139,12 +139,6 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     And a root span's error status alone counts no failed trace
 
   @unit
-  Scenario: A redelivered trace_failed counts its failure once
-    Given trace_failed for a project's trace, delivered again under a new event id
-    When the failed-trace count takes each delivery
-    Then the trace counts one failed trace, its counted row keyed by project, trace and kind
-
-  @unit
   Scenario: A failure on the day after its trace's root span still counts
     Given a project's trace counted on one UTC day and its trace_failed appended on the next
     When the organization's traits are built
@@ -163,18 +157,17 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     Then the day's row gets one upsert adding their trace counts, and failed traces the same
     And two writers adding to one day at once lose no count
 
-  @unit @integration
-  Scenario: A trace stored twice counts once
+  @unit
+  Scenario: A redelivered batch can count a trace twice; accepted
     Given a trace's root span counted on its project's day
-    When the trace is stored again in a second version, or its batch is redelivered or retried
-    Then the trace counts once, in one batch or across batches or writers
-    And its counted row is kept as long as its day row, 30 days
+    When its batch is delivered again
+    Then the trace counts again; accepted (owner decision, issue 9378)
 
   @unit
   Scenario: An organization past its counting window writes no counts
     Given an organization created more than 21 days before a trace or failure, or never seen created
     When the trace or failure is counted
-    Then no counted-trace row and no count is written for it
+    Then no count is written for it
     And its organization's sync sends no trace trait
 
   @unit
@@ -183,7 +176,7 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     When the hourly sweep runs, on time or late
     Then its trace traits go once as null on the organization and on each member it is the latest of
     And no other trait is sent with them
-    And its projects' trace days and counted traces are deleted
+    And its projects' trace days are deleted
     And a refused call, a member's identify included, fails the sweep, so it is retried
     And the retried sweep sends the same nulls again
 
@@ -252,9 +245,9 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
 
   @unit @integration
   Scenario: Trace days older than the window are deleted
-    Given a project's trace day and counted traces older than the 30-day window, of an organization past its counting window
+    Given a project's trace day older than the 30-day window, of an organization past its counting window
     When its organization syncs
-    Then that day's row and the project's counted traces that old are deleted
+    Then that day's row is deleted
 
   @unit
   Scenario: A sync past the counting window deletes old trace days, even without an admin

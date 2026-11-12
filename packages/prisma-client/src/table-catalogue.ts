@@ -146,7 +146,6 @@ export const prismaTableCatalogue = {
   "NurturingOrganization": "NurturingOrganization",
   "NurturingProjectUsageView": "NurturingProjectUsageView",
   "NurturingProjectTraceDay": "NurturingProjectTraceDay",
-  "NurturingProjectCountedTrace": "NurturingProjectCountedTrace",
   "NurturingPersonalProject": "NurturingPersonalProject",
   "NurturingTracedProject": "NurturingTracedProject",
   "BillingMeterCheckpoint": "BillingMeterCheckpoint",
@@ -2460,14 +2459,6 @@ export const prismaModelFieldCatalogue = {
     "lastTraceAt",
     "lastFailedTraceAt"
   ],
-  "NurturingProjectCountedTrace": [
-    "projectId",
-    "traceId",
-    "kind",
-    "day",
-    "appendedAt",
-    "createdAt"
-  ],
   "NurturingPersonalProject": [
     "projectId",
     "organizationId",
@@ -3770,7 +3761,6 @@ export const prismaRelationCatalogue = {
   "NurturingOrganization": {},
   "NurturingProjectUsageView": {},
   "NurturingProjectTraceDay": {},
-  "NurturingProjectCountedTrace": {},
   "NurturingPersonalProject": {},
   "NurturingTracedProject": {},
   "BillingMeterCheckpoint": {},

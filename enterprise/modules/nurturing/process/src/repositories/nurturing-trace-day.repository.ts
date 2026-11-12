@@ -10,21 +10,17 @@ export interface NurturingTraceDayReadRepository {
   findForProjects(
     input: Readonly<{ projectIds: readonly string[]; afterDay: string }>,
   ): Promise<NurturingTraceDay[]>;
-  /**
-   * Drops the projects' days and counted traces before `beforeDay`: no read reaches them, and no
-   * trace that old is re-stored or redelivered.
-   */
+  /** Drops the projects' days before `beforeDay`: no read reaches them. */
   pruneBefore(input: Readonly<{ projectIds: readonly string[]; beforeDay: string }>): Promise<void>;
-  /** Drops every day and counted trace of the projects: past their window nothing reads them. */
+  /** Drops every day of the projects: past their window nothing reads them. */
   pruneProjects(input: Readonly<{ projectIds: readonly string[] }>): Promise<void>;
 }
 
 /** Nurturing's per-project, per-day trace counts: the increment, and the read. */
 export interface NurturingTraceDayRepository extends NurturingTraceDayReadRepository {
   /**
-   * Counts each trace once per project, id and kind, durably: one atomic write per batch records
-   * the traces not yet counted and adds only those to their project's day. A re-stored trace, a
-   * redelivered batch or a retry after the write counts nothing again.
+   * Adds the batch's traces to their project's days, durably, in one atomic write. A redelivered
+   * batch counts again: accepted (owner decision, issue 9378).
    */
   countTraces(traces: readonly NurturingCountedTrace[]): Promise<void>;
 }

@@ -10,16 +10,15 @@ import type { NurturingTraceDayRepository } from "../nurturing-trace-day.reposit
 
 type NurturingTraceDayDatabase = Pick<
   PrismaClient,
-  "nurturingProjectTraceDay" | "nurturingProjectCountedTrace" | "$executeRaw"
+  "nurturingProjectTraceDay" | "$executeRaw"
 >;
 
 /**
  * Nurturing's trace counts in Postgres: one `NurturingProjectTraceDay` row per project and UTC
- * day with native counts, incremented in place by the traces `NurturingProjectCountedTrace` had
- * not yet counted.
+ * day with native counts, incremented in place by each batch.
  */
 export class PrismaNurturingTraceDayRepository
-  extends PrismaRepository.for("NurturingProjectTraceDay", "NurturingProjectCountedTrace")
+  extends PrismaRepository.for("NurturingProjectTraceDay")
   implements NurturingTraceDayRepository
 {
   static create({
@@ -36,38 +35,29 @@ export class PrismaNurturingTraceDayRepository
   }
 
   /**
-   * One statement per batch: the traces not yet counted are inserted (a conflict is one already
-   * counted, or a duplicate in the batch), and only the inserted rows are added to their days.
-   * Concurrent writers add to a day row, so no count is lost between them.
+   * One statement per batch: the batch's traces are counted per project and day, and added to the
+   * day row. Concurrent writers add to a day row, so no count is lost between them. Nothing
+   * de-duplicates: a redelivered batch counts again (accepted, owner decision, issue 9378).
    */
   async countTraces(traces: readonly NurturingCountedTrace[]): Promise<void> {
     if (traces.length === 0) return;
     await this.#database.$executeRaw`
-      WITH fresh AS (
-        INSERT INTO "NurturingProjectCountedTrace"
-          ("projectId", "traceId", "kind", "day", "appendedAt")
-        SELECT incoming."projectId", incoming."traceId", incoming."kind", incoming."day",
-               (to_timestamp(incoming."at" / 1000.0) AT TIME ZONE 'UTC')::timestamp(3)
-        FROM unnest(
-          ${traces.map(({ projectId }) => projectId)}::text[],
-          ${traces.map(({ traceId }) => traceId)}::text[],
-          ${traces.map(({ kind }) => kind)}::text[],
-          ${traces.map(({ day }) => day)}::text[],
-          ${traces.map(({ at }) => at)}::double precision[]
-        ) AS incoming("projectId", "traceId", "kind", "day", "at")
-        WHERE incoming."projectId" = ANY(${[...new Set(traces.map(({ projectId }) => projectId))]}::text[])
-        ON CONFLICT ("projectId", "traceId", "kind") DO NOTHING
-        RETURNING "projectId", "kind", "day", "appendedAt"
-      )
       INSERT INTO "NurturingProjectTraceDay" AS counted
         ("projectId", "day", "traceCount", "errorCount", "lastTraceAt", "lastFailedTraceAt")
-      SELECT "projectId", "day",
-             (count(*) FILTER (WHERE "kind" = 'trace'))::integer,
-             (count(*) FILTER (WHERE "kind" = 'failed'))::integer,
-             max("appendedAt") FILTER (WHERE "kind" = 'trace'),
-             max("appendedAt") FILTER (WHERE "kind" = 'failed')
-      FROM fresh
-      GROUP BY "projectId", "day"
+      SELECT incoming."projectId", incoming."day",
+             (count(*) FILTER (WHERE incoming."kind" = 'trace'))::integer,
+             (count(*) FILTER (WHERE incoming."kind" = 'failed'))::integer,
+             max((to_timestamp(incoming."at" / 1000.0) AT TIME ZONE 'UTC')::timestamp(3))
+               FILTER (WHERE incoming."kind" = 'trace'),
+             max((to_timestamp(incoming."at" / 1000.0) AT TIME ZONE 'UTC')::timestamp(3))
+               FILTER (WHERE incoming."kind" = 'failed')
+      FROM unnest(
+        ${traces.map(({ projectId }) => projectId)}::text[],
+        ${traces.map(({ kind }) => kind)}::text[],
+        ${traces.map(({ day }) => day)}::text[],
+        ${traces.map(({ at }) => at)}::double precision[]
+      ) AS incoming("projectId", "kind", "day", "at")
+      GROUP BY incoming."projectId", incoming."day"
       ON CONFLICT ("projectId", "day") DO UPDATE SET
         "traceCount" = counted."traceCount" + EXCLUDED."traceCount",
         "errorCount" = counted."errorCount" + EXCLUDED."errorCount",
@@ -100,14 +90,12 @@ export class PrismaNurturingTraceDayRepository
   }: Readonly<{ projectIds: readonly string[]; beforeDay: string }>): Promise<void> {
     if (projectIds.length === 0) return;
     const where = { projectId: { in: [...projectIds] }, day: { lt: beforeDay } };
-    await this.#database.nurturingProjectCountedTrace.deleteMany({ where });
     await this.#database.nurturingProjectTraceDay.deleteMany({ where });
   }
 
   async pruneProjects({ projectIds }: Readonly<{ projectIds: readonly string[] }>): Promise<void> {
     if (projectIds.length === 0) return;
     const where = { projectId: { in: [...projectIds] } };
-    await this.#database.nurturingProjectCountedTrace.deleteMany({ where });
     await this.#database.nurturingProjectTraceDay.deleteMany({ where });
   }
 }
