@@ -1,7 +1,9 @@
 /**
- * Pure shaping of the data a run loads: dataset rows and columns, and the keys
- * loaded targets are cached under.
+ * Pure shaping of the data a run loads: dataset rows and columns, the rows a repeated run lays
+ * out, and the keys loaded targets are cached under.
  */
+import type { ExecutionScope } from "@langwatch/experiment-contract";
+
 /** The column type a parameter value writes into the dataset. */
 function parameterColumnType(value: string | number | boolean): string {
   if (typeof value === "number") return "number";
@@ -197,4 +199,44 @@ export function agentLoadKey(target: { dbAgentId?: string; agentLabel?: string }
 /** The bytes one row holds, as the JSON it is stored and sent as. */
 export function rowBytesOf(entry: Record<string, unknown>): number {
   return Buffer.byteLength(JSON.stringify(entry) ?? "");
+}
+
+/**
+ * The run's rows: every dataset row `repeat` times in a row, so run row `r * repeat + k` is
+ * repetition `k` of dataset row `r` (specs/experiments-v3/run-repeat.feature).
+ */
+export function repeatedRows<T>({ rows, repeat }: { rows: readonly T[]; repeat: number }): T[] {
+  return rows.flatMap((row) => Array.from({ length: repeat }, () => row));
+}
+
+/** Every run row of each dataset row a scope names. */
+function repeatedIndices({ indices, repeat }: { indices: number[]; repeat: number }): number[] {
+  return indices.flatMap((index) =>
+    Array.from({ length: repeat }, (_, repetition) => index * repeat + repetition),
+  );
+}
+
+/** The scope over the repeated rows: a row it names becomes all of that row's repetitions. */
+export function repeatedScope({
+  scope,
+  repeat,
+}: {
+  scope: ExecutionScope;
+  repeat: number;
+}): ExecutionScope {
+  switch (scope.type) {
+    case "rows":
+      return { type: "rows", rowIndices: repeatedIndices({ indices: scope.rowIndices, repeat }) };
+    case "target-rows":
+      return scope.rowIndices
+        ? { ...scope, rowIndices: repeatedIndices({ indices: scope.rowIndices, repeat }) }
+        : scope;
+    default:
+      return scope;
+  }
+}
+
+/** How many times a run asked to repeat every row: 1 when it asked for no repeat. */
+export function runRepeatOf(repeat: number | undefined): number {
+  return repeat !== undefined && repeat > 1 ? repeat : 1;
 }

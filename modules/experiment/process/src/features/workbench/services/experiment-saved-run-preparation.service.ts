@@ -22,7 +22,7 @@ import {
   repeatedRows,
   repeatedScope,
   runRepeatOf,
-} from "../../../rules/experiment-run-repeat.rules.ts";
+} from "../../../rules/experiment-execution-data.rules.ts";
 import { datasetVersionAuthorFrom } from "../../../rules/experiment-workbench-actor.rules.ts";
 import { ExperimentBoardRowsService } from "../../../services/experiment-board-rows.service.ts";
 import type { LoadedExecutionData } from "../../../services/experiment-execution-data.service.ts";
@@ -117,38 +117,6 @@ export class ExperimentSavedRunPreparationService {
     const scope: ExecutionScope = runInputs.row_indices
       ? { type: "rows", rowIndices: runInputs.row_indices }
       : { type: "full" };
-    const repeat = runRepeatOf(runInputs.repeat);
-    // The board holds one cell per row, so a repeated run keeps to its own results.
-    if (repeat > 1) {
-      return {
-        experimentId: prepared.experiment.id,
-        state: prepared.state,
-        data: {
-          datasetRows: repeatedRows({ rows: prepared.datasetRows, repeat }),
-          datasetColumns: prepared.datasetColumns,
-          loadedPrompts: prepared.loadedPrompts,
-          loadedAgents: prepared.loadedAgents,
-          loadedEvaluators: prepared.loadedEvaluators,
-          loadedWorkflows: prepared.loadedWorkflows,
-          ...(prepared.datasetVersion ? { datasetVersion: prepared.datasetVersion } : {}),
-        },
-        scope: repeatedScope({ scope, repeat }),
-        runInputs,
-        carriedOverCells: [],
-        repeat,
-      };
-    }
-    // A run over another version than the board shows writes back onto the rows with its ids.
-    const boardRowIndices =
-      prepared.pinnedVersionRowIds && prepared.datasetVersion && runsSavedDataset(runInputs)
-        ? await ExperimentBoardRowsService.create({
-            datasets: runs.services.datasets,
-          }).boardRowIndices({
-            projectId,
-            datasetId: prepared.datasetVersion.datasetId,
-            runRowIds: prepared.pinnedVersionRowIds,
-          })
-        : undefined;
     const data: LoadedExecutionData = {
       datasetRows: prepared.datasetRows,
       datasetColumns: prepared.datasetColumns,
@@ -158,6 +126,20 @@ export class ExperimentSavedRunPreparationService {
       loadedWorkflows: prepared.loadedWorkflows,
       ...(prepared.datasetVersion ? { datasetVersion: prepared.datasetVersion } : {}),
     };
+    const repeat = runRepeatOf(runInputs.repeat);
+    // The board holds one cell per row, so a repeated run keeps to its own results.
+    if (repeat > 1) {
+      return {
+        experimentId: prepared.experiment.id,
+        state: prepared.state,
+        data: { ...data, datasetRows: repeatedRows({ rows: prepared.datasetRows, repeat }) },
+        scope: repeatedScope({ scope, repeat }),
+        runInputs,
+        carriedOverCells: [],
+        repeat,
+      };
+    }
+    const boardRowIndices = await this.boardRowIndicesOf({ prepared, runInputs, runs, projectId });
     return {
       experimentId: prepared.experiment.id,
       state: prepared.state,
@@ -171,5 +153,28 @@ export class ExperimentSavedRunPreparationService {
         ...(boardRowIndices ? { boardRowIndices } : {}),
       }),
     };
+  }
+
+  /** A run over another version than the board shows writes back onto the rows with its ids. */
+  private async boardRowIndicesOf({
+    prepared,
+    runInputs,
+    runs,
+    projectId,
+  }: {
+    prepared: Awaited<
+      ReturnType<ExperimentSavedStateExecutionService["prepareSavedStateExecution"]>
+    >;
+    runInputs: z.infer<typeof runInputsBodySchema>;
+    runs: WorkbenchRunPipeline;
+    projectId: string;
+  }): Promise<(number | null)[] | undefined> {
+    if (!prepared.pinnedVersionRowIds || !prepared.datasetVersion) return undefined;
+    if (!runsSavedDataset(runInputs)) return undefined;
+    return ExperimentBoardRowsService.create({ datasets: runs.services.datasets }).boardRowIndices({
+      projectId,
+      datasetId: prepared.datasetVersion.datasetId,
+      runRowIds: prepared.pinnedVersionRowIds,
+    });
   }
 }

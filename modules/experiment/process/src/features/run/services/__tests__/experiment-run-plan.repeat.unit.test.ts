@@ -9,7 +9,7 @@ import {
   repeatedRows,
   repeatedScope,
   runRepeatOf,
-} from "../../../../rules/experiment-run-repeat.rules.ts";
+} from "../../../../rules/experiment-execution-data.rules.ts";
 import { ExperimentRunPlanService } from "../experiment-run-plan.service.ts";
 
 const promptTarget: TargetConfig = {
