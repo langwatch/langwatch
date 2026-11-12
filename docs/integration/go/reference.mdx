@@ -25,7 +25,7 @@ go get github.com/langwatch/langwatch/sdks/go
 go get github.com/langwatch/langwatch/sdks/go/instrumentation/openai
 ```
 
-Requires Go 1.25+. The OpenAI client is `github.com/openai/openai-go/v3`.
+Requires Go 1.26+. The OpenAI client is `github.com/openai/openai-go/v3`.
 
 ## Core SDK (`langwatch`)
 
@@ -720,7 +720,7 @@ func setupLangWatch(ctx context.Context, apiKey string) func() {
 
 ## Version Compatibility
 
-- **Go Version:** 1.25 or later
+- **Go Version:** 1.26 or later
 - **OpenAI Go SDK:** `github.com/openai/openai-go/v3`
 - **OpenTelemetry:** the SDK tracks current OTel Go releases
 

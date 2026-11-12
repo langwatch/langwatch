@@ -19,7 +19,7 @@ hand-wrapped for a clean, discoverable Go surface.
 go get github.com/langwatch/langwatch/sdks/go/client
 ```
 
-Requires Go 1.25+.
+Requires Go 1.26+.
 
 ## Quick start
 
