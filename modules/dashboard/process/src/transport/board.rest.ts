@@ -3,6 +3,7 @@
  * 404 while `release_dashboards` is off (dashboards-v2.feature AC199l, AC199n to AC199q); bare
  * `/api/dashboards` answers too, deprecated (AC199v). Reports: /api/v1/analytics/reports.
  */
+import { curatedBoardWidgetById } from "@langwatch/analytics-catalogue";
 import { DashboardWidgetNotFoundError } from "@langwatch/analytics-contract";
 import {
   apiErrorSchema,
@@ -313,7 +314,8 @@ export const boardRest = defineRestRouter(DashboardApi)
   .withOutput(dashboardWidgetResourceSchema)
   .withDocs({
     summary: "Get a widget on a dashboard",
-    description: "Returns one widget on this dashboard with its React source and named queries.",
+    description:
+      "Returns one widget on this dashboard with its React source and named queries. A From LangWatch board's read-only widgets (`template:<templateId>:<key>`) are answered under the board whose id is their template id, and as not found under any other board.",
     tags: BOARD_TAGS,
     responses: {
       ...canonicalBaseResponses,
@@ -377,17 +379,20 @@ export const boardRest = defineRestRouter(DashboardApi)
     resource: "dashboard widget",
     action: "delete",
     idParam: "widgetId",
-    name: ({ app, projectId, id, ownerUserId, input }) =>
-      nameUnlessMissing({
-        read: app.getDashboardWidget({
-          projectId,
-          id,
-          onDashboardId: boardIdParamsSchema.parse(input).dashboardId,
-          ...viewerOfOwner({ ownerUserId }),
-        }),
-        missing: DashboardWidgetNotFoundError,
-        nameOf: (widget) => widget.name,
-      }),
+    // A `template:` widget id gets no card under any board's path, as none can be deleted: 404.
+    name: async ({ app, projectId, id, ownerUserId, input }) =>
+      curatedBoardWidgetById(id)
+        ? undefined
+        : nameUnlessMissing({
+            read: app.getDashboardWidget({
+              projectId,
+              id,
+              onDashboardId: boardIdParamsSchema.parse(input).dashboardId,
+              ...viewerOfOwner({ ownerUserId }),
+            }),
+            missing: DashboardWidgetNotFoundError,
+            nameOf: (widget) => widget.name,
+          }),
   })
   .withMiddlewareContext(boardsReleased)
   .withOutput(z.void())

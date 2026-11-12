@@ -3,9 +3,9 @@
  * laid out on the grid; the rest hold no widgets and say how many are built.
  */
 
+import { CHART_GRID_COLUMNS } from "@langwatch/analytics-contract/chart-grid";
 import { describe, expect, it } from "vitest";
 
-import { CHART_GRID_COLUMNS } from "../../../../model/chart-grid.ts";
 import { CATALOGUE_TEMPLATES, GALLERY_TEMPLATES } from "../index.ts";
 
 const ready = GALLERY_TEMPLATES.filter(({ comingSoon }) => comingSoon === void 0);

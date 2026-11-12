@@ -3,6 +3,7 @@
  * A delete card's record name, read as the key's owner over the real app and memory repositories.
  * Spec: specs/langy/langy-delete-confirmation.feature.
  */
+import { CURATED_BOARD_DEFINITIONS, templateWidgetId } from "@langwatch/analytics-catalogue";
 import type { RestTransportDeclaration } from "@langwatch/api/rest";
 import type { DashboardApi } from "@langwatch/dashboard-contract";
 import { describe, expect, it } from "vitest";
@@ -262,5 +263,23 @@ describe("a Langy key's delete card for a widget at /api/v1/dashboards/{dashboar
       own: await nameThrough(holding.id),
       other: await nameThrough(other.id),
     }).toEqual({ own: "Traces", other: undefined });
+  });
+});
+
+describe("a Langy key's delete card for a From LangWatch widget", () => {
+  /** @scenario "A From LangWatch widget is read over the API by its template widget id" */
+  it("names nothing, as the widget can never be deleted", async () => {
+    const { app } = appWithDatabase();
+    const [board] = CURATED_BOARD_DEFINITIONS;
+    const [widget] = board?.widgets ?? [];
+    if (!board || !widget) throw new Error("No From LangWatch board ships a widget");
+
+    const names = await namesFor({
+      app,
+      mark: markOf(dashboardWidgetRest.router(), "dashboard widget"),
+      id: templateWidgetId({ templateId: board.templateId, key: widget.key }),
+    });
+
+    expect(names).toEqual({ owner: undefined, other: undefined, nobody: undefined });
   });
 });

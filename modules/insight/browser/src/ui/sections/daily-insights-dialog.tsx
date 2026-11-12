@@ -15,13 +15,10 @@ export function DailyInsightsDialog({
   boardName,
   settings,
   ownTimezone,
-  note,
   onSubmit,
   onClose,
 }: {
   boardName: string;
-  /** A line the person should read before they save, when the board needs one. */
-  note?: string;
   /** What the run's choices start at. */
   settings: InsightRunSettings;
   ownTimezone: string;
@@ -43,11 +40,6 @@ export function DailyInsightsDialog({
           <Text marginTop={1} textStyle="caption" color="fg.muted">
             This is your own setting, and only you see the insights it files.
           </Text>
-          {note && (
-            <Text marginTop={1} textStyle="caption" color="fg.muted">
-              {note}
-            </Text>
-          )}
         </Dialog.Body>
         <Dialog.Footer>
           <HStack width="full" gap={3} flexWrap="wrap">

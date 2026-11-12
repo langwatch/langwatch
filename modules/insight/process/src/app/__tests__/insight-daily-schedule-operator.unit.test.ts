@@ -20,7 +20,7 @@ import {
 import { onFirstDay, scheduleDriver } from "./insight-daily-schedule.fixture.ts";
 import { PROJECT } from "./insight.fixture.ts";
 
-const TEMPLATE: InsightRunBoard = { kind: "template", id: "llm-costs", name: "LLM costs" };
+const TEMPLATE: InsightRunBoard = { kind: "template", id: "release", name: "Release check" };
 const SETTINGS = { hour: 9, timezone: "UTC", maxInsights: 3 };
 const THIRD = "user-third";
 

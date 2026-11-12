@@ -45,6 +45,7 @@ export {
   CATALOGUE_WIDGETS,
   type CatalogueBuild,
   type CatalogueWidget,
+  isCodingWidget,
 } from "./model/catalogue-widgets.ts";
 export {
   DATA_REQUIREMENTS,

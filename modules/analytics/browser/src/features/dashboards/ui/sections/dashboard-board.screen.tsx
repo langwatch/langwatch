@@ -167,6 +167,7 @@ function OpenBoard({ board }: { board: SavedBoard }) {
           pointer={{
             boardKind: "dashboard",
             boardId: board.id,
+            boardPointerId: board.id,
             widgetCount: boardWidgets.status === "success" ? widgets.length : void 0,
           }}
           action={canEdit ? <AddWidgetButton onClick={openPicker} /> : null}

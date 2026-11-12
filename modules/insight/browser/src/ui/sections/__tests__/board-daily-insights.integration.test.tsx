@@ -7,7 +7,7 @@
 
 import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
 import {
-  INSIGHT_RUN_SKIP_REASONS,
+  INSIGHT_RUN_RECORDED_SKIP_REASONS,
   type InsightDailyRunSetting,
   type InsightEntry,
 } from "@langwatch/insight-contract";
@@ -77,6 +77,9 @@ function Board({
   witness?: boolean;
 }) {
   const [added, setAdded] = useState(0);
+  // The wire value of the catalogue's pointer id, `curated/<templateId>`; this package
+  // does not import the catalogue.
+  const boardPointerId = kind === "template" ? `curated/${id}` : id;
   return (
     <>
       <button type="button" onClick={() => setAdded(added + 1)}>
@@ -85,6 +88,7 @@ function Board({
       <BoardDailyInsights
         boardKind={kind}
         boardId={id}
+        boardPointerId={boardPointerId}
         boardName="Checkout health"
         widgetCount={widgets === "loading" ? void 0 : widgets + added}
       />
@@ -93,6 +97,7 @@ function Board({
           <BoardDailyInsights
             boardKind={kind}
             boardId={id}
+            boardPointerId={boardPointerId}
             boardName="Checkout health"
             widgetCount={1}
           />
@@ -411,6 +416,28 @@ describe("given a member turned a board's daily run on", () => {
     });
   });
 
+  describe("when a From LangWatch board has 2 unseen insights filed under its pointer id and 1 under its bare template id", () => {
+    /** @scenario "The control counts the board's unseen insights" */
+    it("says 2 new", async () => {
+      // The wire value of the catalogue's pointer id; the browser does not import the catalogue.
+      const pointer = { id: "curated/release", name: "Release", widget: null };
+      openBoard({
+        kind: "template",
+        id: "release",
+        setting: ON,
+        entries: [
+          insightEntry({ id: "i-1", board: pointer }),
+          insightEntry({ id: "i-2", board: pointer }),
+          insightEntry({ id: "i-3", board: { id: "release", name: "Other", widget: null } }),
+        ],
+      });
+
+      expect(
+        await screen.findByRole("button", { name: "Daily insights: on, 2 new" }),
+      ).toHaveTextContent("2 new");
+    });
+  });
+
   describe("when the board lost its last widget", () => {
     /** @scenario "A board that is on with no widgets waits" */
     it("says it waits, and that there is nothing to read", async () => {
@@ -439,7 +466,7 @@ describe("given a member turned a board's daily run on", () => {
         { outcome: "failed", reason: "turn_failed" },
         `Failed ${RAN_AT} · nothing was filed, and the next run tries again`,
       ],
-      ...INSIGHT_RUN_SKIP_REASONS.map(
+      ...INSIGHT_RUN_RECORDED_SKIP_REASONS.map(
         (reason) =>
           [
             `was skipped as ${reason}`,
@@ -520,86 +547,11 @@ describe("given a From LangWatch board", () => {
       expect(board.reads()).toEqual([
         { projectId: "project-1", board: { kind: "template", id: "release" } },
       ]);
-    });
-  });
-
-  describe("when a member turns it on from the quiet control", () => {
-    /** @scenario "Turning on a From LangWatch board says no run reads it yet" */
-    it("says that a run on this board files nothing for now, and promises no daily read", async () => {
-      const board = openBoard({ kind: "template", id: "release" });
-      await waitFor(() => expect(quietControl()).toBeInTheDocument());
-
-      await board.user.click(quietControl()!);
-
-      await waitFor(() =>
-        expect(board.host.successes).toEqual([
-          {
-            title:
-              "Daily insights on. Langy cannot read From LangWatch boards yet. Until it can, a run on this board files nothing.",
-          },
-        ]),
-      );
-    });
-
-    /** @scenario "Turning on a From LangWatch board says no run reads it yet" */
-    it("promises the daily read on a stored board", async () => {
-      const board = openBoard();
-      await waitFor(() => expect(quietControl()).toBeInTheDocument());
-
-      await board.user.click(quietControl()!);
-
+      // A run reads it from the catalogue, so its toast promises the daily read like any board.
       await waitFor(() => expect(board.host.successes).toHaveLength(1));
       expect(board.host.successes[0]?.title).toMatch(
         /^Daily insights on\. Langy reads this board every day /,
       );
-    });
-  });
-
-  describe("when a member that turned it on opens Settings", () => {
-    async function openSettings(board: ReturnType<typeof openBoard>) {
-      const dropdown = await openDropdown(board.user);
-      await board.user.click(dropdown.getByRole("button", { name: "Settings" }));
-      return within(
-        await screen.findByRole("dialog", { name: "Daily insights for Checkout health" }),
-      );
-    }
-
-    /** @scenario "A From LangWatch board's settings say no run reads it yet" */
-    it("says that a run on this board files nothing for now", async () => {
-      const settings = await openSettings(
-        openBoard({ kind: "template", id: "release", setting: ON }),
-      );
-
-      expect(
-        settings.getByText(
-          "Langy cannot read From LangWatch boards yet. Until it can, a run on this board files nothing.",
-        ),
-      ).toBeInTheDocument();
-    });
-
-    /** @scenario "A From LangWatch board's settings say no run reads it yet" */
-    it("says no such thing on a stored board", async () => {
-      const settings = await openSettings(openBoard({ setting: ON }));
-
-      expect(settings.queryByText(/cannot read From LangWatch boards/)).toBeNull();
-    });
-  });
-
-  describe("when its run was skipped because no server reads a template yet", () => {
-    /** @scenario "A From LangWatch board takes the control and is named by its template id" */
-    it("says calmly that Langy cannot read From LangWatch boards yet", async () => {
-      const board = openBoard({
-        kind: "template",
-        id: "release",
-        setting: ranToday({ outcome: "skipped", reason: "template_board" }),
-      });
-
-      const dropdown = await openDropdown(board.user);
-
-      expect(
-        dropdown.getByText(`Did not run ${RAN_AT} · Langy cannot read From LangWatch boards yet`),
-      ).toBeInTheDocument();
-      expect(board.host.failures).toEqual([]);
     });
   });
 });

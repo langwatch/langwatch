@@ -7,9 +7,10 @@
 import {
   DEFAULT_INSIGHT_RUN_MAX_INSIGHTS,
   INSIGHT_RUN_MAX_INSIGHTS_CHOICES,
-  INSIGHT_RUN_SKIP_REASONS,
+  INSIGHT_RUN_RECORDED_SKIP_REASONS,
   INSIGHT_SCHEDULE_SKIPPED_DAYS_BEFORE_OFF,
   type InsightDailyRunSetting,
+  type InsightRunRetiredReason,
   type InsightRunSettings,
   type InsightRunSkipReason,
   type InsightScheduleOffReason,
@@ -109,8 +110,11 @@ export function scheduleWords({
   return `Langy reads this board for you every day ${runTimeWords(settings)} and files what stands out, at most ${most} per run.`;
 }
 
-/** Why a run never reached Langy, in a person's words. One per reason the contract lists. */
-export const SKIP_REASON_WORDS: Record<InsightRunSkipReason, string> = {
+/**
+ * Why a run never reached Langy, in a person's words. One per skip reason the contract lists,
+ * retired ones included: a run recorded before a reason retired still says why it did not run.
+ */
+export const SKIP_REASON_WORDS: Record<InsightRunSkipReason | InsightRunRetiredReason, string> = {
   flag_off: "Insights is off for this project",
   project_unavailable: "this project takes no daily runs",
   user_missing: "your account was not found",
@@ -119,7 +123,7 @@ export const SKIP_REASON_WORDS: Record<InsightRunSkipReason, string> = {
   board_deleted: "this board could not be found",
   board_unreadable: "this board cannot be read in this project",
   board_empty: "this board had no widgets Langy can read",
-  template_board: "Langy cannot read From LangWatch boards yet",
+  template_board: "Langy could not read From LangWatch boards then",
 };
 
 /** "09:12" for a run today, "Oct 3" for an earlier one, read in the run's own zone. */
@@ -174,13 +178,6 @@ export function lastRunWords({
   if (lastRun.outcome === "failed") {
     return `Failed ${when} · nothing was filed, and the next run tries again`;
   }
-  const reason = INSIGHT_RUN_SKIP_REASONS.find((known) => known === lastRun.reason);
+  const reason = INSIGHT_RUN_RECORDED_SKIP_REASONS.find((known) => known === lastRun.reason);
   return `Did not run ${when} · ${reason ? SKIP_REASON_WORDS[reason] : "nothing was filed"}`;
 }
-
-/**
- * Said in a From LangWatch board's settings, and in the toast when its run is turned on or saved:
- * no run can read one yet.
- */
-export const TEMPLATE_BOARD_NOTE =
-  "Langy cannot read From LangWatch boards yet. Until it can, a run on this board files nothing.";

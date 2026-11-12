@@ -4,13 +4,18 @@
  * the half-made one.
  */
 
+import {
+  type BoardTemplate,
+  type BoardTemplateWidget,
+  pickerWidgets,
+  type WidgetQuestion,
+} from "@langwatch/analytics-catalogue";
 import type { DashboardWidgetSource } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { type UiAnalyticsEvent, useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { useState } from "react";
 
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
-import { pickerWidgets } from "../catalogue/index.ts";
 import { boardCopyWidgets, boardWidgetsOf } from "../model/board-widgets.ts";
 import {
   boardCopyName,
@@ -20,9 +25,7 @@ import {
 } from "../model/boards.ts";
 import type { CuratedBoard } from "../model/curated-boards.ts";
 import { dashboardCreated } from "../model/dashboard-usage-events.ts";
-import type { WidgetQuestion } from "../model/widget-questions.ts";
 import { catalogueSource } from "../model/widget-source.ts";
-import type { BoardTemplate, BoardTemplateWidget } from "../templates/index.ts";
 import type { SavedBoard } from "./use-saved-dashboards.ts";
 
 /** What a new board is made of; `widgets` is read only once the board is about to be made. */

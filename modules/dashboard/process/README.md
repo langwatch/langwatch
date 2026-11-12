@@ -524,7 +524,7 @@ type Response = z.infer<typeof boardResourceSchema>; // ../contract/src/board-re
 
 |             |                                              |
 | ----------- | -------------------------------------------- |
-| Declared at | `src/transport/board.rest.ts:90`             |
+| Declared at | `src/transport/board.rest.ts:91`             |
 | Base URL    | `/api/dashboards`, twin `/api/v1/dashboards` |
 | Addressing  | dated                                        |
 | Credential  | project                                      |
@@ -534,7 +534,7 @@ type Response = z.infer<typeof boardResourceSchema>; // ../contract/src/board-re
 
 List dashboards
 
-Permission `analytics:view`. Declared at `src/transport/board.rest.ts:95`.
+Permission `analytics:view`. Declared at `src/transport/board.rest.ts:96`.
 
 Answers at `/api/dashboards`, `/api/v1/dashboards`; also, undocumented, `/api/dashboards/2026-10-26`, `/api/v1/dashboards/2026-10-26`, `/api/dashboards/latest`, `/api/v1/dashboards/latest`.
 
@@ -546,7 +546,7 @@ type Response = z.infer<typeof boardListSchema>; // ../contract/src/board-rest.s
 
 Create a dashboard
 
-Permission `analytics:create`. Declared at `src/transport/board.rest.ts:121`.
+Permission `analytics:create`. Declared at `src/transport/board.rest.ts:122`.
 
 Answers at `/api/dashboards`, `/api/v1/dashboards`; also, undocumented, `/api/dashboards/2026-10-26`, `/api/v1/dashboards/2026-10-26`, `/api/dashboards/latest`, `/api/v1/dashboards/latest`.
 
@@ -562,7 +562,7 @@ type Response = z.infer<typeof boardResourceSchema>; // ../contract/src/board-re
 
 Get a dashboard
 
-Permission `analytics:view`. Declared at `src/transport/board.rest.ts:148`.
+Permission `analytics:view`. Declared at `src/transport/board.rest.ts:149`.
 
 Answers at `/api/dashboards/:dashboardId`, `/api/v1/dashboards/:dashboardId`; also, undocumented, `/api/dashboards/2026-10-26/:dashboardId`, `/api/v1/dashboards/2026-10-26/:dashboardId`, `/api/dashboards/latest/:dashboardId`, `/api/v1/dashboards/latest/:dashboardId`.
 
@@ -578,7 +578,7 @@ type Response = z.infer<typeof boardResourceSchema>; // ../contract/src/board-re
 
 Update a dashboard
 
-Permission `analytics:update`. Declared at `src/transport/board.rest.ts:175`.
+Permission `analytics:update`. Declared at `src/transport/board.rest.ts:176`.
 
 Answers at `/api/dashboards/:dashboardId`, `/api/v1/dashboards/:dashboardId`; also, undocumented, `/api/dashboards/2026-10-26/:dashboardId`, `/api/v1/dashboards/2026-10-26/:dashboardId`, `/api/dashboards/latest/:dashboardId`, `/api/v1/dashboards/latest/:dashboardId`.
 
@@ -596,7 +596,7 @@ type Response = z.infer<typeof boardResourceSchema>; // ../contract/src/board-re
 
 Delete a dashboard
 
-Permission `analytics:delete`. Declared at `src/transport/board.rest.ts:208`.
+Permission `analytics:delete`. Declared at `src/transport/board.rest.ts:209`.
 
 Answers at `/api/dashboards/:dashboardId`, `/api/v1/dashboards/:dashboardId`; also, undocumented, `/api/dashboards/2026-10-26/:dashboardId`, `/api/v1/dashboards/2026-10-26/:dashboardId`, `/api/dashboards/latest/:dashboardId`, `/api/v1/dashboards/latest/:dashboardId`.
 
@@ -613,7 +613,7 @@ interface Response {
 
 List a dashboard's widgets
 
-Permission `analytics:view`. Declared at `src/transport/board.rest.ts:246`.
+Permission `analytics:view`. Declared at `src/transport/board.rest.ts:247`.
 
 Answers at `/api/dashboards/:dashboardId/widgets`, `/api/v1/dashboards/:dashboardId/widgets`; also, undocumented, `/api/dashboards/2026-10-26/:dashboardId/widgets`, `/api/v1/dashboards/2026-10-26/:dashboardId/widgets`, `/api/dashboards/latest/:dashboardId/widgets`, `/api/v1/dashboards/latest/:dashboardId/widgets`.
 
@@ -626,7 +626,7 @@ type Response = z.infer<typeof dashboardWidgetListSchema>; // ../contract/src/da
 
 Create a widget on a dashboard
 
-Permission `analytics:create`. Declared at `src/transport/board.rest.ts:272`.
+Permission `analytics:create`. Declared at `src/transport/board.rest.ts:273`.
 
 Answers at `/api/dashboards/:dashboardId/widgets`, `/api/v1/dashboards/:dashboardId/widgets`; also, undocumented, `/api/dashboards/2026-10-26/:dashboardId/widgets`, `/api/v1/dashboards/2026-10-26/:dashboardId/widgets`, `/api/dashboards/latest/:dashboardId/widgets`, `/api/v1/dashboards/latest/:dashboardId/widgets`.
 
@@ -640,7 +640,7 @@ type Response = z.infer<typeof dashboardWidgetResourceSchema>; // ../contract/sr
 
 Get a widget on a dashboard
 
-Permission `analytics:view`. Declared at `src/transport/board.rest.ts:309`.
+Permission `analytics:view`. Declared at `src/transport/board.rest.ts:310`.
 
 Answers at `/api/dashboards/:dashboardId/widgets/:widgetId`, `/api/v1/dashboards/:dashboardId/widgets/:widgetId`; also, undocumented, `/api/dashboards/2026-10-26/:dashboardId/widgets/:widgetId`, `/api/v1/dashboards/2026-10-26/:dashboardId/widgets/:widgetId`, `/api/dashboards/latest/:dashboardId/widgets/:widgetId`, `/api/v1/dashboards/latest/:dashboardId/widgets/:widgetId`.
 
@@ -657,7 +657,7 @@ type Response = z.infer<typeof dashboardWidgetResourceSchema>; // ../contract/sr
 
 Update a widget on a dashboard
 
-Permission `analytics:update`. Declared at `src/transport/board.rest.ts:335`.
+Permission `analytics:update`. Declared at `src/transport/board.rest.ts:337`.
 
 Answers at `/api/dashboards/:dashboardId/widgets/:widgetId`, `/api/v1/dashboards/:dashboardId/widgets/:widgetId`; also, undocumented, `/api/dashboards/2026-10-26/:dashboardId/widgets/:widgetId`, `/api/v1/dashboards/2026-10-26/:dashboardId/widgets/:widgetId`, `/api/dashboards/latest/:dashboardId/widgets/:widgetId`, `/api/v1/dashboards/latest/:dashboardId/widgets/:widgetId`.
 
@@ -671,13 +671,13 @@ type Response = z.infer<typeof dashboardWidgetResourceSchema>; // ../contract/sr
 
 Delete a widget on a dashboard
 
-Permission `analytics:delete`. Declared at `src/transport/board.rest.ts:372`.
+Permission `analytics:delete`. Declared at `src/transport/board.rest.ts:374`.
 
 Answers at `/api/dashboards/:dashboardId/widgets/:widgetId`, `/api/v1/dashboards/:dashboardId/widgets/:widgetId`; also, undocumented, `/api/dashboards/2026-10-26/:dashboardId/widgets/:widgetId`, `/api/v1/dashboards/2026-10-26/:dashboardId/widgets/:widgetId`, `/api/dashboards/latest/:dashboardId/widgets/:widgetId`, `/api/v1/dashboards/latest/:dashboardId/widgets/:widgetId`.
 
 ```typescript
 type Params = z.infer<typeof boardWidgetParamsSchema>; // ../contract/src/board-rest.schemas.ts:69
-// Response: inline, src/transport/board.rest.ts:393
+// Response: inline, src/transport/board.rest.ts:398
 type Response = unknown;
 ```
 
@@ -685,7 +685,7 @@ type Response = unknown;
 
 |             |                                              |
 | ----------- | -------------------------------------------- |
-| Declared at | `src/transport/dashboard-widget.rest.ts:110` |
+| Declared at | `src/transport/dashboard-widget.rest.ts:111` |
 | Base URL    | none: each route's path is its address       |
 | Addressing  | literal                                      |
 | Credential  | project                                      |
@@ -694,7 +694,7 @@ type Response = unknown;
 
 List dashboard widgets
 
-Permission `analytics:view`. Declared at `src/transport/dashboard-widget.rest.ts:115`.
+Permission `analytics:view`. Declared at `src/transport/dashboard-widget.rest.ts:116`.
 
 Answers at `/api/v1/projects/:projectId/analytics/dashboard-widgets`.
 
@@ -710,7 +710,7 @@ type Response = z.infer<typeof dashboardWidgetListSchema>; // ../contract/src/da
 
 Create a dashboard widget
 
-Permission `analytics:create`. Declared at `src/transport/dashboard-widget.rest.ts:141`.
+Permission `analytics:create`. Declared at `src/transport/dashboard-widget.rest.ts:142`.
 
 Answers at `/api/v1/projects/:projectId/analytics/dashboard-widgets`.
 
@@ -724,7 +724,7 @@ type Response = z.infer<typeof dashboardWidgetResourceSchema>; // ../contract/sr
 
 Get a dashboard widget
 
-Permission `analytics:view`. Declared at `src/transport/dashboard-widget.rest.ts:181`.
+Permission `analytics:view`. Declared at `src/transport/dashboard-widget.rest.ts:182`.
 
 Answers at `/api/v1/projects/:projectId/analytics/dashboard-widgets/:widgetId`.
 
@@ -741,7 +741,7 @@ type Response = z.infer<typeof dashboardWidgetResourceSchema>; // ../contract/sr
 
 Update a dashboard widget
 
-Permission `analytics:update`. Declared at `src/transport/dashboard-widget.rest.ts:212`.
+Permission `analytics:update`. Declared at `src/transport/dashboard-widget.rest.ts:213`.
 
 Answers at `/api/v1/projects/:projectId/analytics/dashboard-widgets/:widgetId`.
 
@@ -755,7 +755,7 @@ type Response = z.infer<typeof dashboardWidgetResourceSchema>; // ../contract/sr
 
 Add a dashboard widget to a dashboard
 
-Permission `analytics:update`. Declared at `src/transport/dashboard-widget.rest.ts:253`.
+Permission `analytics:update`. Declared at `src/transport/dashboard-widget.rest.ts:254`.
 
 Answers at `/api/v1/projects/:projectId/analytics/dashboard-widgets/:widgetId/dashboard`.
 
@@ -772,13 +772,13 @@ type Response = z.infer<typeof dashboardWidgetResourceSchema>; // ../contract/sr
 
 Delete a dashboard widget
 
-Permission `analytics:delete`. Declared at `src/transport/dashboard-widget.rest.ts:288`.
+Permission `analytics:delete`. Declared at `src/transport/dashboard-widget.rest.ts:289`.
 
 Answers at `/api/v1/projects/:projectId/analytics/dashboard-widgets/:widgetId`.
 
 ```typescript
 type Params = z.infer<typeof dashboardWidgetParamsSchema>; // ../contract/src/dashboard-widget-rest.schemas.ts:112
-// Response: inline, src/transport/dashboard-widget.rest.ts:307
+// Response: inline, src/transport/dashboard-widget.rest.ts:311
 type Response = unknown;
 ```
 

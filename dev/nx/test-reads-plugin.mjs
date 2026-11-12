@@ -123,6 +123,8 @@ export const reads = {
   "@langwatch/analytics-browser": [
     "apps/ui/public/images/dashboards/templates/**/*",
     "pnpm-workspace.yaml",
+  ],
+  "@langwatch/analytics-catalogue": [
     "modules/analytics/process/src/langwatch-ql/__tests__/fixtures/stock-widget-queries.json",
   ],
   "@langwatch/dashboard-process": ["docs/features/dashboards.mdx"],

@@ -51,10 +51,16 @@ const WIDGETS = ["Traces", "Cost"].map((name, index) => ({
 }));
 
 /** What a peer would lend: it prints what the header handed it. */
-function LentProbe({ boardKind, boardId, boardName, widgetCount }: BoardHeaderActionProps) {
+function LentProbe({
+  boardKind,
+  boardId,
+  boardPointerId,
+  boardName,
+  widgetCount,
+}: BoardHeaderActionProps) {
   return (
     <output aria-label="Lent action">
-      {[boardKind, boardId, boardName, widgetCount ?? "loading"].join(" | ")}
+      {[boardKind, boardId, boardPointerId, boardName, widgetCount ?? "loading"].join(" | ")}
     </output>
   );
 }
@@ -111,7 +117,7 @@ describe("given a module lends an action to the board header", () => {
       });
 
       expect(
-        await screen.findByText("dashboard | board-1 | Weekly review | 2"),
+        await screen.findByText("dashboard | board-1 | board-1 | Weekly review | 2"),
       ).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Add a widget" })).toBeInTheDocument();
     });
@@ -119,7 +125,7 @@ describe("given a module lends an action to the board header", () => {
 
   describe("when a member opens a From LangWatch board", () => {
     /** @scenario "A board's header draws the action a peer lends it" */
-    it("hands it the kind template, the template's id and its widget count", async () => {
+    it("hands it the kind template, the template's id, its pointer id and its widget count", async () => {
       const board = curatedBoardById("release")!;
       openScreen({
         element: <CuratedBoardScreen />,
@@ -128,7 +134,9 @@ describe("given a module lends an action to the board header", () => {
       });
 
       expect(
-        await screen.findByText(`template | release | ${board.name} | ${board.widgets.length}`),
+        await screen.findByText(
+          `template | release | curated/release | ${board.name} | ${board.widgets.length}`,
+        ),
       ).toBeInTheDocument();
     });
   });

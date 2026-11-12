@@ -55,3 +55,34 @@ Feature: Editing a dashboard widget from an agent, and where each widget came fr
   Scenario: A widget saved before sources existed still reads
     Given a stored widget definition with no source
     Then it parses, and the widget has no source
+
+  @integration
+  Scenario: A From LangWatch widget is read over the API by its template widget id
+    Given a project key with analytics:view
+    When it gets the widget "template:<templateId>:<key>" of a From LangWatch board
+    Then it answers the widget's name and stored queries from the catalogue
+    And changing or deleting it is refused as not found
+
+  @integration
+  Scenario: A From LangWatch widget is read under its own board's path only
+    Given a project key with analytics:view
+    When it gets a From LangWatch widget under the path of the board its template id names
+    Then it answers the widget's name and stored queries from the catalogue
+    When it gets the same widget under any other board's path
+    Then the request is refused as not found
+
+  @integration
+  Scenario: A From LangWatch widget cannot be changed under its own board's path
+    Given a Langy session key with analytics:update and analytics:delete
+    When it deletes a From LangWatch widget under the path of the board its template id names
+    Then no confirmation card is raised and the request is refused as not found
+    When it updates the same widget under the same path
+    Then the request is refused as not found
+    When it deletes a stored widget under its own board's path
+    Then the confirmation card names that widget and the widget is deleted
+
+  @integration
+  Scenario: A From LangWatch widget is refused without analytics:view
+    Given a project key without analytics:view
+    When it gets a From LangWatch widget by its template widget id
+    Then the request is refused as forbidden

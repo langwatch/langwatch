@@ -5,6 +5,7 @@
  * @see modules/dashboard/specs/dashboards-telemetry.feature
  */
 
+import type { BoardTemplate } from "@langwatch/analytics-catalogue";
 import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
 import { act, cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -24,7 +25,6 @@ import { boardSubject, SUGGESTED_QUESTIONS } from "../../langy/model/board-langy
 import { BoardLangy } from "../../langy/ui/sections/board-langy.tsx";
 import type { BoardPeriod } from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
-import type { BoardTemplate } from "../../templates/index.ts";
 import { BlockPickerDialog } from "../../ui/sections/block-picker-dialog.tsx";
 import { useBoardFromTemplate } from "../use-board-from-template.ts";
 import { useBoardRange } from "../use-board-period.ts";

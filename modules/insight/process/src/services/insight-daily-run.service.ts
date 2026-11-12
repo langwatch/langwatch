@@ -34,8 +34,10 @@ import {
   dailyRunReplay,
   dailyRunWindows,
   decideRunFindings,
+  insightBoardPointerId,
   matchableInsightsOfBoard,
   openInsightsOfBoard,
+  runFindingPointer,
   runInsightId,
 } from "../rules/insight-daily-run.rules.ts";
 import { isLastSkippedDay } from "../rules/insight-daily-skip-streak.rules.ts";
@@ -72,6 +74,8 @@ type RunEnd = Readonly<{
 type ReadyRun = Readonly<{
   gate: Extract<RunGateResult, { ok: true }>;
   board: InsightRunBoard;
+  /** The board id the run's insights keep, worked out once. */
+  boardPointerId: string;
   windows: DailyRunWindows;
 }>;
 
@@ -184,7 +188,7 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
       const quiet = { outcome: "nothing", reason: "no_new_traces" } as const;
       return { ...quiet, ...NOTHING_WRITTEN, conversationId: null, board };
     }
-    return { gate, board, windows };
+    return { gate, board, boardPointerId: insightBoardPointerId(input.board), windows };
   }
 
   /**
@@ -224,7 +228,7 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
     return turn;
   }
 
-  private async askLangy(input: RunInput, { gate, windows }: ReadyRun) {
+  private async askLangy(input: RunInput, { gate, windows, boardPointerId }: ReadyRun) {
     const { projectId, userId, scheduleId, runId, slot, maxInsights } = input;
     const entries = await this.insightsOf(input);
     try {
@@ -239,7 +243,11 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
           widgets: gate.widgets,
           windows,
           maxInsights,
-          openInsights: openInsightsOfBoard({ entries, boardId: gate.board.id, slot }),
+          openInsights: openInsightsOfBoard({
+            entries,
+            boardId: boardPointerId,
+            slot,
+          }),
         }),
         title: dailyRunConversationTitle({
           boardName: gate.board.name,
@@ -300,7 +308,7 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
     // Read again: what the person marked done while Langy read is not found again for them.
     const insights = matchableInsightsOfBoard({
       entries: await this.insightsOf(input),
-      boardId: ready.gate.board.id,
+      boardId: ready.boardPointerId,
       slot,
     });
     const acts = decideRunFindings({ findings, insights });
@@ -340,7 +348,12 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
       ...words,
       replay: words.lwql === null ? null : dailyRunReplay({ window: ready.windows.window }),
       source,
-      board: { ...ready.gate.board, widget },
+      board: runFindingPointer({
+        board: input.board,
+        boardPointerId: ready.boardPointerId,
+        name: ready.gate.board.name,
+        widget,
+      }),
       filedVia: "run",
       ownerUserId: userId,
       filedByUserId: null,

@@ -4,6 +4,7 @@
  * @see modules/dashboard/specs/dashboard-widget-validation.feature
  * @vitest-environment node
  */
+import { CURATED_BOARD_DEFINITIONS, templateWidgetId } from "@langwatch/analytics-catalogue";
 import {
   bindMiddlewareContext,
   canonicalErrorResponse,
@@ -86,6 +87,7 @@ function mountKey({
     read: (id: string) => send({ path: `/${id}` }),
     create: (body: unknown) => send({ method: "POST", body }),
     update: (id: string, body: unknown) => send({ path: `/${id}`, method: "PATCH", body }),
+    remove: (id: string) => send({ path: `/${id}`, method: "DELETE" }),
   };
 }
 
@@ -232,6 +234,48 @@ describe("given a key whose role only views analytics", () => {
 
     expect(patched.status).toBe(403);
     expect(read.json.definition.queries[0].sources).toEqual(["application"]);
+  });
+});
+
+describe("given a From LangWatch board's widget", () => {
+  const [board] = CURATED_BOARD_DEFINITIONS;
+  const [widget] = board?.widgets ?? [];
+  if (!board || !widget) throw new Error("No From LangWatch board ships a widget");
+  const id = templateWidgetId({ templateId: board.templateId, key: widget.key });
+
+  describe("when a key with analytics:view gets it by its template widget id", () => {
+    /** @scenario "A From LangWatch widget is read over the API by its template widget id" */
+    it("answers its name and queries from the catalogue, and refuses to change it", async () => {
+      const key = mountKey({ permits: (permission) => permission === "analytics:view" });
+      const fullKey = mountKey();
+
+      const read = await key.read(id);
+      const updated = await fullKey.update(id, { name: "Mine now" });
+      const removed = await fullKey.remove(id);
+
+      expect(read.status).toBe(200);
+      expect(read.json).toMatchObject({
+        id,
+        name: widget.name,
+        definition: { queries: widget.definition.queries },
+        dashboardId: null,
+      });
+      expect(updated.status).toBe(404);
+      expect(removed.status).toBe(404);
+    });
+  });
+
+  describe("when a key without analytics:view gets it", () => {
+    /** @scenario "A From LangWatch widget is refused without analytics:view" */
+    it("refuses the request as forbidden", async () => {
+      const key = mountKey({
+        permits: (permission) => ["analytics:create", "analytics:update"].includes(permission),
+      });
+
+      const read = await key.read(id);
+
+      expect(read.status).toBe(403);
+    });
   });
 });
 

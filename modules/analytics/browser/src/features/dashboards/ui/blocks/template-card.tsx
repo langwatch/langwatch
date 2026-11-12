@@ -4,6 +4,7 @@
  * no actions the badges sit over the preview. Cards carry no data status.
  */
 
+import { AGENT_KIND_CHIP_LABELS, TRUNK_QUESTIONS } from "@langwatch/analytics-catalogue";
 import {
   Box,
   Button,
@@ -18,7 +19,6 @@ import type { ReactNode } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { opensElsewhere } from "../../../../ui/elements/analytics-link.tsx";
-import { AGENT_KIND_CHIP_LABELS, TRUNK_QUESTIONS } from "../../catalogue/index.ts";
 import type { LibraryTemplate } from "../../model/template-library.ts";
 import { TRUNK_ICONS, TRUNK_PALETTES } from "./catalogue-filters.tsx";
 import { TemplatePreview } from "./template-preview.tsx";

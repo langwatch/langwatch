@@ -39,7 +39,10 @@ export function dashboardsPath({
 /** The templates library's segment; the route table ranks it above a board id, so none takes it. */
 export const TEMPLATES_SEGMENT = "templates";
 
-/** The From LangWatch boards' segment, ranked above a board id like the library's. */
+/**
+ * The From LangWatch boards' route segment, ranked above a board id like the library's.
+ * The pointer id prefix is a different thing; it lives in the catalogue codec.
+ */
 export const CURATED_SEGMENT = "curated";
 
 /** The address of the templates library. */

@@ -20,6 +20,7 @@ const API = process.env.LANGWATCH_API_URL ?? "http://localhost:6560";
 const OUT_DIR = path.join(REPO_ROOT, "apps/ui/public/images/dashboards/templates");
 const AUTH_STATE = path.join(os.tmpdir(), "langwatch-template-previews-auth.json");
 const DASHBOARDS_SRC = "/modules/analytics/browser/src/features/dashboards";
+const CATALOGUE_SRC = "/modules/analytics/catalogue/src";
 const THEMES = ["light", "dark"];
 
 // The board is laid out at this width and cropped with a margin to the card's 2.36 ratio, so
@@ -67,10 +68,11 @@ async function projectSlug(context) {
 /** The templates and the captured ids, read through the app's own Vite server: no TS runner. */
 async function loadCatalogue(page) {
   const src = `/@fs${REPO_ROOT}${DASHBOARDS_SRC}`;
+  const catalogue = `/@fs${REPO_ROOT}${CATALOGUE_SRC}`;
   await page.addScriptTag({
     type: "module",
     content: `
-      import { BOARD_TEMPLATES } from "${src}/templates/index.ts";
+      import { BOARD_TEMPLATES } from "${catalogue}/templates/index.ts";
       import { TEMPLATE_PREVIEW_IDS } from "${src}/model/template-library.ts";
       window.__templatePreviews = JSON.stringify({
         templates: BOARD_TEMPLATES,

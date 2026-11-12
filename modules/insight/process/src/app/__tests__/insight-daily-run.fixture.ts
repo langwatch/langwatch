@@ -391,6 +391,9 @@ function scriptedDashboard(world: RunWorld) {
       widget({ boardId: found.id, projectId: found.projectId, at, scripted }),
     );
   const dashboard = createApiFixture<DashboardApi>({
+    assertDashboardWidgetsEnabled: async () => {
+      if (world.boardReadError) throw world.boardReadError;
+    },
     getBoard: async ({ projectId, dashboardId, viewer }) => {
       boardReads.push({ read: "board", viewer });
       if (world.boardReadError) throw world.boardReadError;
@@ -673,6 +676,17 @@ export async function installDailyRuns(world: RunWorld = runWorld()) {
         context: { tenantId: createTenantId(PROJECT) },
       });
       return events.map((event) => event.type);
+    },
+    /** The board each turn-on recorded on one schedule's stream, oldest first. */
+    configuredBoardsOf: async (scope: { userId?: string; board?: InsightRunBoard } = {}) => {
+      const events = await eventStore.getEvents({
+        aggregateId: scheduleIdOf(scope),
+        aggregateType: INSIGHT_DAILY_SCHEDULE_AGGREGATE_TYPE,
+        context: { tenantId: createTenantId(PROJECT) },
+      });
+      return events
+        .filter((event) => event.type === INSIGHT_DAILY_RUN_EVENT_TYPES.CONFIGURED)
+        .map(({ data }) => z.object({ board: z.unknown() }).parse(data).board);
     },
     /** Every outcome one schedule's stream holds, oldest first: the run, how and why. */
     outcomesOf: async (scope: { userId?: string; board?: InsightRunBoard } = {}) => {
