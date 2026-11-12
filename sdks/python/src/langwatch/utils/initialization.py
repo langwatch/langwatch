@@ -44,6 +44,7 @@ def setup(
     debug: Optional[bool] = None,
     skip_open_telemetry_setup: Optional[bool] = None,
     prompts_path: Optional[str] = None,
+    disable_sending: Optional[bool] = None,
 ) -> Client:
     """
     Initialize the LangWatch client.
@@ -58,6 +59,7 @@ def setup(
         debug: Whether to enable debug logging for the LangWatch client.
         skip_open_telemetry_setup: Whether to skip setting up the OpenTelemetry tracer provider. If this is skipped, instrumentors will be added to the global tracer provider. Reads LANGWATCH_SKIP_OTEL_SETUP when not given.
         prompts_path: The base path for local prompt files. If not set, defaults to the current working directory.
+        disable_sending: Optional. If True, no traces will be sent to the server.
     Returns:
         The LangWatch client.
     """
@@ -97,6 +99,7 @@ def setup(
         ignore_global_tracer_provider_override_warning=changed_api_key,
         skip_open_telemetry_setup=skip_open_telemetry_setup,
         prompts_path=prompts_path,
+        disable_sending=disable_sending,
     )
 
     if debug:
