@@ -170,10 +170,26 @@ export function hasVariantSuffix(modelId: string): boolean {
   );
 }
 
+/** The batch-priced tier the catalog lists as `<model>:batch`: a price, not a callable model. */
+const isBatchTier = (modelId: string): boolean => modelId.endsWith(":batch");
+
+/**
+ * The catalog's source names OpenAI's pro reasoning mode as `gpt-<version>-<tier>-pro`
+ * (`gpt-6-sol-pro`), which OpenAI does not serve: it answers 404 model_not_found. OpenAI's own
+ * pro models carry no tier (`gpt-5.5-pro`).
+ */
+const isUnservedOpenAITierPro = (modelId: string): boolean =>
+  /^openai\/gpt-\d+(?:\.\d+)?-[a-z]+-pro$/.test(modelId);
+
+/** Whether a model picker may offer this catalog id: a call naming it reaches a real model. */
+export function isPickableCatalogModel(modelId: string): boolean {
+  return !hasVariantSuffix(modelId) && !isBatchTier(modelId) && !isUnservedOpenAITierPro(modelId);
+}
+
 export const allLitellmModels: Record<string, { mode: "chat" | "embedding" | "audio" | "image" }> =
   Object.fromEntries(
     Object.entries(llmModels.models)
-      .filter(([id]) => !hasVariantSuffix(id))
+      .filter(([id]) => isPickableCatalogModel(id))
       .map(([id, model]) => [id, { mode: model.mode }]),
   );
 
