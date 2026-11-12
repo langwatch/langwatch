@@ -173,11 +173,6 @@ function GuardrailsPage() {
 
       <PageLayout.Container>
         <VStack align="stretch" gap={6}>
-          <Text color="fg.muted">
-            Check what goes into and comes out of your models, using this project's evaluators on
-            every gateway request.
-          </Text>
-
           {isLoadingGuardrails && <ListSkeleton />}
           {showGuardrailsEmpty && (
             <GuardrailsEmptyState
