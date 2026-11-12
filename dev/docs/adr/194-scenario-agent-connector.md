@@ -72,8 +72,8 @@ LangWatch stores the blocks, hosts the wrapper around them, and runs them. The c
   Block = { language: "python"; code: string }   // 64 KiB cap
   ```
 
-- **The scenario module owns run behaviour.** The target prefetch (`modules/scenario/process/src/features/prefetch/services/scenario-target-prefetch.service.ts`) reads the agent through `AgentApi`, the named secrets through `SecretApi.getValuesByName`, and the fixture rows through `DatasetApi.getDatasetPage`. It puts them on a new `ConnectorAgentData` in `scenario-execution-data.ts`. `adapterDeclaresHooks` (`modules/scenario/process/src/rules/scenario-run-hooks.rules.ts`) counts a connector agent with a setup or teardown block as hooked.
-- **The child gets its own target.** A new row `connector` in `SERIALIZED_AGENT_RUNTIMES`, a new `TARGET_RESOURCE_CLASS` and stop signal, and a new channel `HttpSerializedConnectorAgentChannel` beside `http.serialized-code-agent.channel.ts`. `hookTargetOf` (`scenario-child-execution.service.ts`) returns the connector's hook caller for this type.
+- **The scenario module owns run behaviour.** The target prefetch (`modules/scenario/process/src/features/prefetch/services/scenario-target-prefetch.service.ts`) reads the agent through `AgentApi`, the named secrets through `SecretApi.getValuesByName`, and the fixture rows through `DatasetApi.getDatasetPage`. It puts them on a new `ConnectorAgentData` in `scenario-execution-data.ts`. `adapterDeclaresHooks` (`modules/scenario/process/src/rules/scenario-run-hooks.rules.ts`) counts every connector agent as hooked, whatever blocks it declares, so the gate below can record its refusal.
+- **The child gets its own target.** A new row `connector` in `SERIALIZED_AGENT_RUNTIMES`, a new `TARGET_RESOURCE_CLASS` and stop signal, and a new channel `HttpSerializedConnectorAgentChannel` beside `http.serialized-code-agent.channel.ts`. `hookTargetOf` (`scenario-child-execution.service.ts`) returns the connector's hook caller for this type, even with no setup or teardown block. Every connector run goes to the Node child, as voice runs do, whatever it declares: the child choice (`scenario-child-choice.service.ts`) must not send it to the Go runner, which has no connector runtime.
 
 ### How a run goes
 
@@ -84,18 +84,18 @@ LangWatch stores the blocks, hosts the wrapper around them, and runs them. The c
 State and run-scoped secrets follow ADR-180 and the earlier draft of this ADR:
 
 - Setup returns `state` (a JSON object, 64 KiB cap). Call and teardown receive it. The simulated user and the judge may see it, so it holds ids, not credentials.
-- Setup may also return `secrets` (name to string). They override a project secret of the same name for this run only. Call and teardown receive them. They are never recorded and never shown to the simulated user or the judge, and are scrubbed from every error and transcript.
+- Setup may also return `secrets` (name to string). They override a project secret of the same name for this run only. Their names must be in `secretNames`; any other name fails setup with an error naming it. Call and teardown receive them. They are never recorded and never shown to the simulated user or the judge, and are scrubbed from every error and transcript, except values under 8 characters, which the scrub skips (`scrubKnownSecrets`); rejecting short secret values at save is follow-up.
 - Any other top-level key in setup's answer fails setup with an error naming the key.
 - **LangWatch never sends a secret anywhere itself.** The customer's base URL is a config field or a project secret, never taken from `state` by LangWatch. The blocks are customer code and build their own requests, so nothing stops a block sending a secret to a host it reads from `state`; an allowed-host check comes with the address fence (follow-up, see Isolation and egress).
-- The input also carries `run`, `params`, `rows` (the fixture rows, 64 KiB cap, over it fails the step) and `idempotencyKey` `<scenarioRunId>:<attemptId>:<kind>`, so a block can tag the data it makes and a sweep can find leftovers.
+- The input also carries `run`, `params`, `rows` (the fixture rows, 64 KiB cap, over it fails the step) and `idempotencyKey` `<scenarioRunId>:<attemptId>:<kind>`, where kind is `setup`, `teardown` or `call:<turn index>`, so a block can tag the data it makes and a sweep can find leftovers.
 - Each block gets only the secrets in `secretNames`, fewer than a code agent gets today.
 
 ### Lifecycle, records and timeouts
 
-This plugs into the lifecycle on main (ADR-180) and does not change it: `ScenarioRunHooksService.around`, the `ScenarioHookResult` record, the `lw.simulation_run.hooks_recorded` event and the Setup and Teardown bands.
+This plugs into the lifecycle on main (ADR-180) and keeps its parts: `ScenarioRunHooksService.around`, the `ScenarioHookResult` record, the `lw.simulation_run.hooks_recorded` event and the Setup and Teardown bands. The wiring around it changes: `hookTargetOf` and `adapterDeclaresHooks` learn the connector type, and connector runs always get a hook target (see Consequences).
 
 - Setup that fails or times out ends the run `ERROR` and Not scored. Teardown never changes the score.
-- Each block run has the `timeoutMs` budget, by default the 60 s hook budget (`DEFAULT_HOOK_TIMEOUT_MS`, `modules/scenario/contract/src/features/execution/scenario-hooks.ts:11`). The child aborts the execute call at the budget; the block's own `timeout_ms` is set 5 s under it, so nlpgo reports why. No retries.
+- Each block run has the `timeoutMs` budget, by default the 60 s hook budget (`DEFAULT_HOOK_TIMEOUT_MS`, `modules/scenario/contract/src/features/execution/scenario-hooks.ts:11`). The child aborts the execute call at the budget; the block's own `timeout_ms` is set 5 s under it, so nlpgo reports why. No retries. The bounds of `timeoutMs` are an open question below.
 - **Rerun and keep data** skips teardown.
 - Each hook records status, duration, trace id, state or returned object, and the first 1,000 characters of the error, scrubbed of secrets.
 
@@ -103,7 +103,7 @@ This plugs into the lifecycle on main (ADR-180) and does not change it: `Scenari
 
 Blocks run only in nlpgo's code-block sandbox, never in the worker or the child. The Connector adds no egress exposure beyond a code agent: on cloud the code runner's network is fenced by port at the infrastructure level; a fence by address is not built. The app-level fence is not built (`specs/security/tenant-aware-egress-isolation.feature`, `@unimplemented`), and self-hosted Python can still open any socket. A fence is follow-up work. The WebAssembly runtime (https://github.com/langwatch/langwatch/pull/8991) is not a precondition.
 
-**Gate:** the product flag `release_scenario_connector_steps` (the owner asked for the Connector behind a feature flag). Whether it gates self-hosted too, and its cloud default, are open questions below. When off, the child records a failed setup with "Connector steps are not released for this project yet." for every connector run, with or without a setup block, so the existing Not-scored rule (`isRunNotScored`) applies: the run ends `ERROR` and Not scored, and no code-runner call is made.
+**Gate:** the product flag `release_scenario_connector_steps` (the owner asked for the Connector behind a feature flag). Whether it gates self-hosted too, and its cloud default, are open questions below. When off, the child records both setup and teardown as failed with "Connector steps are not released for this project yet." for every connector run, with or without those blocks, so the existing Not-scored rule (`isRunNotScored`) applies: the run ends `ERROR` and Not scored, and no code-runner call is made for setup, the turns or teardown.
 
 ### Open questions for the owner
 
@@ -111,6 +111,7 @@ They stay open. This ADR does not decide them.
 
 - **Self-hosted gate.** Does the flag gate self-hosted too? Proposal: yes, default on there, so it can be switched off anywhere.
 - **The cloud default of the flag.** Proposal: off, turned on per project, until code blocks get an address fence. Cost: each cloud project needs turning on.
+- **Block timeout bounds.** What minimum and maximum may `timeoutMs` take? The block's own timeout sits 5 s under it, so the minimum must be above 5 s; no maximum is proposed here.
 
 ## What is reused, and from where
 
@@ -142,7 +143,8 @@ Not reused: the HTTP agent `connector` field, the `{{ state }}` turn templates i
 ## Consequences
 
 - New: `connector` in the agent type enum, the config file, the `ConnectorAgentData` schema, the registry row, the channel, and an agent form with its own icon in the type picker.
-- Unchanged: code, HTTP and connected agents (config, editor, target), the hook lifecycle, the record schema and the event.
+- Changed: `hookTargetOf` and `adapterDeclaresHooks` learn the connector type, and the child choice keeps connector runs on the Node child.
+- Unchanged: code, HTTP and connected agents (config, editor, target), `ScenarioRunHooksService`, the record schema and the event.
 - Specs: `modules/scenario/specs/scenario-run-hooks.feature` gains a Connector rule, error paths included (setup throws, times out, state over the cap, missing secret, dataset over the cap, teardown throws, keep-data, secret scrubbed from an error), and a new agent spec under `modules/agent/specs/`.
 - Nothing stops a block leaving data behind if its own code is wrong. The `idempotencyKey` tag is how a later sweep finds it.
 - The fallback teardown for a killed child (https://github.com/langwatch/langwatch/issues/8781) becomes possible, since the worker holds the code. Follow-up.
