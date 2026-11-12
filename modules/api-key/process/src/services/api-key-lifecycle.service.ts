@@ -180,7 +180,9 @@ export class ApiKeyLifecycleService {
     return {
       token: key.token,
       apiKey: publicApiKey(
-        await this.bindings.attachOne(await this.repository.activate({ id: key.id })),
+        await this.bindings.attachOne(
+          await this.repository.activate({ id: key.id, organizationId: key.organizationId }),
+        ),
       ),
     };
   }

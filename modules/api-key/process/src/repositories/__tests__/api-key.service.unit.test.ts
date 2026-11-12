@@ -102,7 +102,7 @@ class MemoryApiKeys extends ApiKeyRepository {
     this.rows.push(row);
     return Promise.resolve(row);
   }
-  activate({ id }: { id: string }): Promise<ApiKeyRow> {
+  activate({ id }: { id: string; organizationId: string }): Promise<ApiKeyRow> {
     return this.update({ id, revokedAt: null });
   }
   revokeExpiredByName({ name, now }: { name: string; now: Instant }): Promise<number> {

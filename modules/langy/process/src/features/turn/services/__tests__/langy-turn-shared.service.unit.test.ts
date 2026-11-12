@@ -31,3 +31,31 @@ describe("composeLangyTurnPrompt", () => {
     });
   });
 });
+
+describe("heldKeyName", () => {
+  const run = { userId: "user-1", idempotencyKey: "run-1" };
+
+  /** @scenario "An unattended turn holds its key under the run and releases it on revoke" */
+  it("names the same run the same way, whatever its brief or turn id, as neither is an input", () => {
+    expect(LANGY_TURN_SHARED.heldKeyName({ ...run })).toBe(LANGY_TURN_SHARED.heldKeyName(run));
+    expect(LANGY_TURN_SHARED.heldKeyName(run)).toMatch(/^langyhold_[0-9a-f]{32}$/);
+  });
+
+  it("names another person's run differently", () => {
+    expect(LANGY_TURN_SHARED.heldKeyName({ ...run, userId: "user-2" })).not.toBe(
+      LANGY_TURN_SHARED.heldKeyName(run),
+    );
+  });
+
+  it("names another run of the same person differently", () => {
+    expect(LANGY_TURN_SHARED.heldKeyName({ ...run, idempotencyKey: "run-2" })).not.toBe(
+      LANGY_TURN_SHARED.heldKeyName(run),
+    );
+  });
+
+  it("keeps a user and run that concatenate alike apart", () => {
+    expect(LANGY_TURN_SHARED.heldKeyName({ userId: "ab", idempotencyKey: "c" })).not.toBe(
+      LANGY_TURN_SHARED.heldKeyName({ userId: "a", idempotencyKey: "bc" }),
+    );
+  });
+});

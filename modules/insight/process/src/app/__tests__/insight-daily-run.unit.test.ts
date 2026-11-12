@@ -6,6 +6,7 @@
  * @see modules/insight/specs/insight-daily-run.feature
  */
 
+import { AuthzGrantNotConfirmedError } from "@langwatch/authz-contract";
 import {
   deriveInsightInbox,
   INSIGHT_DAILY_RUN_EVENT_TYPES,
@@ -21,6 +22,7 @@ import {
 import { nowInstant, Temporal } from "@langwatch/time";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { INSIGHT_DAILY_RUN_MAX_ATTEMPTS } from "../../eventing/insight-daily-run.intent.ts";
 import { dailyRunWindows } from "../../rules/insight-daily-run.rules.ts";
 import {
   answerWith,
@@ -931,16 +933,29 @@ describe("given a turn that does not end with an answer", () => {
 
   /** @scenario "A run that cannot start is retried, then recorded on the last attempt" */
   it("throws a start failure for the retry with no outcome, then records it on the last attempt", async () => {
-    installed.world.langy.startError = new Error("langy is down");
+    installed.world.langy.startError = Object.assign(new Error("langy is down"), {
+      code: "langy_down",
+    });
     const { payload } = await request();
 
-    await expect(installed.carryOut(payload, { attempt: 1 })).rejects.toThrow("langy is down");
-    await expect(installed.carryOut(payload, { attempt: 2 })).rejects.toThrow("langy is down");
+    await expect(installed.carryOut(payload, { attempt: 1 })).rejects.toMatchObject({
+      code: "langy_down",
+    });
+    await expect(installed.carryOut(payload, { attempt: 2 })).rejects.toMatchObject({
+      code: "langy_down",
+    });
 
     expect(await installed.runEventsOf()).toEqual([RUN_REQUESTED]);
     expect(await runsOf()).toEqual([]);
 
-    await expect(installed.carryOut(payload, { attempt: 3 })).rejects.toThrow("langy is down");
+    await expect(installed.carryOut(payload, { attempt: 3 })).rejects.toMatchObject({
+      code: "langy_down",
+    });
+    expect(await runsOf()).toEqual([]);
+
+    await expect(
+      installed.carryOut(payload, { attempt: INSIGHT_DAILY_RUN_MAX_ATTEMPTS }),
+    ).rejects.toMatchObject({ code: "langy_down" });
 
     expect(await lastRunOf()).toMatchObject({
       outcome: "failed",
@@ -950,11 +965,27 @@ describe("given a turn that does not end with an answer", () => {
     });
   });
 
+  it("hands the outbox the pace Langy's held key asked for when its grant has not landed", async () => {
+    // What Langy's held key mint throws (see the Langy turn's own test for that layer).
+    installed.world.langy.startError = new AuthzGrantNotConfirmedError({
+      retryable: true,
+      retryAfterMs: 40_000,
+    });
+    const { payload } = await request();
+
+    const thrown = await installed.carryOut(payload, { attempt: 1 }).catch((e: unknown) => e);
+
+    expect(thrown).toMatchObject({ code: "authz_grant_not_confirmed", retryAfterMs: 40_000 });
+    expect(await runsOf()).toEqual([]);
+  });
+
   it("records rate_limited when the last attempt is still over Langy's window", async () => {
     installed.world.langy.startError = new LangyTurnsRateLimitedError({ retryAfterSeconds: 60 });
     const { payload } = await request();
 
-    await expect(installed.carryOut(payload, { attempt: 3 })).rejects.toMatchObject({
+    await expect(
+      installed.carryOut(payload, { attempt: INSIGHT_DAILY_RUN_MAX_ATTEMPTS }),
+    ).rejects.toMatchObject({
       code: "langy_turns_rate_limited",
     });
 

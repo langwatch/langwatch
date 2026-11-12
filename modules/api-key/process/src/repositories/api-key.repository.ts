@@ -45,7 +45,8 @@ export type ApiKeyUpdateRecord = {
 /** Private persistence boundary for the API-key aggregate. */
 export abstract class ApiKeyRepository {
   abstract create(input: ApiKeyCreateRecord): Promise<ApiKeyRow>;
-  abstract activate(input: { id: string }): Promise<ApiKeyRow>;
+  /** Throws `ApiKeyAlreadyRevokedError` for a key revoked with a cause, never undoing it. */
+  abstract activate(input: { id: string; organizationId: string }): Promise<ApiKeyRow>;
   abstract findByLookupId(input: { lookupId: string }): Promise<ApiKeyRow | null>;
   abstract findById(input: { id: string }): Promise<ApiKeyRow | null>;
   abstract findByIdInOrganization(input: {

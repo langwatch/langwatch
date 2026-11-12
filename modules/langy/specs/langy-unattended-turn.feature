@@ -68,6 +68,20 @@ Feature: Unattended Langy turns
       And the turn's handoff carries that key
 
     @unit
+    Scenario: An unattended turn holds its key under the run and releases it on revoke
+      When an unattended turn is started
+      Then its key is minted held under a name from the person and the run's idempotency key
+      And a retry whose brief changed holds the same key
+      And revoking it after an abandoned turn releases the held entry by that id
+      And a reply in a run conversation holds no key
+
+    @unit
+    Scenario: A held key's refusal reaches the caller with the pace it asked for
+      Given the held key's grants have not landed
+      When an unattended turn is started
+      Then it fails with "authz_grant_not_confirmed" carrying retryAfterMs
+
+    @unit
     Scenario: A chat turn keeps the full ceiling and its GitHub token
       Given a project with GitHub connected
       When a person sends a chat turn

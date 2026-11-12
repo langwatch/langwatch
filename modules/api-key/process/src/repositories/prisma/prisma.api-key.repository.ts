@@ -41,11 +41,17 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
       },
     });
   }
-  activate(input: { id: string }): Promise<ApiKeyRow> {
-    return this.database.apiKey.update({
-      where: { id: input.id },
-      data: { revokedAt: null },
-    });
+  /** SQL so a revoke with a cause that landed first is never undone: that key stays revoked. */
+  async activate(input: { id: string; organizationId: string }): Promise<ApiKeyRow> {
+    const activated = await this.database.$executeRaw`
+      UPDATE "ApiKey"
+         SET "revokedAt" = NULL, "updatedAt" = now()
+       WHERE "id" = ${input.id}
+         AND "organizationId" = ${input.organizationId}
+         AND "revocationCause" IS NULL
+    `;
+    if (activated === 0) throw new ApiKeyAlreadyRevokedError(input.id);
+    return this.database.apiKey.findUniqueOrThrow({ where: { id: input.id } });
   }
   findByLookupId(input: { lookupId: string }): Promise<ApiKeyRow | null> {
     return this.database.apiKey.findFirst({

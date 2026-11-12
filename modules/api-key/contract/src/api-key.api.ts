@@ -111,8 +111,24 @@ export type CliSessionKeyRevocation = Readonly<{
   ingestKeysRevoked: number;
 }>;
 
+/** A key for `createHeld`: the create input, named by what holds it, always with an expiry. */
+export type CreateHeldApiKeyInput = {
+  holdKey: string;
+  key: CreateApiKeyInput & { expiresAt: NonNullable<CreateApiKeyInput["expiresAt"]> };
+};
+
 export interface ApiKeyApi {
   create(input: CreateApiKeyInput): Promise<{ token: string; apiKey: ApiKey }>;
+  /**
+   * `create` for a caller that is retried: the key is written once per `holdKey`, and a retry
+   * grants that same key again. Throws a retryable `AuthzGrantNotConfirmedError` (with
+   * `retryAfterMs`) until its grants land. `created` marks the call that activated the key.
+   */
+  createHeld(
+    input: CreateHeldApiKeyInput,
+  ): Promise<{ token: string; apiKeyId: string; created: boolean }>;
+  /** Drops a held key's entry, so the next `createHeld` mints; call it when the key is revoked. */
+  releaseHeld(input: { organizationId: string; holdKey: string }): Promise<void>;
   update(input: UpdateApiKeyInput): Promise<ApiKey>;
   /** `update`, answering somebody else's key as not found so the id confirms nothing. */
   updateAsCaller(input: UpdateApiKeyInput): Promise<ApiKey>;

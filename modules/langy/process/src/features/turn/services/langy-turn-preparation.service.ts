@@ -64,6 +64,7 @@ export class LangyTurnPreparationService {
     /** Keeps the unattended ceiling: an allowlisted key, no GitHub token, no UI action. */
     readOnly: boolean;
     unattended?: Pick<NonNullable<StartConversationTurnInput["unattended"]>, "title">;
+    holdKey?: string;
     worker: NonNullable<LangyTurnServiceDependencies["worker"]>;
     accessStore: LangyTurnServiceDependencies["accessStore"];
     handoffStore: LangyTurnServiceDependencies["handoffStore"];
@@ -138,9 +139,8 @@ export class LangyTurnPreparationService {
             projectId,
           }),
       this.override.resolve(),
-      // The live UI-action channel is flagged (`release_langy_ui_actions`), and
-      // the turn block may only advertise it while the dispatch route would
-      // answer.
+      // The live UI-action channel is flagged (`release_langy_ui_actions`); the turn block
+      // may only advertise it while the dispatch route would answer.
       this.deps.uiActionSurface.resolve({
         userId,
         projectId,
@@ -261,11 +261,12 @@ export class LangyTurnPreparationService {
       projectId: args.projectId,
       organizationId: args.credentials.organizationId,
       ...(args.readOnly ? { ceiling: "unattended" as const } : {}),
+      ...(args.holdKey ? { holdKey: args.holdKey } : {}),
       conversation: { id: args.conversation.id, turnId: args.turnId },
     });
     args.credentials.langwatchApiKey = minted.token;
     args.credentials.langwatchApiKeyId = minted.apiKeyId;
-    args.attempt.retainSessionKey(minted.apiKeyId);
+    args.attempt.retainSessionKey(minted.apiKeyId, args.holdKey);
   }
 
   private buildPreparedTurn(

@@ -51,8 +51,12 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
     return structuredClone(key);
   }
 
-  async activate(input: { id: string }): Promise<ApiKeyRow> {
-    return this.#write(input.id, (key) => ({ ...key, revokedAt: null }));
+  async activate(input: { id: string; organizationId: string }): Promise<ApiKeyRow> {
+    return this.#write(input.id, (key) => {
+      if (key.organizationId !== input.organizationId || key.revocationCause !== null)
+        throw new ApiKeyAlreadyRevokedError(input.id);
+      return { ...key, revokedAt: null };
+    });
   }
 
   async findByLookupId(input: { lookupId: string }): Promise<ApiKeyRow | null> {
