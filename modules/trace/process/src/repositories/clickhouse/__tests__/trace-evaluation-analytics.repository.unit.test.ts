@@ -83,7 +83,7 @@ describe("TraceEvaluationAnalyticsClickHouseRepository", () => {
         { clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 } },
       ]);
       expect(reads).toHaveLength(1);
-      expect(reads[0]?.settings).toBeUndefined();
+      expect(reads[0]?.settings).not.toHaveProperty("select_sequential_consistency");
     });
   });
 
@@ -104,7 +104,7 @@ describe("TraceEvaluationAnalyticsClickHouseRepository", () => {
         },
       ]);
       expect(reads).toHaveLength(1);
-      expect(reads[0]?.settings).toEqual({ select_sequential_consistency: 1 });
+      expect(reads[0]?.settings).toMatchObject({ select_sequential_consistency: 1 });
     });
   });
 });

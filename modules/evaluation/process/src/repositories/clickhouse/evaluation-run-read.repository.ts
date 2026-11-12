@@ -76,7 +76,14 @@ const ATTEMPT_MOMENTS = [
   "toUnixTimestamp64Milli(NextAttemptAt) AS NextAttemptAtMs",
 ].join(", ");
 
-type ClickHouseEvaluationRunRow = ClickHouseEvaluationRunRecord & {
+/** A read row: no output takes a name the fence reads (ADR-201 §3), so those times end `Ms`. */
+type ClickHouseEvaluationRunRow = Omit<
+  ClickHouseEvaluationRunRecord,
+  "UpdatedAt" | "ScheduledAt" | "StartedAt"
+> & {
+  UpdatedAtMs: number | string;
+  ScheduledAtMs: number | string | null;
+  StartedAtMs: number | string | null;
   LastAttemptAtMs: number | string | null;
   NextAttemptAtMs: number | string | null;
 };
@@ -102,8 +109,8 @@ const TRACE_EVALUATION_COLUMNS_LIGHT = [
   "Label",
   "Details",
   "Error",
-  `toUnixTimestamp64Milli(${RUNS}.ScheduledAt) AS ScheduledAt`,
-  `toUnixTimestamp64Milli(${RUNS}.StartedAt) AS StartedAt`,
+  `toUnixTimestamp64Milli(${RUNS}.ScheduledAt) AS ScheduledAtMs`,
+  `toUnixTimestamp64Milli(${RUNS}.StartedAt) AS StartedAtMs`,
   `toUnixTimestamp64Milli(${RUNS}.CompletedAt) AS CompletedAt`,
 ].join(", ");
 const TRACE_EVALUATION_COLUMNS_WITH_INPUTS = `${TRACE_EVALUATION_COLUMNS_LIGHT}, Inputs`;
@@ -122,8 +129,8 @@ type TraceEvaluationRow = {
   Details: string | null;
   Error: string | null;
   Inputs?: string | null;
-  ScheduledAt: number | string | null;
-  StartedAt: number | string | null;
+  ScheduledAtMs: number | string | null;
+  StartedAtMs: number | string | null;
   CompletedAt: number | string | null;
 };
 
@@ -249,23 +256,23 @@ export class EvaluationRunClickHouseReadRepository {
   }): Promise<ClickHouseEvaluationRunRow | undefined> {
     const client = this.options.clickhouse.as(input.authorization, { reads: "traces" });
     const attempts = await this.attemptColumns({ authorization: input.authorization, alias: "t" });
-    // The outer scope's bare `ScheduledAt` is the UInt64 alias below, so the windowed fence
-    // reads the raw column in the dedup subquery; the outer scope takes the tenant set alone.
+    // No output takes a name the fence reads (ADR-201 §3): those times leave as `…Ms`. The
+    // windowed fence reads the raw column in the dedup subquery; the outer takes the tenant set.
     const result = await client.query<ClickHouseEvaluationRunRow>({
       query: `
         SELECT
-          t.ProjectionId AS ProjectionId, t.TenantId AS TenantId,
+          t.ProjectionId AS ProjectionId, t.TenantId,
           t.EvaluationId AS EvaluationId, t.Version AS Version,
           t.EvaluatorId AS EvaluatorId, t.EvaluatorType AS EvaluatorType,
-          t.EvaluatorName AS EvaluatorName, t.TraceId AS TraceId,
+          t.EvaluatorName AS EvaluatorName, t.TraceId,
           t.IsGuardrail AS IsGuardrail, t.Status AS Status, t.Score AS Score,
           t.Passed AS Passed, t.Label AS Label, t.Details AS Details,
           t.Inputs AS Inputs, t.Error AS Error, t.ErrorDetails AS ErrorDetails,
           toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
-          toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
+          toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAtMs,
           toUnixTimestamp64Milli(t.ArchivedAt) AS ArchivedAt,
-          toUnixTimestamp64Milli(t.ScheduledAt) AS ScheduledAt,
-          toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
+          toUnixTimestamp64Milli(t.ScheduledAt) AS ScheduledAtMs,
+          toUnixTimestamp64Milli(t.StartedAt) AS StartedAtMs,
           toUnixTimestamp64Milli(t.CompletedAt) AS CompletedAt,
           t.CostId AS CostId, ${attempts}, ${ATTEMPT_MOMENTS},
           t.LastProcessedEventId AS LastProcessedEventId,
@@ -307,10 +314,10 @@ export class EvaluationRunClickHouseReadRepository {
             EvaluatorType, EvaluatorName, TraceId, IsGuardrail, Status, Score,
             Passed, Label, Details, Inputs, Error, ErrorDetails,
             toUnixTimestamp64Milli(${RUNS}.CreatedAt) AS CreatedAt,
-            toUnixTimestamp64Milli(${RUNS}.UpdatedAt) AS UpdatedAt,
+            toUnixTimestamp64Milli(${RUNS}.UpdatedAt) AS UpdatedAtMs,
             toUnixTimestamp64Milli(${RUNS}.ArchivedAt) AS ArchivedAt,
-            toUnixTimestamp64Milli(${RUNS}.ScheduledAt) AS ScheduledAt,
-            toUnixTimestamp64Milli(${RUNS}.StartedAt) AS StartedAt,
+            toUnixTimestamp64Milli(${RUNS}.ScheduledAt) AS ScheduledAtMs,
+            toUnixTimestamp64Milli(${RUNS}.StartedAt) AS StartedAtMs,
             toUnixTimestamp64Milli(${RUNS}.CompletedAt) AS CompletedAt, CostId,
             ${attempts}, ${ATTEMPT_MOMENTS}, LastProcessedEventId,
             toUnixTimestamp64Milli(${RUNS}.LastEventOccurredAt) AS LastEventOccurredAt
@@ -488,8 +495,8 @@ export class EvaluationRunClickHouseReadRepository {
               error: row.Error,
               ...(row.Inputs === undefined ? {} : { inputs: parseObject(row.Inputs) }),
               timestamps: {
-                scheduledAt: toNumberOrNull(row.ScheduledAt),
-                startedAt: toNumberOrNull(row.StartedAt),
+                scheduledAt: toNumberOrNull(row.ScheduledAtMs),
+                startedAt: toNumberOrNull(row.StartedAtMs),
                 completedAt: toNumberOrNull(row.CompletedAt),
               },
             }),
@@ -622,11 +629,11 @@ export class EvaluationRunClickHouseReadRepository {
       error: row.Error,
       errorDetails: row.ErrorDetails,
       createdAt: Number(row.CreatedAt),
-      updatedAt: Number(row.UpdatedAt),
+      updatedAt: Number(row.UpdatedAtMs),
       LastEventOccurredAt: Number(row.LastEventOccurredAt ?? 0),
       archivedAt: toNumberOrNull(row.ArchivedAt),
-      scheduledAt: toNumberOrNull(row.ScheduledAt),
-      startedAt: toNumberOrNull(row.StartedAt),
+      scheduledAt: toNumberOrNull(row.ScheduledAtMs),
+      startedAt: toNumberOrNull(row.StartedAtMs),
       completedAt: toNumberOrNull(row.CompletedAt),
       costId: row.CostId,
       attempts: Number(row.Attempts ?? 0),

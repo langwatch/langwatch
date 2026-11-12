@@ -1,5 +1,6 @@
 import type { TraceListRepository } from "@langwatch/trace-contract";
 
+import type { TraceBraidReadsRepository } from "../features/braid/repositories/trace-braid-reads.repository.ts";
 import type { TraceEditOverlayRepository } from "../features/edit-overlay/repositories/trace-edit-overlay.repository.ts";
 import type { TraceExportSlotRepository } from "../features/export/repositories/trace-export-slot.repository.ts";
 import type { TraceIngestSourceBillingRepository } from "../features/ingestion/repositories/trace-ingest-source-billing.repository.ts";
@@ -61,6 +62,8 @@ export interface TraceRepositories {
   /** The span tree's summary rows, read under the route's proof (ADR-177). */
   readonly spanTree: TraceProjectedReadRepository;
   readonly existence: TraceExistenceRepository;
+  /** The braid dialog's, Braids page's and header's reads (ADR-201 §7). */
+  readonly braidReads: TraceBraidReadsRepository;
   readonly derivationSpans: TraceDerivationSpanReaderRepository;
   readonly summary: TraceSummaryRepository;
   readonly logRecords: LogRecordStorageRepository;

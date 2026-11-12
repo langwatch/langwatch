@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 import { StubAuthzListingRepository } from "../../repositories/__tests__/support/authz-listing.stub.ts";
 import { StubAuthzManagedGrantRepository } from "../../repositories/__tests__/support/authz-managed-grant.stub.ts";
 import { makeReader } from "../../repositories/__tests__/support/authz-read.stub.ts";
+import { MemoryAuthzOrganizationPolicyRepository } from "../../repositories/memory/memory.authz-organization-policy.repository.ts";
 import { AuthzService } from "../authz.service.ts";
 
 const PROJECT = { projectId: "proj-1", teamId: "team-1", organizationId: "org-1" };
@@ -19,6 +20,7 @@ const PROJECT = { projectId: "proj-1", teamId: "team-1", organizationId: "org-1"
 /** The project exists and the user holds no binding anywhere on it. */
 function authzWithNoBindings() {
   return AuthzService.create({
+    policies: MemoryAuthzOrganizationPolicyRepository.create(),
     isOnEngine: async () => true,
     repository: makeReader({
       findProjectLineage: vi.fn().mockResolvedValue(PROJECT),
@@ -31,6 +33,7 @@ function authzWithNoBindings() {
 /** The user holds a Developer seat and no binding on this shared project. */
 function authzForDeveloperSeat() {
   return AuthzService.create({
+    policies: MemoryAuthzOrganizationPolicyRepository.create(),
     isOnEngine: async () => true,
     repository: makeReader({
       findProjectLineage: vi.fn().mockResolvedValue(PROJECT),

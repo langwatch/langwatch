@@ -1,6 +1,7 @@
 /**
  * What a browser installs when it installs authz: the Roles & access settings
- * page, whose Access tab /settings/role-bindings now redirects to.
+ * page, whose Access tab /settings/role-bindings now redirects to, and the
+ * project and organisation Braids pages (ADR-201).
  */
 
 import { authzWebConfigSchema } from "@langwatch/authz-contract";
@@ -27,6 +28,20 @@ export const authzWeb = defineBrowserModule("authz")
       requires: "members:view",
       requiresAt: "organization",
       load: () => import("./ui/sections/roles.screen.tsx"),
+    },
+    "pages/settings/braids": {
+      path: "/settings/braids",
+      within: "settings",
+      label: "Braids",
+      requires: "project:view",
+      load: () => import("./ui/sections/braids/braids.screen.tsx"),
+    },
+    "pages/settings/organization-braids": {
+      path: "/settings/organization-braids",
+      within: "settings",
+      label: "Braids",
+      requires: "organization:manage",
+      load: () => import("./ui/sections/braids/organization-braids.screen.tsx"),
     },
   })
   /** What one role can do: `?drawer.open=roleDetail&drawer.role=<key or id>`. */

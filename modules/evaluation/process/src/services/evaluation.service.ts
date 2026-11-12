@@ -1,4 +1,8 @@
-import { type Authorization, internalActor, narrowAuthorization } from "@langwatch/authorization";
+import {
+  type Authorization,
+  internalActor,
+  narrowAuthorizationOrNotFound,
+} from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   EvaluationNotFoundError,
@@ -180,11 +184,11 @@ export class EvaluationService {
     input: EvaluationInputsQuery & { authorization: Authorization; userId: string | null },
   ): Promise<Record<string, unknown> | null> {
     const query = evaluationInputsQuerySchema.parse(input);
-    const authorization =
-      query.tenantId === undefined
-        ? input.authorization
-        : narrowAuthorization({ authorization: input.authorization, projectId: query.tenantId });
-    if (authorization === null) throw new EvaluationNotFoundError(query.evaluationId);
+    const authorization = narrowAuthorizationOrNotFound({
+      authorization: input.authorization,
+      tenantId: query.tenantId,
+      notFound: () => new EvaluationNotFoundError(query.evaluationId),
+    });
 
     const protections = await this.options.traces.resolveViewerProtections({
       projectId: query.projectId,

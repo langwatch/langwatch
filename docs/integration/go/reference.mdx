@@ -548,6 +548,13 @@ A `Criteria` matches on `ScopeName` (the `InstrumentationScope.Name`) and/or `Sp
 Multiple filters use AND semantics (a span must pass all). Within a `Criteria`, matchers use OR semantics (a span matches if any matcher matches); multiple fields in a `Criteria` use AND.
 </Note>
 
+## Braids: signed calls
+
+`langwatch.SignBaggage` signs the baggage entries a braid names; `langwatch.NewBraidBaggageSpanProcessor`
+copies them onto the called service's spans. Setup is on the [Braids](/features/braids#signed-calls)
+page. Signing returns a `*langwatch.BraidSigningError` whose `Code` is `malformed_signing_key`,
+`empty_entries`, `invalid_entry_key`, `invalid_entry_value` or `no_active_trace`.
+
 ## LangWatch Span Types
 
 `SpanType` is a string constant used with `span.SetType()` to categorize spans in LangWatch for specialized UI treatment and analytics.

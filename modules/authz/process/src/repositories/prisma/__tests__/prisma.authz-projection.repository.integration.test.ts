@@ -16,6 +16,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { AuthzService } from "../../../services/authz.service.ts";
 import { EventingAuthzListingRepository } from "../../eventing/eventing.authz-listing.repository.ts";
 import { EventingAuthzReadRepository } from "../../eventing/eventing.authz-read.repository.ts";
+import { MemoryAuthzOrganizationPolicyRepository } from "../../memory/memory.authz-organization-policy.repository.ts";
 import { PrismaAuthzManagedGrantRepository } from "../prisma.authz-managed-grant.repository.ts";
 import { PrismaAuthzProjectionRepository } from "../prisma.authz-projection.repository.ts";
 
@@ -27,6 +28,7 @@ describe.skipIf(!DB_URL)("given the grants projection over a real database", () 
   });
   const projection = PrismaAuthzProjectionRepository.create(prisma);
   const authz = AuthzService.create({
+    policies: MemoryAuthzOrganizationPolicyRepository.create(),
     repository: EventingAuthzReadRepository.create(prisma),
     listing: EventingAuthzListingRepository.create(prisma),
     bindings: PrismaAuthzManagedGrantRepository.create({ database: prisma }),

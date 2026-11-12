@@ -12,6 +12,7 @@ import {
   Bug,
   Building2,
   Coins,
+  Combine,
   CreditCard,
   EyeOff,
   Server,
@@ -33,6 +34,7 @@ import {
   UserRound,
   Workflow,
   Vault,
+  Waypoints,
   UserStar,
   UsersRound,
   ShieldUser,
@@ -258,6 +260,7 @@ function organizationGroup({
 
 function accessGroup({
   enterprisePlan,
+  isLiteMember,
   hasOrganizationPermission,
 }: SettingsMenuGates): SettingsMenuGroup {
   return {
@@ -305,6 +308,13 @@ function accessGroup({
         },
         enterprisePlan,
       }),
+      // Every braid in the organisation and who may braid; the project page is under Project.
+      ...(!isLiteMember && hasOrganizationPermission("organization:manage")
+        ? enterpriseEntry({
+            item: { label: "Braids", href: "/settings/organization-braids", icon: Combine },
+            enterprisePlan,
+          })
+        : []),
     ],
   };
 }
@@ -349,7 +359,7 @@ function dataControlsGroup({ hasPermission }: SettingsMenuGates): SettingsMenuGr
   };
 }
 
-function projectGroup({ isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
+function projectGroup({ isLiteMember, enterprisePlan }: SettingsMenuGates): SettingsMenuGroup {
   return {
     id: "settings-project",
     label: "Project",
@@ -370,6 +380,12 @@ function projectGroup({ isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
           ]
         : []),
       { label: "Integrations", href: "/settings/integrations", icon: Blocks },
+      ...(!isLiteMember
+        ? enterpriseEntry({
+            item: { label: "Braids", href: "/settings/braids", icon: Waypoints },
+            enterprisePlan,
+          })
+        : []),
     ],
   };
 }

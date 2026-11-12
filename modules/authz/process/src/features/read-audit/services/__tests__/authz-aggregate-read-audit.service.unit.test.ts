@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { RecordAggregateReadCommandData } from "../../eventing/authz-aggregate-read.events.ts";
+import type { RecordAggregateReadCommandData } from "../../../../eventing/authz-aggregate-read.events.ts";
 import {
   AGGREGATE_READ_AUDIT_WINDOW_MS as WINDOW_MS,
   type AggregateRead,

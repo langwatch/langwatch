@@ -2,6 +2,7 @@ import type { FoldProjectionStore } from "@langwatch/eventing";
 import { memoryObjectStorage } from "@langwatch/process-stores";
 import { TraceCapabilityUnavailableError } from "@langwatch/trace-contract";
 
+import { MemoryNullTraceBraidReadsRepository } from "../../features/braid/repositories/memory/memory.null-trace-braid-reads.repository.ts";
 import {
   TraceClickHouse,
   type TraceClickHouseClient,
@@ -182,6 +183,7 @@ export class MemoryTraceRepositories {
       modelSpend: MemoryTraceModelSpendRepository.create(),
       attributeSpend: MemoryTraceAttributeSpendRepository.create(),
       attributedRollup: MemoryNullTraceAttributedRollupRepository.create(),
+      braidReads: MemoryNullTraceBraidReadsRepository.create(),
       spanDedup: MemoryTraceSpanDedupRepository.create(),
       spoolObjects: ObjectStorageTraceSpoolObjectsRepository.create({
         objectStorage: memoryObjectStorage(),

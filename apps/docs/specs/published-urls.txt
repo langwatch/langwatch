@@ -679,6 +679,7 @@
 /features
 /features/annotations
 /features/automations
+/features/braids
 /features/dashboards
 /features/datasets
 /features/embedded-analytics

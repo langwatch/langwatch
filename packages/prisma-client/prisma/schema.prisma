@@ -4855,6 +4855,14 @@ model AuthzEngineSwitch {
   updatedAt      DateTime @default(now()) @updatedAt
 }
 
+/// ADR-201: an organisation's braid setting. Owned by authz; read into the organisation's snapshot.
+model AuthzOrganizationPolicy {
+  organizationId               String   @id
+  braidsOrganizationAdminsOnly Boolean  @default(false)
+  updatedByUserId              String
+  updatedAt                    DateTime @updatedAt
+}
+
 model RoleBinding {
   id             String       @id @default(nanoid())
   organizationId String
@@ -4947,7 +4955,7 @@ model Grant {
   // like every other fact column; the proof minted at the door copies it.
   condition Json?
 
-  // ADR-185 §2: on a braid change's attach, the braid it replaces. Null on every other grant and
+  // ADR-201 §2: on a braid change's attach, the braid it replaces. Null on every other grant and
   // on braids attached before the column; the fold writes it from the attach event, so a replay
   // rebuilds it.
   replacesGrantId String?
@@ -4981,6 +4989,11 @@ model Grant {
   // the WHERE on the next `prisma migrate dev`. Without it the leading column
   // selects the whole organization and the read degrades to a full scan on
   // every check.
+  //
+  // Which grants a braid change replaced, live or revoked (ADR-201 §2), is
+  // served by "Grant_organizationId_replacesGrantId_idx", partial on
+  // `WHERE "replacesGrantId" IS NOT NULL`, from migration
+  // 20261113180003_braids_grant_replaced_lookup; undeclarable for the same reason.
   //
   // "Grant_resource_terms_check" is an all-or-nothing CHECK over the tier's
   // four identity columns (token, permission, resourceKind, projectId), tied
@@ -5140,6 +5153,25 @@ model ApiKey {
   @@index([lookupId])
   @@index([ingestSourceType])
   @@index([ingestionTemplateId])
+}
+
+/// ADR-201: a project's key for signing the tags on its calls. Owned by the API key module.
+model SigningKey {
+  id               String    @id
+  organizationId   String
+  projectId        String // the calling project, whose calls the key signs
+  name             String
+  publicId         String    @unique // carried in baggage beside the signature
+  secretCiphertext String // encrypted by the process encryption store; never returned by a query
+  createdByUserId  String
+  createdAt        DateTime  @default(now())
+  rotatedAt        DateTime? // set on the key a rotation replaced
+  verifiesUntil    DateTime? // end of the rotation overlap
+  revokedAt        DateTime?
+  lastUsedAt       DateTime?
+
+  @@index([projectId])
+  @@index([organizationId])
 }
 
 model ProjectActiveDay {

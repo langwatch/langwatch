@@ -27,16 +27,16 @@ import {
   type DiscoverParams,
   type FacetValuesParams,
 } from "../../../rules/trace-list-cache-key.rules.ts";
-import {
-  cursorForTraceRow,
-  mapToTraceListItem,
-  SORT_COLUMN_MAP,
-} from "../../../rules/trace-list-row.rules.ts";
 import { TraceDiscoverService } from "../../../services/trace-discover.service.ts";
 import type { FacetFilterResolver } from "../../facet/rules/trace-facet-filter.rules.ts";
 import { TraceFacetValuesService } from "../../facet/services/trace-facet-values.service.ts";
 import type { TraceTopicNamesReadRepository } from "../../topic/repositories/trace-topic-names.repository.ts";
 import { TraceTopicNamingService } from "../../topic/services/trace-topic-naming.service.ts";
+import {
+  cursorForTraceRow,
+  mapToTraceListItem,
+  SORT_COLUMN_MAP,
+} from "../rules/trace-list-row.rules.ts";
 
 interface ListParams {
   authorization: Authorization;
