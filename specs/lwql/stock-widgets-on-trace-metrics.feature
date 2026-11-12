@@ -29,9 +29,10 @@ Feature: Stock trace widgets read the light trace table
       Then it has no Attributes column
 
     @unit
-    Scenario: trace_metrics keeps its FINAL dedup
+    Scenario: trace_metrics keeps its latest-version dedup without FINAL
       When the trace_metrics catalogue is read
       Then it still deduplicates on TenantId, OccurredAt and TraceId by the latest UpdatedAt
+      And it reads in sort-key order without FINAL, breaking UpdatedAt ties by Version
 
   Rule: The moved widget queries read trace_metrics and return the same rows
 

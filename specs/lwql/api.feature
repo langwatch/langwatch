@@ -254,7 +254,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When a view whose source sorts by a column its write path moves is inspected
     Then it declares that one row is one record rather than one sort key
     And a view that declares a grain narrower than its engine's key declares a strategy that can deliver it
-    And the views whose sort keys hold still keep the shipped default
+    And the views whose sort keys hold still keep the shipped default or read their latest version in order without FINAL
 
   @integration
   Scenario: A pre-aggregated view returns one merged row per bucket

@@ -100,10 +100,11 @@ const outcomes = ({
 }: { window: Window; from: string } & OutcomeExtras) => {
   // Sent, then the latest ms, then a 20-bit hash of the pick: two judge labels at one ms tie
   // only within a hash bucket. UInt64, not a tuple, whose generic state ran out of memory.
+  // Epoch milliseconds through dateDiff: LangWatchQL does not allow toUnixTimestamp64Milli.
   const hashed = withReason ? "r.outcome, r.reason" : "r.outcome";
   const pick =
     "toUInt64(r.sent) * 9223372036854775808" +
-    " + toUInt64(toUnixTimestamp64Milli(r.row_at)) * 1048576" +
+    " + toUInt64(dateDiff('millisecond', toDateTime64(0, 3), r.row_at)) * 1048576" +
     ` + cityHash64(${hashed}) % 1048576`;
   return `SELECT trace_id,
     min(row_at) AS at, argMax(r.outcome, ${pick}) AS outcome${

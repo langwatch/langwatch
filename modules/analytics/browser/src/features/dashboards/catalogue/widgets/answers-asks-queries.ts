@@ -77,8 +77,9 @@ function tracesWithOutcome({
   // Sent first, then the latest row: one row per trace, sent and time, as the judge gives one
   // verdict per trace, so outcome and reason come from one row. UInt64, not a tuple: a tuple
   // key's generic state took 350 MB more over 1.76M traces (code 241 at the 1 GB limit).
+  // Epoch milliseconds through dateDiff: LangWatchQL does not allow toUnixTimestamp64Milli.
   const pick =
-    "toUInt64(r.sent) * 4611686018427387904 + toUInt64(toUnixTimestamp64Milli(r.row_at))";
+    "toUInt64(r.sent) * 4611686018427387904 + toUInt64(dateDiff('millisecond', toDateTime64(0, 3), r.row_at))";
   // Each trace keeps a 64-bit hash of its first topic, not two strings; the window's few
   // distinct topics then name it.
   const topicState = withTopic

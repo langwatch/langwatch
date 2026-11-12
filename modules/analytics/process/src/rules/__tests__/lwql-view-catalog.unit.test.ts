@@ -578,17 +578,23 @@ describe("given the LangWatchQL view catalog when a dataset's source sorts by a 
    * "expected".
    */
   /** @scenario "A view whose sort key moves declares the strategy that deduplicates it" */
-  it("leaves the datasets whose sort keys hold still on the shipped default", () => {
+  it("leaves the datasets whose sort keys hold still on the shipped default or on latest-in-order", () => {
     const pinned = LWQL_VIEW_CATALOG.filter((view) => view.dedup.strategy !== undefined);
     expect(
       pinned.length,
       "no dataset pins a strategy — this case is inspecting nothing",
     ).toBeGreaterThan(0);
     for (const view of pinned) {
+      // ADR-006: latest-in-order is pinned to read without FINAL, so it needs a version, not a
+      // narrower grain.
+      const calledFor =
+        view.dedup.strategy === "latest-in-order"
+          ? view.dedup.versionColumn !== undefined
+          : catalogShapes.grainColumns(view).length < view.dedup.keyColumns.length;
       expect(
-        catalogShapes.grainColumns(view).length,
-        `${view.name} pins a strategy its grain does not call for — the shipped default already collapses on the whole key`,
-      ).toBeLessThan(view.dedup.keyColumns.length);
+        calledFor,
+        `${view.name} pins a strategy nothing calls for — in-tuple needs a grain narrower than the key, latest-in-order a version column`,
+      ).toBe(true);
       expect(
         view.dedup.aggregating,
         `${view.name} aggregates, so its narrow grain is delivered by the GROUP BY render, not a pinned strategy`,

@@ -23,7 +23,7 @@ describe("given the Answer quality widgets", () => {
     // A sent outcome (sent = 1) wins over the judge's label (sent = 0), then the latest row; one
     // fixed-size key, so outcome and reason come from one row.
     const key =
-      "toUInt64(r.sent) * 4611686018427387904 + toUInt64(toUnixTimestamp64Milli(r.row_at))";
+      "toUInt64(r.sent) * 4611686018427387904 + toUInt64(dateDiff('millisecond', toDateTime64(0, 3), r.row_at))";
     expect(sql.trend).toContain(`argMax(r.outcome, ${key}) AS outcome`);
     expect(sql.reasons).toContain(`argMax(r.reason, ${key}) AS reason`);
     expect(sql.trend).toContain("GROUP BY sipHash128(r.trace_id)");
