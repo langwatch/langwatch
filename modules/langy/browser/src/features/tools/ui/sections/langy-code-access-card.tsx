@@ -1,3 +1,7 @@
+/**
+ * The code access card (ADR-129): four states, all read from `langy.getLocalWorkspace` rather
+ * than the tool call, which is only where the card hangs, never what it says.
+ */
 import { GitHubIcon } from "@langwatch/design-system/icons";
 import {
   Box,
@@ -8,20 +12,19 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
+import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import type {
   LangyChoiceSelection,
   LangyControlRequestState,
   LangyDerivedChoicesCard,
 } from "@langwatch/langy-contract";
-import { SHARE_CONTROL_COMMAND } from "@langwatch/langy-contract";
-/**
- * The code access card (ADR-129): four states, all read from `langy.getLocalWorkspace` rather
- * than the tool call, which is only where the card hangs, never what it says.
- */
+import { shareControlCommand } from "@langwatch/langy-contract";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 import { Check, FolderCode, FolderOpen, GitPullRequest } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 
+import { useSession } from "../../../../behavior/auth-session.ts";
 import { describeError } from "../../../../behavior/errors.tsx";
 import { api } from "../../../../behavior/langy-api.ts";
 import { useLangyLocalControlStore } from "../../../../behavior/langy-local-control.store.ts";
@@ -211,6 +214,7 @@ function CodeAccessBody({
   onRefetch: () => void;
 }) {
   const { projectId, conversationId, callId, onAskAgain, now } = props;
+  const command = useShareControlCommand({ projectId, organizationId: props.organizationId });
   const [pickedLocal, setPickedLocal] = useState(() =>
     readLocalFolderPick({ conversationId, callId }),
   );
@@ -252,6 +256,7 @@ function CodeAccessBody({
     return (
       <CardShell>
         <WaitingState
+          command={command}
           requestState={folder.requestState}
           expiresAt={request ? toEpochMs(request.expiresAt) : null}
           now={now ?? (() => nowInstant().epochMilliseconds)}
@@ -264,6 +269,22 @@ function CodeAccessBody({
     );
   }
   return <AskingState {...props} onPickLocal={pickLocal} />;
+}
+
+/** The share command; it names the reader, who is the asker since only they see their request. */
+function useShareControlCommand({
+  projectId,
+  organizationId,
+}: {
+  projectId: string;
+  organizationId?: string | null;
+}): string {
+  const session = useSession();
+  const namesAsker = useFeatureFlag(FrontendFlags.release_ui_langy_share_command_names_asker, {
+    projectId,
+    organizationId: organizationId ?? NOT_TARGETED,
+  });
+  return shareControlCommand({ email: namesAsker.enabled ? session.data?.user.email : null });
 }
 
 /** The older ask, once Langy has asked again: readable, closed, unanswerable. */
@@ -566,6 +587,7 @@ function RememberBox({
 
 /** The waiting state: the one command, the countdown, and what comes next. */
 function WaitingState({
+  command,
   requestState,
   expiresAt,
   now,
@@ -574,6 +596,7 @@ function WaitingState({
   tryingAgain,
   failure,
 }: {
+  command: string;
   requestState: LangyControlRequestState;
   expiresAt: number | null;
   now: () => number;
@@ -635,12 +658,12 @@ function WaitingState({
           fontFamily="mono"
           color="fg"
           flex={1}
-          overflowX="auto"
-          whiteSpace="nowrap"
+          paddingY={1}
+          overflowWrap="anywhere"
         >
-          {SHARE_CONTROL_COMMAND}
+          {command}
         </Text>
-        <LangyCopyButton size="xs" value={SHARE_CONTROL_COMMAND} label="The command" />
+        <LangyCopyButton size="xs" value={command} label="The command" />
       </HStack>
       <HStack gap={2}>
         <Spinner size="xs" />

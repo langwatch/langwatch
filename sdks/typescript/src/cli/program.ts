@@ -1967,21 +1967,27 @@ function registerLangyCommands(program: Command): void {
         "Share control of this folder with the Langy session that requested it (what a bare `langwatch langy` does today)",
       )
       .option(
+        "--as <email>",
+        "The email of the person who asked Langy, as the card's command names it; a login that is someone else's offers to sign in as them",
+      )
+      .option(
         "-o, --output <format>",
         "Not available: this command is an interactive session and prints as it goes",
       ),
-  ).action(async (options: { shareControl?: boolean; output?: string }, command: Command) => {
-    // `--json` and `--jq` are global, so they never reach the command's own
-    // options. They are read here and passed on, or the refusal below would
-    // miss them now that the format gate lets this command through.
-    const globals: { json?: unknown; jq?: unknown } = command.optsWithGlobals();
-    const { langyCommand: impl } = await import("./commands/langy/index.js");
-    return impl({
-      ...options,
-      ...(globals.json !== undefined ? { json: true } : {}),
-      ...(globals.jq !== undefined ? { jq: true } : {}),
-    });
-  });
+  ).action(
+    async (options: { shareControl?: boolean; as?: string; output?: string }, command: Command) => {
+      // `--json` and `--jq` are global, so they never reach the command's own
+      // options. They are read here and passed on, or the refusal below would
+      // miss them now that the format gate lets this command through.
+      const globals: { json?: unknown; jq?: unknown } = command.optsWithGlobals();
+      const { langyCommand: impl } = await import("./commands/langy/index.js");
+      return impl({
+        ...options,
+        ...(globals.json !== undefined ? { json: true } : {}),
+        ...(globals.jq !== undefined ? { jq: true } : {}),
+      });
+    },
+  );
 }
 
 function registerAgentCommands(program: Command): void {
