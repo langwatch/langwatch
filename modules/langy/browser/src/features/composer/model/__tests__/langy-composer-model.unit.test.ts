@@ -12,6 +12,7 @@ describe("given the composer has no model yet", () => {
         resolveComposerModel({
           current: "",
           resolvedDefault: "openai/gpt-5-mini",
+          resolvedDefaultSettled: true,
           reachable,
         }),
       ).toBe("anthropic/claude-sonnet-4-5");
@@ -25,6 +26,7 @@ describe("given the composer has no model yet", () => {
         resolveComposerModel({
           current: "",
           resolvedDefault: "gemini/gemini-3.7-flash",
+          resolvedDefaultSettled: true,
           reachable,
         }),
       ).toBe("gemini/gemini-3.7-flash");
@@ -33,9 +35,44 @@ describe("given the composer has no model yet", () => {
 
   describe("when no default resolves", () => {
     it("seeds the first model the project's providers serve", () => {
-      expect(resolveComposerModel({ current: "", resolvedDefault: null, reachable })).toBe(
-        "anthropic/claude-sonnet-4-5",
-      );
+      expect(
+        resolveComposerModel({
+          current: "",
+          resolvedDefault: null,
+          resolvedDefaultSettled: true,
+          reachable,
+        }),
+      ).toBe("anthropic/claude-sonnet-4-5");
+    });
+  });
+});
+
+describe("given the providers answered before the resolved default", () => {
+  describe("when the default is still loading", () => {
+    /** @scenario "The composer waits for the resolved default before seeding" */
+    it("seeds nothing yet", () => {
+      expect(
+        resolveComposerModel({
+          current: "",
+          resolvedDefault: undefined,
+          resolvedDefaultSettled: false,
+          reachable,
+        }),
+      ).toBeNull();
+    });
+  });
+
+  describe("when the default then answers", () => {
+    /** @scenario "The composer waits for the resolved default before seeding" */
+    it("seeds the default, not the first model in the menu", () => {
+      expect(
+        resolveComposerModel({
+          current: "",
+          resolvedDefault: "gemini/gemini-3.7-flash",
+          resolvedDefaultSettled: true,
+          reachable,
+        }),
+      ).toBe("gemini/gemini-3.7-flash");
     });
   });
 });
@@ -47,6 +84,7 @@ describe("given the composer already holds a model", () => {
         resolveComposerModel({
           current: "gemini/gemini-3.7-flash",
           resolvedDefault: "anthropic/claude-sonnet-4-5",
+          resolvedDefaultSettled: true,
           reachable,
         }),
       ).toBeNull();
@@ -59,6 +97,7 @@ describe("given the composer already holds a model", () => {
         resolveComposerModel({
           current: "openai/gpt-5-mini",
           resolvedDefault: "openai/gpt-5-mini",
+          resolvedDefaultSettled: true,
           reachable,
         }),
       ).toBe("anthropic/claude-sonnet-4-5");
@@ -73,6 +112,7 @@ describe("given the reachable list is empty", () => {
         resolveComposerModel({
           current: "",
           resolvedDefault: "openai/gpt-5-mini",
+          resolvedDefaultSettled: true,
           reachable: [],
         }),
       ).toBeNull();
@@ -80,6 +120,7 @@ describe("given the reachable list is empty", () => {
         resolveComposerModel({
           current: "openai/gpt-5-mini",
           resolvedDefault: null,
+          resolvedDefaultSettled: true,
           reachable: [],
         }),
       ).toBeNull();

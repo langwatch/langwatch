@@ -111,6 +111,13 @@ Feature: Langy runs on the model the project chose
     And a model the project can serve is seeded unchanged
 
   @unit
+  Scenario: The composer waits for the resolved default before seeding
+    Given the project's providers answered before the resolved Langy default
+    When the composer seeds its model
+    Then it holds no model until the default answers
+    And then it holds the resolved default, not the first model in the menu
+
+  @unit
   Scenario: The composer follows a default-model change made in settings
     Given the composer's model was seeded from the resolved default
     When the default model configuration is saved or removed while the panel is open

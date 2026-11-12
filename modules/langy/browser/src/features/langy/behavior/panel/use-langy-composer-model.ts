@@ -58,16 +58,24 @@ export function useLangyComposerModel({ projectId }: { projectId: string | undef
     ? resolvedDefaultModel
     : null;
 
+  const resolvedDefaultSettled = !resolvedDefaultQuery.isPending;
   const settled = !resolvedDefaultQuery.isLoading && !modelsAllowedQuery.isLoading;
 
   useEffect(() => {
     const next = resolveComposerModel({
       current: modelOverride,
       resolvedDefault: resolvedDefaultModel,
+      resolvedDefaultSettled,
       reachable: reachableModels,
     });
     if (next) setModelOverride(next);
-  }, [resolvedDefaultModel, modelOverride, reachableModels, setModelOverride]);
+  }, [
+    resolvedDefaultModel,
+    resolvedDefaultSettled,
+    modelOverride,
+    reachableModels,
+    setModelOverride,
+  ]);
 
   return {
     modelOverride,

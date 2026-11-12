@@ -6,12 +6,15 @@
 export function resolveComposerModel({
   current,
   resolvedDefault,
+  resolvedDefaultSettled,
   reachable,
 }: {
   /** The model the composer holds now, empty when nothing is chosen yet. */
   current: string;
   /** The model the project's Langy configuration resolves to. */
   resolvedDefault: string | null | undefined;
+  /** False while the resolved default loads, so the menu's first model never wins the race. */
+  resolvedDefaultSettled: boolean;
   /** Models the project can serve, in menu order. */
   reachable: readonly string[];
 }): string | null {
@@ -21,6 +24,7 @@ export function resolveComposerModel({
   if (reachable.length === 0) return null;
 
   if (current) return reachable.includes(current) ? null : reachable[0]!;
+  if (!resolvedDefaultSettled) return null;
 
   if (resolvedDefault && reachable.includes(resolvedDefault)) {
     return resolvedDefault;
