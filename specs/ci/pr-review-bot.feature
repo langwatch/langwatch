@@ -36,6 +36,15 @@ Feature: PR Review Bot workflow
     Then the review job is skipped
     And no review is posted to the PR
 
+  # On a job, GitHub's implicit success() checks every job upstream, not only
+  # `needs`. Path filters skip calls above ci-complete, so without !cancelled()
+  # the review would be skipped on most PRs, and a skipped check passes.
+  @unit
+  Scenario: The review still starts when CI skipped checks the change does not reach
+    Given pr.yml skipped a call the change does not reach
+    When ci-complete succeeds
+    Then the review job still starts
+
   @unit
   Scenario: The merge queue gets no review
     Given a merge queue run of pr.yml

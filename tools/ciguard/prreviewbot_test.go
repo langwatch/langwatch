@@ -54,6 +54,7 @@ jobs:
   review:
     needs: ci-complete
     if: |
+      !cancelled() &&
       needs.ci-complete.result == 'success' &&
       github.event_name == 'pull_request' &&
       github.event.pull_request.user.login != 'dependabot[bot]' &&
@@ -141,6 +142,18 @@ func TestPRReviewBotGatesOnCIComplete(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, problems)
 	assert.Contains(t, strings.Join(problems, "\n"), "ci-complete")
+}
+
+// @scenario "The review still starts when CI skipped checks the change does not reach"
+func TestPRReviewBotStartsWhenCISkippedACall(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow, "      !cancelled() &&\n", "", 1)
+	root := writePRReviewBotWorkflow(t, broken)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), "skipped call")
 }
 
 // @scenario "The review starts only after CI passed"

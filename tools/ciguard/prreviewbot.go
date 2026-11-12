@@ -17,8 +17,11 @@ const PRReviewBotWorkflow = PRWorkflowFile
 // prReviewBotGateClauses are the job-level `if:` clauses the review job
 // depends on to stay off Dependabot PRs (separate secret store), fork PRs (no
 // access to repo secrets), drafts (not ready for review), the merge queue (the
-// bot reads github.event.pull_request) and a change CI did not pass. Read as
-// literal text rather than evaluated — like goversion.go reading a Go
+// bot reads github.event.pull_request) and a change CI did not pass. It also
+// needs !cancelled(): a job's implicit success() checks every job upstream,
+// transitively, so a call path-filtered away above ci-complete would skip the
+// review even though ci-complete passed, and a skipped required check passes.
+// Read as literal text rather than evaluated — like goversion.go reading a Go
 // directive, this guard's job is to notice a clause disappearing, not to
 // re-implement GitHub's expression language.
 var prReviewBotGateClauses = map[string]string{
@@ -27,6 +30,7 @@ var prReviewBotGateClauses = map[string]string{
 	"draft":        "draft == false",
 	"pull request": "github.event_name == 'pull_request'",
 	"ci-complete":  "needs.ci-complete.result == 'success'",
+	"skipped call": "!cancelled()",
 }
 
 // prReviewBotTriggerTypes are the pull_request event types that (subject to
@@ -49,9 +53,9 @@ var fullSHAPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 // PRReviewBot reports every way the PR Review Bot workflow has drifted from
 // the invariants specs/ci/pr-review-bot.feature describes: the wait for
-// ci-complete, the wait for every other check, the skip gate, the trigger types that can run a review,
-// single-review-in-flight concurrency, full-SHA pinning on every action it
-// uses, and the required permissions block.
+// ci-complete, the wait for every other check, the skip gate, the trigger
+// types that can run a review, single-review-in-flight concurrency, full-SHA
+// pinning on every action it uses, and the required permissions block.
 func PRReviewBot(repoRoot string) ([]string, error) {
 	workflow, err := ciscan.Load(repoRoot, PRReviewBotWorkflow)
 	if err != nil {
@@ -243,8 +247,9 @@ func prReviewBotConcurrency(workflow *ciscan.Workflow) []string {
 }
 
 // prReviewBotPermissions checks the review job's effective permissions block
-// grants exactly contents: write and pull-requests: write, with no extra
-// permissions. contents: write is required for resolveReviewThread. GitHub
+// grants exactly checks: read, contents: write and pull-requests: write, with
+// no extra permissions. contents: write is required for resolveReviewThread
+// and checks: read for listing the head commit's check runs. GitHub
 // permissions blocks do not merge: a job-level `permissions:` completely
 // replaces the workflow-level one when present, so the effective set is the
 // job's block if it declares one, else the workflow's.
@@ -253,7 +258,7 @@ func prReviewBotPermissions(workflow *ciscan.Workflow) []string {
 
 	if perms.Shorthand != "" {
 		return []string{fmt.Sprintf(
-			"%s permissions block uses shorthand %q, want an explicit contents/pull-requests mapping",
+			"%s permissions block uses shorthand %q, want an explicit checks/contents/pull-requests mapping",
 			PRReviewBotWorkflow, perms.Shorthand)}
 	}
 

@@ -202,8 +202,14 @@ jobs:
   # check, and a silent pass would let an unreviewed change merge.
   review:
     needs: ci-complete
+    # !cancelled() replaces the implicit success(). On a job, success() checks
+    # every job upstream, transitively, not just `needs`: a call that path
+    # filters skipped anywhere above ci-complete would skip this job even
+    # though ci-complete passed, and a skipped required check passes, so the
+    # change would merge unreviewed. ci-complete's own result is checked below.
     # Dependabot PRs read a separate secret store, so the token check would fail.
     if: |
+      !cancelled() &&
       needs.ci-complete.result == 'success' &&
       github.event_name == 'pull_request' &&
       github.event.pull_request.user.login != 'dependabot[bot]' &&
