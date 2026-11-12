@@ -283,12 +283,10 @@ const traceSpanDataSchema = z
       .extend({ attributes: originAttributesSchema }),
     resource: z.object({ attributes: originAttributesSchema }).nullish(),
   })
-  .transform(
-    ({ span: { parentSpanId, attributes }, resource }): NurturingTraceSpanData => ({
-      span: { parentSpanId },
-      origin: extractOrigin(attributes) ?? extractOrigin(resource?.attributes),
-    }),
-  );
+  .transform(({ span: { parentSpanId, attributes }, resource }): NurturingTraceSpanData => ({
+    span: { parentSpanId },
+    origin: extractOrigin(attributes) ?? extractOrigin(resource?.attributes),
+  }));
 
 /** Not a sample's or Langy's own trace, which trace's `isRealFirstIngest` leaves out too. */
 function isCustomerOrigin(origin: string | undefined): boolean {
