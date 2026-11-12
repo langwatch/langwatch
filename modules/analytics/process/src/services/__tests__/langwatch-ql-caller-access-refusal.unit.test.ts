@@ -33,6 +33,10 @@ const FAILURE_METRIC = "lwql_query_failure_total";
 const STOCK_GATEWAY_SQL: string = loadStockStatements().find(
   ({ label }) => label === "fd-gateway/present",
 )!.sql;
+/** A stock spend widget: it reads TotalCost, a column gated by cost:view. */
+const STOCK_COST_SQL: string = loadStockStatements().find(
+  ({ label }) => label === "fd-cost-efficiency/summary",
+)!.sql;
 const accessRefusals = LangWatchQLAccessRefusalService.create();
 const lwql = LangWatchQLService.create({
   accessRefusals,
@@ -88,6 +92,22 @@ describe("given a view the catalogue holds but the caller's protections hide", (
 
     service.reportBuiltInFailure({ projectId: "project-1", source: "gateway", error });
     service.reportFailure({ projectId: "project-1", sql: STOCK_GATEWAY_SQL, error });
+
+    expect(accessRefusals.isCallerAccessRefusal({ error })).toBe(true);
+    expect(lines.filter((line) => line.level === 50)).toHaveLength(0);
+    expect(meter.valueOf(FAILURE_METRIC, { origin: "built_in" })).toBe(0);
+  });
+
+  /** @scenario "A caller's own access refusal is neither reported nor counted" */
+  it("is the caller's access refused for a cost column without cost:view, on both paths", () => {
+    const error = refusalOf({
+      sql: STOCK_COST_SQL,
+      protections: { catalogue: catalogueWithout("cost:view") },
+    });
+    const { lines, service } = reporter();
+
+    service.reportBuiltInFailure({ projectId: "project-1", source: "gateway", error });
+    service.reportFailure({ projectId: "project-1", sql: STOCK_COST_SQL, error });
 
     expect(accessRefusals.isCallerAccessRefusal({ error })).toBe(true);
     expect(lines.filter((line) => line.level === 50)).toHaveLength(0);

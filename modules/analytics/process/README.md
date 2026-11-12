@@ -166,7 +166,7 @@ executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResu
 
 #### `reportBuiltInQueryFailure`
 
-A statement the server itself wrote failed: reported as built in, with no statement hash, under its fixed `source` label. A caller's own access refusal is not reported.
+A statement the server itself wrote failed: reported as built in, with no statement hash, under its fixed `source` label. A caller's own access refusal, a rate-limited project and a deployment without LangWatchQL are not reported.
 
 ```typescript
 reportBuiltInQueryFailure(input: { projectId: string; source: string; error: unknown }): void;
