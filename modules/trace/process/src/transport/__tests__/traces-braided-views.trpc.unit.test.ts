@@ -1,14 +1,13 @@
 /**
  * @vitest-environment node
  * @see modules/trace/specs/braided-spans.feature
- * The drawer's views of a braided trace through the real tRPC runtime (ADR-201 §5): each reads
- * `spans`, and each braided item is protected by its owner's protections, the reader's by theirs.
+ * The drawer's views of a braided trace through the real tRPC runtime (ADR-201 §5): each asks one
+ * `TraceApi` operation, for the viewer, under the route's proof; the owner protections are its.
  */
 import { createTrpcRuntime } from "@langwatch/api/trpc";
-import type { Authorization } from "@langwatch/authorization";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { testAuthorizeDefaults, trpcTestMembers } from "@langwatch/test-harness/trpc-members";
-import type { Protections, SpanTreeNode, TraceApi } from "@langwatch/trace-contract";
+import type { TraceApi } from "@langwatch/trace-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -16,82 +15,27 @@ import { tracesTrpcTransport } from "../traces.trpc.ts";
 
 type Context = { actor: { id: string } | null };
 
-const READER = "project_orchestrator";
-const OWNER = "project_specialists";
-const readerSees: Protections = {
-  canSeeCapturedInput: true,
-  canSeeCosts: true,
-  hiddenAttributes: [],
-};
-const ownerHides: Protections = {
-  canSeeCapturedInput: false,
-  canSeeCosts: false,
-  hiddenAttributes: [{ pattern: "*", visibleTo: "members of this project" }],
-};
-
-function treeNode(node: Pick<SpanTreeNode, "spanId" | "cost" | "ownerProjectId">): SpanTreeNode {
-  return {
-    parentSpanId: null,
-    name: "step",
-    type: "llm",
-    startTimeMs: 0,
-    endTimeMs: 1,
-    durationMs: 1,
-    status: "ok",
-    model: null,
-    ...node,
-  };
-}
-
-const treeNodes = [
-  treeNode({ spanId: "reader-span", cost: 0.5 }),
-  treeNode({ spanId: "owner-span", cost: 0.25, ownerProjectId: OWNER }),
-];
-
-function mount({ reader = readerSees, owner = ownerHides } = {}) {
+function mount() {
   const app = {
-    authorizationForTrace: vi.fn(
-      async ({ authorization }: { authorization: Authorization }) => authorization,
-    ),
-    resolveViewerProtections: vi.fn<TraceApi["resolveViewerProtections"]>(async () => reader),
-    resolveBraidOwnerProtections: vi.fn<TraceApi["resolveBraidOwnerProtections"]>(
-      async ({ ownerProjectIds }) =>
-        new Map(ownerProjectIds.flatMap((id) => (id ? [[id, owner] as const] : []))),
-    ),
-    readSpanTreePage: vi.fn<TraceApi["readSpanTreePage"]>(async () => ({
-      nodes: treeNodes,
+    readTraceEventsForViewer: vi.fn<TraceApi["readTraceEventsForViewer"]>(async () => []),
+    readSpanTreePageForViewer: vi.fn<TraceApi["readSpanTreePageForViewer"]>(async () => ({
+      nodes: [],
       nextCursor: null,
     })),
-    readSpanTreeDelta: vi.fn<TraceApi["readSpanTreeDelta"]>(async () => treeNodes),
-    readTraceEvents: vi.fn<TraceApi["readTraceEvents"]>(async () => [
-      { spanId: "reader-span", timestamp: 1, name: "step", attributes: { said: "hello" } },
-      {
-        spanId: "owner-span",
-        timestamp: 2,
-        name: "step",
-        attributes: { said: "secret" },
-        ownerProjectId: OWNER,
-      },
-    ]),
-    readSpanResources: vi.fn<TraceApi["readSpanResources"]>(async () => [
-      {
-        spanId: "owner-span",
-        parentSpanId: null,
-        startTimeMs: 0,
-        resourceAttributes: { "service.name": "owner-service" },
-        scopeName: "test",
-        scopeVersion: null,
-        ownerProjectId: OWNER,
-      },
-      {
-        spanId: "reader-span",
-        parentSpanId: null,
-        startTimeMs: 1,
-        resourceAttributes: { "service.name": "reader-service" },
-        scopeName: "test",
-        scopeVersion: null,
-      },
-    ]),
+    readSpanTreeDeltaForViewer: vi.fn<TraceApi["readSpanTreeDeltaForViewer"]>(async () => []),
+    readSpanTreeForViewer: vi.fn<TraceApi["readSpanTreeForViewer"]>(async () => []),
+    readSpansPageForViewer: vi.fn<TraceApi["readSpansPageForViewer"]>(async () => ({
+      spans: [],
+      total: 0,
+    })),
+    readSpansSinceForViewer: vi.fn<TraceApi["readSpansSinceForViewer"]>(async () => []),
+    readSpansFullForViewer: vi.fn<TraceApi["readSpansFullForViewer"]>(async () => []),
+    readSpanResourcesForViewer: vi.fn<TraceApi["readSpanResourcesForViewer"]>(async () => ({
+      rootSpanId: null,
+      resourceAttributes: {},
+      scope: null,
+      spans: [],
+    })),
   };
   const trpc = initTRPC.context<Context>().create();
   const members = trpcTestMembers<Context>({
@@ -114,68 +58,31 @@ function mount({ reader = readerSees, owner = ownerHides } = {}) {
   return { app, caller: router.createCaller({ actor: { id: "user_ana" } }).traces };
 }
 
-const trace = { projectId: READER, traceId: "trace-1" };
+const trace = { projectId: "project_orchestrator", traceId: "trace-1", tenantId: "project_m" };
+const forTheViewer = expect.objectContaining({
+  ...trace,
+  viewerUserId: "user_ana",
+  authorization: expect.objectContaining({ grants: expect.any(Array) }),
+});
 
 describe("the drawer's views of a braided trace", () => {
-  describe("when the timeline shows a braided span's events", () => {
-    /** @scenario "Every view of the trace shows the same braided spans" */
-    it("reads spans and hides the owner's event content under the owner's policy only", async () => {
+  describe("when a view is asked for", () => {
+    it.each([
+      ["traceEvents", "readTraceEventsForViewer", {}],
+      ["spanTreePaginated", "readSpanTreePageForViewer", { limit: 50 }],
+      ["spanTreeDelta", "readSpanTreeDeltaForViewer", { sinceUpdatedAtMs: 0 }],
+      ["spanTree", "readSpanTreeForViewer", {}],
+      ["spansPaginated", "readSpansPageForViewer", { limit: 50, offset: 0 }],
+      ["spansDelta", "readSpansSinceForViewer", { sinceStartTimeMs: 0 }],
+      ["spansFull", "readSpansFullForViewer", {}],
+      ["resourceInfo", "readSpanResourcesForViewer", {}],
+    ] as const)("%s asks %s alone, for the viewer", async (procedure, operation, extra) => {
       const { app, caller } = mount();
 
-      const events = await caller.traceEvents(trace);
+      await (caller[procedure] as (input: unknown) => Promise<unknown>)({ ...trace, ...extra });
 
-      expect(app.readTraceEvents).toHaveBeenCalledWith(expect.objectContaining({ reads: "spans" }));
-      expect(events.map((event) => [event.spanId, event.attributes.said])).toEqual([
-        ["reader-span", "hello"],
-        ["owner-span", "[REDACTED]"],
-      ]);
-    });
-  });
-
-  describe("when the span tree prices a braided span", () => {
-    /** @scenario "A braided span's cost shows only to a viewer who may see costs on its owner" */
-    it("hides the owner's span cost when the viewer may not see costs there", async () => {
-      const { caller } = mount();
-
-      const page = await caller.spanTreePaginated({ ...trace, limit: 50 });
-      const delta = await caller.spanTreeDelta({ ...trace, sinceUpdatedAtMs: 0 });
-
-      for (const nodes of [page.nodes, delta]) {
-        expect(nodes.map((node) => [node.spanId, node.cost])).toEqual([
-          ["reader-span", 0.5],
-          ["owner-span", null],
-        ]);
-      }
-    });
-
-    it("shows the owner's span cost by the owner's standing, not the reader's", async () => {
-      const { caller } = mount({
-        reader: { ...readerSees, canSeeCosts: false },
-        owner: { ...ownerHides, canSeeCosts: true },
-      });
-
-      const page = await caller.spanTreePaginated({ ...trace, limit: 50 });
-
-      expect(page.nodes.map((node) => [node.spanId, node.cost])).toEqual([
-        ["reader-span", null],
-        ["owner-span", 0.25],
-      ]);
-    });
-  });
-
-  describe("when the resource pane shows a braided span", () => {
-    it("takes the trace's resources from the reader's span and gates the owner's by its owner", async () => {
-      const { app, caller } = mount();
-
-      const resources = await caller.resourceInfo(trace);
-
-      expect(app.readSpanResources).toHaveBeenCalledWith(
-        expect.objectContaining({ reads: "spans" }),
-      );
-      expect(resources.rootSpanId).toBe("reader-span");
-      expect(resources.resourceAttributes["service.name"]).toBe("reader-service");
-      const owned = resources.spans.find((span) => span.ownerProjectId === OWNER);
-      expect(owned?.resourceAttributes["service.name"]).not.toBe("owner-service");
+      expect(app[operation]).toHaveBeenCalledTimes(1);
+      expect(app[operation]).toHaveBeenCalledWith(forTheViewer);
     });
   });
 });

@@ -2,7 +2,6 @@ import { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
   internalActor,
   narrowAuthorizationOrNotFound,
-  ownProjectIdReadBy,
   projectIdsReadBy,
   withoutSpanBraids,
 } from "@langwatch/authorization";
@@ -211,7 +210,8 @@ import {
   TraceAiQueryUnavailableError,
   type TraceRef,
   type TraceHeader,
-  type SpanBraid,
+  type TraceDrawerReadInput,
+  type TraceResourceInfoDto,
 } from "@langwatch/trace-contract";
 import type { ConversationView } from "@langwatch/trace-contract/conversation";
 import type { z } from "zod";
@@ -336,6 +336,7 @@ import {
 import { TraceBraidPauseService } from "../features/read/services/trace-braid-pause.service.ts";
 import { TraceBraidedTotalsService } from "../features/read/services/trace-braided-totals.service.ts";
 import { TraceContentReadService } from "../features/read/services/trace-content-read.service.ts";
+import { TraceDrawerReadService } from "../features/read/services/trace-drawer-read.service.ts";
 import { TraceListService } from "../features/read/services/trace-list-read.service.ts";
 import { TraceLogRecordIOService } from "../features/read/services/trace-log-record-io.service.ts";
 import { LogRecordStorageService } from "../features/read/services/trace-log-record-read.service.ts";
@@ -382,12 +383,7 @@ import {
 } from "../repositories/trace-summary.repository.ts";
 import type { TraceUsageCountRepository } from "../repositories/trace-usage-count.repository.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
-import {
-  readsBraidedSpans,
-  selectedSpanOwnerOf,
-  verifiedMarksOf,
-} from "../rules/braided-span-owner.rules.ts";
-import { braidedTraceSummaryOf } from "../rules/braided-trace-totals.rules.ts";
+import { selectedSpanOwnerOf, verifiedMarksOf } from "../rules/braided-span-owner.rules.ts";
 import { gateEvaluationContent } from "../rules/evaluation-content-gate.rules.ts";
 import { mapTraceEvaluationsToLegacyEvaluations } from "../rules/trace-evaluation-mapping.rules.ts";
 import {
@@ -1464,6 +1460,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   #braidDetail: TraceBraidDetailService;
   #braidPreview: TraceBraidPreviewService;
   #braidedTotals: TraceBraidedTotalsService;
+  #drawer: TraceDrawerReadService;
   #transcriptRead: TraceTranscriptReadService;
   #exportProgress: TraceExportProgressService;
   #tenantUpdates: TraceTenantUpdateStreamService;
@@ -1487,6 +1484,12 @@ export class TraceModule implements TraceApi, CollectorApp {
     this.#braidedTotals = TraceBraidedTotalsService.create({
       reads: dependencies.traces.braidReads ?? EmptyTraceBraidReadsRepository.create(),
       prices: dependencies.braidPrices ?? null,
+    });
+    this.#drawer = TraceDrawerReadService.create({
+      reads: this,
+      braids: this.#braidDetail,
+      totals: this.#braidedTotals,
+      mappers: traceReadMapperPorts,
     });
     this.#braidPreview = TraceBraidPreviewService.create({
       reads: dependencies.traces.braidReads ?? EmptyTraceBraidReadsRepository.create(),
@@ -1936,8 +1939,14 @@ export class TraceModule implements TraceApi, CollectorApp {
     ownerProjectId?: string | undefined;
     occurredAtMs?: number;
     viewerUserId: string;
+    tenantId?: string | undefined;
   }): Promise<SpanDetail> {
-    const selected = selectedSpanOwnerOf(input);
+    const authorization = await this.authorizationForTrace({
+      authorization: input.authorization,
+      traceId: input.traceId,
+      tenantId: input.tenantId,
+    });
+    const selected = selectedSpanOwnerOf({ authorization, ownerProjectId: input.ownerProjectId });
     const braidOwner = selected.kind === "braid" ? selected.ownerProjectId : undefined;
     // A braided span: its owner's policy, the viewer's standing on the owner (ADR-201 §5).
     const protections = await this.resolveViewerProtections({
@@ -1946,7 +1955,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     });
     const [span, rawEvents] = await Promise.all([
       this.findSpan({
-        authorization: input.authorization,
+        authorization,
         traceId: input.traceId,
         spanId: input.spanId,
         ownerProjectId: input.ownerProjectId,
@@ -1954,7 +1963,7 @@ export class TraceModule implements TraceApi, CollectorApp {
         occurredAtMs: input.occurredAtMs,
       }),
       this.readSpanEvents({
-        authorization: input.authorization,
+        authorization,
         traceId: input.traceId,
         spanId: input.spanId,
         ownerProjectId: input.ownerProjectId,
@@ -1980,7 +1989,7 @@ export class TraceModule implements TraceApi, CollectorApp {
         }),
         needsSiblingRefs
           ? this.readSpanSummaries({
-              authorization: input.authorization,
+              authorization,
               traceId: input.traceId,
               occurredAtMs: input.occurredAtMs,
             })
@@ -2057,7 +2066,7 @@ export class TraceModule implements TraceApi, CollectorApp {
         verifiedMarks: verifiedMarksOf({ params: span.params }),
       });
       await this.#braidDetail.recordView({
-        authorization: input.authorization,
+        authorization,
         ownerProjectIds: [braidOwner],
       });
     }
@@ -2982,81 +2991,52 @@ export class TraceModule implements TraceApi, CollectorApp {
     return this.#braidPause.honoured({ authorization });
   }
 
-  /** Each braid owner's protections for this viewer: its policy, the viewer's standing there. */
-  async resolveBraidOwnerProtections(input: {
-    viewerUserId: string;
-    ownerProjectIds: readonly (string | null | undefined)[];
-  }): Promise<ReadonlyMap<string, Protections>> {
-    const owners = [...new Set(input.ownerProjectIds.filter((id): id is string => !!id))];
-    const resolved = await Promise.all(
-      owners.map(
-        async (projectId) =>
-          [
-            projectId,
-            await this.resolveViewerProtections({ projectId, userId: input.viewerUserId }),
-          ] as const,
-      ),
-    );
-    return new Map(resolved);
+  // The drawer's views (ADR-201 §5): one operation each, protected per owner in the service.
+
+  readTraceHeaderForViewer(
+    input: TraceDrawerReadInput & { full?: boolean | undefined },
+  ): Promise<TraceHeader> {
+    return this.#drawer.header(input);
   }
 
-  /** Each span's `braid`, null on the reader's own; owners and braids are asked about once. */
-  describeBraidedSpans(input: {
-    authorization: Authorization;
-    viewerUserId: string;
-    spans: readonly {
-      ownerProjectId?: string | undefined;
-      startedAtMs: number;
-      params?: unknown;
-    }[];
-  }): Promise<(SpanBraid | null)[]> {
-    return this.#braidDetail.describeSpans({
-      readerProjectId: ownProjectIdReadBy(input.authorization),
-      viewerUserId: input.viewerUserId,
-      spans: input.spans.map(({ ownerProjectId, startedAtMs, params }) => ({
-        ownerProjectId,
-        startedAtMs,
-        verifiedMarks: verifiedMarksOf({ params }),
-      })),
-    });
+  readSpansPageForViewer(
+    input: TraceDrawerReadInput & { limit: number; offset: number },
+  ): Promise<{ spans: Span[]; total: number }> {
+    return this.#drawer.spansPage(input);
   }
 
-  /**
-   * The header's `braided`: whole-trace totals with the braided spans the reader sees, and their
-   * owners. A trace without them, or a proof without braids, adds nothing and sends no statement.
-   */
-  async readBraidedHeaderTotals(input: {
-    authorization: Authorization;
-    traceId: string;
-    tenantId: string;
-    occurredAtMs?: number | undefined;
-    viewerUserId: string;
-    header: TraceHeader;
-    canSeeCosts: boolean;
-  }): Promise<Pick<TraceHeader, "braided">> {
-    if (!readsBraidedSpans(input.authorization)) return {};
-    const totals = await this.#braidedTotals.ownerTotals({
-      authorization: await this.authorizationForTrace(input),
-      traceId: input.traceId,
-      occurredAtMs: input.occurredAtMs ?? input.header.timestamp,
-    });
-    if (totals.length === 0) return {};
-    const ownerProjectIds = totals.map((owner) => owner.ownerProjectId);
-    const [owners, ownerProtections] = await Promise.all([
-      this.#braidDetail.describeOwners({ ownerProjectIds, viewerUserId: input.viewerUserId }),
-      this.resolveBraidOwnerProtections({ viewerUserId: input.viewerUserId, ownerProjectIds }),
-    ]);
-    return {
-      braided: braidedTraceSummaryOf({
-        header: input.header,
-        owners,
-        totals,
-        canSeeCosts: input.canSeeCosts,
-        costVisibleOwners: new Set(
-          ownerProjectIds.filter((id) => ownerProtections.get(id)?.canSeeCosts === true),
-        ),
-      }),
-    };
+  readSpansSinceForViewer(
+    input: TraceDrawerReadInput & { sinceStartTimeMs: number },
+  ): Promise<Span[]> {
+    return this.#drawer.spansSince(input);
+  }
+
+  readSpanTreePageForViewer(
+    input: TraceDrawerReadInput & Omit<SpanTreeInput, "canSeeCosts">,
+  ): Promise<SpanTreePage> {
+    return this.#drawer.spanTreePage(input);
+  }
+
+  readSpanTreeDeltaForViewer(
+    input: TraceDrawerReadInput & Omit<SpanTreeDeltaInput, "canSeeCosts">,
+  ): Promise<SpanTreeNode[]> {
+    return this.#drawer.spanTreeDelta(input);
+  }
+
+  readSpanTreeForViewer(input: TraceDrawerReadInput): Promise<SpanTreeNode[]> {
+    return this.#drawer.spanTree(input);
+  }
+
+  readSpansFullForViewer(input: TraceDrawerReadInput): Promise<SpanDetail[]> {
+    return this.#drawer.spansFull(input);
+  }
+
+  readSpanResourcesForViewer(input: TraceDrawerReadInput): Promise<TraceResourceInfoDto> {
+    return this.#drawer.resources(input);
+  }
+
+  readTraceEventsForViewer(input: TraceDrawerReadInput): Promise<DerivedTraceEvent[]> {
+    return this.#drawer.traceEvents(input);
   }
 
   /** One trace's summary fold, read from the named member when the header names one. */

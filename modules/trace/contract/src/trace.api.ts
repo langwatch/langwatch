@@ -115,10 +115,10 @@ import type {
 } from "./trace-rest.schemas.ts";
 import type { SharedTraceDto } from "./trace-share.schemas.ts";
 import type {
-  SpanBraid,
   SpanDetail,
   SpanLangwatchSignals,
   TraceHeader,
+  TraceResourceInfoDto,
 } from "./trace-view.contract.ts";
 import type { Protections } from "./trace-viewer-protections.contract.ts";
 import type {
@@ -176,6 +176,16 @@ export interface TraceUsageCount {
 }
 
 /** Public Trace operations shared by process peers after boot composition. */
+/** A drawer read for one viewer: the route's proof, narrowed to the trace's member inside. */
+export type TraceDrawerReadInput = {
+  projectId: string;
+  authorization: Authorization;
+  traceId: string;
+  tenantId?: string | undefined;
+  occurredAtMs?: number | undefined;
+  viewerUserId: string;
+};
+
 export interface TraceApi extends TraceOtlpIngestApi {
   extractInlineMediaFromEvent(input: {
     event: unknown;
@@ -334,7 +344,37 @@ export interface TraceApi extends TraceOtlpIngestApi {
     ownerProjectId?: string | undefined;
     occurredAtMs?: number;
     viewerUserId: string;
+    /** The member the drawer named; the route's proof is narrowed to the trace's member inside. */
+    tenantId?: string | undefined;
   }): Promise<SpanDetail>;
+  /** The drawer header, its cost and its `braided` totals gated per owner (ADR-201 §5). */
+  readTraceHeaderForViewer(
+    input: TraceDrawerReadInput & { full?: boolean | undefined },
+  ): Promise<TraceHeader>;
+  /** One page of a trace's spans, each braided span protected by its owner; audited (§8). */
+  readSpansPageForViewer(
+    input: TraceDrawerReadInput & { limit: number; offset: number },
+  ): Promise<{ spans: Span[]; total: number }>;
+  /** A live trace's spans since a start-time mark, protected by owner; audited (§8). */
+  readSpansSinceForViewer(
+    input: TraceDrawerReadInput & { sinceStartTimeMs: number },
+  ): Promise<Span[]>;
+  /** One page of the span tree, each span's cost gated by its owner; audited (§8). */
+  readSpanTreePageForViewer(
+    input: TraceDrawerReadInput & Omit<SpanTreeInput, "canSeeCosts">,
+  ): Promise<SpanTreePage>;
+  /** The tree nodes of a live trace newer than a mark, cost gated by owner; audited (§8). */
+  readSpanTreeDeltaForViewer(
+    input: TraceDrawerReadInput & Omit<SpanTreeDeltaInput, "canSeeCosts">,
+  ): Promise<SpanTreeNode[]>;
+  /** The whole span tree in one answer, each span's cost gated by its owner. */
+  readSpanTreeForViewer(input: TraceDrawerReadInput): Promise<SpanTreeNode[]>;
+  /** Every span's detail, protected and described by its owner (ADR-201 §5). */
+  readSpansFullForViewer(input: TraceDrawerReadInput): Promise<SpanDetail[]>;
+  /** The resource pane, each braided span's resources gated by its owner. */
+  readSpanResourcesForViewer(input: TraceDrawerReadInput): Promise<TraceResourceInfoDto>;
+  /** The drawer timeline, each braided span's events protected by its owner. */
+  readTraceEventsForViewer(input: TraceDrawerReadInput): Promise<DerivedTraceEvent[]>;
   /** `GET /api/traces/facets` for an API key: the discovery payload or one field's paged values. */
   readTraceFacetsForApiKey(input: {
     projectId: string;
@@ -855,32 +895,6 @@ export interface TraceApi extends TraceOtlpIngestApi {
     traceId: string;
     tenantId?: string | undefined;
   }): Promise<Authorization>;
-  /** Each braid owner's protections for this viewer: its policy, the viewer's standing there. */
-  resolveBraidOwnerProtections(input: {
-    viewerUserId: string;
-    ownerProjectIds: readonly (string | null | undefined)[];
-  }): Promise<ReadonlyMap<string, Protections>>;
-  /** Each span's `braid`, null on the reader's own (ADR-201 §5). */
-  describeBraidedSpans(input: {
-    authorization: Authorization;
-    viewerUserId: string;
-    spans: readonly {
-      ownerProjectId?: string | undefined;
-      startedAtMs: number;
-      params?: unknown;
-    }[];
-  }): Promise<(SpanBraid | null)[]>;
-  /** The header's `braided` totals and owners; `{}` for a trace or proof without braids. Each
-   *  owner's cost counts only where its own protections show this viewer cost. */
-  readBraidedHeaderTotals(input: {
-    authorization: Authorization;
-    traceId: string;
-    tenantId: string;
-    occurredAtMs?: number | undefined;
-    viewerUserId: string;
-    header: TraceHeader;
-    canSeeCosts: boolean;
-  }): Promise<Pick<TraceHeader, "braided">>;
   readTraceSummary(input: {
     authorization: Authorization;
     traceId: string;

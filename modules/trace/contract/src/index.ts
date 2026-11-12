@@ -60,6 +60,7 @@ export {
   TraceApi,
   type TraceAnnotationCommands,
   type TraceAnnotationMarker,
+  type TraceDrawerReadInput,
   type TraceMessagesSide,
   type TracePreconditionSampleInput,
   type TraceRenderedSpanMessages,

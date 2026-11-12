@@ -608,3 +608,7 @@ not operations.
   compiled form the minter gives a span braid with no `where`, rows stored earlier included; the stored
   shape and the compiler version are unchanged. Resealing a proof drops `braidsHonoured`; narrowing,
   which only removes grants, keeps it (§3, §9).
+- v1.13 (2026-11-12, how ruling 1a landed in the trace module, no decision of Alex's changed). Each
+  drawer procedure calls one `TraceApi` `read…ForViewer` operation; trace's drawer read service narrows
+  the proof, resolves each owner's protections, gates cost per owner and builds the header's
+  `braided` totals, and the paged and live reads still audit before they return an owner's span (§5, §8).

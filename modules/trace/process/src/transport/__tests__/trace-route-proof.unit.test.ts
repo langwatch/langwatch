@@ -53,6 +53,15 @@ describe("a trace route and the proof", () => {
       "readSpanTreePage",
       "readSpanTreeDelta",
       "readSpanDetailForViewer",
+      "readTraceHeaderForViewer",
+      "readSpansPageForViewer",
+      "readSpansSinceForViewer",
+      "readSpanTreePageForViewer",
+      "readSpanTreeDeltaForViewer",
+      "readSpanTreeForViewer",
+      "readSpansFullForViewer",
+      "readSpanResourcesForViewer",
+      "readTraceEventsForViewer",
     ];
     const bodyOf = (name: string): string => {
       const start = source.search(new RegExp(`\\n  (?:async )?${name}\\(`));

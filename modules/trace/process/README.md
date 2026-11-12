@@ -12,9 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`TraceApi`)
 
-Public Trace operations shared by process peers after boot composition.
-
-Peers call these through the token, declared at `../contract/src/trace.api.ts:179`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/trace.api.ts:189`; nothing else in this package is public.
 It extends `TraceOtlpIngestApi`.
 
 #### `extractInlineMediaFromEvent`
@@ -252,7 +250,79 @@ readBraidTestTrace(input: { ownerAuthorization: Authorization; readerAuthorizati
 One span's detail through the viewer's protections; refuses with `SpanNotFoundError`.
 
 ```typescript
-readSpanDetailForViewer(input: { projectId: string; authorization: Authorization; traceId: string; spanId: string; /** A braided span's owner (ADR-201 §5); absent, the reader's own span. */ ownerProjectId?: string | undefined; occurredAtMs?: number; viewerUserId: string; }): Promise<SpanDetail>;
+readSpanDetailForViewer(input: { projectId: string; authorization: Authorization; traceId: string; spanId: string; /** A braided span's owner (ADR-201 §5); absent, the reader's own span. */ ownerProjectId?: string | undefined; occurredAtMs?: number; viewerUserId: string; /** The member the drawer named; the route's proof is narrowed to the trace's member inside. */ tenantId?: string | undefined; }): Promise<SpanDetail>;
+```
+
+#### `readTraceHeaderForViewer`
+
+The drawer header, its cost and its `braided` totals gated per owner (ADR-201 §5).
+
+```typescript
+readTraceHeaderForViewer(input: TraceDrawerReadInput & { full?: boolean | undefined }): Promise<TraceHeader>;
+```
+
+#### `readSpansPageForViewer`
+
+One page of a trace's spans, each braided span protected by its owner; audited (§8).
+
+```typescript
+readSpansPageForViewer(input: TraceDrawerReadInput & { limit: number; offset: number }): Promise<{ spans: Span[]; total: number }>;
+```
+
+#### `readSpansSinceForViewer`
+
+A live trace's spans since a start-time mark, protected by owner; audited (§8).
+
+```typescript
+readSpansSinceForViewer(input: TraceDrawerReadInput & { sinceStartTimeMs: number }): Promise<Span[]>;
+```
+
+#### `readSpanTreePageForViewer`
+
+One page of the span tree, each span's cost gated by its owner; audited (§8).
+
+```typescript
+readSpanTreePageForViewer(input: TraceDrawerReadInput & Omit<SpanTreeInput, "canSeeCosts">): Promise<SpanTreePage>;
+```
+
+#### `readSpanTreeDeltaForViewer`
+
+The tree nodes of a live trace newer than a mark, cost gated by owner; audited (§8).
+
+```typescript
+readSpanTreeDeltaForViewer(input: TraceDrawerReadInput & Omit<SpanTreeDeltaInput, "canSeeCosts">): Promise<SpanTreeNode[]>;
+```
+
+#### `readSpanTreeForViewer`
+
+The whole span tree in one answer, each span's cost gated by its owner.
+
+```typescript
+readSpanTreeForViewer(input: TraceDrawerReadInput): Promise<SpanTreeNode[]>;
+```
+
+#### `readSpansFullForViewer`
+
+Every span's detail, protected and described by its owner (ADR-201 §5).
+
+```typescript
+readSpansFullForViewer(input: TraceDrawerReadInput): Promise<SpanDetail[]>;
+```
+
+#### `readSpanResourcesForViewer`
+
+The resource pane, each braided span's resources gated by its owner.
+
+```typescript
+readSpanResourcesForViewer(input: TraceDrawerReadInput): Promise<TraceResourceInfoDto>;
+```
+
+#### `readTraceEventsForViewer`
+
+The drawer timeline, each braided span's events protected by its owner.
+
+```typescript
+readTraceEventsForViewer(input: TraceDrawerReadInput): Promise<DerivedTraceEvent[]>;
 ```
 
 #### `readTraceFacetsForApiKey`
@@ -801,30 +871,6 @@ The proof narrowed to the member holding the trace; an unreadable member is not 
 
 ```typescript
 authorizationForTrace(input: { authorization: Authorization; traceId: string; tenantId?: string | undefined; }): Promise<Authorization>;
-```
-
-#### `resolveBraidOwnerProtections`
-
-Each braid owner's protections for this viewer: its policy, the viewer's standing there.
-
-```typescript
-resolveBraidOwnerProtections(input: { viewerUserId: string; ownerProjectIds: readonly (string | null | undefined)[]; }): Promise<ReadonlyMap<string, Protections>>;
-```
-
-#### `describeBraidedSpans`
-
-Each span's `braid`, null on the reader's own (ADR-201 §5).
-
-```typescript
-describeBraidedSpans(input: { authorization: Authorization; viewerUserId: string; spans: readonly { ownerProjectId?: string | undefined; startedAtMs: number; params?: unknown; }[]; }): Promise<(SpanBraid | null)[]>;
-```
-
-#### `readBraidedHeaderTotals`
-
-The header's `braided` totals and owners; `{}` for a trace or proof without braids.
-
-```typescript
-readBraidedHeaderTotals(input: { authorization: Authorization; traceId: string; tenantId: string; occurredAtMs?: number | undefined; viewerUserId: string; header: TraceHeader; canSeeCosts: boolean; }): Promise<Pick<TraceHeader, "braided">>;
 ```
 
 #### `readTraceSummary`
@@ -1491,7 +1537,7 @@ type Input = z.infer<typeof traceScopeSchema>; // ../contract/src/features/edit-
 
 ### `traces`
 
-Contract `../contract/src/traces.trpc.ts:189`, router `src/transport/traces.trpc.ts:48`.
+Contract `../contract/src/traces.trpc.ts:189`, router `src/transport/traces.trpc.ts:32`.
 
 | Procedure                              | Kind         | Gate                                                                  | Input                           | Output                             |
 | -------------------------------------- | ------------ | --------------------------------------------------------------------- | ------------------------------- | ---------------------------------- |

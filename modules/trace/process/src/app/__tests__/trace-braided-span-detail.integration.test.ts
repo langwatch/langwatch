@@ -9,7 +9,11 @@ import {
   EMPTY_AUDIENCE,
   PLATFORM_DEFAULT_DATA_PRIVACY,
 } from "@langwatch/data-privacy-contract";
-import type { PlanProvider } from "@langwatch/entitlement-contract";
+import {
+  type EntitlementApi,
+  planSchema,
+  type PlanProvider,
+} from "@langwatch/entitlement-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -19,13 +23,24 @@ import { describe, expect, it, vi } from "vitest";
 import { braidedProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import type { SpanCostSuggestionService } from "../../features/span/services/span-cost-suggestion.service.ts";
 import { TraceViewerProtectionService } from "../../services/trace-viewer-protection.service.ts";
-import type { TracesSpanReader } from "../trace.app.ts";
+import type { TraceAppDependencies, TracesSpanReader } from "../trace.app.ts";
 import { createTraceAppHarness } from "./support/trace-app.harness.ts";
 
 const READER = "proj_orchestrator";
 const OWNER = "proj_specialists";
 const CONDITION = 'attributes["orchestrator"] == "web"';
 const ADMIN = ["traces:view", "traces:update", "project:manage", "cost:view"];
+const ENTERPRISE_PLAN = {
+  planSource: "subscription",
+  type: "ENTERPRISE",
+  name: "ENTERPRISE",
+  free: false,
+  maxMessagesPerMonth: 0,
+  maxMembers: 0,
+  maxMembersLite: 0,
+  canPublish: true,
+  prices: { USD: 0, EUR: 0 },
+};
 
 type Category = { disposition: "restrict"; audience: typeof EMPTY_AUDIENCE };
 const policyHiding = (input: Category, output: Category = input) => ({
@@ -111,7 +126,15 @@ function spanPanel({
       { derive: async () => null },
       "spanCostSuggestions",
     ),
+    braidPlans: createApiFixture<EntitlementApi>(
+      { getActivePlan: async () => planSchema.parse(ENTERPRISE_PLAN) },
+      "braidPlans",
+    ),
     traces: {
+      summary: createApiFixture<TraceAppDependencies["traces"]["summary"]>(
+        { getTraceAuthorization: async ({ authorization }) => authorization },
+        "summary",
+      ),
       spans: createApiFixture<TracesSpanReader>(
         {
           findSpanById: async ({ ownerProjectId }) => spanOf(ownerProjectId ?? READER),
