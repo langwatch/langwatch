@@ -6,7 +6,7 @@ import type { ModelProviderServedModelsRepository } from "../../../repositories/
 import type { ModelProviderModelList } from "./http-model-provider-model-list.service.ts";
 
 /** A provider credential whose model list is asked for. */
-export type ServedModelsCredential = Readonly<{
+type ServedModelsCredential = Readonly<{
   provider: string;
   customKeys: Record<string, unknown>;
 }>;

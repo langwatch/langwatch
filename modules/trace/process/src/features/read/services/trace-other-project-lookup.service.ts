@@ -18,7 +18,7 @@ type LookupDependencies = {
   existence: Pick<TraceExistenceRepository, "findProjectsHoldingTrace">;
 };
 
-export type TraceOtherProjectLookup = {
+type TraceOtherProjectLookup = {
   located?: { project: ProjectIdentity; keyMayRead: boolean };
   /** The other projects the id was looked for in, so a not-found can say what was searched. */
   searchedProjectSlugs: string[];

@@ -82,7 +82,7 @@ const PASSING_CONCLUSIONS = new Set(["success", "neutral", "skipped"]);
 const MAX_FAILED_CHECKS = 20;
 
 /** What a commit's checks add up to once they all finished, or `running` while any still runs. */
-export type GithubCommitChecksVerdict =
+type GithubCommitChecksVerdict =
   | { kind: "running" }
   | {
       kind: "finished";
