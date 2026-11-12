@@ -22,7 +22,7 @@ import { BillableEventsMeterClickHouseRepository } from "../clickhouse.billable-
  */
 function testClickHouseUrl(): URL | null {
   if (process.env.TEST_CLICKHOUSE_URL) return new URL(process.env.TEST_CLICKHOUSE_URL);
-  const server = process.env.LANGWATCH_TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
+  const server = process.env.LANGWATCH_TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL;
   if (!server) return null;
   const url = new URL(server);
   url.pathname = "/test_langwatch";
