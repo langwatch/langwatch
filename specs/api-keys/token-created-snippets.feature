@@ -340,3 +340,9 @@ Feature: Token Created modal command snippets
     Given I have clicked a copy button and its Copied state is waiting to reset
     When the button unmounts before the reset fires
     Then no reset timer is left pending
+
+  @integration
+  Scenario: Unmounting a copy button while the copy is pending leaves no reset timer
+    Given I have clicked a copy button and the clipboard write has not finished
+    When the button unmounts and the write then finishes
+    Then no reset timer is armed

@@ -168,9 +168,17 @@ function KeyHandOff({
   const [revealed, setRevealed] = useState(false);
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  useEffect(() => () => clearTimeout(timer.current), []);
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      clearTimeout(timer.current);
+    };
+  }, []);
   const copyKey = async () => {
-    if (!(await copy({ text: token, what: "API key" }))) return;
+    const ok = await copy({ text: token, what: "API key" });
+    if (!ok || !mounted.current) return;
     setCopied(true);
     clearTimeout(timer.current);
     timer.current = setTimeout(() => setCopied(false), 2000);

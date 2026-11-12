@@ -281,11 +281,19 @@ function SnippetCopyButton({
 }) {
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  // A pending reset must not fire after unmount, when the window may be gone.
-  useEffect(() => () => clearTimeout(timer.current), []);
+  // A reset must not be armed or fire after unmount, when the window may be gone.
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      clearTimeout(timer.current);
+    };
+  }, []);
   const name = `Copy ${label.toLowerCase()}`;
   const copy = async (value: string) => {
-    if (!(await copyText({ text: value, what: label }))) return;
+    const ok = await copyText({ text: value, what: label });
+    if (!ok || !mounted.current) return;
     setCopied(true);
     clearTimeout(timer.current);
     timer.current = setTimeout(() => setCopied(false), 2000);

@@ -37,4 +37,37 @@ describe("given a copy button whose Copied state is waiting to reset", () => {
       expect(vi.getTimerCount()).toBe(baseline);
     });
   });
+
+  describe("when it unmounts while the copy is still pending", () => {
+    /** @scenario "Unmounting a copy button while the copy is pending leaves no reset timer" */
+    it("arms no reset timer once the copy resolves", async () => {
+      let resolveCopy: (ok: boolean) => void = () => {};
+      class DeferredCopyHost extends FakeApiKeyHost {
+        override copyToClipboard(): Promise<boolean> {
+          return new Promise((resolve) => {
+            resolveCopy = resolve;
+          });
+        }
+      }
+      renderWithDesignSystem(
+        <ApiKeyHostProvider value={new DeferredCopyHost()}>
+          <InlineCopyButton text="{}" label="Config" />
+        </ApiKeyHostProvider>,
+      );
+
+      const setSpy = vi.spyOn(globalThis, "setTimeout");
+      try {
+        fireEvent.click(screen.getByRole("button", { name: "Copy config" }));
+        cleanup();
+        await act(async () => {
+          resolveCopy(true);
+          await Promise.resolve();
+        });
+
+        expect(setSpy.mock.calls.filter((call) => call[1] === 2000)).toHaveLength(0);
+      } finally {
+        setSpy.mockRestore();
+      }
+    });
+  });
 });

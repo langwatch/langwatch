@@ -24,14 +24,21 @@ export function InlineCopyButton({
   const host = useApiKeyHost();
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  useEffect(() => () => clearTimeout(timer.current), []);
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      clearTimeout(timer.current);
+    };
+  }, []);
 
   async function handleCopy(): Promise<void> {
     const ok = await host.copyToClipboard({
       text,
       succeeded: { title: "Copied", description: `${label} copied to clipboard` },
     });
-    if (ok) {
+    if (ok && mounted.current) {
       setCopied(true);
       clearTimeout(timer.current);
       timer.current = setTimeout(() => setCopied(false), 2000);
