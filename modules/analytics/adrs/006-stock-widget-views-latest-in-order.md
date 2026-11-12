@@ -62,9 +62,10 @@ new MATERIALIZED column.
    which turns `optimize_limit_by_in_order` off) a `LIMIT 1 BY` here held every span key of the
    period and ran 11 stock widgets out of memory in under 3 seconds.
 6. **History by replay, not by mutation.** The `spanAnalytics` replay fills spans that are
-   missing; it goes through first-write-wins, so it cannot correct a stored span. Two `defineProjectionReplayStep` steps, one per lane
-   (`traceAnalytics`, `spanAnalytics`), replay the last 62 days (the longest stock period plus two)
-   after old writers are gone. No goose file starts a mutation; the 00128 fill steps are gone.
+   missing; it goes through first-write-wins, so it cannot correct a stored span. Two
+   `defineProjectionReplayStep` steps, one per lane (`traceAnalytics`, `spanAnalytics`), replay
+   the last 62 days (the longest stock period plus two) after old writers are gone. No goose
+   file starts a mutation; the 00128 fill steps are gone.
 7. **The span floor.** The replay step's report keeps the instant its lane was first replayed
    from (`replayedSince`). The trace module reads it from the upgrade ledger
    (`TraceApi.getSpanAnalyticsFloor`); analytics serves it (`analytics.lwql.spanDataFloor`). A

@@ -380,8 +380,14 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
     const wholeHistory = "toDateTime64('1970-01-02 00:00:00', 3)";
     const twins = LWQL_VIEW_CATALOG.filter((view) => flooredViewNames([view]).length > 0);
     expect(twins.length, "no floored twin in the catalog to check").toBeGreaterThan(0);
+    expect(twins.map((view) => flooredViewName(view.name))).toEqual([
+      "evaluation_metrics__floor",
+      "trace_evaluation_metrics__floor",
+      "trace_evaluation_checks__floor",
+    ]);
     for (const view of twins) {
       const twin = flooredViewName(view.name);
+      await recordSeedControl({ harness, table: view.sourceTable, tenantColumn: "TenantId" });
       const rows = await selectRows<{ TenantId: string }>(
         tenantA,
         `SELECT DISTINCT TenantId FROM ${database}.${twin}(lwql_floor = ${wholeHistory})`,
@@ -1296,8 +1302,9 @@ describe("given traces assigned to topics when a caller asks for traffic by topi
 
 describe("given the LangWatchQL views provisioned over the shipped fact tables when a span's residual duplicate reached span_analytics", () => {
   /**
-   * ADR-034 accepts a residual duplicate (a re-sent span missing the lookup), and span_metrics is
-   * read plainly, so a read counts it. This pins that behaviour so a future dedup is a visible change.
+   * ADR-034 accepts a residual duplicate (a re-sent span missing the lookup), and span_metrics
+   * is read plainly, so a read counts it. This pins that behaviour so a future dedup is a
+   * visible change.
    */
   /** @scenario "A plain span_metrics read counts a residual duplicate span" */
   it("returns both copies of the span through span_metrics", async () => {
@@ -1338,7 +1345,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
       );
       expect(
         stored,
-        "the source table holds one copy — this case is not being exercised",
+        "the source table does not hold two copies, so this case is not exercised",
       ).toHaveLength(2);
 
       const read = await selectRows<{ SpanId: string }>(

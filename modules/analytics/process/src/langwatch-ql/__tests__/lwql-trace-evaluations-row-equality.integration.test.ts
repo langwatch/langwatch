@@ -249,8 +249,9 @@ const check = (trace: string, name: string, passed: boolean, n = 0): EvaluationS
 });
 
 /**
- * Reviewer checks on the thumbed traces: two per application trace, ten per langy trace. Langy needs
- * ten because ck-attention/agreement only shows an evaluator with at least ten audited checks.
+ * Reviewer checks on the thumbed traces: two per application trace, ten per langy trace.
+ * Langy needs ten because ck-attention/agreement only shows an evaluator with at least ten
+ * audited checks.
  */
 const REVIEWED = ["a1", "a2", "a3", "a4", "c1", "l1"];
 const reviewerChecksOn = (trace: string) => (traceOf(trace).origin === "langy" ? 10 : 2);

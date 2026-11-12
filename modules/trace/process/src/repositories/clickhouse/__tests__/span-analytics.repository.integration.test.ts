@@ -94,6 +94,7 @@ afterAll(async () => {
   await ch.exec({
     query: `ALTER TABLE ${TABLE} DELETE WHERE TraceId = {traceId:String}`,
     query_params: { traceId: `${tag}-trace` },
+    clickhouse_settings: { mutations_sync: "2" },
   });
 });
 
@@ -132,6 +133,7 @@ describe.skipIf(!clickHouseConfigured)("span_analytics first-write-wins lookup",
     const tenantB = `${tag}-tenant-b`;
     await append([spanRow({ tenantId: tenantA, spanId: "c" })]);
     await append([spanRow({ tenantId: tenantB, spanId: "c" })]);
+    await append([spanRow({ tenantId: tenantA, spanId: "c" })]);
 
     expect(await countRows({ tenantId: tenantA, spanId: "c" })).toBe(1);
     expect(await countRows({ tenantId: tenantB, spanId: "c" })).toBe(1);

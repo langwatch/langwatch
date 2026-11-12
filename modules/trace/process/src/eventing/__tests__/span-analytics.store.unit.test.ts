@@ -132,12 +132,13 @@ describe("SpanAnalyticsStore", () => {
     expect(repository.appended.map((stored) => stored.tenantId)).toEqual(["tenant-1", "tenant-2"]);
   });
 
+  /** @scenario "A batch that mixes tenants is refused" */
   it("refuses a batch that mixes tenants", async () => {
     const { repository, store, context } = setup();
     await expect(
       store.bulkAppend([row(), row({ tenantId: "tenant-2", spanId: "span-2" })], context),
     ).rejects.toThrow(SecurityError);
-    expect(repository.lookups).toHaveLength(0);
+    expect(repository.appended).toHaveLength(0);
   });
 
   /** @scenario "A span redelivered after a failed insert is written once" */
