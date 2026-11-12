@@ -201,6 +201,57 @@ Feature: A PII redaction model call is priced per character, written to the spen
       And the first report after the meter is mapped carries the month from zero
 
     @unit
+    Scenario: Usage is held while the subscription carries no PII redaction price
+      Given a Stripe mode whose catalog maps the PII redaction meter
+      And an organization whose active subscription has no PII redaction price
+      And PII redaction spend this month
+      When the month is reported
+      Then no PII redaction meter event is sent and its checkpoint is not advanced
+      And the first report after the price is added carries the month from zero
+      # Stripe drops a meter event no subscription item prices, so sending it would lose the charge.
+
+    @unit
+    Scenario: Usage is reported once the subscription carries the PII redaction price
+      Given an organization whose active subscription has the PII redaction price
+      And PII redaction spend this month
+      When the month is reported
+      Then the PII redaction meter event is sent
+
+    @unit
+    Scenario: A subscription that cannot be read holds the usage and retries
+      Given an organization whose subscription cannot be read from Stripe
+      And PII redaction spend this month
+      When the month is reported
+      Then no PII redaction meter event is sent and its checkpoint is not advanced
+      And another report is scheduled
+
+    @unit
+    Scenario: The other meters do not wait on the PII redaction price
+      Given an organization whose active subscription has no PII redaction price
+      And billable events and Instant Eval spend this month
+      When the month is reported
+      Then the billable events and Instant Evals meter events are sent
+
+    @unit
+    Scenario: A Growth checkout in dollars carries the PII redaction price
+      Given a Stripe mode where the PII redaction price is provisioned
+      When a Growth checkout in dollars is built
+      Then it carries the metered PII redaction item with no quantity
+
+    @unit
+    Scenario: A Growth checkout in euros carries no PII redaction price
+      Given a Stripe mode where the PII redaction price is provisioned
+      When a Growth checkout in euros is built
+      Then it carries no PII redaction item
+      # The meter counts dollars; a euro subscription cannot hold a dollar price.
+
+    @unit
+    Scenario: A Growth checkout works where the PII redaction price is not provisioned
+      Given a Stripe mode whose catalog maps no PII redaction price
+      When a Growth checkout in dollars is built
+      Then it carries the seat and events items only
+
+    @unit
     Scenario: The spend is read across every project of the organization
       Given an organization with two projects whose PII redaction spend is 0.60 and 0.50 dollars
       When the month is reported

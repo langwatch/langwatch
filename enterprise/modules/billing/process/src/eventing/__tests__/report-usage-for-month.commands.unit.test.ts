@@ -21,6 +21,7 @@ const {
   mockQueryInstantEvalSpendTotal,
   mockQueryPiiRedactionSpendTotal,
   mockConnectedUsageCeiling,
+  mockHasPiiRedactionPrice,
   mockLogger,
 } = vi.hoisted(() => {
   const reportUsageDeltaFn = vi.fn();
@@ -47,6 +48,7 @@ const {
   };
 
   const connectedUsageCeilingFn = vi.fn(async () => null);
+  const hasPiiRedactionPriceFn = vi.fn<(input: { stripeCustomerId: string }) => Promise<boolean>>();
 
   const billingCheckpointsPort = {
     findCheckpoint: vi.fn(),
@@ -66,6 +68,7 @@ const {
     mockQueryInstantEvalSpendTotal: queryInstantEvalSpendTotalFn,
     mockQueryPiiRedactionSpendTotal: queryPiiRedactionSpendTotalFn,
     mockConnectedUsageCeiling: connectedUsageCeilingFn,
+    mockHasPiiRedactionPrice: hasPiiRedactionPriceFn,
     mockLogger: loggerInstance,
   };
 });
@@ -178,6 +181,7 @@ async function createHandler() {
     isInstantEvalMeterProvisioned: () => instantEvalMeterProvisioned,
     queryPiiRedactionSpendTotal: mockQueryPiiRedactionSpendTotal,
     isPiiRedactionMeterProvisioned: () => piiRedactionMeterProvisioned,
+    hasPiiRedactionPrice: mockHasPiiRedactionPrice,
     selfDispatch: mockSelfDispatch,
     organizationCache: missingOrganizationCache,
     errorReporter: errorReporter as any,
@@ -200,6 +204,7 @@ describe("ReportUsageForMonthCommand", () => {
     // meter stays out of the way of every assertion about the events one.
     mockQueryInstantEvalSpendTotal.mockResolvedValue({ outcome: "unavailable" });
     mockQueryPiiRedactionSpendTotal.mockResolvedValue({ outcome: "unavailable" });
+    mockHasPiiRedactionPrice.mockResolvedValue(true);
   });
 
   // ========================================================================
@@ -750,6 +755,103 @@ describe("ReportUsageForMonthCommand", () => {
         identifier: "org-1:2026-02:langwatch_pii_redaction_usd:from:0:to:5000",
         value: 0.5,
       });
+    });
+  });
+
+  describe("given an active subscription with no PII redaction price", () => {
+    /** @scenario "Usage is held while the subscription carries no PII redaction price" */
+    it("sends no PII redaction event, leaves its checkpoint alone and schedules nothing", async () => {
+      mockHasPiiRedactionPrice.mockResolvedValue(false);
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
+      mockQueryPiiRedactionSpendTotal.mockResolvedValue({ outcome: "counted", total: 5_000 });
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockHasPiiRedactionPrice).toHaveBeenCalledWith({ stripeCustomerId: "cus_123" });
+      expect(mockQueryPiiRedactionSpendTotal).not.toHaveBeenCalled();
+      expect(mockReportUsageDelta).not.toHaveBeenCalled();
+      expect(mockBillingCheckpoints.findCheckpoint).not.toHaveBeenCalledWith(
+        expect.objectContaining({ meter: "langwatch_pii_redaction_usd" }),
+      );
+      expect(mockBillingCheckpoints.writeIntent).not.toHaveBeenCalled();
+      expect(mockSelfDispatch).not.toHaveBeenCalled();
+    });
+
+    it("carries the month from zero on the first report after the price is added", async () => {
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
+      mockQueryPiiRedactionSpendTotal.mockResolvedValue({ outcome: "counted", total: 5_000 });
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      const handler = await createHandler();
+
+      mockHasPiiRedactionPrice.mockResolvedValueOnce(false);
+      await handler.handle(makeCommand());
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).toHaveBeenCalledTimes(1);
+      expect(mockReportUsageDelta.mock.calls[0]?.[0].events[0]).toMatchObject({
+        eventName: "langwatch_pii_redaction_usd",
+        identifier: "org-1:2026-02:langwatch_pii_redaction_usd:from:0:to:5000",
+        value: 0.5,
+      });
+    });
+
+    /** @scenario "The other meters do not wait on the PII redaction price" */
+    it("still reports the billable events and Instant Evals meters", async () => {
+      mockHasPiiRedactionPrice.mockResolvedValue(false);
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
+      countedTotal = 150;
+      mockQueryInstantEvalSpendTotal.mockResolvedValue({ outcome: "counted", total: 12_345 });
+      mockQueryPiiRedactionSpendTotal.mockResolvedValue({ outcome: "counted", total: 5_000 });
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      const sent = mockReportUsageDelta.mock.calls.map(([input]) => input.events[0].eventName);
+      expect(sent).toEqual(["langwatch_billable_events", "langwatch_instant_eval_usd"]);
+    });
+  });
+
+  describe("given an active subscription with the PII redaction price", () => {
+    /** @scenario "Usage is reported once the subscription carries the PII redaction price" */
+    it("sends the PII redaction meter event", async () => {
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
+      mockQueryPiiRedactionSpendTotal.mockResolvedValue({ outcome: "counted", total: 5_000 });
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).toHaveBeenCalledTimes(1);
+      expect(mockReportUsageDelta.mock.calls[0]?.[0]).toMatchObject({
+        stripeCustomerId: "cus_123",
+        events: [expect.objectContaining({ eventName: "langwatch_pii_redaction_usd" })],
+      });
+    });
+  });
+
+  describe("given a subscription Stripe cannot read", () => {
+    /** @scenario "A subscription that cannot be read holds the usage and retries" */
+    it("sends no PII redaction event, leaves its checkpoint alone and schedules another report", async () => {
+      mockHasPiiRedactionPrice.mockRejectedValue(new Error("stripe unavailable"));
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
+      mockQueryPiiRedactionSpendTotal.mockResolvedValue({ outcome: "counted", total: 5_000 });
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).not.toHaveBeenCalled();
+      expect(mockBillingCheckpoints.writeIntent).not.toHaveBeenCalled();
+      expect(mockBillingCheckpoints.incrementFailures).not.toHaveBeenCalled();
+      expect(mockSelfDispatch).toHaveBeenCalledTimes(1);
     });
   });
 
