@@ -16,9 +16,14 @@ const VARIABLE = "CLICKHOUSE_PASSWORD_FILE";
 
 /** The file named by `CLICKHOUSE_PASSWORD_FILE` could not give a password at boot. */
 export class ClickHousePasswordFileError extends Error {
+  readonly code = "clickhouse_password_file_unreadable";
+  readonly variable = VARIABLE;
+  readonly path: string;
+
   constructor({ path, reason }: { path: string; reason: string }) {
     super(`${VARIABLE} names "${path}", which ${reason}. Point it at a file holding one password.`);
     this.name = "ClickHousePasswordFileError";
+    this.path = path;
   }
 }
 

@@ -114,6 +114,7 @@ describe("given the ClickHouse member in front of a server that records logins",
       expect(logins).toEqual(["app:first-password", "app:second-password"]);
     });
 
+    /** @scenario "A URL without a user logs in as default with the file's password" */
     it("logs in as default when the URL names no user", async () => {
       writeFileSync(passwordPath, "file-password");
 
@@ -145,6 +146,7 @@ describe("given the ClickHouse member in front of a server that records logins",
       expect(logins).toEqual(["tenant:tenant-password"]);
     });
 
+    /** @scenario "The admin client logs in with the file's password too" */
     it("logs the untenanted admin seam in with the file's password too", async () => {
       writeFileSync(passwordPath, "file-password");
       const admin = buildClickHouseAdmin({

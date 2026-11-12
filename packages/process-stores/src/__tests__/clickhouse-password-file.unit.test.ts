@@ -48,8 +48,13 @@ describe("ClickHousePasswordFile", () => {
             });
 
           expect(build).toThrow(ClickHousePasswordFileError);
-          expect(build).toThrow(/CLICKHOUSE_PASSWORD_FILE/);
-          expect(build).toThrow(path);
+          expect(build).toThrow(
+            expect.objectContaining({
+              code: "clickhouse_password_file_unreadable",
+              variable: "CLICKHOUSE_PASSWORD_FILE",
+              path,
+            }),
+          );
         });
       });
     }

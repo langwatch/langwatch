@@ -26,6 +26,19 @@ Feature: The app logs in to ClickHouse with a password read from a file
     Then the statement logs in with the URL's user and the file's password
 
   @integration
+  Scenario: A URL without a user logs in as default with the file's password
+    Given CLICKHOUSE_URL names no user
+    And CLICKHOUSE_PASSWORD_FILE names a file holding a password
+    When the app sends a statement to the shared ClickHouse
+    Then the statement logs in as default with the file's password
+
+  @integration
+  Scenario: The admin client logs in with the file's password too
+    Given CLICKHOUSE_PASSWORD_FILE names a file holding a password
+    When the untenanted admin client sends a statement
+    Then the statement logs in with the URL's user and the file's password
+
+  @integration
   Scenario: A rotated password reaches the next statement without a restart
     Given the app logs in with the password in CLICKHOUSE_PASSWORD_FILE
     When the file is replaced with a new password
