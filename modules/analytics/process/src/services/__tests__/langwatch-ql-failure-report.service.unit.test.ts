@@ -11,6 +11,7 @@ import {
   LangWatchQLNotProvisionedError,
   LangWatchQLParameterInvalidError,
   LangWatchQLParameterMissingError,
+  LangWatchQLRateLimitedError,
   LangWatchQLReservedParameterSuppliedError,
   LangWatchQLUnavailableError,
   LangWatchQLUnknownIdentifierError,
@@ -496,5 +497,47 @@ describe("given the placement gate refuses a deployment", () => {
 
     expect(lines.filter((line) => line.level === 50)).toHaveLength(0);
     expect(meter.valueOf(FAILURE_METRIC, { origin: "user_written" })).toBe(1);
+  });
+});
+
+describe("given the project's own query volume is over its limit", () => {
+  /** @scenario "A rate-limited query is the caller's own volume, neither reported nor counted" */
+  it("writes no line and raises no count on the workbench path", () => {
+    const { lines, service } = reporter();
+
+    service.reportFailure({
+      projectId: "project-1",
+      sql: STOCK_SQL,
+      error: new LangWatchQLRateLimitedError({ retryAfterSeconds: 30 }),
+    });
+
+    expect(lines.filter((line) => line.level === 50)).toHaveLength(0);
+    expect(meter.valueOf(FAILURE_METRIC)).toBe(0);
+  });
+
+  /** @scenario "A rate-limited query is the caller's own volume, neither reported nor counted" */
+  it("writes no line and raises no count on the server-written path", () => {
+    const { lines, service } = reporter();
+
+    service.reportBuiltInFailure({
+      projectId: "project-1",
+      source: "traces",
+      error: new LangWatchQLRateLimitedError({}),
+    });
+
+    expect(lines.filter((line) => line.level === 50)).toHaveLength(0);
+    expect(meter.valueOf(FAILURE_METRIC)).toBe(0);
+  });
+
+  /** @scenario "A rate-limited query is the caller's own volume, neither reported nor counted" */
+  it("still reports any other failure as one built-in failure on each path", () => {
+    const { lines, service } = reporter();
+    const error = new LangWatchQLUnavailableError();
+
+    service.reportFailure({ projectId: "project-1", sql: STOCK_SQL, error });
+    service.reportBuiltInFailure({ projectId: "project-1", source: "traces", error });
+
+    expect(lines.filter((line) => line.level === 50)).toHaveLength(2);
+    expect(meter.valueOf(FAILURE_METRIC, { origin: "built_in" })).toBe(2);
   });
 });

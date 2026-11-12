@@ -1,6 +1,7 @@
 import type { Logger } from "@langwatch/observability";
 import type { CounterHandle } from "@langwatch/observability/metrics";
 
+import { isCallerRateLimit } from "../rules/lwql-caller-access-refusal.rules.ts";
 import { hashStatement, originOfStatement } from "../rules/lwql-statement-origin.rules.ts";
 import type { LangWatchQLAccessRefusalService } from "./langwatch-ql-access-refusal.service.ts";
 
@@ -27,7 +28,7 @@ type AccessRefusalReader = Pick<
 /**
  * Reports a failed LangWatchQL query by who wrote it: a built-in statement is one error line
  * (never its text or values), a user-written one a count; the error code never sets the origin.
- * Skipped: the caller's own access or sent values, and a not-provisioned deployment.
+ * Skipped: the caller's own access, sent values or query volume, and a not-provisioned deployment.
  * @see specs/lwql/query-origin.feature
  */
 export class LangWatchQLFailureReportService {
@@ -78,7 +79,7 @@ export class LangWatchQLFailureReportService {
     sql: string;
     error: unknown;
   }): void {
-    if (errorCodeOf(error) === NOT_PROVISIONED) return;
+    if (errorCodeOf(error) === NOT_PROVISIONED || isCallerRateLimit({ error })) return;
     if (this.accessRefusals.isCallerOwnRefusal({ error })) return;
     const origin = originOfStatement({ sql });
     this.failures.inc({ origin }, 1);
@@ -100,7 +101,7 @@ export class LangWatchQLFailureReportService {
     source: string;
     error: unknown;
   }): void {
-    if (errorCodeOf(error) === NOT_PROVISIONED) return;
+    if (errorCodeOf(error) === NOT_PROVISIONED || isCallerRateLimit({ error })) return;
     if (this.accessRefusals.isCallerAccessRefusal({ error })) return;
     this.failures.inc({ origin: "built_in" }, 1);
     this.logger.error(

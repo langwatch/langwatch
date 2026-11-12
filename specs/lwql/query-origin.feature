@@ -169,6 +169,15 @@ Feature: A failed LangWatchQL query is told apart by who wrote it
       And the server-written path, whose values the server sent, still reports such a refusal
 
     @unit
+    Scenario: A rate-limited query is the caller's own volume, neither reported nor counted
+      Given a project has run more LangWatchQL queries than its limit allows in the window
+      When the dashboard source presence check is refused as rate limited
+      Then no error-level record is written
+      And the failure count does not rise
+      And a stock statement refused as rate limited writes no record and no count either
+      And a failure for any other reason is still reported as before
+
+    @unit
     Scenario: A statement failure still writes the built-in failure
       Given a stock statement is sent with an accepted project scope and its time window
       When the statement fails for a reason of its own, such as a column the view lacks
