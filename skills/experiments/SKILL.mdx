@@ -10,6 +10,7 @@ import CliSetup from "../_shared/cli-setup.mdx";
 import ProjectsAndApiKeys from "../_shared/projects-and-api-keys.mdx";
 import PlanLimits from "../_shared/plan-limits.mdx";
 import ConsultantMode from "../_shared/consultant-mode.mdx";
+import MeasuredImprovement from "../_shared/measured-improvement.mdx";
 
 # Run Experiments for Your Agent
 
@@ -190,6 +191,12 @@ langwatch experiment list --format json
 
 If the CLI supports a more specific read or run for the installed version, discover it with `langwatch experiment --help` before using it.
 
+## Use Experiments to Measure a Change
+
+An experiment is the yardstick for a prompt, model, retrieval or code change. Run the current version first, then the candidate on the same dataset and evaluators. When the application samples at non-zero temperature, run each version more than once (`langwatch experiment run <slug>` again, or the script again) and compare per row: a row that fails on one run and passes on the next is variation, not a regression. Two runs of the same version can differ by more than the change you are testing.
+
+<MeasuredImprovement />
+
 ## Consultant Mode
 
 <ConsultantMode />
@@ -202,3 +209,4 @@ If the CLI supports a more specific read or run for the installed version, disco
 - Do not report an inconclusive or errored comparison as a tie.
 - Do not guess SDK APIs when the installed documentation is available.
 - Do not stop after writing the experiment. Run it and inspect the real result.
+- Do not declare a winner from one run of each version when outputs vary; compare repeated runs per row.

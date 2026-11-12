@@ -78,6 +78,7 @@ prose.
    git checkout -b langy/<short-slug>
    ```
 4. **Make the edits**: read existing files, write changes, follow the repo's conventions.
+   When the change is meant to improve the agent (a failing scenario, a low score, bad answers), it ships only on a measured win: follow the measured loop in the `agent-improve` skill. This clone usually cannot run the agent (no dependencies, keys or data), so measure through what reaches it: the repo's own tests and linters where they run here, a platform experiment or scenario run against the deployed or connected agent, or the repo's CI. A test you wrote in this branch is not the measurement.
 5. **Commit**: credit the requesting user with a `Co-authored-by` trailer (blank line before it):
 
    ```bash
@@ -99,9 +100,12 @@ prose.
    Requested by @${GITHUB_LOGIN} via LangWatch." --base main
    ```
 
+   For an improvement, the body carries the hypothesis and the baseline and candidate results over the same items. Tests, scenarios or expected answers you changed in this branch are listed separately and never offered as the proof. With no measurement, the body says the change is untested.
+
    Use `--base` matching the repo's default branch (check via `gh repo view --json defaultBranchRef`).
 
-7. **Report the PR URL** in your reply. The sidebar renders it as a PR card.
+7. **Read the checks.** `gh pr checks <url>` lists them. When one fails, read why (`gh run view <run-id> --log-failed`), fix it on the same branch and push again. A check still running when you finish is reported as running, not as passed.
+8. **Report the PR URL** in your reply. The sidebar renders it as a PR card.
 
 ## Hard rules
 

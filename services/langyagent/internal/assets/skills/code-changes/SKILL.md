@@ -31,6 +31,12 @@ When nothing is connected yet, the tool renders the code access card and your tu
 
 Ask once per conversation. A second change in the same conversation uses the folder that is already connected.
 
+## When the change is meant to improve the agent
+
+A fix for a failing scenario, a bad trace or a low score is an improvement, and an improvement ships only when a measurement shows it helped. Follow the measured loop in the `agent-improve` skill: a hypothesis that predicts what moves, the baseline measured before the edit, the candidate measured the same way, and a pull request only on a win, with both results in the body. Measure with what this environment can run: the project's own tests and linters, a scenario or experiment run against the agent on this branch (a connected agent started from the branch is a target), or the repository's CI. A test you add in the same change shows your code does what you meant; it is not evidence that the agent got better.
+
+The same rule as for prompts holds for code: fix the class. Code that recognises the evaluation questions by their words, or returns a fixed answer for them, passes those items and fails the next question of the same kind.
+
 ## Step 2a: work in the shared folder
 
 The `local_read`, `local_write`, `local_edit`, `local_bash`, `local_grep`, `local_find` and `local_ls` tools run on the user's machine, inside the shared folder. Their parameters mirror the built-in tools. Everything else about the folder is the user's:
@@ -47,12 +53,13 @@ The `local_read`, `local_write`, `local_edit`, `local_bash`, `local_grep`, `loca
 
 ### The checklist before `gh pr create`
 
-The body may only state what a command output **in this conversation** showed. Go through these four lines and change the body until every one of them is true. Do it before the command, not after.
+The body may only state what a command output **in this conversation** showed. Go through these five lines and change the body until every one of them is true. Do it before the command, not after.
 
 1. **Every claim points at an output you read.** For each sentence in the body, name the command whose output says it. A sentence with no such command is deleted or rewritten as what you did rather than what you proved.
 2. **The checks you name are the checks you ran.** Paste the result the way the command printed it: the test count, the exit line. Never write "tests pass" from a run you did not make.
 3. **A connect change carries the registration read.** When the change touched a connect call, the body carries the restart and the output of `langwatch agent get "<name>"`, with the parameter list as the command printed it. When you could not restart the process, the body says in one line that the restart is left to the user and that the parameters are not registered yet. "Confirmed the agent registered both options" is false unless the `agent get` output in this conversation lists both options.
-4. **The final message carries the pull request address.** `gh pr create` prints the pull request address on its own line. Copy that address into your reply, character for character. "Opened a pull request." with no address is not a report; the reader has nothing to open.
+4. **An improvement carries its measurement.** When the change is meant to make the agent better, the body names the baseline and candidate results over the same items, and lists any test, scenario or expected answer you changed in the same branch as a separate item, not as proof. With no measurement, the body says the change is untested.
+5. **The final message carries the pull request address.** `gh pr create` prints the pull request address on its own line. Copy that address into your reply, character for character. "Opened a pull request." with no address is not a report; the reader has nothing to open.
 
 **Permissions.** Reads, searches and edits inside the folder run at once, and so does git: staging, committing, branching, fetching, pulling, pushing, merging and rebasing never ask. The forms that throw work away or rewrite history the remote already has still do (a force push, a push that deletes a remote branch, `reset --hard`, `clean -fd`, `checkout -- <path>`, `restore <path>`, `branch -D`, `stash drop`), so run one only when the user asked for it. Every other command that is not read-only asks the user and waits: the developer answers in the terminal or on the card, whichever they reach first. Never refuse a command on the user's behalf, and a delete is not an exception: when they ask for one, `rm` included, send it to `local_bash` and let the card carry it. The routing table's "delete" row is about LangWatch resources, not about files in this folder. The same for a path they name outside the folder: send it once, the CLI refuses it, and you explain the refusal in one line. The only thing you decline yourself is reading a secret. A path that a symlink takes out of the folder is refused for the same reason, and that refusal is correct: `node_modules/langwatch` in a monorepo is a link to the package source outside the folder. Do not look for a way around it; read the public documentation for the library instead. Batch your read-only exploration first, then ask for as few commands as possible: prefer one `pnpm typecheck && pnpm test` over three separate asks, and when the user grants a pattern such as `pnpm *`, use it. A denied command is the user's answer: do not run it again in that turn, say what you could not do and continue with what you can. A refused path or command (outside the folder, `sudo`, a secret file) means the boundary; explain it in one line and find another way inside the folder. Never ask the user to run a command by hand while the folder is connected.
 
@@ -68,7 +75,7 @@ When you cannot find the running process, say so in one line and ask the user to
 
 ## Step 2b: work through GitHub
 
-When the user chose GitHub, follow the `github` skill: it clones into your own workspace, commits as the LangWatch app with the user as co-author, and opens the pull request. The project's checks run in their CI; say so when you report the pull request.
+When the user chose GitHub, follow the `github` skill: it clones into your own workspace, commits as the LangWatch app with the user as co-author, and opens the pull request. A shallow clone in your workspace usually cannot run the user's agent (no dependencies, keys or data), so measure an improvement through what can reach it: a platform run against the connected or deployed agent, or the repository's CI. Read the CI result after you push and fix what your change broke on the same branch.
 
 ## Asking the user mid-task
 
