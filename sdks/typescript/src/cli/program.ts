@@ -36,6 +36,13 @@ import {
   projectSelectorOf,
   QUERY_PROJECT_FLAG_HELP,
 } from "./utils/projectOption";
+import {
+  DEFAULT_LOOKBACK,
+  endDateHelp,
+  SINCE_HELP,
+  startDateHelp,
+  WIDENED_LOOKBACK,
+} from "./utils/timeWindow";
 
 declare const __CLI_VERSION__: string;
 
@@ -3389,8 +3396,9 @@ function registerAnalyticsCommands(program: Command): void {
         "-a, --aggregation <aggregation>",
         "Aggregation type: cardinality, avg, sum, min, max, p95, p99",
       )
-      .option("--start-date <date>", "Start date (ISO string, default: 7 days ago)")
-      .option("--end-date <date>", "End date (ISO string, default: now)")
+      .option("--start-date <date>", startDateHelp())
+      .option("--end-date <date>", endDateHelp())
+      .option("--since <lookback>", SINCE_HELP)
       .option("--group-by <field>", "Group by field (e.g. metadata.model)")
       .option("--time-scale <scale>", "Time scale: 'full' for aggregate, or interval in seconds")
       .option(
@@ -3403,6 +3411,7 @@ function registerAnalyticsCommands(program: Command): void {
       aggregation?: string;
       startDate?: string;
       endDate?: string;
+      since?: string;
       groupBy?: string;
       timeScale?: string;
       includeLangy?: boolean;
@@ -3628,7 +3637,9 @@ function registerTraceCommands(program: Command): void {
   rendersOwnResult(
     traceCmd
       .command("search")
-      .description("Search traces with optional text query and date range")
+      .description(
+        `Search traces by text, filter and time window. Reads the last ${DEFAULT_LOOKBACK} by default; when that finds nothing and no window was given, it searches the last ${WIDENED_LOOKBACK} once and says so. An empty answer names the project, window and filters it read`,
+      )
       .option(
         "-q, --query <query>",
         "Text search query. Plain text only: AND, OR and NOT are matched as words, not as operators",
@@ -3637,8 +3648,9 @@ function registerTraceCommands(program: Command): void {
         "--filter <filter>",
         'Trace filter, the language the Trace Explorer search bar speaks: "status:error AND model:gpt-*", "trace.attribute.langwatch.user_id:alice", "evaluatorVerdict:fail". Combined with -q and the other flags. `langwatch trace fields` lists every field',
       )
-      .option("--start-date <date>", "Start date (ISO string or epoch ms, default: 24h ago)")
-      .option("--end-date <date>", "End date (ISO string or epoch ms, default: now)")
+      .option("--start-date <date>", startDateHelp())
+      .option("--end-date <date>", endDateHelp())
+      .option("--since <lookback>", SINCE_HELP)
       .option("--limit <n>", "Max results to return (default: 25)")
       .option(
         "--origin <origins>",
@@ -3660,9 +3672,12 @@ function registerTraceCommands(program: Command): void {
 
   traceCmd
     .command("export")
-    .description("Export traces as CSV, JSONL, or JSON")
-    .option("--start-date <date>", "Start date (ISO string, default: 7 days ago)")
-    .option("--end-date <date>", "End date (ISO string, default: now)")
+    .description(
+      `Export traces as CSV, JSONL, or JSON. Reads the last ${DEFAULT_LOOKBACK} by default; an empty export says on stderr what it read`,
+    )
+    .option("--start-date <date>", startDateHelp())
+    .option("--end-date <date>", endDateHelp())
+    .option("--since <lookback>", SINCE_HELP)
     .option(
       "-q, --query <query>",
       "Text search query to filter traces. Plain text only: AND, OR and NOT are matched as words, not as operators",
@@ -3687,6 +3702,7 @@ function registerTraceCommands(program: Command): void {
       async (options: {
         startDate?: string;
         endDate?: string;
+        since?: string;
         query?: string;
         origin?: string;
         format?: string;
@@ -3703,7 +3719,9 @@ function registerTraceCommands(program: Command): void {
   rendersOwnResult(
     traceCmd
       .command("get <traceId>")
-      .description("Get full trace details by ID")
+      .description(
+        "Get full trace details by ID. Also accepts a span ID or a scenario run ID, any case. Retries briefly while a just-sent trace is still being stored.",
+      )
       .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
       .option(
         "-f, --format <format>",
@@ -3738,8 +3756,9 @@ function registerTraceCommands(program: Command): void {
       )
       .option("--prefix <prefix>", "Only values starting with this. Needs a field")
       .option("--limit <n>", "Values to return, 1 to 1000 (default: 50). Needs a field")
-      .option("--start-date <date>", "Start date (ISO string or epoch ms, default: 24h ago)")
-      .option("--end-date <date>", "End date (ISO string or epoch ms, default: now)")
+      .option("--start-date <date>", startDateHelp())
+      .option("--end-date <date>", endDateHelp())
+      .option("--since <lookback>", SINCE_HELP)
       .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (field: string | undefined, options: Record<string, string>) => {

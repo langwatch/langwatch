@@ -10,9 +10,12 @@ import { createCommandEvents, type CommandEvents } from "../../telemetry/events.
 import { resolveCredentials } from "../../utils/apiKey.ts";
 import { cliAuthHeaders } from "../../utils/authHeaders.ts";
 import { formatFetchError } from "../../utils/formatFetchError.ts";
+import { searchedProjectSlug } from "../../utils/searchedProject.ts";
 import { createSpinner } from "../../utils/spinner.ts";
 import { failSpinner } from "../../utils/spinnerError.ts";
+import { resolveTimeWindowOrExit, type TimeWindow } from "../../utils/timeWindow.ts";
 import { parseOriginOption } from "./origin-filter.ts";
+import { searchedDocument, searchedLines, widenCommand } from "./searched.ts";
 
 /** Rows are serialised in chunks so the progress bar moves as the file is built. */
 const PROGRESS_CHUNK = 25;
@@ -61,6 +64,7 @@ interface SearchPage {
 export const exportTracesCommand = async (options: {
   startDate?: string;
   endDate?: string;
+  since?: string;
   query?: string;
   format?: string;
   output?: string;
@@ -81,11 +85,12 @@ export const exportTracesCommand = async (options: {
     process.exit(1);
   }
 
-  const now = Date.now();
-  const startDate = options.startDate
-    ? new Date(options.startDate).getTime()
-    : now - 7 * 24 * 60 * 60 * 1000; // 7 days ago
-  const endDate = options.endDate ? new Date(options.endDate).getTime() : now;
+  const window = resolveTimeWindowOrExit({
+    startDate: options.startDate,
+    endDate: options.endDate,
+    since: options.since,
+    now: Date.now(),
+  });
 
   const limit = options.limit ? Number(options.limit) : 1000;
   if (!Number.isSafeInteger(limit) || limit <= 0) {
@@ -110,8 +115,8 @@ export const exportTracesCommand = async (options: {
         endpoint,
         apiKey,
         query: options.query,
-        startDate,
-        endDate,
+        startDate: window.from,
+        endDate: window.to,
         filters,
         includeSpans: options.includeSpans === true,
       },
@@ -136,6 +141,10 @@ export const exportTracesCommand = async (options: {
       process.stdout.write(output);
     }
 
+    if (traces.length === 0) {
+      await reportEmptyExport({ options, window, origin: originFilter });
+    }
+
     events.completed({
       count: traces.length,
       total: matched,
@@ -153,6 +162,38 @@ export const exportTracesCommand = async (options: {
     await events.flush();
   }
 };
+
+/**
+ * An empty export says what it read and how to read further back. On stderr:
+ * stdout is the exported file, and a note in it would corrupt the file.
+ */
+async function reportEmptyExport({
+  options,
+  window,
+  origin,
+}: {
+  options: { query?: string; errorsOnly?: boolean; project?: string };
+  window: TimeWindow;
+  origin: string[] | undefined;
+}): Promise<void> {
+  const searched = {
+    project: await searchedProjectSlug({ project: options.project }),
+    window,
+    query: options.query,
+    origin,
+    errorsOnly: options.errorsOnly,
+  };
+  console.error(chalk.yellow("No traces to export. Searched:"));
+  for (const line of searchedLines(searchedDocument(searched))) {
+    console.error(chalk.gray(`  ${line}`));
+  }
+  const widen = widenCommand({
+    base: "langwatch trace export",
+    searched,
+    project: options.project,
+  });
+  if (widen) console.error(chalk.gray(`Export further back: ${chalk.cyan(widen)}`));
+}
 
 type ExportSpinner = ReturnType<typeof createSpinner>;
 
