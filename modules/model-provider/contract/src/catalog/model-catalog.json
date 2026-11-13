@@ -1,7 +1,48 @@
 {
-  "updatedAt": "2026-10-31T17:23:22.000Z",
-  "modelCount": 516,
+  "updatedAt": "2026-11-02T02:11:24.566Z",
+  "modelCount": 471,
   "models": {
+    "particle-ai/particle-1": {
+      "id": "particle-ai/particle-1",
+      "name": "Particle AI: Particle-1",
+      "provider": "particle-ai",
+      "pricing": {
+        "inputCostPerToken": 5e-8,
+        "outputCostPerToken": 5e-7,
+        "inputCacheReadPerToken": 3e-9
+      },
+      "contextLength": 1048576,
+      "maxCompletionTokens": 131072,
+      "supportedParameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "logprobs",
+        "max_tokens",
+        "min_p",
+        "presence_penalty",
+        "reasoning",
+        "reasoning_effort",
+        "repetition_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_k",
+        "top_logprobs",
+        "top_p"
+      ],
+      "defaultParameters": {},
+      "modality": "text+image->text",
+      "mode": "chat",
+      "description": "Particle-1 is a token-efficient agentic coding model from Particle AI, post-trained on DeepSeek V4.1 Flash. It is suited for software engineering work such as terminal workflows, codebase changes, and data...",
+      "supportsImageInput": true,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
     "openai/gpt-6.1-terra-pro": {
       "id": "openai/gpt-6.1-terra-pro",
       "name": "OpenAI: GPT-6.1 Terra Pro",
@@ -230,12 +271,12 @@
       "name": "DeepSeek: DeepSeek V4.1 Flash 1017",
       "provider": "deepseek",
       "pricing": {
-        "inputCostPerToken": 1.5e-7,
-        "outputCostPerToken": 6e-7,
-        "inputCacheReadPerToken": 3e-9
+        "inputCostPerToken": 3.5e-8,
+        "outputCostPerToken": 5e-7,
+        "inputCacheReadPerToken": 5e-9
       },
       "contextLength": 1048576,
-      "maxCompletionTokens": 393216,
+      "maxCompletionTokens": 943718,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -383,6 +424,48 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
+    "prism-ml/ternary-bonsai-2-9b": {
+      "id": "prism-ml/ternary-bonsai-2-9b",
+      "name": "PrismML: Ternary Bonsai 2 9B",
+      "provider": "prism-ml",
+      "pricing": {
+        "inputCostPerToken": 8e-8,
+        "outputCostPerToken": 1.3e-7,
+        "inputCacheReadPerToken": 4e-8
+      },
+      "contextLength": 262144,
+      "maxCompletionTokens": 65536,
+      "supportedParameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "logprobs",
+        "max_tokens",
+        "presence_penalty",
+        "reasoning",
+        "repetition_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_k",
+        "top_logprobs",
+        "top_p"
+      ],
+      "defaultParameters": {
+        "temperature": 1,
+        "topP": 0.95
+      },
+      "modality": "text+image->text",
+      "mode": "chat",
+      "description": "Ternary Bonsai 2 9B is PrismML’s compact, open-weight language model for conversational AI, reasoning, and tool use. Built on Qwen3.5, it uses ternary weights packed into 2 bits for efficient...",
+      "supportsImageInput": true,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
     "moondream/moondream3-preview": {
       "id": "moondream/moondream3-preview",
       "name": "Moondream: Moondream 3 Preview",
@@ -453,7 +536,7 @@
         "inputCacheReadPerToken": 1.5e-7
       },
       "contextLength": 1048576,
-      "maxCompletionTokens": 943718,
+      "maxCompletionTokens": 131072,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -813,7 +896,6 @@
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
-        "logit_bias",
         "logprobs",
         "max_tokens",
         "min_p",
@@ -955,9 +1037,9 @@
       "name": "Mistral: Mistral Large 4",
       "provider": "mistralai",
       "pricing": {
-        "inputCostPerToken": 0.00000136,
-        "outputCostPerToken": 0.00000418,
-        "inputCacheReadPerToken": 1.4e-7
+        "inputCostPerToken": 7e-7,
+        "outputCostPerToken": 0.0000021,
+        "inputCacheReadPerToken": 7e-8
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 262144,
@@ -997,8 +1079,8 @@
         "outputCostPerToken": 2.25e-7,
         "inputCacheReadPerToken": 1.5e-8
       },
-      "contextLength": 262144,
-      "maxCompletionTokens": 235929,
+      "contextLength": 1000000,
+      "maxCompletionTokens": 262144,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -1243,51 +1325,6 @@
       "description": "Claude Sonnet 5.5 is Anthropic's Sonnet-class model for well-scoped everyday work, succeeding Claude Sonnet 5 as a direct upgrade. It is especially strong at building features, fixing bugs, and producing...",
       "supportsImageInput": true,
       "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "typesafe/jev-router": {
-      "id": "typesafe/jev-router",
-      "name": "TypeSafe: Jev Router",
-      "provider": "typesafe",
-      "pricing": {
-        "inputCostPerToken": -1,
-        "outputCostPerToken": -1
-      },
-      "contextLength": 1000000,
-      "maxCompletionTokens": 65536,
-      "supportedParameters": [
-        "frequency_penalty",
-        "include_reasoning",
-        "logit_bias",
-        "logprobs",
-        "max_completion_tokens",
-        "max_tokens",
-        "min_p",
-        "parallel_tool_calls",
-        "presence_penalty",
-        "reasoning",
-        "reasoning_effort",
-        "repetition_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_a",
-        "top_k",
-        "top_logprobs",
-        "top_p",
-        "verbosity"
-      ],
-      "defaultParameters": {},
-      "modality": "text+image+file+audio+video->text",
-      "mode": "chat",
-      "description": "Jev Router picks the best model and reasoning effort for each request, balancing quality, speed, and cost. It runs on , TypeSafe's first System One model, and adapts as your...",
-      "supportsImageInput": true,
-      "supportsAudioInput": true,
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
@@ -1955,26 +1992,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "nvidia/switchyard": {
-      "id": "nvidia/switchyard",
-      "name": "NVIDIA: Switchyard",
-      "provider": "nvidia",
-      "pricing": {
-        "inputCostPerToken": -1,
-        "outputCostPerToken": -1
-      },
-      "contextLength": 1000000,
-      "maxCompletionTokens": null,
-      "supportedParameters": [],
-      "defaultParameters": {},
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Switchyard is an open-source model routing system that switches between multiple models to optimize the cost of requests. By default it will use OpenRouter market data to select the most...",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "xiaomi/mimo-v2.6-pro-ultraspeed": {
       "id": "xiaomi/mimo-v2.6-pro-ultraspeed",
       "name": "Xiaomi: MiMo-V2.6-Pro-UltraSpeed",
@@ -2263,9 +2280,9 @@
       "name": "DeepSeek: DeepSeek Pro Latest",
       "provider": "~deepseek",
       "pricing": {
-        "inputCostPerToken": 1.259e-7,
+        "inputCostPerToken": 1.035e-7,
         "outputCostPerToken": 0.000008,
-        "inputCacheReadPerToken": 1.3e-7
+        "inputCacheReadPerToken": 1e-7
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 393216,
@@ -2308,9 +2325,9 @@
       "name": "DeepSeek: DeepSeek Flash Latest",
       "provider": "~deepseek",
       "pricing": {
-        "inputCostPerToken": 1.7e-8,
-        "outputCostPerToken": 6e-7,
-        "inputCacheReadPerToken": 1e-9
+        "inputCostPerToken": 3.5e-8,
+        "outputCostPerToken": 5e-7,
+        "inputCacheReadPerToken": 5e-9
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 943718,
@@ -2672,12 +2689,12 @@
       "name": "DeepSeek: DeepSeek V4.1 Flash",
       "provider": "deepseek",
       "pricing": {
-        "inputCostPerToken": 1.4e-7,
-        "outputCostPerToken": 4.2e-7,
-        "inputCacheReadPerToken": 4.2e-9
+        "inputCostPerToken": 4.5e-8,
+        "outputCostPerToken": 5e-7,
+        "inputCacheReadPerToken": 6e-9
       },
       "contextLength": 1048576,
-      "maxCompletionTokens": 131072,
+      "maxCompletionTokens": 943718,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -3034,41 +3051,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "meta/muse-spark-1.3-contributor": {
-      "id": "meta/muse-spark-1.3-contributor",
-      "name": "Meta: Muse Spark 1.3 Contributor",
-      "provider": "meta",
-      "pricing": {
-        "inputCostPerToken": 1e-7,
-        "outputCostPerToken": 2e-7,
-        "inputCacheReadPerToken": 2e-9,
-        "webSearchCostPerQuery": 0.0025
-      },
-      "contextLength": 1048576,
-      "maxCompletionTokens": 943718,
-      "supportedParameters": [
-        "include_reasoning",
-        "max_tokens",
-        "reasoning",
-        "reasoning_effort",
-        "repetition_penalty",
-        "response_format",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_k",
-        "top_p"
-      ],
-      "defaultParameters": {},
-      "modality": "text+image+file+video->text",
-      "mode": "chat",
-      "description": "Muse Spark 1.3 Contributor is the cost-efficient contributor tier of Meta’s multimodal reasoning model for experimentation, learning, and early-stage agentic, multi-agent, and coding workflows. It is designed to track information...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "meta/muse-spark-1.3": {
       "id": "meta/muse-spark-1.3",
       "name": "Meta: Muse Spark 1.3",
@@ -3109,13 +3091,13 @@
       "name": "Google: Gemini 3.8 Flash",
       "provider": "gemini",
       "pricing": {
-        "inputCostPerToken": 8.25e-7,
-        "outputCostPerToken": 0.000004125,
-        "inputCacheReadPerToken": 8.25e-8,
+        "inputCostPerToken": 7.5e-7,
+        "outputCostPerToken": 0.00000375,
+        "inputCacheReadPerToken": 7.5e-8,
         "inputCacheWritePerToken": 4.16666666666667e-8,
-        "imageCostPerToken": 8.25e-7,
-        "audioCostPerToken": 8.25e-7,
-        "internalReasoningCostPerToken": 0.000004125,
+        "imageCostPerToken": 7.5e-7,
+        "audioCostPerToken": 7.5e-7,
+        "internalReasoningCostPerToken": 0.00000375,
         "webSearchCostPerQuery": 0.014
       },
       "contextLength": 1048576,
@@ -3271,7 +3253,7 @@
       "provider": "ibm-granite",
       "pricing": {
         "inputCostPerToken": 6e-8,
-        "outputCostPerToken": 2.5e-7,
+        "outputCostPerToken": 1.5e-7,
         "inputCacheReadPerToken": 1.5e-8
       },
       "contextLength": 131072,
@@ -3359,9 +3341,9 @@
       "name": "Z.ai: GLM Flash Latest",
       "provider": "~z-ai",
       "pricing": {
-        "inputCostPerToken": 3.13e-8,
-        "outputCostPerToken": 1.046e-7,
-        "inputCacheReadPerToken": 3e-8
+        "inputCostPerToken": 2.85e-8,
+        "outputCostPerToken": 9.23e-8,
+        "inputCacheReadPerToken": 2.85e-8
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 131072,
@@ -3443,12 +3425,12 @@
       "name": "Z.ai: GLM 5.3 Flash",
       "provider": "z-ai",
       "pricing": {
-        "inputCostPerToken": 1.5e-7,
-        "outputCostPerToken": 5e-7,
-        "inputCacheReadPerToken": 3e-8
+        "inputCostPerToken": 2.85e-8,
+        "outputCostPerToken": 9.23e-8,
+        "inputCacheReadPerToken": 2.85e-8
       },
       "contextLength": 1048576,
-      "maxCompletionTokens": 943717,
+      "maxCompletionTokens": 131072,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -3524,41 +3506,6 @@
       "modality": "text+image+video->text",
       "mode": "chat",
       "description": "GLM-5.3-Flash is a native multimodal model from Z.ai. It is suited for efficient coding and long-horizon agent tasks. Its hybrid sparse and linear attention architecture maintains accurate long-context behavior while...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "meta/muse-spark-1.2-contributor": {
-      "id": "meta/muse-spark-1.2-contributor",
-      "name": "Meta: Muse Spark 1.2 Contributor",
-      "provider": "meta",
-      "pricing": {
-        "inputCostPerToken": 1e-7,
-        "outputCostPerToken": 2e-7,
-        "inputCacheReadPerToken": 2e-9,
-        "webSearchCostPerQuery": 0.0025
-      },
-      "contextLength": 1048576,
-      "maxCompletionTokens": 943718,
-      "supportedParameters": [
-        "include_reasoning",
-        "max_tokens",
-        "reasoning",
-        "reasoning_effort",
-        "repetition_penalty",
-        "response_format",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_k",
-        "top_p"
-      ],
-      "defaultParameters": {},
-      "modality": "text+image+file+video->text",
-      "mode": "chat",
-      "description": "Muse Spark 1.2 contributor tier is a reasoning model from Meta designed for developers who want to start building at an even lower cost. It’s meaningfully cheaper than Muse Spark...",
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
@@ -3731,9 +3678,9 @@
       "name": "Z.ai: GLM 5.3",
       "provider": "z-ai",
       "pricing": {
-        "inputCostPerToken": 6.99e-8,
-        "outputCostPerToken": 0.0000014,
-        "inputCacheReadPerToken": 6.89e-8
+        "inputCostPerToken": 8e-8,
+        "outputCostPerToken": 0.0000036,
+        "inputCacheReadPerToken": 7.6e-8
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 943718,
@@ -3820,9 +3767,9 @@
       "name": "Qwen: Qwen3.8 27B",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 2e-7,
-        "outputCostPerToken": 0.0000025,
-        "inputCacheReadPerToken": 9e-8
+        "inputCostPerToken": 1.5e-7,
+        "outputCostPerToken": 0.000001875,
+        "inputCacheReadPerToken": 3.75e-8
       },
       "contextLength": 1000000,
       "maxCompletionTokens": 235929,
@@ -3993,7 +3940,7 @@
         "inputCacheReadPerToken": 2.5e-7
       },
       "contextLength": 1048576,
-      "maxCompletionTokens": 909000,
+      "maxCompletionTokens": 131072,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -4066,12 +4013,12 @@
       "name": "DeepSeek: DeepSeek V4 Pro 0813",
       "provider": "deepseek",
       "pricing": {
-        "inputCostPerToken": 6.6e-7,
-        "outputCostPerToken": 0.00000198,
-        "inputCacheReadPerToken": 2.2e-8
+        "inputCostPerToken": 1.15e-7,
+        "outputCostPerToken": 0.000004,
+        "inputCacheReadPerToken": 1.1e-7
       },
       "contextLength": 1048576,
-      "maxCompletionTokens": 393216,
+      "maxCompletionTokens": 943718,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -4126,12 +4073,10 @@
         "reasoning_effort",
         "response_format",
         "seed",
-        "stop",
         "structured_outputs",
         "temperature",
         "tool_choice",
         "tools",
-        "top_k",
         "top_logprobs",
         "top_p"
       ],
@@ -4140,49 +4085,6 @@
       "mode": "chat",
       "description": "Grok 4.6 is a model from SpaceXAI with frontier performance on coding, knowledge work, and STEM. It is succeeded by [Grok 4.7](/x-ai/grok-4.7).",
       "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "liquid/lfm-2.5-2.6b": {
-      "id": "liquid/lfm-2.5-2.6b",
-      "name": "LiquidAI: LFM2.5-2.6B",
-      "provider": "liquid",
-      "pricing": {
-        "inputCostPerToken": 3.5e-7,
-        "outputCostPerToken": 5e-7,
-        "inputCacheReadPerToken": 4e-8
-      },
-      "contextLength": 128000,
-      "maxCompletionTokens": 8192,
-      "supportedParameters": [
-        "frequency_penalty",
-        "include_reasoning",
-        "logprobs",
-        "max_completion_tokens",
-        "max_tokens",
-        "min_p",
-        "presence_penalty",
-        "reasoning",
-        "repetition_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_k",
-        "top_logprobs",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": 0.1
-      },
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "LFM2.5-2.6B is a compact reasoning model from Liquid AI. It is suited for agent workflows, data extraction, RAG, and long-context processing. Liquid advises against using it for agentic coding or...",
-      "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
       "supportsAudioOutput": false
@@ -4224,36 +4126,6 @@
       "mode": "chat",
       "description": "NVIDIA Nemotron 3.5 Lightning is an open mixture-of-experts model from NVIDIA, with 3B active parameters out of 30B total. It is suited for high-throughput agentic workloads and specialized tasks that...",
       "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "sakana/sakana-namazu": {
-      "id": "sakana/sakana-namazu",
-      "name": "Sakana: Sakana Namazu",
-      "provider": "sakana",
-      "pricing": {
-        "inputCostPerToken": 9.5e-7,
-        "outputCostPerToken": 0.000004,
-        "inputCacheReadPerToken": 1.5e-7,
-        "webSearchCostPerQuery": 0.007
-      },
-      "contextLength": 262144,
-      "maxCompletionTokens": 65536,
-      "supportedParameters": [
-        "include_reasoning",
-        "reasoning",
-        "reasoning_effort",
-        "structured_outputs",
-        "tool_choice",
-        "tools",
-        "web_search_options"
-      ],
-      "defaultParameters": {},
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "Sakana Namazu is a Japanese-specialized reasoning model from Sakana AI, based on Kimi K2.6 with additional training for Japanese language and business contexts. It is suited for Japanese instruction following,...",
-      "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
       "supportsAudioOutput": false
@@ -4376,9 +4248,9 @@
       "name": "DeepSeek: DeepSeek V4 Flash Latest",
       "provider": "~deepseek",
       "pricing": {
-        "inputCostPerToken": 4.22e-8,
-        "outputCostPerToken": 1.694e-7,
-        "inputCacheReadPerToken": 2.8e-8
+        "inputCostPerToken": 5.9e-8,
+        "outputCostPerToken": 3e-7,
+        "inputCacheReadPerToken": 3.5e-8
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 943718,
@@ -4646,34 +4518,6 @@
       "modality": "text->text",
       "mode": "chat",
       "description": "*Ling-3.0-flash* is a *124B-parameter Mixture-of-Experts (MoE) model*, with approximately *5.1B parameters activated per token*. The model is designed with *token efficiency and production-scale agentic inference* as key priorities, enabling developers...",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "poolside/laguna-s-2.1": {
-      "id": "poolside/laguna-s-2.1",
-      "name": "Poolside: Laguna S 2.1",
-      "provider": "poolside",
-      "pricing": {
-        "inputCostPerToken": 9e-8,
-        "outputCostPerToken": 1.8e-7,
-        "inputCacheReadPerToken": 9e-9
-      },
-      "contextLength": 1048576,
-      "maxCompletionTokens": 131072,
-      "supportedParameters": [
-        "include_reasoning",
-        "max_tokens",
-        "reasoning",
-        "temperature",
-        "tool_choice",
-        "tools"
-      ],
-      "defaultParameters": {},
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Laguna S 2.1 is the latest coding agent model from [Poolside](<https://poolside.ai/>). Laguna S 2.1 is a 118B total parameter model with 8B active parameters, scoring 70.2% on Terminal-Bench 2.1 and...",
       "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
@@ -4952,58 +4796,14 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "openrouter/auto-beta": {
-      "id": "openrouter/auto-beta",
-      "name": "Auto Router (Beta)",
-      "provider": "openrouter",
-      "pricing": {
-        "inputCostPerToken": -1,
-        "outputCostPerToken": -1
-      },
-      "contextLength": 2000000,
-      "maxCompletionTokens": null,
-      "supportedParameters": [
-        "frequency_penalty",
-        "include_reasoning",
-        "logit_bias",
-        "logprobs",
-        "max_tokens",
-        "min_p",
-        "prediction",
-        "presence_penalty",
-        "reasoning",
-        "reasoning_effort",
-        "repetition_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_a",
-        "top_k",
-        "top_logprobs",
-        "top_p",
-        "web_search_options"
-      ],
-      "defaultParameters": {},
-      "modality": "text+image+file+audio+video->text+image",
-      "mode": "chat",
-      "description": "The experimental version of our Auto Router where we test new improvements. Use it to get the latest and greatest version of our general purpose auto router, but expect beta...",
-      "supportsImageInput": true,
-      "supportsAudioInput": true,
-      "supportsImageOutput": true,
-      "supportsAudioOutput": false
-    },
     "moonshotai/kimi-k3": {
       "id": "moonshotai/kimi-k3",
       "name": "MoonshotAI: Kimi K3",
       "provider": "moonshotai",
       "pricing": {
-        "inputCostPerToken": 1.79e-7,
-        "outputCostPerToken": 0.00002,
-        "inputCacheReadPerToken": 1.69e-7
+        "inputCostPerToken": 1.92e-7,
+        "outputCostPerToken": 0.000015,
+        "inputCacheReadPerToken": 1.82e-7
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 943718,
@@ -5761,34 +5561,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "poolside/laguna-xs-2.1": {
-      "id": "poolside/laguna-xs-2.1",
-      "name": "Poolside: Laguna XS 2.1",
-      "provider": "poolside",
-      "pricing": {
-        "inputCostPerToken": 6e-8,
-        "outputCostPerToken": 1.2e-7,
-        "inputCacheReadPerToken": 3e-8
-      },
-      "contextLength": 262144,
-      "maxCompletionTokens": 32768,
-      "supportedParameters": [
-        "include_reasoning",
-        "max_tokens",
-        "reasoning",
-        "temperature",
-        "tool_choice",
-        "tools"
-      ],
-      "defaultParameters": {},
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Laguna XS 2.1 is the latest coding agent model in the 33B-A3B category from [Poolside](https://poolside.ai/) and a step forward from their Laguna XS.2 model (released in April 2026). It combines...",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "anthropic/claude-sonnet-5": {
       "id": "anthropic/claude-sonnet-5",
       "name": "Anthropic: Claude Sonnet 5",
@@ -5806,41 +5578,6 @@
       "supportedParameters": [
         "include_reasoning",
         "max_completion_tokens",
-        "max_tokens",
-        "reasoning",
-        "reasoning_effort",
-        "response_format",
-        "stop",
-        "structured_outputs",
-        "tool_choice",
-        "tools",
-        "verbosity"
-      ],
-      "defaultParameters": {},
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "Sonnet 5 is Anthropic's most capable Sonnet-class model, with frontier performance across coding, agents, and professional work. It supports adaptive thinking with selectable reasoning effort levels (low, medium, high, max,...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "anthropic/claude-sonnet-5:batch": {
-      "id": "anthropic/claude-sonnet-5:batch",
-      "name": "Anthropic: Claude Sonnet 5 (batch)",
-      "provider": "anthropic",
-      "pricing": {
-        "inputCostPerToken": 0.000001,
-        "outputCostPerToken": 0.000005,
-        "inputCacheReadPerToken": 1e-7,
-        "inputCacheWritePerToken": 0.00000125,
-        "inputCacheWrite1hPerToken": 0.000002,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 1000000,
-      "maxCompletionTokens": 128000,
-      "supportedParameters": [
-        "include_reasoning",
         "max_tokens",
         "reasoning",
         "reasoning_effort",
@@ -6022,9 +5759,9 @@
       "name": "Z.ai: GLM 5.2",
       "provider": "z-ai",
       "pricing": {
-        "inputCostPerToken": 3.41e-8,
-        "outputCostPerToken": 0.000007,
-        "inputCacheReadPerToken": 3.3e-8
+        "inputCostPerToken": 6e-9,
+        "outputCostPerToken": 0.0000068,
+        "inputCacheReadPerToken": 5e-9
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 943718,
@@ -6064,37 +5801,13 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "openrouter/fusion": {
-      "id": "openrouter/fusion",
-      "name": "OpenRouter: Fusion",
-      "provider": "openrouter",
-      "pricing": {
-        "inputCostPerToken": -1,
-        "outputCostPerToken": -1
-      },
-      "contextLength": 1000000,
-      "maxCompletionTokens": null,
-      "supportedParameters": [],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Fusion turns your prompt into a small multi-model deliberation. A panel of expert models (see below) analyzes your prompt in parallel with web search and web fetch enabled, then a...",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "moonshotai/kimi-k2.7-code": {
       "id": "moonshotai/kimi-k2.7-code",
       "name": "MoonshotAI: Kimi K2.7 Code",
       "provider": "moonshotai",
       "pricing": {
-        "inputCostPerToken": 5.6e-7,
-        "outputCostPerToken": 0.0000031,
+        "inputCostPerToken": 6e-7,
+        "outputCostPerToken": 0.0000035,
         "inputCacheReadPerToken": 1.5e-7
       },
       "contextLength": 262144,
@@ -6187,45 +5900,6 @@
       "supportedParameters": [
         "include_reasoning",
         "max_completion_tokens",
-        "max_tokens",
-        "reasoning",
-        "reasoning_effort",
-        "response_format",
-        "stop",
-        "structured_outputs",
-        "tool_choice",
-        "tools",
-        "verbosity"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "Claude Fable 5 is a Mythos-class model from Anthropic, built for autonomous knowledge work and coding. It supports text, image, and file inputs with text output, with reasoning support and...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "anthropic/claude-fable-5:batch": {
-      "id": "anthropic/claude-fable-5:batch",
-      "name": "Anthropic: Claude Fable 5 (batch)",
-      "provider": "anthropic",
-      "pricing": {
-        "inputCostPerToken": 0.000005,
-        "outputCostPerToken": 0.000025,
-        "inputCacheReadPerToken": 5e-7,
-        "inputCacheWritePerToken": 0.00000625,
-        "inputCacheWrite1hPerToken": 0.00001,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 1000000,
-      "maxCompletionTokens": 128000,
-      "supportedParameters": [
-        "include_reasoning",
         "max_tokens",
         "reasoning",
         "reasoning_effort",
@@ -6513,48 +6187,6 @@
       "supportedParameters": [
         "include_reasoning",
         "max_completion_tokens",
-        "max_tokens",
-        "reasoning",
-        "reasoning_effort",
-        "response_format",
-        "stop",
-        "structured_outputs",
-        "tool_choice",
-        "tools",
-        "verbosity"
-      ],
-      "defaultParameters": {},
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "Claude Opus 4.8 is Anthropic's most capable generally available model in the Opus family. It supports text, image, and file inputs with text output, with reasoning support and a 1M-token...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false,
-      "reasoningConfig": {
-        "supported": true,
-        "parameterName": "effort",
-        "allowedValues": ["low", "medium", "high"],
-        "defaultValue": "high",
-        "canDisable": false
-      }
-    },
-    "anthropic/claude-opus-4-8:batch": {
-      "id": "anthropic/claude-opus-4-8:batch",
-      "name": "Anthropic: Claude Opus 4.8 (batch)",
-      "provider": "anthropic",
-      "pricing": {
-        "inputCostPerToken": 0.0000025,
-        "outputCostPerToken": 0.0000125,
-        "inputCacheReadPerToken": 2.5e-7,
-        "inputCacheWritePerToken": 0.000003125,
-        "inputCacheWrite1hPerToken": 0.000005,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 1000000,
-      "maxCompletionTokens": 128000,
-      "supportedParameters": [
-        "include_reasoning",
         "max_tokens",
         "reasoning",
         "reasoning_effort",
@@ -7208,9 +6840,9 @@
       "name": "MoonshotAI: Kimi Latest",
       "provider": "~moonshotai",
       "pricing": {
-        "inputCostPerToken": 1.79e-7,
-        "outputCostPerToken": 0.00002,
-        "inputCacheReadPerToken": 1.69e-7
+        "inputCostPerToken": 1.495e-7,
+        "outputCostPerToken": 0.00000715,
+        "inputCacheReadPerToken": 7.475e-8
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 943718,
@@ -7408,8 +7040,8 @@
       "provider": "qwen",
       "pricing": {
         "inputCostPerToken": 1e-7,
-        "outputCostPerToken": 9.5e-7,
-        "inputCacheReadPerToken": 5e-8
+        "outputCostPerToken": 9e-7,
+        "inputCacheReadPerToken": 2.5e-8
       },
       "contextLength": 262144,
       "maxCompletionTokens": 235929,
@@ -7451,11 +7083,11 @@
       "name": "Qwen: Qwen3.6 27B",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 3.2e-7,
-        "outputCostPerToken": 0.0000032
+        "inputCostPerToken": 4.5e-7,
+        "outputCostPerToken": 0.0000027
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 81920,
+      "maxCompletionTokens": 65536,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -7526,42 +7158,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "openai/gpt-5.5-pro:batch": {
-      "id": "openai/gpt-5.5-pro:batch",
-      "name": "OpenAI: GPT-5.5 Pro (batch)",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0.000015,
-        "outputCostPerToken": 0.00009,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 1050000,
-      "maxCompletionTokens": 128000,
-      "supportedParameters": [
-        "include_reasoning",
-        "max_tokens",
-        "reasoning",
-        "reasoning_effort",
-        "response_format",
-        "seed",
-        "structured_outputs",
-        "tool_choice",
-        "tools",
-        "verbosity"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "GPT-5.5 Pro is OpenAI’s high-capability model optimized for deep reasoning and accuracy on complex, high-stakes workloads. It features a 1M+ token context window (922K input, 128K output) with support for...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "openai/gpt-5.5": {
       "id": "openai/gpt-5.5",
       "name": "OpenAI: GPT-5.5",
@@ -7600,43 +7196,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "openai/gpt-5.5:batch": {
-      "id": "openai/gpt-5.5:batch",
-      "name": "OpenAI: GPT-5.5 (batch)",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0.0000025,
-        "outputCostPerToken": 0.000015,
-        "inputCacheReadPerToken": 2.5e-7,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 1050000,
-      "maxCompletionTokens": 128000,
-      "supportedParameters": [
-        "include_reasoning",
-        "max_tokens",
-        "reasoning",
-        "reasoning_effort",
-        "response_format",
-        "seed",
-        "structured_outputs",
-        "tool_choice",
-        "tools",
-        "verbosity"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "GPT-5.5 is OpenAI’s frontier model designed for complex professional workloads, building on GPT-5.4 with stronger reasoning, higher reliability, and improved token efficiency on hard tasks. It features a 1M+ token...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "deepseek/deepseek-v4-pro": {
       "id": "deepseek/deepseek-v4-pro",
       "name": "DeepSeek: DeepSeek V4 Pro 0423",
@@ -7647,7 +7206,7 @@
         "inputCacheReadPerToken": 4.4e-8
       },
       "contextLength": 1048576,
-      "maxCompletionTokens": 384000,
+      "maxCompletionTokens": 393216,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -7693,7 +7252,7 @@
         "inputCacheReadPerToken": 6e-9
       },
       "contextLength": 1048576,
-      "maxCompletionTokens": 943718,
+      "maxCompletionTokens": 943717,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -7914,55 +7473,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "openrouter/pareto-code": {
-      "id": "openrouter/pareto-code",
-      "name": "Pareto Code Router",
-      "provider": "openrouter",
-      "pricing": {
-        "inputCostPerToken": -1,
-        "outputCostPerToken": -1
-      },
-      "contextLength": 2000000,
-      "maxCompletionTokens": null,
-      "supportedParameters": [
-        "frequency_penalty",
-        "include_reasoning",
-        "logit_bias",
-        "logprobs",
-        "max_completion_tokens",
-        "max_tokens",
-        "min_p",
-        "parallel_tool_calls",
-        "presence_penalty",
-        "reasoning",
-        "reasoning_effort",
-        "repetition_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_a",
-        "top_k",
-        "top_logprobs",
-        "top_p",
-        "verbosity"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "The Pareto Router maintains a tiered shortlist of strong coding models, ranked by [Artificial Analysis](https://artificialanalysis.ai/) coding percentiles. Set min_coding_score between 0 and 1 on the to control how...",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "moonshotai/kimi-k2.6": {
       "id": "moonshotai/kimi-k2.6",
       "name": "MoonshotAI: Kimi K2.6",
@@ -8052,59 +7562,17 @@
         "canDisable": false
       }
     },
-    "anthropic/claude-opus-4-7:batch": {
-      "id": "anthropic/claude-opus-4-7:batch",
-      "name": "Anthropic: Claude Opus 4.7 (batch)",
-      "provider": "anthropic",
-      "pricing": {
-        "inputCostPerToken": 0.0000025,
-        "outputCostPerToken": 0.0000125,
-        "inputCacheReadPerToken": 2.5e-7,
-        "inputCacheWritePerToken": 0.000003125,
-        "inputCacheWrite1hPerToken": 0.000005,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 1000000,
-      "maxCompletionTokens": 128000,
-      "supportedParameters": [
-        "include_reasoning",
-        "max_tokens",
-        "reasoning",
-        "reasoning_effort",
-        "response_format",
-        "stop",
-        "structured_outputs",
-        "tool_choice",
-        "tools",
-        "verbosity"
-      ],
-      "defaultParameters": {},
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "Opus 4.7 is the next generation of Anthropic's Opus family, built for long-running, asynchronous agents. Building on the coding and agentic strengths of Opus 4.6, it delivers stronger performance on...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false,
-      "reasoningConfig": {
-        "supported": true,
-        "parameterName": "effort",
-        "allowedValues": ["low", "medium", "high"],
-        "defaultValue": "high",
-        "canDisable": false
-      }
-    },
     "z-ai/glm-5.1": {
       "id": "z-ai/glm-5.1",
       "name": "Z.ai: GLM 5.1",
       "provider": "z-ai",
       "pricing": {
-        "inputCostPerToken": 9.66e-7,
-        "outputCostPerToken": 0.000003036,
-        "inputCacheReadPerToken": 1.794e-7
+        "inputCostPerToken": 0.0000014,
+        "outputCostPerToken": 0.0000044,
+        "inputCacheReadPerToken": 2.6e-7
       },
       "contextLength": 204800,
-      "maxCompletionTokens": 128000,
+      "maxCompletionTokens": 131072,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -8144,12 +7612,12 @@
       "name": "Google: Gemma 4 26B A4B ",
       "provider": "gemini",
       "pricing": {
-        "inputCostPerToken": 9e-8,
-        "outputCostPerToken": 3e-7,
-        "inputCacheReadPerToken": 5e-8
+        "inputCostPerToken": 2.3e-8,
+        "outputCostPerToken": 7e-8,
+        "inputCacheReadPerToken": 1.2e-8
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 235929,
+      "maxCompletionTokens": 32768,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -8199,6 +7667,7 @@
         "include_reasoning",
         "logit_bias",
         "logprobs",
+        "max_completion_tokens",
         "max_tokens",
         "min_p",
         "presence_penalty",
@@ -8548,43 +8017,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "openai/gpt-5.4-nano:batch": {
-      "id": "openai/gpt-5.4-nano:batch",
-      "name": "OpenAI: GPT-5.4 Nano (batch)",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 1e-7,
-        "outputCostPerToken": 6.25e-7,
-        "inputCacheReadPerToken": 1e-8,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 400000,
-      "maxCompletionTokens": 128000,
-      "supportedParameters": [
-        "include_reasoning",
-        "max_tokens",
-        "reasoning",
-        "reasoning_effort",
-        "response_format",
-        "seed",
-        "structured_outputs",
-        "tool_choice",
-        "tools",
-        "verbosity"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "GPT-5.4 nano is the most lightweight and cost-efficient variant of the GPT-5.4 family, optimized for speed-critical and high-volume tasks. It supports text and image inputs and is designed for low-latency...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "openai/gpt-5.4-mini": {
       "id": "openai/gpt-5.4-mini",
       "name": "OpenAI: GPT-5.4 Mini",
@@ -8600,43 +8032,6 @@
       "supportedParameters": [
         "include_reasoning",
         "max_completion_tokens",
-        "max_tokens",
-        "reasoning",
-        "reasoning_effort",
-        "response_format",
-        "seed",
-        "structured_outputs",
-        "tool_choice",
-        "tools",
-        "verbosity"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "GPT-5.4 mini brings the core capabilities of GPT-5.4 to a faster, more efficient model optimized for high-throughput workloads. It supports text and image inputs with strong performance across reasoning, coding,...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "openai/gpt-5.4-mini:batch": {
-      "id": "openai/gpt-5.4-mini:batch",
-      "name": "OpenAI: GPT-5.4 Mini (batch)",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 3.75e-7,
-        "outputCostPerToken": 0.00000225,
-        "inputCacheReadPerToken": 3.75e-8,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 400000,
-      "maxCompletionTokens": 128000,
-      "supportedParameters": [
-        "include_reasoning",
         "max_tokens",
         "reasoning",
         "reasoning_effort",
@@ -8744,8 +8139,8 @@
         "outputCostPerToken": 0.0000024,
         "inputCacheReadPerToken": 1.5e-7
       },
-      "contextLength": 262144,
-      "maxCompletionTokens": 235929,
+      "contextLength": 1048576,
+      "maxCompletionTokens": 262144,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -8900,42 +8295,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "openai/gpt-5.4-pro:batch": {
-      "id": "openai/gpt-5.4-pro:batch",
-      "name": "OpenAI: GPT-5.4 Pro (batch)",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0.000015,
-        "outputCostPerToken": 0.00009,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 1050000,
-      "maxCompletionTokens": 128000,
-      "supportedParameters": [
-        "include_reasoning",
-        "max_tokens",
-        "reasoning",
-        "reasoning_effort",
-        "response_format",
-        "seed",
-        "structured_outputs",
-        "tool_choice",
-        "tools",
-        "verbosity"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "GPT-5.4 Pro is OpenAI's most advanced model, building on GPT-5.4's unified architecture with enhanced reasoning capabilities for complex, high-stakes tasks. It features a 1M+ token context window (922K input, 128K...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "openai/gpt-5.4": {
       "id": "openai/gpt-5.4",
       "name": "OpenAI: GPT-5.4",
@@ -8951,43 +8310,6 @@
       "supportedParameters": [
         "include_reasoning",
         "max_completion_tokens",
-        "max_tokens",
-        "reasoning",
-        "reasoning_effort",
-        "response_format",
-        "seed",
-        "structured_outputs",
-        "tool_choice",
-        "tools",
-        "verbosity"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "GPT-5.4 is OpenAI’s latest frontier model, unifying the Codex and GPT lines into a single system. It features a 1M+ token context window (922K input, 128K output) with support for...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "openai/gpt-5.4:batch": {
-      "id": "openai/gpt-5.4:batch",
-      "name": "OpenAI: GPT-5.4 (batch)",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0.00000125,
-        "outputCostPerToken": 0.0000075,
-        "inputCacheReadPerToken": 1.25e-7,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 1050000,
-      "maxCompletionTokens": 128000,
-      "supportedParameters": [
-        "include_reasoning",
         "max_tokens",
         "reasoning",
         "reasoning_effort",
@@ -9613,43 +8935,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "anthropic/claude-sonnet-4-6:batch": {
-      "id": "anthropic/claude-sonnet-4-6:batch",
-      "name": "Anthropic: Claude Sonnet 4.6 (batch)",
-      "provider": "anthropic",
-      "pricing": {
-        "inputCostPerToken": 0.0000015,
-        "outputCostPerToken": 0.0000075,
-        "inputCacheReadPerToken": 1.5e-7,
-        "inputCacheWritePerToken": 0.000001875,
-        "inputCacheWrite1hPerToken": 0.000003,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 1000000,
-      "maxCompletionTokens": 128000,
-      "supportedParameters": [
-        "include_reasoning",
-        "max_tokens",
-        "reasoning",
-        "reasoning_effort",
-        "response_format",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_p",
-        "verbosity"
-      ],
-      "defaultParameters": {},
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "Sonnet 4.6 is Anthropic's most capable Sonnet-class model yet, with frontier performance across coding, agents, and professional work. It excels at iterative development, complex codebase navigation, end-to-end project management with...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "qwen/qwen3.5-plus-02-15": {
       "id": "qwen/qwen3.5-plus-02-15",
       "name": "Qwen: Qwen3.5 Plus 2026-02-15",
@@ -9741,12 +9026,12 @@
       "name": "MiniMax: MiniMax M2.5",
       "provider": "minimax",
       "pricing": {
-        "inputCostPerToken": 3e-7,
-        "outputCostPerToken": 0.0000012,
+        "inputCostPerToken": 2.7e-7,
+        "outputCostPerToken": 9.5e-7,
         "inputCacheReadPerToken": 3e-8
       },
       "contextLength": 204800,
-      "maxCompletionTokens": 131072,
+      "maxCompletionTokens": 32768,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -9870,50 +9155,6 @@
         "canDisable": false
       }
     },
-    "anthropic/claude-opus-4-6:batch": {
-      "id": "anthropic/claude-opus-4-6:batch",
-      "name": "Anthropic: Claude Opus 4.6 (batch)",
-      "provider": "anthropic",
-      "pricing": {
-        "inputCostPerToken": 0.0000025,
-        "outputCostPerToken": 0.0000125,
-        "inputCacheReadPerToken": 2.5e-7,
-        "inputCacheWritePerToken": 0.000003125,
-        "inputCacheWrite1hPerToken": 0.000005,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 1000000,
-      "maxCompletionTokens": 128000,
-      "supportedParameters": [
-        "include_reasoning",
-        "max_tokens",
-        "reasoning",
-        "reasoning_effort",
-        "response_format",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_p",
-        "verbosity"
-      ],
-      "defaultParameters": {},
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "Opus 4.6 is Anthropic’s strongest model for coding and long-running professional tasks. It is built for agents that operate across entire workflows rather than single prompts, making it especially effective...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false,
-      "reasoningConfig": {
-        "supported": true,
-        "parameterName": "effort",
-        "allowedValues": ["low", "medium", "high"],
-        "defaultValue": "high",
-        "canDisable": false
-      }
-    },
     "qwen/qwen3-coder-next": {
       "id": "qwen/qwen3-coder-next",
       "name": "Qwen: Qwen3 Coder Next",
@@ -9952,51 +9193,6 @@
       "mode": "chat",
       "description": "Qwen3-Coder-Next is an open-weight causal language model optimized for coding agents and local development workflows. It uses a sparse MoE design with 80B total parameters and only 3B activated per...",
       "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "openrouter/free": {
-      "id": "openrouter/free",
-      "name": "Free Models Router",
-      "provider": "openrouter",
-      "pricing": {
-        "inputCostPerToken": 0,
-        "outputCostPerToken": 0
-      },
-      "contextLength": 200000,
-      "maxCompletionTokens": null,
-      "supportedParameters": [
-        "frequency_penalty",
-        "include_reasoning",
-        "logprobs",
-        "max_completion_tokens",
-        "max_tokens",
-        "min_p",
-        "presence_penalty",
-        "reasoning",
-        "reasoning_effort",
-        "repetition_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_k",
-        "top_logprobs",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text+image->text",
-      "mode": "chat",
-      "description": "The simplest way to get free inference. openrouter/free is a router that selects free models at random from the models available on OpenRouter. The router smartly filters for models that...",
-      "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
       "supportsAudioOutput": false
@@ -10076,45 +9272,6 @@
       "mode": "chat",
       "description": "Kimi K2.5 is Moonshot AI's native multimodal model, delivering state-of-the-art visual coding capability and a self-directed agent swarm paradigm. Built on Kimi K2 with continued pretraining over approximately 15T mixed...",
       "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "upstage/solar-pro-3": {
-      "id": "upstage/solar-pro-3",
-      "name": "Upstage: Solar Pro 3",
-      "provider": "upstage",
-      "pricing": {
-        "inputCostPerToken": 1.5e-7,
-        "outputCostPerToken": 6e-7,
-        "inputCacheReadPerToken": 1.5e-8
-      },
-      "contextLength": 131072,
-      "maxCompletionTokens": 117964,
-      "supportedParameters": [
-        "frequency_penalty",
-        "include_reasoning",
-        "max_tokens",
-        "parallel_tool_calls",
-        "presence_penalty",
-        "reasoning",
-        "reasoning_effort",
-        "response_format",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Solar Pro 3 is Upstage's powerful Mixture-of-Experts (MoE) language model. With 102B total parameters and 12B active parameters per forward pass, it delivers exceptional performance while maintaining computational efficiency. Optimized...",
-      "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
       "supportsAudioOutput": false
@@ -10447,9 +9604,9 @@
       "name": "Z.ai: GLM 4.7",
       "provider": "z-ai",
       "pricing": {
-        "inputCostPerToken": 5.4e-7,
-        "outputCostPerToken": 0.00000198,
-        "inputCacheReadPerToken": 9.9e-8
+        "inputCostPerToken": 6e-7,
+        "outputCostPerToken": 0.0000022,
+        "inputCacheReadPerToken": 1.1e-7
       },
       "contextLength": 204800,
       "maxCompletionTokens": 131072,
@@ -10628,47 +9785,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "openai/gpt-5.2-chat": {
-      "id": "openai/gpt-5.2-chat",
-      "name": "OpenAI: GPT-5.2 Chat",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0.00000175,
-        "outputCostPerToken": 0.000014,
-        "inputCacheReadPerToken": 1.75e-7,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 128000,
-      "maxCompletionTokens": 32000,
-      "supportedParameters": [
-        "max_completion_tokens",
-        "response_format",
-        "seed",
-        "structured_outputs",
-        "tool_choice",
-        "tools",
-        "verbosity"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "GPT-5.2 Chat (AKA Instant) is the fast, lightweight member of the 5.2 family, optimized for low-latency chat while retaining strong general intelligence. It uses adaptive reasoning to selectively “think” on...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false,
-      "reasoningConfig": {
-        "supported": true,
-        "parameterName": "reasoning_effort",
-        "allowedValues": ["none", "low", "medium", "high", "xhigh"],
-        "defaultValue": "none",
-        "canDisable": true
-      }
-    },
     "openai/gpt-5.2-pro": {
       "id": "openai/gpt-5.2-pro",
       "name": "OpenAI: GPT-5.2 Pro",
@@ -10676,49 +9792,6 @@
       "pricing": {
         "inputCostPerToken": 0.000021,
         "outputCostPerToken": 0.000168,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 400000,
-      "maxCompletionTokens": 128000,
-      "supportedParameters": [
-        "include_reasoning",
-        "max_tokens",
-        "reasoning",
-        "reasoning_effort",
-        "response_format",
-        "seed",
-        "structured_outputs",
-        "tool_choice",
-        "tools",
-        "verbosity"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "GPT-5.2 Pro is OpenAI’s most advanced model, offering major improvements in agentic coding and long context performance over GPT-5 Pro. It is optimized for complex tasks that require step-by-step reasoning,...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false,
-      "reasoningConfig": {
-        "supported": true,
-        "parameterName": "reasoning_effort",
-        "allowedValues": ["high"],
-        "defaultValue": "high",
-        "canDisable": false
-      }
-    },
-    "openai/gpt-5.2-pro:batch": {
-      "id": "openai/gpt-5.2-pro:batch",
-      "name": "OpenAI: GPT-5.2 Pro (batch)",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0.0000105,
-        "outputCostPerToken": 0.000084,
         "webSearchCostPerQuery": 0.01
       },
       "contextLength": 400000,
@@ -10770,50 +9843,6 @@
       "supportedParameters": [
         "include_reasoning",
         "max_completion_tokens",
-        "max_tokens",
-        "reasoning",
-        "reasoning_effort",
-        "response_format",
-        "seed",
-        "structured_outputs",
-        "tool_choice",
-        "tools",
-        "verbosity"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "GPT-5.2 is the latest frontier-grade model in the GPT-5 series, offering stronger agentic and long context perfomance compared to GPT-5.1. It uses adaptive reasoning to allocate computation dynamically, responding quickly...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false,
-      "reasoningConfig": {
-        "supported": true,
-        "parameterName": "reasoning_effort",
-        "allowedValues": ["none", "low", "medium", "high", "xhigh"],
-        "defaultValue": "none",
-        "canDisable": true
-      }
-    },
-    "openai/gpt-5.2:batch": {
-      "id": "openai/gpt-5.2:batch",
-      "name": "OpenAI: GPT-5.2 (batch)",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 8.75e-7,
-        "outputCostPerToken": 0.000007,
-        "inputCacheReadPerToken": 8.75e-8,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 400000,
-      "maxCompletionTokens": 128000,
-      "supportedParameters": [
-        "include_reasoning",
         "max_tokens",
         "reasoning",
         "reasoning_effort",
@@ -10950,30 +9979,6 @@
       "mode": "chat",
       "description": "GLM-4.6V is a large multimodal model designed for high-fidelity visual understanding and long-context reasoning across images, documents, and mixed media. It supports up to 128K tokens, processes complex page layouts...",
       "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "openrouter/bodybuilder": {
-      "id": "openrouter/bodybuilder",
-      "name": "Body Builder (beta)",
-      "provider": "openrouter",
-      "pricing": {
-        "inputCostPerToken": -1,
-        "outputCostPerToken": -1
-      },
-      "contextLength": 128000,
-      "maxCompletionTokens": null,
-      "supportedParameters": [],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Transform your natural language requests into structured OpenRouter API request objects. Describe what you want to accomplish with AI models, and Body Builder will construct the appropriate API calls. Example:...",
-      "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
       "supportsAudioOutput": false
@@ -11214,7 +10219,7 @@
         "inputCacheReadPerToken": 2.8e-8
       },
       "contextLength": 163840,
-      "maxCompletionTokens": 65536,
+      "maxCompletionTokens": 147456,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -11275,48 +10280,6 @@
         "tool_choice",
         "tools",
         "top_k",
-        "verbosity"
-      ],
-      "defaultParameters": {},
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "Claude Opus 4.5 is Anthropic’s frontier reasoning model optimized for complex software engineering, agentic workflows, and long-horizon computer use. It offers strong multimodal capabilities, competitive performance across real-world coding and...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false,
-      "reasoningConfig": {
-        "supported": true,
-        "parameterName": "effort",
-        "allowedValues": ["low", "medium", "high"],
-        "defaultValue": "high",
-        "canDisable": false
-      }
-    },
-    "anthropic/claude-opus-4-5:batch": {
-      "id": "anthropic/claude-opus-4-5:batch",
-      "name": "Anthropic: Claude Opus 4.5 (batch)",
-      "provider": "anthropic",
-      "pricing": {
-        "inputCostPerToken": 0.0000025,
-        "outputCostPerToken": 0.0000125,
-        "inputCacheReadPerToken": 2.5e-7,
-        "inputCacheWritePerToken": 0.000003125,
-        "inputCacheWrite1hPerToken": 0.000005,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 200000,
-      "maxCompletionTokens": 64000,
-      "supportedParameters": [
-        "include_reasoning",
-        "max_tokens",
-        "reasoning",
-        "response_format",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
         "verbosity"
       ],
       "defaultParameters": {},
@@ -11398,50 +10361,6 @@
       "supportedParameters": [
         "include_reasoning",
         "max_completion_tokens",
-        "max_tokens",
-        "reasoning",
-        "reasoning_effort",
-        "response_format",
-        "seed",
-        "structured_outputs",
-        "tool_choice",
-        "tools",
-        "verbosity"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "GPT-5.1 is the latest frontier-grade model in the GPT-5 series, offering stronger general-purpose reasoning, improved instruction adherence, and a more natural conversational style compared to GPT-5. It uses adaptive reasoning...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false,
-      "reasoningConfig": {
-        "supported": true,
-        "parameterName": "reasoning_effort",
-        "allowedValues": ["none", "low", "medium", "high"],
-        "defaultValue": "none",
-        "canDisable": true
-      }
-    },
-    "openai/gpt-5.1:batch": {
-      "id": "openai/gpt-5.1:batch",
-      "name": "OpenAI: GPT-5.1 (batch)",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 6.25e-7,
-        "outputCostPerToken": 0.000005,
-        "inputCacheReadPerToken": 6.25e-8,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 400000,
-      "maxCompletionTokens": 128000,
-      "supportedParameters": [
-        "include_reasoning",
         "max_tokens",
         "reasoning",
         "reasoning_effort",
@@ -11574,7 +10493,6 @@
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
-        "logprobs",
         "max_tokens",
         "presence_penalty",
         "reasoning",
@@ -11587,7 +10505,6 @@
         "tool_choice",
         "tools",
         "top_k",
-        "top_logprobs",
         "top_p"
       ],
       "defaultParameters": {
@@ -11746,22 +10663,12 @@
       "contextLength": 204800,
       "maxCompletionTokens": 131072,
       "supportedParameters": [
-        "frequency_penalty",
         "include_reasoning",
-        "logprobs",
         "max_tokens",
-        "presence_penalty",
         "reasoning",
-        "repetition_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
         "temperature",
         "tool_choice",
         "tools",
-        "top_k",
-        "top_logprobs",
         "top_p"
       ],
       "defaultParameters": {
@@ -11840,46 +10747,6 @@
       "supportedParameters": [
         "include_reasoning",
         "max_completion_tokens",
-        "max_tokens",
-        "reasoning",
-        "response_format",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_k",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "Claude Haiku 4.5 is Anthropic’s fastest and most efficient model, delivering near-frontier intelligence at a fraction of the cost and latency of larger Claude models. Matching Claude Sonnet 4’s performance...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "anthropic/claude-haiku-4-5:batch": {
-      "id": "anthropic/claude-haiku-4-5:batch",
-      "name": "Anthropic: Claude Haiku 4.5 (batch)",
-      "provider": "anthropic",
-      "pricing": {
-        "inputCostPerToken": 5e-7,
-        "outputCostPerToken": 0.0000025,
-        "inputCacheReadPerToken": 5e-8,
-        "inputCacheWritePerToken": 6.25e-7,
-        "inputCacheWrite1hPerToken": 0.000001,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 200000,
-      "maxCompletionTokens": 64000,
-      "supportedParameters": [
-        "include_reasoning",
         "max_tokens",
         "reasoning",
         "response_format",
@@ -12159,57 +11026,14 @@
         "canDisable": false
       }
     },
-    "openai/gpt-5-pro:batch": {
-      "id": "openai/gpt-5-pro:batch",
-      "name": "OpenAI: GPT-5 Pro (batch)",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0.0000075,
-        "outputCostPerToken": 0.00006,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 400000,
-      "maxCompletionTokens": 128000,
-      "supportedParameters": [
-        "include_reasoning",
-        "max_tokens",
-        "reasoning",
-        "reasoning_effort",
-        "response_format",
-        "seed",
-        "structured_outputs",
-        "tool_choice",
-        "tools",
-        "verbosity"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "GPT-5 Pro is OpenAI’s most advanced model, offering major improvements in reasoning, code quality, and user experience. It is optimized for complex tasks that require step-by-step reasoning, instruction following, and...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false,
-      "reasoningConfig": {
-        "supported": true,
-        "parameterName": "reasoning_effort",
-        "allowedValues": ["high"],
-        "defaultValue": "high",
-        "canDisable": false
-      }
-    },
     "z-ai/glm-4.6": {
       "id": "z-ai/glm-4.6",
       "name": "Z.ai: GLM 4.6",
       "provider": "z-ai",
       "pricing": {
-        "inputCostPerToken": 5.5e-7,
-        "outputCostPerToken": 0.0000022,
-        "inputCacheReadPerToken": 1.1e-7
+        "inputCostPerToken": 5e-7,
+        "outputCostPerToken": 0.000002,
+        "inputCacheReadPerToken": 1e-7
       },
       "contextLength": 204800,
       "maxCompletionTokens": 131072,
@@ -12262,46 +11086,6 @@
       "supportedParameters": [
         "include_reasoning",
         "max_completion_tokens",
-        "max_tokens",
-        "reasoning",
-        "response_format",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_k",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": 1,
-        "topP": 1,
-        "frequencyPenalty": null
-      },
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "Claude Sonnet 4.5 is Anthropic’s most advanced Sonnet model to date, optimized for real-world agents and coding workflows. It delivers state-of-the-art performance on coding benchmarks such as SWE-bench Verified, with...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "anthropic/claude-sonnet-4-5:batch": {
-      "id": "anthropic/claude-sonnet-4-5:batch",
-      "name": "Anthropic: Claude Sonnet 4.5 (batch)",
-      "provider": "anthropic",
-      "pricing": {
-        "inputCostPerToken": 0.0000015,
-        "outputCostPerToken": 0.0000075,
-        "inputCacheReadPerToken": 1.5e-7,
-        "inputCacheWritePerToken": 0.000001875,
-        "inputCacheWrite1hPerToken": 0.000003,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 1000000,
-      "maxCompletionTokens": 64000,
-      "supportedParameters": [
-        "include_reasoning",
         "max_tokens",
         "reasoning",
         "response_format",
@@ -12485,7 +11269,6 @@
         "max_tokens",
         "reasoning",
         "response_format",
-        "stop",
         "structured_outputs",
         "temperature",
         "tool_choice",
@@ -12541,48 +11324,6 @@
       "modality": "text->text",
       "mode": "chat",
       "description": "Qwen3 Coder Flash is Alibaba's fast and cost efficient version of their proprietary Qwen3 Coder Plus. It is a powerful coding agent model specializing in autonomous programming via tool calling...",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "qwen/qwen3-next-80b-a3b-thinking": {
-      "id": "qwen/qwen3-next-80b-a3b-thinking",
-      "name": "Qwen: Qwen3 Next 80B A3B Thinking",
-      "provider": "qwen",
-      "pricing": {
-        "inputCostPerToken": 1.5e-7,
-        "outputCostPerToken": 0.0000012
-      },
-      "contextLength": 262144,
-      "maxCompletionTokens": 235929,
-      "supportedParameters": [
-        "frequency_penalty",
-        "include_reasoning",
-        "logprobs",
-        "max_tokens",
-        "presence_penalty",
-        "reasoning",
-        "repetition_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_k",
-        "top_logprobs",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Qwen3-Next-80B-A3B-Thinking is a reasoning-first chat model in the Qwen3-Next line that outputs structured “thinking” traces by default. It’s designed for hard multi-step problems; math proofs, code synthesis/debugging, logic, and agentic...",
       "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
@@ -12705,7 +11446,7 @@
         "inputCacheReadPerToken": 1.3e-7
       },
       "contextLength": 163840,
-      "maxCompletionTokens": 32768,
+      "maxCompletionTokens": 147456,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -12856,50 +11597,6 @@
         "canDisable": false
       }
     },
-    "openai/gpt-5:batch": {
-      "id": "openai/gpt-5:batch",
-      "name": "OpenAI: GPT-5 (batch)",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 6.25e-7,
-        "outputCostPerToken": 0.000005,
-        "inputCacheReadPerToken": 6.25e-8,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 400000,
-      "maxCompletionTokens": 128000,
-      "supportedParameters": [
-        "include_reasoning",
-        "max_tokens",
-        "reasoning",
-        "reasoning_effort",
-        "response_format",
-        "seed",
-        "structured_outputs",
-        "tool_choice",
-        "tools",
-        "verbosity"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "GPT-5 is OpenAI’s most advanced model, offering major improvements in reasoning, code quality, and user experience. It is optimized for complex tasks that require step-by-step reasoning, instruction following, and accuracy...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false,
-      "reasoningConfig": {
-        "supported": true,
-        "parameterName": "reasoning_effort",
-        "allowedValues": ["low", "medium", "high"],
-        "defaultValue": "medium",
-        "canDisable": false
-      }
-    },
     "openai/gpt-5-mini": {
       "id": "openai/gpt-5-mini",
       "name": "OpenAI: GPT-5 Mini",
@@ -12915,50 +11612,6 @@
       "supportedParameters": [
         "include_reasoning",
         "max_completion_tokens",
-        "max_tokens",
-        "reasoning",
-        "reasoning_effort",
-        "response_format",
-        "seed",
-        "structured_outputs",
-        "tool_choice",
-        "tools",
-        "verbosity"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "GPT-5 Mini is a compact version of GPT-5, designed to handle lighter-weight reasoning tasks. It provides the same instruction-following and safety-tuning benefits as GPT-5, but with reduced latency and cost....",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false,
-      "reasoningConfig": {
-        "supported": true,
-        "parameterName": "reasoning_effort",
-        "allowedValues": ["low", "medium", "high"],
-        "defaultValue": "medium",
-        "canDisable": false
-      }
-    },
-    "openai/gpt-5-mini:batch": {
-      "id": "openai/gpt-5-mini:batch",
-      "name": "OpenAI: GPT-5 Mini (batch)",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 1.25e-7,
-        "outputCostPerToken": 0.000001,
-        "inputCacheReadPerToken": 1.25e-8,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 400000,
-      "maxCompletionTokens": 128000,
-      "supportedParameters": [
-        "include_reasoning",
         "max_tokens",
         "reasoning",
         "reasoning_effort",
@@ -13302,51 +11955,6 @@
         "canDisable": false
       }
     },
-    "anthropic/claude-opus-4-1:batch": {
-      "id": "anthropic/claude-opus-4-1:batch",
-      "name": "Anthropic: Claude Opus 4.1 (batch)",
-      "provider": "anthropic",
-      "pricing": {
-        "inputCostPerToken": 0.0000075,
-        "outputCostPerToken": 0.0000375,
-        "inputCacheReadPerToken": 7.5e-7,
-        "inputCacheWritePerToken": 0.000009375,
-        "inputCacheWrite1hPerToken": 0.000015,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 200000,
-      "maxCompletionTokens": 32000,
-      "supportedParameters": [
-        "include_reasoning",
-        "max_tokens",
-        "reasoning",
-        "response_format",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "Claude Opus 4.1 is an updated version of Anthropic’s flagship model, offering improved performance in coding, reasoning, and agentic tasks. It achieves 74.5% on SWE-bench Verified and shows notable gains...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false,
-      "reasoningConfig": {
-        "supported": true,
-        "parameterName": "effort",
-        "allowedValues": ["low", "medium", "high"],
-        "defaultValue": "high",
-        "canDisable": false
-      }
-    },
     "mistralai/codestral-2508": {
       "id": "mistralai/codestral-2508",
       "name": "Mistral: Codestral 2508",
@@ -13388,8 +11996,8 @@
       "name": "Qwen: Qwen3 Coder 30B A3B Instruct",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 7e-8,
-        "outputCostPerToken": 2.8e-7
+        "inputCostPerToken": 1.5e-7,
+        "outputCostPerToken": 6e-7
       },
       "contextLength": 262144,
       "maxCompletionTokens": 235929,
@@ -13576,7 +12184,6 @@
       "supportedParameters": [
         "frequency_penalty",
         "logit_bias",
-        "logprobs",
         "max_tokens",
         "min_p",
         "presence_penalty",
@@ -13589,7 +12196,6 @@
         "tool_choice",
         "tools",
         "top_k",
-        "top_logprobs",
         "top_p"
       ],
       "defaultParameters": {},
@@ -14381,42 +12987,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "openai/o4-mini-high": {
-      "id": "openai/o4-mini-high",
-      "name": "OpenAI: o4 Mini High",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0.0000011,
-        "outputCostPerToken": 0.0000044,
-        "inputCacheReadPerToken": 2.75e-7,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 200000,
-      "maxCompletionTokens": 100000,
-      "supportedParameters": [
-        "include_reasoning",
-        "max_tokens",
-        "reasoning",
-        "reasoning_effort",
-        "response_format",
-        "seed",
-        "structured_outputs",
-        "tool_choice",
-        "tools"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "OpenAI o4-mini-high is the same model as [o4-mini](/openai/o4-mini) with reasoning_effort set to high. OpenAI o4-mini is a compact reasoning model in the o-series, optimized for fast, cost-efficient performance while retaining...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "openai/o3": {
       "id": "openai/o3",
       "name": "OpenAI: o3",
@@ -14455,106 +13025,6 @@
         "canDisable": false
       }
     },
-    "openai/o3:batch": {
-      "id": "openai/o3:batch",
-      "name": "OpenAI: o3 (batch)",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0.000001,
-        "outputCostPerToken": 0.000004,
-        "inputCacheReadPerToken": 2.5e-7,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 200000,
-      "maxCompletionTokens": 100000,
-      "supportedParameters": [
-        "include_reasoning",
-        "max_tokens",
-        "reasoning",
-        "response_format",
-        "seed",
-        "structured_outputs",
-        "tool_choice",
-        "tools"
-      ],
-      "defaultParameters": {},
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "o3 is a well-rounded and powerful model across domains. It sets a new standard for math, science, coding, and visual reasoning tasks. It also excels at technical writing and instruction-following....",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false,
-      "reasoningConfig": {
-        "supported": true,
-        "parameterName": "reasoning_effort",
-        "allowedValues": ["low", "medium", "high"],
-        "defaultValue": "medium",
-        "canDisable": false
-      }
-    },
-    "openai/o4-mini": {
-      "id": "openai/o4-mini",
-      "name": "OpenAI: o4 Mini",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0.0000011,
-        "outputCostPerToken": 0.0000044,
-        "inputCacheReadPerToken": 2.75e-7,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 200000,
-      "maxCompletionTokens": 100000,
-      "supportedParameters": [
-        "include_reasoning",
-        "max_tokens",
-        "reasoning",
-        "response_format",
-        "seed",
-        "structured_outputs",
-        "tool_choice",
-        "tools"
-      ],
-      "defaultParameters": {},
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "OpenAI o4-mini is a compact reasoning model in the o-series, optimized for fast, cost-efficient performance while retaining strong multimodal and agentic capabilities. It supports tool use and demonstrates competitive reasoning...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "openai/o4-mini:batch": {
-      "id": "openai/o4-mini:batch",
-      "name": "OpenAI: o4 Mini (batch)",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 5.5e-7,
-        "outputCostPerToken": 0.0000022,
-        "inputCacheReadPerToken": 1.375e-7,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 200000,
-      "maxCompletionTokens": 100000,
-      "supportedParameters": [
-        "include_reasoning",
-        "max_tokens",
-        "reasoning",
-        "response_format",
-        "seed",
-        "structured_outputs",
-        "tool_choice",
-        "tools"
-      ],
-      "defaultParameters": {},
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "OpenAI o4-mini is a compact reasoning model in the o-series, optimized for fast, cost-efficient performance while retaining strong multimodal and agentic capabilities. It supports tool use and demonstrates competitive reasoning...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "openai/gpt-4.1": {
       "id": "openai/gpt-4.1",
       "name": "OpenAI: GPT-4.1",
@@ -14569,37 +13039,6 @@
       "maxCompletionTokens": 32768,
       "supportedParameters": [
         "max_completion_tokens",
-        "max_tokens",
-        "response_format",
-        "seed",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_p"
-      ],
-      "defaultParameters": {},
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "GPT-4.1 is a flagship large language model optimized for advanced instruction following, real-world software engineering, and long-context reasoning. It supports a 1 million token context window and outperforms GPT-4o and...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "openai/gpt-4.1:batch": {
-      "id": "openai/gpt-4.1:batch",
-      "name": "OpenAI: GPT-4.1 (batch)",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0.000001,
-        "outputCostPerToken": 0.000004,
-        "inputCacheReadPerToken": 2.5e-7,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 1047576,
-      "maxCompletionTokens": 32768,
-      "supportedParameters": [
         "max_tokens",
         "response_format",
         "seed",
@@ -14650,37 +13089,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "openai/gpt-4.1-mini:batch": {
-      "id": "openai/gpt-4.1-mini:batch",
-      "name": "OpenAI: GPT-4.1 Mini (batch)",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 2e-7,
-        "outputCostPerToken": 8e-7,
-        "inputCacheReadPerToken": 5e-8,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 1047576,
-      "maxCompletionTokens": 32768,
-      "supportedParameters": [
-        "max_tokens",
-        "response_format",
-        "seed",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_p"
-      ],
-      "defaultParameters": {},
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "GPT-4.1 Mini is a mid-sized model delivering performance competitive with GPT-4o at substantially lower latency and cost. It retains a 1 million token context window and scores 45.1% on hard...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "openai/gpt-4.1-nano": {
       "id": "openai/gpt-4.1-nano",
       "name": "OpenAI: GPT-4.1 Nano",
@@ -14695,38 +13103,6 @@
       "maxCompletionTokens": 942818,
       "supportedParameters": [
         "max_completion_tokens",
-        "max_tokens",
-        "response_format",
-        "seed",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_p"
-      ],
-      "defaultParameters": {},
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "For tasks that demand low latency, GPT‑4.1 nano is the fastest and cheapest model in the GPT-4.1 series. It delivers exceptional performance at a small size with its 1 million...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "openai/gpt-4.1-nano:batch": {
-      "id": "openai/gpt-4.1-nano:batch",
-      "name": "OpenAI: GPT-4.1 Nano (batch)",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 5e-8,
-        "outputCostPerToken": 2e-7,
-        "inputCacheReadPerToken": 1.25e-8,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 1047576,
-      "maxCompletionTokens": 32768,
-      "supportedParameters": [
-        "max_tokens",
         "response_format",
         "seed",
         "structured_outputs",
@@ -14790,7 +13166,7 @@
         "inputCostPerToken": 1e-7,
         "outputCostPerToken": 3e-7
       },
-      "contextLength": 1310720,
+      "contextLength": 327680,
       "maxCompletionTokens": 16384,
       "supportedParameters": [
         "frequency_penalty",
@@ -14799,7 +13175,6 @@
         "min_p",
         "presence_penalty",
         "repetition_penalty",
-        "response_format",
         "seed",
         "stop",
         "structured_outputs",
@@ -14851,41 +13226,6 @@
       "supportsAudioInput": false,
       "supportsImageOutput": false,
       "supportsAudioOutput": false
-    },
-    "openai/o1-pro": {
-      "id": "openai/o1-pro",
-      "name": "OpenAI: o1-pro",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0.00015,
-        "outputCostPerToken": 0.0006,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 200000,
-      "maxCompletionTokens": 100000,
-      "supportedParameters": [
-        "include_reasoning",
-        "max_tokens",
-        "reasoning",
-        "response_format",
-        "seed",
-        "structured_outputs"
-      ],
-      "defaultParameters": {},
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "The o1 series of models are trained with reinforcement learning to think before they answer and perform complex reasoning. The o1-pro model uses more compute to think harder and provide...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false,
-      "reasoningConfig": {
-        "supported": true,
-        "parameterName": "reasoning_effort",
-        "allowedValues": ["low", "medium", "high"],
-        "defaultValue": "medium",
-        "canDisable": false
-      }
     },
     "mistralai/mistral-small-3.1-24b-instruct": {
       "id": "mistralai/mistral-small-3.1-24b-instruct",
@@ -15273,49 +13613,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "openai/o3-mini-high": {
-      "id": "openai/o3-mini-high",
-      "name": "OpenAI: o3 Mini High",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0.0000011,
-        "outputCostPerToken": 0.0000044,
-        "inputCacheReadPerToken": 5.5e-7,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 200000,
-      "maxCompletionTokens": 100000,
-      "supportedParameters": [
-        "include_reasoning",
-        "max_tokens",
-        "reasoning",
-        "reasoning_effort",
-        "response_format",
-        "seed",
-        "structured_outputs",
-        "tool_choice",
-        "tools"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text+file->text",
-      "mode": "chat",
-      "description": "OpenAI o3-mini-high is the same model as [o3-mini](/openai/o3-mini) with reasoning_effort set to high. o3-mini is a cost-efficient language model optimized for STEM reasoning tasks, particularly excelling in science, mathematics, and...",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false,
-      "reasoningConfig": {
-        "supported": true,
-        "parameterName": "reasoning_effort",
-        "allowedValues": ["low", "medium", "high"],
-        "defaultValue": "medium",
-        "canDisable": false
-      }
-    },
     "aion-labs/aion-rp-llama-3.1-8b": {
       "id": "aion-labs/aion-rp-llama-3.1-8b",
       "name": "AionLabs: Aion-RP 1.0 (8B)",
@@ -15408,90 +13705,6 @@
       "supportsAudioInput": false,
       "supportsImageOutput": false,
       "supportsAudioOutput": false
-    },
-    "openai/o3-mini": {
-      "id": "openai/o3-mini",
-      "name": "OpenAI: o3 Mini",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0.0000011,
-        "outputCostPerToken": 0.0000044,
-        "inputCacheReadPerToken": 5.5e-7,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 200000,
-      "maxCompletionTokens": 100000,
-      "supportedParameters": [
-        "include_reasoning",
-        "max_tokens",
-        "reasoning",
-        "response_format",
-        "seed",
-        "structured_outputs",
-        "tool_choice",
-        "tools"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text+file->text",
-      "mode": "chat",
-      "description": "OpenAI o3-mini is a cost-efficient language model optimized for STEM reasoning tasks, particularly excelling in science, mathematics, and coding. This model supports the `reasoning_effort` parameter, which can be set to...",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false,
-      "reasoningConfig": {
-        "supported": true,
-        "parameterName": "reasoning_effort",
-        "allowedValues": ["low", "medium", "high"],
-        "defaultValue": "medium",
-        "canDisable": false
-      }
-    },
-    "openai/o3-mini:batch": {
-      "id": "openai/o3-mini:batch",
-      "name": "OpenAI: o3 Mini (batch)",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 5.5e-7,
-        "outputCostPerToken": 0.0000022,
-        "inputCacheReadPerToken": 2.75e-7,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 200000,
-      "maxCompletionTokens": 100000,
-      "supportedParameters": [
-        "include_reasoning",
-        "max_tokens",
-        "reasoning",
-        "response_format",
-        "seed",
-        "structured_outputs",
-        "tool_choice",
-        "tools"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text+file->text",
-      "mode": "chat",
-      "description": "OpenAI o3-mini is a cost-efficient language model optimized for STEM reasoning tasks, particularly excelling in science, mathematics, and coding. This model supports the `reasoning_effort` parameter, which can be set to...",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false,
-      "reasoningConfig": {
-        "supported": true,
-        "parameterName": "reasoning_effort",
-        "allowedValues": ["low", "medium", "high"],
-        "defaultValue": "medium",
-        "canDisable": false
-      }
     },
     "mistralai/mistral-small-24b-instruct-2501": {
       "id": "mistralai/mistral-small-24b-instruct-2501",
@@ -15654,48 +13867,6 @@
       "supportsAudioInput": false,
       "supportsImageOutput": false,
       "supportsAudioOutput": false
-    },
-    "openai/o1": {
-      "id": "openai/o1",
-      "name": "OpenAI: o1",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0.000015,
-        "outputCostPerToken": 0.00006,
-        "inputCacheReadPerToken": 0.0000075,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 200000,
-      "maxCompletionTokens": 100000,
-      "supportedParameters": [
-        "include_reasoning",
-        "max_tokens",
-        "reasoning",
-        "response_format",
-        "seed",
-        "structured_outputs",
-        "tool_choice",
-        "tools"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "The latest and strongest model family from OpenAI, o1 is designed to spend more time thinking before responding. The o1 model series is trained with large-scale reinforcement learning to reason...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false,
-      "reasoningConfig": {
-        "supported": true,
-        "parameterName": "reasoning_effort",
-        "allowedValues": ["low", "medium", "high"],
-        "defaultValue": "medium",
-        "canDisable": false
-      }
     },
     "cohere/command-r7b-12-2024": {
       "id": "cohere/command-r7b-12-2024",
@@ -16079,11 +14250,11 @@
       "name": "Meta: Llama 3.2 3B Instruct",
       "provider": "meta-llama",
       "pricing": {
-        "inputCostPerToken": 5e-8,
-        "outputCostPerToken": 3.3e-7
+        "inputCostPerToken": 5.09e-8,
+        "outputCostPerToken": 3.35e-7
       },
       "contextLength": 131072,
-      "maxCompletionTokens": 117964,
+      "maxCompletionTokens": 72000,
       "supportedParameters": [
         "frequency_penalty",
         "logit_bias",
@@ -16578,45 +14749,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "openai/gpt-4o-mini:batch": {
-      "id": "openai/gpt-4o-mini:batch",
-      "name": "OpenAI: GPT-4o-mini (batch)",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 7.5e-8,
-        "outputCostPerToken": 3e-7,
-        "inputCacheReadPerToken": 3.75e-8,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 128000,
-      "maxCompletionTokens": 16384,
-      "supportedParameters": [
-        "frequency_penalty",
-        "logit_bias",
-        "logprobs",
-        "max_tokens",
-        "prediction",
-        "presence_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_logprobs",
-        "top_p",
-        "web_search_options"
-      ],
-      "defaultParameters": {},
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "GPT-4o mini is OpenAI's newest model after [GPT-4 Omni](/models/openai/gpt-4o), supporting both text and image inputs with text outputs. As their most advanced small model, it is many multiples more affordable...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "gemini/gemma-2-27b-it": {
       "id": "gemini/gemma-2-27b-it",
       "name": "Google: Gemma 2 27B",
@@ -16702,47 +14834,6 @@
         "logit_bias",
         "logprobs",
         "max_completion_tokens",
-        "max_tokens",
-        "prediction",
-        "presence_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_logprobs",
-        "top_p",
-        "web_search_options"
-      ],
-      "defaultParameters": {},
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "GPT-4o (\"o\" for \"omni\") is OpenAI's latest AI model, supporting both text and image inputs with text outputs. It maintains the intelligence level of [GPT-4 Turbo](/models/openai/gpt-4-turbo) while being twice as...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "openai/gpt-4o:batch": {
-      "id": "openai/gpt-4o:batch",
-      "name": "OpenAI: GPT-4o (batch)",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0.00000125,
-        "outputCostPerToken": 0.000005,
-        "inputCacheReadPerToken": 6.25e-7,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 128000,
-      "maxCompletionTokens": 16384,
-      "supportedParameters": [
-        "frequency_penalty",
-        "logit_bias",
-        "logprobs",
-        "max_tokens",
-        "prediction",
         "presence_penalty",
         "response_format",
         "seed",
@@ -16795,77 +14886,6 @@
       "mode": "chat",
       "description": "Mistral's official instruct fine-tuned version of [Mixtral 8x22B](/models/mistralai/mixtral-8x22b). It uses 39B active parameters out of 141B, offering unparalleled cost efficiency for its size. Its strengths include: - strong math, coding,...",
       "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "openai/gpt-4-turbo": {
-      "id": "openai/gpt-4-turbo",
-      "name": "OpenAI: GPT-4 Turbo",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0.00001,
-        "outputCostPerToken": 0.00003
-      },
-      "contextLength": 128000,
-      "maxCompletionTokens": 4096,
-      "supportedParameters": [
-        "frequency_penalty",
-        "logit_bias",
-        "logprobs",
-        "max_tokens",
-        "presence_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_logprobs",
-        "top_p"
-      ],
-      "defaultParameters": {},
-      "modality": "text+image->text",
-      "mode": "chat",
-      "description": "The latest GPT-4 Turbo model with vision capabilities. Vision requests can now use JSON mode and function calling. Training data: up to December 2023.",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "openai/gpt-4-turbo:batch": {
-      "id": "openai/gpt-4-turbo:batch",
-      "name": "OpenAI: GPT-4 Turbo (batch)",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0.000005,
-        "outputCostPerToken": 0.000015,
-        "webSearchCostPerQuery": 0.01
-      },
-      "contextLength": 128000,
-      "maxCompletionTokens": 4096,
-      "supportedParameters": [
-        "frequency_penalty",
-        "logit_bias",
-        "logprobs",
-        "max_tokens",
-        "presence_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_logprobs",
-        "top_p"
-      ],
-      "defaultParameters": {},
-      "modality": "text+image->text",
-      "mode": "chat",
-      "description": "The latest GPT-4 Turbo model with vision capabilities. Vision requests can now use JSON mode and function calling. Training data: up to December 2023.",
-      "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
       "supportsAudioOutput": false
@@ -16940,50 +14960,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "openrouter/auto": {
-      "id": "openrouter/auto",
-      "name": "Auto Router",
-      "provider": "openrouter",
-      "pricing": {
-        "inputCostPerToken": -1,
-        "outputCostPerToken": -1
-      },
-      "contextLength": 2000000,
-      "maxCompletionTokens": null,
-      "supportedParameters": [
-        "frequency_penalty",
-        "include_reasoning",
-        "logit_bias",
-        "logprobs",
-        "max_tokens",
-        "min_p",
-        "prediction",
-        "presence_penalty",
-        "reasoning",
-        "reasoning_effort",
-        "repetition_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_a",
-        "top_k",
-        "top_logprobs",
-        "top_p",
-        "web_search_options"
-      ],
-      "defaultParameters": {},
-      "modality": "text+image+file+audio+video->text+image",
-      "mode": "chat",
-      "description": "The Auto Router automatically selects the best model for your prompt, powered by the wisdom of the market. It routes you based on what the OpenRouter community collectively spends on...",
-      "supportsImageInput": true,
-      "supportsAudioInput": true,
-      "supportsImageOutput": true,
-      "supportsAudioOutput": false
-    },
     "openai/gpt-3.5-turbo-16k": {
       "id": "openai/gpt-3.5-turbo-16k",
       "name": "OpenAI: GPT-3.5 Turbo 16k",
@@ -16999,7 +14975,6 @@
         "logit_bias",
         "logprobs",
         "max_completion_tokens",
-        "max_tokens",
         "presence_penalty",
         "response_format",
         "seed",
@@ -17145,12 +15120,10 @@
         "logit_bias",
         "logprobs",
         "max_completion_tokens",
-        "max_tokens",
         "presence_penalty",
         "response_format",
         "seed",
         "stop",
-        "structured_outputs",
         "temperature",
         "tool_choice",
         "tools",
@@ -17164,6 +15137,302 @@
       "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "typesafe/jev-router": {
+      "id": "typesafe/jev-router",
+      "name": "TypeSafe: Jev Router",
+      "provider": "typesafe",
+      "pricing": {
+        "inputCostPerToken": -1,
+        "outputCostPerToken": -1
+      },
+      "contextLength": 1000000,
+      "maxCompletionTokens": 65536,
+      "supportedParameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "logit_bias",
+        "logprobs",
+        "max_completion_tokens",
+        "max_tokens",
+        "min_p",
+        "parallel_tool_calls",
+        "presence_penalty",
+        "reasoning",
+        "reasoning_effort",
+        "repetition_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_a",
+        "top_k",
+        "top_logprobs",
+        "top_p",
+        "verbosity"
+      ],
+      "defaultParameters": {},
+      "modality": "text+image+file+audio+video->text",
+      "mode": "chat",
+      "description": "Jev Router picks the best model and reasoning effort for each request, balancing quality, speed, and cost. It runs on , TypeSafe's first System One model, and adapts as your...",
+      "supportsImageInput": true,
+      "supportsAudioInput": true,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "nvidia/switchyard": {
+      "id": "nvidia/switchyard",
+      "name": "NVIDIA: Switchyard",
+      "provider": "nvidia",
+      "pricing": {
+        "inputCostPerToken": -1,
+        "outputCostPerToken": -1
+      },
+      "contextLength": 1000000,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": {},
+      "modality": "text->text",
+      "mode": "chat",
+      "description": "Switchyard is an open-source model routing system that switches between multiple models to optimize the cost of requests. By default it will use OpenRouter market data to select the most...",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "openrouter/auto-beta": {
+      "id": "openrouter/auto-beta",
+      "name": "Auto Router (Beta)",
+      "provider": "openrouter",
+      "pricing": {
+        "inputCostPerToken": -1,
+        "outputCostPerToken": -1
+      },
+      "contextLength": 2000000,
+      "maxCompletionTokens": 65536,
+      "supportedParameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "logit_bias",
+        "logprobs",
+        "max_completion_tokens",
+        "max_tokens",
+        "min_p",
+        "parallel_tool_calls",
+        "presence_penalty",
+        "reasoning",
+        "reasoning_effort",
+        "repetition_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_a",
+        "top_k",
+        "top_logprobs",
+        "top_p",
+        "verbosity"
+      ],
+      "defaultParameters": {},
+      "modality": "text+image+file+audio+video->text+image",
+      "mode": "chat",
+      "description": "The experimental version of our Auto Router where we test new improvements. Use it to get the latest and greatest version of our general purpose auto router, but expect beta...",
+      "supportsImageInput": true,
+      "supportsAudioInput": true,
+      "supportsImageOutput": true,
+      "supportsAudioOutput": false
+    },
+    "openrouter/fusion": {
+      "id": "openrouter/fusion",
+      "name": "OpenRouter: Fusion",
+      "provider": "openrouter",
+      "pricing": {
+        "inputCostPerToken": -1,
+        "outputCostPerToken": -1
+      },
+      "contextLength": 1000000,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
+      "modality": "text->text",
+      "mode": "chat",
+      "description": "Fusion turns your prompt into a small multi-model deliberation. A panel of expert models (see below) analyzes your prompt in parallel with web search and web fetch enabled, then a...",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "openrouter/pareto-code": {
+      "id": "openrouter/pareto-code",
+      "name": "Pareto Code Router",
+      "provider": "openrouter",
+      "pricing": {
+        "inputCostPerToken": -1,
+        "outputCostPerToken": -1
+      },
+      "contextLength": 2000000,
+      "maxCompletionTokens": null,
+      "supportedParameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "logit_bias",
+        "logprobs",
+        "max_completion_tokens",
+        "max_tokens",
+        "min_p",
+        "parallel_tool_calls",
+        "presence_penalty",
+        "reasoning",
+        "reasoning_effort",
+        "repetition_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_a",
+        "top_k",
+        "top_logprobs",
+        "top_p",
+        "verbosity"
+      ],
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
+      "modality": "text->text",
+      "mode": "chat",
+      "description": "The Pareto Router maintains a tiered shortlist of strong coding models, ranked by [Artificial Analysis](https://artificialanalysis.ai/) coding percentiles. Set min_coding_score between 0 and 1 on the to control how...",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "openrouter/free": {
+      "id": "openrouter/free",
+      "name": "Free Models Router",
+      "provider": "openrouter",
+      "pricing": {
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0
+      },
+      "contextLength": 200000,
+      "maxCompletionTokens": null,
+      "supportedParameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "logprobs",
+        "max_completion_tokens",
+        "max_tokens",
+        "min_p",
+        "presence_penalty",
+        "reasoning",
+        "reasoning_effort",
+        "repetition_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_k",
+        "top_logprobs",
+        "top_p"
+      ],
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
+      "modality": "text+image->text",
+      "mode": "chat",
+      "description": "The simplest way to get free inference. openrouter/free is a router that selects free models at random from the models available on OpenRouter. The router smartly filters for models that...",
+      "supportsImageInput": true,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "openrouter/bodybuilder": {
+      "id": "openrouter/bodybuilder",
+      "name": "Body Builder (beta)",
+      "provider": "openrouter",
+      "pricing": {
+        "inputCostPerToken": -1,
+        "outputCostPerToken": -1
+      },
+      "contextLength": 128000,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
+      "modality": "text->text",
+      "mode": "chat",
+      "description": "Transform your natural language requests into structured OpenRouter API request objects. Describe what you want to accomplish with AI models, and Body Builder will construct the appropriate API calls. Example:...",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "openrouter/auto": {
+      "id": "openrouter/auto",
+      "name": "Auto Router",
+      "provider": "openrouter",
+      "pricing": {
+        "inputCostPerToken": -1,
+        "outputCostPerToken": -1
+      },
+      "contextLength": 2000000,
+      "maxCompletionTokens": null,
+      "supportedParameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "logit_bias",
+        "logprobs",
+        "max_tokens",
+        "min_p",
+        "prediction",
+        "presence_penalty",
+        "reasoning",
+        "reasoning_effort",
+        "repetition_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_a",
+        "top_k",
+        "top_logprobs",
+        "top_p",
+        "web_search_options"
+      ],
+      "defaultParameters": {},
+      "modality": "text+image+file+audio+video->text+image",
+      "mode": "chat",
+      "description": "The Auto Router automatically selects the best model for your prompt, powered by the wisdom of the market. It routes you based on what the OpenRouter community collectively spends on...",
+      "supportsImageInput": true,
+      "supportsAudioInput": true,
+      "supportsImageOutput": true,
       "supportsAudioOutput": false
     },
     "amazon/titan-embed-image-v1": {
