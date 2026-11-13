@@ -1,5 +1,8 @@
 /** Spec: specs/upgrade/projection-replay-step.feature. */
-import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
+import {
+  memoryRedisDouble,
+  memoryRedisStore,
+} from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
 import type { Event } from "../../domain/types.ts";
@@ -11,7 +14,7 @@ import {
   projectionLaneReplayer,
   unionReplayTenants,
 } from "../projectionLaneReplay.ts";
-import { REPLAY_CURSOR_SKEW_MARGIN_MS } from "../replayConstants.ts";
+import { CUTOFF_KEY_PREFIX, REPLAY_CURSOR_SKEW_MARGIN_MS } from "../replayConstants.ts";
 import type {
   CutoffInfo,
   DiscoveredAggregateWithEventTypes,
@@ -275,8 +278,14 @@ function setUpTwoTenants({
 }
 
 function setUp() {
+  const store = memoryRedisStore();
+  const hdel = async (key: unknown, ...fields: unknown[]) => {
+    const hash = store.hashes.get(String(key));
+    return fields.filter((field) => hash?.delete(String(field))).length;
+  };
   const redis = memoryRedisDouble({
-    script: { hdel: async () => 0, hlen: async () => 0, lpush: async () => 0 },
+    store,
+    script: { hdel, hlen: async () => 0, lpush: async () => 0 },
   });
   const readModel = new Map<string, number>();
   const otherReadModel = new Map<string, number>();
@@ -306,7 +315,16 @@ function setUp() {
     service: new ReplayService({ eventSource: log, redis }),
     projections,
   });
-  return { redis, readModel, otherReadModel, writes, log, replayer };
+  return { redis, store, readModel, otherReadModel, writes, log, replayer };
+}
+
+/** Three more aggregates of one event each, so a batch of five splits unevenly. */
+function seedThreeMore(log: SeededLog): void {
+  log.events.push(
+    seededEvent({ n: 4, aggregateId: "directory-c" }),
+    seededEvent({ n: 5, aggregateId: "directory-d" }),
+    seededEvent({ n: 6, aggregateId: "directory-e" }),
+  );
 }
 
 /** ClickHouse's refusal for one statement over its own memory limit, as the client raises it. */
@@ -608,6 +626,63 @@ describe("projectionLaneReplayer", () => {
       expect(result).toMatchObject({ aggregatesReplayed: 2, totalEvents: 3 });
     });
 
+    /** @scenario "A batch over the query memory limit is split until it fits" */
+    it("splits an odd batch again until every part fits, larger half first", async () => {
+      const clean = setUp();
+      seedThreeMore(clean.log);
+      await clean.replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false });
+      const { log, readModel, replayer } = setUp();
+      seedThreeMore(log);
+      const { streamed } = failStreamsAbove({ log, maxAggregates: 1 });
+
+      const result = await replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false });
+
+      expect(streamed).toEqual([5, 3, 2, 1, 1, 1, 2, 1, 1]);
+      expect(Object.fromEntries(readModel)).toEqual(Object.fromEntries(clean.readModel));
+      expect(result).toMatchObject({ aggregatesReplayed: 5, totalEvents: 6 });
+    });
+
+    /** @scenario "A batch over the query memory limit is split until it fits" */
+    it("clears the failed batch's markers before its halves run", async () => {
+      const { log, store, replayer } = setUp();
+      failStreamsAbove({ log, maxAggregates: 1 });
+      const stream = log.streamEventsForAggregates.bind(log);
+      const markedAtStream: string[][] = [];
+      log.streamEventsForAggregates = async (input) => {
+        markedAtStream.push([...(store.hashes.get(`${CUTOFF_KEY_PREFIX}${LANE}`)?.keys() ?? [])]);
+        return stream(input);
+      };
+
+      await replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false });
+
+      expect(markedAtStream).toEqual([
+        ["tenant-1:directory:directory-a", "tenant-1:directory:directory-b"],
+        ["tenant-1:directory:directory-a"],
+        ["tenant-1:directory:directory-b"],
+      ]);
+    });
+
+    /** @scenario "A worker stop between the halves of a split batch ends the replay" */
+    it("stops before the second half once the first half completes", async () => {
+      const { redis, log, readModel, replayer } = setUp();
+      const { streamed } = failStreamsAbove({ log, maxAggregates: 1 });
+      const stop = new AbortController();
+
+      await expect(
+        replayer.replayLane({
+          lane: LANE,
+          since: FROM_START,
+          dryRun: false,
+          signal: stop.signal,
+          onBatchComplete: () => stop.abort(new Error("worker stopping")),
+        }),
+      ).rejects.toThrow("worker stopping");
+
+      expect(streamed).toEqual([2, 1]);
+      expect(Object.fromEntries(readModel)).toEqual({ "directory-a": 2 });
+      expect(await redis.smembers(PAUSED_SET_KEY)).not.toContain(PAUSE_KEY);
+    });
+
     /** @scenario "A batch that hits the query memory limit mid-stream is not applied twice" */
     it("writes nothing of the failed attempt when the limit lands after some events", async () => {
       const clean = setUp();
@@ -656,6 +731,24 @@ describe("projectionLaneReplayer", () => {
 
       expect(streamed).toEqual([2]);
       expect(readModel.size).toBe(0);
+    });
+
+    /** @scenario "A batch failing for any other reason fails the lane without splitting" */
+    it("does not split on the server-wide total memory limit, which is load, not size", async () => {
+      const { log, replayer } = setUp();
+      const totalLimit =
+        "Memory limit (total) exceeded: would use 14.90 GiB (attempt to allocate chunk of 4.00 MiB), maximum: 14.90 GiB";
+      const { streamed } = failStreamsAbove({
+        log,
+        maxAggregates: 0,
+        failure: () => Object.assign(new Error(totalLimit), { code: "241" }),
+      });
+
+      await expect(
+        replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false }),
+      ).rejects.toThrow(`Replaying "${LANE}" failed in 1 batch(es): ${totalLimit}`);
+
+      expect(streamed).toEqual([2]);
     });
   });
 });
