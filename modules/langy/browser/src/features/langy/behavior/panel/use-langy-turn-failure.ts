@@ -11,6 +11,7 @@ import { api } from "../../../../behavior/langy-api.ts";
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import {
   type InterruptedTurn,
+  isLiveErrorOnRunningTurn,
   isTurnErrorOutlived,
 } from "../../model/logic/outlived-turn-error.ts";
 import {
@@ -40,13 +41,17 @@ function presentTurnError({
   error,
   isBusy,
   durableLastError,
+  isTurnStillRunning,
 }: {
   error: Error | undefined;
   isBusy: boolean;
   durableLastError: string | null;
+  /** The record holds the turn this unnamed error interrupted as running. */
+  isTurnStillRunning: (code: string) => boolean;
 }): LangyErrorPresentation | null {
   if (error) {
     const domain = resolveLiveTurnError({ error, durableLastError });
+    if (isTurnStillRunning(domain.code)) return null;
     // Debug context for the case nothing could name; `meta` is the card's contract, not a log.
     if (domain.code === "unknown") console.warn("[Langy] unclassified turn failure", error.message);
     return explainLangyError(domain);
@@ -54,6 +59,42 @@ function presentTurnError({
   if (isBusy || !durableLastError) return null;
   const domain = readLangyStreamError(durableLastError);
   return domain ? explainLangyError(domain) : null;
+}
+
+/**
+ * Whether an unnamed live error interrupted a turn the record still holds as running. The turn is
+ * read off the store once, when the error arrives.
+ */
+function useLostConnectionCheck({
+  error,
+  turnActive,
+}: {
+  error: Error | undefined;
+  turnActive: boolean;
+}) {
+  const recordedTurnId = useLangyStore((s) => s.turnProjection.turnId);
+  const recordedStatus = useLangyStore((s) => s.turnProjection.turn?.Status ?? null);
+  const [errorTurn, setErrorTurn] = useState<{
+    error: Error | undefined;
+    turn: InterruptedTurn | null;
+  }>({ error: undefined, turn: null });
+  if (errorTurn.error !== error) {
+    setErrorTurn({ error, turn: error ? interruptedTurnNow() : null });
+  }
+  const interruptedTurn = errorTurn.error === error ? errorTurn.turn : null;
+  const isTurnStillRunning = useCallback(
+    (code: string) =>
+      isLiveErrorOnRunningTurn({
+        errorCode: code,
+        interrupted: interruptedTurn,
+        turnInFlight: turnActive,
+        recorded: { turnId: recordedTurnId, status: recordedStatus },
+      }),
+    [interruptedTurn, turnActive, recordedTurnId, recordedStatus],
+  );
+  // The error arrived on a turn the record still runs: the panel goes on following it.
+  const followsLostTurn = !!error && !!interruptedTurn && isTurnStillRunning("unknown");
+  return { isTurnStillRunning, followsLostTurn };
 }
 
 /**
@@ -79,9 +120,10 @@ export function useLangyTurnFailure({
   restoreDraftOnFailure: () => void;
 }) {
   const utils = api.useUtils();
+  const { isTurnStillRunning, followsLostTurn } = useLostConnectionCheck({ error, turnActive });
   const turnError = useMemo(
-    () => presentTurnError({ error, isBusy, durableLastError }),
-    [error, isBusy, durableLastError],
+    () => presentTurnError({ error, isBusy, durableLastError, isTurnStillRunning }),
+    [error, isBusy, durableLastError, isTurnStillRunning],
   );
 
   // RE-DRIVE the turn; never RE-POST the message.
@@ -129,7 +171,7 @@ export function useLangyTurnFailure({
   // line, a recovering line, a card, or the answer — never blank.
   const interrupted = !!turnError || recovery.isRecovering || needsGithubConnect;
   return {
-    liveTurnInFlight: (isBusy || turnActive) && !interrupted,
+    liveTurnInFlight: (isBusy || turnActive || followsLostTurn) && !interrupted,
     isSettling: !!turnError || recovery.isRecovering,
     turnError,
     retryTurn,

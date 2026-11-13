@@ -95,6 +95,12 @@ Rule: A dropped channel comes back, and a channel that cannot come back says so
     Given a screen watching a live procedure that dropped and came back
     Then the screen was told the subscription started exactly once
 
+  @unit
+  Scenario: A reopened channel tells the screen it is connected again
+    Given a screen watching a live procedure that dropped and came back
+    Then the screen is told the channel is connected again, once per reopen
+    And a screen that replays from the start can tell the replay from new updates
+
 Rule: What arrives on the channel reaches the screen as what it is
 
   @unit

@@ -544,6 +544,26 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     When the conversation's record shows that turn failed
     Then the error card stays
 
+  # The turn runs on the server whether or not the panel's connection to it
+  # holds. A connection that gave up (a deploy, a flaky network, a proxy drop)
+  # used to end the panel's stream with an unnamed error, so a turn that went on
+  # to open a pull request showed "Something went wrong", and "Try again" started
+  # a second turn. A lost connection is followed, not reported.
+  @unit
+  Scenario: A lost connection follows the running turn instead of failing it
+    Given Langy is answering a question
+    When the panel's connection to the turn is lost and does not come back on its own
+    Then the panel reattaches to the same turn and keeps showing it as it runs
+    And what the panel already showed is not shown twice
+    And no error card or "Try again" appears while the record holds the turn as running
+
+  @unit
+  Scenario: A stream the server refused by name still fails the turn
+    Given Langy is answering a question
+    When the server refuses the turn's stream with a named error
+    Then the panel does not reattach
+    And the card names that refusal
+
   @unit
   Scenario: The previous turn's completion never clears an error about a new message
     Given the last turn had already completed when a new message failed to send

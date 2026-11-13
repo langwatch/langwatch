@@ -4,10 +4,12 @@
  * turn-start to `useChat().error`.
  */
 
-import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 import {
   createLangyChatTransport,
+  LANGY_TURN_STREAM_MAX_REATTACHES,
+  LANGY_TURN_STREAM_REATTACH_DELAY_MS,
   type LangyChatTransportDeps,
   type LangyTurnClient,
   type LangyTurnRequestContext,
@@ -457,6 +459,119 @@ describe("createLangyChatTransport", () => {
       handlers().onComplete();
 
       expect(onTurnSettled).toHaveBeenCalledExactlyOnceWith({ reason: "end" });
+    });
+  });
+
+  describe("when the connection to a running turn is lost", () => {
+    type StreamHandlers = {
+      onData: (entry: unknown) => void;
+      onError: (err: unknown) => void;
+      onComplete: () => void;
+      onConnectionStateChange?: (state: { state: string }) => void;
+    };
+    const handlersOf = (call: number) => subscription.mock.calls[call]![2] as StreamHandlers;
+
+    let onTurnSettled: Mock<NonNullable<LangyChatTransportDeps["onTurnSettled"]>>;
+    let onWireEntry: Mock<NonNullable<LangyChatTransportDeps["onWireEntry"]>>;
+    let chunks: { type: string; errorText?: string; delta?: string }[];
+    let done: Promise<void>;
+
+    beforeEach(async () => {
+      vi.useFakeTimers();
+      onTurnSettled = vi.fn();
+      onWireEntry = vi.fn();
+      const { transport } = makeTransport({}, { onTurnSettled, onWireEntry });
+      const stream = await transport.sendMessages(options());
+      chunks = [];
+      done = (async () => {
+        const reader = stream.getReader();
+        for (;;) {
+          const { value, done: finished } = await reader.read();
+          if (finished) return;
+          chunks.push(value as { type: string });
+        }
+      })();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** @scenario "A lost connection follows the running turn instead of failing it" */
+    it("reattaches to the same turn instead of failing it", async () => {
+      handlersOf(0).onData({ type: "delta", text: "Looking" });
+      handlersOf(0).onError(new Error("SSE connection failed after 5 attempts"));
+
+      expect(onTurnSettled).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(LANGY_TURN_STREAM_REATTACH_DELAY_MS);
+      expect(subscription).toHaveBeenCalledTimes(2);
+      expect(subscription.mock.calls[1]![1]).toEqual({
+        projectId: "p1",
+        conversationId: "conv-1",
+        turnId: "turn-1",
+      });
+
+      handlersOf(1).onData({ type: "delta", text: "Looking" });
+      handlersOf(1).onData({ type: "delta", text: " at the traces" });
+      handlersOf(1).onData({ type: "end" });
+      await done;
+
+      expect(chunks.some((chunk) => chunk.type === "error")).toBe(false);
+      expect(chunks.filter((c) => c.type === "text-delta").map((c) => c.delta)).toEqual([
+        "Looking",
+        " at the traces",
+      ]);
+      expect(onTurnSettled).toHaveBeenCalledExactlyOnceWith({ reason: "end" });
+    });
+
+    /** @scenario "A lost connection follows the running turn instead of failing it" */
+    it("skips what a reopened connection replays", async () => {
+      handlersOf(0).onData({ type: "delta", text: "one" });
+      handlersOf(0).onData({ type: "delta", text: "two" });
+      handlersOf(0).onConnectionStateChange?.({ state: "pending" });
+      handlersOf(0).onData({ type: "delta", text: "one" });
+      handlersOf(0).onData({ type: "delta", text: "two" });
+      handlersOf(0).onData({ type: "delta", text: "three" });
+      handlersOf(0).onData({ type: "end" });
+      await done;
+
+      expect(chunks.filter((c) => c.type === "text-delta").map((c) => c.delta)).toEqual([
+        "one",
+        "two",
+        "three",
+      ]);
+      expect(onWireEntry).toHaveBeenCalledTimes(4);
+    });
+
+    /** @scenario "A stream the server refused by name still fails the turn" */
+    it("fails at once on a refusal the server named", async () => {
+      handlersOf(0).onError(new Error("langy_conversation_not_found"));
+      await done;
+
+      expect(chunks).toContainEqual({ type: "error", errorText: "langy_conversation_not_found" });
+      expect(subscription).toHaveBeenCalledTimes(1);
+      expect(onTurnSettled).toHaveBeenCalledExactlyOnceWith({ reason: "error" });
+    });
+
+    /** @scenario "A lost connection follows the running turn instead of failing it" */
+    it("gives the loss to the panel only after every reattach failed", async () => {
+      for (let attempt = 0; attempt < LANGY_TURN_STREAM_MAX_REATTACHES; attempt++) {
+        handlersOf(attempt).onError(new Error("SSE connection failed after 5 attempts"));
+        vi.advanceTimersByTime(60_000);
+      }
+      expect(subscription).toHaveBeenCalledTimes(LANGY_TURN_STREAM_MAX_REATTACHES + 1);
+
+      handlersOf(LANGY_TURN_STREAM_MAX_REATTACHES).onError(
+        new Error("SSE connection failed after 5 attempts"),
+      );
+      await done;
+
+      expect(chunks.at(-2)).toEqual({
+        type: "error",
+        errorText: "SSE connection failed after 5 attempts",
+      });
+      vi.advanceTimersByTime(60_000);
+      expect(subscription).toHaveBeenCalledTimes(LANGY_TURN_STREAM_MAX_REATTACHES + 1);
     });
   });
 

@@ -371,6 +371,101 @@ function routeStreamEntry({
   }
 }
 
+/** Reattaches to a live turn after its connection is lost, before the loss becomes an error. */
+export const LANGY_TURN_STREAM_MAX_REATTACHES = 5;
+
+/** The first reattach waits this long; each further one doubles it, up to the cap. */
+export const LANGY_TURN_STREAM_REATTACH_DELAY_MS = 2_000;
+const REATTACH_DELAY_CAP_MS = 16_000;
+
+/**
+ * A stream refusal the server named with a handled code (the SSE error frame's message is the
+ * code slug: not found, outdated client). Anything else is the connection, not the turn.
+ */
+function isNamedRefusal(message: string): boolean {
+  return /^[a-z][a-z0-9_]*$/.test(message);
+}
+
+const isTerminalEntry = (entry: LangyStreamWireEntry): boolean =>
+  entry.type === "end" || entry.type === "error";
+
+/** Where one turn's subscription goes, and the routing every entry of it takes. */
+interface TurnSubscriptionTarget {
+  client: LangyTurnClient;
+  projectId: string;
+  conversationId: string;
+  turnId: string;
+  handlers: TurnStreamHandlers;
+}
+
+/**
+ * One turn's subscription across its connections. Each connection replays the turn from its
+ * first buffered entry, so entries already passed on are counted and skipped; a lost connection
+ * reattaches to the same turn instead of failing it, since the turn runs on the server either way.
+ */
+class TurnSubscription {
+  private sub: Unsubscribable | undefined;
+  private reattachTimer: ReturnType<typeof setTimeout> | undefined;
+  private passedOn = 0;
+  private seenOnConnection = 0;
+  private reattaches = 0;
+  sink: TurnStreamSink | undefined;
+
+  constructor(private readonly target: TurnSubscriptionTarget) {}
+
+  attach(): void {
+    const { client, projectId, conversationId, turnId } = this.target;
+    this.seenOnConnection = 0;
+    this.sub = client.langy.onTurnStream.subscribe(
+      { projectId, conversationId, turnId },
+      {
+        // A reopened connection replays the turn from its first entry again.
+        onConnectionStateChange: (connection) => {
+          if (connection.state === "pending") this.seenOnConnection = 0;
+        },
+        onData: (entry) => this.receive(entry),
+        onError: (err: unknown) => this.lose(err),
+        onComplete: () => this.sink?.finish("closed"),
+      },
+    );
+  }
+
+  release(): void {
+    clearTimeout(this.reattachTimer);
+    this.sub?.unsubscribe();
+  }
+
+  private receive(entry: LangyStreamWireEntry): void {
+    const sink = this.sink;
+    if (!sink || sink.closed) return;
+    this.seenOnConnection += 1;
+    if (this.seenOnConnection <= this.passedOn && !isTerminalEntry(entry)) return;
+    this.passedOn = this.seenOnConnection;
+    this.reattaches = 0;
+    this.target.handlers.onWireEntry?.(entry, this.target.turnId);
+    routeStreamEntry({ entry, sink, handlers: this.target.handlers });
+  }
+
+  private lose(err: unknown): void {
+    const sink = this.sink;
+    if (!sink || sink.closed) return;
+    const message = err instanceof Error ? err.message : "Langy stream error";
+    if (isNamedRefusal(message) || this.reattaches >= LANGY_TURN_STREAM_MAX_REATTACHES) {
+      sink.error(message);
+      return;
+    }
+    this.sub?.unsubscribe();
+    const delay = Math.min(
+      LANGY_TURN_STREAM_REATTACH_DELAY_MS * 2 ** this.reattaches,
+      REATTACH_DELAY_CAP_MS,
+    );
+    this.reattaches += 1;
+    this.reattachTimer = setTimeout(() => {
+      if (!sink.closed) this.attach();
+    }, delay);
+  }
+}
+
 /**
  * Bridge one turn's `onTurnStream` subscription into a UIMessageChunk stream. The tape
  * (`onWireEntry`) sees every entry first, including the ones the routing drops.
@@ -389,31 +484,24 @@ function subscribeTurnStream({
   turnId: string;
   abortSignal?: AbortSignal;
 }): ReadableStream<UIMessageChunk> {
-  let sub: Unsubscribable | undefined;
+  const subscription = new TurnSubscription({
+    client,
+    projectId,
+    conversationId,
+    turnId,
+    handlers,
+  });
 
   return new ReadableStream<UIMessageChunk>({
     start(controller) {
-      const sink = new TurnStreamSink(controller, handlers, () => sub?.unsubscribe());
+      const sink = new TurnStreamSink(controller, handlers, () => subscription.release());
+      subscription.sink = sink;
       controller.enqueue({ type: "start" });
-      sub = client.langy.onTurnStream.subscribe(
-        { projectId, conversationId, turnId },
-        {
-          onData: (entry) => {
-            if (sink.closed) return;
-            handlers.onWireEntry?.(entry, turnId);
-            routeStreamEntry({ entry, sink, handlers });
-          },
-          onError: (err: unknown) => {
-            if (sink.closed) return;
-            sink.error(err instanceof Error ? err.message : "Langy stream error");
-          },
-          onComplete: () => sink.finish("closed"),
-        },
-      );
+      subscription.attach();
       abortSignal?.addEventListener("abort", () => sink.abort());
     },
     cancel() {
-      sub?.unsubscribe();
+      subscription.release();
     },
   });
 }
