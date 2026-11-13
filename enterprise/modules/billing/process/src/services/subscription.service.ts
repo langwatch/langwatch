@@ -143,7 +143,7 @@ export class BillingSubscriptionService {
   }): Promise<{ success: boolean }> {
     const effectiveMembers = upgradeMembers ? totalMembers : 0;
     const effectiveTraces = upgradeTraces ? totalTraces : 0;
-    await this.assertSeatsCoverUse({ organizationId, requested: effectiveMembers });
+    await this.assertFullSeatsCoverUse({ organizationId, requested: effectiveMembers });
 
     if (this.seatEventService) {
       const pricingModel = await this.organizationRepository.findPricingModel(organizationId);
@@ -187,7 +187,7 @@ export class BillingSubscriptionService {
   }
 
   /** Refuses a seat count below the full seats in use, and below one, before any charge. */
-  private async assertSeatsCoverUse({
+  private async assertFullSeatsCoverUse({
     organizationId,
     requested,
   }: {

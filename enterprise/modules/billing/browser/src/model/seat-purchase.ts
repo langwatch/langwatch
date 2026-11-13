@@ -70,18 +70,34 @@ export function developerSeatMinimum({ current, inUse }: { current: number; inUs
   return Math.min(current, inUse);
 }
 
-/** Why the Developer stepper stopped lowering, once it reaches the Developers in use. */
+type DeveloperFloor = { current: number; inUse: number };
+
+/** A pick under the floor, made before the Developers in use were counted, lifted to it. */
+export function developerTargetWithin({ target, ...floor }: DeveloperFloor & { target: number }) {
+  return Math.max(target, developerSeatMinimum(floor));
+}
+
+/** The stepper's next count, skipping the counts the server refuses: under use and not billed. */
+export function snapDeveloperTarget({
+  previous,
+  next,
+  current,
+  inUse,
+}: DeveloperFloor & { previous: number; next: number }) {
+  if (next === current || next >= inUse) return next;
+  return next > previous ? inUse : Math.min(current, previous);
+}
+
+/** Why the Developer stepper stopped where it did, once it reaches the Developers in use. */
 export function developerMinimumHint({
   target,
   current,
   inUse,
-}: {
-  target: number;
-  current: number;
-  inUse: number;
-}): string | undefined {
-  if (inUse === 0 || target > inUse || target >= current) return undefined;
-  return `${people(inUse)} use Developer seats. Remove someone in Users to go lower.`;
+}: DeveloperFloor & { target: number }): string | undefined {
+  if (inUse === 0 || target !== inUse || target === current) return undefined;
+  return target < current
+    ? `${people(inUse)} use Developer seats. Remove someone in Users to go lower.`
+    : `${people(inUse)} use Developer seats, so you need at least ${inUse}.`;
 }
 
 /** "€87/mo", "excl. VAT" and "3 seats × €29", the seat dialog's live total. */

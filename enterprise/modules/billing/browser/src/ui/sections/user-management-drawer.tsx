@@ -31,6 +31,7 @@ import {
   developerMinimumHint,
   developerSeatHint,
   developerSeatMinimum,
+  developerTargetWithin,
   freeSeatPlan,
   type GrowthSeatPlan,
   growthMinimumSeats,
@@ -40,6 +41,7 @@ import {
   type SeatPrice,
   seatChangeToast,
   seatConfirm,
+  snapDeveloperTarget,
 } from "../../model/seat-purchase.ts";
 import {
   isValidEmail,
@@ -492,14 +494,17 @@ function quoteReason({ needed, failed }: { needed: boolean; failed: boolean }) {
 function developerPlanOf({
   seats,
   target,
+  inUse,
 }: {
   seats: DeveloperSeats | undefined;
   target: number | undefined;
+  inUse: number;
 }): DeveloperSeatPlan | undefined {
   if (!seats?.available || seats.unitAmountCents === null) return undefined;
+  const current = seats.quantity;
   return {
-    current: seats.quantity,
-    target: target ?? seats.quantity,
+    current,
+    target: developerTargetWithin({ target: target ?? current, current, inUse }),
     unitCents: seats.unitAmountCents,
   };
 }
@@ -545,7 +550,11 @@ function useGrowthSeats({
   useEffect(() => {
     if (open && isGrowth) void refetchDeveloperSeats();
   }, [open, isGrowth, refetchDeveloperSeats]);
-  const developer = developerPlanOf({ seats: developerSeats.data, target: developerTarget });
+  const developer = developerPlanOf({
+    seats: developerSeats.data,
+    target: developerTarget,
+    inUse: developersInUse,
+  });
   const developerAdded = developer ? developer.target > developer.current : false;
   const seatsChanged = seats !== paid;
 
@@ -586,7 +595,10 @@ function useGrowthSeats({
     minimum,
     setRequested,
     developer,
-    setDeveloperTarget,
+    setDeveloperTarget: (next: number) =>
+      setDeveloperTarget(
+        snapDeveloperTarget({ ...developerFloor, previous: developer?.target ?? 0, next }),
+      ),
     developerMinimum: developerSeatMinimum(developerFloor),
     developerHint: developer
       ? developerMinimumHint({ ...developerFloor, target: developer.target })

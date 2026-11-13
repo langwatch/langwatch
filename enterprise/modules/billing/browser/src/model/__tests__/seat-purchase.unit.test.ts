@@ -9,6 +9,8 @@ import {
   type GrowthSeatPlan,
   developerMinimumHint,
   developerSeatMinimum,
+  developerTargetWithin,
+  snapDeveloperTarget,
   freeSeatPlan,
   growthMinimumSeats,
   growthSeatPlan,
@@ -127,6 +129,24 @@ describe("developerSeatMinimum()", () => {
   it("never raises the floor above the Developer seats billed now", () => {
     expect(developerSeatMinimum({ current: 0, inUse: 2 })).toBe(0);
     expect(developerMinimumHint({ target: 0, current: 0, inUse: 2 })).toBeUndefined();
+  });
+
+  /** @scenario "Raising Developer seats skips the counts below the Developers in use" */
+  it("skips the counts the server refuses, up and down", () => {
+    expect(snapDeveloperTarget({ previous: 0, next: 1, current: 0, inUse: 2 })).toBe(2);
+    expect(developerMinimumHint({ target: 2, current: 0, inUse: 2 })).toBe(
+      "2 people use Developer seats, so you need at least 2.",
+    );
+    expect(snapDeveloperTarget({ previous: 2, next: 1, current: 0, inUse: 2 })).toBe(0);
+    expect(snapDeveloperTarget({ previous: 2, next: 3, current: 0, inUse: 2 })).toBe(3);
+    expect(snapDeveloperTarget({ previous: 3, next: 2, current: 3, inUse: 2 })).toBe(2);
+  });
+
+  /** @scenario "Developers counted after a lower pick lift the pick to the floor" */
+  it("lifts a pick below the floor once the Developers in use are counted", () => {
+    expect(developerTargetWithin({ target: 1, current: 3, inUse: 2 })).toBe(2);
+    expect(developerTargetWithin({ target: 3, current: 3, inUse: 2 })).toBe(3);
+    expect(developerTargetWithin({ target: 0, current: 0, inUse: 2 })).toBe(0);
   });
 });
 

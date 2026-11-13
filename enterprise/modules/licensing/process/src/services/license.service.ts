@@ -350,7 +350,6 @@ export class LicenseService extends LicensingServiceContract {
     return this.repository.getMemberCount(organizationId);
   }
 
-  /** Developer seats in use now, the count the Developer seat line is floored on. */
   countDevelopersInUse(organizationId: string): Promise<number> {
     return this.repository.getMembersDeveloperCount(organizationId);
   }
