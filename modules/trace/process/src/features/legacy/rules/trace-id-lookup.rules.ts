@@ -31,21 +31,21 @@ export function normaliseTraceLookupId(raw: string): string {
   return HEX_ONLY.test(trimmed) ? trimmed.toLowerCase() : trimmed;
 }
 
-export function isHexId(id: string): boolean {
+function isHexId(id: string): boolean {
   return HEX_ONLY.test(id);
 }
 
-export function isScenarioRunId(id: string): boolean {
+function isScenarioRunId(id: string): boolean {
   return id.startsWith(SCENARIO_RUN_ID_PREFIX);
 }
 
 /** An OTel span id (16 hex) or an SDK one (`span_...`): the only ids worth a span scan. */
-export function looksLikeSpanId(id: string): boolean {
+function looksLikeSpanId(id: string): boolean {
   return OTEL_SPAN_ID.test(id) || id.startsWith(SDK_SPAN_ID_PREFIX);
 }
 
 /** A hex id between the minimum prefix length and a full trace id: worth a prefix read. */
-export function isTraceIdPrefix(id: string): boolean {
+function isTraceIdPrefix(id: string): boolean {
   return id.length < FULL_TRACE_ID_LENGTH && id.length >= MIN_TRACE_ID_PREFIX_LENGTH && isHexId(id);
 }
 
