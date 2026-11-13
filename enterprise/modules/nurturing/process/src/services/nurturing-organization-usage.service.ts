@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import type { CounterHandle } from "@langwatch/observability/metrics";
 import type {
   CioBatchCall,
   CioOrganizationUsageTraits,
@@ -41,8 +42,18 @@ type OrganizationUsageDependencies = Readonly<{
   /** Rejects when Customer.io did not take the call, so the subscriber's job retries. */
   sendBatch: (calls: CioBatchCall[]) => Promise<void>;
   clock: Readonly<{ nowMs: () => number }>;
-  logger: Readonly<{ warn(payload: Readonly<Record<string, unknown>>, message: string): void }>;
+  /** One increment per sync attempt, its `outcome` the only attribute: never an id. */
+  syncs: CounterHandle;
+  /** Run lines carry counts and reasons only, never an organization, user or project id. */
+  logger: Readonly<{
+    warn(payload: Readonly<Record<string, unknown>>, message: string): void;
+    info(payload: Readonly<Record<string, unknown>>, message: string): void;
+    debug(payload: Readonly<Record<string, unknown>>, message: string): void;
+  }>;
 }>;
+
+/** What mirroring onto members sent, for the run's log line. */
+type MirroredCounts = Readonly<{ members: number; identifyCalls: number }>;
 
 /** An organization as nurturing's own copies place and date it. */
 type CopiedOrganization = Readonly<{ organizationId: string; organizationCreatedAt: number }>;
@@ -75,7 +86,14 @@ export class NurturingOrganizationUsageService {
     const organization = await this.copiedOrganizationOf({ projectId });
     if (!organization) return;
     const at = this.dependencies.clock.nowMs();
-    if (!isTraceCounted({ organizationCreatedAt: organization.organizationCreatedAt, at })) return;
+    if (!isTraceCounted({ organizationCreatedAt: organization.organizationCreatedAt, at })) {
+      this.dependencies.syncs.inc({ outcome: "outside_counting_window" });
+      this.dependencies.logger.debug(
+        { reason: "outside_counting_window" },
+        "nurturing organization usage sync skipped",
+      );
+      return;
+    }
     await this.syncOrganization(organization);
   }
 
@@ -88,7 +106,14 @@ export class NurturingOrganizationUsageService {
   }: Readonly<{ projectId: string }>): Promise<CopiedOrganization | undefined> {
     if (projectId === "") return undefined;
     const project = await this.dependencies.copiedProjects.copiedProjectOf({ projectId });
-    if (project.outcome !== "placed" || project.organizationCreatedAt === null) return undefined;
+    if (project.outcome !== "placed" || project.organizationCreatedAt === null) {
+      this.dependencies.syncs.inc({ outcome: "not_placed" });
+      this.dependencies.logger.debug(
+        { reason: "not_placed" },
+        "nurturing organization usage sync skipped",
+      );
+      return undefined;
+    }
     const { organizationId, organizationCreatedAt } = project;
     return { organizationId, organizationCreatedAt };
   }
@@ -107,7 +132,14 @@ export class NurturingOrganizationUsageService {
     if (!counting) await traceDays.pruneBefore({ projectIds, beforeDay: windowStartDay });
     const [organization] = await milestones.findOrganization({ organizationId });
     const adminUserId = organization?.adminUserId;
-    if (!adminUserId) return;
+    if (!adminUserId) {
+      this.dependencies.syncs.inc({ outcome: "no_admin" });
+      this.dependencies.logger.debug(
+        { reason: "no_admin" },
+        "nurturing organization usage sync skipped",
+      );
+      return;
+    }
     const [usage, folded] = await Promise.all([
       projectUsage.findForProjects({ projectIds }),
       counting ? traceDays.findForProjects({ projectIds, afterDay: windowStartDay }) : [],
@@ -121,15 +153,31 @@ export class NurturingOrganizationUsageService {
       organizationCreatedAt,
     });
     await sendBatch([{ type: "group", userId: adminUserId, groupId: organizationId, traits }]);
+    let mirrored = { members: 0, identifyCalls: 0 };
+    let mirrorFailed = false;
     try {
-      await this.mirrorOntoMembers({ organizationId, traits });
+      mirrored = await this.mirrorOntoMembers({ organizationId, traits });
     } catch (error) {
+      mirrorFailed = true;
       // The group call stands, and the next sync mirrors again, as the other sinks' failures.
       this.dependencies.logger.warn(
         { error, organizationId },
         "an organization's usage could not be mirrored onto its members",
       );
     }
+    this.dependencies.syncs.inc({ outcome: mirrorFailed ? "mirror_failed" : "synced" });
+    // Debug: it fires for every changed project, so the counter carries the volume.
+    this.dependencies.logger.debug(
+      {
+        counting,
+        projects: projectIds.length,
+        groupCalls: 1,
+        identifyCalls: mirrored.identifyCalls,
+        members: mirrored.members,
+        mirrorFailed,
+      },
+      "nurturing organization usage synced",
+    );
   }
 
   /**
@@ -148,6 +196,9 @@ export class NurturingOrganizationUsageService {
       createdRangeOfEndedWindows({ after, upTo }),
     );
     const traits = endedTraceWindowTraits();
+    let synced = 0;
+    let skippedNoAdmin = 0;
+    let identifyCalls = 0;
     for (const organizationId of ended) {
       // Nothing reads its trace rows past the window, and a quiet organization never syncs again.
       await traceDays.pruneProjects({
@@ -155,10 +206,18 @@ export class NurturingOrganizationUsageService {
       });
       const [organization] = await milestones.findOrganization({ organizationId });
       const adminUserId = organization?.adminUserId;
-      if (!adminUserId) continue;
+      if (!adminUserId) {
+        skippedNoAdmin += 1;
+        continue;
+      }
       await sendBatch([{ type: "group", userId: adminUserId, groupId: organizationId, traits }]);
-      await this.mirrorOntoMembers({ organizationId, traits });
+      identifyCalls += (await this.mirrorOntoMembers({ organizationId, traits })).identifyCalls;
+      synced += 1;
     }
+    this.dependencies.logger.info(
+      { ended: ended.length, synced, skippedNoAdmin, groupCalls: synced, identifyCalls },
+      "nurturing trace windows ended",
+    );
   }
 
   /**
@@ -169,7 +228,10 @@ export class NurturingOrganizationUsageService {
   private async mirrorOntoMembers({
     organizationId,
     traits,
-  }: Readonly<{ organizationId: string; traits: CioOrganizationUsageTraits }>): Promise<void> {
+  }: Readonly<{
+    organizationId: string;
+    traits: CioOrganizationUsageTraits;
+  }>): Promise<MirroredCounts> {
     const { members, sendBatch } = this.dependencies;
     const userIds = membersWhoseLatestOrganizationIs({
       memberships: await members.findMembershipsOfMembers({ organizationId }),
@@ -182,5 +244,6 @@ export class NurturingOrganizationUsageService {
           .map((userId) => ({ type: "identify" as const, userId, traits })),
       );
     }
+    return { members: userIds.length, identifyCalls: userIds.length };
   }
 }

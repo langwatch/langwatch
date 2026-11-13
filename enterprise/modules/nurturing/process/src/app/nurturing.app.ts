@@ -8,6 +8,7 @@ import {
 } from "@langwatch/enterprise-nurturing-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import { counter } from "@langwatch/observability/metrics";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { nowInstant } from "@langwatch/time";
@@ -108,6 +109,12 @@ export class NurturingModule implements NurturingApi {
       placements: repositories.placements,
       organizationsCreated: repositories.organizationsCreated,
     });
+    const logger = createLogger("langwatch:nurturing");
+    // Without this line "the sync never ran" and "it ran fine" look the same in prod logs.
+    logger.info(
+      { customerIoApiKeyPresent: customerIo !== void 0 },
+      customerIo ? "nurturing usage sync enabled" : "nurturing usage sync disabled",
+    );
     const organizationUsage = customerIo
       ? NurturingOrganizationUsageService.create({
           projectUsage: repositories.projectUsage,
@@ -119,7 +126,11 @@ export class NurturingModule implements NurturingApi {
           members: repositories.members,
           sendBatch: (calls) => customerIo.batchOrThrow(calls),
           clock: { nowMs: () => nowInstant().epochMilliseconds },
-          logger: createLogger("langwatch:nurturing"),
+          logger,
+          syncs: counter({
+            name: "nurturing_org_usage_sync_total",
+            description: "Nurturing organization usage sync attempts, by outcome",
+          }),
         })
       : void 0;
     const projectFacts = NurturingProjectFactsService.create({

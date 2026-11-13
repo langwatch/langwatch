@@ -265,6 +265,16 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     And inside the window the trace syncs the organization as a usage change does
 
   @unit
+  Scenario: Each usage sync run is logged with counts, never ids
+    Given the nurturing app is built with or without a Customer.io API key
+    Then startup logs whether the usage sync is enabled and whether the key is present, never the key
+    When an organization's usage syncs
+    Then one debug line logs its project, group call, identify call and member counts, and whether mirroring failed
+    And a sync skipped for want of an admin, a placement or a counting window logs its reason at debug
+    And a counter records each sync attempt's outcome, never an id
+    And no log line of a sync carries an organization, user or project id
+
+  @unit
   Scenario: The organization's traits sum its projects
     Given an organization with two projects with usage and its trace counts
     When the traits are built

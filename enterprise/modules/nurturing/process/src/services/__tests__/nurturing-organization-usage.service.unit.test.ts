@@ -6,7 +6,7 @@
 import type { CioBatchCall } from "@langwatch/enterprise-nurturing-contract";
 import { createTenantId } from "@langwatch/eventing";
 import { createTestLogger } from "@langwatch/test-harness";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingOrganizationCreatedRepository } from "../../repositories/memory/memory.nurturing-organization-created.repository.ts";
@@ -29,6 +29,11 @@ import { NurturingOrganizationUsageService } from "../nurturing-organization-usa
 
 /** The service's logger, to read what it reported. */
 const { logger, lines } = createTestLogger();
+
+/** A logger whose info and debug lines are read as (payload, message) pairs. */
+function spyLogger() {
+  return { warn: vi.fn(), info: vi.fn(), debug: vi.fn(), syncs: { inc: vi.fn() } };
+}
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const NOW = Date.UTC(2026, 10, 20, 12);
@@ -60,11 +65,15 @@ async function serviceOver({
   createdAt = new Map([["org-1", NOW - DAY_MS]]),
   send = async () => {},
   members = MemoryNurturingOrganizationMemberRepository.create(),
+  logger: serviceLogger = logger,
+  syncs = { inc: () => {} },
 }: {
   placed: ReadonlyMap<string, string>;
   createdAt?: ReadonlyMap<string, number>;
   send?: (calls: CioBatchCall[]) => Promise<void>;
   members?: MembersCopy;
+  logger?: Omit<ReturnType<typeof spyLogger>, "syncs">;
+  syncs?: { inc: (attributes?: Record<string, unknown>) => void };
 }) {
   const projectUsage = MemoryNurturingProjectUsageRepository.create();
   const traceDays = MemoryNurturingTraceDayRepository.create();
@@ -90,7 +99,8 @@ async function serviceOver({
       sent.push(calls);
     },
     clock: { nowMs: () => NOW },
-    logger,
+    logger: serviceLogger,
+    syncs,
   });
   return { service, projectUsage, traceDays, sent };
 }
@@ -449,6 +459,117 @@ describe("NurturingOrganizationUsageService", () => {
     });
   });
 
+  describe("when a sync run is logged", () => {
+    const placed = new Map([["project-1", "org-1"]]);
+    const idKeys = (log: ReturnType<typeof spyLogger>) =>
+      [...log.info.mock.calls, ...log.debug.mock.calls, ...log.syncs.inc.mock.calls]
+        .flatMap(([payload]) => Object.keys(payload))
+        .filter((key) => /id$/i.test(key));
+
+    /** @scenario "Each usage sync run is logged with counts, never ids" */
+    it("logs a sent run once with its counts, and counts it as synced", async () => {
+      const log = spyLogger();
+      const { service } = await serviceOver({
+        placed,
+        logger: log,
+        syncs: log.syncs,
+        members: await membersOver(
+          new Map([
+            ["admin-1", ["org-1"]],
+            ["member-2", ["org-1"]],
+          ]),
+        ),
+      });
+
+      await service.usageChanged({ projectId: "project-1" });
+
+      expect(log.syncs.inc.mock.calls).toEqual([[{ outcome: "synced" }]]);
+      expect(log.info).not.toHaveBeenCalled();
+      expect(log.debug.mock.calls).toEqual([
+        [
+          {
+            counting: true,
+            projects: 1,
+            groupCalls: 1,
+            identifyCalls: 2,
+            members: 2,
+            mirrorFailed: false,
+          },
+          "nurturing organization usage synced",
+        ],
+      ]);
+      expect(idKeys(log)).toEqual([]);
+    });
+
+    /** @scenario "Each usage sync run is logged with counts, never ids" */
+    it("logs the debug skip with its reason when the organization has no admin, and sends nothing", async () => {
+      const log = spyLogger();
+      const { service, sent } = await serviceOver({
+        syncs: log.syncs,
+        placed: new Map([["project-8", "org-without-admin"]]),
+        createdAt: new Map([["org-without-admin", NOW - DAY_MS]]),
+        logger: log,
+      });
+
+      await service.usageChanged({ projectId: "project-8" });
+
+      expect(sent).toEqual([]);
+      expect(log.syncs.inc.mock.calls).toEqual([[{ outcome: "no_admin" }]]);
+      expect(log.debug.mock.calls).toEqual([
+        [{ reason: "no_admin" }, "nurturing organization usage sync skipped"],
+      ]);
+      expect(log.info).not.toHaveBeenCalled();
+      expect(idKeys(log)).toEqual([]);
+    });
+
+    /** @scenario "Each usage sync run is logged with counts, never ids" */
+    it("logs a mirror failure on the synced line, and counts it as mirror_failed", async () => {
+      const log = spyLogger();
+      const { service } = await serviceOver({
+        placed,
+        logger: log,
+        syncs: log.syncs,
+        members: { findMembershipsOfMembers: () => Promise.reject(new Error("unavailable")) },
+      });
+
+      await service.usageChanged({ projectId: "project-1" });
+
+      expect(log.syncs.inc.mock.calls).toEqual([[{ outcome: "mirror_failed" }]]);
+      expect(log.debug).toHaveBeenCalledWith(
+        expect.objectContaining({ mirrorFailed: true, groupCalls: 1, identifyCalls: 0 }),
+        "nurturing organization usage synced",
+      );
+    });
+
+    /** @scenario "Each usage sync run is logged with counts, never ids" */
+    it.each([
+      ["a project never seen created", new Map<string, string>(), NOW - DAY_MS, "not_placed"],
+      [
+        "an organization past its counting window",
+        placed,
+        NOW - 25 * DAY_MS,
+        "outside_counting_window",
+      ],
+    ])("logs %s as a debug skip for a trace", async (_name, projects, createdAt, reason) => {
+      const log = spyLogger();
+      const { service } = await serviceOver({
+        placed: projects,
+        createdAt: new Map([["org-1", createdAt]]),
+        logger: log,
+        syncs: log.syncs,
+      });
+
+      await service.tracesChanged({ projectId: "project-1" });
+
+      expect(log.syncs.inc.mock.calls).toEqual([[{ outcome: reason }]]);
+      expect(log.debug.mock.calls).toEqual([
+        [{ reason }, "nurturing organization usage sync skipped"],
+      ]);
+      expect(log.info).not.toHaveBeenCalled();
+      expect(idKeys(log)).toEqual([]);
+    });
+  });
+
   describe("when an organization's trace window ends", () => {
     const ended = NOW - TRACE_COUNTING_WINDOW_MS;
 
@@ -484,6 +605,32 @@ describe("NurturingOrganizationUsageService", () => {
         { type: "identify", userId: "member-2", traits: traitsOf(group?.[0]) },
       ]);
       expect(sent).toHaveLength(2);
+    });
+
+    /** @scenario "Each usage sync run is logged with counts, never ids" */
+    it("logs one summary line with how many ended, synced and had no admin", async () => {
+      const log = spyLogger();
+      const { service } = await serviceOver({
+        placed: new Map(),
+        createdAt: new Map([
+          ["org-1", ended],
+          ["org-without-admin", ended],
+        ]),
+        members: await membersOver(new Map([["member-2", ["org-1"]]])),
+        logger: log,
+      });
+
+      await service.traceWindowsEnded({ after: NOW - 60 * 60 * 1000, upTo: NOW });
+
+      expect(log.info.mock.calls).toEqual([
+        [
+          { ended: 2, synced: 1, skippedNoAdmin: 1, groupCalls: 1, identifyCalls: 1 },
+          "nurturing trace windows ended",
+        ],
+      ]);
+      expect(
+        Object.keys(log.info.mock.calls[0]?.[0] ?? {}).filter((key) => /id$/i.test(key)),
+      ).toEqual([]);
     });
 
     /** @scenario "The trace traits are removed once when an organization's window ends" */
