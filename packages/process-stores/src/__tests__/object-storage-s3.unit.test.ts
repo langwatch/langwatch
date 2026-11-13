@@ -1,9 +1,11 @@
 import { createHash } from "node:crypto";
+import { createServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
 import { Readable } from "node:stream";
 
 import { NoSuchKey } from "@aws-sdk/client-s3";
 import { Temporal } from "@langwatch/time";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ObjectBodyTooLargeError, StoredObjectNotFoundError } from "../object-storage-backend.ts";
 import { s3Backend, s3Client } from "../object-storage-s3.ts";
@@ -125,6 +127,39 @@ describe("given object storage on S3", () => {
 
       await expect(backend.read(at)).rejects.toBeInstanceOf(StoredObjectNotFoundError);
     });
+  });
+
+  describe("when the endpoint takes the request and never answers", () => {
+    let stalled: Server | undefined;
+
+    afterEach(async () => {
+      vi.useRealTimers();
+      stalled?.closeAllConnections();
+      await new Promise((resolve) => stalled?.close(resolve));
+    });
+
+    it("refuses the read once the answer deadline passes, instead of waiting forever", async () => {
+      stalled = createServer(() => void 0);
+      await new Promise<void>((resolve) => stalled?.listen(0, "127.0.0.1", resolve));
+      const { port } = stalled.address() as AddressInfo;
+      const client = s3Client({ ...account, endpoint: `http://127.0.0.1:${port}` });
+      const backend = s3Backend({ client, bucket: "objects", clock });
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+
+      let settled = false;
+      const outcome = backend.read(at).then(
+        () => "answered",
+        (error: unknown) => error,
+      );
+      void outcome.finally(() => (settled = true));
+      // Real I/O runs between steps, so each step lands after the SDK queued its request.
+      for (let step = 0; step < 400 && !settled; step += 1) {
+        await new Promise((resolve) => setImmediate(resolve));
+        vi.advanceTimersByTime(1_000);
+      }
+
+      await expect(outcome).resolves.toMatchObject({ name: "TimeoutError" });
+    }, 10_000);
   });
 
   describe("when an upload URL is signed", () => {

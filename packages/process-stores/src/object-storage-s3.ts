@@ -62,8 +62,22 @@ export function s3Client(account: ObjectStorageAccount): S3Client {
     forcePathStyle: account.forcePathStyle ?? true,
     requestChecksumCalculation: "WHEN_REQUIRED",
     responseChecksumValidation: "WHEN_REQUIRED",
+    requestHandler: {
+      connectionTimeout: S3_CONNECTION_TIMEOUT_MS,
+      socketTimeout: S3_SOCKET_IDLE_TIMEOUT_MS,
+      throwOnRequestTimeout: true,
+    },
   });
 }
+
+/** A stalled socket fails the call instead of holding one of the pool's sockets forever. */
+const S3_CONNECTION_TIMEOUT_MS = 5_000;
+const S3_SOCKET_IDLE_TIMEOUT_MS = 60_000;
+/**
+ * Until response headers, socket wait in the pool included. PUT carries none: its clock
+ * would include the upload body, which the idle timeout already bounds.
+ */
+const S3_ANSWER_DEADLINE = { requestTimeout: 30_000 } as const;
 
 /**
  * Reads the endpoint's hostname, so a trailing slash, path or port still counts
@@ -113,6 +127,7 @@ async function readObject(place: S3Place, at: StoredObjectAddress): Promise<Read
   try {
     const response = await place.client.send(
       new GetObjectCommand({ Bucket: place.bucket, Key: at.key }),
+      S3_ANSWER_DEADLINE,
     );
     if (response.Body instanceof Readable) return response.Body;
     throw new Error(`S3 answered "${at.key}" without a readable body.`);
@@ -130,6 +145,7 @@ async function heldDigest(
   try {
     const head = await place.client.send(
       new HeadObjectCommand({ Bucket: place.bucket, Key: at.key, ChecksumMode: "ENABLED" }),
+      S3_ANSWER_DEADLINE,
     );
     const { ChecksumSHA256: checksum, ChecksumType: type, ContentLength: byteLength } = head;
     if (checksum === undefined || type !== "FULL_OBJECT" || byteLength === undefined) {
@@ -184,12 +200,15 @@ export function s3Backend(options: {
     read: (at) => readObject(place, at),
     digest: async (at) => (await heldDigest(place, at)) ?? digestOf(await readObject(place, at)),
     async remove(at) {
-      await place.client.send(new DeleteObjectCommand({ Bucket: place.bucket, Key: at.key }));
+      await place.client.send(
+        new DeleteObjectCommand({ Bucket: place.bucket, Key: at.key }),
+        S3_ANSWER_DEADLINE,
+      );
     },
     signUpload: (at, facts) => signObjectUpload({ ...place, clock: options.clock }, at, facts),
     signDownload: (at, facts) => signObjectDownload({ ...place, clock: options.clock }, at, facts),
     async probe() {
-      await place.client.send(new HeadBucketCommand({ Bucket: place.bucket }));
+      await place.client.send(new HeadBucketCommand({ Bucket: place.bucket }), S3_ANSWER_DEADLINE);
     },
   };
 }

@@ -1,3 +1,4 @@
+import { isQueueStagingClosed } from "@langwatch/group-queue";
 import { createLogger } from "@langwatch/observability";
 import type {
   OtlpInstrumentationScope,
@@ -44,6 +45,9 @@ const DEDUP_BATCH_SIZE = 100;
 
 /** Spans prepared at once: each may claim usage in Redis or upload a payload blob. */
 const PREPARE_CONCURRENCY = 16;
+
+/** Spans one request could not hand off because shutdown had closed queue staging. */
+type StagingClosedTally = { spans: number; tenantId: string | undefined };
 
 /** The store gave no answer for this span: ingest it, as an unreachable store would. */
 const UNANSWERED_CLAIM: SpanDedupClaim = { outcome: "unknown" };
@@ -103,8 +107,10 @@ export class TraceSpanCollectionService {
   async ingestNormalizedSpan(input: NormalizedSpanInput): Promise<SpanIngestionResult> {
     const ref = spanDedupRefOf(input);
     const [claim = UNANSWERED_CLAIM] = await this.options.dedup.claimProcessing([ref]);
-    const result = await this.collectClaimed({ input, claim });
+    const closed: StagingClosedTally = { spans: 0, tenantId: input.tenantId };
+    const result = await this.collectClaimed({ input, claim, closed });
     if (result.status === "collected") await this.options.dedup.confirmProcessed([ref]);
+    this.reportStagingClosed(closed);
     return result;
   }
 
@@ -113,9 +119,12 @@ export class TraceSpanCollectionService {
     inputs: readonly NormalizedSpanInput[],
   ): Promise<SpanIngestionResult[]> {
     const results: SpanIngestionResult[] = [];
+    const closed: StagingClosedTally = { spans: 0, tenantId: inputs[0]?.tenantId };
     for (let start = 0; start < inputs.length; start += DEDUP_BATCH_SIZE) {
-      results.push(...(await this.collectBatch(inputs.slice(start, start + DEDUP_BATCH_SIZE))));
+      const batch = inputs.slice(start, start + DEDUP_BATCH_SIZE);
+      results.push(...(await this.collectBatch({ inputs: batch, closed })));
     }
+    this.reportStagingClosed(closed);
     return results;
   }
 
@@ -124,13 +133,17 @@ export class TraceSpanCollectionService {
    * confirmation for those the pipeline took. A failed span releases its claim, so a resend
    * reaches the pipeline under the same identity (specs/span-admission-batch-hand-off.feature).
    */
-  private async collectBatch(
-    inputs: readonly NormalizedSpanInput[],
-  ): Promise<SpanIngestionResult[]> {
+  private async collectBatch({
+    inputs,
+    closed,
+  }: {
+    inputs: readonly NormalizedSpanInput[];
+    closed: StagingClosedTally;
+  }): Promise<SpanIngestionResult[]> {
     const claims = await this.options.dedup.claimProcessing(inputs.map(spanDedupRefOf));
     const results: SpanIngestionResult[] = [];
     const failures: Promise<void>[] = [];
-    const ready = await this.prepareClaimed({ inputs, claims, results, failures });
+    const ready = await this.prepareClaimed({ inputs, claims, results, failures, closed });
 
     const outcomes = await this.handOff(ready.map(({ data }) => data));
     const recorded: SpanDedupRef[] = [];
@@ -141,7 +154,7 @@ export class TraceSpanCollectionService {
         recorded.push(spanDedupRefOf(input));
         continue;
       }
-      results[index] = this.failedSpan({ input, error: outcome.error });
+      results[index] = this.failedSpan({ input, error: outcome.error, closed });
       if (claims[index]?.outcome === "acquired") failures.push(this.releaseClaim(input));
       if (usageRecord) failures.push(this.usage.release({ record: usageRecord }));
     }
@@ -168,18 +181,27 @@ export class TraceSpanCollectionService {
     claims,
     results,
     failures,
+    closed,
   }: {
     inputs: readonly NormalizedSpanInput[];
     claims: readonly SpanDedupClaim[];
     results: SpanIngestionResult[];
     failures: Promise<void>[];
+    closed: StagingClosedTally;
   }): Promise<ReadySpan[]> {
     const prepared: (ReadySpan | null)[] = [];
     for (let start = 0; start < inputs.length; start += PREPARE_CONCURRENCY) {
       const slice = inputs.slice(start, start + PREPARE_CONCURRENCY);
       const answers = await Promise.all(
         slice.map((input, offset) =>
-          this.prepareClaimedSpan({ index: start + offset, input, claims, results, failures }),
+          this.prepareClaimedSpan({
+            index: start + offset,
+            input,
+            claims,
+            results,
+            failures,
+            closed,
+          }),
         ),
       );
       prepared.push(...answers);
@@ -194,12 +216,14 @@ export class TraceSpanCollectionService {
     claims,
     results,
     failures,
+    closed,
   }: {
     index: number;
     input: NormalizedSpanInput;
     claims: readonly SpanDedupClaim[];
     results: SpanIngestionResult[];
     failures: Promise<void>[];
+    closed: StagingClosedTally;
   }): Promise<ReadySpan | null> {
     const claim = claims[index] ?? UNANSWERED_CLAIM;
     if (claim.outcome === "held") {
@@ -209,7 +233,7 @@ export class TraceSpanCollectionService {
     try {
       return { index, input, ...(await this.prepareCommand(input)) };
     } catch (error) {
-      results[index] = this.failedSpan({ input, error });
+      results[index] = this.failedSpan({ input, error, closed });
       if (claim.outcome === "acquired") failures.push(this.releaseClaim(input));
       return null;
     }
@@ -244,34 +268,54 @@ export class TraceSpanCollectionService {
     await this.options.dedup.releaseOnFailure(spanDedupRefOf(input));
   }
 
-  /** A span the pipeline did not take, noted on the request span and logged. */
+  /**
+   * A span the pipeline did not take, noted on the request span and logged. One refused because
+   * shutdown closed queue staging is counted instead: the request logs those once, at warn.
+   */
   private failedSpan({
     input,
     error,
+    closed,
   }: {
     input: NormalizedSpanInput;
     error: unknown;
+    closed: StagingClosedTally;
   }): SpanIngestionResult {
     input.otelSpanRef?.addEvent("span_ingestion_error", {
       "error.message": error instanceof Error ? error.message : String(error),
       "tenant.id": input.tenantId,
     });
-    this.logger.error(
-      { error, tenantId: input.tenantId, traceId: input.span.traceId, spanId: input.span.spanId },
-      "Error dispatching span to the trace processing pipeline",
-    );
+    if (isQueueStagingClosed(error)) {
+      closed.spans += 1;
+    } else {
+      this.logger.error(
+        { error, tenantId: input.tenantId, traceId: input.span.traceId, spanId: input.span.spanId },
+        "Error dispatching span to the trace processing pipeline",
+      );
+    }
     return {
       status: "failed",
       error: error instanceof Error ? error.message : String(error),
     };
   }
 
+  /** The client retries a refused request against a pod still serving, so this is a warning. */
+  private reportStagingClosed(closed: StagingClosedTally): void {
+    if (closed.spans === 0) return;
+    this.logger.warn(
+      { tenantId: closed.tenantId, spans: closed.spans },
+      "Spans refused: shutdown closed queue staging before this request finished",
+    );
+  }
+
   private async collectClaimed({
     input,
     claim,
+    closed,
   }: {
     input: NormalizedSpanInput;
     claim: SpanDedupClaim;
+    closed: StagingClosedTally;
   }): Promise<SpanIngestionResult> {
     if (claim.outcome === "held") {
       return { status: "deduped" };
@@ -285,7 +329,7 @@ export class TraceSpanCollectionService {
     } catch (error) {
       if (claim.outcome === "acquired") await this.releaseClaim(input);
       if (usageRecord) await this.usage.release({ record: usageRecord });
-      return this.failedSpan({ input, error });
+      return this.failedSpan({ input, error, closed });
     }
   }
 }

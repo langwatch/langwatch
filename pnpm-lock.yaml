@@ -15917,6 +15917,9 @@ importers:
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
+      '@langwatch/group-queue':
+        specifier: workspace:*
+        version: link:../../../packages/group-queue
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error

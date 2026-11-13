@@ -53,6 +53,14 @@ async function serverWithHeldRequest(events: string[]) {
         entered();
         return;
       }
+      if (request.url === "/unwinds") {
+        entered();
+        // Stands in for a handler whose request signal aborts when its response is cut.
+        await new Promise((resolve) => response.once("close", resolve));
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        events.push("handler unwound");
+        return;
+      }
       if (request.url !== "/slow") {
         response.writeHead(200).end("fast");
         return;
@@ -110,9 +118,64 @@ describe("Server", () => {
         await closing;
 
         expect(late.status).toBe(503);
+        expect(late.headers.get("retry-after")).toBe("5");
         await expect(late.text()).resolves.toContain("shutting down");
         expect(probe.status).toBe(200);
       });
+    });
+  });
+
+  describe("given a request's client disconnected while its handler still runs", () => {
+    describe("when the server closes and the handler finishes afterwards", () => {
+      /** @scenario "A request whose client went away still holds the drain until its handler finishes" */
+      it("holds every component until the handler settles", async () => {
+        const events: string[] = [];
+        const { server, release, handlerEntered } = await serverWithHeldRequest(events);
+        const port = portOf(server);
+        const client = new AbortController();
+
+        const slow = fetch(`http://127.0.0.1:${port}/slow`, { signal: client.signal });
+        await handlerEntered;
+        client.abort();
+        await slow.catch(() => undefined);
+        const closing = server.close();
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        events.push("released");
+        release();
+        await closing;
+
+        expect(events).toEqual([
+          "released",
+          "request finished",
+          "stores stopping",
+          "runtime stopped",
+          "stores stopped",
+        ]);
+      });
+    });
+  });
+
+  describe("given a request outlives the drain grace", () => {
+    describe("when the server cuts its response", () => {
+      /** @scenario "A handler cut at the drain grace gets a short unwind before the stores close" */
+      it("lets the handler unwind before any component stops", async () => {
+        const events: string[] = [];
+        const { server, handlerEntered } = await serverWithHeldRequest(events);
+        const port = portOf(server);
+
+        const cut = fetch(`http://127.0.0.1:${port}/unwinds`).catch(() => undefined);
+        await handlerEntered;
+        await server.close();
+        await cut;
+
+        expect(events).toEqual([
+          "handler unwound",
+          "stores stopping",
+          "runtime stopped",
+          "stores stopped",
+        ]);
+        expect(lines.findLine("info", "outlived the drain grace")).toBeDefined();
+      }, 15_000);
     });
   });
 
