@@ -12,6 +12,10 @@ Feature: Agent registry with ARD discovery and change events
   An organisation's first reconcile, whatever triggers it and including right after it upgrades to
   Enterprise, is a silent baseline: its existing agents enter the feed but are not pushed. Changes
   after the baseline are pushed.
+  A new organisation's agents created before its first sync are part of that silent baseline, so
+  they are not announced; agents created after it are.
+  An organisation that leaves Enterprise and comes back is not baselined again: every change made
+  during the gap is announced together on its first reconcile after it returns.
   Docs: docs/governance/agent-registry.mdx
 
   Background:
