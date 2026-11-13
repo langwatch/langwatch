@@ -30,8 +30,10 @@ import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalo
 import { project } from "../../services/__tests__/project.fixture.ts";
 import { analyticsTestSecrets } from "./analytics-secrets.fixture.ts";
 
-const QUERY_FAILURE_LOGGER = "langwatch:analytics:lwql:query-failure";
-const failureLog = vi.hoisted((): { lines: TestLogLine[] } => ({ lines: [] }));
+const failureLog = vi.hoisted((): { loggerName: string; lines: TestLogLine[] } => ({
+  loggerName: "langwatch:analytics:lwql:query-failure",
+  lines: [],
+}));
 
 // Only the failure logger is replaced, so the module's other loggers stay real.
 vi.mock("@langwatch/observability", async (importOriginal) => {
@@ -42,7 +44,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
   return {
     ...original,
     createLogger: (name: string) =>
-      name === QUERY_FAILURE_LOGGER ? logger : original.createLogger(name),
+      name === failureLog.loggerName ? logger : original.createLogger(name),
   };
 });
 
