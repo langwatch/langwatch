@@ -554,7 +554,7 @@ export interface TrpcRouterAccess<
   ): TrpcRouterAccess<Api, Contract, Implemented, Name, Contexts>;
   /**
    * The procedure mints a credential (a key, token or secret). The runtime refuses it with
-   * PermissionDeniedError naming `permission` whenever the actor carries an impersonatorId,
+   * ImpersonationCannotMintCredentialError whenever the actor carries an impersonatorId,
    * after access and before the handler.
    */
   mintsCredential(
@@ -1722,12 +1722,7 @@ function check<TContext extends object>({
     }
 
     if (mintsCredential) {
-      refuseImpersonatedMint({
-        permission: mintsCredential,
-        actor: decision.actor,
-        scope: decision.scope,
-        address: `tRPC ${procedure}`,
-      });
+      refuseImpersonatedMint({ actor: decision.actor });
     }
 
     // After access, never before it: a caller who may not do this at all is

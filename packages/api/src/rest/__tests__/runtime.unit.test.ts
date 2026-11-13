@@ -1206,7 +1206,7 @@ describe("a route declared as minting a credential", () => {
     const response = await app.request("/api/keys/2026-08-07/", { method: "POST" });
 
     expect(response.status).toBe(403);
-    expect(await response.json()).toMatchObject({ code: "permission_denied" });
+    expect(await response.json()).toMatchObject({ code: "impersonation_cannot_mint_credential" });
     expect(ran).toBe(false);
   });
 

@@ -386,6 +386,7 @@ export const APP_ERROR_CODES = [
   "identity_verification_invalid",
   "identity_verification_not_settled",
   "impersonation_cannot_change_credentials",
+  "impersonation_cannot_mint_credential",
   "ingestion_key_not_found",
   "ingestion_key_revoke_incomplete",
   "ingestion_key_session_revoked",

@@ -545,7 +545,7 @@ describe("the apiKey tRPC transport", () => {
 
       await expect(
         caller.mintDocsSessionKey({ projectId: "project_1", docsOrigin: "https://langwatch.ai" }),
-      ).rejects.toMatchObject({ cause: { code: "permission_denied" } });
+      ).rejects.toMatchObject({ cause: { code: "impersonation_cannot_mint_credential" } });
       expect(mintDocsSessionKey).not.toHaveBeenCalled();
     });
   });

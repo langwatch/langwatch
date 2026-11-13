@@ -27,7 +27,10 @@ import { AuthApi, type BrowserSessionInventoryEntry } from "@langwatch/auth-cont
  * That is what lets one operation serve a browser session, an API key and the
  * CLI without knowing which it is serving.
  */
-import { type AuthzPermission, PermissionDeniedError } from "@langwatch/authorization";
+import {
+  type AuthzPermission,
+  ImpersonationCannotMintCredentialError,
+} from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
@@ -1535,11 +1538,7 @@ export class GovernanceModule implements GovernanceRestApi {
     const { impersonatorId, ...rotate } = input;
     // An operator acting as a member holds no grant to issue credentials as them (F05).
     if (impersonatorId) {
-      throw new PermissionDeniedError({
-        permission: "ingestionSources:manage",
-        scope: { type: "organization", id: rotate.organizationId },
-        denialReason: "no-grant",
-      });
+      throw new ImpersonationCannotMintCredentialError();
     }
     const rotated = await this.ingestionSources.rotateSecret(rotate);
     return {
@@ -1628,7 +1627,7 @@ export class GovernanceModule implements GovernanceRestApi {
     input: PersonalIngestionKeyMint & { impersonatorId?: string | undefined },
   ): Promise<IssuedIngestionKey> {
     const { impersonatorId, ...mint } = input;
-    refuseImpersonatedKeyMint({ impersonatorId, organizationId: mint.organizationId });
+    refuseImpersonatedKeyMint({ impersonatorId });
     return this.ingestionKeys.install(mint);
   }
 
@@ -1636,7 +1635,7 @@ export class GovernanceModule implements GovernanceRestApi {
     input: PersonalIngestionKeyMint & { impersonatorId?: string | undefined },
   ): Promise<RotatedIngestionKey> {
     const { impersonatorId, ...mint } = input;
-    refuseImpersonatedKeyMint({ impersonatorId, organizationId: mint.organizationId });
+    refuseImpersonatedKeyMint({ impersonatorId });
     return this.ingestionKeys.rotate(mint);
   }
 
@@ -2272,16 +2271,9 @@ export class GovernanceModule implements GovernanceRestApi {
  * instead, and it has to be one string, decided once.
  */
 /** An operator acting as a member holds no grant to issue a key as them (F05). */
-function refuseImpersonatedKeyMint(input: {
-  impersonatorId: string | undefined;
-  organizationId: string;
-}): void {
+function refuseImpersonatedKeyMint(input: { impersonatorId: string | undefined }): void {
   if (!input.impersonatorId) return;
-  throw new PermissionDeniedError({
-    permission: "organization:view",
-    scope: { type: "organization", id: input.organizationId },
-    denialReason: "no-grant",
-  });
+  throw new ImpersonationCannotMintCredentialError();
 }
 
 function attributedUserId(by: GovernanceProjectCaller): string {

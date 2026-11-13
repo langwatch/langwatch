@@ -1137,7 +1137,7 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
 
   /**
    * The route mints a credential (a key, token or secret). The runtime refuses it with
-   * PermissionDeniedError naming `permission` whenever the actor carries an impersonatorId,
+   * ImpersonationCannotMintCredentialError whenever the actor carries an impersonatorId,
    * after access and before the handler.
    */
   mintsCredential(permission: AuthzPermission): RouteBuilder<Api, S> {

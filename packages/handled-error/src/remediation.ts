@@ -336,6 +336,11 @@ const registry = {
     tips: ["Re-create the API key with the required scope, or ask an admin to raise your role"],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
+  impersonation_cannot_mint_credential: {
+    tips: [
+      "No role or grant changes this; leave impersonation, and ask the member to create or rotate the key themselves",
+    ],
+  },
   legacy_project_key_ingestion_only: {
     tips: [
       "A legacy project key is limited to ingestion and the scopes enabled for its project; create an API key with the permissions this call needs and send it instead",
