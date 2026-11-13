@@ -30,7 +30,7 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 ## Calls
 
 - `withApi(authzApi)`, tRPC contracts: –.
-- Client packages (package.json): `@langwatch/api-key-client`, `@langwatch/trace-client`.
+- Client packages (package.json): `@langwatch/api-key-client`, `@langwatch/project-client`, `@langwatch/trace-client`.
 - Host APIs it requires: `AuthzHostApi`.
 - Config slices: `authz`.
 
