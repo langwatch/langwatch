@@ -23,23 +23,40 @@ We will give an operator's coding agent access only through the public REST API 
   challenge. A request lasts 10 minutes; a requester may make 5 an hour.
 - Only the requester's owner can open the approval page. The page shows organization, scopes,
   reason, machine and IP. The WebAuthn challenge is the SHA-256 of exactly those fields plus the
-  spend tick and expiry, verified with user verification required. `org:content`, and
-  `org:support` with spend, need the organization name typed.
+  spend tick and expiry, verified with user verification required. `org:content` and
+  `org:support` need the organization name typed, with or without spend.
 - The agent redeems once with the verifier and its requester key, from the same address the
   request came from and the operator saw. A request or redeem with no address is refused. That
   address is pinned. The agent gets a 1-hour key with no refresh.
 - Organization reach is an ownerless, system-managed, restricted API key: "LangWatch Staff Read"
   (`staff-reader`) or "LangWatch Support" (`staff-support`). The bags exclude credentials,
-  members, SSO, roles, keys, billing and every delete or manage permission. No impersonation and
-  no fake user.
+  members, SSO, roles, keys, billing and every delete or manage permission. Prompt text
+  (`prompts:view`) is in the content bag. The support bag holds no prompt or trigger write. No
+  impersonation and no fake user.
 - Cross-organization reads are an allowlist on a separate `staff_access` door answering the new
   platform-tier permission `opsRead:view`, never `ops:view`.
 - Every request by such a key passes a staff access gate in the REST runtime, bound by the
   `staff-access` module the way Langy binds its confirmation gate. The gate writes a trail row
   before the handler and refuses the request when that write fails. Writes also land in the
   customer's audit log with the approver and the reason.
-- Routes that start a run carry `.spends()`. A support key approved without the spend tick is
-  refused there.
+- The gate fails closed. A route's kind comes from its declaration (`routeWrites`): GET, HEAD and
+  OPTIONS are reads, and so is a POST declared `withoutAudit("read sent as a POST")`; every other
+  route is a write, whatever permissions it asks.
+- A write passes only when the session was approved with the spend tick, or when every
+  permission it asks is in `STAFF_WRITES_WITHOUT_SPEND` (`datasets:create`, `datasets:update`).
+  Otherwise it is refused with `staff_spend_not_approved`, including a write that asks no
+  permission. A route with a confirmation (`.withConfirmation`) is always refused with
+  `staff_write_not_allowed`, even with spend.
+- A route that starts a run (`withoutAudit("run, not a change")`) must declare `.spends()` or
+  `.withoutSpend("<reason>")`; the declaration throws otherwise. A `.spends()` route is refused
+  without the spend tick.
+- A route that serves customer content under a metadata permission declares `.servesContent()`
+  and is refused with `staff_content_not_approved` unless the session has `org:content`.
+- Every refusal of a staff key with a known session writes a trail row with its status and error
+  code: the gate's own refusals, and those before it (door permission, scope, plan, second
+  factor), which the runtime reports through `gate.refused`.
+- LangWatchQL `eval()` functions are off for a staff key whose session has no spend approval.
+  Public health probes treat a staff key as no key.
 - An approval is claimed as `approving`, written to the customer's audit log, and only then
   confirmed as `approved`. An `approving` request is never redeemable, so a failed write or a
   crash leaves no approval without its row.
@@ -76,8 +93,10 @@ cannot reach any customer route.
   the end; their reads stay in our own trail, not in the customer's log. `org:support` also writes
   a `staffAccess.write` row for each change. The audit log page is an Enterprise feature, so other
   plans do not see these rows in the product.
-- Spend control depends on run routes carrying `.spends()`; a new run route without it is open
-  to a support key. Route review must check this.
+- Spend control on run routes is enforced at declaration. Content control depends on routes
+  declaring `.servesContent()`; a new content route under a metadata permission without it is
+  open to an `org:metadata` key. Route review must check this. A missed write is refused, not
+  let through.
 - Customer-facing creator fields on evaluators, monitors, datasets and triggers do not exist, so
   "LangWatch Support" shows in the audit log rather than on every object.
 - The standing database paths are a gap: an agent running on a machine that holds production
