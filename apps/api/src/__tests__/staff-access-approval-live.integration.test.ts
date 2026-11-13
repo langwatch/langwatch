@@ -256,9 +256,11 @@ describe.skipIf(!liveStoresConfigured)("given the staff access approval on the l
     if (acme.id) {
       const where = { organizationId: acme.id };
       await prisma.auditLog.deleteMany({ where });
-      await prisma.apiKey.deleteMany({ where });
-      await prisma.grant.deleteMany({ where });
       await prisma.roleBinding.deleteMany({ where });
+      await prisma.grant.deleteMany({ where });
+      await prisma.customRole.deleteMany({ where });
+      await prisma.modelDefaultConfig.deleteMany({ where });
+      await prisma.apiKey.deleteMany({ where });
       await prisma.systemMigrationTenantState.deleteMany({ where: { tenantId: acme.id } });
       await prisma.project.deleteMany({ where: { id: acme.projectId } });
       await prisma.team.deleteMany({ where });
