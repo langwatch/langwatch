@@ -294,6 +294,7 @@ export function BraidDialog({
                 !!reader && check.ok && draft.where.trim().length > 0 && verifiedKey === undefined
               }
               viewers={viewers.data ? viewersPhrase(viewers.data) : undefined}
+              exampleFolded={testState.state === "ready"}
             />
           </Card>
         </Box>

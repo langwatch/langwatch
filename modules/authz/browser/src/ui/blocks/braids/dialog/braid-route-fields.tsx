@@ -120,7 +120,7 @@ export function BraidRouteFields(props: BraidRouteFieldsProps) {
             startElement={<ProjectAvatar name={props.owner.name} />}
             endElement={<Lock size={12} aria-label="Fixed" />}
           >
-            <Input readOnly value={props.owner.name} data-testid="braid-from" />
+            <Input readOnly variant="subtle" value={props.owner.name} data-testid="braid-from" />
           </InputGroup>
           <Field.HelperText>Owns the spans</Field.HelperText>
         </Field.Root>

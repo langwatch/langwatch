@@ -3,9 +3,10 @@
 
 import { Link } from "@langwatch/browser-host/link";
 import { InlineCode } from "@langwatch/design-system/inline-code";
-import { Alert, HStack, Stack, Text } from "@langwatch/design-system/primitives";
+import { Alert, Box, HStack, Stack, Text } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
 import { formatDistanceToNow } from "@langwatch/time";
+import { ShieldCheck } from "lucide-react";
 
 import { BRAIDS_GUIDE_HREF } from "../../../../model/braids/braids.ts";
 
@@ -40,12 +41,12 @@ function SigningLine({
       ? `last used ${formatDistanceToNow(signing.lastUsedAt)} ago`
       : "not used yet";
     return (
-      <Alert.Root status="success" size="sm" data-testid="braid-signing-key">
-        <Alert.Indicator />
-        <Alert.Title fontWeight="normal">
-          {`${readerName} signs its calls · key “${signing.keyName}”, ${used}`}
-        </Alert.Title>
-      </Alert.Root>
+      <HStack gap={1.5} textStyle="sm" color="fg.muted" data-testid="braid-signing-key">
+        <Box as="span" color="fg.success" flexShrink={0}>
+          <ShieldCheck size={14} aria-hidden />
+        </Box>
+        <Text>{`${readerName} signs its calls · key “${signing.keyName}”, ${used}`}</Text>
+      </HStack>
     );
   }
   if (signing.state === "none" && on) {

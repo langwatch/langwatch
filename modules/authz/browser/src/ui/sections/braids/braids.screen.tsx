@@ -11,7 +11,7 @@ import { FeatureMark } from "@langwatch/design-system/feature-mark";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Box, Button, Skeleton, Stack, Text } from "@langwatch/design-system/primitives";
-import { BookOpen, Plus } from "lucide-react";
+import { ArrowRight, BookOpen, Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import {
@@ -153,12 +153,15 @@ function BraidsHeaderActions({
   tab,
   canCreate,
   canManageKeys,
+  organizationLink,
   onNewBraid,
   onNewKey,
 }: {
   tab: BraidsTab;
   canCreate: boolean;
   canManageKeys: boolean;
+  /** The organisation's braids link; absent for whoever cannot open that view. */
+  organizationLink: ReactNode;
   onNewBraid: () => void;
   onNewKey: () => void;
 }) {
@@ -169,6 +172,7 @@ function BraidsHeaderActions({
       : canCreate && <NewBraidButton onOpen={onNewBraid} />;
   return (
     <>
+      {organizationLink}
       <GuideLink />
       {action || null}
     </>
@@ -228,14 +232,15 @@ function EmptyTab({
   return children;
 }
 
-/** The organisation's view of every braid, for whoever may open it. */
+/** The organisation's view of every braid, a secondary header link for whoever may open it. */
 function OrganizationBraidsLink({ organizationName }: { organizationName: string | undefined }) {
   return (
-    <Text textStyle="sm" data-testid="braids-organization-link">
-      <Link href={ORGANIZATION_BRAIDS_HREF}>
+    <PageLayout.HeaderButton asChild>
+      <Link href={ORGANIZATION_BRAIDS_HREF} data-testid="braids-organization-link">
         {organizationName ? `All braids in ${organizationName}` : "All braids in your organisation"}
+        <ArrowRight size={14} aria-hidden />
       </Link>
-    </Text>
+    </PageLayout.HeaderButton>
   );
 }
 
@@ -356,6 +361,13 @@ export default function BraidsScreen() {
             tab={tab}
             canCreate={can.canCreate}
             canManageKeys={canManageKeys}
+            organizationLink={
+              seesOrganization ? (
+                <OrganizationBraidsLink
+                  organizationName={host.organizationStructure().organizationName}
+                />
+              ) : null
+            }
             onNewBraid={() => openBraid("new")}
             onNewKey={() => host.setQuery({ ...query, [SIGNING_KEY_QUERY_KEY]: "new" })}
           />
@@ -410,11 +422,6 @@ export default function BraidsScreen() {
             },
           ]}
         />
-        {seesOrganization ? (
-          <OrganizationBraidsLink
-            organizationName={host.organizationStructure().organizationName}
-          />
-        ) : null}
       </Stack>
       {dialogOpen ? (
         <BraidDialog

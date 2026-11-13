@@ -18,7 +18,7 @@ import {
   Text,
 } from "@langwatch/design-system/primitives";
 import { StatTileFigure } from "@langwatch/design-system/stat-tile";
-import { Plus, ShieldCheck, Users } from "lucide-react";
+import { ChevronDown, ChevronUp, Plus, ShieldCheck, Users } from "lucide-react";
 import { useState } from "react";
 
 import type { TestTraceRow } from "../../../../model/braids/braid-draft.ts";
@@ -47,6 +47,8 @@ export type BraidPreviewPanelProps = {
       };
   unsignedWarning: boolean;
   viewers: string | undefined;
+  /** A trace was tested: the example trace starts folded so one tree shows in full. */
+  exampleFolded?: boolean;
 };
 
 export type TestTraceProps = {
@@ -174,7 +176,7 @@ function TraceRows({
               {row.name}
             </Text>
             {row.kind === "braided" ? (
-              <Badge size="sm" variant="subtle">
+              <Badge size="sm" variant="subtle" colorPalette="orange">
                 Braided
               </Badge>
             ) : null}
@@ -187,6 +189,41 @@ function TraceRows({
         ))}
       </Stack>
     </Card>
+  );
+}
+
+/** The preview's example trace; folded while a tested trace shows, until opened. */
+function ExampleTrace({ rows, folded }: { rows: TestTraceRow[]; folded: boolean }) {
+  const [opened, setOpened] = useState(false);
+  const shown = !folded || opened;
+  return (
+    <Stack gap={2}>
+      <HStack justify="space-between">
+        <Text fontWeight="medium" textStyle="sm">
+          An example trace
+        </Text>
+        {folded ? (
+          <Button
+            size="xs"
+            variant="ghost"
+            aria-expanded={shown}
+            onClick={() => setOpened(!opened)}
+            data-testid="braid-preview-example-toggle"
+          >
+            {shown ? <ChevronUp size={12} aria-hidden /> : <ChevronDown size={12} aria-hidden />}
+            {shown ? "Hide" : "Show"}
+          </Button>
+        ) : null}
+      </HStack>
+      {shown ? (
+        <TraceRows
+          rows={rows}
+          note="The newest trace in the last 7 days that gets spans. Only you see it."
+          testId="braid-preview-example"
+          rowTestId="braid-example-span"
+        />
+      ) : null}
+    </Stack>
   );
 }
 
@@ -298,17 +335,7 @@ export function BraidPreviewPanel(props: BraidPreviewPanelProps) {
             </HStack>
           ) : null}
           {preview.example ? (
-            <Stack gap={2}>
-              <Text fontWeight="medium" textStyle="sm">
-                An example trace
-              </Text>
-              <TraceRows
-                rows={preview.example}
-                note="The newest trace in the last 7 days that gets spans. Only you see it."
-                testId="braid-preview-example"
-                rowTestId="braid-example-span"
-              />
-            </Stack>
+            <ExampleTrace rows={preview.example} folded={props.exampleFolded ?? false} />
           ) : null}
         </>
       ) : null}

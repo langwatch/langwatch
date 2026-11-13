@@ -521,6 +521,31 @@ describe("the braid dialog", () => {
   });
 
   describe("when ana tests a trace id", () => {
+    /** @scenario A tested trace folds the preview's example trace */
+    it("folds the preview's example trace, which ana can open again", async () => {
+      const nodes = [
+        spanNode("s-1", "handle_message"),
+        spanNode("s-2", "payments_agent", { ownerProjectId: "p-spec", braided: true }),
+      ];
+      braidTraces.state.preview = previewOf({
+        traces: { every: 1200, some: 300, none: 3402, total: 4902, capped: false },
+        example: { traceId: "4bf92f3577b34da6", nodes },
+      });
+      braidTraces.state.testTrace = { found: true, nodes };
+      const { user } = openDialog();
+      await pickReader(user);
+      await writeCondition(user, CONDITION);
+      expect(await screen.findByTestId("braid-preview-example")).toBeInTheDocument();
+
+      await user.type(screen.getByRole("textbox", { name: "Trace id" }), "4bf92f3577b34da6");
+      await user.click(screen.getByTestId("braid-test"));
+
+      expect(await screen.findByTestId("braid-test-trace")).toBeInTheDocument();
+      expect(screen.queryByTestId("braid-preview-example")).toBeNull();
+      await user.click(screen.getByRole("button", { name: "Show" }));
+      expect(screen.getByTestId("braid-preview-example")).toBeInTheDocument();
+    });
+
     /** @scenario Testing a trace shows it exactly as the reader will see it */
     it("shows the reader's spans, the braided ones marked and the rest struck through", async () => {
       braidTraces.state.testTrace = {

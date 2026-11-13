@@ -105,6 +105,13 @@ Feature: The Braids screen
       Then that trace is shown with exactly the spans "orchestrator" will see
 
     @integration
+    Scenario: A tested trace folds the preview's example trace
+      Given the preview shows an example trace
+      When ana tests an "orchestrator" trace id
+      Then the example trace folds, so only one trace shows in full
+      And ana can open the example trace again
+
+    @integration
     Scenario: The dialog names how many people will see the spans
       When ana picks "orchestrator" as the project to braid into
       Then the dialog says how many members of "orchestrator" will see the braided spans
