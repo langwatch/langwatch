@@ -8,6 +8,7 @@ import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { PASSWORD_FILE_REFRESH_MS } from "@langwatch/process-stores/clickhouse-password-file";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -115,7 +116,7 @@ describe("given the ops ClickHouse client in front of a server that records logi
         use: async (explain) => {
           await explain();
           writeFileSync(passwordPath, "second-password");
-          await new Promise((resolve) => setTimeout(resolve, 1_100));
+          await new Promise((resolve) => setTimeout(resolve, PASSWORD_FILE_REFRESH_MS + 100));
           await explain();
         },
       });
