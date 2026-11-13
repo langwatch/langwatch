@@ -173,3 +173,34 @@ Feature: A module fills a new read model at deploy by replaying a projection lan
     Given a projection replay step that completed and runs again from its cursor
     When the worker runs it
     Then every report it saves and returns names the instant its first run replayed from
+
+  # A heavy tenant's batch can outgrow ClickHouse's per-query memory limit on its event query. That
+  # failure is the batch's size, so the batch splits in halves, as the group queue's batches do
+  # (packages/group-queue/specs/batch-bisection.feature); any other failure stops the lane as before.
+
+  @unit
+  Scenario: A batch over the query memory limit is split until it fits
+    Given a batch whose event query outgrows ClickHouse's per-query memory limit
+    When the step replays the lane
+    Then the batch's markers are cleared and it is replayed as two halves, each split again until it fits
+    And every aggregate's read model equals a replay that never hit the limit
+
+  @unit
+  Scenario: A batch that hits the query memory limit mid-stream is not applied twice
+    Given a batch whose event query hits the memory limit after some of its events were read
+    When the step replays the lane
+    Then nothing of the failed attempt is written
+    And every aggregate's read model equals a replay that never hit the limit
+
+  @unit
+  Scenario: A single aggregate still over the query memory limit fails the lane by name
+    Given an aggregate whose own event query outgrows the per-query memory limit
+    When the step replays the lane
+    Then the lane fails with the original error, naming the aggregate's type and id
+    And the message names no tenant
+
+  @unit
+  Scenario: A batch failing for any other reason fails the lane without splitting
+    Given a batch whose event query fails with an error other than the per-query memory limit
+    When the step replays the lane
+    Then the lane fails on that batch with its error and no half is replayed

@@ -1,5 +1,6 @@
 import { nowInstant, toEpochMs } from "@langwatch/time";
 
+import { isQueryMemoryLimitExceeded } from "../services/errorHandling.ts";
 import { pMapLimited } from "./pMapLimited.ts";
 import { pauseProjection, unpauseProjection, waitForAllActiveJobs } from "./replayDrain.ts";
 import {
@@ -434,6 +435,9 @@ class FoldMapReplayRun {
         emit,
       });
     } catch (error) {
+      if (batchKeys.length > 1 && isQueryMemoryLimitExceeded(error)) {
+        return this.splitBatch({ error, batchKeys, batchNum });
+      }
       await this.handleBatchFailure({ error, batchKeys, batchNum, progress });
       this.callbacks?.signal?.throwIfAborted();
       return false;
@@ -457,6 +461,52 @@ class FoldMapReplayRun {
     return true;
   }
 
+  /**
+   * A statement over its own memory limit fails on the batch's size, so the batch clears its
+   * markers and runs again as two halves. Fold writes happen only after the whole stream, so a
+   * half rebuilds from init() with nothing of the failed attempt applied.
+   */
+  private async splitBatch({
+    error,
+    batchKeys,
+    batchNum,
+  }: {
+    error: unknown;
+    batchKeys: string[];
+    batchNum: number;
+  }): Promise<boolean> {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    this.log.write({
+      step: "split-batch",
+      batch: batchNum,
+      aggregates: batchKeys.length,
+      error: errorMsg,
+    });
+    await clearFailedBatchMarkers({
+      redis: this.ctx.redis,
+      projectionNames: this.selected.allProjectionNames,
+      aggKeys: batchKeys,
+      log: this.log,
+    });
+    this.callbacks?.signal?.throwIfAborted();
+    const middle = Math.ceil(batchKeys.length / 2);
+    for (const half of [batchKeys.slice(0, middle), batchKeys.slice(middle)]) {
+      if (!(await this.runOneBatch({ batchKeys: half, batchNum }))) return false;
+    }
+    return true;
+  }
+
+  /** The failure's text; a lone aggregate still over the memory limit is named, never its tenant. */
+  private describeFailure({ error, batchKeys }: { error: unknown; batchKeys: string[] }): string {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    const [onlyKey] = batchKeys;
+    if (batchKeys.length !== 1 || onlyKey === undefined || !isQueryMemoryLimitExceeded(error)) {
+      return errorMsg;
+    }
+    const entry = this.aggregateProjectionMap.get(onlyKey)!;
+    return `${errorMsg} (aggregate ${entry.aggregateType} ${entry.aggregateId})`;
+  }
+
   private async handleBatchFailure({
     error,
     batchKeys,
@@ -469,7 +519,7 @@ class FoldMapReplayRun {
     progress: ReplayProgress;
   }): Promise<void> {
     this.totalBatchErrors++;
-    const errorMsg = error instanceof Error ? error.message : String(error);
+    const errorMsg = this.describeFailure({ error, batchKeys });
     if (!this.firstError) this.firstError = errorMsg;
     this.log.write({ step: "error", batch: batchNum, error: errorMsg });
 
