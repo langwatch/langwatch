@@ -13,7 +13,7 @@ export const OPS_SETUP_COMMAND = "pbpaste | langwatch ops setup";
 const readAll = async (input: NodeJS.ReadableStream): Promise<string> => {
   const chunks: Buffer[] = [];
   for await (const chunk of input) {
-    chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : (chunk as Buffer));
+    chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
   }
   return Buffer.concat(chunks).toString("utf8");
 };
