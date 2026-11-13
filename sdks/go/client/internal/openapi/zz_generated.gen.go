@@ -43393,6 +43393,7 @@ type CallConnectedAgent200JSONResponseBody_State struct {
 
 // PostApiAnalyticsJSONBody defines parameters for PostApiAnalytics.
 type PostApiAnalyticsJSONBody struct {
+	// EndDate Epoch milliseconds, or an ISO 8601 date string.
 	EndDate        PostApiAnalyticsJSONBody_EndDate  `json:"endDate"`
 	ExcludeOrigins *[]string                         `json:"excludeOrigins,omitempty"`
 	Filters        *PostApiAnalyticsJSONBody_Filters `json:"filters,omitempty"`
@@ -43412,11 +43413,13 @@ type PostApiAnalyticsJSONBody struct {
 		} `json:"pipeline,omitempty"`
 		Subkey *string `json:"subkey,omitempty"`
 	} `json:"series"`
-	ShouldSkipPreviousPeriod *bool                               `json:"shouldSkipPreviousPeriod,omitempty"`
-	StartDate                PostApiAnalyticsJSONBody_StartDate  `json:"startDate"`
-	TimeScale                *PostApiAnalyticsJSONBody_TimeScale `json:"timeScale,omitempty"`
-	TimeZone                 string                              `json:"timeZone"`
-	TraceIds                 *[]string                           `json:"traceIds,omitempty"`
+	ShouldSkipPreviousPeriod *bool `json:"shouldSkipPreviousPeriod,omitempty"`
+
+	// StartDate Epoch milliseconds, or an ISO 8601 date string.
+	StartDate PostApiAnalyticsJSONBody_StartDate  `json:"startDate"`
+	TimeScale *PostApiAnalyticsJSONBody_TimeScale `json:"timeScale,omitempty"`
+	TimeZone  string                              `json:"timeZone"`
+	TraceIds  *[]string                           `json:"traceIds,omitempty"`
 }
 
 // PostApiAnalyticsJSONBodyEndDate0 defines parameters for PostApiAnalytics.
@@ -44359,6 +44362,7 @@ type PatchApiV1AnalyticsReportsByReportIdJSONBody struct {
 
 // PostApiAnalyticsTimeseriesJSONBody defines parameters for PostApiAnalyticsTimeseries.
 type PostApiAnalyticsTimeseriesJSONBody struct {
+	// EndDate Epoch milliseconds, or an ISO 8601 date string.
 	EndDate        PostApiAnalyticsTimeseriesJSONBody_EndDate  `json:"endDate"`
 	ExcludeOrigins *[]string                                   `json:"excludeOrigins,omitempty"`
 	Filters        *PostApiAnalyticsTimeseriesJSONBody_Filters `json:"filters,omitempty"`
@@ -44378,11 +44382,13 @@ type PostApiAnalyticsTimeseriesJSONBody struct {
 		} `json:"pipeline,omitempty"`
 		Subkey *string `json:"subkey,omitempty"`
 	} `json:"series"`
-	ShouldSkipPreviousPeriod *bool                                         `json:"shouldSkipPreviousPeriod,omitempty"`
-	StartDate                PostApiAnalyticsTimeseriesJSONBody_StartDate  `json:"startDate"`
-	TimeScale                *PostApiAnalyticsTimeseriesJSONBody_TimeScale `json:"timeScale,omitempty"`
-	TimeZone                 string                                        `json:"timeZone"`
-	TraceIds                 *[]string                                     `json:"traceIds,omitempty"`
+	ShouldSkipPreviousPeriod *bool `json:"shouldSkipPreviousPeriod,omitempty"`
+
+	// StartDate Epoch milliseconds, or an ISO 8601 date string.
+	StartDate PostApiAnalyticsTimeseriesJSONBody_StartDate  `json:"startDate"`
+	TimeScale *PostApiAnalyticsTimeseriesJSONBody_TimeScale `json:"timeScale,omitempty"`
+	TimeZone  string                                        `json:"timeZone"`
+	TraceIds  *[]string                                     `json:"traceIds,omitempty"`
 }
 
 // PostApiAnalyticsTimeseriesJSONBodyEndDate0 defines parameters for PostApiAnalyticsTimeseries.
@@ -53923,12 +53929,16 @@ type RunTestSuite200JSONResponseBodyItemsTargetType string
 
 // GetApiTracesFacetsParams defines parameters for GetApiTracesFacets.
 type GetApiTracesFacetsParams struct {
-	Field     *string `form:"field,omitempty" json:"field,omitempty"`
-	Prefix    *string `form:"prefix,omitempty" json:"prefix,omitempty"`
-	Limit     *int    `form:"limit,omitempty" json:"limit,omitempty"`
-	Offset    *int    `form:"offset,omitempty" json:"offset,omitempty"`
+	Field  *string `form:"field,omitempty" json:"field,omitempty"`
+	Prefix *string `form:"prefix,omitempty" json:"prefix,omitempty"`
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset *int    `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// StartDate Epoch milliseconds, or an ISO 8601 date string.
 	StartDate *string `form:"startDate,omitempty" json:"startDate,omitempty"`
-	EndDate   *string `form:"endDate,omitempty" json:"endDate,omitempty"`
+
+	// EndDate Epoch milliseconds, or an ISO 8601 date string.
+	EndDate *string `form:"endDate,omitempty" json:"endDate,omitempty"`
 }
 
 // GetApiTracesFacets200JSONResponseBody0 defines parameters for GetApiTracesFacets.
@@ -54048,9 +54058,11 @@ type GetApiTracesFacets200JSONResponseBody struct {
 // PostApiTracesSearchJSONBody defines parameters for PostApiTracesSearch.
 type PostApiTracesSearchJSONBody struct {
 	// DateField Which timestamp the startDate/endDate window filters on. 'occurred' (default) selects traces by when they happened. 'updated' selects traces by when they were last modified — use this for incremental ETL ('give me everything changed since my last pull'), since a trace can occur long before it gains a later evaluation or annotation.
-	DateField      *PostApiTracesSearchJSONBodyDateField `json:"dateField,omitempty"`
-	EndDate        PostApiTracesSearchJSONBody_EndDate   `json:"endDate"`
-	ExcludeOrigins *[]string                             `json:"excludeOrigins,omitempty"`
+	DateField *PostApiTracesSearchJSONBodyDateField `json:"dateField,omitempty"`
+
+	// EndDate Epoch milliseconds, or an ISO 8601 date string.
+	EndDate        PostApiTracesSearchJSONBody_EndDate `json:"endDate"`
+	ExcludeOrigins *[]string                           `json:"excludeOrigins,omitempty"`
 
 	// Filter A trace filter string in the same language the Trace Explorer's search bar speaks — `status:error AND model:gpt-*`, `trace.attribute.langwatch.user_id:alice`, a quoted phrase for free text. Combined with `filters`/`query`/`traceIds` rather than replacing them, so every condition sent must hold. A malformed filter, or one naming a field the language does not have, is a 422 that names the `filter` field.
 	Filter  *string                              `json:"filter,omitempty"`
@@ -54075,12 +54087,14 @@ type PostApiTracesSearchJSONBody struct {
 	ScrollId   *string  `json:"scrollId,omitempty"`
 
 	// Select Flat list of dotted-path columns to project, e.g. ['trace_id','metadata.user_id','events.type','evaluations.score']. Paths group by root in the response: scalar fields stay top-level, 'metadata.*' nests under a metadata object, and 'events.*'/'annotations.*'/'evaluations.*' return as nested arrays (one row per trace). When present, the response gains a top-level 'schema' field describing the resolved columns. When omitted, the response is unchanged from the legacy shape.
-	Select        *[]string                             `json:"select,omitempty"`
-	SortBy        *string                               `json:"sortBy,omitempty"`
-	SortDirection *string                               `json:"sortDirection,omitempty"`
-	StartDate     PostApiTracesSearchJSONBody_StartDate `json:"startDate"`
-	TraceIds      *[]string                             `json:"traceIds,omitempty"`
-	UpdatedAt     *float32                              `json:"updatedAt,omitempty"`
+	Select        *[]string `json:"select,omitempty"`
+	SortBy        *string   `json:"sortBy,omitempty"`
+	SortDirection *string   `json:"sortDirection,omitempty"`
+
+	// StartDate Epoch milliseconds, or an ISO 8601 date string.
+	StartDate PostApiTracesSearchJSONBody_StartDate `json:"startDate"`
+	TraceIds  *[]string                             `json:"traceIds,omitempty"`
+	UpdatedAt *float32                              `json:"updatedAt,omitempty"`
 }
 
 // PostApiTracesSearchJSONBodyDateField defines parameters for PostApiTracesSearch.

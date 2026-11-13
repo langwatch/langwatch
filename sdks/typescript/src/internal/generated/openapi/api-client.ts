@@ -2857,7 +2857,9 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
+                    /** @description Epoch milliseconds, or an ISO 8601 date string. */
                     startDate: number | string;
+                    /** @description Epoch milliseconds, or an ISO 8601 date string. */
                     endDate: number | string;
                     query?: string;
                     /** @default {} */
@@ -15983,7 +15985,9 @@ export interface operations {
                     sortDirection?: string;
                     updatedAt?: number;
                     scrollId?: string | null;
+                    /** @description Epoch milliseconds, or an ISO 8601 date string. */
                     startDate: number | string;
+                    /** @description Epoch milliseconds, or an ISO 8601 date string. */
                     endDate: number | string;
                     /** @description A trace filter string in the same language the Trace Explorer's search bar speaks — `status:error AND model:gpt-*`, `trace.attribute.langwatch.user_id:alice`, a quoted phrase for free text. Combined with `filters`/`query`/`traceIds` rather than replacing them, so every condition sent must hold. A malformed filter, or one naming a field the language does not have, is a 422 that names the `filter` field. */
                     filter?: string;
@@ -16098,7 +16102,9 @@ export interface operations {
                 prefix?: string;
                 limit?: number;
                 offset?: number;
+                /** @description Epoch milliseconds, or an ISO 8601 date string. */
                 startDate?: string;
+                /** @description Epoch milliseconds, or an ISO 8601 date string. */
                 endDate?: string;
             };
             header?: never;

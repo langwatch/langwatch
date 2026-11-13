@@ -459,7 +459,7 @@ Authenticated: The presenting key is the only thing this route touches, so holdi
 Answers at `/api/docs-session`, `/api/v1/docs-session`; also, undocumented, `/api/docs-session/2026-08-07`, `/api/v1/docs-session/2026-08-07`, `/api/docs-session/latest`, `/api/v1/docs-session/latest`.
 
 ```typescript
-// Response: docsSessionRevokedSchema, ../contract/src/api-key.docs-session.ts:189
+// Response: docsSessionRevokedSchema, ../contract/src/api-key.docs-session.ts:186
 interface Response {
   revoked: true;
 }
@@ -812,14 +812,14 @@ type Output = {
 }[];
 
 // apiKey.mintDocsSessionKey
-// Input: apiKeyTrpcMintDocsSessionKeyInputSchema, ../contract/src/api-key.docs-session.ts:58
+// Input: apiKeyTrpcMintDocsSessionKeyInputSchema, ../contract/src/api-key.docs-session.ts:55
 interface Input {
   projectId: string;
   docsOrigin: string;
   access: "full" | "read";
   lifetimeMinutes: 5 | 15 | 30 | 60;
 }
-// Output: docsSessionKeyMintedSchema, ../contract/src/api-key.docs-session.ts:92
+// Output: docsSessionKeyMintedSchema, ../contract/src/api-key.docs-session.ts:89
 interface Output {
   token: string;
   expiresAt: string;
@@ -831,11 +831,11 @@ interface Output {
 }
 
 // apiKey.docsSessionAvailability
-// Input: apiKeyTrpcDocsSessionAvailabilityInputSchema, ../contract/src/api-key.docs-session.ts:68
+// Input: apiKeyTrpcDocsSessionAvailabilityInputSchema, ../contract/src/api-key.docs-session.ts:65
 interface Input {
   projectId: string;
 }
-// Output: docsSessionAvailabilitySchema, ../contract/src/api-key.docs-session.ts:75
+// Output: docsSessionAvailabilitySchema, ../contract/src/api-key.docs-session.ts:72
 interface Output {
   enabled: boolean;
 }
@@ -907,11 +907,11 @@ Declared at `src/eventing/api-key.pipeline.ts:90`.
 
 ### Pipeline `api_key_docs_playground_revocation` (aggregate `global`)
 
-Declared at `src/eventing/docs-playground-revocation.pipeline.ts:36`.
+Declared at `src/eventing/docs-playground-revocation.pipeline.ts:37`.
 
 | Kind            | Name                                   | Handles                                                                                               | Declared at                                              |
 | --------------- | -------------------------------------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| peer subscriber | `apiKeyDocsPlaygroundSessionsDisabled` | `lw.organization.docs_playground_sessions_disabled` from [organization](../../organization/README.md) | `src/eventing/docs-playground-revocation.pipeline.ts:43` |
+| peer subscriber | `apiKeyDocsPlaygroundSessionsDisabled` | `lw.organization.docs_playground_sessions_disabled` from [organization](../../organization/README.md) | `src/eventing/docs-playground-revocation.pipeline.ts:44` |
 
 ## Configuration
 
