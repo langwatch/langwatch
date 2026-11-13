@@ -54,6 +54,7 @@ app:
     bucket: "your-dataset-bucket"
     providers:
       awsS3:
+        region: "eu-west-1" # rendered as S3_REGION; AWS signs with the bucket's region
         accessKeyId:
           secretKeyRef: { name: "your-secret", key: "accessKeyId" }
         secretAccessKey:

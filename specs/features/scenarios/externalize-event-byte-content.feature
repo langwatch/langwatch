@@ -490,8 +490,7 @@ Feature: Externalize event byte content to stored_objects
     When createS3Client constructs the S3Client
     Then the constructor receives region "auto" (the Cloudflare R2 / MinIO convention)
 
-  # Gap: the client sends "auto" to AWS when access keys are set and no region is named.
-  @unit @unimplemented
+  @unit
   Scenario: S3 client never sends the 'auto' region to AWS, even with access keys
     Given S3_REGION is not set and an access key pair is set
     And the endpoint is absent or an AWS host
@@ -500,7 +499,7 @@ Feature: Externalize event byte content to stored_objects
     And a regional AWS endpoint such as s3.eu-west-1.amazonaws.com gives the region eu-west-1
     And with no regional endpoint the SDK region chain (AWS_REGION) decides
 
-  @unit @unimplemented
+  @unit
   Scenario: Every S3 client picks its region by the same rule
     Given the dataset and stored-objects client, the object-storage migration client and the governance S3 channel
     When each builds an S3 client with no region named
@@ -748,12 +747,11 @@ Feature: Externalize event byte content to stored_objects
     And each secret-bearing field accepts a literal value or a secretKeyRef
     And selecting the azureBlob provider emits STORED_OBJECTS_BACKEND=azure on the deployment
 
-  # Gap: the chart has no region setting, so S3_REGION is never rendered.
-  @unit @unimplemented
+  @unit
   Scenario: Helm chart passes the awsS3 provider's region to every process
     Given the awsS3 dataplane provider with region "eu-north1"
     When the chart renders
-    Then the app, the workers and the migrate job each carry S3_REGION=eu-north1
+    Then the app, the workers and every hook that carries the S3 settings carry S3_REGION=eu-north1
     And with no region set no S3_REGION is rendered
 
   @unit

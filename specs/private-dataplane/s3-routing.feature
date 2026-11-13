@@ -25,8 +25,7 @@ Feature: Private Dataplane S3 Routing
     Then org "org123" maps to an S3 account with that endpoint, bucket and credentials
     And the label "acme" is ignored by the routing logic
 
-  # Gap: the config has no region field; every organisation inherits the shared S3_REGION.
-  @unit @unimplemented
+  @unit
   Scenario: A private S3 config may name its own region
     Given env var "DATAPLANE_S3__acme__org123" is set to JSON with endpoint, bucket, keys and region "eu-north1"
     And the shared S3_REGION is "eu-west-1"

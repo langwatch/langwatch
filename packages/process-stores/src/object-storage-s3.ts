@@ -15,6 +15,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { fromTokenFile } from "@aws-sdk/credential-providers";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { s3RegionOf } from "@langwatch/aws-client";
 
 import type { ObjectStorageAccount } from "./config.ts";
 import type {
@@ -48,35 +49,18 @@ interface S3Place {
 export function s3Client(account: ObjectStorageAccount): S3Client {
   const endpoint = account.endpoint?.trim() || undefined;
   const roleArn = account.roleArn;
-  const staticCredentials = roleArn ? undefined : account.credentials;
-  const isAwsEndpoint = endpoint === undefined || isAwsHost(endpoint);
-  const region = account.region ?? (isAwsEndpoint && !staticCredentials ? undefined : "auto");
   const credentials = roleArn
     ? fromTokenFile({ roleArn })
-    : staticCredentials && { ...staticCredentials };
+    : account.credentials && { ...account.credentials };
 
   return new S3Client({
-    ...(region === undefined ? {} : { region }),
+    region: s3RegionOf({ region: account.region, endpoint }),
     ...(endpoint === undefined ? {} : { endpoint }),
     ...(credentials === undefined ? {} : { credentials }),
     forcePathStyle: account.forcePathStyle ?? true,
     requestChecksumCalculation: "WHEN_REQUIRED",
     responseChecksumValidation: "WHEN_REQUIRED",
   });
-}
-
-/**
- * Reads the endpoint's hostname, so a trailing slash, path or port still counts
- * as AWS. A bare host without a scheme is read as https.
- */
-function isAwsHost(endpoint: string): boolean {
-  let host: string;
-  try {
-    host = new URL(endpoint.includes("://") ? endpoint : `https://${endpoint}`).hostname;
-  } catch {
-    return false;
-  }
-  return host.endsWith(".amazonaws.com") || host.endsWith(".amazonaws.com.cn");
 }
 
 function isMissing(error: unknown): boolean {

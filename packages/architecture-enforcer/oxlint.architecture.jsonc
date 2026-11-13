@@ -23,6 +23,7 @@
     "langwatch/no-hand-rolled-plan-gate": "error",
     "langwatch/no-tautological-assertion": "error",
     "langwatch/require-fetch-timeout": "error",
+    "langwatch/s3-client-region": "error",
     "langwatch/banned-verb-prefix": "error",
     "langwatch/module-classes": "error",
     "langwatch/module-layers": "error",

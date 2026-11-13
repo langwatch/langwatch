@@ -281,6 +281,12 @@ jobs:
         if: "!cancelled()"
         run: ./tests/workers-extra-envs.sh
 
+      # The awsS3 provider's region must reach every container that carries the
+      # S3 settings; without it a keyed client signs for the wrong region.
+      - name: "assert the S3 region reaches every process"
+        if: "!cancelled()"
+        run: ./tests/s3-region.sh
+
       - name: "assert ClickHouse pool sizing follows fleet capacity"
         if: "!cancelled()"
         run: ./tests/clickhouse-pool-sizing.sh
