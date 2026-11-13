@@ -17,7 +17,10 @@ import {
   type DeleteRecordsResponse,
   type UploadResponse,
   type DatasetRecordResponse,
+  type UpsertRecordsOptions,
+  type UpsertRecordsResult,
 } from "./types";
+import { assertUpsertableKeys } from "./upsert-keys";
 
 type DatasetsFacadeConfig = {
   langwatchApiClient: LangwatchApiClient;
@@ -129,6 +132,27 @@ export class DatasetsFacade {
     entry: Record<string, unknown>,
   ): Promise<DatasetRecordResponse> => {
     return this.#datasetService.updateRecord(slugOrId, recordId, entry);
+  };
+
+  /**
+   * Upserts rows matched on a key column: a known key updates in place (columns left out are
+   * kept), a new key adds a row, and an unchanged row is not written, so a rerun writes nothing.
+   * @param slugOrId - The slug or ID of the dataset
+   * @param entries - The rows to upsert; each must hold the key column
+   * @param options - The key column that identifies a row, such as "case_id"
+   * @returns The created and updated records and the number of rows left unchanged
+   */
+  upsertRecords = async (
+    slugOrId: string,
+    entries: Record<string, unknown>[],
+    options: UpsertRecordsOptions,
+  ): Promise<UpsertRecordsResult> => {
+    const { key } = options;
+    if (!key) {
+      throw new DatasetValidationError("key must name the column that identifies a row");
+    }
+    assertUpsertableKeys(entries, key);
+    return this.#datasetService.upsertRecords(slugOrId, entries, options);
   };
 
   /**

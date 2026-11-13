@@ -46329,11 +46329,21 @@ type PostApiDatasetJSONBody struct {
 		Name string                                `json:"name"`
 		Type PostApiDatasetJSONBodyColumnTypesType `json:"type"`
 	} `json:"columnTypes,omitempty"`
-	Name string `json:"name"`
+
+	// Entries The dataset's first rows, written with it in one call. Each key must be a column in `columnTypes`.
+	Entries *[]PostApiDatasetJSONBody_Entries_Item `json:"entries,omitempty"`
+	Name    string                                 `json:"name"`
 }
 
 // PostApiDatasetJSONBodyColumnTypesType defines parameters for PostApiDataset.
 type PostApiDatasetJSONBodyColumnTypesType string
+
+// PostApiDatasetJSONBody_Entries_Item defines parameters for PostApiDataset.
+type PostApiDatasetJSONBody_Entries_Item struct {
+	// Id Leave it out: record ids are unique across projects, so the platform picks them.
+	Id                   *string                `json:"id,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
 
 // PostApiDataset201JSONResponseBodyColumnTypesType defines parameters for PostApiDataset.
 type PostApiDataset201JSONResponseBodyColumnTypesType string
@@ -64265,6 +64275,74 @@ func (a PostApiAnalyticsTimeseriesJSONBody_Series_Filters) MarshalJSON() ([]byte
 		object["traces.origin"], err = json.Marshal(a.TracesOrigin)
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling 'traces.origin': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for PostApiDatasetJSONBody_Entries_Item. Returns the specified
+// element and whether it was found
+func (a PostApiDatasetJSONBody_Entries_Item) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for PostApiDatasetJSONBody_Entries_Item
+func (a *PostApiDatasetJSONBody_Entries_Item) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for PostApiDatasetJSONBody_Entries_Item to handle AdditionalProperties
+func (a *PostApiDatasetJSONBody_Entries_Item) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["id"]; found {
+		err = json.Unmarshal(raw, &a.Id)
+		if err != nil {
+			return fmt.Errorf("error reading 'id': %w", err)
+		}
+		delete(object, "id")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for PostApiDatasetJSONBody_Entries_Item to handle AdditionalProperties
+func (a PostApiDatasetJSONBody_Entries_Item) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Id != nil {
+		object["id"], err = json.Marshal(a.Id)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'id': %w", err)
 		}
 	}
 

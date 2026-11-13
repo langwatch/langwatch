@@ -429,6 +429,68 @@ Feature: Enterprise licensing lifecycle
       Then the request is refused as invalid, with a message naming the maximum
       And nothing is signed or stored
 
+  Rule: Every way of issuing a licence carries the Developer seats it sells
+
+    A licence that states no Developer seats sells none (specs/members/developer-seat.feature).
+    A count of 0 is left out of the signed plan like an unstated one, so the licence keeps
+    verifying on deployments that predate the field. A row holds the count, or none.
+
+    @unit
+    Scenario: An operator issues a licence with Developer seats
+      Given an operator issuing a licence with 4 Developer seats
+      When the licence is signed and recorded
+      Then the licence signs 4 Developer seats and its row holds 4
+
+    @unit
+    Scenario: A licence issued with no Developer seats, or 0, signs none and its row holds none
+      Given an operator issuing a licence with no Developer seats given, or 0
+      When the licence is signed and recorded
+      Then the signed plan carries no Developer seat field and the row holds no Developer count
+
+    @unit
+    Scenario: A replacement keeps the Developer seats of the licence it replaces
+      Given a recorded licence with 4 Developer seats
+      When an operator reissues it, or changes its seats, without naming Developer seats
+      Then the replacement signs 4 Developer seats and its row holds 4
+
+    @unit
+    Scenario: A reissue that names Developer seats signs the new count
+      Given a recorded licence with 4 Developer seats
+      When an operator reissues it with 7 Developer seats, or with 0
+      Then the replacement signs 7, or carries no Developer seat field for 0
+
+    @unit
+    Scenario: An activation code carries its Developer seats to the licence it mints
+      Given an operator issues an activation code with 3 Developer seats
+      When the code is stored and later redeemed
+      Then the code row holds 3 Developer seats and the licence it mints signs 3
+
+    @unit
+    Scenario: The mint script states Developer seats
+      When the generate-license script runs with --max-members-developer 2
+      Then the licence it mints signs 2 Developer seats
+
+    @unit
+    Scenario: An operator's Developer seats above the seat column's maximum are refused by name
+      Given an operator issuing a licence, reissuing one, or issuing an activation code
+      When they state more than 2147483647 Developer seats
+      Then the request is refused as invalid, with a message naming the maximum
+
+    @unit
+    Scenario: Every seat kind a licence sells is accepted by every issue path
+      Given the seat kinds a signed licence carries
+      Then issuing, reissuing, activation codes and the mint script accept each one
+      And the registry and activation-code views show each one, in licensing and in the admin console
+
+    @integration
+    Scenario: The admin console states and shows Developer seats
+      Given an operator in the backoffice licence screens
+      When they issue a licence or an activation code, or reissue a licence
+      Then issuing sends the typed Developer seats, and an empty field sends none
+      And the reissue field starts at the licence's current Developer seats and must hold a count
+      And a count the licence cannot sign, negative, fractional or above 2147483647, is named on the field and nothing is sent
+      And the licence details read its Developer seats, 0 when it states none
+
   # ADR-179: licensing keeps sso's sign-in provider fact with the id of the event it applied.
   @unit
   Scenario: The SSO gate status answers from sso's recorded sign-in provider

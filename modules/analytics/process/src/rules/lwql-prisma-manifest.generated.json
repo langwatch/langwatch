@@ -5120,6 +5120,15 @@
           "documentation": "True when the license sells unlimited lite seats; maxMembersLite is then null."
         },
         {
+          "name": "maxMembersDeveloper",
+          "columnName": "maxMembersDeveloper",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The Developer seats sold: null when not stated, which sells none."
+        },
+        {
           "name": "issuedAt",
           "columnName": "issuedAt",
           "type": "DateTime",
@@ -5507,6 +5516,15 @@
           "isList": false,
           "isOptional": false,
           "documentation": "True when the minted license carries unlimited lite seats; maxMembersLite is then null."
+        },
+        {
+          "name": "maxMembersDeveloper",
+          "columnName": "maxMembersDeveloper",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The Developer seats the minted license carries: null when not stated, which sells none."
         },
         {
           "name": "licenseTermDays",

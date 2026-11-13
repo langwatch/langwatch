@@ -1462,6 +1462,8 @@ model IssuedLicense {
   maxMembersLite   Int?
   /// True when the license sells unlimited lite seats; maxMembersLite is then null.
   liteSeatsUnlimited Boolean   @default(false)
+  /// The Developer seats sold: null when not stated, which sells none.
+  maxMembersDeveloper Int?
   issuedAt         DateTime
   expiresAt        DateTime
 
@@ -1562,6 +1564,8 @@ model ActivationCode {
   maxMembersLite   Int?     @default(0)
   /// True when the minted license carries unlimited lite seats; maxMembersLite is then null.
   liteSeatsUnlimited Boolean @default(false)
+  /// The Developer seats the minted license carries: null when not stated, which sells none.
+  maxMembersDeveloper Int?
   /// How long the license this code mints runs for.
   licenseTermDays  Int
   /// Hosted services the minted license may call.

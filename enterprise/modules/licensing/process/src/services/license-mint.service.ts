@@ -2,6 +2,7 @@ import {
   OrganizationNotFoundError,
   type LicensingApi,
 } from "@langwatch/enterprise-licensing-contract";
+import { statedDeveloperSeatsSchema } from "@langwatch/plans";
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 
 import type { ConnectOrganizationRepository } from "../repositories/connect-organization.repository.ts";
@@ -14,6 +15,7 @@ export type LicenseMintRequest = Readonly<{
   planType: string;
   maxMembers?: number;
   maxMembersLite?: number;
+  maxMembersDeveloper?: number;
   maxMessagesPerMonth?: number;
   expiresAt?: Instant;
   email?: string;
@@ -59,6 +61,9 @@ export class LicenseMintService {
       planType: request.planType,
       maxMembers: request.maxMembers ?? DEFAULT_MAX_MEMBERS,
       ...(request.maxMembersLite === undefined ? {} : { maxMembersLite: request.maxMembersLite }),
+      ...(request.maxMembersDeveloper === undefined
+        ? {}
+        : { maxMembersDeveloper: statedDeveloperSeatsSchema.parse(request.maxMembersDeveloper) }),
       ...(request.maxMessagesPerMonth === undefined
         ? {}
         : { maxMessagesPerMonth: request.maxMessagesPerMonth }),

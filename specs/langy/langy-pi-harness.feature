@@ -56,7 +56,17 @@ Feature: Langy runs a conversation on the pi worker
   Scenario: A model pi's catalog does not know is written from config alone
     Given the manager configures a model id pi's catalog does not list for that API dialect
     When the wrapper generates the model registry
-    Then the entry is exactly the manager's config
+    Then the entry is exactly the manager's config, apart from the reasoning default
+
+  # A provider prefix cannot tell a reasoning model from one that refuses the
+  # parameter outright, so the manager stays silent and pi's catalog decides.
+  @unit
+  Scenario: A model that cannot reason is never asked to
+    Given the manager configures a model without saying whether it reasons
+    When the wrapper generates the model registry
+    Then a model pi's catalog lists keeps the catalog's reasoning flag
+    And a Responses or Messages model the catalog does not list reasons by default
+    And a chat-completions model the catalog does not list does not reason
 
   # The model config passes unknown keys through so a new compat flag needs no
   # wrapper change. Routing and credential keys must not travel that path: they
