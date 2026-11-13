@@ -432,15 +432,62 @@ describe("TraceEvaluationOutcomesMigrationService", () => {
       expect(report).toMatchObject({ skippedProjects: 1, inProject: null, afterProjectId: TENANT });
     });
 
+    /** @scenario "The backfill skips a project archived since its evaluations" */
+    it("keeps the counts of pages sent before the project was archived", async () => {
+      const outcome = (index: number) => ({
+        evaluationId: `evaluation-${index}`,
+        traceId: TRACE_ID,
+        evaluatorName: "Faithfulness",
+        isGuardrail: false,
+        status: "processed" as const,
+        passed: true,
+        label: null,
+        occurredAt: EVALUATED_AT + index,
+        lastEventId: `last-evaluation-${index}`,
+      });
+      const anchors = { traceAnchors: async () => new Map([[TRACE_ID, EVALUATED_AT]]) };
+      let archivedCalls = 0;
+      const sent: RecordEvaluationOutcomeCommandData[] = [];
+      const backfill = TraceEvaluationOutcomesMigrationService.create({
+        projects,
+        evaluations: {
+          listEvaluationOutcomes: async ({ tenantId }) => {
+            if (tenantId !== archivedId) return { outcomes: [], next: null };
+            if (archivedCalls++ > 0) throw projectGone;
+            return {
+              outcomes: [outcome(1)],
+              next: { occurredAt: EVALUATED_AT + 1, evaluationId: "evaluation-1" },
+            };
+          },
+        },
+        anchors,
+        commands: { recordEvaluationOutcomes: async (data) => void sent.push(...data) },
+        logger: { warn: () => {} },
+        now: () => EVALUATED_AT + 60_000,
+      });
+
+      const report = await backfill.recordEvaluationOutcomes({
+        resumeFrom: null,
+        dryRun: false,
+        signal: new AbortController().signal,
+        onPage: async () => {},
+      });
+
+      expect(sent.map(({ evaluationId }) => evaluationId)).toEqual(["evaluation-1"]);
+      expect(report).toMatchObject({ projects: 1, outcomes: 1, skippedProjects: 1 });
+    });
+
     /** @scenario "The backfill still fails on any other error" */
     it("still fails the run on any other error", async () => {
-      const { run } = await backfillWith({ failure: new Error("clickhouse down") });
+      const failure = new Error("clickhouse down");
+      const { run } = await backfillWith({ failure });
 
-      await expect(run()).rejects.toThrow("clickhouse down");
+      await expect(run()).rejects.toBe(failure);
     });
   });
 
   describe("given a report saved before projects could be skipped", () => {
+    /** @scenario "A checkpoint saved before projects could be skipped still resumes" */
     it("reads it with no skipped projects", () => {
       const report = evaluationOutcomesBackfillReportSchema.parse({
         sinceMs: 1,

@@ -145,3 +145,9 @@ Feature: Each evaluation's outcome is kept beside its trace's columns
     Given a project whose outcomes cannot be read for another reason
     When the record step runs
     Then the step fails
+
+  @unit
+  Scenario: A checkpoint saved before projects could be skipped still resumes
+    Given a record step checkpoint saved before skipped projects were counted
+    When the record step resumes from it
+    Then it reads it with no skipped projects

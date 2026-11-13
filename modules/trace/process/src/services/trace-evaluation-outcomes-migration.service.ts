@@ -85,12 +85,22 @@ export class TraceEvaluationOutcomesMigrationService {
         limit: PROJECT_PAGE_SIZE,
       });
       for (const { id: projectId } of page.projects) {
+        let latest = report;
         try {
-          report = await this.recordProject({ projectId, report, dryRun, signal, onPage });
+          report = await this.recordProject({
+            projectId,
+            report,
+            dryRun,
+            signal,
+            onPage: async (saved) => {
+              latest = saved;
+              await onPage(saved);
+            },
+          });
         } catch (error) {
-          // Counts from pages of this project already sent in this run are dropped from the
-          // totals here; the checkpoints saved after each page keep them.
+          // Pages of this project already sent keep their counts: carry on from the last saved one.
           if (!isProjectGone(error)) throw error;
+          report = latest;
           this.deps.logger.warn(
             { projectId },
             "the evaluation outcomes step skipped a project that is archived or gone",
