@@ -700,6 +700,36 @@ describe("TraceModule", () => {
       });
     });
 
+    describe("given an id no project holds", () => {
+      const searchedAs = async (traceId: string) => {
+        const { app } = harness({
+          findById: async () => undefined,
+          otherProjectLookup: { locate: async () => ({ searchedProjectSlugs: [] }) },
+        });
+        const error: unknown = await get(app, traceId).catch((e: unknown) => e);
+        return (error as { meta: { searched: { as: string[] } } }).meta.searched.as;
+      };
+
+      /** @scenario "A trace_not_found names only the id kinds the lookup tried" */
+      it("names only the id kinds the lookup tried for that id", async () => {
+        expect(await searchedAs("0123456789abcdef0123456789abcdef")).toEqual([
+          "trace_id",
+          "stored_spans",
+        ]);
+        expect(await searchedAs("0123456789ABCDEF")).toEqual([
+          "trace_id",
+          "stored_spans",
+          "trace_id_prefix",
+          "span_id",
+        ]);
+        expect(await searchedAs("scenariorun_abc")).toEqual([
+          "trace_id",
+          "stored_spans",
+          "scenario_run_id",
+        ]);
+      });
+    });
+
     describe("given the trace was found by a span id while it is still being stored", () => {
       it("says how it was found and that it is still ingesting", async () => {
         const { app } = harness({

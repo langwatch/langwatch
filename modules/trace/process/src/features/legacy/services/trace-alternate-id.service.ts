@@ -9,24 +9,10 @@ import { ScenarioRunHasManyTracesError } from "@langwatch/trace-contract";
 
 import type { TraceLegacyReadRepository } from "../repositories/trace-legacy-read.repository.ts";
 import {
-  isHexId,
-  isScenarioRunId,
-  looksLikeSpanId,
+  traceIdLookupKinds,
   type TraceLookupResolvedFrom,
 } from "../rules/trace-id-lookup.rules.ts";
 import type { LegacyTraceMappingService } from "./legacy-trace-mapping.service.ts";
-
-/**
- * Minimum prefix length we will attempt to resolve. Shorter strings fall through to "not found" —
- * this avoids scanning the entire trace_summaries table on a single-character typo.
- */
-const MIN_TRACE_ID_PREFIX_LENGTH = 8;
-
-/**
- * Full length of a trace ID. Inputs shorter than this are treated as
- * potential prefixes; equal-or-longer inputs are treated as literal IDs.
- */
-const FULL_TRACE_ID_LENGTH = 32;
 
 /**
  * How many candidates the resolver asks ClickHouse for when disambiguating
@@ -104,11 +90,8 @@ export class TraceAlternateIdService {
       from: now - TRACE_ID_PREFIX_LOOKUP_WINDOW_DAYS * 24 * 60 * 60 * 1000,
       to: now,
     };
-    if (
-      traceId.length < FULL_TRACE_ID_LENGTH &&
-      traceId.length >= MIN_TRACE_ID_PREFIX_LENGTH &&
-      isHexId(traceId)
-    ) {
+    const kinds = traceIdLookupKinds(traceId);
+    if (kinds.includes("trace_id_prefix")) {
       const candidates = await store.resolveTraceIdByPrefix({
         projectId,
         prefix: traceId,
@@ -122,7 +105,7 @@ export class TraceAlternateIdService {
       if (candidates[0]) return [{ traceId: candidates[0], resolvedFrom: "trace_id_prefix" }];
     }
 
-    if (isScenarioRunId(traceId)) {
+    if (kinds.includes("scenario_run_id")) {
       const runTraces = await store.resolveTraceIdsByScenarioRunId({
         authorization,
         projectId,
@@ -134,7 +117,7 @@ export class TraceAlternateIdService {
       return runTraces.map((id) => ({ traceId: id, resolvedFrom: "scenario_run_id" as const }));
     }
 
-    if (!looksLikeSpanId(traceId)) return [];
+    if (!kinds.includes("span_id")) return [];
     const holding = await mapping.findTraceIdsBySpanId({
       authorization,
       projectId,

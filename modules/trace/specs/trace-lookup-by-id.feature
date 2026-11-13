@@ -45,6 +45,12 @@ Feature: Looking up a trace by id never fails for a trace that exists
     And the CLI error document does not mark it terminal
 
   @unit
+  Scenario: A trace_not_found names only the id kinds the lookup tried
+    When I get an id no project holds yet
+    Then the answer lists the trace id and the stored spans as searched
+    And it lists a prefix, a span id or a scenario run id only when the id is shaped like one
+
+  @unit
   Scenario: The CLI retries a trace that is still arriving
     Given the first lookups answer trace_not_found marked retryable
     When I run `langwatch trace get <id>`

@@ -301,6 +301,7 @@ import type {
 } from "../features/legacy/repositories/trace-legacy-read.repository.ts";
 import {
   normaliseTraceLookupId,
+  traceIdLookupKinds,
   type TraceByIdRead,
 } from "../features/legacy/rules/trace-id-lookup.rules.ts";
 import {
@@ -3900,7 +3901,7 @@ export class TraceModule implements TraceApi, CollectorApp {
         searched: {
           normalisedId,
           projectSlugs: [input.projectSlug, ...lookup.searchedProjectSlugs],
-          as: ["trace_id", "stored_spans", "trace_id_prefix", "scenario_run_id", "span_id"],
+          as: traceIdLookupKinds(normalisedId),
         },
       });
     }
