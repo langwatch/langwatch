@@ -489,6 +489,26 @@ describe("WelcomeScreen in the guided variant", () => {
       expect(takeover).toHaveAttribute("data-org", "org_2");
     });
 
+    /** @scenario "A reloaded new-organization welcome resumes the organization it created" */
+    it("lands on the created organization's guided page after a reload, never a second form", async () => {
+      routerState.query = { new_organization: "org_2" };
+      organizations = [
+        {
+          ...guidedOrganization({
+            paths: ["llmops"],
+            currentPath: "llmops",
+            donePaths: [],
+            provider: "openai",
+            providerModel: "gpt-5.2",
+          }),
+          id: "org_2",
+        },
+      ];
+      renderWelcome();
+      await waitFor(() => expect(push).toHaveBeenCalledWith("/acme-proj/traces"));
+      expect(screen.queryByLabelText("Organization name")).not.toBeInTheDocument();
+    });
+
     it("hands a pending continuation to the takeover", async () => {
       routerState.query = { return_to: "/cli/auth?user_code=ABCD" };
       organizations = [guidedOrganization({ paths: [], donePaths: [] })];

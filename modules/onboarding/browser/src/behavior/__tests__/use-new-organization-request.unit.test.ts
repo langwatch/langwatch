@@ -29,6 +29,21 @@ describe("selectingNewOrganization", () => {
     ).resolves.toBe("/onboarding/product?projectSlug=demo");
   });
 
+  it("asks the graph again when the first read fails", async () => {
+    let calls = 0;
+    await expect(
+      selectingNewOrganization({
+        landing: "/",
+        organizationId: "organization_new",
+        fetchScopeGraph: () => {
+          calls += 1;
+          return calls === 1 ? Promise.reject(new Error("blip")) : Promise.resolve(graph);
+        },
+      }),
+    ).resolves.toBe("/?org=new-co");
+    expect(calls).toBe(2);
+  });
+
   it("falls back to the plain landing when the graph cannot be read", async () => {
     await expect(
       selectingNewOrganization({

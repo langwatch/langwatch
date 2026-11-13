@@ -14,6 +14,8 @@ import { api } from "./onboarding-api.ts";
  * "/" resolves the organization from the remembered selection, which still names the one the
  * member came from; `?org=<slug>` selects the new one first (org-query-param-switch.feature).
  */
+const SCOPE_GRAPH_ATTEMPTS = 3;
+
 export async function selectingNewOrganization({
   landing,
   organizationId,
@@ -24,13 +26,19 @@ export async function selectingNewOrganization({
   fetchScopeGraph: () => Promise<readonly { id: string; slug: string }[]>;
 }): Promise<string> {
   if (landing !== "/") return landing;
-  const organizations = await fetchScopeGraph().catch(() => []);
-  const slug = organizations.find((org) => org.id === organizationId)?.slug;
-  return slug ? `/?org=${encodeURIComponent(slug)}` : landing;
+  for (let attempt = 0; attempt < SCOPE_GRAPH_ATTEMPTS; attempt++) {
+    const organizations = await fetchScopeGraph().catch(() => []);
+    const slug = organizations.find((org) => org.id === organizationId)?.slug;
+    if (slug) return `/?org=${encodeURIComponent(slug)}`;
+  }
+  // The organization exists either way; home in the remembered one beats a page with no way out.
+  return landing;
 }
 
 export function useNewOrganizationRequest({ created }: { created: GuidedOrganization | null }): {
   wantsNewOrganization: boolean;
+  /** Asked and nothing created yet; once it exists, its own resume or landing decides. */
+  asksForNewOrganizationForm: boolean;
   /** The organization this page created for the request, also after a reload. */
   createdOrganizationId: string | undefined;
   landAfterCreate: (input: { landing: string; organizationId: string }) => void;
@@ -70,9 +78,11 @@ export function useNewOrganizationRequest({ created }: { created: GuidedOrganiza
     }).then((to) => host.hardRedirect(to));
   };
 
+  const createdOrganizationId = created?.organizationId ?? recordedId;
   return {
     wantsNewOrganization: request.wanted,
-    createdOrganizationId: created?.organizationId ?? recordedId,
+    asksForNewOrganizationForm: request.wanted && !createdOrganizationId,
+    createdOrganizationId,
     landAfterCreate,
   };
 }

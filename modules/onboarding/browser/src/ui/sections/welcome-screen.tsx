@@ -299,8 +299,12 @@ export const WelcomeScreen: React.FC = () => {
   // fresh signup here with return_to=/cli/auth?user_code=… so the approval
   // survives onboarding). Only relative in-app paths are honored.
   const returnTo = getSafeReturnToPath(router.query.return_to);
-  const { wantsNewOrganization, createdOrganizationId, landAfterCreate } =
-    useNewOrganizationRequest({ created });
+  const {
+    wantsNewOrganization,
+    asksForNewOrganizationForm,
+    createdOrganizationId,
+    landAfterCreate,
+  } = useNewOrganizationRequest({ created });
 
   const resume = resolveWelcomeResume({
     organizations,
@@ -319,7 +323,7 @@ export const WelcomeScreen: React.FC = () => {
       : resolveWelcomeRedirect({
           organizations,
           currentProjectSlug: project?.slug ?? null,
-          wantsNewOrganization,
+          wantsNewOrganization: asksForNewOrganizationForm,
         });
 
     if (decision.kind === "onboard") {
@@ -339,7 +343,7 @@ export const WelcomeScreen: React.FC = () => {
     takeover,
     landing,
     router,
-    wantsNewOrganization,
+    asksForNewOrganizationForm,
   ]);
 
   function handleFinalizeSubmit() {
