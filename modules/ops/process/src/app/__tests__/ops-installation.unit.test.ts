@@ -72,6 +72,7 @@ function process(
       ops: {
         apiKey: undefined,
         clickhouseOpsUrl: undefined,
+        clickhouseOpsPasswordFile: undefined,
         usageStats: {
           disabled: false,
           installMethod: undefined,

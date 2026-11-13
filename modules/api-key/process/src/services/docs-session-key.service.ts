@@ -10,7 +10,10 @@ import {
   type MintDocsSessionKeyInput,
   type RevokeDocsSessionKeysInput,
 } from "@langwatch/api-key-contract";
-import { PermissionDeniedError } from "@langwatch/authorization";
+import {
+  ImpersonationCannotMintCredentialError,
+  PermissionDeniedError,
+} from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { isRegisteredDocsOrigin } from "@langwatch/config";
 import { createLogger } from "@langwatch/observability";
@@ -55,7 +58,8 @@ export class DocsSessionKeyService {
     const input = mintDocsSessionKeyInputSchema.parse(rawInput);
     const { browserSession } = input;
     // Only a browser session mints one; an operator acting as the member never does.
-    if (input.impersonatorId || !browserSession) {
+    if (input.impersonatorId) throw new ImpersonationCannotMintCredentialError();
+    if (!browserSession) {
       throw new PermissionDeniedError({
         permission: "project:view",
         scope: { type: "project", id: input.projectId },

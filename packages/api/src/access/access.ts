@@ -16,6 +16,7 @@ import {
   writesUnderProject,
   isPlatformTierPermission,
   permissionGrantTiers,
+  ImpersonationCannotMintCredentialError,
   PermissionDeniedError,
   SCOPE_TIER_BY_FIELD,
   SCOPE_TIER_FIELDS,
@@ -1293,25 +1294,11 @@ function declaredPermissionOf(declaration: AccessDeclaration): string {
 
 /**
  * A credential minted while an operator acts as the user would outlive the session it came
- * from, so an endpoint declared as minting one is refused for such an actor. With no resolved
- * scope the refusal names the endpoint as the resource.
+ * from, so an endpoint declared as minting one is refused for such an actor. No grant
+ * unlocks it, so the refusal names none.
  */
-export function refuseImpersonatedMint({
-  permission,
-  actor,
-  scope,
-  address,
-}: {
-  permission: AuthzPermission;
-  actor: Actor | null;
-  scope: AuthzDeclaredScopeId | null;
-  address: string;
-}): void {
+export function refuseImpersonatedMint({ actor }: { actor: Actor | null }): void {
   if (actor?.type !== "user" || !actor.impersonatorId) return;
 
-  throw new PermissionDeniedError({
-    permission,
-    scope: scope ? { type: scope.tier, id: scope.id } : { type: "resource", id: address },
-    denialReason: "no-grant",
-  });
+  throw new ImpersonationCannotMintCredentialError();
 }

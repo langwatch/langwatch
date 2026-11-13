@@ -1,3 +1,8 @@
+import fs from "node:fs";
+import { afterAll } from "vitest";
+
+import { isolateHome } from "./__tests__/helpers/isolate-home";
+
 /**
  * Tests run in-process by default (`LANGWATCH_NO_DAEMON=1`) -- a daemon
  * here could serve stale spawns or leak a previous build's module graph.
@@ -6,8 +11,11 @@
 process.env.LANGWATCH_NO_DAEMON ??= "1";
 
 /**
- * A session's own tool config (a Claude Code or Codex session running the suite) never
- * leaks in.
+ * Every test file starts in a temp HOME with no config location variables
+ * set, so a test that writes agent settings never touches the developer's
+ * own files, even when run from inside a Claude Code session.
  */
-delete process.env.CLAUDE_CONFIG_DIR;
-delete process.env.CODEX_HOME;
+const testHome = isolateHome(process.env);
+afterAll(() => {
+  fs.rmSync(testHome, { recursive: true, force: true });
+});
