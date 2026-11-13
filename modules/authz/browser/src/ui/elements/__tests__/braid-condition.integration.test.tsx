@@ -28,13 +28,24 @@ const spans = (element: HTMLElement) =>
 describe("Feature: Braids screen", () => {
   /** @scenario A braid condition reads with syntax highlighting */
   it("colours a listed condition by part and keeps its whole text as the title", () => {
-    renderWithDesignSystem(<BraidCondition where={CONDITION} />);
+    const where = 'attributes["orchestrator"] == "web" and name == "charge"';
+    renderWithDesignSystem(<BraidCondition where={where} />);
     const code = screen.getByTestId("braid-condition-code");
-    expect(code).toHaveTextContent(CONDITION);
-    expect(code).toHaveAttribute("title", CONDITION);
+    expect(code).toHaveTextContent(where);
+    expect(code).toHaveAttribute("title", where);
     expect(spans(code)).toEqual(
-      expect.arrayContaining(["attributes", '"orchestrator"', "==", '"web"', "and", "Verified"]),
+      expect.arrayContaining(["attributes", '"orchestrator"', "==", '"web"', "and"]),
     );
+  });
+
+  /** @scenario A braid condition reads with syntax highlighting */
+  it("says Verified as a Signed badge beside the rest of the condition", () => {
+    renderWithDesignSystem(<BraidCondition where={CONDITION} />);
+    expect(screen.getByTestId("braid-condition-code")).toHaveTextContent(
+      'attributes["orchestrator"] == "web"',
+    );
+    expect(screen.getByTestId("braid-condition-code")).not.toHaveTextContent("Verified");
+    expect(screen.getByTestId("braid-condition-signed")).toHaveTextContent("Signed");
   });
 
   /** @scenario A braid condition reads with syntax highlighting */

@@ -1,19 +1,17 @@
-// From and Into: the project the braid starts from is fixed; the picker offers the projects the
-// viewer can read, the braid's own project and aggregates disabled with the reason.
+// From and Into: the project the braid starts from is fixed, so it reads as plain text; the picker
+// offers the projects the viewer can read, the braid's own project and aggregates disabled.
 
 import { Banner, BannerAction } from "@langwatch/design-system/banner";
-import { InputGroup } from "@langwatch/design-system/input-group";
 import {
   createListCollection,
   Field,
   HStack,
-  Input,
   Stack,
   Text,
 } from "@langwatch/design-system/primitives";
 import { ProjectAvatar } from "@langwatch/design-system/project-avatar";
 import { Select } from "@langwatch/design-system/select";
-import { ArrowRight, Lock } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import type { Ref } from "react";
 
 import { type BraidTargetOption, braidTargetLabel } from "../../../../model/braids/braid-draft.ts";
@@ -119,15 +117,14 @@ export function BraidRouteFields(props: BraidRouteFieldsProps) {
   return (
     <Stack gap={2}>
       <HStack gap={3} align="start">
-        <Field.Root flex={1} minWidth={0} readOnly>
+        <Field.Root flex={1} minWidth={0}>
           <Field.Label>From</Field.Label>
-          <InputGroup
-            width="full"
-            startElement={<ProjectAvatar name={props.owner.name} />}
-            endElement={<Lock size={12} aria-label="Fixed" />}
-          >
-            <Input readOnly variant="subtle" value={props.owner.name} data-testid="braid-from" />
-          </InputGroup>
+          <HStack gap={2} height="10" minWidth={0} data-testid="braid-from">
+            <ProjectAvatar name={props.owner.name} />
+            <Text as="span" textStyle="body" truncate>
+              {props.owner.name}
+            </Text>
+          </HStack>
           <Field.HelperText>Owns the spans</Field.HelperText>
         </Field.Root>
         <RouteArrow />

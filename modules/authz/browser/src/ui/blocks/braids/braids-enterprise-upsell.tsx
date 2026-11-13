@@ -27,7 +27,7 @@ export function BraidsEnterpriseUpsell() {
       actions={
         <>
           <Button asChild colorPalette="orange" size="sm">
-            <Link href="/settings/plans">Talk to us about Enterprise</Link>
+            <Link href="/settings/plans">See plans</Link>
           </Button>
           <Button asChild variant="outline" size="sm">
             <Link href={BRAIDS_GUIDE_HREF} isExternal>

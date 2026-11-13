@@ -2,8 +2,9 @@
 // only when signing is in the way: the reader has no key yet, or its key has never signed a call.
 
 import { Link } from "@langwatch/browser-host/link";
-import { Alert, HStack, Stack, Text } from "@langwatch/design-system/primitives";
+import { Alert, Stack } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
+import { ToggleRow } from "@langwatch/design-system/toggle-row";
 
 import { BRAIDS_GUIDE_HREF } from "../../../../model/braids/braids.ts";
 
@@ -71,29 +72,18 @@ export function BraidSignedCalls(props: BraidSignedCallsProps) {
   const reader = props.readerName ?? "the other project";
   return (
     <Stack gap={2}>
-      <HStack
-        justify="space-between"
-        align="center"
-        gap={4}
-        borderWidth="1px"
-        borderColor={props.on ? "border.emphasized" : "border"}
-        borderRadius="l2"
-        paddingX={3}
-        paddingY={2.5}
+      <ToggleRow
+        label="Only signed calls"
+        hint={`Show spans only when ${reader} really made the call.`}
+        on={props.on}
       >
-        <Stack gap={0}>
-          <Text textStyle="label">Only signed calls</Text>
-          <Text textStyle="caption" color="fg.muted">
-            {`Show spans only when ${reader} really made the call.`}
-          </Text>
-        </Stack>
         <Switch
           checked={props.on}
           onCheckedChange={({ checked }) => props.onChange(checked)}
           aria-label="Only signed calls"
           data-testid="braid-signed-calls"
         />
-      </HStack>
+      </ToggleRow>
       {props.readerName ? (
         <SigningLine
           readerName={props.readerName}

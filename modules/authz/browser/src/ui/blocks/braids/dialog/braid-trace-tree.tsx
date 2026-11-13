@@ -14,7 +14,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { ProjectAvatar } from "@langwatch/design-system/project-avatar";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { EyeOff } from "lucide-react";
+import { Circle, EyeOff } from "lucide-react";
 import { useState } from "react";
 
 import type { TestTraceRow } from "../../../../model/braids/braid-draft.ts";
@@ -105,9 +105,12 @@ function SpanName({ row, ownerName }: { row: TestTraceRow; ownerName: string }) 
     );
   }
   return (
-    <Text textStyle="bodySm" color="fg.muted" truncate>
-      {row.name}
-    </Text>
+    <HStack gap={1.5} minWidth={0} color="fg.muted">
+      <Circle size={10} aria-hidden />
+      <Text textStyle="bodySm" truncate>
+        {row.name}
+      </Text>
+    </HStack>
   );
 }
 
@@ -175,7 +178,10 @@ export function TraceTree({
               <ProjectAvatar name={ownerName} size="xs" />
               <Text>Braided in</Text>
             </HStack>
-            <Text>{`${readerName}'s own`}</Text>
+            <HStack gap={1}>
+              <Circle size={10} aria-hidden />
+              <Text>{`${readerName}'s own`}</Text>
+            </HStack>
             {withheld ? (
               <HStack gap={1}>
                 <EyeOff size={12} aria-hidden />

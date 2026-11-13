@@ -117,8 +117,9 @@ describe("the braid dialog", () => {
           "Show specialists's spans inside another project's traces. Nothing is copied.",
         ),
       ).toBeInTheDocument();
-      expect(screen.getByTestId("braid-from")).toHaveValue("specialists");
-      expect(screen.getByTestId("braid-from")).toHaveAttribute("readonly");
+      const from = screen.getByTestId("braid-from");
+      expect(from).toHaveTextContent("specialists");
+      expect(within(from).queryByRole("textbox")).toBeNull();
       expect(intoPicker()).toHaveTextContent("Pick a project");
       await user.click(intoPicker());
       expect(screen.getByRole("option", { name: "orchestrator" })).toBeInTheDocument();
@@ -219,7 +220,11 @@ describe("the braid dialog", () => {
         await writeCondition(user, CONDITION);
 
         expect(await screen.findByTestId("braid-preview-added")).toHaveTextContent(
-          "Adds no spans: the other braid already shows them.",
+          "Adds nothing newThe other braid already shows these spans.",
+        );
+        expect(screen.queryByTestId("braid-preview-figure")).toBeNull();
+        expect(screen.getByTestId("braid-preview-counts")).toHaveTextContent(
+          "Together they reach 1,500 of 4,902 traces",
         );
       });
     });
@@ -306,10 +311,27 @@ describe("the braid dialog", () => {
       ]);
       expect(screen.getByTestId("braid-save")).toBeDisabled();
 
+      expect(screen.queryByTestId("braid-viewers")).toBeNull();
+      expect(screen.getByTestId("braid-preview-refused")).toBeInTheDocument();
+
       await writeCondition(user, CONDITION);
       // A supported condition needs no remark.
       expect(screen.queryByTestId("braid-condition-check")).toBeNull();
       expect(screen.getByTestId("braid-save")).toBeEnabled();
+    });
+  });
+
+  describe("when the condition uses a lone =", () => {
+    /** @scenario The condition is checked as it is typed */
+    it("answers with the comparison rewritten with ==", async () => {
+      const { user } = openDialog();
+      await pickReader(user);
+
+      await writeCondition(user, 'attributes["orchestrator"] = "web"');
+
+      expect(
+        await screen.findByTestId("braid-condition-check", {}, { timeout: 2000 }),
+      ).toHaveTextContent('Use == to compare: attributes["orchestrator"] == "web"');
     });
   });
 

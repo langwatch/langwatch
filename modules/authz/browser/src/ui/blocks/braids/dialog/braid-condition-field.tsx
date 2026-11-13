@@ -94,18 +94,40 @@ function refusedEnd({ text, at }: { text: string; at: number }): number {
   return Math.max(at + 1, space === -1 ? text.length : at + space);
 }
 
-function refusalMessage(check: Extract<BraidConditionCompileResult, { ok: false }>): string {
+/** The comparison a lone `=` at `at` meant, rewritten with `==`, e.g. `attributes["k"] == "v"`. */
+function withDoubleEquals({ text, at }: { text: string; at: number }): string {
+  const before =
+    text
+      .slice(0, at)
+      .split(/\s+and\s+/)
+      .at(-1) ?? "";
+  const after = text.slice(at + 1).split(/\s+and\s+/)[0] ?? "";
+  return `${before.trim()} == ${after.trim()}`;
+}
+
+/** Leads with what to write: a lone `=` gets the corrected comparison itself. */
+function refusalMessage({
+  check,
+  text,
+}: {
+  check: Extract<BraidConditionCompileResult, { ok: false }>;
+  text: string;
+}): string {
+  if (check.construct === "=")
+    return `Use == to compare: ${withDoubleEquals({ text, at: check.at })}`;
   return `${check.construct[0]?.toUpperCase() ?? ""}${check.construct.slice(1)} isn't supported. ${check.fix}`;
 }
 
 function CheckLine({
   check,
+  text,
   empty,
   touched,
   ownerName,
   readerName,
 }: {
   check: BraidConditionCompileResult;
+  text: string;
   empty: boolean;
   touched: boolean;
   ownerName: string;
@@ -114,7 +136,7 @@ function CheckLine({
   if (!check.ok) {
     return (
       <Field.ErrorText role="alert" data-testid="braid-condition-check">
-        {refusalMessage(check)}
+        {refusalMessage({ check, text })}
       </Field.ErrorText>
     );
   }
@@ -153,7 +175,7 @@ export function BraidConditionField(props: BraidConditionFieldProps) {
     : {
         at: check.at,
         end: refusedEnd({ text: props.value, at: check.at }),
-        message: refusalMessage(check),
+        message: refusalMessage({ check, text: props.value }),
       };
 
   useBraidConditionEditor({
@@ -179,21 +201,16 @@ export function BraidConditionField(props: BraidConditionFieldProps) {
   return (
     <Stack gap={2}>
       <Field.Root invalid={refusal !== undefined}>
-        <Stack gap={0.5} width="full" marginBottom={1}>
-          <HStack justify="space-between" align="baseline" gap={3}>
-            <Field.Label>Condition</Field.Label>
-            <HStack gap={1} textStyle="caption" color="fg.muted">
-              <Text>OTTL</Text>
-              <Text aria-hidden>·</Text>
-              <Link href={`${BRAIDS_GUIDE_HREF}#conditions`} isExternal>
-                Help
-              </Link>
-            </HStack>
+        <HStack justify="space-between" align="baseline" gap={3} width="full" marginBottom={1}>
+          <Field.Label>Condition</Field.Label>
+          <HStack gap={1} textStyle="caption" color="fg.muted">
+            <Text>OTTL</Text>
+            <Text aria-hidden>·</Text>
+            <Link href={`${BRAIDS_GUIDE_HREF}#conditions`} isExternal>
+              Help
+            </Link>
           </HStack>
-          <Text textStyle="caption" color="fg.muted">
-            {`Which ${props.ownerName} spans ${props.readerName} sees. Left empty, all of them.`}
-          </Text>
-        </Stack>
+        </HStack>
         <Box
           width="full"
           height={`${height + 2 * BORDER_PX}px`}
@@ -237,6 +254,7 @@ export function BraidConditionField(props: BraidConditionFieldProps) {
         </Box>
         <CheckLine
           check={check}
+          text={props.value}
           empty={props.value.trim().length === 0}
           touched={touched}
           ownerName={props.ownerName}

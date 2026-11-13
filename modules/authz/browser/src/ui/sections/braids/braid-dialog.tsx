@@ -9,9 +9,8 @@ import { Banner } from "@langwatch/design-system/banner";
 import { Card } from "@langwatch/design-system/card";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Box, Grid, HStack, Stack, Text } from "@langwatch/design-system/primitives";
-import { SmallLabel } from "@langwatch/design-system/small-label";
 import { nowInstant } from "@langwatch/time";
-import { Lock } from "lucide-react";
+import { Info } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
 
 import {
@@ -136,11 +135,36 @@ function saveBlockedReason({
   return "Change the braid to save it";
 }
 
-/** A group of the form under a quiet overline: Route, Which spans, Active. */
-function FieldGroup({ title, children }: { title: string; children: ReactNode }) {
+/** Side by side, each column scrolls on its own, so the form stays put while the preview grows. */
+const COLUMN_SCROLL = {
+  maxHeight: { lg: "full" },
+  overflowY: { lg: "auto" },
+  padding: 1,
+  margin: -1,
+} as const;
+
+/** A group of the form under a heading a step above its field labels: Which spans, Active. */
+function FieldGroup({
+  title,
+  hint,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  children: ReactNode;
+}) {
   return (
     <Stack as="section" gap={3} aria-label={title}>
-      <SmallLabel>{title}</SmallLabel>
+      <Stack gap={0.5}>
+        <Text as="h3" textStyle="cardTitle">
+          {title}
+        </Text>
+        {hint ? (
+          <Text textStyle="bodySm" color="fg.muted">
+            {hint}
+          </Text>
+        ) : null}
+      </Stack>
       {children}
     </Stack>
   );
@@ -227,10 +251,11 @@ export function BraidDialog({
       title={editing ? "Edit braid" : "New braid"}
       description="Show this project's matching spans inside another project's traces. Nothing is copied."
       busy={save.isSaving}
+      bodyScroll="content"
       initialFocusEl={() => (editing ? null : intoTrigger.current)}
       note={
         <HStack gap={1.5} color="fg.muted" textStyle="xs">
-          <Lock size={12} aria-hidden />
+          <Info size={12} aria-hidden />
           <Text>
             {keptToAdmins
               ? "Organisation admins can remove a braid at any time."
@@ -250,31 +275,34 @@ export function BraidDialog({
         templateColumns={{ base: "1fr", lg: "minmax(0, 1.4fr) minmax(0, 1fr)" }}
         gap={8}
         alignItems="start"
+        flex={1}
+        minHeight={0}
+        overflowY={{ base: "auto", lg: "hidden" }}
+        height={{ lg: "full" }}
       >
-        <Stack gap={7}>
+        <Stack gap={7} {...COLUMN_SCROLL}>
           {save.refusal ? (
             <Banner status="error" title="The braid wasn't saved">
               {save.refusal}
             </Banner>
           ) : null}
-          <FieldGroup title="Route">
-            <BraidRouteFields
-              owner={owner}
-              reader={reader}
-              options={options}
-              someLeftOut={someLeftOut}
-              listedOnly={
-                projects.length > targetProjects.length ? targetProjects.length : undefined
-              }
-              isLoading={targets.isLoading}
-              loadFailed={targets.isError}
-              onRetry={() => void targets.refetch()}
-              readerFixed={!!editing}
-              onPick={(readerProjectId) => change({ readerProjectId })}
-              intoRef={intoTrigger}
-            />
-          </FieldGroup>
-          <FieldGroup title="Which spans">
+          <BraidRouteFields
+            owner={owner}
+            reader={reader}
+            options={options}
+            someLeftOut={someLeftOut}
+            listedOnly={projects.length > targetProjects.length ? targetProjects.length : undefined}
+            isLoading={targets.isLoading}
+            loadFailed={targets.isError}
+            onRetry={() => void targets.refetch()}
+            readerFixed={!!editing}
+            onPick={(readerProjectId) => change({ readerProjectId })}
+            intoRef={intoTrigger}
+          />
+          <FieldGroup
+            title="Which spans"
+            hint={`Which ${owner.name} spans ${reader?.name ?? "the other project"} sees. Left empty, all of them.`}
+          >
             <BraidConditionField
               value={draft.where}
               onChange={(where) => change({ where })}
@@ -309,7 +337,7 @@ export function BraidDialog({
             />
           </FieldGroup>
         </Stack>
-        <Box position={{ base: "static", lg: "sticky" }} top={0}>
+        <Box {...COLUMN_SCROLL}>
           <Card variant="nested">
             <BraidPreviewPanel
               ownerName={owner.name}

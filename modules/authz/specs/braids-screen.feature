@@ -35,7 +35,7 @@ Feature: The Braids screen
     @integration
     Scenario: The braid starts from this project and picks where it goes
       When ana starts a new braid
-      Then the project it braids from is "specialists" and cannot be changed
+      Then the project it braids from is "specialists", shown as plain text since it cannot be changed
       And the project picker lists the plain projects ana can read
       And aggregate projects and "specialists" itself are listed but disabled, each with the reason
       And "specialists" itself is listed last
@@ -59,7 +59,7 @@ Feature: The Braids screen
     Scenario: The dialog says what the reader already sees from this project
       Given a live braid from "specialists" into "orchestrator"
       When ana picks "orchestrator" for a new braid
-      Then one quiet line in the preview says there is 1 other braid into "orchestrator"
+      Then a note in the preview says there is 1 other braid into "orchestrator"
       And showing it lists that braid's condition and data window
 
     @integration
@@ -67,7 +67,8 @@ Feature: The Braids screen
       Given a live braid from "specialists" into "orchestrator"
       When ana previews another braid from "specialists" into "orchestrator"
       Then the preview counts what "orchestrator" will see with both braids
-      And says in one quiet line how many more spans the new braid shows, or that it adds none
+      And a note says how many more spans the new braid shows
+      And when it adds none, the preview leads with "Adds nothing new" and quiets the counts under it
 
     @integration
     Scenario: The condition is checked as it is typed
@@ -75,6 +76,8 @@ Feature: The Braids screen
       Then the editor marks the or in place with its fix and explains in one line how to write the condition instead
       And the create button stays disabled until the condition is supported
       And Test stays disabled, saying why, until the condition is supported
+      And while the condition is refused the preview shows no counts, only that the condition needs fixing
+      And a lone = is answered with the comparison itself rewritten with ==
       And a supported condition gets no remark under the field
 
     @integration
@@ -103,6 +106,7 @@ Feature: The Braids screen
       And with only signed calls on it counts the spans that stay hidden for having no valid signature
       And a plain legend on one line under the bar says how many traces get every span, some or none
       And when the condition reads attributes without only signed calls, one warning says anyone can set this tag and offers to turn on only signed calls
+      And the warning and the other notes are one list, most severe first, each with its action
       And an example trace, folded until ana opens it, shows the braided spans with their project and marks the rest not braided, seen by ana only
 
     @integration
@@ -110,7 +114,7 @@ Feature: The Braids screen
       When ana tests the condition against an "orchestrator" trace id
       Then that trace is shown with exactly the spans "orchestrator" will see
       And a summary first says how many spans are braided in and how many are withheld
-      And "orchestrator"'s own spans are quiet context, each braided span carries the "specialists" avatar and each withheld span is marked not braided
+      And "orchestrator"'s own spans are quiet context with a muted marker the legend repeats, each braided span carries the "specialists" avatar and each withheld span is marked not braided
 
     @integration
     Scenario: A tested trace folds the preview's example trace
@@ -151,8 +155,9 @@ Feature: The Braids screen
     Scenario: A braid condition reads with syntax highlighting
       Given a braid whose condition is attributes["orchestrator"] == "web" and Verified("orchestrator")
       When ana reads it in the braids list, the pair's braids in the dialog or the condition editor
-      Then its fields, strings, operators, the joining word and the function call each take their own colour
-      And the whole condition is still its text, with the full condition as the title where it is cut
+      Then its fields, strings, operators and the joining word each take their own colour
+      And in the braids list and the pair's braids, Verified("orchestrator") reads as a Signed badge beside the condition
+      And a listed condition wraps to two lines, with the full condition as the title where it is cut
 
     @unit
     Scenario: View in audit log from the reader's side opens the owner's project
@@ -174,6 +179,7 @@ Feature: The Braids screen
       Then the sections "Shown in other projects", "Shown here from other projects" and "Signing keys" follow one another
       And each braid section names how many braids it holds
       And an empty section says so in one muted line, with no empty-state illustration
+      And who may change braids is one muted footnote at the end of the page
 
     @unit
     Scenario: A link opens the Braids page at its Signing keys
@@ -221,6 +227,7 @@ Feature: The Braids screen
       Then every braid in the organisation is listed
       And the guide is a quiet link under the page description, with no header buttons
       And a setting offers to keep braids to organisation admins, saying project admins can braid until it is on
+      And the setting is the same bordered row as the dialog's only signed calls
 
     @integration
     Scenario: A member who is not an admin sees the braids but cannot change them
@@ -235,7 +242,7 @@ Feature: The Braids screen
     Scenario: An organisation below Enterprise sees what Braids offers
       Given an organisation below Enterprise
       When ana opens Braids
-      Then the page explains braids and offers a conversation about Enterprise
+      Then the page explains braids and offers See plans, as every other upgrade does
       And the title marks Braids with a lock, as the settings menu does
       And nothing half-works
 

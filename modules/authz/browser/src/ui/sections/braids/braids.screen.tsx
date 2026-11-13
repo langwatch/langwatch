@@ -129,7 +129,6 @@ function BraidsSectionBand({
   hint,
   count,
   none,
-  footnote,
   children,
 }: {
   side: "into" | "from";
@@ -137,8 +136,6 @@ function BraidsSectionBand({
   hint: string;
   count: number;
   none: string;
-  /** Under the rows or the empty line. */
-  footnote?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -160,7 +157,6 @@ function BraidsSectionBand({
           {none}
         </Text>
       )}
-      {footnote}
     </SettingsSection>
   );
 }
@@ -246,9 +242,18 @@ function SigningKeysBand({
   );
 }
 
+/** Who may change braids: one muted footnote at the end of the page. */
 function WhoMayBraidHint({ keptToAdmins }: { keptToAdmins: boolean }) {
   return (
-    <Text textStyle="sm" color="fg.muted">
+    <Text
+      textStyle="caption"
+      color="fg.muted"
+      paddingTop={6}
+      borderTopWidth="1px"
+      borderColor="border.subtle"
+      marginTop={2}
+      data-testid="braids-who-may-braid"
+    >
       {keptToAdmins
         ? "Organisation admins can create, change or remove braids. Every change is in the audit log."
         : "Admins of this project and organisation admins can create, change or remove braids. Every change is in the audit log."}
@@ -371,7 +376,6 @@ export default function BraidsScreen() {
               hint={`Projects whose matching spans show in ${projectName}'s traces.`}
               count={rows.from.length}
               none={`No project shows its spans in ${projectName} yet.`}
-              footnote={<WhoMayBraidHint keptToAdmins={keptToAdmins} />}
             >
               {table("from")}
             </BraidsSectionBand>
@@ -386,6 +390,7 @@ export default function BraidsScreen() {
               : undefined
           }
         />
+        <WhoMayBraidHint keptToAdmins={keptToAdmins} />
       </Stack>
       {dialogOpen ? (
         <BraidDialog

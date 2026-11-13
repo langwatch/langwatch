@@ -1,6 +1,6 @@
-// What the reader will see: two headline figures, the share of its traces getting every, some or
-// none of the owner's spans, one warning when a tag can be forged, the pair's other braids as a
-// quiet line, an example trace, and a trace id to try the draft against.
+// What the reader will see: two headline figures and the share of its traces getting every, some
+// or none of the owner's spans (or, when the braid adds nothing, that first), then one list of
+// notes by severity, an example trace, and a trace id to try the draft against.
 
 import type { AuthzBraid } from "@langwatch/authz-contract";
 import { MeterBar } from "@langwatch/design-system/meter-bar";
@@ -14,9 +14,8 @@ import {
   Stack,
   Text,
 } from "@langwatch/design-system/primitives";
-import { SmallLabel } from "@langwatch/design-system/small-label";
 import { StatTileFigure } from "@langwatch/design-system/stat-tile";
-import { ChevronDown, ChevronUp, Info, ShieldCheck } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
@@ -235,91 +234,204 @@ function ExampleTrace({
   );
 }
 
-/** A quiet line with an icon, for what is worth knowing but asks nothing. */
-function QuietLine({ icon, children }: { icon: ReactNode; children: ReactNode }) {
+/** One note of the preview, all in one style: a status, a claim, and an action where one helps. */
+function Note({
+  status,
+  title,
+  testId,
+  children,
+}: {
+  status: "warning" | "info";
+  title?: ReactNode;
+  testId?: string;
+  children?: ReactNode;
+}) {
   return (
-    <HStack gap={2} align="start" textStyle="bodySm" color="fg.muted">
-      <Box paddingTop="3px" flexShrink={0}>
-        {icon}
-      </Box>
-      <Stack gap={0.5} minWidth={0}>
+    <Alert.Root status={status} variant="outline" size="sm" data-testid={testId}>
+      <Alert.Indicator />
+      <Alert.Content>
+        {title ? <Alert.Title>{title}</Alert.Title> : null}
         {children}
-      </Stack>
-    </HStack>
+      </Alert.Content>
+    </Alert.Root>
   );
+}
+
+/** The braid adds no span the pair's other braids lack: said first, the counts quiet under it. */
+function Redundant({
+  braids,
+  others,
+  readerName,
+  traces,
+  viewers,
+}: {
+  braids: readonly AuthzBraid[];
+  others: number;
+  readerName: string;
+  traces: BraidPreviewCounts;
+  viewers: string | undefined;
+}) {
+  const summary = (
+    <Stack gap={0.5} data-testid="braid-preview-added">
+      <Text textStyle="metric">Adds nothing new</Text>
+      <Text textStyle="bodySm" color="fg.muted">
+        {others === 1
+          ? "The other braid already shows these spans."
+          : `The ${count(others)} other braids already show these spans.`}
+      </Text>
+    </Stack>
+  );
+  const got = traces.every + traces.some;
+  return (
+    <Stack gap={3}>
+      {braids.length > 0 ? <BraidPairBraids braids={braids} summary={summary} /> : summary}
+      <Text textStyle="caption" color="fg.muted" data-testid="braid-preview-counts">
+        {traces.total === 0
+          ? `${readerName} has no traces in the last 7 days.`
+          : `Together they reach ${count(got)} of ${count(traces.total)} traces${viewers ? ` · ${viewers} will see them` : ""}.`}
+      </Text>
+    </Stack>
+  );
+}
+
+/** The notes, one list most severe first: the forgeable tag, the pair's braids, unsigned spans. */
+function Notes({
+  reader,
+  warnUnsigned,
+  onSignedCalls,
+  pairBraids,
+  added,
+  hidden,
+}: {
+  reader: string;
+  warnUnsigned: boolean;
+  onSignedCalls: () => void;
+  pairBraids: readonly AuthzBraid[];
+  /** What the braid adds beyond the pair's braids; null when it adds nothing or there are none. */
+  added: { spans: number; braids: number } | null;
+  hidden: number;
+}) {
+  const addedTitle = added ? (
+    <Text as="span" data-testid="braid-preview-added">
+      {addedPhrase(added)}
+    </Text>
+  ) : null;
+  const pairTitle =
+    addedTitle ??
+    `${pairBraids.length} other ${pairBraids.length === 1 ? "braid" : "braids"} into ${reader}`;
+  const any = warnUnsigned || pairBraids.length > 0 || added !== null || hidden > 0;
+  if (!any) return null;
+  return (
+    <Stack gap={2} data-testid="braid-preview-notes">
+      {warnUnsigned ? (
+        <Note status="warning" title="Anyone can set this tag" testId="braid-preview-unsigned-hint">
+          <Alert.Description>
+            {`Without signing, any caller can get spans shown in ${reader}.`}
+          </Alert.Description>
+          <Button
+            size="xs"
+            variant="outline"
+            alignSelf="start"
+            marginTop={2}
+            onClick={onSignedCalls}
+          >
+            Turn on only signed calls
+          </Button>
+        </Note>
+      ) : null}
+      {pairBraids.length > 0 ? (
+        <Note status="info">
+          <BraidPairBraids braids={pairBraids} summary={<Alert.Title>{pairTitle}</Alert.Title>} />
+        </Note>
+      ) : null}
+      {addedTitle && pairBraids.length === 0 ? <Note status="info" title={addedTitle} /> : null}
+      {hidden > 0 ? (
+        <Note
+          status="info"
+          title={
+            <Text as="span" data-testid="braid-preview-unsigned">
+              {unsignedHiddenPhrase(hidden)}
+            </Text>
+          }
+        />
+      ) : null}
+    </Stack>
+  );
+}
+
+/** What stands in for the counts before they are ready. */
+function NotReady({ state }: { state: BraidPreviewPanelProps["preview"]["state"] }) {
+  if (state === "no-reader") {
+    return (
+      <Text textStyle="bodySm" color="fg.muted">
+        Pick a project to braid into to see a preview.
+      </Text>
+    );
+  }
+  if (state === "refused") {
+    return (
+      <Text textStyle="bodySm" color="fg.muted" data-testid="braid-preview-refused">
+        Fix the condition to see a preview.
+      </Text>
+    );
+  }
+  if (state === "error") {
+    return (
+      <Alert.Root status="error" size="sm" data-testid="braid-preview-error">
+        <Alert.Indicator />
+        <Alert.Title fontWeight="normal">
+          Couldn't load the preview. It tries again when you change the braid.
+        </Alert.Title>
+      </Alert.Root>
+    );
+  }
+  return state === "loading" ? <Skeleton height="24" /> : null;
 }
 
 export function BraidPreviewPanel(props: BraidPreviewPanelProps) {
   const reader = props.readerName ?? "the other project";
+  const readerTitle = props.readerName ?? "The project";
   const { preview } = props;
   const ready = preview.state === "ready" ? preview : undefined;
-  const hidden = ready?.unsignedHidden ?? 0;
-  const added = ready?.added ? (
-    <Text as="span" data-testid="braid-preview-added">
-      {addedPhrase(ready.added)}
-    </Text>
-  ) : null;
+  const redundant = ready?.added?.spans === 0 ? ready.added : undefined;
+  const pairBraids = props.readerName ? props.pairBraids : [];
   return (
     <Stack gap={5} data-testid="braid-preview">
       <Stack gap={0.5}>
-        <Text textStyle="cardTitle">{`What ${reader} will see`}</Text>
+        <Text as="h3" textStyle="cardTitle">{`What ${reader} will see`}</Text>
         <Text textStyle="caption" color="fg.muted">
           Last 7 days · updates as you type
         </Text>
       </Stack>
-      {preview.state === "no-reader" ? (
-        <Text textStyle="bodySm" color="fg.muted">
-          Pick a project to braid into to see a preview.
-        </Text>
-      ) : null}
-      {preview.state === "refused" ? (
-        <Alert.Root status="info" size="sm" data-testid="braid-preview-refused">
-          <Alert.Indicator />
-          <Alert.Title fontWeight="normal">Fix the condition to see a preview.</Alert.Title>
-        </Alert.Root>
-      ) : null}
-      {preview.state === "error" ? (
-        <Alert.Root status="error" size="sm" data-testid="braid-preview-error">
-          <Alert.Indicator />
-          <Alert.Title fontWeight="normal">
-            Couldn't load the preview. It tries again when you change the braid.
-          </Alert.Title>
-        </Alert.Root>
-      ) : null}
-      {preview.state === "loading" ? <Skeleton height="24" /> : null}
-      {ready ? (
-        <Counts
-          ownerName={props.ownerName}
-          readerName={props.readerName ?? "The project"}
+      <NotReady state={preview.state} />
+      {ready && redundant ? (
+        <Redundant
+          braids={pairBraids}
+          others={redundant.braids}
+          readerName={readerTitle}
           traces={ready.traces}
           viewers={props.viewers}
         />
       ) : null}
-      {!ready && props.viewers ? <Viewers viewers={props.viewers} readerName={reader} /> : null}
-      {ready && props.unsignedWarning ? (
-        <UnsignedWarning reader={reader} onSignedCalls={props.onSignedCalls} />
+      {ready && !redundant ? (
+        <Counts
+          ownerName={props.ownerName}
+          readerName={readerTitle}
+          traces={ready.traces}
+          viewers={props.viewers}
+        />
       ) : null}
-      {added || hidden > 0 || props.pairBraids.length > 0 ? (
-        <Stack gap={2}>
-          {props.readerName && props.pairBraids.length > 0 ? (
-            <QuietLine icon={<Info size={14} aria-hidden />}>
-              <BraidPairBraids
-                readerName={props.readerName}
-                braids={props.pairBraids}
-                summary={added}
-              />
-            </QuietLine>
-          ) : null}
-          {added && props.pairBraids.length === 0 ? (
-            <QuietLine icon={<Info size={14} aria-hidden />}>{added}</QuietLine>
-          ) : null}
-          {hidden > 0 ? (
-            <QuietLine icon={<ShieldCheck size={14} aria-hidden />}>
-              <Text data-testid="braid-preview-unsigned">{unsignedHiddenPhrase(hidden)}</Text>
-            </QuietLine>
-          ) : null}
-        </Stack>
+      {preview.state === "loading" && props.viewers ? (
+        <Viewers viewers={props.viewers} readerName={reader} />
       ) : null}
+      <Notes
+        reader={reader}
+        warnUnsigned={!!ready && props.unsignedWarning}
+        onSignedCalls={props.onSignedCalls}
+        pairBraids={redundant ? [] : pairBraids}
+        added={redundant ? null : (ready?.added ?? null)}
+        hidden={ready?.unsignedHidden ?? 0}
+      />
       {ready?.example ? (
         <ExampleTrace
           rows={ready.example}
@@ -332,7 +444,9 @@ export function BraidPreviewPanel(props: BraidPreviewPanelProps) {
         <>
           <Separator />
           <Stack gap={3}>
-            <SmallLabel>Try a trace</SmallLabel>
+            <Text as="h3" textStyle="cardTitle">
+              Try a trace
+            </Text>
             <TestTrace
               test={props.test}
               onTest={props.onTest}
@@ -346,29 +460,10 @@ export function BraidPreviewPanel(props: BraidPreviewPanelProps) {
   );
 }
 
-/** Without signing, a tag is only a claim: the one warning, with its fix. */
-function UnsignedWarning({ reader, onSignedCalls }: { reader: string; onSignedCalls: () => void }) {
-  return (
-    <Alert.Root status="warning" size="sm" data-testid="braid-preview-unsigned-hint">
-      <Alert.Indicator />
-      <Alert.Content>
-        <Alert.Title>Anyone can set this tag</Alert.Title>
-        <Alert.Description>
-          {`Without signing, any caller can get spans shown in ${reader}.`}
-        </Alert.Description>
-        <Button size="xs" variant="outline" alignSelf="start" marginTop={2} onClick={onSignedCalls}>
-          Turn on only signed calls
-        </Button>
-      </Alert.Content>
-    </Alert.Root>
-  );
-}
-
-/** What this braid adds to the pair's other live braids, in spans. */
+/** What this braid adds to the pair's other live braids, in spans; never zero (see Redundant). */
 function addedPhrase({ spans, braids }: { spans: number; braids: number }): string {
   const one = braids === 1;
   const others = one ? "the other braid" : `the ${count(braids)} other braids`;
-  if (spans === 0) return `Adds no spans: ${others} already ${one ? "shows" : "show"} them.`;
   return `Adds ${count(spans)} ${spans === 1 ? "span" : "spans"} that ${others} ${one ? "doesn't" : "don't"} show.`;
 }
 

@@ -10,10 +10,9 @@ import { FeatureMark } from "@langwatch/design-system/feature-mark";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Box, Button, Skeleton, Stack } from "@langwatch/design-system/primitives";
-import { SettingsField } from "@langwatch/design-system/settings-field";
 import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { Switch } from "@langwatch/design-system/switch";
-import { ShieldCheck } from "lucide-react";
+import { ToggleRow } from "@langwatch/design-system/toggle-row";
 
 import {
   useBraidsPolicy,
@@ -28,6 +27,9 @@ import { BraidsTitle } from "../../elements/braids-title.tsx";
 import { SectionErrorNotice } from "../../elements/section-error-notice.tsx";
 
 const KEEP_TO_ADMINS = "Keep braids to organisation admins";
+
+/** The header already ends on a rule: a band that opens the body draws none of its own. */
+const NO_RULE_UNDER_HEADER = { "& > section:first-child": { borderTopWidth: 0, paddingTop: 0 } };
 
 function OrganizationBraidsHeader({ locked = false }: { locked?: boolean }) {
   return (
@@ -58,14 +60,12 @@ function WhoMayBraid({
   const setting = useSetBraidsPolicy({ organizationId });
   return (
     <SettingsSection
-      icon={<ShieldCheck size={18} />}
       title="Who may braid"
       hint="Who can create, change or remove braids in this organisation's projects."
     >
-      <SettingsField
+      <ToggleRow
         label={KEEP_TO_ADMINS}
-        controlAlign="end"
-        layout="inline"
+        on={isEnterprise && keptToAdmins}
         hint={
           isEnterprise
             ? "While this is off, project admins can braid their projects. Turn it on and only organisation admins can."
@@ -86,7 +86,7 @@ function WhoMayBraid({
             <Link href="/settings/plans">See plans</Link>
           </Button>
         )}
-      </SettingsField>
+      </ToggleRow>
     </SettingsSection>
   );
 }
@@ -141,7 +141,7 @@ export default function OrganizationBraidsScreen() {
   return (
     <>
       <OrganizationBraidsHeader locked={!isEnterprise} />
-      <Stack gap={0}>
+      <Stack gap={0} css={NO_RULE_UNDER_HEADER}>
         {paused ? (
           <Box paddingBottom={4}>
             <Banner status="warning" title="Braids are paused">
@@ -157,7 +157,6 @@ export default function OrganizationBraidsScreen() {
           isReading={policy.isLoading}
         />
         <SettingsSection
-          icon={<FeatureMark feature="braids" size={18} variant="mono" />}
           title="Braids in this organisation"
           hint="Each braid shows a project's matching spans inside another project's traces."
           data-testid="organization-braids"

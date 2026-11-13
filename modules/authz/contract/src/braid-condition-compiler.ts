@@ -56,7 +56,7 @@ const FIX = {
   function:
     'The only function is Verified("k"); compare whole values with ==, for example attributes["k"] == "v".',
   stringEquality:
-    'Only string equality is supported: write attributes["k"] == "v" with the value in double quotes.',
+    'Compare with == and put the value in double quotes, for example attributes["k"] == "v".',
   notEqualValue:
     'Name the value a braided span carries with ==, or require the key with attributes["k"] != nil.',
   emptyString:

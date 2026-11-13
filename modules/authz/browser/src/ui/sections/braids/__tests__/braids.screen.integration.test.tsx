@@ -133,6 +133,14 @@ describe("BraidsScreen", () => {
         "No project shows its spans in specialists yet.",
       );
       expect(screen.queryByTestId("braids-empty-into")).not.toBeInTheDocument();
+      const footnote = screen.getByTestId("braids-who-may-braid");
+      expect(footnote).toHaveTextContent("Every change is in the audit log.");
+      expect(
+        within(screen.getByTestId("braids-section-keys")).queryByTestId("braids-who-may-braid"),
+      ).toBeNull();
+      expect(screen.getByTestId("braids-section-keys").compareDocumentPosition(footnote)).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      );
     });
     /** @scenario Each braid row shows where it goes, its condition, its access and its activity */
     it("Each braid row shows where it goes, its condition, its access and its activity", async () => {
@@ -301,9 +309,7 @@ describe("BraidsScreen", () => {
       renderAs({ isEnterprise: false });
       const upsell = screen.getByTestId("braids-enterprise-upsell");
       expect(within(upsell).getByText("See every agent call, across projects")).toBeInTheDocument();
-      expect(
-        within(upsell).getByRole("link", { name: "Talk to us about Enterprise" }),
-      ).toBeInTheDocument();
+      expect(within(upsell).getByRole("link", { name: "See plans" })).toBeInTheDocument();
       expect(screen.queryByTestId("braids-section-keys")).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /New braid/ })).not.toBeInTheDocument();
       expect(screen.getAllByRole("link", { name: /How braids work/ })).toHaveLength(1);
