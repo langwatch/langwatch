@@ -8,11 +8,13 @@ import type { DataPrivacyRule } from "@langwatch/data-privacy-contract";
 import { describe, expect, it } from "vitest";
 
 import {
+  levelChangeConfirmation,
   organizationPiiLevel,
   organizationRule,
   PII_REDACTION_MODEL_PRICE,
   PII_REDACTION_MODEL_PRICE_UNIT,
   piiRedactionModelPrice,
+  STRICT_FALLBACK_NOTE,
   withOrganizationPiiLevel,
 } from "../pii-redaction-level-offer.ts";
 
@@ -96,5 +98,54 @@ describe("given the organization's resolved PII level", () => {
     expect(organizationPiiLevel("strict")).toBe("strict");
     expect(organizationPiiLevel("disabled")).toBeNull();
     expect(organizationPiiLevel("custom")).toBeNull();
+  });
+});
+
+describe("given a change of the organization's level", () => {
+  describe("when Essential turns into Strict for a paying organization", () => {
+    it("asks with the model and its price", () => {
+      expect(levelChangeConfirmation({ from: "essential", to: "strict", free: false })).toEqual({
+        title: "Turn on Strict?",
+        description:
+          "Strict uses the LangWatch PII Redaction Model at $0.50 per 1M characters, pay as you go. Turn it on?",
+        confirmLabel: "Turn on Strict",
+      });
+    });
+  });
+
+  describe("when the organization is free", () => {
+    it("turns Strict on without asking", () => {
+      expect(levelChangeConfirmation({ from: "essential", to: "strict", free: true })).toBeNull();
+    });
+  });
+
+  describe("when Custom turns into Essential", () => {
+    it("asks before replacing the custom settings", () => {
+      expect(
+        levelChangeConfirmation({ from: "custom", to: "essential", free: false })?.description,
+      ).toBe("This replaces your custom PII settings with Essential.");
+    });
+  });
+
+  describe("when Custom turns into Strict for a paying organization", () => {
+    it("asks once, naming both", () => {
+      expect(
+        levelChangeConfirmation({ from: "custom", to: "strict", free: false })?.description,
+      ).toBe(
+        "This replaces your custom PII settings. Strict uses the LangWatch PII Redaction Model at $0.50 per 1M characters, pay as you go. Turn it on?",
+      );
+    });
+  });
+
+  describe("when Strict goes back to Essential", () => {
+    it("needs no confirmation", () => {
+      expect(levelChangeConfirmation({ from: "strict", to: "essential", free: false })).toBeNull();
+    });
+  });
+});
+
+describe("given the fallback note", () => {
+  it("names the limit on a span's text combined", () => {
+    expect(STRICT_FALLBACK_NOTE).toContain("over 8,000 characters in total");
   });
 });

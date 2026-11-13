@@ -38,10 +38,54 @@ export const PII_REDACTION_MODEL_PRICE = piiRedactionModelPrice({
 });
 export const PII_REDACTION_MODEL_PRICE_UNIT = "per 1M characters, pay as you go";
 
+/**
+ * The model's limit on one span's texts combined; longer spans fall back to the standard detector.
+ * Mirrors PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS in
+ * process/src/rules/pii-redaction-model.rules.ts, which the browser cannot import.
+ */
+const PII_REDACTION_MODEL_MAX_SPAN_CHARACTERS = 8_000;
+
 export const STRICT_BILLING_NOTE =
-  "Pay as you go, no quota or plan. Only Strict spans are billed; Essential stays included.";
-export const STRICT_FALLBACK_NOTE =
-  "Strict falls back to the standard detector for a span when the model is unavailable or the span is over 8,000 characters.";
+  "Pay as you go, no quota or plan. Only spans the model redacts are billed; spans that fall back to the standard detector are free. Essential stays included.";
+export const STRICT_FREE_NOTE = "Strict has no charge for your organization.";
+export const STRICT_FALLBACK_NOTE = `Strict falls back to the standard detector for a span when the model is unavailable or the span's text is very long (over ${PII_REDACTION_MODEL_MAX_SPAN_CHARACTERS.toLocaleString("en-US")} characters in total).`;
+
+/** Whether the Strict offer shows, and whether it is free: null hides every Strict surface. */
+export type PiiRedactionModelOffer = { free: boolean } | null;
+
+/** The second thought a level change asks for, or null when it needs none. */
+type LevelChangeConfirmation = {
+  title: string;
+  description: string;
+  confirmLabel: string;
+};
+
+export function levelChangeConfirmation({
+  from,
+  to,
+  free,
+}: {
+  from: PiiLevel;
+  to: OrganizationPiiLevel;
+  free: boolean;
+}): LevelChangeConfirmation | null {
+  const replacesCustom = from === "custom" ? "This replaces your custom PII settings. " : "";
+  if (to === "strict" && !free) {
+    return {
+      title: "Turn on Strict?",
+      description: `${replacesCustom}Strict uses the ${PII_REDACTION_MODEL_NAME} at ${PII_REDACTION_MODEL_PRICE} ${PII_REDACTION_MODEL_PRICE_UNIT}. Turn it on?`,
+      confirmLabel: "Turn on Strict",
+    };
+  }
+  if (replacesCustom) {
+    return {
+      title: "Replace custom PII settings?",
+      description: `This replaces your custom PII settings with ${to === "strict" ? "Strict" : "Essential"}.`,
+      confirmLabel: "Replace",
+    };
+  }
+  return null;
+}
 
 export const ESSENTIAL_FINDS = "Emails, phones, cards, IPs and national IDs";
 export const ESSENTIAL_MISSES = "Does not find names or street addresses";
@@ -51,6 +95,19 @@ export const STRICT_GAPS =
 /** The level the organization picker shows, or null when it is Off or Custom. */
 export function organizationPiiLevel(level: PiiLevel | undefined): OrganizationPiiLevel | null {
   return level === "essential" || level === "strict" ? level : null;
+}
+
+/** How the picker names a level it does not offer: "Off", or "Custom (2 types)". */
+export function otherPiiLevelLabel({
+  level,
+  entityCount,
+}: {
+  level: PiiLevel;
+  entityCount: number;
+}): string {
+  if (level === "custom") return `Custom (${entityCount} ${entityCount === 1 ? "type" : "types"})`;
+  if (level === "disabled") return "Off";
+  return level === "strict" ? "Strict" : "Essential";
 }
 
 /** The organization's own rule, if it has one. */
