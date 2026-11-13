@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { CounterHandle } from "@langwatch/observability/metrics";
 import type {
   CioBatchCall,
   CioOrganizationUsageTraits,
 } from "@langwatch/enterprise-nurturing-contract";
+import type { CounterHandle } from "@langwatch/observability/metrics";
 
 import type { NurturingMilestonesRepository } from "../repositories/nurturing-milestones.repository.ts";
 import type { NurturingOrganizationCreatedRepository } from "../repositories/nurturing-organization-created.repository.ts";
@@ -42,7 +42,11 @@ type OrganizationUsageDependencies = Readonly<{
   /** Rejects when Customer.io did not take the call, so the subscriber's job retries. */
   sendBatch: (calls: CioBatchCall[]) => Promise<void>;
   clock: Readonly<{ nowMs: () => number }>;
-  /** One increment per sync attempt, its `outcome` the only attribute: never an id. */
+  /**
+   * One increment per sync attempt, its `outcome` the only attribute, never an id: `synced`,
+   * `mirror_failed`, `send_failed` (the group call was refused), `no_admin`, `not_placed` or
+   * `outside_counting_window`.
+   */
   syncs: CounterHandle;
   /** Run lines carry counts and reasons only, never an organization, user or project id. */
   logger: Readonly<{
@@ -52,8 +56,8 @@ type OrganizationUsageDependencies = Readonly<{
   }>;
 }>;
 
-/** What mirroring onto members sent, for the run's log line. */
-type MirroredCounts = Readonly<{ members: number; identifyCalls: number }>;
+/** What mirroring onto members has sent so far, kept as it goes so a failed batch loses no count. */
+type MirroredCounts = { members: number; identifyCalls: number };
 
 /** An organization as nurturing's own copies place and date it. */
 type CopiedOrganization = Readonly<{ organizationId: string; organizationCreatedAt: number }>;
@@ -152,11 +156,16 @@ export class NurturingOrganizationUsageService {
       now,
       organizationCreatedAt,
     });
-    await sendBatch([{ type: "group", userId: adminUserId, groupId: organizationId, traits }]);
-    let mirrored = { members: 0, identifyCalls: 0 };
+    try {
+      await sendBatch([{ type: "group", userId: adminUserId, groupId: organizationId, traits }]);
+    } catch (error) {
+      this.dependencies.syncs.inc({ outcome: "send_failed" });
+      throw error;
+    }
+    const mirrored: MirroredCounts = { members: 0, identifyCalls: 0 };
     let mirrorFailed = false;
     try {
-      mirrored = await this.mirrorOntoMembers({ organizationId, traits });
+      await this.mirrorOntoMembers({ organizationId, traits, counts: mirrored });
     } catch (error) {
       mirrorFailed = true;
       // The group call stands, and the next sync mirrors again, as the other sinks' failures.
@@ -211,7 +220,12 @@ export class NurturingOrganizationUsageService {
         continue;
       }
       await sendBatch([{ type: "group", userId: adminUserId, groupId: organizationId, traits }]);
-      identifyCalls += (await this.mirrorOntoMembers({ organizationId, traits })).identifyCalls;
+      const mirrored: MirroredCounts = { members: 0, identifyCalls: 0 };
+      try {
+        await this.mirrorOntoMembers({ organizationId, traits, counts: mirrored });
+      } finally {
+        identifyCalls += mirrored.identifyCalls;
+      }
       synced += 1;
     }
     this.dependencies.logger.info(
@@ -228,22 +242,22 @@ export class NurturingOrganizationUsageService {
   private async mirrorOntoMembers({
     organizationId,
     traits,
+    counts,
   }: Readonly<{
     organizationId: string;
     traits: CioOrganizationUsageTraits;
-  }>): Promise<MirroredCounts> {
+    counts: MirroredCounts;
+  }>): Promise<void> {
     const { members, sendBatch } = this.dependencies;
     const userIds = membersWhoseLatestOrganizationIs({
       memberships: await members.findMembershipsOfMembers({ organizationId }),
       organizationId,
     });
+    counts.members = userIds.length;
     for (let start = 0; start < userIds.length; start += MEMBER_BATCH_SIZE) {
-      await sendBatch(
-        userIds
-          .slice(start, start + MEMBER_BATCH_SIZE)
-          .map((userId) => ({ type: "identify" as const, userId, traits })),
-      );
+      const batch = userIds.slice(start, start + MEMBER_BATCH_SIZE);
+      await sendBatch(batch.map((userId) => ({ type: "identify" as const, userId, traits })));
+      counts.identifyCalls += batch.length;
     }
-    return { members: userIds.length, identifyCalls: userIds.length };
   }
 }
