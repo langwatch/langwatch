@@ -2,12 +2,13 @@
  * @vitest-environment jsdom
  *
  * Avatar bubble with emoji project names: full grapheme, not char(0) only.
+ * Spec: specs/navigation/project-avatar-initial.feature
  */
-import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ProjectAvatar } from "../project-avatar.tsx";
+import { ProjectAvatar } from "../src/components/display/project-avatar.tsx";
+import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 afterEach(cleanup);
 
@@ -21,14 +22,14 @@ describe("given a project whose name begins with an emoji", () => {
   it("renders the whole emoji", () => {
     const container = renderAvatar("🏭 Background jobs");
 
-    expect(screen.getByText("🏭")).toBeInTheDocument();
+    expect(screen.getByText("🏭")).toBeTruthy();
     expect(hasLoneSurrogate(container.textContent ?? "")).toBe(false);
   });
 
   it("keeps a multi-code-point emoji together", () => {
     renderAvatar("🇳🇱 Netherlands");
 
-    expect(screen.getByText("🇳🇱")).toBeInTheDocument();
+    expect(screen.getByText("🇳🇱")).toBeTruthy();
   });
 });
 
@@ -37,7 +38,7 @@ describe("given a project named with plain letters", () => {
   it("renders the first letter, exactly as before", () => {
     renderAvatar("Engineering");
 
-    expect(screen.getByText("E")).toBeInTheDocument();
+    expect(screen.getByText("E")).toBeTruthy();
   });
 });
 

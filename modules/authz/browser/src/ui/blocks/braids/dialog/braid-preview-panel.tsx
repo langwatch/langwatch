@@ -3,6 +3,7 @@
 // want of a signature, an example trace and one tested trace, seen by you only.
 
 import { Banner } from "@langwatch/design-system/banner";
+import { MeterBar } from "@langwatch/design-system/meter-bar";
 import {
   Badge,
   Box,
@@ -86,7 +87,7 @@ function Counts({
       </Text>
     );
   }
-  const share = (value: number) => (value / traces.total) * 100;
+  const share = (value: number) => value / traces.total;
   return (
     <Stack gap={3} data-testid="braid-preview-counts">
       <Text fontSize="xl" fontWeight="semibold">
@@ -95,21 +96,18 @@ function Counts({
           {`of ${count(traces.total)} traces get spans`}
         </Text>
       </Text>
-      <HStack
-        gap={0}
-        height="8px"
-        borderRadius="full"
-        overflow="hidden"
-        bg="bg.emphasized"
-        aria-hidden
-      >
-        <Box height="full" width={`${share(traces.every)}%`} bg="blue.solid" />
-        <Box height="full" width={`${share(traces.some)}%`} bg="blue.muted" />
-      </HStack>
+      <MeterBar
+        width="full"
+        height="2"
+        segments={[
+          { ratio: share(traces.every), color: "blue.solid" },
+          { ratio: share(traces.some), color: "blue.muted" },
+        ]}
+      />
       <Stack gap={1}>
         <Legend colour="blue.solid" label={`Every ${ownerName} span`} value={traces.every} />
         <Legend colour="blue.muted" label="Some of its spans" value={traces.some} />
-        <Legend colour="bg.emphasized" label={`Nothing from ${ownerName}`} value={traces.none} />
+        <Legend colour="border.subtle" label={`Nothing from ${ownerName}`} value={traces.none} />
       </Stack>
       {traces.capped ? (
         <Text fontSize="xs" color="fg.muted" data-testid="braid-preview-capped">

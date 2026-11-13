@@ -8,12 +8,12 @@ import { useUiHostServices, useUiScope } from "@langwatch/browser-host/capabilit
 import { Link } from "@langwatch/browser-host/link";
 import { Menu } from "@langwatch/design-system/menu";
 import { Button, HStack, Text } from "@langwatch/design-system/primitives";
+import { ProjectAvatar } from "@langwatch/design-system/project-avatar";
 import { ChevronDown } from "lucide-react";
 import { useMemo, useState, type MouseEvent } from "react";
 
 import { projectApi } from "../../behavior/project-api.ts";
 import { projectSwitchGroups, projectSwitchHref } from "../../model/project-switch.ts";
-import { ProjectAvatar } from "../elements/project-avatar.tsx";
 
 export default function ProjectSwitcher() {
   const { navigation, route } = useUiHostServices();

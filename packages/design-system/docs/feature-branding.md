@@ -5,15 +5,14 @@ semantic tokens. A few features earn a brand of their own inside it: a name, a m
 colour roles and a small set of illustrations. This guide is how any feature gets one, with
 Braids (spans from one project shown in another project's traces) as the worked example.
 
-| Export                                          | Component             | What it draws                                             |
-| ----------------------------------------------- | --------------------- | --------------------------------------------------------- |
-| `@langwatch/design-system/feature-mark`         | `FeatureMark`         | The mark: colour, one colour, or the small master         |
-| `@langwatch/design-system/feature-lockup`       | `FeatureLockup`       | Mark plus the name in the display face, optional tagline  |
-| `@langwatch/design-system/feature-illustration` | `FeatureIllustration` | The feature's art: `empty-state`, `enterprise` and `hero` |
-| `@langwatch/design-system/enterprise-pill`      | `EnterprisePill`      | The quiet ENT chip, alike in the sidebar and a page title |
+| Export                                          | Component             | What it draws                                                  |
+| ----------------------------------------------- | --------------------- | -------------------------------------------------------------- |
+| `@langwatch/design-system/feature-mark`         | `FeatureMark`         | The mark: colour, one colour, or the small master              |
+| `@langwatch/design-system/feature-illustration` | `FeatureIllustration` | The feature's art: `empty-state` and `enterprise`              |
+| `@langwatch/design-system/enterprise-badge`     | `EnterpriseBadge`     | The quiet Enterprise badge, alike in the sidebar, title, field |
 
 In Storybook: Brand/Feature branding (the whole kit on one page), Brand/Feature mark,
-Brand/Feature lockup, Brand/Feature illustration, Brand/Enterprise pill and the feature rows in
+Brand/Feature illustration, Brand/Enterprise badge and the feature rows in
 Foundations/Colour.
 
 ## When a feature earns a brand
@@ -37,8 +36,9 @@ and the mark on whatever the feature adds to other screens.
   `SettingsSection` and `SettingsField`, `NoDataInfoBlock`, `AccessState`. No custom panels.
 - **The mark leads the title, in colour.** `FeatureMark` at 20px sits before the page title, and
   the Enterprise chip after it when the plan gates the feature. Buttons and table rows carry none.
-- **One Enterprise chip.** `EnterprisePill` is the quiet ENT chip the sidebar shows, and a gated
-  page's title wears the same one. Never an orange pill or a second wording.
+- **One Enterprise badge.** `EnterpriseBadge` is the quiet "Enterprise" badge the sidebar shows; a
+  gated page's title and a gated setting wear the same one. Never an orange pill, an abbreviation
+  or a second wording.
 - **The art explains, once.** The empty state before anything exists and the upgrade show the
   illustration inside a `Card` or `AccessState`, with the app's type scale around it. Its lines
   are drawn as the mark is: solid, one curve for every crossing, a clean gap where a strand passes
@@ -50,7 +50,7 @@ and the mark on whatever the feature adds to other screens.
   `fg.warning` and `fg.success`. A badge, outline or bar is never painted in the feature's lead,
   and a span bar keeps its span type's colour.
 
-Braids shows all of these: the mark and ENT chip lead its titles, its settings are plain settings
+Braids shows all of these: the mark and Enterprise badge lead its titles, its settings are plain settings
 rows, its dialog is laid out as New role is, the empty tab and the upgrade carry the braid art,
 and a braided span carries the mark and a chip naming its project, like the model chip beside it.
 
@@ -60,15 +60,12 @@ and a braided span carries the mark and a chip naming its project, like the mode
 | ---------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | Name             | One word, title case, used in copy as a noun                               | Braids                                                       |
 | Mark             | A small drawing on a 40 by 40 canvas, a standard master and a small master | The open weave: three strands crossing with transparent gaps |
-| Lockup           | Mark beside the name in Sentient, the display face                         | `FeatureLockup feature="braids"`                             |
-| Tagline          | One short line for landing pages and the lockup                            | One trace. Every project.                                    |
+| Tagline          | One short line for landing pages                                           | One trace. Every project.                                    |
 | Colour roles     | Named tokens under `feature.<name>.*`, light and dark values               | `lead`, `weave`, `project.1-3`, `projectInk.1-3`             |
-| Illustration set | An empty state, an Enterprise upsell and a hero, 760 wide                  | Three projects braided into one trace                        |
-| Motion           | At most one arrival animation, in the hero                                 | Strands weave in over 650ms, spans land after                |
-| Enterprise chip  | The sidebar's ENT chip, after the title of any page the plan gates         | `EnterprisePill`                                             |
+| Illustration set | An empty state and an Enterprise upsell, 760 wide                          | Three projects braided into one trace                        |
+| Enterprise badge | The sidebar's badge, after the title of any page or setting the plan gates | `EnterpriseBadge`                                            |
 
-Inside the product, page titles stay in Inter. Sentient appears only in the lockup and on
-landing or docs pages, as Langy and the front door already use it.
+Inside the product, page titles stay in Inter. Sentient appears only on landing or docs pages, as Langy and the front door already use it.
 
 ## The rules
 
@@ -95,10 +92,7 @@ landing or docs pages, as Langy and the front door already use it.
    cut-outs, or not at all.
 8. **Decorative art is hidden.** Illustrations are `aria-hidden`; the copy beside them carries
    the meaning. A mark is hidden too unless it stands alone, where it takes `label`.
-9. **Motion plays once and never under reduced motion.** Only the hero animates. It plays on
-   mount and finishes; it does not loop or replay on re-render. With
-   `prefers-reduced-motion: reduce` or `animate={false}` it renders in its final state. To
-   replay on purpose, remount it with a new `key`.
+9. **The art stands still.** No illustration animates; a landing page's motion is the website's.
 10. **Example data is fictional and labelled.** Project names in the art are invented, and every
     project colour is paired with its initial, so colour is never the only cue.
 
@@ -114,24 +108,22 @@ landing or docs pages, as Langy and the front door already use it.
    `<feature>: { lead, weave, ... }` with `_light` and `_dark`. Point the lead at the app orange.
    Add the tokens to `featureColours` in `src/system/colour.stories.tsx`.
 4. **Register the feature.** Add it to `FEATURE_BRANDS` in `src/components/brand/feature-brands.ts`
-   (name, tagline, both masters) and to `FEATURE_NAMES`. `FeatureMark` and `FeatureLockup` then
-   draw it with no further change.
+   (name, tagline, both masters) and to `FEATURE_NAMES`. `FeatureMark` then
+   draws it with no further change.
 5. **Draw the illustrations.** Add the feature's art component to `ART` in
-   `feature-illustration.tsx`, drawing the three names from its paths file with tokens only.
+   `feature-illustration.tsx`, drawing the two names from its paths file with tokens only.
    If a mark is not stroked strands, extend `MarkMaster` rather than writing a second component.
-6. **Stories and scenarios.** Add the feature's states to the three Brand stories and the Brand/
+6. **Stories and scenarios.** Add the feature's states to the Brand stories and the Brand/
    Feature branding page. Add scenarios to `specs/feature-*.feature` bound to
    `renderWithDesignSystem` tests: colour from tokens, mono in `currentColor`, the small master,
-   unique ids, forced colour mode, reduced motion.
-7. **Use it.** The feature's screens import the three subpaths; they never copy the paths or the
+   unique ids, forced colour mode.
+7. **Use it.** The feature's screens import the subpaths; they never copy the paths or the
    colours.
 
 ```tsx
 import { FeatureIllustration } from "@langwatch/design-system/feature-illustration";
-import { FeatureLockup } from "@langwatch/design-system/feature-lockup";
 import { FeatureMark } from "@langwatch/design-system/feature-mark";
 
-<FeatureLockup feature="braids" size="lg" tagline />;
 <FeatureMark feature="braids" size={16} variant="mono" />;
 <FeatureIllustration feature="braids" name="empty-state" />;
 ```
@@ -143,10 +135,9 @@ import { FeatureMark } from "@langwatch/design-system/feature-mark";
 | `braids-mark-app.svg`, `braids-mark-app-dark.svg`          | `FeatureMark feature="braids"`, light and dark            |
 | `braids-mark-mono.svg`                                     | `variant="mono"`                                          |
 | `braids-mark-small.svg`                                    | the small master, automatic at 24px and below             |
-| `braids-lockup.svg`                                        | `FeatureLockup feature="braids"`                          |
 | `braids-empty-state.svg`                                   | `FeatureIllustration name="empty-state"`                  |
 | `braids-enterprise.svg`                                    | `FeatureIllustration name="enterprise"`, follows the mode |
-| `braids-docs-hero.svg`, the prototype's `hero()`           | `FeatureIllustration name="hero"`, with the weave         |
+| `braids-lockup.svg`, `braids-docs-hero.svg`                | website only: no product screen draws them                |
 | `braids-mark.svg`, `braids-mark-dark.svg`, `braids-og.svg` | website only: they use the website orange                 |
 
 Where the code departs from the kit: the Enterprise art follows the colour mode instead of being

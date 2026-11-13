@@ -74,10 +74,10 @@ Feature: Settings shell
     And the old page addresses forward to the corresponding consolidated tabs
 
   @integration
-  Scenario: A plan with Enterprise sees its entries marked ENT, not locked
+  Scenario: A plan with Enterprise sees its entries marked Enterprise, not locked
     Given my plan includes Enterprise
     When the settings sidebar renders
-    Then the Enterprise entries carry a quiet grey "ENT" chip
+    Then the Enterprise entries carry the quiet grey "Enterprise" badge
     And no entry carries a lock
 
   @integration

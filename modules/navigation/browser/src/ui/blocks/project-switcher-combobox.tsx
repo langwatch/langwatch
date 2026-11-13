@@ -1,4 +1,5 @@
 import { Button, Combobox, Text } from "@langwatch/design-system/primitives";
+import { AggregateProjectAvatar, ProjectAvatar } from "@langwatch/design-system/project-avatar";
 import { ChevronsUpDown } from "lucide-react";
 import { useState } from "react";
 
@@ -8,7 +9,6 @@ import {
   resolvePickOutcome,
   useProjectPickItems,
 } from "../../model/project-pick-items.ts";
-import { AggregateProjectAvatar, ProjectAvatar } from "../elements/project-avatar.tsx";
 import { ProjectComboboxPopup } from "./project-switcher-combobox-popup.tsx";
 
 /**

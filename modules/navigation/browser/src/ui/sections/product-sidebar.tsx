@@ -1,6 +1,6 @@
 /** Sidebar column: product pages and utilities. Host and search palette integration. */
 
-import { EnterprisePill } from "@langwatch/design-system/enterprise-pill";
+import { EnterpriseBadge } from "@langwatch/design-system/enterprise-badge";
 import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
 import { Box, VStack } from "@langwatch/design-system/primitives";
 import { ScrollEdgeFade, useScrollEdges } from "@langwatch/design-system/scroll-fade";
@@ -536,7 +536,7 @@ function OutboundArrow() {
   return <ArrowUpRight size={12} aria-hidden color="var(--chakra-colors-fg-muted)" />;
 }
 
-/** The "ENT" chip on an Enterprise entry the plan includes; a locked entry shows a lock. */
+/** The Enterprise badge on an entry the plan includes; a locked entry shows a lock. */
 function EnterpriseChip() {
-  return <EnterprisePill />;
+  return <EnterpriseBadge />;
 }

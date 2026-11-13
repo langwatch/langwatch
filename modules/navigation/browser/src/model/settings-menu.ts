@@ -67,7 +67,7 @@ export interface SettingsMenuItem {
    * in Enterprise", and the page opens on its upsell.
    */
   isLocked?: boolean;
-  /** An Enterprise entry on a plan that includes it: the sidebar marks it with the "ENT" chip. */
+  /** An Enterprise entry on a plan that includes it: the sidebar marks it Enterprise. */
   isEnterprise?: boolean;
 }
 

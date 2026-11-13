@@ -4,11 +4,11 @@
 import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import { Menu } from "@langwatch/design-system/menu";
 import { Box, Button, Field, HStack, Stack, Text } from "@langwatch/design-system/primitives";
+import { ProjectAvatar } from "@langwatch/design-system/project-avatar";
 import { ArrowRight, Check, ChevronDown, Lock } from "lucide-react";
 
 import { type BraidTargetOption, braidTargetLabel } from "../../../../model/braids/braid-draft.ts";
 import type { BraidProject } from "../../../../model/braids/braids.ts";
-import { BraidProjectBadge } from "../../../elements/braid-project.tsx";
 
 export type BraidRouteFieldsProps = {
   owner: BraidProject;
@@ -66,7 +66,7 @@ export function BraidRouteFields(props: BraidRouteFieldsProps) {
             bg="bg.muted"
             data-testid="braid-from"
           >
-            <BraidProjectBadge project={props.owner} size="sm" />
+            <ProjectAvatar name={props.owner.name} />
             <Text textStyle="sm" flex={1} truncate>
               {props.owner.name}
             </Text>
@@ -95,7 +95,7 @@ export function BraidRouteFields(props: BraidRouteFieldsProps) {
                 data-testid="braid-into"
               >
                 <HStack gap={2} minWidth={0}>
-                  {props.reader ? <BraidProjectBadge project={props.reader} size="sm" /> : null}
+                  {props.reader ? <ProjectAvatar name={props.reader.name} /> : null}
                   <Text truncate color={props.reader ? "fg" : "fg.muted"}>
                     {props.reader?.name ??
                       (props.isLoading ? "Loading projects" : "Pick a project")}
@@ -120,7 +120,7 @@ export function BraidRouteFields(props: BraidRouteFieldsProps) {
                 >
                   <HStack justify="space-between" width="full" gap={4}>
                     <HStack gap={2} minWidth={0}>
-                      <BraidProjectBadge project={option} size="sm" />
+                      <ProjectAvatar name={option.name} />
                       <Text truncate>{option.name}</Text>
                     </HStack>
                     <OptionEnd option={option} picked={option.projectId === props.reader?.id} />

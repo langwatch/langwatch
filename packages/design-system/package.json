@@ -106,6 +106,10 @@
       "types": "./dist/components/display/avatar.d.ts",
       "default": "./src/components/display/avatar.tsx"
     },
+    "./project-avatar": {
+      "types": "./dist/components/display/project-avatar.d.ts",
+      "default": "./src/components/display/project-avatar.tsx"
+    },
     "./presence": {
       "types": "./dist/components/display/presence.d.ts",
       "default": "./src/components/display/presence.tsx"
@@ -178,17 +182,13 @@
       "types": "./dist/components/brand/feature-mark.d.ts",
       "default": "./src/components/brand/feature-mark.tsx"
     },
-    "./feature-lockup": {
-      "types": "./dist/components/brand/feature-lockup.d.ts",
-      "default": "./src/components/brand/feature-lockup.tsx"
-    },
     "./feature-illustration": {
       "types": "./dist/components/brand/feature-illustration.d.ts",
       "default": "./src/components/brand/feature-illustration.tsx"
     },
-    "./enterprise-pill": {
-      "types": "./dist/components/brand/enterprise-pill.d.ts",
-      "default": "./src/components/brand/enterprise-pill.tsx"
+    "./enterprise-badge": {
+      "types": "./dist/components/brand/enterprise-badge.d.ts",
+      "default": "./src/components/brand/enterprise-badge.tsx"
     },
     "./access-state": {
       "types": "./dist/components/states/access-state.d.ts",
