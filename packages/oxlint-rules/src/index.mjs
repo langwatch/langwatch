@@ -35,6 +35,7 @@ import { featureSourceSubjectRule } from "./rules/feature-source-subject.rule.mj
 import { handledErrorOutsideContractRule } from "./rules/handled-error-outside-contract.rule.mjs";
 import { idGenerationOriginRule } from "./rules/id-generation-origin.rule.mjs";
 import { idempotencyKeyIsStableRule } from "./rules/idempotency-key-is-stable.rule.mjs";
+import { ingestionSourceStatusLiteralRule } from "./rules/ingestion-source-status-literal.rule.mjs";
 import { jsxFromHookRule } from "./rules/jsx-from-hook.rule.mjs";
 import { legacyMonolithPathRule } from "./rules/legacy-monolith-path.rule.mjs";
 import { moduleClassesRule } from "./rules/module-classes.rule.mjs";
@@ -131,6 +132,7 @@ const HOUSE_RULES = [
   namespaceClassRule,
   noAliasReexportRule,
   noBootHookOutsideGuardRule,
+  ingestionSourceStatusLiteralRule,
   noHandRolledPlanGateRule,
   noHonoHttpExceptionRule,
   sliceReaderIsAHookRule,
@@ -233,6 +235,7 @@ export {
   namespaceClassRule,
   noAliasReexportRule,
   noBootHookOutsideGuardRule,
+  ingestionSourceStatusLiteralRule,
   noHandRolledPlanGateRule,
   noHonoHttpExceptionRule,
   sliceReaderIsAHookRule,

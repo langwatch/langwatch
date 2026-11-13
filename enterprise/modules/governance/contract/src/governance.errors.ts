@@ -302,6 +302,23 @@ export class IngestionSourceUnauthorizedError extends HandledError {
   }
 }
 
+/**
+ * The secret and the path name the same source, but an admin disabled it. The caller has proved
+ * it holds the secret, so naming the state leaks nothing, and OTLP exporters drop a 403 for good.
+ */
+export class IngestionSourceDisabledError extends HandledError {
+  declare readonly code: "ingestion_source_disabled";
+
+  constructor() {
+    super("ingestion_source_disabled", "This ingestion source is disabled.", {
+      httpStatus: 403,
+      fault: "customer",
+      ...remediation("ingestion_source_disabled"),
+    });
+    this.name = "IngestionSourceDisabledError";
+  }
+}
+
 /** One caller sent more to the push receivers than the window allows; it retries after the wait. */
 export class IngestionRateLimitedError extends HandledError {
   declare readonly code: "ingestion_rate_limited";

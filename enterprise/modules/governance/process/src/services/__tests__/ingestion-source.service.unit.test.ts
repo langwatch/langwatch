@@ -91,6 +91,7 @@ class FakeSourceRepository extends IngestionSourceRepository {
     this.row = source({ ...this.row, ...rowPatchOf(input) });
     return this.row;
   });
+  recordEventReceived = vi.fn(async () => undefined);
   getUnpricedUsageWindow = vi.fn(async () => ({ since: null, through: null }));
   updateUnpricedUsageWindow = vi.fn(async () => undefined);
   findUnpricedUsageWindows = vi.fn(async () => []);

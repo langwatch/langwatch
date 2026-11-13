@@ -39,7 +39,9 @@ export class ObjectStorageTraceSpoolObjectsRepository extends TraceSpoolObjectsR
   }
 
   async read(at: TraceSpoolObjectAddress): Promise<Readable> {
-    return Readable.from(await this.objects.read(at));
+    const body = await this.objects.read(at);
+    // The member's own stream frees its socket however a reader stops; a wrapper would not.
+    return body instanceof Readable ? body : Readable.from(body);
   }
 
   async remove(at: TraceSpoolObjectAddress): Promise<void> {
