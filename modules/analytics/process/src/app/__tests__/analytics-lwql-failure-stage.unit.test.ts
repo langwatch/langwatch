@@ -11,10 +11,7 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import type * as observabilityModule from "@langwatch/observability";
-import {
-  createRecordingMeterProvider,
-  type RecordingMeterProvider,
-} from "@langwatch/observability/metrics/testing";
+import type { RecordingMeterProvider } from "@langwatch/observability/metrics/testing";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { TestLogLine } from "@langwatch/test-harness";
@@ -48,10 +45,13 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
   };
 });
 
-// Reset so the dynamic import binds the mock even where files share a module graph.
+// Reset so the dynamic imports bind the mock even where files share a module graph. Both
+// dynamic imports must come after the reset so the app and the recording meter share one
+// metrics module.
 vi.resetModules();
 
 const { AnalyticsModule } = await import("../analytics.app.ts");
+const { createRecordingMeterProvider } = await import("@langwatch/observability/metrics/testing");
 
 const AGGREGATE = "project_aggregate";
 const MEMBERS = ["project_a", "project_b"];
