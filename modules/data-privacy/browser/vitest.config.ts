@@ -6,6 +6,9 @@ import { mergeConfig } from "vitest/config";
 export default mergeConfig(
   defineModuleVitestConfig({
     kind: "jsdom",
+    // Two screen suites mock the package's own api binding with different snapshots; a
+    // shared registry lets one file's mock leak into the next.
+    isolate: true,
     test: {
       setupFiles: ["./vitest.setup.ts"],
       // The screen's suite drives real user events through Chakra overlays; under
@@ -17,15 +20,13 @@ export default mergeConfig(
   }),
   {
     resolve: {
-      alias: {
-        // Before the package root, which would otherwise swallow the subpath.
-        "@langwatch/data-privacy-contract/pii-redaction-spend": fileURLToPath(
-          new URL("../contract/src/data-privacy.pii-redaction-spend.ts", import.meta.url),
-        ),
-        "@langwatch/data-privacy-contract": fileURLToPath(
-          new URL("../contract/src/index.ts", import.meta.url),
-        ),
-      },
+      // Exact, so the `/pii-redaction-spend` subpath resolves through the package's exports.
+      alias: [
+        {
+          find: /^@langwatch\/data-privacy-contract$/,
+          replacement: fileURLToPath(new URL("../contract/src/index.ts", import.meta.url)),
+        },
+      ],
     },
   },
 );

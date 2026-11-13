@@ -24,6 +24,7 @@
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/data-privacy-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/redaction": "workspace:*",
     "lucide-react": "catalog:",
     "safe-regex2": "catalog:"
