@@ -1,11 +1,11 @@
 import { defineRule } from "../define-rule.mjs";
 
 // Whether an ingestion source takes events is decided once, in the governance
-// contract's source-liveness.ts. A second spelling drifts: the push door once
+// contract's source-health.ts. A second spelling drifts: the push door once
 // checked only `archivedAt` while pull checked `status`, so a disabled source
 // kept ingesting (GOV-01). Anomaly rules have their own status and stay out.
 
-const LIVENESS_FILE = /\/features\/ingestion\/source-liveness\.ts$/;
+const LIVENESS_FILE = /\/features\/ingestion\/source-health\.ts$/;
 const ANOMALY = /anomaly/i;
 const SOURCE_STATES = new Set(["disabled", "awaiting_first_event"]);
 const EQUALITY = new Set(["===", "!==", "==", "!="]);

@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import {
   ingestionSourceIsLive,
   ingestionSourceStatusIsOff,
-} from "../features/ingestion/source-liveness.ts";
+} from "../features/ingestion/source-health.ts";
 
 const ARCHIVED_AT = new Date("2026-11-13T10:00:00.000Z");
 

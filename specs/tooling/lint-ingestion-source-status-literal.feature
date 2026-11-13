@@ -1,7 +1,7 @@
 Feature: The ingestion-source-status-literal lint rule
   Whether an ingestion source takes events is decided once, by
   `ingestionSourceIsLive` and `ingestionSourceStatusIsOff` in the governance
-  contract (`source-liveness.ts`). When the push receivers spelled it as "not
+  contract (`source-health.ts`). When the push receivers spelled it as "not
   archived" while the pull worker spelled it as "not disabled", a disabled
   source kept ingesting and flipped itself back to active (GOV-01). The rule
   reports a `status` compared with "disabled" or "awaiting_first_event" in the

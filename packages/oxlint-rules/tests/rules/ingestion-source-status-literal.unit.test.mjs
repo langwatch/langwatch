@@ -56,7 +56,7 @@ describe("given code the rule does not govern", () => {
   it.each([
     [
       "the liveness file",
-      "enterprise/modules/governance/contract/src/features/ingestion/source-liveness.ts",
+      "enterprise/modules/governance/contract/src/features/ingestion/source-health.ts",
     ],
     [
       "an anomaly rule file",

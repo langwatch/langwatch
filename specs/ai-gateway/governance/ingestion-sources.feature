@@ -817,7 +817,7 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
     And the upstream operator gets a clear paste-this-in instruction for the new value
 
   # A source is live while it is neither archived nor disabled. That one rule
-  # (`ingestionSourceIsLive`, contract `source-liveness.ts`) is what the push
+  # (`ingestionSourceIsLive`, contract `source-health.ts`) is what the push
   # receivers, the pull scheduler and the pull worker all ask. The
   # `ingestion-source-status-literal` lint rule keeps it from being re-spelled.
   # Disabling only writes the status, so the source's history stays.
