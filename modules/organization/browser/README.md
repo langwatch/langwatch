@@ -25,7 +25,7 @@ A URL marked (route table) is joined from `apps/ui/src/shell/ui-route-table.ts`;
 | --------------- | ------------------------------------------- | ------------------- |
 | `createProject` | `src/ui/sections/create-project-drawer.tsx` | api-key, navigation |
 | `editProject`   | `src/ui/sections/edit-project-drawer.tsx`   | –                   |
-| `createTeam`    | `src/ui/sections/create-team-drawer.tsx`    | –                   |
+| `createTeam`    | `src/ui/sections/create-team-drawer.tsx`    | navigation          |
 | `inviteMember`  | `src/ui/sections/invite-member-drawer.tsx`  | navigation          |
 | `person`        | `src/ui/sections/person-drawer.tsx`         | –                   |
 
