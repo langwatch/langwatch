@@ -19,6 +19,13 @@ Feature: CI results wake Langy on the pull requests it opened
       Then pull request 12 on "acme/agent" is stored with its conversation, its owner and when it was opened
 
     @unit
+    Scenario: A pull request opened on a GitHub Enterprise Server host is linked too
+      Given a deployment whose GitHub App lives on an Enterprise Server host
+      And a completed turn whose `gh pr create` printed that host's URL of pull request 12 on "acme/agent"
+      When the turn's answer is recorded
+      Then pull request 12 on "acme/agent" is stored with its conversation
+
+    @unit
     Scenario: A redelivered answer stores its pull request once
       Given an answer that opened pull request 12 on "acme/agent" was stored
       When the same answer is delivered again

@@ -1,7 +1,9 @@
-import { githubProgressFromToolParts, type LangyMessagePart } from "@langwatch/langy-contract";
+import {
+  githubProgressFromToolParts,
+  pullRequestUrlsIn,
+  type LangyMessagePart,
+} from "@langwatch/langy-contract";
 import { Temporal } from "@langwatch/time";
-
-const PULL_REQUEST_URL = /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/(\d+)$/;
 
 /** The most automatic follow-ups CI may start in a row on a pull request before a person speaks. */
 export const LANGY_CI_FOLLOW_UPS_IN_A_ROW = 3;
@@ -16,9 +18,9 @@ export function pullRequestsOpenedIn(
   const opened = new Map<string, { repositoryFullName: string; prNumber: number }>();
   for (const event of githubProgressFromToolParts(parts)) {
     if (event.stage !== "opened" || !event.url) continue;
-    const match = PULL_REQUEST_URL.exec(event.url);
-    if (!match?.[1] || !match[2]) continue;
-    const pull = { repositoryFullName: match[1], prNumber: Number(match[2]) };
+    const [url] = pullRequestUrlsIn(event.url);
+    if (!url || url.url !== event.url) continue;
+    const pull = { repositoryFullName: url.repositoryFullName, prNumber: url.number };
     opened.set(`${pull.repositoryFullName.toLowerCase()}#${pull.prNumber}`, pull);
   }
   return [...opened.values()];

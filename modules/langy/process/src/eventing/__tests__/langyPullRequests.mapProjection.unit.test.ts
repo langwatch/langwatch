@@ -87,6 +87,25 @@ describe("the langyPullRequests map", () => {
       ]);
     });
 
+    /** @scenario "A pull request opened on a GitHub Enterprise Server host is linked too" */
+    it("stores a pull request whose URL is on an Enterprise Server host", async () => {
+      const { deliver, lookUp } = await harness();
+
+      await deliver(
+        answered("turn-1", [
+          shell(
+            "gh pr create --title t --body b",
+            "output-available",
+            "https://github.acme.example/Acme/Agent/pull/12\n",
+          ),
+        ]),
+      );
+
+      expect(await lookUp()).toEqual([
+        expect.objectContaining({ conversationId: CONVERSATION_ID }),
+      ]);
+    });
+
     /** @scenario "A redelivered answer stores its pull request once" */
     it("keeps the first row when the answer is delivered again", async () => {
       const { deliver, lookUp } = await harness();
