@@ -13,7 +13,11 @@ const ISO_INSTANT_WITH_OFFSET =
 const PLACEHOLDER = /\{\s*([A-Za-z_]\w*)\s*:\s*([^{}]*)\}/g;
 
 /** A date-time type under any `Nullable`/`LowCardinality` wrappers; group 1 says which. */
-const DATE_TIME_TYPE = /^(?:(?:Nullable|LowCardinality)\(\s*)*(DateTime64|DateTime)(?!\w)/i;
+const DATE_TIME_TYPE =
+  /^(?:(?:Nullable|LowCardinality)\(\s*)*(DateTime64|DateTime32|DateTime)(?!\w)/i;
+
+/** The opening tag of a `$$…$$` or `$tag$…$tag$` string, read where a token starts. */
+const HEREDOC_TAG = /\$\w*\$/y;
 
 /** What opens a string literal or a quoted identifier, where ClickHouse places no parameter. */
 const QUOTES = new Set(["'", '"', "`"]);
@@ -50,6 +54,16 @@ function blockCommentEnd({ sql, start }: { sql: string; start: number }): number
   return sql.length;
 }
 
+/** The end of the heredoc string opened at `start`, or `start` when none opens there. */
+function heredocEnd({ sql, start }: { sql: string; start: number }): number {
+  if (/[\w$]/.test(sql[start - 1] ?? "")) return start;
+  HEREDOC_TAG.lastIndex = start;
+  const tag = HEREDOC_TAG.exec(sql)?.[0];
+  if (tag === undefined) return start;
+  const close = sql.indexOf(tag, start + tag.length);
+  return close === -1 ? sql.length : close + tag.length;
+}
+
 /** The statement with every quoted run and comment blanked, so only real placeholders remain. */
 function withoutQuotedTextOrComments(sql: string): string {
   let kept = "";
@@ -57,6 +71,7 @@ function withoutQuotedTextOrComments(sql: string): string {
   while (at < sql.length) {
     let end = at;
     if (QUOTES.has(sql[at] ?? "")) end = quotedEnd({ sql, start: at });
+    else if (sql[at] === "$") end = heredocEnd({ sql, start: at });
     else if (sql.startsWith("/*", at)) end = blockCommentEnd({ sql, start: at });
     else if (sql.startsWith("--", at) || sql[at] === "#") {
       const newline = sql.indexOf("\n", at);

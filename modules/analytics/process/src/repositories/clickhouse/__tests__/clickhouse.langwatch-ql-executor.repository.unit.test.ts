@@ -271,6 +271,24 @@ describe("given date-time parameters bound as ISO instants", () => {
       expect(queryMock.mock.lastCall?.[0].query_params).toEqual({ s: "2026-11-01T00:00:00Z" });
     });
 
+    it("ignores placeholder text inside heredoc strings and still reads the real one", async () => {
+      queryMock.mockResolvedValueOnce({ json: async () => ({ data: [], meta: [] }) });
+
+      await executor.execute({
+        sql:
+          "SELECT $$'$$, {s:String}, $$'{s:DateTime}$$, $q$it's$q$ AS x$y$z," +
+          " {t:DateTime} FROM analytics.traces",
+        parameters: { s: "2026-11-01T00:00:00Z", t: "2026-11-01T00:00:00Z" },
+        projectIds: PROJECT_IDS,
+        tenantCapability: TENANT_A_CAPABILITY,
+      });
+
+      expect(queryMock.mock.lastCall?.[0].query_params).toEqual({
+        s: "2026-11-01T00:00:00Z",
+        t: "1793491200",
+      });
+    });
+
     it("leaves a name declared as both String and DateTime as bound", async () => {
       queryMock.mockResolvedValueOnce({ json: async () => ({ data: [], meta: [] }) });
 
@@ -290,8 +308,9 @@ describe("given date-time parameters bound as ISO instants", () => {
       await executor.execute({
         sql:
           "SELECT {a:datetime}, {b:DATETIME64(3)}, {c:LowCardinality(DateTime)}," +
-          " {d:Nullable( dateTime64(3, 'UTC') )} FROM analytics.traces",
+          " {d:Nullable( dateTime64(3, 'UTC') )}, {e:DateTime32} FROM analytics.traces",
         parameters: {
+          e: "2026-11-01T00:00:00Z",
           a: "2026-11-01T00:00:00Z",
           b: "2026-11-01T00:00:00Z",
           c: "2026-11-01T00:00:00Z",
@@ -306,6 +325,7 @@ describe("given date-time parameters bound as ISO instants", () => {
         b: "1793491200.000000000",
         c: "1793491200",
         d: "1793491200.250000000",
+        e: "1793491200",
       });
     });
   });
