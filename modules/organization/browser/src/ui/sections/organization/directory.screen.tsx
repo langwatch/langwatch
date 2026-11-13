@@ -68,7 +68,7 @@ function Directory({
       <PageLayout.Header description="Who is in this organization, how they got here, and which system says so.">
         <PageLayout.Heading>Users</PageLayout.Heading>
       </PageLayout.Header>
-      <VStack gap={3} width="full" align="stretch">
+      <VStack gap={3} width="full" align="stretch" paddingTop={4}>
         {/* The status band reads what the directory has been doing: sso:view. */}
         {Summary && host.hasOrganizationPermission("sso:view") && (
           <Suspense fallback={null}>
