@@ -19,9 +19,13 @@ import {
   describeWorkspace,
   ensureSignedIn,
   isGitRepository,
+  KEY_NOT_PERSONAL_MESSAGE,
+  KEY_UNCHECKED_MESSAGE,
   loginElsewhereMessage,
   packageManagerOf,
+  checkPersonalKey,
   platformTakesTheKey,
+  PROJECT_KEY_IN_ENV_MESSAGE,
   resolveShareRoot,
   ShareControlError,
   SIGN_IN_FAILED_MESSAGE,
@@ -155,6 +159,10 @@ describe("given the share-control command", () => {
   describe("when the command signs in", () => {
     const FOLDER_KEY = "sk-lw-folder-project-key";
     const ENV_FILE = `LANGWATCH_API_KEY=${FOLDER_KEY}\nOTHER_SECRET=stays\n`;
+    const PERSONAL_KEY = "sk-lw-personallookup_personalsecret";
+    const SERVICE_KEY = "sk-lw-servicelookup_servicesecret";
+    const SHOP = { kind: "personal", projectId: "project_shop", projectName: "ACME Shop" } as const;
+    const REFUSED = { kind: "refused" } as const;
 
     let dir: string;
     let configPath: string;
@@ -163,6 +171,7 @@ describe("given the share-control command", () => {
     const before = {
       config: process.env.LANGWATCH_CLI_CONFIG,
       key: process.env.LANGWATCH_API_KEY,
+      project: process.env.LANGWATCH_PROJECT_ID,
       endpoint: process.env.LANGWATCH_ENDPOINT,
       cwd: process.cwd(),
     };
@@ -213,6 +222,7 @@ describe("given the share-control command", () => {
       process.env.LANGWATCH_CLI_CONFIG = configPath;
       process.env.LANGWATCH_ENDPOINT = ENDPOINT;
       delete process.env.LANGWATCH_API_KEY;
+      delete process.env.LANGWATCH_PROJECT_ID;
       printed = [];
       vi.spyOn(console, "log").mockImplementation((text) => {
         printed.push(stripAnsi(String(text)));
@@ -228,6 +238,7 @@ describe("given the share-control command", () => {
       process.chdir(before.cwd);
       restoreEnv("LANGWATCH_CLI_CONFIG", before.config);
       restoreEnv("LANGWATCH_API_KEY", before.key);
+      restoreEnv("LANGWATCH_PROJECT_ID", before.project);
       restoreEnv("LANGWATCH_ENDPOINT", before.endpoint);
       fs.rmSync(dir, { recursive: true, force: true });
     });
@@ -244,6 +255,7 @@ describe("given the share-control command", () => {
         expect(login).not.toHaveBeenCalled();
         expect(credentials.apiKey).toBe("sk-lw-login-key");
         expect(credentials.projectId).toBe("project_personal");
+        expect(credentials.source).toBe("device");
         expect(printed).toContain("Using your login as Riley at ACME.");
         const wrong = printed.filter(
           (line) =>
@@ -252,6 +264,18 @@ describe("given the share-control command", () => {
             line.includes("API key"),
         );
         expect(wrong).toEqual([]);
+      });
+
+      /** @scenario "The login answers before a project key found in the folder" */
+      it("keeps the login even when the folder's .env carries a personal key", async () => {
+        writeLogin();
+        fs.writeFileSync(envPath, `LANGWATCH_API_KEY=${PERSONAL_KEY}\n`);
+        const checkKey = vi.fn(async () => SHOP);
+
+        const credentials = await ensureSignedIn({ login: loginThatSignsIn(), checkKey });
+
+        expect(credentials.apiKey).toBe("sk-lw-login-key");
+        expect(checkKey).not.toHaveBeenCalled();
       });
 
       /** @scenario "The folder's .env is left as it is" */
@@ -279,11 +303,12 @@ describe("given the share-control command", () => {
         expect(printed).toContain("Using your login as Riley at ACME.");
       });
 
-      /** @scenario "A key in the environment never stands in for the login" */
-      it("signs in even with a key exported in the shell, and never resolves that key", async () => {
+      /** @scenario "A project key in the environment never stands in for the login" */
+      it("signs in even with a project key exported in the shell, and never resolves that key", async () => {
         process.env.LANGWATCH_API_KEY = "sk-lw-exported-in-the-shell";
         const login = loginThatSignsIn();
         const probed: string[] = [];
+        const checkKey = vi.fn(async () => REFUSED);
 
         const credentials = await ensureSignedIn({
           login,
@@ -291,12 +316,86 @@ describe("given the share-control command", () => {
             probed.push(apiKey);
             return true;
           },
+          checkKey,
         });
 
         expect(login).toHaveBeenCalledTimes(1);
         expect(credentials.apiKey).toBe("sk-lw-new-login-key");
         expect(probed).toEqual(["sk-lw-new-login-key"]);
+        expect(checkKey).not.toHaveBeenCalled();
+        expect(printed).toContain(PROJECT_KEY_IN_ENV_MESSAGE);
+        expect(printed.filter((line) => line.includes("sk-lw-exported"))).toEqual([]);
         expect(process.env.LANGWATCH_API_KEY).toBe("sk-lw-exported-in-the-shell");
+      });
+
+      /** @scenario "A project key in the environment never stands in for the login" */
+      it("signs in when LangWatch does not take a new-format key as a person", async () => {
+        process.env.LANGWATCH_API_KEY = SERVICE_KEY;
+        const login = loginThatSignsIn();
+        const checkKey = vi.fn(async () => REFUSED);
+
+        const credentials = await ensureSignedIn({ login, checkKey });
+
+        expect(checkKey).toHaveBeenCalledWith({ apiKey: SERVICE_KEY, endpoint: ENDPOINT });
+        expect(login).toHaveBeenCalledTimes(1);
+        expect(credentials.apiKey).toBe("sk-lw-new-login-key");
+        expect(printed).toContain(KEY_NOT_PERSONAL_MESSAGE);
+        expect(printed).toContain("No login on this machine yet. Signing in first.");
+        expect(printed.filter((line) => line.includes(SERVICE_KEY))).toEqual([]);
+      });
+
+      /** @scenario "A key LangWatch could not be asked about gives way to the login" */
+      it("signs in, without calling the key refused, when LangWatch could not be asked", async () => {
+        process.env.LANGWATCH_API_KEY = PERSONAL_KEY;
+        const login = loginThatSignsIn();
+
+        const credentials = await ensureSignedIn({
+          login,
+          checkKey: async () => ({ kind: "unchecked" }),
+        });
+
+        expect(login).toHaveBeenCalledTimes(1);
+        expect(credentials.apiKey).toBe("sk-lw-new-login-key");
+        expect(printed).toContain(KEY_UNCHECKED_MESSAGE);
+        expect(printed).not.toContain(KEY_NOT_PERSONAL_MESSAGE);
+        expect(printed.filter((line) => line.includes(PERSONAL_KEY))).toEqual([]);
+      });
+
+      /** @scenario "A personal key in the environment answers when there is no login" */
+      it("uses a personal key from the folder's .env on its project, with no sign-in", async () => {
+        fs.writeFileSync(envPath, `LANGWATCH_API_KEY=${PERSONAL_KEY}\n`);
+        const login = loginThatSignsIn();
+        const checkKey = vi.fn(async () => SHOP);
+
+        const credentials = await ensureSignedIn({ login, checkKey });
+
+        expect(login).not.toHaveBeenCalled();
+        expect(checkKey).toHaveBeenCalledWith({ apiKey: PERSONAL_KEY, endpoint: ENDPOINT });
+        expect(credentials).toEqual({
+          apiKey: PERSONAL_KEY,
+          endpoint: ENDPOINT,
+          projectId: "project_shop",
+          source: "env",
+        });
+        expect(printed).toContain(
+          "Using the personal key in LANGWATCH_API_KEY on project ACME Shop, since this machine has no device login.",
+        );
+        expect(printed.filter((line) => line.includes(PERSONAL_KEY))).toEqual([]);
+      });
+
+      /** @scenario "A personal key in the environment answers when there is no login" */
+      it("hands the project LANGWATCH_PROJECT_ID names to the check", async () => {
+        process.env.LANGWATCH_API_KEY = PERSONAL_KEY;
+        process.env.LANGWATCH_PROJECT_ID = "project_shop";
+        const checkKey = vi.fn(async () => SHOP);
+
+        await ensureSignedIn({ login: loginThatSignsIn(), checkKey });
+
+        expect(checkKey).toHaveBeenCalledWith({
+          apiKey: PERSONAL_KEY,
+          endpoint: ENDPOINT,
+          projectId: "project_shop",
+        });
       });
 
       /** @scenario "The folder's .env is left as it is" */
@@ -365,6 +464,21 @@ describe("given the share-control command", () => {
         expect(login).toHaveBeenCalledTimes(1);
         expect(credentials.apiKey).toBe("sk-lw-new-login-key");
         expect(printed).toContain(SIGNING_IN_AGAIN);
+      });
+
+      /** @scenario "A personal key in the environment answers when there is no login" */
+      it("uses a personal key from the environment instead of signing in again", async () => {
+        writeLogin({ cli_api_key: undefined });
+        process.env.LANGWATCH_API_KEY = PERSONAL_KEY;
+        const login = loginThatSignsIn();
+
+        const credentials = await ensureSignedIn({ login, checkKey: async () => SHOP });
+
+        expect(login).not.toHaveBeenCalled();
+        expect(credentials.apiKey).toBe(PERSONAL_KEY);
+        expect(printed).toContain(
+          "Using the personal key in LANGWATCH_API_KEY on project ACME Shop, since the login on this machine can no longer be used.",
+        );
       });
 
       /** @scenario "A login that cannot be used signs in again" */
@@ -470,6 +584,145 @@ describe("given the share-control command", () => {
         expect(login).not.toHaveBeenCalled();
         expect(credentials.apiKey).toBe("sk-lw-login-key");
       });
+    });
+  });
+
+  describe("when LangWatch is asked whether a key in the environment is personal", () => {
+    const PERSONAL_KEY = "sk-lw-personallookup_personalsecret";
+    const candidate = { endpoint: ENDPOINT, apiKey: PERSONAL_KEY };
+    const ME_PROJECT = "/api/v1/me/project";
+    const LIST = "/api/v1/langy/control/requests";
+    const shop = { id: "project_shop", name: "ACME Shop", slug: "acme-shop", isPersonal: false };
+    const basicFor = (projectId: string): string =>
+      `Basic ${Buffer.from(`${projectId}:${PERSONAL_KEY}`).toString("base64")}`;
+
+    /** @scenario "A personal key in the environment answers when there is no login" */
+    it("answers with the key's project when the request list answers on it", async () => {
+      const { impl, calls } = fakeFetch({
+        [ME_PROJECT]: { body: shop },
+        [LIST]: { body: { requests: [] } },
+      });
+
+      expect(await checkPersonalKey(candidate, { fetchImpl: impl })).toEqual({
+        kind: "personal",
+        projectId: "project_shop",
+        projectName: "ACME Shop",
+      });
+      const listCall = calls.find((call) => call.url.endsWith(LIST));
+      const headers = listCall!.init!.headers as Record<string, string>;
+      expect(headers.authorization).toBe(basicFor("project_shop"));
+    });
+
+    /** @scenario "A project key in the environment never stands in for the login" */
+    it("calls the key refused when the request list refuses it, as it does a service key", async () => {
+      const { impl } = fakeFetch({
+        [ME_PROJECT]: { body: shop },
+        [LIST]: { status: 404, body: { code: "langy_local_request_invalid" } },
+      });
+
+      expect(await checkPersonalKey(candidate, { fetchImpl: impl })).toEqual({ kind: "refused" });
+    });
+
+    /** @scenario "A project key in the environment never stands in for the login" */
+    it("calls the key refused, and reads no list, when the key names no project", async () => {
+      const { impl, calls } = fakeFetch({
+        [ME_PROJECT]: { status: 400, body: { code: "project_required" } },
+        [LIST]: { body: { requests: [] } },
+      });
+
+      expect(await checkPersonalKey(candidate, { fetchImpl: impl })).toEqual({ kind: "refused" });
+      expect(calls.some((call) => call.url.endsWith(LIST))).toBe(false);
+    });
+
+    /** @scenario "A personal key in the environment answers when there is no login" */
+    it("asks for the project the environment names", async () => {
+      const { impl, calls } = fakeFetch({
+        [ME_PROJECT]: { body: shop },
+        [LIST]: { body: { requests: [] } },
+      });
+
+      await checkPersonalKey({ ...candidate, projectId: "project_shop" }, { fetchImpl: impl });
+
+      const meCall = calls.find((call) => call.url.endsWith(ME_PROJECT));
+      const headers = meCall!.init!.headers as Record<string, string>;
+      expect(headers.authorization).toBe(basicFor("project_shop"));
+    });
+
+    /** @scenario "A personal key in the environment answers when there is no login" */
+    it("names the project by its id when LangWatch gives it no name", async () => {
+      const { impl } = fakeFetch({
+        [ME_PROJECT]: { body: { id: "project_shop", name: "" } },
+        [LIST]: { body: { requests: [] } },
+      });
+
+      expect(await checkPersonalKey(candidate, { fetchImpl: impl })).toEqual({
+        kind: "personal",
+        projectId: "project_shop",
+        projectName: "project_shop",
+      });
+    });
+
+    /** @scenario "A key LangWatch could not be asked about gives way to the login" */
+    it("cannot tell, and reads no list, when the project answer carries no id", async () => {
+      const { impl, calls } = fakeFetch({
+        [ME_PROJECT]: { body: { name: "ACME Shop" } },
+        [LIST]: { body: { requests: [] } },
+      });
+
+      expect(await checkPersonalKey(candidate, { fetchImpl: impl })).toEqual({ kind: "unchecked" });
+      expect(calls.some((call) => call.url.endsWith(LIST))).toBe(false);
+    });
+
+    /** @scenario "A key LangWatch could not be asked about gives way to the login" */
+    it("cannot tell when the connection fails", async () => {
+      const impl = (async () => {
+        throw new TypeError("fetch failed");
+      }) as unknown as typeof fetch;
+
+      expect(await checkPersonalKey(candidate, { fetchImpl: impl })).toEqual({ kind: "unchecked" });
+    });
+
+    /** @scenario "A key LangWatch could not be asked about gives way to the login" */
+    it("cannot tell when the request list answers with a server error", async () => {
+      const { impl } = fakeFetch({
+        [ME_PROJECT]: { body: shop },
+        [LIST]: { status: 503, body: {} },
+      });
+
+      expect(await checkPersonalKey(candidate, { fetchImpl: impl })).toEqual({ kind: "unchecked" });
+    });
+
+    /** @scenario "A key LangWatch could not be asked about gives way to the login" */
+    it("cannot tell when the project lookup is rate limited", async () => {
+      const { impl } = fakeFetch({
+        [ME_PROJECT]: { status: 429, body: {} },
+        [LIST]: { body: { requests: [] } },
+      });
+
+      expect(await checkPersonalKey(candidate, { fetchImpl: impl })).toEqual({ kind: "unchecked" });
+    });
+
+    /** @scenario "A key LangWatch could not be asked about gives way to the login" */
+    it("cannot tell when the request list times out on the server", async () => {
+      const { impl } = fakeFetch({
+        [ME_PROJECT]: { body: shop },
+        [LIST]: { status: 408, body: {} },
+      });
+
+      expect(await checkPersonalKey(candidate, { fetchImpl: impl })).toEqual({ kind: "unchecked" });
+    });
+
+    /** @scenario "A key LangWatch could not be asked about gives way to the login" */
+    it("gives every request of the check a deadline", async () => {
+      const { impl, calls } = fakeFetch({
+        [ME_PROJECT]: { body: shop },
+        [LIST]: { body: { requests: [] } },
+      });
+
+      await checkPersonalKey(candidate, { fetchImpl: impl });
+
+      expect(calls).toHaveLength(2);
+      expect(calls.every((call) => call.init?.signal instanceof AbortSignal)).toBe(true);
     });
   });
 
