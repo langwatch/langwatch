@@ -5,7 +5,7 @@ import {
   EXAMPLE_LANGUAGES,
   generateExample,
   type HighlightedExamples,
-  initialBodyOf,
+  playgroundBodyOf,
 } from "../features/api-reference/model.ts";
 import { highlightLines } from "../features/code/compile.ts";
 import { headDescription } from "../features/discovery/compile.ts";
@@ -20,7 +20,7 @@ async function highlightedExamples({
 }): Promise<{ examples?: HighlightedExamples }> {
   const operation = await loadOperation({ slug });
   if (!operation) return {};
-  const state = { values: {}, body: initialBodyOf({ operation }) };
+  const state = { values: {}, body: playgroundBodyOf({ operation }).body };
   const examples: HighlightedExamples = { python: [], typescript: [], curl: [] };
   for (const entry of EXAMPLE_LANGUAGES) {
     examples[entry.id] = await highlightLines({

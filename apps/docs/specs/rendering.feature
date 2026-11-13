@@ -90,6 +90,42 @@ Feature: Read and navigate the generated documentation
     Then keys, strings and other values take the code blocks' colours as they type
     And text that is not yet valid JSON is still shown, uncoloured where it cannot be read
 
+  @integration
+  Scenario: Fill a request body in a form built from its schema
+    Given an endpoint whose JSON request body is an object
+    When the reader opens Try it
+    Then the body is a form of its fields, each labelled with its name and type, marked when required, with its description as a hint
+    And a field the schema formats as a date or date-time is a date picker that sends that format, in UTC
+    And a number field the schema describes as epoch milliseconds is a date-time picker that sends milliseconds
+    And a field with an enum is a select, a boolean is an Omit, true or false switch (a checkbox when required), and a number is a number field with the schema's minimum and maximum
+    And a list of plain values has a row per value, with Add and Remove
+    And a nested object is a group of its own fields
+    And a field the form cannot represent, such as a union or a free-form object, is a small JSON field inside the form
+    And a field left empty is left out of the request
+    But a field the schema gives no date format stays a text field, whatever its name
+
+  @integration
+  Scenario: Switch the request body between the form and JSON
+    Given the reader has filled the body form
+    When they choose JSON
+    Then the editor shows the form's value, pretty-printed
+    When they edit the JSON and choose Form
+    Then the form shows the edited value
+    But JSON that does not parse, or a value the form cannot show, keeps them in JSON with the reason under the editor
+
+  @integration
+  Scenario: Send and show the form's value as the request body
+    Given the reader has filled the body form
+    Then the Python, TypeScript and curl examples and the agent prompt carry that value
+    And Send request sends that value as the body
+    And a required field left empty, or a JSON sub-field that does not parse, prevents sending and is marked on its field
+
+  @integration
+  Scenario: Type each parameter by its schema
+    Given an endpoint with date-time, enum, boolean and number parameters
+    Then a date-time parameter is a date picker sent as an ISO timestamp in UTC
+    And an enum parameter is a select, a boolean is an Omit, true or false switch, and a number is a number field with the schema's limits
+
   @e2e
   Scenario: Start with a coding agent
     Given the reader opens the introduction

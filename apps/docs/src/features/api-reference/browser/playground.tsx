@@ -10,10 +10,12 @@ import type { Operation } from "../model/operation.ts";
 import { requestErrorOutcome } from "../model/playground-outcome.ts";
 import type { Outcome } from "../model/playground-outcome.ts";
 import { validateRequest } from "../model/request-validation.ts";
+import { editRows, readForm, setBodyMode, syncFormToBody } from "./body-form.ts";
 import { frameConnection, sendThroughFrame, type FrameAnswer } from "./docs-session.ts";
 import {
   editManualKey,
   fieldValue,
+  paramErrors,
   requestState,
   setFormOpen,
   showErrors,
@@ -58,11 +60,18 @@ function PlaygroundRuntime({ operation }: { operation: Operation }) {
     [],
   );
   const send = async () => {
+    syncFormToBody({ operation });
     const state = requestState({ operation });
     /* Signed in, the frame sends as the reader and this page never holds the key. */
     const viaFrame = sessionCovers({ scheme: operation.schemes[0] }) && frameConnection() !== null;
     const key = fieldValue({ id: "pg-auth" });
-    const errors = validateRequest({ operation, state, key: viaFrame ? { from: "frame" } : key });
+    const fieldErrors = { ...paramErrors({ operation }), ...readForm({ operation })?.errors };
+    const errors = validateRequest({
+      operation,
+      state,
+      key: viaFrame ? { from: "frame" } : key,
+      fieldErrors,
+    });
     showErrors({ errors });
     if (Object.keys(errors).length) return;
     pending.current?.abort();
@@ -169,12 +178,20 @@ function bindRequestForm({
   const form = document.getElementById("try-it-form");
   const input = (event: Event) => {
     if (event.target instanceof HTMLElement && event.target.id === "pg-body") syncBody();
+    else if (event.target instanceof Element && event.target.closest("[data-body-form]"))
+      syncFormToBody({ operation });
     updateExamples({ operation });
   };
   const click = (event: Event) => {
     const button = event.target instanceof Element ? event.target.closest("button") : null;
     if (!button) return;
     if (button.id === "pg-send") void onSend();
+    const mode = button.getAttribute("data-body-mode-button");
+    if (mode === "form" || mode === "json") setBodyMode({ operation, mode });
+    if (editRows({ button })) {
+      syncFormToBody({ operation });
+      updateExamples({ operation });
+    }
     if (button.getAttribute("aria-label") === "Close request form") setFormOpen({ open: false });
     const label = button.getAttribute("aria-label") ?? button.textContent?.trim();
     if (label && ["Clear", "Reveal key", "Hide key"].includes(label))

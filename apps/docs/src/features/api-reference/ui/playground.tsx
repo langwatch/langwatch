@@ -3,7 +3,8 @@ import { useState } from "react";
 
 import { docsUrl, publicSlug } from "../../../lib/site-path.ts";
 import type { CodeSource } from "../../code/model.ts";
-import { agentPrompt, generateExample, initialBodyOf } from "../model/codegen.ts";
+import { playgroundBodyOf } from "../model/body-value.ts";
+import { agentPrompt, generateExample } from "../model/codegen.ts";
 import type { RequestState } from "../model/codegen.ts";
 import { EXAMPLE_LANGUAGES } from "../model/operation.ts";
 import type { HighlightedExamples, Operation } from "../model/operation.ts";
@@ -21,10 +22,8 @@ export function Playground({
   highlighted?: HighlightedExamples;
   slug: string;
 }) {
-  const [state, setState] = useState<RequestState>({
-    values: {},
-    body: initialBodyOf({ operation }),
-  });
+  const seed = playgroundBodyOf({ operation });
+  const [state, setState] = useState<RequestState>({ values: {}, body: seed.body });
   const [touched, setTouched] = useState(false);
   const examples = Object.fromEntries(
     EXAMPLE_LANGUAGES.map((entry) => {
@@ -66,6 +65,7 @@ export function Playground({
     >
       <PlaygroundRequest
         operation={operation}
+        seed={seed}
         state={state}
         onChange={setState}
         onTouched={() => setTouched(true)}

@@ -1,6 +1,7 @@
 import { slide } from "../../../lib/slide.ts";
 import { agentPrompt, generateExample, paramKey } from "../model/codegen.ts";
 import type { RequestState } from "../model/codegen.ts";
+import { paramText } from "../model/field-value.ts";
 import { jsonTokens } from "../model/json-tokens.ts";
 import { EXAMPLE_LANGUAGES } from "../model/operation.ts";
 import type { Operation } from "../model/operation.ts";
@@ -8,6 +9,8 @@ import { errorFieldId } from "../model/request-validation.ts";
 
 export function fieldValue({ id }: { id: string }) {
   const field = document.getElementById(id);
+  if (field?.getAttribute("role") === "radiogroup")
+    return field.querySelector<HTMLInputElement>("input:checked")?.value ?? "";
   return field instanceof HTMLInputElement ||
     field instanceof HTMLTextAreaElement ||
     field instanceof HTMLSelectElement
@@ -15,16 +18,27 @@ export function fieldValue({ id }: { id: string }) {
     : "";
 }
 
+/** Parameters as they go out (a picked date as an ISO timestamp), and the body in `#pg-body`. */
 export function requestState({ operation }: { operation: Operation }): RequestState {
   return {
     values: Object.fromEntries(
       operation.parameters.map((param) => [
         paramKey({ location: param.in, name: param.name }),
-        fieldValue({ id: `pg-${param.in}-${param.name}` }),
+        paramText({ param, raw: fieldValue({ id: `pg-${param.in}-${param.name}` }) }).text,
       ]),
     ),
     body: fieldValue({ id: "pg-body" }),
   };
+}
+
+/** Parameter values that cannot be sent, such as a number past its maximum. */
+export function paramErrors({ operation }: { operation: Operation }) {
+  const errors: Record<string, string> = {};
+  for (const param of operation.parameters) {
+    const { error } = paramText({ param, raw: fieldValue({ id: `pg-${param.in}-${param.name}` }) });
+    if (error) errors[paramKey({ location: param.in, name: param.name })] = error;
+  }
+  return errors;
 }
 
 function setExample({ id, code }: { id: string; code: string }) {

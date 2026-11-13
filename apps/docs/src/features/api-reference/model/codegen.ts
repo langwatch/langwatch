@@ -8,7 +8,7 @@ export function paramKey({ location, name }: { location: string; name: string })
   return `${location}:${name}`;
 }
 
-function mergeExampleSchema({ schema }: { schema: Schema }): Schema {
+export function mergeExampleSchema({ schema }: { schema: Schema }): Schema {
   if (!schema.allOf) return schema;
   const parts = schema.allOf.map((part) => mergeExampleSchema({ schema: part }));
   return {

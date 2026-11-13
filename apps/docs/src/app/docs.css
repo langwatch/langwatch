@@ -2125,6 +2125,25 @@ body {
   height: var(--docs-input-height);
   font-size: 13px;
 }
+#try-it-form input:is([type="checkbox"], [type="radio"]) {
+  height: 18px;
+}
+#try-it-form legend {
+  color: var(--chakra-colors-blue-fg);
+}
+/* A date and time picker, or Omit, true and false, needs the whole row on a phone. */
+@container (max-width: 440px) {
+  .docs-request-field:has(input[type="datetime-local"], .docs-boolean-switch) {
+    grid-column: 1 / -1;
+  }
+}
+/* An optional boolean's Omit, true and false read as one segmented control, not as labels. */
+#try-it-form .docs-boolean-switch label {
+  color: var(--chakra-colors-fg-muted);
+}
+#try-it-form .docs-boolean-switch label:has(input:checked) {
+  color: var(--chakra-colors-fg);
+}
 #try-it-form label {
   color: var(--chakra-colors-blue-fg);
 }
