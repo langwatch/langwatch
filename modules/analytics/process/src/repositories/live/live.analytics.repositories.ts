@@ -8,8 +8,10 @@ import { ClickHouseAnalyticsSessionsRepository } from "../clickhouse/clickhouse.
 import { ClickHouseAnalyticsRepository } from "../clickhouse/clickhouse.analytics.repository.ts";
 import { FilterOptionsClickHouseRepository } from "../clickhouse/clickhouse.filter-options.repository.ts";
 import { ClickHouseLangWatchQLAppFunctionStoreRepository } from "../clickhouse/clickhouse.langwatch-ql-app-function-store.repository.ts";
+import { ClickHouseLangWatchQLPlacementRepository } from "../clickhouse/clickhouse.langwatch-ql-placement.repository.ts";
 import type { LwqlProvisioningDatabase } from "../langwatch-ql-postgres.repository.ts";
 import { RedisAnalyticsRateLimitRepository } from "../redis/redis.analytics-rate-limit.repository.ts";
+import { RedisLangWatchQLAccessModelAnswerRepository } from "../redis/redis.langwatch-ql-access-model-answer.repository.ts";
 import {
   type LwqlUnconfirmedSinceRedis,
   RedisLwqlUnconfirmedSinceRepository,
@@ -58,6 +60,8 @@ export class LiveAnalyticsRepositories {
       appFunctionStore: ClickHouseLangWatchQLAppFunctionStoreRepository.create(clickhouse),
       recency: ClickHouseAnalyticsRecencyRepository.create(clickhouse),
       rateLimits: RedisAnalyticsRateLimitRepository.create(rateLimiter),
+      lwqlPlacement: ClickHouseLangWatchQLPlacementRepository.create({ clickhouse }),
+      lwqlAccessModelAnswer: RedisLangWatchQLAccessModelAnswerRepository.create({ redis }),
       langWatchQl: {
         admin: clickhouseAdmin,
         postgres: databaseTarget,

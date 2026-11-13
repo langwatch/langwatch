@@ -214,3 +214,24 @@ export function buildPoint(args: {
     }),
   };
 }
+
+/**
+ * The key a metric point is redacted under, which the PII redaction model's priced request id
+ * is derived from: its metric and its times, as an SDK re-exports one attribute set every
+ * interval (ADR-201). A point whose time cannot be read is rejected when it is built.
+ */
+export function metricRedactionRecordKey({
+  metricName,
+  point,
+}: {
+  metricName: string;
+  point: UnknownRecord;
+}): string {
+  try {
+    const time = toTimestampDecimal(point.timeUnixNano) ?? "unreadable-time";
+    const start = toTimestampDecimal(point.startTimeUnixNano) ?? "0";
+    return `metric:${metricName}:${start}:${time}`;
+  } catch {
+    return `metric:${metricName}:unreadable-time`;
+  }
+}

@@ -36,6 +36,7 @@ import type {
 import {
   type PeerEventSchema,
   type PeerFoldProjectionDeclaration,
+  type PeerFoldSubscriberSpec,
   type PeerMapProjectionDeclaration,
   peerFoldProjection,
   peerMapProjection,
@@ -249,19 +250,29 @@ export class PipelineBuilder<
   }
 
   /**
-   * This module's fold over a peer pipeline's events (§9), on the global registry: lane
-   * `<this pipeline>.<fold name>`, ordered per source aggregate, deduped by event id, re-folded
-   * and replayed from the owner's event log. Spec: packages/eventing/specs/peer-projection.feature.
+   * This module's fold over peer events (§9), lane `<this pipeline>.<fold name>`: ordered per
+   * source aggregate, deduped by event id, replayed from the owner's log; each subscriber gets
+   * committed state on `<fold lane>.<name>`. Spec: packages/eventing/specs/peer-projection.feature.
    */
   withPeerFoldProjection<State, const Events extends readonly PeerEventSchema[]>(
     declaration: PeerFoldProjectionDeclaration<State, Events>,
+    subscribers: readonly PeerFoldSubscriberSpec<State>[] = [],
   ): this {
     const lane = `${this.name}.${declaration.fold.name}`;
     this.assertGlobalLaneFree(lane);
     const fold = peerFoldProjection({ lane, declaration });
+    const definitions = subscribers.map(({ name, ...spec }) =>
+      buildProjectionSubscriberDefinition<Event>(`${lane}.${name}`, {
+        ...spec,
+        fold: lane,
+      } as SubscriberSpec<Event>),
+    );
     this.globalProjections.push({
       name: lane,
-      register: (registry, host) => registry.registerPeerFoldProjection(fold, host),
+      register: (registry, host) => {
+        registry.registerPeerFoldProjection(fold, host);
+        for (const definition of definitions) registry.registerSubscriber(lane, definition);
+      },
       peer: { kind: "fold", projection: sealFoldProjection(fold) },
     });
     return this;

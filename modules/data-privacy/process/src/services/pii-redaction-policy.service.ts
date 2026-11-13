@@ -35,6 +35,8 @@ export type PIICheckOptions = {
    * resolved strict level may reach the PII redaction model.
    */
   resolvedPiiLevel?: PiiLevel;
+  /** The record's trace and span, which the model's spend request id is derived from. */
+  recordKey?: string;
 };
 
 /**
@@ -114,8 +116,15 @@ const batchClearPII = async ({
   options: PIICheckOptions;
   spareNamesAndPlaces: readonly boolean[];
 }): Promise<(string | null)[]> => {
-  const { piiRedactionLevel, mainMethod, entities, exceptPatterns, projectId, resolvedPiiLevel } =
-    options;
+  const {
+    piiRedactionLevel,
+    mainMethod,
+    entities,
+    exceptPatterns,
+    projectId,
+    resolvedPiiLevel,
+    recordKey,
+  } = options;
 
   if (mainMethod === "google_dlp") {
     return runGoogleDlpBatch({
@@ -135,6 +144,7 @@ const batchClearPII = async ({
       projectId,
       resolvedPiiLevel,
       spareNamesAndPlaces,
+      recordKey,
     });
   } catch {
     // The DLP fallback redacts by level, not by the custom entity subset; the

@@ -110,7 +110,7 @@ function claims() {
 describe("NurturingDeliveryService", () => {
   describe("when a created scenario is delivered", () => {
     /** @scenario "A created scenario reaches PostHog and Customer.io with main's attributes" */
-    it("tracks it in PostHog with the project and sends Customer.io its count and event", async () => {
+    it("tracks it in PostHog with the project and sends Customer.io its event, no count", async () => {
       const posthog = MemoryPostHogChannel.create();
       const cio = customerIo();
       const delivery = NurturingDeliveryService.create({
@@ -128,10 +128,6 @@ describe("NurturingDeliveryService", () => {
         { userId: "user-1", event: "scenario_created", properties: { projectId: "project-1" } },
       ]);
       expect(cio.sent).toEqual([
-        {
-          path: "/v1/identify",
-          body: expect.objectContaining({ userId: "user-1", traits: { scenario_count: 3 } }),
-        },
         {
           path: "/v1/track",
           body: expect.objectContaining({
@@ -162,7 +158,7 @@ describe("NurturingDeliveryService", () => {
       await settle();
 
       expect(posthog.tracked).toHaveLength(1);
-      expect(cio.sent).toHaveLength(2);
+      expect(cio.sent).toHaveLength(1);
     });
   });
 

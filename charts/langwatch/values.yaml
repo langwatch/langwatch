@@ -1682,7 +1682,7 @@ ingress:
 
   # Ingress annotations for specific behaviors
   # See: https://kubespec.dev/networking.k8s.io/v1/Ingress#metadata.annotations
-  ## @param ingress.annotations [object] Additional ingress annotations.
+  ## @param ingress.annotations [object] Additional ingress annotations. With className nginx the app Ingress also gets proxy-read-timeout and proxy-send-timeout of 120 s; set either here to override.
   annotations: {}
 
   # Extra labels applied to the Ingress and to the blackhole Service that backs

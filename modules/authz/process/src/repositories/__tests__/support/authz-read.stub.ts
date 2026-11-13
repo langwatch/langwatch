@@ -20,6 +20,7 @@ export function makeReader(
   const base: ReaderStub = {
     findOrganizationMembership: vi.fn().mockResolvedValue(null),
     findActiveAdministratorIds: vi.fn().mockResolvedValue([]),
+    findActiveMemberIds: vi.fn().mockResolvedValue([]),
     findUserBindings: vi.fn().mockResolvedValue([]),
     findGroupBindings: vi.fn().mockResolvedValue([]),
     findApiKeyBindings: vi.fn().mockResolvedValue([]),
@@ -27,6 +28,7 @@ export function makeReader(
     findCustomRolePermissions: vi.fn().mockResolvedValue([]),
     findShareLinks: vi.fn().mockResolvedValue([]),
     findProjectLineage: vi.fn().mockResolvedValue(null),
+    findProjectLineages: vi.fn().mockResolvedValue(new Map()),
     findTeamOrganization: vi.fn().mockResolvedValue(null),
     findLiveSharedReads: vi.fn().mockResolvedValue([]),
   };

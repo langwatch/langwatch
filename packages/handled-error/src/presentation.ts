@@ -661,6 +661,11 @@ const presentations = {
     describe: () =>
       "This project doesn't have the SQL workbench enabled yet. Ask your administrator to switch it on.",
   },
+  lwql_not_provisioned: {
+    title: "Custom SQL isn't set up where this data lives",
+    describe: () =>
+      "Custom SQL isn't set up yet on the server that holds this organisation's data. Ask your workspace administrator, or contact support.",
+  },
   saved_workbench_chart_already_exists: {
     title: "That chart id is already taken",
     describe: () =>
@@ -817,6 +822,60 @@ const presentations = {
     // earlier release's wire format; reloading fetches this one.
     title: "This page is out of date: reload to continue",
     describe: () => "LangWatch was updated while this page was open. Reload to pick up the update.",
+  },
+  braid_across_organizations: {
+    title: "These projects are in different organisations",
+    describe: () =>
+      "A braid joins two projects of the same organisation. Pick a project from this one.",
+  },
+  braid_aggregate_project: {
+    title: "Aggregate projects cannot be braided",
+    describe: () =>
+      "An aggregate project already reads its member projects. Braid the member projects instead.",
+  },
+  braid_already_exists: {
+    title: "This braid already exists",
+    describe: () =>
+      "A live braid between these projects already has this condition, data window and end date.",
+  },
+  braid_changed: {
+    title: "This braid changed in the meantime",
+    describe: () =>
+      "Someone changed or removed this braid since you opened it. Reload the list and try again.",
+  },
+  braid_condition_limit_reached: {
+    title: "This project receives too many braid conditions",
+    describe: (error) =>
+      `A project can receive braids with at most ${num(error, "limit", 50)} different conditions. Reuse a condition an existing braid already has, or remove a braid first.`,
+  },
+  braid_condition_syntax: {
+    title: "The condition is not complete",
+    describe: (error) =>
+      str(error, "fix", "") || "Check the condition for an unclosed quote, bracket or parenthesis.",
+  },
+  braid_condition_too_large: {
+    title: "The condition is too large",
+    describe: (error) =>
+      str(error, "fix", "") || "Shorten the condition, or use fewer comparisons or less nesting.",
+  },
+  braid_condition_unsupported: {
+    title: "The condition uses something braids do not support",
+    describe: (error) =>
+      str(error, "fix", "") ||
+      "Braid conditions support equality on attributes and the span name, joined with and.",
+  },
+  braid_governance_project: {
+    title: "The governance project cannot be braided",
+    describe: () => "The organisation's governance project never shares its spans with a braid.",
+  },
+  braid_into_itself: {
+    title: "A project cannot be braided into itself",
+    describe: () => "Pick a different project to braid into.",
+  },
+  braid_not_on_project: {
+    title: "This braid is not on this project",
+    describe: () =>
+      "A braid can only be removed from the project its spans come from or the project that shows them.",
   },
   broadcaster_not_active: {
     title: "Live updates disconnected",
@@ -1636,6 +1695,13 @@ const presentations = {
     title: "Choose a model first",
     describe: () =>
       "No default model is set yet. Open Settings, then Default Models, and pick one for your organization.",
+  },
+  model_execution_unavailable: {
+    // A codex model reached a process with no gateway road to run it; no retry
+    // changes that, so the copy points at picking a model from another provider.
+    title: "This model can't run this feature yet",
+    describe: () =>
+      "Codex models can't run this feature on this deployment yet. Pick a model from another provider for it in Default Models.",
   },
   model_restricted_for_execution: {
     // The same licence as `model_restricted_for_feature`, hit at the other
@@ -2478,6 +2544,11 @@ const presentations = {
   auth_invalid_origin: {
     title: "LangWatch is set up for a different web address than the one you are using",
     describe: () => "Check the address and try again.",
+  },
+  authz_epoch_bump_failed: {
+    title: "Saved, but not yet applied everywhere",
+    describe: () =>
+      "The access change was saved, but not every server has picked it up yet. Try again to finish it; otherwise it applies on its own within a few minutes.",
   },
   authz_ledger_unavailable: {
     title: "Access changes are paused",

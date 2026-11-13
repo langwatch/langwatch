@@ -11,6 +11,7 @@ let storeState: {
   traceId: string | null;
   occurredAtMs: number | null;
   tenantId: string | null;
+  backfilledOccurredAt: { traceId: string; occurredAtMs: number } | null;
 };
 
 const useQuery = vi.fn((_input: unknown, _options: unknown) => ({
@@ -51,7 +52,12 @@ function lastCall(): { input: unknown; enabled: unknown } {
 describe("useTraceEvaluations", () => {
   beforeEach(() => {
     useQuery.mockClear();
-    storeState = { traceId: "t1", occurredAtMs: null, tenantId: "member-a" };
+    storeState = {
+      traceId: "t1",
+      occurredAtMs: null,
+      tenantId: "member-a",
+      backfilledOccurredAt: null,
+    };
   });
 
   describe("when the drawer opened from a deep link with no partition hint", () => {
@@ -72,7 +78,11 @@ describe("useTraceEvaluations", () => {
       const { rerender } = renderHook(() => useTraceEvaluations());
       const before = lastCall().input;
 
-      storeState = { ...storeState, occurredAtMs: 1714476000000 };
+      storeState = {
+        ...storeState,
+        occurredAtMs: 1714476000000,
+        backfilledOccurredAt: { traceId: "t1", occurredAtMs: 1714476000000 },
+      };
       rerender();
 
       expect(lastCall().input).toEqual(before);

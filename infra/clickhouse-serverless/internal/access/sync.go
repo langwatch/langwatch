@@ -28,6 +28,9 @@ func Render(f *File, in Inputs, now time.Time, usersD string) (Planned, bool, er
 	if err != nil {
 		return Planned{}, false, err
 	}
+	if err := constraints.checkCaps(f); err != nil {
+		return Planned{}, false, err
+	}
 	in.Constraints = constraints
 	p := Plan(f, in, now)
 	data, err := p.UsersYAML()
@@ -106,6 +109,11 @@ func (s *Syncer) current() (*File, bool) {
 		s.Log.Error("access file not applied: its mode differs from the one the server started in; "+
 			"restart the server to change mode, keeping the last good one",
 			zap.Bool("file_dynamic_only", f.DynamicOnly()), zap.Bool("server_dynamic_only", server))
+		return s.lastFile, false
+	}
+	// A cap looser than its tier is only visible against the rendered constraints.
+	if err := CheckCaps(f, s.UsersD); err != nil {
+		s.Log.Error("access file not applied, keeping the last good one", zap.Error(err))
 		return s.lastFile, false
 	}
 	s.lastFile = f

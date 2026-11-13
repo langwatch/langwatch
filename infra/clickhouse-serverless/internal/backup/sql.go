@@ -27,13 +27,23 @@ type Tables struct {
 	Cluster string
 }
 
+// The source tables, as a FROM target. systemBackups is the in-memory table.
+// backupLog reads every copy of the persistent log: an upgrade that changes
+// backup_log's columns renames the old table to backup_log_0 (then _1, ...)
+// and starts an empty backup_log, so reading backup_log alone loses every
+// backup taken before the upgrade, the full an incremental chains on included.
+const (
+	systemBackups = "system.backups"
+	backupLog     = "merge('system', '^backup_log')"
+)
+
 // from is the FROM target and the SETTINGS a cluster read needs. A replica
 // that is down is skipped: the log of any replica that is up names a base.
 func (t Tables) from(table string) (string, string) {
 	if t.Cluster == "" {
-		return "system." + table, ""
+		return table, ""
 	}
-	return "clusterAllReplicas(" + quoteString(t.Cluster) + ", system." + table + ")", " SETTINGS skip_unavailable_shards = 1"
+	return "clusterAllReplicas(" + quoteString(t.Cluster) + ", " + table + ")", " SETTINGS skip_unavailable_shards = 1"
 }
 
 // BackupSQL starts a backup of db to path, chained on base when set. ASYNC:
@@ -76,19 +86,19 @@ func RestoreSQL(db, path, id string) (string, error) {
 }
 
 // FlushLogsSQL writes pending backup_log rows, and creates the table on a
-// server that has never logged a backup, so the cluster read finds it.
+// server that has never logged a backup, so the cluster read finds a copy.
 const FlushLogsSQL = "SYSTEM FLUSH LOGS"
 
 // InFlightSQL lists backups still being written, on every replica.
 func (t Tables) InFlightSQL() string {
-	from, settings := t.from("backups")
+	from, settings := t.from(systemBackups)
 	return "SELECT id, name, status, toUnixTimestamp(start_time) AS start_ts, hostName() AS host FROM " + from +
 		" WHERE status = 'CREATING_BACKUP'" + settings
 }
 
 // CreatedSQL lists db's backups that completed after since, newest first.
 func (t Tables) CreatedSQL(db string, since time.Time) string {
-	from, settings := t.from("backup_log")
+	from, settings := t.from(backupLog)
 	return "SELECT id, name, status, toUnixTimestamp(start_time) AS start_ts, toUnixTimestamp(end_time) AS end_ts, total_size AS size_bytes, hostName() AS host FROM " + from +
 		" WHERE status = 'BACKUP_CREATED' AND event_time >= toDateTime(" + strconv.FormatInt(since.Unix(), 10) + ")" +
 		" AND (match(name, " + quoteString(nameRegexp(db, Full)) + ") OR match(name, " + quoteString(nameRegexp(db, Incremental)) + "))" +
@@ -97,14 +107,14 @@ func (t Tables) CreatedSQL(db string, since time.Time) string {
 
 // SummarySQL counts db's completed backups of mode ever, and the newest end.
 func (t Tables) SummarySQL(db string, mode Mode) string {
-	from, settings := t.from("backup_log")
+	from, settings := t.from(backupLog)
 	return "SELECT count() AS created, toUnixTimestamp(max(end_time)) AS last_end_ts FROM " + from +
 		" WHERE status = 'BACKUP_CREATED' AND match(name, " + quoteString(nameRegexp(db, mode)) + ")" + settings
 }
 
 // StatusSQL reads one backup or restore by id from the in-memory table.
 func (t Tables) StatusSQL(id string) string {
-	from, settings := t.from("backups")
+	from, settings := t.from(systemBackups)
 	return "SELECT id, name, status, error, toUnixTimestamp(start_time) AS start_ts, toUnixTimestamp(end_time) AS end_ts, total_size AS size_bytes, hostName() AS host FROM " + from +
 		" WHERE id = " + quoteString(id) + settings
 }
@@ -112,14 +122,14 @@ func (t Tables) StatusSQL(id string) string {
 // LoggedStatusSQL reads the last logged state of id, for when a server
 // restart emptied system.backups.
 func (t Tables) LoggedStatusSQL(id string) string {
-	from, settings := t.from("backup_log")
+	from, settings := t.from(backupLog)
 	return "SELECT id, name, status, error, toUnixTimestamp(start_time) AS start_ts, toUnixTimestamp(end_time) AS end_ts, total_size AS size_bytes, hostName() AS host FROM " + from +
 		" WHERE id = " + quoteString(id) + " ORDER BY event_time_microseconds DESC LIMIT 1" + settings
 }
 
 // ListSQL lists every completed backup on the backups disk, newest first.
 func (t Tables) ListSQL(limit int) string {
-	from, settings := t.from("backup_log")
+	from, settings := t.from(backupLog)
 	return "SELECT id, name, status, toUnixTimestamp(start_time) AS start_ts, toUnixTimestamp(end_time) AS end_ts, total_size AS size_bytes, hostName() AS host FROM " + from +
 		" WHERE status = 'BACKUP_CREATED' AND startsWith(name, " + quoteString("Disk("+quoteString(Disk)) + ")" +
 		" ORDER BY end_ts DESC LIMIT " + strconv.Itoa(limit) + settings
@@ -127,7 +137,7 @@ func (t Tables) ListSQL(limit int) string {
 
 // ReplicasSQL lists the cluster's replicas in order and marks this server.
 func ReplicasSQL(cluster string) string {
-	return "SELECT toUInt8(is_local) AS is_self, host_name AS host FROM system.clusters WHERE cluster = " +
+	return "SELECT shard_num, replica_num, toUInt8(is_local) AS is_self, host_name AS host FROM system.clusters WHERE cluster = " +
 		quoteString(cluster) + " ORDER BY shard_num, replica_num"
 }
 

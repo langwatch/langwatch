@@ -10,7 +10,9 @@ import type { AddressInfo } from "node:net";
 import { fileURLToPath } from "node:url";
 
 import { RestHost } from "@langwatch/api/rest";
+import { BILLING_REPORT_COMMAND_TYPES } from "@langwatch/enterprise-billing-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import { createTenantId } from "@langwatch/eventing";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -21,12 +23,17 @@ import { createStripeUsageReporting } from "../billing.module.ts";
 import { composeHttpBillingStripe } from "../channels/http/http.billing-stripe.channels.ts";
 import { HttpStripeWebhooksChannel } from "../channels/http/http.billing.channels.ts";
 import { MemoryBillingWebhookHostChannel } from "../channels/memory/memory.billing-webhook-host.channel.ts";
+import { ReportUsageForMonthCommandHandler } from "../eventing/report-usage-for-month.commands.ts";
 import { MemoryBillingOrganizationRepository } from "../repositories/memory/memory.billing-account-facts.repository.ts";
+import { MemoryBillingReportOrganizationRepository } from "../repositories/memory/memory.billing-report-organization.repository.ts";
 import { MemoryBillingWebhookOrganizationRepository } from "../repositories/memory/memory.billing-webhook-organization.repository.ts";
 import { MemoryBillingWebhookSubscriptionRepository } from "../repositories/memory/memory.billing-webhook-subscription.repository.ts";
 import { MemoryBillingRepositories } from "../repositories/memory/memory.billing.repositories.ts";
 import { MemoryBillingStore } from "../repositories/memory/memory.billing.store.ts";
 import { MemoryBillingSubscriptionRepository } from "../repositories/memory/memory.subscription.repository.ts";
+import { carriesPiiRedactionPrice } from "../rules/pii-redaction-meter.rules.ts";
+import { BillingErrorReporter } from "../services/billing-error-reporter.service.ts";
+import { PiiRedactionSpendQueryService } from "../services/pii-redaction-spend-query.service.ts";
 import type { ResourceLimitAlertService } from "../services/resource-limit-alert.service.ts";
 import type { UsageWarningService } from "../services/usage-warning.service.ts";
 import { billingStripeWebhookRest } from "../transport/billing-stripe-webhook.rest.ts";
@@ -34,6 +41,8 @@ import { billingStripeWebhookRest } from "../transport/billing-stripe-webhook.re
 const SECRET_KEY = "sk_test_paymentsim";
 const WEBHOOK_SECRET = "whsec_paymentsim";
 const LAUNCH_PRICE = "price_1R9LHnIMsTw08cudoc9eO4L8";
+const GROWTH_SEAT_USD_MONTHLY = "price_1SzP11IMsTw08cudRhGETYNa";
+const GROWTH_PII_REDACTION_USD = "price_1Uat9tIMsTw08cudpWWrZG4a";
 const REPO_ROOT = fileURLToPath(new URL("../../../../../../", import.meta.url));
 const CATALOG = fileURLToPath(
   new URL("../../../contract/src/stripe-catalog.json", import.meta.url),
@@ -337,6 +346,117 @@ describe.skipIf(!goPresent)(
 
       const { totals } = usageTotals.parse(await control(`/usage?customer=${customer}`));
       expect(totals).toEqual([expect.objectContaining({ value: 1234, events: 1 })]);
+    }, 30_000);
+
+    /** @scenario "The month's PII redaction total reaches the Stripe simulator" */
+    /** @scenario "Usage is held while the subscription carries no PII redaction price" */
+    it("holds the month until the subscription carries the PII redaction price, then reports it once", async () => {
+      const organizationId = "org-pii";
+      const customer = (await stripe("/customers", { name: organizationId })).id;
+      store.organizations.set(organizationId, {
+        id: organizationId,
+        name: organizationId,
+        stripeCustomerId: customer,
+        pricingModel: "SEAT_EVENT",
+        currency: "USD",
+        selfHostedCustomer: false,
+        teamIds: [],
+        signupData: {},
+      });
+      const pending = await subscriptions.createPending({
+        organizationId,
+        plan: "GROWTH_SEAT_USD_MONTHLY",
+      });
+      await subscriptions.updateStatus({ id: pending.id, status: "ACTIVE" });
+      // A Growth subscription at the provider bought before the PII redaction price existed.
+      const session = await stripe("/checkout/sessions", {
+        mode: "subscription",
+        customer,
+        success_url: "http://langwatch.test/settings/subscription",
+        "line_items[0][price]": GROWTH_SEAT_USD_MONTHLY,
+        "line_items[0][quantity]": "1",
+      });
+      const completed = z
+        .object({ subscription: z.string() })
+        .parse(await control(`/checkout/${session.id}/complete`, { body: {} }));
+      const stripeChannels = composeHttpBillingStripe({
+        secretKey: SECRET_KEY,
+        nodeEnvironment: "test",
+        apiBase: simBase,
+      });
+      const repositories = MemoryBillingRepositories.create();
+      const errors: Error[] = [];
+      const errorReporter = new (class extends BillingErrorReporter {
+        capture(error: Error): void {
+          errors.push(error);
+        }
+      })();
+      const ledgerReads: { requestType: string }[] = [];
+      const piiRedactionSpend = PiiRedactionSpendQueryService.create({
+        isSpendSourceAvailable: () => true,
+        listProjectIds: async () => ["project-pii-1", "project-pii-2"],
+        // 0.60 + 0.5234 dollars of pii_redaction rows across the two projects.
+        sumSpendNanoUsdByRequestType: async (input) => {
+          ledgerReads.push({ requestType: input.requestType });
+          return 1_123_400_000;
+        },
+      });
+      const handler = ReportUsageForMonthCommandHandler.create({
+        organizations: MemoryBillingReportOrganizationRepository.create(store),
+        billingCheckpoints: repositories.checkpoints,
+        organizationCache: repositories.organizationCache,
+        getUsageReportingService: () =>
+          createStripeUsageReporting({
+            secretKey: SECRET_KEY,
+            nodeEnvironment: "test",
+            apiBase: simBase,
+          }),
+        queryInstantEvalSpendTotal: async () => ({ outcome: "unavailable" }),
+        isInstantEvalMeterProvisioned: () => false,
+        queryPiiRedactionSpendTotal: (input) =>
+          piiRedactionSpend.queryPiiRedactionSpendTotal(input),
+        isPiiRedactionMeterProvisioned: () => true,
+        hasPiiRedactionPrice: async ({ stripeCustomerId }) =>
+          carriesPiiRedactionPrice({
+            subscriptions: await stripeChannels.subscriptions.listCustomerSubscriptions({
+              customerId: stripeCustomerId,
+            }),
+            priceId: GROWTH_PII_REDACTION_USD,
+          }),
+        selfDispatch: async () => {},
+        errorReporter,
+        connectedUsageCeiling: async () => null,
+      });
+      const now = new Date();
+      const billingMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+      const command = {
+        tenantId: createTenantId(organizationId),
+        aggregateId: organizationId,
+        type: BILLING_REPORT_COMMAND_TYPES.REPORT_USAGE_FOR_MONTH,
+        data: { organizationId, billingMonth, tenantId: organizationId, occurredAt: Date.now() },
+      };
+
+      const piiUsage = async () =>
+        usageTotals.parse(
+          await control(`/usage?customer=${customer}&event_name=langwatch_pii_redaction_usd`),
+        ).totals;
+
+      await handler.handle(command);
+      expect(await piiUsage()).toEqual([]);
+
+      await stripe(`/subscriptions/${completed.subscription}`, {
+        "items[0][price]": GROWTH_PII_REDACTION_USD,
+      });
+      await handler.handle(command);
+      await handler.handle(command);
+
+      const totals = await piiUsage();
+      expect(errors).toEqual([]);
+      expect(ledgerReads).toEqual([
+        { requestType: "pii_redaction" },
+        { requestType: "pii_redaction" },
+      ]);
+      expect(totals).toEqual([expect.objectContaining({ value: 1.1234, events: 1 })]);
     }, 30_000);
 
     /** @scenario "A failed renewal payment is recorded" */

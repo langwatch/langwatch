@@ -113,6 +113,7 @@ def _api_key():
 
 # Lazy loading configuration
 _LAZY_MODULES = {
+    "braids": "langwatch.braids",
     "evaluations": "langwatch.evaluations",
     "experiment": "langwatch.experiment",
     "workflow": "langwatch.workflow",
@@ -262,6 +263,7 @@ __all__ = [
     "evaluation",  # Deprecated, use experiment
     "dataset",
     "evaluations",
+    "braids",
     "langchain",
     "dspy",
     "FetchPolicy",

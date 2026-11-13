@@ -1,5 +1,10 @@
 import { grantConditionSchema } from "@langwatch/authorization";
-import { type AuthzSharedProjectGrant, OffboardIncompleteError } from "@langwatch/authz-contract";
+import {
+  type AuthzSharedProjectGrant,
+  GRANT_SOURCE_BRAID,
+  OffboardIncompleteError,
+  PROJECT_READER_ROLE_KEY,
+} from "@langwatch/authz-contract";
 import { isFullMember } from "@langwatch/entitlement-contract";
 import type { Instant } from "@langwatch/time";
 import { z } from "zod";
@@ -8,10 +13,11 @@ import {
   AuthzLedgerReadRepository,
   type LedgerDirectoryGrantRow,
   type LedgerGrantIdentity,
+  type LedgerBraidRow,
   type LedgerRoleDefinition,
 } from "../authz-ledger-read.repository.ts";
 import type { AuthzReadRepository } from "../authz-read.repository.ts";
-import { sharedProjectReadsOf } from "../eventing/eventing.authz-read.mapper.ts";
+import { NOT_A_BRAID, sharedProjectReadsOf } from "../eventing/eventing.authz-read.mapper.ts";
 import type { GrantRowShape } from "../prisma/prisma.authz-grant.mapper.ts";
 import type { AuthzGrantFilter } from "../prisma/prisma.authz-ledger.mapper.ts";
 import type { AuthzMemoryGrantRow, AuthzMemoryStore } from "./authz-memory.store.ts";
@@ -174,7 +180,7 @@ export class MemoryAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
     organizationId: string;
     readerProjectId: string;
   }): Promise<AuthzSharedProjectGrant[]> {
-    const where = sharedProjectReadsOf({ organizationId, readerProjectId });
+    const where = { ...sharedProjectReadsOf({ organizationId, readerProjectId }), ...NOT_A_BRAID };
     return this.liveGrants()
       .filter((row) => matchesFilter({ row, where }))
       .map((row) => ({
@@ -183,6 +189,45 @@ export class MemoryAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
         condition: grantConditionSchema.safeParse(row.condition).data ?? null,
       }))
       .toSorted((a, b) => a.memberProjectId.localeCompare(b.memberProjectId));
+  }
+
+  async findBraids({
+    organizationId,
+    projectId,
+    grantId,
+    includeRevoked = false,
+  }: {
+    organizationId: string;
+    projectId?: string;
+    grantId?: string;
+    includeRevoked?: boolean;
+  }): Promise<LedgerBraidRow[]> {
+    const replaced = this.memory.replacedGrantIds({ organizationId });
+    return this.memory.grants
+      .filter(
+        (row) =>
+          row.organizationId === organizationId &&
+          row.source === GRANT_SOURCE_BRAID &&
+          row.roleKey === PROJECT_READER_ROLE_KEY &&
+          row.scopeType === "PROJECT" &&
+          (includeRevoked || row.revokedAt === null) &&
+          (grantId === undefined || row.id === grantId) &&
+          (projectId === undefined || row.principalId === projectId || row.scopeId === projectId),
+      )
+      .toSorted((a, b) => msOf(a.occurredAt) - msOf(b.occurredAt))
+      .map((row) => ({
+        grantId: row.id,
+        ownerProjectId: row.scopeId,
+        readerProjectId: row.principalId ?? "",
+        condition: grantConditionSchema.safeParse(row.condition).data ?? null,
+        expiresAt: row.expiresAt,
+        createdByUserId: row.createdByUserId,
+        occurredAt: row.occurredAt,
+        revokedReason: row.revokedReason ?? null,
+        isLive: row.revokedAt === null,
+        replacesGrantId: row.replacesGrantId ?? null,
+        isReplaced: replaced.has(row.id),
+      }));
   }
 
   async findLiveGrantIds({ where }: { where: AuthzGrantFilter }): Promise<string[]> {

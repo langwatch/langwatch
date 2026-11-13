@@ -1,3 +1,5 @@
+import { EvaluationApi } from "@langwatch/evaluation-contract";
+import type { BoundApis } from "@langwatch/process";
 import { TraceCapabilityUnavailableError, type TraceServerConfig } from "@langwatch/trace-contract";
 
 import { S3TraceLegacySpoolChannel } from "../s3/s3.trace-legacy-spool.channel.ts";
@@ -7,12 +9,21 @@ import { HttpTokenCounterChannel } from "./http.token-counter.channel.ts";
 /**
  * Tokenizer files over HTTP. A v1 spool ref predates the stored-object registry and reads back
  * through S3 directly, which no process composes; `resolveOffloadedTraces` swallows the refusal.
+ * Evaluation is bound, not a peer, so evaluation keeps depending on trace (record §5).
  */
 export class HttpTraceChannels {
   static readonly requires = [] as const;
+  static readonly binds = { evaluations: EvaluationApi } as const;
 
-  static create({ config }: { config: TraceServerConfig }): TraceChannels {
+  static create({
+    config,
+    bound,
+  }: {
+    config: TraceServerConfig;
+    bound: BoundApis<typeof HttpTraceChannels.binds>;
+  }): TraceChannels {
     return {
+      evaluations: bound.evaluations,
       tokenizer: HttpTokenCounterChannel.create(config.tokenizer),
       legacySpool: S3TraceLegacySpoolChannel.create({
         resolveS3Client: () =>

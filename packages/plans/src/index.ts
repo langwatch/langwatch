@@ -44,6 +44,8 @@ export {
   planLimitsSchema,
   UNLIMITED,
   UNLIMITED_MESSAGES,
+  UNLIMITED_SEATS,
+  isUncappedSeats,
   type LimitUnit,
   type PlanLimit,
   type PlanLimits,

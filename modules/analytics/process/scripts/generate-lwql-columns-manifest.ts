@@ -17,7 +17,7 @@ import type {
 } from "../src/rules/lwql-columns-manifest.rules.ts";
 
 /** The image the integration harness pins, kept in step by the parity test. */
-const CLICKHOUSE_IMAGE = "clickhouse/clickhouse-server:26.8.34.13";
+const CLICKHOUSE_IMAGE = "clickhouse/clickhouse-server:26.8.36.3";
 const MANIFEST_DATABASE = "lwql_manifest";
 const ADMIN_USER = "manifest";
 const ADMIN_PASSWORD = "manifest";

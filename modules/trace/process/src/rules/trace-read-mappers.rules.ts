@@ -17,7 +17,9 @@ import type {
   Protections,
   ContentPrivacy,
   DerivedTraceEvent,
+  OwnedSpan,
   Span,
+  SpanBraid,
   SpanDetail,
   LegacySpanInputOutput,
   SpanTreeNode,
@@ -37,6 +39,7 @@ import {
   traceTotalTokensOf,
 } from "@langwatch/trace-contract";
 
+import { protectByOwner } from "../features/braid/rules/braided-span-owner.rules.ts";
 import { readTruncatedAttributes } from "./trace-attribute-cap.rules.ts";
 import {
   createAttributeRedactor,
@@ -136,6 +139,7 @@ export function mapLegacySpanSummaryToTreeNode(row: SpanSummaryRow): SpanTreeNod
     cacheReadTokens: row.cacheReadTokens,
     cacheCreationTokens: row.cacheCreationTokens,
     updatedAtMs: row.updatedAtMs,
+    ...(row.ownerProjectId === undefined ? {} : { ownerProjectId: row.ownerProjectId }),
   };
 }
 
@@ -293,6 +297,46 @@ export function buildSpanContentRedactions(
       ? spanProtection.extractRedactionsFromAllSpanOutputs(spans)
       : []),
   ]);
+}
+
+/** Every span's detail under its owner's protections; a braided span carries its `braid`. */
+export function mapSpanDetailsByOwner({
+  spans,
+  protections,
+  owners,
+  braids,
+  ports,
+}: {
+  spans: OwnedSpan[];
+  protections: Protections;
+  owners: ReadonlyMap<string, Protections>;
+  braids: readonly (SpanBraid | null)[];
+  ports: TraceReadMapperMembers;
+}): SpanDetail[] {
+  const details = protectByOwner({
+    items: spans,
+    reader: protections,
+    owners,
+    protect: (group, groupProtections) => mapSpansToDetailDtos(group, groupProtections, ports),
+  });
+  return details.map((detail, index) => {
+    const braid = braids[index];
+    return braid ? { ...detail, braid } : detail;
+  });
+}
+
+/** One project's spans under its protections, hidden content scrubbed wherever it rides along. */
+export function protectSpans({
+  spans,
+  protections,
+  spanProtection,
+}: {
+  spans: Span[];
+  protections: Protections;
+  spanProtection: TraceSpanProtection;
+}): Span[] {
+  const redactions = buildSpanContentRedactions(spans, protections, spanProtection);
+  return spans.map((span) => spanProtection.applySpanProtections(span, protections, redactions));
 }
 
 /**

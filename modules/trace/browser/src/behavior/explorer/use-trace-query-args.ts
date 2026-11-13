@@ -1,5 +1,4 @@
 import { nowInstant } from "@langwatch/time";
-import { useState } from "react";
 
 import { useDrawerProjectId } from "../../features/trace-drawer/behavior/use-drawer-project-id.ts";
 import { isPreviewTraceId } from "../../model/preview-trace-id.ts";
@@ -8,16 +7,24 @@ import { useTraceDrawer } from "../trace-drawer.ts";
 import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
 import { useTraceViewer } from "./context/trace-viewer-context.tsx";
 
-type Opening = { traceId: string | null; occurredAtMs: number | null };
-
-/** The time known when the drawer opened on this trace: a later header back-fill never counts. */
-function useOpeningOccurredAtMs({ traceId, occurredAtMs }: Opening): number | null {
-  const [opening, setOpening] = useState<Opening>({ traceId, occurredAtMs });
-  if (opening.traceId !== traceId) {
-    setOpening({ traceId, occurredAtMs });
-    return occurredAtMs;
-  }
-  return opening.occurredAtMs;
+/**
+ * The time a read may send: the link's own, never one the header filled in later. Held in the
+ * drawer, not per component, so a panel mounted after the fill reads the same keys.
+ */
+function readableOccurredAtMs({
+  traceId,
+  occurredAtMs,
+  backfilled,
+}: {
+  traceId: string | null;
+  occurredAtMs: number | null;
+  backfilled: { traceId: string; occurredAtMs: number } | null;
+}): number | null {
+  const isBackfilled =
+    backfilled !== null &&
+    backfilled.traceId === traceId &&
+    backfilled.occurredAtMs === occurredAtMs;
+  return isBackfilled ? null : occurredAtMs;
 }
 
 /**
@@ -38,7 +45,8 @@ export function useTraceQueryArgs() {
   const tenantId =
     addressedTenantId !== null && addressedTenantId !== projectId ? addressedTenantId : null;
 
-  const readOccurredAtMs = useOpeningOccurredAtMs({ traceId, occurredAtMs });
+  const backfilled = useTraceDrawer((s) => s.backfilledOccurredAt);
+  const readOccurredAtMs = readableOccurredAtMs({ traceId, occurredAtMs, backfilled });
 
   const isLive =
     occurredAtMs !== null && nowInstant().epochMilliseconds - occurredAtMs < LIVE_WINDOW_MS;

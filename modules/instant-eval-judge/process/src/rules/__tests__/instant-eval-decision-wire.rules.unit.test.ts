@@ -64,6 +64,36 @@ describe("decisionRequestBodyOf", () => {
     });
   });
 
+  describe("when the wire is Gemini Decisions", () => {
+    /** @scenario "Gemini Decisions questions are sent keyed by id and read back by id" */
+    it("sends the text as input, each question by id, and the sides as descriptions", () => {
+      const body = decisionRequestBodyOf({
+        wire: "gemini_decisions",
+        providerModel: "gemini-decision-1",
+        text: "hello",
+        questions: QUESTIONS,
+      });
+
+      expect(body).toEqual({
+        model: "gemini-decision-1",
+        input: "hello",
+        questions: {
+          polite: {
+            type: "noul",
+            instructions: "Is it polite?",
+            criteria: { true_description: "kind", false_description: "rude" },
+          },
+          quality: { type: "score", instructions: "Rate it", criteria: ["1", "2", "3"] },
+          topic: {
+            type: "choice",
+            instructions: "Which topic?",
+            criteria: { billing: "Money", other: "Anything else" },
+          },
+        },
+      });
+    });
+  });
+
   describe("when the wire is the Jev body", () => {
     it("sends the state and the questions keyed by id", () => {
       const body = decisionRequestBodyOf({
@@ -140,6 +170,42 @@ describe("parseDecisionResponse", () => {
     });
 
     expect(response?.usage).toEqual({ input_tokens: 42, output_tokens: 7 });
+  });
+
+  /** @scenario "Gemini Decisions questions are sent keyed by id and read back by id" */
+  it("reads Gemini's answers by id, with the input tokens it reports", () => {
+    const response = parseDecisionResponse({
+      wire: "gemini_decisions",
+      body: {
+        answers: {
+          polite: { type: "noul", noul: 0.99, confidence: 0.99 },
+          topic: {
+            type: "choice",
+            choice: "billing",
+            probabilities: { billing: 0.8, other: 0.2 },
+            confidence: 0.8,
+          },
+        },
+        usage: {
+          total_input_tokens: 100,
+          input_tokens_by_modality: [{ modality: "text", tokens: 100 }],
+          total_output_tokens: 0,
+          total_tokens: 100,
+        },
+      },
+    });
+
+    expect(response).toBeDefined();
+    expect(response?.usage).toEqual({ input_tokens: 100, output_tokens: 0 });
+    expect(
+      readClassifierVerdicts({
+        questions: QUESTIONS.filter((question) => question.id !== "quality"),
+        response: response!,
+      }),
+    ).toEqual([
+      { questionId: "polite", probability: 0.99 },
+      { questionId: "topic", label: "billing", probabilities: { billing: 0.8, other: 0.2 } },
+    ]);
   });
 
   it("drops a refused question and keeps the rest", () => {

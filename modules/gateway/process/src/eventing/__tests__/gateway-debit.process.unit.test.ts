@@ -327,3 +327,41 @@ describe("transient process message keys", () => {
     });
   });
 });
+
+describe("given a PII redaction outcome that states its own attribution", () => {
+  const piiOutcome = (requestType: string) =>
+    outcomeData({
+      organization_id: "org_1",
+      team_id: "team_1",
+      request_type: requestType,
+      model: "pii-redaction-model",
+      model_provider_id: "",
+      usage: usage(),
+      cost_nano_usd: 500_000,
+    });
+
+  /** @scenario "A pii_redaction outcome debits no budget" */
+  it("debits no budget", () => {
+    const def = definition();
+
+    const result = evolve(
+      def,
+      def.initialState,
+      processEvent(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE, piiOutcome("pii_redaction")),
+    );
+
+    expect(result.intents).toEqual([]);
+  });
+
+  it("still debits the same outcome under another request type", () => {
+    const def = definition();
+
+    const result = evolve(
+      def,
+      def.initialState,
+      processEvent(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE, piiOutcome("instant_eval")),
+    );
+
+    expect(result.intents).toHaveLength(1);
+  });
+});

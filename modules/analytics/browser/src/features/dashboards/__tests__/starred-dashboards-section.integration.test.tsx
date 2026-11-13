@@ -57,6 +57,9 @@ function renderSection({
     if (call.path === "boards.create") {
       return gate.then(() => ({ ...LATENCY, id: "board-new" }));
     }
+    if (call.path === "boards.unstar" || call.path === "boards.delete") {
+      return Promise.resolve({ success: true });
+    }
     if (call.path === "boards.star") {
       return pinFails ? Promise.reject(new Error("pin down")) : Promise.resolve({ success: true });
     }
@@ -102,6 +105,94 @@ describe("the LLM Ops sidebar's Dashboards section", () => {
       );
       await user.click(group.getByRole("link", { name: "Latency" }));
       expect(host.navigations).toEqual(["/test-project/dashboards/board-1"]);
+    });
+  });
+
+  describe("given the member opens a pinned board's \u22ee menu", () => {
+    /** @scenario "A pinned dashboard in the LLM Ops sidebar has the same menu as in Dashboards" */
+    it("offers Unpin, Rename, Duplicate and Delete, and Delete asks first then deletes it", async () => {
+      const user = userEvent.setup();
+      const { calls } = renderSection({ stars: [{ kind: "board", dashboard: LATENCY }] });
+
+      await user.click(
+        await (await section()).findByRole("button", { name: "Actions for Latency" }),
+      );
+      for (const name of ["Unpin", "Rename", "Duplicate", "Delete"]) {
+        expect(await screen.findByRole("menuitem", { name })).toBeInTheDocument();
+      }
+      await user.click(screen.getByRole("menuitem", { name: "Delete" }));
+      expect(inputsTo(calls, "boards.delete")).toEqual([]);
+      fireEvent.click(
+        within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Delete" }),
+      );
+
+      await waitFor(() =>
+        expect(inputsTo(calls, "boards.delete")).toEqual([
+          { projectId: "proj-1", dashboardId: "board-1" },
+        ]),
+      );
+    });
+
+    /** @scenario "A pinned dashboard in the LLM Ops sidebar has the same menu as in Dashboards" */
+    it("offers only Unpin on a From LangWatch board", async () => {
+      const user = userEvent.setup();
+      renderSection({ stars: [{ kind: "template", templateId: "release" }] });
+      const release = CURATED_BOARDS.find(({ templateId }) => templateId === "release")!;
+
+      await user.click(
+        await (await section()).findByRole("button", { name: `Actions for ${release.name}` }),
+      );
+
+      expect(await screen.findByRole("menuitem", { name: "Unpin" })).toBeInTheDocument();
+      expect(screen.queryByRole("menuitem", { name: "Delete" })).toBeNull();
+      expect(screen.queryByRole("menuitem", { name: "Rename" })).toBeNull();
+    });
+
+    /** @scenario "A pinned dashboard in the LLM Ops sidebar has the same menu as in Dashboards" */
+    it("unpins a stored board through boards.unstar", async () => {
+      const user = userEvent.setup();
+      const { calls } = renderSection({ stars: [{ kind: "board", dashboard: LATENCY }] });
+
+      await user.click(
+        await (await section()).findByRole("button", { name: "Actions for Latency" }),
+      );
+      await user.click(await screen.findByRole("menuitem", { name: "Unpin" }));
+
+      await waitFor(() =>
+        expect(inputsTo(calls, "boards.unstar")).toEqual([
+          { projectId: "proj-1", star: { kind: "board", dashboardId: "board-1" } },
+        ]),
+      );
+    });
+
+    /** @scenario "A pinned dashboard in the LLM Ops sidebar has the same menu as in Dashboards" */
+    it("offers only Unpin on a stored board the member may only read", async () => {
+      const user = userEvent.setup();
+      renderSection({ stars: [{ kind: "board", dashboard: LATENCY }], permissions: VIEWER });
+
+      await user.click(
+        await (await section()).findByRole("button", { name: "Actions for Latency" }),
+      );
+
+      expect(await screen.findByRole("menuitem", { name: "Unpin" })).toBeInTheDocument();
+      expect(screen.queryByRole("menuitem", { name: "Rename" })).toBeNull();
+      expect(screen.queryByRole("menuitem", { name: "Delete" })).toBeNull();
+    });
+
+    /** @scenario "A pinned dashboard in the LLM Ops sidebar has the same menu as in Dashboards" */
+    it("does not offer Delete on My dashboard", async () => {
+      const user = userEvent.setup();
+      const mine = { ...LATENCY, id: "mine", name: "My dashboard" };
+      renderSection({ stars: [{ kind: "board", dashboard: mine }] });
+
+      await user.click(
+        await (await section()).findByRole("button", { name: "Actions for My dashboard" }),
+      );
+
+      expect(await screen.findByRole("menuitem", { name: "Delete" })).toHaveAttribute(
+        "aria-disabled",
+        "true",
+      );
     });
   });
 

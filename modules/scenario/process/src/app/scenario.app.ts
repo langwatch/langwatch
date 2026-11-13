@@ -25,6 +25,7 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
 import {
   DEFAULT_SET_ID,
+  ScenarioEventType,
   type RunConfigurationEntryResponse,
   startScenarioTabPresence,
   ScenarioApi,
@@ -166,6 +167,7 @@ import { VoiceNonceRegistryService } from "../features/voice/services/voice-nonc
 import { VoicePublicUrlService } from "../features/voice/services/voice-public-url.service.ts";
 import { VoiceSessionService } from "../features/voice/services/voice-session.service.ts";
 import type { ScenarioRepositories } from "../repositories/scenario.repositories.ts";
+import { isCountedScenarioSet } from "../rules/scenario-set-cap.rules.ts";
 import { AgentTestService } from "../services/agent-test.service.ts";
 import { ConnectedTargetService } from "../services/connected-target.service.ts";
 import { HttpAgentTestService } from "../services/http-agent-test.service.ts";
@@ -546,6 +548,12 @@ export class ScenarioModule implements ScenarioApi {
   async reportScenarioEvent(input: ScenarioEventReportInput): Promise<ScenarioEventReportResult> {
     const reported = await this.#dependencies.events.report(input);
     if (reported.scenarioSetId === null) return { success: true };
+    if (input.event.type === ScenarioEventType.RUN_STARTED) {
+      this.reportSimulationSetCreated({
+        projectId: input.projectId,
+        scenarioSetId: reported.scenarioSetId,
+      });
+    }
 
     return {
       success: true,
@@ -745,6 +753,32 @@ export class ScenarioModule implements ScenarioApi {
       })
       .catch((error: unknown) => {
         lifecycleLogger.error({ error, projectId }, "failed to record a created scenario");
+      });
+  }
+
+  /**
+   * Records that the project ran the set, once per project and set (the event's idempotency key),
+   * without making the run wait for it. Platform-owned sets are left out, as the plan's cap does.
+   */
+  private reportSimulationSetCreated(
+    input: Readonly<{ projectId: string; scenarioSetId: string }>,
+  ): void {
+    const { projectId, scenarioSetId } = input;
+    if (!isCountedScenarioSet(scenarioSetId)) return;
+    Promise.resolve()
+      .then(() => {
+        if (!this.#lifecycleCommands) {
+          throw new Error("scenario_lifecycle pipeline senders are not connected yet");
+        }
+        return this.#lifecycleCommands.recordSimulationSetCreated.send({
+          tenantId: projectId,
+          occurredAt: nowInstant().epochMilliseconds,
+          scenarioSetId,
+          projectId,
+        });
+      })
+      .catch((error: unknown) => {
+        lifecycleLogger.error({ error, projectId }, "failed to record a created simulation set");
       });
   }
 

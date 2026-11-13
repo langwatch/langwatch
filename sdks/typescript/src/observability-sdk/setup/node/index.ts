@@ -5,3 +5,4 @@
 
 export { setupObservability, ensureSetup } from "./setup";
 export type { SetupObservabilityOptions, ObservabilityHandle } from "./types";
+export { computeBraidSignature, signBaggage, withSignedBaggage } from "../../braids/sign-baggage";

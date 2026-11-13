@@ -4,15 +4,17 @@ The browser half of [authz](../README.md). What a browser installs when it insta
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-Declared in `src/authz.web.ts:12` (`defineBrowserModule("authz")`), exported as `authzWeb` at `./declaration`.
+Declared in `src/authz.web.ts:13` (`defineBrowserModule("authz")`), exported as `authzWeb` at `./declaration`.
 
 Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
 ## Screens
 
-| Page key               | URL               | Within   | Label          | Permission     | Flags |
-| ---------------------- | ----------------- | -------- | -------------- | -------------- | ----- |
-| `pages/settings/roles` | `/settings/roles` | settings | Roles & access | `members:view` | –     |
+| Page key                             | URL                             | Within   | Label          | Permission            | Flags |
+| ------------------------------------ | ------------------------------- | -------- | -------------- | --------------------- | ----- |
+| `pages/settings/roles`               | `/settings/roles`               | settings | Roles & access | `members:view`        | –     |
+| `pages/settings/braids`              | `/settings/braids`              | settings | Braids         | `project:view`        | –     |
+| `pages/settings/organization-braids` | `/settings/organization-braids` | settings | Braids         | `organization:manage` | –     |
 
 A URL marked (route table) is joined from `apps/ui/src/shell/ui-route-table.ts`; the screen declares no `path`.
 
@@ -28,6 +30,7 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 ## Calls
 
 - `withApi(authzApi)`, tRPC contracts: –.
+- Client packages (package.json): `@langwatch/api-key-client`, `@langwatch/trace-client`.
 - Host APIs it requires: `AuthzHostApi`.
 - Config slices: `authz`.
 
