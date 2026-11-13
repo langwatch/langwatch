@@ -52,6 +52,13 @@ function plain(schema: Schema): Schema {
   const union = merged.anyOf ?? merged.oneOf;
   if (!union) return merged;
   const kept = union.filter((branch) => branch.type !== "null");
+  const scalarOnly = kept.every(
+    (branch) => typeof branch.type === "string" && Object.keys(branch).length <= 2,
+  );
+  if (kept.length > 1 && scalarOnly) {
+    const { anyOf: _any, oneOf: _one, ...rest } = merged;
+    return { ...rest, type: kept.map((branch) => String(branch.type)) };
+  }
   if (kept.length !== 1 || !kept[0]) return merged;
   const { anyOf: _any, oneOf: _one, ...rest } = merged;
   return plain({ ...rest, ...kept[0], description: merged.description ?? kept[0].description });
@@ -73,9 +80,9 @@ export function dateKindOf({
   if (types.includes("string") && schema.format === "date-time") return "date-time";
   if (types.includes("string") && schema.format === "date") return "date";
   if (types.length === 1 && types[0] === "string" && ISO_DATE.test(description)) return "date-time";
-  const numeric =
-    types.length > 0 && types.every((type) => type === "number" || type === "integer");
-  if (numeric && EPOCH_MS.test(description)) return "epoch-ms";
+  const numeric = types.some((type) => type === "number" || type === "integer");
+  const numericOrText = types.every((type) => ["number", "integer", "string"].includes(type));
+  if (numeric && numericOrText && EPOCH_MS.test(description)) return "epoch-ms";
   return null;
 }
 
@@ -215,10 +222,13 @@ export function paramFieldOf({
   name,
   schema,
   required,
+  description,
 }: {
   name: string;
   schema: Schema;
   required: boolean;
+  description?: string;
 }): FormField {
-  return fieldOf({ name, schema, path: [name], required });
+  const described = schema.description || !description ? schema : { ...schema, description };
+  return fieldOf({ name, schema: described, path: [name], required });
 }

@@ -168,7 +168,12 @@ export function paramText({ param, raw }: { param: Parameter; raw: string }): {
   text: string;
   error?: string;
 } {
-  const field = paramFieldOf({ name: param.name, schema: param.schema, required: param.required });
+  const field = paramFieldOf({
+    name: param.name,
+    schema: param.schema,
+    required: param.required,
+    description: param.description,
+  });
   if (!isScalar(field) || !["date-time", "epoch-ms", "integer", "number"].includes(field.kind))
     return { text: raw };
   const { value, error } = scalarValue({ field, raw });

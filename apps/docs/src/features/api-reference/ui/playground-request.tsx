@@ -35,7 +35,12 @@ function ParamInput({
   onChange: (value: string) => void;
 }) {
   const id = `pg-${param.in}-${param.name}`;
-  const field = paramFieldOf({ name: param.name, schema: param.schema, required: param.required });
+  const field = paramFieldOf({
+    name: param.name,
+    schema: param.schema,
+    required: param.required,
+    description: param.description,
+  });
   const scalar: ScalarField = isScalar(field)
     ? field
     : { ...field, kind: "text", options: [], numeric: false };
