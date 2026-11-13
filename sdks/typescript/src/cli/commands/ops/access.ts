@@ -1,5 +1,6 @@
 import chalk from "chalk";
 
+import { isLangWatchHandledError } from "../../../internal/api/errors";
 import { getEndpoint } from "../../utils/endpoint";
 import { commandValidationError } from "../../utils/errorOutput";
 import {
@@ -147,15 +148,33 @@ export const waitForDecision = async ({
 }): Promise<string> => {
   const deadline = Date.parse(expiresAt);
   for (;;) {
-    const current = await staffAccessFetch<RequestStatus>({
+    const current = await pollStatus({ requestId, endpoint, requesterKey });
+    if (current && current.status !== "pending") return current.status;
+    if (Number.isFinite(deadline) && Date.now() >= deadline) return "expired";
+    await sleep(OPS_POLL_INTERVAL_MS);
+  }
+};
+
+/** One status read; a failed read the platform did not refuse by name answers undefined. */
+const pollStatus = async ({
+  requestId,
+  endpoint,
+  requesterKey,
+}: {
+  requestId: string;
+  endpoint: string;
+  requesterKey: string;
+}): Promise<RequestStatus | undefined> => {
+  try {
+    return await staffAccessFetch<RequestStatus>({
       method: "GET",
       path: `/api/staff-access/requests/${encodeURIComponent(requestId)}`,
       bearer: requesterKey,
       endpoint,
     });
-    if (current.status !== "pending") return current.status;
-    if (Number.isFinite(deadline) && Date.now() >= deadline) return "expired";
-    await sleep(OPS_POLL_INTERVAL_MS);
+  } catch (error) {
+    if (isLangWatchHandledError(error) && error.httpStatus < 500) throw error;
+    return undefined;
   }
 };
 

@@ -11,6 +11,12 @@ Feature: Ops agent access from the CLI
     And no ".env" file is written
 
   @integration
+  Scenario: The CLI keeps waiting through a status read the server failed to answer
+    Given a pending access request
+    When one status read fails with a server error while the approver decides
+    Then the CLI keeps waiting and redeems the key once approved
+
+  @integration
   Scenario: Normal commands use a live ops session
     Given a live ops session file
     When the agent runs "langwatch trace search"
