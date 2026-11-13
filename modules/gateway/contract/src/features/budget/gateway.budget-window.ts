@@ -178,9 +178,9 @@ export class GatewayWindow {
   }
 
   /**
-   * Start of the calendar period containing `now`, on the wall clock of `timezone`. Day, week
-   * (ISO, Monday) and month boundaries are local midnights, so a DST change gives a 23 or 25
-   * hour day instead of shifting the boundary.
+   * Start of the calendar period containing `now`. Day, week (ISO, Monday) and month start at
+   * local midnight in `timezone`, so DST gives a 23 or 25 hour day; minute and hour stay on UTC,
+   * since a half-hour offset zone would start its hour at :30 and miss the UTC rollup.
    */
   static calendarPeriodStart({
     window,
@@ -191,8 +191,9 @@ export class GatewayWindow {
     now?: Instant;
     timezone?: string | null;
   }): Instant {
+    const zone = window === "MINUTE" || window === "HOUR" ? UTC : resolveBudgetTimeZone(timezone);
     const clock = now
-      .toZonedDateTimeISO(resolveBudgetTimeZone(timezone))
+      .toZonedDateTimeISO(zone)
       .with({ millisecond: 0, microsecond: 0, nanosecond: 0 });
     switch (window) {
       case "MINUTE":

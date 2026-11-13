@@ -101,6 +101,25 @@ describe("budget windows in the budget's timezone", () => {
     ).toEqual({ start: "2026-10-31T23:00:00.000Z", end: "2026-11-30T23:00:00.000Z" });
   });
 
+  /** @scenario "Minute and hour windows roll on UTC whatever the budget's timezone" */
+  it("rolls an hour budget in a half-hour offset zone on the UTC hour", () => {
+    const now = "2026-07-15T10:45:00Z";
+    expect(period({ window: "HOUR", timezone: "Asia/Kolkata", now })).toEqual({
+      start: "2026-07-15T10:00:00.000Z",
+      end: "2026-07-15T11:00:00.000Z",
+    });
+    expect(period({ window: "MINUTE", timezone: "Asia/Kolkata", now })).toEqual({
+      start: "2026-07-15T10:45:00.000Z",
+      end: "2026-07-15T10:46:00.000Z",
+    });
+    expect(
+      computeBudgetPeriodFloorMs(
+        calendarBudget({ window: "HOUR", timezone: "Australia/Adelaide" }),
+        at(now),
+      ),
+    ).toBeUndefined();
+  });
+
   /** @scenario "A budget with no usable timezone rolls on UTC" */
   it("falls back to UTC for an empty, missing or unknown zone and keeps the rollup path", () => {
     const now = at("2026-07-15T21:30:00Z");

@@ -588,6 +588,13 @@ Feature: AI Gateway — Budgets
     And a "week" or "month" period spanning the change still starts and ends at local midnight
 
   @unit
+  Scenario: Minute and hour windows roll on UTC whatever the budget's timezone
+    Given a budget with window "hour" and timezone "Asia/Kolkata"
+    When the clock reads 2026-07-15T10:45Z
+    Then its current period started at 2026-07-15T10:00Z, not 10:30Z
+    And its spend is still served from the calendar rollup
+
+  @unit
   Scenario: A budget with no usable timezone rolls on UTC
     Given a budget whose timezone is empty, missing or not a known IANA zone
     Then its windows roll at 00:00 UTC exactly as before
