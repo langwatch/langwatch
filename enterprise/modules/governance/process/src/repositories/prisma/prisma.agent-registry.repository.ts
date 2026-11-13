@@ -182,7 +182,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`agent-registry:${organizationId
     const rows = await this.prisma.agentRegistryEntry.findMany({
       where: { organizationId, ...(status ? { status } : {}) },
       select: { entry: true },
-      orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
       take: limit,
     });
     return rows.map((row) => entryOf(row.entry));

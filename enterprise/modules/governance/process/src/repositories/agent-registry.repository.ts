@@ -27,7 +27,7 @@ export abstract class AgentRegistryRepository {
   }): Promise<AgentRegistryEvent[]>;
   /** Organisations holding any entry, in id order after `after`; the traffic pass walks them. */
   abstract findOrganizationIds(input: { after?: string; limit: number }): Promise<string[]>;
-  /** At most `limit` entries, oldest update first. */
+  /** At most `limit` entries, latest update first. */
   abstract findEntries(input: {
     organizationId: string;
     status?: AgentRegistryStatus;

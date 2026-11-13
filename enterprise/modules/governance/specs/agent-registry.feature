@@ -265,6 +265,12 @@ Feature: Agent registry with ARD discovery and change events
     When the ARD manifest is built
     Then only the active entry is listed
 
+  @integration
+  Scenario: The ARD manifest past its cap lists the agents changed most recently
+    Given an organisation with more active agents than the ARD read takes
+    When the ARD manifest is read
+    Then it lists the active agents changed most recently
+
   @unit
   Scenario: ARD search ranks entries by the query text and applies filters
     Given entries "Billing assistant" and "Support bot"

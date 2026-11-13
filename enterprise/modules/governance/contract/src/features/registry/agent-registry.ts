@@ -131,7 +131,7 @@ export const agentRegistryEventSchema: AgentRegistryEventSchema =
 export type AgentRegistryEvent = z.infer<typeof agentRegistryEventSchema>;
 
 export const AGENT_REGISTRY_PAGE_LIMIT_MAX = 200;
-/** The most active agents the ARD manifest and search read, oldest update first. */
+/** The most active agents the ARD manifest and search read, latest change first. */
 export const AGENT_REGISTRY_ARD_ENTRY_LIMIT = 1000;
 
 const agentRegistryListQuerySchemaDefinition = z.object({

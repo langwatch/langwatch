@@ -137,7 +137,7 @@ export const agentRegistryRest = defineRestRouter(GovernanceRestApi)
     summary: "Get the registry as an ARD manifest",
     tags: TAGS,
     description:
-      "The organisation's active agents, up to 1,000 in order of last change, as an Agentic Resource Discovery (ARD v0.91) manifest. Each entry has a `urn:air:<host>:<organization id>:agent:<id>` identifier, type `application/agent-card+json` and the registry entry inline as `data`.",
+      "The organisation's active agents, the 1,000 changed most recently, as an Agentic Resource Discovery (ARD v0.91) manifest. Each entry has a `urn:air:<host>:<organization id>:agent:<id>` identifier, type `application/agent-card+json` and the registry entry inline as `data`.",
     responses: { ...baseResponses },
   })
   .handle(({ app, scope }) => app.getRegistryArdManifest({ organizationId: scope.id }))
@@ -153,7 +153,7 @@ export const agentRegistryRest = defineRestRouter(GovernanceRestApi)
     summary: "Search the registry (ARD search)",
     tags: TAGS,
     description:
-      "ARD `POST /search`: `query.text` is matched against names, capabilities, descriptions, instructions and tools; `query.filter` keys are term paths (`tags`, `capabilities`, `data.source`, `data.shadow`), values within a key are OR-ed and keys AND-ed. Results carry a 0 to 100 relevance `score`. Federation is not performed.",
+      "ARD `POST /search`: `query.text` is matched against names, capabilities, descriptions, instructions and tools; `query.filter` keys are term paths (`tags`, `capabilities`, `data.source`, `data.shadow`), values within a key are OR-ed and keys AND-ed. Results carry a 0 to 100 relevance `score`. Searches the 1,000 active agents changed most recently. Federation is not performed.",
     responses: { ...baseResponses },
   })
   .handle(({ app, input, scope }) =>

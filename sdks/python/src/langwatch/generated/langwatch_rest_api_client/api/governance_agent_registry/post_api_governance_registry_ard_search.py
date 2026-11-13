@@ -109,7 +109,7 @@ def sync_detailed(
      ARD `POST /search`: `query.text` is matched against names, capabilities, descriptions, instructions
     and tools; `query.filter` keys are term paths (`tags`, `capabilities`, `data.source`,
     `data.shadow`), values within a key are OR-ed and keys AND-ed. Results carry a 0 to 100 relevance
-    `score`. Federation is not performed.
+    `score`. Searches the 1,000 active agents changed most recently. Federation is not performed.
 
     Args:
         body (PostApiGovernanceRegistryArdSearchBody):
@@ -150,7 +150,7 @@ def sync(
      ARD `POST /search`: `query.text` is matched against names, capabilities, descriptions, instructions
     and tools; `query.filter` keys are term paths (`tags`, `capabilities`, `data.source`,
     `data.shadow`), values within a key are OR-ed and keys AND-ed. Results carry a 0 to 100 relevance
-    `score`. Federation is not performed.
+    `score`. Searches the 1,000 active agents changed most recently. Federation is not performed.
 
     Args:
         body (PostApiGovernanceRegistryArdSearchBody):
@@ -185,7 +185,7 @@ async def asyncio_detailed(
      ARD `POST /search`: `query.text` is matched against names, capabilities, descriptions, instructions
     and tools; `query.filter` keys are term paths (`tags`, `capabilities`, `data.source`,
     `data.shadow`), values within a key are OR-ed and keys AND-ed. Results carry a 0 to 100 relevance
-    `score`. Federation is not performed.
+    `score`. Searches the 1,000 active agents changed most recently. Federation is not performed.
 
     Args:
         body (PostApiGovernanceRegistryArdSearchBody):
@@ -224,7 +224,7 @@ async def asyncio(
      ARD `POST /search`: `query.text` is matched against names, capabilities, descriptions, instructions
     and tools; `query.filter` keys are term paths (`tags`, `capabilities`, `data.source`,
     `data.shadow`), values within a key are OR-ed and keys AND-ed. Results carry a 0 to 100 relevance
-    `score`. Federation is not performed.
+    `score`. Searches the 1,000 active agents changed most recently. Federation is not performed.
 
     Args:
         body (PostApiGovernanceRegistryArdSearchBody):

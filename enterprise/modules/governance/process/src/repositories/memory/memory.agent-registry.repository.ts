@@ -98,7 +98,7 @@ export class MemoryAgentRegistryRepository extends AgentRegistryRepository {
   }): Promise<AgentRegistryEntry[]> {
     return this.entriesOf(organizationId)
       .filter((entry) => !status || entry.status === status)
-      .toSorted(byPosition)
+      .toSorted((a, b) => byPosition(b, a))
       .slice(0, limit);
   }
 

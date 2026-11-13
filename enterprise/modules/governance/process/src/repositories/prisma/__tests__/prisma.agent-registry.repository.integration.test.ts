@@ -83,8 +83,8 @@ describe.skipIf(!connection)("PrismaAgentRegistryRepository", () => {
 
       const entries = await repository().findEntries({ organizationId: ORG, limit: 100 });
       expect(entries.map((entry) => [entry.name, entry.status, entry.version])).toEqual([
-        ["alpha", "active", 2],
         ["beta", "removed", 2],
+        ["alpha", "active", 2],
       ]);
 
       const events = await repository().findEventsAfter({ organizationId: ORG, limit: 10 });
@@ -145,6 +145,25 @@ describe.skipIf(!connection)("PrismaAgentRegistryRepository", () => {
         limit: 1000,
       });
       expect(organizations).toContain(ORG);
+    });
+  });
+
+  describe("given more active entries than the ARD read takes", () => {
+    /** @scenario The ARD manifest past its cap lists the agents changed most recently */
+    it("answers the most recently changed active entries", async () => {
+      await reconcile([draft("alpha"), draft("gamma")], "2026-11-12T00:00:00Z");
+      await reconcile(
+        [draft("alpha"), { ...draft("gamma"), description: "changed" }],
+        "2026-11-13T00:00:00Z",
+      );
+
+      const entries = await repository().findEntries({
+        organizationId: ORG,
+        status: "active",
+        limit: 1,
+      });
+
+      expect(entries.map((entry) => entry.name)).toEqual(["gamma"]);
     });
   });
 });

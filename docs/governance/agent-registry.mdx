@@ -158,7 +158,7 @@ Each event is delivered in the standard webhook envelope, with the event above a
 
 ## ARD v0.91
 
-`GET /api/governance/registry/ard.json` returns the active entries as an ARD manifest, up to 1,000 entries in order of last change, oldest first. Use the REST list to read a larger registry in full:
+`GET /api/governance/registry/ard.json` returns the active entries as an ARD manifest: the 1,000 changed most recently, newest first. ARD search reads the same 1,000. Use the REST list to read a larger registry in full:
 
 ```json
 {
