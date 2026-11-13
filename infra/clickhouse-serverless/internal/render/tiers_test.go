@@ -198,6 +198,43 @@ func TestRenderAll_TierConstraintsFollowThePolicy(t *testing.T) {
 	}
 }
 
+// @scenario "A cap looser than its tier is refused, naming the user"
+func TestRenderAll_UserCapsAreCheckedAgainstTheRenderedTier(t *testing.T) {
+	withCap := func(t *testing.T, caps string) *config.Input {
+		input := testInput()
+		input.AccessFile = writeAccessFixture(t)
+		input.AccessListen = "127.0.0.1:8124"
+		input.ReadTierMaxExecutionTime = 120
+		raw, err := os.ReadFile(input.AccessFile)
+		if err != nil {
+			t.Fatal(err)
+		}
+		capped := strings.Replace(string(raw), "login: {rolling:", "caps: "+caps+", login: {rolling:", 1)
+		if err := os.WriteFile(input.AccessFile, []byte(capped), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return input
+	}
+
+	t.Run("a cap above the tier stops the server starting", func(t *testing.T) {
+		input := withCap(t, "{max_execution_time: 121}")
+		err := render.RenderAll(testLogger(), input, config.ComputeFromResources(input.CPU, input.RAMBytes, input), t.TempDir())
+		if err == nil || !strings.Contains(err.Error(), `users "dashboards": caps.max_execution_time = 121 is above the limit of 120 in profile tier_read`) {
+			t.Errorf("RenderAll = %v, want the cap refused naming the user, setting and limit", err)
+		}
+	})
+
+	t.Run("a cap within the tier renders as the user's own constraint", func(t *testing.T) {
+		dir := t.TempDir()
+		renderInto(t, withCap(t, "{max_execution_time: 60}"), dir)
+		profile := section(t, section(t, readYAML(t, dir, "users.d/access-users.yaml"), "profiles"), "access_dashboards")
+		assertValue(t, "access_dashboards", profile, "max_execution_time", 60)
+		constraint := section(t, section(t, profile, "constraints"), "max_execution_time")
+		assertValue(t, "access_dashboards", constraint, "max", 60)
+		assertValue(t, "access_dashboards", constraint, "min", 1)
+	})
+}
+
 // @scenario "A user whose own settings break a rendered cap or pin is left out"
 func TestRenderAll_ConstraintsThePlanChecksAreTheRenderedOnes(t *testing.T) {
 	dir := t.TempDir()

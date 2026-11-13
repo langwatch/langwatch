@@ -177,8 +177,10 @@ Issuer keys: `name`, `url`, `audience`, `username_claim`, `required_claims`,
 `jwks_url` (skip discovery), `ca_file` (a private CA), `allow_admin` (token users
 of this issuer may hold `tier_admin`). User keys: `name`, `tier`, `databases`
 (read and write only), `networks`, `login` with exactly one of `rolling` or
-`token`, and optionally `settings`, `quota` (`duration_seconds`, `limits`) and
-`grants` (extra read grants). A top-level `policy` block adds to or replaces the
+`token`, and optionally `settings`, `quota` (`duration_seconds`, `limits`),
+`grants` (extra read grants) and `caps` (maxima the user cannot raise, such as
+`{max_execution_time: 30, max_rows_to_read: 1000000}`; a cap above its tier's
+limit refuses the file). A top-level `policy` block adds to or replaces the
 rules those are checked against (`grant_privileges`, `quota_limits`,
 `protected_settings`, `restricted_databases`), each with `add` or `replace`.
 

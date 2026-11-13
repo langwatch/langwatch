@@ -43,6 +43,7 @@ const subscriptionRecord = (
   endDate: null,
   maxMembers: null,
   maxMembersLite: null,
+  maxMembersDeveloper: null,
   maxMessagesPerMonth: null,
   lastPaymentFailedDate: null,
   seatsKept: null,

@@ -115,7 +115,7 @@ export const SLOWEST_OPERATIONS_SQL = `SELECT SpanName AS operation,
   sum(DurationMs) AS total_ms,
   quantileExact(0.95)(DurationMs) AS p95_ms,
   count() AS spans
-FROM spans
+FROM span_metrics
 WHERE ${inPeriod("StartTime")}
 GROUP BY operation
 ORDER BY total_ms DESC

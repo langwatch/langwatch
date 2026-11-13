@@ -121,6 +121,7 @@ import type {
   PersonalWorkspaceFeaturesInput,
 } from "./personal-workspace.ts";
 import type { ScopeGraphOrganization } from "./scope-graph.ts";
+import type { OrganizationSeatPeak } from "./seat-peak.ts";
 
 export interface OrganizationCaller {
   readonly id: string;
@@ -853,6 +854,11 @@ export interface OrganizationApi {
   findSeatOccupantsSince(
     input: Readonly<{ organizationId: string; since: number }>,
   ): Promise<OrganizationSeatOccupants>;
+  /**
+   * The most full and Lite Member seats held at once in each month, beside the plan's caps
+   * (ADR-002). For our own team on the ops console; `counted: false` until counting opened.
+   */
+  getSeatPeak(input: Readonly<{ organizationId: string }>): Promise<OrganizationSeatPeak>;
   /** Whether one more of a limited resource fits the organization's plan, for this caller. */
   checkLimit(
     input: Readonly<{ organizationId: string; limitType: LimitType }>,

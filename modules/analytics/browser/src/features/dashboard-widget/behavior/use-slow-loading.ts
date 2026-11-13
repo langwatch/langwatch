@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react";
 
-/** How long a widget loads before its skeleton says "Still loading…". */
+/** How long a widget loads before its skeleton says "Slow query, still running…". */
 export const SLOW_WIDGET_LOADING_MS = 5_000;
 
 export function useSlowLoading({ isLoading }: { isLoading: boolean }): boolean {

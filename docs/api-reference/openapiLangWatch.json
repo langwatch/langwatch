@@ -17092,7 +17092,9 @@
                                           "subscription:manage",
                                           "seatRequests:view",
                                           "seatRequests:manage",
-                                          "members:view"
+                                          "members:view",
+                                          "braids:manage",
+                                          "spans:braided"
                                         ]
                                       }
                                     ]
@@ -17320,7 +17322,9 @@
                                     "subscription:manage",
                                     "seatRequests:view",
                                     "seatRequests:manage",
-                                    "members:view"
+                                    "members:view",
+                                    "braids:manage",
+                                    "spans:braided"
                                   ]
                                 }
                               ]
@@ -17948,7 +17952,9 @@
                                                   "subscription:manage",
                                                   "seatRequests:view",
                                                   "seatRequests:manage",
-                                                  "members:view"
+                                                  "members:view",
+                                                  "braids:manage",
+                                                  "spans:braided"
                                                 ]
                                               }
                                             ]
@@ -18176,7 +18182,9 @@
                                             "subscription:manage",
                                             "seatRequests:view",
                                             "seatRequests:manage",
-                                            "members:view"
+                                            "members:view",
+                                            "braids:manage",
+                                            "spans:braided"
                                           ]
                                         }
                                       ]
@@ -18625,7 +18633,9 @@
                                         "subscription:manage",
                                         "seatRequests:view",
                                         "seatRequests:manage",
-                                        "members:view"
+                                        "members:view",
+                                        "braids:manage",
+                                        "spans:braided"
                                       ]
                                     }
                                   ]
@@ -52224,7 +52234,7 @@
             }
           }
         },
-        "description": "Create a new evaluator",
+        "description": "Create a new evaluator: a built-in one, a custom code evaluator (`type: \"code\"`) or one that wraps a workflow (`type: \"workflow\"`)",
         "security": [
           {
             "project_api_key": []
@@ -52251,12 +52261,28 @@
                     "minLength": 1,
                     "maxLength": 255
                   },
+                  "type": {
+                    "default": "evaluator",
+                    "description": "The kind of evaluator. \"evaluator\" (the default) is a built-in type named by config.evaluatorType; \"code\" is a custom Python evaluator whose config carries code and inputs; \"workflow\" wraps the workflow named by workflowId.",
+                    "type": "string",
+                    "enum": [
+                      "evaluator",
+                      "code",
+                      "workflow"
+                    ]
+                  },
                   "config": {
                     "type": "object",
                     "propertyNames": {
                       "type": "string"
                     },
-                    "additionalProperties": {}
+                    "additionalProperties": {},
+                    "description": "For a built-in evaluator: { evaluatorType, settings }. For a code evaluator: { code, inputs: [{ identifier, type }] }; outputs are the fixed passed, score, label and details. For a workflow evaluator: {}."
+                  },
+                  "workflowId": {
+                    "description": "The workflow a \"workflow\" evaluator wraps. Only for type \"workflow\".",
+                    "type": "string",
+                    "minLength": 1
                   }
                 },
                 "required": [

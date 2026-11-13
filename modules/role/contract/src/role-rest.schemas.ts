@@ -3,19 +3,29 @@
  * no kind, and writes bound to the permission cross product `GET /permissions`
  * publishes, so nothing a caller can read is ungrantable.
  */
-import { ALL_PERMISSIONS, permissionResource } from "@langwatch/authorization";
+import {
+  ALL_PERMISSIONS,
+  isGrantablePermission,
+  permissionResource,
+} from "@langwatch/authorization";
 import { bindingScopeCanGrantPermission } from "@langwatch/authz-contract";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-/** Every resource the registry names, in registry order. */
+/** The registry's permissions a role may list: never one minted onto a proof alone. */
+const GRANTABLE_PERMISSIONS = ALL_PERMISSIONS.filter(isGrantablePermission);
+
+/** Every resource a role may name, in registry order. */
 export const ROLE_PERMISSION_RESOURCES: readonly string[] = [
-  ...new Set([...ALL_PERMISSIONS.map((permission) => permissionResource(permission)), "scim"]),
+  ...new Set([
+    ...GRANTABLE_PERMISSIONS.map((permission) => permissionResource(permission)),
+    "scim",
+  ]),
 ];
 
-/** Every action the registry names, sorted. */
+/** Every action a role may name, sorted. */
 export const ROLE_PERMISSION_ACTIONS: readonly string[] = [
-  ...new Set(ALL_PERMISSIONS.map((permission) => permission.split(":")[1] ?? "")),
+  ...new Set(GRANTABLE_PERMISSIONS.map((permission) => permission.split(":")[1] ?? "")),
 ].toSorted();
 
 const ROLE_PERMISSION_KEYS = new Set(

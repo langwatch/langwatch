@@ -134,7 +134,8 @@ export class OrganizationMemberRoleService {
         userId,
         reason: "DISABLED",
       });
-      await this.repo.setMemberDisabled({ organizationId, userId, disabled, seat });
+      const actorUserId = actingUser?.id ?? null;
+      await this.repo.setMemberDisabled({ organizationId, userId, disabled, seat, actorUserId });
       // The seat is gone and the authz snapshot retired below, so the next request is refused
       // now; user ends the live browser sessions from this fact (§9, R7).
       await this.dependencies.seatNotices.memberDisabled({

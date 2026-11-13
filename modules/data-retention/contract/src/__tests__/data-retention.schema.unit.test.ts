@@ -120,8 +120,8 @@ describe("plan-tier retention constants", () => {
     expect(ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS).toBe(49);
   });
 
-  it("has both paid presets whole-week aligned and persistable by the schema", () => {
-    expect(PAID_RETENTION_PRESET_DAYS).toEqual([35, 63]);
+  it("has every paid preset whole-week aligned and persistable by the schema", () => {
+    expect(PAID_RETENTION_PRESET_DAYS).toEqual([35, 63, 91]);
     for (const days of PAID_RETENTION_PRESET_DAYS) {
       expect(days % RETENTION_WEEK_DAYS).toBe(0);
       expect(retentionDaysSchema.validate(days)).toBe(true);

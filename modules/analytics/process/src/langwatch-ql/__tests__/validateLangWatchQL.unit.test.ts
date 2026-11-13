@@ -194,6 +194,23 @@ describe("validateLangWatchQL given a SETTINGS clause", () => {
   ])("refuses one %s", (_case, sql) => {
     expect(codesOf(validate(sql))).toContain("SETTINGS_CLAUSE");
   });
+
+  /** @scenario "The query log names the tenant without the raw key or its hash" */
+  it.each([
+    [
+      "trailing the statement",
+      "SELECT TraceId FROM traces SETTINGS log_comment = 'lwql:project=b'",
+    ],
+    [
+      "in a subquery",
+      "SELECT TraceId FROM (SELECT TraceId FROM traces SETTINGS log_comment = 'lwql:project=b')",
+    ],
+  ])(
+    "refuses a log_comment naming another tenant %s, so the executor's is the only one",
+    (_case, sql) => {
+      expect(codesOf(validate(sql))).toContain("SETTINGS_CLAUSE");
+    },
+  );
 });
 
 describe("validateLangWatchQL given a clause that redirects output", () => {
@@ -247,6 +264,84 @@ describe("validateLangWatchQL given a table outside the caller's catalog", () =>
     for (const message of messages) {
       expect(message).not.toMatch(/[^\P{Cc}\t-\r]|[\u200b-\u200f\u202a-\u202e\u2066-\u2069]/u);
     }
+  });
+});
+
+/**
+ * The floored twin is reached only through the executor's rewrite (analytics ADR-005). It is not in
+ * the catalogue, so the allow-list refuses every way a caller could name it.
+ */
+describe("validateLangWatchQL given a read of evaluation_metrics' floored twin", () => {
+  const database = "analytics";
+  const twinPolicy = {
+    allowedTables: catalogShapes.allowedTables({ database, views: LWQL_VIEW_CATALOG }),
+    gatedColumns: [] as readonly string[],
+    defaultDatabase: database,
+  };
+
+  /** @scenario "A caller cannot read the floored twin directly" */
+  it.each<[string, string, LangWatchQLViolationCode]>([
+    ["by name", "SELECT 1 FROM evaluation_metrics__floor LIMIT 1", "TABLE_NOT_ALLOWED"],
+    ["quoted", "SELECT 1 FROM `evaluation_metrics__floor` LIMIT 1", "TABLE_NOT_ALLOWED"],
+    [
+      "database-qualified",
+      "SELECT 1 FROM `analytics`.evaluation_metrics__floor LIMIT 1",
+      "TABLE_NOT_ALLOWED",
+    ],
+    ["under an alias", "SELECT 1 FROM evaluation_metrics__floor AS x LIMIT 1", "TABLE_NOT_ALLOWED"],
+    [
+      "inside a subquery",
+      "SELECT 1 FROM evaluation_metrics " +
+        "WHERE TraceId IN (SELECT TraceId FROM evaluation_metrics__floor) LIMIT 1",
+      "TABLE_NOT_ALLOWED",
+    ],
+    [
+      "behind a WITH of the same name, by a reference that resolves to the twin",
+      "WITH evaluation_metrics__floor AS (SELECT 1 AS n) " +
+        "SELECT n FROM analytics.evaluation_metrics__floor LIMIT 1",
+      "TABLE_NOT_ALLOWED",
+    ],
+    [
+      "in a JOIN",
+      "SELECT 1 FROM evaluation_metrics AS e " +
+        "INNER JOIN evaluation_metrics__floor AS f ON f.EvaluationId = e.EvaluationId LIMIT 1",
+      "TABLE_NOT_ALLOWED",
+    ],
+    [
+      "in a UNION",
+      "SELECT TraceId FROM evaluation_metrics LIMIT 1 " +
+        "UNION ALL SELECT TraceId FROM evaluation_metrics__floor LIMIT 1",
+      "TABLE_NOT_ALLOWED",
+    ],
+    [
+      "as a table function",
+      "SELECT 1 FROM evaluation_metrics__floor(lwql_floor = now()) LIMIT 1",
+      "TABLE_FUNCTION",
+    ],
+    [
+      "as a table function behind a WITH of the same name",
+      "WITH evaluation_metrics__floor AS (SELECT 1 AS n) " +
+        "SELECT n FROM evaluation_metrics__floor(lwql_floor = now()) LIMIT 1",
+      "TABLE_FUNCTION",
+    ],
+  ])("refuses it %s", (_case, sql, code) => {
+    expect(codesOf(validateLangWatchQL({ sql, ...twinPolicy }))).toContain(code);
+  });
+
+  /** @scenario "A caller cannot read the floored twin directly" */
+  it("refuses a database-qualified table-function call to it", () => {
+    const sql =
+      "SELECT 1 FROM analytics.evaluation_metrics__floor(lwql_floor = now()) AS e LIMIT 1";
+
+    expect(validateLangWatchQL({ sql, ...twinPolicy }).ok).toBe(false);
+  });
+
+  it("admits the view the twin is cut from", () => {
+    expect(
+      codesOf(
+        validateLangWatchQL({ sql: "SELECT 1 FROM evaluation_metrics LIMIT 1", ...twinPolicy }),
+      ),
+    ).toEqual([]);
   });
 });
 

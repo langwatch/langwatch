@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { StubAuthzListingRepository } from "../repositories/__tests__/support/authz-listing.stub.ts";
 import { StubAuthzManagedGrantRepository } from "../repositories/__tests__/support/authz-managed-grant.stub.ts";
 import { makeReader } from "../repositories/__tests__/support/authz-read.stub.ts";
+import { MemoryAuthzOrganizationPolicyRepository } from "../repositories/memory/memory.authz-organization-policy.repository.ts";
 import { AuthzService } from "../services/authz.service.ts";
 
 const ORG = "org-1";
@@ -25,6 +26,7 @@ const manyProjects = (count: number) =>
 
 function makeAuthz(reader: ReturnType<typeof makeReader>) {
   return AuthzService.create({
+    policies: MemoryAuthzOrganizationPolicyRepository.create(),
     isOnEngine: async () => true,
     repository: reader,
     listing: new StubAuthzListingRepository(),

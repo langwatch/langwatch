@@ -12,6 +12,7 @@ import {
   Bug,
   Building2,
   Coins,
+  Combine,
   CreditCard,
   EyeOff,
   Server,
@@ -33,6 +34,7 @@ import {
   UserRound,
   Workflow,
   Vault,
+  Waypoints,
   UserStar,
   UsersRound,
   ShieldUser,
@@ -73,14 +75,51 @@ export interface SettingsMenuItem {
 export function isSettingsMenuItemActive({
   item,
   pathname,
+  search = "",
 }: {
   item: SettingsMenuItem;
   pathname: string;
+  search?: string;
 }): boolean {
   // By prefix, so a detail page (/settings/teams/:team) keeps its owner lit.
   if (item.alsoActiveAt?.some((base) => isPathUnder({ pathname, base }))) return true;
-  if (item.isExactMatch) return pathname === item.href;
-  return isPathUnder({ pathname, base: item.includePath ?? item.href });
+  const [hrefPath = item.href, hrefQuery] = item.href.split("?");
+  // An entry whose href opens a tab (?tab=teams) is lit only while the address shows that tab.
+  if (hrefQuery) {
+    const current = new URLSearchParams(search);
+    for (const [key, value] of new URLSearchParams(hrefQuery)) {
+      if (current.get(key) !== value) return false;
+    }
+  }
+  if (item.isExactMatch) return pathname === hrefPath;
+  return isPathUnder({ pathname, base: item.includePath ?? hrefPath });
+}
+
+/** An entry whose href opens one tab of a shared page. */
+function opensTab(item: SettingsMenuItem): boolean {
+  return item.href.includes("?");
+}
+
+/** As above, but an entry for a whole page yields to a lit sibling that opens one of its tabs. */
+export function isSettingsMenuItemActiveAmong({
+  item,
+  siblings,
+  pathname,
+  search = "",
+}: {
+  item: SettingsMenuItem;
+  siblings: readonly SettingsMenuItem[];
+  pathname: string;
+  search?: string;
+}): boolean {
+  if (!isSettingsMenuItemActive({ item, pathname, search })) return false;
+  if (opensTab(item)) return true;
+  return !siblings.some(
+    (sibling) =>
+      sibling !== item &&
+      opensTab(sibling) &&
+      isSettingsMenuItemActive({ item: sibling, pathname, search }),
+  );
 }
 
 export interface SettingsMenuGroup {
@@ -101,6 +140,11 @@ export interface SettingsMenuGroup {
  */
 export interface SettingsMenuGates {
   hasPermission: (permission: string) => boolean;
+  /**
+   * The same check across the whole organization, not just the open project: what an
+   * organization page asks, so an entry onto one is offered exactly when the page is.
+   */
+  hasOrganizationPermission: (permission: string) => boolean;
   isSaaS: boolean;
   hasCloudOps: boolean;
   hosting: Hosting;
@@ -214,7 +258,11 @@ function organizationGroup({
   };
 }
 
-function accessGroup({ enterprisePlan }: SettingsMenuGates): SettingsMenuGroup {
+function accessGroup({
+  enterprisePlan,
+  isLiteMember,
+  hasOrganizationPermission,
+}: SettingsMenuGates): SettingsMenuGroup {
   return {
     id: "settings-access",
     label: "People & access",
@@ -234,6 +282,21 @@ function accessGroup({ enterprisePlan }: SettingsMenuGates): SettingsMenuGroup {
           "/settings/access",
         ],
       },
+      // A shortcut to the Users page's Teams tab, which readers could not find; the tab is
+      // offered to an organization manager only, so the entry is too, asked the way the tab
+      // asks it. Where both are offered, Users yields team pages to it; a reader without it
+      // still sees Users lit there.
+      ...(hasOrganizationPermission("organization:manage")
+        ? [
+            {
+              label: "Teams & projects",
+              href: "/settings/directory?tab=teams",
+              includePath: "/settings/directory",
+              icon: UsersRound,
+              alsoActiveAt: ["/settings/teams"],
+            },
+          ]
+        : []),
       // Every organization role reads it through `members:view`, Lite included; the page
       // offers its edits to a manager only. Definitions and assignments are two tabs.
       ...enterpriseEntry({
@@ -245,6 +308,13 @@ function accessGroup({ enterprisePlan }: SettingsMenuGates): SettingsMenuGroup {
         },
         enterprisePlan,
       }),
+      // Every braid in the organisation and who may braid; the project page is under Project.
+      ...(!isLiteMember && hasOrganizationPermission("organization:manage")
+        ? enterpriseEntry({
+            item: { label: "Braids", href: "/settings/organization-braids", icon: Combine },
+            enterprisePlan,
+          })
+        : []),
     ],
   };
 }
@@ -289,7 +359,7 @@ function dataControlsGroup({ hasPermission }: SettingsMenuGates): SettingsMenuGr
   };
 }
 
-function projectGroup({ isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
+function projectGroup({ isLiteMember, enterprisePlan }: SettingsMenuGates): SettingsMenuGroup {
   return {
     id: "settings-project",
     label: "Project",
@@ -310,6 +380,12 @@ function projectGroup({ isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
           ]
         : []),
       { label: "Integrations", href: "/settings/integrations", icon: Blocks },
+      ...(!isLiteMember
+        ? enterpriseEntry({
+            item: { label: "Braids", href: "/settings/braids", icon: Waypoints },
+            enterprisePlan,
+          })
+        : []),
     ],
   };
 }

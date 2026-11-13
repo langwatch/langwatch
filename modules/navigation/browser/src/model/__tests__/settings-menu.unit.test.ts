@@ -6,10 +6,16 @@
 
 import { describe, expect, it } from "vitest";
 
-import { adminMenu, settingsMenu, type SettingsMenuGates } from "../settings-menu.ts";
+import {
+  adminMenu,
+  isSettingsMenuItemActiveAmong,
+  settingsMenu,
+  type SettingsMenuGates,
+} from "../settings-menu.ts";
 
 const EVERYTHING_CLOSED: SettingsMenuGates = {
   hasPermission: () => false,
+  hasOrganizationPermission: () => false,
   isSaaS: false,
   hasCloudOps: false,
   hosting: "self-hosted",
@@ -177,6 +183,95 @@ describe("given an enterprise plan", () => {
   });
 });
 
+describe("given the People & access group", () => {
+  function accessHrefsIn(gates: Partial<SettingsMenuGates>): string[] {
+    const group = settingsMenu({ ...EVERYTHING_CLOSED, enterprisePlan: "included", ...gates }).find(
+      (candidate) => candidate.id === "settings-access",
+    );
+    return group?.items.map((item) => item.href) ?? [];
+  }
+
+  describe("when the reader may manage the organization", () => {
+    /** @scenario "Teams & projects has its own entry under Users" */
+    it("offers Teams & projects right after Users, on the Users page's teams tab", () => {
+      expect(
+        accessHrefsIn({ hasOrganizationPermission: (p) => p === "organization:manage" }),
+      ).toEqual([
+        "/settings/directory",
+        "/settings/directory?tab=teams",
+        "/settings/roles",
+        "/settings/organization-braids",
+      ]);
+    });
+
+    /** @scenario "Teams & projects asks who may manage the organization the way its tab does" */
+    it("follows the organization-wide answer, not the open project's", () => {
+      expect(
+        accessHrefsIn({
+          hasPermission: () => false,
+          hasOrganizationPermission: (p) => p === "organization:manage",
+        }),
+      ).toContain("/settings/directory?tab=teams");
+      expect(
+        accessHrefsIn({
+          hasPermission: (p) => p === "organization:manage",
+          hasOrganizationPermission: () => false,
+        }),
+      ).not.toContain("/settings/directory?tab=teams");
+    });
+
+    /** @scenario "Teams & projects has its own entry under Users" */
+    it("lights Teams & projects alone on its tab and Users alone elsewhere on the page", () => {
+      const items = settingsMenu({
+        ...EVERYTHING_CLOSED,
+        hasOrganizationPermission: (p) => p === "organization:manage",
+      }).find((group) => group.id === "settings-access")!.items;
+      const marked = (pathname: string, search: string) =>
+        items
+          .filter((item) =>
+            isSettingsMenuItemActiveAmong({ item, siblings: items, pathname, search }),
+          )
+          .map((item) => item.label);
+
+      expect(marked("/settings/directory", "?tab=teams")).toEqual(["Teams & projects"]);
+      expect(marked("/settings/directory", "?tab=groups")).toEqual(["Users"]);
+      expect(marked("/settings/directory", "")).toEqual(["Users"]);
+      expect(marked("/settings/teams/platform", "")).toEqual(["Teams & projects"]);
+    });
+  });
+
+  describe("when the reader may not manage the organization", () => {
+    /** @scenario "Teams & projects is offered only to whoever may manage the organization" */
+    it("offers no Teams & projects entry", () => {
+      expect(accessHrefsIn({ hasPermission: (p) => p === "members:view" })).toEqual([
+        "/settings/directory",
+        "/settings/roles",
+      ]);
+    });
+
+    /** @scenario "A team page lights Users for whoever may not manage the organization" */
+    it("keeps Users lit on a team's own page", () => {
+      const items = settingsMenu({
+        ...EVERYTHING_CLOSED,
+        hasPermission: (p) => p === "team:view",
+      }).find((group) => group.id === "settings-access")!.items;
+
+      expect(
+        items
+          .filter((item) =>
+            isSettingsMenuItemActiveAmong({
+              item,
+              siblings: items,
+              pathname: "/settings/teams/platform",
+              search: "",
+            }),
+          )
+          .map((item) => item.label),
+      ).toEqual(["Users"]);
+    });
+  });
+});
+
 describe("given a plan that lacks Enterprise", () => {
   function lockedHrefsIn(gates: Partial<SettingsMenuGates>): string[] {
     return settingsMenu({ ...EVERYTHING_CLOSED, enterprisePlan: "locked", ...gates })
@@ -188,18 +283,23 @@ describe("given a plan that lacks Enterprise", () => {
   describe("when the menu is built", () => {
     /** @scenario "A plan without Enterprise sees its entries locked" */
     it("offers the enterprise entries locked", () => {
-      expect(lockedHrefsIn({ hasPermission: () => true })).toEqual([
+      expect(
+        lockedHrefsIn({ hasPermission: () => true, hasOrganizationPermission: () => true }),
+      ).toEqual([
         "/settings/audit-log",
         "/settings/roles",
+        "/settings/organization-braids",
+        "/settings/braids",
       ]);
     });
 
     /** @scenario "A plan without Enterprise sees its entries locked" */
     it("still hides an entry the reader lacks the permission for", () => {
-      expect(lockedHrefsIn({})).toEqual(["/settings/roles"]);
+      expect(lockedHrefsIn({})).toEqual(["/settings/roles", "/settings/braids"]);
       expect(lockedHrefsIn({ hasPermission: (p) => p === "auditLog:view" })).toEqual([
         "/settings/audit-log",
         "/settings/roles",
+        "/settings/braids",
       ]);
     });
 

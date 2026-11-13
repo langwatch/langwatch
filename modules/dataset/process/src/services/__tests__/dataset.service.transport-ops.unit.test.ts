@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   createDatasetTestAttachments,
+  createDatasetTestContent,
   createDatasetTestInlineAttachments,
   createDatasetTestRequestBounds,
 } from "../../app/__tests__/dataset.fixture.ts";
@@ -23,6 +24,7 @@ function serviceOver({ database }: { database: MemoryDatasetDatabase }): Dataset
   return DatasetService.create({
     repository: MemoryDatasetRepository.create({ database }),
     records: MemoryDatasetRecordRepository.create({ database }),
+    content: createDatasetTestContent({ database }),
     generateId: () => "generated-id",
     requestBounds: createDatasetTestRequestBounds(),
     attachments: createDatasetTestAttachments(),

@@ -257,10 +257,10 @@ func (s *Server) handleHold(w http.ResponseWriter, r *http.Request) {
 
 // UsageTotal is one customer's metered total for one event name.
 type UsageTotal struct {
-	Customer  string `json:"customer"`
-	EventName string `json:"event_name"`
-	Value     int64  `json:"value"`
-	Events    int    `json:"events"`
+	Customer  string  `json:"customer"`
+	EventName string  `json:"event_name"`
+	Value     float64 `json:"value"`
+	Events    int     `json:"events"`
 }
 
 // handleUsage totals accepted meter events per customer and event name; ?customer=
@@ -284,7 +284,7 @@ func (s *Server) handleUsage(w http.ResponseWriter, r *http.Request) {
 		if totals[key] == nil {
 			totals[key] = &UsageTotal{Customer: e.Customer, EventName: e.EventName}
 		}
-		totals[key].Value += e.Value
+		totals[key].Value = addDecimal(totals[key].Value, e.Value)
 		totals[key].Events++
 	}
 	out := make([]*UsageTotal, 0, len(totals))

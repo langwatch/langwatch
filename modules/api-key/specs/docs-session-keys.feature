@@ -32,7 +32,7 @@ Feature: Docs session keys for the documentation playground
   Scenario: No docs session key is minted while an operator acts as another member
     Given an operator impersonating a member
     When the consent page asks to mint a docs session key
-    Then permission_denied is returned with status 403
+    Then impersonation_cannot_mint_credential is returned with status 403
     And no key is minted
 
   @integration

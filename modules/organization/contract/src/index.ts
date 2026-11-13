@@ -39,3 +39,4 @@ export * from "./organization-drawers.ts";
 export * from "./features/seat-request/seat-request.ts";
 export * from "./features/seat-request/seat-request.errors.ts";
 export * from "./features/seat-request/seat-request.trpc.ts";
+export * from "./seat-peak.ts";

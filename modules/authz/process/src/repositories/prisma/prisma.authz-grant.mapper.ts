@@ -87,10 +87,16 @@ export interface GrantRowShape {
   /** The shared grant's window (ADR-177); absent on own grants. Read back untyped,
    *  so {@link grantRowToFact} parses it. */
   condition?: unknown;
+  /** ADR-201 §2: the braid a braid change's attach replaces; absent on every other grant. */
+  replacesGrantId?: string | null;
   occurredAt: Instant;
 }
 
-/** Exactly the columns a {@link GrantRowShape} holds, for a read that feeds one. */
+/**
+ * The columns a {@link GrantRowShape} holds, for a read that feeds one. `replacesGrantId` is left
+ * out: the reads that need it select it themselves, the minter's shared reads and the braid
+ * list (ADR-201 §2).
+ */
 export const GRANT_ROW_COLUMNS = {
   id: true,
   organizationId: true,

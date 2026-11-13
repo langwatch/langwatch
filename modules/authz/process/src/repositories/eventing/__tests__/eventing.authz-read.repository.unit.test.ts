@@ -81,7 +81,7 @@ describe("EventingAuthzReadRepository", () => {
           scopeType: { in: ["ORGANIZATION", "TEAM", "PROJECT"] },
           revokedAt: null,
         },
-        select: { roleKey: true, scopeType: true, scopeId: true, expiresAt: true },
+        select: { roleKey: true, scopeType: true, scopeId: true, expiresAt: true, condition: true },
       });
       expect(bindings).toEqual([
         {
@@ -239,6 +239,7 @@ describe("EventingAuthzReadRepository", () => {
           scopeId: true,
           principalId: true,
           expiresAt: true,
+          condition: true,
         },
       });
       expect(bindings).toEqual([
@@ -295,7 +296,7 @@ describe("EventingAuthzReadRepository", () => {
           scopeType: { in: ["ORGANIZATION", "TEAM", "PROJECT"] },
           revokedAt: null,
         },
-        select: { roleKey: true, scopeType: true, scopeId: true, expiresAt: true },
+        select: { roleKey: true, scopeType: true, scopeId: true, expiresAt: true, condition: true },
       });
       expect(bindings).toEqual([
         {

@@ -10,7 +10,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { shortcutAriaKeys } from "@langwatch/design-system/shortcut-hint";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
+import type { BraidedOwner, SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { lazy, Suspense, useMemo, useRef } from "react";
 import {
   LuChartGantt,
@@ -458,6 +458,7 @@ export function VizPlaceholder({
             style={fillParent ? { overflowAnchor: "none" } : undefined}
           >
             <VizBody
+              braidedOwners={trace?.braided?.owners}
               isCollapsed={viz.isCollapsed}
               isLoading={isLoading}
               onClearSpan={onClearSpan}
@@ -584,6 +585,7 @@ function CollapsedOverview({ spans }: { spans: SpanTreeNode[] }) {
 
 /** Whichever visualisation the current tab asks for, once spans have arrived. */
 function VizBody({
+  braidedOwners,
   isCollapsed,
   isLoading,
   onClearSpan,
@@ -593,6 +595,7 @@ function VizBody({
   spans,
   vizTab,
 }: {
+  braidedOwners: readonly BraidedOwner[] | undefined;
   isCollapsed: boolean;
   isLoading: boolean;
   onClearSpan: () => void;
@@ -644,6 +647,7 @@ function VizBody({
   return (
     <WaterfallView
       spans={spans}
+      braidedOwners={braidedOwners}
       selectedSpanId={selectedSpanId}
       promptSpanIds={promptSpanIds}
       onSelectSpan={onSelectSpan}

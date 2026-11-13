@@ -29,6 +29,7 @@ import {
   breakdownGapMessage,
   chartAxis,
   dailyBars,
+  developerSeats,
   fullSeats,
   liteRow,
   monthEvents,
@@ -214,6 +215,7 @@ function HostedUsage({
       {plan && usage.data && (
         <UsageSeatsCard
           fullSeats={fullSeats({ used: usage.data.membersCount, plan })}
+          developerSeats={developerSeats({ used: usage.data.membersDeveloperCount, plan })}
           lite={liteRow({
             plan,
             pricingModel,

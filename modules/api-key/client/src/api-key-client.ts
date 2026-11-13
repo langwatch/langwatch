@@ -1,4 +1,4 @@
-/** The hooks API keys' own contract generates, and what each procedure takes and answers. */
+/** The hooks the API keys contract generates, what each procedure takes and answers, its mounts. */
 
 import type { apiKeyTrpc } from "@langwatch/api-key-contract";
 import {
@@ -7,6 +7,7 @@ import {
   type ModuleApi,
   type OutputsFromMap,
 } from "@langwatch/api/web";
+import { uiTokens } from "@langwatch/module";
 
 type ApiKeyApiMap = ContractApiMap<typeof apiKeyTrpc>;
 
@@ -25,3 +26,9 @@ export type ApiKeyInputs = { [K in keyof ApiKeyApiMap]: InputsOf<ApiKeyApiMap[K]
 
 /** What each procedure answers, as the browser receives it. */
 export type ApiKeyOutputs = OutputsFromMap<ApiKeyApiMap>;
+
+/** What the keys panel needs from whoever mounts it: the project whose keys it manages. */
+export type SigningKeysPanelProps = Readonly<{ projectId: string }>;
+
+export const SigningKeysPanelToken =
+  uiTokens("api-key").component<SigningKeysPanelProps>("signingKeysPanel");

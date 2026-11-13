@@ -15636,6 +15636,27 @@ func (e PostApiEvaluationsByEvaluatorBySubpathEvaluate200JSONResponseBody2Status
 	}
 }
 
+// Defines values for PostApiEvaluatorsJSONBodyType.
+const (
+	PostApiEvaluatorsJSONBodyTypeCode      PostApiEvaluatorsJSONBodyType = "code"
+	PostApiEvaluatorsJSONBodyTypeEvaluator PostApiEvaluatorsJSONBodyType = "evaluator"
+	PostApiEvaluatorsJSONBodyTypeWorkflow  PostApiEvaluatorsJSONBodyType = "workflow"
+)
+
+// Valid indicates whether the value is a known member of the PostApiEvaluatorsJSONBodyType enum.
+func (e PostApiEvaluatorsJSONBodyType) Valid() bool {
+	switch e {
+	case PostApiEvaluatorsJSONBodyTypeCode:
+		return true
+	case PostApiEvaluatorsJSONBodyTypeEvaluator:
+		return true
+	case PostApiEvaluatorsJSONBodyTypeWorkflow:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DeleteApiEvaluatorsLabel200JSONResponseBodyRemoved.
 const (
 	DeleteApiEvaluatorsLabel200JSONResponseBodyRemovedTrue DeleteApiEvaluatorsLabel200JSONResponseBodyRemoved = true
@@ -25131,6 +25152,7 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1AnomalyRulesUpdate            GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "anomalyRules:update"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1AnomalyRulesView              GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "anomalyRules:view"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1AuditLogView                  GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "auditLog:view"
+	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1BraidsManage                  GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "braids:manage"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1ComplianceExportView          GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "complianceExport:view"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1CostView                      GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "cost:view"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1DatasetsCreate                GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "datasets:create"
@@ -25219,6 +25241,7 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SecretsManage                 GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "secrets:manage"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SecretsUpdate                 GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "secrets:update"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SecretsView                   GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "secrets:view"
+	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SpansBraided                  GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "spans:braided"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SsoManage                     GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "sso:manage"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SsoView                       GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "sso:view"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SubscriptionManage            GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "subscription:manage"
@@ -25296,6 +25319,8 @@ func (e GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1) Valid()
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1AnomalyRulesView:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1AuditLogView:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1BraidsManage:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1ComplianceExportView:
 		return true
@@ -25473,6 +25498,8 @@ func (e GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1) Valid()
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SecretsView:
 		return true
+	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SpansBraided:
+		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SsoManage:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SsoView:
@@ -25599,6 +25626,7 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1AnomalyRulesUpdate            GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "anomalyRules:update"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1AnomalyRulesView              GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "anomalyRules:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1AuditLogView                  GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "auditLog:view"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1BraidsManage                  GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "braids:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1ComplianceExportView          GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "complianceExport:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1CostView                      GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "cost:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1DatasetsCreate                GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "datasets:create"
@@ -25687,6 +25715,7 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SecretsManage                 GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "secrets:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SecretsUpdate                 GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "secrets:update"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SecretsView                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "secrets:view"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SpansBraided                  GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "spans:braided"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SsoManage                     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "sso:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SsoView                       GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "sso:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SubscriptionManage            GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "subscription:manage"
@@ -25764,6 +25793,8 @@ func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1) V
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1AnomalyRulesView:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1AuditLogView:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1BraidsManage:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1ComplianceExportView:
 		return true
@@ -25941,6 +25972,8 @@ func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1) V
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SecretsView:
 		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SpansBraided:
+		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SsoManage:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SsoView:
@@ -26067,6 +26100,7 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1AnomalyRulesUpdate            GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "anomalyRules:update"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1AnomalyRulesView              GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "anomalyRules:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1AuditLogView                  GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "auditLog:view"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1BraidsManage                  GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "braids:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1ComplianceExportView          GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "complianceExport:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1CostView                      GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "cost:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1DatasetsCreate                GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "datasets:create"
@@ -26155,6 +26189,7 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SecretsManage                 GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "secrets:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SecretsUpdate                 GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "secrets:update"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SecretsView                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "secrets:view"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SpansBraided                  GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "spans:braided"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SsoManage                     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "sso:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SsoView                       GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "sso:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SubscriptionManage            GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "subscription:manage"
@@ -26232,6 +26267,8 @@ func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1) V
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1AnomalyRulesView:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1AuditLogView:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1BraidsManage:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1ComplianceExportView:
 		return true
@@ -26408,6 +26445,8 @@ func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1) V
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SecretsUpdate:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SecretsView:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SpansBraided:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SsoManage:
 		return true
@@ -26655,6 +26694,7 @@ const (
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1AnomalyRulesUpdate            GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "anomalyRules:update"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1AnomalyRulesView              GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "anomalyRules:view"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1AuditLogView                  GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "auditLog:view"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1BraidsManage                  GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "braids:manage"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1ComplianceExportView          GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "complianceExport:view"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1CostView                      GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "cost:view"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1DatasetsCreate                GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "datasets:create"
@@ -26743,6 +26783,7 @@ const (
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SecretsManage                 GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "secrets:manage"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SecretsUpdate                 GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "secrets:update"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SecretsView                   GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "secrets:view"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SpansBraided                  GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "spans:braided"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SsoManage                     GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "sso:manage"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SsoView                       GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "sso:view"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SubscriptionManage            GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "subscription:manage"
@@ -26820,6 +26861,8 @@ func (e GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1) Valid() bool {
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1AnomalyRulesView:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1AuditLogView:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1BraidsManage:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1ComplianceExportView:
 		return true
@@ -26997,6 +27040,8 @@ func (e GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1) Valid() bool {
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SecretsView:
 		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SpansBraided:
+		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SsoManage:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SsoView:
@@ -27123,6 +27168,7 @@ const (
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1AnomalyRulesUpdate            GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "anomalyRules:update"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1AnomalyRulesView              GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "anomalyRules:view"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1AuditLogView                  GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "auditLog:view"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1BraidsManage                  GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "braids:manage"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1ComplianceExportView          GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "complianceExport:view"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1CostView                      GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "cost:view"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1DatasetsCreate                GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "datasets:create"
@@ -27211,6 +27257,7 @@ const (
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SecretsManage                 GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "secrets:manage"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SecretsUpdate                 GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "secrets:update"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SecretsView                   GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "secrets:view"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SpansBraided                  GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "spans:braided"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SsoManage                     GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "sso:manage"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SsoView                       GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "sso:view"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SubscriptionManage            GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "subscription:manage"
@@ -27288,6 +27335,8 @@ func (e GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1) Valid() bool {
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1AnomalyRulesView:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1AuditLogView:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1BraidsManage:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1ComplianceExportView:
 		return true
@@ -27464,6 +27513,8 @@ func (e GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1) Valid() bool {
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SecretsUpdate:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SecretsView:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SpansBraided:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SsoManage:
 		return true
@@ -46941,9 +46992,19 @@ type GetApiEvaluators200JSONResponseBody_Version struct {
 
 // PostApiEvaluatorsJSONBody defines parameters for PostApiEvaluators.
 type PostApiEvaluatorsJSONBody struct {
+	// Config For a built-in evaluator: { evaluatorType, settings }. For a code evaluator: { code, inputs: [{ identifier, type }] }; outputs are the fixed passed, score, label and details. For a workflow evaluator: {}.
 	Config map[string]interface{} `json:"config"`
 	Name   string                 `json:"name"`
+
+	// Type The kind of evaluator. "evaluator" (the default) is a built-in type named by config.evaluatorType; "code" is a custom Python evaluator whose config carries code and inputs; "workflow" wraps the workflow named by workflowId.
+	Type *PostApiEvaluatorsJSONBodyType `json:"type,omitempty"`
+
+	// WorkflowId The workflow a "workflow" evaluator wraps. Only for type "workflow".
+	WorkflowId *string `json:"workflowId,omitempty"`
 }
+
+// PostApiEvaluatorsJSONBodyType defines parameters for PostApiEvaluators.
+type PostApiEvaluatorsJSONBodyType string
 
 // PostApiEvaluators200JSONResponseBodyCreatedBy0 defines parameters for PostApiEvaluators.
 type PostApiEvaluators200JSONResponseBodyCreatedBy0 struct {

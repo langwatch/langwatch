@@ -325,7 +325,7 @@ describe("column-pruning", () => {
         // The JOIN subquery reconstructs a map of only the referenced key so the
         // wide SpanAttributes values never reach the join buffer.
         expect(result.sql).toContain(
-          "map('langwatch.span.type', SpanAttributes['langwatch.span.type']) AS SpanAttributes",
+          "map('langwatch.span.type', SpanAttributes['langwatch.span.type']) AS JoinedSpanAttributes",
         );
         // The bare whole-map column is never selected into the subquery, in
         // any position. Checked against the extracted SELECT list rather than
@@ -337,7 +337,7 @@ describe("column-pruning", () => {
         const selectedItems = selectListItems(storedSpansSelect!);
         expect(selectedItems).not.toContain("SpanAttributes");
         // Outer accesses still resolve against the reconstructed map.
-        expect(result.sql).toContain("ss.SpanAttributes['langwatch.span.type']");
+        expect(result.sql).toContain("ss.JoinedSpanAttributes['langwatch.span.type']");
       });
     });
 
