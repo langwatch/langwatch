@@ -327,6 +327,7 @@ Feature: Buying seats
     @unit
     Scenario: Lowering Developer seats changes the line from the next period with no credit
       Given the subscription bills 3 Developer seats
+      And 1 Developer is in use
       When an administrator sets 1 Developer seat
       Then the Developer seat line moves to 1 with no proration
 

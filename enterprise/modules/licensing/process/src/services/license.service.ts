@@ -350,6 +350,11 @@ export class LicenseService extends LicensingServiceContract {
     return this.repository.getMemberCount(organizationId);
   }
 
+  /** Developer seats in use now, the count the Developer seat line is floored on. */
+  countDevelopersInUse(organizationId: string): Promise<number> {
+    return this.repository.getMembersDeveloperCount(organizationId);
+  }
+
   private async getResourceCounts(
     organizationId: string,
     plan: LicensePlanLimits,
@@ -491,4 +496,5 @@ export interface LicenseStorage extends Pick<
   removeLicense(organizationId: string): Promise<void>;
   getMemberCount(organizationId: string): Promise<number>;
   getMembersLiteCount(organizationId: string): Promise<number>;
+  getMembersDeveloperCount(organizationId: string): Promise<number>;
 }

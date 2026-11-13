@@ -39,6 +39,10 @@ export const STRIPE_PRICE_NAMES = [
 
 export type StripePriceName = (typeof STRIPE_PRICE_NAMES)[number];
 
+/** The seat kinds a subscription bills as a line of their own; each has a floor. */
+export const BILLED_SEAT_KINDS = ["full", "developer"] as const;
+export type BilledSeatKind = (typeof BILLED_SEAT_KINDS)[number];
+
 /**
  * Names that may be absent from the catalog in a given Stripe mode. They are
  * provisioned per mode by hand, so the feature stays off rather than the whole
