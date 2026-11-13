@@ -3,7 +3,8 @@
  * producer (an SDK, a computed average) must never reach the insert, or it is refused
  * and the job retries forever.
  */
-import { createTenantId } from "@langwatch/eventing";
+import { type AppendStore, type FoldProjectionStore, createTenantId } from "@langwatch/eventing";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -11,8 +12,12 @@ import {
   EXPERIMENT_RUN_EVENT_VERSIONS,
 } from "../../rules/experiment-run-event-types.rules.ts";
 import type { EvaluatorResultEvent, TargetResultEvent } from "../experiment-run-events.process.ts";
-import { ExperimentRunResultStorageMapProjection } from "../experiment-run-result-storage.projection.ts";
 import {
+  type ClickHouseExperimentRunResultRecord,
+  ExperimentRunResultStorageMapProjection,
+} from "../experiment-run-result-storage.projection.ts";
+import {
+  type ExperimentRunStateData,
   ExperimentRunStateFoldProjection,
   normalizeDurationMs,
 } from "../experiment-run-state.projection.ts";
@@ -59,7 +64,7 @@ const verdict = (duration: number): EvaluatorResultEvent => ({
 });
 
 const storage = ExperimentRunResultStorageMapProjection.create({
-  store: { append: async () => undefined },
+  store: createApiFixture<AppendStore<ClickHouseExperimentRunResultRecord>>({}, "result store"),
 });
 
 describe("normalizeDurationMs", () => {
@@ -95,10 +100,7 @@ describe("given a result with a fractional duration", () => {
   describe("when the run's total is folded", () => {
     it("keeps the total duration a whole number", () => {
       const projection = ExperimentRunStateFoldProjection.create({
-        store: {
-          store: async () => undefined,
-          get: async () => ({ kind: "empty" as const }),
-        },
+        store: createApiFixture<FoldProjectionStore<ExperimentRunStateData>>({}, "state store"),
       });
       let state = projection.init();
       state = projection.apply(state, targetResult(100.4));
