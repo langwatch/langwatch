@@ -344,6 +344,13 @@ Feature: Agent registry with ARD discovery and change events
     When the worker runs the intent
     Then WebhookApi.requestDelivery is asked once with the event type and the key "agent-registry:<event id>:<endpoint id>"
 
+  @unit
+  Scenario: Recorded delivery intents land in governance's outbox once per event and endpoint
+    Given two delivery intents for one event and two endpoints
+    When the registry records them twice
+    Then governance's outbox holds one requestDelivery message per endpoint, keyed "agent-registry:<event id>:<endpoint id>"
+    And recording no intents appends nothing
+
   # REST reads
 
   @integration

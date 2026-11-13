@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { IntentSpec, WakeHandler } from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
 /**
@@ -13,6 +14,8 @@ export const AGENT_REGISTRY_TRAFFIC_INTERVAL_MS = 15 * 60 * 1000;
 /** Outbox rows are bookkeeping, one per pass, pruned like every recurring process's. */
 const AGENT_REGISTRY_TRAFFIC_ROW_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+const logger = createLogger("langwatch:governance:agent-registry:traffic");
 
 export const agentRegistryTrafficPassSchema = z.object({
   scheduledFor: z.number().int(),
@@ -111,11 +114,16 @@ export function runAgentRegistryTraffic(deps: {
     } else {
       await deps.reconcile({ everyOrganization: false });
     }
-    await deps
-      .deleteDispatchedBefore({
+    try {
+      await deps.deleteDispatchedBefore({
         processName: AGENT_REGISTRY_TRAFFIC_PROCESS_NAME,
         before: startedAt - AGENT_REGISTRY_TRAFFIC_ROW_RETENTION_MS,
-      })
-      .catch(() => 0);
+      });
+    } catch (error) {
+      logger.warn(
+        { error: error instanceof Error ? error.message : String(error) },
+        "Agent registry traffic outbox retention failed",
+      );
+    }
   };
 }

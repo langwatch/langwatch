@@ -1,11 +1,19 @@
 /** Spec: enterprise/modules/governance/specs/agent-registry.feature */
-import type { IntentContext } from "@langwatch/eventing";
+import { InMemoryProcessStore, type IntentContext } from "@langwatch/eventing";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WebhookApi, WebhookDeliveryRequest } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
 
-import { requestAgentRegistryDelivery } from "../../features/registry/eventing/agent-registry-delivery.intent.ts";
-import { AGENT_REGISTRY_DELIVERY_PROCESS_NAME } from "../../features/registry/eventing/agent-registry-delivery.process.ts";
+import {
+  OutboxAgentRegistryDelivery,
+  requestAgentRegistryDelivery,
+} from "../../features/registry/eventing/agent-registry-delivery.intent.ts";
+import {
+  AGENT_REGISTRY_DELIVERY_PROCESS_KEY,
+  AGENT_REGISTRY_DELIVERY_PROCESS_NAME,
+  AGENT_REGISTRY_DELIVERY_REQUEST_INTENT,
+  type AgentRegistryDeliveryIntent,
+} from "../../features/registry/eventing/agent-registry-delivery.process.ts";
 
 const context: IntentContext = {
   processName: AGENT_REGISTRY_DELIVERY_PROCESS_NAME,
@@ -51,6 +59,69 @@ describe("requestAgentRegistryDelivery()", () => {
           source: { module: "governance", ref: "evt-1" },
         },
       ]);
+    });
+  });
+});
+
+describe("OutboxAgentRegistryDelivery", () => {
+  function intentFor(endpointId: string): AgentRegistryDeliveryIntent {
+    return {
+      organizationId: "org-1",
+      eventId: "evt-1",
+      eventType: "governance.agent.registered",
+      endpointId,
+      body: { id: "evt-1", agent: { name: "support-bot" } },
+    };
+  }
+
+  function withOutbox() {
+    const processStore = InMemoryProcessStore.createForTesting();
+    const outbox = OutboxAgentRegistryDelivery.create(processStore);
+    const recorded = () =>
+      processStore.findMessagesByRef({
+        ref: {
+          processName: AGENT_REGISTRY_DELIVERY_PROCESS_NAME,
+          projectId: "org-1",
+          processKey: AGENT_REGISTRY_DELIVERY_PROCESS_KEY,
+        },
+      });
+    return { outbox, recorded };
+  }
+
+  describe("when the registry records delivery intents", () => {
+    /** @scenario Recorded delivery intents land in governance's outbox once per event and endpoint */
+    it("appends one requestDelivery message per endpoint, keyed by event and endpoint", async () => {
+      const { outbox, recorded } = withOutbox();
+      const intents = [intentFor("hook-1"), intentFor("hook-2")];
+
+      await outbox.record(intents);
+      await outbox.record(intents);
+
+      const messages = await recorded();
+      expect(messages).toHaveLength(2);
+      expect(messages.toSorted((a, b) => a.messageKey.localeCompare(b.messageKey))).toMatchObject([
+        {
+          messageKey: "agent-registry:evt-1:hook-1",
+          intentType: AGENT_REGISTRY_DELIVERY_REQUEST_INTENT,
+          tenantId: "org-1",
+          payload: intentFor("hook-1"),
+        },
+        {
+          messageKey: "agent-registry:evt-1:hook-2",
+          intentType: AGENT_REGISTRY_DELIVERY_REQUEST_INTENT,
+          tenantId: "org-1",
+          payload: intentFor("hook-2"),
+        },
+      ]);
+    });
+
+    /** @scenario Recorded delivery intents land in governance's outbox once per event and endpoint */
+    it("appends nothing for an empty batch", async () => {
+      const { outbox, recorded } = withOutbox();
+
+      await outbox.record([]);
+
+      expect(await recorded()).toEqual([]);
     });
   });
 });

@@ -1035,10 +1035,26 @@ func (s *Service) Stop() {
 // after a response that carried none: the next staleness refresh asks for the
 // config outright rather than revalidating against a token we do not have.
 func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle, configETag string) *entry {
+	return s.publishL1(h, s.newEntry(bundle, configETag))
+}
+
+// carryBudgetChanges marks an unpublished replacement behind when budget
+// changes reached the entry it replaces after its refresh had started, since
+// the figures that refresh read may predate them. It runs before publishL1:
+// marking after publishing lets a reader see the replacement caught up.
+func (e *entry) carryBudgetChanges(from *entry, seenAtStart uint64) *entry {
+	if from.budgetChangeCount() != seenAtStart {
+		e.budgetChanges = 1
+	}
+	return e
+}
+
+// newEntry builds the cache entry for a bundle whose config was fetched under
+// configETag, without publishing it.
+func (s *Service) newEntry(bundle *domain.Bundle, configETag string) *entry {
 	softExpiresAt, hardExpiresAt := entryDeadlines(bundle, s.hardGrace)
 	now := time.Now()
-	s.lastKnown.Remove(h)
-	stored := &entry{
+	return &entry{
 		bundle:             bundle,
 		softExpiresAt:      softExpiresAt,
 		hardExpiresAt:      hardExpiresAt,
@@ -1047,6 +1063,13 @@ func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle, configETag string) 
 		configETag:         configETag,
 		budgetRollAckedFor: ackedBoundaryAtBuild(bundle, now),
 	}
+}
+
+// publishL1 makes stored the live entry under h and records its org for the
+// change feed.
+func (s *Service) publishL1(h [64]byte, stored *entry) *entry {
+	bundle := stored.bundle
+	s.lastKnown.Remove(h)
 	s.l1.Add(h, stored)
 	// Record the bundle's org so the change-feed loop knows which orgs
 	// to subscribe to. LoadOrStore is the first-write-wins shape: if
@@ -1057,15 +1080,6 @@ func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle, configETag string) 
 		s.activeOrgs.LoadOrStore(bundle.OrganizationID, &orgCursor{since: "0"})
 	}
 	return stored
-}
-
-// carryBudgetChanges marks a replacement entry when budget changes reached the
-// entry it replaces after its refresh had already started, since the figures
-// that refresh read may predate them.
-func carryBudgetChanges(from, to *entry, seenAtStart uint64) {
-	if from.budgetChangeCount() != seenAtStart {
-		to.markBudgetChanged()
-	}
 }
 
 // entryDeadlines computes the two instants a cached entry lives by: the JWT
@@ -1416,7 +1430,7 @@ func (s *Service) refreshBackground(key domain.PresentedKey, h [64]byte, started
 			s.logger.Debug("auth_cache_refresh_dropped_stale", zap.String("vk_id", bundle.VirtualKeyID))
 			return
 		}
-		carryBudgetChanges(started, s.storeL1(h, bundle, etag), budgetChangesAtStart)
+		s.publishL1(h, s.newEntry(bundle, etag).carryBudgetChanges(started, budgetChangesAtStart))
 		s.logger.Debug("auth_cache_refresh_success", zap.String("vk_id", bundle.VirtualKeyID))
 
 	case classAuthRejection:
@@ -1537,7 +1551,7 @@ func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 		)
 		return
 	}
-	carryBudgetChanges(e, s.storeL1(h, &fresh, res.ETag), budgetChangesAtStart)
+	s.publishL1(h, s.newEntry(&fresh, res.ETag).carryBudgetChanges(e, budgetChangesAtStart))
 	s.logger.Debug("config_ttl_refresh_success", zap.String("vk_id", stale.VirtualKeyID))
 }
 
