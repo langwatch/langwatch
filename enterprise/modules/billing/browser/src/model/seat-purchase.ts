@@ -37,6 +37,8 @@ export type SeatPrice = {
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const people = (n: number) => (n === 1 ? "1 person" : `${n} people`);
+/** "1 person uses", "2 people use": the count and its verb in agreement. */
+const peopleUse = (n: number) => `${people(n)} ${n === 1 ? "uses" : "use"}`;
 const money = (price: SeatPrice, cents: number) => formatPrice({ cents, currency: price.currency });
 /** "excl. VAT" beside a recurring price; nothing beside a free one. */
 const recurringNote = (cents: number) => (cents > 0 ? EXCLUDING_VAT : undefined);
@@ -96,8 +98,8 @@ export function developerMinimumHint({
 }: DeveloperFloor & { target: number }): string | undefined {
   if (inUse === 0 || target !== inUse || target === current) return undefined;
   return target < current
-    ? `${people(inUse)} use Developer seats. Remove someone in Users to go lower.`
-    : `${people(inUse)} use Developer seats, so you need at least ${inUse}.`;
+    ? `${peopleUse(inUse)} Developer seats. Remove someone in Users to go lower.`
+    : `${peopleUse(inUse)} Developer seats, so you need at least ${inUse}.`;
 }
 
 /** "€87/mo", "excl. VAT" and "3 seats × €29", the seat dialog's live total. */
@@ -280,12 +282,12 @@ export function growthSeatPlan(plan: GrowthSeatPlan) {
 
 function growthMinimumHint({ inUse, held }: { inUse: number; held: HeldSeats }): string {
   const lower = "Remove someone in Users to go lower.";
-  if (!("firstFreesOn" in held)) return `${people(inUse)} use full seats. ${lower}`;
+  if (!("firstFreesOn" in held)) return `${peopleUse(inUse)} full seats. ${lower}`;
   const heldPart =
     held.count === 1
       ? `1 more is held until ${held.firstFreesOn}`
       : `${held.count} more are held, the first until ${held.firstFreesOn}`;
-  return `${people(inUse - held.count)} use full seats and ${heldPart}. ${lower}`;
+  return `${peopleUse(inUse - held.count)} full seats and ${heldPart}. ${lower}`;
 }
 
 function nextPeriodDay({

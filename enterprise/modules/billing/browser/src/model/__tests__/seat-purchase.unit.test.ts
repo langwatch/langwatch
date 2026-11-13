@@ -142,6 +142,15 @@ describe("developerSeatMinimum()", () => {
     expect(snapDeveloperTarget({ previous: 3, next: 2, current: 3, inUse: 2 })).toBe(2);
   });
 
+  it("puts the verb in agreement with one person", () => {
+    expect(developerMinimumHint({ target: 1, current: 3, inUse: 1 })).toBe(
+      "1 person uses Developer seats. Remove someone in Users to go lower.",
+    );
+    expect(growthSeatPlan(growth({ paid: 5, seats: 1, inUse: 1 })).minimumHint).toBe(
+      "1 person uses full seats. Remove someone in Users to go lower.",
+    );
+  });
+
   /** @scenario "Developers counted after a lower pick lift the pick to the floor" */
   it("lifts a pick below the floor once the Developers in use are counted", () => {
     expect(developerTargetWithin({ target: 1, current: 3, inUse: 2 })).toBe(2);
