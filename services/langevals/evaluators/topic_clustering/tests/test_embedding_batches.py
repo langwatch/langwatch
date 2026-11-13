@@ -90,20 +90,47 @@ def test_a_rate_limited_batch_is_asked_again(monkeypatch):
     assert refused == ["text-40"]
 
 
-# @scenario "Any other failed embedding batch falls back to one call per input"
-def test_any_other_batch_failure_falls_back_to_one_call_per_input(monkeypatch):
+# @scenario "A batch still rate limited after its retries is raised to the caller"
+def test_a_batch_rate_limited_on_every_try_is_raised(monkeypatch):
     single_calls = []
 
-    def batches_fail(*, input, **_params):
-        if isinstance(input, list):
+    def always_limit(*, input, **_params):
+        if not isinstance(input, list):
+            single_calls.append(input)
+        raise litellm.exceptions.RateLimitError(message="slow down", **PROVIDER)
+
+    monkeypatch.setattr(litellm, "embedding", always_limit)
+
+    with pytest.raises(litellm.exceptions.RateLimitError):
+        utils.generate_embeddings(TEXTS[:40], PARAMS)
+
+    assert single_calls == []
+
+
+# @scenario "Any other failed embedding batch falls back to one call per input"
+def test_any_other_batch_failure_falls_back_after_the_batches_in_flight(monkeypatch):
+    lock = threading.Lock()
+    last_batch_returned = []
+    single_calls_started = []
+
+    def first_batch_fails(*, input, **_params):
+        if not isinstance(input, list):
+            with lock:
+                single_calls_started.append(time.monotonic())
+            return answer(input)
+        if input[0] == "text-0":
             raise litellm.exceptions.APIConnectionError(message="reset", **PROVIDER)
-        single_calls.append(input)
+        time.sleep(0.2)
+        with lock:
+            last_batch_returned.append(time.monotonic())
         return answer(input)
 
-    monkeypatch.setattr(litellm, "embedding", batches_fail)
+    monkeypatch.setattr(litellm, "embedding", first_batch_fails)
 
-    assert utils.generate_embeddings(TEXTS[:30], PARAMS) == EXPECTED[:30]
-    assert sorted(single_calls) == sorted(TEXTS[:30])
+    assert utils.generate_embeddings(TEXTS[:60], PARAMS, max_workers=3) == EXPECTED[:60]
+    assert len(last_batch_returned) == 2
+    assert len(single_calls_started) == 60
+    assert min(single_calls_started) >= max(last_batch_returned)
 
 
 # @scenario "Embedding a page stops at a provider auth refusal without retrying input by input"

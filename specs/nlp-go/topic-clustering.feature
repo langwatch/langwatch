@@ -132,10 +132,18 @@ Feature: Topic clustering runs on langevals
     And no per-input fallback calls are made
 
   @unit
+  Scenario: A batch still rate limited after its retries is raised to the caller
+    Given an embedding provider that rate limits a batch on every try
+    When langevals embeds a page
+    Then the rate limit is raised to the caller
+    And no per-input fallback calls are made
+
+  @unit
   Scenario: Any other failed embedding batch falls back to one call per input
     Given an embedding provider that fails a batch call for a reason other than auth or rate limits
     When langevals embeds a page
     Then the page is embedded again one input per call
+    And no per-input call starts before every batch call in flight has returned
 
   @unit
   Scenario: Embedding a page stops at a provider auth refusal without retrying input by input
@@ -152,3 +160,4 @@ Feature: Topic clustering runs on langevals
     When langevals names the topics
     Then every topic keeps the name the model gave it
     And the naming cost counts that call as zero
+    And the same holds when pricing the call raises instead

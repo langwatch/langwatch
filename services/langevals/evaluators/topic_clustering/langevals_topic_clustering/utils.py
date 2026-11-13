@@ -166,7 +166,7 @@ def generate_embeddings(
     logger.info("Generating embeddings", text_count=len(texts), batch_count=total_batches)
 
     fall_back_to_threaded = False
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=max(1, max_workers))
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
     try:
         # Each batch runs in its own copy of the context, so the request's log
         # context and usage ledger follow it onto the worker thread.
@@ -189,6 +189,10 @@ def generate_embeddings(
                     # Don't fallback for auth errors — same key will fail for every individual request
                     if isinstance(e, litellm.exceptions.AuthenticationError):
                         logger.warning("Embedding authentication failed, not retrying", error=str(e))
+                        raise
+                    # Still limited after its retries: one call per input would only add load.
+                    if isinstance(e, litellm.exceptions.RateLimitError):
+                        logger.warning("Embedding still rate limited after retries", error=str(e))
                         raise
                     logger.info("Batch embedding failed, falling back to threaded implementation")
                     fall_back_to_threaded = True
