@@ -155,6 +155,36 @@ describe("given object storage on the local filesystem", () => {
     });
   });
 
+  describe("when a module asks whether an object exists", () => {
+    /** @scenario "Azure and filesystem existence checks read no body" */
+    it("answers true for a held object and false for an absent one", async () => {
+      const backend = filesystemBackend({ root });
+      await backend.write(at, bytes(5), { byteLength: 5, contentType: "text/plain" });
+
+      await expect(backend.exists(at)).resolves.toBe(true);
+      await expect(backend.exists({ ...at, key: "project-1/object-2" })).resolves.toBe(false);
+    });
+
+    /** @scenario "Azure and filesystem existence checks read no body" */
+    it("answers false when the key names a directory, not a file", async () => {
+      const backend = filesystemBackend({ root });
+      await backend.write(at, bytes(5), { byteLength: 5, contentType: "text/plain" });
+
+      await expect(backend.exists({ ...at, key: "project-1" })).resolves.toBe(false);
+    });
+
+    /** @scenario "Azure and filesystem existence checks read no body" */
+    it.skipIf(process.getuid?.() === 0)("fails when the root cannot be searched", async () => {
+      const backend = filesystemBackend({ root });
+      await chmod(root, 0o000);
+      try {
+        await expect(backend.exists(at)).rejects.toMatchObject({ code: "EACCES" });
+      } finally {
+        await chmod(root, 0o700);
+      }
+    });
+  });
+
   describe("when the root refuses writes", () => {
     const runsAsRoot = process.getuid?.() === 0;
 

@@ -49,6 +49,12 @@ export abstract class StoredObjectBytesRepository {
     address: StoredObjectStorageAddress;
   }): Promise<ObjectDigest>;
 
+  /** Whether bytes are at the address, asked without opening them. */
+  abstract exists(input: {
+    projectId: StoredObjectProjectId;
+    address: StoredObjectStorageAddress;
+  }): Promise<boolean>;
+
   /** Throws `StoredObjectNotFoundError` when no bytes are at the address. */
   abstract getBytes(input: {
     projectId: StoredObjectProjectId;

@@ -420,11 +420,12 @@ export class IngestionSourceService {
     return source;
   }
 
+  /** A disabled source is never stamped back to active; the repository write says so. */
   async recordEventReceived(id: string): Promise<void> {
-    await this.repository.update(id, {
-      lastEventAt: Temporal.Instant.fromEpochMilliseconds(this.now()),
-      status: "active",
-    });
+    await this.repository.recordEventReceived(
+      id,
+      Temporal.Instant.fromEpochMilliseconds(this.now()),
+    );
   }
 
   async getById({

@@ -49,6 +49,7 @@ export interface LicenseMinter {
     planType: string;
     maxMembers: number;
     maxMembersLite: number | undefined;
+    maxMembersDeveloper?: number;
     expiresAt: Instant;
     terms?: { services?: ConnectService[] };
     operatorId: string;
@@ -110,6 +111,8 @@ export class ActivationCodeService {
           maxMembersLite: input.maxMembersLite,
         }),
       }),
+      // 0 sells none, so it is stored as none, the way a signed licence leaves it out.
+      maxMembersDeveloper: input.maxMembersDeveloper || null,
       licenseTermDays: input.licenseTermDays,
       services: input.services ?? [],
       expiresAt: Temporal.Instant.from(input.expiresAt),
@@ -265,7 +268,11 @@ export class ActivationCodeService {
       customer: { organizationId: row.organizationId },
       email: row.email,
       planType: row.planType,
-      ...licenseSeats({ members: row.maxMembers, membersLite: signedLiteSeats(row).membersLite }),
+      ...licenseSeats({
+        members: row.maxMembers,
+        membersLite: signedLiteSeats(row).membersLite,
+        membersDeveloper: row.maxMembersDeveloper ?? undefined,
+      }),
       expiresAt,
       terms: { services: entitledConnectServices(row.services) },
       operatorId: this.collaborators.systemActorId,

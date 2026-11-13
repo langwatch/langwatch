@@ -80,6 +80,11 @@ export abstract class IngestionSourceRepository {
     id: string,
     input: UpdateIngestionSourceRecord,
   ): Promise<GovernanceIngestionSource>;
+  /**
+   * Stamp a received batch: last event time, and active. One conditional write that never
+   * touches a source that is off, so a disable landing while a batch is in flight holds.
+   */
+  abstract recordEventReceived(id: string, at: Instant): Promise<void>;
   abstract getUnpricedUsageWindow(id: string): Promise<UnpricedUsageWindow>;
   abstract updateUnpricedUsageWindow(id: string, window: UnpricedUsageWindow): Promise<void>;
   /** The organisation's unarchived sources that read a window they could not price. */

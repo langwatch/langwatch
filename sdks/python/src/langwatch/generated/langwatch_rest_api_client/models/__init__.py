@@ -5536,6 +5536,7 @@ from .post_api_dataset_attachments_uploads_response_201_headers import (
 from .post_api_dataset_body import PostApiDatasetBody
 from .post_api_dataset_body_column_types_item import PostApiDatasetBodyColumnTypesItem
 from .post_api_dataset_body_column_types_item_type import PostApiDatasetBodyColumnTypesItemType
+from .post_api_dataset_body_entries_item import PostApiDatasetBodyEntriesItem
 from .post_api_dataset_by_slug_entries_response_200 import PostApiDatasetBySlugEntriesResponse200
 from .post_api_dataset_by_slug_or_id_imports_response_200 import PostApiDatasetBySlugOrIdImportsResponse200
 from .post_api_dataset_by_slug_or_id_records_body import PostApiDatasetBySlugOrIdRecordsBody
@@ -12256,6 +12257,7 @@ __all__ = (
     "PostApiDatasetBody",
     "PostApiDatasetBodyColumnTypesItem",
     "PostApiDatasetBodyColumnTypesItemType",
+    "PostApiDatasetBodyEntriesItem",
     "PostApiDatasetBySlugEntriesResponse200",
     "PostApiDatasetBySlugOrIdImportsResponse200",
     "PostApiDatasetBySlugOrIdRecordsBody",
