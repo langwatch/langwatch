@@ -76,7 +76,7 @@ const checkRunsSchema = z.object({
   ),
 });
 
-/** One page is enough to judge a commit: GitHub caps both lists at 100 per page. */
+/** GitHub's largest page for the check suites and check runs lists. */
 const CHECKS_PAGE_SIZE = 100;
 /** Pages of check runs read per commit; past them the rest count as still running. */
 const MAX_CHECK_RUN_PAGES = 10;
