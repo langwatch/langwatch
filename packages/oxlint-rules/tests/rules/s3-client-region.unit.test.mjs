@@ -88,6 +88,26 @@ new S3Client({ ...this.aws.build({ region }) });`;
       const shared = "const options = { region: s3RegionOf(config) };\nnew S3Client(options);";
       expect(messageIds(shared)).toEqual([]);
     });
+
+    /** @scenario "An S3 client whose options the rule cannot read is reported" */
+    it("reports unreadableOptions when a property of the binding is written later", () => {
+      const written = `const options = { region: s3RegionOf(config) };
+options.region = "auto";
+new S3Client(options);`;
+      expect(messageIds(written)).toEqual(["unreadableOptions"]);
+    });
+  });
+
+  describe("when a later region replaces one from a spread", () => {
+    /** @scenario "A region from the shared rule is accepted" */
+    it("judges only the region the client receives", () => {
+      const code = `const defaults = { region: "auto" };
+new S3Client({ ...defaults, region: s3RegionOf(config) });`;
+      expect(messageIds(code)).toEqual([]);
+      const before = `const defaults = { region: "auto" };
+new S3Client({ region: s3RegionOf(config), ...defaults });`;
+      expect(messageIds(before)).toEqual(["regionNotShared"]);
+    });
   });
 
   describe("when a same-named region in another function comes from the shared rule", () => {

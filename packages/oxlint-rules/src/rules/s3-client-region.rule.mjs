@@ -31,13 +31,29 @@ function propertyName(property) {
   return property.key.type === "Literal" ? String(property.key.value) : undefined;
 }
 
-/** The initialiser of the `const` this identifier resolves to in its own scope. */
-function constInitOf(context, identifier) {
+function variableOf(context, identifier) {
   let scope = context.sourceCode.getScope(identifier);
   while (scope && !scope.set.has(identifier.name)) scope = scope.upper;
-  const definition = scope?.set.get(identifier.name)?.defs[0];
+  return scope?.set.get(identifier.name);
+}
+
+/** The initialiser of the `const` this identifier resolves to in its own scope. */
+function constInitOf(context, identifier) {
+  const definition = variableOf(context, identifier)?.defs[0];
   if (definition?.type !== "Variable" || definition.parent?.kind !== "const") return undefined;
   return definition.node.init ?? undefined;
+}
+
+/** `options.region = x`, `delete options.region` or `options.n++`: the initialiser is stale. */
+function isWrittenThrough(context, identifier) {
+  return (variableOf(context, identifier)?.references ?? []).some(({ identifier: used }) => {
+    const member = used.parent;
+    if (member?.type !== "MemberExpression" || member.object !== used) return false;
+    const { parent } = member;
+    if (parent?.type === "AssignmentExpression") return parent.left === member;
+    if (parent?.type === "UnaryExpression") return parent.operator === "delete";
+    return parent?.type === "UpdateExpression";
+  });
 }
 
 const NO_OPTIONS = { regions: [], always: false, unreadable: undefined };
@@ -60,7 +76,8 @@ function objectOptions(context, node, depth) {
       result.always ||= spread.always;
       result.unreadable ??= spread.unreadable;
     } else if (propertyName(property) === "region") {
-      result.regions.push(property.value);
+      // A later region replaces every earlier one, spread or not.
+      result.regions = [property.value];
       result.always = true;
     }
   }
@@ -87,7 +104,8 @@ const READERS = {
       : { ...NO_OPTIONS, unreadable: node },
   Identifier: (context, node, depth) => {
     const init = constInitOf(context, node);
-    return init ? optionsOf(context, init, depth + 1) : { ...NO_OPTIONS, unreadable: node };
+    if (!init || isWrittenThrough(context, node)) return { ...NO_OPTIONS, unreadable: node };
+    return optionsOf(context, init, depth + 1);
   },
 };
 

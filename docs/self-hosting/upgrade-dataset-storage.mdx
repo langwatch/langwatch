@@ -56,7 +56,7 @@ app:
       awsS3:
         # Your bucket's region (rendered as S3_REGION). Required for AWS. For MinIO
         # or other S3-compatible services, set the region the service expects, or
-        # remove this line to sign as "auto".
+        # remove the whole region block (both lines) to sign as "auto".
         region:
           value: "<your-bucket-region>"
         accessKeyId:
