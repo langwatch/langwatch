@@ -1,3 +1,4 @@
+import { OPENAI_MODELS } from "@earendil-works/pi-ai/providers/openai.models";
 import { describe, expect, it } from "vitest";
 
 import type { LangyWorkerModelConfig } from "./config.js";
@@ -193,6 +194,53 @@ describe("buildModelsJson", () => {
       for (const id of ["anthropic/claude-opus-4-20250514", "anthropic/claude-3-7-sonnet-latest"]) {
         expect(claude(id).compat, id).toBeUndefined();
       }
+    });
+  });
+
+  describe("when the manager leaves reasoning unsaid", () => {
+    const env = { LLM_BASE_URL: "http://127.0.0.1:41234", LLM_API_KEY: "k" };
+    const reasoningOf = (id: string, api: LangyWorkerModelConfig["api"], reasoning?: boolean) => {
+      const provider = buildModelsJson({
+        model: {
+          id,
+          api,
+          baseUrlEnv: "LLM_BASE_URL",
+          apiKeyEnv: "LLM_API_KEY",
+          ...(reasoning === undefined ? {} : { reasoning }),
+        },
+        env,
+      }).providers[PROVIDER_ID] as { models: Record<string, unknown>[] };
+      return provider.models[0]?.reasoning;
+    };
+    const [nonReasoningId] =
+      Object.entries(OPENAI_MODELS).find(
+        ([, entry]) => !entry.reasoning && entry.api === "openai-responses",
+      ) ?? [];
+
+    /** @scenario A model that cannot reason is never asked to */
+    it("takes reasoning off for a catalogued model that cannot reason", () => {
+      expect(nonReasoningId).toBeDefined();
+      expect(reasoningOf(`openai/${nonReasoningId}`, "openai-responses")).toBe(false);
+    });
+
+    /** @scenario A model that cannot reason is never asked to */
+    it("keeps reasoning on for a catalogued model that reasons", () => {
+      expect(reasoningOf("openai/gpt-5-mini", "openai-responses")).toBe(true);
+    });
+
+    /** @scenario A model that cannot reason is never asked to */
+    it("assumes reasoning for an uncatalogued Responses or Messages model", () => {
+      expect(reasoningOf("openai_codex/gpt-5-codex", "openai-responses")).toBe(true);
+      expect(reasoningOf("anthropic/claude-acme-1", "anthropic-messages")).toBe(true);
+    });
+
+    /** @scenario A model that cannot reason is never asked to */
+    it("leaves an uncatalogued chat-completions model without reasoning", () => {
+      expect(reasoningOf("gemini/gemini-2.5-pro", "openai-completions")).toBeUndefined();
+    });
+
+    it("lets an explicit setting win over the default", () => {
+      expect(reasoningOf("openai_codex/gpt-5-codex", "openai-responses", false)).toBe(false);
     });
   });
 
