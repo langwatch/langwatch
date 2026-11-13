@@ -48,11 +48,11 @@ const TRACE_ANALYTICS_METADATA_COLUMN_NAMES = Object.keys(
 ) as (keyof TraceAnalyticsMetadataColumns)[];
 
 /**
- * The 9 columns goose 00126 made MATERIALIZED, left to the database (its expression computes the same
- * value from Attributes): in prod the fold's insert of them failed with ILLEGAL_COLUMN despite
- * insert_allow_materialized_columns. The ADR-006 REMOVE MATERIALIZED step waits until the fold writes them.
+ * The 9 columns goose 00126 made MATERIALIZED, left to the database (same value from Attributes):
+ * in prod the fold's insert of them failed with ILLEGAL_COLUMN despite the allow setting.
+ * The ADR-006 REMOVE MATERIALIZED step waits until the fold writes them again.
  */
-export const TRACE_ANALYTICS_MATERIALIZED_METADATA_COLUMNS: ReadonlySet<string> = new Set([
+const MATERIALIZED_NAMES = [
   "MetadataOutputAction",
   "MetadataOutcome",
   "MetadataSentToReview",
@@ -62,20 +62,27 @@ export const TRACE_ANALYTICS_MATERIALIZED_METADATA_COLUMNS: ReadonlySet<string> 
   "MetadataSegment",
   "MetadataTeam",
   "MetadataTopic",
-]);
+] as const satisfies readonly (keyof TraceAnalyticsMetadataColumns)[];
 
-/**
- * The metadata columns the fold inserts: the plain ones. The MATERIALIZED nine are left to the
- * database, see TRACE_ANALYTICS_MATERIALIZED_METADATA_COLUMNS.
- */
+export const TRACE_ANALYTICS_MATERIALIZED_METADATA_COLUMNS: ReadonlySet<string> = new Set(
+  MATERIALIZED_NAMES,
+);
+
+/** The plain metadata columns: what the fold inserts. */
+export type TraceAnalyticsWrittenMetadataColumns = Omit<
+  TraceAnalyticsMetadataColumns,
+  (typeof MATERIALIZED_NAMES)[number]
+>;
+
+/** The metadata columns the fold inserts: the plain ones, never the MATERIALIZED nine. */
 export function traceAnalyticsWrittenMetadataColumns(
-  columns: Readonly<Record<string, string>>,
-): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(columns).filter(
-      ([column]) => !TRACE_ANALYTICS_MATERIALIZED_METADATA_COLUMNS.has(column),
-    ),
-  );
+  columns: TraceAnalyticsMetadataColumns,
+): TraceAnalyticsWrittenMetadataColumns {
+  return {
+    MetadataOutcomeReason: columns.MetadataOutcomeReason,
+    MetadataPromptVersion: columns.MetadataPromptVersion,
+    MetadataEnvironment: columns.MetadataEnvironment,
+  };
 }
 
 /**

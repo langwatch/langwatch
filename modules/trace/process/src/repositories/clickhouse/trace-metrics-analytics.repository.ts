@@ -19,7 +19,7 @@ import type {
   TraceEvaluationOutcome,
 } from "../../eventing/trace-derived.projection.ts";
 import {
-  type TraceAnalyticsMetadataColumns,
+  type TraceAnalyticsWrittenMetadataColumns,
   traceAnalyticsMetadataColumns,
   traceAnalyticsWrittenMetadataColumns,
 } from "../../rules/trace-widget-columns.rules.ts";
@@ -101,7 +101,7 @@ type ClickHouseTraceAnalyticsWriteRecord = {
   Attributes: Record<string, string>;
 
   // ── The stock widgets' metadata columns (migrations 00126, 00128) ──────
-} & TraceAnalyticsMetadataColumns & {
+} & TraceAnalyticsWrittenMetadataColumns & {
     // ── Read-back state (ADR-066, migration 00056) ─────────────────────────
     SpanCount: number;
     AnnotationIds: string[];
