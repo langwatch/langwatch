@@ -85,39 +85,74 @@ export class TraceEvaluationOutcomesMigrationService {
         limit: PROJECT_PAGE_SIZE,
       });
       for (const { id: projectId } of page.projects) {
-        let latest = report;
-        let skipped = false;
-        try {
-          report = await this.recordProject({
-            projectId,
-            report,
-            dryRun,
-            signal,
-            onPage: async (saved) => {
-              latest = saved;
-              await onPage(saved);
-            },
-          });
-        } catch (error) {
-          // Pages of this project already sent keep their counts: carry on from the last saved one.
-          if (!isProjectGone(error)) throw error;
-          report = latest;
-          this.deps.logger.warn(
-            { projectId },
-            "the evaluation outcomes step skipped a project that is archived or gone",
-          );
-          report = { ...report, skippedProjects: report.skippedProjects + 1 };
-          skipped = true;
-        }
-        // A skip is saved even when aborted, or the resume would revisit the gone project uncounted.
-        if (signal.aborted && !skipped) return report;
-        report = { ...report, afterProjectId: projectId, inProject: null };
-        if (!dryRun) await onPage(report);
-        if (skipped && signal.aborted) return report;
+        const step = await this.recordOrSkipProject({ projectId, report, dryRun, signal, onPage });
+        report = step.report;
+        if (step.stop) return report;
       }
       after = page.next ?? undefined;
     } while (after !== undefined);
     return report;
+  }
+
+  /** Records one project, or skips it whole when it is gone; `stop` says the run was aborted. */
+  private async recordOrSkipProject({
+    projectId,
+    report,
+    dryRun,
+    signal,
+    onPage,
+  }: {
+    projectId: string;
+    report: EvaluationOutcomesBackfillReport;
+    dryRun: boolean;
+    signal: AbortSignal;
+    onPage: (report: EvaluationOutcomesBackfillReport) => Promise<void>;
+  }): Promise<{ report: EvaluationOutcomesBackfillReport; stop: boolean }> {
+    let latest = report;
+    let recorded: EvaluationOutcomesBackfillReport;
+    try {
+      recorded = await this.recordProject({
+        projectId,
+        report,
+        dryRun,
+        signal,
+        onPage: async (saved) => {
+          latest = saved;
+          await onPage(saved);
+        },
+      });
+    } catch (error) {
+      // Pages of this project already sent keep their counts: carry on from the last saved one.
+      if (!isProjectGone(error)) throw error;
+      this.deps.logger.warn(
+        { projectId },
+        "the evaluation outcomes step skipped a project that is archived or gone",
+      );
+      const skipped = { ...latest, skippedProjects: latest.skippedProjects + 1 };
+      // A skip is saved even when aborted, or the resume would revisit the gone project uncounted.
+      const advanced = await this.advancePast({ projectId, report: skipped, dryRun, onPage });
+      return { report: advanced, stop: signal.aborted };
+    }
+    if (signal.aborted) return { report: recorded, stop: true };
+    const advanced = await this.advancePast({ projectId, report: recorded, dryRun, onPage });
+    return { report: advanced, stop: false };
+  }
+
+  /** Marks the project done in the report and saves it, unless this is a dry run. */
+  private async advancePast({
+    projectId,
+    report,
+    dryRun,
+    onPage,
+  }: {
+    projectId: string;
+    report: EvaluationOutcomesBackfillReport;
+    dryRun: boolean;
+    onPage: (report: EvaluationOutcomesBackfillReport) => Promise<void>;
+  }): Promise<EvaluationOutcomesBackfillReport> {
+    const advanced = { ...report, afterProjectId: projectId, inProject: null };
+    if (!dryRun) await onPage(advanced);
+    return advanced;
   }
 
   private firstReport(): EvaluationOutcomesBackfillReport {
