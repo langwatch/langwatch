@@ -34,7 +34,7 @@ describe("the agent prompt example", () => {
     const tabs = [...strip.matchAll(/<button[^>]*role="tab"[^>]*>[\s\S]*?<\/button>/g)]
       .map((match) => match[0])
       .slice(0, 4);
-    const text = (tag: string) => tag.replace(/<[^>]+>/g, "");
+    const text = (tag: string) => [...tag.matchAll(/>([^<]*)</g)].map((part) => part[1]).join("");
     expect(tabs.map(text).map((label) => label.replace(/\d+$/, ""))).toEqual([
       "Agent prompt",
       "Python",

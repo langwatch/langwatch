@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import {
   apiKeyTokenResolutionInputSchema,
   apiKeyVerificationSchema,
@@ -30,7 +32,6 @@ import {
   isDocsSessionKey,
   keyCredentialTypeOf,
   parseHeld,
-  tokenHash,
 } from "../rules/api-key-held-answer.rules.ts";
 import { ApiKeyGrantsService } from "./api-key-grants.service.ts";
 import { ApiKeyLastUsedService } from "./api-key-last-used.service.ts";
@@ -488,4 +489,8 @@ function shared<T>({
   pending.set(key, started);
 
   return started;
+}
+
+function tokenHash({ token }: { token: string }): string {
+  return createHash("sha256").update(token).digest("hex");
 }

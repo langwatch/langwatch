@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 import {
   CLI_LOGIN_KEY_NAME_PREFIX,
   DOCS_SESSION_API_KEY_NAME,
@@ -8,11 +6,6 @@ import {
 import { Temporal, toDate } from "@langwatch/time";
 
 const DATE_FIELDS = new Set(["expiresAt", "revokedAt", "lastUsedAt", "createdAt", "updatedAt"]);
-
-/** What a token's held answer is filed under: its sha256, never the token itself. */
-export function tokenHash({ token }: { token: string }): string {
-  return createHash("sha256").update(token).digest("hex");
-}
 
 /** JSON with the key's dates restored; anything unreadable is a miss. */
 export function parseHeld({ raw }: { raw: string }): unknown {
