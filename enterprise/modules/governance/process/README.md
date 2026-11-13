@@ -765,7 +765,7 @@ searchRegistryArd(input: { organizationId: string; request: ArdSearchRequest; })
 
 List the organisation's agent registry
 
-Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:45`.
+Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:45`.
 
 Answers at `/api/governance/registry/agents`, `/api/v1/governance/registry/agents`.
 
@@ -784,7 +784,7 @@ type Response = z.infer<typeof agentRegistryListResponseSchema>; // ../contract/
 
 Get one registry agent
 
-Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:67`.
+Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:68`.
 
 Answers at `/api/governance/registry/agents/:agentId`, `/api/v1/governance/registry/agents/:agentId`.
 
@@ -800,7 +800,7 @@ type Response = z.infer<typeof agentRegistryDetailResponseSchema>; // ../contrac
 
 List one registry agent's versions
 
-Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:87`.
+Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:89`.
 
 Answers at `/api/governance/registry/agents/:agentId/versions`, `/api/v1/governance/registry/agents/:agentId/versions`.
 
@@ -818,7 +818,7 @@ type Response = z.infer<typeof agentRegistryEventsResponseSchema>; // ../contrac
 
 Read the registry change feed
 
-Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:113`.
+Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:116`.
 
 Answers at `/api/governance/registry/events`, `/api/v1/governance/registry/events`.
 
@@ -831,7 +831,7 @@ type Response = z.infer<typeof agentRegistryEventsResponseSchema>; // ../contrac
 
 Get the registry's JSON Schemas
 
-Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:133`.
+Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:137`.
 
 Answers at `/api/governance/registry/schema`, `/api/v1/governance/registry/schema`.
 
@@ -847,7 +847,7 @@ interface Response {
 
 Get the registry as an ARD manifest
 
-Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:146`.
+Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:151`.
 
 Answers at `/api/governance/registry/ard.json`, `/api/v1/governance/registry/ard.json`.
 
@@ -859,7 +859,7 @@ type Response = z.infer<typeof ardManifestSchema>; // ../contract/src/features/r
 
 Search the registry (ARD search)
 
-Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:159`.
+Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:165`.
 
 Answers at `/api/governance/registry/ard/search`, `/api/v1/governance/registry/ard/search`.
 
@@ -2350,20 +2350,20 @@ Declared at `src/eventing/pulled-usage.pipeline.ts:167`. Events: `pulledUsageObs
 
 ### Pipeline `governance_agent_registry` (aggregate `global`)
 
-Declared at `src/features/registry/eventing/agent-registry.pipeline.ts:83`.
+Declared at `src/features/registry/eventing/agent-registry.pipeline.ts:89`.
 
 | Kind            | Name                                    | Handles                                                                                                                             | Declared at                                                     |
 | --------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| process manager | `agentRegistryDelivery`                 | every 1 d (`AGENT_REGISTRY_DELIVERY_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneDelivered`, `requestDelivery` (outbox) | `src/features/registry/eventing/agent-registry.pipeline.ts:101` |
-| process manager | `agentRegistryTraffic`                  | every 15 min (`AGENT_REGISTRY_TRAFFIC_INTERVAL_MS = 15 * 60 * 1000`); intents `pass` (outbox)                                       | `src/features/registry/eventing/agent-registry.pipeline.ts:118` |
-| peer subscriber | `reconcileAgentRegistryOnAgentChanged`  | `lw.agent.changed` from [agent](../../../../modules/agent/README.md)                                                                | `src/features/registry/eventing/agent-registry.pipeline.ts:89`  |
-| peer subscriber | `reconcileAgentRegistryOnAgentArchived` | `lw.agent.archived` from [agent](../../../../modules/agent/README.md)                                                               | `src/features/registry/eventing/agent-registry.pipeline.ts:95`  |
+| process manager | `agentRegistryDelivery`                 | every 1 d (`AGENT_REGISTRY_DELIVERY_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneDelivered`, `requestDelivery` (outbox) | `src/features/registry/eventing/agent-registry.pipeline.ts:107` |
+| process manager | `agentRegistryTraffic`                  | every 15 min (`AGENT_REGISTRY_TRAFFIC_INTERVAL_MS = 15 * 60 * 1000`); intents `pass` (outbox)                                       | `src/features/registry/eventing/agent-registry.pipeline.ts:124` |
+| peer subscriber | `reconcileAgentRegistryOnAgentChanged`  | `lw.agent.changed` from [agent](../../../../modules/agent/README.md)                                                                | `src/features/registry/eventing/agent-registry.pipeline.ts:95`  |
+| peer subscriber | `reconcileAgentRegistryOnAgentArchived` | `lw.agent.archived` from [agent](../../../../modules/agent/README.md)                                                               | `src/features/registry/eventing/agent-registry.pipeline.ts:101` |
 
 ## Configuration
 
 | Kind   | Leaf                       | Environment variable                  | Declared at                               |
 | ------ | -------------------------- | ------------------------------------- | ----------------------------------------- |
-| secret | `–`                        | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:530`           |
+| secret | `–`                        | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:533`           |
 | config | `gatewayPublicUrl`         | `LW_GATEWAY_PUBLIC_URL`               | `../contract/src/governance.config.ts:41` |
 | config | `gatewayInternalUrl`       | `LW_GATEWAY_INTERNAL_URL`             | `../contract/src/governance.config.ts:42` |
 | config | `gatewayLegacyUrl`         | `LW_GATEWAY_BASE_URL`                 | `../contract/src/governance.config.ts:43` |

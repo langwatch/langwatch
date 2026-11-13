@@ -21,6 +21,8 @@ A LangWatch agent that is archived or deleted, and a traced agent that has sent 
 
 ## Authentication
 
+The agent registry is part of the Enterprise plan. On other plans every route answers `402` with code `enterprise_plan_required`, and the registry is not built.
+
 Every route takes an organization API key in `Authorization: Bearer <key>`. The key needs the `governance:view` permission, which organization admins hold. A key without it gets `403`.
 
 ## Endpoints
@@ -97,7 +99,7 @@ curl -s "$LANGWATCH_ENDPOINT/api/governance/registry/agents?limit=50" \
 - `source_version` is the version the source names, when it names one: the prompt version of a LangWatch prompt-based agent, the last modified time of a Copilot Studio agent.
 - `tools` lists what the agent can be called with, each with a JSON Schema of its arguments. A prompt-based, code, workflow or HTTP agent has one `invoke` tool built from its declared inputs and outputs. A connected agent has one `call` tool built from its declared parameters; a secret parameter is marked `writeOnly` and never carries its default.
 - `instructions` is the system prompt of a prompt-based agent, and `null` where LangWatch does not hold one.
-- Credentials an HTTP agent holds (auth, headers) never appear in an entry. Its URL is published as origin and path only: user info, query string and fragment are left out, since they can carry keys such as `?code=`.
+- Credentials an HTTP agent holds (auth, headers) never appear in an entry. Its URL is published as its origin only, such as `https://agent.example.com`: the path, user info, query string and fragment are left out, since webhook URLs and `?code=` keys put credentials there. A URL that is not `http` or `https` publishes no endpoint.
 
 ## Change events
 
@@ -132,8 +134,8 @@ Every event has the same shape:
 
 - A change to an agent in a LangWatch project updates the registry within seconds of the save or archive.
 - A listing from an ingestion source updates it right after the listing runs.
-- When an upgrade first fills the registry, the events for agents that already existed are written to the feed but not pushed to webhooks.
-- Traffic is read every 15 minutes for organizations that already hold a registry, once a day for every organization, and on each of the two triggers above. A traced agent a read did not return stays as it is while its last sighting is inside the 30-day window.
+- When an upgrade first fills the registry, the events for agents that already existed are written to the feed but not pushed to webhooks. The first daily pass over every organization does the same.
+- Traffic is read every 15 minutes for organizations that already hold a registry, once a day for every organization, and on each of the two triggers above. A daily pass that is interrupted resumes where it stopped on the next 15-minute pass. A traced agent a read did not return stays as it is while its last sighting is inside the 30-day window.
 
 ### Reading the feed by cursor
 

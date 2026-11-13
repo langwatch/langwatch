@@ -7,11 +7,12 @@ Feature: Agent registry with ARD discovery and change events
   callable tools with JSON Schema parameters, owner and a registry version. The same entries are
   published as an Agentic Resource Discovery (ARD v0.91) manifest with search. Every material
   change appends a numbered event to the organisation's feed, which is read by cursor and pushed
-  to the organisation's webhook endpoints that subscribe to `governance.agent.*`.
+  to the organisation's webhook endpoints that subscribe to `governance.agent.*`. The registry is
+  an Enterprise feature: its routes refuse other plans and no reconcile touches their organisations.
   Docs: docs/governance/agent-registry.mdx
 
   Background:
-    Given an organisation with a project and an organisation API key holding governance:view
+    Given an Enterprise organisation with a project and an organisation API key holding governance:view
 
   # Building entries
 
@@ -34,15 +35,28 @@ Feature: Agent registry with ARD discovery and change events
   Scenario: An HTTP agent exposes its URL as an endpoint and never its credentials
     Given an HTTP agent calling "https://agent.acme.test/run" with a bearer token
     When the registry builds its entry
-    Then the entry lists the endpoint "https://agent.acme.test/run"
+    Then the entry lists the endpoint "https://agent.acme.test"
     And no part of the entry carries the bearer token
 
   @unit
-  Scenario: An HTTP agent's URL is published as its origin and path only
+  Scenario: An HTTP agent's URL is published as its origin only
     Given an HTTP agent calling "https://bot:secret@agent.acme.test/run?code=secret&region=eu#secret"
     When the registry builds its entry
-    Then the entry lists the endpoint "https://agent.acme.test/run"
-    And no part of the entry, which change events carry whole, holds the user info, query or fragment
+    Then the entry lists the endpoint "https://agent.acme.test"
+    And no part of the entry, which change events carry whole, holds the user info, path, query or fragment
+
+  @unit
+  Scenario: A webhook token in an HTTP agent's path is never published
+    Given an HTTP agent calling a chat webhook "https://chat.acme.test/api/webhooks/123/secret-token"
+    When the registry builds its entry
+    Then the entry lists the endpoint "https://chat.acme.test"
+    And no part of the entry holds the token
+
+  @unit
+  Scenario: An HTTP agent whose URL is not http or https publishes no endpoint
+    Given HTTP agents calling "mailto:ops@acme.test" and "file:///etc/agent"
+    When the registry builds their entries
+    Then neither entry lists an invoke endpoint
 
   @unit
   Scenario: A Copilot Studio agent a source listed becomes a discovered entry with its environment endpoint
@@ -198,9 +212,36 @@ Feature: Agent registry with ARD discovery and change events
   @unit
   Scenario: The daily traffic pass also reaches organisations the registry does not hold
     Given an organisation that holds no registry entry yet
-    When a traffic pass runs a day or more after the last full pass
+    When a traffic pass runs a day or more after the last completed walk
     Then the pass walks every organisation and reconciles that one too
     And passes within the next day walk only the organisations the registry holds
+
+  @unit
+  Scenario: The first walk over every organisation announces no existing agent
+    Given an organisation the deploy seed has not reached, with two agents
+    And a webhook endpoint subscribed to "governance.*"
+    When the first traffic pass walks every organisation
+    Then the registry holds both agents
+    And no webhook delivery is recorded for them
+
+  @unit
+  Scenario: An interrupted walk resumes from its cursor on the next pass
+    Given a walk over every organisation that stopped after the page ending at "org-100"
+    When the next traffic pass runs
+    Then it walks again from after "org-100"
+    And the walk counts as completed only when it reaches the last organisation
+
+  @unit
+  Scenario: Traffic passes and walks skip organisations below the Enterprise plan
+    Given an Enterprise organisation and an organisation on another plan
+    When a traffic pass walks every organisation
+    Then only the Enterprise organisation is reconciled
+
+  @integration
+  Scenario: An organisation below the Enterprise plan is never reconciled
+    Given an organisation on another plan
+    When the agent module records a change in one of its projects
+    Then its registry stays empty
 
   @unit
   Scenario: The deploy seed fills the feed without pushing webhooks
@@ -307,6 +348,12 @@ Feature: Agent registry with ARD discovery and change events
   Scenario: An event cursor past the sequence range is refused
     When GET /api/governance/registry/events is asked with a cursor above the largest sequence
     Then the response is 422 with code "validation_error"
+
+  @integration
+  Scenario: The registry routes refuse an organisation below the Enterprise plan
+    Given an organisation on another plan with a key holding governance:view
+    When it calls any registry route
+    Then the response is 402 "enterprise_plan_required" naming the feature "AGENT_REGISTRY"
 
   @integration
   Scenario: A key without governance:view is refused

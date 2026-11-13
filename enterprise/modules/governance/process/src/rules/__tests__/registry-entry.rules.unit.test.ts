@@ -105,7 +105,7 @@ describe("langwatchAgentDraft()", () => {
 
       expect(draft.endpoints).toContainEqual({
         kind: "invoke",
-        url: "https://agent.acme.test/run",
+        url: "https://agent.acme.test",
         protocol: "http",
       });
       expect(JSON.stringify(draft)).not.toContain("tok-very-secret");
@@ -116,8 +116,8 @@ describe("langwatchAgentDraft()", () => {
 
 describe("langwatchAgentDraft() with credentials in the URL", () => {
   describe("given an HTTP agent whose URL carries user info, a query and a fragment", () => {
-    /** @scenario An HTTP agent's URL is published as its origin and path only */
-    it("publishes only the origin and path", () => {
+    /** @scenario An HTTP agent's URL is published as its origin only */
+    it("publishes only the origin", () => {
       const draft = draftOf({
         ...record("agent-4", "Keyed agent"),
         type: "http",
@@ -129,10 +129,46 @@ describe("langwatchAgentDraft() with credentials in the URL", () => {
 
       expect(draft.endpoints).toContainEqual({
         kind: "invoke",
-        url: "https://agent.acme.test/run",
+        url: "https://agent.acme.test",
         protocol: "http",
       });
-      expect(JSON.stringify(draft)).not.toMatch(/very-secret/);
+      expect(JSON.stringify(draft)).not.toMatch(/very-secret|\/run/);
+    });
+  });
+
+  describe("given an HTTP agent calling a chat webhook whose path holds the token", () => {
+    /** @scenario A webhook token in an HTTP agent's path is never published */
+    it("publishes the origin and never the token", () => {
+      const draft = draftOf({
+        ...record("agent-5", "Chat relay"),
+        type: "http",
+        config: {
+          url: "https://chat.acme.test/api/webhooks/123456/wh-very-secret-token",
+          method: "POST",
+        },
+      });
+
+      expect(draft.endpoints).toContainEqual({
+        kind: "invoke",
+        url: "https://chat.acme.test",
+        protocol: "http",
+      });
+      expect(JSON.stringify(draft)).not.toMatch(/very-secret|123456/);
+    });
+  });
+
+  describe("given HTTP agents whose URLs are not http or https", () => {
+    /** @scenario An HTTP agent whose URL is not http or https publishes no endpoint */
+    it("lists no invoke endpoint for either", () => {
+      const invokes = ["mailto:ops@acme.test", "file:///etc/agent"].map((url) =>
+        draftOf({
+          ...record("agent-6", "Odd agent"),
+          type: "http",
+          config: { url, method: "POST" },
+        }).endpoints.filter((endpoint) => endpoint.kind === "invoke"),
+      );
+
+      expect(invokes).toEqual([[], []]);
     });
   });
 });

@@ -305,7 +305,10 @@ import {
 } from "../features/registry/eventing/agent-registry-delivery.intent.ts";
 import type { AgentRegistryDeliveryIntent } from "../features/registry/eventing/agent-registry-delivery.process.ts";
 import { AgentRegistryReadsService } from "../features/registry/services/agent-registry-reads.service.ts";
-import { AgentRegistryService } from "../features/registry/services/agent-registry.service.ts";
+import {
+  AgentRegistryService,
+  type AgentRegistryTrafficPass,
+} from "../features/registry/services/agent-registry.service.ts";
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
 import { governanceOperatorReads } from "../repositories/prisma/prisma.suppression-snapshot.repository.ts";
 import { anomalyRuleConfigComplaint } from "../rules/anomaly-rule-config-error.rules.ts";
@@ -708,6 +711,12 @@ export class GovernanceModule implements GovernanceRestApi {
       organizations: dependencies.organizations,
       traces: dependencies.traces,
       webhooks: dependencies.webhooks,
+      entitlements: {
+        hasEnterprisePlan: async (organizationId) =>
+          isEnterpriseTier(
+            (await dependencies.entitlements.getActivePlan({ organizationId })).type,
+          ),
+      },
       outbox: () => this.#agentRegistryOutbox,
       publicBaseUrl: publicBaseUrl ?? "",
     });
@@ -1735,10 +1744,10 @@ export class GovernanceModule implements GovernanceRestApi {
     await this.agentRegistry.reconcileOrganization({ organizationId });
   }
 
-  /** The scheduled traffic pass: the organisations the registry holds, or every organisation. */
+  /** The scheduled traffic pass: the organisations the registry holds, or a walk over every one. */
   reconcileAgentRegistryTraffic(
-    input: { everyOrganization?: boolean } = {},
-  ): Promise<{ organizations: number }> {
+    input: AgentRegistryTrafficPass = {},
+  ): Promise<{ organizations: number; complete: boolean }> {
     return this.agentRegistry.reconcileTraffic(input);
   }
 

@@ -29,3 +29,9 @@ Feature: Agents seen in a project's traffic
     Given a project whose spans for agent "planner" name model "gpt-5" twice and later "gpt-5-mini" once
     When the agents seen since the window start are read twice
     Then both reads answer "planner" with model "gpt-5" and the agent id on most spans
+
+  @unit
+  Scenario: The in-memory twin orders tied agent names by bytes like the stored read
+    Given recorded spans for "beta", "Zeta" and "Ärger" with one span each
+    When the agents seen since the window start are read from the in-memory twin
+    Then it answers "Zeta", "beta" and "Ärger" in that order

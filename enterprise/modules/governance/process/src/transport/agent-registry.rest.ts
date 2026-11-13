@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * `/api/governance/registry`: the organisation's agent registry, its change feed and its ARD v0.91
- * view, read with an organisation API key holding `governance:view`.
+ * view, read with an organisation API key holding `governance:view` on an Enterprise plan.
  * Spec: enterprise/modules/governance/specs/agent-registry.feature
  */
 import {
@@ -45,6 +45,7 @@ export const agentRegistryRest = defineRestRouter(GovernanceRestApi)
   .get("/api/governance/registry/agents", "listRegistryAgents")
   .withQuery(agentRegistryListQuerySchema)
   .withPermission("governance:view")
+  .withEntitlement("enterprise", { feature: "AGENT_REGISTRY" })
   .withOutput(agentRegistryListResponseSchema)
   .withDocs({
     operationId: "getApiGovernanceRegistryAgents",
@@ -67,6 +68,7 @@ export const agentRegistryRest = defineRestRouter(GovernanceRestApi)
   .get("/api/governance/registry/agents/:agentId", "getRegistryAgent")
   .withParams(agentRegistryParamsSchema)
   .withPermission("governance:view")
+  .withEntitlement("enterprise", { feature: "AGENT_REGISTRY" })
   .withOutput(agentRegistryDetailResponseSchema)
   .withDocs({
     operationId: "getApiGovernanceRegistryAgentsById",
@@ -88,6 +90,7 @@ export const agentRegistryRest = defineRestRouter(GovernanceRestApi)
   .withParams(agentRegistryParamsSchema)
   .withQuery(agentRegistryEventsQuerySchema)
   .withPermission("governance:view")
+  .withEntitlement("enterprise", { feature: "AGENT_REGISTRY" })
   .withOutput(agentRegistryEventsResponseSchema)
   .withDocs({
     operationId: "getApiGovernanceRegistryAgentsByIdVersions",
@@ -113,6 +116,7 @@ export const agentRegistryRest = defineRestRouter(GovernanceRestApi)
   .get("/api/governance/registry/events", "listRegistryEvents")
   .withQuery(agentRegistryEventsQuerySchema)
   .withPermission("governance:view")
+  .withEntitlement("enterprise", { feature: "AGENT_REGISTRY" })
   .withOutput(agentRegistryEventsResponseSchema)
   .withDocs({
     operationId: "getApiGovernanceRegistryEvents",
@@ -132,6 +136,7 @@ export const agentRegistryRest = defineRestRouter(GovernanceRestApi)
 
   .get("/api/governance/registry/schema", "getRegistrySchema")
   .withPermission("governance:view")
+  .withEntitlement("enterprise", { feature: "AGENT_REGISTRY" })
   .withOutput(agentRegistrySchemaResponseSchema)
   .withDocs({
     operationId: "getApiGovernanceRegistrySchema",
@@ -145,6 +150,7 @@ export const agentRegistryRest = defineRestRouter(GovernanceRestApi)
 
   .get("/api/governance/registry/ard.json", "getRegistryArdManifest")
   .withPermission("governance:view")
+  .withEntitlement("enterprise", { feature: "AGENT_REGISTRY" })
   .withOutput(ardManifestSchema)
   .withDocs({
     operationId: "getApiGovernanceRegistryArdManifest",
@@ -161,6 +167,7 @@ export const agentRegistryRest = defineRestRouter(GovernanceRestApi)
   .withoutAudit("a read over the registry sent as a POST, as ARD defines search")
   .withInput(ardSearchRequestSchema)
   .withPermission("governance:view")
+  .withEntitlement("enterprise", { feature: "AGENT_REGISTRY" })
   .withOutput(ardSearchResponseSchema)
   .withDocs({
     operationId: "postApiGovernanceRegistryArdSearch",

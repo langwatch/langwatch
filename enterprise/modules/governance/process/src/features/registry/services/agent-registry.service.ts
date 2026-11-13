@@ -23,11 +23,22 @@ const FAN_OUT_BATCH = 500;
 const RECONCILE_ATTEMPTS = 3;
 const ORGANIZATION_PAGE_LIMIT = 100;
 
+/** One scheduled traffic pass, as the traffic process asks it. */
+export type AgentRegistryTrafficPass = {
+  everyOrganization?: boolean;
+  announce?: boolean;
+  after?: string;
+  onPage?: (page: { afterOrganizationId: string }) => Promise<void>;
+  signal?: AbortSignal;
+};
+
 type AgentRegistryDependencies = {
   registry: AgentRegistryRepository;
   sources: AgentRegistrySourcesService;
   organizations: Pick<OrganizationApi, "listAllIds">;
   webhooks: Pick<WebhookApi, "getAll">;
+  /** The registry is an Enterprise feature: an organisation without the plan is never reconciled. */
+  entitlements: { hasEnterprisePlan: (organizationId: string) => Promise<boolean> };
   /** Present in the worker, where the delivery process runs; the api records no fan-out. */
   outbox: () => AgentRegistryDeliveryOutbox | undefined;
   logger: Logger;
@@ -71,7 +82,8 @@ export class AgentRegistryService {
   /**
    * Rebuilds the organisation's entries from its sources, appends what changed, fans it out. A
    * read another reconcile's commit overtook plans nothing and is read again. With `announce`
-   * off the appended events stay in the feed but are pushed to no webhook.
+   * off the appended events stay in the feed but are pushed to no webhook. An organisation
+   * without the Enterprise plan is left untouched.
    */
   async reconcileOrganization({
     organizationId,
@@ -80,6 +92,7 @@ export class AgentRegistryService {
     organizationId: string;
     announce?: boolean;
   }): Promise<{ events: number }> {
+    if (!(await this.deps.entitlements.hasEnterprisePlan(organizationId))) return { events: 0 };
     let events = 0;
     for (let attempt = 1; attempt <= RECONCILE_ATTEMPTS; attempt++) {
       const readAt = this.deps.now();
@@ -102,38 +115,42 @@ export class AgentRegistryService {
   }
 
   /**
-   * The scheduled traffic pass: every organisation the registry holds, or every organisation when
-   * `everyOrganization` is set, so one whose first agent shows only in traces is reached too.
+   * The scheduled traffic pass: every organisation the registry holds, or, with
+   * `everyOrganization`, a walk over every organisation from `after`, so one whose first agent
+   * shows only in traces is reached too. `complete` is false when the walk was cut short.
    */
   async reconcileTraffic({
     everyOrganization = false,
+    announce = true,
+    after,
+    onPage,
     signal,
-  }: { everyOrganization?: boolean; signal?: AbortSignal } = {}): Promise<{
-    organizations: number;
-  }> {
+  }: AgentRegistryTrafficPass = {}): Promise<{ organizations: number; complete: boolean }> {
     if (everyOrganization) {
-      const { organizations } = await this.seedAll({
-        announce: true,
+      const { organizations, complete } = await this.seedAll({
+        announce,
+        ...(after === undefined ? {} : { after }),
+        ...(onPage ? { onPage } : {}),
         ...(signal ? { signal } : {}),
       });
-      return { organizations };
+      return { organizations, complete };
     }
     let organizations = 0;
-    let after: string | undefined;
+    let cursor: string | undefined;
     let hasMore = true;
     while (hasMore && !signal?.aborted) {
       const ids = await this.deps.registry.findOrganizationIds({
-        after,
+        after: cursor,
         limit: ORGANIZATION_PAGE_LIMIT,
       });
       for (const organizationId of ids) {
-        await this.reconcileLogged({ organizationId });
+        await this.reconcileLogged({ organizationId, announce });
         organizations += 1;
       }
       hasMore = ids.length === ORGANIZATION_PAGE_LIMIT;
-      after = ids.at(-1);
+      cursor = ids.at(-1);
     }
-    return { organizations };
+    return { organizations, complete: !hasMore };
   }
 
   /**
@@ -150,7 +167,7 @@ export class AgentRegistryService {
     signal?: AbortSignal;
     announce?: boolean;
     onPage?: (page: { afterOrganizationId: string }) => Promise<void>;
-  }): Promise<{ afterOrganizationId: string | null; organizations: number }> {
+  }): Promise<{ afterOrganizationId: string | null; organizations: number; complete: boolean }> {
     let cursor = after;
     let organizations = 0;
     let hasMore = true;
@@ -170,7 +187,7 @@ export class AgentRegistryService {
       }
       hasMore = page.next !== null;
     }
-    return { afterOrganizationId: cursor ?? null, organizations };
+    return { afterOrganizationId: cursor ?? null, organizations, complete: !hasMore };
   }
 
   /** Records a delivery intent per pending event and subscribed endpoint, then marks them. */

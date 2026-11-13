@@ -11,7 +11,7 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import type { ScimApi } from "@langwatch/enterprise-scim-contract";
-import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -88,7 +88,25 @@ const AGENT: Agent = {
   config: { parameters: [], sdk: { name: "langwatch", version: "1.0.0", language: "python" } },
 };
 
-async function buildApi({ grants = ["governance:view"] }: { grants?: string[] } = {}) {
+function planOfType(type: string): Plan {
+  return {
+    planSource: "subscription",
+    type,
+    name: type,
+    free: type === "FREE",
+    maxMembers: 10,
+    maxMembersLite: 10,
+    maxMembersDeveloper: 0,
+    maxMessagesPerMonth: 1000,
+    canPublish: true,
+    prices: { USD: 0, EUR: 0 },
+  };
+}
+
+async function buildApi({
+  grants = ["governance:view"],
+  planType = "ENTERPRISE",
+}: { grants?: string[]; planType?: string } = {}) {
   const repositories = MemoryGovernanceRepositories.create();
   const app = await GovernanceModule.create({
     config: void 0,
@@ -108,7 +126,9 @@ async function buildApi({ grants = ["governance:view"] }: { grants?: string[] } 
         listNamesByIds: async () => [],
       }),
       auth: createApiFixture<AuthApi>(),
-      entitlements: createApiFixture<EntitlementApi>(),
+      entitlements: createApiFixture<EntitlementApi>({
+        getActivePlan: async () => planOfType(planType),
+      }),
       organizations: createApiFixture<OrganizationApi>({
         findMembersWithDepartments: async () => [],
       }),
@@ -133,6 +153,7 @@ async function buildApi({ grants = ["governance:view"] }: { grants?: string[] } 
   const runtime = createRestRuntime({
     audit: { record: () => {} },
     authorization: restTestAuthorization(),
+    entitlements: { holds: async () => planType === "ENTERPRISE" },
     identity: {
       authenticate: ({ request, permission }) => {
         if (request.headers.get("Authorization") !== `Bearer ${KEY}`) {
@@ -303,6 +324,42 @@ describe("the agent registry REST family", () => {
       const response = await get("/api/governance/registry/agents");
 
       expect(response.status).toBe(403);
+    });
+  });
+
+  describe("given an organisation below the Enterprise plan", () => {
+    /** @scenario The registry routes refuse an organisation below the Enterprise plan */
+    it("answers 402 enterprise_plan_required naming AGENT_REGISTRY on every route", async () => {
+      const { get, post } = await buildApi({ planType: "LAUNCH" });
+
+      const answers = await Promise.all([
+        get("/api/governance/registry/agents"),
+        get("/api/governance/registry/agents/agent-1"),
+        get("/api/governance/registry/agents/agent-1/versions"),
+        get("/api/governance/registry/events"),
+        get("/api/governance/registry/schema"),
+        get("/api/governance/registry/ard.json"),
+        post("/api/governance/registry/ard/search", { query: { text: "agent" } }),
+      ]);
+
+      for (const answer of answers) {
+        expect(answer.status).toBe(402);
+        expect(await answer.json()).toMatchObject({
+          code: "enterprise_plan_required",
+          meta: { feature: "AGENT_REGISTRY" },
+        });
+      }
+    });
+
+    /** @scenario An organisation below the Enterprise plan is never reconciled */
+    it("leaves the registry empty when the agent module records a change", async () => {
+      const { app, repositories } = await buildApi({ planType: "LAUNCH" });
+
+      await app.reconcileAgentRegistryForProject({ projectId: "project-1" });
+
+      await expect(
+        repositories.agentRegistry.findEntries({ organizationId: ORG, limit: 100 }),
+      ).resolves.toEqual([]);
     });
   });
 

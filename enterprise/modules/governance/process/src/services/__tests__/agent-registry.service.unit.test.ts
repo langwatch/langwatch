@@ -1,5 +1,7 @@
 /** Spec: enterprise/modules/governance/specs/agent-registry.feature */
 import type { Agent, AgentApi } from "@langwatch/agent-contract";
+import type { ProcessHandlerContext } from "@langwatch/eventing";
+import { intentAccessorOf } from "@langwatch/eventing/testing";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
@@ -10,6 +12,11 @@ import type { WebhookApi, WebhookEndpointView } from "@langwatch/webhook-contrac
 import { describe, expect, it, vi } from "vitest";
 
 import type { AgentRegistryDeliveryIntent } from "../../features/registry/eventing/agent-registry-delivery.process.ts";
+import {
+  AGENT_REGISTRY_TRAFFIC_INITIAL_STATE,
+  type AgentRegistryTrafficIntents,
+  agentRegistryTrafficWake,
+} from "../../features/registry/eventing/agent-registry-traffic.process.ts";
 import { AgentRegistryReadsService } from "../../features/registry/services/agent-registry-reads.service.ts";
 import {
   type AgentRegistryDeliveryOutbox,
@@ -59,6 +66,16 @@ function endpoint(id: string, enabledEvents: string[]): WebhookEndpointView {
   };
 }
 
+const wakeAt = (at: number): ProcessHandlerContext<AgentRegistryTrafficIntents> => ({
+  at,
+  now: at,
+  key: "agentRegistryTraffic",
+  projectId: "__global__",
+  intent: intentAccessorOf({
+    pass: (key, payload) => ({ intentType: "pass", messageKey: key, payload }),
+  }),
+});
+
 const OUTBOX_DOWN = new Error("outbox unavailable");
 const AGENT_STORE_DOWN = new Error("agent store unavailable");
 
@@ -80,12 +97,14 @@ function setup({
   endpoints = [endpoint("hook-governance", ["governance.agent.*"])],
   traffic = [],
   organizationIds = [ORG],
+  enterpriseOrganizationIds = organizationIds,
   now = () => NOW,
 }: {
   agents?: Agent[];
   endpoints?: WebhookEndpointView[];
   traffic?: TraceAgentSeen[];
   organizationIds?: string[];
+  enterpriseOrganizationIds?: string[];
   now?: () => Instant;
 } = {}) {
   const state: {
@@ -139,6 +158,10 @@ function setup({
     }),
     traces: createApiFixture<TraceApi>({ findAgentsSeen: async () => traffic }),
     webhooks: createApiFixture<WebhookApi>({ getAll: async () => endpoints }),
+    entitlements: {
+      hasEnterprisePlan: async (organizationId) =>
+        enterpriseOrganizationIds.includes(organizationId),
+    },
     outbox: () => outbox,
     publicBaseUrl: "https://app.langwatch.test",
     logger: createTestLogger().logger,
@@ -214,7 +237,10 @@ describe("AgentRegistryService", () => {
       await service.seedAll({});
       reconciled.length = 0;
 
-      await expect(service.reconcileTraffic()).resolves.toEqual({ organizations: 2 });
+      await expect(service.reconcileTraffic()).resolves.toEqual({
+        organizations: 2,
+        complete: true,
+      });
       expect(reconciled.toSorted()).toEqual([ORG, "org-2"]);
     });
   });
@@ -262,15 +288,55 @@ describe("AgentRegistryService", () => {
         ],
         organizationIds: [ORG],
       });
-      await expect(service.reconcileTraffic()).resolves.toEqual({ organizations: 0 });
+      await expect(service.reconcileTraffic()).resolves.toEqual({
+        organizations: 0,
+        complete: true,
+      });
 
       await expect(service.reconcileTraffic({ everyOrganization: true })).resolves.toEqual({
         organizations: 1,
+        complete: true,
       });
 
       expect(reconciled).toEqual([ORG]);
       const entries = await registry.findEntries({ organizationId: ORG, limit: 10 });
       expect(entries.map((entry) => [entry.name, entry.shadow])).toEqual([["shadow-bot", true]]);
+    });
+  });
+
+  describe("when the first walk reaches an organisation the deploy seed has not", () => {
+    /** @scenario The first walk over every organisation announces no existing agent */
+    it("records the agents but sends no intent to the governance.* endpoint", async () => {
+      const { service, registry, outbox } = setup({
+        agents: [connectedAgent("agent-1", "Field agent"), connectedAgent("agent-2", "Desk agent")],
+        endpoints: [endpoint("hook-governance", ["governance.*"])],
+      });
+      const first = agentRegistryTrafficWake(AGENT_REGISTRY_TRAFFIC_INITIAL_STATE, wakeAt(1_000));
+      const pass = first.intents?.[0]?.payload as { everyOrganization: boolean; announce: boolean };
+
+      await service.reconcileTraffic(pass);
+
+      expect(pass).toMatchObject({ everyOrganization: true, announce: false });
+      expect(outbox.intents).toHaveLength(0);
+      const entries = await registry.findEntries({ organizationId: ORG, limit: 10 });
+      expect(entries).toHaveLength(2);
+    });
+  });
+
+  describe("when an organisation does not hold the Enterprise plan", () => {
+    /** @scenario Traffic passes and walks skip organisations below the Enterprise plan */
+    it("reconciles only the Enterprise organisations", async () => {
+      const { service, registry, reconciled } = setup({
+        organizationIds: [ORG, "org-free"],
+        enterpriseOrganizationIds: [ORG],
+      });
+
+      await service.reconcileTraffic({ everyOrganization: true });
+
+      expect(reconciled).toEqual([ORG]);
+      await expect(
+        registry.findEntries({ organizationId: "org-free", limit: 10 }),
+      ).resolves.toEqual([]);
     });
   });
 

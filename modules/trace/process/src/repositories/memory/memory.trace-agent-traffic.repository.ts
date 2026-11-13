@@ -21,7 +21,7 @@ function mostUsedFirst(
     if (value) counts.set(value, (counts.get(value) ?? 0) + 1);
   }
   return [...counts.entries()]
-    .toSorted(([a, x], [b, y]) => y - x || Number(b > a) - Number(b < a))
+    .toSorted(([a, x], [b, y]) => y - x || byteOrder(b, a))
     .map(([value]) => value);
 }
 
@@ -63,7 +63,12 @@ export class MemoryTraceAgentTrafficRepository extends TraceAgentTrafficReposito
         firstSeenMs: Math.min(...spans.map((span) => span.startTimeMs)),
         lastSeenMs: Math.max(...spans.map((span) => span.startTimeMs)),
       }))
-      .toSorted((a, b) => b.spanCount - a.spanCount || a.agentName.localeCompare(b.agentName))
+      .toSorted((a, b) => b.spanCount - a.spanCount || byteOrder(a.agentName, b.agentName))
       .slice(0, input.limit);
   }
+}
+
+/** ClickHouse orders strings by their UTF-8 bytes, not by locale. */
+function byteOrder(a: string, b: string): number {
+  return Buffer.compare(Buffer.from(a, "utf8"), Buffer.from(b, "utf8"));
 }

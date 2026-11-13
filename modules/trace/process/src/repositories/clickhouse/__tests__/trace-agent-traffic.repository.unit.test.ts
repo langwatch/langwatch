@@ -108,4 +108,22 @@ describe("MemoryTraceAgentTrafficRepository", () => {
       expect(seen).toMatchObject({ agentId: "agent-7", model: "gpt-5", spanCount: 4 });
     });
   });
+
+  describe("when agents tie on span count", () => {
+    /** @scenario The in-memory twin orders tied agent names by bytes like the stored read */
+    it("orders their names by UTF-8 bytes, not by locale", async () => {
+      const repository = MemoryTraceAgentTrafficRepository.create();
+      for (const agentName of ["beta", "Ärger", "Zeta"]) {
+        repository.record({ tenantId: "project-1", startTimeMs: 1_100, agentName });
+      }
+
+      const seen = await repository.findAgentsSeen({
+        tenantId: "project-1",
+        sinceMs: 1_000,
+        limit: 10,
+      });
+
+      expect(seen.map((agent) => agent.agentName)).toEqual(["Zeta", "beta", "Ärger"]);
+    });
+  });
 });

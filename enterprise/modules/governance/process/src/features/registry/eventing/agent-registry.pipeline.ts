@@ -36,6 +36,7 @@ import {
   agentRegistryDeliveryPruneWake,
   agentRegistryDeliveryStateSchema,
 } from "./agent-registry-delivery.process.ts";
+import { agentRegistryWalkCheckpoint } from "./agent-registry-traffic.intent.ts";
 import {
   AGENT_REGISTRY_TRAFFIC_INITIAL_STATE,
   AGENT_REGISTRY_TRAFFIC_INTERVAL_MS,
@@ -78,6 +79,11 @@ export function buildAgentRegistryPipeline({
   processStore,
 }: EventingSetup<unknown, AgentRegistryApp>): StaticPipelineDefinition<never> {
   app.connectAgentRegistryOutbox({ processStore });
+  const runTraffic = runAgentRegistryTraffic({
+    reconcile: (input) => app.reconcileAgentRegistryTraffic(input),
+    deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
+    now: () => nowInstant().epochMilliseconds,
+  });
   const reconcileProject = ({ projectId }: { projectId: string }) =>
     app.reconcileAgentRegistryForProject({ projectId });
   return definePipeline({
@@ -120,14 +126,8 @@ export function buildAgentRegistryPipeline({
         .state(agentRegistryTrafficStateSchema, AGENT_REGISTRY_TRAFFIC_INITIAL_STATE)
         .schedule({ everyMs: AGENT_REGISTRY_TRAFFIC_INTERVAL_MS })
         .onWake(agentRegistryTrafficWake)
-        .intent(
-          "pass",
-          agentRegistryTrafficPassSchema,
-          runAgentRegistryTraffic({
-            reconcile: (input) => app.reconcileAgentRegistryTraffic(input),
-            deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
-            now: () => nowInstant().epochMilliseconds,
-          }),
+        .intent("pass", agentRegistryTrafficPassSchema, (pass, context) =>
+          runTraffic(pass, agentRegistryWalkCheckpoint({ processStore, context })),
         )
         // One pass at a time; each organisation's reconcile is idempotent.
         .outbox({ maxAttempts: 1, concurrency: 1, batchSize: 1, leaseDurationMs: 10 * 60 * 1000 }),

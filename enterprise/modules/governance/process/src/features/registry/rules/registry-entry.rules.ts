@@ -197,15 +197,18 @@ function endpointsOf({
   return endpoints;
 }
 
+const HTTP_SCHEMES = new Set(["http:", "https:"]);
+
 /**
- * An HTTP agent's URL as the registry may publish it: origin and path only. User info, query and
- * fragment can hold credentials (`?code=` function keys), so none of them is published. A URL
- * that does not parse publishes no endpoint.
+ * An HTTP agent's URL as the registry may publish it: the origin only. Path, user info, query and
+ * fragment can each hold the only credential (webhook tokens, `?code=` function keys). A URL that
+ * does not parse or is not http(s) publishes no endpoint.
  */
 function httpInvokeEndpoints(raw: string): AgentRegistryEndpoint[] {
   if (!URL.canParse(raw)) return [];
   const url = new URL(raw);
-  return [{ kind: "invoke", url: `${url.origin}${url.pathname}`, protocol: "http" }];
+  if (!HTTP_SCHEMES.has(url.protocol)) return [];
+  return [{ kind: "invoke", url: url.origin, protocol: "http" }];
 }
 
 function describedBy(agent: Agent): Pick<RegistryDraft, "description"> {
