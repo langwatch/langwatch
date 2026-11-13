@@ -2,6 +2,7 @@ import { auditLogIntentSchema, type AuditLogApi } from "@langwatch/audit-log-con
 import {
   GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
   graphTriggerActivityGroupKey,
+  MAX_TRACE_DEBOUNCE_MS,
   RECORD_TRIGGER_MATCH_COMMAND_TYPE,
   TRIGGER_MATCH_COALESCE_MAX_BATCH,
   TRIGGER_MATCH_RECORDED_EVENT_TYPE,
@@ -31,6 +32,10 @@ import {
 import { z } from "zod";
 
 import type { AutomationIntentRetentionRepository } from "../repositories/automation-intent-retention.repository.ts";
+import {
+  evaluationMatchDedupeId,
+  evaluationMatchGroupKey,
+} from "../rules/evaluation-match-dedup.rules.ts";
 import {
   INITIAL_SETTLEMENT_STATE,
   triggerSettlementStateSchema,
@@ -105,6 +110,28 @@ import {
   TRIGGER_SETTLEMENT_INTENT_TYPES,
 } from "./trigger-settlement.intent.ts";
 
+type TriggerMatchKeyInput = {
+  triggerId: string;
+  traceId: string;
+  occurredAt: number;
+  traceDebounceMs: number;
+};
+
+function recordTriggerMatchIdempotencyKey(input: TriggerMatchKeyInput): string {
+  const { triggerId, traceId, occurredAt, traceDebounceMs } = input;
+  return `${triggerId}:${traceId}:${settleWindowBucket({ occurredAt, traceDebounceMs })}`;
+}
+
+/** Queue twin of the idempotency key: drops at staging only what the event log would drop. */
+export function recordTriggerMatchDedupeId(
+  input: TriggerMatchKeyInput & { tenantId: string },
+): string {
+  return `${input.tenantId}:${recordTriggerMatchIdempotencyKey(input)}`;
+}
+
+/** Outlives every trigger's settle window; the key is released at dispatch either way. */
+export const RECORD_TRIGGER_MATCH_DEDUP_TTL_MS = Math.max(MAX_TRACE_DEBOUNCE_MS, 30_000);
+
 export const RecordTriggerMatchCommand = defineCommand({
   commandType: RECORD_TRIGGER_MATCH_COMMAND_TYPE,
   eventType: TRIGGER_MATCH_RECORDED_EVENT_TYPE,
@@ -113,8 +140,7 @@ export const RecordTriggerMatchCommand = defineCommand({
   schema: triggerMatchRecordedEventDataSchema,
   aggregateId: ({ triggerId }) => triggerId,
   groupKey: ({ triggerId }) => triggerId,
-  idempotencyKey: ({ triggerId, traceId, occurredAt, traceDebounceMs }) =>
-    `${triggerId}:${traceId}:${settleWindowBucket({ occurredAt, traceDebounceMs })}`,
+  idempotencyKey: recordTriggerMatchIdempotencyKey,
   spanAttributes: ({ triggerId, traceId, actionClass }) => ({
     "automation.trigger.id": triggerId,
     "automation.trace.id": traceId,
@@ -164,6 +190,18 @@ function settlePerAggregate(input: { lane: string; delay: number; ttlMs: number 
   };
 }
 
+/** Evaluation matching settles per trace: K settled evaluations of one trace wake it once. */
+function settlePerTrace(input: { lane: string; delay: number; ttlMs: number }) {
+  return {
+    delay: input.delay,
+    deduplication: {
+      makeId: (event: Event) => evaluationMatchDedupeId({ lane: input.lane, event }),
+      ttlMs: input.ttlMs,
+    },
+    groupKeyFn: evaluationMatchGroupKey,
+  };
+}
+
 /** Main's graph-alert debounce: one sweep per tenant per window, in one lane per tenant. */
 const GRAPH_ACTIVITY_OPTIONS = {
   delay: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
@@ -191,6 +229,14 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
       // backed-up trigger's matches into one multi-row insert instead of one
       // tiny insert per match.
       coalesceMaxBatch: TRIGGER_MATCH_COALESCE_MAX_BATCH,
+      // Duplicates used to reach the serial trigger group and die only at the
+      // idempotency key; dropping them at staging keeps that group short.
+      deduplication: {
+        makeId: recordTriggerMatchDedupeId,
+        ttlMs: RECORD_TRIGGER_MATCH_DEDUP_TTL_MS,
+        extend: false,
+        replace: false,
+      },
     })
     .withCommand("configureReportSchedule", ConfigureReportScheduleCommand)
     .withCommand("pauseReportSchedule", PauseReportScheduleCommand)
@@ -378,7 +424,7 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
     .withPeerSubscriber("evaluationCompletedTriggerMatch", {
       eventType: EVALUATION_COMPLETED_EVENT_TYPE,
       data: evaluationCompletedEventDataSchema.pick({ status: true }),
-      options: settlePerAggregate({
+      options: settlePerTrace({
         lane: "evaluationCompletedTriggerMatch",
         delay: EVALUATION_MATCH_DELAY_MS,
         ttlMs: EVALUATION_MATCH_DEDUP_TTL_MS,
@@ -395,7 +441,7 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
     .withPeerSubscriber("evaluationReportedTriggerMatch", {
       eventType: EVALUATION_REPORTED_EVENT_TYPE,
       data: evaluationReportedEventDataSchema.pick({ status: true, traceId: true }),
-      options: settlePerAggregate({
+      options: settlePerTrace({
         lane: "evaluationReportedTriggerMatch",
         delay: EVALUATION_MATCH_DELAY_MS,
         ttlMs: EVALUATION_MATCH_DEDUP_TTL_MS,
