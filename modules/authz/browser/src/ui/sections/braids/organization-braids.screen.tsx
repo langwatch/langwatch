@@ -13,7 +13,7 @@ import { Box, Button, Skeleton, Stack } from "@langwatch/design-system/primitive
 import { SettingsField } from "@langwatch/design-system/settings-field";
 import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { Switch } from "@langwatch/design-system/switch";
-import { BookOpen, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 
 import {
   useBraidsPolicy,
@@ -23,6 +23,7 @@ import {
 import { useAuthzHost } from "../../../model/authz-host.ts";
 import { BRAIDS_GUIDE_HREF, organizationBraidRows } from "../../../model/braids/braids.ts";
 import { OrganizationBraidsTable } from "../../blocks/braids/organization-braids-table.tsx";
+import { BraidsPageLinks } from "../../elements/braids-page-links.tsx";
 import { BraidsTitle } from "../../elements/braids-title.tsx";
 import { SectionErrorNotice } from "../../elements/section-error-notice.tsx";
 
@@ -31,14 +32,11 @@ const KEEP_TO_ADMINS = "Keep braids to organisation admins";
 function OrganizationBraidsHeader({ locked = false }: { locked?: boolean }) {
   return (
     <PageLayout.Header
-      description="Every braid in your organisation, and who may create, change or remove them."
-      actions={
-        <PageLayout.HeaderButton asChild>
-          <Link href={BRAIDS_GUIDE_HREF} isExternal>
-            <BookOpen size={14} aria-hidden />
-            How braids work
-          </Link>
-        </PageLayout.HeaderButton>
+      description={
+        <>
+          Every braid in your organisation, and who may create, change or remove them.
+          <BraidsPageLinks />
+        </>
       }
     >
       <BraidsTitle locked={locked} />

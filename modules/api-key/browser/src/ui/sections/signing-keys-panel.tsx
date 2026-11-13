@@ -35,7 +35,7 @@ const COLUMNS = 6;
 const MANAGE_PERMISSION = "braids:manage";
 /** A mutation answer that may carry a secret is dropped from the client's cache at once. */
 const NO_CACHE = { gcTime: 0 } as const;
-/** The Braids page header's New signing key writes `?signingKey=new`; the panel opens on it. */
+/** The Braids page's Signing keys section writes `?signingKey=new`; the panel opens on it. */
 const CREATE_QUERY_KEY = "signingKey";
 
 function StatusBadge({ signingKey }: { signingKey: SigningKeyRow }) {
@@ -276,7 +276,7 @@ export function SigningKeysPanel({ projectId }: SigningKeysPanelProps) {
   }
 
   return (
-    // The Braids tab already names it Signing keys, so the panel opens on its description.
+    // The Braids page's section names it Signing keys, so the panel opens on its description.
     <VStack gap={4} align="stretch" data-testid="signing-keys-panel">
       <Text textStyle="sm" color="fg.muted">
         Sign the tags on this project's calls so projects that braid into it can trust them.

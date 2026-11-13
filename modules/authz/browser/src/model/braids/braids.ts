@@ -208,17 +208,17 @@ export function braidAuditHref({
 
 export const BRAIDS_GUIDE_HREF = "https://langwatch.ai/docs/features/braids";
 
-/** The Braids page's tabs; `tab` in the query opens one, so a link can land on Signing keys. */
-export const BRAIDS_TABS = ["into", "from", "keys"] as const;
-export type BraidsTab = (typeof BRAIDS_TABS)[number];
-export const BRAIDS_TAB_QUERY_KEY = "tab";
+/** The Braids page's sections; `section` in the query scrolls to one, as Signing keys links do. */
+export const BRAIDS_SECTIONS = ["into", "from", "keys"] as const;
+export type BraidsSection = (typeof BRAIDS_SECTIONS)[number];
+export const BRAIDS_SECTION_QUERY_KEY = "section";
 
-export function braidsTabOf(value: string | undefined): BraidsTab {
-  return BRAIDS_TABS.find((tab) => tab === value) ?? "into";
+export function braidsSectionOf(value: string | undefined): BraidsSection | undefined {
+  return BRAIDS_SECTIONS.find((section) => section === value);
 }
 
-/** Another project's Signing keys tab: the shell switches to the project, then returns here. */
+/** Another project's Signing keys section: the shell switches to the project, then returns here. */
 export function braidsSigningKeysHref({ projectSlug }: { projectSlug: string }): string {
-  const keys = `/settings/braids?${BRAIDS_TAB_QUERY_KEY}=keys`;
+  const keys = `/settings/braids?${BRAIDS_SECTION_QUERY_KEY}=keys`;
   return `/${encodeURIComponent(projectSlug)}?return_to=${encodeURIComponent(keys)}`;
 }

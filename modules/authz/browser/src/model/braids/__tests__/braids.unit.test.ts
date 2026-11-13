@@ -8,7 +8,7 @@ import {
   braidProject,
   braidsPlanState,
   braidsSigningKeysHref,
-  braidsTabOf,
+  braidsSectionOf,
   organizationBraidRows,
   projectBraidRows,
 } from "../braids.ts";
@@ -130,21 +130,21 @@ describe("braidAuditHref", () => {
   });
 });
 
-describe("the Braids page's tab in the URL", () => {
-  /** @scenario A link opens the Braids page on its Signing keys tab */
+describe("the Braids page's section in the URL", () => {
+  /** @scenario A link opens the Braids page at its Signing keys */
   it.each([
     ["keys", "keys"],
     ["from", "from"],
-    [undefined, "into"],
-    ["nonsense", "into"],
-  ] as const)("opens %s as %s", (value, tab) => {
-    expect(braidsTabOf(value)).toBe(tab);
+    [undefined, undefined],
+    ["nonsense", undefined],
+  ] as const)("reads %s as %s", (value, section) => {
+    expect(braidsSectionOf(value)).toBe(section);
   });
 
-  /** @scenario A link opens the Braids page on its Signing keys tab */
-  it("links another project's Signing keys tab through the project switch", () => {
+  /** @scenario A link opens the Braids page at its Signing keys */
+  it("links another project's Signing keys through the project switch", () => {
     expect(braidsSigningKeysHref({ projectSlug: "checkout-web-x1" })).toBe(
-      "/checkout-web-x1?return_to=%2Fsettings%2Fbraids%3Ftab%3Dkeys",
+      "/checkout-web-x1?return_to=%2Fsettings%2Fbraids%3Fsection%3Dkeys",
     );
   });
 });

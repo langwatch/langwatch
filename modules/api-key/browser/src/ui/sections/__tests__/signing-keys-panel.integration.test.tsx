@@ -206,8 +206,8 @@ describe("given the Braids page mounts the signing keys panel by its token", () 
       expect(document.body).not.toHaveTextContent(SECRET);
     });
 
-    /** @scenario The Braids page header opens New signing key on the Signing keys tab */
-    it("opens the create dialog from the header's ask and clears it from the address", async () => {
+    /** @scenario The Signing keys section opens New signing key */
+    it("opens the create dialog from the section's ask and clears it from the address", async () => {
       const host = new FakeApiKeyHost({ grants: MANAGER, query: ASKED });
       renderPanel(host);
 
