@@ -72,7 +72,7 @@ import {
   type LangyConversationListPageDto,
   type LangyConversationMessagesDto,
   type LangyPanelCall,
-  type LangyStreamEntry,
+  type LangyStreamFrame,
   type langyAnswerLocalPermissionInputSchema,
   type langyAnswerQuestionInputSchema,
   type langyClaimUiActionInputSchema,
@@ -1139,7 +1139,7 @@ export class LangyModule implements LangyApiContract {
 
   watchTurnStream(
     input: LangyPanelCall<typeof langyTurnStreamInputSchema> & { signal?: AbortSignal },
-  ): AsyncIterable<LangyStreamEntry> {
+  ): AsyncIterable<LangyStreamFrame> {
     return this.dependencies.panelTurnStream.watchTurnStream(input);
   }
 

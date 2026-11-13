@@ -558,6 +558,13 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     And no error card or "Try again" appears while the record holds the turn as running
 
   @unit
+  Scenario: A reattach to a turn longer than its buffer drops nothing it had not shown
+    Given Langy is answering a question with more entries than the turn's buffer keeps
+    When the panel's connection to the turn is lost and the panel reattaches
+    Then the panel skips only the replayed entries it already showed, by their buffer id
+    And every entry after those is shown once
+
+  @unit
   Scenario: A stream the server refused by name still fails the turn
     Given Langy is answering a question
     When the server refuses the turn's stream with a named error

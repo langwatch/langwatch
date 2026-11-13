@@ -389,6 +389,13 @@ function isNamedRefusal(message: string): boolean {
 const isTerminalEntry = (entry: LangyStreamWireEntry): boolean =>
   entry.type === "end" || entry.type === "error";
 
+/** Whether buffer id `a` (Redis stream id, `<ms>-<seq>`) comes at or before `b`. */
+function cursorAtOrBefore(a: string, b: string): boolean {
+  const [aMs = 0, aSeq = 0] = a.split("-").map(Number);
+  const [bMs = 0, bSeq = 0] = b.split("-").map(Number);
+  return aMs < bMs || (aMs === bMs && aSeq <= bSeq);
+}
+
 /** Where one turn's subscription goes, and the routing every entry of it takes. */
 interface TurnSubscriptionTarget {
   client: LangyTurnClient;
@@ -399,15 +406,14 @@ interface TurnSubscriptionTarget {
 }
 
 /**
- * One turn's subscription across its connections. Each connection replays the turn from its
- * first buffered entry, so entries already passed on are counted and skipped; a lost connection
- * reattaches to the same turn instead of failing it, since the turn runs on the server either way.
+ * One turn's subscription across its connections. Each connection replays the turn's buffer,
+ * so an entry at or before the last cursor passed on is skipped by id (the buffer is trimmed,
+ * so a count would drift); a lost connection reattaches to the same turn instead of failing it.
  */
 class TurnSubscription {
   private sub: Unsubscribable | undefined;
   private reattachTimer: ReturnType<typeof setTimeout> | undefined;
-  private passedOn = 0;
-  private seenOnConnection = 0;
+  private lastCursor: string | undefined;
   private reattaches = 0;
   sink: TurnStreamSink | undefined;
 
@@ -415,14 +421,9 @@ class TurnSubscription {
 
   attach(): void {
     const { client, projectId, conversationId, turnId } = this.target;
-    this.seenOnConnection = 0;
     this.sub = client.langy.onTurnStream.subscribe(
       { projectId, conversationId, turnId },
       {
-        // A reopened connection replays the turn from its first entry again.
-        onConnectionStateChange: (connection) => {
-          if (connection.state === "pending") this.seenOnConnection = 0;
-        },
         onData: (entry) => this.receive(entry),
         onError: (err: unknown) => this.lose(err),
         onComplete: () => this.sink?.finish("closed"),
@@ -438,9 +439,12 @@ class TurnSubscription {
   private receive(entry: LangyStreamWireEntry): void {
     const sink = this.sink;
     if (!sink || sink.closed) return;
-    this.seenOnConnection += 1;
-    if (this.seenOnConnection <= this.passedOn && !isTerminalEntry(entry)) return;
-    this.passedOn = this.seenOnConnection;
+    const { cursor } = entry;
+    if (cursor !== undefined) {
+      const seen = this.lastCursor !== undefined && cursorAtOrBefore(cursor, this.lastCursor);
+      if (seen && !isTerminalEntry(entry)) return;
+      this.lastCursor = cursor;
+    }
     this.reattaches = 0;
     this.target.handlers.onWireEntry?.(entry, this.target.turnId);
     routeStreamEntry({ entry, sink, handlers: this.target.handlers });

@@ -499,7 +499,7 @@ describe("createLangyChatTransport", () => {
 
     /** @scenario "A lost connection follows the running turn instead of failing it" */
     it("reattaches to the same turn instead of failing it", async () => {
-      handlersOf(0).onData({ type: "delta", text: "Looking" });
+      handlersOf(0).onData({ type: "delta", text: "Looking", cursor: "100-0" });
       handlersOf(0).onError(new Error("SSE connection failed after 5 attempts"));
 
       expect(onTurnSettled).not.toHaveBeenCalled();
@@ -511,9 +511,9 @@ describe("createLangyChatTransport", () => {
         turnId: "turn-1",
       });
 
-      handlersOf(1).onData({ type: "delta", text: "Looking" });
-      handlersOf(1).onData({ type: "delta", text: " at the traces" });
-      handlersOf(1).onData({ type: "end" });
+      handlersOf(1).onData({ type: "delta", text: "Looking", cursor: "100-0" });
+      handlersOf(1).onData({ type: "delta", text: " at the traces", cursor: "101-0" });
+      handlersOf(1).onData({ type: "end", cursor: "102-0" });
       await done;
 
       expect(chunks.some((chunk) => chunk.type === "error")).toBe(false);
@@ -526,13 +526,13 @@ describe("createLangyChatTransport", () => {
 
     /** @scenario "A lost connection follows the running turn instead of failing it" */
     it("skips what a reopened connection replays", async () => {
-      handlersOf(0).onData({ type: "delta", text: "one" });
-      handlersOf(0).onData({ type: "delta", text: "two" });
+      handlersOf(0).onData({ type: "delta", text: "one", cursor: "100-0" });
+      handlersOf(0).onData({ type: "delta", text: "two", cursor: "100-1" });
       handlersOf(0).onConnectionStateChange?.({ state: "pending" });
-      handlersOf(0).onData({ type: "delta", text: "one" });
-      handlersOf(0).onData({ type: "delta", text: "two" });
-      handlersOf(0).onData({ type: "delta", text: "three" });
-      handlersOf(0).onData({ type: "end" });
+      handlersOf(0).onData({ type: "delta", text: "one", cursor: "100-0" });
+      handlersOf(0).onData({ type: "delta", text: "two", cursor: "100-1" });
+      handlersOf(0).onData({ type: "delta", text: "three", cursor: "101-0" });
+      handlersOf(0).onData({ type: "end", cursor: "102-0" });
       await done;
 
       expect(chunks.filter((c) => c.type === "text-delta").map((c) => c.delta)).toEqual([
@@ -541,6 +541,29 @@ describe("createLangyChatTransport", () => {
         "three",
       ]);
       expect(onWireEntry).toHaveBeenCalledTimes(4);
+    });
+
+    /** @scenario "A reattach to a turn longer than its buffer drops nothing it had not shown" */
+    it("skips by cursor when the replayed buffer was trimmed", async () => {
+      const shown = Array.from({ length: 2500 }, (_, i) => `t${i}`);
+      shown.forEach((text, i) =>
+        handlersOf(0).onData({ type: "delta", text, cursor: `${1000 + i}-0` }),
+      );
+      handlersOf(0).onError(new Error("SSE connection failed after 5 attempts"));
+      vi.advanceTimersByTime(LANGY_TURN_STREAM_REATTACH_DELAY_MS);
+
+      // The buffer keeps only its last ~2000 entries, so the replay starts mid-turn.
+      for (let i = 500; i < 2500; i++) {
+        handlersOf(1).onData({ type: "delta", text: `t${i}`, cursor: `${1000 + i}-0` });
+      }
+      handlersOf(1).onData({ type: "delta", text: "new-1", cursor: "3500-0" });
+      handlersOf(1).onData({ type: "delta", text: "new-2", cursor: "3501-0" });
+      handlersOf(1).onData({ type: "end", cursor: "3502-0" });
+      await done;
+
+      const deltas = chunks.filter((c) => c.type === "text-delta").map((c) => c.delta);
+      expect(deltas.slice(-2)).toEqual(["new-1", "new-2"]);
+      expect(deltas).toHaveLength(2502);
     });
 
     /** @scenario "A stream the server refused by name still fails the turn" */

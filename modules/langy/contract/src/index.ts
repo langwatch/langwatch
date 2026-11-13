@@ -30,8 +30,11 @@ export * from "./langy-conversation.ts";
 export * from "./langy.api.ts";
 export {
   langyStreamEntrySchema,
+  langyStreamFrameSchema,
   type LangyStreamEntry,
   type LangyStreamEntrySchema,
+  type LangyStreamFrame,
+  type LangyStreamFrameSchema,
 } from "./langy.stream-entry.ts";
 export * from "./langy-kickoff.ts";
 export * from "./langy-shown-once.ts";
