@@ -21,20 +21,24 @@ export const STAFF_ACCESS_SCOPES = [
 
 export type StaffAccessScope = (typeof STAFF_ACCESS_SCOPES)[number];
 
-/** How an organization is set up and used, with no trace, dataset or run content. */
+/**
+ * How an organization is set up and used: projects, analytics, cost, evaluator and trigger
+ * settings. No prompt text, trace, dataset or run content; run results and stored files are
+ * refused to a key without `org:content` at the route (`.servesContent()`).
+ */
 export const STAFF_READER_METADATA_PERMISSIONS: readonly AuthzPermission[] = [
   "project:view",
   "analytics:view",
   "cost:view",
   "evaluations:view",
-  "prompts:view",
   "triggers:view",
   "workflows:view",
   "gatewayUsage:view",
 ];
 
-/** What the organization's end users and runs wrote: traces, datasets, annotations, runs. */
+/** What the organization and its end users wrote: prompts, traces, datasets, annotations, runs. */
 export const STAFF_READER_CONTENT_PERMISSIONS: readonly AuthzPermission[] = [
+  "prompts:view",
   "traces:view",
   "datasets:view",
   "annotations:view",
@@ -42,20 +46,29 @@ export const STAFF_READER_CONTENT_PERMISSIONS: readonly AuthzPermission[] = [
   "scenarios:view",
 ];
 
-/** The writes a support key may make: evaluators, monitors, prompts, datasets, scenarios. */
+/**
+ * The writes a support key may make: evaluators, monitors, datasets, scenarios, dashboards. No
+ * prompt (a prompt write can deploy to production) and no trigger (a trigger sends data out).
+ */
 export const STAFF_SUPPORT_WRITE_PERMISSIONS: readonly AuthzPermission[] = [
   "evaluations:create",
   "evaluations:update",
-  "prompts:create",
-  "prompts:update",
   "datasets:create",
   "datasets:update",
   "scenarios:create",
   "scenarios:update",
   "analytics:create",
   "analytics:update",
-  "triggers:create",
-  "triggers:update",
+];
+
+/**
+ * The writes a support key makes without the spend tick: datasets only. Every other write in the
+ * bag shapes what runs and is charged (an evaluator's model, a monitor, a scenario, a dashboard's
+ * eval() column), so the staff gate refuses it unless the session was approved to spend.
+ */
+export const STAFF_WRITES_WITHOUT_SPEND: readonly AuthzPermission[] = [
+  "datasets:create",
+  "datasets:update",
 ];
 
 /**

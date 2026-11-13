@@ -105,6 +105,7 @@ export abstract class AuthzManagedGrantRepository {
     groupId: string;
   }): Promise<boolean>;
 
+  /** Whether a key a grant may name lives in the organization: never a system-managed key. */
   abstract isApiKeyInOrganization(input: {
     organizationId: string;
     apiKeyId: string;
