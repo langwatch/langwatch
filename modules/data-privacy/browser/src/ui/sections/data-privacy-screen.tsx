@@ -39,20 +39,15 @@ import {
   ruleMatchesScopeFilter,
 } from "../../model/data-privacy-rule-filter.ts";
 import {
-  levelChangeConfirmation,
-  organizationPiiLevel,
-  organizationRule,
-  type OrganizationPiiLevel,
-  otherPiiLevelLabel,
   type PiiRedactionModelOffer,
-  withOrganizationPiiLevel,
+  ruleSaveConfirmation,
 } from "../../model/pii-redaction-level-offer.ts";
 import { EffectiveSummary } from "../blocks/effective-summary.tsx";
 import { NoPrivacyRules } from "../blocks/no-privacy-rules.tsx";
-import { OrganizationPiiLevelPicker } from "../blocks/organization-pii-level-picker.tsx";
 import { PrivacyRuleDrawer, type PrivacyScopeEntry } from "../blocks/privacy-rule-drawer.tsx";
 import { PrivacyRulesTable } from "../blocks/privacy-rules-table.tsx";
 import { RemoveRuleConfirmDialog } from "../blocks/remove-rule-confirm-dialog.tsx";
+import { OrganizationPiiLevelSection } from "./organization-pii-level-section.tsx";
 
 export default function DataPrivacyScreen() {
   const host = useDataPrivacyHost();
@@ -165,8 +160,8 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
           scrubbed, at any scope, inherited down to projects.
         </Text>
 
-        {piiRedactionModelOffer && snapshot && (
-          <OrganizationPiiLevelMount
+        {piiRedactionModelOffer?.kind === "model" && snapshot && (
+          <OrganizationPiiLevelSection
             free={piiRedactionModelOffer.free}
             host={host}
             projectId={projectId}
@@ -283,123 +278,69 @@ function PrivacyRuleDrawerMount({
       host.failed({ error, fallbackTitle: "Couldn't save the privacy rule" });
     }
   };
-
-  return (
-    <PrivacyRuleDrawer
-      open={open}
-      editingRule={editingRule}
-      onClose={onClose}
-      available={available}
-      audienceOptions={snapshot.audienceOptions}
-      effectiveTeam={snapshot.effectiveTeam}
-      effectiveOrganization={snapshot.effectiveOrganization}
-      projectId={projectId}
-      isSaving={setForScope.isPending}
-      piiRedactionModelOffer={piiRedactionModelOffer}
-      scopePicker={({ value, onChange }) => (
-        <ScopeChipPicker<ScopeChipPickerScopeType>
-          value={value}
-          onChange={onChange}
-          organizationId={available.organization?.id}
-          organizationName={available.organization?.name}
-          availableTeams={available.teams}
-          availableProjects={available.projects}
-          availableDepartments={available.departments}
-          allowedScopeTypes={["ORGANIZATION", "DEPARTMENT", "TEAM", "PROJECT"]}
-          personalScopes
-          currentOrganizationId={organizationId ?? null}
-          currentTeamId={teamId ?? null}
-          currentProjectId={projectId}
-        />
-      )}
-      onSave={save}
-    />
-  );
-}
-
-/**
- * The organization's Essential or Strict picker over its own rule, saved with the drawer's
- * setForScope. Strict at a price, or replacing Custom, asks first. A pick shows at once and stays
- * until the snapshot's level moves or the save fails.
- */
-function OrganizationPiiLevelMount({
-  free,
-  host,
-  projectId,
-  snapshot,
-  onSaved,
-}: {
-  free: boolean;
-  host: DataPrivacyHostApi;
-  projectId: string;
-  snapshot: DataPrivacySnapshot;
-  onSaved: () => void;
-}) {
-  const setForScope = dataPrivacyApi.dataPrivacy.setForScope.useMutation();
-  const [picked, setPicked] = useState<{
-    level: OrganizationPiiLevel;
-    over: OrganizationPiiLevel | null;
+  const [pending, setPending] = useState<{
+    scopes: PrivacyScopeEntry[];
+    config: DataPrivacyConfig;
   } | null>(null);
-  const [asking, setAsking] = useState<OrganizationPiiLevel | null>(null);
-  const organizationId = snapshot.available.organization?.id ?? host.scope().organizationId;
-  if (!organizationId || !snapshot.effectiveOrganization) return null;
-
-  const storedPii = snapshot.effectiveOrganization.pii;
-  const stored = organizationPiiLevel(storedPii.level);
-  const shown = picked && picked.over === stored ? picked.level : stored;
-  const ownRule = organizationRule({ rules: snapshot.rules, organizationId });
-  const confirmation = asking
-    ? levelChangeConfirmation({ from: storedPii.level, to: asking, free })
+  const confirmation = pending
+    ? ruleSaveConfirmation({
+        offer: piiRedactionModelOffer,
+        before: editingRule?.config,
+        after: pending.config,
+      })
     : null;
-
-  const save = async (level: OrganizationPiiLevel) => {
-    setPicked({ level, over: stored });
-    try {
-      await setForScope.mutateAsync({
-        projectId,
-        scope: { scopeType: "ORGANIZATION", scopeId: organizationId },
-        personalOnly: false,
-        config: withOrganizationPiiLevel({ config: ownRule?.config ?? {}, level }),
-      });
-      onSaved();
-      host.succeeded({
-        title: level === "strict" ? "Organization on Strict" : "Organization on Essential",
-      });
-    } catch (error) {
-      setPicked(null);
-      host.failed({ error, fallbackTitle: "Couldn't change the organization's PII level" });
-    }
-  };
-
-  const pick = (level: OrganizationPiiLevel) => {
-    if (levelChangeConfirmation({ from: storedPii.level, to: level, free })) setAsking(level);
-    else void save(level);
+  const saveOrAsk = (scopes: PrivacyScopeEntry[], config: DataPrivacyConfig) => {
+    const asks = ruleSaveConfirmation({
+      offer: piiRedactionModelOffer,
+      before: editingRule?.config,
+      after: config,
+    });
+    if (asks) setPending({ scopes, config });
+    else void save(scopes, config);
   };
 
   return (
     <>
-      <OrganizationPiiLevelPicker
-        level={shown}
-        otherLevelLabel={otherPiiLevelLabel({
-          level: storedPii.level,
-          entityCount: storedPii.entities.length,
-        })}
-        free={free}
-        canWrite={snapshot.available.organization !== null}
-        isSaving={setForScope.isPending}
-        onPick={pick}
-      />
       <ConfirmDialog
         open={confirmation !== null}
-        onClose={() => setAsking(null)}
+        onClose={() => setPending(null)}
         onConfirm={() => {
-          if (asking) void save(asking);
-          setAsking(null);
+          if (pending) void save(pending.scopes, pending.config);
+          setPending(null);
         }}
         title={confirmation?.title ?? ""}
         description={confirmation?.description ?? ""}
         confirmLabel={confirmation?.confirmLabel}
         tone="default"
+      />
+      <PrivacyRuleDrawer
+        open={open}
+        editingRule={editingRule}
+        onClose={onClose}
+        available={available}
+        audienceOptions={snapshot.audienceOptions}
+        effectiveTeam={snapshot.effectiveTeam}
+        effectiveOrganization={snapshot.effectiveOrganization}
+        projectId={projectId}
+        isSaving={setForScope.isPending}
+        piiRedactionModelOffer={piiRedactionModelOffer}
+        scopePicker={({ value, onChange }) => (
+          <ScopeChipPicker<ScopeChipPickerScopeType>
+            value={value}
+            onChange={onChange}
+            organizationId={available.organization?.id}
+            organizationName={available.organization?.name}
+            availableTeams={available.teams}
+            availableProjects={available.projects}
+            availableDepartments={available.departments}
+            allowedScopeTypes={["ORGANIZATION", "DEPARTMENT", "TEAM", "PROJECT"]}
+            personalScopes
+            currentOrganizationId={organizationId ?? null}
+            currentTeamId={teamId ?? null}
+            currentProjectId={projectId}
+          />
+        )}
+        onSave={saveOrAsk}
       />
     </>
   );

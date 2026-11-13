@@ -9,7 +9,10 @@ import type {
   DataPrivacyRule,
   PiiLevel,
 } from "@langwatch/data-privacy-contract";
-import { PII_REDACTION_NANO_USD_PER_CHARACTER } from "@langwatch/data-privacy-contract/pii-redaction-spend";
+import {
+  PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS,
+  PII_REDACTION_NANO_USD_PER_CHARACTER,
+} from "@langwatch/data-privacy-contract/pii-redaction-spend";
 
 /** The two levels the organization picker offers. */
 export type OrganizationPiiLevel = "essential" | "strict";
@@ -38,20 +41,23 @@ export const PII_REDACTION_MODEL_PRICE = piiRedactionModelPrice({
 });
 export const PII_REDACTION_MODEL_PRICE_UNIT = "per 1M characters excl. VAT, pay as you go";
 
-/**
- * The model's limit on one span's texts combined; longer spans fall back to the standard detector.
- * Mirrors PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS in
- * process/src/rules/pii-redaction-model.rules.ts, which the browser cannot import.
- */
-const PII_REDACTION_MODEL_MAX_SPAN_CHARACTERS = 8_000;
-
 export const STRICT_BILLING_NOTE =
-  "Pay as you go, no quota or plan. Only spans the model redacts are billed; spans that fall back to the standard detector are free. Essential stays included.";
+  "Pay as you go, no quota or plan. Every span the model answers is billed by the characters sent, even when it finds nothing. Spans that fall back to the rule-based detector are free. Essential stays included.";
 export const STRICT_FREE_NOTE = "Strict has no charge for your organization.";
-export const STRICT_FALLBACK_NOTE = `Strict falls back to the standard detector for a span when the model is unavailable or the span's text is very long (over ${PII_REDACTION_MODEL_MAX_SPAN_CHARACTERS.toLocaleString("en-US")} characters in total).`;
+export const STRICT_FALLBACK_NOTE = `If the model is unavailable or a span's text is over ${PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS.toLocaleString("en-US")} characters in total, that span is redacted by our rule-based detector (Presidio) instead. If that detector fails, the text can be sent to Google Cloud DLP.`;
+export const STRICT_RULE_BASED_NOTE =
+  "Strict here uses the rule-based detector. The LangWatch PII Redaction Model is available on LangWatch Cloud.";
+export const STRICT_BILLED_NOTE =
+  "Strict is billed from the next trace. Projects or teams with their own Strict rule keep it when the organization moves to Essential.";
 
-/** Whether the Strict offer shows, and whether it is free: null hides every Strict surface. */
-export type PiiRedactionModelOffer = { free: boolean } | null;
+/**
+ * What the page offers for Strict: the model on Cloud with the flag (free on the free list), the
+ * rule-based detector on a self-hosted deployment, or null for today's page.
+ */
+export type PiiRedactionModelOffer =
+  | { kind: "model"; free: boolean }
+  | { kind: "rule-based" }
+  | null;
 
 /** The second thought a level change asks for, or null when it needs none. */
 type LevelChangeConfirmation = {
@@ -95,6 +101,21 @@ export const STRICT_GAPS =
 /** The level the organization picker shows, or null when it is Off or Custom. */
 export function organizationPiiLevel(level: PiiLevel | undefined): OrganizationPiiLevel | null {
   return level === "essential" || level === "strict" ? level : null;
+}
+
+/** A rule saved at Strict where Strict is the model at a price asks first, unless it was Strict. */
+export function ruleSaveConfirmation({
+  offer,
+  before,
+  after,
+}: {
+  offer: PiiRedactionModelOffer;
+  before: DataPrivacyConfig | undefined;
+  after: DataPrivacyConfig;
+}): LevelChangeConfirmation | null {
+  if (offer?.kind !== "model" || offer.free) return null;
+  if (after.pii?.level !== "strict" || before?.pii?.level === "strict") return null;
+  return levelChangeConfirmation({ from: "essential", to: "strict", free: false });
 }
 
 /** How the picker names a level it does not offer: "Off", or "Custom (2 types)". */

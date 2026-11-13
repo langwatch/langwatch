@@ -13,12 +13,14 @@ import {
 import { StatusChip } from "@langwatch/design-system/settings-card";
 import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { ChevronRight } from "lucide-react";
+import type { ReactNode } from "react";
 
 import {
   ESSENTIAL_FINDS,
   ESSENTIAL_MISSES,
   type OrganizationPiiLevel,
   PII_REDACTION_MODEL_NAME,
+  STRICT_BILLED_NOTE,
   STRICT_GAPS,
 } from "../../model/pii-redaction-level-offer.ts";
 import { PiiRedactionExample } from "../elements/pii-redaction-example.tsx";
@@ -60,6 +62,94 @@ function StrictGaps() {
   );
 }
 
+/** One level as a radio card: its name, what sits beside it, a subtitle and what it does. */
+function LevelCard({
+  value,
+  aside,
+  subtitle,
+  price,
+  points,
+}: {
+  value: OrganizationPiiLevel;
+  aside: ReactNode;
+  subtitle: string;
+  price?: ReactNode;
+  points: string[];
+}) {
+  return (
+    <RadioCard.Item value={value}>
+      <RadioCard.ItemHiddenInput />
+      <RadioCard.ItemControl>
+        <RadioCard.ItemContent>
+          <HStack width="full">
+            <RadioCard.ItemText>{LEVEL_LABELS[value]}</RadioCard.ItemText>
+            <Spacer />
+            {aside}
+          </HStack>
+          <Text fontSize="xs" color="fg.muted">
+            {subtitle}
+          </Text>
+          {price}
+          <List.Root paddingLeft={4} fontSize="sm" color="fg.muted" gap={0.5}>
+            {points.map((point) => (
+              <List.Item key={point}>{point}</List.Item>
+            ))}
+          </List.Root>
+        </RadioCard.ItemContent>
+        <RadioCard.ItemIndicator />
+      </RadioCard.ItemControl>
+    </RadioCard.Item>
+  );
+}
+
+/** Essential and Strict side by side; Strict carries the model, its price and the New badge. */
+function LevelCards({ free }: { free: boolean }) {
+  return (
+    <Grid templateColumns={{ base: "1fr", md: "1fr 1fr" }} gap={3}>
+      <LevelCard
+        value="essential"
+        aside={
+          <Text fontSize="xs" color="fg.muted">
+            Included
+          </Text>
+        }
+        subtitle="Standard detection"
+        points={[ESSENTIAL_FINDS, ESSENTIAL_MISSES, "Instant"]}
+      />
+      <LevelCard
+        value="strict"
+        aside={
+          <Badge size="sm" variant="solid" colorPalette="orange">
+            New
+          </Badge>
+        }
+        subtitle={PII_REDACTION_MODEL_NAME}
+        price={<PiiRedactionModelPrice free={free} />}
+        points={[
+          "Names and full street addresses in 8 languages",
+          "Plus everything Essential finds",
+          "Adds a few seconds before a trace shows redacted",
+        ]}
+      />
+    </Grid>
+  );
+}
+
+/** What the picked level stores, with what Strict can still miss. */
+function LevelExample({ level }: { level: OrganizationPiiLevel }) {
+  return (
+    <Card variant="nested" padding="md">
+      <VStack align="stretch" gap={3}>
+        <Text fontSize="xs" fontWeight="600" color="fg.muted">
+          What {LEVEL_LABELS[level]} stores, on a synthetic span
+        </Text>
+        <PiiRedactionExample level={level} />
+        <StrictGaps />
+      </VStack>
+    </Card>
+  );
+}
+
 /**
  * The organization's PII level, Essential or Strict, with the example of what the shown level
  * stores. `level` null means the organization is on Off or Custom, named by `otherLevelLabel`.
@@ -79,7 +169,6 @@ export function OrganizationPiiLevelPicker({
   isSaving: boolean;
   onPick: (level: OrganizationPiiLevel) => void;
 }) {
-  const disabled = !canWrite || isSaving;
   const currentLabel = level ? LEVEL_LABELS[level] : otherLevelLabel;
   return (
     <SettingsSection
@@ -102,7 +191,7 @@ export function OrganizationPiiLevelPicker({
           variant="outline"
           colorPalette="orange"
           value={level}
-          disabled={disabled}
+          disabled={!canWrite || isSaving}
           aria-label="PII redaction level for this organization"
           onValueChange={(details) => {
             if (isOrganizationPiiLevel(details.value) && details.value !== level) {
@@ -110,70 +199,12 @@ export function OrganizationPiiLevelPicker({
             }
           }}
         >
-          <Grid templateColumns={{ base: "1fr", md: "1fr 1fr" }} gap={3}>
-            <RadioCard.Item value="essential">
-              <RadioCard.ItemHiddenInput />
-              <RadioCard.ItemControl>
-                <RadioCard.ItemContent>
-                  <HStack width="full">
-                    <RadioCard.ItemText>Essential</RadioCard.ItemText>
-                    <Spacer />
-                    <Text fontSize="xs" color="fg.muted">
-                      Included
-                    </Text>
-                  </HStack>
-                  <Text fontSize="xs" color="fg.muted">
-                    Standard detection
-                  </Text>
-                  <List.Root paddingLeft={4} fontSize="sm" color="fg.muted" gap={0.5}>
-                    <List.Item>{ESSENTIAL_FINDS}</List.Item>
-                    <List.Item>{ESSENTIAL_MISSES}</List.Item>
-                    <List.Item>Instant</List.Item>
-                  </List.Root>
-                </RadioCard.ItemContent>
-                <RadioCard.ItemIndicator />
-              </RadioCard.ItemControl>
-            </RadioCard.Item>
-            <RadioCard.Item value="strict">
-              <RadioCard.ItemHiddenInput />
-              <RadioCard.ItemControl>
-                <RadioCard.ItemContent>
-                  <HStack width="full">
-                    <RadioCard.ItemText>Strict</RadioCard.ItemText>
-                    <Spacer />
-                    <Badge size="sm" variant="solid" colorPalette="orange">
-                      New
-                    </Badge>
-                  </HStack>
-                  <Text fontSize="xs" color="fg.muted">
-                    {PII_REDACTION_MODEL_NAME}
-                  </Text>
-                  <PiiRedactionModelPrice free={free} />
-                  <List.Root paddingLeft={4} fontSize="sm" color="fg.muted" gap={0.5}>
-                    <List.Item>Names and full street addresses in 8 languages</List.Item>
-                    <List.Item>Plus everything Essential finds</List.Item>
-                    <List.Item>Adds a few seconds before a trace shows redacted</List.Item>
-                  </List.Root>
-                </RadioCard.ItemContent>
-                <RadioCard.ItemIndicator />
-              </RadioCard.ItemControl>
-            </RadioCard.Item>
-          </Grid>
+          <LevelCards free={free} />
         </RadioCard.Root>
-        {level && (
-          <Card variant="nested" padding="md">
-            <VStack align="stretch" gap={3}>
-              <Text fontSize="xs" fontWeight="600" color="fg.muted">
-                What {LEVEL_LABELS[level]} stores, on a synthetic span
-              </Text>
-              <PiiRedactionExample level={level} />
-              <StrictGaps />
-            </VStack>
-          </Card>
-        )}
+        {level && <LevelExample level={level} />}
         {level === "strict" && !free && (
           <Text fontSize="xs" color="fg.muted">
-            Strict is billed from the next trace. Pick Essential to stop it.
+            {STRICT_BILLED_NOTE}
           </Text>
         )}
       </VStack>

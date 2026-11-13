@@ -5,6 +5,7 @@
  */
 
 import type { DataPrivacyRule } from "@langwatch/data-privacy-contract";
+import { PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS } from "@langwatch/data-privacy-contract/pii-redaction-spend";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -14,6 +15,7 @@ import {
   PII_REDACTION_MODEL_PRICE,
   PII_REDACTION_MODEL_PRICE_UNIT,
   piiRedactionModelPrice,
+  ruleSaveConfirmation,
   STRICT_FALLBACK_NOTE,
   withOrganizationPiiLevel,
 } from "../pii-redaction-level-offer.ts";
@@ -145,7 +147,52 @@ describe("given a change of the organization's level", () => {
 });
 
 describe("given the fallback note", () => {
-  it("names the limit on a span's text combined", () => {
-    expect(STRICT_FALLBACK_NOTE).toContain("over 8,000 characters in total");
+  /** @scenario The settings page names the model's own length limit */
+  it("names the limit the process routes by, on a span's text combined", () => {
+    expect(STRICT_FALLBACK_NOTE).toContain(
+      `over ${PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS.toLocaleString("en-US")} characters in total`,
+    );
+    expect(STRICT_FALLBACK_NOTE).toContain("rule-based detector (Presidio)");
+    expect(STRICT_FALLBACK_NOTE).toContain("Google Cloud DLP");
+  });
+});
+
+describe("given a rule saved from the drawer", () => {
+  const model = { kind: "model", free: false } as const;
+
+  describe("when it turns Strict on where Strict is the model at a price", () => {
+    it("asks with the price", () => {
+      expect(
+        ruleSaveConfirmation({
+          offer: model,
+          before: { pii: { level: "essential" } },
+          after: { pii: { level: "strict" } },
+        })?.confirmLabel,
+      ).toBe("Turn on Strict");
+    });
+  });
+
+  /** @scenario Saving a rule asks for the price only when it turns Strict on at a price */
+  it("does not ask when nothing new is billed", () => {
+    const strict = { pii: { level: "strict" as const } };
+    expect(ruleSaveConfirmation({ offer: model, before: strict, after: strict })).toBeNull();
+    expect(
+      ruleSaveConfirmation({
+        offer: { kind: "model", free: true },
+        before: undefined,
+        after: strict,
+      }),
+    ).toBeNull();
+    expect(
+      ruleSaveConfirmation({ offer: { kind: "rule-based" }, before: undefined, after: strict }),
+    ).toBeNull();
+    expect(ruleSaveConfirmation({ offer: null, before: undefined, after: strict })).toBeNull();
+    expect(
+      ruleSaveConfirmation({
+        offer: model,
+        before: undefined,
+        after: { pii: { level: "essential" } },
+      }),
+    ).toBeNull();
   });
 });

@@ -20,7 +20,10 @@ import {
   STRICT_ADDED_PII_ENTITY_LABELS,
   STRICT_ADDED_PII_SUMMARY,
 } from "../../model/pii-entity-labels.ts";
-import type { PiiRedactionModelOffer } from "../../model/pii-redaction-level-offer.ts";
+import {
+  type PiiRedactionModelOffer,
+  STRICT_RULE_BASED_NOTE,
+} from "../../model/pii-redaction-level-offer.ts";
 import { PatternListField } from "../elements/pattern-list-field.tsx";
 import { PiiEntityToggleGroup } from "../elements/pii-entity-toggle-group.tsx";
 import { PiiRedactionLevelDetail } from "./pii-redaction-level-detail.tsx";
@@ -84,6 +87,8 @@ export function PiiRedactionFields({
         : {}),
     });
 
+  const effectiveLevel = form.piiChoice === "inherit" ? inheritedLevel : form.piiChoice;
+
   return (
     <VStack gap={2} align="stretch">
       <HStack justifyContent="space-between" gap={4} align="start">
@@ -130,11 +135,13 @@ export function PiiRedactionFields({
           {inheritedHint(PII_VALUE_LABELS[inheritedLevel])}
         </Text>
       )}
-      {piiRedactionModelOffer && (
-        <PiiRedactionLevelDetail
-          level={form.piiChoice === "inherit" ? inheritedLevel : form.piiChoice}
-          free={piiRedactionModelOffer.free}
-        />
+      {piiRedactionModelOffer?.kind === "model" && (
+        <PiiRedactionLevelDetail level={effectiveLevel} free={piiRedactionModelOffer.free} />
+      )}
+      {piiRedactionModelOffer?.kind === "rule-based" && effectiveLevel === "strict" && (
+        <Text fontSize="xs" color="fg.muted">
+          {STRICT_RULE_BASED_NOTE}
+        </Text>
       )}
       {form.piiChoice === "custom" && (
         <VStack align="stretch" gap={3} paddingLeft={6}>
