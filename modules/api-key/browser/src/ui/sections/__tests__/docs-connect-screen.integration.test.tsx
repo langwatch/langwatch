@@ -200,8 +200,7 @@ describe("given an organisation that turned docs playground sessions off", () =>
     const [posted] = host.posted;
     expect(docsSessionMessageSchema.parse(posted?.message)).toMatchObject({ outcome: "disabled" });
     expect(
-      docsSessionMessageSchema.safeParse({ ...(posted?.message as object), token: "sk-lw-x" })
-        .success,
+      docsSessionMessageSchema.validate({ ...(posted?.message as object), token: "sk-lw-x" }),
     ).toBe(false);
   });
 
