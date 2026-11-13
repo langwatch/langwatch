@@ -1,0 +1,78 @@
+name: diag-browser-import (throwaway)
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/diag-browser-import.yml"
+      - ".github/diag/**"
+
+permissions:
+  contents: read
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        leg: [seq, shard8]
+    env:
+      CI: "true"
+      BUILD_TIME: "true"
+      DIAG_BROWSER_HTTP: "1"
+      VITEST_PW_DEBUG: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          ref: 456c5912abd686fd959d89ce9c61200d7d5a41ef
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          path: _diag
+      - name: Apply the instrumentation
+        run: |
+          cp _diag/packages/vitest-config/src/vitest-browser-config.ts packages/vitest-config/src/vitest-browser-config.ts
+          mkdir -p .github/diag && cp _diag/.github/diag/* .github/diag/
+          rm -rf _diag
+          git log -1 --format='%H %s'
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: "all"
+      - uses: ./.github/actions/prepare-generated-files
+      - name: Read the Playwright version
+        id: playwright
+        run: |
+          version=$(grep -m1 -oE '^  playwright@[0-9][^:]*' pnpm-lock.yaml | cut -d@ -f2)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright.outputs.version }}
+      - name: Patch the Playwright provider with request logging
+        run: node .github/diag/patch-playwright.cjs
+      - name: jsdom suite then browser lane, as the shard orders them
+        if: matrix.leg == 'seq'
+        env:
+          DEBUG: "vite:deps,vitest:browser:*"
+        run: |
+          set +e
+          fails=0
+          for i in 1 2 3 4 5; do
+            echo "::group::user-browser test run $i"
+            pnpm exec nx run-many --targets test --projects @langwatch/user-browser --excludeTaskDependencies --skipNxCache --outputStyle=stream-without-prefixes 2>&1 | tail -5
+            echo "::endgroup::"
+            echo "::group::user-browser test:browser run $i"
+            pnpm --filter @langwatch/user-browser run test:browser 2>&1 | grep -v "vite:deps.*->" ; rc=${PIPESTATUS[0]}
+            echo "::endgroup::"
+            echo "RESULT run $i rc=$rc"
+            [ "$rc" = 0 ] || fails=$((fails+1))
+          done
+          echo "FAILS=$fails"
+      - name: Shard 8 of the failing run
+        if: matrix.leg == 'shard8'
+        env:
+          PACKAGE_SUITES_SHARD: "8/8"
+          PACKAGE_SUITES_CONCURRENCY: "2"
+        run: |
+          export PACKAGE_SUITES_ONLY="$(cat .github/diag/only.json)"
+          node --experimental-strip-types .github/scripts/run-package-suites.ts || true
