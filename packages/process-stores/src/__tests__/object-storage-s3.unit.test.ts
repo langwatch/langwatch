@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { createServer, type Server } from "node:http";
+import { createServer, type IncomingMessage, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { Readable } from "node:stream";
 
@@ -8,7 +8,7 @@ import { Temporal } from "@langwatch/time";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ObjectBodyTooLargeError, StoredObjectNotFoundError } from "../object-storage-backend.ts";
-import { s3Backend, s3Client } from "../object-storage-s3.ts";
+import { S3_SOCKET_IDLE_TIMEOUT_MS, s3Backend, s3Client } from "../object-storage-s3.ts";
 
 const clock = { now: () => Temporal.Instant.from("2026-09-24T12:00:00Z") };
 const at = { projectId: "project-1", key: "project-1/object-1" };
@@ -136,6 +136,22 @@ describe("given object storage on S3", () => {
       vi.useRealTimers();
       stalled?.closeAllConnections();
       await new Promise((resolve) => stalled?.close(resolve));
+    });
+
+    it("arms an idle timeout on a body S3 stops sending, since the client's own never does", async () => {
+      stalled = createServer((_request, response) => {
+        response.writeHead(200, { "Content-Length": "10" });
+        response.write("abc");
+      });
+      await new Promise<void>((resolve) => stalled?.listen(0, "127.0.0.1", resolve));
+      const { port } = stalled.address() as AddressInfo;
+      const client = s3Client({ ...account, endpoint: `http://127.0.0.1:${port}` });
+      const backend = s3Backend({ client, bucket: "objects", clock });
+
+      const body = await backend.read(at);
+
+      expect((body as IncomingMessage).socket?.timeout).toBe(S3_SOCKET_IDLE_TIMEOUT_MS);
+      (body as IncomingMessage).destroy();
     });
 
     it("refuses the read once the answer deadline passes, instead of waiting forever", async () => {

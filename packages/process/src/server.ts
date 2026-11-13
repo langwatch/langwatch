@@ -401,10 +401,14 @@ export class Server {
       return;
     }
 
-    this.track(request, response);
-    this.holdUntilSettled(
-      this.answer("application", () => this.whenStarted(application, request, response), response),
+    const kind = this.track(request, response);
+    const handling = this.answer(
+      "application",
+      () => this.whenStarted(application, request, response),
+      response,
     );
+    // An event stream is closed, not waited on, so its handler does not hold the drain either.
+    if (kind === "request") this.holdUntilSettled(handling);
   }
 
   /** A closed response is not a finished handler: the drain waits on both. */
@@ -420,17 +424,18 @@ export class Server {
     if (this.inFlight.size === 0 && this.handlers.size === 0) this.onIdle?.();
   }
 
-  private track(request: IncomingMessage, response: ServerResponse): void {
+  private track(request: IncomingMessage, response: ServerResponse): "stream" | "request" {
     if (request.headers.accept?.includes("text/event-stream")) {
       this.streams.add(response);
       response.once("close", () => this.streams.delete(response));
-      return;
+      return "stream";
     }
     this.inFlight.add(response);
     response.once("close", () => {
       this.inFlight.delete(response);
       this.notifyIfIdle();
     });
+    return "request";
   }
 
   private whenIdle(): Promise<void> {

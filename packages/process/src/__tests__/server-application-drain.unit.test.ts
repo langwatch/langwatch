@@ -51,6 +51,8 @@ async function serverWithHeldRequest(events: string[]) {
         response.writeHead(200, { "Content-Type": "text/event-stream" });
         response.write(": open\n\n");
         entered();
+        // A stream's handler may never settle; the drain closes the stream without waiting on it.
+        await new Promise(() => undefined);
         return;
       }
       if (request.url === "/unwinds") {

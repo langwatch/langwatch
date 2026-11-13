@@ -2,6 +2,7 @@
  * S3 and S3-compatible storage as one placed backend: streamed PUT and GET,
  * and an upload URL whose signature covers content-type and content-length.
  */
+import { IncomingMessage } from "node:http";
 import { Readable } from "node:stream";
 
 import {
@@ -70,12 +71,17 @@ export function s3Client(account: ObjectStorageAccount): S3Client {
   });
 }
 
-/** A stalled socket fails the call instead of holding one of the pool's sockets forever. */
-const S3_CONNECTION_TIMEOUT_MS = 5_000;
-const S3_SOCKET_IDLE_TIMEOUT_MS = 60_000;
 /**
- * Until response headers, socket wait in the pool included. PUT carries none: its clock
- * would include the upload body, which the idle timeout already bounds.
+ * A stalled socket fails the call instead of holding one of the pool's sockets forever. The
+ * handler arms the idle timeout only on a request still waiting 3s in; an upload body that
+ * stops for a minute is cut, and `readObject` arms the same timeout on the body it returns.
+ */
+const S3_CONNECTION_TIMEOUT_MS = 5_000;
+export const S3_SOCKET_IDLE_TIMEOUT_MS = 60_000;
+/**
+ * Until response headers, socket wait in the pool included, per attempt: the SDK retries a
+ * timeout, so a stalled call fails after about three of these. PUT carries none: its clock
+ * would include the upload body.
  */
 const S3_ANSWER_DEADLINE = { requestTimeout: 30_000 } as const;
 
@@ -129,12 +135,22 @@ async function readObject(place: S3Place, at: StoredObjectAddress): Promise<Read
       new GetObjectCommand({ Bucket: place.bucket, Key: at.key }),
       S3_ANSWER_DEADLINE,
     );
-    if (response.Body instanceof Readable) return response.Body;
+    if (response.Body instanceof Readable) return releasedWhenIdle(response.Body);
     throw new Error(`S3 answered "${at.key}" without a readable body.`);
   } catch (error) {
     if (isMissing(error)) throw new StoredObjectNotFoundError(at.projectId, at.key);
     throw error;
   }
+}
+
+/** A body nobody reads, or one S3 stops sending, gives its pooled socket back after a minute. */
+function releasedWhenIdle(body: Readable): Readable {
+  if (body instanceof IncomingMessage) {
+    body.setTimeout(S3_SOCKET_IDLE_TIMEOUT_MS, () => {
+      body.destroy(Object.assign(new Error("S3 body went idle"), { name: "TimeoutError" }));
+    });
+  }
+  return body;
 }
 
 /** S3's own full-object SHA-256 where the object carries one; otherwise nothing. */

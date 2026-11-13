@@ -120,11 +120,14 @@ export class TraceSpanCollectionService {
   ): Promise<SpanIngestionResult[]> {
     const results: SpanIngestionResult[] = [];
     const closed: StagingClosedTally = { spans: 0, tenantId: inputs[0]?.tenantId };
-    for (let start = 0; start < inputs.length; start += DEDUP_BATCH_SIZE) {
-      const batch = inputs.slice(start, start + DEDUP_BATCH_SIZE);
-      results.push(...(await this.collectBatch({ inputs: batch, closed })));
+    try {
+      for (let start = 0; start < inputs.length; start += DEDUP_BATCH_SIZE) {
+        const batch = inputs.slice(start, start + DEDUP_BATCH_SIZE);
+        results.push(...(await this.collectBatch({ inputs: batch, closed })));
+      }
+    } finally {
+      this.reportStagingClosed(closed);
     }
-    this.reportStagingClosed(closed);
     return results;
   }
 
