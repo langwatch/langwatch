@@ -101,6 +101,8 @@ class FakeStaffAccessBackend {
   overviewError: unknown = null;
   approval: StaffAccessApprovalView | undefined;
   approvalError: unknown = null;
+  /** How many times a screen asked to read the overview again. */
+  refetches = 0;
   readonly calls: { procedure: Mutation; input: unknown }[] = [];
   handlers: Partial<Record<Mutation, Handler>> = {};
   private version = 0;
@@ -112,6 +114,7 @@ class FakeStaffAccessBackend {
     this.approval = approvalView();
     this.approvalError = null;
     this.calls.length = 0;
+    this.refetches = 0;
     this.handlers = {};
     this.changed();
   }
@@ -157,7 +160,7 @@ class FakeStaffAccessBackend {
       case "revokeSession":
         return { ok: true };
       case "revokeAll":
-        return { revoked: 2 };
+        return { revoked: 2, failed: 0 };
     }
   }
 }
@@ -172,6 +175,7 @@ function useQuery<T>(read: () => { data: T | undefined; error: unknown }) {
     error: error ?? null,
     isLoading: false,
     refetch: async () => {
+      backend.refetches += 1;
       backend.changed();
       return { data };
     },

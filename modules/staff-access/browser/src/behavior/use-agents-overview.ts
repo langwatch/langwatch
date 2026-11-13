@@ -1,6 +1,7 @@
 /**
  * The agents page: my enrolled agents, every operator's sessions, enrolment with a passkey and
- * the revokes. Writes update the overview in place; the kill switch rereads it.
+ * the revokes. Writes update the overview in place, then reread it: a revoke on the server can
+ * end more than the row it names (revoking an agent ends its sessions).
  */
 
 import type { StaffAccessEnrolled } from "@langwatch/staff-access-contract";
@@ -35,6 +36,7 @@ export function useAgentsOverview() {
         (overview) =>
           overview && withEnrolledRequester({ overview, requester: enrolled.requester }),
       );
+      void overview.refetch();
       return enrolled;
     } finally {
       setEnrolling(false);
@@ -48,6 +50,7 @@ export function useAgentsOverview() {
       void 0,
       (overview) => overview && withRevokedRequester({ overview, requesterId, revokedAt }),
     );
+    await overview.refetch();
   };
 
   const endSession = async ({ requestId }: { requestId: string }) => {
@@ -57,6 +60,7 @@ export function useAgentsOverview() {
       void 0,
       (overview) => overview && withRevokedSession({ overview, requestId, revokedAt }),
     );
+    await overview.refetch();
   };
 
   const revokeEverything = async ({ confirmation }: { confirmation: string }) => {

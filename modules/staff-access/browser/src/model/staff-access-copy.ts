@@ -39,7 +39,8 @@ export function scopeLabel(scope: StaffAccessScopeName): string {
   return SCOPE_COPY[scope].label;
 }
 
-/** The setup command the operator pastes on the machine the agent runs on. */
-export function setupCommand(requesterKey: string): string {
-  return `langwatch ops setup --requester-key ${requesterKey}`;
-}
+/**
+ * The setup command the operator runs where the agent works, after copying the key. The key is
+ * read from stdin, so it stays out of shell history, the process list and the agent's transcript.
+ */
+export const SETUP_COMMAND = "pbpaste | langwatch ops setup";
