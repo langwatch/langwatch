@@ -31,7 +31,7 @@ function connectedAgent(id: string, name: string): Agent {
     createdAt: new Date("2026-11-01T00:00:00Z"),
     updatedAt: new Date("2026-11-01T00:00:00Z"),
     type: "connected",
-    config: { parameters: [] },
+    config: { parameters: [], sdk: { name: "langwatch", version: "1.0.0", language: "python" } },
   };
 }
 
@@ -123,7 +123,7 @@ function setup({
     webhooks: createApiFixture<WebhookApi>({ getAll: async () => endpoints }),
     outbox: () => outbox,
     publicBaseUrl: "https://app.langwatch.test",
-    logger: createTestLogger(),
+    logger: createTestLogger().logger,
     now: () => NOW,
   });
   return { service, registry, outbox, state, reconciled };

@@ -85,7 +85,7 @@ const AGENT: Agent = {
   createdAt: new Date("2026-11-01T00:00:00Z"),
   updatedAt: new Date("2026-11-01T00:00:00Z"),
   type: "connected",
-  config: { parameters: [] },
+  config: { parameters: [], sdk: { name: "langwatch", version: "1.0.0", language: "python" } },
 };
 
 async function buildApi({ grants = ["governance:view"] }: { grants?: string[] } = {}) {

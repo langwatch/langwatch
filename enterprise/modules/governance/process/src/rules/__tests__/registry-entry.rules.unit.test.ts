@@ -70,6 +70,7 @@ describe("langwatchAgentDraft()", () => {
             { name: "region", type: "string", required: true },
             { name: "token", type: "string", secret: true, defaultValue: "s3cret" },
           ],
+          sdk: { name: "langwatch", version: "1.0.0", language: "python" },
         },
       });
 
