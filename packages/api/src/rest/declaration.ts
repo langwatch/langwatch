@@ -631,7 +631,7 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly cache?: RestCachePolicy;
   /** Present exactly when the route asks the tenant to hold an entitlement. */
   readonly entitlement?: EntitlementGate;
-  /** Present exactly when the route mints a credential: the permission its refusal names. */
+  /** Present exactly when the route mints a credential. */
   readonly mintsCredential?: true;
   /** Present exactly when the route is refused on an aggregate though its permission is exempt. */
   readonly refusedOnAggregate?: true;
