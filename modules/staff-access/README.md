@@ -11,7 +11,7 @@ Staff access lets a platform operator's coding agent reach production for one ho
 | Classification | core (`modules/catalogue.json`)                                                                                          |
 | Subjects       | staff-access                                                                                                             |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                                                 |
-| Api token      | `StaffAccessApi` = `moduleApi<StaffAccessApi>()("staff-access")`, `contract/src/staff-access.api.ts:107` (18 operations) |
+| Api token      | `StaffAccessApi` = `moduleApi<StaffAccessApi>()("staff-access")`, `contract/src/staff-access.api.ts:109` (18 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                               |
 
 ## What staff-access owns
