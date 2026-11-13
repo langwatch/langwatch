@@ -21,6 +21,7 @@
     "langwatch/skip-tenant-check-reason": "error",
     "langwatch/no-form-watch-in-child": "error",
     "langwatch/no-hand-rolled-plan-gate": "error",
+    "langwatch/ingestion-source-status-literal": "error",
     "langwatch/no-tautological-assertion": "error",
     "langwatch/require-fetch-timeout": "error",
     "langwatch/banned-verb-prefix": "error",

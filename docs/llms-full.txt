@@ -14988,7 +14988,9 @@ For source types where the puller worker is not yet wired (the three "setup-cont
 
 ## Auth contract: same shape across every receiver
 
-All push-mode + webhook receivers use `Authorization: Bearer lw_is_<secret>` (the same shape the gateway uses for its `vk-lw-` virtual keys, just a different prefix). Mismatched `:sourceId` path vs. resolved-secret source ID returns `401 unauthorized` without leaking which one exists. The 24-hour rotation grace window is documented in the IngestionSource lifecycle architecture.
+All push-mode + webhook receivers use `Authorization: Bearer lw_is_<secret>` (the same shape the gateway uses for its `vk-lw-` virtual keys, just a different prefix). Mismatched `:sourceId` path vs. resolved-secret source ID returns `401 unauthorized` without leaking which one exists.
+
+A disabled source answers its own secret with `403 ingestion_source_disabled` and keeps no part of the batch; set it back to active and the same secret works again. Disabling never deletes the source's history. The 24-hour rotation grace window is documented in the IngestionSource lifecycle architecture.
 
 ## Verification: same loop for every active source
 
@@ -15136,7 +15138,7 @@ sidebarTitle: Generic OTel
 - **Body:** OTLP/HTTP JSON envelope (`resource_spans`, `scope_spans`, `spans`). `snake_case` and `camelCase` both accepted.
 - **OTLP shape:** Spans (parent-child + duration). Lands in `recorded_spans`.
 - **Pipeline:** Receiver lazy-ensures the hidden Governance Project, stamps `langwatch.origin.*` on every span, hands off to the existing trace pipeline (same `traces.collection.handleOtlpTraceRequest` that powers `/api/otel/v1/traces`). No parallel write path.
-- **Status flip:** receiver calls `recordEventReceived(sourceId)` after any successful 202; source flips from `awaiting_first_event` → `active`.
+- **Status flip:** receiver calls `recordEventReceived(sourceId)` after any successful 202; source flips from `awaiting_first_event` → `active`. A disabled source is never flipped back, and its batches are refused with `403 ingestion_source_disabled`.
 
 ## What the admin configures upstream
 

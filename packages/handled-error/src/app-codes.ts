@@ -395,6 +395,7 @@ export const APP_ERROR_CODES = [
   "ingestion_rate_limited",
   "ingestion_receiver_unavailable",
   "ingestion_source_cap_reached",
+  "ingestion_source_disabled",
   "ingestion_source_not_found",
   "ingestion_source_unauthorized",
   "ingestion_wrong_endpoint",
