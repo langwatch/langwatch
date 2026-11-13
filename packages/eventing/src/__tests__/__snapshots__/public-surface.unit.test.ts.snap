@@ -140,6 +140,7 @@ exports[`the @langwatch/eventing public surface > given the . entry > exports ex
   "isDispatchError: function",
   "isOutboxRetryRefused: function",
   "isProjectGone: function",
+  "isQueryMemoryLimitExceeded: function",
   "isRetryableHttpStatus: function",
   "mapCommands: function",
   "markCompletedBatch: function",
