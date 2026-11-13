@@ -581,6 +581,12 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And a value that is not an ISO instant with an offset is sent exactly as the caller bound it
 
   @unit
+  Scenario: Placeholder text inside a string literal or comment does not change a bound value
+    Given a query declaring {s:String} that also holds the text {s:DateTime} in a string literal and in a comment
+    When the request binds s to "2026-11-01T00:00:00Z"
+    Then the server receives s exactly as the caller bound it
+
+  @unit
   Scenario: A missing column passed to a function is named in the refusal
     Given a query that passes a column no view carries to a function, as in arrayJoin(Labels)
     When the server refuses it as an unknown expression or function identifier
