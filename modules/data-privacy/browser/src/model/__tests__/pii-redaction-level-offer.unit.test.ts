@@ -11,6 +11,7 @@ import {
   organizationPiiLevel,
   organizationRule,
   PII_REDACTION_MODEL_PRICE,
+  PII_REDACTION_MODEL_PRICE_UNIT,
   piiRedactionModelPrice,
   withOrganizationPiiLevel,
 } from "../pii-redaction-level-offer.ts";
@@ -20,7 +21,9 @@ describe("given the rate billing charges for the PII redaction model", () => {
     /** @scenario The price is derived from the rate billing charges */
     it("reads $0.50 per 1M characters", () => {
       expect(piiRedactionModelPrice({ nanoUsdPerCharacter: 500 })).toBe("$0.50");
-      expect(PII_REDACTION_MODEL_PRICE).toBe("$0.50 per 1M characters");
+      expect(`${PII_REDACTION_MODEL_PRICE} ${PII_REDACTION_MODEL_PRICE_UNIT}`).toBe(
+        "$0.50 per 1M characters, pay as you go",
+      );
     });
   });
 

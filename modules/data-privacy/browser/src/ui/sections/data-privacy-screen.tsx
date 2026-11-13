@@ -24,6 +24,7 @@ import {
 import { useMemo, useState } from "react";
 
 import { dataPrivacyApi } from "../../behavior/data-privacy-api.ts";
+import { usePiiRedactionModelOffered } from "../../behavior/use-pii-redaction-model-offered.ts";
 import {
   PRIVACY_RULE_NEW_VALUE,
   PRIVACY_RULE_QUERY_KEY,
@@ -36,8 +37,15 @@ import {
   canWritePrivacyRules,
   ruleMatchesScopeFilter,
 } from "../../model/data-privacy-rule-filter.ts";
+import {
+  organizationPiiLevel,
+  organizationRule,
+  type OrganizationPiiLevel,
+  withOrganizationPiiLevel,
+} from "../../model/pii-redaction-level-offer.ts";
 import { EffectiveSummary } from "../blocks/effective-summary.tsx";
 import { NoPrivacyRules } from "../blocks/no-privacy-rules.tsx";
+import { OrganizationPiiLevelPicker } from "../blocks/organization-pii-level-picker.tsx";
 import { PrivacyRuleDrawer, type PrivacyScopeEntry } from "../blocks/privacy-rule-drawer.tsx";
 import { PrivacyRulesTable } from "../blocks/privacy-rules-table.tsx";
 import { RemoveRuleConfirmDialog } from "../blocks/remove-rule-confirm-dialog.tsx";
@@ -53,6 +61,7 @@ export default function DataPrivacyScreen() {
 
 function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projectId: string }) {
   const { teamId } = host.scope();
+  const piiRedactionModelOffered = usePiiRedactionModelOffered();
   const utils = dataPrivacyApi.useUtils();
   const snapshotQuery = dataPrivacyApi.dataPrivacy.getSnapshot.useQuery({ projectId });
 
@@ -152,6 +161,15 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
           scrubbed, at any scope, inherited down to projects.
         </Text>
 
+        {piiRedactionModelOffered && snapshot && (
+          <OrganizationPiiLevelMount
+            host={host}
+            projectId={projectId}
+            snapshot={snapshot}
+            onSaved={() => void invalidate()}
+          />
+        )}
+
         {snapshot && snapshot.rules.length === 0 && (
           <NoPrivacyRules canWrite={canWrite} onAdd={openAdd} />
         )}
@@ -175,6 +193,7 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
             snapshot={snapshot}
             scopeFilter={scopeFilter}
             currentTeamId={teamId ?? null}
+            piiRedactionModelOffered={piiRedactionModelOffered}
           />
         )}
 
@@ -187,6 +206,7 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
             editingRule={privacyRuleForAddress(ruleAddress, snapshot.rules)}
             onClose={closeRuleDrawer}
             onSaved={() => void invalidate()}
+            piiRedactionModelOffered={piiRedactionModelOffered}
           />
         )}
       </VStack>
@@ -224,6 +244,7 @@ function PrivacyRuleDrawerMount({
   editingRule,
   onClose,
   onSaved,
+  piiRedactionModelOffered,
 }: {
   host: DataPrivacyHostApi;
   projectId: string;
@@ -232,6 +253,7 @@ function PrivacyRuleDrawerMount({
   editingRule: DataPrivacyRule | null;
   onClose: () => void;
   onSaved: () => void;
+  piiRedactionModelOffered: boolean;
 }) {
   const { organizationId, teamId } = host.scope();
   const setForScope = dataPrivacyApi.dataPrivacy.setForScope.useMutation();
@@ -268,6 +290,7 @@ function PrivacyRuleDrawerMount({
       effectiveOrganization={snapshot.effectiveOrganization}
       projectId={projectId}
       isSaving={setForScope.isPending}
+      piiRedactionModelOffered={piiRedactionModelOffered}
       scopePicker={({ value, onChange }) => (
         <ScopeChipPicker<ScopeChipPickerScopeType>
           value={value}
@@ -285,6 +308,62 @@ function PrivacyRuleDrawerMount({
         />
       )}
       onSave={save}
+    />
+  );
+}
+
+/**
+ * The organization's Essential or Strict picker over its own rule, saved with the drawer's
+ * setForScope. A pick shows at once and stays until the snapshot's level moves or the save fails.
+ */
+function OrganizationPiiLevelMount({
+  host,
+  projectId,
+  snapshot,
+  onSaved,
+}: {
+  host: DataPrivacyHostApi;
+  projectId: string;
+  snapshot: DataPrivacySnapshot;
+  onSaved: () => void;
+}) {
+  const setForScope = dataPrivacyApi.dataPrivacy.setForScope.useMutation();
+  const [picked, setPicked] = useState<{
+    level: OrganizationPiiLevel;
+    over: OrganizationPiiLevel | null;
+  } | null>(null);
+  const organizationId = snapshot.available.organization?.id ?? host.scope().organizationId;
+  if (!organizationId || !snapshot.effectiveOrganization) return null;
+
+  const stored = organizationPiiLevel(snapshot.effectiveOrganization.pii.level);
+  const shown = picked && picked.over === stored ? picked.level : stored;
+  const ownRule = organizationRule({ rules: snapshot.rules, organizationId });
+
+  const pick = async (level: OrganizationPiiLevel) => {
+    setPicked({ level, over: stored });
+    try {
+      await setForScope.mutateAsync({
+        projectId,
+        scope: { scopeType: "ORGANIZATION", scopeId: organizationId },
+        personalOnly: false,
+        config: withOrganizationPiiLevel({ config: ownRule?.config ?? {}, level }),
+      });
+      onSaved();
+      host.succeeded({
+        title: level === "strict" ? "Organization on Strict" : "Organization on Essential",
+      });
+    } catch (error) {
+      setPicked(null);
+      host.failed({ error, fallbackTitle: "Couldn't change the organization's PII level" });
+    }
+  };
+
+  return (
+    <OrganizationPiiLevelPicker
+      level={shown}
+      canWrite={snapshot.available.organization !== null}
+      isSaving={setForScope.isPending}
+      onPick={(level) => void pick(level)}
     />
   );
 }

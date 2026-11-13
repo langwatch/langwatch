@@ -33,9 +33,10 @@ export function piiRedactionModelPrice({
   }).format(usd);
 }
 
-export const PII_REDACTION_MODEL_PRICE = `${piiRedactionModelPrice({
+export const PII_REDACTION_MODEL_PRICE = piiRedactionModelPrice({
   nanoUsdPerCharacter: PII_REDACTION_NANO_USD_PER_CHARACTER,
-})} per 1M characters`;
+});
+export const PII_REDACTION_MODEL_PRICE_UNIT = "per 1M characters, pay as you go";
 
 export const STRICT_BILLING_NOTE =
   "Pay as you go, no quota or plan. Only Strict spans are billed; Essential stays included.";
