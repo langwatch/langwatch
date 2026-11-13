@@ -232,6 +232,14 @@ Feature: Agent registry with ARD discovery and change events
     And the walk counts as completed only when it reaches the last organisation
 
   @unit
+  Scenario: A walk pass whose walk another pass finished reconciles nothing
+    Given a walk pass queued while a walk was open
+    And another pass completed that walk before it ran
+    When the queued pass runs
+    Then it reconciles no organisation
+    And a cursor it saves late leaves the completed walk's state as it is
+
+  @unit
   Scenario: Traffic passes and walks skip organisations below the Enterprise plan
     Given an Enterprise organisation and an organisation on another plan
     When a traffic pass walks every organisation

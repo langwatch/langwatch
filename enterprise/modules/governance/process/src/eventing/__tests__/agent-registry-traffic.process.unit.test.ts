@@ -161,6 +161,36 @@ describe("runAgentRegistryTraffic()", () => {
   });
 });
 
+describe("a walk pass after its walk was finished", () => {
+  describe("when the pass finds the walk closed", () => {
+    /** @scenario A walk pass whose walk another pass finished reconciles nothing */
+    it("does not reconcile", async () => {
+      const { run, calls } = pass();
+
+      await run({ everyOrganization: true, announce: false }, NO_WALK);
+
+      expect(calls).toEqual(["prune"]);
+    });
+  });
+
+  describe("when a late pass of a finished walk saves its cursor", () => {
+    /** @scenario A walk pass whose walk another pass finished reconciles nothing */
+    it("leaves the state as the completed walk wrote it", async () => {
+      const first = agentRegistryTrafficWake(AGENT_REGISTRY_TRAFFIC_INITIAL_STATE, wakeAt(NOW));
+      const { checkpoint, read } = await processRow(first.state);
+
+      await checkpoint.complete({ startedAt: NOW });
+      await checkpoint.save({ startedAt: NOW, after: "org-stale" });
+
+      expect(await read()).toMatchObject({
+        lastFullPassAt: NOW + DAY_MS,
+        walkStartedAt: null,
+        walkAfter: null,
+      });
+    });
+  });
+});
+
 describe("agentRegistryTrafficWake()", () => {
   describe("when passes run through more than a day", () => {
     /** @scenario The daily traffic pass also reaches organisations the registry does not hold */

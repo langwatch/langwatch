@@ -129,7 +129,8 @@ export function buildAgentRegistryPipeline({
         .intent("pass", agentRegistryTrafficPassSchema, (pass, context) =>
           runTraffic(pass, agentRegistryWalkCheckpoint({ processStore, context })),
         )
-        // One pass at a time; each organisation's reconcile is idempotent.
+        // One pass at a time per worker; passes on two workers may overlap, which each
+        // organisation's idempotent reconcile and the walk-fenced checkpoint tolerate.
         .outbox({ maxAttempts: 1, concurrency: 1, batchSize: 1, leaseDurationMs: 10 * 60 * 1000 }),
     )
     .build();

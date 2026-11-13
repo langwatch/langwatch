@@ -62,9 +62,12 @@ export const agentRegistryTrafficWake: WakeHandler<
 /** Where a walk keeps its progress between passes: the traffic process's own state. */
 export interface AgentRegistryWalkCheckpoint {
   /** The unfinished walk's cursor, or `closed` when another pass already finished it. */
-  getProgress(): Promise<{ walk: "open"; after: string | null } | { walk: "closed" }>;
-  save(input: { after: string }): Promise<void>;
-  complete(): Promise<void>;
+  getProgress(): Promise<
+    { walk: "open"; startedAt: number; after: string | null } | { walk: "closed" }
+  >;
+  /** Both write only while the walk that started at `startedAt` is still the open one. */
+  save(input: { startedAt: number; after: string }): Promise<void>;
+  complete(input: { startedAt: number }): Promise<void>;
 }
 
 type TrafficReconcile = (input: {
@@ -73,6 +76,28 @@ type TrafficReconcile = (input: {
   after?: string;
   onPage?: (page: { afterOrganizationId: string }) => Promise<void>;
 }) => Promise<{ organizations: number; complete: boolean }>;
+
+/** A walk pass resumes the open walk; one whose walk another pass already finished does nothing. */
+async function walkEveryOrganization({
+  reconcile,
+  announce,
+  checkpoint,
+}: {
+  reconcile: TrafficReconcile;
+  announce: boolean;
+  checkpoint: AgentRegistryWalkCheckpoint;
+}): Promise<void> {
+  const progress = await checkpoint.getProgress();
+  if (progress.walk === "closed") return;
+  const { startedAt, after } = progress;
+  const { complete } = await reconcile({
+    everyOrganization: true,
+    announce,
+    ...(after === null ? {} : { after }),
+    onPage: ({ afterOrganizationId }) => checkpoint.save({ startedAt, after: afterOrganizationId }),
+  });
+  if (complete) await checkpoint.complete({ startedAt });
+}
 
 /** One pass; a failed organisation is logged and left to the next trigger, never re-driven whole. */
 export function runAgentRegistryTraffic(deps: {
@@ -85,17 +110,8 @@ export function runAgentRegistryTraffic(deps: {
 ) => Promise<void> {
   return async ({ everyOrganization, announce }, checkpoint) => {
     const startedAt = deps.now();
-    const progress = everyOrganization
-      ? await checkpoint.getProgress()
-      : { walk: "closed" as const };
-    if (progress.walk === "open") {
-      const { complete } = await deps.reconcile({
-        everyOrganization: true,
-        announce,
-        ...(progress.after === null ? {} : { after: progress.after }),
-        onPage: ({ afterOrganizationId }) => checkpoint.save({ after: afterOrganizationId }),
-      });
-      if (complete) await checkpoint.complete();
+    if (everyOrganization) {
+      await walkEveryOrganization({ reconcile: deps.reconcile, announce, checkpoint });
     } else {
       await deps.reconcile({ everyOrganization: false, announce });
     }

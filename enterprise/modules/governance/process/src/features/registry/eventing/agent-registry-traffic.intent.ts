@@ -8,7 +8,10 @@ import {
   type AgentRegistryWalkCheckpoint,
 } from "./agent-registry-traffic.process.ts";
 
-/** The walk's progress, read and written in the traffic process's own state row. */
+/**
+ * The walk's progress, read and written in the traffic process's own state row. A write from a
+ * pass whose walk already finished or was replaced leaves the state as it is.
+ */
 export function agentRegistryWalkCheckpoint({
   processStore,
   context,
@@ -24,6 +27,7 @@ export function agentRegistryWalkCheckpoint({
     processKey: context.processKey,
   };
   const update = async (
+    startedAt: number,
     change: (state: AgentRegistryTrafficState, at: number) => AgentRegistryTrafficState,
   ): Promise<void> => {
     const at = now();
@@ -34,8 +38,9 @@ export function agentRegistryWalkCheckpoint({
       now: at,
       apply: (current) => {
         if (!current) throw new Error("agent registry traffic process has no state to update");
+        const state = agentRegistryTrafficStateSchema.parse(current.state);
         return {
-          state: change(agentRegistryTrafficStateSchema.parse(current.state), at),
+          state: state.walkStartedAt === startedAt ? change(state, at) : state,
           nextWakeAt: current.nextWakeAt,
           messages: [],
         };
@@ -49,11 +54,11 @@ export function agentRegistryWalkCheckpoint({
       const state = agentRegistryTrafficStateSchema.parse(current.state);
       return state.walkStartedAt === null
         ? { walk: "closed" }
-        : { walk: "open", after: state.walkAfter };
+        : { walk: "open", startedAt: state.walkStartedAt, after: state.walkAfter };
     },
-    save: ({ after }) => update((state) => ({ ...state, walkAfter: after })),
-    complete: () =>
-      update((state, at) => ({
+    save: ({ startedAt, after }) => update(startedAt, (state) => ({ ...state, walkAfter: after })),
+    complete: ({ startedAt }) =>
+      update(startedAt, (state, at) => ({
         ...state,
         lastFullPassAt: at,
         walkStartedAt: null,
