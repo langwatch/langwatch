@@ -435,7 +435,11 @@ class FoldMapReplayRun {
         emit,
       });
     } catch (error) {
-      if (batchKeys.length > 1 && isQueryMemoryLimitExceeded(error)) {
+      if (
+        batchKeys.length > 1 &&
+        isQueryMemoryLimitExceeded(error) &&
+        !this.batchHasMapLane(batchKeys)
+      ) {
         return this.splitBatch({ error, batchKeys, batchNum });
       }
       await this.handleBatchFailure({ error, batchKeys, batchNum, progress });
@@ -463,8 +467,8 @@ class FoldMapReplayRun {
 
   /**
    * Over its own memory limit a statement fails on the batch's size: clear markers, rerun halves.
-   * Fold writes follow the stream, so a half re-folds from init() (a failed flush only rewrote rows
-   * that replace each other); map lanes write mid-stream, so a half re-appends rows this run wrote.
+   * Fold-only: fold writes follow the stream, so a half re-folds from init() (a failed flush only
+   * rewrote rows that replace each other). Map lanes write mid-stream, so they never split.
    */
   private async splitBatch({
     error,
@@ -495,6 +499,15 @@ class FoldMapReplayRun {
       if (!(await this.runOneBatch({ batchKeys: half, batchNum }))) return false;
     }
     return true;
+  }
+
+  /** Whether a map lane runs in this batch: its rows land mid-stream, so a rerun would append twice. */
+  private batchHasMapLane(batchKeys: string[]): boolean {
+    return batchKeys.some((key) =>
+      this.aggregateProjectionMap
+        .get(key)!
+        .projections.some((name) => this.selected.mapProjectionByName.has(name)),
+    );
   }
 
   /** The failure's text; a lone aggregate still over the memory limit is named, never its tenant. */
