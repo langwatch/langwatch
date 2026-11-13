@@ -18,6 +18,10 @@ export default mergeConfig(
   {
     resolve: {
       alias: {
+        // Before the package root, which would otherwise swallow the subpath.
+        "@langwatch/data-privacy-contract/pii-redaction-spend": fileURLToPath(
+          new URL("../contract/src/data-privacy.pii-redaction-spend.ts", import.meta.url),
+        ),
         "@langwatch/data-privacy-contract": fileURLToPath(
           new URL("../contract/src/index.ts", import.meta.url),
         ),
