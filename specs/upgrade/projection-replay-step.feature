@@ -175,20 +175,21 @@ Feature: A module fills a new read model at deploy by replaying a projection lan
     Then every report it saves and returns names the instant its first run replayed from
 
   # A heavy tenant's batch can outgrow ClickHouse's per-query memory limit on its event query. That
-  # failure is the batch's size, so the batch splits in halves down to one aggregate. Unlike the
-  # group queue's bisection (LANGWATCH_GQ_BISECTION_SPLIT_BUDGET), it has no budget: its depth is
-  # bounded by log2 of the batch size. Any other failure stops the lane as before.
+  # failure is the batch's size, so a fold lane's batch splits in halves down to one aggregate. Unlike
+  # the group queue's bisection (LANGWATCH_GQ_BISECTION_SPLIT_BUDGET), it has no budget: its depth is
+  # bounded by log2 of the batch size. A map lane writes rows mid-stream, so a rerun half would
+  # append them twice: it never splits. Any other failure stops the lane as before.
 
   @unit
   Scenario: A batch over the query memory limit is split until it fits
-    Given a batch whose event query outgrows ClickHouse's per-query memory limit
+    Given a fold lane's batch whose event query outgrows ClickHouse's per-query memory limit
     When the step replays the lane
     Then the batch's markers are cleared and it is replayed as two halves, each split again until it fits
     And every aggregate's read model equals a replay that never hit the limit
 
   @unit
   Scenario: A batch that hits the query memory limit mid-stream is not applied twice
-    Given a batch whose event query hits the memory limit after some of its events were read
+    Given a fold lane's batch whose event query hits the memory limit after some of its events were read
     When the step replays the lane
     Then nothing of the failed attempt is written
     And every aggregate's read model equals a replay that never hit the limit
@@ -202,7 +203,7 @@ Feature: A module fills a new read model at deploy by replaying a projection lan
 
   @unit
   Scenario: A worker stop between the halves of a split batch ends the replay
-    Given a batch split for the query memory limit whose first half completed
+    Given a fold lane's batch split for the query memory limit whose first half completed
     When the worker stops before the second half starts
     Then the replay ends with the stop and the second half is not replayed
     And the lane's live delivery is resumed
@@ -210,5 +211,11 @@ Feature: A module fills a new read model at deploy by replaying a projection lan
   @unit
   Scenario: A batch failing for any other reason fails the lane without splitting
     Given a batch whose event query fails with an error other than the per-query memory limit
+    When the step replays the lane
+    Then the lane fails on that batch with its error and no half is replayed
+
+  @unit
+  Scenario: A map lane over the query memory limit fails without splitting
+    Given a map lane's batch whose event query outgrows ClickHouse's per-query memory limit
     When the step replays the lane
     Then the lane fails on that batch with its error and no half is replayed

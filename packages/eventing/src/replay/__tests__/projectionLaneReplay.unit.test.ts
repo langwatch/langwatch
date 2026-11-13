@@ -7,7 +7,8 @@ import { describe, expect, it } from "vitest";
 
 import type { Event } from "../../domain/types.ts";
 import type { FoldProjectionDefinition } from "../../projections/foldProjection.types.ts";
-import { sealFoldProjection } from "../../projections/sealedProjection.ts";
+import type { MapProjectionDefinition } from "../../projections/mapProjection.types.ts";
+import { sealFoldProjection, sealMapProjection } from "../../projections/sealedProjection.ts";
 import type { RetentionPolicyResolver } from "../../runtime.types.ts";
 import {
   ProjectionLaneNotFoundError,
@@ -25,11 +26,12 @@ import type {
 import { aggregateKey } from "../replayMarkers.ts";
 import type { ReplayProjections } from "../replayProjections.ts";
 import { ReplayService } from "../replayService.ts";
-import type { RegisteredFoldProjection } from "../types.ts";
+import type { RegisteredFoldProjection, RegisteredMapProjection } from "../types.ts";
 
 const PAUSED_SET_KEY = "{event-sourcing/jobs}:gq:paused-jobs";
 const LANE = "directoryMembers";
 const PAUSE_KEY = `global/projection/${LANE}`;
+const MAP_LANE = "directoryMemberRows";
 const FROM_START = "1970-01-01T00:00:00Z";
 const BASE_MS = 1_700_000_000_000;
 
@@ -225,6 +227,25 @@ function foldLane({
   };
 }
 
+/** A map lane appending one row per member added, in the order it writes them. */
+function mapLane({ rows }: { rows: string[] }): RegisteredMapProjection {
+  const definition: MapProjectionDefinition<string, Event> = {
+    name: MAP_LANE,
+    eventTypes: ["directory.member_added"],
+    map: (event) => event.id,
+    store: { append: async (row) => void rows.push(row) },
+  };
+  return {
+    projectionName: MAP_LANE,
+    pipelineName: "global",
+    aggregateType: "directory",
+    source: "global",
+    pauseKey: `global/handler/${MAP_LANE}`,
+    kind: "map",
+    ...sealMapProjection(definition),
+  };
+}
+
 /** Two tenants' events, a log that lists them, and a lane whose pipeline declares retention. */
 function setUpTwoTenants({
   sharedTenants,
@@ -290,6 +311,7 @@ function setUp() {
   const readModel = new Map<string, number>();
   const otherReadModel = new Map<string, number>();
   const writes = { count: 0 };
+  const mapRows: string[] = [];
   const log = new SeededLog(
     [
       seededEvent({ n: 1, aggregateId: "directory-a" }),
@@ -308,14 +330,14 @@ function setUp() {
         writes: { count: 0 },
       }),
     ],
-    mapProjections: [],
+    mapProjections: [mapLane({ rows: mapRows })],
     stateProjections: [],
   };
   const replayer = projectionLaneReplayer({
     service: new ReplayService({ eventSource: log, redis }),
     projections,
   });
-  return { redis, store, readModel, otherReadModel, writes, log, replayer };
+  return { redis, store, readModel, otherReadModel, writes, mapRows, log, replayer };
 }
 
 /** Three more aggregates of one event each, so a batch of five splits unevenly. */
@@ -749,6 +771,23 @@ describe("projectionLaneReplayer", () => {
       ).rejects.toThrow(`Replaying "${LANE}" failed in 1 batch(es): ${totalLimit}`);
 
       expect(streamed).toEqual([2]);
+    });
+  });
+
+  describe("given a map lane whose event query outgrows the per-query memory limit", () => {
+    /** @scenario "A map lane over the query memory limit fails without splitting" */
+    it("fails the lane on that batch without replaying a half", async () => {
+      const { log, mapRows, replayer } = setUp();
+      const { streamed } = failStreamsAbove({ log, maxAggregates: 1 });
+
+      await expect(
+        replayer.replayLane({ lane: MAP_LANE, since: FROM_START, dryRun: false }),
+      ).rejects.toThrow(
+        `Replaying "${MAP_LANE}" failed in 1 batch(es): ${queryMemoryLimitError().message}`,
+      );
+
+      expect(streamed).toEqual([2]);
+      expect(mapRows).toEqual([]);
     });
   });
 });
