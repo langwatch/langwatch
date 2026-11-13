@@ -89,7 +89,7 @@ export class PrismaStaffAccessRequestRepository
       where: {
         revokedAt: null,
         OR: [
-          { status: { in: ["pending", "approved"] }, expiresAt: { gt: toDate(at) } },
+          { status: { in: ["pending", "approving", "approved"] }, expiresAt: { gt: toDate(at) } },
           { status: "redeemed", accessExpiresAt: { gt: toDate(at) } },
         ],
       },
@@ -106,29 +106,46 @@ export class PrismaStaffAccessRequestRepository
   }): Promise<StaffAccessRequestRow[]> {
     const records = await this.database.staffAccessRequest.findMany({
       where: {
-        status: "redeemed",
-        revokedAt: null,
         endAuditedAt: null,
-        accessExpiresAt: { lte: toDate(at) },
+        OR: [
+          { status: "redeemed", revokedAt: null, accessExpiresAt: { lte: toDate(at) } },
+          {
+            status: { in: ["approving", "approved"] },
+            revokedAt: null,
+            expiresAt: { lte: toDate(at) },
+          },
+          { revokedAt: { not: null }, signedHash: { not: null } },
+        ],
       },
-      orderBy: { accessExpiresAt: "asc" },
+      orderBy: { createdAt: "asc" },
       take: limit,
     });
     return records.map(requestOf);
   }
 
-  async approve(input: StaffAccessApproval): Promise<boolean> {
+  async claimApproval(input: StaffAccessApproval): Promise<boolean> {
     const changed = await this.database.$executeRaw`
       ${skipTenantCheck({
         // A platform staff access request, decided by its id (ADR-202).
         SKIP_TENANT_CHECK: true,
       })}
       UPDATE "StaffAccessRequest"
-      SET "status" = 'approved', "approvedAt" = ${toDate(input.at)},
+      SET "status" = 'approving',
           "spendApproved" = ${input.spendApproved},
           "approvalCredentialId" = ${input.credentialId},
           "approvalSignature" = ${input.signature}, "signedHash" = ${input.signedHash}
       WHERE "id" = ${input.id} AND "status" = 'pending' AND "expiresAt" > ${toDate(input.at)}`;
+    return changed === 1;
+  }
+
+  async confirmApproval({ id, at }: { id: string; at: Instant }): Promise<boolean> {
+    const changed = await this.database.$executeRaw`
+      ${skipTenantCheck({
+        // A platform staff access request, confirmed by its id once audited (ADR-202).
+        SKIP_TENANT_CHECK: true,
+      })}
+      UPDATE "StaffAccessRequest" SET "status" = 'approved', "approvedAt" = ${toDate(at)}
+      WHERE "id" = ${id} AND "status" = 'approving' AND "revokedAt" IS NULL`;
     return changed === 1;
   }
 
@@ -192,26 +209,22 @@ export class PrismaStaffAccessRequestRepository
       })}
       UPDATE "StaffAccessRequest"
       SET "status" = 'revoked', "revokedAt" = ${toDate(at)}, "revokedByUserId" = ${byUserId},
-          "revokeCause" = ${cause}, "endAuditedAt" = ${toDate(at)}
-      WHERE "id" = ${id} AND "status" IN ('pending', 'approved', 'redeemed') AND "revokedAt" IS NULL
+          "revokeCause" = ${cause}
+      WHERE "id" = ${id} AND "status" IN ('pending', 'approving', 'approved', 'redeemed') AND "revokedAt" IS NULL
         AND "endAuditedAt" IS NULL
         AND ("accessExpiresAt" IS NULL OR "accessExpiresAt" > ${toDate(at)})`;
     return changed === 1;
   }
 
-  async claimEndAudit({ id, at }: { id: string; at: Instant }): Promise<boolean> {
+  async markEndAudited({ id, at }: { id: string; at: Instant }): Promise<boolean> {
     const changed = await this.database.$executeRaw`
       ${skipTenantCheck({
-        // A platform staff access session's end, audited once by its id (ADR-202).
+        // A platform staff access request's end, marked audited by its id (ADR-202).
         SKIP_TENANT_CHECK: true,
       })}
       UPDATE "StaffAccessRequest" SET "endAuditedAt" = ${toDate(at)}
-      WHERE "id" = ${id} AND "endAuditedAt" IS NULL AND "revokedAt" IS NULL`;
+      WHERE "id" = ${id} AND "endAuditedAt" IS NULL`;
     return changed === 1;
-  }
-
-  async releaseEndAudit({ id }: { id: string }): Promise<void> {
-    await this.database.staffAccessRequest.update({ where: { id }, data: { endAuditedAt: null } });
   }
 }
 

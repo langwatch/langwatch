@@ -1,4 +1,4 @@
-import { StaffAccessAuditUnavailableError } from "@langwatch/api";
+import { StaffAccessAuditUnavailableError, StaffAccessIpMismatchError } from "@langwatch/api";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type {
@@ -8,6 +8,7 @@ import type {
 } from "@langwatch/auth-contract";
 import { type StaffAccessScope, staffAccessPermissions } from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
 import type {
   OrganizationApi,
   OrganizationProvisioningSummary,
@@ -47,7 +48,6 @@ import {
   organizationNameMatches,
   pkceChallengeOf,
   reachesOrganization,
-  shownStatus,
   STAFF_ACCESS_RATE_WINDOW_MS,
   STAFF_ACCESS_REQUEST_TTL_MS,
   STAFF_ACCESS_REQUESTS_PER_HOUR,
@@ -60,6 +60,8 @@ import type { StaffAccessRequesterService } from "./staff-access-requester.servi
 import type { StaffAccessSessionService } from "./staff-access-session.service.ts";
 
 const PROJECTS_LISTED = 100;
+
+const logger = createLogger("langwatch:staff-access:request");
 
 type RequestDeps = Readonly<{
   requests: StaffAccessRequestRepository;
@@ -99,6 +101,7 @@ export class StaffAccessRequestService {
   /**
    * @throws {StaffAccessRateLimitedError} past five requests in an hour
    * @throws {StaffAccessNotConfiguredError} when the deployment has no public base URL
+   * @throws {StaffAccessIpMismatchError} when the request carries no client address to pin
    */
   async createRequest({
     requesterId,
@@ -113,6 +116,7 @@ export class StaffAccessRequestService {
   }): Promise<StaffAccessRequestCreated> {
     const { publicBaseUrl } = this.deps;
     if (!publicBaseUrl) throw new StaffAccessNotConfiguredError();
+    if (!ipAddress) throw new StaffAccessIpMismatchError();
     const at = this.deps.now();
     const recent = await this.deps.requests.countSince({
       requesterId,
@@ -173,7 +177,7 @@ export class StaffAccessRequestService {
     const row = await this.requestOfRequester({ requesterId, requestId });
     return {
       requestId: row.id,
-      status: shownStatus({ ...row, at: this.deps.now() }),
+      status: this.deps.sessions.statusOf({ row, at: this.deps.now() }),
       expiresAt: isoText(row.expiresAt),
       accessExpiresAt: row.accessExpiresAt ? isoText(row.accessExpiresAt) : null,
     };
@@ -202,9 +206,11 @@ export class StaffAccessRequestService {
   }
 
   /**
-   * Verifies the passkey over that same hash, then claims pending -> approved, records the
-   * approval in the customer's audit log and tells the other operators.
+   * Verifies the passkey over that same hash, claims pending -> approving, records the approval
+   * in the customer's audit log, and only then confirms approving -> approved. An approving
+   * request is never redeemable, so no failure or crash leaves an approval without its row.
    * @throws {PasskeyAssertionRefusedError} when the signature is over anything else
+   * @throws {StaffAccessAuditUnavailableError} when the audit row or the confirm was not written
    */
   async approve({
     userId,
@@ -221,44 +227,25 @@ export class StaffAccessRequestService {
       challenge,
       response: assertion,
     });
-    const at = this.deps.now();
-    const approved = await this.deps.requests.approve({
+    const claimed = await this.deps.requests.claimApproval({
       id: row.id,
-      at,
+      at: this.deps.now(),
       spendApproved,
       credentialId,
       signature: assertion.response.signature,
       signedHash: challenge,
     });
-    if (!approved) await this.throwUndecidable({ id: row.id });
+    if (!claimed) await this.throwUndecidable({ id: row.id });
 
-    const approver = await this.deps.users.findById({ id: userId });
-    if (row.organizationId) {
-      await this.recordApproval({
-        id: row.id,
-        entry: {
-          organizationId: row.organizationId,
-          userId,
-          actorUserId: userId,
-          action: "staffAccess.approved",
-          targetKind: "staffAccess",
-          targetId: row.id,
-          ...(row.requestIp ? { ipAddress: row.requestIp } : {}),
-          metadata: {
-            principal: STAFF_ACCESS_PRINCIPAL,
-            approvedBy: {
-              id: userId,
-              name: approver?.name ?? null,
-              email: approver?.email ?? null,
-            },
-            reason: row.reason,
-            scopes: row.scopes,
-            spendApproved,
-            machine: row.machine,
-          },
-        },
-      });
+    await this.recordApproval({ row, userId, spendApproved });
+    const confirmed = await this.deps.requests
+      .confirmApproval({ id: row.id, at: this.deps.now() })
+      .catch(() => false);
+    if (!confirmed) {
+      await this.abandonApproval({ id: row.id, userId });
+      throw new StaffAccessAuditUnavailableError();
     }
+
     await this.deps.notices.tellOtherOperators({
       actingUserId: userId,
       subject: "An operator approved staff access",
@@ -275,27 +262,60 @@ export class StaffAccessRequestService {
   }
 
   /**
-   * An approval the customer's audit log did not take must not stand: the request is ended
-   * without a customer row and the operator is refused.
-   * @throws {StaffAccessAuditUnavailableError} when the audit write fails
+   * Writes the approval row to the customer's audit log. Any failure, the approver lookup
+   * included, abandons the approval and refuses the operator.
+   * @throws {StaffAccessAuditUnavailableError} when the row was not written
    */
   private async recordApproval({
-    id,
-    entry,
+    row,
+    userId,
+    spendApproved,
   }: {
-    id: string;
-    entry: Parameters<AuditLogApi["record"]>[0];
+    row: StaffAccessRequestRow;
+    userId: string;
+    spendApproved: boolean;
   }): Promise<void> {
+    if (!row.organizationId) return;
     try {
-      await this.deps.auditLog.record(entry);
-    } catch {
+      const approver = await this.deps.users.findById({ id: userId });
+      await this.deps.auditLog.record({
+        organizationId: row.organizationId,
+        userId,
+        actorUserId: userId,
+        action: "staffAccess.approved",
+        targetKind: "staffAccess",
+        targetId: row.id,
+        ...(row.requestIp ? { ipAddress: row.requestIp } : {}),
+        metadata: {
+          principal: STAFF_ACCESS_PRINCIPAL,
+          approvedBy: { id: userId, name: approver?.name ?? null, email: approver?.email ?? null },
+          reason: row.reason,
+          scopes: row.scopes,
+          spendApproved,
+          machine: row.machine,
+        },
+      });
+    } catch (error) {
+      logger.error({ error, requestId: row.id }, "the staff access approval row was not written");
+      await this.abandonApproval({ id: row.id, userId });
+      throw new StaffAccessAuditUnavailableError();
+    }
+  }
+
+  /**
+   * Ends an approval that did not stand. Should this revoke fail too, the request stays
+   * approving, which no redeem accepts, and the sweep settles its end once it lapses.
+   */
+  private async abandonApproval({ id, userId }: { id: string; userId: string }): Promise<void> {
+    try {
       await this.deps.requests.revoke({
         id,
         at: this.deps.now(),
-        byUserId: entry.actorUserId ?? null,
+        byUserId: userId,
         cause: "approval_audit_failed",
       });
-      throw new StaffAccessAuditUnavailableError();
+    } catch (error) {
+      logger.error({ error, requestId: id }, "an abandoned staff access approval was not revoked");
     }
   }
 
@@ -314,8 +334,10 @@ export class StaffAccessRequestService {
   }
 
   /**
-   * Redeems an approved request once, for its own requester, with the verifier behind its
-   * challenge. A wrong verifier spends nothing. The session is pinned to the redeeming address.
+   * Redeems an approved request once, for its own requester, from the address the operator
+   * approved, with the verifier behind its challenge. A wrong verifier or address spends nothing.
+   * The session is pinned to that address.
+   * @throws {StaffAccessIpMismatchError} from any other address, or with none
    */
   async redeem({
     requesterId,
@@ -331,6 +353,7 @@ export class StaffAccessRequestService {
     const row = await this.requestOfRequester({ requesterId, requestId });
     const at = this.deps.now();
     assertRedeemable({ row, at });
+    if (!ipAddress || ipAddress !== row.requestIp) throw new StaffAccessIpMismatchError();
     if (pkceChallengeOf(codeVerifier) !== row.codeChallenge) {
       throw new StaffAccessInvalidCodeVerifierError();
     }
@@ -347,12 +370,26 @@ export class StaffAccessRequestService {
       throw new StaffAccessAlreadyRedeemedError();
     }
 
+    let redeemedAnswer: StaffAccessRedeemed;
     try {
-      return await this.mintCredentials({ row, accessExpiresAt });
+      redeemedAnswer = await this.mintCredentials({ row, accessExpiresAt });
     } catch (error) {
       await this.deps.sessions.endSession({ row, byUserId: null, cause: "mint_failed" });
       throw error;
     }
+    await this.deps.notices.tellOtherOperators({
+      actingUserId: row.ownerUserId,
+      subject: "An agent started a staff access session",
+      lines: [
+        { label: "Organization", value: row.organizationName ?? "None (ops read only)" },
+        { label: "Scopes", value: row.scopes.join(", ") },
+        { label: "Machine", value: row.machine },
+        { label: "Address", value: ipAddress },
+        { label: "Ends", value: isoText(accessExpiresAt) },
+      ],
+      idempotencyKey: `staff-access-redeemed:${row.id}`,
+    });
+    return redeemedAnswer;
   }
 
   private async mintCredentials({

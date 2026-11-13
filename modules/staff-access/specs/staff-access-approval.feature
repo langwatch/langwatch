@@ -148,3 +148,118 @@ Feature: Ops agent access approval
     Given an approved request for "ops:read" only
     When the agent redeems it
     Then it receives an ops token starting "lwsa_" and no API key
+
+  @integration
+  Scenario: Redeem must come from the address the operator approved
+    Given an approved request made from 203.0.113.7
+    When the agent redeems it from 198.51.100.9
+    Then it is refused with "staff_access_ip_mismatch"
+    And no key is minted
+    And a redeem from 203.0.113.7 still succeeds
+
+  @integration
+  Scenario: A request or redeem with no client address is refused
+    Given Olivia enrolled "laptop agent"
+    When the agent asks for access from a connection with no client address
+    Then it is refused with "staff_access_ip_mismatch"
+    And a redeem with no client address is refused with "staff_access_ip_mismatch"
+
+  @integration
+  Scenario: Other operators are told when an agent redeems
+    Given an approved request
+    When the agent redeems it
+    Then every other platform operator is emailed that a session started
+
+  @integration
+  Scenario: An approval whose approver lookup fails is ended
+    Given a pending request for "org:metadata" on "ACME"
+    And the approver's user record cannot be read
+    When Olivia approves it with her passkey
+    Then it is refused with "staff_access_audit_unavailable"
+    And a redeem is refused with "request_not_approved"
+    And ACME's audit log holds no approval row
+
+  @integration
+  Scenario: An approval stays unredeemable when its audit row and its revoke both fail
+    Given a pending request for "org:metadata" on "ACME"
+    And ACME's audit log refuses writes and the request store refuses the revoke
+    When Olivia approves it with her passkey
+    Then it is refused with "staff_access_audit_unavailable"
+    And a redeem is refused with "request_not_approved"
+    And the agent reads the request as pending until it expires
+
+  @integration
+  Scenario: A crash between the approval claim and its audit row leaves nothing redeemable
+    Given a pending request whose approval was claimed but whose audit row was never written
+    When the agent redeems it
+    Then it is refused with "request_not_approved"
+    And after it lapses the customer's audit log still holds nothing for it
+
+  @integration
+  Scenario: An approval whose confirm fails after its audit row is ended and the end is audited
+    Given a pending request for "org:metadata" on "ACME"
+    And the request store fails to confirm the approval after ACME's audit row is written
+    When Olivia approves it with her passkey
+    Then it is refused with "staff_access_audit_unavailable"
+    And a redeem is refused with "request_not_approved"
+    And the next sweep writes one "staffAccess.revoked" row after the approval row
+
+  @integration
+  Scenario: A revoke whose audit row fails is retried by the sweep
+    Given a live session on "ACME"
+    And ACME's audit log refuses writes
+    When Pedro revokes it
+    Then the revoke fails and a second revoke answers "staff_access_already_ended"
+    And once the audit log takes writes the sweep writes one "staffAccess.revoked" row naming Olivia as approver and Pedro as revoker
+
+  @integration
+  Scenario: A revoke whose key revoke fails is retried by the sweep
+    Given a live session on "ACME"
+    And the key store refuses the key revoke
+    When Pedro revokes it
+    Then the key is already refused at the gate as revoked
+    And the next sweep revokes the key and writes one "staffAccess.revoked" row
+
+  @integration
+  Scenario: A natural expiry whose audit row fails is retried by the sweep
+    Given a session past its hour
+    And ACME's audit log refuses writes
+    When the sweep runs
+    Then nothing is marked audited
+    And a later sweep writes one "staffAccess.expired" row
+
+  @integration
+  Scenario: An approval that was never redeemed is audited when it lapses
+    Given Olivia approved a request on "ACME" that the agent never redeemed
+    When its ten minutes pass and the sweep runs
+    Then ACME's audit log holds a "staffAccess.expired" row for it
+
+  @integration
+  Scenario: The kill switch reports how many sessions ended and how many failed
+    Given two live sessions and the key store refuses one key revoke
+    When Pedro revokes all agent access
+    Then the answer counts one ended and one failed
+    And the next sweep finishes the failed one
+
+  @integration
+  Scenario: Revoking an agent ends its live sessions and requests
+    Given Olivia's agent holds a live session on "ACME" and a pending request
+    When Olivia revokes the agent
+    Then its key is refused as revoked
+    And the pending request can no longer be approved
+    And ACME's audit log holds a "staffAccess.revoked" row with cause "requester_revoked"
+    And every other platform operator is emailed
+
+  @integration
+  Scenario: A real passkey approval lands in the audit log and the agent redeems it
+    Given a signed-in operator with a passkey on the live api
+    When the agent asks, the operator signs the approval with the passkey and approves
+    Then ACME's audit log holds a real "staffAccess.approved" row
+    And a redeem from another address is refused with "staff_access_ip_mismatch"
+    And a redeem from the request's address answers an API key
+
+  @integration
+  Scenario: Staff access procedures refuse a person without the operator grant
+    Given a signed-in person with no platform-operator grant
+    When they call the agents page procedures
+    Then each is refused and nothing changes

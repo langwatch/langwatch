@@ -183,7 +183,11 @@ export interface StaffAccessRevokeAllInputSchema extends Named<
 > {}
 export const staffAccessRevokeAllInputSchema: StaffAccessRevokeAllInputSchema =
   staffAccessRevokeAllInputSchemaDefinition;
-const staffAccessRevokedCountSchemaDefinition = z.object({ revoked: z.number().int() });
+/** The kill switch's answer: how many ended, and how many failed and need another try. */
+const staffAccessRevokedCountSchemaDefinition = z.object({
+  revoked: z.number().int(),
+  failed: z.number().int(),
+});
 export interface StaffAccessRevokedCountSchema extends Named<
   typeof staffAccessRevokedCountSchemaDefinition
 > {}

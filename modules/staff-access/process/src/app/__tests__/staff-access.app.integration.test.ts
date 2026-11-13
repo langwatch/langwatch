@@ -622,12 +622,13 @@ function scenarios(backend: Backend): void {
         await expect(
           codeOf(w.app.revokeAll({ ...w.operator(PEDRO), confirmation: "revoke" })),
         ).resolves.toBe("staff_access_confirmation_mismatch");
-        const { revoked } = await w.app.revokeAll({
+        const { revoked, failed } = await w.app.revokeAll({
           ...w.operator(PEDRO),
           confirmation: "revoke all",
         });
 
         expect(revoked).toBeGreaterThanOrEqual(2);
+        expect(failed).toBe(0);
         expect(w.state.revokedKeys).toEqual(expect.arrayContaining(keys));
         for (const apiKeyId of keys) {
           await expect(
@@ -680,6 +681,303 @@ function scenarios(backend: Backend): void {
         await expect(
           w.app.getRequestStatus({ session: agent.session, requestId }),
         ).resolves.toMatchObject({ status: "revoked" });
+      });
+    });
+
+    describe("when the agent redeems from another address", () => {
+      /** @scenario "Redeem must come from the address the operator approved" */
+      it("refuses a redeem from any other address and spends nothing", async () => {
+        const w = world();
+        const { agent, requestId } = await pending(w, ["org:metadata"]);
+        await w.approve({ choice: { requestId, spendApproved: false } });
+
+        await expect(
+          codeOf(
+            w.app.redeem({
+              session: { ...agent.session, ipAddress: "198.51.100.9" },
+              requestId,
+              codeVerifier: VERIFIER,
+            }),
+          ),
+        ).resolves.toBe("staff_access_ip_mismatch");
+        expect(w.state.minted).toEqual([]);
+        await expect(
+          w.app.redeem({ session: agent.session, requestId, codeVerifier: VERIFIER }),
+        ).resolves.toMatchObject({ organizationId: ACME.id });
+      });
+
+      /** @scenario "A request or redeem with no client address is refused" */
+      it("refuses to create or redeem a request without an address", async () => {
+        const w = world();
+        const agent = await w.enrol();
+        const noAddress = { ...agent.session, ipAddress: null };
+
+        await expect(
+          codeOf(
+            w.app.createRequest({
+              session: noAddress,
+              body: requestBody({ scopes: ["org:metadata"] }),
+            }),
+          ),
+        ).resolves.toBe("staff_access_ip_mismatch");
+
+        const { requestId } = await w.app.createRequest({
+          session: agent.session,
+          body: requestBody({ scopes: ["org:metadata"] }),
+        });
+        await w.approve({ choice: { requestId, spendApproved: false } });
+        await expect(
+          codeOf(w.app.redeem({ session: noAddress, requestId, codeVerifier: VERIFIER })),
+        ).resolves.toBe("staff_access_ip_mismatch");
+        expect(w.state.minted).toEqual([]);
+      });
+
+      /** @scenario "Other operators are told when an agent redeems" */
+      it("emails the other operators when a session starts", async () => {
+        const w = world();
+        const { requestId } = await redeemed(w, { scopes: ["org:metadata"] });
+
+        expect(
+          w.state.mail.filter((mail) =>
+            mail.idempotencyKey?.startsWith(`staff-access-redeemed:${requestId}`),
+          ),
+        ).toEqual([expect.objectContaining({ to: `${PEDRO}@langwatch.test` })]);
+      });
+    });
+
+    describe("when an approval cannot be fully written", () => {
+      const approvalRows = (w: ReturnType<typeof world>, requestId: string) =>
+        w.state.audit.filter(
+          (row) => row.targetId === requestId && row.action === "staffAccess.approved",
+        );
+
+      /** @scenario "An approval whose approver lookup fails is ended" */
+      it("refuses the approval when the approver cannot be read, and nothing is redeemable", async () => {
+        const w = world();
+        const { agent, requestId } = await pending(w, ["org:metadata"]);
+        w.state.usersRefused = true;
+
+        await expect(
+          codeOf(w.approve({ choice: { requestId, spendApproved: false } })),
+        ).resolves.toBe("staff_access_audit_unavailable");
+        w.state.usersRefused = false;
+
+        await expect(
+          codeOf(w.app.redeem({ session: agent.session, requestId, codeVerifier: VERIFIER })),
+        ).resolves.toBe("request_not_approved");
+        expect(approvalRows(w, requestId)).toEqual([]);
+        expect(w.state.minted).toEqual([]);
+      });
+
+      /** @scenario "An approval stays unredeemable when its audit row and its revoke both fail" */
+      it("leaves the request approving, never redeemable, when the compensating revoke fails", async () => {
+        const w = world();
+        const { agent, requestId } = await pending(w, ["org:metadata"]);
+        w.state.auditRefused = true;
+        const requests = w.repositories.requests;
+        const revoke = requests.revoke.bind(requests);
+        requests.revoke = async () => {
+          throw new Error("store unavailable");
+        };
+
+        await expect(
+          codeOf(w.approve({ choice: { requestId, spendApproved: false } })),
+        ).resolves.toBe("staff_access_audit_unavailable");
+        requests.revoke = revoke;
+        w.state.auditRefused = false;
+
+        await expect(
+          codeOf(w.app.redeem({ session: agent.session, requestId, codeVerifier: VERIFIER })),
+        ).resolves.toBe("request_not_approved");
+        await expect(
+          w.app.getRequestStatus({ session: agent.session, requestId }),
+        ).resolves.toMatchObject({ status: "pending" });
+
+        w.advance({ minutes: 11 });
+        await w.app.sweepExpiredSessions({ at: w.state.at.epochMilliseconds });
+        expect(w.state.audit.filter((row) => row.targetId === requestId)).toEqual([]);
+        await expect(
+          w.app.getRequestStatus({ session: agent.session, requestId }),
+        ).resolves.toMatchObject({ status: "expired" });
+      });
+
+      /** @scenario "A crash between the approval claim and its audit row leaves nothing redeemable" */
+      it("never redeems a request claimed for approval whose audit row was never written", async () => {
+        const w = world();
+        const { agent, requestId } = await pending(w, ["org:metadata"]);
+        await w.repositories.requests.claimApproval({
+          id: requestId,
+          at: w.state.at,
+          spendApproved: false,
+          credentialId: "credential1",
+          signature: "c2lnbmVk",
+          signedHash: "hash",
+        });
+
+        await expect(
+          codeOf(w.app.redeem({ session: agent.session, requestId, codeVerifier: VERIFIER })),
+        ).resolves.toBe("request_not_approved");
+        w.advance({ minutes: 11 });
+        await w.app.sweepExpiredSessions({ at: w.state.at.epochMilliseconds });
+        expect(w.state.audit.filter((row) => row.targetId === requestId)).toEqual([]);
+      });
+
+      /** @scenario "An approval whose confirm fails after its audit row is ended and the end is audited" */
+      it("refuses the approval and the sweep tells the customer it ended", async () => {
+        const w = world();
+        const { agent, requestId } = await pending(w, ["org:metadata"]);
+        const requests = w.repositories.requests;
+        const confirm = requests.confirmApproval.bind(requests);
+        requests.confirmApproval = async () => {
+          throw new Error("store unavailable");
+        };
+
+        await expect(
+          codeOf(w.approve({ choice: { requestId, spendApproved: false } })),
+        ).resolves.toBe("staff_access_audit_unavailable");
+        requests.confirmApproval = confirm;
+        await expect(
+          codeOf(w.app.redeem({ session: agent.session, requestId, codeVerifier: VERIFIER })),
+        ).resolves.toBe("request_not_approved");
+
+        await w.app.sweepExpiredSessions({ at: w.state.at.epochMilliseconds });
+        await w.app.sweepExpiredSessions({ at: w.state.at.epochMilliseconds });
+        expect(
+          w.state.audit.filter((row) => row.targetId === requestId).map((row) => row.action),
+        ).toEqual(["staffAccess.approved", "staffAccess.revoked"]);
+      });
+    });
+
+    describe("when ending a session cannot be fully written", () => {
+      const endRows = (w: ReturnType<typeof world>, requestId: string) =>
+        w.state.audit
+          .filter((row) => row.targetId === requestId && row.action !== "staffAccess.approved")
+          .map((row) => row.action);
+
+      /** @scenario "A revoke whose audit row fails is retried by the sweep" */
+      it("writes the revoked row on the next sweep after a failed audit write", async () => {
+        const w = world();
+        const { requestId } = await redeemed(w, { scopes: ["org:metadata"] });
+        w.state.auditRefused = true;
+
+        await expect(w.app.revokeSession({ ...w.operator(PEDRO), requestId })).rejects.toThrow(
+          "unavailable",
+        );
+        await expect(
+          codeOf(w.app.revokeSession({ ...w.operator(PEDRO), requestId })),
+        ).resolves.toBe("staff_access_already_ended");
+        expect(endRows(w, requestId)).toEqual([]);
+
+        w.state.auditRefused = false;
+        await w.app.sweepExpiredSessions({ at: w.state.at.epochMilliseconds });
+        await w.app.sweepExpiredSessions({ at: w.state.at.epochMilliseconds });
+        expect(endRows(w, requestId)).toEqual(["staffAccess.revoked"]);
+        const [revokedRow] = w.state.audit.filter((row) => row.action === "staffAccess.revoked");
+        expect(revokedRow).toMatchObject({
+          actorUserId: PEDRO,
+          metadata: expect.objectContaining({
+            approvedBy: expect.objectContaining({ id: OLIVIA, name: "Olivia" }),
+            revokedBy: expect.objectContaining({ id: PEDRO, name: "Pedro" }),
+          }),
+        });
+      });
+
+      /** @scenario "A revoke whose key revoke fails is retried by the sweep" */
+      it("revokes the key and writes the row on the next sweep after a failed key revoke", async () => {
+        const w = world();
+        const { requestId } = await redeemed(w, { scopes: ["org:metadata"] });
+        const apiKeyId = w.state.minted[0]?.apiKeyId ?? "";
+        w.state.keyRevokeRefused.add(apiKeyId);
+
+        await expect(w.app.revokeSession({ ...w.operator(PEDRO), requestId })).rejects.toThrow(
+          "unavailable",
+        );
+        await expect(codeOf(w.app.staffAccessGate.admit(gateRequest({ apiKeyId })))).resolves.toBe(
+          "staff_access_revoked",
+        );
+
+        w.state.keyRevokeRefused.clear();
+        await w.app.sweepExpiredSessions({ at: w.state.at.epochMilliseconds });
+        expect(w.state.revokedKeys).toContain(apiKeyId);
+        expect(endRows(w, requestId)).toEqual(["staffAccess.revoked"]);
+      });
+
+      /** @scenario "A natural expiry whose audit row fails is retried by the sweep" */
+      it("audits the expiry on a later sweep after a failed write", async () => {
+        const w = world();
+        const { requestId } = await redeemed(w, { scopes: ["org:metadata"] });
+        w.advance({ minutes: 61 });
+        w.state.auditRefused = true;
+
+        await expect(
+          w.app.sweepExpiredSessions({ at: w.state.at.epochMilliseconds }),
+        ).resolves.toEqual({ audited: 0 });
+        w.state.auditRefused = false;
+        await w.app.sweepExpiredSessions({ at: w.state.at.epochMilliseconds });
+        await w.app.sweepExpiredSessions({ at: w.state.at.epochMilliseconds });
+        expect(endRows(w, requestId)).toEqual(["staffAccess.expired"]);
+      });
+
+      /** @scenario "An approval that was never redeemed is audited when it lapses" */
+      it("tells the customer an approved request lapsed unredeemed", async () => {
+        const w = world();
+        const { requestId } = await pending(w, ["org:metadata"]);
+        await w.approve({ choice: { requestId, spendApproved: false } });
+        w.advance({ minutes: 11 });
+
+        await w.app.sweepExpiredSessions({ at: w.state.at.epochMilliseconds });
+        expect(endRows(w, requestId)).toEqual(["staffAccess.expired"]);
+      });
+
+      /** @scenario "The kill switch reports how many sessions ended and how many failed" */
+      it("ends the others and counts the one that failed", async () => {
+        const w = world();
+        const first = await redeemed(w, { scopes: ["org:metadata"] });
+        const second = await redeemed(w, { scopes: ["org:metadata"] });
+        const failing = w.state.minted[0]?.apiKeyId ?? "";
+        w.state.keyRevokeRefused.add(failing);
+
+        const killed = await w.app.revokeAll({ ...w.operator(PEDRO), confirmation: "revoke all" });
+        expect(killed.failed).toBe(1);
+        expect(killed.revoked).toBeGreaterThanOrEqual(1);
+        expect(endRows(w, second.requestId)).toEqual(["staffAccess.revoked"]);
+
+        w.state.keyRevokeRefused.clear();
+        await w.app.sweepExpiredSessions({ at: w.state.at.epochMilliseconds });
+        expect(endRows(w, first.requestId)).toEqual(["staffAccess.revoked"]);
+      });
+    });
+
+    describe("when an operator revokes an enrolled agent", () => {
+      /** @scenario "Revoking an agent ends its live sessions and requests" */
+      it("revokes its keys, ends its requests, audits the end and tells the other operators", async () => {
+        const w = world();
+        const { agent, requestId } = await redeemed(w, { scopes: ["org:metadata"] });
+        const apiKeyId = w.state.minted[0]?.apiKeyId ?? "";
+        const asked = await w.app.createRequest({
+          session: agent.session,
+          body: requestBody({ scopes: ["org:metadata"] }),
+        });
+
+        await w.app.revokeRequester({ ...w.operator(OLIVIA), requesterId: agent.requester.id });
+
+        expect(w.state.revokedKeys).toContain(apiKeyId);
+        await expect(codeOf(w.app.staffAccessGate.admit(gateRequest({ apiKeyId })))).resolves.toBe(
+          "staff_access_revoked",
+        );
+        await expect(
+          codeOf(w.approve({ choice: { requestId: asked.requestId, spendApproved: false } })),
+        ).resolves.toBe("request_not_pending");
+        expect(
+          w.state.audit
+            .filter((row) => row.action === "staffAccess.revoked")
+            .map((row) => [row.targetId, (row.metadata as { cause?: string }).cause]),
+        ).toEqual([[requestId, "requester_revoked"]]);
+        expect(
+          w.state.mail.filter((mail) =>
+            mail.idempotencyKey?.startsWith(`staff-access-requester-revoked:${agent.requester.id}`),
+          ),
+        ).toEqual([expect.objectContaining({ to: `${PEDRO}@langwatch.test` })]);
       });
     });
 

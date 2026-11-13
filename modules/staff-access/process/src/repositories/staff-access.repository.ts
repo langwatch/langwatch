@@ -1,7 +1,7 @@
 /**
  * Staff access's owned state (ADR-202): enrolled agents, passkey challenges, requests and the
- * sessions they become, and the call trail. Every claim (`approve`, `redeem`, `claim...`) is one
- * conditional UPDATE, so of two racing callers exactly one wins.
+ * sessions they become, and the call trail. Every claim (`claimApproval`, `redeem`, `revoke`) is
+ * one conditional UPDATE, so of two racing callers exactly one wins.
  */
 import type { Instant } from "@langwatch/time";
 
@@ -122,12 +122,20 @@ export interface StaffAccessRequestRepository {
   findByOpsTokenLookupId(input: { lookupId: string }): Promise<StaffAccessRequestRow[]>;
   /** Created since `since`, newest first, at most `limit`. */
   findRecent(input: { since: Instant; limit: number }): Promise<StaffAccessRequestRow[]>;
-  /** Pending, approved or redeemed, not revoked, and not past its window. */
+  /** Pending, approving, approved or redeemed, not revoked, and not past its window. */
   findLive(input: { at: Instant }): Promise<StaffAccessRequestRow[]>;
-  /** Redeemed, never revoked, past its hour, and not yet audited as ended. */
+  /**
+   * Ends the customer has not been told of yet: a redeemed session past its hour, or a revoked
+   * request that was approved. Oldest first.
+   */
   findEndedUnaudited(input: { at: Instant; limit: number }): Promise<StaffAccessRequestRow[]>;
-  /** pending -> approved while unexpired; false when another decision or the clock won. */
-  approve(input: StaffAccessApproval): Promise<boolean>;
+  /**
+   * pending -> approving while unexpired; false when another decision or the clock won. An
+   * approving request is never redeemable: it stands only once its audit row exists.
+   */
+  claimApproval(input: StaffAccessApproval): Promise<boolean>;
+  /** approving -> approved once the customer's audit row exists; false when it was revoked. */
+  confirmApproval(input: { id: string; at: Instant }): Promise<boolean>;
   /** pending -> denied; false when it was not pending. */
   deny(input: { id: string; at: Instant }): Promise<boolean>;
   /** approved -> redeemed once, by its own requester, while unexpired. */
@@ -139,8 +147,8 @@ export interface StaffAccessRequestRepository {
     opsTokenLookupId: string | null;
   }): Promise<void>;
   /**
-   * pending, approved or redeemed -> revoked, once; the revoke is its own end-of-session audit.
-   * False once the hour ran out or the end was audited: the sweep records a natural end.
+   * pending, approving, approved or redeemed -> revoked, once. False once the hour ran out: the
+   * sweep records a natural end. The end audit is marked separately, after its row is written.
    */
   revoke(input: {
     id: string;
@@ -148,9 +156,8 @@ export interface StaffAccessRequestRepository {
     byUserId: string | null;
     cause: string;
   }): Promise<boolean>;
-  /** Marks a session's natural end audited, once; false when another sweep took it. */
-  claimEndAudit(input: { id: string; at: Instant }): Promise<boolean>;
-  releaseEndAudit(input: { id: string }): Promise<void>;
+  /** Marks a request's end as told to the customer; false when it already was. */
+  markEndAudited(input: { id: string; at: Instant }): Promise<boolean>;
 }
 
 export interface StaffAccessEventRepository {

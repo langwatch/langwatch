@@ -124,6 +124,7 @@ export class StaffAccessModule implements StaffAccessApiContract {
       apiKeys: dependencies.apiKeys,
       auditLog: dependencies.auditLog,
       users: dependencies.users,
+      notices,
       now,
     });
     this.#requests = StaffAccessRequestService.create({
@@ -209,7 +210,7 @@ export class StaffAccessModule implements StaffAccessApiContract {
     requesterId,
   }: StaffAccessOperator & { requesterId: string }): Promise<{ ok: true }> {
     const { userId } = await this.#availability.operatorOf({ actor });
-    await this.#requesters.revoke({ userId, requesterId });
+    await this.#sessions.revokeRequester({ userId, requesterId });
     return { ok: true };
   }
 
@@ -261,7 +262,7 @@ export class StaffAccessModule implements StaffAccessApiContract {
   async revokeAll({
     actor,
     confirmation,
-  }: StaffAccessOperator & { confirmation: string }): Promise<{ revoked: number }> {
+  }: StaffAccessOperator & { confirmation: string }): Promise<{ revoked: number; failed: number }> {
     const { userId } = await this.#availability.operatorOf({ actor });
     return this.#sessions.revokeAll({ userId, confirmation });
   }
