@@ -533,10 +533,7 @@ void describe("given a shard that runs several suites at once", () => {
       const isLane = (id: string) => laneOf(id.slice(id.lastIndexOf(" ") + 1)) !== "shared";
       const packages = [pkg("@fix/a", ["test:integration"]), pkg("@fix/b", ["test:browser"])];
       const units = ["d", "e"].map((name) => pkg(`@fix/${name}`, ["test"]));
-      const { overlaps, statuses } = await pool(
-        jobsFor([...packages, ...units], new Map()),
-        3,
-      );
+      const { overlaps, statuses } = await pool(jobsFor([...packages, ...units], new Map()), 3);
       for (const running of overlaps) {
         const serialRunning = running.filter(isLane);
         assert.ok(serialRunning.length <= 1, running.join());
