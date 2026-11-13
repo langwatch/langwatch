@@ -405,7 +405,7 @@ export class LangyModule implements LangyApiContract {
     const conversationProcessing = EventingLangyConversationAdapter.create({
       langyConversationProjectionStore: persistence.langyConversationState,
       langyConversationTurnProjectionStore: persistence.langyConversationTurnState,
-      langyConversationPullRequestsProjectionStore: persistence.langyConversationPullRequests,
+      langyPullRequestStore: persistence.langyPullRequests,
       langyMessageProjectionStore: persistence.langyMessageStorage,
       langyAnalyticsEventProjectionStore: LangyAnalyticsEventStorageService.create({
         sink: setup.repositories.analyticsEvents,
@@ -438,9 +438,6 @@ export class LangyModule implements LangyApiContract {
         projects: setup.dependencies.projects,
         notifications: setup.dependencies.notifications,
       },
-      githubPrCounter: LangyGithubPrQuotaService.create({
-        counts: setup.repositories.githubPrCounts,
-      }),
     });
     const longPoll = LocalControlLongPollService.create({ core });
     const sockets = LocalControlConnectionService.create({ core });
@@ -494,7 +491,7 @@ export class LangyModule implements LangyApiContract {
         turns: langy,
       }),
       ciFollowUps: LangyCiFollowUpService.create({
-        pullRequests: setup.repositories.conversationPullRequests,
+        pullRequests: setup.repositories.pullRequests,
         conversations: persistence.langyConversationState,
         projects: setup.dependencies.projects,
         users: setup.dependencies.users,
@@ -596,7 +593,7 @@ export class LangyModule implements LangyApiContract {
         worker,
         tokenBuffer: repositories.tokenBuffer.open(),
         permits: LangyGithubPrPermitService.create(
-          LangyGithubPrQuotaService.create({ counts: repositories.githubPrCounts }),
+          LangyGithubPrQuotaService.create({ pullRequests: repositories.pullRequests }),
         ),
         perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
         sessionKeys,

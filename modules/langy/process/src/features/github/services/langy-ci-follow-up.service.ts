@@ -1,6 +1,7 @@
 /**
  * Starts Langy again in the conversation that opened a pull request, once CI on it finished.
- * Once per commit comes from the turn's durable admission: the commit is its idempotency key.
+ * The follow-ups in a row are the conversation's own count; once per commit comes from the turn's
+ * durable admission, where the commit is the idempotency key.
  * @see modules/langy/specs/langy-ci-follow-up.feature
  */
 import { createTenantId, type StateProjectionStore } from "@langwatch/eventing";
@@ -12,9 +13,9 @@ import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 import type {
-  LangyConversationPullRequestMatch,
-  LangyConversationPullRequestsRepository,
-} from "../../../repositories/langy-conversation-pull-requests.repository.ts";
+  LangyOpenedPullRequest,
+  LangyPullRequestRepository,
+} from "../../../repositories/langy-pull-request.repository.ts";
 import {
   LANGY_CI_FOLLOW_UPS_IN_A_ROW,
   ciFollowUpMessage,
@@ -38,7 +39,7 @@ type CiFollowUpTurnStart = StartConversationTurnInput & {
 };
 
 type LangyCiFollowUpMembers = Readonly<{
-  pullRequests: Pick<LangyConversationPullRequestsRepository, "findByPullRequest">;
+  pullRequests: Pick<LangyPullRequestRepository, "findByPullRequest">;
   conversations: Pick<StateProjectionStore<LangyConversationStateData>, "get">;
   projects: Pick<ProjectApi, "listIdsByOrganization">;
   users: LangyActorUserReader;
@@ -70,8 +71,8 @@ export class LangyCiFollowUpService {
         repositoryFullName: checks.repositoryFullName,
         prNumber,
       });
-      for (const conversation of opened) {
-        await this.followUp({ checks, prNumber, conversation });
+      for (const pullRequest of opened) {
+        await this.followUp({ checks, prNumber, pullRequest });
       }
     }
   }
@@ -79,28 +80,42 @@ export class LangyCiFollowUpService {
   private async followUp({
     checks,
     prNumber,
-    conversation,
+    pullRequest,
   }: {
     checks: GithubPullRequestChecksCompletedEventData;
     prNumber: number;
-    conversation: LangyConversationPullRequestMatch;
+    pullRequest: LangyOpenedPullRequest;
   }): Promise<void> {
     const key = { repositoryFullName: checks.repositoryFullName, prNumber };
-    const inARow = conversation.followUpsInARow;
+    const read = await this.members.conversations.get(pullRequest.conversationId, {
+      tenantId: createTenantId(pullRequest.projectId),
+      aggregateId: pullRequest.conversationId,
+    });
+    if (read.kind === "empty") return;
+    const conversation = read.projection.state;
+    const inARow = conversation.CiFollowUpsInARow;
     if (inARow >= LANGY_CI_FOLLOW_UPS_IN_A_ROW) {
       logger.info({ ...key, inARow }, "CI follow-up cap reached; waiting for the person");
       return;
     }
 
-    const session = await this.sessionOf({ conversation, organizationId: checks.organizationId });
+    const session = await this.sessionOf({
+      userId: conversation.UserId,
+      projectId: pullRequest.projectId,
+      organizationId: checks.organizationId,
+    });
     if (!session) return;
+    const conversationRef = {
+      projectId: pullRequest.projectId,
+      conversationId: pullRequest.conversationId,
+    };
 
     try {
       await this.members.turns.startCiFollowUpTurn({
-        projectId: conversation.projectId,
+        projectId: conversationRef.projectId,
         idempotencyKey: `ci-follow-up:${pullRequestKeyOf(key)}@${checks.headSha}`,
         session,
-        requestedConversationId: conversation.conversationId,
+        requestedConversationId: conversationRef.conversationId,
         messages: [
           {
             role: "user",
@@ -126,7 +141,7 @@ export class LangyCiFollowUpService {
           headSha: checks.headSha,
           countTurn: () =>
             this.members.bounds.assertUnattendedTurnWithinBounds({
-              projectId: conversation.projectId,
+              projectId: conversationRef.projectId,
             }),
         },
       });
@@ -138,7 +153,7 @@ export class LangyCiFollowUpService {
         return;
       }
       logger.warn(
-        { error, ...key, conversationId: conversation.conversationId },
+        { error, ...key, conversationId: conversationRef.conversationId },
         "CI follow-up refused",
       );
     }
@@ -146,23 +161,21 @@ export class LangyCiFollowUpService {
 
   /** The conversation's owner as they are now, or none when they may no longer act. */
   private async sessionOf({
-    conversation,
+    userId,
+    projectId,
     organizationId,
   }: {
-    conversation: LangyConversationPullRequestMatch;
+    userId: string;
+    projectId: string;
     organizationId: string;
   }) {
-    const read = await this.members.conversations.get(conversation.conversationId, {
-      tenantId: createTenantId(conversation.projectId),
-      aggregateId: conversation.conversationId,
-    });
-    if (read.kind === "empty" || !read.projection.state.UserId) return null;
-    const user = await this.members.users.findById({ id: read.projection.state.UserId });
+    if (!userId) return null;
+    const user = await this.members.users.findById({ id: userId });
     if (!user || user.deactivatedAt !== null) return null;
     const session = { user: { id: user.id, name: user.name, email: user.email } };
     const hasAccess = await LangyAccessService.create({
       featureFlags: this.members.featureFlags,
-    }).hasAccess({ user: session.user, projectId: conversation.projectId, organizationId });
+    }).hasAccess({ user: session.user, projectId, organizationId });
     return hasAccess ? session : null;
   }
 }

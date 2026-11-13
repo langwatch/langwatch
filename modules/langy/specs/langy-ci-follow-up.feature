@@ -5,9 +5,10 @@ Feature: CI results wake Langy on the pull requests it opened
   the result and fix, push or report. The follow-up acts as the conversation's owner, holds the
   unattended LangWatch ceiling (view only) and a GitHub token for that one repository. GitHub
   cannot bound an installation token to a branch, so the branch rule is the skill's and the
-  repository's branch protection; the platform caps how many follow-ups run in a row. Which
-  conversation opened which pull request, and how many follow-ups ran in a row since the person
-  last spoke, is a fold of the conversation's own events, kept as long as the conversation.
+  repository's branch protection; the platform caps how many follow-ups run in a row. Each pull
+  request Langy opened is one row, keyed by repository and number, mapped from the answer that
+  opened it. How many follow-ups ran in a row since the person last spoke is a count the
+  conversation keeps from its own messages.
 
   Rule: The pull requests a conversation opened are remembered
 
@@ -15,7 +16,13 @@ Feature: CI results wake Langy on the pull requests it opened
     Scenario: A pull request Langy opened in a turn is linked to its conversation
       Given a completed turn whose `gh pr create` printed the URL of pull request 12 on "acme/agent"
       When the turn's answer is recorded
-      Then the conversation keeps pull request 12 on "acme/agent" and when it was opened
+      Then pull request 12 on "acme/agent" is stored with its conversation, its owner and when it was opened
+
+    @unit
+    Scenario: A redelivered answer stores its pull request once
+      Given an answer that opened pull request 12 on "acme/agent" was stored
+      When the same answer is delivered again
+      Then pull request 12 on "acme/agent" keeps its first row
 
     @unit
     Scenario: A failed pull request command links nothing
@@ -78,7 +85,7 @@ Feature: CI results wake Langy on the pull requests it opened
     Scenario: A follow-up message CI started counts one more in a row
       Given a conversation that opened pull request 12
       When the message of an automatic follow-up turn is recorded
-      Then the count of follow-ups in a row goes up by one
+      Then the conversation's count of follow-ups in a row goes up by one
 
     @unit
     Scenario: A message the person sends resets the count
@@ -94,9 +101,9 @@ Feature: CI results wake Langy on the pull requests it opened
 
     @integration
     Scenario: The read model finds the conversation that opened a pull request
-      Given a conversation whose fold keeps pull request 12 on "acme/agent"
+      Given the row of pull request 12 on "acme/agent" opened by a conversation
       When CI looks up pull request 12 on "Acme/Agent" within that conversation's project
-      Then it finds that conversation and its follow-ups in a row
+      Then it finds that conversation and its owner
       And a lookup within other projects finds nothing
 
   Rule: A follow-up acts only for a person who may still act

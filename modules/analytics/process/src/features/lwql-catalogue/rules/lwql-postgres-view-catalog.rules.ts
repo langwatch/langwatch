@@ -976,6 +976,7 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       PendingHandoffTurnId: "inherit",
       RunToken: "omit", // secret
       ArchivedAt: "inherit",
+      CiFollowUpsInARow: "inherit",
       CreatedAt: "inherit",
       UpdatedAt: "inherit",
       OccurredAt: "inherit",

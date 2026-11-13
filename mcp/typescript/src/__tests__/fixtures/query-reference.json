@@ -14303,6 +14303,14 @@
               "available": true
             },
             {
+              "name": "CiFollowUpsInARow",
+              "type": "Int32",
+              "description": "Messages CI started on a pull request since the person last wrote.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
               "name": "CreatedAt",
               "type": "Float64",
               "description": "CreatedAt",

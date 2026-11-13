@@ -19,7 +19,7 @@ import type { LangySessionKeyService } from "../features/session-key/services/la
 import { RedisLangyEffectRepository } from "../repositories/redis/redis.langy-effect.repository.ts";
 import type { LangyTokenBufferRedisRepository } from "../repositories/redis/redis.langy-token-buffer.repository.ts";
 import type { LangyTurnHandoffRedisRepository } from "../repositories/redis/redis.langy-turn-handoff.repository.ts";
-import type { LangyConversationPullRequestsData } from "../rules/langy-ci-follow-up.rules.ts";
+import type { LangyPullRequestsOpenedRecord } from "../rules/langy-ci-follow-up.rules.ts";
 import type { ControlTurnStarter } from "../rules/langy-local-session-contract.rules.ts";
 import type { LangyTitleGenerator } from "../services/langy-title-generator.service.ts";
 import type { LangyAnalyticsEventProjectionRecord } from "./langy-analytics-event.projection.ts";
@@ -37,10 +37,6 @@ import {
   createLangyFirstMessageSeenSubscriber,
   type LangyFirstMessageSeenFacts,
 } from "./langy-first-message-seen.subscriber.ts";
-import {
-  createLangyGithubPrCountSubscriber,
-  type LangyGithubPrCounter,
-} from "./langy-github-pr-count.subscriber.ts";
 import {
   createGuidedOnboardingTurnFailedSubscriber,
   type GuidedOnboardingFacts,
@@ -81,8 +77,8 @@ interface EventingLangyConversationAdapterOptions {
   langyConversationProjectionStore: StateProjectionStore<LangyConversationStateData>;
   /** Direct Postgres per-turn operational projection. */
   langyConversationTurnProjectionStore: StateProjectionStore<LangyConversationTurnData>;
-  /** Direct Postgres fold of the pull requests each conversation opened. */
-  langyConversationPullRequestsProjectionStore: StateProjectionStore<LangyConversationPullRequestsData>;
+  /** Postgres rows of the pull requests Langy opened, one each. */
+  langyPullRequestStore: AppendStore<LangyPullRequestsOpenedRecord>;
   /** Postgres per-message operational projection. */
   langyMessageProjectionStore: AppendStore<LangyMessageProjectionRecord>;
   /** Content-free ClickHouse event-grain analytics. */
@@ -106,8 +102,6 @@ interface EventingLangyConversationAdapterOptions {
   };
   /** Who a notification goes to and whether they want it, and notification's Web Push. */
   webPush: Pick<LangyWebPushSubscriberDeps, "users" | "projects" | "notifications">;
-  /** Where the pull requests a turn opened count against its owner's daily cap. */
-  githubPrCounter: LangyGithubPrCounter;
 }
 
 /**
@@ -219,11 +213,6 @@ export class EventingLangyConversationAdapter {
       turns: options.localConnectTurn.turns,
     });
 
-    const githubPrCountSubscriber = createLangyGithubPrCountSubscriber({
-      conversations: conversationReader,
-      counter: options.githubPrCounter,
-    });
-
     const webPushSubscriber = createLangyWebPushSubscriber({
       ...langyWebPushReaders({
         conversations: conversationStore,
@@ -235,8 +224,7 @@ export class EventingLangyConversationAdapter {
     return buildLangyConversationPipeline({
       langyConversationProjectionStore: conversationStore,
       langyConversationTurnProjectionStore: options.langyConversationTurnProjectionStore,
-      langyConversationPullRequestsProjectionStore:
-        options.langyConversationPullRequestsProjectionStore,
+      langyPullRequestStore: options.langyPullRequestStore,
       langyMessageProjectionStore: options.langyMessageProjectionStore,
       langyAnalyticsEventProjectionStore: options.langyAnalyticsEventProjectionStore,
       ...(options.retention === undefined ? {} : { retention: options.retention }),
@@ -249,7 +237,6 @@ export class EventingLangyConversationAdapter {
         firstMessageSeenSubscriber,
         localConnectTurnSubscriber,
         webPushSubscriber,
-        githubPrCountSubscriber,
       ],
     });
   }

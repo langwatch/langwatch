@@ -26,7 +26,8 @@ import type {
   LangyWorkerDispatchInput,
   LangyWorkerProbeInput,
 } from "../../../../channels/langy-worker.channel.ts";
-import { LangyGithubPrCountMemoryRepository } from "../../../../repositories/memory/memory.langy-github-pr-count.repository.ts";
+import { LangyMemoryStore } from "../../../../repositories/memory/langy-memory.store.ts";
+import { MemoryLangyPullRequestRepository } from "../../../../repositories/memory/memory.langy-pull-request.repository.ts";
 import { LangyGuidedKickoffService } from "../../../../services/langy-guided-kickoff.service.ts";
 import type { LangyConversationService } from "../../../conversation/services/langy-conversation.service.ts";
 import { LangyGithubPrPermitService } from "../../../github/services/langy-github-pr-permit.service.ts";
@@ -350,7 +351,9 @@ describe("LangyTurnPreparationService golden path", () => {
     /** @scenario "A code turn that opens no pull request spends nothing of the daily cap" */
     it("still hands the next turn the GitHub token", async () => {
       const cap = LangyGithubPrPermitService.create(
-        LangyGithubPrQuotaService.create({ counts: LangyGithubPrCountMemoryRepository.create() }),
+        LangyGithubPrQuotaService.create({
+          pullRequests: MemoryLangyPullRequestRepository.create(LangyMemoryStore.create()),
+        }),
       );
       const permits = { check: (input: { userId: string }) => cap.check(input) };
       const githubCredentials = {
@@ -380,7 +383,7 @@ describe("LangyTurnPreparationService golden path", () => {
   });
 
   describe("given the user already opened the per-day maximum of pull requests", () => {
-    /** @scenario "The API process meters the daily pull-request cap on its own Redis" */
+    /** @scenario "The API process counts the daily pull-request cap from the pull requests Langy opened" */
     it("tells the turn the real per-day cap and the hour it resets", async () => {
       const fixture = makeFixture({
         credentials: {

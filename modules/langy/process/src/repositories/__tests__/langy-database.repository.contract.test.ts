@@ -38,6 +38,7 @@ function conversation(overrides: Partial<LangyConversationStateData>): LangyConv
     PendingHandoffTurnId: null,
     RunToken: null,
     ArchivedAt: null,
+    CiFollowUpsInARow: 0,
     CreatedAt: 1_000,
     UpdatedAt: 1_000,
     LastEventOccurredAt: 1_000,

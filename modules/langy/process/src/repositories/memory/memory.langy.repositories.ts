@@ -2,13 +2,11 @@ import type { LangyRepositories } from "../langy-repositories.registry.ts";
 import { LangyMemoryStore } from "./langy-memory.store.ts";
 import { LangyAnalyticsEventMemoryRepository } from "./memory.langy-analytics-event.repository.ts";
 import { MemoryLangyConversationProjectionRepository } from "./memory.langy-conversation-projection.repository.ts";
-import { MemoryLangyConversationPullRequestsRepository } from "./memory.langy-conversation-pull-requests.repository.ts";
 import { MemoryLangyConversationTurnProjectionRepository } from "./memory.langy-conversation-turn-projection.repository.ts";
 import { MemoryLangyConversationRepository } from "./memory.langy-conversation.repository.ts";
 import { MemoryLangyCredentialRepository } from "./memory.langy-credential.repository.ts";
 import { LangyDeleteConfirmationMemoryRepository } from "./memory.langy-delete-confirmation.repository.ts";
 import { LangyFeedbackPromptMemoryRepository } from "./memory.langy-feedback-prompt.repository.ts";
-import { LangyGithubPrCountMemoryRepository } from "./memory.langy-github-pr-count.repository.ts";
 import {
   LangyFrameDedupMemoryRepository,
   LangyResourceLinksMemoryRepository,
@@ -21,6 +19,7 @@ import { LangyLocalPresenceMemoryRepository } from "./memory.langy-local-presenc
 import { LangyLocalUserWaitMemoryRepository } from "./memory.langy-local-user-wait.repository.ts";
 import { MemoryLangyMessageProjectionRepository } from "./memory.langy-message-projection.repository.ts";
 import { MemoryLangyMessageRepository } from "./memory.langy-message.repository.ts";
+import { MemoryLangyPullRequestRepository } from "./memory.langy-pull-request.repository.ts";
 import { MemoryLangyRateLimitRepository } from "./memory.langy-rate-limit.repository.ts";
 import { MemoryLangySessionKeyRepository } from "./memory.langy-session-key.repository.ts";
 import { LangyTokenBufferMemoryRepository } from "./memory.langy-token-buffer.repository.ts";
@@ -44,7 +43,7 @@ export class MemoryLangyRepositories {
       admission: MemoryLangyTurnAdmissionRepository.create(store),
       conversationState: MemoryLangyConversationProjectionRepository.create(store),
       conversationTurnState: MemoryLangyConversationTurnProjectionRepository.create(store),
-      conversationPullRequests: MemoryLangyConversationPullRequestsRepository.create(store),
+      pullRequests: MemoryLangyPullRequestRepository.create(store),
       messageStorage: MemoryLangyMessageProjectionRepository.create(store),
       sessionKeys: MemoryLangySessionKeyRepository.create(store),
       turnAccess: LangyTurnAccessMemoryRepository.create(store),
@@ -56,7 +55,6 @@ export class MemoryLangyRepositories {
       localUserWaits: LangyLocalUserWaitMemoryRepository.create(),
       localControlRequests: LangyLocalControlRequestMemoryRepository.create(),
       deleteConfirmations: LangyDeleteConfirmationMemoryRepository.create(),
-      githubPrCounts: LangyGithubPrCountMemoryRepository.create(),
       feedbackPrompts: LangyFeedbackPromptMemoryRepository.create(),
       // Every call returns the twin over the SAME shared store, the way one
       // Redis serves every open() on the live tier; there is no connection to give back.

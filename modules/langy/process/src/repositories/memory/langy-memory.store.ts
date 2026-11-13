@@ -6,10 +6,10 @@ import type {
 } from "@langwatch/langy-contract";
 import type { Instant } from "@langwatch/time";
 
-import type { LangyConversationPullRequestsData } from "../../rules/langy-ci-follow-up.rules.ts";
 import type { LangyAnalyticsEventRecord } from "../langy-analytics-event.repository.ts";
 import type { LangyTurnAccess, LangyTurnHandoff } from "../langy-live-turn.repository.ts";
 import type { ConnectedWorkspace, OwedConnectTurn } from "../langy-local-presence.repository.ts";
+import type { LangyOpenedPullRequest } from "../langy-pull-request.repository.ts";
 import type { LangyStreamRead } from "../langy-token-buffer.repository.ts";
 import type { PendingUiAction } from "../langy-ui-action.repository.ts";
 
@@ -88,15 +88,8 @@ export class LangyMemoryStore {
     string,
     { projectId: string; projection: StoredProjection<LangyConversationStateData> }
   >();
-  /** Keyed `projectId:conversationId`. */
-  readonly conversationPullRequests = new Map<
-    string,
-    {
-      projectId: string;
-      conversationId: string;
-      projection: StoredProjection<LangyConversationPullRequestsData>;
-    }
-  >();
+  /** Keyed `repository#number`, repository lowercased. */
+  readonly pullRequests = new Map<string, LangyOpenedPullRequest>();
   /** Keyed `projectId:conversationId:turnId`. */
   readonly turns = new Map<
     string,

@@ -1,6 +1,5 @@
 import { githubProgressFromToolParts, type LangyMessagePart } from "@langwatch/langy-contract";
 import { Temporal } from "@langwatch/time";
-import { z } from "zod";
 
 const PULL_REQUEST_URL = /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/(\d+)$/;
 
@@ -59,48 +58,30 @@ export function pullRequestKeyOf(key: { repositoryFullName: string; prNumber: nu
   return `${key.repositoryFullName.toLowerCase()}#${key.prNumber}`;
 }
 
-/** A pull request a conversation opened: repository lowercased, and when the answer landed. */
-export const langyOpenedPullRequestSchema = z.object({
-  repositoryFullName: z.string(),
-  prNumber: z.number().int(),
-  linkedAt: z.number(),
-});
-
-/**
- * The conversation's fold: the pull requests it opened and the CI follow-ups since the person
- * last spoke.
- */
-export type LangyConversationPullRequestsData = {
-  PullRequests: z.infer<typeof langyOpenedPullRequestSchema>[];
-  FollowUpsInARow: number;
-  CreatedAt: number;
-  UpdatedAt: number;
-  LastEventOccurredAt: number;
+/** The pull requests one answer opened, repository lowercased: what the read model stores. */
+export type LangyPullRequestsOpenedRecord = {
+  ConversationId: string;
+  PullRequests: { repositoryFullName: string; prNumber: number }[];
+  /** When the answer was recorded (epoch ms). */
+  OpenedAt: number;
+  SourceEventId: string;
 };
 
-/** Adds the pull requests an answer opened, each once, keeping when each was first linked. */
-export function withPullRequestsOpened(
-  state: LangyConversationPullRequestsData,
-  { parts, at }: { parts: readonly LangyMessagePart[]; at: number },
-): LangyConversationPullRequestsData {
-  const known = new Set(state.PullRequests.map(pullRequestKeyOf));
-  const added = pullRequestsOpenedIn(parts)
-    .map((pull) => ({
+/** The pull requests an answer opened, as the record the read model stores; none is empty. */
+export function pullRequestsOpenedRecordOf(answer: {
+  id: string;
+  occurredAt: number;
+  data: { conversationId: string; parts: readonly LangyMessagePart[] };
+}): LangyPullRequestsOpenedRecord {
+  return {
+    ConversationId: answer.data.conversationId,
+    PullRequests: pullRequestsOpenedIn(answer.data.parts).map((pull) => ({
       repositoryFullName: pull.repositoryFullName.toLowerCase(),
       prNumber: pull.prNumber,
-      linkedAt: at,
-    }))
-    .filter((pull) => !known.has(pullRequestKeyOf(pull)));
-  if (added.length === 0) return state;
-  return { ...state, PullRequests: [...state.PullRequests, ...added] };
-}
-
-/** A CI follow-up message counts one more in a row; a message the person sent starts again. */
-export function withUserMessage(
-  state: LangyConversationPullRequestsData,
-  { isCiFollowUp }: { isCiFollowUp: boolean },
-): LangyConversationPullRequestsData {
-  return { ...state, FollowUpsInARow: isCiFollowUp ? state.FollowUpsInARow + 1 : 0 };
+    })),
+    OpenedAt: answer.occurredAt,
+    SourceEventId: answer.id,
+  };
 }
 
 /** The prompt note for a person past the per-day pull request cap: refuse to open another. */

@@ -13442,6 +13442,15 @@
           "documentation": ""
         },
         {
+          "name": "CiFollowUpsInARow",
+          "columnName": "ciFollowUpsInARow",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Messages CI started on a pull request since the person last wrote."
+        },
+        {
           "name": "CreatedAt",
           "columnName": "createdAt",
           "type": "Float",
@@ -13888,9 +13897,9 @@
       ]
     },
     {
-      "name": "LangyConversationPullRequestsProjection",
-      "tableName": "LangyConversationPullRequestsProjection",
-      "documentation": "Rebuildable fold of the pull requests a Langy conversation opened, one row per conversation:\nCI on one of them finds the conversation here to start a follow-up turn.",
+      "name": "LangyPullRequest",
+      "tableName": "LangyPullRequest",
+      "documentation": "One pull request Langy opened, from the answer whose `gh pr create` printed it. Finished\nchecks look it up by repository and number to wake the conversation; the daily pull request\ncap counts a person's rows by day. Rebuilt by a projection replay.",
       "primaryKey": [
         "id"
       ],
@@ -13914,6 +13923,24 @@
           "documentation": ""
         },
         {
+          "name": "RepositoryFullName",
+          "columnName": "repositoryFullName",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "`owner/repo`, lowercased: GitHub matches repository names without case."
+        },
+        {
+          "name": "PrNumber",
+          "columnName": "prNumber",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
           "name": "ConversationId",
           "columnName": "conversationId",
           "type": "String",
@@ -13923,85 +13950,31 @@
           "documentation": ""
         },
         {
-          "name": "PullRequestKeys",
-          "columnName": "pullRequestKeys",
-          "type": "String",
-          "kind": "scalar",
-          "isList": true,
-          "isOptional": false,
-          "documentation": "`owner/repo#12`, repository lowercased: one per pull request, what CI looks up."
-        },
-        {
-          "name": "PullRequests",
-          "columnName": "pullRequests",
-          "type": "Json",
-          "kind": "scalar",
-          "isList": false,
-          "isOptional": false,
-          "documentation": "[{ repositoryFullName, prNumber, linkedAt }]: each pull request and when it was opened."
-        },
-        {
-          "name": "FollowUpsInARow",
-          "columnName": "followUpsInARow",
-          "type": "Int",
-          "kind": "scalar",
-          "isList": false,
-          "isOptional": false,
-          "documentation": "Automatic CI follow-up turns since the person last sent a message."
-        },
-        {
-          "name": "CreatedAt",
-          "columnName": "createdAt",
-          "type": "Float",
-          "kind": "scalar",
-          "isList": false,
-          "isOptional": false,
-          "documentation": ""
-        },
-        {
-          "name": "UpdatedAt",
-          "columnName": "updatedAt",
-          "type": "Float",
-          "kind": "scalar",
-          "isList": false,
-          "isOptional": false,
-          "documentation": ""
-        },
-        {
-          "name": "OccurredAt",
-          "columnName": "occurredAt",
-          "type": "Float",
-          "kind": "scalar",
-          "isList": false,
-          "isOptional": false,
-          "documentation": ""
-        },
-        {
-          "name": "AcceptedAt",
-          "columnName": "acceptedAt",
-          "type": "Float",
-          "kind": "scalar",
-          "isList": false,
-          "isOptional": false,
-          "documentation": ""
-        },
-        {
-          "name": "LastEventId",
-          "columnName": "lastEventId",
+          "name": "UserId",
+          "columnName": "userId",
           "type": "String",
           "kind": "scalar",
           "isList": false,
           "isOptional": false,
-          "documentation": ""
+          "documentation": "The conversation's owner, who opened it through Langy."
         },
         {
-          "name": "ProjectionVersion",
-          "columnName": "projectionVersion",
+          "name": "OpenedAt",
+          "columnName": "openedAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "When the answer that opened it was recorded (epoch ms)."
+        },
+        {
+          "name": "SourceEventId",
+          "columnName": "sourceEventId",
           "type": "String",
           "kind": "scalar",
           "isList": false,
           "isOptional": false,
-          "documentation": ""
+          "documentation": "The agent_responded event it came from."
         }
       ]
     },

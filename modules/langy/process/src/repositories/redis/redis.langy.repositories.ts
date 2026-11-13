@@ -5,7 +5,6 @@ import type { LangyRepositories } from "../langy-repositories.registry.ts";
 import { LangyDeleteConfirmationRedisRepository } from "./redis.langy-delete-confirmation.repository.ts";
 import { LangyFeedbackPromptRedisRepository } from "./redis.langy-feedback-prompt.repository.ts";
 import { LangyFrameDedupRedisRepository } from "./redis.langy-frame-dedup.repository.ts";
-import { LangyGithubPrCountRedisRepository } from "./redis.langy-github-pr-count.repository.ts";
 import { LangyLocalCallRedisRepository } from "./redis.langy-local-call.repository.ts";
 import { LangyLocalControlRequestRedisRepository } from "./redis.langy-local-control-request.repository.ts";
 import { LangyLocalPresenceRedisRepository } from "./redis.langy-local-presence.repository.ts";
@@ -28,7 +27,6 @@ type LangyRedisRows = Pick<
   | "localUserWaits"
   | "localControlRequests"
   | "deleteConfirmations"
-  | "githubPrCounts"
   | "feedbackPrompts"
   | "tokenBuffer"
   | "uiActions"
@@ -50,7 +48,6 @@ export class RedisLangyRepositories {
       localUserWaits: LangyLocalUserWaitRedisRepository.create({ store: sessionState }),
       localControlRequests: LangyLocalControlRequestRedisRepository.create({ store: sessionState }),
       deleteConfirmations: LangyDeleteConfirmationRedisRepository.create({ redis }),
-      githubPrCounts: LangyGithubPrCountRedisRepository.create({ redis }),
       feedbackPrompts: LangyFeedbackPromptRedisRepository.create({ redis }),
       // Every open builds a fresh buffer; a blocking tail duplicates a
       // connection of its own and gives it back on release.

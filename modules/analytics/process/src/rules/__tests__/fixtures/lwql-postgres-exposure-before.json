@@ -671,6 +671,7 @@
     ["Origin", "origin", []],
     ["PendingHandoffTurnId", "pendingHandoffTurnId", []],
     ["ArchivedAt", "archivedAt", []],
+    ["CiFollowUpsInARow", "ciFollowUpsInARow", []],
     ["CreatedAt", "createdAt", []],
     ["UpdatedAt", "updatedAt", []],
     ["OccurredAt", "occurredAt", []],

@@ -90,7 +90,7 @@ export const prismaTableCatalogue = {
   "LangyTurnRequest": "LangyTurnRequest",
   "LangyActiveTurn": "LangyActiveTurn",
   "LangyConversationTurnProjection": "LangyConversationTurnProjection",
-  "LangyConversationPullRequestsProjection": "LangyConversationPullRequestsProjection",
+  "LangyPullRequest": "LangyPullRequest",
   "LangyMessageProjection": "LangyMessageProjection",
   "ProjectSecret": "ProjectSecret",
   "TriggerSent": "TriggerSent",
@@ -1658,6 +1658,7 @@ export const prismaModelFieldCatalogue = {
     "PendingHandoffTurnId",
     "RunToken",
     "ArchivedAt",
+    "CiFollowUpsInARow",
     "CreatedAt",
     "UpdatedAt",
     "OccurredAt",
@@ -1711,19 +1712,15 @@ export const prismaModelFieldCatalogue = {
     "LastEventId",
     "ProjectionVersion"
   ],
-  "LangyConversationPullRequestsProjection": [
+  "LangyPullRequest": [
     "id",
     "projectId",
+    "RepositoryFullName",
+    "PrNumber",
     "ConversationId",
-    "PullRequestKeys",
-    "PullRequests",
-    "FollowUpsInARow",
-    "CreatedAt",
-    "UpdatedAt",
-    "OccurredAt",
-    "AcceptedAt",
-    "LastEventId",
-    "ProjectionVersion"
+    "UserId",
+    "OpenedAt",
+    "SourceEventId"
   ],
   "LangyMessageProjection": [
     "id",
@@ -3645,7 +3642,7 @@ export const prismaRelationCatalogue = {
   "LangyTurnRequest": {},
   "LangyActiveTurn": {},
   "LangyConversationTurnProjection": {},
-  "LangyConversationPullRequestsProjection": {},
+  "LangyPullRequest": {},
   "LangyMessageProjection": {},
   "ProjectSecret": {
     "project": "Project",

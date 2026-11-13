@@ -3553,6 +3553,8 @@ model LangyConversationProjection {
   /// Per-conversation HMAC key for worker stream frames; server-side only.
   RunToken             String?                    @map("runToken")
   ArchivedAt           Float?                     @map("archivedAt")
+  /// Messages CI started on a pull request since the person last wrote.
+  CiFollowUpsInARow    Int                        @default(0) @map("ciFollowUpsInARow")
   CreatedAt            Float                      @map("createdAt")
   UpdatedAt            Float                      @map("updatedAt")
   /// Business time of the latest applied event.
@@ -3642,27 +3644,25 @@ model LangyConversationTurnProjection {
   @@index([projectId, ConversationId, UpdatedAt])
 }
 
-/// Rebuildable fold of the pull requests a Langy conversation opened, one row per conversation:
-/// CI on one of them finds the conversation here to start a follow-up turn.
-model LangyConversationPullRequestsProjection {
-  id                String   @id @default(nanoid())
-  projectId         String
-  ConversationId    String   @map("conversationId")
-  /// `owner/repo#12`, repository lowercased: one per pull request, what CI looks up.
-  PullRequestKeys   String[] @map("pullRequestKeys")
-  /// [{ repositoryFullName, prNumber, linkedAt }]: each pull request and when it was opened.
-  PullRequests      Json     @map("pullRequests")
-  /// Automatic CI follow-up turns since the person last sent a message.
-  FollowUpsInARow   Int      @map("followUpsInARow")
-  CreatedAt         Float    @map("createdAt")
-  UpdatedAt         Float    @map("updatedAt")
-  OccurredAt        Float    @map("occurredAt")
-  AcceptedAt        Float    @map("acceptedAt")
-  LastEventId       String   @map("lastEventId")
-  ProjectionVersion String   @map("projectionVersion")
+/// One pull request Langy opened, from the answer whose `gh pr create` printed it. Finished
+/// checks look it up by repository and number to wake the conversation; the daily pull request
+/// cap counts a person's rows by day. Rebuilt by a projection replay.
+model LangyPullRequest {
+  id                 String @id @default(nanoid())
+  projectId          String
+  /// `owner/repo`, lowercased: GitHub matches repository names without case.
+  RepositoryFullName String @map("repositoryFullName")
+  PrNumber           Int    @map("prNumber")
+  ConversationId     String @map("conversationId")
+  /// The conversation's owner, who opened it through Langy.
+  UserId             String @map("userId")
+  /// When the answer that opened it was recorded (epoch ms).
+  OpenedAt           Float  @map("openedAt")
+  /// The agent_responded event it came from.
+  SourceEventId      String @map("sourceEventId")
 
-  @@unique([projectId, ConversationId], map: "LangyConversationPullRequests_projectId_conversationId_key")
-  @@index([PullRequestKeys], type: Gin, map: "LangyConversationPullRequests_pullRequestKeys_idx")
+  @@unique([RepositoryFullName, PrNumber])
+  @@index([UserId, OpenedAt])
 }
 
 /// Rebuildable operational message fact. One source event produces one row.

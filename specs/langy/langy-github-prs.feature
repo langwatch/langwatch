@@ -161,10 +161,10 @@ Feature: Langy opens GitHub PRs via the installed GitHub App
     Then the card does not say Langy is working on it
 
   # The cap counts pull requests from the fact of one opening: an answer whose
-  # gh pr create printed a pull request URL. A turn spends nothing by starting,
-  # so there is nothing to give back when it opens none. The cap is soft: a
-  # turn admitted under it may open more than one pull request before its
-  # answer is counted.
+  # gh pr create printed a pull request URL, stored as one row per pull request.
+  # A turn spends nothing by starting, so there is nothing to give back when it
+  # opens none. The cap is soft: a turn admitted under it may open more than one
+  # pull request before its answer is stored.
   @integration
   Scenario: Per-user daily PR cap stops runaway loops
     Given I have already opened 20 PRs via Langy today
@@ -202,15 +202,21 @@ Feature: Langy opens GitHub PRs via the installed GitHub App
   # ── The API process's own composition ──────────────────────────────────
 
   @unit
-  Scenario: The API process meters the daily pull-request cap on its own Redis
-    Given the API process composed a Redis connection
-    When Langy opens a pull request for a user
-    Then the pull request is counted in that user's day bucket
-    And the turn is told the real per-day cap rather than zero
+  Scenario: The API process counts the daily pull-request cap from the pull requests Langy opened
+    Given Langy opened the per-day maximum of pull requests for a user today
+    When the user sends a turn
+    Then the turn is told the real per-day cap rather than zero
+    And another user's cap is untouched
+
+  @integration
+  Scenario: The daily cap counts a person's pull requests in every project
+    Given Langy opened pull requests for a person in two projects
+    When the daily cap counts that person's pull requests since the day began
+    Then each pull request counts once, whichever project it was opened in
 
   @unit
   Scenario: A deployment with no counter never denies a pull request
-    Given the counter cannot be read
+    Given the pull requests Langy opened cannot be read
     When a turn reads the daily pull request cap
     Then the turn is allowed to open a pull request
 

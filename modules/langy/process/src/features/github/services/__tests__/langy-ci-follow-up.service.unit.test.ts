@@ -1,7 +1,7 @@
 /**
- * LangyCiFollowUpService over the memory read model and the memory turn admission: when
- * finished checks on a pull request start a follow-up turn, as whom, with what message, and
- * every case that starts none.
+ * LangyCiFollowUpService over the memory pull request rows, the conversation's count of follow-ups
+ * in a row and the memory turn admission: when finished checks start a follow-up turn, as whom,
+ * with what message, and every case that starts none.
  * @see modules/langy/specs/langy-ci-follow-up.feature
  */
 import { createTenantId } from "@langwatch/eventing";
@@ -20,7 +20,7 @@ import { describe, expect, it } from "vitest";
 
 import { LangyMemoryStore } from "../../../../repositories/memory/langy-memory.store.ts";
 import { MemoryLangyConversationProjectionRepository } from "../../../../repositories/memory/memory.langy-conversation-projection.repository.ts";
-import { MemoryLangyConversationPullRequestsRepository } from "../../../../repositories/memory/memory.langy-conversation-pull-requests.repository.ts";
+import { MemoryLangyPullRequestRepository } from "../../../../repositories/memory/memory.langy-pull-request.repository.ts";
 import { MemoryLangyTurnAdmissionRepository } from "../../../../repositories/memory/memory.langy-turn-admission.repository.ts";
 import { LANGY_CI_FOLLOW_UPS_IN_A_ROW } from "../../../../rules/langy-ci-follow-up.rules.ts";
 import {
@@ -125,34 +125,34 @@ async function harness({
   followUpsInARow?: number;
 } = {}) {
   const store = LangyMemoryStore.create();
-  const pullRequests = MemoryLangyConversationPullRequestsRepository.create(store);
+  const pullRequests = MemoryLangyPullRequestRepository.create(store);
   const conversations = MemoryLangyConversationProjectionRepository.create(store);
   const admission = MemoryLangyTurnAdmissionRepository.create(store);
-  const seedPullRequests = (inARow: number) =>
-    pullRequests.store(
+  const seedConversation = (inARow: number) =>
+    conversations.store(
       projection({
-        PullRequests: openedInProjectOf
-          ? [{ repositoryFullName: "acme/agent", prNumber: 12, linkedAt: 0 }]
-          : [],
-        FollowUpsInARow: inARow,
+        ...initLangyConversationState(),
+        ConversationId: CONVERSATION_ID,
+        UserId: "user-1",
+        CiFollowUpsInARow: inARow,
         CreatedAt: 1,
         UpdatedAt: 1,
         LastEventOccurredAt: 1,
       }),
       at,
     );
-  await seedPullRequests(followUpsInARow);
-  await conversations.store(
-    projection({
-      ...initLangyConversationState(),
-      ConversationId: CONVERSATION_ID,
-      UserId: "user-1",
-      CreatedAt: 1,
-      UpdatedAt: 1,
-      LastEventOccurredAt: 1,
-    }),
-    at,
-  );
+  await seedConversation(followUpsInARow);
+  if (openedInProjectOf) {
+    await pullRequests.append(
+      {
+        ConversationId: CONVERSATION_ID,
+        PullRequests: [{ repositoryFullName: "acme/agent", prNumber: 12 }],
+        OpenedAt: 0,
+        SourceEventId: "evt-answer",
+      },
+      at,
+    );
+  }
   const turns = new AdmittedTurns(admission);
   const counted: string[] = [];
   const service = LangyCiFollowUpService.create({
@@ -171,7 +171,7 @@ async function harness({
     },
     turns,
   });
-  return { turns, service, counted, admission, seedPullRequests };
+  return { turns, service, counted, admission, seedConversation };
 }
 
 const textOf = (input: StartConversationTurnInput) => {
@@ -234,10 +234,10 @@ describe("LangyCiFollowUpService", () => {
     });
 
     it("starts no second turn for the same commit once its follow-up was counted", async () => {
-      const { turns, service, seedPullRequests } = await harness();
+      const { turns, service, seedConversation } = await harness();
 
       await service.handleChecksCompleted(checks());
-      await seedPullRequests(1);
+      await seedConversation(1);
       await service.handleChecksCompleted(checks());
 
       expect(turns.started).toHaveLength(1);

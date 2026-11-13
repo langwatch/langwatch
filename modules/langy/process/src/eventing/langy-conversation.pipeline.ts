@@ -23,13 +23,12 @@ import type {
 
 import type { LangyModule } from "../app/langy.app.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
-import type { LangyConversationPullRequestsData } from "../rules/langy-ci-follow-up.rules.ts";
+import type { LangyPullRequestsOpenedRecord } from "../rules/langy-ci-follow-up.rules.ts";
 import {
   LangyAnalyticsEventMapProjection,
   type LangyAnalyticsEventProjectionRecord,
 } from "./langy-analytics-event.projection.ts";
 import { LANGY_CONVERSATION_PROCESS_NAME } from "./langy-conversation-process.schemas.ts";
-import { LangyConversationPullRequestsFoldProjection } from "./langy-conversation-pull-requests.projection.ts";
 import {
   LangyConversationStateFoldProjection,
   LangyConversationStartedEventSchema,
@@ -84,6 +83,7 @@ import {
 } from "./langy-conversation.intent.ts";
 import { langyConversationProcess } from "./langy-conversation.process.ts";
 import { LangyMessageOperationalMapProjection } from "./langy-message-operational.projection.ts";
+import { LangyPullRequestsMapProjection } from "./langy-pull-requests.projection.ts";
 
 export interface LangyConversationProcessingPipelineDeps {
   langyConversationProjectionStore: StateProjectionStore<LangyConversationStateData>;
@@ -93,8 +93,8 @@ export interface LangyConversationProcessingPipelineDeps {
    * state (status, answer parts, tool-call lifecycle) for one-read rendering.
    */
   langyConversationTurnProjectionStore: StateProjectionStore<LangyConversationTurnData>;
-  /** The pull requests each conversation opened, for CI to find the conversation to wake. */
-  langyConversationPullRequestsProjectionStore: StateProjectionStore<LangyConversationPullRequestsData>;
+  /** One row per pull request Langy opened, for CI to find the conversation to wake. */
+  langyPullRequestStore: AppendStore<LangyPullRequestsOpenedRecord>;
   langyMessageProjectionStore: AppendStore<LangyMessageProjectionRecord>;
   /** Content-free event-grain ClickHouse analytics; never an operational read. */
   langyAnalyticsEventProjectionStore: AppendStore<LangyAnalyticsEventProjectionRecord>;
@@ -168,15 +168,13 @@ export function buildLangyConversationPipeline(
         store: deps.langyConversationTurnProjectionStore,
       }),
     )
-    .withPostgresProjection(
-      LangyConversationPullRequestsFoldProjection.create({
-        store: deps.langyConversationPullRequestsProjectionStore,
-      }),
-    )
     .withClickHouseMapProjection(
       LangyMessageOperationalMapProjection.create({
         store: deps.langyMessageProjectionStore,
       }),
+    )
+    .withClickHouseMapProjection(
+      LangyPullRequestsMapProjection.create({ store: deps.langyPullRequestStore }),
     )
     .withClickHouseMapProjection(
       LangyAnalyticsEventMapProjection.create({

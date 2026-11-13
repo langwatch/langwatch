@@ -1,33 +1,84 @@
 /**
  * The PR cap is the only thing standing between a runaway worker (bad skill, prompt-injected pull)
- * and a user's GitHub account getting flagged for abuse. It counts pull requests that opened.
+ * and a user's GitHub account getting flagged for abuse. It counts the pull requests Langy opened,
+ * one row each in the read model, by the day they opened.
  * @vitest-environment node
  */
+import { createTenantId } from "@langwatch/eventing";
+import { initLangyConversationState } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { LangyGithubPrCountMemoryRepository } from "../../../../repositories/memory/memory.langy-github-pr-count.repository.ts";
-import {
-  type LangyGithubPrCountRedis,
-  LangyGithubPrCountRedisRepository,
-} from "../../../../repositories/redis/redis.langy-github-pr-count.repository.ts";
+import { LangyMemoryStore } from "../../../../repositories/memory/langy-memory.store.ts";
+import { MemoryLangyConversationProjectionRepository } from "../../../../repositories/memory/memory.langy-conversation-projection.repository.ts";
+import { MemoryLangyPullRequestRepository } from "../../../../repositories/memory/memory.langy-pull-request.repository.ts";
 import { LangyGithubPrQuotaService } from "../langy-github-pr-quota.service.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const PROJECT_ID = "project-1";
 
-function memoryQuota() {
-  return LangyGithubPrQuotaService.create({ counts: LangyGithubPrCountMemoryRepository.create() });
+async function harness() {
+  const store = LangyMemoryStore.create();
+  const conversations = MemoryLangyConversationProjectionRepository.create(store);
+  const pullRequests = MemoryLangyPullRequestRepository.create(store);
+  const quota = LangyGithubPrQuotaService.create({ pullRequests });
+  let answers = 0;
+
+  /** One answer in a conversation of `userId` that opened these pull requests of "acme/a". */
+  const opened = async ({
+    userId,
+    numbers,
+    at,
+    conversationId = `conv-${userId}`,
+  }: {
+    userId: string;
+    numbers: number[];
+    at: number;
+    conversationId?: string;
+  }) => {
+    const context = { tenantId: createTenantId(PROJECT_ID), aggregateId: conversationId };
+    await conversations.store(
+      {
+        state: {
+          ...initLangyConversationState(),
+          ConversationId: conversationId,
+          UserId: userId,
+          CreatedAt: at,
+          UpdatedAt: at,
+          LastEventOccurredAt: at,
+        },
+        cursor: { acceptedAt: at, eventId: `evt-${conversationId}` },
+        occurredAt: at,
+        createdAt: at,
+        updatedAt: at,
+        version: "test",
+      },
+      context,
+    );
+    answers += 1;
+    await pullRequests.append(
+      {
+        ConversationId: conversationId,
+        PullRequests: numbers.map((prNumber) => ({ repositoryFullName: "acme/a", prNumber })),
+        OpenedAt: at,
+        SourceEventId: `evt-answer-${answers}`,
+      },
+      context,
+    );
+  };
+
+  return { quota, opened };
 }
 
 describe("LangyGithubPrQuotaService", () => {
   describe("given three pull requests opened today", () => {
     /** @scenario "The daily cap counts pull requests that opened, not turns" */
     it("leaves the rest of the day's cap", async () => {
-      const quota = memoryQuota();
+      const { quota, opened } = await harness();
       const at = nowInstant().epochMilliseconds;
 
-      await quota.recordOpened({ userId: "u1", pullRequests: ["acme/a#1", "acme/a#2"], at });
-      await quota.recordOpened({ userId: "u1", pullRequests: ["acme/b#7"], at });
+      await opened({ userId: "u1", numbers: [1, 2], at });
+      await opened({ userId: "u1", numbers: [7], at, conversationId: "conv-u1-other" });
 
       expect(await quota.usage({ userId: "u1", limit: 20 })).toMatchObject({
         allowed: true,
@@ -36,26 +87,26 @@ describe("LangyGithubPrQuotaService", () => {
     });
   });
 
-  describe("when the same pull request is counted twice", () => {
+  describe("when the answer that opened a pull request is stored twice", () => {
     /** @scenario "Pushing to a pull request already opened does not count again" */
     it("counts it once", async () => {
-      const quota = memoryQuota();
+      const { quota, opened } = await harness();
       const at = nowInstant().epochMilliseconds;
 
-      await quota.recordOpened({ userId: "u1", pullRequests: ["acme/a#1"], at });
-      await quota.recordOpened({ userId: "u1", pullRequests: ["acme/a#1"], at });
+      await opened({ userId: "u1", numbers: [1], at });
+      await opened({ userId: "u1", numbers: [1], at });
 
       expect((await quota.usage({ userId: "u1", limit: 20 })).remaining).toBe(19);
     });
   });
 
   describe("given the per-day maximum already opened", () => {
-    it("refuses until the day rolls over", async () => {
-      const quota = memoryQuota();
+    /** @scenario "The API process counts the daily pull-request cap from the pull requests Langy opened" */
+    it("refuses the person until the day rolls over, and only that person", async () => {
+      const { quota, opened } = await harness();
       const at = nowInstant().epochMilliseconds;
-      const pullRequests = Array.from({ length: 20 }, (_, n) => `acme/a#${n + 1}`);
 
-      await quota.recordOpened({ userId: "u1", pullRequests, at });
+      await opened({ userId: "u1", numbers: Array.from({ length: 20 }, (_, n) => n + 1), at });
 
       const usage = await quota.usage({ userId: "u1", limit: 20 });
       expect(usage).toMatchObject({ allowed: false, remaining: 0 });
@@ -66,52 +117,29 @@ describe("LangyGithubPrQuotaService", () => {
 
   describe("given pull requests opened yesterday", () => {
     it("does not count them against today", async () => {
-      const quota = memoryQuota();
+      const { quota, opened } = await harness();
       const yesterday = nowInstant().epochMilliseconds - DAY_MS;
-      const pullRequests = Array.from({ length: 20 }, (_, n) => `acme/a#${n + 1}`);
 
-      await quota.recordOpened({ userId: "u1", pullRequests, at: yesterday });
+      await opened({
+        userId: "u1",
+        numbers: Array.from({ length: 20 }, (_, n) => n + 1),
+        at: yesterday,
+      });
 
       expect((await quota.usage({ userId: "u1", limit: 20 })).allowed).toBe(true);
     });
   });
-});
 
-describe("LangyGithubPrQuotaService on Redis", () => {
-  const scard = vi.fn<(key: string) => Promise<number>>();
-  const sadd = vi.fn<(key: string, ...members: string[]) => Promise<number>>();
-  const expire = vi.fn<(key: string, seconds: number) => Promise<number>>();
-  const redis: LangyGithubPrCountRedis = { scard, sadd, expire };
-  const quota = LangyGithubPrQuotaService.create({
-    counts: LangyGithubPrCountRedisRepository.create({ redis }),
-  });
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  describe("when the API process composed a Redis connection", () => {
-    /** @scenario "The API process meters the daily pull-request cap on its own Redis" */
-    it("keeps each user's pull requests in their own day bucket, with a two-day lifetime", async () => {
-      sadd.mockResolvedValue(1);
-      expire.mockResolvedValue(1);
-      const at = nowInstant().epochMilliseconds;
-
-      await quota.recordOpened({ userId: "u1", pullRequests: ["acme/a#1"], at });
-      await quota.recordOpened({ userId: "u2", pullRequests: ["acme/a#2"], at });
-
-      const keys = sadd.mock.calls.map(([key]) => key);
-      expect(keys[0]).toMatch(/^langy:gh:prs-opened:u1:\d+$/);
-      expect(keys[1]).toMatch(/^langy:gh:prs-opened:u2:\d+$/);
-      expect(sadd).toHaveBeenCalledWith(keys[0], "acme/a#1");
-      expect(expire).toHaveBeenCalledWith(keys[0], 60 * 60 * 24 * 2);
-    });
-  });
-
-  describe("when the counter cannot be reached at all", () => {
+  describe("when the read model cannot be read at all", () => {
     /** @scenario "A deployment with no counter never denies a pull request" */
     it("allows the pull request", async () => {
-      scard.mockRejectedValue(new Error("no redis connection"));
+      const quota = LangyGithubPrQuotaService.create({
+        pullRequests: {
+          countOpenedSince: async () => {
+            throw new Error("no database connection");
+          },
+        },
+      });
 
       const usage = await quota.usage({ userId: "u1", limit: 20 });
 
