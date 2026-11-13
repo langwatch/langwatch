@@ -56,7 +56,7 @@ import {
   type SigningKey,
   type VerifyBraidSignatureInput,
 } from "@langwatch/api-key-contract";
-import { PermissionDeniedError } from "@langwatch/authorization";
+import { ImpersonationCannotMintCredentialError } from "@langwatch/authorization";
 import { AuthzApi, newAuthzGrantId } from "@langwatch/authz-contract";
 import { ConfigParseError } from "@langwatch/config";
 import { createLogger } from "@langwatch/observability";
@@ -701,11 +701,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
   ): Promise<{ token: string; apiKey: ApiKey; assignedToUserId: string | null }> {
     // An operator acting as a member holds no grant to issue credentials as them.
     if (by.impersonatorId) {
-      throw new PermissionDeniedError({
-        permission: "organization:view",
-        scope: { type: "organization", id: input.organizationId },
-        denialReason: "no-grant",
-      });
+      throw new ImpersonationCannotMintCredentialError();
     }
     await this.#ensureMember(input.organizationId, by);
     const isService = input.keyType === "service";
@@ -777,11 +773,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
     by: ApiKeyCaller,
   ): Promise<{ token: string; apiKey: ApiKey }> {
     if (by.impersonatorId) {
-      throw new PermissionDeniedError({
-        permission: "organization:view",
-        scope: { type: "organization", id: input.organizationId },
-        denialReason: "no-grant",
-      });
+      throw new ImpersonationCannotMintCredentialError();
     }
     await this.#ensureMember(input.organizationId, by);
     const callerIsAdmin = await this.#isOrganizationAdmin(input.organizationId, by);

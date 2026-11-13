@@ -59,7 +59,7 @@ export const apiKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof apiKey
     .handle(({ app, input, actor }) => app.listKeys(input, { id: actor.id }))
 
     .procedure("create")
-    .mintsCredential("organization:view")
+    .mintsCredential()
     .noPermission({
       reason: OWN_KEYS_REASON,
       allow: MEMBER_ONLY,
@@ -99,7 +99,7 @@ export const apiKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof apiKey
     })
 
     .procedure("rotate")
-    .mintsCredential("organization:view")
+    .mintsCredential()
     .noPermission({
       reason: OWN_KEYS_REASON,
       allow: MEMBER_ONLY,
@@ -142,7 +142,7 @@ export const apiKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof apiKey
     .procedure("mintDocsSessionKey")
     .refusedOnAggregate()
     .withMiddlewareContext(browserSessionWindowContext)
-    .mintsCredential("project:view")
+    .mintsCredential()
     .withPermission("project:view", { via: "projectId" })
     .handle(({ app, input, actor }, browserSession) =>
       app.mintDocsSessionKey({

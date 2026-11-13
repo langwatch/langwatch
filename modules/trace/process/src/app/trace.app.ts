@@ -1090,6 +1090,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       evaluations: setup.channels.evaluations,
       anchors: traceAnchors,
       commands,
+      logger: createLogger("langwatch:trace:evaluation-outcomes"),
     });
     app.#processing = TraceProcessingRuntimeAdapter.create({
       role,

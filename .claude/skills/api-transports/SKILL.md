@@ -71,7 +71,7 @@ anything; the process mounts every installed module's declarations.
    `{ at: "organization" }` asks at the organization. A credential bound by the module is a typed
    door: `defineRestDoor(credential, { needs, identify })`, bound with `.withDoors({...})` keyed by the
    routes' credentials (a route naming a credential nobody bound refuses the boot; `packages/api/src/rest/door.ts`).
-   An endpoint that mints a key, token or secret declares `.mintsCredential(permission)` and is
+   An endpoint that mints a key, token or secret declares `.mintsCredential()` and is
    refused while the actor carries an impersonator. `optionalCredential({ reason, refused: "anonymous" })`
    answers a credential the door refuses as no caller. If none fits, extend `packages/api` and the
    door (`modules/auth/process/src/services/api-door.service.ts`), with a spec scenario in

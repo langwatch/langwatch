@@ -21,7 +21,7 @@ export const signingKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof si
     .handle(({ app, input }) => app.findProjectSigning({ projectId: input.projectId }))
 
     .procedure("create")
-    .mintsCredential("braids:manage")
+    .mintsCredential()
     .withEntitlement("enterprise", { feature: "BRAIDS" })
     .withAudit(ORGANIZATION_OF_PROJECT)
     .withPermission("braids:manage")
@@ -30,7 +30,7 @@ export const signingKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof si
     )
 
     .procedure("rotate")
-    .mintsCredential("braids:manage")
+    .mintsCredential()
     .withEntitlement("enterprise", { feature: "BRAIDS" })
     .withAudit(ORGANIZATION_OF_PROJECT)
     .withPermission("braids:manage")

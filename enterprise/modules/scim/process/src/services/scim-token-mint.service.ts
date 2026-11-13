@@ -1,4 +1,4 @@
-import { PermissionDeniedError } from "@langwatch/authorization";
+import { ImpersonationCannotMintCredentialError } from "@langwatch/authorization";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * A SCIM token can push anyone into a directory group and so hand on that group's grants:
@@ -27,11 +27,7 @@ export class ScimTokenMintService {
   }): Promise<void> {
     // An operator acting as a member holds no grant to issue credentials as them (F05).
     if (by.impersonatorId) {
-      throw new PermissionDeniedError({
-        permission: "sso:manage",
-        scope: { type: "organization", id: organizationId },
-        denialReason: "no-grant",
-      });
+      throw new ImpersonationCannotMintCredentialError();
     }
     const missing = await this.authz.findPermissionsBeyondCaller({
       organizationId,
