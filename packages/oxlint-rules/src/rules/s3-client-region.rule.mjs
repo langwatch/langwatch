@@ -124,17 +124,17 @@ export const s3ClientRegionRule = defineRule({
     regionNotShared: {
       what: "This `new S3Client` takes its region from somewhere other than `s3RegionOf`.",
       why: "A hand-picked region drifts per client; one sent `auto` to AWS, which refuses to sign with it.",
-      fix: "Pass `region: s3RegionOf({ region, endpoint })` from `@langwatch/aws-client`, or a `const` bound to that call.",
+      fix: "Pass `region: s3RegionOf({ region, endpoint })` from `@langwatch/aws-client`, or a `const` bound to that call. See the `platform-primitives` skill.",
     },
     missingRegion: {
       what: "This `new S3Client` names no region on at least one path.",
       why: "With no region the SDK guesses from the process environment, not from the configured endpoint.",
-      fix: "Pass `region: s3RegionOf({ region, endpoint })` from `@langwatch/aws-client` on every path.",
+      fix: "Pass `region: s3RegionOf({ region, endpoint })` from `@langwatch/aws-client` on every path. See the `platform-primitives` skill.",
     },
     unreadableOptions: {
       what: "This `new S3Client` gets options the rule cannot read, so it cannot see their region.",
       why: "A region hidden behind a parameter or a mutable binding escapes the one shared region rule.",
-      fix: "Build the options inline or in a `const` here, with `region: s3RegionOf({ region, endpoint })`.",
+      fix: "Build the options inline or in a `const` here, with `region: s3RegionOf({ region, endpoint })`. See the `platform-primitives` skill.",
     },
   },
   create(context) {
