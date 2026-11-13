@@ -124,6 +124,8 @@ Feature: The Braids screen
       When ana opens Braids
       Then the row shows the reader, the condition, the start date, the end date and the braided spans over the last 24 hours
       And its menu offers Edit, View in audit log and Remove braid
+      And View in audit log names both projects, never the braid's grant id
+      And the row says when the braid was created apart from the spans it shows
 
     @unit
     Scenario: Two braids on one pair from the same day show their start times
@@ -135,6 +137,12 @@ Feature: The Braids screen
     Scenario: A link opens the Braids page on its Signing keys tab
       When a link names the Signing keys tab of another project's Braids page
       Then the project switch opens that project and the page lands on Signing keys
+
+    @integration
+    Scenario: The header's main action follows the open tab
+      Given ana may create braids
+      When ana opens the Signing keys tab
+      Then the header no longer offers New braid, since the tab offers New signing key itself
 
     @integration
     Scenario: Removing a braid says what stops before it happens
@@ -187,4 +195,4 @@ Feature: The Braids screen
       And the organisation has left Enterprise
       When ana opens Braids
       Then a banner says braids are paused and start again on upgrade
-      And each braid row is marked paused
+      And each braid row is marked paused once, where its activity would be

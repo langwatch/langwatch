@@ -157,8 +157,8 @@ describe("given the Braids page mounts the signing keys panel by its token", () 
       const active = within(screen.getByTestId("signing-key-row-key-1"));
       expect(active.getByText("Production")).toBeInTheDocument();
       expect(active.getByText("Active")).toBeInTheDocument();
-      expect(active.getByText(`${(18204).toLocaleString()} passed`)).toBeInTheDocument();
-      expect(active.getByText("3 failed")).toBeInTheDocument();
+      expect(active.getByText(/passed$/)).toHaveTextContent(/^18\.2K passed$/);
+      expect(active.getByText(/failed$/)).toHaveTextContent(/^3 failed$/);
 
       const verifying = within(screen.getByTestId("signing-key-row-key-2"));
       expect(verifying.getByText(/Verifying until/)).toBeInTheDocument();

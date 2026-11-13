@@ -9,6 +9,7 @@ import {
   auditClient,
   auditDayHeading,
   auditDayLabel,
+  auditEntryPhrase,
   auditFeedDays,
   groupAuditRuns,
 } from "../audit-log-rows.ts";
@@ -25,6 +26,26 @@ describe("given a recorded action slug", () => {
     ["routingPolicy.personalContext", "Routing policy personal context"],
   ])("reads %s as %s", (action, phrase) => {
     expect(auditActionPhrase(action)).toBe(phrase);
+  });
+});
+
+describe("given a row whose target is a braid", () => {
+  /** @scenario A braid's entries read as braid changes */
+  it.each([
+    ["authz.grants.attach", "Created braid"],
+    ["authz.grants.revoke", "Removed braid"],
+  ])("reads %s as %s", (action, phrase) => {
+    expect(auditEntryPhrase({ action, targetKind: "braid" })).toBe(phrase);
+  });
+
+  /** @scenario A braid's entries read as braid changes */
+  it("keeps the grant wording on any other target", () => {
+    expect(auditEntryPhrase({ action: "authz.grants.attach", targetKind: "role_binding" })).toBe(
+      "Attached grant",
+    );
+    expect(auditEntryPhrase({ action: "authz.grants.attach", targetKind: null })).toBe(
+      "Attached grant",
+    );
   });
 });
 

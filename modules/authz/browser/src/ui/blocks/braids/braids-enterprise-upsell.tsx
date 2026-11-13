@@ -39,6 +39,8 @@ export function BraidsEnterpriseUpsell() {
       <Stack gap={5}>
         <Box
           maxWidth="640px"
+          width="full"
+          marginX="auto"
           borderWidth="1px"
           borderColor="border.muted"
           borderRadius="lg"

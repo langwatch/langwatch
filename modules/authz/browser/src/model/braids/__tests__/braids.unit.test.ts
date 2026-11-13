@@ -97,8 +97,19 @@ describe("what the viewer may do", () => {
 });
 
 describe("braidAuditHref", () => {
-  it("opens the audit log on the braid as its target", () => {
-    expect(braidAuditHref("grant_1")).toBe("/settings/audit-log?targetKind=braid&targetId=grant_1");
+  it("opens the audit log on the braid, labelled by its two projects", () => {
+    const href = braidAuditHref({
+      braidId: "rolebinding_1",
+      ownerName: "payments-agent",
+      readerName: "checkout-web",
+    });
+    const query = new URLSearchParams(href.split("?")[1]);
+    expect(href.startsWith("/settings/audit-log?")).toBe(true);
+    expect(Object.fromEntries(query)).toEqual({
+      targetKind: "braid",
+      targetId: "rolebinding_1",
+      targetLabel: "payments-agent → checkout-web",
+    });
   });
 });
 

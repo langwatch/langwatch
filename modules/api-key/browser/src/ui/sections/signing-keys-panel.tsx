@@ -11,21 +11,13 @@ import type { SnippetCopy } from "@langwatch/design-system/code-preview";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { EmptyValue } from "@langwatch/design-system/empty-value";
 import { FormattedDate } from "@langwatch/design-system/formatted-date";
+import { FormattedNumber } from "@langwatch/design-system/formatted-number";
 import { MoreVerticalIcon } from "@langwatch/design-system/icons";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import {
-  Alert,
-  Badge,
-  Box,
-  Button,
-  Heading,
-  HStack,
-  Spacer,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Alert, Badge, Button, Text, VStack } from "@langwatch/design-system/primitives";
+import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Key, Plus } from "lucide-react";
 import { useState } from "react";
@@ -99,9 +91,11 @@ function SigningKeyTableRow({
       </ListTable.Cell>
       <ListTable.Cell nowrap>
         <VStack gap={0} align="start">
-          <Text textStyle="sm">{signingKey.passed24h.toLocaleString()} passed</Text>
+          <Text textStyle="sm">
+            <FormattedNumber value={signingKey.passed24h} /> passed
+          </Text>
           <Text textStyle="sm" color={signingKey.failed24h > 0 ? "fg.error" : "fg.muted"}>
-            {signingKey.failed24h.toLocaleString()} failed
+            <FormattedNumber value={signingKey.failed24h} /> failed
           </Text>
         </VStack>
       </ListTable.Cell>
@@ -135,34 +129,29 @@ function SigningKeyTableRow({
   );
 }
 
-function SigningKeysHeading({ canManage, onCreate }: { canManage: boolean; onCreate: () => void }) {
+function NewSigningKeyButton({
+  canManage,
+  onCreate,
+}: {
+  canManage: boolean;
+  onCreate: () => void;
+}) {
   return (
-    <HStack width="full" align="start" gap={4}>
-      <Box>
-        <Heading size="sm" as="h3">
-          Signing keys
-        </Heading>
-        <Text color="fg.muted" fontSize="sm">
-          Sign the tags on this project&apos;s calls so projects that braid into it can trust them.
-        </Text>
-      </Box>
-      <Spacer />
-      <Tooltip
-        content="Whoever may braid out of this project manages its signing keys."
-        disabled={canManage}
+    <Tooltip
+      content="Whoever may braid out of this project manages its signing keys."
+      disabled={canManage}
+    >
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={onCreate}
+        disabled={!canManage}
+        data-testid="signing-key-new"
       >
-        <Button
-          size="sm"
-          colorPalette="orange"
-          onClick={onCreate}
-          disabled={!canManage}
-          data-testid="signing-key-new"
-        >
-          <Plus size={14} aria-hidden />
-          New signing key
-        </Button>
-      </Tooltip>
-    </HStack>
+        <Plus size={14} aria-hidden />
+        New signing key
+      </Button>
+    </Tooltip>
   );
 }
 
@@ -302,46 +291,54 @@ export function SigningKeysPanel({ projectId }: SigningKeysPanelProps) {
   }
 
   return (
-    <VStack gap={4} align="stretch" data-testid="signing-keys-panel">
-      <SigningKeysHeading canManage={canManage} onCreate={() => setCreating(true)} />
-      {needsEnterprise && (
-        <AccessState
-          kind="upgrade"
-          compact
-          title="Signing keys come with the Enterprise plan"
-          description="Upgrade to sign the tags on your calls, so projects that braid into this one can trust them."
-          data-testid="signing-keys-upsell"
-        />
-      )}
-      {body}
+    <SettingsSection
+      icon={<Key size={18} />}
+      title="Signing keys"
+      hint="Sign the tags on this project's calls so projects that braid into it can trust them."
+      actions={<NewSigningKeyButton canManage={canManage} onCreate={() => setCreating(true)} />}
+      divided={false}
+      data-testid="signing-keys-panel"
+    >
+      <VStack gap={4} align="stretch">
+        {needsEnterprise && (
+          <AccessState
+            kind="upgrade"
+            compact
+            title="Signing keys come with the Enterprise plan"
+            description="Upgrade to sign the tags on your calls, so projects that braid into this one can trust them."
+            data-testid="signing-keys-upsell"
+          />
+        )}
+        {body}
 
-      <CreateSigningKeyDialog
-        key={createRound}
-        open={creating}
-        creating={create.isPending}
-        onClose={() => setCreating(false)}
-        onCreate={onCreate}
-      />
-      <ConfirmDialog
-        open={pending?.kind === "rotate"}
-        onClose={() => setPending(null)}
-        onConfirm={() => pending && onConfirm(pending)}
-        title={`Rotate "${pending?.key.name ?? ""}"?`}
-        confirmLabel="Rotate key"
-        loading={rotate.isPending}
-        description="You get a new key, shown once. The old one keeps verifying for 7 days, so you can deploy the new key without dropping signatures."
-      />
-      <ConfirmDialog
-        open={pending?.kind === "revoke"}
-        onClose={() => setPending(null)}
-        onConfirm={() => pending && onConfirm(pending)}
-        title={`Revoke "${pending?.key.name ?? ""}"?`}
-        confirmLabel="Revoke key"
-        tone="danger"
-        loading={revoke.isPending}
-        description="The key stops working at once. Spans signed with it stop being marked verified within a minute."
-      />
-      <SigningKeySecretDialog issued={issued} copy={copy} onClose={() => setIssued(null)} />
-    </VStack>
+        <CreateSigningKeyDialog
+          key={createRound}
+          open={creating}
+          creating={create.isPending}
+          onClose={() => setCreating(false)}
+          onCreate={onCreate}
+        />
+        <ConfirmDialog
+          open={pending?.kind === "rotate"}
+          onClose={() => setPending(null)}
+          onConfirm={() => pending && onConfirm(pending)}
+          title={`Rotate "${pending?.key.name ?? ""}"?`}
+          confirmLabel="Rotate key"
+          loading={rotate.isPending}
+          description="You get a new key, shown once. The old one keeps verifying for 7 days, so you can deploy the new key without dropping signatures."
+        />
+        <ConfirmDialog
+          open={pending?.kind === "revoke"}
+          onClose={() => setPending(null)}
+          onConfirm={() => pending && onConfirm(pending)}
+          title={`Revoke "${pending?.key.name ?? ""}"?`}
+          confirmLabel="Revoke key"
+          tone="danger"
+          loading={revoke.isPending}
+          description="The key stops working at once. Spans signed with it stop being marked verified within a minute."
+        />
+        <SigningKeySecretDialog issued={issued} copy={copy} onClose={() => setIssued(null)} />
+      </VStack>
+    </SettingsSection>
   );
 }

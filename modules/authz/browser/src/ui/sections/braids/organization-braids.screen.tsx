@@ -6,13 +6,14 @@
 
 import { Link } from "@langwatch/browser-host/link";
 import { Banner } from "@langwatch/design-system/banner";
+import { FeatureMark } from "@langwatch/design-system/feature-mark";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Box, Button, Skeleton, Stack } from "@langwatch/design-system/primitives";
 import { SettingsField } from "@langwatch/design-system/settings-field";
 import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { Switch } from "@langwatch/design-system/switch";
-import { ShieldCheck, Waypoints } from "lucide-react";
+import { BookOpen, ShieldCheck } from "lucide-react";
 
 import {
   useBraidsPolicy,
@@ -34,6 +35,7 @@ function OrganizationBraidsHeader() {
       actions={
         <PageLayout.HeaderButton asChild>
           <Link href={BRAIDS_GUIDE_HREF} isExternal>
+            <BookOpen size={14} aria-hidden />
             How braids work
           </Link>
         </PageLayout.HeaderButton>
@@ -105,7 +107,7 @@ function OrganizationBraidsList({
   return (
     <NoDataInfoBlock
       size="inline"
-      icon={<Waypoints size={24} />}
+      icon={<FeatureMark feature="braids" size={24} variant="mono" />}
       title="No braids yet"
       description="When a project braids its spans into another, the braid is listed here."
       docsHref={BRAIDS_GUIDE_HREF}
@@ -157,7 +159,7 @@ export default function OrganizationBraidsScreen() {
           isReading={policy.isLoading}
         />
         <SettingsSection
-          icon={<Waypoints size={18} />}
+          icon={<FeatureMark feature="braids" size={18} variant="mono" />}
           title="Braids in this organisation"
           hint="Each braid shows a project's matching spans inside another project's traces."
           data-testid="organization-braids"

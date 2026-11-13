@@ -293,6 +293,22 @@ describe("given a plan that lacks Enterprise", () => {
       ]);
     });
 
+    /** @scenario "A branded feature's entries wear its mark" */
+    it("marks both Braids entries as the braids feature", () => {
+      const braids = settingsMenu({
+        ...EVERYTHING_CLOSED,
+        enterprisePlan: "locked",
+        hasPermission: () => true,
+        hasOrganizationPermission: () => true,
+      })
+        .flatMap((group) => group.items)
+        .filter((item) => item.label === "Braids");
+      expect(braids.map((item) => [item.href, item.feature])).toEqual([
+        ["/settings/organization-braids", "braids"],
+        ["/settings/braids", "braids"],
+      ]);
+    });
+
     /** @scenario "A plan without Enterprise sees its entries locked" */
     it("still hides an entry the reader lacks the permission for", () => {
       expect(lockedHrefsIn({})).toEqual(["/settings/roles", "/settings/braids"]);

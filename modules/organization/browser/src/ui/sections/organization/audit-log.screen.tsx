@@ -41,6 +41,7 @@ import {
   auditBackLink,
   type AuditProjectFilter,
   auditProjectFilterIn,
+  auditTargetChipText,
   matchMemberId,
   searchMatchesNobody,
   readAuditPaging,
@@ -422,7 +423,7 @@ export default function AuditLogScreen() {
     searchUserId && userSearch ? `user ${userSearch}` : null,
     actionFilter ? `action ${actionFilter}` : null,
     selectedProjectId ? `project ${projectLabel(selectedProjectId)}` : null,
-    target ? `${target.targetKind} ${target.targetId}` : null,
+    target ? auditTargetChipText(target) : null,
   ]
     .filter(Boolean)
     .join(", ");
@@ -473,7 +474,7 @@ export default function AuditLogScreen() {
               onClick={() => host.setQuery(withoutAuditTarget(query))}
               title="Clear target filter"
             >
-              {target.targetKind} = {target.targetId.slice(0, 24)}… ×
+              {auditTargetChipText(target)} ×
             </Badge>
           )}
         </VStack>

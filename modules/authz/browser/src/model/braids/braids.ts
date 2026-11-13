@@ -181,9 +181,21 @@ export function braidFromText({ fromMs, showsTime }: { fromMs: number; showsTime
   return `From ${format(fromMs, showsTime ? "d MMM yyyy, HH:mm" : "d MMM yyyy")}`;
 }
 
-/** Where the audit log opens on one braid's history: its entries name the braid as target. */
-export function braidAuditHref(braidId: string): string {
-  const query = new URLSearchParams({ targetKind: BRAID_AUDIT_TARGET_KIND, targetId: braidId });
+/** Where the audit log opens on one braid's history, its chip naming both projects. */
+export function braidAuditHref({
+  braidId,
+  ownerName,
+  readerName,
+}: {
+  braidId: string;
+  ownerName: string;
+  readerName: string;
+}): string {
+  const query = new URLSearchParams({
+    targetKind: BRAID_AUDIT_TARGET_KIND,
+    targetId: braidId,
+    targetLabel: `${ownerName} → ${readerName}`,
+  });
   return `/settings/audit-log?${query.toString()}`;
 }
 

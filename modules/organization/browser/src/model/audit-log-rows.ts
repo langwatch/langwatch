@@ -1,5 +1,6 @@
 /** How the audit feed reads its rows: a verb phrase per action, an actor per row, runs grouped. */
 
+import { BRAID_AUDIT_TARGET_KIND } from "@langwatch/authz-contract";
 import type { EnrichedAuditLog } from "@langwatch/organization-contract";
 import { format, isSameCalendarDay, subDays, type TimeInput } from "@langwatch/time";
 
@@ -95,6 +96,31 @@ export function auditActionPhrase(action: string): string {
   }
   if (verbWords.length === 1 && last.endsWith("ed")) return sentence([last, ...noun]);
   return sentence([...noun, ...verbWords]);
+}
+
+/** A braid's grant verbs as the braid's own; any other braid action keeps its generic phrase. */
+const BRAID_PHRASES: Readonly<Record<string, string>> = {
+  attach: "Created braid",
+  create: "Created braid",
+  update: "Changed braid",
+  revoke: "Removed braid",
+  detach: "Removed braid",
+  remove: "Removed braid",
+};
+
+/** An entry's phrase: braid wording when its target is a braid, `auditActionPhrase` otherwise. */
+export function auditEntryPhrase({
+  action,
+  targetKind,
+}: {
+  action: string;
+  targetKind: string | null | undefined;
+}): string {
+  if (targetKind === BRAID_AUDIT_TARGET_KIND) {
+    const phrase = BRAID_PHRASES[action.split(".").at(-1) ?? ""];
+    if (phrase) return phrase;
+  }
+  return auditActionPhrase(action);
 }
 
 type ActorFields = Pick<

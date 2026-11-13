@@ -169,7 +169,7 @@ export default function BraidsScreen() {
   if (planState === "upsell") {
     return (
       <>
-        <BraidsHeader actions={<GuideLink />} projectName={projectName} />
+        <BraidsHeader projectName={projectName} />
         <Box paddingTop={4}>
           <BraidsEnterpriseUpsell />
         </Box>
@@ -189,6 +189,7 @@ export default function BraidsScreen() {
     <>
       <BraidsTable
         side={side}
+        projectName={projectName}
         rows={side === "into" ? rows.into : rows.from}
         paused={paused}
         canEdit={can.canEditInto}
@@ -212,7 +213,10 @@ export default function BraidsScreen() {
         actions={
           <>
             <GuideLink />
-            {can.canCreate ? <NewBraidButton onOpen={() => openBraid("new")} /> : null}
+            {/* The header's primary action follows the tab; Signing keys carries its own. */}
+            {can.canCreate && tab !== "keys" ? (
+              <NewBraidButton onOpen={() => openBraid("new")} />
+            ) : null}
           </>
         }
       />

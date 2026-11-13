@@ -5,20 +5,12 @@ import { Link } from "@langwatch/browser-host/link";
 import { MoreVerticalIcon } from "@langwatch/design-system/icons";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
-import { Box, Button, Stack, Text } from "@langwatch/design-system/primitives";
-import { format } from "@langwatch/time";
+import { Box, Button } from "@langwatch/design-system/primitives";
 
-import {
-  type OrganizationBraidRow,
-  braidAuditHref,
-  braidFromText,
-} from "../../../model/braids/braids.ts";
+import { type OrganizationBraidRow, braidAuditHref } from "../../../model/braids/braids.ts";
 import { BraidCondition } from "../../elements/braid-condition.tsx";
 import { BraidProjectLabel } from "../../elements/braid-project.tsx";
-
-function day(ms: number): string {
-  return format(ms, "d MMM yyyy");
-}
+import { BRAID_WINDOW_HEADER, BraidCreated, BraidWindow } from "../../elements/braid-window.tsx";
 
 export function OrganizationBraidsTable({
   rows,
@@ -38,7 +30,7 @@ export function OrganizationBraidsTable({
           <ListTable.ColumnHeader>From</ListTable.ColumnHeader>
           <ListTable.ColumnHeader>Into</ListTable.ColumnHeader>
           <ListTable.ColumnHeader>Condition</ListTable.ColumnHeader>
-          <ListTable.ColumnHeader>Access</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>{BRAID_WINDOW_HEADER}</ListTable.ColumnHeader>
           <ListTable.ActionHeader />
         </ListTable.Row>
       </ListTable.Header>
@@ -46,7 +38,10 @@ export function OrganizationBraidsTable({
         {rows.map((row) => (
           <ListTable.Row key={row.braidId} data-testid="organization-braid-row">
             <ListTable.Cell>
-              <BraidProjectLabel project={row.owner} detail={`Since ${day(row.createdAtMs)}`} />
+              <BraidProjectLabel
+                project={row.owner}
+                detail={<BraidCreated atMs={row.createdAtMs} />}
+              />
             </ListTable.Cell>
             <ListTable.Cell>
               <BraidProjectLabel project={row.reader} />
@@ -57,15 +52,12 @@ export function OrganizationBraidsTable({
               </Box>
             </ListTable.Cell>
             <ListTable.Cell nowrap>
-              <Stack gap={0.5}>
-                <Text textStyle="sm">
-                  {paused ? "Paused · " : ""}
-                  {braidFromText({ fromMs: row.fromMs, showsTime: row.fromShowsTime })}
-                </Text>
-                <Text textStyle="xs" color="fg.muted">
-                  {row.expiresAtMs === null ? "No end date" : `Until ${day(row.expiresAtMs)}`}
-                </Text>
-              </Stack>
+              <BraidWindow
+                fromMs={row.fromMs}
+                fromShowsTime={row.fromShowsTime}
+                expiresAtMs={row.expiresAtMs}
+                prefix={paused ? "Paused · " : undefined}
+              />
             </ListTable.Cell>
             <ListTable.ActionCell>
               <Menu.Root>
@@ -80,7 +72,15 @@ export function OrganizationBraidsTable({
                 </Menu.Trigger>
                 <Menu.Content>
                   <Menu.Item value="audit" asChild>
-                    <Link href={braidAuditHref(row.braidId)}>View in audit log</Link>
+                    <Link
+                      href={braidAuditHref({
+                        braidId: row.braidId,
+                        ownerName: row.owner.name,
+                        readerName: row.reader.name,
+                      })}
+                    >
+                      View in audit log
+                    </Link>
                   </Menu.Item>
                 </Menu.Content>
               </Menu.Root>

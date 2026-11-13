@@ -1,6 +1,7 @@
 /** Settings navigation as data; model not hook, gates belong to host; shell menu, not page menu */
 
 import type { Hosting } from "@langwatch/browser-host/deployment";
+import type { FeatureName } from "@langwatch/design-system/feature-mark";
 import {
   Activity,
   Anvil,
@@ -12,7 +13,6 @@ import {
   Bug,
   Building2,
   Coins,
-  Combine,
   CreditCard,
   EyeOff,
   Server,
@@ -62,6 +62,8 @@ export interface SettingsMenuItem {
    */
   alsoActiveAt?: string[];
   icon: LucideIcon;
+  /** A branded feature: the sidebar draws its mark in place of `icon`, as its pages do. */
+  feature?: FeatureName;
   /**
    * An Enterprise entry offered to a plan that lacks it: the sidebar shows a lock and "Included
    * in Enterprise", and the page opens on its upsell.
@@ -311,7 +313,12 @@ function accessGroup({
       // Every braid in the organisation and who may braid; the project page is under Project.
       ...(!isLiteMember && hasOrganizationPermission("organization:manage")
         ? enterpriseEntry({
-            item: { label: "Braids", href: "/settings/organization-braids", icon: Combine },
+            item: {
+              label: "Braids",
+              href: "/settings/organization-braids",
+              icon: Waypoints,
+              feature: "braids",
+            },
             enterprisePlan,
           })
         : []),
@@ -382,7 +389,7 @@ function projectGroup({ isLiteMember, enterprisePlan }: SettingsMenuGates): Sett
       { label: "Integrations", href: "/settings/integrations", icon: Blocks },
       ...(!isLiteMember
         ? enterpriseEntry({
-            item: { label: "Braids", href: "/settings/braids", icon: Waypoints },
+            item: { label: "Braids", href: "/settings/braids", icon: Waypoints, feature: "braids" },
             enterprisePlan,
           })
         : []),

@@ -86,14 +86,19 @@ describe("BraidsScreen", () => {
       const row = screen.getByTestId("braid-row");
       expect(within(row).getByText("orchestrator")).toBeInTheDocument();
       expect(within(row).getByText('attributes["orchestrator"] == "web"')).toBeInTheDocument();
-      expect(within(row).getByText("From 1 Oct 2026")).toBeInTheDocument();
-      expect(within(row).getByText("Until 31 Dec 2026")).toBeInTheDocument();
-      expect(within(row).getByTestId("braid-activity")).toHaveTextContent("1,204 spans");
+      expect(within(row).getByTestId("braid-window-from")).toHaveTextContent(/^From .*2026$/);
+      expect(within(row).getByTestId("braid-window-until")).toHaveTextContent(/^Until .*2026$/);
+      expect(within(row).getByText(/^Created/)).toBeInTheDocument();
+      expect(within(row).getByTestId("braid-activity")).toHaveTextContent(/^1\.2K spans$/);
       await openRowMenu();
       expect(await screen.findByRole("menuitem", { name: "Edit" })).toBeInTheDocument();
       expect(screen.getByRole("menuitem", { name: "View in audit log" })).toHaveAttribute(
         "href",
-        "/settings/audit-log?targetKind=braid&targetId=b-1",
+        `/settings/audit-log?${new URLSearchParams({
+          targetKind: "braid",
+          targetId: "b-1",
+          targetLabel: "specialists → orchestrator",
+        }).toString()}`,
       );
       expect(screen.getByRole("menuitem", { name: "Remove braid" })).toBeInTheDocument();
     });
@@ -112,6 +117,16 @@ describe("BraidsScreen", () => {
       await user.click(within(dialog).getByRole("button", { name: "Remove braid" }));
       expect(braidsFake.state.remove).toHaveBeenCalledWith({ projectId: "p-spec", braidId: "b-1" });
       await waitFor(() => expect(host.successes[0]?.title).toBe("Braid removed"));
+    });
+
+    /** @scenario The header's main action follows the open tab */
+    it("offers no New braid in the header on the Signing keys tab", async () => {
+      renderAs({ query: { tab: "keys" } });
+      expect(await screen.findByRole("tab", { name: /Signing keys/ })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      expect(screen.queryByTestId("new-braid-header")).not.toBeInTheDocument();
     });
 
     it("opens on Signing keys when the link names that tab, and writes a picked tab back", async () => {
@@ -193,6 +208,7 @@ describe("BraidsScreen", () => {
       ).toBeInTheDocument();
       expect(screen.queryByRole("tab")).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /New braid/ })).not.toBeInTheDocument();
+      expect(screen.getAllByRole("link", { name: /How braids work/ })).toHaveLength(1);
     });
 
     /** @scenario After leaving Enterprise the page says braids are paused and kept */
@@ -206,7 +222,11 @@ describe("BraidsScreen", () => {
       expect(screen.getByText(/start working again when you upgrade/)).toBeInTheDocument();
       const rows = screen.getAllByTestId("braid-row");
       expect(rows).toHaveLength(2);
-      for (const row of rows) expect(within(row).getByTestId("braid-paused")).toBeInTheDocument();
+      for (const row of rows) {
+        expect(within(row).getAllByText("Paused")).toHaveLength(1);
+        expect(within(row).getByTestId("braid-paused")).toBeInTheDocument();
+        expect(within(row).queryByTestId("braid-activity")).not.toBeInTheDocument();
+      }
       expect(screen.queryByRole("button", { name: /New braid/ })).not.toBeInTheDocument();
     });
   });

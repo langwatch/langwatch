@@ -24,7 +24,7 @@ import { Check, Copy, Globe, KeyRound, Settings, UserX, VenetianMask } from "luc
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import {
-  auditActionPhrase,
+  auditEntryPhrase,
   auditActor,
   auditChangeSummary,
   auditClient,
@@ -136,7 +136,7 @@ export function AuditLogEntry({
           <Box display="flex" flexDirection="column" gap="0.5" minWidth={0}>
             <HStack gap={2} minWidth={0} height="20px">
               <Text textStyle="label" title={log.action} truncate>
-                {auditActionPhrase(log.action)}
+                {auditEntryPhrase({ action: log.action, targetKind: log.targetKind })}
               </Text>
               {log.error && (
                 <Badge size="xs" variant="subtle" colorPalette="red" flexShrink={0} height="18px">
