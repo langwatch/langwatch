@@ -1,4 +1,4 @@
-import type { AuthApi } from "@langwatch/auth-contract";
+import { type AuthApi, IMPERSONATION_WINDOW_MS } from "@langwatch/auth-contract";
 import {
   CannotImpersonateAdminError,
   CannotImpersonateDeactivatedUserError,
@@ -17,14 +17,14 @@ import type {
 } from "../repositories/impersonation.repository.ts";
 import type { AdminAccess } from "./admin-access.service.ts";
 
-const IMPERSONATION_TTL_MS = 60 * 60 * 1_000;
-
 export abstract class AdminAuditSink {
   abstract record(input: {
     userId: string;
     /** The customer organization whose audit log shows the row; absent on operator-only acts. */
     organizationId?: string | undefined;
     action: string;
+    /** What the row is about; auth matches a window's end to its start by the session. */
+    target?: { kind: string; id: string } | undefined;
     args: Record<string, unknown>;
     req: AdminAuditRequest;
   }): Promise<void>;
@@ -101,6 +101,8 @@ export class ImpersonationService {
       target,
     });
 
+    // Taken before the start rows are written, so auth finds them inside the window it reads.
+    const expiresAt = this.now().add({ milliseconds: IMPERSONATION_WINDOW_MS });
     const organizationIds = await this.memberships.organizationIdsForMember({ userId: target.id });
     // One row per organization so each customer reads it in their own audit log.
     for (const organizationId of organizationIds.length > 0 ? organizationIds : [undefined]) {
@@ -108,6 +110,7 @@ export class ImpersonationService {
         userId: input.impersonatorUserId,
         organizationId,
         action: "admin/impersonate",
+        target: { kind: "session", id: input.sessionId },
         args: { userIdToImpersonate: target.id, reason: input.reason },
         req: input.req,
       });
@@ -118,7 +121,7 @@ export class ImpersonationService {
       actorUserId: input.impersonatorUserId,
       subjectUserId: target.id,
       reason: input.reason,
-      expiresAt: this.now().add({ milliseconds: IMPERSONATION_TTL_MS }),
+      expiresAt,
     });
   }
 

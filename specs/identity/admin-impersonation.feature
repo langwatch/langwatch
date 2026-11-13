@@ -81,9 +81,12 @@ Feature: Who an administrator may borrow access from
   #
   # An impersonation reaches a customer's data, so the customer's own audit
   # log says so: every organization the subject belongs to gets the start,
-  # and the end. A window that is stopped is cleared there and then; one
-  # that runs out is found by a scheduled sweep, audited as expired and
-  # cleared, so no window ends without a row.
+  # and the end. A window that is stopped is audited as stopped and cleared
+  # there and then; one that runs out is audited as expired, either by a
+  # scheduled sweep, by a later stop, or by a new window opened over it. Each
+  # window ends with exactly one row per organization that saw its start, and
+  # a customer never reads an end without the start. Windows opened before
+  # start rows named the session end in the operators' own log only.
   @unit
   Scenario: Each organization the target belongs to sees the impersonation start
     Given the target belongs to two organizations
@@ -109,3 +112,30 @@ Feature: Who an administrator may borrow access from
     When the expiry sweep runs
     Then nothing is recorded and the claims stay
 
+  @integration
+  Scenario: A stopped impersonation is recorded as ended for each organization
+    Given a live impersonation window whose start each organization recorded
+    When the operator stops it, and the stop is repeated
+    Then each organization records it as stopped once, with the operator as the actor
+    And the session no longer carries the impersonation claims
+
+  @integration
+  Scenario: A stop after the window ran out records it as expired once
+    Given an impersonation window that passed without a stop
+    When the operator stops it before the expiry sweep runs, and the sweep runs after
+    Then each organization records it as expired once
+
+  @integration
+  Scenario: A new window over a lapsed one records the lapsed one as expired once
+    Given an impersonation window that passed without a stop
+    When the operator starts a new impersonation on the same session, and the sweep runs after
+    Then each organization records the lapsed window as expired once
+    And the session carries the new window
+
+  @integration
+  Scenario: A window opened before customers saw starts ends in the operators' log only
+    Given an impersonation window that passed without a stop, whose start no organization recorded
+    When the expiry sweep runs
+    Then no organization's audit log records its end
+    And one row with no organization records it as expired, with the operator as the actor
+    And the session no longer carries the impersonation claims

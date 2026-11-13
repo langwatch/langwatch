@@ -156,7 +156,7 @@ import { BrowserSessionService } from "../services/browser-session.service.ts";
 import { CredentialRegistrationService } from "../services/credential-registration.service.ts";
 import { CredentialSignInPolicyService } from "../services/credential-sign-in-policy.service.ts";
 import { FederatedAccountReadsService } from "../services/federated-account-reads.service.ts";
-import { ImpersonationExpiryService } from "../services/impersonation-expiry.service.ts";
+import { ImpersonationEndService } from "../services/impersonation-end.service.ts";
 import {
   LegacySsoAccessService,
   type LegacySsoAccessConnections,
@@ -393,23 +393,27 @@ export class AuthModule implements AuthApiContract {
     return this.#sessions.getImpersonation(input);
   }
 
+  /** A lapsed window the session still carries is audited as expired before the new one opens. */
   startImpersonation(
     input: SessionImpersonation & { sessionId: string; reason: string },
   ): Promise<void> {
-    return this.#sessions.startImpersonation(input);
+    if (!this.#impersonationEnd) return this.#sessions.startImpersonation(input);
+    return this.#impersonationEnd.start(input);
   }
 
+  /** Audits the window's end for each organization that saw its start, then clears it. */
   stopImpersonation(input: { sessionId: string }): Promise<void> {
-    return this.#sessions.stopImpersonation(input);
+    if (!this.#impersonationEnd) return this.#sessions.stopImpersonation(input);
+    return this.#impersonationEnd.stop(input);
   }
 
   /** Set by {@link AuthModule.create}; the scheduled sweep calls it in the worker. */
-  #impersonationExpiry: ImpersonationExpiryService | null = null;
+  #impersonationEnd: ImpersonationEndService | null = null;
 
   /** Audits and clears every impersonation whose window passed without a stop; idempotent. */
   async expireLapsedImpersonations(): Promise<{ expired: number }> {
-    if (!this.#impersonationExpiry) return { expired: 0 };
-    return { expired: await this.#impersonationExpiry.sweep() };
+    if (!this.#impersonationEnd) return { expired: 0 };
+    return { expired: await this.#impersonationEnd.sweep() };
   }
 
   /** Set by {@link AuthModule.create} over auth's own passkey rows. */
@@ -723,7 +727,7 @@ export class AuthModule implements AuthApiContract {
           publicBaseUrl: config.publicBaseUrl,
         }),
     });
-    app.#impersonationExpiry = ImpersonationExpiryService.create({
+    app.#impersonationEnd = ImpersonationEndService.create({
       sessions: repositories.sessions,
       memberships: dependencies.organizations,
       auditLog: dependencies.auditLog,

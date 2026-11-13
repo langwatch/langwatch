@@ -86,6 +86,8 @@ describe("AdminAuditService", () => {
       userId: "user_operator",
       organizationId: "org_acme",
       action: "admin/impersonate",
+      targetKind: "session",
+      targetId: "session_1",
       args: { userIdToImpersonate: TARGET.id, reason: "Debugging trace 42" },
       ipAddress: "203.0.113.7",
       userAgent: "agent/1",

@@ -143,6 +143,7 @@ describe("ImpersonationService", () => {
         userId: "user_admin",
         organizationId: "org_acme",
         action: "admin/impersonate",
+        target: { kind: "session", id: input.sessionId },
         args: {
           userIdToImpersonate: "user_target",
           reason: "Debugging trace 42",

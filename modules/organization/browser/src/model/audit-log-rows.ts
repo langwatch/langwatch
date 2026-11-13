@@ -82,6 +82,7 @@ const NAMED_ACTIONS: Readonly<Record<string, string>> = {
   "staffAccess.revoked": "Revoked LangWatch staff access",
   "staffAccess.expired": "LangWatch staff access ended",
   "admin/impersonate": "Started impersonating a member",
+  "admin/impersonate.stop": "Stopped impersonating a member",
   "admin/impersonate.expired": "Impersonation ended",
 };
 
