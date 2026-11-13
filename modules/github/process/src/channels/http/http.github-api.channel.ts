@@ -64,6 +64,7 @@ const checkSuitesSchema = z.object({
 });
 
 const checkRunsSchema = z.object({
+  total_count: z.number().optional(),
   check_runs: z.array(
     z.object({
       name: z.string(),
@@ -77,6 +78,8 @@ const checkRunsSchema = z.object({
 
 /** One page is enough to judge a commit: GitHub caps both lists at 100 per page. */
 const CHECKS_PAGE_SIZE = 100;
+/** Pages of check runs read per commit; past them the rest count as still running. */
+const MAX_CHECK_RUN_PAGES = 10;
 
 const repositoriesSchema = z.object({
   repositories: z.array(z.object({ id: z.number(), full_name: z.string() })).optional(),
@@ -311,17 +314,34 @@ export class HttpGithubApiAdapter implements GithubAppClient {
     repo: string;
     sha: string;
   }): Promise<GithubCheckRunSummary[]> {
-    const body = await this.readPullRequests(
-      input,
-      `/commits/${encodeURIComponent(input.sha)}/check-runs?filter=latest&per_page=${CHECKS_PAGE_SIZE}`,
-      checkRunsSchema,
-    );
-    return body.check_runs.map((run) => ({
-      name: run.name,
-      status: run.status ?? "queued",
-      conclusion: run.conclusion ?? null,
-      detailsUrl: run.html_url ?? run.details_url ?? null,
-    }));
+    const runs: GithubCheckRunSummary[] = [];
+    let total = 0;
+    for (let page = 1; page <= MAX_CHECK_RUN_PAGES; page++) {
+      const body = await this.readPullRequests(
+        input,
+        `/commits/${encodeURIComponent(input.sha)}/check-runs?filter=latest&per_page=${CHECKS_PAGE_SIZE}&page=${page}`,
+        checkRunsSchema,
+      );
+      total = body.total_count ?? 0;
+      runs.push(
+        ...body.check_runs.map((run) => ({
+          name: run.name,
+          status: run.status ?? "queued",
+          conclusion: run.conclusion ?? null,
+          detailsUrl: run.html_url ?? run.details_url ?? null,
+        })),
+      );
+      if (body.check_runs.length < CHECKS_PAGE_SIZE || runs.length >= total) break;
+    }
+    if (runs.length < total) {
+      runs.push({
+        name: `${total - runs.length} more check runs`,
+        status: "queued",
+        conclusion: null,
+        detailsUrl: null,
+      });
+    }
+    return runs;
   }
 
   private async readPullRequests<T>(

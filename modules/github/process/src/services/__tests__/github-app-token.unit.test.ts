@@ -630,6 +630,49 @@ describe("listPullRequestsForHead", () => {
   });
 });
 
+describe("listCommitCheckRuns", () => {
+  const commit = { token: "t", owner: "acme", repo: "agent", sha: "abc" };
+  const run = (name: string, status = "completed") => ({ name, status, conclusion: "success" });
+  const pageOf = (url: string) => Number(new URL(url).searchParams.get("page"));
+
+  /** @scenario "A commit with more check runs than one page is judged on all of them" */
+  it("reads every page of a commit's check runs", async () => {
+    const pages: Record<number, unknown[]> = {
+      1: Array.from({ length: 100 }, (_, i) => run(`check-${i}`)),
+      2: [run("last", "in_progress")],
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(async (input) =>
+        Response.json({ total_count: 101, check_runs: pages[pageOf(requestUrl(input))] ?? [] }),
+      ),
+    );
+
+    const runs = await liveApi("app", privateKey).listCommitCheckRuns(commit);
+
+    expect(runs).toHaveLength(101);
+    expect(runs.at(-1)).toMatchObject({ name: "last", status: "in_progress" });
+  });
+
+  /** @scenario "A commit with more check runs than one page is judged on all of them" */
+  it("counts the check runs past the pages it read as still running", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(async () =>
+        Response.json({
+          total_count: 1050,
+          check_runs: Array.from({ length: 100 }, (_, i) => run(`check-${i}`)),
+        }),
+      ),
+    );
+
+    const runs = await liveApi("app", privateKey).listCommitCheckRuns(commit);
+
+    expect(runs).toHaveLength(1001);
+    expect(runs.at(-1)).toMatchObject({ status: "queued", conclusion: null });
+  });
+});
+
 describe("configured", () => {
   it("is false without a private key, true with app id + key", () => {
     expect(

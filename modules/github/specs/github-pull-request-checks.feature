@@ -29,6 +29,13 @@ Feature: GitHub reports when the checks on a Langy pull request have finished
       Then the fact is recorded
 
     @unit
+    Scenario: A commit with more check runs than one page is judged on all of them
+      Given a Langy pull request whose head commit has more than 100 check runs
+      When GitHub is asked about that commit's check runs
+      Then every page of check runs is read
+      And check runs past the pages read count as still running
+
+    @unit
     Scenario: A branch Langy did not open is not announced
       Given a pull request from branch "feature/manual" on an installed repository
       When GitHub announces that a check suite on its head commit completed
