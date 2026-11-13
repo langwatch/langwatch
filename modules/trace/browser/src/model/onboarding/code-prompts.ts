@@ -81,8 +81,8 @@ CRITICAL: Do NOT guess how to instrument. Read the actual documentation for the 
 
 For Python:
 \`\`\`bash
-pip install langwatch
-# or: uv add langwatch
+pip install "langwatch>=1.3.0"
+# or: uv add "langwatch>=1.3.0"
 \`\`\`
 
 For TypeScript:

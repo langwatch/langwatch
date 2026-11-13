@@ -583,7 +583,7 @@ Feature: Langy guides the first setup after sign-up
       Then the manifest of a pip project is requirements.txt, or the requirements file the folder uses
       And a pip install writes no manifest, so Langy writes the langwatch line into that file itself
       And the version comes from python -m pip show langwatch, run with the interpreter the install worked with
-      And the line is pinned the way the file pins its other packages, and unpinned when the file pins none of them
+      And the line is pinned the way the file pins its other packages, and langwatch>=1.3.0 when the file pins none of them
       And the commit stages that manifest
 
     # The fixture folder was a repository with no remote, so
@@ -740,6 +740,13 @@ Feature: Langy guides the first setup after sign-up
     # release without a cap and reported success, and the tracing edit then
     # failed on `module 'langwatch' has no attribute 'setup'`.
     @unit
+    Scenario: Every Python install asks for a release that carries the API
+      When the compiled skills are read
+      Then every Python install command asks for "langwatch>=1.3.0", quoted so the shell never reads the > as a redirect
+      And no Python install command asks for a bare langwatch, the starter agent's install of several packages included
+      And on an interpreter newer than the SDK supports pip refuses the install instead of walking back to a release without the API
+
+    @unit
     Scenario: The install is checked for the API before code is written
       When the compiled guided-onboarding skill is read
       Then item 1 imports langwatch.setup and langwatch.connect_agent through the interpreter that installed it, before any edit
@@ -749,12 +756,24 @@ Feature: Langy guides the first setup after sign-up
       And the tracing skill says the same
 
     @unit
-    Scenario: An installed SDK without the tracing API is an interpreter question, not a stop
+    Scenario: An interpreter the SDK does not support is an interpreter question, not a stop
       When the compiled guided-onboarding skill is read
-      Then a failed check, or a version below 1.3.0, is the third unlock question of "When a step fails"
+      Then pip refusing the install for the interpreter's version, a failed check, or a version below 1.3.0, is the third unlock question of "When a step fails"
+      And a refusal ends the ladder, since every rung on the same interpreter gets the same answer
       And the question names the Python version and offers "Install Python 3.13 with uv for me" and "I'll pick the interpreter myself", plain answers with no ref
       And the first option installs Python 3.13 with uv, runs the ladder's uv rung against it and checks the install again
       And the second ends the turn naming the Python the SDK supports
+
+    # A uv project declaring requires-python >=3.9 locked langwatch 0.2.10 on
+    # Python 3.13 with a bare spec: uv resolves for the whole declared range. The
+    # floor turns that into a refusal, and another interpreter cannot fix a range.
+    @unit
+    Scenario: A uv project whose Python range starts below the SDK's is asked about
+      When the compiled guided-onboarding skill is read
+      Then uv refusing the install over the project's requires-python is the fifth unlock question of "When a step fails", about raising its lower bound to 3.10
+      And the options are "Raise it to 3.10 for me" and "I'll change it myself", plain answers with no ref
+      And the project's Python range is never changed unasked
+      And the tracing skill says the same
 
     # The wait is one CLI call, not a loop the model writes: a hand-written
     # poll once misread the list and gave up on an agent that was online.
@@ -959,11 +978,12 @@ Feature: Langy guides the first setup after sign-up
       Given a shared folder whose manifest is requirements.txt
       And a terminal whose only interpreter is a Python every current langwatch release excludes
       When Langy runs the llmops path
-      Then the installed release is checked for the tracing API before any file is edited
-      And the turn ends on the question "Your Python 3.14 is newer than the LangWatch SDK supports, so pip installed an old release without the tracing API. Want me to set up a supported Python for this folder?"
+      Then the install asks for a release with the tracing API, and pip refuses it before any file is edited
+      And no release without the tracing API is installed into that interpreter
+      And the turn ends on the question "Your Python 3.14 is newer than the LangWatch SDK supports, so pip can't install a release with the tracing API. Want me to set up a supported Python for this folder?"
       And its options are "Install Python 3.13 with uv for me" and "I'll pick the interpreter myself", in that order
       And the project's code is untouched when the card is answered
-      And pip install langwatch --upgrade is never run against that interpreter
+      And pip install --upgrade is never run against that interpreter
 
   # ===========================================================================
   # The skill and its routing

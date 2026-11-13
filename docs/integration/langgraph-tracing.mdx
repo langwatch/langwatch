@@ -20,7 +20,7 @@ A trace of the whole run shows each step as a span, nested in the order the grap
 Install the SDK and set `LANGWATCH_API_KEY`, which you find in your [project settings](https://app.langwatch.ai/settings):
 
 ```bash
-uv add langwatch
+uv add "langwatch>=1.3.0"
 ```
 
 Then wrap the function that runs the graph and pass the callback in the run's config:

@@ -23,7 +23,7 @@ Traditionally, RAG evaluation emphasizes the quality of the generated answers. H
 Before starting, ensure you have the following packages installed:
 
 ```bash
-pip install langwatch openai chromadb pandas matplotlib
+pip install "langwatch>=1.3.0" openai chromadb pandas matplotlib
 ```
 
 ## Setup
@@ -65,11 +65,19 @@ def calculate_mrr(predictions: list[str], ground_truth: list[str]):
     return mrr
 ```
 
-If you retrieve a large number of documents (e.g., 100) and only a few are relevant, you have **high recall but low precision**: forcing the LLM to sift through noise. If you retrieve very few documents and miss many relevant ones, you have **high precision but low recall**: limiting the LLM’s ability to generate good answers. Assuming LLMs improve at selecting relevant information, recall becomes more and more important. That's why recall is usually the metric to optimize. MRR is helpful when displaying citations to users. If citation quality isn’t critical for your app, focusing on precision and recall is often enough.
+If you retrieve a large number of documents (e.g., 100) and only a few are relevant, you have **high recall but low precision**: forcing the LLM to sift through noise. If you retrieve very few documents and miss many relevant ones, you have **high precision but low recall**: limiting the LLM’s ability to generate good answers.
+
+Assuming LLMs improve at selecting relevant information, recall becomes more and more important. That's why recall is usually the metric to optimize.
+
+MRR is helpful when displaying citations to users. If citation quality isn’t critical for your app, focusing on precision and recall is often enough.
 
 ## Generating Synthetic Data
 
-In many domains - enterprise tools, legal, finance, internal docs - you don’t start with an evaluation dataset. You don’t have thousands of labeled questions or relevance scores. You barely have users. But you do have access to your own corpus. And with a bit of prompting, you can start generating useful data from it. If you already have a dataset, you can use it directly. If not, you can generate a synthetic dataset using LangWatch’s `data_simulator` library. For retrieval evaluation, your dataset should contain queries and the expected document IDs that should be retrieved. In this example, I downloaded four research papers (GPT-1, GPT-2, GPT-3, GPT-4) and will use `data_simulator` to generate queries based on them.
+In many domains - enterprise tools, legal, finance, internal docs - you don’t start with an evaluation dataset. You don’t have thousands of labeled questions or relevance scores. You barely have users. But you do have access to your own corpus. And with a bit of prompting, you can start generating useful data from it.
+
+If you already have a dataset, you can use it directly. If not, you can generate a synthetic dataset using LangWatch’s `data_simulator` library.
+
+For retrieval evaluation, your dataset should contain queries and the expected document IDs that should be retrieved. In this example, I downloaded four research papers (GPT-1, GPT-2, GPT-3, GPT-4) and will use `data_simulator` to generate queries based on them.
 
 ```python
 from data_simulator import DataSimulator

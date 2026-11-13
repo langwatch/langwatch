@@ -110,8 +110,8 @@ LangWatch.
 Read the codebase first. Find two things: the entry point that runs the agent, which is what the connect function calls, and the file that starts the service, which is where the connect function goes.
 
 ```bash
-pip install langwatch          # Python
-npm install langwatch zod      # TypeScript, Node only
+pip install "langwatch>=1.3.0"  # Python
+npm install langwatch zod       # TypeScript, Node only
 ```
 
 The process needs `LANGWATCH_API_KEY` in its environment. It is the same project key the CLI uses. Without a key the SDK logs one line and opens no connection.
@@ -489,7 +489,7 @@ The steps below are the same setup by hand, and what to check when the skill's r
 <Tabs>
   <Tab title="Python">
     ```bash
-    pip install langwatch
+    pip install "langwatch>=1.3.0"
     ```
   </Tab>
   <Tab title="TypeScript">
