@@ -11,6 +11,7 @@ import {
   auditDayLabel,
   auditEntryPhrase,
   auditFeedDays,
+  auditTargetLine,
   groupAuditRuns,
 } from "../audit-log-rows.ts";
 
@@ -46,6 +47,26 @@ describe("given a row whose target is a braid", () => {
     expect(auditEntryPhrase({ action: "authz.grants.attach", targetKind: null })).toBe(
       "Attached grant",
     );
+  });
+});
+
+describe("given the line under a row's phrase", () => {
+  /** @scenario A braid's entry row names its owner project, never its grant id */
+  it("reads a braid by its owner project, or as Braid alone", () => {
+    expect(
+      auditTargetLine({ targetKind: "braid", targetId: "rolebinding_1", projectName: "payments" }),
+    ).toEqual({ kind: "words", text: "Braid owned by payments" });
+    expect(
+      auditTargetLine({ targetKind: "braid", targetId: "rolebinding_1", projectName: null }),
+    ).toEqual({ kind: "words", text: "Braid" });
+  });
+
+  /** @scenario A braid's entry row names its owner project, never its grant id */
+  it("keeps any other target's id", () => {
+    expect(
+      auditTargetLine({ targetKind: "role_binding", targetId: "rolebinding_1", projectName: "p" }),
+    ).toEqual({ kind: "id", id: "rolebinding_1" });
+    expect(auditTargetLine({ targetKind: null, targetId: null, projectName: null })).toBeNull();
   });
 });
 

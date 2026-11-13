@@ -283,7 +283,8 @@ describe("the settings shell in a new navigation mode", () => {
       renderSettingsSidebar();
 
       const roles = screen.getByRole("link", { name: /^Roles/ });
-      expect(within(roles).getByText("Enterprise")).toBeInTheDocument();
+      expect(within(roles).getByLabelText("Enterprise")).toBeInTheDocument();
+      expect(within(roles).queryByText("Enterprise")).not.toBeInTheDocument();
       expect(screen.queryByLabelText("Included in Enterprise")).not.toBeInTheDocument();
     });
 
@@ -296,7 +297,7 @@ describe("the settings shell in a new navigation mode", () => {
         const link = screen.getByRole("link", { name });
         expect(within(link).getByLabelText("Included in Enterprise")).toBeInTheDocument();
       }
-      expect(screen.queryByText("Enterprise")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("Enterprise")).not.toBeInTheDocument();
       for (const name of [/^Users/, /^Authentication/]) {
         const link = screen.getByRole("link", { name });
         expect(within(link).queryByLabelText("Included in Enterprise")).not.toBeInTheDocument();

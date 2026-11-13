@@ -537,7 +537,7 @@ function OutboundArrow() {
   return <ArrowUpRight size={12} aria-hidden color="var(--chakra-colors-fg-muted)" />;
 }
 
-/** The Enterprise badge on an entry the plan includes; a locked entry shows a lock. */
+/** The compact Enterprise badge on an entry the plan includes, so the label keeps its width. */
 function EnterpriseChip() {
-  return <EnterpriseBadge />;
+  return <EnterpriseBadge compact />;
 }

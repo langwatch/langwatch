@@ -18,4 +18,14 @@ describe("EnterpriseBadge", () => {
       expect(container.querySelector("svg")).toBeNull();
     });
   });
+
+  describe("given the compact Enterprise badge", () => {
+    /** @scenario The compact badge on a menu row is a lock named Enterprise */
+    it("shows a lock with no text and is named Enterprise", () => {
+      renderWithDesignSystem(<EnterpriseBadge compact />);
+      const lock = screen.getByLabelText("Enterprise");
+      expect(lock.tagName.toLowerCase()).toBe("svg");
+      expect(lock.parentElement?.textContent).toBe("");
+    });
+  });
 });

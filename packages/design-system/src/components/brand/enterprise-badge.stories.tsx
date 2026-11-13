@@ -34,6 +34,18 @@ export const BesideATitle: Story = {
   ),
 };
 
+/** A menu row: the compact lock keeps the label whole; hover or a screen reader says Enterprise. */
+export const CompactInAMenuRow: Story = {
+  render: () => (
+    <HStack gap="2" width="48" minWidth={0}>
+      <Text textStyle="sm" truncate flex="1">
+        Roles & access
+      </Text>
+      <EnterpriseBadge compact />
+    </HStack>
+  ),
+};
+
 /** A narrow row: the badge keeps its width and the name truncates. */
 export const Narrow: Story = {
   render: () => (

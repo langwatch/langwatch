@@ -11,3 +11,10 @@ Feature: One Enterprise badge marks where a feature is gated
     When it renders
     Then "Enterprise" is on the screen, spelled out, with no mark
     And its title says it is an Enterprise plan feature
+
+  @integration
+  Scenario: The compact badge on a menu row is a lock named Enterprise
+    Given the compact Enterprise badge
+    When it renders
+    Then it shows a lock and no abbreviated text
+    And its accessible name is "Enterprise"

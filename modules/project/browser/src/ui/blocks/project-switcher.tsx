@@ -10,7 +10,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { ProjectAvatar } from "@langwatch/design-system/project-avatar";
 import { ChevronDown } from "lucide-react";
-import { useMemo, useState, type MouseEvent } from "react";
+import { useState, type MouseEvent } from "react";
 
 import { projectApi } from "../../behavior/project-api.ts";
 import { projectSwitchGroups, projectSwitchHref } from "../../model/project-switch.ts";
@@ -21,7 +21,7 @@ export default function ProjectSwitcher() {
   const [isOpen, setIsOpen] = useState(false);
   const organizations = projectApi.organization.getScopeGraph.useQuery({});
 
-  const groups = useMemo(() => projectSwitchGroups(organizations.data ?? []), [organizations.data]);
+  const groups = projectSwitchGroups(organizations.data ?? []);
   const current = groups
     .flatMap((group) => group.projects)
     .find((project) => project.id === projectId);
@@ -41,6 +41,7 @@ export default function ProjectSwitcher() {
     <Menu.Root open={isOpen} onOpenChange={({ open }) => setIsOpen(open)}>
       <Menu.Trigger asChild>
         <Button
+          aria-label={`Switch project: ${current.name}`}
           variant="ghost"
           textStyle="bodySm"
           paddingX={2}
@@ -74,7 +75,12 @@ export default function ProjectSwitcher() {
                 });
                 return (
                   <Menu.Item key={project.id} value={project.id} textStyle="body" asChild>
-                    <Link href={href} onClick={follow(href)} _hover={{ textDecoration: "none" }}>
+                    <Link
+                      href={href}
+                      aria-label={project.name}
+                      onClick={follow(href)}
+                      _hover={{ textDecoration: "none" }}
+                    >
                       <HStack gap={2} minWidth={0}>
                         <ProjectAvatar name={project.name} />
                         <Text truncate title={project.name}>

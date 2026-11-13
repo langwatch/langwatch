@@ -123,6 +123,24 @@ export function auditEntryPhrase({
   return auditActionPhrase(action);
 }
 
+/** The line under an entry's phrase: a braid by its owner project, never its grant id. */
+export type AuditTargetLine = { kind: "words"; text: string } | { kind: "id"; id: string } | null;
+
+export function auditTargetLine({
+  targetKind,
+  targetId,
+  projectName,
+}: {
+  targetKind: string | null | undefined;
+  targetId: string | null | undefined;
+  projectName: string | null;
+}): AuditTargetLine {
+  if (targetKind === BRAID_AUDIT_TARGET_KIND) {
+    return { kind: "words", text: projectName ? `Braid owned by ${projectName}` : "Braid" };
+  }
+  return targetId ? { kind: "id", id: targetId } : null;
+}
+
 type ActorFields = Pick<
   EnrichedAuditLog,
   "userId" | "user" | "actorUserId" | "actorUser" | "apiKeyId"

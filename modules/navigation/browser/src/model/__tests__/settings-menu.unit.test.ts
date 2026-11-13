@@ -196,12 +196,7 @@ describe("given the People & access group", () => {
     it("offers Teams & projects right after Users, on the Users page's teams tab", () => {
       expect(
         accessHrefsIn({ hasOrganizationPermission: (p) => p === "organization:manage" }),
-      ).toEqual([
-        "/settings/directory",
-        "/settings/directory?tab=teams",
-        "/settings/roles",
-        "/settings/organization-braids",
-      ]);
+      ).toEqual(["/settings/directory", "/settings/directory?tab=teams", "/settings/roles"]);
     });
 
     /** @scenario "Teams & projects asks who may manage the organization the way its tab does" */
@@ -285,16 +280,11 @@ describe("given a plan that lacks Enterprise", () => {
     it("offers the enterprise entries locked", () => {
       expect(
         lockedHrefsIn({ hasPermission: () => true, hasOrganizationPermission: () => true }),
-      ).toEqual([
-        "/settings/audit-log",
-        "/settings/roles",
-        "/settings/organization-braids",
-        "/settings/braids",
-      ]);
+      ).toEqual(["/settings/audit-log", "/settings/roles", "/settings/braids"]);
     });
 
     /** @scenario "A branded feature's entries wear its mark" */
-    it("marks both Braids entries as the braids feature", () => {
+    it("offers Braids once, under Project, marked as the braids feature", () => {
       const braids = settingsMenu({
         ...EVERYTHING_CLOSED,
         enterprisePlan: "locked",
@@ -304,7 +294,6 @@ describe("given a plan that lacks Enterprise", () => {
         .flatMap((group) => group.items)
         .filter((item) => item.label === "Braids");
       expect(braids.map((item) => [item.href, item.feature])).toEqual([
-        ["/settings/organization-braids", "braids"],
         ["/settings/braids", "braids"],
       ]);
     });

@@ -262,7 +262,6 @@ function organizationGroup({
 
 function accessGroup({
   enterprisePlan,
-  isLiteMember,
   hasOrganizationPermission,
 }: SettingsMenuGates): SettingsMenuGroup {
   return {
@@ -310,18 +309,6 @@ function accessGroup({
         },
         enterprisePlan,
       }),
-      // Every braid in the organisation and who may braid; the project page is under Project.
-      ...(!isLiteMember && hasOrganizationPermission("organization:manage")
-        ? enterpriseEntry({
-            item: {
-              label: "Braids",
-              href: "/settings/organization-braids",
-              icon: Waypoints,
-              feature: "braids",
-            },
-            enterprisePlan,
-          })
-        : []),
     ],
   };
 }

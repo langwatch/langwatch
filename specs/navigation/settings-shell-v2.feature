@@ -77,8 +77,9 @@ Feature: Settings shell
   Scenario: A plan with Enterprise sees its entries marked Enterprise, not locked
     Given my plan includes Enterprise
     When the settings sidebar renders
-    Then the Enterprise entries carry the quiet grey "Enterprise" badge
-    And no entry carries a lock
+    Then the Enterprise entries carry the compact grey Enterprise badge, a lock in a hairline chip
+    And that badge is named "Enterprise" by its tooltip and accessible label, so the entry's label keeps its width
+    And no entry carries the bare "Included in Enterprise" lock
 
   @integration
   Scenario: A plan without Enterprise sees its entries locked
@@ -90,8 +91,9 @@ Feature: Settings shell
 
   @unit
   Scenario: A branded feature's entries wear its mark
-    Given the settings menu offers the project and organisation Braids pages
-    Then both entries draw the Braids mark, the one its pages' titles and empty states draw
+    Given the settings menu offers the Braids page
+    Then Braids appears once, under Project, never also under People & access
+    And the entry draws the Braids mark, the one its pages' titles and empty states draw
     And opening a locked entry shows its page title and an Enterprise upsell, never the feature
 
   @unit @integration
