@@ -9,7 +9,10 @@ import type { NormalizedSpan, SpanAnalyticsFloor } from "@langwatch/trace-contra
 import type { LedgerStepRecord } from "@langwatch/upgrade/reader";
 import { projectionReplaySinceOf } from "@langwatch/upgrade/step";
 
-/** The replay step that refolds trace_analytics so its rows carry the fold's metadata columns. */
+/**
+ * The replay step that refolds trace_analytics rows: the fold writes the 3 plain metadata
+ * columns; the database computes the 9 MATERIALIZED ones.
+ */
 export const TRACE_ANALYTICS_REPLAY_STEP_ID = "trace:replay-trace-analytics-widget-columns";
 
 /** The replay step that fills span_analytics; its recorded since is the span widgets' floor. */
@@ -46,6 +49,44 @@ export type TraceAnalyticsMetadataColumns = Record<
 const TRACE_ANALYTICS_METADATA_COLUMN_NAMES = Object.keys(
   TRACE_ANALYTICS_METADATA_KEYS,
 ) as (keyof TraceAnalyticsMetadataColumns)[];
+
+/**
+ * The 9 columns goose 00126 made MATERIALIZED, left to the database (same value from Attributes):
+ * in prod the fold's insert of them failed with ILLEGAL_COLUMN despite the allow setting.
+ * The ADR-006 REMOVE MATERIALIZED step waits until the fold writes them again.
+ */
+const MATERIALIZED_NAMES = [
+  "MetadataOutputAction",
+  "MetadataOutcome",
+  "MetadataSentToReview",
+  "MetadataDocumentType",
+  "MetadataFlow",
+  "MetadataLanguage",
+  "MetadataSegment",
+  "MetadataTeam",
+  "MetadataTopic",
+] as const satisfies readonly (keyof TraceAnalyticsMetadataColumns)[];
+
+export const TRACE_ANALYTICS_MATERIALIZED_METADATA_COLUMNS: ReadonlySet<string> = new Set(
+  MATERIALIZED_NAMES,
+);
+
+/** The plain metadata columns: what the fold inserts. */
+export type TraceAnalyticsWrittenMetadataColumns = Omit<
+  TraceAnalyticsMetadataColumns,
+  (typeof MATERIALIZED_NAMES)[number]
+>;
+
+/** The metadata columns the fold inserts: the plain ones, never the MATERIALIZED nine. */
+export function traceAnalyticsWrittenMetadataColumns(
+  columns: TraceAnalyticsMetadataColumns,
+): TraceAnalyticsWrittenMetadataColumns {
+  return {
+    MetadataOutcomeReason: columns.MetadataOutcomeReason,
+    MetadataPromptVersion: columns.MetadataPromptVersion,
+    MetadataEnvironment: columns.MetadataEnvironment,
+  };
+}
 
 /**
  * The metadata columns of one `trace_analytics` row, read from the trimmed attribute map the row
