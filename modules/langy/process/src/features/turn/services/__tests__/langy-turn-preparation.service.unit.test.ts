@@ -382,6 +382,54 @@ describe("LangyTurnPreparationService golden path", () => {
     });
   });
 
+  describe("given one pull request opened today and many card clicks and retries after it", () => {
+    /** @scenario "Clicking a card or Try again spends nothing of the daily cap" */
+    it("counts only the opened pull request, however many turns the cards started", async () => {
+      const store = LangyMemoryStore.create();
+      store.pullRequests.set("acme/retriever#4", {
+        projectId: "project-1",
+        conversationId: "conversation-1",
+        userId: "user-1",
+        openedAt: Date.now(),
+      });
+      const quota = LangyGithubPrQuotaService.create({
+        pullRequests: MemoryLangyPullRequestRepository.create(store),
+      });
+      const cap = LangyGithubPrPermitService.create(quota);
+      const permits = { check: (permitInput: { userId: string }) => cap.check(permitInput) };
+      const githubCredentials = {
+        getOrProvision: vi.fn(async () =>
+          workerCredentials({
+            organizationId: "organization-1",
+            githubToken: "gh-token",
+            githubLogin: "octocat",
+          }),
+        ),
+        findEgressAllowlist: vi.fn(async () => null),
+        resolveMirrorTier: vi.fn(async () => "content" as const),
+        findModelsAllowed: vi.fn(async () => null),
+      };
+
+      for (let click = 0; click < 25; click += 1) {
+        const fixture = makeFixture({ credentials: githubCredentials, permits, perDayPrCap: 20 });
+        await LangyTurnService.create(fixture.deps).startConversationTurn({
+          ...input,
+          isRetry: click % 2 === 0,
+        });
+        expect(fixture.dispatch).toHaveBeenCalledWith(
+          expect.objectContaining({
+            credentials: expect.objectContaining({ githubToken: "gh-token" }),
+          }),
+        );
+      }
+
+      await expect(quota.usage({ userId: "user-1", limit: 20 })).resolves.toMatchObject({
+        allowed: true,
+        remaining: 19,
+      });
+    });
+  });
+
   describe("given the user already opened the per-day maximum of pull requests", () => {
     /** @scenario "The API process counts the daily pull-request cap from the pull requests Langy opened" */
     it("tells the turn the real per-day cap and the hour it resets", async () => {

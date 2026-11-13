@@ -185,6 +185,16 @@ Feature: Langy opens GitHub PRs via the installed GitHub App
     Then Langy still gets the GitHub token
     And my whole daily cap remains
 
+  # A card (code access, repository choice, Try again) answers by starting a
+  # turn. Those turns open nothing, so they spend nothing.
+  @unit
+  Scenario: Clicking a card or Try again spends nothing of the daily cap
+    Given Langy opened 1 pull request for me today
+    And I then clicked cards and "Try again" 25 times
+    When I send the next turn
+    Then Langy still gets the GitHub token
+    And 19 of my 20 pull requests for today remain
+
   @unit
   Scenario: Pushing to a pull request already opened does not count again
     Given Langy opened a pull request for me today
