@@ -854,9 +854,9 @@ if (isEntrypoint()) {
   if (failed.length > 0) {
     console.error(`::error::${failed.length} package suite(s) failed and are not registered.`);
     process.exitCode = 1;
-    return;
+  } else {
+    console.log(
+      `All ${outcomes.filter((o) => o.outcome === "passed").length} package suites passed.`,
+    );
   }
-  console.log(
-    `All ${outcomes.filter((o) => o.outcome === "passed").length} package suites passed.`,
-  );
 }
