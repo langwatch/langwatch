@@ -30,10 +30,16 @@ interface CopyReport {
   target: { slug: string; name: string };
   dryRun: boolean;
   items: CopyItem[];
+  stoppedBecause?: string | null;
   totals: Record<string, number>;
 }
 
-type Side = Readonly<{ label: "source" | "target"; organization: string; scopes: string[] }>;
+type Side = Readonly<{
+  label: "source" | "target";
+  organization: string;
+  counterpartOrganization: string;
+  scopes: string[];
+}>;
 
 /** One approved, redeemed side of a copy: its request and the ops token it was given. */
 type Approved = Readonly<{ requestId: string; opsToken: string }>;
@@ -61,6 +67,7 @@ const requestSide = async ({
     body: {
       scopes: side.scopes,
       organization: side.organization,
+      counterpartOrganization: side.counterpartOrganization,
       reason,
       codeChallenge,
       codeChallengeMethod: "S256",
@@ -124,9 +131,9 @@ const endSide = async ({
 };
 
 /**
- * `langwatch ops copy --from <org> --to <org>`: one approval per organization (`ops:copy` with
- * `org:content` on the source, with `org:support` on the target), then the server-side copy.
- * Both sessions are ended afterwards; the tokens are never written to disk.
+ * `langwatch ops copy --from <org> --to <org>`: one approval per organization (`copy:source` and
+ * `copy:target`, each naming the other organization), then the server-side copy. Both sessions
+ * are ended afterwards; the tokens are never written to disk.
  */
 export const opsCopyCommand = async ({
   from,
@@ -145,7 +152,8 @@ export const opsCopyCommand = async ({
   const target = to.trim();
   if (!source || !target) throw validationError("Pass both --from and --to.");
   if (source === target) throw validationError("--from and --to name the same organization.");
-  const why = reason?.trim() || `Copy projects from ${source} into ${target}`;
+  const typed = reason?.trim() ?? "";
+  const why = typed === "" ? `Copy projects from ${source} into ${target}` : typed;
   if (why.length > 500) throw validationError("--reason is limited to 500 characters.");
   const named = (projects ?? "")
     .split(",")
@@ -155,8 +163,18 @@ export const opsCopyCommand = async ({
   const requesterKey = requireRequesterKey();
   const endpoint = getEndpoint();
   const sides: Side[] = [
-    { label: "source", organization: source, scopes: ["ops:copy", "org:content"] },
-    { label: "target", organization: target, scopes: ["ops:copy", "org:support"] },
+    {
+      label: "source",
+      organization: source,
+      counterpartOrganization: target,
+      scopes: ["copy:source"],
+    },
+    {
+      label: "target",
+      organization: target,
+      counterpartOrganization: source,
+      scopes: ["copy:target"],
+    },
   ];
   const asked = [];
   for (const side of sides) {
@@ -214,4 +232,11 @@ const printReport = (report: CopyReport): void => {
       .map(([outcome, count]) => `${outcome}: ${count}`)
       .join(", ") || "Nothing to copy.",
   );
+  if (report.stoppedBecause) {
+    console.log(
+      chalk.yellow(
+        `Stopped early (${sanitizeTerminalText(report.stoppedBecause)}): an approval ended.`,
+      ),
+    );
+  }
 };

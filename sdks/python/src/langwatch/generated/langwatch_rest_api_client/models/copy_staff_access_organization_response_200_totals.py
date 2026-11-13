@@ -18,6 +18,7 @@ class CopyStaffAccessOrganizationResponse200Totals:
         already_copied (int):
         skipped (int):
         failed (int):
+        stopped (int):
     """
 
     planned: int
@@ -25,6 +26,7 @@ class CopyStaffAccessOrganizationResponse200Totals:
     already_copied: int
     skipped: int
     failed: int
+    stopped: int
     additional_properties: dict[str, int] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -38,6 +40,8 @@ class CopyStaffAccessOrganizationResponse200Totals:
 
         failed = self.failed
 
+        stopped = self.stopped
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -47,6 +51,7 @@ class CopyStaffAccessOrganizationResponse200Totals:
                 "already_copied": already_copied,
                 "skipped": skipped,
                 "failed": failed,
+                "stopped": stopped,
             }
         )
 
@@ -65,12 +70,15 @@ class CopyStaffAccessOrganizationResponse200Totals:
 
         failed = d.pop("failed")
 
+        stopped = d.pop("stopped")
+
         copy_staff_access_organization_response_200_totals = cls(
             planned=planned,
             copied=copied,
             already_copied=already_copied,
             skipped=skipped,
             failed=failed,
+            stopped=stopped,
         )
 
         copy_staff_access_organization_response_200_totals.additional_properties = d

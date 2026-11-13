@@ -2,7 +2,8 @@ from enum import Enum
 
 
 class CreateStaffAccessRequestBodyScopesItem(str, Enum):
-    OPSCOPY = "ops:copy"
+    COPYSOURCE = "copy:source"
+    COPYTARGET = "copy:target"
     OPSREAD = "ops:read"
     ORGCONTENT = "org:content"
     ORGMETADATA = "org:metadata"

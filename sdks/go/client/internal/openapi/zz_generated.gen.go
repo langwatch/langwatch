@@ -29443,6 +29443,7 @@ const (
 	CopyStaffAccessOrganization200JSONResponseBodyItemsOutcomeFailed        CopyStaffAccessOrganization200JSONResponseBodyItemsOutcome = "failed"
 	CopyStaffAccessOrganization200JSONResponseBodyItemsOutcomePlanned       CopyStaffAccessOrganization200JSONResponseBodyItemsOutcome = "planned"
 	CopyStaffAccessOrganization200JSONResponseBodyItemsOutcomeSkipped       CopyStaffAccessOrganization200JSONResponseBodyItemsOutcome = "skipped"
+	CopyStaffAccessOrganization200JSONResponseBodyItemsOutcomeStopped       CopyStaffAccessOrganization200JSONResponseBodyItemsOutcome = "stopped"
 )
 
 // Valid indicates whether the value is a known member of the CopyStaffAccessOrganization200JSONResponseBodyItemsOutcome enum.
@@ -29457,6 +29458,8 @@ func (e CopyStaffAccessOrganization200JSONResponseBodyItemsOutcome) Valid() bool
 	case CopyStaffAccessOrganization200JSONResponseBodyItemsOutcomePlanned:
 		return true
 	case CopyStaffAccessOrganization200JSONResponseBodyItemsOutcomeSkipped:
+		return true
+	case CopyStaffAccessOrganization200JSONResponseBodyItemsOutcomeStopped:
 		return true
 	default:
 		return false
@@ -29480,7 +29483,8 @@ func (e CreateStaffAccessRequestJSONBodyCodeChallengeMethod) Valid() bool {
 
 // Defines values for CreateStaffAccessRequestJSONBodyScopes.
 const (
-	CreateStaffAccessRequestJSONBodyScopesOpsCopy     CreateStaffAccessRequestJSONBodyScopes = "ops:copy"
+	CreateStaffAccessRequestJSONBodyScopesCopySource  CreateStaffAccessRequestJSONBodyScopes = "copy:source"
+	CreateStaffAccessRequestJSONBodyScopesCopyTarget  CreateStaffAccessRequestJSONBodyScopes = "copy:target"
 	CreateStaffAccessRequestJSONBodyScopesOpsRead     CreateStaffAccessRequestJSONBodyScopes = "ops:read"
 	CreateStaffAccessRequestJSONBodyScopesOrgContent  CreateStaffAccessRequestJSONBodyScopes = "org:content"
 	CreateStaffAccessRequestJSONBodyScopesOrgMetadata CreateStaffAccessRequestJSONBodyScopes = "org:metadata"
@@ -29490,7 +29494,9 @@ const (
 // Valid indicates whether the value is a known member of the CreateStaffAccessRequestJSONBodyScopes enum.
 func (e CreateStaffAccessRequestJSONBodyScopes) Valid() bool {
 	switch e {
-	case CreateStaffAccessRequestJSONBodyScopesOpsCopy:
+	case CreateStaffAccessRequestJSONBodyScopesCopySource:
+		return true
+	case CreateStaffAccessRequestJSONBodyScopesCopyTarget:
 		return true
 	case CreateStaffAccessRequestJSONBodyScopesOpsRead:
 		return true
@@ -29552,7 +29558,8 @@ func (e EndStaffAccessSession200JSONResponseBodyEnded) Valid() bool {
 
 // Defines values for RedeemStaffAccessRequest200JSONResponseBodyScopes.
 const (
-	RedeemStaffAccessRequest200JSONResponseBodyScopesOpsCopy     RedeemStaffAccessRequest200JSONResponseBodyScopes = "ops:copy"
+	RedeemStaffAccessRequest200JSONResponseBodyScopesCopySource  RedeemStaffAccessRequest200JSONResponseBodyScopes = "copy:source"
+	RedeemStaffAccessRequest200JSONResponseBodyScopesCopyTarget  RedeemStaffAccessRequest200JSONResponseBodyScopes = "copy:target"
 	RedeemStaffAccessRequest200JSONResponseBodyScopesOpsRead     RedeemStaffAccessRequest200JSONResponseBodyScopes = "ops:read"
 	RedeemStaffAccessRequest200JSONResponseBodyScopesOrgContent  RedeemStaffAccessRequest200JSONResponseBodyScopes = "org:content"
 	RedeemStaffAccessRequest200JSONResponseBodyScopesOrgMetadata RedeemStaffAccessRequest200JSONResponseBodyScopes = "org:metadata"
@@ -29562,7 +29569,9 @@ const (
 // Valid indicates whether the value is a known member of the RedeemStaffAccessRequest200JSONResponseBodyScopes enum.
 func (e RedeemStaffAccessRequest200JSONResponseBodyScopes) Valid() bool {
 	switch e {
-	case RedeemStaffAccessRequest200JSONResponseBodyScopesOpsCopy:
+	case RedeemStaffAccessRequest200JSONResponseBodyScopesCopySource:
+		return true
+	case RedeemStaffAccessRequest200JSONResponseBodyScopesCopyTarget:
 		return true
 	case RedeemStaffAccessRequest200JSONResponseBodyScopesOpsRead:
 		return true
@@ -51776,6 +51785,7 @@ type CopyStaffAccessOrganization200JSONResponseBody_Totals struct {
 	Failed               int            `json:"failed"`
 	Planned              int            `json:"planned"`
 	Skipped              int            `json:"skipped"`
+	Stopped              int            `json:"stopped"`
 	AdditionalProperties map[string]int `json:"-"`
 }
 
@@ -51786,12 +51796,13 @@ type ListStaffAccessOrganizationsParams struct {
 
 // CreateStaffAccessRequestJSONBody defines parameters for CreateStaffAccessRequest.
 type CreateStaffAccessRequestJSONBody struct {
-	CodeChallenge       string                                              `json:"codeChallenge"`
-	CodeChallengeMethod CreateStaffAccessRequestJSONBodyCodeChallengeMethod `json:"codeChallengeMethod"`
-	Machine             string                                              `json:"machine"`
-	Organization        *string                                             `json:"organization,omitempty"`
-	Reason              string                                              `json:"reason"`
-	Scopes              []CreateStaffAccessRequestJSONBodyScopes            `json:"scopes"`
+	CodeChallenge           string                                              `json:"codeChallenge"`
+	CodeChallengeMethod     CreateStaffAccessRequestJSONBodyCodeChallengeMethod `json:"codeChallengeMethod"`
+	CounterpartOrganization *string                                             `json:"counterpartOrganization,omitempty"`
+	Machine                 string                                              `json:"machine"`
+	Organization            *string                                             `json:"organization,omitempty"`
+	Reason                  string                                              `json:"reason"`
+	Scopes                  []CreateStaffAccessRequestJSONBodyScopes            `json:"scopes"`
 }
 
 // CreateStaffAccessRequestJSONBodyCodeChallengeMethod defines parameters for CreateStaffAccessRequest.
@@ -64524,6 +64535,14 @@ func (a *CopyStaffAccessOrganization200JSONResponseBody_Totals) UnmarshalJSON(b 
 		delete(object, "skipped")
 	}
 
+	if raw, found := object["stopped"]; found {
+		err = json.Unmarshal(raw, &a.Stopped)
+		if err != nil {
+			return fmt.Errorf("error reading 'stopped': %w", err)
+		}
+		delete(object, "stopped")
+	}
+
 	if len(object) != 0 {
 		a.AdditionalProperties = make(map[string]int)
 		for fieldName, fieldBuf := range object {
@@ -64566,6 +64585,11 @@ func (a CopyStaffAccessOrganization200JSONResponseBody_Totals) MarshalJSON() ([]
 	object["skipped"], err = json.Marshal(a.Skipped)
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling 'skipped': %w", err)
+	}
+
+	object["stopped"], err = json.Marshal(a.Stopped)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'stopped': %w", err)
 	}
 
 	for fieldName, field := range a.AdditionalProperties {
@@ -177062,7 +177086,8 @@ type CopyStaffAccessOrganizationResponse struct {
 			Name string `json:"name"`
 			Slug string `json:"slug"`
 		} `json:"source"`
-		Target struct {
+		StoppedBecause *string `json:"stoppedBecause"`
+		Target         struct {
 			Id   string `json:"id"`
 			Name string `json:"name"`
 			Slug string `json:"slug"`
@@ -210677,7 +210702,8 @@ func ParseCopyStaffAccessOrganizationResponse(rsp *http.Response) (*CopyStaffAcc
 				Name string `json:"name"`
 				Slug string `json:"slug"`
 			} `json:"source"`
-			Target struct {
+			StoppedBecause *string `json:"stoppedBecause"`
+			Target         struct {
 				Id   string `json:"id"`
 				Name string `json:"name"`
 				Slug string `json:"slug"`

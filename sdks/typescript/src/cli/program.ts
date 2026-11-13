@@ -6122,7 +6122,7 @@ function registerOpsCommands(program: Command): void {
       )
       .option(
         "--scope <scope>",
-        "ops:read, ops:copy, org:metadata, org:content or org:support; repeat for more",
+        "ops:read, org:metadata, org:content or org:support; repeat for more (copies use `ops copy`)",
         collectScope,
         [],
       )

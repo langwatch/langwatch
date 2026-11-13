@@ -11,7 +11,7 @@ import {
   type PasskeyAssertionResponse,
   PasskeyAssertionRefusedError,
 } from "@langwatch/auth-contract";
-import { reachesOrganization, type StaffAccessScope } from "@langwatch/authz-contract";
+import { namesOrganization, type StaffAccessScope } from "@langwatch/authz-contract";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
@@ -33,6 +33,7 @@ export const OLIVIA = "user_olivia";
 export const PEDRO = "user_pedro";
 export const ACME = { id: "org_acme", slug: "acme", name: "ACME" };
 export const GLOBEX = { id: "org_globex", slug: "globex", name: "Globex" };
+export const INITECH = { id: "org_initech", slug: "initech", name: "Initech" };
 export const AGENT_IP = "203.0.113.7";
 export const VERIFIER = "v".repeat(43);
 export const CHALLENGE = createHash("sha256").update(VERIFIER).digest("base64url");
@@ -142,7 +143,7 @@ export function staffAccessWorld({
   });
 
   const copy = copyCatalog();
-  const summaries = [ACME, GLOBEX].map((organization) => ({
+  const summaries = [ACME, GLOBEX, INITECH].map((organization) => ({
     ...organization,
     createdAt: Temporal.Instant.from("2025-01-01T00:00:00Z"),
   }));
@@ -298,15 +299,18 @@ export function staffAccessWorld({
 export function requestBody({
   scopes,
   organization = ACME.slug,
+  counterpartOrganization,
   reason = "fix ACME's broken evaluator",
 }: {
   scopes: StaffAccessScope[];
   organization?: string;
+  counterpartOrganization?: string;
   reason?: string;
 }) {
   return {
     scopes,
-    ...(reachesOrganization(scopes) ? { organization } : {}),
+    ...(namesOrganization(scopes) ? { organization } : {}),
+    ...(counterpartOrganization ? { counterpartOrganization } : {}),
     reason,
     codeChallenge: CHALLENGE,
     codeChallengeMethod: "S256" as const,

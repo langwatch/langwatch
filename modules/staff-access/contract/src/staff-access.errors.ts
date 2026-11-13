@@ -187,7 +187,7 @@ export class StaffCopySourceInvalidError extends HandledError {
   }
 }
 
-/** One side of a copy lacks its scopes: `ops:copy` with `org:content` or with `org:support`. */
+/** One side of a copy was not approved as that side: `copy:source` or `copy:target`. */
 export class StaffCopyScopeMissingError extends HandledError {
   declare readonly code: "staff_copy_scope_missing";
 
@@ -195,8 +195,8 @@ export class StaffCopyScopeMissingError extends HandledError {
     super(
       "staff_copy_scope_missing",
       side === "source"
-        ? "The source session was not approved for ops:copy with org:content."
-        : "The target session was not approved for ops:copy with org:support.",
+        ? "The source session was not approved as the source of a copy (copy:source)."
+        : "The target session was not approved as the target of a copy (copy:target).",
       { httpStatus: 403, fault: "customer", ...remediation("staff_copy_scope_missing") },
     );
     this.name = "StaffCopyScopeMissingError";
@@ -241,5 +241,19 @@ export class StaffCopyWindowClosedError extends HandledError {
       { httpStatus: 403, fault: "customer", ...remediation("staff_copy_window_closed") },
     );
     this.name = "StaffCopyWindowClosedError";
+  }
+}
+
+/** The two approvals do not name each other: each side signs the copy's other organization. */
+export class StaffCopyDirectionMismatchError extends HandledError {
+  declare readonly code: "staff_copy_direction_mismatch";
+
+  constructor() {
+    super(
+      "staff_copy_direction_mismatch",
+      "The source and target approvals do not name each other's organization.",
+      { httpStatus: 403, fault: "customer", ...remediation("staff_copy_direction_mismatch") },
+    );
+    this.name = "StaffCopyDirectionMismatchError";
   }
 }

@@ -7366,6 +7366,9 @@ model StaffAccessRequest {
   scopes               String[]
   organizationId       String?
   organizationName     String?
+  /// A copy side's other organization, signed with the approval (staff-access module ADR-002).
+  counterpartOrganizationId   String?
+  counterpartOrganizationName String?
   reason               String
   codeChallenge        String
   machine              String

@@ -1,3 +1,4 @@
+import { STAFF_COPY_TARGET_PERMISSIONS } from "@langwatch/authz-contract";
 import type { StaffAccessCopyItem } from "@langwatch/staff-access-contract";
 import { describe, expect, it } from "vitest";
 
@@ -9,6 +10,7 @@ import {
   failureReason,
   holdsScopes,
   selectProjects,
+  withinGrant,
 } from "../staff-access-copy.rules.ts";
 
 const item = (overrides: Partial<StaffAccessCopyItem>): StaffAccessCopyItem => ({
@@ -24,13 +26,21 @@ const item = (overrides: Partial<StaffAccessCopyItem>): StaffAccessCopyItem => (
 });
 
 describe("holdsScopes", () => {
-  it("needs every scope of a side", () => {
-    expect(holdsScopes({ scopes: ["ops:copy", "org:content"], needed: COPY_SOURCE_SCOPES })).toBe(
-      true,
-    );
-    expect(holdsScopes({ scopes: ["ops:copy", "org:content"], needed: COPY_TARGET_SCOPES })).toBe(
-      false,
-    );
+  it("needs the scope of its own side", () => {
+    expect(holdsScopes({ scopes: ["copy:source"], needed: COPY_SOURCE_SCOPES })).toBe(true);
+    expect(holdsScopes({ scopes: ["copy:source"], needed: COPY_TARGET_SCOPES })).toBe(false);
+    expect(holdsScopes({ scopes: ["org:support"], needed: COPY_TARGET_SCOPES })).toBe(false);
+  });
+});
+
+describe("withinGrant", () => {
+  /** @scenario "A copy makes only what the target approval granted" */
+  it("allows a kind only when the grant holds every permission it needs", () => {
+    expect(withinGrant({ kind: "project", grant: STAFF_COPY_TARGET_PERMISSIONS })).toBe(true);
+    expect(withinGrant({ kind: "monitor", grant: STAFF_COPY_TARGET_PERMISSIONS })).toBe(true);
+    expect(withinGrant({ kind: "monitor", grant: ["evaluations:create"] })).toBe(false);
+    expect(withinGrant({ kind: "dataset", grant: ["project:create"] })).toBe(false);
+    expect(withinGrant({ kind: "project", grant: [] })).toBe(false);
   });
 });
 
@@ -68,8 +78,9 @@ describe("copyTotals and auditedPlan", () => {
       already_copied: 0,
       skipped: 1,
       failed: 0,
+      stopped: 0,
     });
-    expect(auditedPlan(items)).toEqual({
+    expect(auditedPlan({ items })).toEqual({
       counts: { project: 1, prompt: 1 },
       names: ["project: support-bot", "prompt: reply"],
     });

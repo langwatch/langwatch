@@ -2,17 +2,45 @@
  * The pure decisions of an organization copy (module ADR-002): which approvals pair up, which
  * source projects a copy takes, and how its report adds up.
  */
+import type { AuthzPermission } from "@langwatch/authorization";
 import type { StaffAccessScope } from "@langwatch/authz-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import type {
   StaffAccessCopyItem,
+  StaffAccessCopyKind,
   StaffAccessCopyOutcome,
   StaffAccessCopyReport,
 } from "@langwatch/staff-access-contract";
 
-/** The scopes each side of a copy needs: read the source's content, write into the target. */
-export const COPY_SOURCE_SCOPES: readonly StaffAccessScope[] = ["ops:copy", "org:content"];
-export const COPY_TARGET_SCOPES: readonly StaffAccessScope[] = ["ops:copy", "org:support"];
+/** The scope each side of a copy was approved for. */
+export const COPY_SOURCE_SCOPES: readonly StaffAccessScope[] = ["copy:source"];
+export const COPY_TARGET_SCOPES: readonly StaffAccessScope[] = ["copy:target"];
+
+/** What making one item of each kind asks of the target grant. */
+export const COPY_KIND_PERMISSIONS: Readonly<
+  Record<StaffAccessCopyKind, readonly AuthzPermission[]>
+> = {
+  project: ["project:create"],
+  evaluator: ["evaluations:create"],
+  monitor: ["evaluations:create", "evaluations:update"],
+  prompt: ["prompts:create", "prompts:update"],
+  dataset: ["datasets:create"],
+};
+
+/** The ledger key of one source object: `${kind}:${sourceId}`. */
+export const copyKeyOf = (kind: StaffAccessCopyKind, sourceId: string): string =>
+  `${kind}:${sourceId}`;
+
+/** Whether the target's signed grant covers making an item of this kind. */
+export function withinGrant({
+  kind,
+  grant,
+}: {
+  kind: StaffAccessCopyKind;
+  grant: readonly string[];
+}): boolean {
+  return COPY_KIND_PERMISSIONS[kind].every((permission) => grant.includes(permission));
+}
 
 /** At most this many item names go into each organization's audit row. */
 export const COPY_AUDIT_NAMES_MAX = 200;
@@ -53,17 +81,24 @@ export function copyTotals(items: readonly StaffAccessCopyItem[]): StaffAccessCo
     already_copied: 0,
     skipped: 0,
     failed: 0,
+    stopped: 0,
   };
   for (const item of items) totals[item.outcome] += 1;
   return totals;
 }
 
-/** What the audit rows say a copy is about to make: kind and name, capped. */
-export function auditedPlan(items: readonly StaffAccessCopyItem[]): {
+/** What the audit rows say a copy is about to make, or made before it stopped: kind and name. */
+export function auditedPlan({
+  items,
+  outcome = "planned",
+}: {
+  items: readonly StaffAccessCopyItem[];
+  outcome?: StaffAccessCopyOutcome;
+}): {
   counts: Record<string, number>;
   names: string[];
 } {
-  const planned = items.filter((item) => item.outcome === "planned");
+  const planned = items.filter((item) => item.outcome === outcome);
   const counts: Record<string, number> = {};
   for (const item of planned) counts[item.kind] = (counts[item.kind] ?? 0) + 1;
   const names = planned.slice(0, COPY_AUDIT_NAMES_MAX).map((item) => `${item.kind}: ${item.name}`);

@@ -17,18 +17,39 @@ rules.
 
 The copy is an ops operation of the `staff-access` module:
 `POST /api/staff-access/ops/copies`, asked as the platform permission
-`opsCopy:create` and answered only for a session approved with the `ops:copy`
-scope.
+`opsCopy:create` and answered only for a session approved with the
+`copy:target` scope.
 
-- **Two approvals, one per organization.** The bearer is the target session
-  (`ops:copy` and `org:support`); the body carries the source session's ops
-  token (`ops:copy` and `org:content`). Both must be live, redeemed by the same
-  enrolled agent of the same operator, pinned to the same address, and name
-  different organizations. Each approval needs the organization's name typed.
+- **Two approvals, one per organization, each naming the other.** A copy side
+  is its own scope, approved alone: `copy:source` on the source organization
+  and `copy:target` on the target. Each request names its organization and the
+  other organization of the copy (`counterpartOrganization`). The approval page
+  shows the direction ("From ACME into Globex") and the passkey signs the other
+  organization, so a live session pairs only with the copy it was approved
+  for. The bearer is the target session; the body carries the source session's
+  ops token. Both must be live, redeemed by the same enrolled agent of the same
+  operator, pinned to the same address, and name each other. Each approval
+  needs the organization's name typed.
+- **The target grant is signed.** `copy:target` grants exactly what a copy
+  creates (`STAFF_COPY_TARGET_PERMISSIONS`: `project:create`,
+  `evaluations:create`, `evaluations:update`, `prompts:create`,
+  `prompts:update`, `datasets:create`). The approval page lists it, the
+  passkey signs it, and the run checks each item against it before making it;
+  an item outside the grant is skipped with `outside_copy_grant`.
+- **No organization key.** Copy scopes are platform scopes: redeeming either
+  side answers only an ops token. The server reads the source itself through
+  the owners' APIs, so the agent never holds a key that reads the source's
+  traces.
 - **Trail and audit first.** Before anything is made, each session gets a trail
-  row and each organization's audit log gets a `staffAccess.orgCopy` row with
-  the approver, the reason and the planned items. A failed write copies
-  nothing.
+  row and each organization's audit log gets a row with the approver, the
+  reason and the planned items: `staffAccess.orgCopyPlanned` on a dry run,
+  `staffAccess.orgCopy` before a real run (which also records that copied
+  monitors start paused). A failed write copies nothing. The source ops token
+  is never written to a trail row, an audit row or an answer.
+- **A revoke stops a running copy.** Before each item the run rereads both
+  approvals. Once either is revoked, lapsed or ended, nothing more is made,
+  the remaining items are reported `stopped`, the report says why, and both
+  audit logs get a `staffAccess.orgCopyStopped` row with what was made.
 - **An allowlist.** A copy carries projects, evaluators, monitors (paused),
   prompts with every version, and ready datasets. It never carries secrets,
   API keys, model providers, members, roles, SSO, billing, licence or usage.
@@ -41,7 +62,7 @@ scope.
 - **Idempotent by a ledger.** `StaffAccessCopyLedger` records each source item
   and the target item made from it, unique on target organization, kind and
   source id. A rerun reports earlier items as `already_copied` and makes only
-  new ones. A dry run plans and writes nothing.
+  new ones. A dry run plans and creates nothing.
 
 ## Consequences
 

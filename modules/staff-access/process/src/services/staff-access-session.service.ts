@@ -217,6 +217,8 @@ export class StaffAccessSessionService {
       scopes: row.scopes as StaffAccessScope[],
       organizationId: row.organizationId,
       organizationName: row.organizationName,
+      counterpartOrganizationId: row.counterpartOrganizationId,
+      counterpartOrganizationName: row.counterpartOrganizationName,
       reason: row.reason,
       machine: row.machine,
       requestIp: row.requestIp,

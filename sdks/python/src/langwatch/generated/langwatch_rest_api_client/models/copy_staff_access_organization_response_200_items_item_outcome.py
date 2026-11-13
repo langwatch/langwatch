@@ -7,6 +7,7 @@ class CopyStaffAccessOrganizationResponse200ItemsItemOutcome(str, Enum):
     FAILED = "failed"
     PLANNED = "planned"
     SKIPPED = "skipped"
+    STOPPED = "stopped"
 
     def __str__(self) -> str:
         return str(self.value)

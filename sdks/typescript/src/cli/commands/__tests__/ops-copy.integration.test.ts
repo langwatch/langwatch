@@ -167,8 +167,16 @@ describe("langwatch ops copy", () => {
 
     expect(result.exitCode).toBe(0);
     expect(requests).toEqual([
-      expect.objectContaining({ scopes: ["ops:copy", "org:content"], organization: "acme" }),
-      expect.objectContaining({ scopes: ["ops:copy", "org:support"], organization: "globex" }),
+      expect.objectContaining({
+        scopes: ["copy:source"],
+        organization: "acme",
+        counterpartOrganization: "globex",
+      }),
+      expect.objectContaining({
+        scopes: ["copy:target"],
+        organization: "globex",
+        counterpartOrganization: "acme",
+      }),
     ]);
     expect(result.stderr).toContain(`${endpoint}/ops/agents/approve/req_source`);
     expect(result.stderr).toContain(`${endpoint}/ops/agents/approve/req_target`);

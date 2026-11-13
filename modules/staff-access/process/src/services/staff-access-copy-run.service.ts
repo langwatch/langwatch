@@ -1,32 +1,30 @@
 import type { DatasetApi, DatasetSummary } from "@langwatch/dataset-contract";
-import {
-  evaluatorConfigSchema,
-  newEvaluatorId,
-  type Evaluator,
-  type EvaluatorApi,
-} from "@langwatch/evaluator-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { generate } from "@langwatch/ksuid";
-import {
-  monitorCreateInputSchema,
-  type MonitorApi,
-  type MonitorWithEvaluator,
-} from "@langwatch/monitor-contract";
+import type { MonitorApi } from "@langwatch/monitor-contract";
 import type {
   OrganizationApi,
   OrganizationProvisioningSummary,
 } from "@langwatch/organization-contract";
 import type { Project, ProjectApi } from "@langwatch/project-contract";
-import type { PromptApi, VersionedPrompt } from "@langwatch/prompt-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
 import type { StaffAccessCopyItem, StaffAccessCopyKind } from "@langwatch/staff-access-contract";
 import type { Instant } from "@langwatch/time";
 
 import type { StaffAccessCopyLedgerRepository } from "../repositories/staff-access.repository.ts";
 import {
   copyItem,
+  copyKeyOf as keyOf,
   failureReason,
-  promptFields,
   selectProjects,
+  withinGrant,
 } from "../rules/staff-access-copy.rules.ts";
+import {
+  StaffAccessCopyMakeService,
+  type CopyPlaced as Placed,
+  type CopyRun as Run,
+  type CopyWork as Work,
+} from "./staff-access-copy-make.service.ts";
 
 const PAGE = 100;
 const DATASET_PAGE = 1000;
@@ -44,26 +42,11 @@ type RunDeps = Readonly<{
   now: () => Instant;
 }>;
 
-/** One source object the plan found, with what it carries to be copied. */
-type Work =
-  | { kind: "project"; source: Project }
-  | { kind: "evaluator"; source: Evaluator }
-  | { kind: "monitor"; source: MonitorWithEvaluator }
-  | { kind: "prompt"; source: VersionedPrompt }
-  | { kind: "dataset"; source: DatasetSummary };
-
 type Step = Readonly<{ item: StaffAccessCopyItem; work: Work | null }>;
-type Placed = Readonly<{ targetId: string; targetProjectId: string }>;
 type Organization = OrganizationProvisioningSummary;
-type Teams = { teamId: string | undefined; looked: boolean };
-/** What one execution carries from step to step. */
-type Run = {
-  requestId: string;
-  source: Organization;
-  target: Organization;
-  placed: Map<string, Placed>;
-  teams: Teams;
-};
+
+/** Why a run stopped early, or null while both approvals are still live. */
+export type CopyLiveness = () => Promise<string | null>;
 
 export type StaffAccessCopyPlan = Readonly<{
   items: StaffAccessCopyItem[];
@@ -72,15 +55,17 @@ export type StaffAccessCopyPlan = Readonly<{
   placed: ReadonlyMap<string, Placed>;
 }>;
 
-const keyOf = (kind: StaffAccessCopyKind, sourceId: string) => `${kind}:${sourceId}`;
-
 /**
  * Reads what a copy would make and makes it, through each owner's `*Api` only. The allowlist is
  * the kinds below; anything else in the organization is never read. A rerun skips every object
  * the ledger says an earlier copy made, so it adds only what is new.
  */
 export class StaffAccessCopyRunService {
-  private constructor(private readonly deps: RunDeps) {}
+  readonly #make: StaffAccessCopyMakeService;
+
+  private constructor(private readonly deps: RunDeps) {
+    this.#make = StaffAccessCopyMakeService.create(deps);
+  }
 
   static create(deps: RunDeps): StaffAccessCopyRunService {
     return new StaffAccessCopyRunService(deps);
@@ -122,28 +107,48 @@ export class StaffAccessCopyRunService {
     return { items: steps.map((step) => step.item), steps, placed };
   }
 
-  /** Makes every planned item in order, each on its own: one failure never stops the rest. */
+  /**
+   * Makes every planned item in order, each on its own: one failure never stops the rest. Before
+   * each item it asks whether both approvals are still live; once one is not, every remaining
+   * planned item is reported `stopped` and nothing more is made.
+   */
   async execute({
     plan,
     requestId,
     source,
     target,
+    grant,
+    stillLive,
   }: {
     plan: StaffAccessCopyPlan;
     requestId: string;
     source: Organization;
     target: Organization;
-  }): Promise<StaffAccessCopyItem[]> {
+    grant: readonly string[];
+    stillLive: CopyLiveness;
+  }): Promise<{ items: StaffAccessCopyItem[]; stoppedBecause: string | null }> {
     const run: Run = {
       requestId,
       source,
       target,
       placed: new Map(plan.placed),
       teams: { teamId: undefined, looked: false },
+      grant,
     };
-    const results: StaffAccessCopyItem[] = [];
-    for (const step of plan.steps) results.push(await this.runStep({ step, run }));
-    return results;
+    const items: StaffAccessCopyItem[] = [];
+    let stoppedBecause: string | null = null;
+    for (const step of plan.steps) {
+      const due = step.item.outcome === "planned" && step.work !== null;
+      if (due && stoppedBecause === null) {
+        stoppedBecause = await stillLive();
+      }
+      if (due && stoppedBecause !== null) {
+        items.push({ ...step.item, outcome: "stopped", reason: stoppedBecause });
+        continue;
+      }
+      items.push(await this.runStep({ step, run }));
+    }
+    return { items, stoppedBecause };
   }
 
   private async runStep({ step, run }: { step: Step; run: Run }): Promise<StaffAccessCopyItem> {
@@ -155,8 +160,11 @@ export class StaffAccessCopyRunService {
     if (targetProjectId === undefined) {
       return { ...step.item, outcome: "skipped", reason: "project_not_copied" };
     }
+    if (!withinGrant({ kind: step.item.kind, grant: run.grant })) {
+      return { ...step.item, outcome: "skipped", reason: "outside_copy_grant" };
+    }
     try {
-      const made = await this.make({
+      const made = await this.#make.make({
         work: step.work,
         sourceProjectId: step.item.sourceProjectId,
         targetProjectId,
@@ -325,169 +333,5 @@ export class StaffAccessCopyRunService {
       if (answer.length < DATASET_PAGE) break;
     }
     return datasets;
-  }
-
-  private async make({
-    work,
-    sourceProjectId,
-    targetProjectId,
-    run,
-  }: {
-    work: Work;
-    sourceProjectId: string;
-    targetProjectId: string | null;
-    run: Run;
-  }): Promise<Placed | { skipped: string }> {
-    if (work.kind === "project") {
-      const created = await this.deps.projects.createInOrganization({
-        organizationId: run.target.id,
-        userId: null,
-        ...(await this.teamFor({ target: run.target, teams: run.teams })),
-        name: work.source.name,
-        language: work.source.language,
-        framework: work.source.framework,
-      });
-      return { targetId: created.id, targetProjectId: created.id };
-    }
-    const projectId = targetProjectId as string;
-    const into = (targetId: string) => ({ targetId, targetProjectId: projectId });
-    switch (work.kind) {
-      case "evaluator":
-        return into(await this.copyEvaluator({ evaluator: work.source, projectId }));
-      case "monitor":
-        return this.copyMonitor({ monitor: work.source, projectId, placed: run.placed });
-      case "prompt":
-        return into(
-          await this.copyPrompt({
-            prompt: work.source,
-            source: run.source,
-            target: run.target,
-            projectId,
-          }),
-        );
-      case "dataset": {
-        const copied = await this.deps.datasets.copyDataset({
-          sourceDatasetId: work.source.id,
-          sourceProjectId,
-          targetProjectId: projectId,
-        });
-        return into(copied.id);
-      }
-    }
-  }
-
-  private async copyEvaluator({
-    evaluator,
-    projectId,
-  }: {
-    evaluator: Evaluator;
-    projectId: string;
-  }): Promise<string> {
-    const created = await this.deps.evaluators.create({
-      id: newEvaluatorId(),
-      projectId,
-      name: evaluator.name,
-      ...(evaluator.slug ? { slug: evaluator.slug } : {}),
-      type: evaluator.type as "evaluator" | "code",
-      config: evaluatorConfigSchema.parse(evaluator.config ?? {}),
-    });
-    return created.id;
-  }
-
-  /** A copied monitor starts paused: it would run on the target's traces and spend there. */
-  private async copyMonitor({
-    monitor,
-    projectId,
-    placed,
-  }: {
-    monitor: MonitorWithEvaluator;
-    projectId: string;
-    placed: ReadonlyMap<string, Placed>;
-  }): Promise<Placed | { skipped: string }> {
-    const evaluatorId = monitor.evaluatorId
-      ? placed.get(keyOf("evaluator", monitor.evaluatorId))?.targetId
-      : undefined;
-    if (monitor.evaluatorId && !evaluatorId) return { skipped: "evaluator_not_copied" };
-    const created = await this.deps.monitors.create(
-      monitorCreateInputSchema.parse({
-        projectId,
-        name: monitor.name,
-        checkType: monitor.checkType,
-        preconditions: monitor.preconditions,
-        parameters: monitor.parameters,
-        ...(monitor.mappings ? { mappings: monitor.mappings } : {}),
-        sample: monitor.sample,
-        executionMode: monitor.executionMode,
-        ...(evaluatorId ? { evaluatorId } : {}),
-        level: monitor.level === "thread" ? "thread" : "trace",
-        threadIdleTimeout: monitor.threadIdleTimeout,
-      }),
-    );
-    if (created.enabled) {
-      await this.deps.monitors.toggle({ id: created.id, projectId, enabled: false });
-    }
-    return { targetId: created.id, targetProjectId: projectId };
-  }
-
-  /** Every version, oldest first, as new versions of one new prompt. */
-  private async copyPrompt({
-    prompt,
-    source,
-    target,
-    projectId,
-  }: {
-    prompt: VersionedPrompt;
-    source: Organization;
-    target: Organization;
-    projectId: string;
-  }): Promise<string> {
-    const versions = (
-      await this.deps.prompts.getAllVersions({
-        idOrHandle: prompt.id,
-        projectId: prompt.projectId,
-        organizationId: source.id,
-      })
-    ).toSorted((a, b) => a.version - b.version);
-    const [first, ...later] = versions.length > 0 ? versions : [prompt];
-    const created = await this.deps.prompts.createPrompt({
-      projectId,
-      organizationId: target.id,
-      handle: prompt.handle as string,
-      scope: prompt.scope,
-      commitMessage: first?.commitMessage ?? null,
-      ...promptFields(first as VersionedPrompt),
-    });
-    for (const version of later) {
-      await this.deps.prompts.updatePrompt({
-        idOrHandle: created.id,
-        projectId,
-        data: {
-          commitMessage: version.commitMessage || `Version ${version.version}`,
-          ...promptFields(version),
-        },
-      });
-    }
-    return created.id;
-  }
-
-  /** The target organization's first shared team, or a new team named after it. */
-  private async teamFor({
-    target,
-    teams,
-  }: {
-    target: Organization;
-    teams: Teams;
-  }): Promise<{ teamId: string } | { newTeamName: string }> {
-    if (!teams.looked) {
-      const page = await this.deps.organizations.listTeams({
-        organizationId: target.id,
-        page: 1,
-        limit: PAGE,
-      });
-      teams.teamId = page.data.find((team) => !team.isPersonal && team.archivedAt === null)?.id;
-      teams.looked = true;
-    }
-    if (teams.teamId) return { teamId: teams.teamId };
-    return { newTeamName: target.name };
   }
 }

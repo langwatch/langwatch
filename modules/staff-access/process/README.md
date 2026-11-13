@@ -162,16 +162,19 @@ Authenticated: the bearer is an operator's enrolled agent or one approved sessio
 Answers at `/api/staff-access/requests`, `/api/v1/staff-access/requests`.
 
 ```typescript
-// Body: staffAccessRequestBodySchema, ../contract/src/staff-access-rest.schemas.ts:62
+// Body: staffAccessRequestBodySchema, ../contract/src/staff-access-rest.schemas.ts:91
 interface Body {
-  scopes: ("ops:read" | "ops:copy" | "org:metadata" | "org:content" | "org:support")[];
+  scopes: (
+    "ops:read" | "copy:source" | "copy:target" | "org:metadata" | "org:content" | "org:support"
+  )[];
   organization?: string;
+  counterpartOrganization?: string;
   reason: string;
   codeChallenge: string;
   codeChallengeMethod: "S256";
   machine: string;
 }
-// Response: staffAccessRequestCreatedSchema, ../contract/src/staff-access-rest.schemas.ts:74
+// Response: staffAccessRequestCreatedSchema, ../contract/src/staff-access-rest.schemas.ts:103
 interface Response {
   requestId: string;
   approvalUrl: string;
@@ -186,11 +189,11 @@ Authenticated: the bearer is an operator's enrolled agent or one approved sessio
 Answers at `/api/staff-access/requests/:requestId`, `/api/v1/staff-access/requests/:requestId`.
 
 ```typescript
-// Params: staffAccessRequestParamsSchema, ../contract/src/staff-access-rest.schemas.ts:82
+// Params: staffAccessRequestParamsSchema, ../contract/src/staff-access-rest.schemas.ts:111
 interface Params {
   requestId: string;
 }
-// Response: staffAccessRequestStatusAnswerSchema, ../contract/src/staff-access-rest.schemas.ts:94
+// Response: staffAccessRequestStatusAnswerSchema, ../contract/src/staff-access-rest.schemas.ts:123
 interface Response {
   requestId: string;
   status: "pending" | "approved" | "denied" | "redeemed" | "expired" | "revoked";
@@ -206,24 +209,12 @@ Authenticated: the bearer is an operator's enrolled agent or one approved sessio
 Answers at `/api/staff-access/requests/:requestId/redeem`, `/api/v1/staff-access/requests/:requestId/redeem`.
 
 ```typescript
-type Params = z.infer<typeof staffAccessRequestParamsSchema>; // ../contract/src/staff-access-rest.schemas.ts:82
-// Body: staffAccessRedeemBodySchema, ../contract/src/staff-access-rest.schemas.ts:104
+type Params = z.infer<typeof staffAccessRequestParamsSchema>; // ../contract/src/staff-access-rest.schemas.ts:111
+// Body: staffAccessRedeemBodySchema, ../contract/src/staff-access-rest.schemas.ts:133
 interface Body {
   codeVerifier: string;
 }
-// Response: staffAccessRedeemedSchema, ../contract/src/staff-access-rest.schemas.ts:126
-interface Response {
-  apiKey?: string;
-  opsToken?: string;
-  organizationId?: string;
-  projects: {
-    id: string;
-    slug: string;
-    name: string;
-  }[];
-  scopes: ("ops:read" | "ops:copy" | "org:metadata" | "org:content" | "org:support")[];
-  expiresAt: string;
-}
+type Response = z.infer<typeof staffAccessRedeemedSchema>; // ../contract/src/staff-access-rest.schemas.ts:155
 ```
 
 #### `POST /api/staff-access/requests/:requestId/end` · `endStaffAccessSession`
@@ -233,10 +224,10 @@ Authenticated: the bearer is an operator's enrolled agent or one approved sessio
 Answers at `/api/staff-access/requests/:requestId/end`, `/api/v1/staff-access/requests/:requestId/end`.
 
 ```typescript
-type Params = z.infer<typeof staffAccessRequestParamsSchema>; // ../contract/src/staff-access-rest.schemas.ts:82
-// Body: staffAccessNoBodySchema, ../contract/src/staff-access-rest.schemas.ts:131
+type Params = z.infer<typeof staffAccessRequestParamsSchema>; // ../contract/src/staff-access-rest.schemas.ts:111
+// Body: staffAccessNoBodySchema, ../contract/src/staff-access-rest.schemas.ts:160
 interface Body {}
-// Response: staffAccessEndedSchema, ../contract/src/staff-access-rest.schemas.ts:134
+// Response: staffAccessEndedSchema, ../contract/src/staff-access-rest.schemas.ts:163
 interface Response {
   ended: true;
 }
@@ -249,11 +240,11 @@ Platform permission `opsRead:view`. Declared at `src/transport/staff-access.rest
 Answers at `/api/staff-access/ops/organizations`, `/api/v1/staff-access/ops/organizations`.
 
 ```typescript
-// Query: staffAccessOrganizationsQuerySchema, ../contract/src/staff-access-rest.schemas.ts:143
+// Query: staffAccessOrganizationsQuerySchema, ../contract/src/staff-access-rest.schemas.ts:172
 interface Query {
   query?: string;
 }
-// Response: staffAccessOrganizationListSchema, ../contract/src/staff-access-rest.schemas.ts:152
+// Response: staffAccessOrganizationListSchema, ../contract/src/staff-access-rest.schemas.ts:181
 interface Response {
   organizations: {
     id: string;
@@ -270,11 +261,11 @@ Platform permission `opsRead:view`. Declared at `src/transport/staff-access.rest
 Answers at `/api/staff-access/ops/organizations/:organization/usage`, `/api/v1/staff-access/ops/organizations/:organization/usage`.
 
 ```typescript
-// Params: staffAccessOrganizationParamsSchema, ../contract/src/staff-access-rest.schemas.ts:163
+// Params: staffAccessOrganizationParamsSchema, ../contract/src/staff-access-rest.schemas.ts:192
 interface Params {
   organization: string;
 }
-type Response = z.infer<typeof staffAccessUsageSchema>; // ../contract/src/staff-access-rest.schemas.ts:184
+type Response = z.infer<typeof staffAccessUsageSchema>; // ../contract/src/staff-access-rest.schemas.ts:213
 ```
 
 #### `GET /api/staff-access/ops/queues` · `getStaffAccessQueueSummary`
@@ -284,7 +275,7 @@ Platform permission `opsRead:view`. Declared at `src/transport/staff-access.rest
 Answers at `/api/staff-access/ops/queues`, `/api/v1/staff-access/ops/queues`.
 
 ```typescript
-// Response: staffAccessQueueSummarySchema, ../contract/src/staff-access-rest.schemas.ts:205
+// Response: staffAccessQueueSummarySchema, ../contract/src/staff-access-rest.schemas.ts:234
 interface Response {
   queues: {
     name: string;
@@ -306,13 +297,13 @@ Platform permission `opsCopy:create`. Declared at `src/transport/staff-access.re
 Answers at `/api/staff-access/ops/copies`, `/api/v1/staff-access/ops/copies`.
 
 ```typescript
-// Body: staffAccessCopyBodySchema, ../contract/src/staff-access-rest.schemas.ts:235
+// Body: staffAccessCopyBodySchema, ../contract/src/staff-access-rest.schemas.ts:264
 interface Body {
   sourceOpsToken: string;
   projects?: string[];
   dryRun?: boolean;
 }
-type Response = z.infer<typeof staffAccessCopyReportSchema>; // ../contract/src/staff-access-rest.schemas.ts:277
+type Response = z.infer<typeof staffAccessCopyReportSchema>; // ../contract/src/staff-access-rest.schemas.ts:309
 ```
 
 ## tRPC transport
@@ -338,12 +329,12 @@ Contract `../contract/src/staff-access.trpc.ts:23`, router `src/transport/staff-
 // staffAccess.overview
 // Input: inline, ../contract/src/staff-access.trpc.ts:25
 type Input = unknown;
-type Output = z.infer<typeof staffAccessOverviewSchema>; // ../contract/src/staff-access.ts:115
+type Output = z.infer<typeof staffAccessOverviewSchema>; // ../contract/src/staff-access.ts:120
 
 // staffAccess.enrolOptions
 // Input: inline, ../contract/src/staff-access.trpc.ts:29
 type Input = unknown;
-// Output: staffAccessAssertionOptionsSchema, ../contract/src/staff-access.ts:118
+// Output: staffAccessAssertionOptionsSchema, ../contract/src/staff-access.ts:123
 interface Output {
   challenge: string;
   rpId: string;
@@ -357,8 +348,8 @@ interface Output {
 }
 
 // staffAccess.enrol
-type Input = z.infer<typeof staffAccessEnrolInputSchema>; // ../contract/src/staff-access.ts:128
-// Output: staffAccessEnrolledSchema, ../contract/src/staff-access.ts:140
+type Input = z.infer<typeof staffAccessEnrolInputSchema>; // ../contract/src/staff-access.ts:133
+// Output: staffAccessEnrolledSchema, ../contract/src/staff-access.ts:145
 interface Output {
   requesterKey: string;
   requester: {
@@ -372,49 +363,49 @@ interface Output {
 }
 
 // staffAccess.revokeRequester
-// Input: staffAccessRequesterIdInputSchema, ../contract/src/staff-access.ts:148
+// Input: staffAccessRequesterIdInputSchema, ../contract/src/staff-access.ts:153
 interface Input {
   requesterId: string;
 }
-// Output: staffAccessOkSchema, ../contract/src/staff-access.ts:194
+// Output: staffAccessOkSchema, ../contract/src/staff-access.ts:199
 interface Output {
   ok: true;
 }
 
 // staffAccess.getApprovalRequest
-// Input: staffAccessRequestIdInputSchema, ../contract/src/staff-access.ts:154
+// Input: staffAccessRequestIdInputSchema, ../contract/src/staff-access.ts:159
 interface Input {
   requestId: string;
 }
-type Output = z.infer<typeof staffAccessApprovalViewSchema>; // ../contract/src/staff-access.ts:102
+type Output = z.infer<typeof staffAccessApprovalViewSchema>; // ../contract/src/staff-access.ts:107
 
 // staffAccess.approvalOptions
-// Input: staffAccessApprovalChoiceSchema, ../contract/src/staff-access.ts:166
+// Input: staffAccessApprovalChoiceSchema, ../contract/src/staff-access.ts:171
 interface Input {
   requestId: string;
   spendApproved: boolean;
   typedOrganizationName?: string;
 }
-type Output = z.infer<typeof staffAccessAssertionOptionsSchema>; // ../contract/src/staff-access.ts:118
+type Output = z.infer<typeof staffAccessAssertionOptionsSchema>; // ../contract/src/staff-access.ts:123
 
 // staffAccess.approve
-type Input = z.infer<typeof staffAccessApproveInputSchema>; // ../contract/src/staff-access.ts:177
-type Output = z.infer<typeof staffAccessApprovalViewSchema>; // ../contract/src/staff-access.ts:102
+type Input = z.infer<typeof staffAccessApproveInputSchema>; // ../contract/src/staff-access.ts:182
+type Output = z.infer<typeof staffAccessApprovalViewSchema>; // ../contract/src/staff-access.ts:107
 
 // staffAccess.deny
-type Input = z.infer<typeof staffAccessRequestIdInputSchema>; // ../contract/src/staff-access.ts:154
-type Output = z.infer<typeof staffAccessApprovalViewSchema>; // ../contract/src/staff-access.ts:102
+type Input = z.infer<typeof staffAccessRequestIdInputSchema>; // ../contract/src/staff-access.ts:159
+type Output = z.infer<typeof staffAccessApprovalViewSchema>; // ../contract/src/staff-access.ts:107
 
 // staffAccess.revokeSession
-type Input = z.infer<typeof staffAccessRequestIdInputSchema>; // ../contract/src/staff-access.ts:154
-type Output = z.infer<typeof staffAccessOkSchema>; // ../contract/src/staff-access.ts:194
+type Input = z.infer<typeof staffAccessRequestIdInputSchema>; // ../contract/src/staff-access.ts:159
+type Output = z.infer<typeof staffAccessOkSchema>; // ../contract/src/staff-access.ts:199
 
 // staffAccess.revokeAll
-// Input: staffAccessRevokeAllInputSchema, ../contract/src/staff-access.ts:185
+// Input: staffAccessRevokeAllInputSchema, ../contract/src/staff-access.ts:190
 interface Input {
   confirmation: string;
 }
-// Output: staffAccessRevokedCountSchema, ../contract/src/staff-access.ts:191
+// Output: staffAccessRevokedCountSchema, ../contract/src/staff-access.ts:196
 interface Output {
   revoked: number;
 }

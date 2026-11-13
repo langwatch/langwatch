@@ -2552,6 +2552,8 @@ export interface LwqlPrismaRows {
     readonly scopes: "String[]";
     readonly organizationId: "String?";
     readonly organizationName: "String?";
+    readonly counterpartOrganizationId: "String?";
+    readonly counterpartOrganizationName: "String?";
     readonly reason: "String";
     readonly codeChallenge: "String";
     readonly machine: "String";

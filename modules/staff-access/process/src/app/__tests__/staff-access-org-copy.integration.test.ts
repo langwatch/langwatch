@@ -22,6 +22,7 @@ import {
   ACME,
   AGENT_IP,
   GLOBEX,
+  INITECH,
   OLIVIA,
   PEDRO,
   requestBody,
@@ -57,15 +58,26 @@ async function liveApproval({
   agent,
   scopes,
   organization,
+  counterpart,
 }: {
   w: StaffAccessWorld;
   agent: Agent;
   scopes: StaffAccessScope[];
   organization: Organization;
-}): Promise<{ requestId: string; opsToken: string; session: StaffAccessDoorSession }> {
+  counterpart?: Organization;
+}): Promise<{
+  requestId: string;
+  opsToken: string;
+  apiKey: string | undefined;
+  session: StaffAccessDoorSession;
+}> {
   const created = await w.app.createRequest({
     session: agent.session,
-    body: requestBody({ scopes, organization: organization.slug }),
+    body: requestBody({
+      scopes,
+      organization: organization.slug,
+      ...(counterpart ? { counterpartOrganization: counterpart.slug } : {}),
+    }),
   });
   await w.approve({
     choice: {
@@ -86,6 +98,7 @@ async function liveApproval({
   return {
     requestId: created.requestId,
     opsToken,
+    apiKey: answer.apiKey,
     session: caller?.session as StaffAccessDoorSession,
   };
 }
@@ -115,14 +128,16 @@ async function pairedApprovals(w: StaffAccessWorld) {
   const source = await liveApproval({
     w,
     agent,
-    scopes: ["ops:copy", "org:content"],
+    scopes: ["copy:source"],
     organization: ACME,
+    counterpart: GLOBEX,
   });
   const target = await liveApproval({
     w,
     agent,
-    scopes: ["ops:copy", "org:support"],
+    scopes: ["copy:target"],
     organization: GLOBEX,
+    counterpart: ACME,
   });
   return { agent, source, target };
 }
@@ -131,14 +146,18 @@ function scenarios(backend: Backend): void {
   const world = () => staffAccessWorld({ repositories: backend.repositories() });
 
   describe(`given the ${backend.name} store`, () => {
-    describe("when an operator approves an ops:copy request", () => {
-      /** @scenario "An ops:copy approval needs the organization name typed" */
+    describe("when an operator approves a copy request", () => {
+      /** @scenario "A copy approval needs the organization name typed" */
       it("refuses an approval without the typed organization name", async () => {
         const w = world();
         const agent = await w.enrol();
         const created = await w.app.createRequest({
           session: agent.session,
-          body: requestBody({ scopes: ["ops:copy", "org:support"], organization: GLOBEX.slug }),
+          body: requestBody({
+            scopes: ["copy:target"],
+            organization: GLOBEX.slug,
+            counterpartOrganization: ACME.slug,
+          }),
         });
 
         await expect(
@@ -148,15 +167,23 @@ function scenarios(backend: Backend): void {
     });
 
     describe("when the door is asked opsCopy:create", () => {
-      /** @scenario "The door answers opsCopy:create only for a session approved for ops:copy" */
-      it("permits a session approved for ops:copy and refuses an ops:read one", async () => {
+      /** @scenario "The door answers opsCopy:create only for a session approved for copy:target" */
+      it("permits a copy:target session and refuses copy:source and ops:read ones", async () => {
         const w = world();
         const agent = await w.enrol();
         const copy = await liveApproval({
           w,
           agent,
-          scopes: ["ops:copy", "org:support"],
+          scopes: ["copy:target"],
           organization: GLOBEX,
+          counterpart: ACME,
+        });
+        const source = await liveApproval({
+          w,
+          agent,
+          scopes: ["copy:source"],
+          organization: ACME,
+          counterpart: GLOBEX,
         });
         const read = await liveApproval({ w, agent, scopes: ["ops:read"], organization: ACME });
         const door = w.app.staffAccessDoor;
@@ -172,6 +199,7 @@ function scenarios(backend: Backend): void {
         expect(ask(copy.session, "opsCopy:create")).toEqual({ permitted: true });
         expect(ask(copy.session, "opsRead:view")).toEqual({ permitted: false });
         expect(ask(read.session, "opsCopy:create")).toEqual({ permitted: false });
+        expect(ask(source.session, "opsCopy:create")).toEqual({ permitted: false });
       });
     });
 
@@ -219,11 +247,10 @@ function scenarios(backend: Backend): void {
       });
 
       /** @scenario "A dry run lists what a copy would make and copies nothing" */
-      it("plans every item and writes nothing on a dry run", async () => {
+      it("plans every item and creates nothing on a dry run", async () => {
         const w = world();
         const seeded = seedAcme(w);
         const { source, target } = await pairedApprovals(w);
-        const auditBefore = w.state.audit.length;
 
         const report = await w.app.copyOrganization({
           session: target.session,
@@ -236,7 +263,57 @@ function scenarios(backend: Backend): void {
         expect(w.copy.data.projects.some((project) => project.organizationId === GLOBEX.id)).toBe(
           false,
         );
-        expect(w.state.audit.length).toBe(auditBefore);
+        expect(w.state.audit.some((row) => row.action === "staffAccess.orgCopy")).toBe(false);
+      });
+
+      /** @scenario "A dry run is in both organizations' audit logs as a planned copy" */
+      it("writes a planned-copy audit row in each organization on a dry run", async () => {
+        const w = world();
+        const seeded = seedAcme(w);
+        const { source, target } = await pairedApprovals(w);
+
+        await w.app.copyOrganization({
+          session: target.session,
+          body: { sourceOpsToken: source.opsToken, projects: [seeded.project.id], dryRun: true },
+        });
+
+        const rows = w.state.audit.filter((row) => row.action === "staffAccess.orgCopyPlanned");
+        expect(rows.map((row) => row.organizationId)).toEqual([ACME.id, GLOBEX.id]);
+        expect(rows[0]?.metadata).toMatchObject({
+          approvedBy: { id: OLIVIA },
+          items: expect.arrayContaining(["project: support-bot", "prompt: support-reply"]),
+        });
+      });
+
+      /** @scenario "A revoked approval stops a running copy" */
+      it("stops at the next item once the source session is revoked mid-run", async () => {
+        const w = world();
+        const seeded = seedAcme(w);
+        const { source, target } = await pairedApprovals(w);
+        w.copy.hooks.beforeEvaluatorCreate = async () => {
+          await w.app.revokeSession({ ...w.operator(OLIVIA), requestId: source.requestId });
+        };
+
+        const report = await w.app.copyOrganization({
+          session: target.session,
+          body: { sourceOpsToken: source.opsToken, projects: [seeded.project.id] },
+        });
+
+        expect(report.stoppedBecause).toBe("source_approval_ended");
+        expect(report.items.map((item) => [item.kind, item.outcome])).toEqual([
+          ["project", "copied"],
+          ["evaluator", "copied"],
+          ["monitor", "stopped"],
+          ["prompt", "stopped"],
+          ["dataset", "stopped"],
+        ]);
+        expect(report.totals.stopped).toBe(3);
+        expect(
+          w.copy.data.datasets.filter((dataset) => dataset.projectId !== seeded.project.id),
+        ).toEqual([]);
+        const stopped = w.state.audit.filter((row) => row.action === "staffAccess.orgCopyStopped");
+        expect(stopped.map((row) => row.organizationId)).toEqual([ACME.id, GLOBEX.id]);
+        expect(stopped[0]?.metadata).toMatchObject({ stoppedBecause: "source_approval_ended" });
       });
 
       /** @scenario "A rerun copies only what is new" */
@@ -317,6 +394,7 @@ function scenarios(backend: Backend): void {
           reason: "fix ACME's broken evaluator",
           counts: { project: 1, evaluator: 1, monitor: 1, prompt: 1, dataset: 1 },
           items: expect.arrayContaining(["project: support-bot", "prompt: support-reply"]),
+          monitorsCreatedPaused: true,
         });
       });
 
@@ -337,6 +415,57 @@ function scenarios(backend: Backend): void {
         expect(refused).toBe("staff_access_audit_unavailable");
         expect(w.copy.data.projects.some((project) => project.organizationId === GLOBEX.id)).toBe(
           false,
+        );
+      });
+    });
+
+    describe("when the agent redeems the copy approvals", () => {
+      /** @scenario "A copy approval mints only an ops token, never an organization key" */
+      it("answers an ops token and no organization key for either side", async () => {
+        const w = world();
+        const { source, target } = await pairedApprovals(w);
+
+        expect(source.opsToken).toMatch(/^lwsa_/);
+        expect(target.opsToken).toMatch(/^lwsa_/);
+        expect(source.apiKey).toBeUndefined();
+        expect(target.apiKey).toBeUndefined();
+        expect(w.state.minted).toEqual([]);
+      });
+
+      /** @scenario "The approval page shows the other organization and the target grant" */
+      it("shows the counterpart on both sides and the grant on the target only", async () => {
+        const w = world();
+        const agent = await w.enrol();
+        const ask = async (
+          scopes: StaffAccessScope[],
+          organization: Organization,
+          other: Organization,
+        ) => {
+          const created = await w.app.createRequest({
+            session: agent.session,
+            body: requestBody({
+              scopes,
+              organization: organization.slug,
+              counterpartOrganization: other.slug,
+            }),
+          });
+          return w.app.getApprovalRequest({ ...w.operator(OLIVIA), requestId: created.requestId });
+        };
+
+        const sourceView = await ask(["copy:source"], ACME, GLOBEX);
+        const targetView = await ask(["copy:target"], GLOBEX, ACME);
+
+        expect(sourceView).toMatchObject({
+          organizationName: ACME.name,
+          counterpartOrganizationName: GLOBEX.name,
+        });
+        expect(sourceView.copyGrant).toEqual([]);
+        expect(targetView).toMatchObject({
+          organizationName: GLOBEX.name,
+          counterpartOrganizationName: ACME.name,
+        });
+        expect(targetView.copyGrant).toEqual(
+          expect.arrayContaining(["project:create", "prompts:create", "datasets:create"]),
         );
       });
     });
@@ -372,15 +501,17 @@ function scenarios(backend: Backend): void {
         const source = await liveApproval({
           w,
           agent,
-          scopes: ["ops:copy", "org:content"],
+          scopes: ["copy:source"],
           organization: ACME,
+          counterpart: GLOBEX,
         });
         w.advance({ minutes: 50 });
         const target = await liveApproval({
           w,
           agent,
-          scopes: ["ops:copy", "org:support"],
+          scopes: ["copy:target"],
           organization: GLOBEX,
+          counterpart: ACME,
         });
         w.advance({ minutes: 15 });
 
@@ -402,14 +533,16 @@ function scenarios(backend: Backend): void {
         const source = await liveApproval({
           w,
           agent: second,
-          scopes: ["ops:copy", "org:content"],
+          scopes: ["copy:source"],
           organization: ACME,
+          counterpart: GLOBEX,
         });
         const target = await liveApproval({
           w,
           agent: first,
-          scopes: ["ops:copy", "org:support"],
+          scopes: ["copy:target"],
           organization: GLOBEX,
+          counterpart: ACME,
         });
 
         await expect(
@@ -422,33 +555,42 @@ function scenarios(backend: Backend): void {
         ).resolves.toBe("staff_copy_approvals_mismatch");
       });
 
-      /** @scenario "Each side needs its own copy scopes" */
-      it("refuses a source without ops:copy and a target without org:support", async () => {
+      /** @scenario "Each side needs its own copy scope" */
+      it("refuses an ops:read source and a target approved as a copy source", async () => {
         const w = world();
         const agent = await w.enrol();
         const readSource = await liveApproval({
           w,
           agent,
-          scopes: ["ops:read", "org:content"],
+          scopes: ["ops:read"],
           organization: ACME,
         });
         const source = await liveApproval({
           w,
           agent,
-          scopes: ["ops:copy", "org:content"],
+          scopes: ["copy:source"],
           organization: ACME,
+          counterpart: GLOBEX,
         });
-        const contentTarget = await liveApproval({
+        const target = await liveApproval({
           w,
           agent,
-          scopes: ["ops:copy", "org:content"],
+          scopes: ["copy:target"],
           organization: GLOBEX,
+          counterpart: ACME,
+        });
+        const sourceAsTarget = await liveApproval({
+          w,
+          agent,
+          scopes: ["copy:source"],
+          organization: GLOBEX,
+          counterpart: ACME,
         });
 
         await expect(
           codeOf(
             w.app.copyOrganization({
-              session: contentTarget.session,
+              session: target.session,
               body: { sourceOpsToken: readSource.opsToken },
             }),
           ),
@@ -456,28 +598,30 @@ function scenarios(backend: Backend): void {
         await expect(
           codeOf(
             w.app.copyOrganization({
-              session: contentTarget.session,
+              session: sourceAsTarget.session,
               body: { sourceOpsToken: source.opsToken },
             }),
           ),
         ).resolves.toBe("staff_copy_scope_missing");
       });
 
-      /** @scenario "A copy into the same organization is refused" */
-      it("refuses source and target approvals on the same organization", async () => {
+      /** @scenario "Approvals that do not name each other do not pair" */
+      it("refuses a source approved for a copy into another organization", async () => {
         const w = world();
         const agent = await w.enrol();
         const source = await liveApproval({
           w,
           agent,
-          scopes: ["ops:copy", "org:content"],
-          organization: ACME,
+          scopes: ["copy:source"],
+          organization: GLOBEX,
+          counterpart: INITECH,
         });
         const target = await liveApproval({
           w,
           agent,
-          scopes: ["ops:copy", "org:support"],
+          scopes: ["copy:target"],
           organization: ACME,
+          counterpart: GLOBEX,
         });
 
         await expect(
@@ -485,6 +629,25 @@ function scenarios(backend: Backend): void {
             w.app.copyOrganization({
               session: target.session,
               body: { sourceOpsToken: source.opsToken },
+            }),
+          ),
+        ).resolves.toBe("staff_copy_direction_mismatch");
+      });
+
+      /** @scenario "A copy request naming one organization on both sides is refused" */
+      it("refuses a copy request whose counterpart is its own organization", async () => {
+        const w = world();
+        const agent = await w.enrol();
+
+        await expect(
+          codeOf(
+            w.app.createRequest({
+              session: agent.session,
+              body: requestBody({
+                scopes: ["copy:source"],
+                organization: ACME.slug,
+                counterpartOrganization: ACME.slug,
+              }),
             }),
           ),
         ).resolves.toBe("staff_copy_same_organization");

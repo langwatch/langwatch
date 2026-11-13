@@ -139,7 +139,7 @@ export class StaffAccessDoorService implements RestIdentity {
 /** The only platform permissions this door answers, each from one approved scope. */
 const DOOR_PERMISSION_SCOPES: Partial<Record<PlatformTierPermission, StaffAccessScope>> = {
   "opsRead:view": "ops:read",
-  "opsCopy:create": "ops:copy",
+  "opsCopy:create": "copy:target",
 };
 
 /** RFC 6750: the Bearer scheme in any case, then the token; anything else presents "". */

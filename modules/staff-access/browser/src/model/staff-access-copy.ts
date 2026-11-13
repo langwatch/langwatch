@@ -24,9 +24,13 @@ export const SCOPE_COPY: Readonly<Record<StaffAccessScopeName, ScopeCopy>> = {
     label: "Ops read",
     line: "Platform health and which organizations use which features. No customer content.",
   },
-  "ops:copy": {
-    label: "Organization copy",
-    line: "Lets the agent copy projects with their evaluators, monitors, prompts and datasets between this organization and one other, each side approved on its own. Never secrets, keys, members or billing.",
+  "copy:source": {
+    label: "Copy from this organization",
+    line: "The server reads this organization's projects with their evaluators, monitors, prompts and datasets to copy them into the other organization named here. The agent gets no key to this organization and never sees its traces.",
+  },
+  "copy:target": {
+    label: "Copy into this organization",
+    line: "The server creates the copied projects, evaluators, paused monitors, prompts and datasets here, and nothing else. Never secrets, keys, members or billing.",
   },
 };
 
@@ -41,6 +45,23 @@ export const STATUS_LABEL: Readonly<Record<StaffAccessRequestStatus, string>> = 
 
 export function scopeLabel(scope: StaffAccessScopeName): string {
   return SCOPE_COPY[scope].label;
+}
+
+/** Which way a copy side moves the setup, in the operator's words; null for any other request. */
+export function copyDirection({
+  scopes,
+  organizationName,
+  counterpartOrganizationName,
+}: {
+  scopes: readonly StaffAccessScopeName[];
+  organizationName: string | null;
+  counterpartOrganizationName: string | null;
+}): string | null {
+  const here = organizationName ?? "this organization";
+  const other = counterpartOrganizationName ?? "the other organization";
+  if (scopes.includes("copy:source")) return `From ${here} into ${other}`;
+  if (scopes.includes("copy:target")) return `From ${other} into ${here}`;
+  return null;
 }
 
 /** The setup command the operator pastes on the machine the agent runs on. */

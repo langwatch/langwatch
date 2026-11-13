@@ -2715,7 +2715,7 @@ const presentations = {
   staff_copy_scope_missing: {
     title: "This approval does not cover a copy",
     describe: () =>
-      "A copy needs one approval with ops:copy and org:content on the source and one with ops:copy and org:support on the target.",
+      "A copy needs one approval for copy:source on the source organization and one for copy:target on the target, each naming the other organization.",
   },
   staff_copy_same_organization: {
     title: "The source and target are the same organization",
@@ -2724,6 +2724,11 @@ const presentations = {
   staff_copy_approvals_mismatch: {
     title: "The two approvals do not belong together",
     describe: () => "Both approvals of a copy must come from the same agent and the same operator.",
+  },
+  staff_copy_direction_mismatch: {
+    title: "The two approvals name different copies",
+    describe: () =>
+      "Each approval of a copy names the other organization, and these two do not name each other.",
   },
   staff_copy_window_closed: {
     title: "The source approval is no longer live",

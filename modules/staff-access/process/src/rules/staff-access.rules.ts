@@ -4,7 +4,11 @@
  */
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
-import type { StaffAccessScope } from "@langwatch/authz-contract";
+import {
+  STAFF_ACCESS_COPY_SCOPES,
+  staffCopyGrant,
+  type StaffAccessScope,
+} from "@langwatch/authz-contract";
 import {
   StaffAccessAlreadyRedeemedError,
   StaffAccessRequestExpiredError,
@@ -13,6 +17,8 @@ import {
   type StaffAccessRequestStatus,
 } from "@langwatch/staff-access-contract";
 import { type Instant, Temporal } from "@langwatch/time";
+
+import type { StaffAccessRequestRow } from "../repositories/staff-access.repository.ts";
 
 export const STAFF_ACCESS_REQUEST_TTL_MS = 10 * 60 * 1000;
 export const STAFF_ACCESS_SESSION_TTL_MS = 60 * 60 * 1000;
@@ -34,7 +40,12 @@ export const STAFF_ACCESS_USAGE_CLASSIFICATION =
 
 /** The scopes that mint an `lwsa_` ops token, answered by the staff access door. */
 export function mintsOpsToken(scopes: readonly StaffAccessScope[]): boolean {
-  return scopes.includes("ops:read") || scopes.includes("ops:copy");
+  return scopes.includes("ops:read") || isCopySide(scopes);
+}
+
+/** Whether the request is one side of an organization copy. */
+export function isCopySide(scopes: readonly StaffAccessScope[]): boolean {
+  return scopes.some((scope) => STAFF_ACCESS_COPY_SCOPES.includes(scope));
 }
 
 /** Support writes as "LangWatch Support"; anything else reads as "LangWatch Staff Read". */
@@ -50,7 +61,7 @@ export function typedNameRequired({
   scopes: readonly StaffAccessScope[];
   spendApproved: boolean;
 }): boolean {
-  if (scopes.includes("org:content") || scopes.includes("ops:copy")) return true;
+  if (scopes.includes("org:content") || isCopySide(scopes)) return true;
   return spendApproved && scopes.includes("org:support");
 }
 
@@ -70,6 +81,11 @@ export type StaffAccessApprovalFields = Readonly<{
   scopes: readonly string[];
   organizationId: string | null;
   organizationName: string | null;
+  /** A copy side's other organization; left out of the hash when there is none. */
+  counterpartOrganizationId: string | null;
+  counterpartOrganizationName: string | null;
+  /** What a copy target may create; left out of the hash when empty. */
+  copyGrant: readonly string[];
   reason: string;
   machine: string;
   requestIp: string | null;
@@ -82,6 +98,13 @@ export type StaffAccessApprovalFields = Readonly<{
 export function approvalChallengeOf(fields: StaffAccessApprovalFields): string {
   const canonical = {
     codeChallenge: fields.codeChallenge,
+    ...(fields.copyGrant.length > 0 ? { copyGrant: fields.copyGrant.toSorted() } : {}),
+    ...(fields.counterpartOrganizationId === null
+      ? {}
+      : {
+          counterpartOrganizationId: fields.counterpartOrganizationId,
+          counterpartOrganizationName: fields.counterpartOrganizationName,
+        }),
     expiresAt: fields.expiresAt,
     machine: fields.machine,
     organizationId: fields.organizationId,
@@ -208,4 +231,90 @@ export function assertRedeemable({ row, at }: { row: DecisionRow; at: Instant })
   if (undecidedOrApproved && hasPassed({ moment: row.expiresAt, at }))
     throw new StaffAccessRequestExpiredError();
   if (row.status !== "approved") throw new StaffAccessRequestNotApprovedError();
+}
+
+type NamedOrganization = Readonly<{ id: string; name: string }> | null;
+
+/** A new pending request: what the agent asked for, nothing decided yet. */
+export function pendingRequestRow({
+  id,
+  requesterId,
+  ownerUserId,
+  body,
+  organization,
+  counterpart,
+  ipAddress,
+  at,
+}: {
+  id: string;
+  requesterId: string;
+  ownerUserId: string;
+  body: Readonly<{
+    scopes: readonly string[];
+    reason: string;
+    codeChallenge: string;
+    machine: string;
+  }>;
+  organization: NamedOrganization;
+  counterpart: NamedOrganization;
+  ipAddress: string | null;
+  at: Instant;
+}): StaffAccessRequestRow {
+  return {
+    id,
+    requesterId,
+    ownerUserId,
+    scopes: [...body.scopes],
+    organizationId: organization?.id ?? null,
+    organizationName: organization?.name ?? null,
+    counterpartOrganizationId: counterpart?.id ?? null,
+    counterpartOrganizationName: counterpart?.name ?? null,
+    reason: body.reason,
+    codeChallenge: body.codeChallenge,
+    machine: body.machine,
+    requestIp: ipAddress,
+    status: "pending",
+    expiresAt: later({ at, ms: STAFF_ACCESS_REQUEST_TTL_MS }),
+    approvedAt: null,
+    spendApproved: false,
+    approvalCredentialId: null,
+    approvalSignature: null,
+    signedHash: null,
+    redeemedAt: null,
+    pinnedIp: null,
+    apiKeyId: null,
+    hashedOpsToken: null,
+    opsTokenLookupId: null,
+    accessExpiresAt: null,
+    revokedAt: null,
+    revokedByUserId: null,
+    revokeCause: null,
+    endAuditedAt: null,
+    createdAt: at,
+  };
+}
+
+/** What the passkey signs for one request and the operator's spend choice. */
+export function approvalFieldsOf({
+  row,
+  spendApproved,
+}: {
+  row: StaffAccessRequestRow;
+  spendApproved: boolean;
+}): StaffAccessApprovalFields {
+  return {
+    requestId: row.id,
+    scopes: row.scopes,
+    organizationId: row.organizationId,
+    organizationName: row.organizationName,
+    counterpartOrganizationId: row.counterpartOrganizationId,
+    counterpartOrganizationName: row.counterpartOrganizationName,
+    copyGrant: staffCopyGrant(row.scopes),
+    reason: row.reason,
+    machine: row.machine,
+    requestIp: row.requestIp,
+    codeChallenge: row.codeChallenge,
+    spendApproved,
+    expiresAt: isoText(row.expiresAt),
+  };
 }

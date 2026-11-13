@@ -26617,6 +26617,24 @@
           "documentation": ""
         },
         {
+          "name": "counterpartOrganizationId",
+          "columnName": "counterpartOrganizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "A copy side's other organization, signed with the approval (staff-access module ADR-002)."
+        },
+        {
+          "name": "counterpartOrganizationName",
+          "columnName": "counterpartOrganizationName",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
           "name": "reason",
           "columnName": "reason",
           "type": "String",

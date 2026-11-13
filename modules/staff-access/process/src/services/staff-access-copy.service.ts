@@ -4,6 +4,7 @@ import {
   StaffAccessOperatorLostError,
 } from "@langwatch/api";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import { staffCopyGrant } from "@langwatch/authz-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -21,6 +22,7 @@ import {
   STAFF_ACCESS_PRINCIPAL,
   StaffAccessNotFoundError,
   StaffCopyApprovalsMismatchError,
+  StaffCopyDirectionMismatchError,
   StaffCopySameOrganizationError,
   StaffCopyScopeMissingError,
   StaffCopySourceInvalidError,
@@ -50,6 +52,13 @@ import { StaffAccessCopyRunService } from "./staff-access-copy-run.service.ts";
 
 const COPY_OPERATION = "staffAccess.copyOrganization";
 const COPY_PATH = "/api/staff-access/ops/copies";
+
+/** The audit action for each moment of a copy, written in both organizations. */
+const AUDIT_ACTION = {
+  planned: "staffAccess.orgCopyPlanned",
+  copy: "staffAccess.orgCopy",
+  stopped: "staffAccess.orgCopyStopped",
+} as const;
 
 type CopyDeps = Readonly<{
   requests: Pick<StaffAccessRequestRepository, "findById" | "findByOpsTokenLookupId">;
@@ -116,15 +125,33 @@ export class StaffAccessCopyService {
         target: target.organization,
         projects: body.projects,
       });
-      if (!dryRun) await this.writeAudit({ bearer, source, target, items: planned.items });
-      const items = dryRun
-        ? planned.items
+      await this.writeAudit({
+        bearer,
+        source,
+        target,
+        items: planned.items,
+        action: dryRun ? AUDIT_ACTION.planned : AUDIT_ACTION.copy,
+      });
+      const { items, stoppedBecause } = dryRun
+        ? { items: planned.items, stoppedBecause: null }
         : await this.#run.execute({
             plan: planned,
             requestId: target.row.id,
             source: source.organization,
             target: target.organization,
+            grant: staffCopyGrant(target.row.scopes),
+            stillLive: () => this.stopReason({ source, target }),
           });
+      if (stoppedBecause !== null) {
+        await this.writeAudit({
+          bearer,
+          source,
+          target,
+          items,
+          action: AUDIT_ACTION.stopped,
+          stoppedBecause,
+        }).catch(() => undefined);
+      }
       await finish(200, null);
       return {
         source: identityOf(source.organization),
@@ -132,6 +159,7 @@ export class StaffAccessCopyService {
         dryRun,
         items,
         totals: copyTotals(items),
+        stoppedBecause,
       };
     } catch (error) {
       const handled = HandledError.isHandled(error) ? error : null;
@@ -173,6 +201,25 @@ export class StaffAccessCopyService {
       source: { row: sourceRow, organization: sourceOrganization },
       target: { row: targetRow, organization: targetOrganization },
     };
+  }
+
+  /** Rereads both approvals: a revoke, kill switch or lapse on either side stops the copy. */
+  private async stopReason({
+    source,
+    target,
+  }: {
+    source: Side;
+    target: Side;
+  }): Promise<string | null> {
+    const at = this.deps.now();
+    for (const [side, reason] of [
+      [source, "source_approval_ended"],
+      [target, "target_approval_ended"],
+    ] as const) {
+      const [row] = await this.deps.requests.findById({ id: side.row.id });
+      if (!row || !isLive({ row, at })) return reason;
+    }
+    return null;
   }
 
   private async sourceRowOf({ token }: { token: string }): Promise<StaffAccessRequestRow> {
@@ -224,19 +271,29 @@ export class StaffAccessCopyService {
     return rows.map((row) => row.id);
   }
 
-  /** The copy in both customers' audit logs, with each side's approver, reason and the plan. */
+  /**
+   * The copy in both customers' audit logs, with each side's approver, reason and the plan: on a
+   * dry run as planned, before a run as the copy, and after a stopped run with what it made.
+   */
   private async writeAudit({
     bearer,
     source,
     target,
     items,
+    action,
+    stoppedBecause,
   }: {
     bearer: OpsSession;
     source: Side;
     target: Side;
     items: readonly StaffAccessCopyItem[];
+    action: (typeof AUDIT_ACTION)[keyof typeof AUDIT_ACTION];
+    stoppedBecause?: string;
   }): Promise<void> {
-    const plan = auditedPlan(items);
+    const plan = auditedPlan({
+      items,
+      outcome: action === AUDIT_ACTION.stopped ? "copied" : "planned",
+    });
     try {
       for (const [side, role] of [
         [source, "source"],
@@ -246,7 +303,7 @@ export class StaffAccessCopyService {
           organizationId: side.organization.id,
           userId: side.row.ownerUserId,
           actorUserId: side.row.ownerUserId,
-          action: "staffAccess.orgCopy",
+          action,
           targetKind: "staffAccess",
           targetId: side.row.id,
           ...(bearer.ipAddress ? { ipAddress: bearer.ipAddress } : {}),
@@ -262,6 +319,8 @@ export class StaffAccessCopyService {
             targetApproval: target.row.id,
             counts: plan.counts,
             items: plan.names,
+            monitorsCreatedPaused: true,
+            ...(stoppedBecause ? { stoppedBecause } : {}),
           },
         });
       }
@@ -273,15 +332,23 @@ export class StaffAccessCopyService {
 
 /** @throws {StaffCopyWindowClosedError} once the source session ended, lapsed or was revoked */
 function assertSourceLive({ row, at }: { row: StaffAccessRequestRow; at: Instant }): void {
-  const live =
+  if (!isLive({ row, at })) throw new StaffCopyWindowClosedError();
+}
+
+function isLive({ row, at }: { row: StaffAccessRequestRow; at: Instant }): boolean {
+  return (
     row.status === "redeemed" &&
     row.revokedAt === null &&
     row.accessExpiresAt !== null &&
-    !hasPassed({ moment: row.accessExpiresAt, at });
-  if (!live) throw new StaffCopyWindowClosedError();
+    !hasPassed({ moment: row.accessExpiresAt, at })
+  );
 }
 
-/** Each side's scopes and organization; a copy goes between two different organizations. */
+/**
+ * Each side's scope and organization; a copy goes between two different organizations, and each
+ * side's signed approval names the other, so a session pairs only with the copy it was approved
+ * for.
+ */
 function copyPairOf({
   source,
   target,
@@ -304,6 +371,10 @@ function copyPairOf({
     throw new StaffCopyScopeMissingError({ side: "target" });
   }
   if (sourceOrganizationId === targetOrganizationId) throw new StaffCopySameOrganizationError();
+  const facing =
+    source.counterpartOrganizationId === targetOrganizationId &&
+    target.counterpartOrganizationId === sourceOrganizationId;
+  if (!facing) throw new StaffCopyDirectionMismatchError();
   return { sourceOrganizationId, targetOrganizationId };
 }
 

@@ -249,10 +249,14 @@ export function copyCatalog() {
     }),
   } satisfies Partial<Record<keyof OrganizationApi, unknown>>;
 
+  /** Runs before each evaluator is made, so a test can act in the middle of a copy. */
+  const hooks = { beforeEvaluatorCreate: async () => {} };
+
   const evaluators = createApiFixture<EvaluatorApi>({
     getAll: async ({ projectId }) =>
       data.evaluators.filter((evaluator) => evaluator.projectId === projectId),
     create: async (input) => {
+      await hooks.beforeEvaluatorCreate();
       const evaluator: Evaluator = {
         id: input.id,
         projectId: input.projectId,
@@ -352,6 +356,7 @@ export function copyCatalog() {
 
   return {
     data,
+    hooks,
     projects,
     organizations,
     evaluators,

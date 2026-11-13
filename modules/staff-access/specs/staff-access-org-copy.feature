@@ -1,17 +1,20 @@
 Feature: Copying an organization's setup into another organization
   Staff stand up a demo organization from a source organization without database access or
   scripts. The copy runs on the server through each owner's API, copies an allowlist of kinds
-  only, and needs one approval per organization, both live at once. Module ADR-002, ADR-193.
+  only, and needs one approval per organization, both live at once. Each approval names both
+  organizations, and the target approval names what the copy may create there; the passkey
+  signs both. Neither side gets an organization key. Module ADR-002, ADR-193.
 
   Background:
     Given cloud ops is on and the system flag "ops_agent_access_enabled" is on
     And Olivia's agent holds a requester key
 
   @unit
-  Scenario: ops:copy comes with org:content or org:support
-    Given a request body with the scope "ops:copy" and no organization scope
-    Then the request is refused as invalid
-    And "ops:copy" with "org:content" on ACME is a valid request
+  Scenario: A copy side is approved alone and names the other organization
+    Given a request body for "copy:source" on ACME naming Globex as the other organization
+    Then it is a valid request, and so is "copy:target" on ACME naming Globex
+    And a copy side without the other organization, with a second scope, or naming its own organization twice is refused as invalid
+    And a request that is no copy side naming another organization is refused as invalid
 
   @unit
   Scenario: The copy allowlist names only setup kinds
@@ -19,20 +22,33 @@ Feature: Copying an organization's setup into another organization
     And no kind is a secret, API key, model provider, member, role, SSO, billing, licence or usage counter
 
   @integration
-  Scenario: An ops:copy approval needs the organization name typed
-    Given a pending request for "ops:copy" and "org:support" on Globex
+  Scenario: A copy approval needs the organization name typed
+    Given a pending request for "copy:target" on Globex naming ACME
     When Olivia approves it without typing the organization's name
     Then the approval is refused with "organization_name_mismatch"
 
+  @integration @unit
+  Scenario: The approval page shows the other organization and the target grant
+    Given pending requests for "copy:source" on ACME naming Globex and "copy:target" on Globex naming ACME
+    Then each approval page shows the other organization and the copy direction
+    And only the target's page lists what the copy may create there: projects, evaluators, monitors, prompts and datasets
+    And the passkey signs the other organization and that list, so changing either changes what is signed
+
   @integration
-  Scenario: The door answers opsCopy:create only for a session approved for ops:copy
-    Given a redeemed "ops:copy" session and a redeemed "ops:read" session
-    Then the door permits "opsCopy:create" to the first and refuses it to the second
+  Scenario: A copy approval mints only an ops token, never an organization key
+    When the agent redeems approved "copy:source" and "copy:target" requests
+    Then each answers an ops token and no organization API key
+    And the server reads the source itself, so the agent never holds a key that reads ACME's traces
+
+  @integration
+  Scenario: The door answers opsCopy:create only for a session approved for copy:target
+    Given redeemed "copy:target", "copy:source" and "ops:read" sessions
+    Then the door permits "opsCopy:create" to the "copy:target" session and refuses it to the others
 
   @integration
   Scenario: A copy makes the source's projects and their setup in the target
-    Given a live source approval for "ops:copy" and "org:content" on ACME
-    And a live target approval for "ops:copy" and "org:support" on Globex
+    Given a live source approval for "copy:source" on ACME naming Globex
+    And a live target approval for "copy:target" on Globex naming ACME
     And ACME has a project with an evaluator, a monitor on it, a prompt with two versions and a dataset
     When the agent copies ACME into Globex
     Then Globex has a new project with a new id and slug
@@ -45,7 +61,12 @@ Feature: Copying an organization's setup into another organization
     Given live source and target approvals
     When the agent copies ACME into Globex as a dry run
     Then the report lists each item as planned
-    And nothing is created in Globex and no audit row is written
+    And nothing is created in Globex
+
+  @integration
+  Scenario: A dry run is in both organizations' audit logs as a planned copy
+    When the agent copies ACME into Globex as a dry run
+    Then ACME's and Globex's audit logs each hold a "staffAccess.orgCopyPlanned" row with the approver and the items read
 
   @integration
   Scenario: A rerun copies only what is new
@@ -66,6 +87,21 @@ Feature: Copying an organization's setup into another organization
     When the agent copies ACME into Globex
     Then each approval has a trail row for the copy
     And ACME's and Globex's audit logs each hold a "staffAccess.orgCopy" row with the approver, the reason and the planned items
+    And the row says copied monitors are created paused
+
+  @unit
+  Scenario: A copy makes only what the target approval granted
+    Given a target grant without "datasets:create"
+    When a copy runs with a dataset in its plan
+    Then the dataset is skipped with "outside_copy_grant" and the rest is made
+
+  @integration @unit
+  Scenario: A revoked approval stops a running copy
+    Given a copy is running
+    When Olivia revokes the source session after the evaluator was made
+    Then nothing more is made and every remaining item is reported as stopped
+    And the report says why it stopped
+    And ACME's and Globex's audit logs each hold a "staffAccess.orgCopyStopped" row with the reason and what was made
 
   @integration
   Scenario: A failed audit write copies nothing
@@ -93,22 +129,33 @@ Feature: Copying an organization's setup into another organization
     Then the copy is refused with "staff_copy_approvals_mismatch"
 
   @integration
-  Scenario: Each side needs its own copy scopes
-    Given a source approval for "ops:read" and "org:content" without "ops:copy"
+  Scenario: Each side needs its own copy scope
+    Given a source approval for "ops:read" on ACME
     When the agent copies ACME into Globex
     Then the copy is refused with "staff_copy_scope_missing"
-    And a target approved for "ops:copy" with "org:content" instead of "org:support" is refused the same way
+    And a target session approved as "copy:source" is refused the same way
 
   @integration
-  Scenario: A copy into the same organization is refused
-    Given source and target approvals both on ACME
-    When the agent copies ACME into ACME
-    Then the copy is refused with "staff_copy_same_organization"
+  Scenario: Approvals that do not name each other do not pair
+    Given a source approval for "copy:source" on Globex naming Initech
+    And a target approval for "copy:target" on ACME naming Globex
+    When the agent copies with them
+    Then the copy is refused with "staff_copy_direction_mismatch"
+
+  @integration
+  Scenario: A copy request naming one organization on both sides is refused
+    When the agent asks for "copy:source" on ACME naming ACME as the other organization
+    Then the request is refused with "staff_copy_same_organization"
+
+  @integration
+  Scenario: The source ops token never shows in an answer, a trail row or an audit row
+    When the agent sends a copy, a malformed copy body and an unknown source token over REST
+    Then no answer, trail row or audit row holds the source ops token
 
   @integration
   Scenario: The CLI asks one approval per organization and runs the copy
     When the agent runs "langwatch ops copy --from acme --to globex --dry-run"
-    Then it requests "ops:copy" with "org:content" on acme and "ops:copy" with "org:support" on globex
+    Then it requests "copy:source" on acme naming globex and "copy:target" on globex naming acme
     And it prints both approval URLs and waits for both
     And it sends the copy with the target's ops token and the source's ops token in the body
     And it ends both sessions afterwards

@@ -34,6 +34,8 @@ export type StaffAccessRequestRow = Readonly<{
   scopes: string[];
   organizationId: string | null;
   organizationName: string | null;
+  counterpartOrganizationId: string | null;
+  counterpartOrganizationName: string | null;
   reason: string;
   codeChallenge: string;
   machine: string;

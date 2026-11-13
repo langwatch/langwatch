@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 
@@ -24,6 +24,7 @@ class CopyStaffAccessOrganizationResponse200:
         source (CopyStaffAccessOrganizationResponse200Source):
         target (CopyStaffAccessOrganizationResponse200Target):
         dry_run (bool):
+        stopped_because (None | str):
         items (list[CopyStaffAccessOrganizationResponse200ItemsItem]):
         totals (CopyStaffAccessOrganizationResponse200Totals):
     """
@@ -31,6 +32,7 @@ class CopyStaffAccessOrganizationResponse200:
     source: CopyStaffAccessOrganizationResponse200Source
     target: CopyStaffAccessOrganizationResponse200Target
     dry_run: bool
+    stopped_because: None | str
     items: list[CopyStaffAccessOrganizationResponse200ItemsItem]
     totals: CopyStaffAccessOrganizationResponse200Totals
 
@@ -40,6 +42,9 @@ class CopyStaffAccessOrganizationResponse200:
         target = self.target.to_dict()
 
         dry_run = self.dry_run
+
+        stopped_because: None | str
+        stopped_because = self.stopped_because
 
         items = []
         for items_item_data in self.items:
@@ -55,6 +60,7 @@ class CopyStaffAccessOrganizationResponse200:
                 "source": source,
                 "target": target,
                 "dryRun": dry_run,
+                "stoppedBecause": stopped_because,
                 "items": items,
                 "totals": totals,
             }
@@ -84,6 +90,13 @@ class CopyStaffAccessOrganizationResponse200:
 
         dry_run = d.pop("dryRun")
 
+        def _parse_stopped_because(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        stopped_because = _parse_stopped_because(d.pop("stoppedBecause"))
+
         items = []
         _items = d.pop("items")
         for items_item_data in _items:
@@ -97,6 +110,7 @@ class CopyStaffAccessOrganizationResponse200:
             source=source,
             target=target,
             dry_run=dry_run,
+            stopped_because=stopped_because,
             items=items,
             totals=totals,
         )

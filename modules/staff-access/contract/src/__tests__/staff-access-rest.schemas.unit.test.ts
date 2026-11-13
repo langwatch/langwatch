@@ -56,17 +56,24 @@ describe("staffAccessRedeemBodySchema", () => {
   });
 });
 
-describe("ops:copy requests", () => {
-  /** @scenario "ops:copy comes with org:content or org:support" */
-  it("refuses ops:copy alone and accepts it with org:content on an organization", () => {
-    const alone = staffAccessRequestBodySchema.safeParse({ ...request, scopes: ["ops:copy"] });
-    expect(alone.success).toBe(false);
+describe("copy requests", () => {
+  const side = { ...request, scopes: ["copy:source"], counterpartOrganization: "globex" };
+
+  /** @scenario "A copy side is approved alone and names the other organization" */
+  it("accepts a copy side naming both organizations and refuses any other shape", () => {
+    expect(staffAccessRequestBodySchema.validate(side)).toBe(true);
+    expect(staffAccessRequestBodySchema.validate({ ...side, scopes: ["copy:target"] })).toBe(true);
+    const { counterpartOrganization: _other, ...withoutOther } = side;
+    expect(staffAccessRequestBodySchema.validate(withoutOther)).toBe(false);
     expect(
-      staffAccessRequestBodySchema.validate({ ...request, scopes: ["ops:copy", "org:content"] }),
-    ).toBe(true);
+      staffAccessRequestBodySchema.validate({ ...side, scopes: ["copy:source", "org:content"] }),
+    ).toBe(false);
     expect(
-      staffAccessRequestBodySchema.validate({ ...request, scopes: ["ops:copy", "org:support"] }),
-    ).toBe(true);
+      staffAccessRequestBodySchema.validate({ ...side, counterpartOrganization: "acme" }),
+    ).toBe(false);
+    expect(
+      staffAccessRequestBodySchema.validate({ ...request, counterpartOrganization: "globex" }),
+    ).toBe(false);
   });
 });
 

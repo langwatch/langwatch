@@ -107416,7 +107416,8 @@
                       "type": "string",
                       "enum": [
                         "ops:read",
-                        "ops:copy",
+                        "copy:source",
+                        "copy:target",
                         "org:metadata",
                         "org:content",
                         "org:support"
@@ -107424,6 +107425,11 @@
                     }
                   },
                   "organization": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "counterpartOrganization": {
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 200
@@ -107579,7 +107585,8 @@
                         "type": "string",
                         "enum": [
                           "ops:read",
-                          "ops:copy",
+                          "copy:source",
+                          "copy:target",
                           "org:metadata",
                           "org:content",
                           "org:support"
@@ -108038,6 +108045,12 @@
                     "dryRun": {
                       "type": "boolean"
                     },
+                    "stoppedBecause": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
                     "items": {
                       "type": "array",
                       "items": {
@@ -108069,7 +108082,8 @@
                               "copied",
                               "already_copied",
                               "skipped",
-                              "failed"
+                              "failed",
+                              "stopped"
                             ]
                           },
                           "targetId": {
@@ -108113,7 +108127,8 @@
                           "copied",
                           "already_copied",
                           "skipped",
-                          "failed"
+                          "failed",
+                          "stopped"
                         ]
                       },
                       "additionalProperties": {
@@ -108126,7 +108141,8 @@
                         "copied",
                         "already_copied",
                         "skipped",
-                        "failed"
+                        "failed",
+                        "stopped"
                       ],
                       "properties": {
                         "planned": {
@@ -108153,6 +108169,11 @@
                           "type": "integer",
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991
+                        },
+                        "stopped": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
                         }
                       }
                     }
@@ -108161,6 +108182,7 @@
                     "source",
                     "target",
                     "dryRun",
+                    "stoppedBecause",
                     "items",
                     "totals"
                   ],

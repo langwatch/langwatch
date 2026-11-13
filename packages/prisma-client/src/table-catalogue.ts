@@ -3062,6 +3062,8 @@ export const prismaModelFieldCatalogue = {
     "scopes",
     "organizationId",
     "organizationName",
+    "counterpartOrganizationId",
+    "counterpartOrganizationName",
     "reason",
     "codeChallenge",
     "machine",

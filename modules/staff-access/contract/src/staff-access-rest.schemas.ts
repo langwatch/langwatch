@@ -2,7 +2,7 @@
  * The agent's wire under `/api/staff-access` (ADR-193): request, status, redeem and end with
  * a requester key; the `ops:read` allowlist with an ops token. Read by the `langwatch` CLI.
  */
-import { reachesOrganization } from "@langwatch/authz-contract";
+import { namesOrganization, STAFF_ACCESS_COPY_SCOPES } from "@langwatch/authz-contract";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
@@ -20,6 +20,8 @@ const staffAccessRequestBodySchemaDefinition = z
     scopes: z.array(staffAccessScopeSchema).min(1).max(5),
     /** The organization's id or slug; required by, and only with, an organization scope. */
     organization: z.string().trim().min(1).max(200).optional(),
+    /** A copy's other organization (id or slug): where a source copies into, or a target from. */
+    counterpartOrganization: z.string().trim().min(1).max(200).optional(),
     reason: z.string().trim().min(1).max(STAFF_ACCESS_REASON_MAX_LENGTH),
     /** base64url(SHA-256(verifier)): 43 characters. */
     codeChallenge: base64UrlSchema.length(43),
@@ -31,7 +33,7 @@ const staffAccessRequestBodySchemaDefinition = z
     if (new Set(body.scopes).size !== body.scopes.length) {
       context.addIssue({ code: "custom", path: ["scopes"], message: "Each scope once." });
     }
-    const organizationScoped = reachesOrganization(body.scopes);
+    const organizationScoped = namesOrganization(body.scopes);
     if (organizationScoped && body.organization === undefined) {
       context.addIssue({
         code: "custom",
@@ -46,15 +48,42 @@ const staffAccessRequestBodySchemaDefinition = z
         message: "Only an organization scope names an organization.",
       });
     }
-    const copySide = body.scopes.includes("org:content") || body.scopes.includes("org:support");
-    if (body.scopes.includes("ops:copy") && !copySide) {
-      context.addIssue({
-        code: "custom",
-        path: ["scopes"],
-        message: "ops:copy comes with org:content (the source) or org:support (the target).",
-      });
-    }
+    refineCopySide({ body, context });
   });
+/** A copy side is approved alone, names its other organization, and only it names one. */
+function refineCopySide({
+  body,
+  context,
+}: {
+  body: { scopes: string[]; organization?: string; counterpartOrganization?: string };
+  context: z.RefinementCtx;
+}): void {
+  const copySide = body.scopes.some((scope) =>
+    (STAFF_ACCESS_COPY_SCOPES as readonly string[]).includes(scope),
+  );
+  if (copySide && body.scopes.length !== 1) {
+    context.addIssue({
+      code: "custom",
+      path: ["scopes"],
+      message: "A copy side is approved alone.",
+    });
+  }
+  if (copySide !== (body.counterpartOrganization !== undefined)) {
+    context.addIssue({
+      code: "custom",
+      path: ["counterpartOrganization"],
+      message: "A copy side, and only a copy side, names the other organization of the copy.",
+    });
+  }
+  if (copySide && body.counterpartOrganization === body.organization) {
+    context.addIssue({
+      code: "custom",
+      path: ["counterpartOrganization"],
+      message: "A copy names two different organizations.",
+    });
+  }
+}
+
 export interface StaffAccessRequestBodySchema extends Named<
   typeof staffAccessRequestBodySchemaDefinition
 > {}
@@ -241,6 +270,7 @@ export const staffAccessCopyOutcomeSchema = z.enum([
   "already_copied",
   "skipped",
   "failed",
+  "stopped",
 ]);
 export type StaffAccessCopyOutcome = z.infer<typeof staffAccessCopyOutcomeSchema>;
 
@@ -267,6 +297,8 @@ const staffAccessCopyReportSchemaDefinition = z.object({
   source: staffAccessCopyOrganizationSchemaDefinition,
   target: staffAccessCopyOrganizationSchemaDefinition,
   dryRun: z.boolean(),
+  /** Why the copy stopped before its last item (a session ended or was revoked); null otherwise. */
+  stoppedBecause: z.string().nullable(),
   items: z.array(staffAccessCopyItemSchemaDefinition),
   totals: z.record(staffAccessCopyOutcomeSchema, z.number().int()),
 });

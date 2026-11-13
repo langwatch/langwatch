@@ -811,6 +811,7 @@ export const APP_ERROR_CODES = [
   "staff_access_revoked",
   "staff_access_unavailable",
   "staff_copy_approvals_mismatch",
+  "staff_copy_direction_mismatch",
   "staff_copy_same_organization",
   "staff_copy_scope_missing",
   "staff_copy_source_invalid",
