@@ -54,6 +54,14 @@ organization.
   ([ADR-201](../../dev/docs/adr/201-pii-redaction-model-call-is-metered.md),
   `specs/pii-redaction-billing.feature`).
 
+- **Settings page.** On LangWatch Cloud with the same flag, the Data Privacy page offers the
+  organization Essential (included) or Strict (the model, with its price derived from the billed
+  rate, or "Included for your organization" with `release_pii_redaction_model_free`), and the rule
+  drawer shows what a level runs and stores. A pick writes only the PII level of the organization
+  rule through `setForScope`; Strict at a price and replacing Custom ask first. Self-hosted shows
+  none of it: the browser cannot see `PII_REDACTION_MODEL_ENDPOINT`, so Cloud plus the flag is the
+  gate (`specs/pii-redaction-level-picker.feature`).
+
 - **Strict only.** Only a batch whose project's resolved privacy policy is `strict` can reach the
   model. A custom level, even one that selects every analysis-service entity, and a batch whose
   policy could not be loaded stay on Presidio exactly as today, without reading the flag. The

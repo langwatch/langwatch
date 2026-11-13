@@ -56,6 +56,11 @@ export const FRONTEND_FEATURE_FLAGS = [
   "release_instant_evals_own_decision_model",
   // LangWatch Evals Preview says it routes through the LangWatch Judge (ADR-190).
   "release_instant_evals_judge_router",
+  // The Data Privacy page's Essential or Strict organization picker, Strict's
+  // price and its example (modules/data-privacy/specs/pii-redaction-level-picker.feature).
+  "release_pii_redaction_model_enabled",
+  // On the free list: the picker shows Strict as included, with no price and no price confirmation.
+  "release_pii_redaction_model_free",
   // The guided onboarding variant, read on the welcome flow with the user's
   // id, which the percentage rollout buckets on (guided-onboarding-variant.feature).
   "experiment_onboarding_langy_guided",
