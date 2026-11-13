@@ -13,7 +13,7 @@ import {
 import { StatusChip } from "@langwatch/design-system/settings-card";
 import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { ChevronRight } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 
 import {
   ESSENTIAL_FINDS,
@@ -151,11 +151,36 @@ function LevelExample({ level }: { level: OrganizationPiiLevel }) {
 }
 
 /**
+ * A click the picker does not apply yet (it asks first) still checks the native radio; this puts
+ * the radios assistive tech reads back on the shown level once the question is settled.
+ */
+function useNativeRadiosAt({
+  level,
+  pendingLevel,
+}: {
+  level: OrganizationPiiLevel | null;
+  pendingLevel: OrganizationPiiLevel | null;
+}) {
+  const container = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (pendingLevel) return;
+    for (const radio of container.current?.querySelectorAll<HTMLInputElement>(
+      'input[type="radio"]',
+    ) ?? []) {
+      radio.checked = radio.value === level;
+    }
+  }, [level, pendingLevel]);
+  return container;
+}
+
+/**
  * The organization's PII level, Essential or Strict, with the example of what the shown level
  * stores. `level` null means the organization is on Off or Custom, named by `otherLevelLabel`.
+ * `pendingLevel` is a pick awaiting confirmation; the radios keep showing `level` meanwhile.
  */
 export function OrganizationPiiLevelPicker({
   level,
+  pendingLevel,
   otherLevelLabel,
   free,
   canWrite,
@@ -163,6 +188,7 @@ export function OrganizationPiiLevelPicker({
   onPick,
 }: {
   level: OrganizationPiiLevel | null;
+  pendingLevel: OrganizationPiiLevel | null;
   otherLevelLabel: string;
   free: boolean;
   canWrite: boolean;
@@ -170,6 +196,7 @@ export function OrganizationPiiLevelPicker({
   onPick: (level: OrganizationPiiLevel) => void;
 }) {
   const currentLabel = level ? LEVEL_LABELS[level] : otherLevelLabel;
+  const radios = useNativeRadiosAt({ level, pendingLevel });
   return (
     <SettingsSection
       divided={false}
@@ -186,7 +213,7 @@ export function OrganizationPiiLevelPicker({
           : `Rules inherit ${currentLabel} unless they set their own level. Pick Essential or Strict to replace it.`
       }
     >
-      <VStack align="stretch" gap={3} width="full">
+      <VStack align="stretch" gap={3} width="full" ref={radios}>
         <RadioCard.Root
           variant="outline"
           colorPalette="orange"

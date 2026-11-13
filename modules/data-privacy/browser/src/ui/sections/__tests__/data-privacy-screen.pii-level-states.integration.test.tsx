@@ -55,6 +55,9 @@ describe("given the Data Privacy page", () => {
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
       expect(api.setForScope).not.toHaveBeenCalled();
       expect(pickedLevel()).toBe("Essential");
+      // The native radios screen readers announce follow the shown level too.
+      expect(levelRadio("Essential")).toBeChecked();
+      expect(levelRadio("Strict")).not.toBeChecked();
     });
   });
 

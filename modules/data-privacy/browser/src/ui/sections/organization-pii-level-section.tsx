@@ -81,6 +81,7 @@ export function OrganizationPiiLevelSection({
     <>
       <OrganizationPiiLevelPicker
         level={shown}
+        pendingLevel={asking}
         otherLevelLabel={otherPiiLevelLabel({
           level: storedPii.level,
           entityCount: storedPii.entities.length,

@@ -143,6 +143,8 @@ describe("given the Data Privacy page", () => {
         fallbackTitle: "Couldn't change the organization's PII level",
       });
       await waitFor(() => expect(pickedLevel()).toBe("Essential"));
+      expect(levelRadio("Essential")).toBeChecked();
+      expect(levelRadio("Strict")).not.toBeChecked();
     });
   });
 
