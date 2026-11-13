@@ -272,6 +272,9 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     Then one debug line logs its project, group call, identify call and member counts, and whether mirroring failed
     And a sync skipped for want of an admin, a placement or a counting window logs its reason at debug
     And a counter records each sync attempt's outcome, never an id
+    And a refused group call counts as send_failed and the sync still rejects, so the job retries
+    And any other failure of a sync counts once as error and the sync still rejects
+    And the hourly trace-window sweep logs one info line with how many ended, synced and had no admin
     And the run lines and the counter carry no organization, user or project id
     And a failure warning keeps the organization id, as the one line needed to debug it
 

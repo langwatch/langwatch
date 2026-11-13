@@ -44,8 +44,8 @@ type OrganizationUsageDependencies = Readonly<{
   clock: Readonly<{ nowMs: () => number }>;
   /**
    * One increment per sync attempt, its `outcome` the only attribute, never an id: `synced`,
-   * `mirror_failed`, `send_failed` (the group call was refused), `no_admin`, `not_placed` or
-   * `outside_counting_window`.
+   * `mirror_failed`, `send_failed` (the group call was refused), `error` (anything else threw),
+   * `no_admin`, `not_placed` or `outside_counting_window`.
    */
   syncs: CounterHandle;
   /** Run lines carry counts and reasons only, never an organization, user or project id. */
@@ -58,6 +58,12 @@ type OrganizationUsageDependencies = Readonly<{
 
 /** What mirroring onto members has sent so far, kept as it goes so a failed batch loses no count. */
 type MirroredCounts = { members: number; identifyCalls: number };
+
+/** Why a sync sent nothing, as counted and logged. */
+type SkipReason = "no_admin" | "not_placed" | "outside_counting_window";
+
+/** Set once a failure is counted with its own outcome, so the attempt does not count it again. */
+type AttemptState = { counted: boolean };
 
 /** An organization as nurturing's own copies place and date it. */
 type CopiedOrganization = Readonly<{ organizationId: string; organizationCreatedAt: number }>;
@@ -78,8 +84,10 @@ export class NurturingOrganizationUsageService {
 
   /** The project's usage changed: its organization's traits go to Customer.io. */
   async usageChanged({ projectId }: Readonly<{ projectId: string }>): Promise<void> {
-    const organization = await this.copiedOrganizationOf({ projectId });
-    if (organization) await this.syncOrganization(organization);
+    await this.attempt(async (state) => {
+      const organization = await this.copiedOrganizationOf({ projectId });
+      if (organization) await this.syncOrganization(organization, state);
+    });
   }
 
   /**
@@ -87,18 +95,32 @@ export class NurturingOrganizationUsageService {
    * a trace moves is sent, and the rest are a fold's sync's, so nothing is read or sent.
    */
   async tracesChanged({ projectId }: Readonly<{ projectId: string }>): Promise<void> {
-    const organization = await this.copiedOrganizationOf({ projectId });
-    if (!organization) return;
-    const at = this.dependencies.clock.nowMs();
-    if (!isTraceCounted({ organizationCreatedAt: organization.organizationCreatedAt, at })) {
-      this.dependencies.syncs.inc({ outcome: "outside_counting_window" });
-      this.dependencies.logger.debug(
-        { reason: "outside_counting_window" },
-        "nurturing organization usage sync skipped",
-      );
-      return;
+    await this.attempt(async (state) => {
+      const organization = await this.copiedOrganizationOf({ projectId });
+      if (!organization) return;
+      const at = this.dependencies.clock.nowMs();
+      if (!isTraceCounted({ organizationCreatedAt: organization.organizationCreatedAt, at })) {
+        this.skipped("outside_counting_window");
+        return;
+      }
+      await this.syncOrganization(organization, state);
+    });
+  }
+
+  /** Counts every attempt once: a throw nothing counted yet is an `error`, and still rethrown. */
+  private async attempt(run: (state: AttemptState) => Promise<void>): Promise<void> {
+    const state: AttemptState = { counted: false };
+    try {
+      await run(state);
+    } catch (error) {
+      if (!state.counted) this.dependencies.syncs.inc({ outcome: "error" });
+      throw error;
     }
-    await this.syncOrganization(organization);
+  }
+
+  private skipped(reason: SkipReason): void {
+    this.dependencies.syncs.inc({ outcome: reason });
+    this.dependencies.logger.debug({ reason }, "nurturing organization usage sync skipped");
   }
 
   /**
@@ -108,24 +130,23 @@ export class NurturingOrganizationUsageService {
   private async copiedOrganizationOf({
     projectId,
   }: Readonly<{ projectId: string }>): Promise<CopiedOrganization | undefined> {
-    if (projectId === "") return undefined;
+    if (projectId === "") {
+      this.skipped("not_placed");
+      return undefined;
+    }
     const project = await this.dependencies.copiedProjects.copiedProjectOf({ projectId });
     if (project.outcome !== "placed" || project.organizationCreatedAt === null) {
-      this.dependencies.syncs.inc({ outcome: "not_placed" });
-      this.dependencies.logger.debug(
-        { reason: "not_placed" },
-        "nurturing organization usage sync skipped",
-      );
+      this.skipped("not_placed");
       return undefined;
     }
     const { organizationId, organizationCreatedAt } = project;
     return { organizationId, organizationCreatedAt };
   }
 
-  private async syncOrganization({
-    organizationId,
-    organizationCreatedAt,
-  }: CopiedOrganization): Promise<void> {
+  private async syncOrganization(
+    { organizationId, organizationCreatedAt }: CopiedOrganization,
+    state: AttemptState,
+  ): Promise<void> {
     const { projectUsage, traceDays, placements, milestones, sendBatch, clock } = this.dependencies;
     const now = clock.nowMs();
     const windowStartDay = windowStartDayOf(now);
@@ -137,11 +158,7 @@ export class NurturingOrganizationUsageService {
     const [organization] = await milestones.findOrganization({ organizationId });
     const adminUserId = organization?.adminUserId;
     if (!adminUserId) {
-      this.dependencies.syncs.inc({ outcome: "no_admin" });
-      this.dependencies.logger.debug(
-        { reason: "no_admin" },
-        "nurturing organization usage sync skipped",
-      );
+      this.skipped("no_admin");
       return;
     }
     const [usage, folded] = await Promise.all([
@@ -159,9 +176,11 @@ export class NurturingOrganizationUsageService {
     try {
       await sendBatch([{ type: "group", userId: adminUserId, groupId: organizationId, traits }]);
     } catch (error) {
+      state.counted = true;
       this.dependencies.syncs.inc({ outcome: "send_failed" });
       throw error;
     }
+    // An out-parameter, so a batch that fails midway still reports the identifies already sent.
     const mirrored: MirroredCounts = { members: 0, identifyCalls: 0 };
     let mirrorFailed = false;
     try {
@@ -207,31 +226,36 @@ export class NurturingOrganizationUsageService {
     const traits = endedTraceWindowTraits();
     let synced = 0;
     let skippedNoAdmin = 0;
-    let identifyCalls = 0;
-    for (const organizationId of ended) {
-      // Nothing reads its trace rows past the window, and a quiet organization never syncs again.
-      await traceDays.pruneProjects({
-        projectIds: await placements.findProjectIds({ organizationId }),
-      });
-      const [organization] = await milestones.findOrganization({ organizationId });
-      const adminUserId = organization?.adminUserId;
-      if (!adminUserId) {
-        skippedNoAdmin += 1;
-        continue;
-      }
-      await sendBatch([{ type: "group", userId: adminUserId, groupId: organizationId, traits }]);
-      const mirrored: MirroredCounts = { members: 0, identifyCalls: 0 };
-      try {
+    // Shared across organizations, so identifyCalls totals the sweep even if it fails midway.
+    const mirrored: MirroredCounts = { members: 0, identifyCalls: 0 };
+    try {
+      for (const organizationId of ended) {
+        // Nothing reads its trace rows past the window, and a quiet organization never syncs again.
+        await traceDays.pruneProjects({
+          projectIds: await placements.findProjectIds({ organizationId }),
+        });
+        const [organization] = await milestones.findOrganization({ organizationId });
+        const adminUserId = organization?.adminUserId;
+        if (!adminUserId) {
+          skippedNoAdmin += 1;
+          continue;
+        }
+        await sendBatch([{ type: "group", userId: adminUserId, groupId: organizationId, traits }]);
         await this.mirrorOntoMembers({ organizationId, traits, counts: mirrored });
-      } finally {
-        identifyCalls += mirrored.identifyCalls;
+        synced += 1;
       }
-      synced += 1;
+    } finally {
+      this.dependencies.logger.info(
+        {
+          ended: ended.length,
+          synced,
+          skippedNoAdmin,
+          groupCalls: synced,
+          identifyCalls: mirrored.identifyCalls,
+        },
+        "nurturing trace windows ended",
+      );
     }
-    this.dependencies.logger.info(
-      { ended: ended.length, synced, skippedNoAdmin, groupCalls: synced, identifyCalls },
-      "nurturing trace windows ended",
-    );
   }
 
   /**
