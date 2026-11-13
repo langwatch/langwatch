@@ -989,7 +989,9 @@ describe("given datasets created before versioning", () => {
       projectId: "project-0",
       entries: [{ id: "a", input: "x" }],
     });
-    vi.spyOn(repositories.chunks, "readChunk").mockRejectedValueOnce(new Error("connection reset"));
+    // The findPage spy below only fires for Postgres-layout datasets.
+    expect(legacy.contentLayout).toBe("postgres");
+    vi.spyOn(repositories.records, "findPage").mockRejectedValueOnce(new Error("connection reset"));
 
     const { saved, checkpoint } = checkpointOf(null);
     await expect(
