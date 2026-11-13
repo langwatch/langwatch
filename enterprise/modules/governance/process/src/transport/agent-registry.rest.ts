@@ -4,7 +4,13 @@
  * view, read with an organisation API key holding `governance:view`.
  * Spec: enterprise/modules/governance/specs/agent-registry.feature
  */
-import { baseResponses, defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import {
+  canonicalBaseResponses,
+  canonicalNotFoundResponses,
+  canonicalUnprocessableResponses,
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+} from "@langwatch/api/rest";
 import {
   agentRegistryDetailResponseSchema,
   agentRegistryEntrySchema,
@@ -46,7 +52,7 @@ export const agentRegistryRest = defineRestRouter(GovernanceRestApi)
     tags: TAGS,
     description:
       "Every agent LangWatch sees for the organisation: agents defined in its projects, agents a governance source listed (Databricks Genie, Copilot Studio) and agents its traces name in `gen_ai.agent.name`. Ordered by last change, oldest first; pass `next_cursor` back as `cursor`. `updated_since` returns only entries changed at or after that instant.",
-    responses: { ...baseResponses },
+    responses: { ...canonicalBaseResponses, ...canonicalUnprocessableResponses },
   })
   .handle(({ app, input, scope }) =>
     app.listRegistryAgents({
@@ -68,7 +74,11 @@ export const agentRegistryRest = defineRestRouter(GovernanceRestApi)
     tags: TAGS,
     description:
       "One agent with its endpoints, model configuration, system instructions, tools with JSON Schema parameters, owner and registry version. An id outside the organisation is a 404 `agent_registry_entry_not_found`.",
-    responses: { ...baseResponses },
+    responses: {
+      ...canonicalBaseResponses,
+      ...canonicalUnprocessableResponses,
+      ...canonicalNotFoundResponses,
+    },
   })
   .handle(async ({ app, input, scope }) => ({
     data: await app.getRegistryAgent({ organizationId: scope.id, id: input.agentId }),
@@ -85,7 +95,11 @@ export const agentRegistryRest = defineRestRouter(GovernanceRestApi)
     tags: TAGS,
     description:
       "The change events recorded for the agent, oldest first, one page at a time. Each carries `from_version`, `to_version` and the entry as it stood at `to_version`. Pass `next_cursor` back as `cursor` for the next page; it is null on the last page.",
-    responses: { ...baseResponses },
+    responses: {
+      ...canonicalBaseResponses,
+      ...canonicalUnprocessableResponses,
+      ...canonicalNotFoundResponses,
+    },
   })
   .handle(({ app, input, scope }) =>
     app.listRegistryAgentVersions({
@@ -106,7 +120,7 @@ export const agentRegistryRest = defineRestRouter(GovernanceRestApi)
     tags: TAGS,
     description:
       "The organisation's registry events in order: `governance.agent.registered`, `.versioned`, `.tool_deprecated`, `.removed` and `.flagged_shadow`. Pass the last `sequence` read as `cursor`; the same events are pushed to webhook endpoints subscribed to `governance.agent.*`.",
-    responses: { ...baseResponses },
+    responses: { ...canonicalBaseResponses, ...canonicalUnprocessableResponses },
   })
   .handle(({ app, input, scope }) =>
     app.listRegistryEvents({
@@ -125,7 +139,7 @@ export const agentRegistryRest = defineRestRouter(GovernanceRestApi)
     tags: TAGS,
     description:
       "JSON Schema (draft 2020-12) documents for one registry entry and one change event, for validating what the REST routes, the ARD manifest and the webhooks return.",
-    responses: { ...baseResponses },
+    responses: { ...canonicalBaseResponses },
   })
   .handle(() => registrySchemas)
 
@@ -138,7 +152,7 @@ export const agentRegistryRest = defineRestRouter(GovernanceRestApi)
     tags: TAGS,
     description:
       "The organisation's active agents, the 1,000 changed most recently, as an Agentic Resource Discovery (ARD v0.91) manifest. Each entry has a `urn:air:<host>:<organization id>:agent:<id>` identifier, type `application/agent-card+json` and the registry entry inline as `data`.",
-    responses: { ...baseResponses },
+    responses: { ...canonicalBaseResponses },
   })
   .handle(({ app, scope }) => app.getRegistryArdManifest({ organizationId: scope.id }))
 
@@ -154,7 +168,7 @@ export const agentRegistryRest = defineRestRouter(GovernanceRestApi)
     tags: TAGS,
     description:
       "ARD `POST /search`: `query.text` is matched against names, capabilities, descriptions, instructions and tools; `query.filter` keys are term paths (`tags`, `capabilities`, `data.source`, `data.shadow`), values within a key are OR-ed and keys AND-ed. Results carry a 0 to 100 relevance `score`. Searches the 1,000 active agents changed most recently. Federation is not performed.",
-    responses: { ...baseResponses },
+    responses: { ...canonicalBaseResponses, ...canonicalUnprocessableResponses },
   })
   .handle(({ app, input, scope }) =>
     app.searchRegistryArd({ organizationId: scope.id, request: input }),

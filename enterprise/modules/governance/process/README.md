@@ -756,7 +756,7 @@ searchRegistryArd(input: { organizationId: string; request: ArdSearchRequest; })
 
 |             |                                           |
 | ----------- | ----------------------------------------- |
-| Declared at | `src/transport/agent-registry.rest.ts:32` |
+| Declared at | `src/transport/agent-registry.rest.ts:38` |
 | Base URL    | none: each route's path is its address    |
 | Addressing  | literal                                   |
 | Credential  | organization                              |
@@ -765,7 +765,7 @@ searchRegistryArd(input: { organizationId: string; request: ArdSearchRequest; })
 
 List the organisation's agent registry
 
-Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:39`.
+Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:45`.
 
 Answers at `/api/governance/registry/agents`, `/api/v1/governance/registry/agents`.
 
@@ -784,7 +784,7 @@ type Response = z.infer<typeof agentRegistryListResponseSchema>; // ../contract/
 
 Get one registry agent
 
-Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:61`.
+Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:67`.
 
 Answers at `/api/governance/registry/agents/:agentId`, `/api/v1/governance/registry/agents/:agentId`.
 
@@ -800,43 +800,43 @@ type Response = z.infer<typeof agentRegistryDetailResponseSchema>; // ../contrac
 
 List one registry agent's versions
 
-Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:77`.
+Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:87`.
 
 Answers at `/api/governance/registry/agents/:agentId/versions`, `/api/v1/governance/registry/agents/:agentId/versions`.
 
 ```typescript
 type Params = z.infer<typeof agentRegistryParamsSchema>; // ../contract/src/features/registry/agent-registry.ts:165
-// Query: agentRegistryEventsQuerySchema, ../contract/src/features/registry/agent-registry.ts:183
+// Query: agentRegistryEventsQuerySchema, ../contract/src/features/registry/agent-registry.ts:190
 interface Query {
   limit?: number;
   cursor?: string;
 }
-type Response = z.infer<typeof agentRegistryEventsResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:194
+type Response = z.infer<typeof agentRegistryEventsResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:201
 ```
 
 #### `GET /api/governance/registry/events` · `listRegistryEvents`
 
 Read the registry change feed
 
-Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:99`.
+Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:113`.
 
 Answers at `/api/governance/registry/events`, `/api/v1/governance/registry/events`.
 
 ```typescript
-type Query = z.infer<typeof agentRegistryEventsQuerySchema>; // ../contract/src/features/registry/agent-registry.ts:183
-type Response = z.infer<typeof agentRegistryEventsResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:194
+type Query = z.infer<typeof agentRegistryEventsQuerySchema>; // ../contract/src/features/registry/agent-registry.ts:190
+type Response = z.infer<typeof agentRegistryEventsResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:201
 ```
 
 #### `GET /api/governance/registry/schema` · `getRegistrySchema`
 
 Get the registry's JSON Schemas
 
-Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:119`.
+Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:133`.
 
 Answers at `/api/governance/registry/schema`, `/api/v1/governance/registry/schema`.
 
 ```typescript
-// Response: agentRegistrySchemaResponseSchema, ../contract/src/features/registry/agent-registry.ts:206
+// Response: agentRegistrySchemaResponseSchema, ../contract/src/features/registry/agent-registry.ts:213
 interface Response {
   entry: Record<string, unknown>;
   event: Record<string, unknown>;
@@ -847,7 +847,7 @@ interface Response {
 
 Get the registry as an ARD manifest
 
-Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:132`.
+Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:146`.
 
 Answers at `/api/governance/registry/ard.json`, `/api/v1/governance/registry/ard.json`.
 
@@ -859,7 +859,7 @@ type Response = z.infer<typeof ardManifestSchema>; // ../contract/src/features/r
 
 Search the registry (ARD search)
 
-Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:145`.
+Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:159`.
 
 Answers at `/api/governance/registry/ard/search`, `/api/v1/governance/registry/ard/search`.
 
@@ -2363,7 +2363,7 @@ Declared at `src/features/registry/eventing/agent-registry.pipeline.ts:83`.
 
 | Kind   | Leaf                       | Environment variable                  | Declared at                               |
 | ------ | -------------------------- | ------------------------------------- | ----------------------------------------- |
-| secret | `–`                        | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:526`           |
+| secret | `–`                        | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:527`           |
 | config | `gatewayPublicUrl`         | `LW_GATEWAY_PUBLIC_URL`               | `../contract/src/governance.config.ts:41` |
 | config | `gatewayInternalUrl`       | `LW_GATEWAY_INTERNAL_URL`             | `../contract/src/governance.config.ts:42` |
 | config | `gatewayLegacyUrl`         | `LW_GATEWAY_BASE_URL`                 | `../contract/src/governance.config.ts:43` |

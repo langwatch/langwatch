@@ -171,10 +171,17 @@ export interface AgentRegistryDetailResponseSchema extends Named<
 export const agentRegistryDetailResponseSchema: AgentRegistryDetailResponseSchema =
   agentRegistryDetailResponseSchemaDefinition;
 
+/** The largest value the signed 64-bit `sequence` column holds. */
+const SEQUENCE_MAX = 9_223_372_036_854_775_807n;
+
 const agentRegistryEventsQuerySchemaDefinition = z.object({
   limit: z.coerce.number().int().min(1).max(AGENT_REGISTRY_PAGE_LIMIT_MAX).default(100),
   /** The last `sequence` read; events after it are returned in order. */
-  cursor: z.string().regex(/^\d+$/).optional(),
+  cursor: z
+    .string()
+    .regex(/^\d{1,19}$/)
+    .refine((value) => BigInt(value) <= SEQUENCE_MAX, "cursor is out of range")
+    .optional(),
 });
 export interface AgentRegistryEventsQuerySchema extends Named<
   typeof agentRegistryEventsQuerySchemaDefinition

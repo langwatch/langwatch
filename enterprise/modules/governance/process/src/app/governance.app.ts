@@ -301,6 +301,7 @@ import {
   requestAgentRegistryDelivery,
 } from "../features/registry/eventing/agent-registry-delivery.intent.ts";
 import type { AgentRegistryDeliveryIntent } from "../features/registry/eventing/agent-registry-delivery.process.ts";
+import { AgentRegistryReadsService } from "../features/registry/services/agent-registry-reads.service.ts";
 import { AgentRegistryService } from "../features/registry/services/agent-registry.service.ts";
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
 import { governanceOperatorReads } from "../repositories/prisma/prisma.suppression-snapshot.repository.ts";
@@ -707,6 +708,11 @@ export class GovernanceModule implements GovernanceRestApi {
       outbox: () => this.#agentRegistryOutbox,
       publicBaseUrl: publicBaseUrl ?? "",
     });
+    this.agentRegistryReads = AgentRegistryReadsService.create({
+      registry: repositories.agentRegistry,
+      publicBaseUrl: publicBaseUrl ?? "",
+      now: nowInstant,
+    });
     this.costSummary = GovernanceCostSummaryService.create({
       costRollup: repositories.costRollup,
       projects: dependencies.projects,
@@ -1009,6 +1015,7 @@ export class GovernanceModule implements GovernanceRestApi {
   private readonly agentsScreen: GovernanceAgentsScreenService;
   /** The organisation's agent registry, its ARD view and change feed (specs/agent-registry.feature). */
   readonly agentRegistry: AgentRegistryService;
+  private readonly agentRegistryReads: AgentRegistryReadsService;
   private readonly costBreakdown: GovernanceCostBreakdownService;
   private readonly costSummary: GovernanceCostSummaryService;
   private readonly aiTools: DefaultGovernanceAiToolCatalogService;
@@ -1743,11 +1750,11 @@ export class GovernanceModule implements GovernanceRestApi {
     updatedSince?: string;
     status?: AgentRegistryStatus;
   }): Promise<AgentRegistryPage> {
-    return this.agentRegistry.listEntries(input);
+    return this.agentRegistryReads.listEntries(input);
   }
 
   getRegistryAgent(input: { organizationId: string; id: string }): Promise<AgentRegistryEntry> {
-    return this.agentRegistry.getEntry(input);
+    return this.agentRegistryReads.getEntry(input);
   }
 
   listRegistryAgentVersions(input: {
@@ -1756,7 +1763,7 @@ export class GovernanceModule implements GovernanceRestApi {
     cursor?: string;
     limit: number;
   }): Promise<AgentRegistryEventPage> {
-    return this.agentRegistry.listVersions(input);
+    return this.agentRegistryReads.listVersions(input);
   }
 
   listRegistryEvents(input: {
@@ -1764,7 +1771,7 @@ export class GovernanceModule implements GovernanceRestApi {
     after?: string;
     limit: number;
   }): Promise<AgentRegistryEventPage> {
-    return this.agentRegistry.listEvents({
+    return this.agentRegistryReads.listEvents({
       organizationId: input.organizationId,
       limit: input.limit,
       ...(input.after ? { cursor: input.after } : {}),
@@ -1772,14 +1779,14 @@ export class GovernanceModule implements GovernanceRestApi {
   }
 
   getRegistryArdManifest(input: { organizationId: string }): Promise<ArdManifest> {
-    return this.agentRegistry.ardManifest(input);
+    return this.agentRegistryReads.ardManifest(input);
   }
 
   searchRegistryArd(input: {
     organizationId: string;
     request: ArdSearchRequest;
   }): Promise<ArdSearchResponse> {
-    return this.agentRegistry.ardSearch(input);
+    return this.agentRegistryReads.ardSearch(input);
   }
 
   governanceAgentsList(input: { organizationId: string }): Promise<GovernanceAgentRow[]> {

@@ -10,6 +10,7 @@ import type { WebhookApi, WebhookEndpointView } from "@langwatch/webhook-contrac
 import { describe, expect, it, vi } from "vitest";
 
 import type { AgentRegistryDeliveryIntent } from "../../features/registry/eventing/agent-registry-delivery.process.ts";
+import { AgentRegistryReadsService } from "../../features/registry/services/agent-registry-reads.service.ts";
 import {
   type AgentRegistryDeliveryOutbox,
   AgentRegistryService,
@@ -140,7 +141,12 @@ function setup({
     logger: createTestLogger().logger,
     now,
   });
-  return { service, registry, outbox, state, reconciled };
+  const reads = AgentRegistryReadsService.create({
+    registry,
+    publicBaseUrl: "https://app.langwatch.test",
+    now,
+  });
+  return { service, reads, registry, outbox, state, reconciled };
 }
 
 describe("AgentRegistryService", () => {
@@ -213,7 +219,7 @@ describe("AgentRegistryService", () => {
   describe("when an agent's versions are read one page at a time", () => {
     /** @scenario An agent's versions are read in pages, oldest first */
     it("answers each page after the cursor and a null cursor on the last", async () => {
-      const { service, registry, state } = setup();
+      const { service, reads, registry, state } = setup();
       for (const name of ["Field agent", "Field agent v2", "Field agent v3"]) {
         state.agents = [connectedAgent("agent-1", name)];
         await service.reconcileOrganization({ organizationId: ORG });
@@ -221,8 +227,8 @@ describe("AgentRegistryService", () => {
       const [entry] = await registry.findEntries({ organizationId: ORG, limit: 10 });
       const id = entry?.id ?? "";
 
-      const first = await service.listVersions({ organizationId: ORG, id, limit: 2 });
-      const second = await service.listVersions({
+      const first = await reads.listVersions({ organizationId: ORG, id, limit: 2 });
+      const second = await reads.listVersions({
         organizationId: ORG,
         id,
         cursor: first.next_cursor ?? undefined,
@@ -268,11 +274,11 @@ describe("AgentRegistryService", () => {
   describe("when a listing cursor carries a timestamp that does not parse", () => {
     /** @scenario A listing cursor this registry never returned is refused */
     it("refuses it as a validation error", async () => {
-      const { service } = setup();
+      const { reads } = setup();
       const cursor = Buffer.from(JSON.stringify({ u: "not-a-date", i: "x" })).toString("base64url");
 
       await expect(
-        service.listEntries({ organizationId: ORG, limit: 10, cursor }),
+        reads.listEntries({ organizationId: ORG, limit: 10, cursor }),
       ).rejects.toMatchObject({ code: "validation_error" });
     });
   });

@@ -7,7 +7,7 @@ from ...client import AuthenticatedClient, Client
 from ...models.get_api_governance_registry_schema_response_200 import GetApiGovernanceRegistrySchemaResponse200
 from ...models.get_api_governance_registry_schema_response_400 import GetApiGovernanceRegistrySchemaResponse400
 from ...models.get_api_governance_registry_schema_response_401 import GetApiGovernanceRegistrySchemaResponse401
-from ...models.get_api_governance_registry_schema_response_422 import GetApiGovernanceRegistrySchemaResponse422
+from ...models.get_api_governance_registry_schema_response_403 import GetApiGovernanceRegistrySchemaResponse403
 from ...models.get_api_governance_registry_schema_response_500 import GetApiGovernanceRegistrySchemaResponse500
 from ...types import Response, safe_http_status
 
@@ -28,7 +28,7 @@ def _parse_response(
     GetApiGovernanceRegistrySchemaResponse200
     | GetApiGovernanceRegistrySchemaResponse400
     | GetApiGovernanceRegistrySchemaResponse401
-    | GetApiGovernanceRegistrySchemaResponse422
+    | GetApiGovernanceRegistrySchemaResponse403
     | GetApiGovernanceRegistrySchemaResponse500
     | None
 ):
@@ -47,10 +47,10 @@ def _parse_response(
 
         return response_401
 
-    if response.status_code == 422:
-        response_422 = GetApiGovernanceRegistrySchemaResponse422.from_dict(response.json())
+    if response.status_code == 403:
+        response_403 = GetApiGovernanceRegistrySchemaResponse403.from_dict(response.json())
 
-        return response_422
+        return response_403
 
     if response.status_code == 500:
         response_500 = GetApiGovernanceRegistrySchemaResponse500.from_dict(response.json())
@@ -69,7 +69,7 @@ def _build_response(
     GetApiGovernanceRegistrySchemaResponse200
     | GetApiGovernanceRegistrySchemaResponse400
     | GetApiGovernanceRegistrySchemaResponse401
-    | GetApiGovernanceRegistrySchemaResponse422
+    | GetApiGovernanceRegistrySchemaResponse403
     | GetApiGovernanceRegistrySchemaResponse500
 ]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
@@ -90,7 +90,7 @@ def sync_detailed(
     GetApiGovernanceRegistrySchemaResponse200
     | GetApiGovernanceRegistrySchemaResponse400
     | GetApiGovernanceRegistrySchemaResponse401
-    | GetApiGovernanceRegistrySchemaResponse422
+    | GetApiGovernanceRegistrySchemaResponse403
     | GetApiGovernanceRegistrySchemaResponse500
 ]:
     """Get the registry's JSON Schemas
@@ -103,7 +103,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiGovernanceRegistrySchemaResponse200 | GetApiGovernanceRegistrySchemaResponse400 | GetApiGovernanceRegistrySchemaResponse401 | GetApiGovernanceRegistrySchemaResponse422 | GetApiGovernanceRegistrySchemaResponse500]
+        Response[GetApiGovernanceRegistrySchemaResponse200 | GetApiGovernanceRegistrySchemaResponse400 | GetApiGovernanceRegistrySchemaResponse401 | GetApiGovernanceRegistrySchemaResponse403 | GetApiGovernanceRegistrySchemaResponse500]
     """
 
     kwargs = _get_kwargs()
@@ -122,7 +122,7 @@ def sync(
     GetApiGovernanceRegistrySchemaResponse200
     | GetApiGovernanceRegistrySchemaResponse400
     | GetApiGovernanceRegistrySchemaResponse401
-    | GetApiGovernanceRegistrySchemaResponse422
+    | GetApiGovernanceRegistrySchemaResponse403
     | GetApiGovernanceRegistrySchemaResponse500
     | None
 ):
@@ -136,7 +136,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiGovernanceRegistrySchemaResponse200 | GetApiGovernanceRegistrySchemaResponse400 | GetApiGovernanceRegistrySchemaResponse401 | GetApiGovernanceRegistrySchemaResponse422 | GetApiGovernanceRegistrySchemaResponse500
+        GetApiGovernanceRegistrySchemaResponse200 | GetApiGovernanceRegistrySchemaResponse400 | GetApiGovernanceRegistrySchemaResponse401 | GetApiGovernanceRegistrySchemaResponse403 | GetApiGovernanceRegistrySchemaResponse500
     """
 
     return sync_detailed(
@@ -151,7 +151,7 @@ async def asyncio_detailed(
     GetApiGovernanceRegistrySchemaResponse200
     | GetApiGovernanceRegistrySchemaResponse400
     | GetApiGovernanceRegistrySchemaResponse401
-    | GetApiGovernanceRegistrySchemaResponse422
+    | GetApiGovernanceRegistrySchemaResponse403
     | GetApiGovernanceRegistrySchemaResponse500
 ]:
     """Get the registry's JSON Schemas
@@ -164,7 +164,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiGovernanceRegistrySchemaResponse200 | GetApiGovernanceRegistrySchemaResponse400 | GetApiGovernanceRegistrySchemaResponse401 | GetApiGovernanceRegistrySchemaResponse422 | GetApiGovernanceRegistrySchemaResponse500]
+        Response[GetApiGovernanceRegistrySchemaResponse200 | GetApiGovernanceRegistrySchemaResponse400 | GetApiGovernanceRegistrySchemaResponse401 | GetApiGovernanceRegistrySchemaResponse403 | GetApiGovernanceRegistrySchemaResponse500]
     """
 
     kwargs = _get_kwargs()
@@ -181,7 +181,7 @@ async def asyncio(
     GetApiGovernanceRegistrySchemaResponse200
     | GetApiGovernanceRegistrySchemaResponse400
     | GetApiGovernanceRegistrySchemaResponse401
-    | GetApiGovernanceRegistrySchemaResponse422
+    | GetApiGovernanceRegistrySchemaResponse403
     | GetApiGovernanceRegistrySchemaResponse500
     | None
 ):
@@ -195,7 +195,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiGovernanceRegistrySchemaResponse200 | GetApiGovernanceRegistrySchemaResponse400 | GetApiGovernanceRegistrySchemaResponse401 | GetApiGovernanceRegistrySchemaResponse422 | GetApiGovernanceRegistrySchemaResponse500
+        GetApiGovernanceRegistrySchemaResponse200 | GetApiGovernanceRegistrySchemaResponse400 | GetApiGovernanceRegistrySchemaResponse401 | GetApiGovernanceRegistrySchemaResponse403 | GetApiGovernanceRegistrySchemaResponse500
     """
 
     return (

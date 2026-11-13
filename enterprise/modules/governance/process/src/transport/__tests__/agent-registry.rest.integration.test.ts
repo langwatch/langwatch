@@ -247,6 +247,19 @@ describe("the agent registry REST family", () => {
     });
   });
 
+  describe("given an event cursor past the signed 64-bit range", () => {
+    /** @scenario An event cursor past the sequence range is refused */
+    it("answers 422 validation_error", async () => {
+      const { get } = await buildApi();
+
+      const response = await get("/api/governance/registry/events?cursor=99999999999999999999");
+      const body = (await response.json()) as { code: string };
+
+      expect(response.status).toBe(422);
+      expect(body.code).toBe("validation_error");
+    });
+  });
+
   describe("given a key without governance:view", () => {
     /** @scenario A key without governance:view is refused */
     it("answers 403", async () => {

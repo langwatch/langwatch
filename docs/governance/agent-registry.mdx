@@ -17,7 +17,7 @@ The agent registry lists every agent LangWatch can see in your organization, wit
 
 A traced agent is matched to a listed one when its `gen_ai.agent.id` equals a LangWatch agent id or a provider's agent id (such as a Databricks Genie space id), or when its name equals, ignoring case, the name of a LangWatch agent in the same project or of an agent listed by an ingestion source. A traced agent with no match is registered with `shadow: true` and a `governance.agent.flagged_shadow` event. That is how agents running outside your inventory show up.
 
-A LangWatch agent that is archived or deleted, and a traced agent that has sent no traffic for 30 days, is kept with `status: "removed"`; entries are never deleted. Agents from ingestion sources stay active once listed.
+A LangWatch agent that is archived or deleted, and a traced agent that has sent no traffic for 30 days, is kept with `status: "removed"`; entries are never deleted. Agents from ingestion sources stay active once listed. A traced agent that a listed agent now matches is also removed, and the listed entry takes its place. Each reconcile reads the 200 busiest agent names of each project; an agent past that count is registered once it is among them.
 
 ## Authentication
 
@@ -133,7 +133,7 @@ Every event has the same shape:
 - A change to an agent in a LangWatch project updates the registry within seconds of the save or archive.
 - A listing from an ingestion source updates it right after the listing runs.
 - When an upgrade first fills the registry, the events for agents that already existed are written to the feed but not pushed to webhooks.
-- Traffic is read every 15 minutes for organizations that already hold a registry, once a day for every organization, and on each of the two triggers above. When a project names more agents than one read returns, traced agents the read did not return are kept as they are.
+- Traffic is read every 15 minutes for organizations that already hold a registry, once a day for every organization, and on each of the two triggers above. A traced agent a read did not return stays as it is while its last sighting is inside the 30-day window.
 
 ### Reading the feed by cursor
 

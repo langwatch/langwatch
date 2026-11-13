@@ -183,6 +183,17 @@ function planRegistered(draft: RegistryDraft, context: PlanContext): RegistryCha
   return { writes: [{ ...write, isNew: true }], events };
 }
 
+/** The later of two sightings: a read that saw less never moves `last_seen_at` back. */
+function laterSighting({ held, read }: { held: string | null; read: string | null }): {
+  lastSeenAt: string | null;
+} {
+  if (held === null) return { lastSeenAt: read };
+  if (read === null) return { lastSeenAt: held };
+  const readIsLater =
+    Temporal.Instant.compare(Temporal.Instant.from(read), Temporal.Instant.from(held)) > 0;
+  return { lastSeenAt: readIsLater ? read : held };
+}
+
 /** A held agent observed again: a new version on a material change, else at most a last-seen move. */
 function planObserved(
   draft: RegistryDraft,
@@ -197,7 +208,7 @@ function planObserved(
     version: nextVersion,
     now: context.now,
   });
-  const candidate = entryOf({
+  const read = entryOf({
     id: held.id,
     draft,
     version: nextVersion,
@@ -205,6 +216,8 @@ function planObserved(
     firstSeenAt: previous.first_seen_at,
     updatedAt: context.at,
   });
+  const { lastSeenAt } = laterSighting({ held: previous.last_seen_at, read: read.last_seen_at });
+  const candidate = { ...read, last_seen_at: lastSeenAt };
   const fingerprint = registryFingerprint(candidate);
   const row = { id: held.id, sourceKey: held.sourceKey, fingerprint, isNew: false };
 

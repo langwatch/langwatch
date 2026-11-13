@@ -50,7 +50,9 @@ export class MemoryTraceAgentTrafficRepository extends TraceAgentTrafficReposito
     for (const span of this.#spans) {
       if (span.tenantId !== input.tenantId || span.startTimeMs < input.sinceMs) continue;
       if (span.agentName === "") continue;
-      byName.set(span.agentName, [...(byName.get(span.agentName) ?? []), span]);
+      const group = byName.get(span.agentName);
+      if (group) group.push(span);
+      else byName.set(span.agentName, [span]);
     }
     return [...byName.entries()]
       .map(([agentName, spans]) => ({

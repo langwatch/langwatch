@@ -14,6 +14,12 @@ from ...models.get_api_governance_registry_agents_by_id_versions_response_400 im
 from ...models.get_api_governance_registry_agents_by_id_versions_response_401 import (
     GetApiGovernanceRegistryAgentsByIdVersionsResponse401,
 )
+from ...models.get_api_governance_registry_agents_by_id_versions_response_403 import (
+    GetApiGovernanceRegistryAgentsByIdVersionsResponse403,
+)
+from ...models.get_api_governance_registry_agents_by_id_versions_response_404 import (
+    GetApiGovernanceRegistryAgentsByIdVersionsResponse404,
+)
 from ...models.get_api_governance_registry_agents_by_id_versions_response_422 import (
     GetApiGovernanceRegistryAgentsByIdVersionsResponse422,
 )
@@ -55,6 +61,8 @@ def _parse_response(
     GetApiGovernanceRegistryAgentsByIdVersionsResponse200
     | GetApiGovernanceRegistryAgentsByIdVersionsResponse400
     | GetApiGovernanceRegistryAgentsByIdVersionsResponse401
+    | GetApiGovernanceRegistryAgentsByIdVersionsResponse403
+    | GetApiGovernanceRegistryAgentsByIdVersionsResponse404
     | GetApiGovernanceRegistryAgentsByIdVersionsResponse422
     | GetApiGovernanceRegistryAgentsByIdVersionsResponse500
     | None
@@ -73,6 +81,16 @@ def _parse_response(
         response_401 = GetApiGovernanceRegistryAgentsByIdVersionsResponse401.from_dict(response.json())
 
         return response_401
+
+    if response.status_code == 403:
+        response_403 = GetApiGovernanceRegistryAgentsByIdVersionsResponse403.from_dict(response.json())
+
+        return response_403
+
+    if response.status_code == 404:
+        response_404 = GetApiGovernanceRegistryAgentsByIdVersionsResponse404.from_dict(response.json())
+
+        return response_404
 
     if response.status_code == 422:
         response_422 = GetApiGovernanceRegistryAgentsByIdVersionsResponse422.from_dict(response.json())
@@ -96,6 +114,8 @@ def _build_response(
     GetApiGovernanceRegistryAgentsByIdVersionsResponse200
     | GetApiGovernanceRegistryAgentsByIdVersionsResponse400
     | GetApiGovernanceRegistryAgentsByIdVersionsResponse401
+    | GetApiGovernanceRegistryAgentsByIdVersionsResponse403
+    | GetApiGovernanceRegistryAgentsByIdVersionsResponse404
     | GetApiGovernanceRegistryAgentsByIdVersionsResponse422
     | GetApiGovernanceRegistryAgentsByIdVersionsResponse500
 ]:
@@ -120,6 +140,8 @@ def sync_detailed(
     GetApiGovernanceRegistryAgentsByIdVersionsResponse200
     | GetApiGovernanceRegistryAgentsByIdVersionsResponse400
     | GetApiGovernanceRegistryAgentsByIdVersionsResponse401
+    | GetApiGovernanceRegistryAgentsByIdVersionsResponse403
+    | GetApiGovernanceRegistryAgentsByIdVersionsResponse404
     | GetApiGovernanceRegistryAgentsByIdVersionsResponse422
     | GetApiGovernanceRegistryAgentsByIdVersionsResponse500
 ]:
@@ -139,7 +161,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiGovernanceRegistryAgentsByIdVersionsResponse200 | GetApiGovernanceRegistryAgentsByIdVersionsResponse400 | GetApiGovernanceRegistryAgentsByIdVersionsResponse401 | GetApiGovernanceRegistryAgentsByIdVersionsResponse422 | GetApiGovernanceRegistryAgentsByIdVersionsResponse500]
+        Response[GetApiGovernanceRegistryAgentsByIdVersionsResponse200 | GetApiGovernanceRegistryAgentsByIdVersionsResponse400 | GetApiGovernanceRegistryAgentsByIdVersionsResponse401 | GetApiGovernanceRegistryAgentsByIdVersionsResponse403 | GetApiGovernanceRegistryAgentsByIdVersionsResponse404 | GetApiGovernanceRegistryAgentsByIdVersionsResponse422 | GetApiGovernanceRegistryAgentsByIdVersionsResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -165,6 +187,8 @@ def sync(
     GetApiGovernanceRegistryAgentsByIdVersionsResponse200
     | GetApiGovernanceRegistryAgentsByIdVersionsResponse400
     | GetApiGovernanceRegistryAgentsByIdVersionsResponse401
+    | GetApiGovernanceRegistryAgentsByIdVersionsResponse403
+    | GetApiGovernanceRegistryAgentsByIdVersionsResponse404
     | GetApiGovernanceRegistryAgentsByIdVersionsResponse422
     | GetApiGovernanceRegistryAgentsByIdVersionsResponse500
     | None
@@ -185,7 +209,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiGovernanceRegistryAgentsByIdVersionsResponse200 | GetApiGovernanceRegistryAgentsByIdVersionsResponse400 | GetApiGovernanceRegistryAgentsByIdVersionsResponse401 | GetApiGovernanceRegistryAgentsByIdVersionsResponse422 | GetApiGovernanceRegistryAgentsByIdVersionsResponse500
+        GetApiGovernanceRegistryAgentsByIdVersionsResponse200 | GetApiGovernanceRegistryAgentsByIdVersionsResponse400 | GetApiGovernanceRegistryAgentsByIdVersionsResponse401 | GetApiGovernanceRegistryAgentsByIdVersionsResponse403 | GetApiGovernanceRegistryAgentsByIdVersionsResponse404 | GetApiGovernanceRegistryAgentsByIdVersionsResponse422 | GetApiGovernanceRegistryAgentsByIdVersionsResponse500
     """
 
     return sync_detailed(
@@ -206,6 +230,8 @@ async def asyncio_detailed(
     GetApiGovernanceRegistryAgentsByIdVersionsResponse200
     | GetApiGovernanceRegistryAgentsByIdVersionsResponse400
     | GetApiGovernanceRegistryAgentsByIdVersionsResponse401
+    | GetApiGovernanceRegistryAgentsByIdVersionsResponse403
+    | GetApiGovernanceRegistryAgentsByIdVersionsResponse404
     | GetApiGovernanceRegistryAgentsByIdVersionsResponse422
     | GetApiGovernanceRegistryAgentsByIdVersionsResponse500
 ]:
@@ -225,7 +251,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiGovernanceRegistryAgentsByIdVersionsResponse200 | GetApiGovernanceRegistryAgentsByIdVersionsResponse400 | GetApiGovernanceRegistryAgentsByIdVersionsResponse401 | GetApiGovernanceRegistryAgentsByIdVersionsResponse422 | GetApiGovernanceRegistryAgentsByIdVersionsResponse500]
+        Response[GetApiGovernanceRegistryAgentsByIdVersionsResponse200 | GetApiGovernanceRegistryAgentsByIdVersionsResponse400 | GetApiGovernanceRegistryAgentsByIdVersionsResponse401 | GetApiGovernanceRegistryAgentsByIdVersionsResponse403 | GetApiGovernanceRegistryAgentsByIdVersionsResponse404 | GetApiGovernanceRegistryAgentsByIdVersionsResponse422 | GetApiGovernanceRegistryAgentsByIdVersionsResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -249,6 +275,8 @@ async def asyncio(
     GetApiGovernanceRegistryAgentsByIdVersionsResponse200
     | GetApiGovernanceRegistryAgentsByIdVersionsResponse400
     | GetApiGovernanceRegistryAgentsByIdVersionsResponse401
+    | GetApiGovernanceRegistryAgentsByIdVersionsResponse403
+    | GetApiGovernanceRegistryAgentsByIdVersionsResponse404
     | GetApiGovernanceRegistryAgentsByIdVersionsResponse422
     | GetApiGovernanceRegistryAgentsByIdVersionsResponse500
     | None
@@ -269,7 +297,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiGovernanceRegistryAgentsByIdVersionsResponse200 | GetApiGovernanceRegistryAgentsByIdVersionsResponse400 | GetApiGovernanceRegistryAgentsByIdVersionsResponse401 | GetApiGovernanceRegistryAgentsByIdVersionsResponse422 | GetApiGovernanceRegistryAgentsByIdVersionsResponse500
+        GetApiGovernanceRegistryAgentsByIdVersionsResponse200 | GetApiGovernanceRegistryAgentsByIdVersionsResponse400 | GetApiGovernanceRegistryAgentsByIdVersionsResponse401 | GetApiGovernanceRegistryAgentsByIdVersionsResponse403 | GetApiGovernanceRegistryAgentsByIdVersionsResponse404 | GetApiGovernanceRegistryAgentsByIdVersionsResponse422 | GetApiGovernanceRegistryAgentsByIdVersionsResponse500
     """
 
     return (

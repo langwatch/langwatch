@@ -15,7 +15,7 @@ import {
 } from "../rules/registry-entry.rules.ts";
 import type { StoredRegistryEntry } from "../rules/registry-reconcile.rules.ts";
 import {
-  keepsUnreadTraffic,
+  keepsTrafficInWindow,
   REGISTRY_TRAFFIC_LIMIT_PER_PROJECT,
   REGISTRY_TRAFFIC_WINDOW_MS,
   trafficAgentDrafts,
@@ -98,7 +98,7 @@ export class AgentRegistrySourcesService {
         }),
       })),
     );
-    const keepTraffic = keepsUnreadTraffic({ seen });
+    const keepTraffic = keepsTrafficInWindow({ sinceMs: since, projectIds, listed });
     return {
       drafts: [...listed, ...trafficAgentDrafts({ seen, listed })],
       keep: (held) =>

@@ -1450,6 +1450,7 @@
             "pages": [
               "api-reference/governance-agent-registry/overview",
               "api-reference/governance-agent-registry/list-the-organisation-s-agent-registry",
+              "api-reference/governance-agent-registry/get-the-registry-as-an-ard-manifest",
               "api-reference/governance-agent-registry/read-the-registry-change-feed",
               "api-reference/governance-agent-registry/get-the-registry-s-json-schemas",
               "api-reference/governance-agent-registry/search-the-registry-ard-search",

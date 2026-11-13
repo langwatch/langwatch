@@ -6,54 +6,29 @@ from typing import Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..types import UNSET, Unset
-
-T = TypeVar("T", bound="GetApiGovernanceRegistrySchemaResponse422")
+T = TypeVar("T", bound="GetApiGovernanceRegistryAgentsByIdVersionsResponse401Meta")
 
 
 @_attrs_define
-class GetApiGovernanceRegistrySchemaResponse422:
-    """
-    Attributes:
-        error (str):
-        message (str | Unset):
-    """
+class GetApiGovernanceRegistryAgentsByIdVersionsResponse401Meta:
+    """ """
 
-    error: str
-    message: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        error = self.error
-
-        message = self.message
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update(
-            {
-                "error": error,
-            }
-        )
-        if message is not UNSET:
-            field_dict["message"] = message
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        error = d.pop("error")
+        get_api_governance_registry_agents_by_id_versions_response_401_meta = cls()
 
-        message = d.pop("message", UNSET)
-
-        get_api_governance_registry_schema_response_422 = cls(
-            error=error,
-            message=message,
-        )
-
-        get_api_governance_registry_schema_response_422.additional_properties = d
-        return get_api_governance_registry_schema_response_422
+        get_api_governance_registry_agents_by_id_versions_response_401_meta.additional_properties = d
+        return get_api_governance_registry_agents_by_id_versions_response_401_meta
 
     @property
     def additional_keys(self) -> list[str]:

@@ -8,6 +8,7 @@ from ...models.post_api_governance_registry_ard_search_body import PostApiGovern
 from ...models.post_api_governance_registry_ard_search_response_200 import PostApiGovernanceRegistryArdSearchResponse200
 from ...models.post_api_governance_registry_ard_search_response_400 import PostApiGovernanceRegistryArdSearchResponse400
 from ...models.post_api_governance_registry_ard_search_response_401 import PostApiGovernanceRegistryArdSearchResponse401
+from ...models.post_api_governance_registry_ard_search_response_403 import PostApiGovernanceRegistryArdSearchResponse403
 from ...models.post_api_governance_registry_ard_search_response_422 import PostApiGovernanceRegistryArdSearchResponse422
 from ...models.post_api_governance_registry_ard_search_response_500 import PostApiGovernanceRegistryArdSearchResponse500
 from ...types import Response, safe_http_status
@@ -38,6 +39,7 @@ def _parse_response(
     PostApiGovernanceRegistryArdSearchResponse200
     | PostApiGovernanceRegistryArdSearchResponse400
     | PostApiGovernanceRegistryArdSearchResponse401
+    | PostApiGovernanceRegistryArdSearchResponse403
     | PostApiGovernanceRegistryArdSearchResponse422
     | PostApiGovernanceRegistryArdSearchResponse500
     | None
@@ -56,6 +58,11 @@ def _parse_response(
         response_401 = PostApiGovernanceRegistryArdSearchResponse401.from_dict(response.json())
 
         return response_401
+
+    if response.status_code == 403:
+        response_403 = PostApiGovernanceRegistryArdSearchResponse403.from_dict(response.json())
+
+        return response_403
 
     if response.status_code == 422:
         response_422 = PostApiGovernanceRegistryArdSearchResponse422.from_dict(response.json())
@@ -79,6 +86,7 @@ def _build_response(
     PostApiGovernanceRegistryArdSearchResponse200
     | PostApiGovernanceRegistryArdSearchResponse400
     | PostApiGovernanceRegistryArdSearchResponse401
+    | PostApiGovernanceRegistryArdSearchResponse403
     | PostApiGovernanceRegistryArdSearchResponse422
     | PostApiGovernanceRegistryArdSearchResponse500
 ]:
@@ -101,6 +109,7 @@ def sync_detailed(
     PostApiGovernanceRegistryArdSearchResponse200
     | PostApiGovernanceRegistryArdSearchResponse400
     | PostApiGovernanceRegistryArdSearchResponse401
+    | PostApiGovernanceRegistryArdSearchResponse403
     | PostApiGovernanceRegistryArdSearchResponse422
     | PostApiGovernanceRegistryArdSearchResponse500
 ]:
@@ -119,7 +128,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiGovernanceRegistryArdSearchResponse200 | PostApiGovernanceRegistryArdSearchResponse400 | PostApiGovernanceRegistryArdSearchResponse401 | PostApiGovernanceRegistryArdSearchResponse422 | PostApiGovernanceRegistryArdSearchResponse500]
+        Response[PostApiGovernanceRegistryArdSearchResponse200 | PostApiGovernanceRegistryArdSearchResponse400 | PostApiGovernanceRegistryArdSearchResponse401 | PostApiGovernanceRegistryArdSearchResponse403 | PostApiGovernanceRegistryArdSearchResponse422 | PostApiGovernanceRegistryArdSearchResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -141,6 +150,7 @@ def sync(
     PostApiGovernanceRegistryArdSearchResponse200
     | PostApiGovernanceRegistryArdSearchResponse400
     | PostApiGovernanceRegistryArdSearchResponse401
+    | PostApiGovernanceRegistryArdSearchResponse403
     | PostApiGovernanceRegistryArdSearchResponse422
     | PostApiGovernanceRegistryArdSearchResponse500
     | None
@@ -160,7 +170,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiGovernanceRegistryArdSearchResponse200 | PostApiGovernanceRegistryArdSearchResponse400 | PostApiGovernanceRegistryArdSearchResponse401 | PostApiGovernanceRegistryArdSearchResponse422 | PostApiGovernanceRegistryArdSearchResponse500
+        PostApiGovernanceRegistryArdSearchResponse200 | PostApiGovernanceRegistryArdSearchResponse400 | PostApiGovernanceRegistryArdSearchResponse401 | PostApiGovernanceRegistryArdSearchResponse403 | PostApiGovernanceRegistryArdSearchResponse422 | PostApiGovernanceRegistryArdSearchResponse500
     """
 
     return sync_detailed(
@@ -177,6 +187,7 @@ async def asyncio_detailed(
     PostApiGovernanceRegistryArdSearchResponse200
     | PostApiGovernanceRegistryArdSearchResponse400
     | PostApiGovernanceRegistryArdSearchResponse401
+    | PostApiGovernanceRegistryArdSearchResponse403
     | PostApiGovernanceRegistryArdSearchResponse422
     | PostApiGovernanceRegistryArdSearchResponse500
 ]:
@@ -195,7 +206,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiGovernanceRegistryArdSearchResponse200 | PostApiGovernanceRegistryArdSearchResponse400 | PostApiGovernanceRegistryArdSearchResponse401 | PostApiGovernanceRegistryArdSearchResponse422 | PostApiGovernanceRegistryArdSearchResponse500]
+        Response[PostApiGovernanceRegistryArdSearchResponse200 | PostApiGovernanceRegistryArdSearchResponse400 | PostApiGovernanceRegistryArdSearchResponse401 | PostApiGovernanceRegistryArdSearchResponse403 | PostApiGovernanceRegistryArdSearchResponse422 | PostApiGovernanceRegistryArdSearchResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -215,6 +226,7 @@ async def asyncio(
     PostApiGovernanceRegistryArdSearchResponse200
     | PostApiGovernanceRegistryArdSearchResponse400
     | PostApiGovernanceRegistryArdSearchResponse401
+    | PostApiGovernanceRegistryArdSearchResponse403
     | PostApiGovernanceRegistryArdSearchResponse422
     | PostApiGovernanceRegistryArdSearchResponse500
     | None
@@ -234,7 +246,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiGovernanceRegistryArdSearchResponse200 | PostApiGovernanceRegistryArdSearchResponse400 | PostApiGovernanceRegistryArdSearchResponse401 | PostApiGovernanceRegistryArdSearchResponse422 | PostApiGovernanceRegistryArdSearchResponse500
+        PostApiGovernanceRegistryArdSearchResponse200 | PostApiGovernanceRegistryArdSearchResponse400 | PostApiGovernanceRegistryArdSearchResponse401 | PostApiGovernanceRegistryArdSearchResponse403 | PostApiGovernanceRegistryArdSearchResponse422 | PostApiGovernanceRegistryArdSearchResponse500
     """
 
     return (

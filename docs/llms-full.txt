@@ -77255,6 +77255,15 @@ openapi: "GET /api/v1/governance/registry/agents/{agentId}"
 
 ---
 
+# FILE: ./api-reference/governance-agent-registry/get-the-registry-as-an-ard-manifest.mdx
+
+---
+title: "Get the registry as an ARD manifest"
+openapi: "GET /api/v1/governance/registry/ard.json"
+---
+
+---
+
 # FILE: ./api-reference/governance-agent-registry/get-the-registry-s-json-schemas.mdx
 
 ---

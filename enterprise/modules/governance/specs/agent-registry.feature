@@ -149,11 +149,29 @@ Feature: Agent registry with ARD discovery and change events
     Then both agents stay active
 
   @unit
-  Scenario: A traffic read that hit its cap removes no traced agent it did not read
-    Given a project whose traffic read returned the per-project cap of agent names
-    And the registry holds a traced agent of that project the read did not return
+  Scenario: A traced agent last seen inside the traffic window stays when a read misses it
+    Given the registry holds a traced agent last seen inside the 30-day window
+    And a traffic read did not return it, past the per-project cap or overtaken by a newer sighting
     When the registry reconciles
     Then that traced agent stays as it was
+
+  @unit
+  Scenario: A traced agent last seen before the traffic window is removed
+    Given the registry holds a traced agent last seen more than 30 days ago
+    When the registry reconciles
+    Then the entry's status is "removed"
+
+  @unit
+  Scenario: A traced agent a listed agent now accounts for is removed
+    Given the registry holds a shadow traced agent seen inside the window
+    When a LangWatch agent with the same name is defined in its project and the registry reconciles
+    Then the traced entry's status is "removed" and the listed agent's entry is active
+
+  @unit
+  Scenario: A read that saw an older sighting never moves last seen back
+    Given the registry holds a traced agent whose last sighting a newer reconcile recorded
+    When an older read with an earlier sighting plans its changes
+    Then the entry keeps the later last seen time
 
   # Event-sourced triggers and webhook push
 
@@ -264,6 +282,11 @@ Feature: Agent registry with ARD discovery and change events
     Given the registry appended three events
     When GET /api/governance/registry/events is asked after the first event's sequence
     Then the second and third events are returned in order
+
+  @integration
+  Scenario: An event cursor past the sequence range is refused
+    When GET /api/governance/registry/events is asked with a cursor above the largest sequence
+    Then the response is 422 with code "validation_error"
 
   @integration
   Scenario: A key without governance:view is refused

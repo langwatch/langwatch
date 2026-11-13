@@ -16,6 +16,7 @@ import {
   definePipeline,
   type EventingSetup,
   type StaticPipelineDefinition,
+  throttledWindow,
 } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
@@ -47,7 +48,7 @@ import {
 
 const AGENT_REGISTRY_PIPELINE_NAME = "governance_agent_registry";
 
-/** A burst of writes to one project's agents settles into one reconcile. */
+/** A burst of writes to one project's agents settles into one reconcile, due 5 s after its first. */
 const AGENT_REGISTRY_SETTLE_MS = 5_000;
 /** Outlives the settle, so a fact arriving as the window closes still joins it. */
 const AGENT_REGISTRY_DEDUP_TTL_MS = 10_000;
@@ -55,14 +56,13 @@ const AGENT_REGISTRY_DEDUP_TTL_MS = 10_000;
 const projectKeyOf = z.object({ projectId: z.string().min(1) });
 
 function settlePerProject(lane: string) {
-  return {
-    delay: AGENT_REGISTRY_SETTLE_MS,
-    deduplication: {
-      makeId: (event: { data: unknown }) =>
-        `agent-registry:${lane}:${projectKeyOf.parse(event.data).projectId}`,
-      ttlMs: AGENT_REGISTRY_DEDUP_TTL_MS,
-    },
-  };
+  const { delay, dedup } = throttledWindow({
+    makeId: (event: { data: unknown }) =>
+      `agent-registry:${lane}:${projectKeyOf.parse(event.data).projectId}`,
+    windowMs: AGENT_REGISTRY_SETTLE_MS,
+    dedupTtlMs: AGENT_REGISTRY_DEDUP_TTL_MS,
+  });
+  return { delay, deduplication: dedup };
 }
 
 type AgentRegistryApp = Pick<

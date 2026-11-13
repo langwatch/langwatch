@@ -117,6 +117,20 @@ describe("planRegistryChanges()", () => {
       expect(changes.writes[0]?.entry.last_seen_at).toBe("2026-11-11T09:00:00.000Z");
     });
 
+    /** @scenario A read that saw an older sighting never moves last seen back */
+    it("keeps the later last seen and writes nothing", () => {
+      const newer = registered([draft({ lastSeenAt: T1 })]);
+
+      const changes = planRegistryChanges({
+        stored: held(newer),
+        drafts: [draft({ lastSeenAt: T0 })],
+        now: T1,
+        newId: idsFrom("older"),
+      });
+
+      expect(changes).toEqual({ writes: [], events: [] });
+    });
+
     /** @scenario A tool that disappears is marked deprecated, never dropped */
     it("keeps a dropped tool listed as deprecated since the new version", () => {
       const both = [
@@ -180,7 +194,7 @@ describe("planRegistryChanges()", () => {
   });
 
   describe("when a held agent is absent but kept", () => {
-    /** @scenario A traffic read that hit its cap removes no traced agent it did not read */
+    /** @scenario A traced agent last seen inside the traffic window stays when a read misses it */
     it("leaves it as it was", () => {
       const first = registered([draft({ sourceKey: "traffic:project-1:planner" })]);
 

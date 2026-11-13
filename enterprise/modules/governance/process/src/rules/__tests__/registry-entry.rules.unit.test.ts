@@ -8,8 +8,7 @@ import {
   langwatchAgentDraft,
 } from "../../features/registry/rules/registry-entry.rules.ts";
 import {
-  keepsUnreadTraffic,
-  REGISTRY_TRAFFIC_LIMIT_PER_PROJECT,
+  keepsTrafficInWindow,
   trafficAgentDrafts,
 } from "../../features/registry/rules/registry-traffic.rules.ts";
 
@@ -254,33 +253,48 @@ describe("trafficAgentDrafts()", () => {
   });
 });
 
-describe("keepsUnreadTraffic()", () => {
-  const seen = (count: number) =>
-    Array.from({ length: count }, (_, index) => ({
-      agentName: `agent-${index}`,
-      agentId: null,
-      model: null,
-      spanCount: 1,
-      firstSeenMs: 1_000,
-      lastSeenMs: 2_000,
-    }));
-  const held = (source: string, projectId: string) => ({
-    entry: { source, project_id: projectId },
+describe("keepsTrafficInWindow()", () => {
+  const SINCE = Date.parse("2026-10-01T00:00:00.000Z");
+  const held = ({
+    source = "traffic",
+    projectId = "project-1",
+    name = "planner",
+    lastSeenAt = "2026-10-20T00:00:00.000Z",
+  }: {
+    source?: "langwatch" | "traffic";
+    projectId?: string;
+    name?: string;
+    lastSeenAt?: string | null;
+  }) => ({ entry: { source, project_id: projectId, name, last_seen_at: lastSeenAt } });
+  const keep = keepsTrafficInWindow({ sinceMs: SINCE, projectIds: ["project-1"], listed: [] });
+
+  describe("given a traced agent last seen inside the window that a read missed", () => {
+    /** @scenario A traced agent last seen inside the traffic window stays when a read misses it */
+    it("keeps it", () => {
+      expect(keep(held({}))).toBe(true);
+    });
   });
 
-  describe("given one project read at its cap and one below it", () => {
-    /** @scenario A traffic read that hit its cap removes no traced agent it did not read */
-    it("keeps only the capped project's traffic entries", () => {
-      const keep = keepsUnreadTraffic({
-        seen: [
-          { projectId: "project-full", agents: seen(REGISTRY_TRAFFIC_LIMIT_PER_PROJECT) },
-          { projectId: "project-small", agents: seen(3) },
-        ],
+  describe("given a traced agent last seen before the window", () => {
+    /** @scenario A traced agent last seen before the traffic window is removed */
+    it("keeps neither it, nor one of a project no longer live, nor a listed source's entry", () => {
+      expect(keep(held({ lastSeenAt: "2026-09-01T00:00:00.000Z" }))).toBe(false);
+      expect(keep(held({ projectId: "project-gone" }))).toBe(false);
+      expect(keep(held({ source: "langwatch" }))).toBe(false);
+    });
+  });
+
+  describe("given a LangWatch agent of the same name is now defined in its project", () => {
+    /** @scenario A traced agent a listed agent now accounts for is removed */
+    it("does not keep the traced entry", () => {
+      const listed = draftOf({ ...record("agent-9", "Planner"), type: "signature", config: {} });
+      const accounted = keepsTrafficInWindow({
+        sinceMs: SINCE,
+        projectIds: ["project-1"],
+        listed: [listed],
       });
 
-      expect(keep(held("traffic", "project-full"))).toBe(true);
-      expect(keep(held("traffic", "project-small"))).toBe(false);
-      expect(keep(held("langwatch", "project-full"))).toBe(false);
+      expect(accounted(held({}))).toBe(false);
     });
   });
 });
