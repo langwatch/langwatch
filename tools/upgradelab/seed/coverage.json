@@ -138,6 +138,12 @@
       "cells": ["C2"],
       "note": "no headless door on the old image: SQL, flagged"
     },
+    "governance:seed-agent-registry": {
+      "status": "pending",
+      "seed": "tenancy-sql:governance",
+      "cells": ["C2"],
+      "note": "new tables, filled from agents, discovered agents and traffic the old image already wrote"
+    },
     "governance:record-coding-assistant-billing": {
       "status": "pending",
       "seed": "tenancy-sql:governance",

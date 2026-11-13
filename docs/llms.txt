@@ -577,6 +577,10 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [The /governance overview](https://langwatch.ai/docs/ai-governance/governance-dashboard.md): What the /governance page shows today, where each governance number actually lives, and the setup-state signal behind the section.
 - [People](https://langwatch.ai/docs/ai-governance/people.md): Departments group the people, teams and projects of your organization for spend accounting, so every request rolls up to exactly one department, including personal AI use.
 
+## Agent Registry
+
+- [Agent registry](https://langwatch.ai/docs/governance/agent-registry.md): A machine-readable registry of every AI agent in your organization, served as REST, as an ARD v0.91 manifest, as a change feed and as signed webhooks.
+
 ## Privacy
 
 - [No-spy mode (drop conversational content)](https://langwatch.ai/docs/ai-governance/no-spy-mode.md): The privacy posture for organizations that must not store employee conversational content, one Organization rule in the data privacy policy that drops input, output, and system instructions at ingestion while keeping cost and usage metadata.

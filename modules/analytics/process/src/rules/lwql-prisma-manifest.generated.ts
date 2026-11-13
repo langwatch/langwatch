@@ -2628,6 +2628,33 @@ export interface LwqlPrismaRows {
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
+  readonly AgentRegistryEntry: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly sourceKey: "String";
+    readonly source: "String";
+    readonly status: "String";
+    readonly version: "Int";
+    readonly fingerprint: "String";
+    readonly entry: "Json";
+    readonly firstSeenAt: "DateTime";
+    readonly lastSeenAt: "DateTime?";
+    readonly removedAt: "DateTime?";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
+  readonly AgentRegistryEvent: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly sequence: "BigInt";
+    readonly type: "String";
+    readonly entryId: "String";
+    readonly fromVersion: "Int?";
+    readonly toVersion: "Int?";
+    readonly payload: "Json";
+    readonly occurredAt: "DateTime";
+    readonly deliveryRecordedAt: "DateTime?";
+  };
   readonly IdentityMatch: {
     readonly id: "String";
     readonly organizationId: "String";

@@ -27252,6 +27252,233 @@
       ]
     },
     {
+      "name": "AgentRegistryEntry",
+      "tableName": "AgentRegistryEntry",
+      "documentation": "One agent in the organisation's governance registry, from any source governance reads\n(enterprise/modules/governance/specs/agent-registry.feature). `entry` is the latest\nmachine-readable snapshot; `version` grows by one on every material change.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "sourceKey",
+          "columnName": "sourceKey",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Where the agent came from and its id there, e.g. `langwatch:<agentId>`."
+        },
+        {
+          "name": "source",
+          "columnName": "source",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "status",
+          "columnName": "status",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "version",
+          "columnName": "version",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "fingerprint",
+          "columnName": "fingerprint",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "entry",
+          "columnName": "entry",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "firstSeenAt",
+          "columnName": "firstSeenAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "lastSeenAt",
+          "columnName": "lastSeenAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "removedAt",
+          "columnName": "removedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "AgentRegistryEvent",
+      "tableName": "AgentRegistryEvent",
+      "documentation": "The registry's append-only change feed: one row per registered, versioned, removed or\ntool-deprecated fact. `sequence` is the pull cursor; `deliveryRecordedAt` marks the webhook\nfan-out as recorded in governance's outbox.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "sequence",
+          "columnName": "sequence",
+          "type": "BigInt",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "type",
+          "columnName": "type",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "entryId",
+          "columnName": "entryId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "fromVersion",
+          "columnName": "fromVersion",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "toVersion",
+          "columnName": "toVersion",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "payload",
+          "columnName": "payload",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "occurredAt",
+          "columnName": "occurredAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "deliveryRecordedAt",
+          "columnName": "deliveryRecordedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        }
+      ]
+    },
+    {
       "name": "IdentityMatch",
       "tableName": "IdentityMatch",
       "documentation": "The dated match table: \"`user_abc123` on Anthropic is platform user #42,\nvalid from March 3\", closed when it stops being true.\n\nDating is what makes a re-issued email address survivable: the leaver's link\ncloses at offboarding, the new hire gets a new link, and January's spend\nstays with January's person. A correction closes the old row and opens a new\none; nothing is ever silently rewritten.",

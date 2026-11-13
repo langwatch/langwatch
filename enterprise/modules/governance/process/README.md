@@ -6,7 +6,7 @@ The server half of [governance](../README.md). AI governance: ingestion sources 
 
 ## Installation
 
-`defineProcessModule("governance").withRepositories(governanceRepositories).withApi(GovernanceModule).withTransports(governanceRest, governanceCliRest, governanceIngestRest, meUsageRest, departmentsTrpcTransport, ingestionTemplatesTrpcTransport, aiToolsTrpcTransport, ingestionSourcesTrpcTransport, governanceTrpcTransport, anomalyRulesTrpcTransport, activityMonitorTrpcTransport, personalSessionsTrpcTransport, ingestionKeyTrpcTransport, sessionPolicyTrpcTransport, governancePeopleTrpcTransport, governanceAgentsTrpcTransport, governanceCostTrpcTransport).provideMiddlewareBindings(…).provideMiddlewareContext(…).withEventing(pulledUsageEventing).withEventing(ingestionPullEventing).withEventing(ingestionPullReconcileEventing).withEventing(governanceActivityMonitorEventing).withEventing(codingAssistantBillingEventing).withMigrations(…)`, `src/governance.module.ts:49`.
+`defineProcessModule("governance").withRepositories(governanceRepositories).withApi(GovernanceModule).withTransports(governanceRest, agentRegistryRest, governanceCliRest, governanceIngestRest, meUsageRest, departmentsTrpcTransport, ingestionTemplatesTrpcTransport, aiToolsTrpcTransport, ingestionSourcesTrpcTransport, governanceTrpcTransport, anomalyRulesTrpcTransport, activityMonitorTrpcTransport, personalSessionsTrpcTransport, ingestionKeyTrpcTransport, sessionPolicyTrpcTransport, governancePeopleTrpcTransport, governanceAgentsTrpcTransport, governanceCostTrpcTransport).provideMiddlewareBindings(…).provideMiddlewareContext(…).withEventing(pulledUsageEventing).withEventing(ingestionPullEventing).withEventing(ingestionPullReconcileEventing).withEventing(governanceActivityMonitorEventing).withEventing(codingAssistantBillingEventing).withEventing(agentRegistryEventing).withMigrations(…)`, `src/governance.module.ts:72`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The ingestion-template operations the governance REST family calls.
 
-Peers call these through the token, declared at `../contract/src/governance.api.ts:174`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/governance.api.ts:186`; nothing else in this package is public.
 
 #### `registerMcpTools`
 
@@ -706,7 +706,175 @@ personalBudgetOverview(input: { organizationId: string; includeTopModels?: boole
 cliBootstrap(input: { organizationId: string }, by: GovernanceCaller): Promise<CliBootstrapResult>;
 ```
 
+#### `listRegistryAgents`
+
+The organisation's agent registry, a page at a time (specs/agent-registry.feature).
+
+```typescript
+listRegistryAgents(input: { organizationId: string; limit: number; cursor?: string; updatedSince?: string; status?: AgentRegistryStatus; }): Promise<AgentRegistryPage>;
+```
+
+#### `getRegistryAgent`
+
+Throws `agent_registry_entry_not_found` for an id outside the organisation.
+
+```typescript
+getRegistryAgent(input: { organizationId: string; id: string }): Promise<AgentRegistryEntry>;
+```
+
+#### `findRegistryAgentVersions`
+
+Every recorded change of one agent, oldest first; each carries the entry at its version.
+
+```typescript
+findRegistryAgentVersions(input: { organizationId: string; id: string; }): Promise<AgentRegistryEvent[]>;
+```
+
+#### `listRegistryEvents`
+
+The organisation's change feed after a sequence, in order.
+
+```typescript
+listRegistryEvents(input: { organizationId: string; after?: string; limit: number; }): Promise<AgentRegistryEventPage>;
+```
+
+#### `getRegistryArdManifest`
+
+```typescript
+getRegistryArdManifest(input: { organizationId: string }): Promise<ArdManifest>;
+```
+
+#### `searchRegistryArd`
+
+```typescript
+searchRegistryArd(input: { organizationId: string; request: ArdSearchRequest; }): Promise<ArdSearchResponse>;
+```
+
 ## REST transport
+
+### `agentRegistryRest`
+
+|             |                                           |
+| ----------- | ----------------------------------------- |
+| Declared at | `src/transport/agent-registry.rest.ts:33` |
+| Base URL    | none: each route's path is its address    |
+| Addressing  | literal                                   |
+| Credential  | organization                              |
+
+#### `GET /api/governance/registry/agents` · `listRegistryAgents`
+
+List the organisation's agent registry
+
+Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:40`.
+
+Answers at `/api/governance/registry/agents`, `/api/v1/governance/registry/agents`.
+
+```typescript
+// Query: agentRegistryListQuerySchema, ../contract/src/features/registry/agent-registry.ts:145
+interface Query {
+  limit?: number;
+  cursor?: string;
+  updated_since?: string;
+  status?: "active" | "removed";
+}
+type Response = z.infer<typeof agentRegistryListResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:155
+```
+
+#### `GET /api/governance/registry/agents/:agentId` · `getRegistryAgent`
+
+Get one registry agent
+
+Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:62`.
+
+Answers at `/api/governance/registry/agents/:agentId`, `/api/v1/governance/registry/agents/:agentId`.
+
+```typescript
+// Params: agentRegistryParamsSchema, ../contract/src/features/registry/agent-registry.ts:163
+interface Params {
+  agentId: string;
+}
+type Response = z.infer<typeof agentRegistryDetailResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:170
+```
+
+#### `GET /api/governance/registry/agents/:agentId/versions` · `findRegistryAgentVersions`
+
+List one registry agent's versions
+
+Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:78`.
+
+Answers at `/api/governance/registry/agents/:agentId/versions`, `/api/v1/governance/registry/agents/:agentId/versions`.
+
+```typescript
+type Params = z.infer<typeof agentRegistryParamsSchema>; // ../contract/src/features/registry/agent-registry.ts:163
+type Response = z.infer<typeof agentRegistryVersionsResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:202
+```
+
+#### `GET /api/governance/registry/events` · `listRegistryEvents`
+
+Read the registry change feed
+
+Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:94`.
+
+Answers at `/api/governance/registry/events`, `/api/v1/governance/registry/events`.
+
+```typescript
+// Query: agentRegistryEventsQuerySchema, ../contract/src/features/registry/agent-registry.ts:181
+interface Query {
+  limit?: number;
+  cursor?: string;
+}
+type Response = z.infer<typeof agentRegistryEventsResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:192
+```
+
+#### `GET /api/governance/registry/schema` · `getRegistrySchema`
+
+Get the registry's JSON Schemas
+
+Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:114`.
+
+Answers at `/api/governance/registry/schema`, `/api/v1/governance/registry/schema`.
+
+```typescript
+// Response: agentRegistrySchemaResponseSchema, ../contract/src/features/registry/agent-registry.ts:213
+interface Response {
+  entry: Record<string, unknown>;
+  event: Record<string, unknown>;
+}
+```
+
+#### `GET /api/governance/registry/ard.json` · `getRegistryArdManifest`
+
+Get the registry as an ARD manifest
+
+Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:127`.
+
+Answers at `/api/governance/registry/ard.json`, `/api/v1/governance/registry/ard.json`.
+
+```typescript
+type Response = z.infer<typeof ardManifestSchema>; // ../contract/src/features/registry/agent-registry-ard.ts:41
+```
+
+#### `POST /api/governance/registry/ard/search` · `searchRegistryArd`
+
+Search the registry (ARD search)
+
+Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:140`.
+
+Answers at `/api/governance/registry/ard/search`, `/api/v1/governance/registry/ard/search`.
+
+```typescript
+// Body: ardSearchRequestSchema, ../contract/src/features/registry/agent-registry-ard.ts:55
+interface Body {
+  query: {
+    text: string;
+    filter?: Record<string, string[]>;
+  };
+  federation?: "auto" | "referrals" | "none";
+  pageSize?: number;
+  pageToken?: string;
+}
+type Response = z.infer<typeof ardSearchResponseSchema>; // ../contract/src/features/registry/agent-registry-ard.ts:63
+```
 
 ### `governanceCliRest`
 
@@ -2104,6 +2272,17 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
 
+### Pipeline `governance_agent_registry` (aggregate `global`)
+
+Declared at `src/eventing/agent-registry.pipeline.ts:83`.
+
+| Kind            | Name                                    | Handles                                                                                                                             | Declared at                                   |
+| --------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| process manager | `agentRegistryDelivery`                 | every 1 d (`AGENT_REGISTRY_DELIVERY_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneDelivered`, `requestDelivery` (outbox) | `src/eventing/agent-registry.pipeline.ts:101` |
+| process manager | `agentRegistryTraffic`                  | every 15 min (`AGENT_REGISTRY_TRAFFIC_INTERVAL_MS = 15 * 60 * 1000`); intents `pass` (outbox)                                       | `src/eventing/agent-registry.pipeline.ts:118` |
+| peer subscriber | `reconcileAgentRegistryOnAgentChanged`  | `lw.agent.changed` from [agent](../../../../modules/agent/README.md)                                                                | `src/eventing/agent-registry.pipeline.ts:89`  |
+| peer subscriber | `reconcileAgentRegistryOnAgentArchived` | `lw.agent.archived` from [agent](../../../../modules/agent/README.md)                                                               | `src/eventing/agent-registry.pipeline.ts:95`  |
+
 ### Pipeline `coding_assistant_billing` (aggregate `coding_assistant_billing`)
 
 Declared at `src/eventing/coding-assistant-billing.pipeline.ts:52`. Events: `codingAssistantBillingRecordedEventSchema`.
@@ -2183,7 +2362,7 @@ Declared at `src/eventing/pulled-usage.pipeline.ts:167`. Events: `pulledUsageObs
 
 | Kind   | Leaf                       | Environment variable                  | Declared at                               |
 | ------ | -------------------------- | ------------------------------------- | ----------------------------------------- |
-| secret | `–`                        | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:511`           |
+| secret | `–`                        | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:527`           |
 | config | `gatewayPublicUrl`         | `LW_GATEWAY_PUBLIC_URL`               | `../contract/src/governance.config.ts:41` |
 | config | `gatewayInternalUrl`       | `LW_GATEWAY_INTERNAL_URL`             | `../contract/src/governance.config.ts:42` |
 | config | `gatewayLegacyUrl`         | `LW_GATEWAY_BASE_URL`                 | `../contract/src/governance.config.ts:43` |

@@ -7353,6 +7353,49 @@ model DiscoveredAgent {
   @@index([organizationId, lastSeenAt])
 }
 
+/// One agent in the organisation's governance registry, from any source governance reads
+/// (enterprise/modules/governance/specs/agent-registry.feature). `entry` is the latest
+/// machine-readable snapshot; `version` grows by one on every material change.
+model AgentRegistryEntry {
+  id             String    @id @default(nanoid())
+  organizationId String
+  /// Where the agent came from and its id there, e.g. `langwatch:<agentId>`.
+  sourceKey      String
+  source         String
+  status         String
+  version        Int
+  fingerprint    String
+  entry          Json
+  firstSeenAt    DateTime
+  lastSeenAt     DateTime?
+  removedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @default(now()) @updatedAt
+
+  @@unique([organizationId, sourceKey])
+  @@index([organizationId, updatedAt])
+}
+
+/// The registry's append-only change feed: one row per registered, versioned, removed or
+/// tool-deprecated fact. `sequence` is the pull cursor; `deliveryRecordedAt` marks the webhook
+/// fan-out as recorded in governance's outbox.
+model AgentRegistryEvent {
+  id                 String    @id @default(nanoid())
+  organizationId     String
+  sequence           BigInt    @default(autoincrement())
+  type               String
+  entryId            String
+  fromVersion        Int?
+  toVersion          Int?
+  payload            Json
+  occurredAt         DateTime
+  deliveryRecordedAt DateTime?
+
+  @@unique([organizationId, sequence])
+  @@index([organizationId, deliveryRecordedAt])
+  @@index([organizationId, entryId])
+}
+
 /// The dated match table: "`user_abc123` on Anthropic is platform user #42,
 /// valid from March 3", closed when it stops being true.
 ///

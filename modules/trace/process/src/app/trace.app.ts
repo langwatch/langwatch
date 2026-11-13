@@ -214,6 +214,7 @@ import {
   type TraceDrawerReadInput,
   type TraceResourceInfoDto,
   type OwnedSpan,
+  type TraceAgentSeen,
 } from "@langwatch/trace-contract";
 import type { ConversationView } from "@langwatch/trace-contract/conversation";
 import type { z } from "zod";
@@ -376,6 +377,7 @@ import type {
   StoredTraceSpan,
   TraceViewRead,
 } from "../repositories/span-storage.repository.ts";
+import type { TraceAgentTrafficRepository } from "../repositories/trace-agent-traffic.repository.ts";
 import type { TraceAttributeSpendRepository } from "../repositories/trace-attribute-spend.repository.ts";
 import type { TraceAttributedRollupRepository } from "../repositories/trace-attributed-rollup.repository.ts";
 import type { TraceEvaluationRunsReadRepository } from "../repositories/trace-evaluation-runs.repository.ts";
@@ -1048,6 +1050,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     app.#attributeSpend = setup.repositories.attributeSpend;
     app.#attributedRollup = setup.repositories.attributedRollup;
     app.#usageCount = setup.repositories.usageCount;
+    app.#agentTraffic = setup.repositories.agentTraffic;
     app.#spanAnalyticsFloor = setup.repositories.spanAnalyticsFloor;
     app.#preconditionSamples = TracePreconditionSampleService.create({
       traces: app,
@@ -1421,6 +1424,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   #attributeSpend: TraceAttributeSpendRepository | null = null;
   #attributedRollup: TraceAttributedRollupRepository | null = null;
   #usageCount: TraceUsageCountRepository | null = null;
+  #agentTraffic: TraceAgentTrafficRepository | null = null;
   #spanAnalyticsFloor: SpanAnalyticsFloorRepository | null = null;
   #preconditionSamples: TracePreconditionSampleService | null = null;
 
@@ -3475,6 +3479,21 @@ export class TraceModule implements TraceApi, CollectorApp {
       sinceMs: input.sinceMs,
       attribute: input.attribute,
       groupByKey: input.groupByKey,
+    });
+  }
+
+  findAgentsSeen(input: {
+    projectId: string;
+    sinceMs: number;
+    limit: number;
+  }): Promise<TraceAgentSeen[]> {
+    if (!this.#agentTraffic) {
+      throw new TraceCapabilityUnavailableError("this process", "the agent traffic read");
+    }
+    return this.#agentTraffic.findAgentsSeen({
+      tenantId: input.projectId,
+      sinceMs: input.sinceMs,
+      limit: input.limit,
     });
   }
 

@@ -1,0 +1,18 @@
+Feature: Agents seen in a project's traffic
+
+  Governance's agent registry registers every agent a project's spans name, so an agent that only
+  sends traces or gateway calls is still listed (enterprise/modules/governance/specs/agent-registry.feature).
+  The trace module answers that read from stored spans through TraceApi.findAgentsSeen.
+
+  @unit
+  Scenario: Distinct agent names are read from the project's spans in the window
+    Given a project whose spans since the window start name agents "planner" and "researcher"
+    When the agents seen since the window start are read
+    Then the read asks stored spans for the project's tenant bounded by start time
+    And it answers one row per agent name with its id, model, first and last seen time
+
+  @unit
+  Scenario: Spans outside the window or without an agent name are not counted
+    Given a project with a span naming "planner" before the window and a span with no agent name
+    When the agents seen since the window start are read
+    Then no agent is answered

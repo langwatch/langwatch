@@ -848,6 +848,12 @@
             ]
           },
           {
+            "group": "Agent Registry",
+            "pages": [
+              "governance/agent-registry"
+            ]
+          },
+          {
             "group": "Privacy",
             "pages": [
               "ai-governance/no-spy-mode"

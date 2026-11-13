@@ -134,6 +134,14 @@ import {
   type IdentityMatchRun,
   type OrganizationSessionPolicyShape,
   type GovernanceAgentRow,
+  type AgentRegistryEntry,
+  type AgentRegistryEvent,
+  type AgentRegistryEventPage,
+  type AgentRegistryPage,
+  type AgentRegistryStatus,
+  type ArdManifest,
+  type ArdSearchRequest,
+  type ArdSearchResponse,
   type GovernanceCostDayRecords,
   type GovernanceCostModelBreakdown,
   type GovernanceCostPeriodRecordsInput,
@@ -191,6 +199,11 @@ import {
 import { HttpOttlTransformChannel } from "../channels/http/http.ottl-transform.channel.ts";
 import { HttpPollingPullerAdapter } from "../channels/http/http.polling.channel.ts";
 import { HttpProviderAccountChannel } from "../channels/http/http.provider-account.channel.ts";
+import {
+  OutboxAgentRegistryDelivery,
+  requestAgentRegistryDelivery,
+} from "../eventing/agent-registry-delivery.intent.ts";
+import type { AgentRegistryDeliveryIntent } from "../eventing/agent-registry-delivery.process.ts";
 import {
   OutboxAnomalyAlertDelivery,
   requestAnomalyAlertDelivery,
@@ -289,6 +302,7 @@ import { PersonalIngestionKeyService } from "../features/personal/services/perso
 import { PersonalUsageDashboardService } from "../features/personal/services/personal-usage-dashboard.service.ts";
 import { PersonalUsageKeyService } from "../features/personal/services/personal-usage-key.service.ts";
 import { DefaultGovernancePersonalUsageService } from "../features/personal/services/personal-usage.service.ts";
+import { AgentRegistryService } from "../features/registry/services/agent-registry.service.ts";
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
 import { governanceOperatorReads } from "../repositories/prisma/prisma.suppression-snapshot.repository.ts";
 import { anomalyRuleConfigComplaint } from "../rules/anomaly-rule-config-error.rules.ts";
@@ -323,7 +337,7 @@ type EventingSenders = Readonly<Record<string, EventingCommandSender<unknown>>>;
 /** The peers this application reads, resolved from {@link GovernanceModule.dependencies}. */
 interface GovernanceAppDependencies {
   /** Anomaly alerts to a rule's registered endpoints, and the endpoints W-11's step creates. */
-  webhooks: Pick<WebhookApi, "requestDelivery" | "create" | "archive">;
+  webhooks: Pick<WebhookApi, "requestDelivery" | "create" | "archive" | "getAll">;
   /**
    * The organization a project belongs to, for the project-scoped REST family,
    * and the organization's hidden governance project, which is the tenant an
@@ -351,9 +365,10 @@ interface GovernanceAppDependencies {
     | "findLiveAggregateIds"
     | "findPersonalProjectIds"
     | "findReadableProjectIds"
+    | "listNamesByIds"
   >;
   /** Agent owns the Agent table: the organization's connected agents, read by project. */
-  agents: Pick<AgentApi, "findConnectedInProjects">;
+  agents: Pick<AgentApi, "findConnectedInProjects" | "list" | "platformUrl">;
   /** The release flag that decides whether an organization's pulled usage carries a cost. */
   featureFlags: Pick<FeatureFlagApi, "isEnabled">;
   /** Where a pulled Genie/Copilot conversation lands as a trace: the OTLP door main routed through. */
@@ -366,6 +381,7 @@ interface GovernanceAppDependencies {
     | "findModelSpend"
     | "hasTraceWithAttribute"
     | "findTraceCountsByAttribute"
+    | "findAgentsSeen"
     | "compileLangWatchQLTraceFilter"
     | "listTraceSummaries"
     | keyof ActivityMonitorTraces
@@ -681,6 +697,17 @@ export class GovernanceModule implements GovernanceRestApi {
       organizations: dependencies.organizations,
       discoveredAgents: repositories.discoveredAgents,
     });
+    this.agentRegistry = AgentRegistryService.create({
+      registry: repositories.agentRegistry,
+      discoveredAgents: repositories.discoveredAgents,
+      agents: dependencies.agents,
+      projects: dependencies.projects,
+      organizations: dependencies.organizations,
+      traces: dependencies.traces,
+      webhooks: dependencies.webhooks,
+      outbox: () => this.#agentRegistryOutbox,
+      publicBaseUrl: publicBaseUrl ?? "",
+    });
     this.costSummary = GovernanceCostSummaryService.create({
       costRollup: repositories.costRollup,
       projects: dependencies.projects,
@@ -859,6 +886,7 @@ export class GovernanceModule implements GovernanceRestApi {
       signIn,
       genieSpaces: channels.genieSpaces.create({ http }),
       copilotBots: channels.copilotBots.create({ http, vendorBases }),
+      registry: this.agentRegistry,
     });
     this.personListing = PersonListingService.create({
       sourceCredentials,
@@ -980,6 +1008,8 @@ export class GovernanceModule implements GovernanceRestApi {
   readonly anomalyWebhookMigration: AnomalyWebhookDestinationMigrationService;
   private readonly people: GovernancePeopleScreenService;
   private readonly agentsScreen: GovernanceAgentsScreenService;
+  /** The organisation's agent registry, its ARD view and change feed (specs/agent-registry.feature). */
+  readonly agentRegistry: AgentRegistryService;
   private readonly costBreakdown: GovernanceCostBreakdownService;
   private readonly costSummary: GovernanceCostSummaryService;
   private readonly aiTools: DefaultGovernanceAiToolCatalogService;
@@ -1078,6 +1108,24 @@ export class GovernanceModule implements GovernanceRestApi {
   }
 
   #anomalyAlertOutbox: OutboxAnomalyAlertDelivery | undefined;
+  #agentRegistryOutbox: OutboxAgentRegistryDelivery | undefined;
+
+  /** A built pipeline means an outbox: registry change events fan out through it from here on. */
+  connectAgentRegistryOutbox({
+    processStore,
+  }: {
+    processStore: Pick<ProcessStore, "appendIntents">;
+  }): void {
+    this.#agentRegistryOutbox = OutboxAgentRegistryDelivery.create(processStore);
+  }
+
+  /** The registry delivery intent's handler: one WebhookApi.requestDelivery per intent. */
+  requestAgentRegistryDelivery(
+    intent: AgentRegistryDeliveryIntent,
+    context: IntentContext,
+  ): Promise<void> {
+    return requestAgentRegistryDelivery(this.dependencies.webhooks)(intent, context);
+  }
 
   /** A built pipeline means an outbox: endpoint deliveries are recorded in it from here on. */
   connectAnomalyAlertOutbox({
@@ -1674,6 +1722,61 @@ export class GovernanceModule implements GovernanceRestApi {
   }): Promise<AgentListingRequestResult> {
     this.agentListingSender();
     return this.agentSync.requestListing(input);
+  }
+
+  /** An agent's lifecycle fact: its project's organisation is reconciled (worker only). */
+  async reconcileAgentRegistryForProject({ projectId }: { projectId: string }): Promise<void> {
+    const organizationId = await this.dependencies.projects.getOrganizationId(projectId);
+    await this.agentRegistry.reconcileOrganization({ organizationId });
+  }
+
+  /** The scheduled traffic pass over every organisation the registry holds. */
+  reconcileAgentRegistryTraffic(): Promise<{ organizations: number }> {
+    return this.agentRegistry.reconcileHeldOrganizations();
+  }
+
+  listRegistryAgents(input: {
+    organizationId: string;
+    limit: number;
+    cursor?: string;
+    updatedSince?: string;
+    status?: AgentRegistryStatus;
+  }): Promise<AgentRegistryPage> {
+    return this.agentRegistry.listEntries(input);
+  }
+
+  getRegistryAgent(input: { organizationId: string; id: string }): Promise<AgentRegistryEntry> {
+    return this.agentRegistry.getEntry(input);
+  }
+
+  findRegistryAgentVersions(input: {
+    organizationId: string;
+    id: string;
+  }): Promise<AgentRegistryEvent[]> {
+    return this.agentRegistry.findVersions(input);
+  }
+
+  listRegistryEvents(input: {
+    organizationId: string;
+    after?: string;
+    limit: number;
+  }): Promise<AgentRegistryEventPage> {
+    return this.agentRegistry.listEvents({
+      organizationId: input.organizationId,
+      limit: input.limit,
+      ...(input.after ? { cursor: input.after } : {}),
+    });
+  }
+
+  getRegistryArdManifest(input: { organizationId: string }): Promise<ArdManifest> {
+    return this.agentRegistry.ardManifest(input);
+  }
+
+  searchRegistryArd(input: {
+    organizationId: string;
+    request: ArdSearchRequest;
+  }): Promise<ArdSearchResponse> {
+    return this.agentRegistry.ardSearch(input);
   }
 
   governanceAgentsList(input: { organizationId: string }): Promise<GovernanceAgentRow[]> {
