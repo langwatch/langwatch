@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 import {
   apiKeyTokenResolutionInputSchema,
   apiKeyVerificationSchema,
@@ -11,8 +9,6 @@ import {
   type OrganizationApiKeyResolution,
   type ResolvedApiKeyCredential,
   API_KEY_PREFIX,
-  CLI_LOGIN_KEY_NAME_PREFIX,
-  DOCS_SESSION_API_KEY_NAME,
   LANGY_SESSION_API_KEY_NAME,
   WORKFLOW_RUN_API_KEY_NAME,
 } from "@langwatch/api-key-contract";
@@ -20,7 +16,7 @@ import type * as apiKeyContractModule from "@langwatch/api-key-contract";
 import { createLogger } from "@langwatch/observability";
 import { noteRequestCredential } from "@langwatch/observability/credential-census";
 import { projectIdentitySchema, type ProjectIdentity } from "@langwatch/project-contract";
-import { Temporal, fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
+import { Temporal, fromDate, nowInstant, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
 import {
@@ -30,6 +26,12 @@ import {
 } from "../repositories/api-key-answer-cache.repository.ts";
 import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
 import { bindingsReachProject, findGrantedProjectIds } from "../rules/api-key-grant-reach.rules.ts";
+import {
+  isDocsSessionKey,
+  keyCredentialTypeOf,
+  parseHeld,
+  tokenHash,
+} from "../rules/api-key-held-answer.rules.ts";
 import { ApiKeyGrantsService } from "./api-key-grants.service.ts";
 import { ApiKeyLastUsedService } from "./api-key-last-used.service.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
@@ -48,15 +50,10 @@ const heldLegacySchema = z.object({ project: projectIdentitySchema.nullable() })
 const REVOKED = "revoked";
 /** The value a revoked legacy key's column holds; it never authenticates (ARCHITECTURE.md §10). */
 const REVOKED_LEGACY_KEY_PREFIX = "lw-revoked-";
-const DATE_FIELDS = new Set(["expiresAt", "revokedAt", "lastUsedAt", "createdAt", "updatedAt"]);
 
 const verifiedKey = (lookupId: string) => `pat:${lookupId}`;
 const unknownKey = (hash: string) => `unknown:${hash}`;
 const legacyKey = (hash: string) => `legacy:${hash}`;
-
-function isDocsSessionKey(key: Pick<ApiKey, "name" | "isSystemManaged">): boolean {
-  return key.isSystemManaged === true && key.name === DOCS_SESSION_API_KEY_NAME;
-}
 
 function publicApiKey(row: StoredApiKey): ApiKey {
   const { hashedSecret: _hashedSecret, ...key } = row;
@@ -133,7 +130,7 @@ export class ApiKeyTokenResolutionService {
     withProject: boolean;
   }): Promise<HeldAnswer | null> {
     const held = await this.findHeldAnswer(input);
-    if (!held || !isDocsSessionKey(held.answer)) return held;
+    if (!held || !isDocsSessionKey({ key: held.answer })) return held;
     const policy = await this.options.organizations.getDocsPlaygroundPolicy({
       organizationId: held.answer.organizationId,
     });
@@ -154,10 +151,10 @@ export class ApiKeyTokenResolutionService {
     const lookupId = this.findTokenParts(input.token)?.lookupId;
     if (!lookupId) return null;
 
-    const hash = tokenHash(input.token);
+    const hash = tokenHash({ token: input.token });
     for (const raw of await this.findHeld(verifiedKey(lookupId))) {
       if (raw === REVOKED) return null;
-      const held = heldVerificationSchema.safeParse(parseHeld(raw));
+      const held = heldVerificationSchema.safeParse(parseHeld({ raw }));
       if (held.success && held.data.tokenHash === hash) {
         const answer = this.unexpired(held.data.answer);
         return answer ? { answer, project: held.data.project } : null;
@@ -285,7 +282,7 @@ export class ApiKeyTokenResolutionService {
       const apiKey = await this.findVerifiedToken({ token: parsed.token });
       if (apiKey) {
         noteRequestCredential({
-          credentialType: keyCredentialTypeOf(apiKey),
+          credentialType: keyCredentialTypeOf({ key: apiKey }),
           apiKeyId: apiKey.id,
           organizationId: apiKey.organizationId,
         });
@@ -371,7 +368,7 @@ export class ApiKeyTokenResolutionService {
       return null;
     }
     noteRequestCredential({
-      credentialType: keyCredentialTypeOf(apiKey),
+      credentialType: keyCredentialTypeOf({ key: apiKey }),
       apiKeyId: apiKey.id,
       projectId: project.id,
       organizationId: apiKey.organizationId,
@@ -398,9 +395,9 @@ export class ApiKeyTokenResolutionService {
   private async findLegacyProject(token: string): Promise<ProjectIdentity | null> {
     if (token.startsWith(REVOKED_LEGACY_KEY_PREFIX)) return null;
 
-    const key = legacyKey(tokenHash(token));
+    const key = legacyKey(tokenHash({ token }));
     for (const raw of await this.findHeld(key)) {
-      const held = heldLegacySchema.safeParse(parseHeld(raw));
+      const held = heldLegacySchema.safeParse(parseHeld({ raw }));
       if (held.success) return held.data.project;
     }
 
@@ -474,11 +471,6 @@ export class ApiKeyTokenResolutionService {
   }
 }
 
-/** A key a CLI login minted is a CLI token to the credential census; any other is an API key. */
-function keyCredentialTypeOf(key: { name: string }): "cli_token" | "api_key" {
-  return key.name.startsWith(CLI_LOGIN_KEY_NAME_PREFIX) ? "cli_token" : "api_key";
-}
-
 /** Concurrent reads of one token in this process share one promise, dropped once it settles. */
 function shared<T>({
   pending,
@@ -496,21 +488,4 @@ function shared<T>({
   pending.set(key, started);
 
   return started;
-}
-
-function tokenHash(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
-}
-
-/** JSON with the key's dates restored; anything unreadable is a miss. */
-function parseHeld(raw: string): unknown {
-  try {
-    return JSON.parse(raw, (field, value: unknown) =>
-      DATE_FIELDS.has(field) && typeof value === "string"
-        ? toDate(Temporal.Instant.from(value))
-        : value,
-    );
-  } catch {
-    return undefined;
-  }
 }
