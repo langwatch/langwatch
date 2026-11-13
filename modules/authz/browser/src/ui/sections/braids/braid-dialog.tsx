@@ -146,7 +146,6 @@ export function BraidDialog({
   const [testedTraceId, setTestedTraceId] = useState<string>();
   // New braid opens on Into, Edit (Into fixed) on the condition: never on the locked From.
   const intoTrigger = useRef<HTMLButtonElement>(null);
-  const conditionInput = useRef<HTMLTextAreaElement>(null);
   const change = (next: Partial<BraidDraft>) => setDraft((current) => ({ ...current, ...next }));
 
   const targetProjects = projects.slice(0, BRAID_TARGETS_LIMIT);
@@ -205,7 +204,7 @@ export function BraidDialog({
       title={editing ? "Edit braid" : "New braid"}
       description="Show this project's matching spans inside another project's traces. Nothing is copied."
       busy={save.isSaving}
-      initialFocusEl={() => (editing ? conditionInput.current : intoTrigger.current)}
+      initialFocusEl={() => (editing ? null : intoTrigger.current)}
       note={
         <HStack gap={1.5} color="fg.muted" textStyle="xs">
           <Lock size={12} aria-hidden />
@@ -259,7 +258,7 @@ export function BraidDialog({
             readerName={reader?.name ?? "the other project"}
             verified={verifiedKey !== undefined}
             attributeKeys={attributeKeys.data?.keys ?? []}
-            textareaRef={conditionInput}
+            focusOnLoad={!!editing}
           />
           <BraidSignedCalls
             on={verifiedKey !== undefined}
@@ -291,7 +290,10 @@ export function BraidDialog({
               readerName={reader?.name}
               preview={previewState}
               unsignedWarning={
-                !!reader && check.ok && draft.where.trim().length > 0 && verifiedKey === undefined
+                !!reader &&
+                check.ok &&
+                /\battributes\s*\[/.test(draft.where) &&
+                verifiedKey === undefined
               }
               viewers={viewers.data ? viewersPhrase(viewers.data) : undefined}
               exampleFolded={testState.state === "ready"}

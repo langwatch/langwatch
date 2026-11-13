@@ -1,14 +1,60 @@
-// The condition, coloured and checked as it is typed: a refusal is underlined in place, its fix in
-// one line below, and an attribute the owner's spans carry goes in at the cursor, caret in quotes.
+// The condition, coloured, completed and checked as it is typed: a refusal is marked in place with
+// its fix, and repeated in one line below. Monaco loads only when the field first shows.
 
 import { type BraidConditionCompileResult } from "@langwatch/authz-contract/braid-condition-compiler";
-import { ExpressionTextarea } from "@langwatch/design-system/expression-textarea";
-import { Menu } from "@langwatch/design-system/menu";
-import { Alert, Button, Field, HStack, Stack, Text } from "@langwatch/design-system/primitives";
-import { ChevronDown, Plus } from "lucide-react";
-import { type RefObject, useEffect, useRef, useState } from "react";
+import { useColorMode } from "@langwatch/design-system/color-mode";
+import { Alert, Box, Field, Text } from "@langwatch/design-system/primitives";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
+import type { OnMount } from "@monaco-editor/react";
+import type { editor } from "monaco-editor";
+import { lazy, Suspense, useId, useState } from "react";
 
-import { insertAttribute } from "../../../../model/braids/braid-draft.ts";
+import {
+  defineBraidConditionTheme,
+  registerBraidConditionLanguage,
+} from "../../../../behavior/braid-condition-monaco.ts";
+import {
+  type BraidConditionMountedEditor,
+  braidConditionThemeName,
+  useBraidConditionEditor,
+} from "../../../../behavior/use-braid-condition-editor.ts";
+import { BRAID_CONDITION_LANGUAGE_ID } from "../../../../model/braids/braid-condition-language.ts";
+
+const MonacoEditor = lazy(() => import("@monaco-editor/react"));
+
+const LINE_PX = 20;
+const PADDING_PX = 6;
+const MIN_HEIGHT = LINE_PX + 2 * PADDING_PX;
+const MAX_HEIGHT = 4 * LINE_PX + 2 * PADDING_PX;
+
+const EDITOR_OPTIONS: editor.IStandaloneEditorConstructionOptions = {
+  ariaLabel: "Condition",
+  placeholder: 'attributes["orchestrator"] == "web"',
+  fontFamily: "var(--chakra-fonts-mono)",
+  fontSize: TYPE_SCALE_PX.bodySm,
+  lineHeight: LINE_PX,
+  padding: { top: PADDING_PX, bottom: PADDING_PX },
+  minimap: { enabled: false },
+  lineNumbers: "off",
+  glyphMargin: false,
+  folding: false,
+  lineDecorationsWidth: 8,
+  lineNumbersMinChars: 0,
+  renderLineHighlight: "none",
+  overviewRulerLanes: 0,
+  overviewRulerBorder: false,
+  hideCursorInOverviewRuler: true,
+  scrollbar: { vertical: "auto", horizontal: "hidden", alwaysConsumeMouseWheel: false },
+  scrollBeyondLastLine: false,
+  wordWrap: "on",
+  automaticLayout: true,
+  fixedOverflowWidgets: true,
+  contextmenu: false,
+  quickSuggestions: { other: true, strings: true, comments: false },
+  suggestOnTriggerCharacters: true,
+  wordBasedSuggestions: "off",
+  tabCompletion: "on",
+};
 
 export type BraidConditionFieldProps = {
   value: string;
@@ -18,42 +64,37 @@ export type BraidConditionFieldProps = {
   readerName: string;
   verified: boolean;
   attributeKeys: readonly { key: string; spanCount: number }[];
-  /** The textarea, so Edit can open with focus on the condition. */
-  textareaRef?: RefObject<HTMLTextAreaElement | null>;
+  /** Puts the caret in the condition once the editor has loaded, so Edit opens on it. */
+  focusOnLoad?: boolean;
 };
 
-/** Where a refusal's underline ends: the next space after its offset, or the text's end. */
+/** Where a refusal's mark ends: the next space after its offset, or the text's end. */
 function refusedEnd({ text, at }: { text: string; at: number }): number {
   const space = text.slice(at).search(/\s/);
   return Math.max(at + 1, space === -1 ? text.length : at + space);
+}
+
+function refusalMessage(check: Extract<BraidConditionCompileResult, { ok: false }>): string {
+  return `${check.construct[0]?.toUpperCase() ?? ""}${check.construct.slice(1)} isn't supported. ${check.fix}`;
 }
 
 function CheckLine({
   check,
   empty,
   touched,
-  held,
   ownerName,
   readerName,
 }: {
   check: BraidConditionCompileResult;
   empty: boolean;
   touched: boolean;
-  held: boolean;
   ownerName: string;
   readerName: string;
 }) {
-  if (held) {
-    return (
-      <Field.HelperText data-testid="braid-condition-check">
-        Type the value between the quotes.
-      </Field.HelperText>
-    );
-  }
   if (!check.ok) {
     return (
       <Field.ErrorText role="alert" data-testid="braid-condition-check">
-        {`${check.construct[0]?.toUpperCase() ?? ""}${check.construct.slice(1)} isn't supported. ${check.fix}`}
+        {refusalMessage(check)}
       </Field.ErrorText>
     );
   }
@@ -78,106 +119,90 @@ function CheckLine({
 }
 
 export function BraidConditionField(props: BraidConditionFieldProps) {
-  const own = useRef<HTMLTextAreaElement>(null);
-  const textarea = props.textareaRef ?? own;
-  const [caret, setCaret] = useState<number | null>(null);
+  const { colorMode } = useColorMode();
+  const dark = colorMode === "dark";
+  const [mounted, setMounted] = useState<BraidConditionMountedEditor | null>(null);
+  const [height, setHeight] = useState(MIN_HEIGHT);
   // The no-condition warning waits until the field has been used, so it never greets a new braid.
   const [touched, setTouched] = useState(false);
-  // An inserted comparison's empty quotes are not refused until the text changes: the admin has
-  // not typed the value yet. Save stays disabled meanwhile, since the condition does not compile.
-  const [inserted, setInserted] = useState<{ where: string; quoteAt: number } | null>(null);
-  const held =
-    !props.check.ok &&
-    inserted !== null &&
-    inserted.where === props.value &&
-    inserted.quoteAt === props.check.at;
-  const refusal =
-    !props.check.ok && !held
-      ? { at: props.check.at, end: refusedEnd({ text: props.value, at: props.check.at }) }
-      : undefined;
-  useEffect(() => {
-    if (caret === null || !textarea.current) return;
-    textarea.current.focus();
-    textarea.current.setSelectionRange(caret, caret);
-    setCaret(null);
-  }, [caret, textarea]);
-  const insert = (key: string) => {
-    const cursor = textarea.current?.selectionStart ?? props.value.length;
-    const next = insertAttribute({ where: props.value, cursor, key });
-    props.onChange(next.where);
-    setCaret(next.caret);
-    setInserted({ where: next.where, quoteAt: next.caret - 1 });
+  const modelPath = `inmemory://braid-condition/${useId().replaceAll(":", "")}.ottl`;
+  const refusal = props.check.ok
+    ? undefined
+    : {
+        at: props.check.at,
+        end: refusedEnd({ text: props.value, at: props.check.at }),
+        message: refusalMessage(props.check),
+      };
+
+  useBraidConditionEditor({
+    mounted,
+    value: props.value,
+    attributeKeys: props.attributeKeys,
+    refusal,
+    dark,
+  });
+
+  const handleMount: OnMount = (mountedEditor, monaco) => {
+    const fit = (contentHeight: number) =>
+      setHeight(Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, contentHeight)));
+    fit(mountedEditor.getContentHeight());
+    mountedEditor.onDidContentSizeChange((event) => fit(event.contentHeight));
+    mountedEditor.onDidBlurEditorText(() => setTouched(true));
+    if (props.focusOnLoad) mountedEditor.focus();
+    setMounted({ editor: mountedEditor, monaco });
   };
 
   return (
     <Field.Root invalid={refusal !== undefined}>
-      <HStack justify="space-between" width="full">
-        <Field.Label>
-          Condition{" "}
-          <Text as="span" color="fg.muted" textStyle="xs" fontWeight="normal">
-            OTTL
-          </Text>
-        </Field.Label>
-        <Menu.Root>
-          <Menu.Trigger asChild>
-            <Button
-              size="xs"
-              variant="ghost"
-              data-testid="braid-insert-attribute"
-              disabled={props.attributeKeys.length === 0}
-            >
-              <Plus size={12} aria-hidden />
-              Insert attribute
-              <ChevronDown size={12} aria-hidden />
-            </Button>
-          </Menu.Trigger>
-          <Menu.Content maxHeight="72" overflowY="auto">
-            {props.attributeKeys.map(({ key, spanCount }) => (
-              <Menu.Item
-                key={key}
-                value={key}
-                onClick={() => insert(key)}
-                data-testid="braid-attribute"
-              >
-                <HStack justify="space-between" width="full" gap={4}>
-                  <Text fontFamily="mono" textStyle="sm">
-                    {key}
-                  </Text>
-                  <Text
-                    color="fg.muted"
-                    textStyle="xs"
-                  >{`${spanCount.toLocaleString("en-GB")} spans`}</Text>
-                </HStack>
-              </Menu.Item>
-            ))}
-          </Menu.Content>
-        </Menu.Root>
-      </HStack>
-      <ExpressionTextarea
-        ref={textarea}
-        aria-label="Condition"
-        value={props.value}
-        onChange={(event) => {
-          setTouched(true);
-          props.onChange(event.target.value);
-        }}
-        onBlur={() => setTouched(true)}
-        mark={refusal}
-        rows={4}
-        spellCheck={false}
-        placeholder={'attributes["orchestrator"] == "web"'}
-        data-testid="braid-condition"
+      <Field.Label>
+        Condition{" "}
+        <Text as="span" color="fg.muted" textStyle="xs" fontWeight="normal">
+          OTTL
+        </Text>
+      </Field.Label>
+      <Box
+        width="full"
+        height={`${height}px`}
+        borderWidth="1px"
+        borderColor={refusal ? "border.error" : "border"}
+        borderRadius="l2"
+        overflow="hidden"
+        _focusWithin={{ outline: "2px solid", outlineColor: "colorPalette.focusRing" }}
+      >
+        <Suspense
+          fallback={
+            <Text paddingX={2} paddingY={1.5} color="fg.muted" textStyle="sm">
+              Loading the editor
+            </Text>
+          }
+        >
+          <MonacoEditor
+            height="100%"
+            path={modelPath}
+            language={BRAID_CONDITION_LANGUAGE_ID}
+            defaultValue={props.value}
+            theme={braidConditionThemeName(dark)}
+            onChange={(next: string | undefined) => {
+              setTouched(true);
+              props.onChange(next ?? "");
+            }}
+            beforeMount={(monaco) => {
+              registerBraidConditionLanguage(monaco);
+              defineBraidConditionTheme({ monaco, name: braidConditionThemeName(dark), dark });
+            }}
+            onMount={handleMount}
+            options={EDITOR_OPTIONS}
+            wrapperProps={{ "data-testid": "braid-condition" }}
+          />
+        </Suspense>
+      </Box>
+      <CheckLine
+        check={props.check}
+        empty={props.value.trim().length === 0}
+        touched={touched}
+        ownerName={props.ownerName}
+        readerName={props.readerName}
       />
-      <Stack gap={1.5} width="full">
-        <CheckLine
-          check={props.check}
-          empty={props.value.trim().length === 0}
-          touched={touched}
-          held={held}
-          ownerName={props.ownerName}
-          readerName={props.readerName}
-        />
-      </Stack>
     </Field.Root>
   );
 }

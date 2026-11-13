@@ -471,10 +471,6 @@
       "types": "./dist/components/display/highlighted-expression.d.ts",
       "default": "./src/components/display/highlighted-expression.tsx"
     },
-    "./expression-textarea": {
-      "types": "./dist/components/forms/expression-textarea.d.ts",
-      "default": "./src/components/forms/expression-textarea.tsx"
-    },
     "./shortcut-hint": {
       "types": "./dist/components/display/shortcut-hint.d.ts",
       "default": "./src/components/display/shortcut-hint.tsx"

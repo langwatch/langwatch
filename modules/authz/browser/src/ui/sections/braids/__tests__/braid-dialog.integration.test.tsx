@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@langwatch/trace-client", async () => ({
   traceClient: (await import("./braids-api-fake.ts")).braidTraces.traceClient,
 }));
+vi.mock("@monaco-editor/react", () => import("./monaco-editor-fake.tsx"));
 vi.mock("../../../../behavior/authz-api.ts", async () => ({
   authzApi: (await import("./braids-api-fake.ts")).braidsFake.api,
 }));
@@ -20,6 +21,7 @@ vi.resetModules();
 const { braidsFake, braidTraces, liveBraid, previewOf } = await import("./braids-api-fake.ts");
 const { FakeAuthzHost, renderWithAuthzHost } = await import("../../../../testing.tsx");
 const { default: BraidsScreen } = await import("../braids.screen.tsx");
+const { monacoRecorded } = await import("./monaco-editor-fake.tsx");
 
 const STRUCTURE = {
   organizationName: "Acme",
@@ -57,7 +59,7 @@ async function pickReader(user: ReturnType<typeof userEvent.setup>, name = "orch
 }
 
 async function writeCondition(user: ReturnType<typeof userEvent.setup>, text: string) {
-  const editor = screen.getByTestId("braid-condition");
+  const editor = await screen.findByTestId("braid-condition");
   await user.clear(editor);
   await user.click(editor);
   await user.paste(text);
@@ -290,10 +292,14 @@ describe("the braid dialog", () => {
       await writeCondition(user, `${CONDITION} or attributes["team"] == "a"`);
 
       expect(screen.getByTestId("braid-condition-check")).toHaveAttribute("role", "alert");
-      const marked = screen
-        .getByTestId("expression-textarea-highlight")
-        .querySelector("[data-mark]");
-      expect(marked).toHaveTextContent("or");
+      const orAt = CONDITION.length + 1;
+      expect(monacoRecorded.markers).toEqual([
+        expect.objectContaining({
+          message: expect.stringContaining("isn't supported."),
+          startColumn: orAt + 1,
+          endColumn: orAt + 3,
+        }),
+      ]);
       expect(screen.getByTestId("braid-save")).toBeDisabled();
 
       await writeCondition(user, CONDITION);
@@ -310,67 +316,37 @@ describe("the braid dialog", () => {
       await pickReader(user);
 
       expect(screen.queryByTestId("braid-condition-empty")).toBeNull();
-      await user.type(screen.getByTestId("braid-condition"), "a");
+      await user.type(await screen.findByTestId("braid-condition"), "a");
       await user.clear(screen.getByTestId("braid-condition"));
 
       expect(screen.getByTestId("braid-condition-empty")).toBeInTheDocument();
     });
   });
 
-  describe("when ana inserts an attribute the owner's spans carry", () => {
-    /** @scenario The attributes this project's spans carry can be inserted into the condition */
-    it("inserts it at the cursor with the caret inside the quotes", async () => {
+  describe("when ana opens attributes in the condition", () => {
+    /** @scenario Autocomplete offers the owner's attribute keys */
+    it("offers the keys the owner's spans carry, most used first, with their span counts", async () => {
+      braidTraces.state.attributeKeys = [
+        { key: "team", spanCount: 3 },
+        { key: "orchestrator", spanCount: 1200 },
+      ];
       const { user } = openDialog();
-
-      await user.click(screen.getByTestId("braid-insert-attribute"));
-      await user.click(screen.getByTestId("braid-attribute"));
+      await writeCondition(user, 'attributes["');
+      await waitFor(() => expect(monacoRecorded.provider).toBeDefined());
 
       const editor = screen.getByTestId<HTMLTextAreaElement>("braid-condition");
-      expect(editor).toHaveValue('attributes["orchestrator"] == ""');
-      await waitFor(() => expect(editor.selectionStart).toBe(editor.value.length - 1));
-    });
-
-    /** @scenario The attributes this project's spans carry can be inserted into the condition */
-    it("holds the empty value's refusal until ana types, keeping Save disabled", async () => {
-      const { user } = openDialog();
-      await pickReader(user);
-
-      await user.click(screen.getByTestId("braid-insert-attribute"));
-      await user.click(screen.getByTestId("braid-attribute"));
-
-      const check = screen.getByTestId("braid-condition-check");
-      expect(check).toHaveTextContent("Type the value between the quotes.");
-      expect(screen.queryByRole("alert")).toBeNull();
-      expect(screen.getByTestId("braid-save")).toBeDisabled();
-
-      const editor = screen.getByTestId<HTMLTextAreaElement>("braid-condition");
-      const insideQuotes = editor.value.length - 1;
-      await user.type(editor, "web", {
-        initialSelectionStart: insideQuotes,
-        initialSelectionEnd: insideQuotes,
+      const offered = await waitFor(() => {
+        const result = monacoRecorded.provider!.provideCompletionItems(monacoRecorded.model, {
+          lineNumber: 1,
+          column: editor.value.length + 1,
+        }) as { suggestions: { label: string; detail: string }[] };
+        expect(result.suggestions).toHaveLength(2);
+        return result.suggestions;
       });
-
-      expect(screen.getByTestId("braid-condition")).toHaveValue(
-        'attributes["orchestrator"] == "web"',
-      );
-      expect(screen.queryByTestId("braid-condition-check")).toBeNull();
-    });
-
-    it("refuses the empty value once ana changes the text without filling it in", async () => {
-      const { user } = openDialog();
-
-      await user.click(screen.getByTestId("braid-insert-attribute"));
-      await user.click(screen.getByTestId("braid-attribute"));
-      const editor = screen.getByTestId<HTMLTextAreaElement>("braid-condition");
-      const end = editor.value.length;
-      await user.type(editor, ' and name == "n"', {
-        initialSelectionStart: end,
-        initialSelectionEnd: end,
-      });
-
-      expect(screen.getByTestId("braid-condition-check")).toHaveTextContent(
-        "An empty string isn't supported.",
-      );
+      expect(offered.map(({ label, detail }) => [label, detail])).toEqual([
+        ["orchestrator", "1,200 spans"],
+        ["team", "3 spans"],
+      ]);
     });
   });
 
@@ -672,7 +648,8 @@ describe("the braid dialog", () => {
       braidsFake.state.project = { intoOtherProjects: [liveBraid()], fromOtherProjects: [] };
       const { user } = openDialog({ braid: "b-1" });
 
-      expect(screen.getByTestId("braid-condition")).toHaveValue(CONDITION);
+      expect(await screen.findByTestId("braid-condition")).toHaveValue(CONDITION);
+      await waitFor(() => expect(screen.getByTestId("braid-condition")).toHaveFocus());
       expect(intoPicker()).toBeDisabled();
       expect(screen.getByTestId("braid-save")).toBeDisabled();
 

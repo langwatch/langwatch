@@ -134,26 +134,6 @@ export function withSignedCalls({ where, on, key }: { where: string; on: boolean
     .trim();
 }
 
-/** Inserts `attributes["k"] == ""` at the cursor, joined by `and`; the caret in its quotes. */
-export function insertAttribute({
-  where,
-  cursor,
-  key,
-}: {
-  where: string;
-  cursor: number;
-  key: string;
-}) {
-  const at = Math.max(0, Math.min(cursor, where.length));
-  const before = where.slice(0, at);
-  const after = where.slice(at);
-  const needsAnd = before.trim().length > 0 && !/\b(and|not)\s*$/.test(before);
-  const lead = needsAnd ? `${before.replace(/\s*$/, "")} and ` : before;
-  const comparison = `attributes["${key.replace(/["\\]/g, "\\$&")}"] == ""`;
-  const tail = after.trim().length > 0 && !/^\s/.test(after) ? ` ${after}` : after;
-  return { where: `${lead}${comparison}${tail}`, caret: lead.length + comparison.length - 1 };
-}
-
 export type BraidTargetOption = {
   projectId: string;
   name: string;

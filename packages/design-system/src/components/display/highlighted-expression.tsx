@@ -4,10 +4,16 @@ import type React from "react";
 import {
   EXPRESSION_TOKEN_COLOR,
   type ExpressionToken,
+  type ExpressionTokenKind,
   tokeniseExpression,
 } from "../../expression-tokens.ts";
 
-export { EXPRESSION_TOKEN_COLOR, type ExpressionToken, tokeniseExpression };
+export {
+  EXPRESSION_TOKEN_COLOR,
+  type ExpressionToken,
+  type ExpressionTokenKind,
+  tokeniseExpression,
+};
 
 interface HighlightedExpressionProps extends Omit<BoxProps, "children"> {
   /** The expression, for example `attributes["k"] == "v" and Verified("k")`. */

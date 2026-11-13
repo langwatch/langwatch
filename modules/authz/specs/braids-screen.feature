@@ -72,14 +72,15 @@ Feature: The Braids screen
     @integration
     Scenario: The condition is checked as it is typed
       When ana types attributes["orchestrator"] == "web" or attributes["team"] == "a"
-      Then the editor underlines the or in place and explains in one line how to write the condition instead
+      Then the editor marks the or in place with its fix and explains in one line how to write the condition instead
       And the create button stays disabled until the condition is supported
       And a supported condition gets no remark under the field
 
     @integration
-    Scenario: The attributes this project's spans carry can be inserted into the condition
-      When ana picks an attribute from the ones "specialists" spans carry
-      Then it is inserted into the condition at the cursor
+    Scenario: Autocomplete offers the owner's attribute keys
+      When ana types attributes[" in the condition
+      Then the editor offers the attributes "specialists" spans carry, most used first, each with its span count
+      And outside the brackets it offers attributes[""], Verified(""), the comparisons and the joining words
 
     @integration
     Scenario: The signed calls switch and the condition stay in step
@@ -100,7 +101,7 @@ Feature: The Braids screen
       Then the preview counts "orchestrator" traces over the last 7 days that get every, some or none of their "specialists" spans
       And with only signed calls on it counts the spans that stay hidden for having no valid signature
       And a compact legend on one line says how many traces get every, some or no spans
-      And without only signed calls one quiet line under the headline warns that anyone can set a tag
+      And when the condition reads attributes without only signed calls, one quiet line under the headline warns that anyone can set a tag
       And an example trace, folded until ana opens it, marks the braided spans and strikes through the rest, seen by ana only
 
     @integration

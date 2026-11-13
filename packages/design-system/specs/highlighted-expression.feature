@@ -19,10 +19,3 @@ Feature: Filter expressions read with syntax highlighting
     Given the expression 'name == "web" or attributes["k"] != nil'
     Then it renders in a code element whose text and title are the whole expression
     And the joining word and the strings are drawn in their own spans
-
-  @integration
-  Scenario: The expression editor highlights what is typed and underlines a marked span
-    Given an expression editor holding 'attributes["k"] >= 3'
-    And the span ">=" is marked
-    Then the layer under the textarea shows the same text, coloured
-    And the marked span is underlined
