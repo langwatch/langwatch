@@ -148,7 +148,7 @@ describe("Server", () => {
         });
         const { port } = server.healthAddress as AddressInfo;
 
-        const inFlight = fetch(`http://127.0.0.1:${port}/api/slow`);
+        const inFlight = fetch(`http://localhost:${port}/api/slow`);
         await requestArrived;
         const closed = server.close();
         const response = await inFlight;

@@ -85,7 +85,7 @@ describe("Server", () => {
         const { server, release, handlerEntered } = await serverWithHeldRequest(events);
         const port = portOf(server);
 
-        const slow = fetch(`http://127.0.0.1:${port}/slow`);
+        const slow = fetch(`http://localhost:${port}/slow`);
         await handlerEntered;
         const closing = server.close();
         await new Promise((resolve) => setTimeout(resolve, 50));
@@ -110,11 +110,11 @@ describe("Server", () => {
         const { server, release, handlerEntered } = await serverWithHeldRequest(events);
         const port = portOf(server);
 
-        const slow = fetch(`http://127.0.0.1:${port}/slow`);
+        const slow = fetch(`http://localhost:${port}/slow`);
         await handlerEntered;
         const closing = server.close();
-        const late = await fetch(`http://127.0.0.1:${port}/fast`);
-        const probe = await fetch(`http://127.0.0.1:${port}/healthz`);
+        const late = await fetch(`http://localhost:${port}/fast`);
+        const probe = await fetch(`http://localhost:${port}/healthz`);
         release();
         await slow;
         await closing;
@@ -136,7 +136,7 @@ describe("Server", () => {
         const port = portOf(server);
         const client = new AbortController();
 
-        const slow = fetch(`http://127.0.0.1:${port}/slow`, { signal: client.signal });
+        const slow = fetch(`http://localhost:${port}/slow`, { signal: client.signal });
         await handlerEntered;
         client.abort();
         await slow.catch(() => undefined);
@@ -165,7 +165,7 @@ describe("Server", () => {
         const { server, handlerEntered } = await serverWithHeldRequest(events);
         const port = portOf(server);
 
-        const cut = fetch(`http://127.0.0.1:${port}/unwinds`).catch(() => undefined);
+        const cut = fetch(`http://localhost:${port}/unwinds`).catch(() => undefined);
         await handlerEntered;
         await server.close();
         await cut;
@@ -189,7 +189,7 @@ describe("Server", () => {
         const { server, handlerEntered } = await serverWithHeldRequest(events);
         const port = portOf(server);
 
-        const stream = await fetch(`http://127.0.0.1:${port}/stream`, {
+        const stream = await fetch(`http://localhost:${port}/stream`, {
           headers: { Accept: "text/event-stream" },
         });
         await handlerEntered;
