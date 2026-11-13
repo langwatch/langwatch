@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { defaultS3Host, isAwsS3Endpoint, s3RegionOf } from "../s3-region.ts";
+import { defaultS3Host, s3RegionOf } from "../s3-region.ts";
 
 describe("s3RegionOf()", () => {
   describe("when a region is named", () => {
@@ -52,23 +52,19 @@ describe("s3RegionOf()", () => {
     });
   });
 
+  describe("when the endpoint cannot be parsed or only looks like AWS", () => {
+    it("treats it as not AWS, so it signs with 'auto'", () => {
+      expect(s3RegionOf({ endpoint: "http://[not-a-host" })).toBe("auto");
+      expect(s3RegionOf({ endpoint: "https://amazonaws.com.evil.example" })).toBe("auto");
+    });
+  });
+
   describe("when there is no regional endpoint and no region is named", () => {
     it("leaves the region to the SDK chain (AWS_REGION)", () => {
       expect(s3RegionOf({})).toBeUndefined();
       expect(s3RegionOf({ endpoint: "  ", region: "" })).toBeUndefined();
       expect(s3RegionOf({ endpoint: "https://s3.amazonaws.com" })).toBeUndefined();
     });
-  });
-});
-
-describe("isAwsS3Endpoint()", () => {
-  it("reads the hostname, so a path, port or missing scheme still counts", () => {
-    expect(isAwsS3Endpoint("s3.eu-west-1.amazonaws.com/")).toBe(true);
-    expect(isAwsS3Endpoint("https://s3.amazonaws.com:443/x")).toBe(true);
-    expect(isAwsS3Endpoint("https://s3.cn-north-1.amazonaws.com.cn")).toBe(true);
-    expect(isAwsS3Endpoint("https://amazonaws.com.evil.example")).toBe(false);
-    expect(isAwsS3Endpoint("http://minio:9000")).toBe(false);
-    expect(isAwsS3Endpoint("::not a url::")).toBe(false);
   });
 });
 

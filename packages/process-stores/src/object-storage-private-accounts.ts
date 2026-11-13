@@ -137,13 +137,14 @@ export function objectStoragePrivateFamilyOf(options: {
     }
 
     malformed.delete(organizationId);
+    const accountRegion = config.region ?? region;
     accounts.set(organizationId, {
       organizationId,
       label,
       variable: envVar,
       bucket: config.bucket,
       endpoint: config.endpoint,
-      ...((config.region ?? region) ? { region: config.region ?? region } : {}),
+      ...(accountRegion ? { region: accountRegion } : {}),
       ...credentialsOf(config),
       forcePathStyle: true,
     });

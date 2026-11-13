@@ -14,16 +14,12 @@ export function s3RegionOf({
 }): string | undefined {
   const named = region?.trim();
   if (named && named.toLowerCase() !== "auto") return named;
-  const hostname = hostnameOf(endpoint?.trim() ?? "");
-  if (hostname === undefined) return undefined;
-  if (!isAwsHostname(hostname)) return "auto";
+  const given = endpoint?.trim();
+  if (!given) return undefined;
+  const hostname = hostnameOf(given);
+  // An endpoint that does not parse is not an AWS host, so it signs as S3-compatible.
+  if (hostname === undefined || !isAwsHostname(hostname)) return "auto";
   return REGIONAL_AWS_S3_HOST.exec(hostname)?.[1];
-}
-
-/** Reads the hostname, so a path, port or missing scheme still counts as AWS. */
-export function isAwsS3Endpoint(endpoint: string): boolean {
-  const hostname = hostnameOf(endpoint.trim());
-  return hostname !== undefined && isAwsHostname(hostname);
 }
 
 /** The host an SDK client with no custom endpoint talks to. */
@@ -37,12 +33,12 @@ function isAwsHostname(hostname: string): boolean {
   return hostname.endsWith(".amazonaws.com") || hostname.endsWith(".amazonaws.com.cn");
 }
 
+/** Reads the hostname, so a path, port or missing scheme still counts; undefined if unparseable. */
 function hostnameOf(endpoint: string): string | undefined {
-  if (endpoint === "") return undefined;
   try {
     const url = new URL(endpoint.includes("://") ? endpoint : `https://${endpoint}`);
     return url.hostname.toLowerCase();
   } catch {
-    return "";
+    return undefined;
   }
 }
