@@ -346,9 +346,12 @@ export async function startLangWatchQLClickHouse({
   facts = "fixture",
   extraConfigFiles = [],
   image = LWQL_CLICKHOUSE_TEST_IMAGE,
+  settingsPrefixes,
 }: {
   suite: string;
   facts?: LangWatchQLFactTableMode;
+  /** The server's `custom_settings_prefixes`, when a suite needs more than `custom_`. */
+  settingsPrefixes?: readonly string[];
   /** The server image; LangWatchQL's own 26.8 unless a suite pins another. */
   image?: string;
   /** Extra server config files to install before ClickHouse starts. */
@@ -359,11 +362,14 @@ export async function startLangWatchQLClickHouse({
     administrativeUser: ADMIN_USER,
   });
   const pins = testClickHouseProfilePins();
+  const settingsPrefixXml = settingsPrefixes
+    ? serverConfig.customSettingsPrefixConfigXml({ prefixes: settingsPrefixes })
+    : CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_XML;
   const configDigest = extraConfigFiles
     .reduce(
       (hash, file) => hash.update(file.target).update(file.contents),
       createHash("sha256")
-        .update(CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_XML)
+        .update(settingsPrefixXml)
         .update(accessManagementXml)
         .update(pins.file.content),
     )
@@ -383,11 +389,7 @@ export async function startLangWatchQLClickHouse({
     })
     .withCopyFilesToContainer([
       {
-        source: writeConfigFile(
-          configDirectory,
-          "custom-settings-prefix.xml",
-          CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_XML,
-        ),
+        source: writeConfigFile(configDirectory, "custom-settings-prefix.xml", settingsPrefixXml),
         target: CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_PATH,
       },
       {

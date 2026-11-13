@@ -1,7 +1,6 @@
 /**
- * The app reader's row policies on a real ClickHouse (26.8), provisioned from the rendered DDL
- * (ADR-202). The server must declare the `SQL_` settings prefix and let the URL's user manage
- * access.
+ * The app reader's row policies on a throwaway ClickHouse (26.8), provisioned from the rendered
+ * DDL (ADR-202). Never a shared server: the policies, users and log reads are server-wide.
  * @see specs/clickhouse/app-reader-row-policies.feature
  */
 import { createHash, randomBytes } from "node:crypto";
@@ -11,13 +10,16 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { PostgresNamedCollection } from "../../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
 import {
+  type LangWatchQLClickHouseHarness,
+  startLangWatchQLClickHouse,
+} from "../../langwatch-ql/__tests__/lwql-clickhouse-harness.ts";
+import {
   APP_READER_NAMES,
   APP_READER_SETTINGS_PREFIX,
 } from "../../rules/app-reader-access.rules.ts";
 import { LangWatchQLAccessModelDefinitionService } from "../langwatch-ql-access-model-definition.service.ts";
 import type { LangWatchQLNames } from "../langwatch-ql-access-model.service.ts";
 
-const url = process.env.LANGWATCH_TEST_CLICKHOUSE_URL;
 const accessModelDefinition = LangWatchQLAccessModelDefinitionService.create();
 
 const DATABASE = `app_reader_${process.pid}`;
@@ -174,7 +176,8 @@ const TENANT_SETS: [string, string, Record<string, number>][] = [
 /** Tables holding another session's statements; the reader is granted none of them. */
 const DENIED_LOGS = ["query_log", "processes", "query_views_log", "text_log"];
 
-describe.runIf(Boolean(url))("given the app reader provisioned from the rendered DDL", () => {
+describe("given the app reader provisioned from the rendered DDL", () => {
+  let harness: LangWatchQLClickHouseHarness | undefined;
   let admin: ClickHouseClient;
   let reader: ClickHouseClient;
 
@@ -210,7 +213,11 @@ describe.runIf(Boolean(url))("given the app reader provisioned from the rendered
   }
 
   beforeAll(async () => {
-    admin = createClient({ url });
+    harness = await startLangWatchQLClickHouse({
+      suite: "app_reader_row_policies",
+      settingsPrefixes: ["custom_", APP_READER_SETTINGS_PREFIX],
+    });
+    admin = harness.admin;
     await admin
       .command({
         query: `SELECT 1 SETTINGS ${APP_READER_SETTINGS_PREFIX}langwatch_prefix_probe = 1`,
@@ -228,7 +235,7 @@ describe.runIf(Boolean(url))("given the app reader provisioned from the rendered
     for (const [table, values] of inserts) {
       await admin.insert({ table: `${DATABASE}.${table}`, values, format: "JSONEachRow" });
     }
-    const readerUrl = new URL(url ?? "");
+    const readerUrl = new URL(harness.container.getHttpUrl());
     readerUrl.username = APP_READER_NAMES.user;
     readerUrl.password = READER_LOGIN;
     reader = createClient({ url: readerUrl.toString() });
@@ -249,7 +256,7 @@ describe.runIf(Boolean(url))("given the app reader provisioned from the rendered
         await admin.command({ query: `DROP ROW POLICY IF EXISTS ${name} ON ${table}` });
     }
     await admin.command({ query: `DROP DATABASE IF EXISTS ${DATABASE}` });
-    await admin.close();
+    await harness?.stop();
   });
 
   describe("when the profile pins enforce to 1", () => {
