@@ -80,6 +80,30 @@ Feature: Batch Evaluation Results Visualization
   # compares one column over 30 rows against another over 40. The workbench
   # header says the same thing the same way, so the two surfaces read alike.
 
+  # A run of some rows holds them at their dataset positions, so rows 10 to 14
+  # arrive as indices 10 to 14. The page keeps rows positional so two runs line
+  # up row for row, but the positions the run holds nothing for are padding,
+  # not rows: counting them made a run of 5 rows report 6, or 15.
+
+  @unit
+  Scenario: A run of some rows counts only the rows it holds
+    Given a run that holds rows 1 to 5 of the dataset
+    When its results are summarised
+    Then the run reports 5 rows
+
+  @unit
+  Scenario: The results table shows only the rows a run holds, under their dataset numbers
+    Given a run that holds rows 0, 2 and 5 of the dataset
+    When the results table is built
+    Then it shows three rows
+    And they keep their dataset positions, so a comparison lines them up row for row
+
+  @unit
+  Scenario: CSV holds only the rows a run holds
+    Given a run that holds rows 1 to 5 of the dataset
+    When I export to CSV
+    Then the CSV has 5 data rows
+
   @integration
   Scenario: A column header says how much of the dataset its score covers
     Given a saved run holds results for 5 of the dataset's 10 rows

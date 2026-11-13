@@ -3,11 +3,16 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { computeBatchTargetAggregates } from "../ui/sections/batch-evaluation-results.aggregates.ts";
+import {
+  computeAllBatchAggregates,
+  computeBatchTargetAggregates,
+} from "../ui/sections/batch-evaluation-results.aggregates.ts";
 import {
   type BatchResultRow,
   type BatchTargetColumn,
+  transformBatchEvaluationData,
 } from "../ui/sections/batch-evaluation-results.types.ts";
+import { WHOLE_RUN_COMPLETENESS } from "./run-completeness.fixture.ts";
 
 describe("computeBatchTargetAggregates", () => {
   const createTargetColumn = (id: string): BatchTargetColumn => ({
@@ -15,6 +20,32 @@ describe("computeBatchTargetAggregates", () => {
     name: id,
     type: "custom",
     outputFields: ["output"],
+  });
+
+  describe("given a run that holds rows 1 to 5 of the dataset", () => {
+    /** @scenario "A run of some rows counts only the rows it holds" */
+    it("reports 5 rows, not the 6 positions up to row 5", () => {
+      const data = transformBatchEvaluationData({
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "project-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
+        dataset: [1, 2, 3, 4, 5].map((index) => ({ index, entry: { question: `Q${index}` } })),
+        evaluations: [1, 2, 3, 4, 5].map((index) => ({
+          evaluator: "exact",
+          name: "Exact",
+          index,
+          status: "processed" as const,
+          passed: true,
+        })),
+        timestamps: { createdAt: 0, updatedAt: 0 },
+      });
+
+      const [aggregate] = [...computeAllBatchAggregates(data).values()];
+
+      expect(aggregate?.totalRows).toBe(5);
+      expect(aggregate?.completedRows).toBe(5);
+    });
   });
 
   describe("when counting completedRows", () => {
