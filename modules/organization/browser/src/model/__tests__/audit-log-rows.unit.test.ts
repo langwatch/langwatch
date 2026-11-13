@@ -122,12 +122,17 @@ describe("given a row LangWatch staff or an operator wrote", () => {
         actorUserId: "u_o",
         actorUser: { id: "u_o", name: "Olivia", email: "olivia@langwatch.ai" },
         action: "staffAccess.write",
-        staffAccess: { principal: "LangWatch Support", reason: "fix the broken evaluator" },
+        staffAccess: {
+          principal: "LangWatch Support",
+          reason: "fix the broken evaluator",
+          approvedBy: { id: "u_o" },
+        },
       }),
     ).toEqual({
       kind: "staff",
       principal: "LangWatch Support",
       approvedBy: "olivia@langwatch.ai",
+      revokedBy: null,
       reason: "fix the broken evaluator",
     });
   });
@@ -143,8 +148,44 @@ describe("given a row LangWatch staff or an operator wrote", () => {
       kind: "staff",
       principal: "LangWatch Staff Read",
       approvedBy: null,
+      revokedBy: null,
       reason: null,
     });
+  });
+
+  /** @scenario A revoked or expired staff access row names its approver, not whoever ended it */
+  it("reads the approver from the row's metadata and the revoker separately", () => {
+    expect(
+      auditActor({
+        userId: "u_o",
+        user: { id: "u_o", name: "Olivia", email: "olivia@langwatch.ai" },
+        actorUserId: "u_p",
+        actorUser: { id: "u_p", name: "Pedro", email: "pedro@langwatch.ai" },
+        apiKeyId: null,
+        action: "staffAccess.revoked",
+        staffAccess: {
+          principal: "LangWatch Staff Read",
+          reason: "check usage",
+          approvedBy: { id: "u_o", name: "Olivia", email: "olivia@langwatch.ai" },
+          revokedBy: { id: "u_p", name: "Pedro", email: "pedro@langwatch.ai" },
+        },
+      }),
+    ).toMatchObject({ approvedBy: "olivia@langwatch.ai", revokedBy: "pedro@langwatch.ai" });
+  });
+
+  /** @scenario A revoked or expired staff access row names its approver, not whoever ended it */
+  it("names the approver of an expired row, which has no actor", () => {
+    expect(
+      auditActor({
+        userId: "u_o",
+        user: { id: "u_o", name: "Olivia", email: "olivia@langwatch.ai" },
+        actorUserId: null,
+        actorUser: null,
+        apiKeyId: null,
+        action: "staffAccess.expired",
+        staffAccess: { principal: "LangWatch Staff Read", reason: null, approvedBy: { id: "u_o" } },
+      }),
+    ).toMatchObject({ approvedBy: "olivia@langwatch.ai", revokedBy: null });
   });
 
   it("names the operator who started an impersonation, with the reason", () => {

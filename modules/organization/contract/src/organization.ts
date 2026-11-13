@@ -195,10 +195,22 @@ export interface AuditImpersonationMetadataSchema extends Named<
 export const auditImpersonationMetadataSchema: AuditImpersonationMetadataSchema =
   auditImpersonationMetadataSchemaDefinition;
 
-/** What a staff access row (ADR-202) carries: the principal that acted and the approval reason. */
+/** An operator a staff access row names; older rows carry only the id. */
+const auditStaffPersonSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().nullish(),
+  email: z.string().nullish(),
+});
+
+/**
+ * What a staff access row (ADR-202) carries: the principal that acted, the approval reason, the
+ * operator who approved it and, on a revoke, the operator who ended it.
+ */
 const auditStaffAccessMetadataSchemaDefinition = z.object({
   principal: z.string().min(1),
   reason: z.string().nullable().catch(null),
+  approvedBy: auditStaffPersonSchema.nullish().catch(null),
+  revokedBy: auditStaffPersonSchema.nullish().catch(null),
 });
 export interface AuditStaffAccessMetadataSchema extends Named<
   typeof auditStaffAccessMetadataSchemaDefinition
