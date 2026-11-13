@@ -19,3 +19,9 @@ Feature: Filter expressions read with syntax highlighting
     Given the expression 'name == "web" or attributes["k"] != nil'
     Then it renders in a code element whose text and title are the whole expression
     And the joining word and the strings are drawn in their own spans
+
+  @integration
+  Scenario: A block expression cut to its lines keeps its whole text in the title
+    Given the expression 'attributes["orchestrator"] == "web" and attributes["tier"] == "gold"'
+    When it shows as a block cut after two lines
+    Then it renders in a code element whose text and title are the whole expression

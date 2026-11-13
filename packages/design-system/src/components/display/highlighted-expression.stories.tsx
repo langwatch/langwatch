@@ -52,3 +52,18 @@ export const InASentence: Story = {
     </Stack>
   ),
 };
+
+/** On its own lines in a table cell or a list: wraps between words, cut after two lines. */
+export const Block: Story = {
+  args: {
+    layout: "block",
+    maxLines: 2,
+    code: 'attributes["orchestrator"] == "web" and attributes["tenant.region"] == "eu-central-1" and attributes["tier"] == "gold"',
+    maxWidth: "280px",
+  },
+};
+
+/** Narrow: a block wraps rather than cutting the only part that tells two conditions apart. */
+export const BlockNarrow: Story = {
+  args: { layout: "block", code: 'attributes["orchestrator"] == "web"', maxWidth: "140px" },
+};

@@ -21,4 +21,13 @@ describe("Feature: Filter expressions read with syntax highlighting", () => {
     expect(screen.getByText("or").tagName).toBe("SPAN");
     expect(screen.getByText('"web"').tagName).toBe("SPAN");
   });
+
+  /** @scenario "A block expression cut to its lines keeps its whole text in the title" */
+  it("Scenario: A block expression cut to its lines keeps its whole text in the title", () => {
+    const code = 'attributes["orchestrator"] == "web" and attributes["tier"] == "gold"';
+    renderWithDesignSystem(<HighlightedExpression layout="block" maxLines={2} code={code} />);
+    const element = screen.getByTitle(code);
+    expect(element.tagName).toBe("CODE");
+    expect(element.textContent).toBe(code);
+  });
 });

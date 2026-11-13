@@ -19,10 +19,12 @@ interface HighlightedExpressionProps extends Omit<BoxProps, "children"> {
   /** The expression, for example `attributes["k"] == "v" and Verified("k")`. */
   code: string;
   /**
-   * `chip` is one line in a quiet code chip, cut at the end with the whole text as its title,
-   * for tables. `wrap` flows inside a sentence and breaks between words.
+   * `chip` is one line in a quiet code chip, cut at the end with the whole text as its title.
+   * `wrap` flows inside a sentence. `block` stands on its own lines, wrapping between words.
    */
-  layout?: "chip" | "wrap";
+  layout?: "chip" | "wrap" | "block";
+  /** `block` only: cut after this many lines, the whole text as its title. */
+  maxLines?: number;
 }
 
 /** The tokens as coloured spans; joined, their text is exactly `code`. */
@@ -61,6 +63,18 @@ const WRAP = {
   overflowWrap: "break-word",
   boxDecorationBreak: "clone",
 } as const;
+const BLOCK = {
+  display: "block",
+  width: "fit-content",
+  maxWidth: "full",
+  paddingX: "6px",
+  paddingY: "2px",
+  borderRadius: "xs",
+  textStyle: "monoSm",
+  whiteSpace: "normal",
+  overflowWrap: "anywhere",
+} as const;
+const LAYOUTS = { chip: CHIP, wrap: WRAP, block: BLOCK } as const;
 
 /**
  * A filter expression read as code, coloured by part: fields, strings, numbers, operators, the
@@ -69,18 +83,21 @@ const WRAP = {
 export function HighlightedExpression({
   code,
   layout = "chip",
+  maxLines,
   ...props
 }: HighlightedExpressionProps): React.ReactElement {
+  const cut = layout === "block" && maxLines !== undefined;
   return (
     <Box
       as="code"
-      title={layout === "chip" ? code : undefined}
+      title={layout === "chip" || cut ? code : undefined}
       fontFamily="mono"
       fontVariantLigatures="none"
       letterSpacing="normal"
       bg="bg.control"
       color="fg"
-      {...(layout === "chip" ? CHIP : WRAP)}
+      {...LAYOUTS[layout]}
+      {...(cut ? { lineClamp: maxLines } : {})}
       {...props}
     >
       <ExpressionTokens tokens={tokeniseExpression({ text: code })} />

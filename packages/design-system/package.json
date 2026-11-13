@@ -511,6 +511,10 @@
       "types": "./dist/components/forms/field-editor.d.ts",
       "default": "./src/components/forms/field-editor.tsx"
     },
+    "./toggle-row": {
+      "types": "./dist/components/forms/toggle-row.d.ts",
+      "default": "./src/components/forms/toggle-row.tsx"
+    },
     "./settings-field": {
       "types": "./dist/components/forms/settings-field.d.ts",
       "default": "./src/components/forms/settings-field.tsx"
