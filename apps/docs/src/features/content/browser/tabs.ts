@@ -1,3 +1,5 @@
+import { conceal } from "../../../lib/slide.ts";
+
 const ROOT = '[data-scope="tabs"][data-part="root"]';
 
 const preferences = new Map<string, string>();
@@ -105,8 +107,8 @@ function selectTab({ button, remember = true }: { button: HTMLElement; remember?
   if (target) button.setAttribute("aria-controls", target);
   root.querySelectorAll<HTMLElement>('[role="tabpanel"]').forEach((panel) => {
     if (panel.closest('[data-scope="tabs"][data-part="root"]') !== root) return;
-    panel.hidden = panel.id !== target;
-    panel.dataset.state = panel.hidden ? "closed" : "open";
+    conceal({ panel, hidden: panel.id !== target });
+    panel.dataset.state = panel.id === target ? "open" : "closed";
   });
   showResponse({ root, button });
   updateCodeTitle({ root, panelId: target });
@@ -218,8 +220,33 @@ function restoreTabs() {
   }
 }
 
+/** Find-in-page opened an unselected tab's panel: select its tab so the strip agrees. */
+function onBeforeMatch(event: Event) {
+  if (!(event.target instanceof HTMLElement)) return;
+  const panel = event.target.closest<HTMLElement>('[role="tabpanel"]');
+  const button = panel?.id
+    ? document.querySelector<HTMLElement>(`[role="tab"][aria-controls="${panel.id}"]`)
+    : null;
+  const label = panel?.getAttribute("aria-labelledby");
+  const tab = button ?? (label ? document.getElementById(label) : null);
+  if (tab) selectTab({ button: tab, remember: false });
+}
+
+/* A panel find-in-page (or a text fragment) opened before this island loaded keeps its tab. */
+function revealedTabs(): HTMLElement[] {
+  return [...document.querySelectorAll<HTMLElement>('[role="tabpanel"][data-docs-findable]')]
+    .filter((panel) => !panel.hasAttribute("hidden") && panel.dataset.state === "closed")
+    .flatMap((panel) => {
+      const tab = document.getElementById(panel.getAttribute("aria-labelledby") ?? "");
+      return tab ? [tab] : [];
+    });
+}
+
 export function installTabs() {
+  document.addEventListener("beforematch", onBeforeMatch);
+  const revealed = revealedTabs();
   restoreTabs();
+  for (const button of revealed) selectTab({ button, remember: false });
   document.addEventListener("docs:navigated", restoreTabs);
   window.addEventListener("resize", measureTabLists);
   document.addEventListener("scroll", measureTabLists, { capture: true, passive: true });

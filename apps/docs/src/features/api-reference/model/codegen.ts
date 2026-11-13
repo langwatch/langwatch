@@ -260,3 +260,45 @@ export function initialBodyOf({ operation }: { operation: Operation }): string {
   const text = JSON.stringify(example, null, 2);
   return text === "{}" || text === "null" ? "" : text;
 }
+
+/** A prompt a coding agent can act on: the call, its reference and how to authenticate. */
+export function agentPrompt({
+  operation,
+  state,
+  reference,
+}: {
+  operation: Operation;
+  state: RequestState;
+  reference: string;
+}): string {
+  const { url, query, headers } = resolved({ operation, state });
+  const auth = authHeader({ operation });
+  const body = operation.body ? parseBody({ text: state.body }) : void 0;
+  const goal = operation.summary.trim().replace(/\.$/, "");
+  const lines = [
+    goal
+      ? `Call the LangWatch API from this project: ${goal}.`
+      : "Call the LangWatch API from this project.",
+    "",
+    `Request: ${operation.method} ${url}`,
+    `Reference: ${reference}`,
+  ];
+  if (auth)
+    lines.push(
+      `Authentication: send the ${auth.name} header${auth.value.includes("Bearer") ? " as a Bearer token" : ""}, read from the ${KEY_ENV} environment variable. Never hard-code the key.`,
+    );
+  if (query.length || headers.length)
+    lines.push(
+      "Parameters:",
+      ...[...query, ...headers].map(([name, value]) => `- ${name}: ${value}`),
+    );
+  if (body !== void 0)
+    lines.push("Body (application/json):", "```json", JSON.stringify(body, null, 2), "```");
+  else if (operation.body?.required)
+    lines.push("Body: JSON, required. Build it from the request schema in the reference.");
+  lines.push(
+    "",
+    "Use the HTTP client this project already uses, handle non-2xx responses, and show me the parsed result.",
+  );
+  return lines.join("\n");
+}

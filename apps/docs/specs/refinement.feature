@@ -108,10 +108,25 @@ Feature: Actionable documentation and restrained reading surfaces
     But a page opened by a full load shows its content at once, with no rise
 
   @unit
-  Scenario: Reserve a heading's link icon room on touch screens
-    Given a touch screen, where a heading shows its link icon after its text
+  Scenario: Reserve a heading's link icon room after its last word
+    Given a heading of any level shows its link icon after its last word, never over its text
+    And a pointer reader sees the icon on hover or focus, a touch reader always
     Then the heading reserves the icon's room at its end
     And the icon's margins cancel that room, so the heading breaks its lines as if the icon had no width
+
+  @unit
+  Scenario: Find text inside collapsed panels with find-in-page
+    Given an accordion, an expandable field list or an unselected tab holds text
+    Then the prerendered page hides its panel as hidden until found, not as plain hidden
+    And panels that are not collapsible keep plain hidden
+
+  @unit
+  Scenario: Hand a coding agent a prompt for the request
+    Given an API operation with an API key scheme and a JSON body
+    When the reader opens the request examples
+    Then an Agent prompt tab comes before Python, though Python stays the default
+    And its prompt names the method and URL, links the operation's reference and sends the body as JSON
+    And it tells the agent to read the key from LANGWATCH_API_KEY, never hard-coding it
 
   @unit
   Scenario: Answer a followed link at once while the next page loads

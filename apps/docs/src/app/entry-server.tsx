@@ -9,6 +9,7 @@ import {
 } from "../features/api-reference/model.ts";
 import { highlightLines } from "../features/code/compile.ts";
 import { headDescription } from "../features/discovery/compile.ts";
+import { findableMarkup } from "../lib/findable-markup.ts";
 import { App } from "./app.tsx";
 import { loadOperation, loadPage } from "./pages.ts";
 
@@ -37,7 +38,11 @@ export async function render({ slug }: { slug: string }) {
   const { examples } = await highlightedExamples({ slug });
   const meta = nav.pages[slug];
   return {
-    html: renderToString(<App slug={slug} page={page} operation={operation} examples={examples} />),
+    html: findableMarkup({
+      html: renderToString(
+        <App slug={slug} page={page} operation={operation} examples={examples} />,
+      ),
+    }),
     title: meta?.title ?? slug,
     description: headDescription({
       title: meta?.title ?? slug,

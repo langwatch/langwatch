@@ -1,3 +1,13 @@
+/**
+ * Hides or shows a panel. A `data-docs-findable` one hides as `hidden="until-found"`, so the
+ * browser's find-in-page can still reach and open it.
+ */
+export function conceal({ panel, hidden }: { panel: HTMLElement; hidden: boolean }) {
+  if (!hidden) panel.removeAttribute("hidden");
+  else if (panel.hasAttribute("data-docs-findable")) panel.setAttribute("hidden", "until-found");
+  else panel.hidden = true;
+}
+
 /** Shows or hides a panel with a 200ms height and fade; a reversal starts from where it is. */
 export function slide({ panel, open }: { panel: HTMLElement; open: boolean }) {
   const all = panel.getAnimations();
@@ -6,7 +16,7 @@ export function slide({ panel, open }: { panel: HTMLElement; open: boolean }) {
   all.forEach((animation) => animation.cancel());
   panel.hidden = false;
   if (!matchMedia("(prefers-reduced-motion: no-preference)").matches) {
-    panel.hidden = !open;
+    conceal({ panel, hidden: !open });
     return;
   }
   const shut = { height: "0px", opacity: 0, overflow: "hidden" };
@@ -20,7 +30,7 @@ export function slide({ panel, open }: { panel: HTMLElement; open: boolean }) {
     id: "docs-slide",
   });
   animation.onfinish = () => {
-    panel.hidden = !open;
+    conceal({ panel, hidden: !open });
     animation.cancel();
   };
 }

@@ -20,6 +20,10 @@ export const docsTheme = {
           shadowStrong: colour({ light: "#14141721", dark: "#00000080" }),
           primary: colour({ light: "#f56b1a", dark: "#f56b1a" }),
           primaryText: colour({ light: "#141417", dark: "#141417" }),
+          // A filled primary button: brand orange deepened until white type meets AA (4.6:1).
+          primaryFill: colour({ light: "#c94e0a", dark: "#c94e0a" }),
+          primaryFillHover: colour({ light: "#b0440a", dark: "#d9560b" }),
+          onPrimary: colour({ light: "#ffffff", dark: "#ffffff" }),
           controlBorder: colour({ light: "#8a8981", dark: "#77766f" }),
           body: colour({ light: "#36352f", dark: "#d6d5d0" }),
           lede: colour({ light: "#4d4d46", dark: "#aaa9a2" }),

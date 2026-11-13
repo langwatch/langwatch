@@ -17,6 +17,7 @@ import {
   requestState,
   setFormOpen,
   showErrors,
+  syncBody,
   updateExamples,
 } from "./playground-dom.ts";
 import { ResponseView } from "./response-view.tsx";
@@ -113,6 +114,13 @@ function PlaygroundRuntime({ operation }: { operation: Operation }) {
   useEffect(() => {
     return bindRequestForm({ operation, onSend: send });
   });
+  useEffect(() => {
+    if (outcome.kind === "idle") return;
+    const smooth = matchMedia("(prefers-reduced-motion: no-preference)").matches;
+    document
+      .querySelector("[data-docs-runtime]")
+      ?.scrollIntoView({ block: "nearest", behavior: smooth ? "smooth" : "instant" });
+  }, [outcome.kind]);
   return (
     <ResponseView
       outcome={outcome}
@@ -131,7 +139,10 @@ function activate() {
       .parse(JSON.parse(document.getElementById("docs-page-data")?.textContent ?? "{}"));
     const container = document.createElement("div");
     container.dataset.docsRuntime = "";
-    document.querySelector("[data-docs-playground]")?.append(container);
+    const slot =
+      document.querySelector("[data-docs-response-slot]") ??
+      document.querySelector("[data-docs-playground]");
+    slot?.append(container);
     root = createRoot(container);
     root.render(<PlaygroundRuntime operation={data.operation} />);
     startSession();
@@ -156,7 +167,10 @@ function bindRequestForm({
   onSend: () => Promise<void>;
 }) {
   const form = document.getElementById("try-it-form");
-  const input = () => updateExamples({ operation });
+  const input = (event: Event) => {
+    if (event.target instanceof HTMLElement && event.target.id === "pg-body") syncBody();
+    updateExamples({ operation });
+  };
   const click = (event: Event) => {
     const button = event.target instanceof Element ? event.target.closest("button") : null;
     if (!button) return;
