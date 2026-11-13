@@ -1,6 +1,6 @@
 /** Spec: specs/trace/trace-evaluation-analytics.feature */
+import { ProjectNotFoundError } from "@langwatch/authorization";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
-import { ProjectNotFoundError } from "@langwatch/project-contract";
 import {
   EVALUATION_OUTCOME_TEXT_MAX_LENGTH,
   type RecordEvaluationOutcomeCommandData,
@@ -340,7 +340,7 @@ describe("TraceEvaluationOutcomesMigrationService", () => {
       }),
     };
 
-    const projectGone = new ProjectNotFoundError("Project p-archived no longer exists");
+    const projectGone = new ProjectNotFoundError("p-archived");
 
     async function backfillWith({
       failure,
