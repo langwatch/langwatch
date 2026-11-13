@@ -373,6 +373,7 @@ export class LangyTurnPreparationService {
           modelOverride: args.turnModel,
           credentials: args.credentials,
           runToken,
+          permitReserved: false,
           ...(prepared.pendingHandoff ? { resumeToken: prepared.pendingHandoff.token } : {}),
         }),
       ]);

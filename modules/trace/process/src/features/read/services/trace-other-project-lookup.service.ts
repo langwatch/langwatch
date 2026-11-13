@@ -4,7 +4,7 @@ import type { ProjectApi, ProjectIdentity } from "@langwatch/project-contract";
 
 import type { TraceExistenceRepository } from "../../../repositories/trace-existence.repository.ts";
 
-/** Projects one miss may look through; an organisation past this searches its first ones. */
+/** Readable projects one miss may look through; past this it searches the first ones. */
 const MAX_PROJECTS_SEARCHED = 100;
 
 type LookupDependencies = {
@@ -46,14 +46,12 @@ export class TraceOtherProjectLookupService {
     const organizationId = await this.deps.projects.getOrganizationId(projectId);
     const others = (
       await this.deps.projects.findLiveNonGovernanceIdsByOrganization({ organizationId })
-    )
-      .filter((id) => id !== projectId)
-      .slice(0, MAX_PROJECTS_SEARCHED);
+    ).filter((id) => id !== projectId);
     if (others.length === 0) return { searchedProjectSlugs: [] };
 
     const identities = await this.deps.projects.listNamesByIds({ projectIds: others });
     const readable = await this.readable({ principal, organizationId, identities });
-    const searchable = identities.filter((p) => readable.has(p.id));
+    const searchable = identities.filter((p) => readable.has(p.id)).slice(0, MAX_PROJECTS_SEARCHED);
     if (searchable.length === 0) return { searchedProjectSlugs: [] };
 
     const holding = new Set(

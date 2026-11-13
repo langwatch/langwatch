@@ -26,6 +26,7 @@ import type {
   LangyWorkerDispatchInput,
   LangyWorkerProbeInput,
 } from "../../../../channels/langy-worker.channel.ts";
+import { langyTurnHandoffSchema } from "../../../../repositories/langy-live-turn.repository.ts";
 import { LangyMemoryStore } from "../../../../repositories/memory/langy-memory.store.ts";
 import { MemoryLangyPullRequestRepository } from "../../../../repositories/memory/memory.langy-pull-request.repository.ts";
 import { LangyGuidedKickoffService } from "../../../../services/langy-guided-kickoff.service.ts";
@@ -199,6 +200,25 @@ describe("LangyTurnService.startConversationTurn ui-action surface", () => {
  * with the durable admission commit — the golden path a turn takes end to end.
  */
 describe("LangyTurnPreparationService golden path", () => {
+  /** @scenario A turn handoff written during a rolling deploy parses on either release */
+  it("stashes a handoff the previous release can still parse", async () => {
+    const stashed: unknown[] = [];
+    const fixture = makeFixture({
+      handoffStore: {
+        stash: async (handoff: unknown) => {
+          stashed.push(handoff);
+        },
+      },
+    });
+
+    await LangyTurnService.create(fixture.deps).startConversationTurn(input);
+
+    expect(stashed).toHaveLength(1);
+    expect(langyTurnHandoffSchema.required({ permitReserved: true }).validate(stashed[0])).toBe(
+      true,
+    );
+  });
+
   it("commits one atomic message + acceptance command and fast-dispatches it", async () => {
     const fixture = makeFixture();
 

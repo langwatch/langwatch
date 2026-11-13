@@ -1,7 +1,10 @@
 import { memoryRedisDouble, memoryRedisStore } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it, vi } from "vitest";
 
-import { LANGY_HANDOFF_TTL_SECONDS } from "../repositories/langy-live-turn.repository.ts";
+import {
+  LANGY_HANDOFF_TTL_SECONDS,
+  langyTurnHandoffSchema,
+} from "../repositories/langy-live-turn.repository.ts";
 import { LangyTurnHandoffRedisRepository } from "../repositories/redis/redis.langy-turn-handoff.repository.ts";
 
 function fakeRedis() {
@@ -56,6 +59,25 @@ describe("LangyTurnHandoffRedisRepository", () => {
     await expect(
       store.read({ conversationId: handoff.conversationId, turnId: handoff.turnId }),
     ).resolves.toEqual({ kind: "miss" });
+  });
+
+  /** @scenario A turn handoff written during a rolling deploy parses on either release */
+  it("reads a handoff the previous release wrote with its permit flag", async () => {
+    const redis = fakeRedis();
+    const store = LangyTurnHandoffRedisRepository.create({ redis });
+    const previous = { ...handoff, permitReserved: true };
+    await redis.set("langy:handoff:{conversation-1}:turn-1", JSON.stringify(previous));
+
+    await expect(
+      store.read({ conversationId: handoff.conversationId, turnId: handoff.turnId }),
+    ).resolves.toEqual({ kind: "hit", handoff: previous });
+  });
+
+  /** @scenario A turn handoff written during a rolling deploy parses on either release */
+  it("writes the permit flag the previous release's strict parse requires", () => {
+    const previousRelease = langyTurnHandoffSchema.required({ permitReserved: true });
+    expect(previousRelease.validate({ ...handoff, permitReserved: false })).toBe(true);
+    expect(previousRelease.validate(handoff)).toBe(false);
   });
 
   it("refreshes a live handoff without rewriting it", async () => {

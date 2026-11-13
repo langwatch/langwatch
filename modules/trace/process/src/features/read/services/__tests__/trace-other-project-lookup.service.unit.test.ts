@@ -35,17 +35,19 @@ function makeService({
   holding,
   ownerReads,
   keyReads,
+  projects = [OWN, OTHER, HIDDEN],
 }: {
   holding: string[];
   ownerReads: string[];
   keyReads: string[];
+  projects?: string[];
 }) {
   const searchedFor: string[][] = [];
   const service = TraceOtherProjectLookupService.create({
     projects: createApiFixture<ProjectApi>(
       {
         getOrganizationId: async () => ORG,
-        findLiveNonGovernanceIdsByOrganization: async () => [OWN, OTHER, HIDDEN],
+        findLiveNonGovernanceIdsByOrganization: async () => projects,
         listNamesByIds: async ({ projectIds }) => projectIds.map(identity),
       },
       "projects",
@@ -107,6 +109,24 @@ describe("TraceOtherProjectLookupService", () => {
       expect(searchedFor).toEqual([[OTHER]]);
       expect(result.searchedProjectSlugs).toEqual([`${OTHER}-slug`]);
       expect(JSON.stringify(result)).not.toContain(HIDDEN);
+    });
+  });
+
+  describe("given more unreadable projects than the search cap ahead of a readable one", () => {
+    /** @scenario A trace in another project the key may read is served from that project */
+    it("still searches the readable project", async () => {
+      const unreadable = Array.from({ length: 150 }, (_, i) => `project-unreadable-${i}`);
+      const { service, searchedFor } = makeService({
+        holding: [OTHER],
+        ownerReads: [OTHER],
+        keyReads: [OTHER],
+        projects: [OWN, ...unreadable, OTHER],
+      });
+
+      const result = await service.locate({ projectId: OWN, traceId: TRACE_ID, principal });
+
+      expect(result.located).toEqual({ project: identity(OTHER) });
+      expect(searchedFor).toEqual([[OTHER]]);
     });
   });
 

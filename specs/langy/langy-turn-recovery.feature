@@ -626,3 +626,9 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     Given Langy is still writing its reply
     When a second message is sent to the conversation
     Then it is refused as "Langy is still replying" without waiting
+
+  @unit
+  Scenario: A turn handoff written during a rolling deploy parses on either release
+    Given replicas on the previous release and on this one serve together
+    When one release stashes a turn handoff and the other reads it
+    Then the handoff is found, never treated as missing
