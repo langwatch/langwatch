@@ -252,6 +252,62 @@ describe("given date-time parameters bound as ISO instants", () => {
 
       expect(queryMock.mock.lastCall?.[0].query_params).toEqual({ t: "2026-11-01T00:00:00.5Z" });
     });
+
+    /** @scenario "Placeholder text inside a string literal or comment does not change a bound value" */
+    it("ignores placeholder text inside string literals, quoted identifiers and comments", async () => {
+      queryMock.mockResolvedValueOnce({ json: async () => ({ data: [], meta: [] }) });
+
+      await executor.execute({
+        sql:
+          "SELECT {s:String} AS v, 'it''s {s:DateTime}' AS a, 'x\\' {s:DateTime}' AS b," +
+          " `{s:DateTime}` AS c -- {s:DateTime}\n" +
+          "/* {s:DateTime} /* nested */ {s:DateTime} */ # {s:DateTime}\n" +
+          "FROM analytics.traces",
+        parameters: { s: "2026-11-01T00:00:00Z" },
+        projectIds: PROJECT_IDS,
+        tenantCapability: TENANT_A_CAPABILITY,
+      });
+
+      expect(queryMock.mock.lastCall?.[0].query_params).toEqual({ s: "2026-11-01T00:00:00Z" });
+    });
+
+    it("leaves a name declared as both String and DateTime as bound", async () => {
+      queryMock.mockResolvedValueOnce({ json: async () => ({ data: [], meta: [] }) });
+
+      await executor.execute({
+        sql: "SELECT {s:String} AS v, {s:DateTime} AS w FROM analytics.traces",
+        parameters: { s: "2026-11-01T00:00:00Z" },
+        projectIds: PROJECT_IDS,
+        tenantCapability: TENANT_A_CAPABILITY,
+      });
+
+      expect(queryMock.mock.lastCall?.[0].query_params).toEqual({ s: "2026-11-01T00:00:00Z" });
+    });
+
+    it("reads date-time types in any case and under LowCardinality", async () => {
+      queryMock.mockResolvedValueOnce({ json: async () => ({ data: [], meta: [] }) });
+
+      await executor.execute({
+        sql:
+          "SELECT {a:datetime}, {b:DATETIME64(3)}, {c:LowCardinality(DateTime)}," +
+          " {d:Nullable( dateTime64(3, 'UTC') )} FROM analytics.traces",
+        parameters: {
+          a: "2026-11-01T00:00:00Z",
+          b: "2026-11-01T00:00:00Z",
+          c: "2026-11-01T00:00:00Z",
+          d: "2026-11-01T00:00:00.25Z",
+        },
+        projectIds: PROJECT_IDS,
+        tenantCapability: TENANT_A_CAPABILITY,
+      });
+
+      expect(queryMock.mock.lastCall?.[0].query_params).toEqual({
+        a: "1793491200",
+        b: "1793491200.000000000",
+        c: "1793491200",
+        d: "1793491200.250000000",
+      });
+    });
   });
 });
 
