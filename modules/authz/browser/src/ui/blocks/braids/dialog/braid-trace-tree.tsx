@@ -13,6 +13,7 @@ import {
   Text,
 } from "@langwatch/design-system/primitives";
 import { ProjectAvatar } from "@langwatch/design-system/project-avatar";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { EyeOff } from "lucide-react";
 import { useState } from "react";
 
@@ -21,6 +22,8 @@ import type { TestTraceRow } from "../../../../model/braids/braid-draft.ts";
 export type TestTraceProps = {
   test:
     | { state: "idle" | "loading" | "error" | "not-found" }
+    /** Nothing can be tested yet: the reason is the button's tooltip. */
+    | { state: "blocked"; reason: string }
     | { state: "ready"; rows: TestTraceRow[] };
   onTest: (traceId: string) => void;
   ownerName: string;
@@ -192,6 +195,7 @@ export function TraceTree({
 /** One trace id run through the draft braid, shown to you only. */
 export function TestTrace({ test, onTest, ownerName, readerName }: TestTraceProps) {
   const [traceId, setTraceId] = useState("");
+  const blocked = test.state === "blocked" ? test.reason : undefined;
   return (
     <Stack gap={3}>
       <HStack
@@ -199,7 +203,7 @@ export function TestTrace({ test, onTest, ownerName, readerName }: TestTraceProp
         gap={2}
         onSubmit={(event) => {
           event.preventDefault();
-          if (traceId.trim()) onTest(traceId.trim());
+          if (!blocked && traceId.trim()) onTest(traceId.trim());
         }}
       >
         <Input
@@ -210,15 +214,18 @@ export function TestTrace({ test, onTest, ownerName, readerName }: TestTraceProp
           onChange={(event) => setTraceId(event.target.value)}
           fontFamily={traceId ? "mono" : "body"}
         />
-        <Button
-          size="sm"
-          type="submit"
-          variant="outline"
-          loading={test.state === "loading"}
-          data-testid="braid-test"
-        >
-          Test
-        </Button>
+        <Tooltip content={blocked} disabled={!blocked}>
+          <Button
+            size="sm"
+            type="submit"
+            variant="outline"
+            disabled={!!blocked}
+            loading={test.state === "loading"}
+            data-testid="braid-test"
+          >
+            Test
+          </Button>
+        </Tooltip>
       </HStack>
       {test.state === "not-found" ? (
         <Text textStyle="bodySm" color="fg.muted">

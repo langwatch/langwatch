@@ -28,16 +28,26 @@ export function BraidedSpanBadge({
         as="span"
         display="inline-flex"
         alignItems="center"
-        flexShrink={0}
+        // Spelled out, the badge gives way before the span's name does, down to its mark.
+        flexShrink={compact ? 0 : 1000}
+        minWidth={compact ? undefined : "12px"}
+        overflow="hidden"
         data-testid="braided-span-badge"
         data-compact={compact ? "true" : undefined}
       >
         {compact ? (
           <FeatureMark feature="braids" size={COMPACT_MARK_SIZE} label={label} />
         ) : (
-          <HStack as="span" gap={1} aria-label={label}>
+          <HStack as="span" gap={1} minWidth={0} aria-label={label}>
             <FeatureMark feature="braids" size={12} />
-            <Text as="span" textStyle="2xs" color="fg.muted" truncate maxWidth={OWNER_MAX_WIDTH}>
+            <Text
+              as="span"
+              textStyle="2xs"
+              color="fg.muted"
+              truncate
+              minWidth={0}
+              maxWidth={OWNER_MAX_WIDTH}
+            >
               {strand.ownerName}
             </Text>
           </HStack>

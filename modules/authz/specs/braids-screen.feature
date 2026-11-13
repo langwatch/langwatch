@@ -74,6 +74,7 @@ Feature: The Braids screen
       When ana types attributes["orchestrator"] == "web" or attributes["team"] == "a"
       Then the editor marks the or in place with its fix and explains in one line how to write the condition instead
       And the create button stays disabled until the condition is supported
+      And Test stays disabled, saying why, until the condition is supported
       And a supported condition gets no remark under the field
 
     @integration

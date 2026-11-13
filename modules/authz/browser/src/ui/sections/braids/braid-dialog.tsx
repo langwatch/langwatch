@@ -96,13 +96,20 @@ function previewStateOf({
   };
 }
 
+/** The test query never runs without a reader or under a refused condition: neither waits on it. */
 function testStateOf({
   traceId,
   tested,
+  hasReader,
+  conditionOk,
 }: {
   traceId: string | undefined;
   tested: ReturnType<typeof useBraidTestTrace>;
+  hasReader: boolean;
+  conditionOk: boolean;
 }): TestTraceProps["test"] {
+  if (!hasReader) return { state: "blocked", reason: "Pick a project to braid into first." };
+  if (!conditionOk) return { state: "blocked", reason: "Fix the condition to test a trace." };
   if (!traceId) return { state: "idle" };
   if (tested.isError) return { state: "error" };
   if (!tested.data) return { state: "loading" };
@@ -197,7 +204,12 @@ export function BraidDialog({
     change({ where: withSignedCalls({ where: draft.where, on, key: entryKey }) });
 
   const previewState = previewStateOf({ hasReader: !!reader, conditionOk: check.ok, preview });
-  const testState = testStateOf({ traceId: testedTraceId, tested });
+  const testState = testStateOf({
+    traceId: testedTraceId,
+    tested,
+    hasReader: !!reader,
+    conditionOk: check.ok,
+  });
   const disabledReason = saveBlockedReason({
     hasReader: !!reader,
     conditionOk: check.ok,

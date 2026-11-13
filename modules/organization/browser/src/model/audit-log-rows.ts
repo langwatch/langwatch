@@ -1,8 +1,9 @@
 /** How the audit feed reads its rows: a verb phrase per action, an actor per row, runs grouped. */
 
 import { BRAID_AUDIT_TARGET_KIND } from "@langwatch/authz-contract";
+import { formatInstant } from "@langwatch/design-system/describe-instant";
 import type { EnrichedAuditLog } from "@langwatch/organization-contract";
-import { format, isSameCalendarDay, subDays, type TimeInput } from "@langwatch/time";
+import { format, isSameCalendarDay, subDays, type TimeInput, toEpochMs } from "@langwatch/time";
 
 const PAST: Readonly<Record<string, string>> = {
   accept: "Accepted",
@@ -306,10 +307,19 @@ export function auditChangeSummary({
 
 export type AuditFeedDay<T> = { label: string; heading: string; runs: AuditRun<T>[] };
 
-/** "Today · Oct 10, 2026" for the two relative days; else the full date alone. */
-export function auditDayHeading({ at, now }: { at: TimeInput; now: TimeInput }): string {
+/** "Today · 10 Oct 2026" for the two relative days, else the date alone; in the reader's locale. */
+export function auditDayHeading({
+  at,
+  now,
+  locale,
+}: {
+  at: TimeInput;
+  now: TimeInput;
+  /** The reader's by default. */
+  locale?: string;
+}): string {
   const label = auditDayLabel({ at, now });
-  const full = format(at, "MMM d, yyyy");
+  const full = formatInstant({ epochMs: toEpochMs(at), display: "date", locale });
   return label === "Today" || label === "Yesterday" ? `${label} · ${full}` : full;
 }
 

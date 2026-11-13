@@ -1,6 +1,6 @@
 import type { Monaco } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 import {
   applyBraidConditionRefusal,
@@ -13,6 +13,14 @@ export type BraidConditionMountedEditor = {
   editor: editor.IStandaloneCodeEditor;
   monaco: Monaco;
 };
+
+/** The colour mode lands as a class on <html>; its tokens resolve only once it has. */
+function subscribeToPageClass(onChange: () => void): () => void {
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  return () => observer.disconnect();
+}
+const pageClass = () => document.documentElement.className;
 
 export const braidConditionThemeName = (dark: boolean) =>
   dark ? "braid-condition-dark" : "braid-condition-light";
@@ -59,10 +67,13 @@ export function useBraidConditionEditor({
     applyBraidConditionRefusal({ monaco: mounted.monaco, model, refusal: marked });
   }, [mounted, at, end, message, value]);
 
+  // `dark` flips before the page's class does, so the theme is redefined again once the class
+  // lands and the tokens read in the new mode.
+  const modeClass = useSyncExternalStore(subscribeToPageClass, pageClass, () => "");
   useEffect(() => {
     if (!mounted) return;
     const name = braidConditionThemeName(dark);
     defineBraidConditionTheme({ monaco: mounted.monaco, name, dark });
     mounted.monaco.editor.setTheme(name);
-  }, [mounted, dark]);
+  }, [mounted, dark, modeClass]);
 }

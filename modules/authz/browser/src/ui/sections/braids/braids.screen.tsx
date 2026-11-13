@@ -47,6 +47,9 @@ const SIGNING_KEY_QUERY_KEY = "signingKey";
 /** The braid dialog is URL-routed: `?braid=new`, or `?braid=<id>` for Edit. */
 const BRAID_QUERY_KEY = "braid";
 
+/** The header already ends on a rule: a band that opens the body draws none of its own. */
+const NO_RULE_UNDER_HEADER = { "& > section:first-child": { borderTopWidth: 0, paddingTop: 0 } };
+
 /** Where `?section=` scrolls to. */
 const SECTION_ANCHORS: Record<BraidsSection, string> = {
   into: "braids-shown-elsewhere",
@@ -345,7 +348,7 @@ export default function BraidsScreen() {
           />
         }
       />
-      <Stack gap={0}>
+      <Stack gap={0} css={NO_RULE_UNDER_HEADER}>
         <BraidsNotices paused={paused} total={total} keptToAdmins={can.showKeptToAdminsNote} />
         {total === 0 ? (
           <Box paddingBottom={6}>

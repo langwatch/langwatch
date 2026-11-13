@@ -548,6 +548,25 @@ describe("the braid dialog", () => {
     });
   });
 
+  describe("when ana tests a trace id under a refused condition", () => {
+    /** @scenario The condition is checked as it is typed */
+    it("disables Test with the reason and never asks for the trace", async () => {
+      const { user } = openDialog();
+      await pickReader(user);
+      await writeCondition(user, `${CONDITION} or attributes["team"] == "a"`);
+      await user.type(screen.getByRole("textbox", { name: "Trace id" }), "4bf92f3577b34da6");
+
+      const test = screen.getByTestId("braid-test");
+      expect(test).toBeDisabled();
+      expect(test).not.toHaveAttribute("data-loading");
+      await user.click(test);
+      expect(braidTraces.state.testTraceAsked).not.toHaveBeenCalled();
+
+      await writeCondition(user, CONDITION);
+      expect(screen.getByTestId("braid-test")).toBeEnabled();
+    });
+  });
+
   describe("when ana tests a trace id", () => {
     /** @scenario A tested trace folds the preview's example trace */
     it("folds the preview's example trace, which ana can open again", async () => {

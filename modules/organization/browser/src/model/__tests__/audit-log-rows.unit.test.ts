@@ -212,8 +212,18 @@ describe("given entries across several days", () => {
 
   /** @scenario The feed reads by day */
   it("pairs a relative day with its full date and spells older days out once", () => {
-    expect(auditDayHeading({ at: new Date(2026, 9, 10, 1, 0), now })).toBe("Today · Oct 10, 2026");
-    expect(auditDayHeading({ at: new Date(2026, 9, 8, 9, 0), now })).toBe("Oct 8, 2026");
+    const at = new Date(2026, 9, 10, 1, 0);
+    expect(auditDayHeading({ at, now, locale: "en-US" })).toBe("Today · Oct 10, 2026");
+    expect(auditDayHeading({ at: new Date(2026, 9, 8, 9, 0), now, locale: "en-US" })).toBe(
+      "Oct 8, 2026",
+    );
+  });
+
+  /** @scenario The feed reads by day */
+  it("writes the date in the reader's locale", () => {
+    const at = new Date(2026, 9, 8, 9, 0);
+    expect(auditDayHeading({ at, now, locale: "en-GB" })).toBe("8 Oct 2026");
+    expect(auditDayHeading({ at, now, locale: "de-DE" })).toBe("8. Okt. 2026");
   });
 
   /** @scenario The feed reads by day */
