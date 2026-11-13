@@ -179,7 +179,7 @@ describe("given a bound parameter whose value does not fit its declared type", (
       queryMock.mockRejectedValueOnce(
         Object.assign(
           new Error(
-            "Value 2026-09-10T00:00:00.000Z cannot be parsed as DateTime64(3) for query parameter 'start' because it isn't parsed completely: only 23 of 24 bytes was parsed: 2026-09-10T00:00:00.000.",
+            "Value last tuesday cannot be parsed as DateTime64(3) for query parameter 'start' because it isn't parsed completely: only 0 of 12 bytes was parsed: .",
           ),
           { code: "457", type: "BAD_QUERY_PARAMETER" },
         ),
@@ -206,6 +206,37 @@ describe("given a bound parameter whose value does not fit its declared type", (
         fault: "customer",
         httpStatus: 400,
         meta: { parameter: "start" },
+      });
+    });
+  });
+});
+
+describe("given date-time parameters bound as ISO instants", () => {
+  describe("when the executor sends them", () => {
+    /** @scenario "An ISO instant bound to a date-time parameter is sent as the same moment the server can read" */
+    it("sends Unix seconds for that moment and leaves every other value as bound", async () => {
+      queryMock.mockResolvedValueOnce({ json: async () => ({ data: [], meta: [] }) });
+
+      await executor.execute({
+        sql:
+          "SELECT count() FROM analytics.traces WHERE OccurredAt >= {start:DateTime64(3, 'UTC')}" +
+          " AND toStartOfDay(OccurredAt) = {day:DateTime} AND OccurredAt < {end:Nullable(DateTime64(3))}" +
+          " AND TraceId = {label:String}",
+        parameters: {
+          start: "2026-11-01T00:00:00Z",
+          day: "2026-11-01T02:00:00+02:00",
+          end: "2026-11-02 00:00:00.000",
+          label: "2026-11-01T00:00:00Z",
+        },
+        projectIds: PROJECT_IDS,
+        tenantCapability: TENANT_A_CAPABILITY,
+      });
+
+      expect(queryMock.mock.lastCall?.[0].query_params).toEqual({
+        start: "1793491200.000000000",
+        day: "1793491200",
+        end: "2026-11-02 00:00:00.000",
+        label: "2026-11-01T00:00:00Z",
       });
     });
   });

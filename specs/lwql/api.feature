@@ -569,9 +569,16 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   @unit
   Scenario: A parameter value that does not fit its declared type is refused with the parameter named
     Given a query declaring {start:DateTime64(3)}
-    When the request binds start to a value the server cannot read as that type, such as an ISO string ending in Z
+    When the request binds start to a value the server cannot read as that type, such as "last tuesday"
     Then the query is refused with error code lwql_parameter_invalid at HTTP 400, a customer fault
     And the refusal names the parameter and nothing else from the server's message
+
+  @unit
+  Scenario: An ISO instant bound to a date-time parameter is sent as the same moment the server can read
+    Given a query declaring {start:DateTime64(3, 'UTC')} and {day:DateTime}
+    When the request binds start to "2026-11-01T00:00:00Z" and day to "2026-11-01T02:00:00+02:00"
+    Then the server receives each as Unix seconds for that moment, start with its fraction and day whole
+    And a value that is not an ISO instant with an offset is sent exactly as the caller bound it
 
   @unit
   Scenario: A missing column passed to a function is named in the refusal
