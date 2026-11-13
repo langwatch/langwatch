@@ -1,4 +1,7 @@
-import type { GovernanceIngestionSource } from "@langwatch/enterprise-governance-contract";
+import {
+  INGESTION_SOURCE_LIVE_STATUSES,
+  type GovernanceIngestionSource,
+} from "@langwatch/enterprise-governance-contract";
 import { skipTenantCheck } from "@langwatch/prisma-client";
 import {
   type Prisma,
@@ -194,7 +197,7 @@ export class PrismaIngestionSourceRepository extends IngestionSourceRepository {
   /** The `where` is `ingestionSourceStatusIsOff` as SQL: a row that is off is never written. */
   async recordEventReceived(id: string, at: Instant): Promise<void> {
     await this.database.ingestionSource.updateMany({
-      where: { id, status: { in: ["active", "awaiting_first_event"] } },
+      where: { id, status: { in: [...INGESTION_SOURCE_LIVE_STATUSES] } },
       data: { lastEventAt: toDate(at), status: "active" },
     });
   }

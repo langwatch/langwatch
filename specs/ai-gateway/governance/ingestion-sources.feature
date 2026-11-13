@@ -841,6 +841,13 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
     Then the source stays disabled
 
   @unit
+  Scenario: A pull run completing after the source is disabled does not re-enable it
+    Given a pull run that delivered events was still being recorded when the admin disabled its source
+    When the run's outcome is mirrored onto the source
+    Then the source stays disabled
+    And its cursor, error count and last success still reflect the run
+
+  @unit
   Scenario: The first batch a source receives makes it active
     Given a source still awaiting its first event
     When a batch is stamped as received

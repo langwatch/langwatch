@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  INGESTION_SOURCE_LIVE_STATUSES,
   ingestionSourceIsLive,
   ingestionSourceStatusIsOff,
 } from "../features/ingestion/source-health.ts";
@@ -31,5 +32,14 @@ describe("ingestionSourceStatusIsOff", () => {
     expect(ingestionSourceStatusIsOff("paused")).toBe(true);
     expect(ingestionSourceStatusIsOff("active")).toBe(false);
     expect(ingestionSourceStatusIsOff("awaiting_first_event")).toBe(false);
+  });
+});
+
+describe("INGESTION_SOURCE_LIVE_STATUSES", () => {
+  it("lists exactly the statuses the predicate calls live, for the writes that filter on it", () => {
+    expect(INGESTION_SOURCE_LIVE_STATUSES).toEqual(["active", "awaiting_first_event"]);
+    for (const status of INGESTION_SOURCE_LIVE_STATUSES) {
+      expect(ingestionSourceStatusIsOff(status)).toBe(false);
+    }
   });
 });

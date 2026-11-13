@@ -12,8 +12,15 @@ import type { Instant } from "@langwatch/time";
  * lint rule reports any other spelling in the governance module.
  */
 
-/** The statuses that take events. Anything else, a status no release knows included, is off. */
-const LIVE_STATUSES: ReadonlySet<string> = new Set(["active", "awaiting_first_event"]);
+/**
+ * The statuses that take events. Anything else, a status no release knows included, is off.
+ *
+ * Exported for the one reader that cannot call a function: a database write that must skip a
+ * row that is off builds its `status in (...)` predicate from this list.
+ */
+export const INGESTION_SOURCE_LIVE_STATUSES = ["active", "awaiting_first_event"] as const;
+
+const LIVE_STATUSES: ReadonlySet<string> = new Set(INGESTION_SOURCE_LIVE_STATUSES);
 
 /** An admin switched the source off (archiving does too), or the status is one no rule names. */
 export function ingestionSourceStatusIsOff(status: string): boolean {
