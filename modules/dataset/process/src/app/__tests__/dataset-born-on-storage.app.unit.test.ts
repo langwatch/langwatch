@@ -239,3 +239,26 @@ describe("copying a dataset kept in the Postgres records table", () => {
     ]);
   });
 });
+
+describe("adding rows to a dataset kept in object storage", () => {
+  /** @scenario "Rows added to a dataset in object storage come back with the ids they were stored under" */
+  it("answers the stored ids, so deleting them removes the rows", async () => {
+    const app = createDatasetTestApp({ repositories: MemoryDatasetRepositories.create() });
+    const dataset = await app.upsertDataset({ projectId, name: "Added Rows", columnTypes });
+
+    const added = await app.batchCreateRecords({
+      slugOrId: dataset.slug,
+      projectId,
+      entries: [{ question: "first" }, { question: "second" }, { question: "third" }],
+    });
+    const page = await app.getDatasetPage({ projectId, slugOrId: dataset.id, page: 1, limit: 10 });
+
+    expect(page.datasetRecords.map((record) => record.id)).toEqual(added.map((row) => row.id));
+    const removed = await app.deleteMatchingRecords({
+      slugOrId: dataset.slug,
+      projectId,
+      recordIds: added.slice(1).map((row) => row.id),
+    });
+    expect(removed.deletedCount).toBe(2);
+  });
+});
