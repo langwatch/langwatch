@@ -1,6 +1,6 @@
 // What the reader will see: its traces over 7 days getting every, some or none of the owner's
 // spans with the pair's live braids and this one, the spans this one adds, the calls held back for
-// want of a signature, an example trace and one tested trace, seen by you only.
+// want of a signature and an example trace; TestTrace runs one trace id, seen by you only.
 
 import { Banner } from "@langwatch/design-system/banner";
 import { Card } from "@langwatch/design-system/card";
@@ -47,6 +47,9 @@ export type BraidPreviewPanelProps = {
       };
   unsignedWarning: boolean;
   viewers: string | undefined;
+};
+
+export type TestTraceProps = {
   test:
     | { state: "idle" | "loading" | "error" | "not-found" }
     | { state: "ready"; rows: TestTraceRow[] };
@@ -165,7 +168,8 @@ function TraceRows({
   );
 }
 
-function TestTrace({ test, onTest }: Pick<BraidPreviewPanelProps, "test" | "onTest">) {
+/** One trace id run through the draft braid, shown to you only. */
+export function TestTrace({ test, onTest }: TestTraceProps) {
   const [traceId, setTraceId] = useState("");
   return (
     <Stack gap={2}>
@@ -291,7 +295,6 @@ export function BraidPreviewPanel(props: BraidPreviewPanelProps) {
           {`Without signing, any caller that sets this tag can get spans shown in ${reader}.`}
         </Banner>
       ) : null}
-      {props.readerName ? <TestTrace test={props.test} onTest={props.onTest} /> : null}
       {props.viewers ? (
         <HStack gap={2} textStyle="sm" color="fg.muted" data-testid="braid-viewers">
           <Users size={14} aria-hidden />

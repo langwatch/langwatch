@@ -176,11 +176,6 @@ export function braidAffordances({
   };
 }
 
-/** A braid's From day, with the time when another braid on its pair starts the same day. */
-export function braidFromText({ fromMs, showsTime }: { fromMs: number; showsTime: boolean }) {
-  return `From ${format(fromMs, showsTime ? "d MMM yyyy, HH:mm" : "d MMM yyyy")}`;
-}
-
 /** Where the audit log opens on one braid's history, its chip naming both projects. */
 export function braidAuditHref({
   braidId,

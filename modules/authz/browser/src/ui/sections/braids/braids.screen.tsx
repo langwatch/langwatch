@@ -74,9 +74,17 @@ function BraidsHeader({
   /** The project the page is about; the organisation screen names none. */
   projectName?: string;
 }) {
+  const switcher = useAuthzHost().projectSwitcher();
   return (
     <PageLayout.Header
-      actions={actions}
+      actions={
+        switcher || actions ? (
+          <>
+            {switcher}
+            {actions}
+          </>
+        ) : undefined
+      }
       description={
         projectName
           ? `Show ${projectName}'s spans inside another project's traces. Nothing is copied.`

@@ -45,6 +45,8 @@ import { BraidPairBraids } from "../../blocks/braids/dialog/braid-pair-braids.ts
 import {
   BraidPreviewPanel,
   type BraidPreviewPanelProps,
+  TestTrace,
+  type TestTraceProps,
 } from "../../blocks/braids/dialog/braid-preview-panel.tsx";
 import { BraidRouteFields } from "../../blocks/braids/dialog/braid-route-fields.tsx";
 import {
@@ -101,7 +103,7 @@ function testStateOf({
 }: {
   traceId: string | undefined;
   tested: ReturnType<typeof useBraidTestTrace>;
-}): BraidPreviewPanelProps["test"] {
+}): TestTraceProps["test"] {
   if (!traceId) return { state: "idle" };
   if (tested.isError) return { state: "error" };
   if (!tested.data) return { state: "loading" };
@@ -274,6 +276,7 @@ export function BraidDialog({
             onFrom={(fromMs) => change({ fromMs })}
             onEnds={(ends) => change({ ends })}
           />
+          {reader ? <TestTrace test={testState} onTest={setTestedTraceId} /> : null}
         </Stack>
         <Box position={{ base: "static", lg: "sticky" }} top={0}>
           <Card variant="nested">
@@ -285,8 +288,6 @@ export function BraidDialog({
                 !!reader && check.ok && draft.where.trim().length > 0 && verifiedKey === undefined
               }
               viewers={viewers.data ? viewersPhrase(viewers.data) : undefined}
-              test={testState}
-              onTest={setTestedTraceId}
             />
           </Card>
         </Box>

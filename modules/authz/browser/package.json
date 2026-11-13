@@ -29,6 +29,8 @@
     "@langwatch/enterprise-billing-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/module": "workspace:*",
+    "@langwatch/project-client": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
     "@langwatch/role-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-client": "workspace:*",

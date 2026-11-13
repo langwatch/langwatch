@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 import {
   braidAffordances,
   braidAuditHref,
-  braidFromText,
   braidProject,
   braidsPlanState,
   braidsSigningKeysHref,
@@ -167,9 +166,5 @@ describe("when two braids on one pair start the same day", () => {
         projects: [],
       }).map((row) => row.fromShowsTime),
     ).toEqual([true, true]);
-    expect(braidFromText({ fromMs: morning, showsTime: true })).toMatch(
-      /^From 1 Oct 2026, \d\d:\d\d$/,
-    );
-    expect(braidFromText({ fromMs: morning, showsTime: false })).toBe("From 1 Oct 2026");
   });
 });

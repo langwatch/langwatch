@@ -6308,6 +6308,12 @@ importers:
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
+      '@langwatch/project-client':
+        specifier: workspace:*
+        version: link:../../project/client
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
       '@langwatch/role-contract':
         specifier: workspace:*
         version: link:../../role/contract

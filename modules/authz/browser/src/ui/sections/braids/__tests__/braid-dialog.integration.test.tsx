@@ -160,7 +160,7 @@ describe("the braid dialog", () => {
         "orchestrator already sees spans from 1 braid from specialists",
       );
       expect(within(pair).getByText(CONDITION)).toBeInTheDocument();
-      expect(pair).toHaveTextContent("From 1 Oct 2026 · No end date");
+      expect(pair).toHaveTextContent(/From .*2026 · No end date/);
     });
 
     it("says nothing when the reader has none", async () => {

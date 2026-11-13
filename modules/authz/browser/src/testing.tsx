@@ -10,7 +10,7 @@ import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
 import { ContactSalesToken } from "@langwatch/enterprise-billing-client";
 import { render } from "@testing-library/react";
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 
 import {
   AuthzHostApi,
@@ -37,6 +37,7 @@ export class FakeAuthzHost extends AuthzHostApi {
       plan?: AuthzPlanReading;
       query?: Readonly<Record<string, string | undefined>>;
       structure?: AuthzOrganizationStructure;
+      projectSwitcher?: ReactNode;
     } = {},
   ) {
     super();
@@ -80,6 +81,10 @@ export class FakeAuthzHost extends AuthzHostApi {
 
   failed(failure: AuthzFailureNotice): void {
     this.failures.push(failure);
+  }
+
+  projectSwitcher(): ReactNode | null {
+    return this.options.projectSwitcher ?? null;
   }
 }
 

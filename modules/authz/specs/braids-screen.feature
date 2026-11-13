@@ -24,6 +24,11 @@ Feature: The Braids screen
       And it offers New braid and a link to the guide in the page header
       And it shows tabs for braids into other projects, braids from other projects and signing keys, each with its count
 
+    @integration
+    Scenario: The project Braids page header offers the project switcher
+      When ana opens Braids in the project settings
+      Then the page header offers the project switcher, so she can open another project's braids
+
   Rule: The dialog builds a braid and shows what the reader will see
 
     @integration

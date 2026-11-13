@@ -5,6 +5,7 @@
 
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@langwatch/trace-client", async () => ({
@@ -28,11 +29,13 @@ function renderAs({
   isEnterprise = true,
   projectId = "p-spec",
   query = {},
+  projectSwitcher,
 }: {
   grants?: Set<string>;
   isEnterprise?: boolean;
   projectId?: string;
   query?: Record<string, string>;
+  projectSwitcher?: ReactNode;
 } = {}) {
   const host = new FakeAuthzHost({
     scope: { organizationId: "org-1", projectId },
@@ -40,6 +43,7 @@ function renderAs({
     plan: { isEnterprise, isLoading: false },
     structure: STRUCTURE,
     query,
+    projectSwitcher,
   });
   return renderWithAuthzHost(<BraidsScreen />, host);
 }
@@ -59,6 +63,12 @@ async function openRowMenu() {
 
 describe("BraidsScreen", () => {
   describe("given an Enterprise organisation", () => {
+    /** @scenario The project Braids page header offers the project switcher */
+    it("The project Braids page header offers the project switcher", () => {
+      renderAs({ projectSwitcher: <button type="button">specialists</button> });
+      expect(screen.getByRole("button", { name: "specialists" })).toBeInTheDocument();
+    });
+
     /** @scenario A project with no braids says what a braid does */
     it("A project with no braids says what a braid does", () => {
       renderAs();

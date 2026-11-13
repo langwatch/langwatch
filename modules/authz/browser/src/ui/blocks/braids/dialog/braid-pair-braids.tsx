@@ -3,13 +3,11 @@
 
 import type { AuthzBraid } from "@langwatch/authz-contract";
 import { Card } from "@langwatch/design-system/card";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import { Stack, Text } from "@langwatch/design-system/primitives";
-import { format } from "@langwatch/time";
 
 import { pairBraidsPhrase } from "../../../../model/braids/braid-draft.ts";
 import { BraidCondition } from "../../../elements/braid-condition.tsx";
-
-const day = (ms: number) => format(ms, "d MMM yyyy");
 
 export function BraidPairBraids({
   readerName,
@@ -31,9 +29,14 @@ export function BraidPairBraids({
           <Stack key={braid.braidId} gap={1} data-testid="braid-pair-braid">
             <BraidCondition where={braid.where} />
             <Text textStyle="xs" color="fg.muted">
-              {`From ${day(braid.fromMs)} · ${
-                braid.expiresAtMs === null ? "No end date" : `Until ${day(braid.expiresAtMs)}`
-              }`}
+              From <FormattedDate value={braid.fromMs} display="date" /> ·{" "}
+              {braid.expiresAtMs === null ? (
+                "No end date"
+              ) : (
+                <>
+                  Until <FormattedDate value={braid.expiresAtMs} display="date" />
+                </>
+              )}
             </Text>
           </Stack>
         ))}

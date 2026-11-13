@@ -12,7 +12,10 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
 import { useDrawer } from "@langwatch/browser-host/drawer";
-import { useMemo, type ReactNode } from "react";
+import { useLent } from "@langwatch/browser-host/lent";
+import { ProjectSwitcherToken } from "@langwatch/project-client";
+import type { ProjectSwitcherProps } from "@langwatch/project-contract";
+import { Suspense, useMemo, type ComponentType, type ReactNode } from "react";
 
 import {
   AuthzHostApi,
@@ -39,6 +42,7 @@ class HostServiceAuthzHost extends AuthzHostApi {
       setQuery: AuthzHostApi["setQuery"];
       openOverlay: <Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>) => void;
       closeOverlay: () => void;
+      Switcher: ComponentType<ProjectSwitcherProps> | undefined;
     },
   ) {
     super();
@@ -86,6 +90,17 @@ class HostServiceAuthzHost extends AuthzHostApi {
   failed(failure: AuthzFailureNotice): void {
     this.deps.feedback.failed(failure);
   }
+
+  /** The switcher project lends by token (ARCHITECTURE §10), as the Secrets page header. */
+  projectSwitcher(): ReactNode | null {
+    const { Switcher } = this.deps;
+    if (!Switcher) return null;
+    return (
+      <Suspense fallback={null}>
+        <Switcher />
+      </Suspense>
+    );
+  }
 }
 
 /**
@@ -98,6 +113,7 @@ export default function AuthzHostMount({ children }: { children?: ReactNode }) {
   const { openDrawer, closeDrawer } = useDrawer();
   const { query } = route.reading();
   const { organizationId, projectId } = useUiScope().activeScope();
+  const Switcher = useLent(ProjectSwitcherToken);
   // The plan tier only: the session-cached read, not the monthly usage count.
   const activePlan = authzApi.plan.getActivePlan.useQuery(
     { organizationId: organizationId ?? "" },
@@ -142,6 +158,7 @@ export default function AuthzHostMount({ children }: { children?: ReactNode }) {
         setQuery: (next, options) => route.setQuery(next, options),
         openOverlay: (drawer, props) => openDrawer(drawer, props),
         closeOverlay: () => closeDrawer(),
+        Switcher,
       }),
     [
       organizationId,
@@ -154,6 +171,7 @@ export default function AuthzHostMount({ children }: { children?: ReactNode }) {
       route,
       openDrawer,
       closeDrawer,
+      Switcher,
     ],
   );
   return <AuthzHostProvider value={host}>{children}</AuthzHostProvider>;

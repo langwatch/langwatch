@@ -7,6 +7,7 @@ import type { SigningKeysPanelProps } from "@langwatch/api-key-client";
 import type { SigningKey } from "@langwatch/api-key-contract";
 import type { WireOf } from "@langwatch/api/web";
 import { AccessState } from "@langwatch/design-system/access-state";
+import { Banner } from "@langwatch/design-system/banner";
 import type { SnippetCopy } from "@langwatch/design-system/code-preview";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { EmptyValue } from "@langwatch/design-system/empty-value";
@@ -16,7 +17,7 @@ import { MoreVerticalIcon } from "@langwatch/design-system/icons";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import { Alert, Badge, Button, Text, VStack } from "@langwatch/design-system/primitives";
+import { Badge, Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Key, Plus } from "lucide-react";
@@ -281,12 +282,11 @@ export function SigningKeysPanel({ projectId }: SigningKeysPanelProps) {
     );
   } else if (keys.isError) {
     body = (
-      <Alert.Root status="error" data-testid="signing-keys-error">
-        <Alert.Indicator />
-        <Alert.Content>
-          <Alert.Title>Couldn&apos;t load this project&apos;s signing keys</Alert.Title>
-        </Alert.Content>
-      </Alert.Root>
+      <Banner
+        status="error"
+        title="Couldn't load this project's signing keys"
+        data-testid="signing-keys-error"
+      />
     );
   }
 
