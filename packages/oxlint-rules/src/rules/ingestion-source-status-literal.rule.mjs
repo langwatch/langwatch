@@ -22,10 +22,11 @@ function governsLiveness(file) {
   );
 }
 
-/** `status` or `<anything>.status`. */
+/** `status`, `<anything>.status` or `<anything>["status"]`. */
 function isStatusOperand(node) {
   if (node?.type === "Identifier") return node.name === "status";
-  if (node?.type !== "MemberExpression" || node.computed) return false;
+  if (node?.type !== "MemberExpression") return false;
+  if (node.computed) return node.property?.type === "Literal" && node.property.value === "status";
 
   return node.property?.type === "Identifier" && node.property.name === "status";
 }

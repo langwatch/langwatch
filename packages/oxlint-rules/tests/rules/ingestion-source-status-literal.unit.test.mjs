@@ -27,6 +27,23 @@ describe("given governance production code", () => {
       expect(found[0].data).toEqual({ state: "disabled", path: PROCESS });
       expect(found[0].message).toContain("ingestionSourceIsLive(source)");
     });
+
+    /** @scenario "A source status compared with the disabled state is reported" */
+    it("reports a bracketed status key the same as a dotted one", () => {
+      const found = report(
+        'export const live = (source) => source["status"] !== "disabled";',
+        PROCESS,
+      );
+
+      expect(found.map((finding) => finding.data.state)).toEqual(["disabled"]);
+    });
+
+    /** @scenario "A source status compared with the disabled state is reported" */
+    it("leaves a computed key that is not status alone", () => {
+      const found = report('export const off = (row, key) => row[key] === "disabled";', PROCESS);
+
+      expect(found).toEqual([]);
+    });
   });
 
   describe("when liveness is spelled as active or awaiting its first event", () => {
