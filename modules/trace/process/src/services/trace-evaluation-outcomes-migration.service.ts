@@ -1,4 +1,5 @@
 import type { EvaluationOutcome } from "@langwatch/evaluation-contract";
+import { isProjectGone } from "@langwatch/eventing";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 import type { RecordEvaluationOutcomeCommandData } from "@langwatch/trace-contract";
@@ -28,6 +29,8 @@ export const evaluationOutcomesBackfillReportSchema = z.object({
   outcomes: z.number(),
   /** Outcomes whose trace is not stored (aged out, or never ingested), left unrecorded. */
   skippedWithoutTrace: z.number(),
+  /** Projects archived or deleted since their evaluations, skipped whole. */
+  skippedProjects: z.number().default(0),
 });
 export type EvaluationOutcomesBackfillReport = z.infer<
   typeof evaluationOutcomesBackfillReportSchema
@@ -81,7 +84,12 @@ export class TraceEvaluationOutcomesMigrationService {
         limit: PROJECT_PAGE_SIZE,
       });
       for (const { id: projectId } of page.projects) {
-        report = await this.recordProject({ projectId, report, dryRun, signal, onPage });
+        try {
+          report = await this.recordProject({ projectId, report, dryRun, signal, onPage });
+        } catch (error) {
+          if (!isProjectGone(error)) throw error;
+          report = { ...report, skippedProjects: report.skippedProjects + 1 };
+        }
         if (signal.aborted) return report;
         report = { ...report, afterProjectId: projectId, inProject: null };
         if (!dryRun) await onPage(report);
@@ -99,6 +107,7 @@ export class TraceEvaluationOutcomesMigrationService {
       projects: 0,
       outcomes: 0,
       skippedWithoutTrace: 0,
+      skippedProjects: 0,
     };
   }
 

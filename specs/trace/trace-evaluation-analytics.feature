@@ -133,3 +133,15 @@ Feature: Each evaluation's outcome is kept beside its trace's columns
     Given a project with finished evaluations of the last 62 days on stored traces
     When the record step runs
     Then each outcome is sent once, keyed by its evaluation id and stamped with its trace's OccurredAt
+
+  @unit
+  Scenario: The backfill skips a project archived since its evaluations
+    Given a project archived since its evaluations, and a live project with a recent outcome
+    When the record step runs
+    Then the archived project is skipped and counted, and the live project's outcome is still sent
+
+  @unit
+  Scenario: The backfill still fails on any other error
+    Given a project whose outcomes cannot be read for another reason
+    When the record step runs
+    Then the step fails

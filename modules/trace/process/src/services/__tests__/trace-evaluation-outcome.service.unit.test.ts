@@ -25,7 +25,11 @@ import {
   EvaluatedTraceNotYetStoredError,
   TraceEvaluationOutcomeService,
 } from "../trace-evaluation-outcome.service.ts";
-import { TraceEvaluationOutcomesMigrationService } from "../trace-evaluation-outcomes-migration.service.ts";
+import {
+  type EvaluationOutcomesBackfillReport,
+  evaluationOutcomesBackfillReportSchema,
+  TraceEvaluationOutcomesMigrationService,
+} from "../trace-evaluation-outcomes-migration.service.ts";
 
 const TENANT = "tenant-outcomes";
 const TRACE_ID = "trace-outcomes";
@@ -318,6 +322,96 @@ describe("TraceEvaluationOutcomesMigrationService", () => {
         },
       ]);
       expect(report).toMatchObject({ projects: 1, outcomes: 2, skippedWithoutTrace: 0 });
+    });
+  });
+
+  describe("given a project archived since its evaluations", () => {
+    const archivedId = "p-archived";
+    const projects = {
+      listAllWithOrganization: async () => ({
+        projects: [
+          { id: archivedId, organizationId: "organization-1" },
+          { id: TENANT, organizationId: "organization-1" },
+        ],
+        orphanIds: [],
+        next: null,
+      }),
+    };
+
+    async function backfillWith({ failure }: { failure: Error }) {
+      const { evaluations, anchors } = await compose();
+      evaluations.outcomes.push({
+        tenantId: TENANT,
+        evaluationId: "evaluation-a",
+        traceId: TRACE_ID,
+        evaluatorName: "Faithfulness",
+        isGuardrail: false,
+        status: "processed",
+        passed: true,
+        label: null,
+        occurredAt: EVALUATED_AT,
+        lastEventId: "last-evaluation-a",
+      });
+      const sent: RecordEvaluationOutcomeCommandData[] = [];
+      const saved: EvaluationOutcomesBackfillReport[] = [];
+      const backfill = TraceEvaluationOutcomesMigrationService.create({
+        projects,
+        evaluations: {
+          listEvaluationOutcomes: async (input) => {
+            if (input.tenantId === archivedId) throw failure;
+            return evaluations.listEvaluationOutcomes(input);
+          },
+        },
+        anchors,
+        commands: { recordEvaluationOutcomes: async (data) => void sent.push(...data) },
+        now: () => EVALUATED_AT + 60_000,
+      });
+      const run = () =>
+        backfill.recordEvaluationOutcomes({
+          resumeFrom: null,
+          dryRun: false,
+          signal: new AbortController().signal,
+          onPage: async (report) => void saved.push(report),
+        });
+      return { run, sent, saved };
+    }
+
+    /** @scenario "The backfill skips a project archived since its evaluations" */
+    it("skips the project, counts it, and carries on with the next one", async () => {
+      const { run, sent, saved } = await backfillWith({
+        failure: Object.assign(new Error("Project p-archived no longer exists"), {
+          name: "ProjectNotFoundError",
+        }),
+      });
+
+      const report = await run();
+
+      expect(sent.map(({ evaluationId }) => evaluationId)).toEqual(["evaluation-a"]);
+      expect(report).toMatchObject({ projects: 1, outcomes: 1, skippedProjects: 1 });
+      expect(saved[0]).toMatchObject({ afterProjectId: archivedId, inProject: null });
+      expect(report.afterProjectId).toBe(TENANT);
+    });
+
+    /** @scenario "The backfill still fails on any other error" */
+    it("still fails the run on any other error", async () => {
+      const { run } = await backfillWith({ failure: new Error("clickhouse down") });
+
+      await expect(run()).rejects.toThrow("clickhouse down");
+    });
+  });
+
+  describe("given a report saved before projects could be skipped", () => {
+    it("reads it with no skipped projects", () => {
+      const report = evaluationOutcomesBackfillReportSchema.parse({
+        sinceMs: 1,
+        afterProjectId: null,
+        inProject: null,
+        projects: 3,
+        outcomes: 4,
+        skippedWithoutTrace: 2,
+      });
+
+      expect(report.skippedProjects).toBe(0);
     });
   });
 });
