@@ -172,7 +172,7 @@ export function TraceTree({
               <ProjectAvatar name={ownerName} size="xs" />
               <Text>Braided in</Text>
             </HStack>
-            <Text title={`${readerName}'s own spans`}>{`Grey: ${readerName}`}</Text>
+            <Text>{`${readerName}'s own`}</Text>
             {withheld ? (
               <HStack gap={1}>
                 <EyeOff size={12} aria-hidden />
