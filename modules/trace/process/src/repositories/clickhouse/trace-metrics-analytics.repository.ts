@@ -21,6 +21,7 @@ import type {
 import {
   type TraceAnalyticsMetadataColumns,
   traceAnalyticsMetadataColumns,
+  traceAnalyticsWrittenMetadataColumns,
 } from "../../rules/trace-widget-columns.rules.ts";
 import {
   TraceAnalyticsProjectionRepository,
@@ -127,7 +128,7 @@ type ClickHouseTraceAnalyticsWriteRecord = {
     _retention_days: number;
   };
 
-/** Every column the fold writes, named: ClickHouse takes a MATERIALIZED column only when listed. */
+/** Every column the fold writes, named, so a column the row lacks is never defaulted silently. */
 function writeColumns(
   records: readonly ClickHouseTraceAnalyticsWriteRecord[],
 ): [string, ...string[]] {
@@ -552,7 +553,9 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
       HasAnnotation: row.hasAnnotation,
 
       Attributes: row.attributes,
-      ...(row.metadataColumns ?? traceAnalyticsMetadataColumns(row.attributes)),
+      ...traceAnalyticsWrittenMetadataColumns(
+        row.metadataColumns ?? traceAnalyticsMetadataColumns(row.attributes),
+      ),
 
       SpanCount: Math.max(0, Math.round(row.spanCount)),
       AnnotationIds: row.annotationIds,

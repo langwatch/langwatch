@@ -32,6 +32,12 @@ Feature: The stock widgets that ran out of memory read no map and no FINAL
     Then each metadata column holds its key's value, and '' when the key is absent
 
   @unit
+  Scenario: The fold never inserts a column the database computes
+    Given a trace whose attributes carry metadata keys that goose 00126 made MATERIALIZED columns
+    When the trace_analytics fold writes its row
+    Then the insert names none of the MATERIALIZED columns and names the plain ones
+
+  @unit
   Scenario: The trace fold reads metadata.env when metadata.environment is absent
     Given a trace with metadata.env but no metadata.environment
     When the trace_analytics fold projects it

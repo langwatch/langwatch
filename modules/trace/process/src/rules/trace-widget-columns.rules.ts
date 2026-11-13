@@ -47,6 +47,33 @@ const TRACE_ANALYTICS_METADATA_COLUMN_NAMES = Object.keys(
   TRACE_ANALYTICS_METADATA_KEYS,
 ) as (keyof TraceAnalyticsMetadataColumns)[];
 
+/** The columns goose 00126 made MATERIALIZED: the database computes them, so an insert may not name them. */
+export const TRACE_ANALYTICS_MATERIALIZED_METADATA_COLUMNS: ReadonlySet<string> = new Set([
+  "MetadataOutputAction",
+  "MetadataOutcome",
+  "MetadataSentToReview",
+  "MetadataDocumentType",
+  "MetadataFlow",
+  "MetadataLanguage",
+  "MetadataSegment",
+  "MetadataTeam",
+  "MetadataTopic",
+]);
+
+/**
+ * The metadata columns the fold may insert: the plain ones only, since ClickHouse refuses a
+ * MATERIALIZED column in an INSERT even when it is listed (ILLEGAL_COLUMN).
+ */
+export function traceAnalyticsWrittenMetadataColumns(
+  columns: Readonly<Record<string, string>>,
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(columns).filter(
+      ([column]) => !TRACE_ANALYTICS_MATERIALIZED_METADATA_COLUMNS.has(column),
+    ),
+  );
+}
+
 /**
  * The metadata columns of one `trace_analytics` row, read from the trimmed attribute map the row
  * stores, so each equals the `Attributes['metadata.*']` lookup it replaces. A missing key reads ''.
