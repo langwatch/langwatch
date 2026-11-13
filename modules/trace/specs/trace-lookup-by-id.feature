@@ -24,19 +24,12 @@ Feature: Looking up a trace by id never fails for a trace that exists
     And the answer names the project it was found in
 
   @unit
-  Scenario: A trace in another project the key may not read names that project
+  Scenario: A trace in a project the key may not read stays hidden
     Given the trace is stored in another project of the same organisation
-    And the key's owner may read that project but the key may not
-    When I get the trace by its id
-    Then the answer is a trace_in_other_project error
-    And it names the project slug and the command to read it from there
-
-  @unit
-  Scenario: A trace in a project the key's owner cannot read stays hidden
-    Given the trace is stored in a project the key's owner cannot read
+    And the key may not read that project, even when the key's owner may
     When I get the trace by its id
     Then the answer is trace_not_found
-    And it does not name that project
+    And neither the answer nor what it says was searched names that project
 
   @unit
   Scenario: A fresh trace_not_found is retryable, not terminal

@@ -870,7 +870,6 @@ export const APP_ERROR_CODES = [
   "trace_export_rate_limited",
   "trace_id_ambiguous",
   "trace_ids_too_many",
-  "trace_in_other_project",
   "trace_not_evaluatable",
   "trace_not_found",
   "trace_page_size_too_large",

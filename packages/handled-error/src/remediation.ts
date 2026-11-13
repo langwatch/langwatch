@@ -103,12 +103,6 @@ const registry = {
     ],
     docsPath: "/platform/data-retention",
   },
-  trace_in_other_project: {
-    tips: [
-      "Read it from the project that holds it: `langwatch trace get <traceId> --project <projectSlug>`",
-      "Or use an API key of that project",
-    ],
-  },
   scenario_run_has_many_traces: {
     tips: [
       "Open one of the listed traces: `langwatch trace get <traceId>`",

@@ -433,11 +433,6 @@ const presentations = {
     describe: () =>
       "This project hides captured input or output from you, or an attribute policy restricts this key to an audience you are not in. Facet a named field instead, such as model, status or evaluator, or call the facets endpoint with no field to see what this project has.",
   },
-  trace_in_other_project: {
-    title: "Trace is in another project",
-    describe: () =>
-      "This trace was sent to a different project than the one you are reading. Open that project, or read it from there with --project.",
-  },
   scenario_run_has_many_traces: {
     title: "That is a scenario run id",
     describe: () => "The run produced several traces. Pick one of the listed trace ids to open it.",

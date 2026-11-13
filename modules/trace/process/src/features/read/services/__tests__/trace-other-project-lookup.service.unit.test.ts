@@ -1,9 +1,8 @@
 /**
  * @vitest-environment node
  * Spec: modules/trace/specs/trace-lookup-by-id.feature - an id that misses in the key's own
- * project is looked for in the organisation's other projects the key or its owner may read.
+ * project is looked for in the organisation's other projects the key itself may read.
  */
-import type { ApiKey, ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi, AuthzCanBatchByIdsInput } from "@langwatch/authz-contract";
 import type { ProjectApi, ProjectIdentity } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -18,7 +17,6 @@ const OTHER = "project-other";
 const HIDDEN = "project-hidden";
 const TRACE_ID = "63dc535cea6335c506bc81ef3543a07d";
 const KEY_ID = "key-1";
-const OWNER = "user-1";
 
 function identity(id: string): ProjectIdentity {
   return {
@@ -51,13 +49,6 @@ function makeService({
         listNamesByIds: async ({ projectIds }) => projectIds.map(identity),
       },
       "projects",
-    ),
-    apiKeys: createApiFixture<ApiKeyApi>(
-      {
-        findById: async () =>
-          ({ id: KEY_ID, organizationId: ORG, userId: OWNER, createdByUserId: OWNER }) as ApiKey,
-      },
-      "api keys",
     ),
     authz: createApiFixture<AuthzApi>(
       {
@@ -97,28 +88,17 @@ describe("TraceOtherProjectLookupService", () => {
 
       const result = await service.locate({ projectId: OWN, traceId: TRACE_ID, principal });
 
-      expect(result.located).toEqual({ project: identity(OTHER), keyMayRead: true });
+      expect(result.located).toEqual({ project: identity(OTHER) });
     });
   });
 
-  describe("given the trace is in another project only the key's owner may read", () => {
-    /** @scenario A trace in another project the key may not read names that project */
-    it("answers that project as not readable by the key", async () => {
-      const { service } = makeService({ holding: [OTHER], ownerReads: [OTHER], keyReads: [] });
-
-      const result = await service.locate({ projectId: OWN, traceId: TRACE_ID, principal });
-
-      expect(result.located).toEqual({ project: identity(OTHER), keyMayRead: false });
-    });
-  });
-
-  describe("given the trace is in a project the key's owner cannot read", () => {
-    /** @scenario A trace in a project the key's owner cannot read stays hidden */
-    it("never searches that project and answers nothing", async () => {
+  describe("given the trace is in a project only the key's owner may read", () => {
+    /** @scenario A trace in a project the key may not read stays hidden */
+    it("never searches or names that project", async () => {
       const { service, searchedFor } = makeService({
         holding: [HIDDEN],
-        ownerReads: [OTHER],
-        keyReads: [],
+        ownerReads: [OTHER, HIDDEN],
+        keyReads: [OTHER],
       });
 
       const result = await service.locate({ projectId: OWN, traceId: TRACE_ID, principal });
@@ -126,6 +106,7 @@ describe("TraceOtherProjectLookupService", () => {
       expect(result.located).toBeUndefined();
       expect(searchedFor).toEqual([[OTHER]]);
       expect(result.searchedProjectSlugs).toEqual([`${OTHER}-slug`]);
+      expect(JSON.stringify(result)).not.toContain(HIDDEN);
     });
   });
 

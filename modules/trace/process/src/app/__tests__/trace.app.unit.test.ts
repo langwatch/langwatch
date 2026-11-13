@@ -646,7 +646,7 @@ describe("TraceModule", () => {
             projectId === OTHER.id ? traceRow("trace-1") : undefined,
           otherProjectLookup: {
             locate: async () => ({
-              located: { project: OTHER, keyMayRead: true },
+              located: { project: OTHER },
               searchedProjectSlugs: [OTHER.slug],
             }),
           },
@@ -656,28 +656,6 @@ describe("TraceModule", () => {
 
         expect(answer.trace_id).toBe("trace-1");
         expect(answer.project).toEqual({ id: OTHER.id, slug: OTHER.slug, name: OTHER.name });
-      });
-    });
-
-    describe("given the trace is in another project only the key's owner may read", () => {
-      it("refuses with trace_in_other_project naming the project and the command", async () => {
-        const { app } = harness({
-          findById: async () => undefined,
-          otherProjectLookup: {
-            locate: async () => ({
-              located: { project: OTHER, keyMayRead: false },
-              searchedProjectSlugs: [OTHER.slug],
-            }),
-          },
-        });
-
-        await expect(get(app)).rejects.toMatchObject({
-          code: "trace_in_other_project",
-          meta: {
-            projectSlug: OTHER.slug,
-            command: "langwatch trace get trace-1 --project other-slug",
-          },
-        });
       });
     });
 

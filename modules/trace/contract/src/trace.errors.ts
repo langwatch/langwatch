@@ -56,33 +56,6 @@ export class TraceNotFoundError extends NotFoundError {
   }
 }
 
-/** The id is a trace of another project in the caller's organisation the key may not read. */
-export class TraceInOtherProjectError extends HandledError {
-  declare readonly code: "trace_in_other_project";
-
-  constructor(
-    readonly traceId: string,
-    readonly project: Readonly<{ id: string; slug: string; name: string }>,
-  ) {
-    super(
-      "trace_in_other_project",
-      `Trace ${traceId} is in project "${project.slug}". Read it from there: langwatch trace get ${traceId} --project ${project.slug}`,
-      {
-        httpStatus: 409,
-        meta: {
-          traceId,
-          projectId: project.id,
-          projectSlug: project.slug,
-          projectName: project.name,
-          command: `langwatch trace get ${traceId} --project ${project.slug}`,
-        },
-        ...remediation("trace_in_other_project"),
-      },
-    );
-    this.name = "TraceInOtherProjectError";
-  }
-}
-
 /** A scenario run id passed as a trace id, where the run produced more than one trace. */
 export class ScenarioRunHasManyTracesError extends HandledError {
   declare readonly code: "scenario_run_has_many_traces";

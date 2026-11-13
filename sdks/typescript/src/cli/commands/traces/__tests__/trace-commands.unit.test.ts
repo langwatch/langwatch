@@ -936,8 +936,8 @@ describe("getTraceCommand()", () => {
 
     it("does not retry a failure the platform did not mark retryable", async () => {
       mockGet.mockRejectedValue(
-        Object.assign(new Error("Trace in another project"), {
-          code: "trace_in_other_project",
+        Object.assign(new Error("That is a scenario run id"), {
+          code: "scenario_run_has_many_traces",
           retryable: false,
         }),
       );

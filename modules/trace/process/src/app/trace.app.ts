@@ -185,7 +185,6 @@ import {
   type TraceServerConfig,
   traceConfig,
   TraceIdAmbiguousError,
-  TraceInOtherProjectError,
   TraceNotFoundError,
   type TraceListTracesInput,
   type TraceFindTraceInput,
@@ -899,8 +898,6 @@ type TraceReaderCompositionOptions = {
    * addresses raise by name rather than admitting an unauthenticated caller.
    */
   apiKeys?: Pick<ApiKeyApi, "findResolvedToken" | "markUsed"> | undefined;
-  /** Who a key acts for, so a by-id miss can look through the owner's other projects. */
-  apiKeyOwners?: Pick<ApiKeyApi, "findById"> | undefined;
   /**
    * The ingestion doors' duplicate claim. Required: the doors are mounted on
    * every process that composes Trace's REST surface, and a claim that is
@@ -1042,7 +1039,6 @@ export class TraceModule implements TraceApi, CollectorApp {
           rateLimiter: repositories.rateLimits,
           slots: repositories.exportSlots,
         }),
-        apiKeyOwners: dependencies.apiKeys,
         presence: dependencies.presence,
         broadcast: dependencies.presence,
         tenantBroadcast: dependencies.presence,
@@ -1350,16 +1346,11 @@ export class TraceModule implements TraceApi, CollectorApp {
             }),
           }
         : {}),
-      ...(options.apiKeyOwners
-        ? {
-            otherProjectLookup: TraceOtherProjectLookupService.create({
-              projects: options.projects,
-              apiKeys: options.apiKeyOwners,
-              authz: options.protections.authz,
-              existence: options.repositories.existence,
-            }),
-          }
-        : {}),
+      otherProjectLookup: TraceOtherProjectLookupService.create({
+        projects: options.projects,
+        authz: options.protections.authz,
+        existence: options.repositories.existence,
+      }),
       ...(options.ingestAllowance ? { ingestAllowance: options.ingestAllowance } : {}),
       ingestSourceBilling,
       publicBaseUrl: options.publicBaseUrl,
@@ -3879,9 +3870,6 @@ export class TraceModule implements TraceApi, CollectorApp {
           })
         : { searchedProjectSlugs: [] };
       const located = lookup.located;
-      if (located && !located.keyMayRead) {
-        throw new TraceInOtherProjectError(normalisedId, located.project);
-      }
       if (located) {
         const served = await this.#renderTraceForApiKey({
           ...input,
