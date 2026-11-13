@@ -31,7 +31,7 @@ const PAUSE_KEY = `global/projection/${LANE}`;
 const MAP_LANE = "directoryMemberRows";
 const FROM_START = "1970-01-01T00:00:00Z";
 const BASE_MS = 1_700_000_000_000;
-/** Rows a map accumulator buffers before it drains mid-stream (replayExecutor's write batch size). */
+/** Rows a map accumulator buffers before it drains mid-stream (replayExecutor write batch). */
 const MAP_DRAIN_ROWS = 5000;
 
 type Matching = { eventTypes: readonly string[]; sinceMs?: number; tenantId?: string };
