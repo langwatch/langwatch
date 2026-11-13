@@ -47,7 +47,11 @@ const TRACE_ANALYTICS_METADATA_COLUMN_NAMES = Object.keys(
   TRACE_ANALYTICS_METADATA_KEYS,
 ) as (keyof TraceAnalyticsMetadataColumns)[];
 
-/** The columns goose 00126 made MATERIALIZED: the database computes them, so an insert may not name them. */
+/**
+ * The 9 columns goose 00126 made MATERIALIZED, left to the database (its expression computes the same
+ * value from Attributes): in prod the fold's insert of them failed with ILLEGAL_COLUMN despite
+ * insert_allow_materialized_columns. The ADR-006 REMOVE MATERIALIZED step waits until the fold writes them.
+ */
 export const TRACE_ANALYTICS_MATERIALIZED_METADATA_COLUMNS: ReadonlySet<string> = new Set([
   "MetadataOutputAction",
   "MetadataOutcome",
@@ -61,8 +65,8 @@ export const TRACE_ANALYTICS_MATERIALIZED_METADATA_COLUMNS: ReadonlySet<string> 
 ]);
 
 /**
- * The metadata columns the fold may insert: the plain ones only, since ClickHouse refuses a
- * MATERIALIZED column in an INSERT even when it is listed (ILLEGAL_COLUMN).
+ * The metadata columns the fold inserts: the plain ones. The MATERIALIZED nine are left to the
+ * database, see TRACE_ANALYTICS_MATERIALIZED_METADATA_COLUMNS.
  */
 export function traceAnalyticsWrittenMetadataColumns(
   columns: Readonly<Record<string, string>>,

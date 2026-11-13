@@ -53,8 +53,8 @@ const READ_BACK_FOLD_INSERT_SETTINGS = {
   async_insert: 1,
   wait_for_async_insert: 1,
   input_format_skip_unknown_fields: 0,
-  // Goose 00126's metadata columns stay MATERIALIZED for older writers until the contract step;
-  // the fold writes them itself, which takes this and a named column list (analytics ADR-006).
+  // The fold no longer sends goose 00126's MATERIALIZED columns (see
+  // traceAnalyticsWrittenMetadataColumns). Kept for when it writes them again (ADR-006 step 4).
   insert_allow_materialized_columns: 1,
 } as const;
 
