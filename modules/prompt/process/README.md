@@ -585,7 +585,7 @@ type Response = z.infer<typeof promptWireSchema>; // ../contract/src/prompt-rest
 
 Delete a prompt
 
-Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:448`.
+Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:450`.
 
 Answers at `/api/prompts/:id{.+}`, `/api/v1/prompts/:id{.+}`.
 
