@@ -82,7 +82,10 @@ export function isCallerParameterRefusal({ error }: { error: unknown }): boolean
 
 const RATE_LIMITED_CODE: ReadonlySet<unknown> = new Set<unknown>(["lwql_rate_limited"]);
 
-/** Whether a handled error is the project's own query volume over its limit, not a failed statement. */
+/**
+ * Whether a handled error is the project's own query volume over its limit, not a failed
+ * statement.
+ */
 export function isCallerRateLimit({ error }: { error: unknown }): boolean {
   return RATE_LIMITED_CODE.has((error as { code?: unknown } | null)?.code);
 }

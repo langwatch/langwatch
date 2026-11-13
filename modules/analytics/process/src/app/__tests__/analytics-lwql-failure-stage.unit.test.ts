@@ -17,7 +17,7 @@ import {
 } from "@langwatch/observability/metrics/testing";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { TestLogLines } from "@langwatch/test-harness";
+import type { TestLogLine } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, afterEach, beforeEach, vi } from "vitest";
@@ -31,7 +31,7 @@ import { project } from "../../services/__tests__/project.fixture.ts";
 import { analyticsTestSecrets } from "./analytics-secrets.fixture.ts";
 
 const QUERY_FAILURE_LOGGER = "langwatch:analytics:lwql:query-failure";
-const failureLog = vi.hoisted(() => ({ lines: [] as unknown as TestLogLines }));
+const failureLog = vi.hoisted((): { lines: TestLogLine[] } => ({ lines: [] }));
 
 // Only the failure logger is replaced, so the module's other loggers stay real.
 vi.mock("@langwatch/observability", async (importOriginal) => {
