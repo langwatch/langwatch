@@ -316,7 +316,10 @@ export class DatasetContentService implements DatasetContent {
     dataset: Dataset;
     input: CreateDatasetRecordsInput;
   }): Promise<DatasetRecord[]> {
-    const forcedIds = input.entries.map((entry) => entry.id);
+    // Ids are minted here, not in the append, so the records returned carry the stored ids.
+    const forcedIds = input.entries.map(
+      (entry) => entry.id ?? generate(RECORD_KSUID_RESOURCE).toString(),
+    );
     const entries = input.entries.map(({ id: _id, ...entry }) => entry);
     entries.forEach((entry) => assertStoredRowWithinLimit(entry));
     const storage = this.storage;

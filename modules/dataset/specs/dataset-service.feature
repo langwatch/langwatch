@@ -249,3 +249,10 @@ Feature: Shared Dataset service
     When its records are read, listed or copied
     Then it reads as an empty dataset
     And only a dataset with no chunk count recorded is refused as drift
+
+  @unit
+  Scenario: Records added to a dataset stored in chunks answer with the ids they were stored under
+    Given a new dataset, stored in chunks
+    When records are added without ids
+    Then each record returned carries the id it was stored under
+    And those ids update and delete the stored records
