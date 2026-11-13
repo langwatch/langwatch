@@ -27,6 +27,8 @@ import type {
 import { NurturingCopiedProjectsService } from "../nurturing-copied-projects.service.ts";
 import { NurturingOrganizationUsageService } from "../nurturing-organization-usage.service.ts";
 
+type UsageDependencies = Parameters<typeof NurturingOrganizationUsageService.create>[0];
+
 /** The service's logger, to read what it reported. */
 const { logger, lines } = createTestLogger();
 
@@ -72,8 +74,8 @@ async function serviceOver({
   createdAt?: ReadonlyMap<string, number>;
   send?: (calls: CioBatchCall[]) => Promise<void>;
   members?: MembersCopy;
-  logger?: Omit<ReturnType<typeof spyLogger>, "syncs">;
-  syncs?: { inc: (attributes?: Record<string, unknown>) => void };
+  logger?: UsageDependencies["logger"];
+  syncs?: UsageDependencies["syncs"];
 }) {
   const projectUsage = MemoryNurturingProjectUsageRepository.create();
   const traceDays = MemoryNurturingTraceDayRepository.create();
