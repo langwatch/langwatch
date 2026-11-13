@@ -435,7 +435,7 @@ export type TrpcProcedureRequest<TContext extends object> = Readonly<{
   furtherPermissions?: readonly TrpcFurtherPermission[];
   /** Present exactly when the procedure asks the tenant to hold an entitlement. */
   entitlement?: EntitlementGate;
-  /** Present exactly when the procedure mints a credential: the permission its refusal names. */
+  /** Present exactly when the procedure mints a credential. */
   mintsCredential?: true;
   /** Present exactly when a mutation is refused on an aggregate though its permission is exempt. */
   refusedOnAggregate?: true;
