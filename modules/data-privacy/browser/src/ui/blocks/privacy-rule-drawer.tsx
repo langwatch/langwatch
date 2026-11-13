@@ -51,6 +51,7 @@ export function PrivacyRuleDrawer({
   effectiveOrganization,
   projectId,
   isSaving,
+  piiRedactionModelOffered = false,
   onSave,
   scopePicker,
 }: {
@@ -63,6 +64,8 @@ export function PrivacyRuleDrawer({
   effectiveOrganization: ResolvedDataPrivacy | null;
   projectId: string;
   isSaving: boolean;
+  /** Shows what the PII level runs and its example (release_pii_redaction_model_enabled). */
+  piiRedactionModelOffered?: boolean;
   onSave: (scopes: PrivacyScopeEntry[], config: DataPrivacyConfig) => void;
   /** Renders the scope picker in add mode, wired to `value` and `onChange`. */
   scopePicker: (props: {
@@ -196,6 +199,7 @@ export function PrivacyRuleDrawer({
         <PiiRedactionFields
           form={form}
           inheritedLevel={inheritedBaseline.pii.level}
+          piiRedactionModelOffered={piiRedactionModelOffered}
           onChange={update}
         />
 

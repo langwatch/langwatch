@@ -22,6 +22,7 @@ import {
 } from "../../model/pii-entity-labels.ts";
 import { PatternListField } from "../elements/pattern-list-field.tsx";
 import { PiiEntityToggleGroup } from "../elements/pii-entity-toggle-group.tsx";
+import { PiiRedactionLevelDetail } from "./pii-redaction-level-detail.tsx";
 
 type PiiFields = Pick<RuleFormState, "piiChoice" | "piiEntities" | "piiExceptPatterns">;
 
@@ -57,10 +58,13 @@ function HelpTip({ content }: { content: string }) {
 export function PiiRedactionFields({
   form,
   inheritedLevel,
+  piiRedactionModelOffered = false,
   onChange,
 }: {
   form: PiiFields;
   inheritedLevel: PiiLevel;
+  /** What the level runs, Strict's price and the example (release_pii_redaction_model_enabled). */
+  piiRedactionModelOffered?: boolean;
   onChange: (patch: Partial<PiiFields>) => void;
 }) {
   const toggleEntity = (entity: string) =>
@@ -124,6 +128,11 @@ export function PiiRedactionFields({
         <Text fontSize="xs" color="fg.muted" textAlign="end">
           {inheritedHint(PII_VALUE_LABELS[inheritedLevel])}
         </Text>
+      )}
+      {piiRedactionModelOffered && (
+        <PiiRedactionLevelDetail
+          level={form.piiChoice === "inherit" ? inheritedLevel : form.piiChoice}
+        />
       )}
       {form.piiChoice === "custom" && (
         <VStack align="stretch" gap={3} paddingLeft={6}>
