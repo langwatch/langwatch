@@ -1,4 +1,5 @@
 import fs from "node:fs";
+
 import { afterAll } from "vitest";
 
 import { isolateHome } from "./__tests__/helpers/isolate-home";
