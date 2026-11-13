@@ -461,7 +461,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
         : Promise.resolve([]),
       ids.apiKey.size > 0
         ? this.database.apiKey.findMany({
-            // A system-managed key (a staff access key) is never a grant to manage, so listings drop it.
+            // A system-managed key (a staff access key) is no grant to manage: listings drop it.
             where: {
               id: { in: [...ids.apiKey] },
               organizationId,

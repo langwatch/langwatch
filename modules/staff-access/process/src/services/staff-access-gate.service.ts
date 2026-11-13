@@ -44,32 +44,6 @@ type Refusal =
   | StaffContentNotApprovedError
   | StaffWriteNotAllowedError;
 
-/**
- * What a live session may do on a route, failing closed (ADR-202). A read passes unless it serves
- * content to a key without `org:content`. A write never removes or disables a record; without the
- * spend tick it passes only when every permission it asks is a dataset write.
- */
-function routeRefusal({
-  session,
-  request,
-}: {
-  session: StaffAccessRequestRow;
-  request: RestStaffAccessRequest;
-}): Refusal | null {
-  if (request.spends && !session.spendApproved) return new StaffSpendNotApprovedError();
-  if (request.servesContent && !session.scopes.includes("org:content")) {
-    return new StaffContentNotApprovedError();
-  }
-  if (!request.writes) return null;
-  if (request.confirms) return new StaffWriteNotAllowedError();
-  if (session.spendApproved) return null;
-  const asked = request.permissions;
-  if (asked.length > 0 && asked.every((permission) => WRITES_WITHOUT_SPEND.has(permission))) {
-    return null;
-  }
-  return new StaffSpendNotApprovedError();
-}
-
 type GateDeps = Readonly<{
   availability: StaffAccessAvailabilityService;
   sessions: Pick<StaffAccessSessionService, "findByApiKeyId">;
@@ -97,7 +71,7 @@ export class StaffAccessGateService implements RestStaffAccessGate {
     const at = this.deps.now();
     if (!session) throw new StaffAccessRevokedError();
     const refusal =
-      (await this.liveRefusal({ session, request, at })) ?? routeRefusal({ session, request });
+      (await this.liveRefusal({ session, request, at })) ?? this.routeRefusal({ session, request });
     if (refusal) {
       await this.trailRefusal({
         session,
@@ -205,6 +179,32 @@ export class StaffAccessGateService implements RestStaffAccessGate {
       ipAddress: request.ipAddress,
       userAgent: request.userAgent,
     };
+  }
+
+  /**
+   * What a live session may do on a route, failing closed (ADR-202). A read passes unless it
+   * serves content to a key without `org:content`. A write never removes or disables a record;
+   * without the spend tick it passes only when every permission it asks is a dataset write.
+   */
+  private routeRefusal({
+    session,
+    request,
+  }: {
+    session: StaffAccessRequestRow;
+    request: RestStaffAccessRequest;
+  }): Refusal | null {
+    if (request.spends && !session.spendApproved) return new StaffSpendNotApprovedError();
+    if (request.servesContent && !session.scopes.includes("org:content")) {
+      return new StaffContentNotApprovedError();
+    }
+    if (!request.writes) return null;
+    if (request.confirms) return new StaffWriteNotAllowedError();
+    if (session.spendApproved) return null;
+    const asked = request.permissions;
+    if (asked.length > 0 && asked.every((permission) => WRITES_WITHOUT_SPEND.has(permission))) {
+      return null;
+    }
+    return new StaffSpendNotApprovedError();
   }
 
   /** Why the session itself no longer admits anything, or null while it is live. */

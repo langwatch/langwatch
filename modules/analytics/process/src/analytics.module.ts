@@ -1,5 +1,5 @@
 import { type AnalyticsApi, type AnalyticsServerConfig } from "@langwatch/analytics-contract";
-import { admittedStaffMaySpend, keyCredentialOfRequest } from "@langwatch/api/rest";
+import { keyCredentialOfRequest } from "@langwatch/api/rest";
 import { censusClientOf } from "@langwatch/observability/credential-census";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { defineMigrationStep } from "@langwatch/upgrade/step";
@@ -34,12 +34,7 @@ export const analyticsProcessModule: PublishedProcessModule<
   )
   // The query door fans the key it authenticated out to the projects it may read.
   .provideMiddlewareContext({
-    // A staff key carries its session's spend approval, which eval() functions need (ADR-202).
-    langWatchQLKeyReach: (request) => {
-      const key = keyCredentialOfRequest(request);
-      if (key.kind !== "apiKey" || key.isStaffAccessKey !== true) return key;
-      return { ...key, staffSpendApproved: admittedStaffMaySpend(request) };
-    },
+    langWatchQLKeyReach: (request) => keyCredentialOfRequest(request),
     // Its client, by the identity headers the CLI and MCP servers send: a metric label only.
     langWatchQLKeyDoor: (request) =>
       keyDoorOfClient({ client: censusClientOf((name) => request.headers.get(name)).client }),

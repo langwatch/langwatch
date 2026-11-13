@@ -59,7 +59,7 @@ export class ApiOrganizationCredentialsService {
         permission,
       });
       if (!allowed) {
-        // A staff key's refusal is trailed by the runtime, which needs the key it refused (ADR-202).
+        // The runtime trails a staff key's refusal and needs the key it refused (ADR-202).
         if (resolved.isStaffAccessKey) recordOrganizationCredential(input.request, resolved);
         throw new OrganizationPermissionError(permission);
       }

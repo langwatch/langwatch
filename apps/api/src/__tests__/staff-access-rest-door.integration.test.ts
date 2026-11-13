@@ -1,8 +1,7 @@
 /**
- * Staff access keys through the installed REST door (ADR-202): the api and worker booted wholly
- * live, a requester key asking over the wire, and the redeemed key minted by the real api-key
- * module. Only the passkey ceremony is skipped: the approval columns, spend included, are
- * written directly.
+ * Staff access keys through the installed REST door (ADR-202) on a live api and worker, the
+ * redeemed key minted by the real api-key module. Only the passkey ceremony is skipped: the
+ * approval columns, spend included, are written directly.
  * @vitest-environment node
  * @see modules/staff-access/specs/staff-access-use.feature
  * @see modules/staff-access/specs/staff-access-approval.feature
