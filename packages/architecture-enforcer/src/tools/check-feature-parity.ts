@@ -279,6 +279,7 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // The docs deploy's redirect store and its job (specs/ci/docs-deploy.feature).
   "tools/docsdeploy",
   "tools/chartheap",
+  "tools/charts3region",
   // How the package-suites weights are measured from main's job logs
   // (specs/ci/package-suites-weights.feature).
   "tools/suiteweights",

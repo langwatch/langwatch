@@ -68,6 +68,7 @@ var (
 		"tools/ecrtag",
 		"tools/docsdeploy",
 		"tools/chartheap",
+		"tools/charts3region",
 		"tools/suiteweights",
 		"tools/matrixseed",
 		"cmd/linkcheck",

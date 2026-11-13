@@ -5,6 +5,7 @@ import { defineRule } from "../define-rule.mjs";
 
 const AWS_CLIENT_PACKAGE = "packages/aws-client/";
 const SHARED_RULE = "s3RegionOf";
+const MAX_DEPTH = 8;
 
 function isSharedRuleCall(node) {
   return (
@@ -20,38 +21,85 @@ function propertyName(property) {
   return property.key.type === "Literal" ? String(property.key.value) : undefined;
 }
 
-/** Every `region` value in the options, through spreads of calls and conditionals. */
-function regionValuesOf(node, found = []) {
-  if (node?.type === "ConditionalExpression") {
-    regionValuesOf(node.consequent, found);
-    regionValuesOf(node.alternate, found);
-  } else if (node?.type === "CallExpression") {
-    regionValuesOf(node.arguments[0], found);
-  } else if (node?.type === "ObjectExpression") {
-    for (const property of node.properties) {
-      if (property.type === "SpreadElement") regionValuesOf(property.argument, found);
-      else if (propertyName(property) === "region") found.push(property.value);
-    }
-  }
-  return found;
+/** The initialiser of the `const` this identifier resolves to in its own scope. */
+function constInitOf(context, identifier) {
+  let scope = context.sourceCode.getScope(identifier);
+  while (scope && !scope.set.has(identifier.name)) scope = scope.upper;
+  const definition = scope?.set.get(identifier.name)?.defs[0];
+  if (definition?.type !== "Variable" || definition.parent?.kind !== "const") return undefined;
+  return definition.node.init ?? undefined;
 }
 
-function isSharedRegion(value, sharedNames) {
+const NO_OPTIONS = { regions: [], always: false, unreadable: undefined };
+
+/** Either path may run: a region counts only when both supply one. */
+function eitherPath(first, second) {
+  return {
+    regions: [...first.regions, ...second.regions],
+    always: first.always && second.always,
+    unreadable: first.unreadable ?? second.unreadable,
+  };
+}
+
+function objectOptions(context, node, depth) {
+  const result = { regions: [], always: false, unreadable: undefined };
+  for (const property of node.properties) {
+    if (property.type === "SpreadElement") {
+      const spread = optionsOf(context, property.argument, depth + 1);
+      result.regions.push(...spread.regions);
+      result.always ||= spread.always;
+      result.unreadable ??= spread.unreadable;
+    } else if (propertyName(property) === "region") {
+      result.regions.push(property.value);
+      result.always = true;
+    }
+  }
+  return result;
+}
+
+const READERS = {
+  ObjectExpression: objectOptions,
+  ConditionalExpression: (context, node, depth) =>
+    eitherPath(
+      optionsOf(context, node.consequent, depth + 1),
+      optionsOf(context, node.alternate, depth + 1),
+    ),
+  LogicalExpression: (context, node, depth) => {
+    const right = optionsOf(context, node.right, depth + 1);
+    if (node.operator === "&&") return { ...right, always: false };
+    return eitherPath(optionsOf(context, node.left, depth + 1), right);
+  },
+  // A builder such as aws.build(options) passes its first argument through.
+  CallExpression: (context, node, depth) =>
+    node.arguments.length === 0 ? NO_OPTIONS : optionsOf(context, node.arguments[0], depth + 1),
+  Identifier: (context, node, depth) => {
+    const init = constInitOf(context, node);
+    return init ? optionsOf(context, init, depth + 1) : { ...NO_OPTIONS, unreadable: node };
+  },
+};
+
+/** Every `region` the options may carry, whether every path has one, and what was unreadable. */
+function optionsOf(context, node, depth = 0) {
+  const read = depth <= MAX_DEPTH ? READERS[node?.type] : undefined;
+  return read ? read(context, node, depth) : { ...NO_OPTIONS, unreadable: node };
+}
+
+function isSharedRegion(context, value) {
   if (isSharedRuleCall(value)) return true;
-  return value.type === "Identifier" && sharedNames.has(value.name);
+  return value.type === "Identifier" && isSharedRuleCall(constInitOf(context, value));
 }
 
-/** Reports one client: no region at all, or each region not taken from the shared rule. */
-function reportClient({ context, client, sharedNames }) {
-  const values = regionValuesOf(client.arguments[0]);
-  if (values.length === 0) {
-    context.report({ node: client, messageId: "missingRegion" });
-    return;
+/** Reports a path with no region, unreadable options, or a region not from the shared rule. */
+function reportClient(context, client) {
+  const options = client.arguments[0];
+  const { regions, always, unreadable } = options ? optionsOf(context, options) : NO_OPTIONS;
+  if (!always) {
+    const messageId = unreadable ? "unreadableOptions" : "missingRegion";
+    context.report({ node: unreadable ?? client, messageId });
   }
-  for (const value of values) {
-    if (!isSharedRegion(value, sharedNames)) {
+  for (const value of regions) {
+    if (!isSharedRegion(context, value))
       context.report({ node: value, messageId: "regionNotShared" });
-    }
   }
 }
 
@@ -63,30 +111,25 @@ export const s3ClientRegionRule = defineRule({
     regionNotShared: {
       what: "This `new S3Client` takes its region from somewhere other than `s3RegionOf`.",
       why: "A hand-picked region drifts per client; one sent `auto` to AWS, which refuses to sign with it.",
-      fix: "Pass `region: s3RegionOf({ region, endpoint })` from `@langwatch/aws-client`, or a name bound to that call.",
+      fix: "Pass `region: s3RegionOf({ region, endpoint })` from `@langwatch/aws-client`, or a `const` bound to that call.",
     },
     missingRegion: {
-      what: "This `new S3Client` names no region.",
+      what: "This `new S3Client` names no region on at least one path.",
       why: "With no region the SDK guesses from the process environment, not from the configured endpoint.",
-      fix: "Pass `region: s3RegionOf({ region, endpoint })` from `@langwatch/aws-client`.",
+      fix: "Pass `region: s3RegionOf({ region, endpoint })` from `@langwatch/aws-client` on every path.",
+    },
+    unreadableOptions: {
+      what: "This `new S3Client` gets options the rule cannot read, so it cannot see their region.",
+      why: "A region hidden behind a parameter or a mutable binding escapes the one shared region rule.",
+      fix: "Build the options inline or in a `const` here, with `region: s3RegionOf({ region, endpoint })`.",
     },
   },
   create(context) {
-    const sharedNames = new Set();
-    const clients = [];
-
     return {
-      VariableDeclarator(node) {
-        if (node.id.type === "Identifier" && isSharedRuleCall(node.init)) {
-          sharedNames.add(node.id.name);
-        }
-      },
       NewExpression(node) {
-        if (node.callee.type !== "Identifier" || node.callee.name !== "S3Client") return;
-        if (node.arguments[0]?.type === "ObjectExpression") clients.push(node);
-      },
-      "Program:exit"() {
-        for (const client of clients) reportClient({ context, client, sharedNames });
+        if (node.callee.type === "Identifier" && node.callee.name === "S3Client") {
+          reportClient(context, node);
+        }
       },
     };
   },

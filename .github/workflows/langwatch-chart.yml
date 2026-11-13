@@ -16,6 +16,8 @@ on:
       - ".github/workflows/langwatch-chart.yml"
       - "tools/chartheap/**"
       - "cmd/chartheap/**"
+      - "tools/charts3region/**"
+      - "cmd/charts3region/**"
       # Where the processes declare what they read. The shutdown deadline must
       # agree with the pod's grace period (workers-shutdown.sh), and every
       # variable the chart sets must still be declared somewhere
@@ -54,6 +56,8 @@ on:
       - ".github/workflows/langwatch-chart.yml"
       - "tools/chartheap/**"
       - "cmd/chartheap/**"
+      - "tools/charts3region/**"
+      - "cmd/charts3region/**"
       # Where the processes declare what they read. The shutdown deadline must
       # agree with the pod's grace period (workers-shutdown.sh), and every
       # variable the chart sets must still be declared somewhere
@@ -281,12 +285,6 @@ jobs:
         if: "!cancelled()"
         run: ./tests/workers-extra-envs.sh
 
-      # The awsS3 provider's region must reach every container that carries the
-      # S3 settings; without it a keyed client signs for the wrong region.
-      - name: "assert the S3 region reaches every process"
-        if: "!cancelled()"
-        run: ./tests/s3-region.sh
-
       - name: "assert ClickHouse pool sizing follows fleet capacity"
         if: "!cancelled()"
         run: ./tests/clickhouse-pool-sizing.sh
@@ -309,6 +307,13 @@ jobs:
         if: "!cancelled()"
         working-directory: .
         run: go run ./cmd/chartheap -prove-node infra/docker/Dockerfile
+
+      # The awsS3 provider's region must reach every container that carries the
+      # S3 settings; without it a keyed client signs for the wrong region.
+      - name: "assert the S3 region reaches every process"
+        if: "!cancelled()"
+        working-directory: .
+        run: go run ./cmd/charts3region
 
       # In local-filesystem mode the app and the workers mount one ReadWriteOnce
       # PVC, and a helm upgrade rolls both Deployments at once. The pre-upgrade

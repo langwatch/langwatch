@@ -17,6 +17,24 @@ Feature: The s3-client-region lint rule
     Then it reports the client
 
   @unit
+  Scenario: An S3 client with a region on only one path is reported
+    Given a module file that builds new S3Client({ ...(enabled ? { region: s3RegionOf(config) } : {}) })
+    When the s3-client-region rule runs over it
+    Then it reports the client, since the other path names no region
+
+  @unit
+  Scenario: An S3 client whose options the rule cannot read is reported
+    Given a module file that builds new S3Client(options) from a function parameter
+    When the s3-client-region rule runs over it
+    Then it reports the options, since their region cannot be seen
+
+  @unit
+  Scenario: A region is judged by the binding in scope, not by its name
+    Given one function binds const region = s3RegionOf(config) and another binds const region = "auto"
+    When the s3-client-region rule runs over both clients
+    Then it reports only the client whose region binding is the literal
+
+  @unit
   Scenario: A region from the shared rule is accepted
     Given a module file that builds new S3Client({ region: s3RegionOf({ region, endpoint }) })
     When the s3-client-region rule runs over it

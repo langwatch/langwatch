@@ -31,10 +31,24 @@ describe("s3RegionOf()", () => {
         ["https://s3.dualstack.us-east-2.amazonaws.com", "us-east-2"],
         ["https://bucket.s3.ap-south-1.amazonaws.com:443", "ap-south-1"],
         ["https://s3.cn-north-1.amazonaws.com.cn", "cn-north-1"],
+        ["https://s3-fips.dualstack.us-east-2.amazonaws.com", "us-east-2"],
+        ["https://s3-fips.us-gov-west-1.amazonaws.com", "us-gov-west-1"],
+        ["https://bucket.vpce-1a2b3c4d-5e6f.s3.us-east-1.vpce.amazonaws.com", "us-east-1"],
       ];
       for (const [endpoint, region] of cases) {
         expect(s3RegionOf({ endpoint })).toBe(region);
       }
+    });
+  });
+
+  describe("when the region is 'auto'", () => {
+    /** @scenario "S3 client never sends the 'auto' region to AWS, even with access keys" */
+    it("treats it as unnamed for AWS and keeps it for other services", () => {
+      expect(s3RegionOf({ region: "auto", endpoint: "https://s3.eu-west-1.amazonaws.com" })).toBe(
+        "eu-west-1",
+      );
+      expect(s3RegionOf({ region: " AUTO " })).toBeUndefined();
+      expect(s3RegionOf({ region: "auto", endpoint: "http://minio:9000" })).toBe("auto");
     });
   });
 

@@ -42,6 +42,46 @@ new S3Client({ ...aws.build({ region, endpoint }), forcePathStyle: true });`;
     });
   });
 
+  describe("when only one branch of a conditional names a region", () => {
+    /** @scenario "An S3 client with a region on only one path is reported" */
+    it("reports missingRegion, since the other path has none", () => {
+      const conditional = "new S3Client({ ...(enabled ? { region: s3RegionOf(config) } : {}) });";
+      expect(messageIds(conditional)).toEqual(["missingRegion"]);
+      const guarded = "new S3Client({ ...(enabled && { region: s3RegionOf(config) }) });";
+      expect(messageIds(guarded)).toEqual(["missingRegion"]);
+    });
+  });
+
+  describe("when the client gets no options, or options it cannot read", () => {
+    /** @scenario "An S3 client whose options the rule cannot read is reported" */
+    it("reports missingRegion for none and unreadableOptions for a parameter", () => {
+      expect(messageIds("new S3Client();")).toEqual(["missingRegion"]);
+      expect(messageIds("function build(options) { return new S3Client(options); }")).toEqual([
+        "unreadableOptions",
+      ]);
+    });
+  });
+
+  describe("when the options are bound to a name first", () => {
+    /** @scenario "A literal region on an S3 client is reported" */
+    it("reads the binding, reporting a literal and accepting the shared rule", () => {
+      expect(messageIds('const options = { region: "auto" };\nnew S3Client(options);')).toEqual([
+        "regionNotShared",
+      ]);
+      const shared = "const options = { region: s3RegionOf(config) };\nnew S3Client(options);";
+      expect(messageIds(shared)).toEqual([]);
+    });
+  });
+
+  describe("when a same-named region in another function comes from the shared rule", () => {
+    /** @scenario "A region is judged by the binding in scope, not by its name" */
+    it("checks the binding in scope, not the name", () => {
+      const code = `function shared() { const region = s3RegionOf(config); return new S3Client({ region }); }
+function literal() { const region = "auto"; return new S3Client({ region }); }`;
+      expect(messageIds(code)).toEqual(["regionNotShared"]);
+    });
+  });
+
   describe("when the region comes from the shared rule", () => {
     /** @scenario "A region from the shared rule is accepted" */
     it("reports nothing, called inline or bound to a name first", () => {

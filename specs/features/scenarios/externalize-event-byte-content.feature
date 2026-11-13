@@ -492,11 +492,12 @@ Feature: Externalize event byte content to stored_objects
 
   @unit
   Scenario: S3 client never sends the 'auto' region to AWS, even with access keys
-    Given S3_REGION is not set and an access key pair is set
+    Given S3_REGION is not set, or is "auto", and an access key pair is set
     And the endpoint is absent or an AWS host
     When createS3Client constructs the S3Client
     Then the region is never "auto"
     And a regional AWS endpoint such as s3.eu-west-1.amazonaws.com gives the region eu-west-1
+    And so do the FIPS, dual-stack and PrivateLink (vpce) forms of a regional AWS host
     And with no regional endpoint the SDK region chain (AWS_REGION) decides
 
   @unit

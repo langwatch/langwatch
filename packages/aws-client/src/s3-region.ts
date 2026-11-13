@@ -1,10 +1,9 @@
-/**
- * The one region rule every S3 client follows: a named region wins, a non-AWS
- * endpoint signs with "auto", a regional AWS host names its own region, and
- * anything else is left to the SDK chain (AWS_REGION). AWS never sees "auto".
- */
+// One region rule for every S3 client: a named region wins (a named "auto" counts as unnamed),
+// a non-AWS endpoint signs with "auto", a regional AWS host names its own region (s3[-fips]
+// [.dualstack].REGION, PrivateLink *.s3.REGION.vpce), and anything else is left to the SDK
+// chain (AWS_REGION). AWS never sees "auto". Hosts: docs.aws.amazon.com/general/latest/gr/s3.html
 const REGIONAL_AWS_S3_HOST =
-  /(?:^|\.)s3[.-](?:dualstack\.|fips\.)?([a-z]{2}(?:-[a-z]+)+-\d+)\.amazonaws\.com(?:\.cn)?$/;
+  /(?:^|\.)s3(?:-fips)?[.-](?:dualstack\.|fips\.)?([a-z]{2}(?:-[a-z]+)+-\d+)(?:\.vpce)?\.amazonaws\.com(?:\.cn)?$/;
 
 export function s3RegionOf({
   region,
@@ -14,7 +13,7 @@ export function s3RegionOf({
   endpoint?: string;
 }): string | undefined {
   const named = region?.trim();
-  if (named) return named;
+  if (named && named.toLowerCase() !== "auto") return named;
   const hostname = hostnameOf(endpoint?.trim() ?? "");
   if (hostname === undefined) return undefined;
   if (!isAwsHostname(hostname)) return "auto";
