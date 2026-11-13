@@ -5,7 +5,7 @@
 import { BILLED_SEAT_KINDS, STRIPE_PRICE_NAMES } from "@langwatch/enterprise-billing-contract";
 import { describe, expect, it } from "vitest";
 
-import { assertSeatsCoverUse, SEAT_FLOORS } from "../seat-floor.rules.ts";
+import { assertSeatsCoverUse, SEAT_FLOORS, SEAT_PRICE_NAME } from "../seat-floor.rules.ts";
 
 describe("assertSeatsCoverUse", () => {
   describe("given full seats", () => {
@@ -56,13 +56,11 @@ describe("assertSeatsCoverUse", () => {
 describe("SEAT_FLOORS", () => {
   /** @scenario "Every seat price in the catalogue belongs to a seat kind with a floor" */
   it("covers every seat price family in the catalogue", () => {
-    const prefixes = BILLED_SEAT_KINDS.map((seat) => SEAT_FLOORS[seat].pricePrefix);
-    const seatPrices = STRIPE_PRICE_NAMES.filter((name) => name.includes("_SEAT_"));
+    const floored = BILLED_SEAT_KINDS.map((seat) => SEAT_FLOORS[seat].prices);
+    const seatPrices = STRIPE_PRICE_NAMES.filter((name) => SEAT_PRICE_NAME.test(name));
 
-    expect(seatPrices.length).toBeGreaterThan(0);
-    const unfloored = seatPrices.filter(
-      (name) => !prefixes.some((prefix) => name.startsWith(prefix)),
-    );
+    expect(seatPrices).toEqual(expect.arrayContaining(["GROWTH_SEAT_EUR_MONTHLY", "LAUNCH_USERS"]));
+    const unfloored = seatPrices.filter((name) => !floored.some((prices) => prices.test(name)));
     expect(unfloored).toEqual([]);
   });
 });

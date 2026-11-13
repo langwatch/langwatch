@@ -78,7 +78,8 @@ Feature: Seat count never goes below the seats in use
 
   Rule: every seat kind sold on a subscription has a floor
   A new seat price family in the catalogue fails the build until its seat kind
-  declares the minimum it may be lowered to.
+  declares the minimum it may be lowered to. Seat prices are the *_SEAT_* families
+  and the legacy *_USERS full-seat prices.
 
   @unit
   Scenario: Every seat price in the catalogue belongs to a seat kind with a floor

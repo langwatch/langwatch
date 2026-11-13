@@ -8,16 +8,20 @@ import {
 } from "@langwatch/enterprise-billing-contract";
 
 type SeatFloor = Readonly<{
-  /** The catalogue price names that bill this kind start with this. */
-  pricePrefix: string;
+  /** Matches every catalogue price name that bills this kind. */
+  prices: RegExp;
   /** The least the line keeps while no seat of this kind is in use. */
   leastWithNoneInUse: number;
 }>;
 
+/** Matches every catalogue price name that bills seats, of any kind. */
+export const SEAT_PRICE_NAME = /_SEAT_|_USERS$/;
+
 /** Every billed seat kind and its floor; a new kind fails the type check until it has one. */
 export const SEAT_FLOORS: Readonly<Record<BilledSeatKind, SeatFloor>> = {
-  full: { pricePrefix: "GROWTH_SEAT_", leastWithNoneInUse: 1 },
-  developer: { pricePrefix: "DEVELOPER_SEAT_", leastWithNoneInUse: 0 },
+  // Legacy tiered plans bill full seats as *_USERS; updateSubscriptionItems floors them too.
+  full: { prices: /^GROWTH_SEAT_|_USERS$/, leastWithNoneInUse: 1 },
+  developer: { prices: /^DEVELOPER_SEAT_/, leastWithNoneInUse: 0 },
 };
 
 /** Refuses a seat count below the seats of its kind in use, before any charge. */

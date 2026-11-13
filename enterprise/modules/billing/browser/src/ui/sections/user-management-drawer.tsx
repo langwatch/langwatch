@@ -325,14 +325,20 @@ function FullSeatsHeader({
         )}
       </HStack>
       {growth?.view.minimumHint && (
-        <HStack gap={2} align="start" color="fg.muted" data-testid="seat-drawer-minimum">
-          <Box flexShrink={0} paddingTop={0.5}>
-            <Info size={14} />
-          </Box>
-          <Text textStyle="bodySm">{growth.view.minimumHint}</Text>
-        </HStack>
+        <SeatMinimumHint hint={growth.view.minimumHint} testId="seat-drawer-minimum" />
       )}
     </VStack>
+  );
+}
+
+function SeatMinimumHint({ hint, testId }: { hint: string; testId: string }) {
+  return (
+    <HStack gap={2} align="start" color="fg.muted" data-testid={testId}>
+      <Box flexShrink={0} paddingTop={0.5}>
+        <Info size={14} />
+      </Box>
+      <Text textStyle="bodySm">{hint}</Text>
+    </HStack>
   );
 }
 
@@ -469,12 +475,7 @@ function OtherSeatTypes({ growth, price }: { growth: GrowthSeats; price: SeatPri
             </HStack>
           )}
           {growth.developerHint && (
-            <HStack gap={2} align="start" color="fg.muted" data-testid="developer-seats-minimum">
-              <Box flexShrink={0} paddingTop={0.5}>
-                <Info size={14} />
-              </Box>
-              <Text textStyle="bodySm">{growth.developerHint}</Text>
-            </HStack>
+            <SeatMinimumHint hint={growth.developerHint} testId="developer-seats-minimum" />
           )}
         </VStack>
       </Collapsible.Content>

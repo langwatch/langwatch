@@ -171,19 +171,13 @@ describe("DeveloperSeatService", () => {
       });
     });
 
-    /** @scenario "Removing every Developer seat removes the line" */
-    it("removes the line when set to none", async () => {
-      seedProvider(2);
-      await service(WITH_DEVELOPER).setDeveloperSeats({ organizationId: "org_1", quantity: 0 });
-      expect(stripeSubscriptions.updates[0]?.change.items).toEqual([
-        { id: "si_dev", deleted: true },
-      ]);
-    });
-
-    /** @scenario "Removing every Developer seat goes through when no Developer is in use" */
-    it("lets the line go when no Developer is in use", async () => {
+    /**
+     * @scenario "Removing every Developer seat removes the line"
+     * @scenario "Removing every Developer seat goes through when no Developer is in use"
+     */
+    it("removes the line when set to none with no Developer in use", async () => {
       developersInUse = 0;
-      seedProvider(3);
+      seedProvider(2);
       await service(WITH_DEVELOPER).setDeveloperSeats({ organizationId: "org_1", quantity: 0 });
       expect(stripeSubscriptions.updates[0]?.change.items).toEqual([
         { id: "si_dev", deleted: true },
