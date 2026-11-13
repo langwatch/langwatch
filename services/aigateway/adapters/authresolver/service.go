@@ -1034,8 +1034,8 @@ func (s *Service) Stop() {
 // records its org for the change feed. An empty configETag is the honest state
 // after a response that carried none: the next staleness refresh asks for the
 // config outright rather than revalidating against a token we do not have.
-func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle, configETag string) *entry {
-	return s.publishL1(h, s.newEntry(bundle, configETag))
+func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle, configETag string) {
+	s.publishL1(h, s.newEntry(bundle, configETag))
 }
 
 // carryBudgetChanges marks an unpublished replacement behind when budget
@@ -1067,7 +1067,7 @@ func (s *Service) newEntry(bundle *domain.Bundle, configETag string) *entry {
 
 // publishL1 makes stored the live entry under h and records its org for the
 // change feed.
-func (s *Service) publishL1(h [64]byte, stored *entry) *entry {
+func (s *Service) publishL1(h [64]byte, stored *entry) {
 	bundle := stored.bundle
 	s.lastKnown.Remove(h)
 	s.l1.Add(h, stored)
@@ -1079,7 +1079,6 @@ func (s *Service) publishL1(h [64]byte, stored *entry) *entry {
 	if bundle.OrganizationID != "" {
 		s.activeOrgs.LoadOrStore(bundle.OrganizationID, &orgCursor{since: "0"})
 	}
-	return stored
 }
 
 // entryDeadlines computes the two instants a cached entry lives by: the JWT
