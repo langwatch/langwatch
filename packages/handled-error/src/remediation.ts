@@ -332,7 +332,7 @@ const registry = {
   },
   impersonation_cannot_mint_credential: {
     tips: [
-      "No role or grant changes this; stop impersonating and create the key as yourself, or sign in as the member",
+      "No role or grant changes this; leave impersonation, and ask the member to create or rotate the key themselves",
     ],
   },
   legacy_project_key_ingestion_only: {

@@ -3802,9 +3802,9 @@ const presentations = {
   },
   impersonation_cannot_mint_credential: {
     // No permission unlocks this, so the copy must not name one to ask for.
-    title: "You can't create keys while impersonating",
+    title: "Not available while impersonating",
     describe: () =>
-      "Keys are tied to the person who creates them. Stop impersonating to create one, or sign in as this user.",
+      "Leave impersonation first. Only the member can create or rotate their own keys.",
   },
   ingestion_key_not_found: {
     title: "Ingestion key not found",

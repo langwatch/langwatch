@@ -524,7 +524,7 @@ export interface TrpcRouterAccess<
   ): TrpcRouterAccess<Api, Contract, Implemented, Name, Contexts>;
   /**
    * The procedure mints a credential (a key, token or secret). The runtime refuses it with
-   * PermissionDeniedError naming `permission` whenever the actor carries an impersonatorId,
+   * ImpersonationCannotMintCredentialError whenever the actor carries an impersonatorId,
    * after access and before the handler.
    */
   mintsCredential(
