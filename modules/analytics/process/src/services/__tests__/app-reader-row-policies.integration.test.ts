@@ -4,7 +4,7 @@
  * access.
  * @see specs/clickhouse/app-reader-row-policies.feature
  */
-import { createHash, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -22,6 +22,9 @@ const accessModelDefinition = LangWatchQLAccessModelDefinitionService.create();
 
 const DATABASE = `app_reader_${process.pid}`;
 const READER_PASSWORD = "app-reader-test-password";
+/** ClickHouse's `sha256_hash` of READER_PASSWORD, the form its user definitions take. */
+const READER_PASSWORD_SHA256_HEX =
+  "f49a03245c659f53b44f395763be47c64db9260bfb645f5acceaa6850788a56d";
 const TENANT_A = "project_a";
 const TENANT_B = "project_b";
 /** Tenant A's id is a prefix of this one, so a substring match would admit it. */
@@ -56,10 +59,12 @@ function readerDdl({ enforce }: { enforce: boolean }): string[] {
     sourceDatabase: DATABASE,
   };
   const lwqlOnly = accessModelDefinition.renderDdl(accessModelDefinition.build(shared)).length;
-  const passwordSha256Hex = createHash("sha256").update(READER_PASSWORD).digest("hex");
   return accessModelDefinition
     .renderDdl(
-      accessModelDefinition.build({ ...shared, appReader: { passwordSha256Hex, enforce } }),
+      accessModelDefinition.build({
+        ...shared,
+        appReader: { passwordSha256Hex: READER_PASSWORD_SHA256_HEX, enforce },
+      }),
     )
     .slice(lwqlOnly);
 }
