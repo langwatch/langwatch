@@ -23,7 +23,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { buildAgentRegistryPipeline } from "../agent-registry.pipeline.ts";
+import { buildAgentRegistryPipeline } from "../../features/registry/eventing/agent-registry.pipeline.ts";
 
 const PROJECT = "project_checkout";
 

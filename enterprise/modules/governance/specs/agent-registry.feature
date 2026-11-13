@@ -329,6 +329,19 @@ Feature: Agent registry with ARD discovery and change events
     Then no result is answered and the search does not fail
 
   @unit
+  Scenario: ARD search pages its ranked results with an offset token
+    Given three entries that match the query text
+    When ARD search asks for two results a page
+    Then the first page holds two results and a page token
+    And the page after that token holds the third result and no token
+
+  @integration
+  Scenario: The ARD manifest, ARD search and the JSON schemas are served through the registry door
+    Given the registry holds an agent
+    When GET /api/governance/registry/ard.json, POST /api/governance/registry/ard/search and GET /api/governance/registry/schema are asked
+    Then the manifest lists the agent, the search finds it and the schemas describe an entry and an event
+
+  @unit
   Scenario: ARD search with no text is refused
     When ARD search is asked without query text
     Then the request body is refused by its schema

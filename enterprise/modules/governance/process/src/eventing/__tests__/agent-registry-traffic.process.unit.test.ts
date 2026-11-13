@@ -11,7 +11,7 @@ import {
   type AgentRegistryTrafficIntents,
   agentRegistryTrafficWake,
   runAgentRegistryTraffic,
-} from "../agent-registry-traffic.process.ts";
+} from "../../features/registry/eventing/agent-registry-traffic.process.ts";
 
 const NOW = 1_800_000_000_000;
 const DAY_MS = 24 * 60 * 60 * 1000;

@@ -110,6 +110,37 @@ describe("ardSearch()", () => {
     });
   });
 
+  describe("given three matching entries and a page size of two", () => {
+    /** @scenario ARD search pages its ranked results with an offset token */
+    it("answers two results with a token, then the third without one", () => {
+      const listed = manifest(
+        ["Support alpha", "Support beta", "Support gamma"].map((name, index) =>
+          entry({ id: `agentreg_${index}`, name }),
+        ),
+      );
+      const ask = (pageToken?: string) =>
+        ardSearch({
+          manifest: listed,
+          request: ardSearchRequestSchema.parse({
+            query: { text: "support" },
+            pageSize: 2,
+            ...(pageToken ? { pageToken } : {}),
+          }),
+        });
+
+      const first = ask();
+      const second = ask(first.pageToken);
+
+      expect(first.results.map((result) => result.displayName)).toEqual([
+        "Support alpha",
+        "Support beta",
+      ]);
+      expect(first.pageToken).toBe("2");
+      expect(second.results.map((result) => result.displayName)).toEqual(["Support gamma"]);
+      expect(second.pageToken).toBeUndefined();
+    });
+  });
+
   describe("given a request without query text", () => {
     /** @scenario ARD search with no text is refused */
     it("is refused by the request schema", () => {

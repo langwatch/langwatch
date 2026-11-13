@@ -4,8 +4,8 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WebhookApi, WebhookDeliveryRequest } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
 
-import { requestAgentRegistryDelivery } from "../agent-registry-delivery.intent.ts";
-import { AGENT_REGISTRY_DELIVERY_PROCESS_NAME } from "../agent-registry-delivery.process.ts";
+import { requestAgentRegistryDelivery } from "../../features/registry/eventing/agent-registry-delivery.intent.ts";
+import { AGENT_REGISTRY_DELIVERY_PROCESS_NAME } from "../../features/registry/eventing/agent-registry-delivery.process.ts";
 
 const context: IntentContext = {
   processName: AGENT_REGISTRY_DELIVERY_PROCESS_NAME,

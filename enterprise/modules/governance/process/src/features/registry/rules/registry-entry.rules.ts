@@ -202,7 +202,7 @@ function endpointsOf({
  * fragment can hold credentials (`?code=` function keys), so none of them is published. A URL
  * that does not parse publishes no endpoint.
  */
-export function httpInvokeEndpoints(raw: string): AgentRegistryEndpoint[] {
+function httpInvokeEndpoints(raw: string): AgentRegistryEndpoint[] {
   if (!URL.canParse(raw)) return [];
   const url = new URL(raw);
   return [{ kind: "invoke", url: `${url.origin}${url.pathname}`, protocol: "http" }];

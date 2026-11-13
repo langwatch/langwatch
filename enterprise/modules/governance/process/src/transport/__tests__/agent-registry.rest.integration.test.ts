@@ -169,8 +169,14 @@ async function buildApi({ grants = ["governance:view"] }: { grants?: string[] } 
     });
 
   const get = (path: string) => hono.request(path, { headers: { Authorization: `Bearer ${KEY}` } });
+  const post = (path: string, body: unknown) =>
+    hono.request(path, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
 
-  return { app, repositories, seed, get };
+  return { app, repositories, seed, get, post };
 }
 
 describe("the agent registry REST family", () => {
@@ -257,6 +263,35 @@ describe("the agent registry REST family", () => {
 
       expect(response.status).toBe(422);
       expect(body.code).toBe("validation_error");
+    });
+  });
+
+  describe("given the registry holds an agent", () => {
+    /** @scenario The ARD manifest, ARD search and the JSON schemas are served through the registry door */
+    it("serves the manifest, finds the agent by search and describes an entry and an event", async () => {
+      const { seed, get, post } = await buildApi();
+      await seed(["planner"], "2026-11-10T00:00:00Z");
+
+      const manifest = await get("/api/governance/registry/ard.json");
+      const manifestBody = (await manifest.json()) as {
+        specVersion: string;
+        entries: { displayName: string }[];
+      };
+      const search = await post("/api/governance/registry/ard/search", {
+        query: { text: "planner" },
+      });
+      const searchBody = (await search.json()) as { results: { displayName: string }[] };
+      const schema = await get("/api/governance/registry/schema");
+      const schemaBody = (await schema.json()) as { entry: { type: string }; event: unknown };
+
+      expect(manifest.status).toBe(200);
+      expect(manifestBody.specVersion).toBe("0.91");
+      expect(manifestBody.entries.map((entry) => entry.displayName)).toEqual(["planner"]);
+      expect(search.status).toBe(200);
+      expect(searchBody.results.map((result) => result.displayName)).toEqual(["planner"]);
+      expect(schema.status).toBe(200);
+      expect(schemaBody.entry.type).toBe("object");
+      expect(schemaBody.event).toBeDefined();
     });
   });
 
