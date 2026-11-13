@@ -225,6 +225,12 @@ export const AUTHZ_RESOURCES = {
     actions: ["braided"],
     scopes: [],
   },
+  // ADR-202. Allowlisted cross-organization reads an approved staff agent may make. Platform-tier
+  // only, like `ops`, and never `ops:view`: an agent token answers it from its approved session.
+  opsRead: {
+    actions: ["view"],
+    scopes: ["platform"],
+  },
 } as const satisfies Record<
   string,
   {

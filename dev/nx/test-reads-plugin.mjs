@@ -222,7 +222,7 @@ export const reads = {
   ],
   "@langwatch/clickhouse-migrations": ["packages/upgrade/releases/image/code-steps.json"],
   "@langwatch/seedgen-runner": ["tools/seedgen/**/*"],
-  "@langwatch/docs-site": ["docs/**/*", "skills/_compiled/**/*"],
+  "@langwatch/docs-site": ["docs/**/*", "skills/_compiled/**/*", "CHANGELOG.md"],
 };
 
 const members = memberPatterns(new URL("../..", import.meta.url).pathname);

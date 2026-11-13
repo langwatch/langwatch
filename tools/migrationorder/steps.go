@@ -346,9 +346,10 @@ type declaration struct {
 }
 
 // declaringFiles finds the non-test files under StepRoots on ref that hold a
-// step id as a quoted literal, the form defineMigrationStep({ id }) takes.
+// step id as a quoted literal outside a comment, the form
+// defineMigrationStep({ id }) takes; a doc comment naming a step declares nothing.
 func (r Repo) declaringFiles(ctx context.Context, ref string, ids []string) ([]declaration, error) {
-	args := []string{"grep", "-o", "-F", "--full-name"}
+	args := []string{"grep", "-F", "--full-name"}
 	for _, id := range ids {
 		for _, quote := range []string{`"`, `'`, "`"} {
 			args = append(args, "-e", quote+id+quote)
@@ -363,24 +364,42 @@ func (r Repo) declaringFiles(ctx context.Context, ref string, ids []string) ([]d
 	}
 	var found []declaration
 	for _, line := range lines(out) {
-		if d, ok := parseDeclaration(ref, line); ok {
-			found = append(found, d)
-		}
+		found = append(found, parseDeclarations(ref, line, ids)...)
 	}
 	slices.SortFunc(found, func(a, b declaration) int { return strings.Compare(a.path+a.id, b.path+b.id) })
 	return slices.Compact(found), nil
 }
 
-// parseDeclaration reads one `git grep -o` line, <ref>:<path>:<quoted id>,
-// skipping test files, which may name a step without declaring it.
-func parseDeclaration(ref, line string) (declaration, bool) {
+// parseDeclarations reads one `git grep` line, <ref>:<path>:<content>, into the
+// step ids it quotes, skipping test files, which may name a step without
+// declaring it, and comment lines.
+func parseDeclarations(ref, line string, ids []string) []declaration {
 	rest, ok := strings.CutPrefix(line, ref+":")
 	if !ok {
-		return declaration{}, false
+		return nil
 	}
-	file, match, ok := strings.Cut(rest, ":")
+	file, content, ok := strings.Cut(rest, ":")
 	if !ok || strings.Contains(file, "/__tests__/") || strings.Contains(file, ".test.") {
-		return declaration{}, false
+		return nil
 	}
-	return declaration{id: strings.Trim(match, "\"'`"), path: file}, true
+	if isCommentLine(content) {
+		return nil
+	}
+	var found []declaration
+	for _, id := range ids {
+		for _, quote := range []string{`"`, `'`, "`"} {
+			if strings.Contains(content, quote+id+quote) {
+				found = append(found, declaration{id: id, path: file})
+				break
+			}
+		}
+	}
+	return found
+}
+
+// isCommentLine reports whether a source line is a line or block comment.
+func isCommentLine(content string) bool {
+	trimmed := strings.TrimSpace(content)
+	return strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "/*") ||
+		strings.HasPrefix(trimmed, "*")
 }

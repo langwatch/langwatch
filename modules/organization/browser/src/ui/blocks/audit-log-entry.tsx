@@ -20,7 +20,17 @@ import {
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useCopyToClipboard } from "@langwatch/design-system/use-copy-to-clipboard";
 import type { EnrichedAuditLog as StoredEnrichedAuditLog } from "@langwatch/organization-contract";
-import { Check, Copy, Globe, KeyRound, Settings, UserX, VenetianMask } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Globe,
+  KeyRound,
+  LifeBuoy,
+  Settings,
+  ShieldUser,
+  UserX,
+  VenetianMask,
+} from "lucide-react";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import {
@@ -331,6 +341,38 @@ function ActorCell({ actor }: { actor: AuditActor }) {
       />
     );
   }
+  if (actor.kind === "staff") {
+    return (
+      <ActorRow
+        mark={
+          <IconBubble palette="purple">
+            <LifeBuoy size={12} aria-label="LangWatch staff" />
+          </IconBubble>
+        }
+        name={actor.principal}
+        hint="LangWatch staff, through access an operator approved with a passkey"
+        second={
+          actor.approvedBy && (
+            <SecondLine hint={actor.reason}>{`Approved by ${actor.approvedBy}`}</SecondLine>
+          )
+        }
+      />
+    );
+  }
+  if (actor.kind === "operator") {
+    return (
+      <ActorRow
+        mark={
+          <IconBubble palette="orange">
+            <ShieldUser size={12} aria-label="LangWatch operator" />
+          </IconBubble>
+        }
+        name={actor.name}
+        hint={actor.email}
+        second={<SecondLine hint={actor.reason}>LangWatch operator</SecondLine>}
+      />
+    );
+  }
   const { Icon, name, hint } = ICON_ACTORS[actor.kind];
   return (
     <ActorRow
@@ -354,8 +396,35 @@ function actorFacts(actor: AuditActor): string {
   if (actor.kind === "impersonation") {
     return `${actor.operator.email ?? actor.operator.name} as ${actor.subject.email ?? actor.subject.name}`;
   }
+  if (actor.kind === "staff") return actor.principal;
+  if (actor.kind === "operator") return `${actor.email ?? actor.name}, LangWatch operator`;
   if (actor.kind === "unresolved") return `Unknown user (${actor.id})`;
   return ICON_ACTORS[actor.kind].name;
+}
+
+/** Who approved LangWatch access and why, for the rows staff or an operator wrote. */
+function accessFacts(actor: AuditActor): { label: string; value: ReactNode }[] {
+  if (actor.kind !== "staff" && actor.kind !== "operator") return [];
+  return [
+    ...(actor.kind === "staff" && actor.approvedBy
+      ? [{ label: "Approved by", value: <Value>{actor.approvedBy}</Value> }]
+      : []),
+    ...(actor.kind === "staff" && actor.revokedBy
+      ? [{ label: "Revoked by", value: <Value>{actor.revokedBy}</Value> }]
+      : []),
+    ...(actor.reason
+      ? [
+          {
+            label: "Reason",
+            value: (
+              <Text color="fg" whiteSpace="pre-wrap" wordBreak="break-word">
+                {actor.reason}
+              </Text>
+            ),
+          },
+        ]
+      : []),
+  ];
 }
 
 /** A value that truncates with its full text a hover away. */
@@ -405,6 +474,7 @@ function EntryDetail({
       ),
     },
     { label: "Actor", value: <Value>{actorFacts(actor)}</Value> },
+    ...accessFacts(actor),
     { label: "Action", value: <Value mono>{log.action}</Value> },
     { label: "User agent", value: <Client userAgent={log.userAgent} /> },
     {

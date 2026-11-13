@@ -310,6 +310,88 @@ describe("given an Enterprise organization with a mixed audit history", () => {
       expect(within(entry).getByLabelText("Impersonation")).toBeInTheDocument();
     });
 
+    /** @scenario "LangWatch staff access reads as LangWatch Support with its approver and reason" */
+    it("reads a staff access row as LangWatch Support, approver and reason in the detail", async () => {
+      state.auditLogs = [
+        auditRow({
+          userId: null,
+          user: null,
+          actorUserId: "op-1",
+          actorUser: { id: "op-1", name: "Olivia", email: "olivia@langwatch.ai" },
+          action: "staffAccess.write",
+          staffAccess: {
+            principal: "LangWatch Support",
+            reason: "fix the broken evaluator",
+            approvedBy: { id: "op-1" },
+          },
+        }),
+      ];
+      state.totalCount = 1;
+      renderWithOrganizationHost(<AuditLogScreen />, planHost());
+
+      const entry = screen.getByTestId("audit-log-entry");
+      expect(within(entry).getByText("LangWatch Support")).toBeInTheDocument();
+      expect(within(entry).getByText("Approved by olivia@langwatch.ai")).toBeInTheDocument();
+      expect(within(entry).getByText("Made a change as LangWatch staff")).toBeInTheDocument();
+
+      await userEvent.click(within(entry).getByRole("button", { name: "Details" }));
+      const detail = screen.getByTestId("audit-log-detail");
+      expect(within(detail).getByText("Approved by")).toBeInTheDocument();
+      expect(within(detail).getByText("fix the broken evaluator")).toBeInTheDocument();
+    });
+
+    /** @scenario "A revoked or expired staff access row names its approver, not whoever ended it" */
+    it("names the approver and, separately, the operator who revoked the access", async () => {
+      state.auditLogs = [
+        auditRow({
+          userId: "op-1",
+          user: { id: "op-1", name: "Olivia", email: "olivia@langwatch.ai" },
+          actorUserId: "op-2",
+          actorUser: { id: "op-2", name: "Pedro", email: "pedro@langwatch.ai" },
+          action: "staffAccess.revoked",
+          staffAccess: {
+            principal: "LangWatch Staff Read",
+            reason: "check usage",
+            approvedBy: { id: "op-1" },
+            revokedBy: { id: "op-2" },
+          },
+        }),
+      ];
+      state.totalCount = 1;
+      renderWithOrganizationHost(<AuditLogScreen />, planHost());
+
+      const entry = screen.getByTestId("audit-log-entry");
+      expect(within(entry).getByText("Approved by olivia@langwatch.ai")).toBeInTheDocument();
+      await userEvent.click(within(entry).getByRole("button", { name: "Details" }));
+      const detail = screen.getByTestId("audit-log-detail");
+      expect(within(detail).getByText("Revoked by")).toBeInTheDocument();
+      expect(within(detail).getByText("pedro@langwatch.ai")).toBeInTheDocument();
+    });
+
+    /** @scenario "An operator's impersonation reads in the customer's audit log" */
+    it("names the operator who started an impersonation, with the reason", async () => {
+      state.auditLogs = [
+        auditRow({
+          userId: "op-1",
+          user: { id: "op-1", name: "Olivia", email: "olivia@langwatch.ai" },
+          action: "admin/impersonate",
+          args: { userIdToImpersonate: "u1", reason: "reproduce a bug report" },
+        }),
+      ];
+      state.totalCount = 1;
+      renderWithOrganizationHost(<AuditLogScreen />, planHost());
+
+      const entry = screen.getByTestId("audit-log-entry");
+      expect(within(entry).getByText("Olivia")).toBeInTheDocument();
+      expect(within(entry).getByText("LangWatch operator")).toBeInTheDocument();
+      expect(within(entry).getByText("Started impersonating a member")).toBeInTheDocument();
+
+      await userEvent.click(within(entry).getByRole("button", { name: "Details" }));
+      expect(
+        within(screen.getByTestId("audit-log-detail")).getByText("reproduce a bug report"),
+      ).toBeInTheDocument();
+    });
+
     /** @scenario The feed reads by day */
     it("heads the entries with their day", () => {
       state.auditLogs = [auditRow({ createdAt: new Date() })];

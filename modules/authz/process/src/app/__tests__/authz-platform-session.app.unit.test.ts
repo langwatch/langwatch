@@ -28,7 +28,7 @@ function appWhere({ isOperator }: { isOperator: boolean }) {
 describe("AuthzModule.effectivePermissionsFor", () => {
   describe("given the session's user holds the platform-operator grant", () => {
     /** @scenario A platform operator's session carries ops permissions */
-    it("adds ops:view and ops:manage to the scope's permissions", async () => {
+    it("adds the platform operator permissions to the scope's permissions", async () => {
       const answer = await appWhere({ isOperator: true }).effectivePermissionsFor(
         { organizationId: "org_1" },
         OPERATOR,
@@ -36,8 +36,8 @@ describe("AuthzModule.effectivePermissionsFor", () => {
 
       expect(answer).toEqual({
         scope: ORG_SCOPE,
-        permissions: ["organization:view", "ops:view", "ops:manage"],
-        organizationPermissions: ["organization:view", "ops:view", "ops:manage"],
+        permissions: ["organization:view", "ops:view", "ops:manage", "opsRead:view"],
+        organizationPermissions: ["organization:view", "ops:view", "ops:manage", "opsRead:view"],
       });
     });
   });

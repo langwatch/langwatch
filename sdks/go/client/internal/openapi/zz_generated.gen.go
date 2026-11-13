@@ -25208,6 +25208,7 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1LangyView                     GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "langy:view"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1MembersView                   GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "members:view"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1OpsManage                     GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "ops:manage"
+	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1OpsReadView                   GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "opsRead:view"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1OpsView                       GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "ops:view"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1OrganizationDelete            GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "organization:delete"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1OrganizationManage            GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "organization:manage"
@@ -25431,6 +25432,8 @@ func (e GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1) Valid()
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1MembersView:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1OpsManage:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1OpsReadView:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1OpsView:
 		return true
@@ -25682,6 +25685,7 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1LangyView                     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "langy:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1MembersView                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "members:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1OpsManage                     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "ops:manage"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1OpsReadView                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "opsRead:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1OpsView                       GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "ops:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1OrganizationDelete            GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "organization:delete"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1OrganizationManage            GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "organization:manage"
@@ -25905,6 +25909,8 @@ func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1) V
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1MembersView:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1OpsManage:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1OpsReadView:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1OpsView:
 		return true
@@ -26156,6 +26162,7 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1LangyView                     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "langy:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1MembersView                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "members:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1OpsManage                     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "ops:manage"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1OpsReadView                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "opsRead:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1OpsView                       GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "ops:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1OrganizationDelete            GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "organization:delete"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1OrganizationManage            GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "organization:manage"
@@ -26379,6 +26386,8 @@ func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1) V
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1MembersView:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1OpsManage:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1OpsReadView:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1OpsView:
 		return true
@@ -26750,6 +26759,7 @@ const (
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1LangyView                     GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "langy:view"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1MembersView                   GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "members:view"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1OpsManage                     GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "ops:manage"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1OpsReadView                   GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "opsRead:view"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1OpsView                       GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "ops:view"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1OrganizationDelete            GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "organization:delete"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1OrganizationManage            GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "organization:manage"
@@ -26973,6 +26983,8 @@ func (e GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1) Valid() bool {
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1MembersView:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1OpsManage:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1OpsReadView:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1OpsView:
 		return true
@@ -27224,6 +27236,7 @@ const (
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1LangyView                     GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "langy:view"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1MembersView                   GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "members:view"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1OpsManage                     GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "ops:manage"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1OpsReadView                   GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "opsRead:view"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1OpsView                       GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "ops:view"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1OrganizationDelete            GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "organization:delete"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1OrganizationManage            GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "organization:manage"
@@ -27447,6 +27460,8 @@ func (e GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1) Valid() bool {
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1MembersView:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1OpsManage:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1OpsReadView:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1OpsView:
 		return true
@@ -30054,6 +30069,114 @@ func (e GetApiSlackConnections200JSONResponseBodyScopeType) Valid() bool {
 	}
 }
 
+// Defines values for CreateStaffAccessRequestJSONBodyCodeChallengeMethod.
+const (
+	S256 CreateStaffAccessRequestJSONBodyCodeChallengeMethod = "S256"
+)
+
+// Valid indicates whether the value is a known member of the CreateStaffAccessRequestJSONBodyCodeChallengeMethod enum.
+func (e CreateStaffAccessRequestJSONBodyCodeChallengeMethod) Valid() bool {
+	switch e {
+	case S256:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateStaffAccessRequestJSONBodyScopes.
+const (
+	CreateStaffAccessRequestJSONBodyScopesOpsRead     CreateStaffAccessRequestJSONBodyScopes = "ops:read"
+	CreateStaffAccessRequestJSONBodyScopesOrgContent  CreateStaffAccessRequestJSONBodyScopes = "org:content"
+	CreateStaffAccessRequestJSONBodyScopesOrgMetadata CreateStaffAccessRequestJSONBodyScopes = "org:metadata"
+	CreateStaffAccessRequestJSONBodyScopesOrgSupport  CreateStaffAccessRequestJSONBodyScopes = "org:support"
+)
+
+// Valid indicates whether the value is a known member of the CreateStaffAccessRequestJSONBodyScopes enum.
+func (e CreateStaffAccessRequestJSONBodyScopes) Valid() bool {
+	switch e {
+	case CreateStaffAccessRequestJSONBodyScopesOpsRead:
+		return true
+	case CreateStaffAccessRequestJSONBodyScopesOrgContent:
+		return true
+	case CreateStaffAccessRequestJSONBodyScopesOrgMetadata:
+		return true
+	case CreateStaffAccessRequestJSONBodyScopesOrgSupport:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetStaffAccessRequest200JSONResponseBodyStatus.
+const (
+	GetStaffAccessRequest200JSONResponseBodyStatusApproved GetStaffAccessRequest200JSONResponseBodyStatus = "approved"
+	GetStaffAccessRequest200JSONResponseBodyStatusDenied   GetStaffAccessRequest200JSONResponseBodyStatus = "denied"
+	GetStaffAccessRequest200JSONResponseBodyStatusExpired  GetStaffAccessRequest200JSONResponseBodyStatus = "expired"
+	GetStaffAccessRequest200JSONResponseBodyStatusPending  GetStaffAccessRequest200JSONResponseBodyStatus = "pending"
+	GetStaffAccessRequest200JSONResponseBodyStatusRedeemed GetStaffAccessRequest200JSONResponseBodyStatus = "redeemed"
+	GetStaffAccessRequest200JSONResponseBodyStatusRevoked  GetStaffAccessRequest200JSONResponseBodyStatus = "revoked"
+)
+
+// Valid indicates whether the value is a known member of the GetStaffAccessRequest200JSONResponseBodyStatus enum.
+func (e GetStaffAccessRequest200JSONResponseBodyStatus) Valid() bool {
+	switch e {
+	case GetStaffAccessRequest200JSONResponseBodyStatusApproved:
+		return true
+	case GetStaffAccessRequest200JSONResponseBodyStatusDenied:
+		return true
+	case GetStaffAccessRequest200JSONResponseBodyStatusExpired:
+		return true
+	case GetStaffAccessRequest200JSONResponseBodyStatusPending:
+		return true
+	case GetStaffAccessRequest200JSONResponseBodyStatusRedeemed:
+		return true
+	case GetStaffAccessRequest200JSONResponseBodyStatusRevoked:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EndStaffAccessSession200JSONResponseBodyEnded.
+const (
+	EndStaffAccessSession200JSONResponseBodyEndedTrue EndStaffAccessSession200JSONResponseBodyEnded = true
+)
+
+// Valid indicates whether the value is a known member of the EndStaffAccessSession200JSONResponseBodyEnded enum.
+func (e EndStaffAccessSession200JSONResponseBodyEnded) Valid() bool {
+	switch e {
+	case EndStaffAccessSession200JSONResponseBodyEndedTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RedeemStaffAccessRequest200JSONResponseBodyScopes.
+const (
+	RedeemStaffAccessRequest200JSONResponseBodyScopesOpsRead     RedeemStaffAccessRequest200JSONResponseBodyScopes = "ops:read"
+	RedeemStaffAccessRequest200JSONResponseBodyScopesOrgContent  RedeemStaffAccessRequest200JSONResponseBodyScopes = "org:content"
+	RedeemStaffAccessRequest200JSONResponseBodyScopesOrgMetadata RedeemStaffAccessRequest200JSONResponseBodyScopes = "org:metadata"
+	RedeemStaffAccessRequest200JSONResponseBodyScopesOrgSupport  RedeemStaffAccessRequest200JSONResponseBodyScopes = "org:support"
+)
+
+// Valid indicates whether the value is a known member of the RedeemStaffAccessRequest200JSONResponseBodyScopes enum.
+func (e RedeemStaffAccessRequest200JSONResponseBodyScopes) Valid() bool {
+	switch e {
+	case RedeemStaffAccessRequest200JSONResponseBodyScopesOpsRead:
+		return true
+	case RedeemStaffAccessRequest200JSONResponseBodyScopesOrgContent:
+		return true
+	case RedeemStaffAccessRequest200JSONResponseBodyScopesOrgMetadata:
+		return true
+	case RedeemStaffAccessRequest200JSONResponseBodyScopesOrgSupport:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateStoredObjectUpload200JSONResponseBodyMethod.
 const (
 	CreateStoredObjectUpload200JSONResponseBodyMethodPUT CreateStoredObjectUpload200JSONResponseBodyMethod = "PUT"
@@ -30095,6 +30218,7 @@ const (
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceIngestionSourcesView  ConfirmStoredObjectUpload200JSONResponseBodyAudience = "ingestionSources:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceLangyView             ConfirmStoredObjectUpload200JSONResponseBodyAudience = "langy:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceMembersView           ConfirmStoredObjectUpload200JSONResponseBodyAudience = "members:view"
+	ConfirmStoredObjectUpload200JSONResponseBodyAudienceOpsReadView           ConfirmStoredObjectUpload200JSONResponseBodyAudience = "opsRead:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceOpsView               ConfirmStoredObjectUpload200JSONResponseBodyAudience = "ops:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceOrganizationView      ConfirmStoredObjectUpload200JSONResponseBodyAudience = "organization:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudiencePlaygroundView        ConfirmStoredObjectUpload200JSONResponseBodyAudience = "playground:view"
@@ -30164,6 +30288,8 @@ func (e ConfirmStoredObjectUpload200JSONResponseBodyAudience) Valid() bool {
 		return true
 	case ConfirmStoredObjectUpload200JSONResponseBodyAudienceMembersView:
 		return true
+	case ConfirmStoredObjectUpload200JSONResponseBodyAudienceOpsReadView:
+		return true
 	case ConfirmStoredObjectUpload200JSONResponseBodyAudienceOpsView:
 		return true
 	case ConfirmStoredObjectUpload200JSONResponseBodyAudienceOrganizationView:
@@ -30227,6 +30353,7 @@ const (
 	GetStoredObjectParamsAudienceIngestionSourcesView  GetStoredObjectParamsAudience = "ingestionSources:view"
 	GetStoredObjectParamsAudienceLangyView             GetStoredObjectParamsAudience = "langy:view"
 	GetStoredObjectParamsAudienceMembersView           GetStoredObjectParamsAudience = "members:view"
+	GetStoredObjectParamsAudienceOpsReadView           GetStoredObjectParamsAudience = "opsRead:view"
 	GetStoredObjectParamsAudienceOpsView               GetStoredObjectParamsAudience = "ops:view"
 	GetStoredObjectParamsAudienceOrganizationView      GetStoredObjectParamsAudience = "organization:view"
 	GetStoredObjectParamsAudiencePlaygroundView        GetStoredObjectParamsAudience = "playground:view"
@@ -30296,6 +30423,8 @@ func (e GetStoredObjectParamsAudience) Valid() bool {
 		return true
 	case GetStoredObjectParamsAudienceMembersView:
 		return true
+	case GetStoredObjectParamsAudienceOpsReadView:
+		return true
 	case GetStoredObjectParamsAudienceOpsView:
 		return true
 	case GetStoredObjectParamsAudienceOrganizationView:
@@ -30359,6 +30488,7 @@ const (
 	GetStoredObject200JSONResponseBodyCapabilityAudienceIngestionSourcesView  GetStoredObject200JSONResponseBodyCapabilityAudience = "ingestionSources:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudienceLangyView             GetStoredObject200JSONResponseBodyCapabilityAudience = "langy:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudienceMembersView           GetStoredObject200JSONResponseBodyCapabilityAudience = "members:view"
+	GetStoredObject200JSONResponseBodyCapabilityAudienceOpsReadView           GetStoredObject200JSONResponseBodyCapabilityAudience = "opsRead:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudienceOpsView               GetStoredObject200JSONResponseBodyCapabilityAudience = "ops:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudienceOrganizationView      GetStoredObject200JSONResponseBodyCapabilityAudience = "organization:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudiencePlaygroundView        GetStoredObject200JSONResponseBodyCapabilityAudience = "playground:view"
@@ -30427,6 +30557,8 @@ func (e GetStoredObject200JSONResponseBodyCapabilityAudience) Valid() bool {
 	case GetStoredObject200JSONResponseBodyCapabilityAudienceLangyView:
 		return true
 	case GetStoredObject200JSONResponseBodyCapabilityAudienceMembersView:
+		return true
+	case GetStoredObject200JSONResponseBodyCapabilityAudienceOpsReadView:
 		return true
 	case GetStoredObject200JSONResponseBodyCapabilityAudienceOpsView:
 		return true
@@ -30509,6 +30641,7 @@ const (
 	IngestionSourcesView  GetStoredObject200JSONResponseBodyMetadataAudiences = "ingestionSources:view"
 	LangyView             GetStoredObject200JSONResponseBodyMetadataAudiences = "langy:view"
 	MembersView           GetStoredObject200JSONResponseBodyMetadataAudiences = "members:view"
+	OpsReadView           GetStoredObject200JSONResponseBodyMetadataAudiences = "opsRead:view"
 	OpsView               GetStoredObject200JSONResponseBodyMetadataAudiences = "ops:view"
 	OrganizationView      GetStoredObject200JSONResponseBodyMetadataAudiences = "organization:view"
 	PlaygroundView        GetStoredObject200JSONResponseBodyMetadataAudiences = "playground:view"
@@ -30577,6 +30710,8 @@ func (e GetStoredObject200JSONResponseBodyMetadataAudiences) Valid() bool {
 	case LangyView:
 		return true
 	case MembersView:
+		return true
+	case OpsReadView:
 		return true
 	case OpsView:
 		return true
@@ -35849,13 +35984,13 @@ func (e PostApiWebhooksV1Endpoints201JSONResponseBodyData1Status) Valid() bool {
 
 // Defines values for DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchived.
 const (
-	DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchivedTrue DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchived = true
+	True DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchived = true
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchived enum.
 func (e DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchived) Valid() bool {
 	switch e {
-	case DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchivedTrue:
+	case True:
 		return true
 	default:
 		return false
@@ -36074,22 +36209,22 @@ func (e PatchApiWebhooksV1EndpointsById200JSONResponseBodyData1Status) Valid() b
 
 // Defines values for GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome.
 const (
-	Pending   GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome = "pending"
-	Retryable GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome = "retryable"
-	Success   GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome = "success"
-	Terminal  GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome = "terminal"
+	GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcomePending   GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome = "pending"
+	GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcomeRetryable GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome = "retryable"
+	GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcomeSuccess   GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome = "success"
+	GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcomeTerminal  GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome = "terminal"
 )
 
 // Valid indicates whether the value is a known member of the GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome enum.
 func (e GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome) Valid() bool {
 	switch e {
-	case Pending:
+	case GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcomePending:
 		return true
-	case Retryable:
+	case GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcomeRetryable:
 		return true
-	case Success:
+	case GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcomeSuccess:
 		return true
-	case Terminal:
+	case GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcomeTerminal:
 		return true
 	default:
 		return false
@@ -52696,6 +52831,41 @@ type GetApiSlackConnections200JSONResponseBodyKind string
 // GetApiSlackConnections200JSONResponseBodyScopeType defines parameters for GetApiSlackConnections.
 type GetApiSlackConnections200JSONResponseBodyScopeType string
 
+// ListStaffAccessOrganizationsParams defines parameters for ListStaffAccessOrganizations.
+type ListStaffAccessOrganizationsParams struct {
+	Query *string `form:"query,omitempty" json:"query,omitempty"`
+}
+
+// CreateStaffAccessRequestJSONBody defines parameters for CreateStaffAccessRequest.
+type CreateStaffAccessRequestJSONBody struct {
+	CodeChallenge       string                                              `json:"codeChallenge"`
+	CodeChallengeMethod CreateStaffAccessRequestJSONBodyCodeChallengeMethod `json:"codeChallengeMethod"`
+	Machine             string                                              `json:"machine"`
+	Organization        *string                                             `json:"organization,omitempty"`
+	Reason              string                                              `json:"reason"`
+	Scopes              []CreateStaffAccessRequestJSONBodyScopes            `json:"scopes"`
+}
+
+// CreateStaffAccessRequestJSONBodyCodeChallengeMethod defines parameters for CreateStaffAccessRequest.
+type CreateStaffAccessRequestJSONBodyCodeChallengeMethod string
+
+// CreateStaffAccessRequestJSONBodyScopes defines parameters for CreateStaffAccessRequest.
+type CreateStaffAccessRequestJSONBodyScopes string
+
+// GetStaffAccessRequest200JSONResponseBodyStatus defines parameters for GetStaffAccessRequest.
+type GetStaffAccessRequest200JSONResponseBodyStatus string
+
+// EndStaffAccessSession200JSONResponseBodyEnded defines parameters for EndStaffAccessSession.
+type EndStaffAccessSession200JSONResponseBodyEnded bool
+
+// RedeemStaffAccessRequestJSONBody defines parameters for RedeemStaffAccessRequest.
+type RedeemStaffAccessRequestJSONBody struct {
+	CodeVerifier string `json:"codeVerifier"`
+}
+
+// RedeemStaffAccessRequest200JSONResponseBodyScopes defines parameters for RedeemStaffAccessRequest.
+type RedeemStaffAccessRequest200JSONResponseBodyScopes string
+
 // CreateStoredObjectUploadJSONBody defines parameters for CreateStoredObjectUpload.
 type CreateStoredObjectUploadJSONBody struct {
 	ByteLength int    `json:"byteLength"`
@@ -57599,6 +57769,12 @@ type DeleteApiSecretsByIdJSONRequestBody DeleteApiSecretsByIdJSONBody
 
 // PutApiSecretsByIdJSONRequestBody defines body for PutApiSecretsById for application/json ContentType.
 type PutApiSecretsByIdJSONRequestBody PutApiSecretsByIdJSONBody
+
+// CreateStaffAccessRequestJSONRequestBody defines body for CreateStaffAccessRequest for application/json ContentType.
+type CreateStaffAccessRequestJSONRequestBody CreateStaffAccessRequestJSONBody
+
+// RedeemStaffAccessRequestJSONRequestBody defines body for RedeemStaffAccessRequest for application/json ContentType.
+type RedeemStaffAccessRequestJSONRequestBody RedeemStaffAccessRequestJSONBody
 
 // CreateStoredObjectUploadJSONRequestBody defines body for CreateStoredObjectUpload for application/json ContentType.
 type CreateStoredObjectUploadJSONRequestBody CreateStoredObjectUploadJSONBody
@@ -128583,6 +128759,31 @@ type ClientInterface interface {
 	// GetApiSlackConnections request
 	GetApiSlackConnections(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListStaffAccessOrganizations request
+	ListStaffAccessOrganizations(ctx context.Context, params *ListStaffAccessOrganizationsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetStaffAccessOrganizationUsage request
+	GetStaffAccessOrganizationUsage(ctx context.Context, organization string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetStaffAccessQueueSummary request
+	GetStaffAccessQueueSummary(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateStaffAccessRequestWithBody request with any body
+	CreateStaffAccessRequestWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateStaffAccessRequest(ctx context.Context, body CreateStaffAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetStaffAccessRequest request
+	GetStaffAccessRequest(ctx context.Context, requestId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// EndStaffAccessSession request
+	EndStaffAccessSession(ctx context.Context, requestId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RedeemStaffAccessRequestWithBody request with any body
+	RedeemStaffAccessRequestWithBody(ctx context.Context, requestId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	RedeemStaffAccessRequest(ctx context.Context, requestId string, body RedeemStaffAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// CreateStoredObjectUploadWithBody request with any body
 	CreateStoredObjectUploadWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -134790,6 +134991,114 @@ func (c *Client) GetApiSimulationRunsByScenarioRunId(ctx context.Context, scenar
 
 func (c *Client) GetApiSlackConnections(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetApiSlackConnectionsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListStaffAccessOrganizations(ctx context.Context, params *ListStaffAccessOrganizationsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListStaffAccessOrganizationsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetStaffAccessOrganizationUsage(ctx context.Context, organization string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetStaffAccessOrganizationUsageRequest(c.Server, organization)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetStaffAccessQueueSummary(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetStaffAccessQueueSummaryRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateStaffAccessRequestWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateStaffAccessRequestRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateStaffAccessRequest(ctx context.Context, body CreateStaffAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateStaffAccessRequestRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetStaffAccessRequest(ctx context.Context, requestId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetStaffAccessRequestRequest(c.Server, requestId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) EndStaffAccessSession(ctx context.Context, requestId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewEndStaffAccessSessionRequest(c.Server, requestId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) RedeemStaffAccessRequestWithBody(ctx context.Context, requestId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRedeemStaffAccessRequestRequestWithBody(c.Server, requestId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) RedeemStaffAccessRequest(ctx context.Context, requestId string, body RedeemStaffAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRedeemStaffAccessRequestRequest(c.Server, requestId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -151781,6 +152090,276 @@ func NewGetApiSlackConnectionsRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewListStaffAccessOrganizationsRequest generates requests for ListStaffAccessOrganizations
+func NewListStaffAccessOrganizationsRequest(server string, params *ListStaffAccessOrganizationsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/staff-access/ops/organizations")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Query != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "query", *params.Query, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetStaffAccessOrganizationUsageRequest generates requests for GetStaffAccessOrganizationUsage
+func NewGetStaffAccessOrganizationUsageRequest(server string, organization string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organization", organization, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/staff-access/ops/organizations/%s/usage", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetStaffAccessQueueSummaryRequest generates requests for GetStaffAccessQueueSummary
+func NewGetStaffAccessQueueSummaryRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/staff-access/ops/queues")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateStaffAccessRequestRequest calls the generic CreateStaffAccessRequest builder with application/json body
+func NewCreateStaffAccessRequestRequest(server string, body CreateStaffAccessRequestJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateStaffAccessRequestRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateStaffAccessRequestRequestWithBody generates requests for CreateStaffAccessRequest with any type of body
+func NewCreateStaffAccessRequestRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/staff-access/requests")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetStaffAccessRequestRequest generates requests for GetStaffAccessRequest
+func NewGetStaffAccessRequestRequest(server string, requestId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "requestId", requestId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/staff-access/requests/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewEndStaffAccessSessionRequest generates requests for EndStaffAccessSession
+func NewEndStaffAccessSessionRequest(server string, requestId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "requestId", requestId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/staff-access/requests/%s/end", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewRedeemStaffAccessRequestRequest calls the generic RedeemStaffAccessRequest builder with application/json body
+func NewRedeemStaffAccessRequestRequest(server string, requestId string, body RedeemStaffAccessRequestJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewRedeemStaffAccessRequestRequestWithBody(server, requestId, "application/json", bodyReader)
+}
+
+// NewRedeemStaffAccessRequestRequestWithBody generates requests for RedeemStaffAccessRequest with any type of body
+func NewRedeemStaffAccessRequestRequestWithBody(server string, requestId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "requestId", requestId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/staff-access/requests/%s/redeem", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewCreateStoredObjectUploadRequest calls the generic CreateStoredObjectUpload builder with application/json body
 func NewCreateStoredObjectUploadRequest(server string, body CreateStoredObjectUploadJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -155979,6 +156558,31 @@ type ClientWithResponsesInterface interface {
 
 	// GetApiSlackConnectionsWithResponse request
 	GetApiSlackConnectionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiSlackConnectionsResponse, error)
+
+	// ListStaffAccessOrganizationsWithResponse request
+	ListStaffAccessOrganizationsWithResponse(ctx context.Context, params *ListStaffAccessOrganizationsParams, reqEditors ...RequestEditorFn) (*ListStaffAccessOrganizationsResponse, error)
+
+	// GetStaffAccessOrganizationUsageWithResponse request
+	GetStaffAccessOrganizationUsageWithResponse(ctx context.Context, organization string, reqEditors ...RequestEditorFn) (*GetStaffAccessOrganizationUsageResponse, error)
+
+	// GetStaffAccessQueueSummaryWithResponse request
+	GetStaffAccessQueueSummaryWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetStaffAccessQueueSummaryResponse, error)
+
+	// CreateStaffAccessRequestWithBodyWithResponse request with any body
+	CreateStaffAccessRequestWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateStaffAccessRequestResponse, error)
+
+	CreateStaffAccessRequestWithResponse(ctx context.Context, body CreateStaffAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateStaffAccessRequestResponse, error)
+
+	// GetStaffAccessRequestWithResponse request
+	GetStaffAccessRequestWithResponse(ctx context.Context, requestId string, reqEditors ...RequestEditorFn) (*GetStaffAccessRequestResponse, error)
+
+	// EndStaffAccessSessionWithResponse request
+	EndStaffAccessSessionWithResponse(ctx context.Context, requestId string, reqEditors ...RequestEditorFn) (*EndStaffAccessSessionResponse, error)
+
+	// RedeemStaffAccessRequestWithBodyWithResponse request with any body
+	RedeemStaffAccessRequestWithBodyWithResponse(ctx context.Context, requestId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RedeemStaffAccessRequestResponse, error)
+
+	RedeemStaffAccessRequestWithResponse(ctx context.Context, requestId string, body RedeemStaffAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*RedeemStaffAccessRequestResponse, error)
 
 	// CreateStoredObjectUploadWithBodyWithResponse request with any body
 	CreateStoredObjectUploadWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateStoredObjectUploadResponse, error)
@@ -179893,6 +180497,279 @@ func (r GetApiSlackConnectionsResponse) ContentType() string {
 	return ""
 }
 
+type ListStaffAccessOrganizationsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Organizations []struct {
+			Id   string `json:"id"`
+			Name string `json:"name"`
+			Slug string `json:"slug"`
+		} `json:"organizations"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r ListStaffAccessOrganizationsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListStaffAccessOrganizationsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListStaffAccessOrganizationsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetStaffAccessOrganizationUsageResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		ApiKeys []struct {
+			Id         string  `json:"id"`
+			LastUsedAt *string `json:"lastUsedAt"`
+			Name       string  `json:"name"`
+		} `json:"apiKeys"`
+		At                  string `json:"at"`
+		Classification      string `json:"classification"`
+		CodingAgentSessions struct {
+			Last30Days    int     `json:"last30Days"`
+			Last7Days     int     `json:"last7Days"`
+			LastSessionAt *string `json:"lastSessionAt"`
+		} `json:"codingAgentSessions"`
+		Gateway struct {
+			Requests30Days int     `json:"requests30Days"`
+			SpendUsd30Days float32 `json:"spendUsd30Days"`
+		} `json:"gateway"`
+		MembersSignedIn int `json:"membersSignedIn"`
+		Organization    struct {
+			Id   string `json:"id"`
+			Name string `json:"name"`
+			Slug string `json:"slug"`
+		} `json:"organization"`
+		Traces30Days int `json:"traces30Days"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetStaffAccessOrganizationUsageResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetStaffAccessOrganizationUsageResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetStaffAccessOrganizationUsageResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetStaffAccessQueueSummaryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Queues []struct {
+			ActiveGroupCount  float32 `json:"activeGroupCount"`
+			BlockedGroupCount float32 `json:"blockedGroupCount"`
+			DisplayName       string  `json:"displayName"`
+			DlqCount          float32 `json:"dlqCount"`
+			Name              string  `json:"name"`
+			ParkedGroupCount  float32 `json:"parkedGroupCount"`
+			PendingGroupCount float32 `json:"pendingGroupCount"`
+			TotalPendingJobs  float32 `json:"totalPendingJobs"`
+		} `json:"queues"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetStaffAccessQueueSummaryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetStaffAccessQueueSummaryResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetStaffAccessQueueSummaryResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateStaffAccessRequestResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		ApprovalUrl string `json:"approvalUrl"`
+		ExpiresAt   string `json:"expiresAt"`
+		RequestId   string `json:"requestId"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateStaffAccessRequestResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateStaffAccessRequestResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateStaffAccessRequestResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetStaffAccessRequestResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		AccessExpiresAt *string                                        `json:"accessExpiresAt"`
+		ExpiresAt       string                                         `json:"expiresAt"`
+		RequestId       string                                         `json:"requestId"`
+		Status          GetStaffAccessRequest200JSONResponseBodyStatus `json:"status"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetStaffAccessRequestResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetStaffAccessRequestResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetStaffAccessRequestResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type EndStaffAccessSessionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Ended EndStaffAccessSession200JSONResponseBodyEnded `json:"ended"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r EndStaffAccessSessionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r EndStaffAccessSessionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r EndStaffAccessSessionResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type RedeemStaffAccessRequestResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		ApiKey         *string `json:"apiKey,omitempty"`
+		ExpiresAt      string  `json:"expiresAt"`
+		OpsToken       *string `json:"opsToken,omitempty"`
+		OrganizationId *string `json:"organizationId,omitempty"`
+		Projects       []struct {
+			Id   string `json:"id"`
+			Name string `json:"name"`
+			Slug string `json:"slug"`
+		} `json:"projects"`
+		Scopes []RedeemStaffAccessRequest200JSONResponseBodyScopes `json:"scopes"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r RedeemStaffAccessRequestResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RedeemStaffAccessRequestResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RedeemStaffAccessRequestResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type CreateStoredObjectUploadResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -187221,6 +188098,85 @@ func (c *ClientWithResponses) GetApiSlackConnectionsWithResponse(ctx context.Con
 		return nil, err
 	}
 	return ParseGetApiSlackConnectionsResponse(rsp)
+}
+
+// ListStaffAccessOrganizationsWithResponse request returning *ListStaffAccessOrganizationsResponse
+func (c *ClientWithResponses) ListStaffAccessOrganizationsWithResponse(ctx context.Context, params *ListStaffAccessOrganizationsParams, reqEditors ...RequestEditorFn) (*ListStaffAccessOrganizationsResponse, error) {
+	rsp, err := c.ListStaffAccessOrganizations(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListStaffAccessOrganizationsResponse(rsp)
+}
+
+// GetStaffAccessOrganizationUsageWithResponse request returning *GetStaffAccessOrganizationUsageResponse
+func (c *ClientWithResponses) GetStaffAccessOrganizationUsageWithResponse(ctx context.Context, organization string, reqEditors ...RequestEditorFn) (*GetStaffAccessOrganizationUsageResponse, error) {
+	rsp, err := c.GetStaffAccessOrganizationUsage(ctx, organization, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetStaffAccessOrganizationUsageResponse(rsp)
+}
+
+// GetStaffAccessQueueSummaryWithResponse request returning *GetStaffAccessQueueSummaryResponse
+func (c *ClientWithResponses) GetStaffAccessQueueSummaryWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetStaffAccessQueueSummaryResponse, error) {
+	rsp, err := c.GetStaffAccessQueueSummary(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetStaffAccessQueueSummaryResponse(rsp)
+}
+
+// CreateStaffAccessRequestWithBodyWithResponse request with arbitrary body returning *CreateStaffAccessRequestResponse
+func (c *ClientWithResponses) CreateStaffAccessRequestWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateStaffAccessRequestResponse, error) {
+	rsp, err := c.CreateStaffAccessRequestWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateStaffAccessRequestResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateStaffAccessRequestWithResponse(ctx context.Context, body CreateStaffAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateStaffAccessRequestResponse, error) {
+	rsp, err := c.CreateStaffAccessRequest(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateStaffAccessRequestResponse(rsp)
+}
+
+// GetStaffAccessRequestWithResponse request returning *GetStaffAccessRequestResponse
+func (c *ClientWithResponses) GetStaffAccessRequestWithResponse(ctx context.Context, requestId string, reqEditors ...RequestEditorFn) (*GetStaffAccessRequestResponse, error) {
+	rsp, err := c.GetStaffAccessRequest(ctx, requestId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetStaffAccessRequestResponse(rsp)
+}
+
+// EndStaffAccessSessionWithResponse request returning *EndStaffAccessSessionResponse
+func (c *ClientWithResponses) EndStaffAccessSessionWithResponse(ctx context.Context, requestId string, reqEditors ...RequestEditorFn) (*EndStaffAccessSessionResponse, error) {
+	rsp, err := c.EndStaffAccessSession(ctx, requestId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseEndStaffAccessSessionResponse(rsp)
+}
+
+// RedeemStaffAccessRequestWithBodyWithResponse request with arbitrary body returning *RedeemStaffAccessRequestResponse
+func (c *ClientWithResponses) RedeemStaffAccessRequestWithBodyWithResponse(ctx context.Context, requestId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RedeemStaffAccessRequestResponse, error) {
+	rsp, err := c.RedeemStaffAccessRequestWithBody(ctx, requestId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRedeemStaffAccessRequestResponse(rsp)
+}
+
+func (c *ClientWithResponses) RedeemStaffAccessRequestWithResponse(ctx context.Context, requestId string, body RedeemStaffAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*RedeemStaffAccessRequestResponse, error) {
+	rsp, err := c.RedeemStaffAccessRequest(ctx, requestId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRedeemStaffAccessRequestResponse(rsp)
 }
 
 // CreateStoredObjectUploadWithBodyWithResponse request with arbitrary body returning *CreateStoredObjectUploadResponse
@@ -213829,6 +214785,251 @@ func ParseGetApiSlackConnectionsResponse(rsp *http.Response) (*GetApiSlackConnec
 
 			// SlackTeamName The Slack workspace a bot connection posts into.
 			SlackTeamName *string `json:"slackTeamName"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListStaffAccessOrganizationsResponse parses an HTTP response from a ListStaffAccessOrganizationsWithResponse call
+func ParseListStaffAccessOrganizationsResponse(rsp *http.Response) (*ListStaffAccessOrganizationsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListStaffAccessOrganizationsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Organizations []struct {
+				Id   string `json:"id"`
+				Name string `json:"name"`
+				Slug string `json:"slug"`
+			} `json:"organizations"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetStaffAccessOrganizationUsageResponse parses an HTTP response from a GetStaffAccessOrganizationUsageWithResponse call
+func ParseGetStaffAccessOrganizationUsageResponse(rsp *http.Response) (*GetStaffAccessOrganizationUsageResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetStaffAccessOrganizationUsageResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			ApiKeys []struct {
+				Id         string  `json:"id"`
+				LastUsedAt *string `json:"lastUsedAt"`
+				Name       string  `json:"name"`
+			} `json:"apiKeys"`
+			At                  string `json:"at"`
+			Classification      string `json:"classification"`
+			CodingAgentSessions struct {
+				Last30Days    int     `json:"last30Days"`
+				Last7Days     int     `json:"last7Days"`
+				LastSessionAt *string `json:"lastSessionAt"`
+			} `json:"codingAgentSessions"`
+			Gateway struct {
+				Requests30Days int     `json:"requests30Days"`
+				SpendUsd30Days float32 `json:"spendUsd30Days"`
+			} `json:"gateway"`
+			MembersSignedIn int `json:"membersSignedIn"`
+			Organization    struct {
+				Id   string `json:"id"`
+				Name string `json:"name"`
+				Slug string `json:"slug"`
+			} `json:"organization"`
+			Traces30Days int `json:"traces30Days"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetStaffAccessQueueSummaryResponse parses an HTTP response from a GetStaffAccessQueueSummaryWithResponse call
+func ParseGetStaffAccessQueueSummaryResponse(rsp *http.Response) (*GetStaffAccessQueueSummaryResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetStaffAccessQueueSummaryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Queues []struct {
+				ActiveGroupCount  float32 `json:"activeGroupCount"`
+				BlockedGroupCount float32 `json:"blockedGroupCount"`
+				DisplayName       string  `json:"displayName"`
+				DlqCount          float32 `json:"dlqCount"`
+				Name              string  `json:"name"`
+				ParkedGroupCount  float32 `json:"parkedGroupCount"`
+				PendingGroupCount float32 `json:"pendingGroupCount"`
+				TotalPendingJobs  float32 `json:"totalPendingJobs"`
+			} `json:"queues"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateStaffAccessRequestResponse parses an HTTP response from a CreateStaffAccessRequestWithResponse call
+func ParseCreateStaffAccessRequestResponse(rsp *http.Response) (*CreateStaffAccessRequestResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateStaffAccessRequestResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			ApprovalUrl string `json:"approvalUrl"`
+			ExpiresAt   string `json:"expiresAt"`
+			RequestId   string `json:"requestId"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetStaffAccessRequestResponse parses an HTTP response from a GetStaffAccessRequestWithResponse call
+func ParseGetStaffAccessRequestResponse(rsp *http.Response) (*GetStaffAccessRequestResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetStaffAccessRequestResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			AccessExpiresAt *string                                        `json:"accessExpiresAt"`
+			ExpiresAt       string                                         `json:"expiresAt"`
+			RequestId       string                                         `json:"requestId"`
+			Status          GetStaffAccessRequest200JSONResponseBodyStatus `json:"status"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseEndStaffAccessSessionResponse parses an HTTP response from a EndStaffAccessSessionWithResponse call
+func ParseEndStaffAccessSessionResponse(rsp *http.Response) (*EndStaffAccessSessionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &EndStaffAccessSessionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Ended EndStaffAccessSession200JSONResponseBodyEnded `json:"ended"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRedeemStaffAccessRequestResponse parses an HTTP response from a RedeemStaffAccessRequestWithResponse call
+func ParseRedeemStaffAccessRequestResponse(rsp *http.Response) (*RedeemStaffAccessRequestResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RedeemStaffAccessRequestResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			ApiKey         *string `json:"apiKey,omitempty"`
+			ExpiresAt      string  `json:"expiresAt"`
+			OpsToken       *string `json:"opsToken,omitempty"`
+			OrganizationId *string `json:"organizationId,omitempty"`
+			Projects       []struct {
+				Id   string `json:"id"`
+				Name string `json:"name"`
+				Slug string `json:"slug"`
+			} `json:"projects"`
+			Scopes []RedeemStaffAccessRequest200JSONResponseBodyScopes `json:"scopes"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err

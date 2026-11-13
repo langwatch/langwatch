@@ -363,7 +363,7 @@ Answers at `/api/prompt-playground/2026-08-20/prompt.execute`.
 
 ```typescript
 type Body = z.infer<typeof executeRequestSchema>; // ../contract/src/prompt.playground-execute.ts:43
-// Response: inline, src/transport/prompt-execute.rest.ts:23
+// Response: inline, src/transport/prompt-execute.rest.ts:24
 type Response = unknown;
 ```
 
@@ -585,7 +585,7 @@ type Response = z.infer<typeof promptWireSchema>; // ../contract/src/prompt-rest
 
 Delete a prompt
 
-Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:448`.
+Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:450`.
 
 Answers at `/api/prompts/:id{.+}`, `/api/v1/prompts/:id{.+}`.
 

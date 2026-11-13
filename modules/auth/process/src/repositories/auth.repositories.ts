@@ -8,6 +8,7 @@ import type { AuthSessionRepository } from "./auth-session.repository.ts";
 import type { BetterAuthHooksRepository } from "./better-auth-hooks.repository.ts";
 import type { BetterAuthStorageRepository } from "./better-auth-storage.repository.ts";
 import type { CliDeviceSessionRepository } from "./cli-device-session.repository.ts";
+import type { PasskeyRepository } from "./passkey.repository.ts";
 import type { PendingSsoSetupRepository } from "./pending-sso-setup.repository.ts";
 import type { SignInAttemptLockRepository } from "./sign-in-attempt-lock.repository.ts";
 import type { SignUpVerificationTokenRepository } from "./signup-verification.repository.ts";
@@ -33,6 +34,8 @@ export interface AuthRepositories {
   readonly betterAuthSecondaryStorage: NonNullable<BetterAuthOptions["secondaryStorage"]>;
   /** The `User` and `Account` rows Better Auth's database hooks read and write. */
   readonly betterAuthHooks: BetterAuthHooksRepository;
+  /** The passkeys Better Auth registered, which one-challenge signatures are checked against. */
+  readonly passkeys: PasskeyRepository;
   /** The person a CLI device grant names. */
   readonly directory: AuthDirectoryRepository;
   /** The sign-in flag a cleanup task pages and clears. */

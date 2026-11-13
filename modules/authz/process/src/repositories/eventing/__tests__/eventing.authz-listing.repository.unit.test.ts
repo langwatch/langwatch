@@ -270,6 +270,28 @@ describe("EventingAuthzListingRepository", () => {
       );
     });
 
+    it("drops a system-managed key's grant, so a staff access key is never listed to manage", async () => {
+      const { prisma, repository } = prismaWith({
+        grants: [
+          grantRow({
+            id: "g-staff-key",
+            principalType: "API_KEY",
+            principalId: "staff-key",
+            roleKey: "viewer",
+          }),
+        ],
+      });
+
+      const rows = await repository.findOrganizationBindings({ organizationId: ORG });
+
+      expect(rows).toEqual([]);
+      expect(prisma.apiKey.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ organizationId: ORG, isSystemManaged: false }),
+        }),
+      );
+    });
+
     it("keeps a per-user row whose decoration is missing, like the legacy per-user read", async () => {
       const { repository } = prismaWith({
         grants: [

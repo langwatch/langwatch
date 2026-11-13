@@ -10,6 +10,7 @@ import {
   adminMenu,
   isSettingsMenuItemActiveAmong,
   settingsMenu,
+  type AdminMenuGates,
   type SettingsMenuGates,
 } from "../settings-menu.ts";
 
@@ -48,7 +49,7 @@ describe("given a reader with no grants on a self-hosted deployment", () => {
     });
 
     it("offers neither the operations nor its admin groups", () => {
-      expect(adminMenu(EVERYTHING_CLOSED)).toEqual([]);
+      expect(adminMenu({ ...EVERYTHING_CLOSED, hasAgentAccess: false })).toEqual([]);
     });
   });
 });
@@ -328,13 +329,15 @@ describe("given a plan that lacks Enterprise", () => {
 });
 
 describe("given an operator", () => {
-  function adminHrefsIn(gates: Partial<SettingsMenuGates>): string[] {
-    return adminMenu({ ...EVERYTHING_CLOSED, ...gates }).flatMap((group) =>
+  function adminHrefsIn(gates: Partial<SettingsMenuGates & AdminMenuGates>): string[] {
+    return adminMenu({ ...EVERYTHING_CLOSED, hasAgentAccess: false, ...gates }).flatMap((group) =>
       group.items.map((item) => item.href),
     );
   }
-  function adminGroupIdsIn(gates: Partial<SettingsMenuGates>): string[] {
-    return adminMenu({ ...EVERYTHING_CLOSED, ...gates }).map((group) => group.id);
+  function adminGroupIdsIn(gates: Partial<SettingsMenuGates & AdminMenuGates>): string[] {
+    return adminMenu({ ...EVERYTHING_CLOSED, hasAgentAccess: false, ...gates }).map(
+      (group) => group.id,
+    );
   }
 
   describe("when the Settings menu is built with operations access", () => {
@@ -357,6 +360,24 @@ describe("given an operator", () => {
       expect(adminHrefsIn({ hasOpsAccess: true })).not.toContain("/ops/feature-flags");
       expect(adminHrefsIn({ hasOpsAccess: true, hasCloudOps: true })).toContain(
         "/ops/feature-flags",
+      );
+    });
+
+    /** @scenario "The Agent access link shows only with cloud ops, the operator grant and the flag" */
+    it("offers Agent access only to a cloud platform administrator with the flag on", () => {
+      const gates = { hasOpsAccess: true, hasAgentAccess: true };
+      expect(adminHrefsIn({ ...gates, hasCloudOps: true })).not.toContain("/ops/agents");
+      expect(adminHrefsIn({ ...gates, isPlatformAdmin: true })).not.toContain("/ops/agents");
+      expect(
+        adminHrefsIn({
+          hasOpsAccess: true,
+          hasCloudOps: true,
+          isPlatformAdmin: true,
+          hasAgentAccess: false,
+        }),
+      ).not.toContain("/ops/agents");
+      expect(adminHrefsIn({ ...gates, hasCloudOps: true, isPlatformAdmin: true })).toContain(
+        "/ops/agents",
       );
     });
 
@@ -388,9 +409,11 @@ describe("given an operator", () => {
 
     it("gives every entry an icon no other entry wears", () => {
       const everything = { hasOpsAccess: true, isPlatformAdmin: true, hasCloudOps: true };
-      const icons = adminMenu({ ...EVERYTHING_CLOSED, ...everything }).flatMap((group) =>
-        group.items.map((item) => item.icon),
-      );
+      const icons = adminMenu({
+        ...EVERYTHING_CLOSED,
+        hasAgentAccess: true,
+        ...everything,
+      }).flatMap((group) => group.items.map((item) => item.icon));
       expect(new Set(icons).size).toBe(icons.length);
     });
   });

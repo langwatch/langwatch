@@ -38,6 +38,7 @@ describe("organizationAuditLogPageSchema", () => {
           actorUser: null,
           channel: "app",
           apiKeyId: null,
+          staffAccess: null,
         },
       ],
     };

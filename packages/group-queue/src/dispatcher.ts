@@ -1,3 +1,5 @@
+import { performance } from "node:perf_hooks";
+
 import type { Logger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import type fastq from "fastq";
@@ -7,8 +9,12 @@ import type { DispatchedWork, DispatchResult, GroupStagingScripts } from "./scri
 
 /** Max jobs to dispatch per Lua call to bound script execution time. */
 const MAX_BATCH_SIZE = 200;
-/** Claims at or above this many leave no pause before the next: there is a backlog to drain. */
+/** The pause after a claim that found fewer jobs than free slots, so arrivals gather. */
+const DRAINED_PAUSE_MS = 25;
+/** A claim for this many free slots, or for all of them, goes at once: a backlog to drain. */
 const FULL_CLAIM = 32;
+/** The least time between claims for fewer free slots, so freed slots gather into one claim. */
+const MIN_CLAIM_GAP_MS = 10;
 
 /** The shortest BRPOP wait: a due-but-unclaimable group cannot spin the loop faster. */
 const MIN_SIGNAL_WAIT_MS = 50;
@@ -58,6 +64,10 @@ export class GroupQueueDispatcher {
   private wake: (() => void) | null = null;
   /** A listed-group dispatcher's own job finished since its last claim: it claims again at once. */
   private slotFreed = false;
+  /** The last claim found a job for every slot it asked for: more work is waiting. */
+  private backlogged = false;
+  /** When the last claim was sent, for the gap between small claims. */
+  private lastClaimAtMs = Number.NEGATIVE_INFINITY;
   /** The open list that claims first next time, so each list leads in turn. */
   private nextList = 0;
   /** Each candidates set the last listed claim scanned, and the clock it scanned below. */
@@ -92,6 +102,8 @@ export class GroupQueueDispatcher {
       claimGuardWorkerId?: () => string | undefined;
       /** This worker: the claim passes over a group whose job it handed back. */
       workerId?: string;
+      /** Monotonic milliseconds for the gap between claims; performance.now by default. */
+      clockMs?: () => number;
     },
   ) {}
 
@@ -158,11 +170,12 @@ export class GroupQueueDispatcher {
   private async dispatchUntilEmpty(): Promise<void> {
     let dispatched: number;
     do {
-      dispatched = await this.dispatchBatch();
-      // A short claim means the queue is nearly drained: pause so arrivals gather. A full one
-      // means a backlog, so only yield the turn; a fixed pause capped each pod's claim rate.
-      if (dispatched > 0 && dispatched < FULL_CLAIM) {
-        await new Promise((resolve) => setTimeout(resolve, 25));
+      const batch = await this.dispatchBatch();
+      dispatched = batch.claimed;
+      // Fewer jobs than asked means the queue is nearly drained: pause so arrivals gather. A claim
+      // that filled every free slot means a backlog, so only yield the turn.
+      if (dispatched > 0 && dispatched < batch.requested) {
+        await new Promise((resolve) => setTimeout(resolve, DRAINED_PAUSE_MS));
       } else if (dispatched > 0) {
         await new Promise((resolve) => setImmediate(resolve));
       }
@@ -195,9 +208,24 @@ export class GroupQueueDispatcher {
     this.wake?.();
   }
 
+  /** Work is waiting for each slot that frees, so a slot between claims is not idle. */
+  hasBacklog(): boolean {
+    return this.backlogged && !this.paused;
+  }
+
+  /** The consumer's slot count changed: a full consumer may now have room to claim. */
+  slotsChanged(): void {
+    this.wakeForFreedSlot();
+  }
+
   private wakeForFreedSlot(): void {
     this.slotFreed = true;
     if (!this.paused) this.wake?.();
+  }
+
+  private async untilSlotFreed(): Promise<void> {
+    if (this.slotFreed || this.shutdownRequested || this.paused) return;
+    await this.untilWoken();
   }
 
   private untilWoken(): Promise<void> {
@@ -217,6 +245,9 @@ export class GroupQueueDispatcher {
 
   private async waitForSignal(): Promise<void> {
     if (this.listed) return this.pollListedGroups();
+    // Full, only a freed slot lets a claim through: a completion's signal can arrive before fastq
+    // frees its slot, and the cycle then clears it, so wait for the slot itself.
+    if (this.saturated()) return this.untilSlotFreed();
     const signalKey = this.params.scripts.getSignalKey();
     const untilDueMs = await this.untilEarliestDueMs();
     // A settling group comes due within one BRPOP floor; signals meanwhile stay listed.
@@ -432,16 +463,38 @@ export class GroupQueueDispatcher {
     return { groupBatch: { ...batching, maxClaims: MAX_BATCH_SIZE } };
   }
 
-  private async dispatchBatch(): Promise<number> {
-    if (this.paused) return 0;
+  private clockMs(): number {
+    return this.params.clockMs ? this.params.clockMs() : performance.now();
+  }
+
+  private freeSlots(): number {
+    const { processingQueue } = this.params;
+    return this.slots() - processingQueue.length() - processingQueue.running();
+  }
+
+  /**
+   * A few free slots wait out the gap since the last claim, so each finished job does not cost
+   * its own claim: claims stay under 1000 / MIN_CLAIM_GAP_MS a second plus one per FULL_CLAIM jobs.
+   */
+  private async gatherFreedSlots(): Promise<void> {
+    const free = this.freeSlots();
+    if (free <= 0 || free >= Math.min(FULL_CLAIM, this.slots())) return;
+    const waitMs = this.lastClaimAtMs + MIN_CLAIM_GAP_MS - this.clockMs();
+    if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs));
+  }
+
+  /** One claim for every free slot: how many it asked for and how many it got. */
+  private async dispatchBatch(): Promise<{ requested: number; claimed: number }> {
+    await this.gatherFreedSlots();
+    if (this.paused || this.shutdownRequested) return { requested: 0, claimed: 0 };
     this.slotFreed = false;
-    const availableSlots =
-      this.slots() - this.params.processingQueue.length() - this.params.processingQueue.running();
+    const availableSlots = this.freeSlots();
     if (availableSlots <= 0) {
-      return 0;
+      return { requested: 0, claimed: 0 };
     }
 
     const maxJobs = Math.min(availableSlots, MAX_BATCH_SIZE);
+    this.lastClaimAtMs = this.clockMs();
     let claimed = 0;
 
     for (const work of await this.claim(maxJobs)) {
@@ -458,8 +511,7 @@ export class GroupQueueDispatcher {
           "fastq push error (already handled in processWithRetries)",
         );
       });
-      // The shared signal is the main dispatcher's; a listed one wakes on its own freed slot.
-      if (this.listed) void run.finally(() => this.wakeForFreedSlot());
+      void run.finally(() => this.wakeForFreedSlot());
 
       gqJobsDispatchedTotal.inc({ queue_name: this.params.queueName }, claims.length);
     }
@@ -474,6 +526,7 @@ export class GroupQueueDispatcher {
       );
     }
 
-    return claimed;
+    this.backlogged = claimed >= maxJobs;
+    return { requested: maxJobs, claimed };
   }
 }

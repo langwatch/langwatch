@@ -1355,6 +1355,11 @@ const presentations = {
     title: "That email already has an account",
     describe: () => "Sign in with it, or reset the password if you don't have it.",
   },
+  passkey_assertion_refused: {
+    title: "That passkey didn't confirm it was you",
+    describe: () =>
+      "Use a passkey registered to your own account, unlock it with your fingerprint, face or PIN, then try again.",
+  },
   password_auth_not_available: {
     title: "Passwords aren't used here",
     describe: () =>
@@ -2852,6 +2857,96 @@ const presentations = {
     title: "Secrets are unavailable",
     describe: () =>
       "The development secrets source could not be read. Sign in to it and try again.",
+  },
+  staff_access_unavailable: {
+    title: "Staff access is not available here",
+    describe: () =>
+      "This request came from a LangWatch staff key, and this server cannot record it, so it was refused.",
+  },
+  staff_access_revoked: {
+    title: "This staff access was revoked",
+    describe: () => "An operator ended this staff access, so its key no longer works.",
+  },
+  staff_access_expired: {
+    title: "This staff access has ended",
+    describe: () => "Staff access lasts one hour and this one has run out.",
+  },
+  staff_access_ip_mismatch: {
+    title: "This key is used from another address",
+    describe: () => "Staff access is pinned to the address that redeemed it.",
+  },
+  staff_access_operator_lost: {
+    title: "The approver is no longer an operator",
+    describe: () =>
+      "The operator who approved this access no longer holds the platform operator grant, so it stopped.",
+  },
+  staff_spend_not_approved: {
+    title: "This access cannot start or change runs",
+    describe: () =>
+      "Runs, evaluators, monitors, scenarios and dashboards spend the organization's money, and this access was approved without that. It may change datasets only.",
+  },
+  staff_content_not_approved: {
+    title: "This access cannot read content",
+    describe: () =>
+      "Run results and stored files hold what the organization's users wrote, and this access was approved without content.",
+  },
+  staff_write_not_allowed: {
+    title: "Staff access cannot make this change",
+    describe: () =>
+      "Staff access never removes or switches off a record, and only changes what it was approved for.",
+  },
+  staff_access_audit_unavailable: {
+    title: "Staff access could not be recorded",
+    describe: () =>
+      "Every staff request is recorded before it runs, and the record could not be written, so the request was refused.",
+  },
+  already_redeemed: {
+    title: "This request was already used",
+    describe: () =>
+      "An approved request gives out its key once, and this one was already redeemed.",
+  },
+  staff_access_not_configured: {
+    title: "Staff access is not set up on this server",
+    describe: () =>
+      "The server has no public base URL, so it cannot build the approval link an operator opens.",
+  },
+  staff_access_already_ended: {
+    title: "This session already ended",
+    describe: () =>
+      "The session was revoked, expired or ended by its agent, so there is nothing to revoke.",
+  },
+  staff_access_confirmation_mismatch: {
+    title: "Confirmation did not match",
+    describe: () => "Type the words exactly as shown to revoke every staff session.",
+  },
+  invalid_code_verifier: {
+    title: "The code verifier does not match",
+    describe: () =>
+      "The agent that redeems a request must present the verifier behind the challenge it sent.",
+  },
+  organization_name_mismatch: {
+    title: "The organization name does not match",
+    describe: () => "This approval needs the organization's name typed exactly as shown.",
+  },
+  passkey_required: {
+    title: "Add a passkey first",
+    describe: () => "Staff access is approved with a passkey, and this account has none.",
+  },
+  staff_access_rate_limited: {
+    title: "Too many access requests",
+    describe: () => "An agent may make five access requests an hour.",
+  },
+  request_not_pending: {
+    title: "This request was already decided",
+    describe: () => "Someone approved or denied this access request already.",
+  },
+  request_expired: {
+    title: "This request expired",
+    describe: () => "An access request waits ten minutes for an approval.",
+  },
+  request_not_approved: {
+    title: "This request is not approved",
+    describe: () => "Only an approved access request can be redeemed.",
   },
   ops_confirmation_required: {
     title: "Confirm before running this",

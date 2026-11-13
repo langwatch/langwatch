@@ -10,6 +10,7 @@ import { execViaDaemon, requestStop } from "./client";
 import {
   collectForwardedEnv,
   evaluateEligibility,
+  hasOpsSessionFile,
   isAutoSpawnEnabled,
   isDaemonDisabledByConfig,
   resolveColorLevel,
@@ -42,6 +43,7 @@ export async function runCli(argv: string[]): Promise<void> {
     args,
     env: process.env,
     daemonDisabledByConfig: isDaemonDisabledByConfig(process.env),
+    opsSessionPresent: hasOpsSessionFile(process.env),
     stdoutIsTty: Boolean(process.stdout.isTTY),
     stderrIsTty: Boolean(process.stderr.isTTY),
     stdinIsTty: Boolean(process.stdin.isTTY),

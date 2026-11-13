@@ -80,6 +80,7 @@ class GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemGatesItemType1(
     LANGYVIEW = "langy:view"
     MEMBERSVIEW = "members:view"
     OPSMANAGE = "ops:manage"
+    OPSREADVIEW = "opsRead:view"
     OPSVIEW = "ops:view"
     ORGANIZATIONDELETE = "organization:delete"
     ORGANIZATIONMANAGE = "organization:manage"

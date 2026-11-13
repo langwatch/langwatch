@@ -8,6 +8,8 @@ import type { WireOf } from "@langwatch/api/web";
 import type { EnrichedAuditLog as StoredEnrichedAuditLog } from "@langwatch/organization-contract";
 import { type Instant, toDate, readableDate } from "@langwatch/time";
 
+import { auditActor } from "./audit-log-rows.ts";
+
 /** An audit row as the browser receives it: its instant is an ISO string. */
 type EnrichedAuditLog = WireOf<StoredEnrichedAuditLog>;
 
@@ -33,8 +35,8 @@ export function truncateJsonForCsv(value: unknown): string {
 
 /**
  * The report's columns. Source/Target/Before/After mirror the on-screen
- * gateway-shape columns, so a downloaded report carries the same diffs the
- * page shows rather than a narrower legacy shape.
+ * gateway-shape columns; the staff columns keep who acted as LangWatch staff,
+ * who approved it and who revoked it, as the page shows them.
  */
 export const AUDIT_LOG_CSV_FIELDS = [
   "Timestamp",
@@ -51,10 +53,16 @@ export const AUDIT_LOG_CSV_FIELDS = [
   "Args",
   "Before",
   "After",
+  "Staff Principal",
+  "Staff Approved By",
+  "Staff Revoked By",
+  "Staff Reason",
 ] as const;
 
 /** One report row, in the column order above. */
 export function auditLogCsvRow(log: EnrichedAuditLog): string[] {
+  const actor = auditActor(log);
+  const staff = actor.kind === "staff" ? actor : null;
   return [
     readableDate(log.createdAt).toISOString(),
     log.source ?? "platform",
@@ -70,6 +78,10 @@ export function auditLogCsvRow(log: EnrichedAuditLog): string[] {
     truncateJsonForCsv(log.args),
     truncateJsonForCsv(log.before),
     truncateJsonForCsv(log.after),
+    staff?.principal ?? "",
+    staff?.approvedBy ?? "",
+    staff?.revokedBy ?? "",
+    staff?.reason ?? "",
   ];
 }
 

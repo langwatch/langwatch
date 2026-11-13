@@ -55,6 +55,12 @@ const registry = {
   },
 
   // ---- identity ----
+  passkey_assertion_refused: {
+    tips: [
+      "meta.reason names the refusal: unknown_credential, wrong_user, user_verification_missing or bad_signature",
+      "Sign with a passkey registered to your own account and unlock it with a fingerprint, face or PIN; a fresh request gets a fresh challenge",
+    ],
+  },
   identity_password_reset_required: {
     tips: [
       "This password may no longer be used; request a reset link from the forgot-password screen and choose a new password",
@@ -1101,6 +1107,66 @@ const registry = {
     tips: [
       "The report expired or was never stored; ask the install to send the step's diagnostics again",
     ],
+  },
+  staff_access_unavailable: {
+    tips: ["Staff access is off on this deployment; ask a platform operator"],
+  },
+  staff_access_revoked: {
+    tips: ["Ask an operator to approve a new request"],
+  },
+  staff_access_expired: {
+    tips: ["Ask an operator to approve a new request"],
+  },
+  staff_access_ip_mismatch: {
+    tips: ["Use the key from the machine that redeemed it, or request access again"],
+  },
+  staff_access_operator_lost: {
+    tips: ["Ask a current operator to approve a new request"],
+  },
+  staff_spend_not_approved: {
+    tips: ["Request support access again and ask the operator to allow runs"],
+  },
+  staff_content_not_approved: {
+    tips: ["Request access again with the org:content scope"],
+  },
+  staff_write_not_allowed: {
+    tips: ["Ask a member of the organization to make this change"],
+  },
+  staff_access_audit_unavailable: {
+    tips: ["Try again in a moment"],
+  },
+  already_redeemed: {
+    tips: ["Request access again from the agent"],
+  },
+  staff_access_not_configured: {
+    tips: ["Set the public base URL (BASE_HOST) on this deployment"],
+  },
+  staff_access_already_ended: {
+    tips: ["Refresh the page to see the session's current state"],
+  },
+  staff_access_confirmation_mismatch: {
+    tips: ['Type "revoke all" exactly'],
+  },
+  invalid_code_verifier: {
+    tips: ["Redeem from the same agent run that made the request"],
+  },
+  organization_name_mismatch: {
+    tips: ["Type the organization name exactly as the page shows it"],
+  },
+  passkey_required: {
+    tips: ["Add a passkey in your account settings, then try again"],
+  },
+  staff_access_rate_limited: {
+    tips: ["Wait an hour, or approve one of the pending requests"],
+  },
+  request_not_pending: {
+    tips: ["Ask the agent to request access again if it still needs it"],
+  },
+  request_expired: {
+    tips: ["Ask the agent to request access again"],
+  },
+  request_not_approved: {
+    tips: ["Wait for an operator to approve it, or request again"],
   },
 } as const satisfies Record<string, RemediationEntry>;
 

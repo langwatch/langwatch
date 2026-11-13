@@ -5,6 +5,7 @@ import {
   type AuthzDeclaredScopeId,
   type AuthzPermission,
   internalActor,
+  type PlatformTierPermission,
 } from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, REQUEST_CAUSE_FIELD, validationMeta } from "@langwatch/observability";
@@ -32,6 +33,7 @@ import {
   chosenPermission,
   decide,
   decideEntitlement,
+  decideDoorPlatform,
   decidePlatform,
   gatedDecision,
   mintAuthorization,
@@ -80,6 +82,7 @@ import {
 import { doorCredentialOf } from "./credential-census.ts";
 import {
   admittedOwnerlessProjectKeyFor,
+  admittedOwnerlessStaffKeyFor,
   OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH,
   recordRouteTemplate,
 } from "./credential.ts";
@@ -88,6 +91,7 @@ import {
   permissionOf,
   routePermissions,
   routeTargetField,
+  routeWrites,
   type RestDeprecation,
   type RestDoorCredential,
   type RestPermissionTarget,
@@ -156,6 +160,13 @@ import {
   ROUTE_TEMPLATE,
   withRetryAfter,
 } from "./response.ts";
+import {
+  admitStaffRequest,
+  admittedStaffOf,
+  finishingStaffRequest,
+  recordStaffRefusal,
+  type RestStaffAccessGate,
+} from "./staff-access.ts";
 
 const outputLogger = createLogger("langwatch:api:output-validation");
 
@@ -223,6 +234,11 @@ export type RestRuntimeMembers = Readonly<{
   servedDoors?: true;
   /** Told when a failed route could not give back its clicks. Defaults to a warning log. */
   confirmationLog?: RestConfirmationLog;
+  /**
+   * Where every request by an approved staff agent's key is recorded before its handler
+   * (ADR-202). Absent, a staff key is refused on every route rather than run unrecorded.
+   */
+  staffAccess?: RestStaffAccessGate;
 }>;
 
 /** Where a failed give-back of confirmation clicks is reported, beside the route's own fault. */
@@ -689,6 +705,20 @@ function assertAfterBodyPorts({
     );
   }
 
+  if (route.permissionsWhenPresent && !door.authorize) {
+    throw new Error(
+      `REST ${address} asks a permission for an input field after its door, and this runtime ` +
+        "supplied no identity.authorize",
+    );
+  }
+
+  if (route.permissionsWhenPresent && credential === "browser" && !route.permissionTarget) {
+    throw new Error(
+      `REST ${address} asks a permission for an input field at the credential's own scope, and ` +
+        "the browser door resolves none: name the scope on the route",
+    );
+  }
+
   if (!route.permissionBy || route.permissionTarget || credential !== "browser") return;
 
   const bare = Object.values(route.permissionBy.map).some((entry) => typeof entry === "string");
@@ -852,6 +882,7 @@ function routeStack<Api>({
     route,
     credential,
     ports,
+    family,
     template: `${route.method.toUpperCase()} ${basePathOf(declaration)}${route.path}`,
   });
   const refusal = routeRefusal({ route, door: doorOf({ credential, ports }) });
@@ -946,11 +977,13 @@ function authenticateMiddleware({
   route,
   credential,
   ports,
+  family,
   template,
 }: {
   route: RestTransportRoute<unknown>;
   credential: RestDoorCredential;
   ports: RestRuntimeMembers;
+  family: string;
   /** The route as `METHOD /path/:param`, which the door may log; never the concrete URL. */
   template: string;
 }): MiddlewareHandler {
@@ -963,6 +996,15 @@ function authenticateMiddleware({
         credential,
         request: context.req.raw,
         rawBody: context.get(ROUTE_RAW_BODY),
+      }).catch(async (error: unknown) => {
+        // A door that resolved a staff key and then refused its permission: the trail holds it.
+        await recordStaffRefusal({
+          gate: ports.staffAccess,
+          error,
+          ...staffRequestInput({ route, credential, request: context.req.raw, family }),
+          scope: null,
+        });
+        throw error;
       });
 
       // The door is told the admitted kinds; the runtime still refuses one it let through.
@@ -1541,122 +1583,245 @@ function handlerMiddleware<Api>({
       return answerWith({ context, next, route, result: anonymous });
     }
 
-    const decision = await decideRouteCaller({ route, ports, options, context, caller, input });
+    const staffInput = staffRequestInput({ route, credential, request: context.req.raw, family });
 
-    if (route.mintsCredential) {
-      refuseImpersonatedMint({
-        permission: route.mintsCredential,
-        actor: decision.actor,
-        scope: decision.scope,
-        address: `REST ${family}.${route.operation}`,
-      });
-    }
+    const authorized = await (async () => {
+      const decision = await decideRouteCaller({ route, ports, options, context, caller, input });
 
-    // Plan first (Q31): the door only identified, so the plan is asked at its scope.
-    if (planFirst(route)) {
-      await checkEntitlement({ route, ports, scope: decision.scope, input, family });
-    }
+      if (route.mintsCredential) {
+        refuseImpersonatedMint({
+          permission: route.mintsCredential,
+          actor: decision.actor,
+          scope: decision.scope,
+          address: `REST ${family}.${route.operation}`,
+        });
+      }
 
-    const target = await checkRouteScope({ route, caller, door, ports, input, context });
-    const further = await checkFurtherTargets({ route, caller, door, ports, input, context });
-    const capabilities = { route, ports, context, family, version, caller, input } as const;
+      // Plan first (Q31): the door only identified, so the plan is asked at its scope.
+      if (planFirst(route)) {
+        await checkEntitlement({ route, ports, scope: decision.scope, input, family });
+      }
 
-    // The scope access resolved: the one a route's own path named when it named
-    // one, and the door's own otherwise. Both the plan question and the
-    // idempotency tenancy are asked about exactly this scope.
-    const resolved = target ?? decision.scope;
-    const authorize = ports.authorization.forRequest(context.req.raw);
-
-    await assertRouteSecondFactor({ caller, actor: decision.actor, scope: resolved, authorize });
-
-    if (!planFirst(route)) await checkEntitlement({ route, ports, scope: resolved, input, family });
-    await refuseAggregateWrite({ route, ports, scope: resolved, request: context.req.raw });
-
-    await countCall(capabilities);
-
-    // After the door, never before it: a caller who may not read this cannot
-    // be handed the bytes an entitled one left behind.
-    const stored = await storedAnswer(capabilities);
-
-    if (stored) return stored;
-
-    const actor = doorActorOf({ credential, actor: decision.actor });
-    const proofActor =
-      actor ?? ownerlessKeyProofActor({ credential, request: context.req.raw, resolved });
-    const authorization = await mintAuthorization({
-      permission: route.permission,
-      actor: proofActor,
-      scope: resolved,
-      authorize,
-      route: `${family}.${route.operation}`,
-    });
-    const targeted = await targetProofs({
-      route,
-      further,
-      authorization,
-      actor: proofActor,
-      authorize,
-      address: `${family}.${route.operation}`,
-    });
-
-    const run = async (): Promise<Response | undefined> => {
-      const result = await auditing({
+      const target = await checkRouteScope({ route, caller, door, ports, input, context });
+      const further = await checkFurtherTargets({ route, caller, door, ports, input, context });
+      const whenPresent = await checkPermissionsWhenPresent({
         route,
+        caller,
+        door,
         ports,
-        actor,
-        credential,
-        scope: resolved,
+        input,
         context,
-        run: async () => {
-          // Before the click, so a context that refuses never shows a card or spends a click.
-          const resolvedContexts = await resolveContexts({ route, contexts, context, input });
-          // After every permission check and inside the trail, so a refusal is recorded too.
-          const receipt = await confirmMarkedRequest({
-            mark: route.confirmation,
-            gate: ports.confirmations,
-            servedDoors: ports.servedDoors === true,
-            credential,
-            request: context.req.raw,
-            input,
-            scope: resolved,
-            app: options.app,
-          });
-
-          return refundingOnFault({
-            receipt,
-            log: ports.confirmationLog ?? loggedConfirmations,
-            run: async () =>
-              route.handler(
-                handlerArguments({
-                  context,
-                  route,
-                  options,
-                  input,
-                  actor,
-                  scope: handlerScopeOf({ route, credential, caller }),
-                  target,
-                  authorization,
-                  ...targeted,
-                  session: sessionOf({ route, credential, caller }),
-                  key: keyOf({ route, credential, request: context.req.raw }),
-                }),
-                ...resolvedContexts,
-              ),
-          });
-        },
+        scope: target ?? caller.scope,
       });
+      const capabilities = { route, ports, context, family, version, caller, input } as const;
 
-      caller.markUsed?.();
+      // The scope access resolved: the one a route's own path named when it named
+      // one, and the door's own otherwise. Both the plan question and the
+      // idempotency tenancy are asked about exactly this scope.
+      const resolved = target ?? decision.scope;
+      const authorize = ports.authorization.forRequest(context.req.raw);
 
-      return answerWith({ context, next, route, result });
-    };
+      await assertRouteSecondFactor({ caller, actor: decision.actor, scope: resolved, authorize });
 
-    const answer = route.idempotency
-      ? await replayable({ route, ports, context, input, scope: resolved, family, run })
-      : await run();
+      if (!planFirst(route)) {
+        await checkEntitlement({ route, ports, scope: resolved, input, family });
+      }
+      await refuseAggregateWrite({ route, ports, scope: resolved, request: context.req.raw });
 
-    return keepAnswer({ ...capabilities, answer });
+      await countCall(capabilities);
+
+      return { decision, target, further, whenPresent, capabilities, resolved, authorize };
+    })().catch(async (error: unknown) => {
+      // A staff key refused before the gate (another project, a missing permission) is trailed too.
+      await recordStaffRefusal({ gate: ports.staffAccess, error, ...staffInput, scope: null });
+      throw error;
+    });
+    const { decision, target, further, whenPresent, capabilities, resolved, authorize } =
+      authorized;
+
+    // After every permission check and before any answer, a stored one included: a staff key's
+    // request is recorded before it is served, or refused.
+    const admitted = await admitStaffRequest({
+      gate: ports.staffAccess,
+      servedDoors: ports.servedDoors === true,
+      ...staffInput,
+      permissions: [...staffInput.permissions, ...whenPresent],
+      scope: resolved,
+    });
+
+    return finishingStaffRequest({
+      admitted,
+      statusOf: () => context.res.status,
+      run: () =>
+        servedAnswer({
+          route,
+          credential,
+          ports,
+          options,
+          contexts,
+          family,
+          capabilities,
+          caller,
+          decisionActor: decision.actor,
+          resolved,
+          target,
+          further,
+          authorize,
+          next,
+        }),
+    });
   };
+}
+
+/** What the staff gate is told of a route a staff key called, by its declaration (ADR-202). */
+function staffRequestInput({
+  route,
+  credential,
+  request,
+  family,
+}: {
+  route: RestTransportRoute<unknown>;
+  credential: RestDoorCredential;
+  request: Request;
+  family: string;
+}) {
+  return {
+    credential,
+    request,
+    operation: `${family}.${route.operation}`,
+    permissions: routePermissions(route),
+    route: {
+      spends: route.spends === true,
+      writes: routeWrites(route),
+      confirms: route.confirmation !== undefined,
+      servesContent: route.servesContent === true,
+    },
+  } as const;
+}
+
+/** The stored answer, or the handler's under its proof, confirmation and audit. */
+async function servedAnswer<Api>({
+  route,
+  credential,
+  ports,
+  options,
+  contexts,
+  family,
+  capabilities,
+  caller,
+  decisionActor,
+  resolved,
+  target,
+  further,
+  authorize,
+  next,
+}: {
+  route: RestTransportRoute<Api>;
+  credential: RestDoorCredential;
+  ports: RestRuntimeMembers;
+  options: RestMountOptions<Api>;
+  contexts: ReadonlyMap<string, MiddlewareContextBinding>;
+  family: string;
+  capabilities: Readonly<{
+    route: RestTransportRoute<unknown>;
+    ports: RestRuntimeMembers;
+    context: Context;
+    family: string;
+    version: string;
+    caller: RestCaller;
+    input: unknown;
+  }>;
+  caller: RestCaller;
+  decisionActor: Actor | null;
+  resolved: AuthzDeclaredScopeId | null;
+  target: AuthzDeclaredScopeId | null;
+  further: readonly FurtherTarget[];
+  authorize: Authorize;
+  next: () => Promise<void>;
+}): Promise<Response | undefined> {
+  const { context, input } = capabilities;
+  // After the door, never before it: a caller who may not read this cannot
+  // be handed the bytes an entitled one left behind.
+  const stored = await storedAnswer(capabilities);
+
+  if (stored) return stored;
+
+  const actor = doorActorOf({ credential, actor: decisionActor });
+  const proofActor =
+    actor ?? ownerlessKeyProofActor({ credential, request: context.req.raw, resolved });
+  const authorization = await mintAuthorization({
+    permission: route.permission,
+    actor: proofActor,
+    scope: resolved,
+    authorize,
+    route: `${family}.${route.operation}`,
+  });
+  const targeted = await targetProofs({
+    route,
+    further,
+    authorization,
+    actor: proofActor,
+    authorize,
+    address: `${family}.${route.operation}`,
+  });
+
+  const run = async (): Promise<Response | undefined> => {
+    const result = await auditing({
+      route,
+      ports,
+      actor,
+      credential,
+      scope: resolved,
+      context,
+      run: async () => {
+        // Before the click, so a context that refuses never shows a card or spends a click.
+        const resolvedContexts = await resolveContexts({ route, contexts, context, input });
+        // After every permission check and inside the trail, so a refusal is recorded too.
+        const receipt = await confirmMarkedRequest({
+          mark: route.confirmation,
+          gate: ports.confirmations,
+          servedDoors: ports.servedDoors === true,
+          credential,
+          request: context.req.raw,
+          input,
+          scope: resolved,
+          app: options.app,
+        });
+
+        return refundingOnFault({
+          receipt,
+          log: ports.confirmationLog ?? loggedConfirmations,
+          run: async () =>
+            route.handler(
+              handlerArguments({
+                context,
+                route,
+                options,
+                input,
+                actor,
+                scope: handlerScopeOf({ route, credential, caller }),
+                target,
+                authorization,
+                ...targeted,
+                session: sessionOf({ route, credential, caller }),
+                key: keyOf({ route, credential, request: context.req.raw }),
+              }),
+              ...resolvedContexts,
+            ),
+        });
+      },
+    });
+
+    caller.markUsed?.();
+
+    return answerWith({ context, next, route, result });
+  };
+
+  const answer = route.idempotency
+    ? await replayable({ route, ports, context, input, scope: resolved, family, run })
+    : await run();
+
+  return keepAnswer({ ...capabilities, answer });
 }
 
 /**
@@ -1760,10 +1925,12 @@ function auditCaller({
   const apiKeyId = named?.type === "api_key" ? named.id : doorKeyId;
   const ipAddress = ClientAddress.resolvedFor(request);
   const userAgent = request.headers.get("user-agent");
+  const staffAccess = admittedStaffOf(request);
 
   return {
     actorId: named?.type === "user" ? named.id : null,
     ...(impersonatorId ? { impersonatorId } : {}),
+    ...(staffAccess ? { staffAccess } : {}),
     ...(apiKeyId ? { apiKeyId } : {}),
     ...(ipAddress ? { ipAddress } : {}),
     ...(userAgent ? { userAgent } : {}),
@@ -2296,6 +2463,56 @@ async function checkFurtherTargets({
   return asked;
 }
 
+/**
+ * Each permission declared for an input field, asked when the parsed input carries the field, at
+ * the scope the route's own permission was asked at, with the same refusal (CLAUDE.md rule 6).
+ */
+async function checkPermissionsWhenPresent({
+  route,
+  caller,
+  door,
+  ports,
+  input,
+  context,
+  scope,
+}: {
+  route: RestTransportRoute<unknown>;
+  caller: RestCaller;
+  door: RestIdentity;
+  ports: RestRuntimeMembers;
+  input: unknown;
+  context: Context;
+  scope: AuthzDeclaredScopeId | null;
+}): Promise<readonly AuthzPermission[]> {
+  const present = (route.permissionsWhenPresent ?? []).filter(({ field }) =>
+    inputHolds({ input, field }),
+  );
+  if (present.length === 0) return [];
+  if (!scope)
+    throw new Error(`REST ${route.operation} asks a permission for a field with no scope`);
+
+  const authorize = ports.authorization.forRequest(context.req.raw);
+  for (const { permission } of present) {
+    const decision = await requireAuthorize(door)({ caller, permission, target: scope });
+
+    assertRouteScopePermission({
+      permission,
+      target: scope,
+      decision: await gatedDecision({ decisions: authorize, scope, decision }),
+      ...(ports.denials ? { denials: ports.denials } : {}),
+    });
+  }
+
+  return present.map(({ permission }) => permission);
+}
+
+/** Whether the parsed input carries `field` with a value; an omitted optional field is absent. */
+function inputHolds({ input, field }: { input: unknown; field: string }): boolean {
+  if (typeof input !== "object" || input === null || !Object.hasOwn(input, field)) return false;
+
+  return Reflect.get(input, field) !== undefined;
+}
+
 /** One proof per proof-bearing route target, by the field naming it; the first's is reused. */
 async function targetProofs({
   route,
@@ -2393,7 +2610,7 @@ async function callerOf({
   const kind = route.access?.kind;
 
   if (route.permissionPlatform) {
-    return platformCallerOf({ door, request, platform: route.permissionPlatform });
+    return platformCallerOf({ door, credential, request, platform: route.permissionPlatform });
   }
 
   if (credential === "browser" && route.permissionTarget) return requireIdentify(door)({ request });
@@ -2467,10 +2684,12 @@ async function anonymousCallerOf({
  */
 async function platformCallerOf({
   door,
+  credential,
   request,
   platform,
 }: {
   door: RestIdentity;
+  credential: RestDoorCredential;
   request: Request;
   platform: PlatformPermissionDeclaration;
 }): Promise<RestCaller> {
@@ -2481,11 +2700,14 @@ async function platformCallerOf({
     },
   );
 
-  await decidePlatform({
-    declaration: platform,
-    actor: caller.actor,
-    ask: ({ permission }) => requireAuthorizePlatform(door)({ caller, permission }),
-  });
+  const ask = async ({ permission }: { permission: PlatformTierPermission }) =>
+    requireAuthorizePlatform(door)({ caller, permission });
+  // The staff access door's caller is a token, not a person: the door answers for it itself.
+  if (credential === "staff_access") {
+    await decideDoorPlatform({ declaration: platform, ask });
+  } else {
+    await decidePlatform({ declaration: platform, actor: caller.actor, ask });
+  }
 
   return caller;
 }
@@ -2685,8 +2907,9 @@ function doorActorOf({
 }
 
 /**
- * A project key that stands for nobody proves its own project's read as the door's own,
- * as main did; the door already asked the key's access. Nothing else gets an actor here.
+ * A project key that stands for nobody proves its own project's read as the door's own, as main
+ * did, and so does an ownerless staff key at a project its organization or key door asked about;
+ * the door already asked the key's access. Nothing else gets an actor here.
  */
 function ownerlessKeyProofActor({
   credential,
@@ -2697,11 +2920,14 @@ function ownerlessKeyProofActor({
   request: Request;
   resolved: AuthzDeclaredScopeId | null;
 }): Actor | null {
-  if (credential !== "project" || resolved?.tier !== "project") return null;
+  if (resolved?.tier !== "project") return null;
+  const admitted =
+    credential === "project"
+      ? admittedOwnerlessProjectKeyFor({ request, projectId: resolved.id })
+      : (credential === "organization" || credential === "api_key") &&
+        admittedOwnerlessStaffKeyFor({ door: credential, request });
 
-  return admittedOwnerlessProjectKeyFor({ request, projectId: resolved.id })
-    ? internalActor(OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH)
-    : null;
+  return admitted ? internalActor(OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH) : null;
 }
 
 /**
@@ -3440,6 +3666,7 @@ const HANDLER_CREDENTIAL = {
   cli_token: "apiKey",
   otlp_ingest: "apiKey",
   licence_token: "apiKey",
+  staff_access: "apiKey",
   browser: "session",
   internal_secret: "internal",
 } as const satisfies Record<Exclude<Credential, "public">, HandlerCredential>;

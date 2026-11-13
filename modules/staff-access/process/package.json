@@ -1,0 +1,57 @@
+{
+  "name": "@langwatch/staff-access-process",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ops agent access: requester enrolment, passkey approval, one-hour staff sessions and their trail.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/api-key-contract": "workspace:*",
+    "@langwatch/audit-log-contract": "workspace:*",
+    "@langwatch/auth-contract": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/coding-agent-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/gateway-contract": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/mail": "workspace:*",
+    "@langwatch/notification-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/ops-contract": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/process": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/staff-access-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/process-stores": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

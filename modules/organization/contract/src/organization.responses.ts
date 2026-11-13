@@ -3,7 +3,7 @@ import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import type { OrganizationUserRole } from "./organization.rows.ts";
-import { auditChannelSchema } from "./organization.ts";
+import { auditChannelSchema, auditStaffAccessMetadataSchema } from "./organization.ts";
 
 /** A write with nothing else to report. */
 const organizationWriteAckSchemaDefinition = z.object({ success: z.literal(true) }).strict();
@@ -370,6 +370,7 @@ const organizationAuditLogEntrySchema = z
       .nullable(),
     channel: auditChannelSchema.nullable(),
     apiKeyId: z.string().nullable(),
+    staffAccess: auditStaffAccessMetadataSchema.nullable(),
   })
   .strict();
 

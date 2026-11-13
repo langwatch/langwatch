@@ -921,6 +921,12 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
         page: "pages/ops/feature-flags",
       },
       { path: "/ops/foundry", page: "pages/ops/foundry" },
+      // Agent access: an operator's agents and the passkey approval page a request links to.
+      { path: "/ops/agents", page: "pages/ops/agents" },
+      {
+        path: "/ops/agents/approve/:requestId",
+        page: "pages/ops/agents/approve/[requestId]",
+      },
       {
         // Organization steps are the Organizations tab of the Upgrades page.
         path: "/ops/migrations",

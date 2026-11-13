@@ -54,6 +54,8 @@ export function mountPromptRest(options: {
   app: PromptApi;
   projectId?: string;
   organizationId?: string;
+  /** Permissions the key does not hold, refused when asked after the body. */
+  withheld?: readonly string[];
 }) {
   const projectId = options.projectId ?? PROMPT_TEST_PROJECT;
   const organizationId = options.organizationId ?? PROMPT_TEST_ORGANIZATION;
@@ -65,6 +67,10 @@ export function mountPromptRest(options: {
       authenticate: () => ({
         actor: { type: "api_key", id: "api_key_1" },
         scope: { tier: "project", id: projectId } as const,
+      }),
+      authorize: ({ permission }) => ({
+        permitted: !(options.withheld ?? []).includes(permission),
+        organizationRole: null,
       }),
     },
   });

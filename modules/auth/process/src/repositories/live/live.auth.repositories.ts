@@ -10,6 +10,7 @@ import {
   type AuthDatabase,
   PrismaBetterAuthStorageRepository,
 } from "../prisma/prisma.better-auth-storage.repository.ts";
+import { PrismaPasskeyRepository } from "../prisma/prisma.passkey.repository.ts";
 import { PrismaPendingSsoSetupRepository } from "../prisma/prisma.pending-sso-setup.repository.ts";
 import { RedisAuthRateLimitRepository } from "../redis/redis.auth-rate-limit.repository.ts";
 import { RedisAuthSessionCacheRepository } from "../redis/redis.auth-session-cache.repository.ts";
@@ -46,6 +47,7 @@ export class LiveAuthRepositories {
         ? RedisBetterAuthSecondaryStorageRepository.create(redis)
         : MemoryBetterAuthSecondaryStorageRepository.create(),
       betterAuthHooks: PrismaBetterAuthHooksRepository.create(prisma),
+      passkeys: PrismaPasskeyRepository.create(prisma),
       directory: PrismaAuthDirectoryRepository.create(prisma),
       pendingSsoSetup: PrismaPendingSsoSetupRepository.create(prisma),
       sessionCache: RedisAuthSessionCacheRepository.create({ redis }),

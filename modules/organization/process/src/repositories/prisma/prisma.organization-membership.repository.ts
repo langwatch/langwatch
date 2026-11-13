@@ -54,6 +54,7 @@ import {
   type DeveloperAdmissionVia,
 } from "../../rules/admission-audit.rules.ts";
 import { auditOriginOf } from "../../rules/audit-origin.rules.ts";
+import { extractAuditStaffAccess } from "../../rules/audit-staff-access.rules.ts";
 import {
   isActiveAdmin,
   isAdminDemotion,
@@ -2577,6 +2578,8 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         after: log.after,
         actorUserId: actorIds.get(log.id) ?? null,
         actorUser: userMap.get(actorIds.get(log.id) ?? "") ?? null,
+        staffAccess:
+          extractAuditStaffAccess({ action: log.action, metadata: log.metadata }) ?? null,
         ...auditOriginOf({
           metadata: log.metadata,
           action: log.action,

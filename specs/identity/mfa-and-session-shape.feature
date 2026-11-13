@@ -245,6 +245,17 @@ Feature: Two-step verification - one setup per person, and organizations that re
     Then not one of them produces a session that proved no second factor
     And no code path can mint one
 
+  # A passkey approval (ADR-202) is a signature over the hash of one request:
+  # the challenge is that hash, so the signature proves the person approved
+  # that request and nothing else. It does not refresh, upgrade or record
+  # anything on the session that carried it, so it reopens no step-up.
+  @integration
+  Scenario: Approving one request with a passkey leaves the session as it was
+    Given "sam" holds a session that proved a password
+    When "sam" signs one request's hash with a passkey
+    Then the signature verifies for that request only
+    And the session still records only what its sign-in proved
+
   # ── An organization that requires it ───────────────────────────────────
 
   @integration

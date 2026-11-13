@@ -65,6 +65,7 @@ type AuthzMemoryApiKeyRow = {
   name: string;
   userId: string | null;
   revokedAt: Instant | null;
+  isSystemManaged?: boolean;
 };
 
 /** A TeamUser row; its organization is its team's. */

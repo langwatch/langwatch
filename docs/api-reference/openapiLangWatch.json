@@ -17090,7 +17090,8 @@
                                           "seatRequests:manage",
                                           "members:view",
                                           "braids:manage",
-                                          "spans:braided"
+                                          "spans:braided",
+                                          "opsRead:view"
                                         ]
                                       }
                                     ]
@@ -17320,7 +17321,8 @@
                                     "seatRequests:manage",
                                     "members:view",
                                     "braids:manage",
-                                    "spans:braided"
+                                    "spans:braided",
+                                    "opsRead:view"
                                   ]
                                 }
                               ]
@@ -17950,7 +17952,8 @@
                                                   "seatRequests:manage",
                                                   "members:view",
                                                   "braids:manage",
-                                                  "spans:braided"
+                                                  "spans:braided",
+                                                  "opsRead:view"
                                                 ]
                                               }
                                             ]
@@ -18180,7 +18183,8 @@
                                             "seatRequests:manage",
                                             "members:view",
                                             "braids:manage",
-                                            "spans:braided"
+                                            "spans:braided",
+                                            "opsRead:view"
                                           ]
                                         }
                                       ]
@@ -18631,7 +18635,8 @@
                                         "seatRequests:manage",
                                         "members:view",
                                         "braids:manage",
-                                        "spans:braided"
+                                        "spans:braided",
+                                        "opsRead:view"
                                       ]
                                     }
                                   ]
@@ -98311,7 +98316,8 @@
             "project_api_key"
           ],
           "permissions": [
-            "prompts:update"
+            "prompts:update",
+            "prompts:manage"
           ]
         },
         "parameters": [
@@ -110341,6 +110347,626 @@
         }
       }
     },
+    "/api/v1/staff-access/requests": {
+      "post": {
+        "operationId": "createStaffAccessRequest",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "requestId": {
+                      "type": "string"
+                    },
+                    "approvalUrl": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "requestId",
+                    "approvalUrl",
+                    "expiresAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "internal"
+          ],
+          "permissions": []
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "scopes": {
+                    "minItems": 1,
+                    "maxItems": 4,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "ops:read",
+                        "org:metadata",
+                        "org:content",
+                        "org:support"
+                      ]
+                    }
+                  },
+                  "organization": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "codeChallenge": {
+                    "type": "string",
+                    "minLength": 43,
+                    "maxLength": 43,
+                    "pattern": "^[A-Za-z0-9_-]+$"
+                  },
+                  "codeChallengeMethod": {
+                    "type": "string",
+                    "const": "S256"
+                  },
+                  "machine": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "scopes",
+                  "reason",
+                  "codeChallenge",
+                  "codeChallengeMethod",
+                  "machine"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/staff-access/requests/{requestId}": {
+      "get": {
+        "operationId": "getStaffAccessRequest",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "requestId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "approved",
+                        "denied",
+                        "redeemed",
+                        "expired",
+                        "revoked"
+                      ]
+                    },
+                    "expiresAt": {
+                      "type": "string"
+                    },
+                    "accessExpiresAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "requestId",
+                    "status",
+                    "expiresAt",
+                    "accessExpiresAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "internal"
+          ],
+          "permissions": []
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "requestId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/v1/staff-access/requests/{requestId}/redeem": {
+      "post": {
+        "operationId": "redeemStaffAccessRequest",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "apiKey": {
+                      "type": "string"
+                    },
+                    "opsToken": {
+                      "type": "string"
+                    },
+                    "organizationId": {
+                      "type": "string"
+                    },
+                    "projects": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "slug": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "slug",
+                          "name"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "scopes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "ops:read",
+                          "org:metadata",
+                          "org:content",
+                          "org:support"
+                        ]
+                      }
+                    },
+                    "expiresAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "projects",
+                    "scopes",
+                    "expiresAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "internal"
+          ],
+          "permissions": []
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "requestId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "codeVerifier": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._~-]{43,128}$"
+                  }
+                },
+                "required": [
+                  "codeVerifier"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/staff-access/requests/{requestId}/end": {
+      "post": {
+        "operationId": "endStaffAccessSession",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ended": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "ended"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "internal"
+          ],
+          "permissions": []
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "requestId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/v1/staff-access/ops/organizations": {
+      "get": {
+        "operationId": "listStaffAccessOrganizations",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "organizations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "slug": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "slug",
+                          "name"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "organizations"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "internal"
+          ],
+          "permissions": [
+            "opsRead:view"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/staff-access/ops/organizations/{organization}/usage": {
+      "get": {
+        "operationId": "getStaffAccessOrganizationUsage",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "organization": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "slug": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "slug",
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "at": {
+                      "type": "string"
+                    },
+                    "codingAgentSessions": {
+                      "type": "object",
+                      "properties": {
+                        "last7Days": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "last30Days": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "lastSessionAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "last7Days",
+                        "last30Days",
+                        "lastSessionAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "gateway": {
+                      "type": "object",
+                      "properties": {
+                        "requests30Days": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "spendUsd30Days": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "requests30Days",
+                        "spendUsd30Days"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "traces30Days": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "apiKeys": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "lastUsedAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "lastUsedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "membersSignedIn": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "classification": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "organization",
+                    "at",
+                    "codingAgentSessions",
+                    "gateway",
+                    "traces30Days",
+                    "apiKeys",
+                    "membersSignedIn",
+                    "classification"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "internal"
+          ],
+          "permissions": [
+            "opsRead:view"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/v1/staff-access/ops/queues": {
+      "get": {
+        "operationId": "getStaffAccessQueueSummary",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "queues": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "displayName": {
+                            "type": "string"
+                          },
+                          "pendingGroupCount": {
+                            "type": "number"
+                          },
+                          "blockedGroupCount": {
+                            "type": "number"
+                          },
+                          "activeGroupCount": {
+                            "type": "number"
+                          },
+                          "parkedGroupCount": {
+                            "type": "number"
+                          },
+                          "totalPendingJobs": {
+                            "type": "number"
+                          },
+                          "dlqCount": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "displayName",
+                          "pendingGroupCount",
+                          "blockedGroupCount",
+                          "activeGroupCount",
+                          "parkedGroupCount",
+                          "totalPendingJobs",
+                          "dlqCount"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "queues"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "internal"
+          ],
+          "permissions": [
+            "opsRead:view"
+          ]
+        }
+      }
+    },
     "/api/v1/stored-objects/uploads": {
       "post": {
         "operationId": "createStoredObjectUpload",
@@ -110541,7 +111167,8 @@
                         "governanceCost:view",
                         "sso:view",
                         "seatRequests:view",
-                        "members:view"
+                        "members:view",
+                        "opsRead:view"
                       ]
                     }
                   },
@@ -110713,7 +111340,8 @@
                               "governanceCost:view",
                               "sso:view",
                               "seatRequests:view",
-                              "members:view"
+                              "members:view",
+                              "opsRead:view"
                             ]
                           }
                         },
@@ -110845,7 +111473,8 @@
                             "governanceCost:view",
                             "sso:view",
                             "seatRequests:view",
-                            "members:view"
+                            "members:view",
+                            "opsRead:view"
                           ]
                         },
                         "generation": {
@@ -110960,7 +111589,8 @@
                 "governanceCost:view",
                 "sso:view",
                 "seatRequests:view",
-                "members:view"
+                "members:view",
+                "opsRead:view"
               ]
             },
             "required": true

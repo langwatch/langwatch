@@ -46,6 +46,7 @@ function row(overrides: Partial<EnrichedAuditLog> = {}): EnrichedAuditLog {
     actorUser: null,
     channel: "app",
     apiKeyId: null,
+    staffAccess: null,
     ...overrides,
   };
 }
@@ -118,6 +119,35 @@ describe("given one audit row bound for a report", () => {
 
       expect(rendered[2]).toBe("");
       expect(rendered[3]).toBe("");
+    });
+  });
+
+  describe("when LangWatch staff wrote it", () => {
+    /** @scenario An exported report keeps the LangWatch staff identity */
+    it("keeps the staff principal, approver, revoker and reason", () => {
+      const rendered = auditLogCsvRow(
+        row({
+          action: "staffAccess.revoked",
+          userId: "u_o",
+          user: { id: "u_o", name: "Olivia", email: "olivia@langwatch.ai" },
+          actorUserId: "u_p",
+          actorUser: { id: "u_p", name: "Pedro", email: "pedro@langwatch.ai" },
+          staffAccess: {
+            principal: "LangWatch Support",
+            reason: "fix the evaluator",
+            approvedBy: { id: "u_o" },
+            revokedBy: { id: "u_p" },
+          },
+        }),
+      );
+
+      expect(rendered.slice(-4)).toEqual([
+        "LangWatch Support",
+        "olivia@langwatch.ai",
+        "pedro@langwatch.ai",
+        "fix the evaluator",
+      ]);
+      expect(auditLogCsvRow(row()).slice(-4)).toEqual(["", "", "", ""]);
     });
   });
 

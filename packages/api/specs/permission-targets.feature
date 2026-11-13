@@ -107,3 +107,20 @@ Feature: A route asks a permission at each of several targets before its handler
       Then the door reads the plan of the organization holding the project
       And the gate does not hold, so the route answers 402 enterprise_plan_required
       And on an Enterprise organization the gate holds
+
+  Rule: A permission can be asked only when the input carries a field
+
+    @unit
+    Scenario: A route asks the field's permission only when the body carries the field
+      Given a REST route asking one permission, and a second one when the body carries "tags"
+      And a caller holding the first permission but not the second
+      When the caller sends a body without "tags"
+      Then the handler runs
+      When the caller sends a body with "tags"
+      Then the answer is 403 permission_denied and the handler never runs
+
+    @unit
+    Scenario: A field permission names a field the route's input parses
+      Given a REST route asking a permission when its body carries a field
+      When the field is not in the route's input schema
+      Then the declaration is refused where it is written

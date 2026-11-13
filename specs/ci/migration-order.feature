@@ -168,6 +168,14 @@ Feature: Migration order check
     Then the check passes
 
   @unit
+  Scenario: A file that only names a released step in a comment may still change
+    Given a module file declares the code step "topic:seed-clusters"
+    And a release manifest names that step
+    And another module file names it only in a comment
+    When the PR modifies that other file
+    Then the check passes
+
+  @unit
   Scenario: A release manifest that is not valid JSON stops the check
     Given a release manifest on the base branch is not valid JSON
     When the migration-order check runs

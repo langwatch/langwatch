@@ -1,0 +1,491 @@
+import { StaffAccessAuditUnavailableError, StaffAccessIpMismatchError } from "@langwatch/api";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type {
+  AuthApi,
+  PasskeyAssertionOptions,
+  PasskeyAssertionResponse,
+} from "@langwatch/auth-contract";
+import type { StaffAccessScope } from "@langwatch/authz-contract";
+import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
+import type {
+  OrganizationApi,
+  OrganizationProvisioningSummary,
+} from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import {
+  STAFF_ACCESS_PRINCIPAL,
+  StaffAccessAlreadyRedeemedError,
+  StaffAccessInvalidCodeVerifierError,
+  StaffAccessNotFoundError,
+  StaffAccessOrganizationNameMismatchError,
+  StaffAccessNotConfiguredError,
+  StaffAccessRateLimitedError,
+  StaffAccessRequestNotPendingError,
+  type StaffAccessApprovalView,
+  type StaffAccessRedeemed,
+  type StaffAccessRequestBody,
+  type StaffAccessRequestCreated,
+  type StaffAccessRequestStatusAnswer,
+  type StaffAccessSessionView,
+} from "@langwatch/staff-access-contract";
+import type { Instant } from "@langwatch/time";
+import type { UserApi } from "@langwatch/user-contract";
+
+import type {
+  StaffAccessRequestRepository,
+  StaffAccessRequestRow,
+} from "../repositories/staff-access.repository.ts";
+import {
+  approvalChallengeOf,
+  assertPending,
+  assertRedeemable,
+  isoText,
+  later,
+  organizationNameMatches,
+  pkceChallengeOf,
+  reachesOrganization,
+  STAFF_ACCESS_RATE_WINDOW_MS,
+  STAFF_ACCESS_REQUEST_TTL_MS,
+  STAFF_ACCESS_REQUESTS_PER_HOUR,
+  STAFF_ACCESS_SESSION_TTL_MS,
+  typedNameRequired,
+} from "../rules/staff-access.rules.ts";
+import type { StaffAccessNoticeService } from "./staff-access-notice.service.ts";
+import { StaffAccessRedemptionService } from "./staff-access-redemption.service.ts";
+import type { StaffAccessRequesterService } from "./staff-access-requester.service.ts";
+import type { StaffAccessSessionService } from "./staff-access-session.service.ts";
+
+const logger = createLogger("langwatch:staff-access:request");
+
+type RequestDeps = Readonly<{
+  requests: StaffAccessRequestRepository;
+  requesters: StaffAccessRequesterService;
+  auth: Pick<AuthApi, "hasPasskey" | "passkeyAssertionOptions" | "verifyPasskeyAssertion">;
+  organizations: Pick<OrganizationApi, "findProvisioningSummary" | "listProvisioningSummaries">;
+  projects: Pick<ProjectApi, "listByOrganization">;
+  apiKeys: Pick<ApiKeyApi, "mintStaffAccessKey" | "revokeStaffAccessKey">;
+  auditLog: Pick<AuditLogApi, "record">;
+  users: Pick<UserApi, "findById">;
+  notices: StaffAccessNoticeService;
+  sessions: StaffAccessSessionService;
+  /** Null when the deployment has none: requests are then refused, since no link can be built. */
+  publicBaseUrl: string | null;
+  now: () => Instant;
+}>;
+
+/** What the operator decided on the approval page. */
+type Choice = Readonly<{
+  requestId: string;
+  spendApproved: boolean;
+  typedOrganizationName?: string;
+}>;
+
+/**
+ * Access requests from asking to ending (ADR-202): the agent asks, its owner approves with a
+ * passkey over the hash of exactly what the page shows, the agent redeems once with its PKCE
+ * verifier for one hour, and any operator can end it. Every transition is one atomic claim.
+ */
+export class StaffAccessRequestService {
+  private readonly credentials: StaffAccessRedemptionService;
+
+  private constructor(private readonly deps: RequestDeps) {
+    this.credentials = StaffAccessRedemptionService.create(deps);
+  }
+
+  static create(deps: RequestDeps): StaffAccessRequestService {
+    return new StaffAccessRequestService(deps);
+  }
+
+  /**
+   * @throws {StaffAccessRateLimitedError} past five requests in an hour
+   * @throws {StaffAccessNotConfiguredError} when the deployment has no public base URL
+   * @throws {StaffAccessIpMismatchError} when the request carries no client address to pin
+   */
+  async createRequest({
+    requesterId,
+    ownerUserId,
+    body,
+    ipAddress,
+  }: {
+    requesterId: string;
+    ownerUserId: string;
+    body: StaffAccessRequestBody;
+    ipAddress: string | null;
+  }): Promise<StaffAccessRequestCreated> {
+    const { publicBaseUrl } = this.deps;
+    if (!publicBaseUrl) throw new StaffAccessNotConfiguredError();
+    if (!ipAddress) throw new StaffAccessIpMismatchError();
+    const at = this.deps.now();
+    const recent = await this.deps.requests.countSince({
+      requesterId,
+      since: later({ at, ms: -STAFF_ACCESS_RATE_WINDOW_MS }),
+    });
+    if (recent >= STAFF_ACCESS_REQUESTS_PER_HOUR) {
+      throw new StaffAccessRateLimitedError({ retryAfterMs: STAFF_ACCESS_RATE_WINDOW_MS });
+    }
+    const organization = reachesOrganization(body.scopes)
+      ? await this.resolveOrganization({ organization: body.organization ?? "" })
+      : null;
+
+    const row: StaffAccessRequestRow = {
+      id: generate("staffrequest").toString(),
+      requesterId,
+      ownerUserId,
+      scopes: [...body.scopes],
+      organizationId: organization?.id ?? null,
+      organizationName: organization?.name ?? null,
+      reason: body.reason,
+      codeChallenge: body.codeChallenge,
+      machine: body.machine,
+      requestIp: ipAddress,
+      status: "pending",
+      expiresAt: later({ at, ms: STAFF_ACCESS_REQUEST_TTL_MS }),
+      approvedAt: null,
+      spendApproved: false,
+      approvalCredentialId: null,
+      approvalSignature: null,
+      signedHash: null,
+      redeemedAt: null,
+      pinnedIp: null,
+      apiKeyId: null,
+      hashedOpsToken: null,
+      opsTokenLookupId: null,
+      accessExpiresAt: null,
+      revokedAt: null,
+      revokedByUserId: null,
+      revokeCause: null,
+      endAuditedAt: null,
+      createdAt: at,
+    };
+    await this.deps.requests.create(row);
+    return {
+      requestId: row.id,
+      approvalUrl: `${publicBaseUrl.replace(/\/+$/, "")}/ops/agents/approve/${row.id}`,
+      expiresAt: isoText(row.expiresAt),
+    };
+  }
+
+  async getRequestStatus({
+    requesterId,
+    requestId,
+  }: {
+    requesterId: string;
+    requestId: string;
+  }): Promise<StaffAccessRequestStatusAnswer> {
+    const row = await this.requestOfRequester({ requesterId, requestId });
+    return {
+      requestId: row.id,
+      status: this.deps.sessions.statusOf({ row, at: this.deps.now() }),
+      expiresAt: isoText(row.expiresAt),
+      accessExpiresAt: row.accessExpiresAt ? isoText(row.accessExpiresAt) : null,
+    };
+  }
+
+  async getApprovalRequest({
+    userId,
+    requestId,
+  }: {
+    userId: string;
+    requestId: string;
+  }): Promise<StaffAccessApprovalView> {
+    return this.approvalViewOf(await this.requestOfOwner({ userId, requestId }));
+  }
+
+  /** The ceremony over the hash of what the page shows and what the operator chose. */
+  async approvalOptions({
+    userId,
+    choice,
+  }: {
+    userId: string;
+    choice: Choice;
+  }): Promise<PasskeyAssertionOptions> {
+    const { challenge } = await this.decidable({ userId, choice });
+    return this.deps.auth.passkeyAssertionOptions({ userId, challenge });
+  }
+
+  /**
+   * Verifies the passkey over that same hash, claims pending -> approving, records the approval
+   * in the customer's audit log, and only then confirms approving -> approved. An approving
+   * request is never redeemable, so no failure or crash leaves an approval without its row.
+   * @throws {PasskeyAssertionRefusedError} when the signature is over anything else
+   * @throws {StaffAccessAuditUnavailableError} when the audit row or the confirm was not written
+   */
+  async approve({
+    userId,
+    choice,
+    assertion,
+  }: {
+    userId: string;
+    choice: Choice;
+    assertion: PasskeyAssertionResponse;
+  }): Promise<StaffAccessApprovalView> {
+    const { row, challenge, spendApproved } = await this.decidable({ userId, choice });
+    const { credentialId } = await this.deps.auth.verifyPasskeyAssertion({
+      userId,
+      challenge,
+      response: assertion,
+    });
+    const claimed = await this.deps.requests.claimApproval({
+      id: row.id,
+      at: this.deps.now(),
+      spendApproved,
+      credentialId,
+      signature: assertion.response.signature,
+      signedHash: challenge,
+    });
+    if (!claimed) await this.throwUndecidable({ id: row.id });
+
+    await this.recordApproval({ row, userId, spendApproved });
+    const confirmed = await this.deps.requests
+      .confirmApproval({ id: row.id, at: this.deps.now() })
+      .catch(() => false);
+    if (!confirmed) {
+      await this.abandonApproval({ id: row.id, userId });
+      throw new StaffAccessAuditUnavailableError();
+    }
+
+    await this.deps.notices.tellOtherOperators({
+      actingUserId: userId,
+      subject: "An operator approved staff access",
+      lines: [
+        { label: "Organization", value: row.organizationName ?? "None (ops read only)" },
+        { label: "Scopes", value: row.scopes.join(", ") },
+        { label: "Reason", value: row.reason },
+        { label: "Machine", value: row.machine },
+        { label: "Runs that spend allowed", value: spendApproved ? "Yes" : "No" },
+      ],
+      idempotencyKey: `staff-access-approved:${row.id}`,
+    });
+    return this.approvalViewOf(await this.rowOf({ id: row.id }));
+  }
+
+  /**
+   * Writes the approval row to the customer's audit log. Any failure, the approver lookup
+   * included, abandons the approval and refuses the operator.
+   * @throws {StaffAccessAuditUnavailableError} when the row was not written
+   */
+  private async recordApproval({
+    row,
+    userId,
+    spendApproved,
+  }: {
+    row: StaffAccessRequestRow;
+    userId: string;
+    spendApproved: boolean;
+  }): Promise<void> {
+    if (!row.organizationId) return;
+    try {
+      const approver = await this.deps.users.findById({ id: userId });
+      await this.deps.auditLog.record({
+        organizationId: row.organizationId,
+        userId,
+        actorUserId: userId,
+        action: "staffAccess.approved",
+        targetKind: "staffAccess",
+        targetId: row.id,
+        ...(row.requestIp ? { ipAddress: row.requestIp } : {}),
+        metadata: {
+          principal: STAFF_ACCESS_PRINCIPAL,
+          approvedBy: { id: userId, name: approver?.name ?? null, email: approver?.email ?? null },
+          reason: row.reason,
+          scopes: row.scopes,
+          spendApproved,
+          machine: row.machine,
+        },
+      });
+    } catch (error) {
+      logger.error({ error, requestId: row.id }, "the staff access approval row was not written");
+      await this.abandonApproval({ id: row.id, userId });
+      throw new StaffAccessAuditUnavailableError();
+    }
+  }
+
+  /**
+   * Ends an approval that did not stand. Should this revoke fail too, the request stays
+   * approving, which no redeem accepts, and the sweep settles its end once it lapses.
+   */
+  private async abandonApproval({ id, userId }: { id: string; userId: string }): Promise<void> {
+    try {
+      await this.deps.requests.revoke({
+        id,
+        at: this.deps.now(),
+        byUserId: userId,
+        cause: "approval_audit_failed",
+      });
+    } catch (error) {
+      logger.error({ error, requestId: id }, "an abandoned staff access approval was not revoked");
+    }
+  }
+
+  async deny({
+    userId,
+    requestId,
+  }: {
+    userId: string;
+    requestId: string;
+  }): Promise<StaffAccessApprovalView> {
+    const row = await this.requestOfOwner({ userId, requestId });
+    if (!(await this.deps.requests.deny({ id: row.id, at: this.deps.now() }))) {
+      await this.throwUndecidable({ id: row.id });
+    }
+    return this.approvalViewOf(await this.rowOf({ id: row.id }));
+  }
+
+  /**
+   * Redeems an approved request once, for its own requester, from the address the operator
+   * approved, with the verifier behind its challenge. A wrong verifier or address spends nothing.
+   * The session is pinned to that address.
+   * @throws {StaffAccessIpMismatchError} from any other address, or with none
+   */
+  async redeem({
+    requesterId,
+    requestId,
+    codeVerifier,
+    ipAddress,
+  }: {
+    requesterId: string;
+    requestId: string;
+    codeVerifier: string;
+    ipAddress: string | null;
+  }): Promise<StaffAccessRedeemed> {
+    const row = await this.requestOfRequester({ requesterId, requestId });
+    const at = this.deps.now();
+    assertRedeemable({ row, at });
+    if (!ipAddress || ipAddress !== row.requestIp) throw new StaffAccessIpMismatchError();
+    if (pkceChallengeOf(codeVerifier) !== row.codeChallenge) {
+      throw new StaffAccessInvalidCodeVerifierError();
+    }
+    const accessExpiresAt = later({ at, ms: STAFF_ACCESS_SESSION_TTL_MS });
+    const redeemed = await this.deps.requests.redeem({
+      id: row.id,
+      requesterId,
+      at,
+      pinnedIp: ipAddress,
+      accessExpiresAt,
+    });
+    if (!redeemed) {
+      assertRedeemable({ row: await this.rowOf({ id: row.id }), at });
+      throw new StaffAccessAlreadyRedeemedError();
+    }
+
+    let redeemedAnswer: StaffAccessRedeemed;
+    try {
+      redeemedAnswer = await this.credentials.mintCredentials({ row, accessExpiresAt });
+    } catch (error) {
+      await this.deps.sessions.endSession({ row, byUserId: null, cause: "mint_failed" });
+      throw error;
+    }
+    await this.deps.notices.tellOtherOperators({
+      actingUserId: row.ownerUserId,
+      subject: "An agent started a staff access session",
+      lines: [
+        { label: "Organization", value: row.organizationName ?? "None (ops read only)" },
+        { label: "Scopes", value: row.scopes.join(", ") },
+        { label: "Machine", value: row.machine },
+        { label: "Address", value: ipAddress },
+        { label: "Ends", value: isoText(accessExpiresAt) },
+      ],
+      idempotencyKey: `staff-access-redeemed:${row.id}`,
+    });
+    return redeemedAnswer;
+  }
+
+  /** Every check a decision needs, then the hash it signs. */
+  private async decidable({
+    userId,
+    choice,
+  }: {
+    userId: string;
+    choice: Choice;
+  }): Promise<{ row: StaffAccessRequestRow; challenge: string; spendApproved: boolean }> {
+    const row = await this.requestOfOwner({ userId, requestId: choice.requestId });
+    const scopes = row.scopes as StaffAccessScope[];
+    assertPending({ row, at: this.deps.now() });
+    const spendApproved = choice.spendApproved && scopes.includes("org:support");
+    if (
+      typedNameRequired({ scopes, spendApproved }) &&
+      !organizationNameMatches({
+        typed: choice.typedOrganizationName,
+        actual: row.organizationName,
+      })
+    ) {
+      throw new StaffAccessOrganizationNameMismatchError();
+    }
+    const challenge = approvalChallengeOf({
+      requestId: row.id,
+      scopes: row.scopes,
+      organizationId: row.organizationId,
+      organizationName: row.organizationName,
+      reason: row.reason,
+      machine: row.machine,
+      requestIp: row.requestIp,
+      codeChallenge: row.codeChallenge,
+      spendApproved,
+      expiresAt: isoText(row.expiresAt),
+    });
+    return { row, challenge, spendApproved };
+  }
+
+  private async throwUndecidable({ id }: { id: string }): Promise<never> {
+    assertPending({ row: await this.rowOf({ id }), at: this.deps.now() });
+    throw new StaffAccessRequestNotPendingError();
+  }
+
+  private async resolveOrganization({
+    organization,
+  }: {
+    organization: string;
+  }): Promise<OrganizationProvisioningSummary> {
+    const byId = await this.deps.organizations.findProvisioningSummary(organization);
+    if (byId) return byId;
+    const all = await this.deps.organizations.listProvisioningSummaries();
+    const bySlug = all.find((summary) => summary.slug === organization);
+    if (!bySlug) throw new StaffAccessNotFoundError();
+    return bySlug;
+  }
+
+  private async rowOf({ id }: { id: string }): Promise<StaffAccessRequestRow> {
+    const [row] = await this.deps.requests.findById({ id });
+    if (!row) throw new StaffAccessNotFoundError();
+    return row;
+  }
+
+  private async requestOfOwner({
+    userId,
+    requestId,
+  }: {
+    userId: string;
+    requestId: string;
+  }): Promise<StaffAccessRequestRow> {
+    const [row] = await this.deps.requests.findById({ id: requestId });
+    if (!row || row.ownerUserId !== userId) throw new StaffAccessNotFoundError();
+    return row;
+  }
+
+  private async requestOfRequester({
+    requesterId,
+    requestId,
+  }: {
+    requesterId: string;
+    requestId: string;
+  }): Promise<StaffAccessRequestRow> {
+    const [row] = await this.deps.requests.findById({ id: requestId });
+    if (!row || row.requesterId !== requesterId) throw new StaffAccessNotFoundError();
+    return row;
+  }
+
+  private async approvalViewOf(row: StaffAccessRequestRow): Promise<StaffAccessApprovalView> {
+    const [view] = await this.deps.sessions.viewsOf({ rows: [row] });
+    const scopes = row.scopes as StaffAccessScope[];
+    return {
+      ...(view as StaffAccessSessionView),
+      typedNameRequired: {
+        withSpend: typedNameRequired({ scopes, spendApproved: scopes.includes("org:support") }),
+        withoutSpend: typedNameRequired({ scopes, spendApproved: false }),
+      },
+      spendOffered: scopes.includes("org:support"),
+    };
+  }
+}

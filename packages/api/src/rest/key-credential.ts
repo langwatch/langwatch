@@ -38,6 +38,8 @@ export type RestKeyCredential = Readonly<{
   kind: RestKeyKind;
   apiKeyId: string | null;
   ownerUserId: string | null;
+  /** Set on an approved staff agent's key (ADR-202): the runtime asks the staff gate first. */
+  isStaffAccessKey?: true;
 }>;
 
 /** The key kinds a route admits: at least one, none twice. */
@@ -69,6 +71,7 @@ export function keyCredentialOf(
         kind: credential.isLangySessionKey === true ? "langy_session_key" : "api_key",
         apiKeyId: credential.apiKeyId,
         ownerUserId: credential.userId,
+        ...staffMarkOf(credential),
       };
   }
 }
@@ -86,14 +89,22 @@ function resolvedKeyOf(
         kind: credential.isLangySessionKey === true ? "langy_session_key" : "api_key",
         apiKeyId: credential.apiKeyId,
         ownerUserId: credential.userId,
+        ...staffMarkOf(credential),
       };
     case "apiKey":
       return {
         kind: projectKeyKindOf(credential),
         apiKeyId: credential.apiKeyId,
         ownerUserId: credential.userId,
+        ...staffMarkOf(credential),
       };
   }
+}
+
+function staffMarkOf(credential: {
+  isStaffAccessKey?: boolean | undefined;
+}): Pick<RestKeyCredential, "isStaffAccessKey"> {
+  return credential.isStaffAccessKey === true ? { isStaffAccessKey: true } : {};
 }
 
 function projectKeyKindOf(

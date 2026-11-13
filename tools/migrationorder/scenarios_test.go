@@ -302,6 +302,25 @@ func TestStepsLeavesAnUnreleasedStepFileAlone(t *testing.T) {
 	}
 }
 
+// @scenario "A file that only names a released step in a comment may still change"
+func TestStepsLeavesAFileThatOnlyMentionsAStepInACommentAlone(t *testing.T) {
+	const appFile = "modules/topic/process/src/app/topic.app.ts"
+	root := initRepo(t)
+	writeAndCommit(t, root, stepFile, "export const step = defineMigrationStep({ id: \"topic:seed-clusters\" });\n")
+	writeAndCommit(t, root, appFile, "/** Step `topic:seed-clusters`: fills clusters. */\n// see 'topic:seed-clusters'\nexport const app = 1;\n")
+	writeAndCommit(t, root, "packages/upgrade/releases/3.21.0.json", releasedManifest)
+	gitIn(t, root, "checkout", "-q", "-b", "feature")
+	writeAndCommit(t, root, appFile, "/** Step `topic:seed-clusters`: fills clusters. */\nexport const app = 2;\n")
+
+	in, err := migrationorder.Repo{Root: root}.Steps(t.Context(), "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if findings := migrationorder.CheckSteps(in); len(findings) != 0 {
+		t.Errorf("a file naming the step only in comments changed, want no finding, got %+v", findings)
+	}
+}
+
 // @scenario "A release manifest that is not valid JSON stops the check"
 func TestRunStopsOnAManifestThatIsNotJSON(t *testing.T) {
 	root := repoWithStep(t, "{ not json")

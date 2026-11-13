@@ -80,6 +80,7 @@
     "@langwatch/secret-browser": "workspace:*",
     "@langwatch/share-browser": "workspace:*",
     "@langwatch/slack-browser": "workspace:*",
+    "@langwatch/staff-access-browser": "workspace:*",
     "@langwatch/suite-browser": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/topic-browser": "workspace:*",

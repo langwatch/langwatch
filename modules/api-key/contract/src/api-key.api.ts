@@ -13,6 +13,11 @@ import type { ApiKeyListEntry, NamedApiKeyBinding } from "./api-key.list.ts";
 import type { CliSessionRevocationCause } from "./api-key.revocation-cause.ts";
 import type { MintAgentSandboxKeyInput, MintRunKeyInput } from "./api-key.run-key.ts";
 import type {
+  MintStaffAccessKeyInput,
+  RevokeStaffAccessKeyInput,
+  StaffAccessKeyMinted,
+} from "./api-key.staff-access.ts";
+import type {
   ApiKeyTokenResolutionInput,
   OrganizationApiKeyResolution,
   OrganizationApiKeyResolutionInput,
@@ -153,6 +158,13 @@ export interface ApiKeyApi {
    * Idempotent, and silent about any key that is not a live docs session key.
    */
   revokeDocsSessionKeys(input: RevokeDocsSessionKeysInput): Promise<DocsSessionRevoked>;
+  /**
+   * An approved staff agent's key (ADR-202): ownerless, system-managed, restricted to the staff
+   * bags at organization scope, expiring within the hour. Refuses any other permission.
+   */
+  mintStaffAccessKey(input: MintStaffAccessKeyInput): Promise<StaffAccessKeyMinted>;
+  /** Revokes a staff access key and forgets its cached answer. Idempotent; silent on other keys. */
+  revokeStaffAccessKey(input: RevokeStaffAccessKeyInput): Promise<void>;
   /** Resolves organization-only credentials while keeping refusal classes apart. */
   resolveOrganizationToken(
     input: OrganizationApiKeyResolutionInput,

@@ -1,5 +1,7 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { SessionImpersonation, SessionImpersonationState } from "@langwatch/auth-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -60,6 +62,9 @@ describe("AdminAuditService", () => {
     const service = ImpersonationService.create({
       repository,
       sessions: repository,
+      memberships: createApiFixture<OrganizationApi>({
+        organizationIdsForMember: async () => ["org_acme"],
+      }),
       access: AdminAccessService.create({
         authz: platformOperatorAuthz({ holders: { user_operator: ["ops:view"] } }),
         users: { findByEmail: async () => null },
@@ -79,7 +84,10 @@ describe("AdminAuditService", () => {
     expect(record).toHaveBeenCalledTimes(1);
     expect(record).toHaveBeenCalledWith({
       userId: "user_operator",
+      organizationId: "org_acme",
       action: "admin/impersonate",
+      targetKind: "session",
+      targetId: "session_1",
       args: { userIdToImpersonate: TARGET.id, reason: "Debugging trace 42" },
       ipAddress: "203.0.113.7",
       userAgent: "agent/1",
@@ -92,6 +100,9 @@ describe("AdminAuditService", () => {
     const service = ImpersonationService.create({
       repository,
       sessions: repository,
+      memberships: createApiFixture<OrganizationApi>({
+        organizationIdsForMember: async () => ["org_acme"],
+      }),
       access: AdminAccessService.create({
         authz: platformOperatorAuthz({ holders: {} }),
         users: { findByEmail: async () => null },

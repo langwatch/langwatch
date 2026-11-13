@@ -1050,6 +1050,9 @@ importers:
       '@langwatch/slack-process':
         specifier: workspace:*
         version: link:../../modules/slack/process
+      '@langwatch/staff-access-process':
+        specifier: workspace:*
+        version: link:../../modules/staff-access/process
       '@langwatch/stored-object-process':
         specifier: workspace:*
         version: link:../../modules/stored-object/process
@@ -1828,6 +1831,9 @@ importers:
       '@langwatch/slack-process':
         specifier: workspace:*
         version: link:../../modules/slack/process
+      '@langwatch/staff-access-process':
+        specifier: workspace:*
+        version: link:../../modules/staff-access/process
       '@langwatch/stored-object-process':
         specifier: workspace:*
         version: link:../../modules/stored-object/process
@@ -2075,6 +2081,9 @@ importers:
       '@langwatch/slack-browser':
         specifier: workspace:*
         version: link:../../modules/slack/browser
+      '@langwatch/staff-access-browser':
+        specifier: workspace:*
+        version: link:../../modules/staff-access/browser
       '@langwatch/suite-browser':
         specifier: workspace:*
         version: link:../../modules/suite/browser
@@ -2430,6 +2439,9 @@ importers:
       '@langwatch/slack-process':
         specifier: workspace:*
         version: link:../../modules/slack/process
+      '@langwatch/staff-access-process':
+        specifier: workspace:*
+        version: link:../../modules/staff-access/process
       '@langwatch/stored-object-process':
         specifier: workspace:*
         version: link:../../modules/stored-object/process
@@ -15006,6 +15018,201 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 5.0.1(patch_hash=6e76d3f23022ff8bd2641479eade71ef47ee1a716eecdfff4bc13c09e77c8d5a)(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(vite@8.3.4(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  modules/staff-access/browser:
+    dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../packages/api
+      '@langwatch/browser':
+        specifier: workspace:*
+        version: link:../../../packages/browser
+      '@langwatch/browser-host':
+        specifier: workspace:*
+        version: link:../../../packages/browser-host
+      '@langwatch/design-system':
+        specifier: workspace:*
+        version: link:../../../packages/design-system
+      '@langwatch/error-views':
+        specifier: workspace:*
+        version: link:../../../packages/error-views
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../packages/handled-error
+      '@langwatch/staff-access-contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../packages/time
+      '@simplewebauthn/browser':
+        specifier: ^13.3.0
+        version: 13.3.0
+      lucide-react:
+        specifier: 'catalog:'
+        version: 1.22.0(react@19.2.8)
+    devDependencies:
+      '@chakra-ui/react':
+        specifier: 'catalog:'
+        version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@emotion/react':
+        specifier: 'catalog:'
+        version: 11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2)
+      '@langwatch/vitest-config':
+        specifier: workspace:*
+        version: link:../../../packages/vitest-config
+      '@testing-library/jest-dom':
+        specifier: 'catalog:'
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.0.1)
+      '@testing-library/react':
+        specifier: 'catalog:'
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@testing-library/user-event':
+        specifier: 'catalog:'
+        version: 14.6.8(@testing-library/dom@10.4.1)
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.2.4(@types/react@19.2.18)
+      jsdom:
+        specifier: 'catalog:'
+        version: 30.0.1(@noble/hashes@2.4.0)
+      react:
+        specifier: ^19.2.7
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.7
+        version: 19.2.8(react@19.2.8)
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.1(patch_hash=6e76d3f23022ff8bd2641479eade71ef47ee1a716eecdfff4bc13c09e77c8d5a)(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.4.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(vite@8.3.4(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  modules/staff-access/contract:
+    dependencies:
+      '@langwatch/auth-contract':
+        specifier: workspace:*
+        version: link:../../auth/contract
+      '@langwatch/authz-contract':
+        specifier: workspace:*
+        version: link:../../authz/contract
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../../packages/config
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../packages/handled-error
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.7
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.1(patch_hash=6e76d3f23022ff8bd2641479eade71ef47ee1a716eecdfff4bc13c09e77c8d5a)(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.4.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(vite@8.3.4(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  modules/staff-access/process:
+    dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../packages/api
+      '@langwatch/api-key-contract':
+        specifier: workspace:*
+        version: link:../../api-key/contract
+      '@langwatch/audit-log-contract':
+        specifier: workspace:*
+        version: link:../../audit-log/contract
+      '@langwatch/auth-contract':
+        specifier: workspace:*
+        version: link:../../auth/contract
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
+      '@langwatch/authz-contract':
+        specifier: workspace:*
+        version: link:../../authz/contract
+      '@langwatch/coding-agent-contract':
+        specifier: workspace:*
+        version: link:../../coding-agent/contract
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../packages/eventing
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
+      '@langwatch/gateway-contract':
+        specifier: workspace:*
+        version: link:../../gateway/contract
+      '@langwatch/ksuid':
+        specifier: workspace:*
+        version: link:../../../packages/ksuid
+      '@langwatch/mail':
+        specifier: workspace:*
+        version: link:../../../packages/mail
+      '@langwatch/notification-contract':
+        specifier: workspace:*
+        version: link:../../notification/contract
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../../../packages/observability
+      '@langwatch/ops-contract':
+        specifier: workspace:*
+        version: link:../../ops/contract
+      '@langwatch/organization-contract':
+        specifier: workspace:*
+        version: link:../../organization/contract
+      '@langwatch/prisma-client':
+        specifier: workspace:*
+        version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
+      '@langwatch/staff-access-contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../packages/time
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../trace/contract
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../user/contract
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.7
+    devDependencies:
+      '@langwatch/process-stores':
+        specifier: workspace:*
+        version: link:../../../packages/process-stores
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
+      '@langwatch/vitest-config':
+        specifier: workspace:*
+        version: link:../../../packages/vitest-config
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.1(patch_hash=6e76d3f23022ff8bd2641479eade71ef47ee1a716eecdfff4bc13c09e77c8d5a)(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.4.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(vite@8.3.4(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
   modules/stored-object/contract:
     dependencies:

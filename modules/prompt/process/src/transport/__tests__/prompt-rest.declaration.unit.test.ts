@@ -22,7 +22,7 @@ describe("the prompts REST declaration", () => {
         route.method,
         route.path,
         route.operation,
-        route.permission,
+        route.permissions ?? route.permission,
       ]),
     ).toEqual([
       ["get", "/api/prompts", "getApiPrompts", "prompts:view"],

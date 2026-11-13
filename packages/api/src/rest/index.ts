@@ -63,6 +63,17 @@ export {
   type RestConfirmationReceipt,
   type RestConfirmationRequest,
 } from "./confirmation.ts";
+export {
+  bindStaffAccessGate,
+  openStaffAccessGate,
+  type RestStaffAccessGate,
+  type RestStaffAccessIdentity,
+  type RestStaffAccessOutcome,
+  type RestStaffAccessRefusal,
+  type RestStaffAccessReceipt,
+  type RestStaffAccessRequest,
+  type StaffAccessGateBinding,
+} from "./staff-access.ts";
 export { canonicalOtlpRequest, withOtlpPathAliases } from "./otlp-path-alias.ts";
 
 export {

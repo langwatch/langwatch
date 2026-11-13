@@ -11,6 +11,8 @@ interface CredentialHolder {
   projectId?: string;
   requestedProject?: string;
   runsOutsideProject?: boolean;
+  /** The request may act on the ops session (ADR-202): `--ops-session`, or an `ops` command. */
+  usesOpsSession?: boolean;
   warnedProjectEnvIgnored?: boolean;
   /**
    * Set to "cli" at the CLI's request boundaries (runWithCliCredentialHolder,
@@ -119,6 +121,16 @@ export function runsOutsideProject(): boolean {
   return currentHolder().runsOutsideProject === true;
 }
 
+/** Publish whether the command about to run may act on the ops session; set from `preAction`. */
+export function setUsesOpsSession(uses: boolean): void {
+  currentHolder().usesOpsSession = uses;
+}
+
+/** Whether the current request may act on the ops session; false when nothing said. */
+export function usesOpsSession(): boolean {
+  return currentHolder().usesOpsSession === true;
+}
+
 /**
  * Take the once-per-request right to warn that `LANGWATCH_PROJECT_ID` was ignored. Request-scoped
  * because the daemon serves many requests from one process; a module flag would warn only the
@@ -156,6 +168,7 @@ export function resetFallbackCredentialHolder(): void {
   fallbackHolder.apiKey = undefined;
   fallbackHolder.projectId = undefined;
   fallbackHolder.requestedProject = undefined;
+  fallbackHolder.usesOpsSession = undefined;
   fallbackHolder.warnedProjectEnvIgnored = undefined;
   fallbackHolder.surface = undefined;
 }

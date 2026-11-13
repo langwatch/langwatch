@@ -75,11 +75,24 @@ function sentence(parts: string[]): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+/** Actions whose slug reads poorly as words: LangWatch staff and operator access. */
+const NAMED_ACTIONS: Readonly<Record<string, string>> = {
+  "staffAccess.approved": "Approved LangWatch staff access",
+  "staffAccess.write": "Made a change as LangWatch staff",
+  "staffAccess.revoked": "Revoked LangWatch staff access",
+  "staffAccess.expired": "LangWatch staff access ended",
+  "admin/impersonate": "Started impersonating a member",
+  "admin/impersonate.stop": "Stopped impersonating a member",
+  "admin/impersonate.expired": "Impersonation ended",
+};
+
 /**
  * `authz.grants.attach` reads "Attached grant", `gateway.budget.created` "Created budget".
  * An action whose last segment is no known verb reads as its words, so nothing is invented.
  */
 export function auditActionPhrase(action: string): string {
+  const named = NAMED_ACTIONS[action];
+  if (named) return named;
   const segments = action.split(".").filter(Boolean);
   const verbWords = words(segments.at(-1) ?? action);
   const noun = words(segments.at(-2) ?? "").map((word, index, all) =>
@@ -100,19 +113,62 @@ export function auditActionPhrase(action: string): string {
 type ActorFields = Pick<
   EnrichedAuditLog,
   "userId" | "user" | "actorUserId" | "actorUser" | "apiKeyId"
->;
+> &
+  Partial<Pick<EnrichedAuditLog, "staffAccess">> & {
+    action?: string;
+    args?: unknown;
+  };
 type Person = { id: string; name: string; email: string | null };
 
 /**
- * Who a row names: a person (maybe through their key), an operator as someone, a key, the system.
+ * Who a row names: a person (maybe through their key), an operator as someone or as themselves,
+ * LangWatch staff through an approved agent session, a key, the system.
  */
 export type AuditActor =
   | ({ kind: "user"; viaKeyId: string | null } & Person)
   | { kind: "apiKey"; id: string }
   | { kind: "impersonation"; operator: Person; subject: Person }
+  | ({ kind: "operator"; reason: string | null } & Person)
+  | {
+      kind: "staff";
+      principal: string;
+      approvedBy: string | null;
+      revokedBy: string | null;
+      reason: string | null;
+    }
   | { kind: "unresolved"; id: string }
   | { kind: "anonymous" }
   | { kind: "system" };
+
+function text(value: unknown): string | null {
+  return typeof value === "string" && value.trim() !== "" ? value : null;
+}
+
+type StaffPerson = { id: string; name?: string | null; email?: string | null } | null | undefined;
+
+/**
+ * How a staff row names an operator: from its metadata, else from whichever of the row's own
+ * user columns holds that id. The row's actor is whoever ended it, never the approver as such.
+ */
+function staffPersonLabel({ who, log }: { who: StaffPerson; log: ActorFields }): string | null {
+  if (!who) return null;
+  const recorded = text(who.email) ?? text(who.name);
+  if (recorded) return recorded;
+  const resolved = [log.actorUser, log.user].find((user) => user?.id === who.id);
+  return resolved?.email ?? resolved?.name ?? null;
+}
+
+/** A staff access row (ADR-202): its principal and reason, who approved it and who revoked it. */
+function staffActor(log: ActorFields): AuditActor | null {
+  if (!log.staffAccess) return null;
+  return {
+    kind: "staff",
+    principal: log.staffAccess.principal,
+    approvedBy: staffPersonLabel({ who: log.staffAccess.approvedBy, log }),
+    revokedBy: staffPersonLabel({ who: log.staffAccess.revokedBy, log }),
+    reason: text(log.staffAccess.reason),
+  };
+}
 
 function person(
   user: { id: string; name: string | null; email: string | null } | null,
@@ -122,11 +178,21 @@ function person(
 }
 
 export function auditActor(log: ActorFields): AuditActor {
+  const staff = staffActor(log);
+  if (staff) return staff;
   if (log.actorUserId && log.userId && log.actorUserId !== log.userId) {
     return {
       kind: "impersonation",
       operator: person(log.actorUser, log.actorUserId),
       subject: person(log.user, log.userId),
+    };
+  }
+  // An operator starting an impersonation acts as themselves; the customer reads who and why.
+  if (log.user && (log.action ?? "").startsWith("admin/impersonate")) {
+    return {
+      kind: "operator",
+      reason: text(record(log.args).reason),
+      ...person(log.user, log.user.id),
     };
   }
   if (log.user) {

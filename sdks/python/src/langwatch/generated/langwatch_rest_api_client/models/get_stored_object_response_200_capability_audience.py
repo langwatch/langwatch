@@ -26,6 +26,7 @@ class GetStoredObjectResponse200CapabilityAudience(str, Enum):
     INGESTIONSOURCESVIEW = "ingestionSources:view"
     LANGYVIEW = "langy:view"
     MEMBERSVIEW = "members:view"
+    OPSREADVIEW = "opsRead:view"
     OPSVIEW = "ops:view"
     ORGANIZATIONVIEW = "organization:view"
     PLAYGROUNDVIEW = "playground:view"

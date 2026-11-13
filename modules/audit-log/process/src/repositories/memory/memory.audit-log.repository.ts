@@ -63,14 +63,16 @@ export class MemoryAuditLogRepository implements AuditLogRepository {
   }
 
   async hasRecordedSince(input: RecordedSinceInput): Promise<boolean> {
-    return this.store.rows.some(
-      (row) =>
+    return this.store.rows.some((row) => {
+      if (input.organizationId && row.organizationId !== input.organizationId) return false;
+      return (
         row.userId === input.userId &&
         row.action === input.action &&
         row.targetKind === input.targetKind &&
         row.targetId === input.targetId &&
-        row.createdAt.epochMilliseconds >= input.sinceMs,
-    );
+        row.createdAt.epochMilliseconds >= input.sinceMs
+      );
+    });
   }
 
   async findEntityHistory(input: ListAuditLogEntityHistoryInput): Promise<AuditLogHistoryEntry[]> {

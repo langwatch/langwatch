@@ -81,6 +81,7 @@ const TARGET_FILES = new Set([
   "rest/response-kind.ts",
   "rest/runtime.ts",
   "rest/security.ts",
+  "rest/staff-access.ts",
   "rest/repositories/prisma/prisma.idempotency-receipt.ts",
   "trpc/index.ts",
   "trpc/audit.ts",

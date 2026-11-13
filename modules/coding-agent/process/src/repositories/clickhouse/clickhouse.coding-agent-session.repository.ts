@@ -1230,7 +1230,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
           tenants: { tenantId },
           whenNotReady: "unbounded",
         });
-        if (lifetime === null) return { sessions: 0, first: [] };
+        if (lifetime === null) return { sessions: 0, first: [], last: [] };
         const read = async (sql: string) =>
           usageRowsSchema.parse(
             (
@@ -1249,31 +1249,33 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
           )[0];
         const [counted, earliest] = await Promise.all([
           read(`
-            SELECT toString(uniqExact(SessionId)) AS Total, '0' AS FirstMs
+            SELECT toString(uniqExact(SessionId)) AS Total, '0' AS FirstMs, '0' AS LastMs
             FROM ${TABLE_NAME}
             WHERE TenantId = {tenantId:String}
               ${lifetime.sql}
               ${window}`),
           read(`
             SELECT toString(count()) AS Total,
-                   toString(toUnixTimestamp64Milli(min(StartedAt))) AS FirstMs
+                   toString(toUnixTimestamp64Milli(min(StartedAt))) AS FirstMs,
+                   toString(toUnixTimestamp64Milli(max(StartedAt))) AS LastMs
             FROM ${TABLE_NAME}
             WHERE TenantId = {tenantId:String}
               ${lifetime.sql}`),
         ]);
+        const none = Number.parseInt(earliest?.Total ?? "0", 10) === 0;
         return {
           sessions: Number.parseInt(counted?.Total ?? "0", 10),
-          first:
-            Number.parseInt(earliest?.Total ?? "0", 10) === 0
-              ? []
-              : [Number(earliest?.FirstMs ?? "0")],
+          first: none ? [] : [Number(earliest?.FirstMs ?? "0")],
+          last: none ? [] : [Number(earliest?.LastMs ?? "0")],
         };
       }),
     );
     const firsts = perProject.flatMap((project) => project.first);
+    const lasts = perProject.flatMap((project) => project.last);
     return {
       sessions: perProject.reduce((sum, project) => sum + project.sessions, 0),
       ...(firsts.length === 0 ? {} : { firstSessionAt: Math.min(...firsts) }),
+      ...(lasts.length === 0 ? {} : { lastSessionAt: Math.max(...lasts) }),
     };
   }
 }
@@ -1287,7 +1289,9 @@ function startedAtWithin(span: SessionSpan): TimeBound {
   };
 }
 
-const usageRowsSchema = z.array(z.object({ Total: z.string(), FirstMs: z.string() }));
+const usageRowsSchema = z.array(
+  z.object({ Total: z.string(), FirstMs: z.string(), LastMs: z.string() }),
+);
 
 const asNumberArray = (value: unknown): number[] =>
   Array.isArray(value) ? value.map(asNumber) : [];

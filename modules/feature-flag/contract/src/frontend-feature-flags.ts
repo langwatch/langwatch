@@ -59,6 +59,8 @@ export const FRONTEND_FEATURE_FLAGS = [
   // The guided onboarding variant, read on the welcome flow with the user's
   // id, which the percentage rollout buckets on (guided-onboarding-variant.feature).
   "experiment_onboarding_langy_guided",
+  // The ops console offers Agent access only while this system flag is on (ADR-202).
+  "ops_agent_access_enabled",
 ] as const;
 
 /** One `ReleaseFlagToken` per browser-visible flag; screens and readers name these. */

@@ -1,12 +1,13 @@
 /**
  * Who ran a key's LangWatchQL query: Langy's session key first, then the client it came from.
  * @see modules/dashboard/specs/dashboards-telemetry.feature
+ * @see modules/staff-access/specs/staff-access-use.feature
  */
 import type { LangWatchQLKeyReach } from "@langwatch/analytics-contract";
 import { CENSUS_CLIENTS } from "@langwatch/observability/credential-census";
 import { describe, expect, it } from "vitest";
 
-import { keyDoorOfClient, keyRunTelemetry } from "../langwatch-ql-key-caller.rules.ts";
+import { keyDoorOfClient, keyMaySpend, keyRunTelemetry } from "../langwatch-ql-key-caller.rules.ts";
 
 const organizationKey: LangWatchQLKeyReach = {
   kind: "apiKey",
@@ -39,5 +40,21 @@ describe("keyDoorOfClient", () => {
     const doors = new Set(CENSUS_CLIENTS.map((client) => keyDoorOfClient({ client })));
 
     expect([...doors].toSorted()).toEqual(["cli", "mcp", "rest_api"]);
+  });
+});
+
+describe("keyMaySpend", () => {
+  /** @scenario "A staff key without the spend tick cannot run LWQL eval functions" */
+  it("refuses charged eval() functions to a staff key whose session was not approved to spend", () => {
+    const staffKey = { ...organizationKey, isStaffAccessKey: true };
+
+    expect(keyMaySpend({ ...staffKey, staffSpendApproved: false })).toBe(false);
+    expect(keyMaySpend(staffKey)).toBe(false);
+    expect(keyMaySpend({ ...staffKey, staffSpendApproved: true })).toBe(true);
+  });
+
+  it("leaves every other key to its project's own Instant Evals switch", () => {
+    expect(keyMaySpend(organizationKey)).toBe(true);
+    expect(keyMaySpend({ kind: "project", projectId: "p-1" })).toBe(true);
   });
 });

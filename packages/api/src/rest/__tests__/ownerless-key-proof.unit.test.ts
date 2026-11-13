@@ -6,6 +6,7 @@ import {
   internalActor,
   sealAuthorization,
   type Actor,
+  type RestResolvedOrganizationCredential,
   type RestResolvedProjectCredential,
 } from "@langwatch/authorization";
 import { moduleApi } from "@langwatch/module";
@@ -15,9 +16,14 @@ import { z } from "zod";
 import { authorizationPort } from "../../__tests__/api-double.ts";
 import { createErrorHandler } from "../../errors.ts";
 import type { RestIdentity } from "../../hosting/api-door.ts";
-import { OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH, recordProjectCredential } from "../credential.ts";
+import {
+  OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH,
+  recordOrganizationCredential,
+  recordProjectCredential,
+} from "../credential.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { createRestRuntime } from "../runtime.ts";
+import type { RestStaffAccessGate } from "../staff-access.ts";
 
 type TracesApi = { search(): Promise<{ read: boolean }> };
 
@@ -62,6 +68,16 @@ const routes = defineRestRouter(TracesApi)
 
 type Minted = Readonly<{ actor: Actor; projectId: string }>;
 
+/** A staff access gate that records nothing and admits every request. */
+const ADMIT_ALL: RestStaffAccessGate = {
+  admit: async () => ({
+    staff: { principal: "LangWatch Support", approverUserId: "operator-1", reason: null },
+    spendApproved: false,
+    finish: async () => {},
+  }),
+  refused: async () => {},
+};
+
 /** A door that admits the key at `scope` and records what it resolved. */
 async function search({
   credential,
@@ -105,7 +121,11 @@ async function search({
     },
   };
 
-  const response = await createRestRuntime({ authorization, identity: door })
+  const response = await createRestRuntime({
+    authorization,
+    identity: door,
+    staffAccess: ADMIT_ALL,
+  })
     .mount(routes, { app: () => app, onError: createErrorHandler() })
     .request(`/api/ownerless-proof/${VERSION}/search`, {
       method: "POST",
@@ -129,6 +149,18 @@ describe("a trace read with a key that stands for nobody", () => {
       expect(response.status).toBe(200);
       expect(minted).toEqual([{ ...OWN_PROOF, projectId: "project-1" }]);
       expect(ran).toEqual(["search"]);
+    });
+  });
+
+  describe("given a staff access key no person owns, at its own project", () => {
+    it("reads on a proof minted as the door's own for that project", async () => {
+      const { response, minted } = await search({
+        credential: { ...apiKey(null), isStaffAccessKey: true } as RestResolvedProjectCredential,
+        scope: "project-1",
+      });
+
+      expect(response.status).toBe(200);
+      expect(minted).toEqual([{ ...OWN_PROOF, projectId: "project-1" }]);
     });
   });
 
@@ -165,6 +197,93 @@ describe("a trace read with a key that stands for nobody", () => {
       });
 
       expect(minted).toEqual([{ actor: person, projectId: "project-1" }]);
+    });
+  });
+});
+
+describe("a trace read at a project named by an organization door route", () => {
+  const orgRoutes = defineRestRouter(TracesApi)
+    .withNamespace("ownerless-org-proof")
+    .withVersion(VERSION)
+    .withCredential("organization")
+    .post("/:projectId/search", "search")
+    .keepsRecords()
+    .withParams(z.object({ projectId: z.string() }))
+    .withPermission("traces:view", { at: "route", param: "projectId" })
+    .withOutput(z.object({ read: z.boolean() }))
+    .withoutAudit("test route")
+    .handle(({ app }) => app.search())
+    .build()
+    .router();
+
+  async function searchAsOrganizationKey(credential: RestResolvedOrganizationCredential) {
+    const minted: Minted[] = [];
+    const door: RestIdentity = {
+      authenticate: ({ request }) => {
+        recordOrganizationCredential(request, credential);
+        return { actor: null, scope: { tier: "organization", id: "org-1" } };
+      },
+      authorize: () => ({ permitted: true, organizationRole: null }),
+    };
+    const authorization = {
+      forRequest: () => ({
+        ...authorizationPort.forRequest(),
+        authorization: async (input: Minted) => {
+          minted.push({ actor: input.actor, projectId: input.projectId });
+          return sealAuthorization({
+            actor: input.actor,
+            principal: { type: "internal", codePath: OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH },
+            scope: { organizationId: "org-1" },
+            grants: [
+              { projectId: input.projectId, permissions: ["traces:view"], via: [], kind: "own" },
+            ],
+            expiresAt: Number.MAX_SAFE_INTEGER,
+            purpose: { kind: "route", route: "trace.search" },
+          });
+        },
+      }),
+    };
+    const app: TracesApi = { search: async () => ({ read: true }) };
+
+    const response = await createRestRuntime({
+      authorization,
+      identity: door,
+      doors: { organization: door },
+      staffAccess: ADMIT_ALL,
+    })
+      .mount(orgRoutes, { app: () => app, onError: createErrorHandler() })
+      .request(`/api/ownerless-org-proof/${VERSION}/project-1/search`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: "Bearer key" },
+        body: "{}",
+      });
+
+    return { response, minted };
+  }
+
+  const orgKey = (isStaffAccessKey: boolean): RestResolvedOrganizationCredential => ({
+    type: "apiKey-org",
+    apiKeyId: "key-1",
+    userId: null,
+    organizationId: "org-1",
+    ...(isStaffAccessKey ? { isStaffAccessKey: true } : {}),
+  });
+
+  describe("given an ownerless staff access key", () => {
+    it("reads on a proof minted as the door's own for the project the door asked about", async () => {
+      const { response, minted } = await searchAsOrganizationKey(orgKey(true));
+
+      expect(response.status).toBe(200);
+      expect(minted).toEqual([{ ...OWN_PROOF, projectId: "project-1" }]);
+    });
+  });
+
+  describe("given any other ownerless organization key", () => {
+    it("is refused 403 without minting, as before", async () => {
+      const { response, minted } = await searchAsOrganizationKey(orgKey(false));
+
+      expect(response.status).toBe(403);
+      expect(minted).toEqual([]);
     });
   });
 });

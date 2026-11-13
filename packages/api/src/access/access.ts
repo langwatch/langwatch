@@ -163,6 +163,7 @@ export type Credential =
   | "cli_token"
   | "otlp_ingest"
   | "licence_token"
+  | "staff_access"
   | "public";
 
 /** An authenticated caller, normalized with a stable identifier for every kind. */
@@ -345,6 +346,37 @@ export async function decidePlatform({
 
   throw refusedPlatform({
     actor,
+    permission: declaration.permission,
+    refusal: platformRefusal(declaration),
+  });
+}
+
+/**
+ * A platform question a door answers for its own caller, who is no person: the `staff_access`
+ * door's ops token (ADR-202), answered from its approved session. Same refusals as a person's.
+ */
+export async function decideDoorPlatform({
+  declaration,
+  ask,
+}: {
+  declaration: PlatformPermissionDeclaration;
+  ask: (input: { permission: PlatformTierPermission }) => Promise<PlatformDecision>;
+}): Promise<void> {
+  const holds = async (permission: PlatformTierPermission) => (await ask({ permission })).permitted;
+  const staff = declaration.hiddenWithout;
+
+  if (staff !== void 0 && !(await holds(staff))) {
+    throw refusedPlatform({
+      actor: null,
+      permission: staff,
+      refusal: new PlatformSurfaceHiddenError(),
+    });
+  }
+
+  if (staff === declaration.permission || (await holds(declaration.permission))) return;
+
+  throw refusedPlatform({
+    actor: null,
     permission: declaration.permission,
     refusal: platformRefusal(declaration),
   });
@@ -716,6 +748,7 @@ export function securityRequirement(credential: Credential): readonly Record<str
     case "public":
       return [];
     case "licence_token":
+    case "staff_access":
     case "browser":
       throw new Error(
         `a "${credential}" route has no security scheme an API client can satisfy, ` +
