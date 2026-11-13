@@ -1,3 +1,4 @@
+import { MAX_STATED_SEATS } from "@langwatch/plans";
 import { type Instant, Temporal } from "@langwatch/time";
 
 import type { LicenseMintRequest } from "../services/license-mint.service.ts";
@@ -13,6 +14,15 @@ function parseQuota(flag: string, value: string): number {
   const parsed = Number(value);
   if (!Number.isSafeInteger(parsed) || parsed < 0) {
     throw new Error(`${flag} must be a whole number, got: ${value}\n${USAGE}`);
+  }
+  return parsed;
+}
+
+/** A seat count fits the 32-bit seat column the registry stores it in. */
+function parseSeats(flag: string, value: string): number {
+  const parsed = parseQuota(flag, value);
+  if (parsed > MAX_STATED_SEATS) {
+    throw new Error(`${flag} can be at most ${MAX_STATED_SEATS}, got: ${value}\n${USAGE}`);
   }
   return parsed;
 }
@@ -39,12 +49,12 @@ export function parseGenerateLicenseArgs(args: readonly string[]): LicenseMintRe
     },
     "--plan": (value) => Object.assign(request, { planType: value.toUpperCase() }),
     "--max-members": (value) =>
-      Object.assign(request, { maxMembers: parseQuota("--max-members", value) }),
+      Object.assign(request, { maxMembers: parseSeats("--max-members", value) }),
     "--max-members-lite": (value) =>
-      Object.assign(request, { maxMembersLite: parseQuota("--max-members-lite", value) }),
+      Object.assign(request, { maxMembersLite: parseSeats("--max-members-lite", value) }),
     "--max-members-developer": (value) =>
       Object.assign(request, {
-        maxMembersDeveloper: parseQuota("--max-members-developer", value),
+        maxMembersDeveloper: parseSeats("--max-members-developer", value),
       }),
     "--max-messages-per-month": (value) =>
       Object.assign(request, {

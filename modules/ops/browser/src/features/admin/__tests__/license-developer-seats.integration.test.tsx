@@ -149,4 +149,45 @@ describe("LicenseDetailDrawer, Developer seats", () => {
 
     expect(screen.getByRole("button", { name: "Reissue license" })).toBeDisabled();
   });
+
+  /** @scenario The admin console states and shows Developer seats */
+  it.each(["-1", "1.5", "2147483648"])(
+    "will not reissue %s Developer seats, and says why",
+    (typed) => {
+      renderDrawer(license());
+      fireEvent.change(screen.getByRole("spinbutton", { name: "Developer seats" }), {
+        target: { value: typed },
+      });
+      fireEvent.change(screen.getByLabelText("New term end"), { target: { value: "2028-01-01" } });
+
+      expect(screen.getByRole("button", { name: "Reissue license" })).toBeDisabled();
+      expect(screen.getByRole("spinbutton", { name: "Developer seats" })).toHaveAttribute(
+        "aria-invalid",
+        "true",
+      );
+    },
+  );
+});
+
+describe("LicenseIssueDrawer, a Developer seat count that cannot be signed", () => {
+  it("names the field and issues nothing", async () => {
+    renderWithOpsHost(<LicenseIssueDrawer open={true} onClose={vi.fn()} />);
+    fireEvent.change(await screen.findByPlaceholderText("Organization id on LangWatch Cloud"), {
+      target: { value: "org_acme" },
+    });
+    fireEvent.change(screen.getByLabelText(/Contact email/), {
+      target: { value: "ops@acme.test" },
+    });
+    fireEvent.change(screen.getByLabelText(/Term ends/), { target: { value: "2027-11-13" } });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Developer seats" }), {
+      target: { value: "-2" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Issue license" }));
+
+    expect(
+      await screen.findByText("Enter a whole number of Developer seats, 0 or more."),
+    ).toBeTruthy();
+    expect(issue).not.toHaveBeenCalled();
+  });
 });

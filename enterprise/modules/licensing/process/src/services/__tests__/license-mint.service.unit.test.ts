@@ -164,13 +164,17 @@ describe("LicenseMintService", () => {
     it("refuses before signing anything", async () => {
       const { mint, repository, organizations } = harness({ goneBeforeWrite: false });
 
-      await expect(
-        mint.applyToOrganization({
+      const refusal = await mint
+        .applyToOrganization({
           organizationId: "org-acme",
           planType: "ENTERPRISE",
           maxMembersDeveloper: MAX_STATED_SEATS + 1,
-        }),
-      ).rejects.toThrow(`at most ${MAX_STATED_SEATS}`);
+        })
+        .catch((error: unknown) => error);
+
+      expect(refusal).toMatchObject({
+        issues: [expect.objectContaining({ code: "too_big", maximum: MAX_STATED_SEATS })],
+      });
       expect(await registryRows(repository)).toEqual([]);
       expect(organizations.licenses.size).toBe(0);
     });

@@ -1,6 +1,7 @@
 /** A registry row as Cloud admin reads it (ADR-156). Declared here, not
  * derived from `RouterOutputs`: model stays pure and behavior depends on it,
  * never the reverse. */
+import { developerSeatsInputSchema } from "@langwatch/ops-contract";
 
 export interface License {
   id: string;
@@ -41,6 +42,16 @@ export type LicenseCounts = Record<"active" | "inactive" | "customer" | "interna
 
 /** The hosted services an operator can put on a license (ADR-156); kept a
  * plain array here since a core browser package names no enterprise one. */
+/** Why a typed Developer seat count cannot be sent, or undefined when it can (or is empty). */
+export function developerSeatsProblem(value: string): string | undefined {
+  if (value.trim() === "") return undefined;
+  const parsed = developerSeatsInputSchema.safeParse(Number(value));
+  if (parsed.success) return undefined;
+  return parsed.error.issues[0]?.code === "too_big"
+    ? parsed.error.issues[0].message
+    : "Enter a whole number of Developer seats, 0 or more.";
+}
+
 export const SERVICES = ["instant_evals", "managed_models"] as const;
 export type Service = (typeof SERVICES)[number];
 

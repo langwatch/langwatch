@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import { api } from "../../../../behavior/ops-api.ts";
 import { useLicenseCommands } from "../../behavior/use-license-commands.ts";
 import {
+  developerSeatsProblem,
   termsFormFrom,
   termsPayload,
   type License,
@@ -346,6 +347,11 @@ function ReissueSection({ license }: { license: License }) {
     setIssuedKey(null);
   }, [licenseId]);
 
+  const developersProblem =
+    developers.trim() === ""
+      ? "Enter the Developer seats, 0 for none."
+      : developerSeatsProblem(developers);
+
   return (
     <Section title="Reissue">
       <Text fontSize="sm" color="fg.muted">
@@ -363,14 +369,16 @@ function ReissueSection({ license }: { license: License }) {
             onChange={(event) => setSeats(event.target.value)}
           />
         </Field.Root>
-        <Field.Root>
+        <Field.Root invalid={developersProblem !== undefined}>
           <Field.Label>Developer seats</Field.Label>
           <Input
             type="number"
             min={0}
+            aria-invalid={developersProblem !== undefined || undefined}
             value={developers}
             onChange={(event) => setDevelopers(event.target.value)}
           />
+          <Field.ErrorText>{developersProblem}</Field.ErrorText>
         </Field.Root>
         <Field.Root>
           <Field.Label>New term end</Field.Label>
@@ -379,7 +387,7 @@ function ReissueSection({ license }: { license: License }) {
       </SimpleGrid>
       <Button
         size="sm"
-        disabled={expires === "" || seats === "" || developers.trim() === ""}
+        disabled={expires === "" || seats === "" || developersProblem !== undefined}
         loading={commands.reissue.isPending}
         onClick={() => {
           const iso = dateInputToISO(expires);

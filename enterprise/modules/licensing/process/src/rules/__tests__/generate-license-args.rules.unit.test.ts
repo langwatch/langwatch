@@ -69,4 +69,13 @@ describe("parseGenerateLicenseArgs", () => {
       "--max-members-developer requires a value",
     );
   });
+
+  it.each(["--max-members", "--max-members-lite", "--max-members-developer"])(
+    "refuses %s above the seat column's maximum, naming the flag",
+    (flag) => {
+      expect(() => parseGenerateLicenseArgs(["--org-id", "o", flag, "2147483648"])).toThrow(
+        `${flag} can be at most 2147483647`,
+      );
+    },
+  );
 });

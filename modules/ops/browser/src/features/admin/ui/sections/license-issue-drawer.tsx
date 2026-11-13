@@ -11,7 +11,12 @@ import {
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
 import { useLicenseCommands } from "../../behavior/use-license-commands.ts";
-import { termsFormFrom, termsPayload, type TermsForm } from "../../model/license-terms.ts";
+import {
+  developerSeatsProblem,
+  termsFormFrom,
+  termsPayload,
+  type TermsForm,
+} from "../../model/license-terms.ts";
 import { LicenseTermsFields } from "../blocks/license-terms-fields.tsx";
 import { dateInputToISO } from "../elements/admin-cells.tsx";
 import { SignedLicenseOnce } from "../elements/signed-license-once.tsx";
@@ -59,7 +64,13 @@ function emptyIssueForm(): IssueForm {
 
 type Problems = Partial<
   Record<
-    "organizationId" | "newOrganizationName" | "licenseKey" | "email" | "maxMembers" | "expiresAt",
+    | "organizationId"
+    | "newOrganizationName"
+    | "licenseKey"
+    | "email"
+    | "maxMembers"
+    | "maxMembersDeveloper"
+    | "expiresAt",
     string
   >
 >;
@@ -79,6 +90,8 @@ function problemsOf(form: IssueForm): Problems {
   }
   if (form.email.trim() === "") problems.email = "Enter a contact email.";
   if (!(Number(form.maxMembers) >= 1)) problems.maxMembers = "Enter at least 1 full member seat.";
+  const developers = developerSeatsProblem(form.maxMembersDeveloper);
+  if (developers) problems.maxMembersDeveloper = developers;
   if (form.expiresAt === "" || !dateInputToISO(form.expiresAt)) {
     problems.expiresAt = "Choose when the term ends.";
   }
@@ -272,17 +285,19 @@ export function LicenseIssueDrawer({ open, onClose }: { open: boolean; onClose: 
                     placeholder="Plan default"
                   />
                 </Field.Root>
-                <Field.Root>
+                <Field.Root invalid={problems.maxMembersDeveloper !== undefined}>
                   <Field.Label>Developer seats</Field.Label>
                   <Input
                     type="number"
                     min={0}
+                    aria-invalid={problems.maxMembersDeveloper !== undefined || undefined}
                     value={form.maxMembersDeveloper}
                     onChange={(event) =>
                       setForm((c) => ({ ...c, maxMembersDeveloper: event.target.value }))
                     }
                     placeholder="None"
                   />
+                  <Field.ErrorText>{problems.maxMembersDeveloper}</Field.ErrorText>
                 </Field.Root>
                 <Field.Root required invalid={problems.expiresAt !== undefined}>
                   <Field.Label>Term ends</Field.Label>
