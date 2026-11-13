@@ -10,7 +10,7 @@ import { ContentTabs } from "@langwatch/design-system/content-tabs";
 import { FeatureMark } from "@langwatch/design-system/feature-mark";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Box, Skeleton, Stack, Text } from "@langwatch/design-system/primitives";
+import { Box, Button, Skeleton, Stack, Text } from "@langwatch/design-system/primitives";
 import { BookOpen, Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
@@ -20,7 +20,7 @@ import {
   useProjectBraids,
   useRemoveBraid,
 } from "../../../behavior/use-braids.ts";
-import { useAuthzHost } from "../../../model/authz-host.ts";
+import { AUTHZ_MANAGE_PERMISSION, useAuthzHost } from "../../../model/authz-host.ts";
 import {
   type BraidAffordances,
   type BraidRow,
@@ -42,6 +42,9 @@ import { BraidDialog } from "./braid-dialog.tsx";
 import { BraidsSigningKeys } from "./braids-signing-keys.tsx";
 
 const BRAIDS_MANAGE_PERMISSION = "braids:manage";
+const ORGANIZATION_BRAIDS_HREF = "/settings/organization-braids";
+/** The api-key panel opens New signing key on `?signingKey=new`, as Edit opens on `?braid=`. */
+const SIGNING_KEY_QUERY_KEY = "signingKey";
 
 /** The braid dialog is URL-routed: `?braid=new`, or `?braid=<id>` for Edit. */
 const BRAID_QUERY_KEY = "braid";
@@ -51,6 +54,16 @@ function NewBraidButton({ onOpen }: { onOpen: () => void }) {
     <PageLayout.HeaderButton primary onClick={onOpen} data-testid="new-braid-header">
       <Plus size={14} aria-hidden />
       New braid
+    </PageLayout.HeaderButton>
+  );
+}
+
+/** Signing keys' primary action, outlined; the panel opens its create dialog from the query. */
+function NewSigningKeyButton({ onOpen }: { onOpen: () => void }) {
+  return (
+    <PageLayout.HeaderButton onClick={onOpen} data-testid="new-signing-key-header">
+      <Plus size={14} aria-hidden />
+      New signing key
     </PageLayout.HeaderButton>
   );
 }
@@ -69,10 +82,13 @@ function GuideLink() {
 function BraidsHeader({
   actions,
   projectName,
+  locked = false,
 }: {
   actions?: ReactNode;
   /** The project the page is about; the organisation screen names none. */
   projectName?: string;
+  /** The plan locks Braids: the title shows a lock, as the settings menu does. */
+  locked?: boolean;
 }) {
   const switcher = useAuthzHost().projectSwitcher();
   return (
@@ -91,7 +107,7 @@ function BraidsHeader({
           : "Show spans from one project inside another project's traces. Nothing is copied."
       }
     >
-      <BraidsTitle />
+      <BraidsTitle locked={locked} />
     </PageLayout.Header>
   );
 }
@@ -117,6 +133,109 @@ function NothingBraidedIn({ projectName }: { projectName: string }) {
       docsHref={BRAIDS_GUIDE_HREF}
       testId="braids-empty-from"
     />
+  );
+}
+
+/** Paused, an empty tab points at the tab that holds this project's braids, in one line. */
+function BraidsOnOtherTab({ tab, onOpen }: { tab: "into" | "from"; onOpen: () => void }) {
+  return (
+    <Text textStyle="sm" color="fg.muted" paddingY={3} data-testid="braids-on-other-tab">
+      {"Nothing here. This project's braids are under "}
+      <Button variant="plain" size="sm" height="auto" padding={0} onClick={onOpen}>
+        {tab === "into" ? "Into other projects" : "From other projects"}
+      </Button>
+      .
+    </Text>
+  );
+}
+
+function BraidsHeaderActions({
+  tab,
+  canCreate,
+  canManageKeys,
+  onNewBraid,
+  onNewKey,
+}: {
+  tab: BraidsTab;
+  canCreate: boolean;
+  canManageKeys: boolean;
+  onNewBraid: () => void;
+  onNewKey: () => void;
+}) {
+  // The header's main action follows the tab.
+  const action =
+    tab === "keys"
+      ? canManageKeys && <NewSigningKeyButton onOpen={onNewKey} />
+      : canCreate && <NewBraidButton onOpen={onNewBraid} />;
+  return (
+    <>
+      <GuideLink />
+      {action || null}
+    </>
+  );
+}
+
+function PausedBanner({ total }: { total: number }) {
+  return (
+    <Banner
+      status="warning"
+      title="Braids are paused"
+      action={
+        <BannerAction asChild>
+          <Link href="/settings/plans">See plans</Link>
+        </BannerAction>
+      }
+    >
+      Braids need the Enterprise plan. Your {total === 1 ? "braid is" : `${total} braids are`} kept
+      and start working again when you upgrade.
+    </Banner>
+  );
+}
+
+function KeptToAdminsBanner() {
+  return (
+    <Banner
+      status="info"
+      title="Your organisation's admins manage braids"
+      action={
+        <BannerAction asChild>
+          <Link href="/settings/directory">Ask an admin</Link>
+        </BannerAction>
+      }
+    >
+      Your organisation keeps braids to its admins, so only they can create, change or remove them.
+    </Banner>
+  );
+}
+
+/** An empty tab: paused with the braids on the other tab, a pointer there; else its empty state. */
+function EmptyTab({
+  side,
+  paused,
+  otherCount,
+  onOpen,
+  children,
+}: {
+  side: "into" | "from";
+  paused: boolean;
+  otherCount: number;
+  onOpen: (tab: "into" | "from") => void;
+  children: ReactNode;
+}) {
+  const other = side === "into" ? "from" : "into";
+  if (paused && otherCount > 0)
+    return <BraidsOnOtherTab tab={other} onOpen={() => onOpen(other)} />;
+  return children;
+}
+
+/** The organisation's view of every braid, for whoever may open it. */
+function OrganizationBraidsLink({ organizationName }: { organizationName: string | undefined }) {
+  return (
+    <Text textStyle="sm" data-testid="braids-organization-link">
+      <Link href={ORGANIZATION_BRAIDS_HREF}>
+        {organizationName ? `All braids in ${organizationName}` : "All braids in your organisation"}
+      </Link>
+    </Text>
   );
 }
 
@@ -177,7 +296,7 @@ export default function BraidsScreen() {
   if (planState === "upsell") {
     return (
       <>
-        <BraidsHeader projectName={projectName} />
+        <BraidsHeader projectName={projectName} locked />
         <Box paddingTop={4}>
           <BraidsEnterpriseUpsell />
         </Box>
@@ -192,12 +311,25 @@ export default function BraidsScreen() {
     keptToOrganizationAdmins: keptToAdmins,
   });
   const paused = planState === "paused";
+  const canManageKeys = planState === "enterprise" && host.hasPermission(BRAIDS_MANAGE_PERMISSION);
+  const seesOrganization = host.hasPermission(AUTHZ_MANAGE_PERMISSION);
+  const emptyTab = (side: "into" | "from", empty: ReactNode) => (
+    <EmptyTab
+      side={side}
+      paused={paused}
+      otherCount={side === "into" ? rows.from.length : rows.into.length}
+      onOpen={setTab}
+    >
+      {empty}
+    </EmptyTab>
+  );
   const total = rows.into.length + rows.from.length;
   const table = (side: "into" | "from") => (
     <>
       <BraidsTable
         side={side}
         projectName={projectName}
+        projectSlug={projects.find((project) => project.id === projectId)?.slug}
         rows={side === "into" ? rows.into : rows.from}
         paused={paused}
         canEdit={can.canEditInto}
@@ -218,45 +350,20 @@ export default function BraidsScreen() {
     <>
       <BraidsHeader
         projectName={projectName}
+        locked={paused}
         actions={
-          <>
-            <GuideLink />
-            {/* The header's primary action follows the tab; Signing keys carries its own. */}
-            {can.canCreate && tab !== "keys" ? (
-              <NewBraidButton onOpen={() => openBraid("new")} />
-            ) : null}
-          </>
+          <BraidsHeaderActions
+            tab={tab}
+            canCreate={can.canCreate}
+            canManageKeys={canManageKeys}
+            onNewBraid={() => openBraid("new")}
+            onNewKey={() => host.setQuery({ ...query, [SIGNING_KEY_QUERY_KEY]: "new" })}
+          />
         }
       />
       <Stack gap={4} paddingTop={paused || can.showKeptToAdminsNote ? 4 : 0}>
-        {paused ? (
-          <Banner
-            status="warning"
-            title="Braids are paused"
-            action={
-              <BannerAction asChild>
-                <Link href="/settings/plans">See plans</Link>
-              </BannerAction>
-            }
-          >
-            Braids need the Enterprise plan. Your {total === 1 ? "braid is" : `${total} braids are`}{" "}
-            kept and start working again when you upgrade.
-          </Banner>
-        ) : null}
-        {can.showKeptToAdminsNote ? (
-          <Banner
-            status="info"
-            title="Your organisation's admins manage braids"
-            action={
-              <BannerAction asChild>
-                <Link href="/settings/directory">Ask an admin</Link>
-              </BannerAction>
-            }
-          >
-            Your organisation keeps braids to its admins, so only they can create, change or remove
-            them.
-          </Banner>
-        ) : null}
+        {paused ? <PausedBanner total={total} /> : null}
+        {can.showKeptToAdminsNote ? <KeptToAdminsBanner /> : null}
         {/* Only the open tab is mounted: the others hold no read open behind it. */}
         <ContentTabs
           label="Braids"
@@ -272,11 +379,9 @@ export default function BraidsScreen() {
               testId: "braids-tab-into",
               content: (
                 <Box paddingTop={4}>
-                  {rows.into.length > 0 ? (
-                    table("into")
-                  ) : (
-                    <BraidsHowItWorks projectName={projectName} />
-                  )}
+                  {rows.into.length > 0
+                    ? table("into")
+                    : emptyTab("into", <BraidsHowItWorks projectName={projectName} />)}
                 </Box>
               ),
             },
@@ -287,11 +392,9 @@ export default function BraidsScreen() {
               testId: "braids-tab-from",
               content: (
                 <Box paddingTop={4}>
-                  {rows.from.length > 0 ? (
-                    table("from")
-                  ) : (
-                    <NothingBraidedIn projectName={projectName} />
-                  )}
+                  {rows.from.length > 0
+                    ? table("from")
+                    : emptyTab("from", <NothingBraidedIn projectName={projectName} />)}
                 </Box>
               ),
             },
@@ -307,6 +410,11 @@ export default function BraidsScreen() {
             },
           ]}
         />
+        {seesOrganization ? (
+          <OrganizationBraidsLink
+            organizationName={host.organizationStructure().organizationName}
+          />
+        ) : null}
       </Stack>
       {dialogOpen ? (
         <BraidDialog

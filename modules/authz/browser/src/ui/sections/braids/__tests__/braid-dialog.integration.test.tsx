@@ -127,8 +127,8 @@ describe("the braid dialog", () => {
       const options = screen.getAllByTestId("braid-target");
       expect(options).toHaveLength(3);
       expect(options[0]).toHaveTextContent("orchestrator");
-      expect(options[1]).toHaveTextContent("specialistsThis project");
-      expect(options[2]).toHaveTextContent("rollupAggregate projects can't be braided");
+      expect(options[1]).toHaveTextContent("rollupAggregate projects can't be braided");
+      expect(options[2]).toHaveTextContent("specialistsThis project");
       expect(options[0]).not.toHaveAttribute("data-disabled");
       expect(options[1]).toHaveAttribute("data-disabled");
       expect(options[2]).toHaveAttribute("data-disabled");

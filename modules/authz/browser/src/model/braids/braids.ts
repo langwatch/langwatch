@@ -10,6 +10,8 @@ export type BraidSide = "into" | "from";
 export type BraidProject = {
   id: string;
   name: string;
+  /** Addresses the project's pages; absent when the host has not read it. */
+  slug?: string;
 };
 
 export type BraidRow = {
@@ -37,7 +39,7 @@ export type OrganizationBraidRow = {
   createdAtMs: number;
 };
 
-type KnownProject = { id: string; name: string };
+type KnownProject = { id: string; name: string; slug?: string };
 
 /** A project the viewer cannot see by name is still a project, never a blank. */
 export function braidProject({
@@ -47,8 +49,11 @@ export function braidProject({
   projectId: string;
   projects: readonly KnownProject[];
 }): BraidProject {
-  const name = projects.find((project) => project.id === projectId)?.name ?? "Another project";
-  return { id: projectId, name };
+  const known = projects.find((project) => project.id === projectId);
+  if (!known) return { id: projectId, name: "Another project" };
+  return known.slug
+    ? { id: projectId, name: known.name, slug: known.slug }
+    : { id: projectId, name: known.name };
 }
 
 function conditionOf(braid: AuthzBraid): string | null {
@@ -176,22 +181,29 @@ export function braidAffordances({
   };
 }
 
-/** Where the audit log opens on one braid's history, its chip naming both projects. */
+/**
+ * Where the audit log opens on one braid's history, its chip naming both projects. The entries
+ * live in the owner's project, so a known owner slug switches there first.
+ */
 export function braidAuditHref({
   braidId,
   ownerName,
   readerName,
+  ownerSlug,
 }: {
   braidId: string;
   ownerName: string;
   readerName: string;
+  ownerSlug?: string | undefined;
 }): string {
   const query = new URLSearchParams({
     targetKind: BRAID_AUDIT_TARGET_KIND,
     targetId: braidId,
     targetLabel: `${ownerName} → ${readerName}`,
   });
-  return `/settings/audit-log?${query.toString()}`;
+  const log = `/settings/audit-log?${query.toString()}`;
+  if (!ownerSlug) return log;
+  return `/${encodeURIComponent(ownerSlug)}?return_to=${encodeURIComponent(log)}`;
 }
 
 export const BRAIDS_GUIDE_HREF = "https://langwatch.ai/docs/features/braids";

@@ -14,6 +14,7 @@ import {
 import { ProjectAvatar } from "@langwatch/design-system/project-avatar";
 import { Select } from "@langwatch/design-system/select";
 import { ArrowRight, Lock } from "lucide-react";
+import type { Ref } from "react";
 
 import { type BraidTargetOption, braidTargetLabel } from "../../../../model/braids/braid-draft.ts";
 import type { BraidProject } from "../../../../model/braids/braids.ts";
@@ -32,6 +33,8 @@ export type BraidRouteFieldsProps = {
   /** Edit keeps the reader: a braid into another project is a new braid. */
   readerFixed: boolean;
   onPick: (projectId: string) => void;
+  /** The picker's trigger, so the dialog can open with focus on it rather than on From. */
+  intoRef?: Ref<HTMLButtonElement>;
 };
 
 /** The arrow between From and Into, under a hidden label so it centres on the controls. */
@@ -63,9 +66,10 @@ function IntoPicker(props: BraidRouteFieldsProps) {
       onValueChange={({ value }) => {
         if (value[0]) props.onPick(value[0]);
       }}
-      disabled={props.readerFixed || props.isLoading}
+      // Loading keeps it focusable, so the dialog can open on it; the list fills in when read.
+      disabled={props.readerFixed}
     >
-      <Select.Trigger>
+      <Select.Trigger ref={props.intoRef}>
         <Select.ValueText placeholder={placeholder}>
           {() =>
             props.reader ? (

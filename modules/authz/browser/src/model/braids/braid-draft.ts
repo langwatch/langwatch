@@ -167,7 +167,7 @@ const TARGET_REASONS = {
   aggregate: "Aggregate projects can't be braided",
 } as const;
 
-/** The picker's entries in the host's order, and whether any project was left out. */
+/** The picker's entries in the host's order, the braid's own project last; any left out? */
 export function braidTargetOptions({
   projects,
   targets,
@@ -188,7 +188,9 @@ export function braidTargetOptions({
       },
     ];
   });
-  return { options, someLeftOut: options.length < projects.length };
+  const own = options.filter((option) => option.reason === TARGET_REASONS.this_project);
+  const others = options.filter((option) => option.reason !== TARGET_REASONS.this_project);
+  return { options: [...others, ...own], someLeftOut: options.length < projects.length };
 }
 
 /** "14 people" or "at least 500 people", as the dialog names who will see the spans. */

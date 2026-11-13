@@ -8,6 +8,7 @@ import {
   braidDraftChanged,
   braidDraftOf,
   braidTargetLabel,
+  braidTargetOptions,
   braidsOnPair,
   insertAttribute,
   pairBraidsPhrase,
@@ -190,5 +191,27 @@ describe("braidDraftChanged", () => {
     const draft = { ...braidDraftOf(saved), ...edit };
 
     expect(braidDraftChanged({ draft, braid: saved, nowMs })).toBe(true);
+  });
+});
+
+describe("braidTargetOptions", () => {
+  describe("when the braid's own project sits early in the host's list", () => {
+    /** @scenario The braid starts from this project and picks where it goes */
+    it("lists it last, the others in the host's order", () => {
+      const { options } = braidTargetOptions({
+        projects: [
+          { id: "p-a", name: "alpha" },
+          { id: "p-own", name: "specialists" },
+          { id: "p-b", name: "beta" },
+        ],
+        targets: [
+          { projectId: "p-a", selectable: true },
+          { projectId: "p-own", selectable: false, reason: "this_project" },
+          { projectId: "p-b", selectable: true },
+        ],
+      });
+
+      expect(options.map((option) => option.projectId)).toEqual(["p-a", "p-b", "p-own"]);
+    });
   });
 });

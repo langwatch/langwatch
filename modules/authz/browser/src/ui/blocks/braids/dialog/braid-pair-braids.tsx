@@ -29,12 +29,12 @@ export function BraidPairBraids({
           <Stack key={braid.braidId} gap={1} data-testid="braid-pair-braid">
             <BraidCondition where={braid.where} />
             <Text textStyle="xs" color="fg.muted">
-              From <FormattedDate value={braid.fromMs} display="date" /> ·{" "}
+              From <FormattedDate value={braid.fromMs} display="date" timeZone="UTC" /> ·{" "}
               {braid.expiresAtMs === null ? (
                 "No end date"
               ) : (
                 <>
-                  Until <FormattedDate value={braid.expiresAtMs} display="date" />
+                  Until <FormattedDate value={braid.expiresAtMs} display="date" timeZone="UTC" />
                 </>
               )}
             </Text>

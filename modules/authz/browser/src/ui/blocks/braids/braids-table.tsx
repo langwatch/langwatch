@@ -21,6 +21,8 @@ export type BraidsTableProps = {
   side: BraidSide;
   /** The page's own project, which the audit log names beside the other one. */
   projectName: string;
+  /** The page's own project's slug: the audit log opens in the project that owns the braid. */
+  projectSlug?: string | undefined;
   rows: readonly BraidRow[];
   paused: boolean;
   canEdit: boolean;
@@ -54,12 +56,29 @@ function Activity({ paused, spans }: { paused: boolean; spans: number | undefine
   );
 }
 
-function auditHref({ row, projectName }: { row: BraidRow; projectName: string }): string {
-  const [ownerName, readerName] =
-    row.side === "into"
-      ? [projectName, row.otherProject.name]
-      : [row.otherProject.name, projectName];
-  return braidAuditHref({ braidId: row.braidId, ownerName, readerName });
+function auditHref({
+  row,
+  projectName,
+  projectSlug,
+}: {
+  row: BraidRow;
+  projectName: string;
+  projectSlug: string | undefined;
+}): string {
+  if (row.side === "into") {
+    return braidAuditHref({
+      braidId: row.braidId,
+      ownerName: projectName,
+      readerName: row.otherProject.name,
+      ownerSlug: projectSlug,
+    });
+  }
+  return braidAuditHref({
+    braidId: row.braidId,
+    ownerName: row.otherProject.name,
+    readerName: projectName,
+    ownerSlug: row.otherProject.slug,
+  });
 }
 
 function rowName(row: BraidRow): string {
@@ -71,6 +90,7 @@ function rowName(row: BraidRow): string {
 export function BraidsTable({
   side,
   projectName,
+  projectSlug,
   rows,
   paused,
   canEdit,
@@ -140,7 +160,9 @@ export function BraidsTable({
                     </Menu.Item>
                   ) : null}
                   <Menu.Item value="audit" asChild data-testid="braid-audit">
-                    <Link href={auditHref({ row, projectName })}>View in audit log</Link>
+                    <Link href={auditHref({ row, projectName, projectSlug })}>
+                      View in audit log
+                    </Link>
                   </Menu.Item>
                   {canRemove ? (
                     <Menu.Item

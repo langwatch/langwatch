@@ -14,8 +14,8 @@ import {
   Text,
   Textarea,
 } from "@langwatch/design-system/primitives";
-import { ChevronDown, Plus } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { ChevronDown, CircleCheck, Plus } from "lucide-react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 
 import { insertAttribute } from "../../../../model/braids/braid-draft.ts";
 
@@ -27,6 +27,8 @@ export type BraidConditionFieldProps = {
   readerName: string;
   verified: boolean;
   attributeKeys: readonly { key: string; spanCount: number }[];
+  /** The textarea, so Edit can open with focus on the condition. */
+  textareaRef?: RefObject<HTMLTextAreaElement | null>;
 };
 
 /** The text with the refused construct underlined from its offset to the next space. */
@@ -108,14 +110,18 @@ function CheckLine({
     );
   }
   return (
-    <Field.HelperText data-testid="braid-condition-check">
-      {verified ? "Looks good, signed calls only" : "Looks good"}
+    <Field.HelperText color="fg.success" data-testid="braid-condition-check">
+      <HStack as="span" gap={1.5}>
+        <CircleCheck size={12} aria-hidden />
+        {verified ? "Looks good, signed calls only" : "Looks good"}
+      </HStack>
     </Field.HelperText>
   );
 }
 
 export function BraidConditionField(props: BraidConditionFieldProps) {
-  const textarea = useRef<HTMLTextAreaElement>(null);
+  const own = useRef<HTMLTextAreaElement>(null);
+  const textarea = props.textareaRef ?? own;
   const [caret, setCaret] = useState<number | null>(null);
   // The no-condition warning waits until the field has been used, so it never greets a new braid.
   const [touched, setTouched] = useState(false);
@@ -132,7 +138,7 @@ export function BraidConditionField(props: BraidConditionFieldProps) {
     textarea.current.focus();
     textarea.current.setSelectionRange(caret, caret);
     setCaret(null);
-  }, [caret]);
+  }, [caret, textarea]);
   const insert = (key: string) => {
     const cursor = textarea.current?.selectionStart ?? props.value.length;
     const next = insertAttribute({ where: props.value, cursor, key });

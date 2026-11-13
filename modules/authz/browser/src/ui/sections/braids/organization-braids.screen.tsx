@@ -28,7 +28,7 @@ import { SectionErrorNotice } from "../../elements/section-error-notice.tsx";
 
 const KEEP_TO_ADMINS = "Keep braids to organisation admins";
 
-function OrganizationBraidsHeader() {
+function OrganizationBraidsHeader({ locked = false }: { locked?: boolean }) {
   return (
     <PageLayout.Header
       description="Every braid in your organisation, and who may create, change or remove them."
@@ -41,7 +41,7 @@ function OrganizationBraidsHeader() {
         </PageLayout.HeaderButton>
       }
     >
-      <BraidsTitle />
+      <BraidsTitle locked={locked} />
     </PageLayout.Header>
   );
 }
@@ -142,7 +142,7 @@ export default function OrganizationBraidsScreen() {
 
   return (
     <>
-      <OrganizationBraidsHeader />
+      <OrganizationBraidsHeader locked={!isEnterprise} />
       <Stack gap={0}>
         {paused ? (
           <Box paddingY={4}>

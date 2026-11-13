@@ -3,8 +3,7 @@
 
 import { Link } from "@langwatch/browser-host/link";
 import { InlineCode } from "@langwatch/design-system/inline-code";
-import { Alert, Box, Stack } from "@langwatch/design-system/primitives";
-import { SettingsField } from "@langwatch/design-system/settings-field";
+import { Alert, HStack, Stack, Text } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
 import { formatDistanceToNow } from "@langwatch/time";
 
@@ -79,28 +78,25 @@ export function BraidSignedCalls(props: BraidSignedCallsProps) {
   const reader = props.readerName ?? "the other project";
   return (
     <Stack gap={2}>
-      {/* The Box keeps the field the last row of its own group, so no rule draws under it. */}
-      <Box>
-        <SettingsField
-          layout="inline"
-          controlAlign="end"
-          label="Only signed calls"
-          hint={
-            <>
-              {`Show spans only when ${reader} really made the call. Adds `}
-              <InlineCode variant="neutral">{`Verified("${props.entryKey}")`}</InlineCode> to the
-              condition.
-            </>
-          }
-        >
-          <Switch
-            checked={props.on}
-            onCheckedChange={({ checked }) => props.onChange(checked)}
-            aria-label="Only signed calls"
-            data-testid="braid-signed-calls"
-          />
-        </SettingsField>
-      </Box>
+      {/* Stacked, as a dialog's fields are, with the switch beside its caption. */}
+      <HStack justify="space-between" align="start" gap={4}>
+        <Stack gap={0.5}>
+          <Text textStyle="sm" fontWeight="medium">
+            Only signed calls
+          </Text>
+          <Text textStyle="sm" color="fg.muted">
+            {`Show spans only when ${reader} really made the call. Adds `}
+            <InlineCode variant="neutral">{`Verified("${props.entryKey}")`}</InlineCode> to the
+            condition.
+          </Text>
+        </Stack>
+        <Switch
+          checked={props.on}
+          onCheckedChange={({ checked }) => props.onChange(checked)}
+          aria-label="Only signed calls"
+          data-testid="braid-signed-calls"
+        />
+      </HStack>
       {props.readerName ? (
         <SigningLine
           readerName={props.readerName}

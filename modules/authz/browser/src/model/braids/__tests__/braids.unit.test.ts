@@ -110,6 +110,24 @@ describe("braidAuditHref", () => {
       targetLabel: "payments-agent → checkout-web",
     });
   });
+
+  describe("when the owner's slug is known", () => {
+    /** @scenario View in audit log from the reader's side opens the owner's project */
+    it("switches to the owner's project, then opens the log on the braid", () => {
+      const href = braidAuditHref({
+        braidId: "rolebinding_1",
+        ownerName: "payments-agent",
+        readerName: "checkout-web",
+        ownerSlug: "payments-agent-x1",
+      });
+      const [path, search] = href.split("?");
+      const returnTo = new URLSearchParams(search).get("return_to") ?? "";
+
+      expect(path).toBe("/payments-agent-x1");
+      expect(returnTo.startsWith("/settings/audit-log?")).toBe(true);
+      expect(new URLSearchParams(returnTo.split("?")[1]).get("targetId")).toBe("rolebinding_1");
+    });
+  });
 });
 
 describe("the Braids page's tab in the URL", () => {

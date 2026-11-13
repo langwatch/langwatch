@@ -11,7 +11,7 @@ import { Dialog } from "@langwatch/design-system/dialog";
 import { Box, Grid, HStack, Stack, Text } from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
 import { Lock } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import {
   useBraidPreview,
@@ -144,6 +144,9 @@ export function BraidDialog({
     editing ? braidDraftOf(editing) : newBraidDraft({ nowMs }),
   );
   const [testedTraceId, setTestedTraceId] = useState<string>();
+  // New braid opens on Into, Edit (Into fixed) on the condition: never on the locked From.
+  const intoTrigger = useRef<HTMLButtonElement>(null);
+  const conditionInput = useRef<HTMLTextAreaElement>(null);
   const change = (next: Partial<BraidDraft>) => setDraft((current) => ({ ...current, ...next }));
 
   const targetProjects = projects.slice(0, BRAID_TARGETS_LIMIT);
@@ -202,6 +205,7 @@ export function BraidDialog({
       title={editing ? "Edit braid" : "New braid"}
       description="Show this project's matching spans inside another project's traces. Nothing is copied."
       busy={save.isSaving}
+      initialFocusEl={() => (editing ? conditionInput.current : intoTrigger.current)}
       note={
         <HStack gap={1.5} color="fg.muted" textStyle="xs">
           <Lock size={12} aria-hidden />
@@ -242,6 +246,7 @@ export function BraidDialog({
             onRetry={() => void targets.refetch()}
             readerFixed={!!editing}
             onPick={(readerProjectId) => change({ readerProjectId })}
+            intoRef={intoTrigger}
           />
           {reader ? (
             <BraidPairBraids readerName={reader.name} ownerName={owner.name} braids={onPair} />
@@ -254,6 +259,7 @@ export function BraidDialog({
             readerName={reader?.name ?? "the other project"}
             verified={verifiedKey !== undefined}
             attributeKeys={attributeKeys.data?.keys ?? []}
+            textareaRef={conditionInput}
           />
           <BraidSignedCalls
             on={verifiedKey !== undefined}

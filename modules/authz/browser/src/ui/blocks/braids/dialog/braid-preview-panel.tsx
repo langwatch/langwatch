@@ -17,7 +17,7 @@ import {
   Stack,
   Text,
 } from "@langwatch/design-system/primitives";
-import { StatTile, StatTileFigure } from "@langwatch/design-system/stat-tile";
+import { StatTileFigure } from "@langwatch/design-system/stat-tile";
 import { Plus, ShieldCheck, Users } from "lucide-react";
 import { useState } from "react";
 
@@ -58,10 +58,29 @@ export type TestTraceProps = {
 
 const count = (value: number) => value.toLocaleString("en-GB");
 
-function Legend({ colour, label, value }: { colour: string; label: string; value: number }) {
+/** `track` is the meter's empty part: its swatch is outlined so it reads against the card. */
+function Legend({
+  colour,
+  label,
+  value,
+  track = false,
+}: {
+  colour: string;
+  label: string;
+  value: number;
+  track?: boolean;
+}) {
   return (
     <HStack gap={2} textStyle="sm">
-      <Box boxSize="2.5" borderRadius="sm" bg={colour} flexShrink={0} aria-hidden />
+      <Box
+        boxSize="2.5"
+        borderRadius="sm"
+        bg={colour}
+        borderWidth={track ? "1px" : undefined}
+        borderColor={track ? "border.emphasized" : undefined}
+        flexShrink={0}
+        aria-hidden
+      />
       <Text flex={1} color="fg.muted">
         {label}
       </Text>
@@ -89,11 +108,9 @@ function Counts({
   const share = (value: number) => value / traces.total;
   return (
     <Stack gap={3} data-testid="braid-preview-counts">
-      <StatTile label={`${readerName} traces that show ${ownerName} spans`}>
-        <StatTileFigure data-testid="braid-preview-figure">
-          {`${count(traces.every + traces.some)} of ${count(traces.total)}`}
-        </StatTileFigure>
-      </StatTile>
+      <StatTileFigure data-testid="braid-preview-figure">
+        {`${count(traces.every + traces.some)} of ${count(traces.total)} traces`}
+      </StatTileFigure>
       <MeterBar
         width="full"
         height="2"
@@ -105,7 +122,12 @@ function Counts({
       <Stack gap={1}>
         <Legend colour="blue.solid" label={`All ${ownerName} spans show`} value={traces.every} />
         <Legend colour="blue.muted" label={`Some ${ownerName} spans show`} value={traces.some} />
-        <Legend colour="border.subtle" label={`No ${ownerName} spans show`} value={traces.none} />
+        <Legend
+          colour="border.subtle"
+          track
+          label={`No ${ownerName} spans show`}
+          value={traces.none}
+        />
       </Stack>
       {traces.capped ? (
         <Text textStyle="xs" color="fg.muted" data-testid="braid-preview-capped">
@@ -131,9 +153,10 @@ function TraceRows({
   return (
     <Card variant="frame" padding="sm" data-testid={testId}>
       <Stack gap={1}>
-        <Text textStyle="xs" color="fg.muted">
-          {note}
-        </Text>
+        <HStack gap={1.5} textStyle="xs" color="fg.muted">
+          <FeatureMark feature="braids" size={12} />
+          <Text>{note}</Text>
+        </HStack>
         {rows.map((row) => (
           <HStack
             key={row.spanId}
@@ -152,7 +175,6 @@ function TraceRows({
             </Text>
             {row.kind === "braided" ? (
               <Badge size="sm" variant="subtle">
-                <FeatureMark feature="braids" size={12} />
                 Braided
               </Badge>
             ) : null}

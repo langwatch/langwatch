@@ -140,6 +140,34 @@ describe("BraidsScreen", () => {
     });
 
     /** @scenario The header's main action follows the open tab */
+    /** @scenario The Braids page header opens New signing key on the Signing keys tab */
+    it("offers New signing key in the header on the Signing keys tab, asking the panel for it", async () => {
+      const { host } = renderAs({ query: { tab: "keys" } });
+      const user = userEvent.setup();
+
+      await user.click(await screen.findByTestId("new-signing-key-header"));
+
+      expect(host.queries.at(-1)).toEqual({ tab: "keys", signingKey: "new" });
+    });
+
+    /** @scenario The project Braids page links to every braid in the organisation */
+    it("links to every braid in the organisation for whoever may open that view", () => {
+      renderAs({ grants: new Set([...ADMIN, "organization:manage"]) });
+
+      expect(screen.getByRole("link", { name: "All braids in Acme" })).toHaveAttribute(
+        "href",
+        "/settings/organization-braids",
+      );
+    });
+
+    /** @scenario The project Braids page links to every braid in the organisation */
+    it("offers no organisation link to someone who cannot open that view", () => {
+      renderAs({ grants: MEMBER });
+
+      expect(screen.queryByTestId("braids-organization-link")).not.toBeInTheDocument();
+    });
+
+    /** @scenario The header's main action follows the open tab */
     it("offers New braid in the header on the Braids tab", async () => {
       renderAs({});
       expect(await screen.findByTestId("new-braid-header")).toBeInTheDocument();
@@ -225,6 +253,32 @@ describe("BraidsScreen", () => {
       expect(screen.queryByRole("tab")).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /New braid/ })).not.toBeInTheDocument();
       expect(screen.getAllByRole("link", { name: /How braids work/ })).toHaveLength(1);
+    });
+
+    /** @scenario An organisation below Enterprise sees what Braids offers */
+    it("marks the title with the Enterprise lock, as the settings menu does", () => {
+      renderAs({ isEnterprise: false });
+
+      const badge = screen.getByTestId("braids-enterprise-badge");
+      expect(within(badge).getByLabelText("Enterprise")).toBeInTheDocument();
+      expect(badge).not.toHaveTextContent("Enterprise");
+    });
+
+    /** @scenario A paused page's empty tab points at the tab holding the braids */
+    it("points an empty tab at the tab holding the braids, without the empty illustration", async () => {
+      braidsFake.state.project = { intoOtherProjects: [liveBraid()], fromOtherProjects: [] };
+      renderAs({ isEnterprise: false });
+      const user = userEvent.setup();
+
+      await user.click(screen.getByRole("tab", { name: /From other projects/ }));
+      const pointer = await screen.findByTestId("braids-on-other-tab");
+      expect(screen.queryByTestId("braids-empty-from")).not.toBeInTheDocument();
+      await user.click(within(pointer).getByRole("button", { name: "Into other projects" }));
+
+      expect(screen.getByRole("tab", { name: /Into other projects/ })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
     });
 
     /** @scenario After leaving Enterprise the page says braids are paused and kept */

@@ -1,5 +1,6 @@
 // Which spans a braid shows: from its start, until its end or with none. Its creation day is not
-// here; the project cell names it, so the two dates never sit side by side unlabelled.
+// here; the project cell names it, so the two dates never sit side by side unlabelled. The window
+// is in UTC days (the dialog picks UTC days), so it is drawn in UTC, never a day early or late.
 
 import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import { Stack, Text } from "@langwatch/design-system/primitives";
@@ -23,14 +24,20 @@ export function BraidWindow({
     <Stack gap={0.5}>
       <Text textStyle="sm" data-testid="braid-window-from">
         {prefix}
-        From <FormattedDate value={fromMs} display={fromShowsTime ? "datetime" : "date"} />
+        From{" "}
+        <FormattedDate
+          value={fromMs}
+          display={fromShowsTime ? "datetime" : "date"}
+          timeZone="UTC"
+          showZone={fromShowsTime}
+        />
       </Text>
       <Text textStyle="xs" color="fg.muted" data-testid="braid-window-until">
         {expiresAtMs === null ? (
           "No end date"
         ) : (
           <>
-            Until <FormattedDate value={expiresAtMs} display="date" />
+            Until <FormattedDate value={expiresAtMs} display="date" timeZone="UTC" />
           </>
         )}
       </Text>

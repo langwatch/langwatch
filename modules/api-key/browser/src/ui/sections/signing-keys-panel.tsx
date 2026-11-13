@@ -19,9 +19,8 @@ import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Badge, Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { SettingsSection } from "@langwatch/design-system/settings-section";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { Key, Plus } from "lucide-react";
-import { useState } from "react";
+import { Key } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { apiKeyApi } from "../../behavior/api-key-api.ts";
 import { useApiKeyHost } from "../../model/api-key-host.ts";
@@ -37,6 +36,8 @@ const COLUMNS = 6;
 const MANAGE_PERMISSION = "braids:manage";
 /** A mutation answer that may carry a secret is dropped from the client's cache at once. */
 const NO_CACHE = { gcTime: 0 } as const;
+/** The Braids page header's New signing key writes `?signingKey=new`; the panel opens on it. */
+const CREATE_QUERY_KEY = "signingKey";
 
 function StatusBadge({ signingKey }: { signingKey: SigningKeyRow }) {
   if (signingKey.status === "active") {
@@ -130,32 +131,6 @@ function SigningKeyTableRow({
   );
 }
 
-function NewSigningKeyButton({
-  canManage,
-  onCreate,
-}: {
-  canManage: boolean;
-  onCreate: () => void;
-}) {
-  return (
-    <Tooltip
-      content="Whoever may braid out of this project manages its signing keys."
-      disabled={canManage}
-    >
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={onCreate}
-        disabled={!canManage}
-        data-testid="signing-key-new"
-      >
-        <Plus size={14} aria-hidden />
-        New signing key
-      </Button>
-    </Tooltip>
-  );
-}
-
 function SigningKeysTable({
   rows,
   isLoading,
@@ -207,7 +182,18 @@ export function SigningKeysPanel({ projectId }: SigningKeysPanelProps) {
   const rotate = apiKeyApi.signingKeys.rotate.useMutation(NO_CACHE);
   const revoke = apiKeyApi.signingKeys.revoke.useMutation();
 
+  const { query } = host.route();
+  const asked = canManage && query[CREATE_QUERY_KEY] === "new";
   const [creating, setCreating] = useState(false);
+  // The ask opens the dialog once, adjusted during render; the effect clears it from the address.
+  const [taken, setTaken] = useState(false);
+  if (asked !== taken) {
+    setTaken(asked);
+    if (asked) setCreating(true);
+  }
+  useEffect(() => {
+    if (asked) host.setQuery({ ...query, [CREATE_QUERY_KEY]: undefined }, { replace: true });
+  }, [asked, host, query]);
   const [createRound, setCreateRound] = useState(0);
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [issued, setIssued] = useState<IssuedSecret | null>(null);
@@ -292,10 +278,8 @@ export function SigningKeysPanel({ projectId }: SigningKeysPanelProps) {
 
   return (
     <SettingsSection
-      icon={<Key size={18} />}
       title="Signing keys"
       hint="Sign the tags on this project's calls so projects that braid into it can trust them."
-      actions={<NewSigningKeyButton canManage={canManage} onCreate={() => setCreating(true)} />}
       divided={false}
       data-testid="signing-keys-panel"
     >

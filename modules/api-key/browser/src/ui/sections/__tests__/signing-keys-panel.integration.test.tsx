@@ -130,6 +130,8 @@ beforeEach(() => {
 afterEach(cleanup);
 
 const MANAGER = new Set(["braids:manage"]);
+/** The Braids page header's New signing key, as the address carries it. */
+const ASKED = { signingKey: "new" };
 
 function renderPanel(host = new FakeApiKeyHost({ grants: MANAGER })) {
   return renderWithApiKeyHost(<Panel projectId="proj-1" />, host);
@@ -175,10 +177,9 @@ describe("given the Braids page mounts the signing keys panel by its token", () 
     /** @scenario Creating a signing key shows its secret once */
     it("shows the secret once with TypeScript, Python and Go setup, then drops it", async () => {
       const user = userEvent.setup();
-      const host = new FakeApiKeyHost({ grants: MANAGER });
+      const host = new FakeApiKeyHost({ grants: MANAGER, query: ASKED });
       renderPanel(host);
 
-      await user.click(screen.getByTestId("signing-key-new"));
       await user.type(screen.getByPlaceholderText("Production"), "Production");
       await user.click(screen.getByTestId("signing-key-create-confirm"));
 
@@ -203,6 +204,15 @@ describe("given the Braids page mounts the signing keys panel by its token", () 
         expect(screen.queryByTestId("signing-key-secret-dialog")).not.toBeInTheDocument(),
       );
       expect(document.body).not.toHaveTextContent(SECRET);
+    });
+
+    /** @scenario The Braids page header opens New signing key on the Signing keys tab */
+    it("opens the create dialog from the header's ask and clears it from the address", async () => {
+      const host = new FakeApiKeyHost({ grants: MANAGER, query: ASKED });
+      renderPanel(host);
+
+      expect(await screen.findByTestId("signing-key-create-confirm")).toBeInTheDocument();
+      expect(host.queryWrites).toContainEqual({ signingKey: undefined });
     });
 
     it("keeps no cache entry for the answers that carry a secret", () => {
@@ -249,12 +259,12 @@ describe("given the Braids page mounts the signing keys panel by its token", () 
   describe("when the viewer may not braid out of the project", () => {
     /** @scenario Someone who may not manage signing keys is told who does */
     it("says who manages the keys, reads none and offers no way to create one", () => {
-      renderPanel(new FakeApiKeyHost({ grants: new Set(["project:view"]) }));
+      renderPanel(new FakeApiKeyHost({ grants: new Set(["project:view"]), query: ASKED }));
 
       expect(screen.getByTestId("signing-keys-not-managed")).toHaveTextContent(
         "Signing keys are managed by whoever may braid out of this project",
       );
-      expect(screen.getByTestId("signing-key-new")).toBeDisabled();
+      expect(screen.queryByTestId("signing-key-create-confirm")).not.toBeInTheDocument();
       expect(screen.queryByTestId("signing-keys-empty")).not.toBeInTheDocument();
       expect(calls.listInputs).toEqual([]);
     });
@@ -273,11 +283,10 @@ describe("given the Braids page mounts the signing keys panel by its token", () 
   describe("when the organisation is below Enterprise", () => {
     it("shows the Enterprise upsell rather than a failure", async () => {
       const user = userEvent.setup();
-      const host = new FakeApiKeyHost({ grants: MANAGER });
+      const host = new FakeApiKeyHost({ grants: MANAGER, query: ASKED });
       state.refusal = ENTERPRISE_REFUSAL;
       renderPanel(host);
 
-      await user.click(screen.getByTestId("signing-key-new"));
       await user.type(screen.getByPlaceholderText("Production"), "Production");
       await user.click(screen.getByTestId("signing-key-create-confirm"));
 
@@ -287,11 +296,10 @@ describe("given the Braids page mounts the signing keys panel by its token", () 
 
     it("reports any other refusal through the host", async () => {
       const user = userEvent.setup();
-      const host = new FakeApiKeyHost({ grants: MANAGER });
+      const host = new FakeApiKeyHost({ grants: MANAGER, query: ASKED });
       state.refusal = { data: { error: { code: "forbidden", httpStatus: 403 } } };
       renderPanel(host);
 
-      await user.click(screen.getByTestId("signing-key-new"));
       await user.type(screen.getByPlaceholderText("Production"), "Production");
       await user.click(screen.getByTestId("signing-key-create-confirm"));
 

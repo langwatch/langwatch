@@ -3,6 +3,7 @@
 
 import { Link } from "@langwatch/browser-host/link";
 import { AccessState } from "@langwatch/design-system/access-state";
+import { Card } from "@langwatch/design-system/card";
 import { FeatureIllustration } from "@langwatch/design-system/feature-illustration";
 import { Box, Button, HStack, Stack } from "@langwatch/design-system/primitives";
 import { Check } from "lucide-react";
@@ -37,16 +38,10 @@ export function BraidsEnterpriseUpsell() {
       }
     >
       <Stack gap={5}>
-        <Box
-          maxWidth="640px"
-          width="full"
-          marginX="auto"
-          borderWidth="1px"
-          borderColor="border.muted"
-          borderRadius="lg"
-          overflow="hidden"
-        >
-          <FeatureIllustration feature="braids" name="enterprise" />
+        <Box maxWidth="2xl" width="full">
+          <Card variant="image-frame">
+            <FeatureIllustration feature="braids" name="enterprise" />
+          </Card>
         </Box>
         <HStack gap={5} flexWrap="wrap" as="ul" listStyleType="none">
           {OFFERS.map((offer) => (

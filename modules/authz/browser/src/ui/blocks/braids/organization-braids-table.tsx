@@ -77,6 +77,7 @@ export function OrganizationBraidsTable({
                         braidId: row.braidId,
                         ownerName: row.owner.name,
                         readerName: row.reader.name,
+                        ownerSlug: row.owner.slug,
                       })}
                     >
                       View in audit log

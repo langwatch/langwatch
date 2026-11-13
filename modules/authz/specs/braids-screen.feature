@@ -37,6 +37,7 @@ Feature: The Braids screen
       Then the project it braids from is "specialists" and cannot be changed
       And the project picker lists the plain projects ana can read
       And aggregate projects and "specialists" itself are listed but disabled, each with the reason
+      And "specialists" itself is listed last
 
     @integration
     Scenario: A team admin is offered only the projects they can read
@@ -130,6 +131,12 @@ Feature: The Braids screen
       Then the row shows the reader, the condition, the start date, the end date and the braided spans over the last 24 hours
       And its menu offers Edit, View in audit log and Remove braid
       And View in audit log names both projects, never the braid's grant id
+
+    @unit
+    Scenario: View in audit log from the reader's side opens the owner's project
+      Given a live braid from "specialists" into "orchestrator"
+      When an admin of "orchestrator" chooses View in audit log on it
+      Then the audit log opens in "specialists", where the braid's entries are kept
       And the row says when the braid was created apart from the spans it shows
 
     @unit
@@ -147,7 +154,19 @@ Feature: The Braids screen
     Scenario: The header's main action follows the open tab
       Given ana may create braids
       When ana opens the Signing keys tab
-      Then the header no longer offers New braid, since the tab offers New signing key itself
+      Then the header offers New signing key in place of New braid
+      And the key shows once on the tab, in its empty state
+
+    @integration
+    Scenario: The Braids page header opens New signing key on the Signing keys tab
+      When ana chooses New signing key in the page header
+      Then the signing keys panel opens its create dialog, once
+
+    @integration
+    Scenario: The project Braids page links to every braid in the organisation
+      When ana opens Braids in the project settings
+      Then the page links to all braids in the organisation
+      And a member who cannot open the organisation's Braids is offered no such link
 
     @integration
     Scenario: Removing a braid says what stops before it happens
@@ -192,6 +211,7 @@ Feature: The Braids screen
       Given an organisation below Enterprise
       When ana opens Braids
       Then the page explains braids and offers a conversation about Enterprise
+      And the title marks Braids with a lock, as the settings menu does
       And nothing half-works
 
     @integration
@@ -201,3 +221,10 @@ Feature: The Braids screen
       When ana opens Braids
       Then a banner says braids are paused and start again on upgrade
       And each braid row is marked paused once, where its activity would be
+
+    @integration
+    Scenario: A paused page's empty tab points at the tab holding the braids
+      Given a live braid from "specialists" into "orchestrator"
+      And the organisation has left Enterprise
+      When ana opens braids from other projects
+      Then one line points to braids into other projects, with no empty-state illustration
