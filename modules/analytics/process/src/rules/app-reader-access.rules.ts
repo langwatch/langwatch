@@ -87,8 +87,9 @@ const TENANT_ID_TABLES = [
 ] as const;
 
 /**
- * Every table holding tenant rows, in the application's database. A table missing here is read
- * in full by the reader, so a guard test replays the migrations and fails on any table not listed.
+ * Every table holding tenant rows, in the application's database. A table missing here is not
+ * granted, so the reader cannot read it; a guard test replays the migrations and fails on any
+ * tenant table neither listed nor excluded with a reason.
  */
 export const APP_READER_TENANT_TABLES: readonly LangWatchQLTable[] = [
   ...TENANT_ID_TABLES.map((table) => ({ table, tenantColumn: "TenantId" })),
