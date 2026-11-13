@@ -188,7 +188,7 @@ describe.skipIf(!clickHouseConfigured)(
 
     describe("given a trace carrying the metadata keys the stock widgets read", () => {
       /** @scenario "The fold's real insert lets the database compute the metadata columns" */
-      it("inserts without ILLEGAL_COLUMN and reads the 9 back computed from Attributes", async () => {
+      it("inserts without ILLEGAL_COLUMN; the 9 read back computed, the 3 plain as written", async () => {
         const traceId = `${tag}-metadata`;
         const row = traceRow({
           traceId,

@@ -16,7 +16,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { TraceAnalyticsRow } from "#eventing/trace-derived.projection";
 
-import { TRACE_ANALYTICS_MATERIALIZED_METADATA_COLUMNS } from "../../../rules/trace-widget-columns.rules.ts";
+import {
+  TRACE_ANALYTICS_MATERIALIZED_METADATA_COLUMNS,
+} from "../../../rules/trace-widget-columns.rules.ts";
 import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { TRACE_ID_INDEXES } from "../clickhouse.trace-id-indexes.database.ts";
 import type { TraceClickHouseWriteClient } from "../clickhouse.trace-member-client.repository.ts";
@@ -438,9 +440,10 @@ describe("TraceAnalyticsClickHouseRepository insert settings", () => {
         });
 
         const inserted = Object.keys(inserts[0]?.values?.[0] ?? {});
-        expect(inserted.filter((c) => TRACE_ANALYTICS_MATERIALIZED_METADATA_COLUMNS.has(c))).toEqual(
-          [],
+        const materialized = inserted.filter((c) =>
+          TRACE_ANALYTICS_MATERIALIZED_METADATA_COLUMNS.has(c),
         );
+        expect(materialized).toEqual([]);
         expect(inserted).toEqual(
           expect.arrayContaining([
             "MetadataOutcomeReason",

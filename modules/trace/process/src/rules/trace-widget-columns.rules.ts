@@ -9,7 +9,10 @@ import type { NormalizedSpan, SpanAnalyticsFloor } from "@langwatch/trace-contra
 import type { LedgerStepRecord } from "@langwatch/upgrade/reader";
 import { projectionReplaySinceOf } from "@langwatch/upgrade/step";
 
-/** The replay step that refolds trace_analytics so its rows carry the fold's metadata columns. */
+/**
+ * The replay step that refolds trace_analytics rows: the fold writes the 3 plain metadata
+ * columns; the database computes the 9 MATERIALIZED ones.
+ */
 export const TRACE_ANALYTICS_REPLAY_STEP_ID = "trace:replay-trace-analytics-widget-columns";
 
 /** The replay step that fills span_analytics; its recorded since is the span widgets' floor. */
