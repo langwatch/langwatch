@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -62,6 +63,9 @@ func (s *Server) Ensure(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	defer unlock()
+	// Before the download: a log that has filled the disk would fail it. Best
+	// effort; the daemon's next tick reports a cap that fails.
+	_, _ = s.CapLogs()
 	bin, err := s.ensureBinary(ctx)
 	if err != nil {
 		return 0, err
@@ -186,6 +190,27 @@ func (s *Server) start(ctx context.Context, bin string) error {
 	}
 	go func() { _ = cmd.Wait() }() // reaps it if it exits while this haven process lives
 	return os.WriteFile(s.pidPath(), []byte(strconv.Itoa(cmd.Process.Pid)), 0o600)
+}
+
+// CapLogs empties stdout.log once it outgrows domain.ClickHouseNativeStdoutLogMax
+// and returns the bytes it emptied: 0 when the log is absent or under the cap.
+// Emptying it under a running server is safe: the server's descriptor is
+// O_APPEND, so its next write lands at the new end, not past a hole.
+func (s *Server) CapLogs() (int64, error) {
+	fi, err := os.Stat(s.stdoutPath())
+	if errors.Is(err, fs.ErrNotExist) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	if fi.Size() <= domain.ClickHouseNativeStdoutLogMax {
+		return 0, nil
+	}
+	if err := os.Truncate(s.stdoutPath(), 0); err != nil {
+		return 0, err
+	}
+	return fi.Size(), nil
 }
 
 func (s *Server) runsPinnedVersion(ctx context.Context) bool {
