@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   adminMenu,
+  isSettingsMenuItemActive,
   isSettingsMenuItemActiveAmong,
   settingsMenu,
   type SettingsMenuGates,
@@ -296,6 +297,20 @@ describe("given a plan that lacks Enterprise", () => {
       expect(braids.map((item) => [item.href, item.feature])).toEqual([
         ["/settings/braids", "braids"],
       ]);
+    });
+
+    /** @scenario "The organization's braids page lights the one Braids entry" */
+    it("lights that one Braids entry on the organization's braids page", () => {
+      const items = settingsMenu({
+        ...EVERYTHING_CLOSED,
+        enterprisePlan: "locked",
+        hasPermission: () => true,
+        hasOrganizationPermission: () => true,
+      }).flatMap((group) => group.items);
+      const lit = items.filter((item) =>
+        isSettingsMenuItemActive({ item, pathname: "/settings/organization-braids" }),
+      );
+      expect(lit.map((item) => item.href)).toEqual(["/settings/braids"]);
     });
 
     /** @scenario "A plan without Enterprise sees its entries locked" */

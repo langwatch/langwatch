@@ -8,7 +8,7 @@ import { Fragment } from "react";
 
 /**
  * Says why a span from another project shows in this trace. "Open in" is offered only to someone
- * who can open the owner, and only with a place to go; a condition stays whole on one line.
+ * who can open the owner, and only with a place to go; a long condition wraps between its words.
  */
 export function BraidedSpanCallout({
   braid,
@@ -54,7 +54,15 @@ function ShownBecause({ braid }: { braid: SpanBraid }) {
       {braid.matchedConditions.map((condition, index) => (
         <Fragment key={condition}>
           {index > 0 ? " or " : null}
-          <InlineCode fontVariantLigatures="none">{condition}</InlineCode>
+          <InlineCode
+            fontVariantLigatures="none"
+            display="inline"
+            whiteSpace="normal"
+            overflowWrap="break-word"
+            boxDecorationBreak="clone"
+          >
+            {condition}
+          </InlineCode>
         </Fragment>
       ))}
       .

@@ -1,6 +1,6 @@
-import { Chip } from "@langwatch/design-system/chip";
 import { FeatureMark } from "@langwatch/design-system/feature-mark";
-import { Box } from "@langwatch/design-system/primitives";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 
 import type { BraidStrand } from "../../../../../model/braids/braided-span.ts";
 
@@ -9,13 +9,9 @@ const OWNER_MAX_WIDTH = "10rem";
 /** The smallest the braids mark stays legible at in a waterfall row. */
 const COMPACT_MARK_SIZE = 16;
 
-function BraidsIcon() {
-  return <FeatureMark feature="braids" size={12} />;
-}
-
 /**
- * Names the project a braided span came from, drawn as the header's braided pill is. Compact, it
- * is the mark alone, naming the owner in its tooltip and accessible label.
+ * Names the project a braided span came from, quieter than the span's own name. Compact, it is
+ * the bare mark, naming the owner in its tooltip and accessible label.
  */
 export function BraidedSpanBadge({
   strand,
@@ -27,29 +23,26 @@ export function BraidedSpanBadge({
   if (!strand) return null;
   const label = `Braided from ${strand.ownerName}`;
   return (
-    <Box
-      as="span"
-      display="inline-flex"
-      flexShrink={0}
-      data-testid="braided-span-badge"
-      data-compact={compact ? "true" : undefined}
-    >
-      {compact ? (
-        <Chip
-          value={<FeatureMark feature="braids" size={COMPACT_MARK_SIZE} label={label} />}
-          tooltip={label}
-          tone="neutral"
-        />
-      ) : (
-        <Chip
-          icon={BraidsIcon}
-          value={strand.ownerName}
-          tooltip={label}
-          ariaLabel={label}
-          tone="neutral"
-          maxValueWidth={OWNER_MAX_WIDTH}
-        />
-      )}
-    </Box>
+    <Tooltip content={label} positioning={{ placement: "top" }}>
+      <Box
+        as="span"
+        display="inline-flex"
+        alignItems="center"
+        flexShrink={0}
+        data-testid="braided-span-badge"
+        data-compact={compact ? "true" : undefined}
+      >
+        {compact ? (
+          <FeatureMark feature="braids" size={COMPACT_MARK_SIZE} label={label} />
+        ) : (
+          <HStack as="span" gap={1} aria-label={label}>
+            <FeatureMark feature="braids" size={12} />
+            <Text as="span" textStyle="2xs" color="fg.muted" truncate maxWidth={OWNER_MAX_WIDTH}>
+              {strand.ownerName}
+            </Text>
+          </HStack>
+        )}
+      </Box>
+    </Tooltip>
   );
 }

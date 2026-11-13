@@ -96,6 +96,12 @@ Feature: Settings shell
     And the entry draws the Braids mark, the one its pages' titles and empty states draw
     And opening a locked entry shows its page title and an Enterprise upsell, never the feature
 
+  @unit
+  Scenario: The organization's braids page lights the one Braids entry
+    Given the settings menu offers the Braids page
+    When I open the organization's braids page
+    Then the one Braids entry is the active entry
+
   @unit @integration
   Scenario: Authentication is offered unlocked on every plan
     Given I may see single sign-on and my plan lacks Enterprise

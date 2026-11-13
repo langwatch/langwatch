@@ -376,7 +376,14 @@ function projectGroup({ isLiteMember, enterprisePlan }: SettingsMenuGates): Sett
       { label: "Integrations", href: "/settings/integrations", icon: Blocks },
       ...(!isLiteMember
         ? enterpriseEntry({
-            item: { label: "Braids", href: "/settings/braids", icon: Waypoints, feature: "braids" },
+            item: {
+              label: "Braids",
+              href: "/settings/braids",
+              // The one Braids entry: the organization's braids page lights it too.
+              alsoActiveAt: ["/settings/organization-braids"],
+              icon: Waypoints,
+              feature: "braids",
+            },
             enterprisePlan,
           })
         : []),
