@@ -806,12 +806,12 @@ Answers at `/api/governance/registry/agents/:agentId/versions`, `/api/v1/governa
 
 ```typescript
 type Params = z.infer<typeof agentRegistryParamsSchema>; // ../contract/src/features/registry/agent-registry.ts:165
-// Query: agentRegistryEventsQuerySchema, ../contract/src/features/registry/agent-registry.ts:190
+// Query: agentRegistryEventsQuerySchema, ../contract/src/features/registry/agent-registry.ts:192
 interface Query {
   limit?: number;
   cursor?: string;
 }
-type Response = z.infer<typeof agentRegistryEventsResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:201
+type Response = z.infer<typeof agentRegistryEventsResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:203
 ```
 
 #### `GET /api/governance/registry/events` · `listRegistryEvents`
@@ -823,8 +823,8 @@ Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:
 Answers at `/api/governance/registry/events`, `/api/v1/governance/registry/events`.
 
 ```typescript
-type Query = z.infer<typeof agentRegistryEventsQuerySchema>; // ../contract/src/features/registry/agent-registry.ts:190
-type Response = z.infer<typeof agentRegistryEventsResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:201
+type Query = z.infer<typeof agentRegistryEventsQuerySchema>; // ../contract/src/features/registry/agent-registry.ts:192
+type Response = z.infer<typeof agentRegistryEventsResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:203
 ```
 
 #### `GET /api/governance/registry/schema` · `getRegistrySchema`
@@ -836,7 +836,7 @@ Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:
 Answers at `/api/governance/registry/schema`, `/api/v1/governance/registry/schema`.
 
 ```typescript
-// Response: agentRegistrySchemaResponseSchema, ../contract/src/features/registry/agent-registry.ts:213
+// Response: agentRegistrySchemaResponseSchema, ../contract/src/features/registry/agent-registry.ts:215
 interface Response {
   entry: Record<string, unknown>;
   event: Record<string, unknown>;
@@ -868,13 +868,13 @@ Answers at `/api/governance/registry/ard/search`, `/api/v1/governance/registry/a
 interface Body {
   query: {
     text: string;
-    filter?: Record<string, string[]>;
+    filter?: Record<string, string | string[]>;
   };
   federation?: "auto" | "referrals" | "none";
   pageSize?: number;
   pageToken?: string;
 }
-type Response = z.infer<typeof ardSearchResponseSchema>; // ../contract/src/features/registry/agent-registry-ard.ts:63
+type Response = z.infer<typeof ardSearchResponseSchema>; // ../contract/src/features/registry/agent-registry-ard.ts:70
 ```
 
 ### `governanceCliRest`

@@ -49189,13 +49189,24 @@ type PostApiGovernanceRegistryArdSearchJSONBody struct {
 	PageSize   *int                                                  `json:"pageSize,omitempty"`
 	PageToken  *string                                               `json:"pageToken,omitempty"`
 	Query      struct {
-		Filter *map[string][]string `json:"filter,omitempty"`
-		Text   string               `json:"text"`
+		Filter *map[string]PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties `json:"filter,omitempty"`
+		Text   string                                                                                   `json:"text"`
 	} `json:"query"`
 }
 
 // PostApiGovernanceRegistryArdSearchJSONBodyFederation defines parameters for PostApiGovernanceRegistryArdSearch.
 type PostApiGovernanceRegistryArdSearchJSONBodyFederation string
+
+// PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0 defines parameters for PostApiGovernanceRegistryArdSearch.
+type PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0 = string
+
+// PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1 defines parameters for PostApiGovernanceRegistryArdSearch.
+type PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1 = []string
+
+// PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties defines parameters for PostApiGovernanceRegistryArdSearch.
+type PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties struct {
+	union json.RawMessage
+}
 
 // PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsContext defines parameters for PostApiGovernanceRegistryArdSearch.
 type PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsContext string
@@ -105106,6 +105117,68 @@ func (t GetApiGovernanceRegistryArdManifest200JSONResponseBody_Entries_Data_Mode
 }
 
 func (t *GetApiGovernanceRegistryArdManifest200JSONResponseBody_Entries_Data_Model_Parameters_AdditionalProperties) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0 returns the union data inside the PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties as a PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0
+func (t PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties) AsPostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0() (PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0, error) {
+	var body PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0 overwrites any union data inside the PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties as the provided PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0
+func (t *PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties) FromPostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0(v PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0 performs a merge with any union data inside the PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties, using the provided PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0
+func (t *PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties) MergePostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0(v PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1 returns the union data inside the PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties as a PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1
+func (t PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties) AsPostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1() (PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1, error) {
+	var body PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1 overwrites any union data inside the PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties as the provided PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1
+func (t *PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties) FromPostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1(v PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1 performs a merge with any union data inside the PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties, using the provided PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1
+func (t *PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties) MergePostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1(v PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -173569,6 +173642,7 @@ type PostApiGovernanceRegistryArdSearchResponse struct {
 			Identifier  string                                                           `json:"identifier"`
 			Metadata    map[string]string                                                `json:"metadata"`
 			Score       float32                                                          `json:"score"`
+			Source      string                                                           `json:"source"`
 			Tags        []string                                                         `json:"tags"`
 			Type        PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsType `json:"type"`
 			UpdatedAt   string                                                           `json:"updatedAt"`
@@ -208248,6 +208322,7 @@ func ParsePostApiGovernanceRegistryArdSearchResponse(rsp *http.Response) (*PostA
 				Identifier  string                                                           `json:"identifier"`
 				Metadata    map[string]string                                                `json:"metadata"`
 				Score       float32                                                          `json:"score"`
+				Source      string                                                           `json:"source"`
 				Tags        []string                                                         `json:"tags"`
 				Type        PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsType `json:"type"`
 				UpdatedAt   string                                                           `json:"updatedAt"`

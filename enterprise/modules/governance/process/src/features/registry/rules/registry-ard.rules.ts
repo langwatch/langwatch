@@ -108,11 +108,14 @@ function termValues(entry: ArdEntry, path: string): string[] {
   return value === undefined || value === null ? [] : [text(value)];
 }
 
-function matchesFilter(entry: ArdEntry, filter: Record<string, string[]> | undefined): boolean {
+function matchesFilter(
+  entry: ArdEntry,
+  filter: Record<string, string | string[]> | undefined,
+): boolean {
   if (!filter) return true;
   return Object.entries(filter).every(([path, accepted]) => {
     const values = termValues(entry, path).map((value) => value.toLowerCase());
-    return accepted.some((wanted) => values.includes(wanted.toLowerCase()));
+    return [accepted].flat().some((wanted) => values.includes(wanted.toLowerCase()));
   });
 }
 
@@ -140,18 +143,23 @@ function ardScore(entry: ArdEntry, text: string): number {
   return Math.round((points / (words.length * 2)) * 100);
 }
 
-/** ARD `POST /search`: filter, score, drop the unmatched, rank, page by offset token. */
+/**
+ * ARD `POST /search`: filter, score, drop the unmatched, rank, page by offset token. Each result
+ * names `source`, the manifest URL of the registry it came from.
+ */
 export function ardSearch({
   manifest,
   request,
+  source,
 }: {
   manifest: ArdManifest;
   request: ArdSearchRequest;
+  source: string;
 }): ArdSearchResponse {
   const offset = request.pageToken ? Number(request.pageToken) : 0;
   const ranked = manifest.entries
     .filter((entry) => matchesFilter(entry, request.query.filter))
-    .map((entry) => ({ ...entry, score: ardScore(entry, request.query.text) }))
+    .map((entry) => ({ ...entry, score: ardScore(entry, request.query.text), source }))
     .filter((entry) => entry.score > 0)
     .toSorted((a, b) => b.score - a.score || a.displayName.localeCompare(b.displayName));
   const page = ranked.slice(offset, offset + request.pageSize);

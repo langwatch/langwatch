@@ -30,7 +30,7 @@ Every route takes an organization API key in `Authorization: Bearer <key>`. The 
 | `GET /api/governance/registry/agents` | The registry, a page at a time |
 | `GET /api/governance/registry/agents/{id}` | One entry |
 | `GET /api/governance/registry/agents/{id}/versions` | The change events of one entry, oldest first, paged like the change feed |
-| `GET /api/governance/registry/events?cursor=` | The change feed, in order |
+| `GET /api/governance/registry/events` | The change feed, in order; pass `cursor` to read after a sequence |
 | `GET /api/governance/registry/ard.json` | The registry as an ARD v0.91 manifest |
 | `POST /api/governance/registry/ard/search` | ARD search |
 | `GET /api/governance/registry/schema` | JSON Schema (draft 2020-12) of an entry and of an event |
@@ -195,4 +195,4 @@ Each event is delivered in the standard webhook envelope, with the event above a
 { "query": { "text": "billing", "filter": { "data.source": ["langwatch"], "data.shadow": ["true"] } }, "pageSize": 10 }
 ```
 
-`query.text` is required. Filter keys are term paths on the ARD entry or on its `data`; values within a key are OR-ed and keys are AND-ed. Each result is an ARD entry with a `score` from 0 to 100, relevance only. `pageToken` pages through results. Federation is not performed: `referrals` is never returned.
+`query.text` is required. Filter keys are term paths on the ARD entry or on its `data`; values within a key are OR-ed and keys are AND-ed, and a single value may be sent without the array. Each result is an ARD entry with a `score` from 0 to 100, relevance only, and a `source` naming the manifest URL it came from. `pageToken` pages through results. Federation is not performed: `referrals` is never returned.

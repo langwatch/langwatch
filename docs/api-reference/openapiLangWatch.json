@@ -78928,8 +78928,7 @@
             "in": "query",
             "name": "cursor",
             "schema": {
-              "type": "string",
-              "pattern": "^\\d{1,19}$"
+              "type": "string"
             }
           }
         ]
@@ -79775,8 +79774,7 @@
             "in": "query",
             "name": "cursor",
             "schema": {
-              "type": "string",
-              "pattern": "^\\d{1,19}$"
+              "type": "string"
             }
           }
         ]
@@ -81263,6 +81261,9 @@
                             "type": "number",
                             "minimum": 0,
                             "maximum": 100
+                          },
+                          "source": {
+                            "type": "string"
                           }
                         },
                         "required": [
@@ -81276,7 +81277,8 @@
                           "capabilities",
                           "data",
                           "metadata",
-                          "score"
+                          "score",
+                          "source"
                         ],
                         "additionalProperties": false
                       }
@@ -81743,10 +81745,17 @@
                           "type": "string"
                         },
                         "additionalProperties": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          ]
                         }
                       }
                     },

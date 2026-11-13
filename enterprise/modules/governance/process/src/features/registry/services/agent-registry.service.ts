@@ -92,15 +92,9 @@ export class AgentRegistryService {
           superseded = changedSince({ stored, readAt });
           return planRegistryChanges({ stored, drafts, now, newId: this.deps.newId, readAt, keep });
         },
+        ...(announce ? {} : { deliveryRecordedAt: now }),
       });
       events += appended.length;
-      if (!announce && appended.length > 0) {
-        await this.deps.registry.markDeliveryRecorded({
-          organizationId,
-          eventIds: appended.map((event) => event.id),
-          at: this.deps.now(),
-        });
-      }
       if (!superseded) break;
     }
     await this.fanOutPending({ organizationId });

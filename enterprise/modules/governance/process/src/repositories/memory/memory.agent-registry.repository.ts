@@ -46,9 +46,11 @@ export class MemoryAgentRegistryRepository extends AgentRegistryRepository {
   async applyChanges({
     organizationId,
     plan,
+    deliveryRecordedAt = null,
   }: {
     organizationId: string;
     plan: (stored: StoredRegistryEntry[]) => RegistryChangeSet;
+    deliveryRecordedAt?: Instant | null;
   }): Promise<AgentRegistryEvent[]> {
     const stored = this.rows
       .filter((row) => row.organizationId === organizationId)
@@ -69,7 +71,7 @@ export class MemoryAgentRegistryRepository extends AgentRegistryRepository {
         sequence: this.sequence,
         draft: { ...draft, occurredAt: registryTimestamp(draft.occurredAt) },
       });
-      this.events.push({ event, deliveryRecordedAt: null });
+      this.events.push({ event, deliveryRecordedAt });
       return event;
     });
   }

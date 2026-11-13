@@ -34,6 +34,7 @@ class PostApiGovernanceRegistryArdSearchResponse200ResultsItem:
         data (PostApiGovernanceRegistryArdSearchResponse200ResultsItemData):
         metadata (PostApiGovernanceRegistryArdSearchResponse200ResultsItemMetadata):
         score (float):
+        source (str):
         description (str | Unset):
     """
 
@@ -48,6 +49,7 @@ class PostApiGovernanceRegistryArdSearchResponse200ResultsItem:
     data: PostApiGovernanceRegistryArdSearchResponse200ResultsItemData
     metadata: PostApiGovernanceRegistryArdSearchResponse200ResultsItemMetadata
     score: float
+    source: str
     description: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
@@ -73,6 +75,8 @@ class PostApiGovernanceRegistryArdSearchResponse200ResultsItem:
 
         score = self.score
 
+        source = self.source
+
         description = self.description
 
         field_dict: dict[str, Any] = {}
@@ -90,6 +94,7 @@ class PostApiGovernanceRegistryArdSearchResponse200ResultsItem:
                 "data": data,
                 "metadata": metadata,
                 "score": score,
+                "source": source,
             }
         )
         if description is not UNSET:
@@ -135,6 +140,8 @@ class PostApiGovernanceRegistryArdSearchResponse200ResultsItem:
 
         score = d.pop("score")
 
+        source = d.pop("source")
+
         description = d.pop("description", UNSET)
 
         post_api_governance_registry_ard_search_response_200_results_item = cls(
@@ -149,6 +156,7 @@ class PostApiGovernanceRegistryArdSearchResponse200ResultsItem:
             data=data,
             metadata=metadata,
             score=score,
+            source=source,
             description=description,
         )
 

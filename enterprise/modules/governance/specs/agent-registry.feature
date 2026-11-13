@@ -162,6 +162,20 @@ Feature: Agent registry with ARD discovery and change events
     Then the entry's status is "removed"
 
   @unit
+  Scenario: A traced agent of a project whose traffic read hit its cap stays past the window
+    Given the registry holds a traced agent last seen more than 30 days ago
+    And its project's traffic read returned the per-project cap of agent names
+    When the registry reconciles
+    Then that traced agent stays as it was
+
+  @unit
+  Scenario: Traffic of a project whose agent read came back incomplete flags no shadow agent
+    Given the registry holds two agents of one project and traces name one of them
+    And the project's agent pages return only the other agent
+    When the registry reconciles
+    Then no shadow entry is registered and both agents stay active
+
+  @unit
   Scenario: A traced agent a listed agent now accounts for is removed
     Given the registry holds a shadow traced agent seen inside the window
     When a LangWatch agent with the same name is defined in its project and the registry reconciles
@@ -194,6 +208,12 @@ Feature: Agent registry with ARD discovery and change events
     When the deploy step seeds the registry
     Then the feed holds the "governance.agent.registered" event
     And no webhook delivery is recorded for it
+
+  @integration
+  Scenario: A seed's events are written as pushed in the same commit that appends them
+    Given a reconcile that does not announce its events
+    When it appends a registration
+    Then no undelivered event is left, even if nothing runs after the commit
 
   @unit
   Scenario: A recorded agent change reconciles the agent's organisation
@@ -327,6 +347,12 @@ Feature: Agent registry with ARD discovery and change events
     Given an entry "Support bot"
     When ARD search asks for text "support" with filters on "toString" and "data.constructor"
     Then no result is answered and the search does not fail
+
+  @unit
+  Scenario: ARD search takes a bare filter value as one value and names its registry
+    Given entries from the "langwatch" and "traffic" sources
+    When ARD search asks for text "support" with filter "data.source" set to the bare value "traffic"
+    Then only the traffic entry is answered and its source is the registry's manifest URL
 
   @unit
   Scenario: ARD search pages its ranked results with an offset token

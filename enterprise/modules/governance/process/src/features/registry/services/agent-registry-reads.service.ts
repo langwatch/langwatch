@@ -160,6 +160,10 @@ export class AgentRegistryReadsService {
     organizationId: string;
     request: ArdSearchRequest;
   }): Promise<ArdSearchResponse> {
-    return ardSearch({ manifest: await this.ardManifest({ organizationId }), request });
+    return ardSearch({
+      manifest: await this.ardManifest({ organizationId }),
+      request,
+      source: `${this.deps.publicBaseUrl.replace(/\/+$/, "")}/api/governance/registry/ard.json`,
+    });
   }
 }

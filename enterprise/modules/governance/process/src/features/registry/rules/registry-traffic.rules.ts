@@ -44,30 +44,34 @@ function listedAccounts(
 }
 
 /**
- * Whether a held traffic entry a read did not return stays: it was last seen inside the window,
- * so the read missed it (past the per-project cap, or overtaken by a newer sighting), unless a
- * listed source now accounts for it. Spec: specs/agent-registry.feature
+ * Whether a held traffic entry a read did not return stays, unless a listed source now accounts
+ * for it: it was last seen inside the window (the read was overtaken by a newer sighting), or its
+ * project's read is unsettled (traffic past the per-project cap, agents read incomplete).
+ * Spec: specs/agent-registry.feature
  */
 export function keepsTrafficInWindow({
   sinceMs,
   projectIds,
+  unsettledProjectIds = new Set(),
   listed,
 }: {
   sinceMs: number;
   projectIds: readonly string[];
+  unsettledProjectIds?: ReadonlySet<string>;
   listed: readonly RegistryDraft[];
 }): (held: {
   entry: Pick<AgentRegistryEntry, "source" | "project_id" | "name" | "last_seen_at">;
 }) => boolean {
   const live = new Set(projectIds);
   const accounts = listedAccounts(listed);
-  return ({ entry }) =>
-    entry.source === "traffic" &&
-    entry.project_id !== null &&
-    live.has(entry.project_id) &&
-    entry.last_seen_at !== null &&
-    Temporal.Instant.from(entry.last_seen_at).epochMilliseconds >= sinceMs &&
-    !accounts({ projectId: entry.project_id, name: entry.name, agentId: null });
+  const inWindow = (lastSeenAt: string | null) =>
+    lastSeenAt !== null && Temporal.Instant.from(lastSeenAt).epochMilliseconds >= sinceMs;
+  return ({ entry }) => {
+    const projectId = entry.project_id;
+    if (entry.source !== "traffic" || projectId === null || !live.has(projectId)) return false;
+    if (accounts({ projectId, name: entry.name, agentId: null })) return false;
+    return unsettledProjectIds.has(projectId) || inWindow(entry.last_seen_at);
+  };
 }
 
 /**

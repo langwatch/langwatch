@@ -179,8 +179,10 @@ const agentRegistryEventsQuerySchemaDefinition = z.object({
   /** The last `sequence` read; events after it are returned in order. */
   cursor: z
     .string()
-    .regex(/^\d{1,19}$/)
-    .refine((value) => BigInt(value) <= SEQUENCE_MAX, "cursor is out of range")
+    .refine(
+      (value) => /^\d{1,19}$/.test(value) && BigInt(value) <= SEQUENCE_MAX,
+      "cursor must be a sequence this feed returned",
+    )
     .optional(),
 });
 export interface AgentRegistryEventsQuerySchema extends Named<

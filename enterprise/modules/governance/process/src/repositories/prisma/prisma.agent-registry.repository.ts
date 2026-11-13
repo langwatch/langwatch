@@ -75,6 +75,46 @@ function jsonOf(value: unknown): Prisma.InputJsonValue {
   return inputJsonSchema.parse(JSON.parse(JSON.stringify(value)));
 }
 
+/** Writes the planned entry rows inside the reconcile's transaction. */
+async function writeEntries({
+  transaction,
+  organizationId,
+  writes,
+}: {
+  transaction: Prisma.TransactionClient;
+  organizationId: string;
+  writes: RegistryChangeSet["writes"];
+}): Promise<void> {
+  for (const write of writes) {
+    const data = {
+      source: write.entry.source,
+      status: write.entry.status,
+      version: write.entry.version,
+      fingerprint: write.fingerprint,
+      entry: jsonOf(write.entry),
+      lastSeenAt: write.entry.last_seen_at ? new Date(write.entry.last_seen_at) : null,
+      removedAt: write.entry.removed_at ? new Date(write.entry.removed_at) : null,
+      updatedAt: new Date(write.entry.updated_at),
+    };
+    if (write.isNew) {
+      await transaction.agentRegistryEntry.create({
+        data: {
+          ...data,
+          id: write.id,
+          organizationId,
+          sourceKey: write.sourceKey,
+          firstSeenAt: new Date(write.entry.first_seen_at),
+        },
+      });
+    } else {
+      await transaction.agentRegistryEntry.updateMany({
+        where: { organizationId, id: write.id },
+        data,
+      });
+    }
+  }
+}
+
 export class PrismaAgentRegistryRepository extends AgentRegistryRepository {
   private constructor(private readonly prisma: PrismaClient) {
     super();
@@ -87,9 +127,11 @@ export class PrismaAgentRegistryRepository extends AgentRegistryRepository {
   async applyChanges({
     organizationId,
     plan,
+    deliveryRecordedAt,
   }: {
     organizationId: string;
     plan: (stored: StoredRegistryEntry[]) => RegistryChangeSet;
+    deliveryRecordedAt?: Instant;
   }): Promise<AgentRegistryEvent[]> {
     return this.prisma.$transaction(
       async (transaction) => {
@@ -104,34 +146,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`agent-registry:${organizationId
         });
         const changes = plan(rows.map((row) => ({ ...row, entry: entryOf(row.entry) })));
 
-        for (const write of changes.writes) {
-          const data = {
-            source: write.entry.source,
-            status: write.entry.status,
-            version: write.entry.version,
-            fingerprint: write.fingerprint,
-            entry: jsonOf(write.entry),
-            lastSeenAt: write.entry.last_seen_at ? new Date(write.entry.last_seen_at) : null,
-            removedAt: write.entry.removed_at ? new Date(write.entry.removed_at) : null,
-            updatedAt: new Date(write.entry.updated_at),
-          };
-          if (write.isNew) {
-            await transaction.agentRegistryEntry.create({
-              data: {
-                ...data,
-                id: write.id,
-                organizationId,
-                sourceKey: write.sourceKey,
-                firstSeenAt: new Date(write.entry.first_seen_at),
-              },
-            });
-          } else {
-            await transaction.agentRegistryEntry.updateMany({
-              where: { organizationId, id: write.id },
-              data,
-            });
-          }
-        }
+        await writeEntries({ transaction, organizationId, writes: changes.writes });
 
         const appended: AgentRegistryEvent[] = [];
         for (const draft of changes.events) {
@@ -145,6 +160,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`agent-registry:${organizationId
               toVersion: draft.toVersion,
               payload: jsonOf({ tool: draft.tool, agent: draft.agent }),
               occurredAt: toDate(draft.occurredAt),
+              ...(deliveryRecordedAt ? { deliveryRecordedAt: toDate(deliveryRecordedAt) } : {}),
             },
           });
           appended.push(eventOf(row));

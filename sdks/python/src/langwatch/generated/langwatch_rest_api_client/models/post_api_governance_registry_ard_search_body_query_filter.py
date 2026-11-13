@@ -13,13 +13,17 @@ T = TypeVar("T", bound="PostApiGovernanceRegistryArdSearchBodyQueryFilter")
 class PostApiGovernanceRegistryArdSearchBodyQueryFilter:
     """ """
 
-    additional_properties: dict[str, list[str]] = _attrs_field(init=False, factory=dict)
+    additional_properties: dict[str, list[str] | str] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
 
         field_dict: dict[str, Any] = {}
         for prop_name, prop in self.additional_properties.items():
-            field_dict[prop_name] = prop
+            if isinstance(prop, list):
+                field_dict[prop_name] = prop
+
+            else:
+                field_dict[prop_name] = prop
 
         return field_dict
 
@@ -30,7 +34,19 @@ class PostApiGovernanceRegistryArdSearchBodyQueryFilter:
 
         additional_properties = {}
         for prop_name, prop_dict in d.items():
-            additional_property = cast(list[str], prop_dict)
+
+            def _parse_additional_property(data: object) -> list[str] | str:
+                try:
+                    if not isinstance(data, list):
+                        raise TypeError()
+                    additional_property_type_1 = cast(list[str], data)
+
+                    return additional_property_type_1
+                except (TypeError, ValueError, AttributeError, KeyError):
+                    pass
+                return cast(list[str] | str, data)
+
+            additional_property = _parse_additional_property(prop_dict)
 
             additional_properties[prop_name] = additional_property
 
@@ -41,10 +57,10 @@ class PostApiGovernanceRegistryArdSearchBodyQueryFilter:
     def additional_keys(self) -> list[str]:
         return list(self.additional_properties.keys())
 
-    def __getitem__(self, key: str) -> list[str]:
+    def __getitem__(self, key: str) -> list[str] | str:
         return self.additional_properties[key]
 
-    def __setitem__(self, key: str, value: list[str]) -> None:
+    def __setitem__(self, key: str, value: list[str] | str) -> None:
         self.additional_properties[key] = value
 
     def __delitem__(self, key: str) -> None:

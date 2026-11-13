@@ -49,6 +49,8 @@ function entry(overrides: Partial<AgentRegistryEntry> = {}): AgentRegistryEntry 
   };
 }
 
+const SOURCE = "https://app.langwatch.ai/api/governance/registry/ard.json";
+
 function manifest(entries: AgentRegistryEntry[]) {
   return ardManifestOf({
     entries,
@@ -98,6 +100,7 @@ describe("ardSearch()", () => {
       ]);
 
       const response = ardSearch({
+        source: SOURCE,
         manifest: listed,
         request: ardSearchRequestSchema.parse({
           query: { text: "billing", filter: { "data.source": ["langwatch"] } },
@@ -107,6 +110,28 @@ describe("ardSearch()", () => {
       expect(response.results[0]?.displayName).toBe("Billing assistant");
       expect(response.results[0]?.score).toBeGreaterThan(0);
       expect(response.results[0]?.score).toBeLessThanOrEqual(100);
+    });
+  });
+
+  describe("given a filter whose value is a bare string", () => {
+    /** @scenario ARD search takes a bare filter value as one value and names its registry */
+    it("filters by it and names the registry as each result's source", () => {
+      const listed = manifest([
+        entry(),
+        entry({ id: "agentreg_2", name: "Support shadow", source: "traffic" }),
+      ]);
+
+      const response = ardSearch({
+        source: SOURCE,
+        manifest: listed,
+        request: ardSearchRequestSchema.parse({
+          query: { text: "support", filter: { "data.source": "traffic" } },
+        }),
+      });
+
+      expect(response.results.map((result) => [result.displayName, result.source])).toEqual([
+        ["Support shadow", SOURCE],
+      ]);
     });
   });
 
@@ -120,6 +145,7 @@ describe("ardSearch()", () => {
       );
       const ask = (pageToken?: string) =>
         ardSearch({
+          source: SOURCE,
           manifest: listed,
           request: ardSearchRequestSchema.parse({
             query: { text: "support" },
@@ -154,6 +180,7 @@ describe("ardSearch()", () => {
     /** @scenario ARD search treats a filter on an inherited property as no match */
     it("answers no results instead of failing", () => {
       const response = ardSearch({
+        source: SOURCE,
         manifest: manifest([entry()]),
         request: ardSearchRequestSchema.parse({
           query: { text: "support", filter: { toString: ["x"], "data.constructor": ["y"] } },

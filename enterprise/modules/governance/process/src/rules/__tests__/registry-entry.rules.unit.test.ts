@@ -284,6 +284,20 @@ describe("keepsTrafficInWindow()", () => {
     });
   });
 
+  describe("given a traced agent last seen before the window in a project whose read is unsettled", () => {
+    /** @scenario A traced agent of a project whose traffic read hit its cap stays past the window */
+    it("keeps it", () => {
+      const unsettled = keepsTrafficInWindow({
+        sinceMs: SINCE,
+        projectIds: ["project-1"],
+        unsettledProjectIds: new Set(["project-1"]),
+        listed: [],
+      });
+
+      expect(unsettled(held({ lastSeenAt: "2026-09-01T00:00:00.000Z" }))).toBe(true);
+    });
+  });
+
   describe("given a LangWatch agent of the same name is now defined in its project", () => {
     /** @scenario A traced agent a listed agent now accounts for is removed */
     it("does not keep the traced entry", () => {

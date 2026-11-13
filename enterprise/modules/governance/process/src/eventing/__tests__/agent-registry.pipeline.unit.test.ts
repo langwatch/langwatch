@@ -150,6 +150,8 @@ describe("the agent registry pipeline", () => {
           ]),
         ),
       );
+      await vi.waitFor(() => expect(reconciled.length).toBeGreaterThan(0), { timeout: 15_000 });
+      // A second reconcile from the burst would land within the same settle window.
       await new Promise((resolve) => setTimeout(resolve, 1_000));
 
       expect(reconciled).toEqual([PROJECT]);

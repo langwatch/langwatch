@@ -59,6 +59,9 @@ function endpoint(id: string, enabledEvents: string[]): WebhookEndpointView {
   };
 }
 
+const OUTBOX_DOWN = new Error("outbox unavailable");
+const AGENT_STORE_DOWN = new Error("agent store unavailable");
+
 class RecordingOutbox implements AgentRegistryDeliveryOutbox {
   readonly intents: AgentRegistryDeliveryIntent[] = [];
   failNext = false;
@@ -66,7 +69,7 @@ class RecordingOutbox implements AgentRegistryDeliveryOutbox {
   async record(intents: readonly AgentRegistryDeliveryIntent[]): Promise<void> {
     if (this.failNext) {
       this.failNext = false;
-      throw new Error("outbox unavailable");
+      throw OUTBOX_DOWN;
     }
     this.intents.push(...intents);
   }
@@ -102,7 +105,7 @@ function setup({
     discoveredAgents: MemoryGovernanceRepositories.create().discoveredAgents,
     agents: createApiFixture<AgentApi>({
       list: async ({ projectId }) => {
-        if (state.failAgents) throw new Error("agent store unavailable");
+        if (state.failAgents) throw AGENT_STORE_DOWN;
         const data = state.agents.filter((agent) => agent.projectId === projectId);
         const hold = state.holdNextList;
         state.holdNextList = undefined;
@@ -157,8 +160,8 @@ describe("AgentRegistryService", () => {
       await service.reconcileOrganization({ organizationId: ORG });
       state.failAgents = true;
 
-      await expect(service.reconcileOrganization({ organizationId: ORG })).rejects.toThrow(
-        "agent store unavailable",
+      await expect(service.reconcileOrganization({ organizationId: ORG })).rejects.toBe(
+        AGENT_STORE_DOWN,
       );
 
       const entries = await registry.findEntries({ organizationId: ORG, limit: 100 });
@@ -191,8 +194,8 @@ describe("AgentRegistryService", () => {
     it("records its intents on the next reconcile with nothing changed", async () => {
       const { service, outbox } = setup();
       outbox.failNext = true;
-      await expect(service.reconcileOrganization({ organizationId: ORG })).rejects.toThrow(
-        "outbox unavailable",
+      await expect(service.reconcileOrganization({ organizationId: ORG })).rejects.toBe(
+        OUTBOX_DOWN,
       );
       expect(outbox.intents).toEqual([]);
 
@@ -322,6 +325,42 @@ describe("AgentRegistryService", () => {
 
       const entries = await registry.findEntries({ organizationId: ORG, limit: 10 });
       expect(entries.map((entry) => entry.status)).toEqual(["active", "active"]);
+    });
+  });
+
+  describe("when traces name an agent of a project whose agent read came back incomplete", () => {
+    /** @scenario Traffic of a project whose agent read came back incomplete flags no shadow agent */
+    it("registers no shadow entry for it", async () => {
+      const field = connectedAgent("agent-1", "Field agent");
+      const desk = connectedAgent("agent-2", "Desk agent");
+      const { service, registry, state } = setup({
+        agents: [field, desk],
+        traffic: [
+          {
+            agentName: "Desk agent",
+            agentId: null,
+            model: null,
+            spanCount: 4,
+            firstSeenMs: NOW.epochMilliseconds - 1_000,
+            lastSeenMs: NOW.epochMilliseconds,
+          },
+        ],
+      });
+      await service.reconcileOrganization({ organizationId: ORG });
+      state.agents = [field];
+      state.claimedTotal = 2;
+
+      await service.reconcileOrganization({ organizationId: ORG });
+
+      const entries = await registry.findEntries({ organizationId: ORG, limit: 10 });
+      expect(
+        entries
+          .map((entry) => [entry.name, entry.source, entry.status])
+          .toSorted((a, b) => String(a[0]).localeCompare(String(b[0]))),
+      ).toEqual([
+        ["Desk agent", "langwatch", "active"],
+        ["Field agent", "langwatch", "active"],
+      ]);
     });
   });
 

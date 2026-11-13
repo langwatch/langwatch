@@ -98,9 +98,21 @@ export class AgentRegistrySourcesService {
         }),
       })),
     );
-    const keepTraffic = keepsTrafficInWindow({ sinceMs: since, projectIds, listed });
+    const unsettled = new Set([
+      ...incompleteProjects,
+      ...seen
+        .filter(({ agents }) => agents.length >= REGISTRY_TRAFFIC_LIMIT_PER_PROJECT)
+        .map(({ projectId }) => projectId),
+    ]);
+    const keepTraffic = keepsTrafficInWindow({
+      sinceMs: since,
+      projectIds,
+      unsettledProjectIds: unsettled,
+      listed,
+    });
+    const settledSeen = seen.filter(({ projectId }) => !incompleteProjects.has(projectId));
     return {
-      drafts: [...listed, ...trafficAgentDrafts({ seen, listed })],
+      drafts: [...listed, ...trafficAgentDrafts({ seen: settledSeen, listed })],
       keep: (held) =>
         keepTraffic(held) ||
         (held.entry.source === "langwatch" &&
@@ -109,7 +121,10 @@ export class AgentRegistrySourcesService {
     };
   }
 
-  /** A project whose pages, read by offset, came back short of their total read incomplete. */
+  /**
+   * A project whose pages, read by offset, came back short of the largest total any page named
+   * read incomplete, so an archive during the walk cannot hide an agent it skipped.
+   */
   private async agentsOf(
     projectIds: readonly string[],
   ): Promise<{ agents: Agent[]; incompleteProjects: Set<string> }> {
@@ -122,8 +137,8 @@ export class AgentRegistrySourcesService {
       for (let page = 1; page <= totalPages; page++) {
         const result = await this.deps.agents.list({ projectId, page, limit: AGENTS_PAGE_LIMIT });
         for (const agent of result.data) agents.set(agent.id, agent);
-        totalPages = result.pagination.totalPages;
-        total = result.pagination.total;
+        totalPages = Math.max(totalPages, result.pagination.totalPages);
+        total = Math.max(total, result.pagination.total);
       }
       if (agents.size - before < total) incompleteProjects.add(projectId);
     }

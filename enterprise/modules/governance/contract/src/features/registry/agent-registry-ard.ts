@@ -44,8 +44,8 @@ export type ArdManifest = z.infer<typeof ardManifestSchema>;
 const ardSearchRequestSchemaDefinition = z.object({
   query: z.object({
     text: z.string().trim().min(1),
-    /** Term path to accepted values: values OR-ed within a key, keys AND-ed. */
-    filter: z.record(z.string(), z.string().array()).optional(),
+    /** Term path to accepted values: values OR-ed within a key, keys AND-ed; a bare value is one. */
+    filter: z.record(z.string(), z.union([z.string(), z.string().array()])).optional(),
   }),
   federation: z.enum(["auto", "referrals", "none"]).optional(),
   pageSize: z.number().int().min(1).max(100).default(10),
@@ -56,7 +56,14 @@ export const ardSearchRequestSchema: ArdSearchRequestSchema = ardSearchRequestSc
 export type ArdSearchRequest = z.infer<typeof ardSearchRequestSchema>;
 
 const ardSearchResponseSchemaDefinition = z.object({
-  results: z.object({ ...ardEntrySchema.shape, score: z.number().min(0).max(100) }).array(),
+  results: z
+    .object({
+      ...ardEntrySchema.shape,
+      score: z.number().min(0).max(100),
+      /** The registry the result came from: its manifest URL. */
+      source: z.string(),
+    })
+    .array(),
   pageToken: z.string().optional(),
 });
 export interface ArdSearchResponseSchema extends Named<typeof ardSearchResponseSchemaDefinition> {}

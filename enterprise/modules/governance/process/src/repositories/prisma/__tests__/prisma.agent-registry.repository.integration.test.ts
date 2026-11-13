@@ -9,7 +9,7 @@ import {
   PrismaConnectionService,
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
-import { Temporal } from "@langwatch/time";
+import { Temporal, type Instant } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it } from "vitest";
 
@@ -51,9 +51,15 @@ function draft(name: string): RegistryDraft {
 
 describe.skipIf(!connection)("PrismaAgentRegistryRepository", () => {
   const ns = `agent-registry-${nanoid(8)}`;
-  const ORG = `org-${ns}`;
+  const organizations: string[] = [];
   let ids = 0;
   const newId = () => `${ns}-${++ids}`;
+  /** A fresh organisation per test, so each test runs alone as well as in the file. */
+  const newOrganization = () => {
+    const organizationId = `org-${ns}-${organizations.length}`;
+    organizations.push(organizationId);
+    return organizationId;
+  };
 
   const prisma = () => {
     if (!connection) throw new Error("no test database");
@@ -61,33 +67,59 @@ describe.skipIf(!connection)("PrismaAgentRegistryRepository", () => {
   };
   const repository = () => PrismaAgentRegistryRepository.create(prisma());
 
-  const reconcile = (drafts: RegistryDraft[], at: string) =>
+  const reconcile = ({
+    organizationId,
+    drafts,
+    at,
+    deliveryRecordedAt,
+  }: {
+    organizationId: string;
+    drafts: RegistryDraft[];
+    at: string;
+    deliveryRecordedAt?: Instant;
+  }) =>
     repository().applyChanges({
-      organizationId: ORG,
+      organizationId,
       plan: (stored) =>
         planRegistryChanges({ stored, drafts, now: Temporal.Instant.from(at), newId }),
+      ...(deliveryRecordedAt ? { deliveryRecordedAt } : {}),
     });
 
+  /** alpha and beta registered on the 10th; alpha versioned and beta removed on the 11th. */
+  const seeded = async () => {
+    const organizationId = newOrganization();
+    await reconcile({
+      organizationId,
+      drafts: [draft("alpha"), draft("beta")],
+      at: "2026-11-10T00:00:00Z",
+    });
+    await reconcile({
+      organizationId,
+      drafts: [
+        { ...draft("alpha"), model: { provider: "openai", model: "gpt-5-mini", parameters: {} } },
+      ],
+      at: "2026-11-11T00:00:00Z",
+    });
+    return organizationId;
+  };
+
   afterAll(async () => {
-    await prisma().agentRegistryEvent.deleteMany({ where: { organizationId: ORG } });
-    await prisma().agentRegistryEntry.deleteMany({ where: { organizationId: ORG } });
+    const organizationId = { in: organizations };
+    await prisma().agentRegistryEvent.deleteMany({ where: { organizationId } });
+    await prisma().agentRegistryEntry.deleteMany({ where: { organizationId } });
   });
 
   describe("given reconciles that register, version and remove agents", () => {
     it("stores entries and appends ordered events under the tenant guard", async () => {
-      await reconcile([draft("alpha"), draft("beta")], "2026-11-10T00:00:00Z");
-      await reconcile(
-        [{ ...draft("alpha"), model: { provider: "openai", model: "gpt-5-mini", parameters: {} } }],
-        "2026-11-11T00:00:00Z",
-      );
+      const organizationId = await seeded();
 
-      const entries = await repository().findEntries({ organizationId: ORG, limit: 100 });
+      const entries = await repository().findEntries({ organizationId, limit: 100 });
       expect(entries.map((entry) => [entry.name, entry.status, entry.version])).toEqual([
         ["beta", "removed", 2],
         ["alpha", "active", 2],
       ]);
 
-      const events = await repository().findEventsAfter({ organizationId: ORG, limit: 10 });
+      const events = await repository().findEventsAfter({ organizationId, limit: 10 });
       expect(events.map((event) => event.type)).toEqual([
         "governance.agent.registered",
         "governance.agent.registered",
@@ -95,7 +127,7 @@ describe.skipIf(!connection)("PrismaAgentRegistryRepository", () => {
         "governance.agent.removed",
       ]);
       const after = await repository().findEventsAfter({
-        organizationId: ORG,
+        organizationId,
         after: BigInt(events[1]?.sequence ?? "0"),
         limit: 10,
       });
@@ -106,11 +138,13 @@ describe.skipIf(!connection)("PrismaAgentRegistryRepository", () => {
     });
 
     it("pages entries by keyset and filters by last change", async () => {
-      const first = await repository().listEntries({ organizationId: ORG, limit: 1 });
+      const organizationId = await seeded();
+
+      const first = await repository().listEntries({ organizationId, limit: 1 });
       expect(first.hasMore).toBe(true);
       const last = first.entries[0];
       const second = await repository().listEntries({
-        organizationId: ORG,
+        organizationId,
         limit: 1,
         ...(last ? { after: { updatedAt: last.updated_at, id: last.id } } : {}),
       });
@@ -120,7 +154,7 @@ describe.skipIf(!connection)("PrismaAgentRegistryRepository", () => {
       ]);
 
       const recent = await repository().listEntries({
-        organizationId: ORG,
+        organizationId,
         limit: 10,
         updatedSince: Temporal.Instant.from("2026-11-10T12:00:00Z"),
       });
@@ -128,37 +162,64 @@ describe.skipIf(!connection)("PrismaAgentRegistryRepository", () => {
     });
 
     it("lists undelivered events until their fan-out is marked", async () => {
-      const pending = await repository().findUndeliveredEvents({ organizationId: ORG, limit: 10 });
+      const organizationId = await seeded();
+
+      const pending = await repository().findUndeliveredEvents({ organizationId, limit: 10 });
       expect(pending).toHaveLength(4);
 
       await repository().markDeliveryRecorded({
-        organizationId: ORG,
+        organizationId,
         eventIds: pending.map((event) => event.id),
         at: Temporal.Instant.from("2026-11-11T00:00:01Z"),
       });
 
       await expect(
-        repository().findUndeliveredEvents({ organizationId: ORG, limit: 10 }),
+        repository().findUndeliveredEvents({ organizationId, limit: 10 }),
       ).resolves.toEqual([]);
-      const organizations = await repository().findOrganizationIds({
+      const held = await repository().findOrganizationIds({
         after: `org-${ns.slice(0, -1)}`,
         limit: 1000,
       });
-      expect(organizations).toContain(ORG);
+      expect(held).toContain(organizationId);
+    });
+  });
+
+  describe("given a reconcile that writes its events as already pushed", () => {
+    /** @scenario A seed's events are written as pushed in the same commit that appends them */
+    it("appends them with no undelivered event left", async () => {
+      const organizationId = newOrganization();
+
+      const appended = await reconcile({
+        organizationId,
+        drafts: [draft("alpha")],
+        at: "2026-11-10T00:00:00Z",
+        deliveryRecordedAt: Temporal.Instant.from("2026-11-10T00:00:00Z"),
+      });
+
+      expect(appended.map((event) => event.type)).toEqual(["governance.agent.registered"]);
+      await expect(
+        repository().findUndeliveredEvents({ organizationId, limit: 10 }),
+      ).resolves.toEqual([]);
     });
   });
 
   describe("given more active entries than the ARD read takes", () => {
     /** @scenario The ARD manifest past its cap lists the agents changed most recently */
     it("answers the most recently changed active entries", async () => {
-      await reconcile([draft("alpha"), draft("gamma")], "2026-11-12T00:00:00Z");
-      await reconcile(
-        [draft("alpha"), { ...draft("gamma"), description: "changed" }],
-        "2026-11-13T00:00:00Z",
-      );
+      const organizationId = newOrganization();
+      await reconcile({
+        organizationId,
+        drafts: [draft("alpha"), draft("gamma")],
+        at: "2026-11-12T00:00:00Z",
+      });
+      await reconcile({
+        organizationId,
+        drafts: [draft("alpha"), { ...draft("gamma"), description: "changed" }],
+        at: "2026-11-13T00:00:00Z",
+      });
 
       const entries = await repository().findEntries({
-        organizationId: ORG,
+        organizationId,
         status: "active",
         limit: 1,
       });
