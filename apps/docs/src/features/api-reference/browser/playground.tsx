@@ -10,20 +10,54 @@ import type { Operation } from "../model/operation.ts";
 import { requestErrorOutcome } from "../model/playground-outcome.ts";
 import type { Outcome } from "../model/playground-outcome.ts";
 import { validateRequest } from "../model/request-validation.ts";
-import { editRows, readForm, setBodyMode, syncFormToBody } from "./body-form.ts";
+import type * as BodyForm from "./body-form.ts";
 import { frameConnection, sendThroughFrame, type FrameAnswer } from "./docs-session.ts";
-import {
-  editManualKey,
-  fieldValue,
-  paramErrors,
-  requestState,
-  setFormOpen,
-  showErrors,
-  syncBody,
-  updateExamples,
-} from "./playground-dom.ts";
+import { editManualKey, fieldValue, setFormOpen, showErrors, syncBody } from "./playground-dom.ts";
+import type * as RequestValues from "./request-values.ts";
 import { ResponseView } from "./response-view.tsx";
 import { startSession } from "./session-controls.ts";
+
+type RequestTools = typeof BodyForm & typeof RequestValues;
+
+/* Typed fields load after the first click; the prerendered form stays usable, and every edit
+   made meanwhile queues on this one promise, so nothing typed before it lands is lost. */
+let requestTools: Promise<RequestTools> | undefined;
+function loadRequestTools(): Promise<RequestTools> {
+  requestTools ??= Promise.all([import("./body-form.ts"), import("./request-values.ts")]).then(
+    ([form, values]) => ({ ...form, ...values }),
+  );
+  return requestTools;
+}
+
+/** The typed fields once they have loaded, for what renders from them. */
+function useRequestTools() {
+  const [tools, setTools] = useState<RequestTools | null>(null);
+  useEffect(() => {
+    let live = true;
+    void loadRequestTools().then((loaded) => {
+      if (live) setTools(loaded);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+  return tools;
+}
+
+/** After a field changes: the form into the body when it was the form, then every example. */
+async function syncEdit({ operation, inForm }: { operation: Operation; inForm: boolean }) {
+  const { syncFormToBody, updateExamples } = await loadRequestTools();
+  if (inForm) syncFormToBody({ operation });
+  updateExamples({ operation });
+}
+
+/** The Form | JSON switch and a list's Add and Remove. */
+async function editBody({ operation, button }: { operation: Operation; button: Element }) {
+  const { setBodyMode, editRows } = await loadRequestTools();
+  const mode = button.getAttribute("data-body-mode-button");
+  if (mode === "form" || mode === "json") setBodyMode({ operation, mode });
+  if (editRows({ button })) await syncEdit({ operation, inForm: true });
+}
 
 /** What the reader is told when the session frame did not send the request. */
 const FRAME_FAILURES: Record<FrameFailure, string> = {
@@ -51,6 +85,7 @@ function frameOutcome({ answer }: { answer: FrameAnswer }): Outcome {
 
 function PlaygroundRuntime({ operation }: { operation: Operation }) {
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
+  const tools = useRequestTools();
   const pending = useRef<AbortController | null>(null);
   useEffect(
     () => () => {
@@ -60,12 +95,16 @@ function PlaygroundRuntime({ operation }: { operation: Operation }) {
     [],
   );
   const send = async () => {
+    const { syncFormToBody, requestState, paramErrors, readForm } = await loadRequestTools();
     syncFormToBody({ operation });
     const state = requestState({ operation });
     /* Signed in, the frame sends as the reader and this page never holds the key. */
     const viaFrame = sessionCovers({ scheme: operation.schemes[0] }) && frameConnection() !== null;
     const key = fieldValue({ id: "pg-auth" });
-    const fieldErrors = { ...paramErrors({ operation }), ...readForm({ operation })?.errors };
+    const fieldErrors = {
+      ...paramErrors({ operation }),
+      ...readForm({ operation })?.errors,
+    };
     const errors = validateRequest({
       operation,
       state,
@@ -135,7 +174,15 @@ function PlaygroundRuntime({ operation }: { operation: Operation }) {
       outcome={outcome}
       retry={() => void send()}
       cancel={() => pending.current?.abort("cancel")}
-      curl={generateExample({ operation, state: requestState({ operation }), language: "curl" })}
+      curl={
+        tools
+          ? generateExample({
+              operation,
+              state: tools.requestState({ operation }),
+              language: "curl",
+            })
+          : ""
+      }
     />
   );
 }
@@ -177,21 +224,16 @@ function bindRequestForm({
 }) {
   const form = document.getElementById("try-it-form");
   const input = (event: Event) => {
-    if (event.target instanceof HTMLElement && event.target.id === "pg-body") syncBody();
-    else if (event.target instanceof Element && event.target.closest("[data-body-form]"))
-      syncFormToBody({ operation });
-    updateExamples({ operation });
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.id === "pg-body") syncBody();
+    void syncEdit({ operation, inForm: Boolean(target?.closest("[data-body-form]")) });
   };
   const click = (event: Event) => {
     const button = event.target instanceof Element ? event.target.closest("button") : null;
     if (!button) return;
     if (button.id === "pg-send") void onSend();
-    const mode = button.getAttribute("data-body-mode-button");
-    if (mode === "form" || mode === "json") setBodyMode({ operation, mode });
-    if (editRows({ button })) {
-      syncFormToBody({ operation });
-      updateExamples({ operation });
-    }
+    if (button.matches("[data-body-mode-button]") || button.closest("[data-body-list]"))
+      void editBody({ operation, button });
     if (button.getAttribute("aria-label") === "Close request form") setFormOpen({ open: false });
     const label = button.getAttribute("aria-label") ?? button.textContent?.trim();
     if (label && ["Clear", "Reveal key", "Hide key"].includes(label))

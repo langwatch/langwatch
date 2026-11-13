@@ -121,6 +121,13 @@ Feature: Read and navigate the generated documentation
     And a required field left empty, or a JSON sub-field that does not parse, prevents sending and is marked on its field
 
   @integration
+  Scenario: Keep what the reader typed while the typed fields load
+    Given the reader opened Try it and the typed fields have not loaded yet
+    When they fill a body field and a parameter
+    Then the prerendered form stays in place and takes their input
+    And once the typed fields load, the body and every example carry what they typed
+
+  @integration
   Scenario: Type each parameter by its schema
     Given an endpoint with date-time, enum, boolean and number parameters
     Then a date-time parameter is a date picker sent as an ISO timestamp in UTC

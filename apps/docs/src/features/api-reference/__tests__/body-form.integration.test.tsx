@@ -9,6 +9,17 @@ import { operationSchema } from "../model/operation-schema.ts";
 import { EndpointStateProvider } from "../ui/endpoint-state.tsx";
 import { Playground } from "../ui/playground.tsx";
 
+/* Holds the typed fields back until a test lets them load, to type into the form meanwhile. */
+const typedFields = vi.hoisted(() => {
+  let open = () => {};
+  const opened = new Promise<void>((resolve) => (open = resolve));
+  return { opened, open: () => open() };
+});
+vi.mock("../browser/request-values.ts", async (importOriginal) => {
+  await typedFields.opened;
+  return importOriginal();
+});
+
 vi.hoisted(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   Element.prototype.scrollIntoView = () => {};
@@ -121,29 +132,36 @@ const example = (id: string) =>
   document.querySelector<HTMLElement>(`[data-docs-example="${id}"] .docs-code-region`)?.dataset
     .code ?? "";
 
-function type({
+/* The island loads its typed fields after the first click; each step waits for that work. */
+async function actThenSettle(step: () => void) {
+  await act(async () => {
+    step();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+async function type({
   element,
   value,
 }: {
   element: HTMLInputElement | HTMLTextAreaElement;
   value: string;
 }) {
-  act(() => {
+  await actThenSettle(() => {
     element.value = value;
     element.dispatchEvent(new Event("input", { bubbles: true }));
   });
 }
-function choose({ element, value }: { element: HTMLSelectElement; value: string }) {
-  act(() => {
+async function choose({ element, value }: { element: HTMLSelectElement; value: string }) {
+  await actThenSettle(() => {
     element.value = value;
     element.dispatchEvent(new Event("change", { bubbles: true }));
   });
 }
-function check({ element }: { element: HTMLInputElement }) {
-  act(() => element.click());
+async function check({ element }: { element: HTMLInputElement }) {
+  await actThenSettle(() => element.click());
 }
-function press({ selector }: { selector: string }) {
-  act(() => document.querySelector<HTMLElement>(selector)?.click());
+async function press({ selector }: { selector: string }) {
+  await actThenSettle(() => document.querySelector<HTMLElement>(selector)?.click());
 }
 const modeButton = (mode: string) => `[data-body-mode-button="${mode}"]`;
 const panel = (mode: string) => document.querySelector<HTMLElement>(`[data-body-panel="${mode}"]`);
@@ -152,6 +170,22 @@ const kindOf = (fields: FormField[], name: string) =>
 
 beforeAll(async () => {
   await act(async () => document.getElementById("try-it-button")?.click());
+});
+
+describe("while the typed fields load", () => {
+  /** @scenario "Keep what the reader typed while the typed fields load" */
+  it("keeps a body field and a parameter typed before they arrive", async () => {
+    const before = bodyText();
+    await type({ element: control("name"), value: "early" });
+    await type({ element: byId("pg-query-limit"), value: "7" });
+    expect(control("name").value).toBe("early");
+    expect(bodyText()).toBe(before);
+    await actThenSettle(() => typedFields.open());
+    await actThenSettle(() => {});
+    expect(body().name).toBe("early");
+    expect(example("curl")).toContain("early");
+    expect(example("curl")).toContain("limit=7");
+  });
 });
 
 describe("given a body whose schema is an object", () => {
@@ -182,20 +216,20 @@ describe("given a body whose schema is an object", () => {
   });
 
   /** @scenario "Fill a request body in a form built from its schema" */
-  it("sends dates in the schema's format, in UTC, and leaves empty fields out", () => {
-    type({ element: control("name"), value: "refunds" });
-    type({ element: control("startDate"), value: "1700000000000" });
-    type({ element: control("expiresAt"), value: "2026-03-01T09:30" });
-    type({ element: control("day"), value: "2026-03-02" });
-    type({ element: control("createdAt"), value: "2026-03-01T00:00:01" });
-    choose({ element: byId<HTMLSelectElement>("pg-body-format"), value: "json" });
-    check({
+  it("sends dates in the schema's format, in UTC, and leaves empty fields out", async () => {
+    await type({ element: control("name"), value: "refunds" });
+    await type({ element: control("startDate"), value: "1700000000000" });
+    await type({ element: control("expiresAt"), value: "2026-03-01T09:30" });
+    await type({ element: control("day"), value: "2026-03-02" });
+    await type({ element: control("createdAt"), value: "2026-03-01T00:00:01" });
+    await choose({ element: byId<HTMLSelectElement>("pg-body-format"), value: "json" });
+    await check({
       element: document.querySelector<HTMLInputElement>(
         'input[name="pg-body-includeSpans"][value="false"]',
       )!,
     });
-    type({ element: control("pageSize"), value: "50" });
-    type({ element: control("window--days"), value: "7" });
+    await type({ element: control("pageSize"), value: "50" });
+    await type({ element: control("window--days"), value: "7" });
     expect(body()).toEqual({
       name: "refunds",
       startDate: 1_700_000_000_000,
@@ -210,22 +244,22 @@ describe("given a body whose schema is an object", () => {
   });
 
   /** @scenario "Fill a request body in a form built from its schema" */
-  it("adds and removes rows of a list", () => {
-    press({ selector: '[data-body-list="tags"] [data-body-add]' });
-    press({ selector: '[data-body-list="tags"] [data-body-add]' });
+  it("adds and removes rows of a list", async () => {
+    await press({ selector: '[data-body-list="tags"] [data-body-add]' });
+    await press({ selector: '[data-body-list="tags"] [data-body-add]' });
     const rows = () => [
       ...document.querySelectorAll<HTMLInputElement>(
         '[data-body-list="tags"] [data-body-rows] input',
       ),
     ];
-    type({ element: rows()[0]!, value: "a" });
-    type({ element: rows()[1]!, value: "b" });
+    await type({ element: rows()[0]!, value: "a" });
+    await type({ element: rows()[1]!, value: "b" });
     expect(rows().map((row) => row.getAttribute("aria-label"))).toEqual([
       "tags item 1",
       "tags item 2",
     ]);
     expect(body().tags).toEqual(["a", "b"]);
-    press({ selector: '[data-body-list="tags"] [aria-label="Remove tags item 1"]' });
+    await press({ selector: '[data-body-list="tags"] [aria-label="Remove tags item 1"]' });
     expect(body().tags).toEqual(["b"]);
     expect(rows()[0]?.getAttribute("aria-label")).toBe("tags item 1");
   });
@@ -233,9 +267,9 @@ describe("given a body whose schema is an object", () => {
 
 describe("when the reader switches between the form and JSON", () => {
   /** @scenario "Switch the request body between the form and JSON" */
-  it("shows the form's value as pretty-printed JSON", () => {
+  it("shows the form's value as pretty-printed JSON", async () => {
     const value = bodyText();
-    press({ selector: modeButton("json") });
+    await press({ selector: modeButton("json") });
     expect(panel("json")?.hidden).toBe(false);
     expect(panel("form")?.hidden).toBe(true);
     expect(bodyText()).toBe(value);
@@ -243,8 +277,8 @@ describe("when the reader switches between the form and JSON", () => {
   });
 
   /** @scenario "Switch the request body between the form and JSON" */
-  it("takes edited JSON back into the form", () => {
-    type({
+  it("takes edited JSON back into the form", async () => {
+    await type({
       element: byId("pg-body"),
       value: JSON.stringify({
         name: "edited",
@@ -253,7 +287,7 @@ describe("when the reader switches between the form and JSON", () => {
         extra: 1,
       }),
     });
-    press({ selector: modeButton("form") });
+    await press({ selector: modeButton("form") });
     expect(panel("form")?.hidden).toBe(false);
     expect(control("name").value).toBe("edited");
     expect(control("expiresAt").value).toBe("");
@@ -269,25 +303,25 @@ describe("when the reader switches between the form and JSON", () => {
   });
 
   /** @scenario "Switch the request body between the form and JSON" */
-  it("keeps the reader in JSON when it does not parse or does not fit", () => {
-    press({ selector: modeButton("json") });
-    type({ element: byId("pg-body"), value: '{"name": ' });
-    press({ selector: modeButton("form") });
+  it("keeps the reader in JSON when it does not parse or does not fit", async () => {
+    await press({ selector: modeButton("json") });
+    await type({ element: byId("pg-body"), value: '{"name": ' });
+    await press({ selector: modeButton("form") });
     expect(panel("json")?.hidden).toBe(false);
     expect(document.querySelector("[data-request-error]")?.textContent).toContain("Invalid JSON");
-    type({ element: byId("pg-body"), value: '{"name": "a", "pageSize": "lots"}' });
-    press({ selector: modeButton("form") });
+    await type({ element: byId("pg-body"), value: '{"name": "a", "pageSize": "lots"}' });
+    await press({ selector: modeButton("form") });
     expect(panel("json")?.hidden).toBe(false);
     expect(document.querySelector("[data-request-error]")?.textContent).toContain("pageSize");
-    type({ element: byId("pg-body"), value: '{"name": "a", "startDate": 5}' });
-    press({ selector: modeButton("form") });
+    await type({ element: byId("pg-body"), value: '{"name": "a", "startDate": 5}' });
+    await press({ selector: modeButton("form") });
     expect(panel("form")?.hidden).toBe(false);
   });
 });
 
 describe("when the reader sends the form", () => {
   const fetches: { url: string; body: string }[] = [];
-  beforeEach(() => {
+  beforeEach(async () => {
     fetches.length = 0;
     vi.stubGlobal(
       "fetch",
@@ -296,7 +330,7 @@ describe("when the reader sends the form", () => {
         return new Response("{}", { status: 200 });
       }),
     );
-    type({ element: byId("pg-auth"), value: "sk-test" });
+    await type({ element: byId("pg-auth"), value: "sk-test" });
   });
   async function send() {
     await act(async () => document.getElementById("pg-send")?.click());
@@ -305,7 +339,7 @@ describe("when the reader sends the form", () => {
 
   /** @scenario "Send and show the form's value as the request body" */
   it("carries the form's value into every example and the request", async () => {
-    type({ element: control("name"), value: "sent" });
+    await type({ element: control("name"), value: "sent" });
     const value = body();
     expect(example("curl")).toContain(JSON.stringify(value));
     expect(example("python")).toContain('"name": "sent"');
@@ -318,16 +352,16 @@ describe("when the reader sends the form", () => {
 
   /** @scenario "Send and show the form's value as the request body" */
   it("refuses to send with a required field empty or a JSON field that does not parse", async () => {
-    type({ element: control("name"), value: "" });
+    await type({ element: control("name"), value: "" });
     await send();
     expect(fetches).toHaveLength(0);
     expect(control("name").getAttribute("aria-invalid")).toBe("true");
-    type({ element: control("name"), value: "ok" });
-    type({ element: control("metadata"), value: "{nope" });
+    await type({ element: control("name"), value: "ok" });
+    await type({ element: control("metadata"), value: "{nope" });
     await send();
     expect(fetches).toHaveLength(0);
     expect(control("metadata").getAttribute("aria-invalid")).toBe("true");
-    type({ element: control("metadata"), value: '{"team": "a"}' });
+    await type({ element: control("metadata"), value: '{"team": "a"}' });
     await send();
     expect(fetches).toHaveLength(1);
     expect(JSON.parse(fetches[0]?.body ?? "").metadata).toEqual({ team: "a" });
@@ -343,18 +377,18 @@ describe("when the reader sends the form", () => {
       min: "1",
       max: "100",
     });
-    type({ element: byId("pg-query-since"), value: "2026-03-01T09:30" });
-    choose({ element: byId("pg-query-order"), value: "desc" });
-    check({
+    await type({ element: byId("pg-query-since"), value: "2026-03-01T09:30" });
+    await choose({ element: byId("pg-query-order"), value: "desc" });
+    await check({
       element: document.querySelector<HTMLInputElement>(
         'input[name="pg-query-archived"][value="true"]',
       )!,
     });
-    type({ element: byId("pg-query-limit"), value: "500" });
+    await type({ element: byId("pg-query-limit"), value: "500" });
     await send();
     expect(fetches).toHaveLength(0);
     expect(byId("pg-query-limit").getAttribute("aria-invalid")).toBe("true");
-    type({ element: byId("pg-query-limit"), value: "10" });
+    await type({ element: byId("pg-query-limit"), value: "10" });
     await send();
     const url = new URL(fetches[0]?.url ?? "");
     expect(Object.fromEntries(url.searchParams)).toEqual({
