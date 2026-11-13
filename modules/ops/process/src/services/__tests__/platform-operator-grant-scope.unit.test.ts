@@ -59,12 +59,10 @@ describe("a platform-operator grant", () => {
 
   describe("given the role every grant path writes", () => {
     /** @scenario "A grant names the account and nothing more" */
-    it("confers the ops permissions and nothing else", () => {
-      const opsPermissions = ["ops:manage", "ops:view", "opsCopy:create", "opsRead:view"];
-      expect(PLATFORM_OPERATOR_PERMISSIONS.toSorted()).toEqual(opsPermissions);
-      expect([...builtinRolePermissions(PLATFORM_OPERATOR_ROLE_ID)].toSorted()).toEqual(
-        opsPermissions,
-      );
+    it("confers ops:view, ops:manage, opsRead:view and opsCopy:create and nothing else", () => {
+      const operator = ["ops:manage", "ops:view", "opsCopy:create", "opsRead:view"];
+      expect(PLATFORM_OPERATOR_PERMISSIONS.toSorted()).toEqual(operator);
+      expect([...builtinRolePermissions(PLATFORM_OPERATOR_ROLE_ID)].toSorted()).toEqual(operator);
     });
   });
 });

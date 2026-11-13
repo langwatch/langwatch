@@ -14,6 +14,7 @@ import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 import { normalizeEndpoint } from "../../internal/endpoint";
+import { sanitizeTerminalText } from "./formatting";
 import { configPath } from "./governance/config";
 
 /** How long one showing of the notice keeps later ones quiet. */
@@ -173,4 +174,31 @@ export async function maybePrintIdentityNotice({
     // The notice must never break, slow-fail, or exit a command.
     void 0;
   }
+}
+
+/**
+ * The ops session's identity line (ADR-202). Never suppressed: a command on this session acts on
+ * a customer organization, so every use says so.
+ */
+export function printOpsSessionNotice({
+  requestId,
+  organizationId,
+  projectName,
+  expiresAt,
+}: {
+  requestId: string;
+  organizationId?: string;
+  projectName?: string;
+  expiresAt: string;
+}): void {
+  const target = [
+    organizationId ? `organization ${organizationId}` : undefined,
+    projectName ? `project "${projectName}"` : undefined,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  const line = sanitizeTerminalText(
+    `Using ops session ${requestId}${target ? ` on ${target}` : ""} until ${expiresAt}. End it: langwatch ops access end`,
+  );
+  console.error(process.stderr.isTTY ? chalk.yellow(line) : line);
 }

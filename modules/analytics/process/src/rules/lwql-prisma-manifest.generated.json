@@ -28547,7 +28547,7 @@
     {
       "name": "StaffAccessRequester",
       "tableName": "StaffAccessRequester",
-      "documentation": "An operator's enrolled coding agent (ADR-202, staff-access module). Its key `lwsr_<lookupId>_<secret>`\ncan only create staff access requests; the secret is stored as its HMAC.",
+      "documentation": "An operator's enrolled coding agent (ADR-202, staff-access module). Its key `lwsr_<lookupId>_<secret>`\ncan only create, poll, redeem and end its own staff access requests; the secret is stored as its SHA-256 hash.",
       "primaryKey": [
         "id"
       ],

@@ -194,17 +194,21 @@ describe("AdaptiveSlots", () => {
         readLoad: () => IDLE,
         now: () => clock,
       });
+      /** `jobs` left their slots: `failed` failed, `handedBack` went back, the rest completed. */
       const second = ({
         jobs,
         durationMs = 20,
         failed = 0,
+        handedBack = 0,
       }: {
         jobs: number;
         durationMs?: number;
         failed?: number;
+        handedBack?: number;
       }) => {
         for (let job = 0; job < jobs; job += 1) slots.jobFinished({ durationMs });
         for (let failure = 0; failure < failed; failure += 1) slots.jobFailed();
+        for (let job = 0; job < jobs - failed - handedBack; job += 1) slots.jobCompleted();
         clock += 1000;
         slots.adjust();
       };
@@ -257,6 +261,27 @@ describe("AdaptiveSlots", () => {
       second({ jobs: 100, durationMs: 20 });
 
       second({ jobs: 100, durationMs: 40 });
+
+      expect(changes).toEqual([125, 100]);
+    });
+
+    /** @scenario "Failed and handed-back jobs do not count as throughput" */
+    it("does not grow while every finished job was handed back", () => {
+      const { changes, second } = reportingConsumer();
+
+      for (let step = 0; step < 5; step += 1) second({ jobs: 200, handedBack: 200 });
+
+      expect(changes).toEqual([]);
+    });
+
+    /** @scenario "Failed and handed-back jobs do not count as throughput" */
+    it("undoes a growth step whose extra finished jobs were only failures and hand-backs", () => {
+      const { changes, second } = reportingConsumer();
+      second({ jobs: 100, failed: 20 });
+      second({ jobs: 100, failed: 20 });
+
+      // The failed share holds at a fifth, so no strain step: only more jobs left their slots.
+      second({ jobs: 400, failed: 80, handedBack: 240 });
 
       expect(changes).toEqual([125, 100]);
     });

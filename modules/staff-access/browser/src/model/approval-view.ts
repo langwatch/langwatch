@@ -6,26 +6,45 @@ import type {
 } from "@langwatch/staff-access-contract";
 import { toEpochMs } from "@langwatch/time";
 
-export type ApprovalPhase = "pending" | "expired" | "approved" | "denied" | "revoked";
+export type ApprovalPhase =
+  | "pending"
+  | "expired"
+  | "approved"
+  | "lapsed"
+  | "live"
+  | "ended"
+  | "denied"
+  | "revoked";
 
-/** A pending request past its expiry reads as expired before the server says so. */
+/**
+ * What became of the request: a pending one past its expiry reads as expired before the server
+ * says so, and a redeemed one reads live for its hour, then ended. An approval the agent never
+ * picked up reads as lapsed, not as a request nobody approved.
+ */
 export function approvalPhase({
   view,
   nowMs,
 }: {
-  view: Pick<StaffAccessApprovalView, "status" | "expiresAt">;
+  view: Pick<
+    StaffAccessApprovalView,
+    "status" | "expiresAt" | "approvedAt" | "redeemedAt" | "accessExpiresAt"
+  >;
   nowMs: number;
 }): ApprovalPhase {
   switch (view.status) {
     case "pending":
       return toEpochMs(view.expiresAt) <= nowMs ? "expired" : "pending";
     case "approved":
+      return toEpochMs(view.expiresAt) <= nowMs ? "lapsed" : "approved";
     case "redeemed":
-      return "approved";
+      return view.accessExpiresAt !== null && toEpochMs(view.accessExpiresAt) <= nowMs
+        ? "ended"
+        : "live";
     case "denied":
       return "denied";
     case "expired":
-      return "expired";
+      if (view.redeemedAt !== null) return "ended";
+      return view.approvedAt !== null ? "lapsed" : "expired";
     case "revoked":
       return "revoked";
   }

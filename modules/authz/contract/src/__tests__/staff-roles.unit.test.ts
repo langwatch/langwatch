@@ -9,6 +9,7 @@ import {
   STAFF_READER_CONTENT_PERMISSIONS,
   STAFF_READER_METADATA_PERMISSIONS,
   STAFF_SUPPORT_WRITE_PERMISSIONS,
+  STAFF_WRITES_WITHOUT_SPEND,
   staffAccessPermissions,
 } from "../staff-roles.ts";
 
@@ -43,6 +44,25 @@ describe("the staff permission bags", () => {
     }
     for (const permission of READER) {
       expect(["create", "update"], permission).not.toContain(permission.split(":")[1]);
+    }
+  });
+
+  /** @scenario "The support bag holds no prompt or trigger write" */
+  it("holds no prompt or trigger write, since one deploys a prompt and the other sends data out", () => {
+    for (const permission of STAFF_SUPPORT_WRITE_PERMISSIONS) {
+      expect(["prompts", "triggers"], permission).not.toContain(permission.split(":")[0]);
+    }
+  });
+
+  it("keeps prompt text out of the metadata bag", () => {
+    expect(STAFF_READER_METADATA_PERMISSIONS).not.toContain("prompts:view");
+    expect(STAFF_READER_CONTENT_PERMISSIONS).toContain("prompts:view");
+  });
+
+  it("lets a support key write without the spend tick only to datasets, all inside its bag", () => {
+    expect(STAFF_WRITES_WITHOUT_SPEND.toSorted()).toEqual(["datasets:create", "datasets:update"]);
+    for (const permission of STAFF_WRITES_WITHOUT_SPEND) {
+      expect(STAFF_SUPPORT_WRITE_PERMISSIONS).toContain(permission);
     }
   });
 

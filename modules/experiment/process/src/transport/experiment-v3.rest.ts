@@ -189,6 +189,8 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .withParams(runIdParamsSchema)
   .withQuery(runResultsQuerySchema)
   .withPermission("evaluations:view", { legacyKey: "legacy_project_key_experiments" })
+  // Each row carries the run's inputs and outputs: content, though asked under evaluations:view.
+  .servesContent()
   .withOutput(runResultsResponseSchema)
   .withDocs({
     summary: "Read run results",

@@ -322,7 +322,7 @@ interface Response {
 
 List an endpoint's delivery attempts
 
-Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:321`.
+Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:322`.
 
 Answers at `/api/webhooks/v1/endpoints/:id/deliveries`.
 
@@ -340,7 +340,7 @@ type Response = z.infer<typeof deliveryListResponseSchema>; // ../contract/src/w
 
 Read an endpoint's delivery health
 
-Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:360`.
+Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:361`.
 
 Answers at `/api/webhooks/v1/endpoints/:id/health`.
 
@@ -353,7 +353,7 @@ type Response = z.infer<typeof healthResponseSchema>; // ../contract/src/webhook
 
 List subscribable event types
 
-Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:390`.
+Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:391`.
 
 Answers at `/api/webhooks/v1/event-types`.
 
@@ -374,7 +374,7 @@ interface Response {
 
 List emitted events
 
-Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:413`.
+Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:414`.
 
 Answers at `/api/webhooks/v1/events`.
 
@@ -404,7 +404,7 @@ interface Response {
 
 Get one emitted event
 
-Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:441`.
+Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:442`.
 
 Answers at `/api/webhooks/v1/events/:id`.
 

@@ -7800,7 +7800,7 @@ model SignInProviderMount {
 }
 
 /// An operator's enrolled coding agent (ADR-202, staff-access module). Its key `lwsr_<lookupId>_<secret>`
-/// can only create staff access requests; the secret is stored as its HMAC.
+/// can only create, poll, redeem and end its own staff access requests; the secret is stored as its SHA-256 hash.
 model StaffAccessRequester {
   id           String    @id
   ownerUserId  String

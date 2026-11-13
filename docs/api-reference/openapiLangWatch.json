@@ -98321,7 +98321,8 @@
             "project_api_key"
           ],
           "permissions": [
-            "prompts:update"
+            "prompts:update",
+            "prompts:manage"
           ]
         },
         "parameters": [
@@ -99582,8 +99583,7 @@
             "project_api_key"
           ],
           "permissions": [
-            "prompts:create",
-            "prompts:update"
+            "prompts:manage"
           ]
         },
         "parameters": [

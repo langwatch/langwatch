@@ -178,6 +178,17 @@ Feature: Unified Audit Log
     Then the entry reads "LangWatch Support" as its actor with "Approved by <email>"
     And its detail shows the approver and the reason
 
+  @unit
+  Scenario: A revoked or expired staff access row names its approver, not whoever ended it
+    Given a "staffAccess.revoked" row Olivia approved and Pedro revoked, and a "staffAccess.expired" row with no actor
+    Then each reads "Approved by" Olivia from the row's metadata
+    And the revoked row shows "Revoked by" Pedro
+
+  @unit
+  Scenario: An exported report keeps the LangWatch staff identity
+    Given a row LangWatch staff wrote
+    Then the exported row carries the staff principal, the approver, the revoker and the reason
+
   @integration
   Scenario: An operator's impersonation reads in the customer's audit log
     Given a row recorded as "admin/impersonate" in the customer's organization, written by an operator with a reason

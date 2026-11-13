@@ -40,9 +40,8 @@ export const opsOrgsCommand = async ({ query }: { query?: string }): Promise<Com
           ID: text(org.id),
           Slug: text(org.slug),
           Name: text(org.name),
-          Plan: text(org.plan),
         })),
-        headers: ["ID", "Slug", "Name", "Plan"],
+        headers: ["ID", "Slug", "Name"],
         colorMap: { Name: chalk.cyan },
         emptyMessage: "No organizations match.",
       });

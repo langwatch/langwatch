@@ -157,6 +157,8 @@ export const instantEvalRest = defineRestRouter(InstantEvalApi)
 
   .get("/:id/results", "listInstantEvalRunResults")
   .withPermission("analytics:view")
+  // Each result names the judged text: content, though asked under analytics:view.
+  .servesContent()
   .withParams(instantEvalIdParamsSchema)
   .withQuery(instantEvalResultsQuerySchema)
   .withOutput(instantEvalResultsSchema)

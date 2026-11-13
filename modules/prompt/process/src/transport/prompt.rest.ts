@@ -383,9 +383,7 @@ export const promptRest = defineRestRouter(PromptApi)
   .withAudit("prompts.syncFromSource")
   .withParams(idParamsSchema)
   .withInput(syncInputSchema)
-  .withPermission(["prompts:create", "prompts:update"], {
-    legacyKey: "legacy_project_key_prompts_write",
-  })
+  .withPermission("prompts:manage", { legacyKey: "legacy_project_key_prompts_write" })
   .withOutput(promptSyncResultSchema)
   .withMiddlewareContext(promptRestContext)
   .withDocs({
@@ -416,6 +414,8 @@ export const promptRest = defineRestRouter(PromptApi)
   .withParams(idParamsSchema)
   .withInput(updatePromptInputSchema)
   .withPermission("prompts:update", { legacyKey: "legacy_project_key_prompts_write" })
+  // `tags` moves a deployment tag onto the new version, so it asks what the tag route asks.
+  .withPermissionWhenPresent({ field: "tags", permission: "prompts:manage" })
   .withOutput(promptWireSchema)
   .withMiddlewareContext(promptRestContext)
   .withDocs({

@@ -87,6 +87,8 @@ export function staffAccessWorld({
     passkeys: new Set([OLIVIA]),
     audit: [] as RecordAuditLogCommand[],
     auditRefused: false,
+    usersRefused: false,
+    keyRevokeRefused: new Set<string>(),
     mail: [] as SendEmailCommand[],
     minted: [] as { apiKeyId: string; organizationId: string; kind: string; expiresAt: Date }[],
     revokedKeys: [] as string[],
@@ -171,6 +173,7 @@ export function staffAccessWorld({
       return { token: `sk-lw-staff-${keyCounter}`, apiKeyId };
     },
     revokeStaffAccessKey: async ({ apiKeyId }) => {
+      if (state.keyRevokeRefused.has(apiKeyId)) throw new Error("api key store unavailable");
       state.revokedKeys.push(apiKeyId);
     },
     listAll: async (): Promise<ApiKey[]> => [
@@ -202,6 +205,15 @@ export function staffAccessWorld({
       state.audit.push(command);
       return { id: `audit_${state.audit.length}`, occurredAt: 0 };
     },
+    hasRecordedSince: async ({ userId, action, targetKind, targetId, organizationId }) =>
+      state.audit.some(
+        (row) =>
+          row.userId === userId &&
+          row.action === action &&
+          row.targetKind === targetKind &&
+          row.targetId === targetId &&
+          (organizationId === undefined || row.organizationId === organizationId),
+      ),
   });
 
   const notifications = createApiFixture<NotificationService>({
@@ -218,12 +230,14 @@ export function staffAccessWorld({
       featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => state.flag }),
       auth,
       users: createApiFixture<UserApi>({
-        findById: async ({ id }) =>
-          ({
+        findById: async ({ id }) => {
+          if (state.usersRefused) throw new Error("user store unavailable");
+          return {
             id,
             name: id === OLIVIA ? "Olivia" : "Pedro",
             email: `${id}@langwatch.test`,
-          }) as never,
+          } as never;
+        },
       }),
       organizations,
       projects,

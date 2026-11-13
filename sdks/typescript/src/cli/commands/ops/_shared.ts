@@ -4,6 +4,7 @@ import { formatApiErrorMessage } from "../../../client-sdk/services/_shared/form
 import { handledErrorFrom } from "../../../internal/api/errors";
 import { getEndpoint } from "../../utils/endpoint";
 import { commandAuthError } from "../../utils/errorOutput";
+import { printOpsSessionNotice } from "../../utils/identityNotice";
 import { loadRequesterKey, OPS_REQUESTER_KEY_ENV, readOpsSession } from "../../utils/opsSession";
 
 /** A local "not authorised yet" refusal, thrown as an Error so stacks and catches keep working. */
@@ -15,7 +16,7 @@ export const requireRequesterKey = (): string => {
   const key = loadRequesterKey() ?? process.env[OPS_REQUESTER_KEY_ENV]?.trim();
   if (key) return key;
   throw opsAuthError(
-    `No ops requester key. Run \`langwatch ops setup --requester-key <key>\` or set ${OPS_REQUESTER_KEY_ENV}.`,
+    `No ops requester key. Copy it from the Ops agents page and run \`pbpaste | langwatch ops setup\`, or set ${OPS_REQUESTER_KEY_ENV}.`,
   );
 };
 
@@ -23,6 +24,11 @@ export const requireRequesterKey = (): string => {
 export const requireOpsToken = (): { opsToken: string; endpoint: string } => {
   const state = readOpsSession();
   if (state.kind === "live" && state.session.opsToken) {
+    printOpsSessionNotice({
+      requestId: state.session.requestId,
+      organizationId: state.session.organizationId,
+      expiresAt: state.session.expiresAt,
+    });
     return { opsToken: state.session.opsToken, endpoint: state.session.endpoint };
   }
   const reasons: Record<typeof state.kind, string> = {

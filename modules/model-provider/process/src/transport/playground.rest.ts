@@ -18,6 +18,7 @@ export const playgroundRest = defineRestRouter(ModelProviderApi)
   .post("/api/playground", "runPlaygroundCompletion")
   .keepsRecords()
   .withoutAudit("run, not a change")
+  .spends()
   .withInput(playgroundRestBodySchema)
   .withHeaders(playgroundRestHeadersSchema)
   .withPermission("playground:view", {

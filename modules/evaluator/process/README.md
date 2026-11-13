@@ -344,7 +344,7 @@ type Response = z.infer<typeof evaluatorWireSchema>; // ../contract/src/evaluato
 
 Update an existing evaluator
 
-Permission `evaluations:update`. Credential `project`. Declared at `src/transport/evaluator.rest.ts:269`.
+Permission `evaluations:update`. Credential `project`. Declared at `src/transport/evaluator.rest.ts:271`.
 
 Answers at `/api/evaluators/:id`, `/api/v1/evaluators/:id`; also, undocumented, `/api/evaluators/2026-08-07/:id`, `/api/v1/evaluators/2026-08-07/:id`, `/api/evaluators/latest/:id`, `/api/v1/evaluators/latest/:id`.
 
@@ -366,7 +366,7 @@ type Response = z.infer<typeof evaluatorWireSchema>; // ../contract/src/evaluato
 
 Archive (soft-delete) an evaluator
 
-Permission `evaluations:manage`. Credential `project`. Declared at `src/transport/evaluator.rest.ts:293`.
+Permission `evaluations:manage`. Credential `project`. Declared at `src/transport/evaluator.rest.ts:297`.
 
 Answers at `/api/evaluators/:id`, `/api/v1/evaluators/:id`; also, undocumented, `/api/evaluators/2026-08-07/:id`, `/api/v1/evaluators/2026-08-07/:id`, `/api/evaluators/latest/:id`, `/api/v1/evaluators/latest/:id`.
 
@@ -382,7 +382,7 @@ interface Response {
 
 List an evaluator's versions, newest first, with the labels on each
 
-Permission `evaluations:view`. Declared at `src/transport/evaluator.rest.ts:318`.
+Permission `evaluations:view`. Declared at `src/transport/evaluator.rest.ts:322`.
 
 Answers at `/api/evaluators/:evaluatorId/versions`, `/api/v1/evaluators/:evaluatorId/versions`; also, undocumented, `/api/evaluators/2026-08-07/:evaluatorId/versions`, `/api/v1/evaluators/2026-08-07/:evaluatorId/versions`, `/api/evaluators/latest/:evaluatorId/versions`, `/api/v1/evaluators/latest/:evaluatorId/versions`.
 
@@ -398,7 +398,7 @@ type Response = z.infer<typeof evaluatorVersionListResponseSchema>; // ../contra
 
 Point a deploy label, such as production, at one of the evaluator's versions
 
-Permission `evaluators:deploy`. Credential `project`. Declared at `src/transport/evaluator.rest.ts:338`.
+Permission `evaluators:deploy`. Credential `project`. Declared at `src/transport/evaluator.rest.ts:342`.
 
 Answers at `/api/evaluators/:evaluatorId/labels/:label`, `/api/v1/evaluators/:evaluatorId/labels/:label`; also, undocumented, `/api/evaluators/2026-08-07/:evaluatorId/labels/:label`, `/api/v1/evaluators/2026-08-07/:evaluatorId/labels/:label`, `/api/evaluators/latest/:evaluatorId/labels/:label`, `/api/v1/evaluators/latest/:evaluatorId/labels/:label`.
 
@@ -424,7 +424,7 @@ interface Response {
 
 Remove a deploy label from an evaluator
 
-Permission `evaluators:deploy`. Declared at `src/transport/evaluator.rest.ts:362`.
+Permission `evaluators:deploy`. Declared at `src/transport/evaluator.rest.ts:366`.
 
 Answers at `/api/evaluators/:evaluatorId/labels/:label`, `/api/v1/evaluators/:evaluatorId/labels/:label`; also, undocumented, `/api/evaluators/2026-08-07/:evaluatorId/labels/:label`, `/api/v1/evaluators/2026-08-07/:evaluatorId/labels/:label`, `/api/evaluators/latest/:evaluatorId/labels/:label`, `/api/v1/evaluators/latest/:evaluatorId/labels/:label`.
 

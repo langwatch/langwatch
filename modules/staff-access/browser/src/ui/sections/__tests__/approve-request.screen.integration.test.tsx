@@ -258,7 +258,35 @@ describe("given a request that is no longer pending", () => {
     ],
     ["expired", { status: "expired" as const }, "staff-access-phase-expired"],
     ["approved", { status: "approved" as const }, "staff-access-phase-approved"],
-    ["redeemed", { status: "redeemed" as const }, "staff-access-phase-approved"],
+    [
+      "approved but never picked up",
+      { status: "approved" as const, expiresAt: "2026-01-01T00:00:00.000Z" },
+      "staff-access-phase-lapsed",
+    ],
+    [
+      "expired after approval",
+      { status: "expired" as const, approvedAt: "2026-01-01T00:00:00.000Z" },
+      "staff-access-phase-lapsed",
+    ],
+    ["redeemed", { status: "redeemed" as const }, "staff-access-phase-live"],
+    [
+      "redeemed past its hour",
+      {
+        status: "redeemed" as const,
+        redeemedAt: "2026-01-01T00:00:00.000Z",
+        accessExpiresAt: "2026-01-01T01:00:00.000Z",
+      },
+      "staff-access-phase-ended",
+    ],
+    [
+      "expired after its session",
+      {
+        status: "expired" as const,
+        approvedAt: "2026-01-01T00:00:00.000Z",
+        redeemedAt: "2026-01-01T00:00:00.000Z",
+      },
+      "staff-access-phase-ended",
+    ],
     ["denied", { status: "denied" as const }, "staff-access-phase-denied"],
     ["revoked", { status: "revoked" as const }, "staff-access-phase-revoked"],
   ])("shows a request %s as its outcome", (_label, overrides, testId) => {

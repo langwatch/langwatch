@@ -42,7 +42,9 @@ export {
   StaffAccessOperatorLostError,
   StaffAccessRevokedError,
   StaffAccessUnavailableError,
+  StaffContentNotApprovedError,
   StaffSpendNotApprovedError,
+  StaffWriteNotAllowedError,
   setOrganizationsCatchingUp,
   UnsupportedMediaTypeError,
 } from "./errors.ts";

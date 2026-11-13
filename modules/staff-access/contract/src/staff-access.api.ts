@@ -81,7 +81,9 @@ export interface StaffAccessApi {
   deny(input: StaffAccessOperator & { requestId: string }): Promise<StaffAccessApprovalView>;
   revokeSession(input: StaffAccessOperator & { requestId: string }): Promise<{ ok: true }>;
   /** The kill switch: every live session, after the typed confirmation. */
-  revokeAll(input: StaffAccessOperator & { confirmation: string }): Promise<{ revoked: number }>;
+  revokeAll(
+    input: StaffAccessOperator & { confirmation: string },
+  ): Promise<{ revoked: number; failed: number }>;
 
   createRequest(
     input: StaffAccessAgent & { body: StaffAccessRequestBody },

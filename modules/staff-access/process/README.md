@@ -83,7 +83,7 @@ revokeSession(input: StaffAccessOperator & { requestId: string }): Promise<{ ok:
 The kill switch: every live session, after the typed confirmation.
 
 ```typescript
-revokeAll(input: StaffAccessOperator & { confirmation: string }): Promise<{ revoked: number }>;
+revokeAll(input: StaffAccessOperator & { confirmation: string }): Promise<{ revoked: number; failed: number }>;
 ```
 
 #### `createRequest`
@@ -367,7 +367,7 @@ interface Output {
 interface Input {
   requesterId: string;
 }
-// Output: staffAccessOkSchema, ../contract/src/staff-access.ts:199
+// Output: staffAccessOkSchema, ../contract/src/staff-access.ts:203
 interface Output {
   ok: true;
 }
@@ -398,16 +398,17 @@ type Output = z.infer<typeof staffAccessApprovalViewSchema>; // ../contract/src/
 
 // staffAccess.revokeSession
 type Input = z.infer<typeof staffAccessRequestIdInputSchema>; // ../contract/src/staff-access.ts:159
-type Output = z.infer<typeof staffAccessOkSchema>; // ../contract/src/staff-access.ts:199
+type Output = z.infer<typeof staffAccessOkSchema>; // ../contract/src/staff-access.ts:203
 
 // staffAccess.revokeAll
 // Input: staffAccessRevokeAllInputSchema, ../contract/src/staff-access.ts:190
 interface Input {
   confirmation: string;
 }
-// Output: staffAccessRevokedCountSchema, ../contract/src/staff-access.ts:196
+// Output: staffAccessRevokedCountSchema, ../contract/src/staff-access.ts:200
 interface Output {
   revoked: number;
+  failed: number;
 }
 ```
 

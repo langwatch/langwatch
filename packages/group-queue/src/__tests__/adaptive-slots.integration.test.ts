@@ -16,6 +16,12 @@ const BACKLOG = 3_500;
 const RUN_MS = 22_000;
 /** How late each queue script answers in the slow-Redis case. */
 const SCRIPT_DELAY_MS = 15;
+/** A failure wave: each job fails fast, after a short store call. */
+const FAILING_STORE_MS = 5;
+const FAILURE_RUN_MS = 10_000;
+/** Jobs finished at the least; loaded local runs finished 900 to 2400 in each case. */
+const SLOW_FINISHED_FLOOR = 200;
+const FAILURE_FINISHED_FLOOR = 100;
 
 /** A store that serves a fixed number of jobs at once and queues the rest. */
 function storeServing({ atOnce }: { atOnce: number }) {
@@ -58,8 +64,17 @@ describe("GroupQueueProcessor - adaptive slots", () => {
     await redis.quit();
   });
 
-  /** Runs the backlog for RUN_MS through a consumer on `connection`; the most jobs ever running. */
-  async function runBacklog({ connection }: { connection: Redis }) {
+  /** Runs the backlog through a consumer on `connection`; the most jobs ever running. */
+  async function runBacklog({
+    connection,
+    failing = false,
+    runMs = RUN_MS,
+  }: {
+    connection: Redis;
+    /** Every job throws after its store call, so none completes. */
+    failing?: boolean;
+    runMs?: number;
+  }) {
     const serve = storeServing({ atOnce: STORE_SERVES });
     let running = 0;
     let peak = 0;
@@ -70,9 +85,13 @@ describe("GroupQueueProcessor - adaptive slots", () => {
         process: async () => {
           running += 1;
           peak = Math.max(peak, running);
-          await serve({ ms: STORE_MS });
-          running -= 1;
-          finished += 1;
+          try {
+            await serve({ ms: failing ? FAILING_STORE_MS : STORE_MS });
+          } finally {
+            running -= 1;
+            finished += 1;
+          }
+          if (failing) throw new Error("store refused the write");
         },
         groupKey: (payload) => payload.groupId,
         identify: (payload) => payload.id,
@@ -88,7 +107,7 @@ describe("GroupQueueProcessor - adaptive slots", () => {
     for (let start = 0; start < ids.length; start += 250) {
       await Promise.all(ids.slice(start, start + 250).map((id) => queue.send({ id, groupId: id })));
     }
-    await new Promise((resolve) => setTimeout(resolve, RUN_MS));
+    await new Promise((resolve) => setTimeout(resolve, runMs));
     return { peak, finished };
   }
 
@@ -110,12 +129,29 @@ describe("GroupQueueProcessor - adaptive slots", () => {
 
     beforeEach(() => {
       slow = new IORedis(redis.options);
+      const late = () => new Promise((resolve) => setTimeout(resolve, SCRIPT_DELAY_MS));
       const evalsha = slow.evalsha.bind(slow);
-      // Slow claims and completions: a slot between claims now counts as taken during a backlog.
       slow.evalsha = (async (...args: Parameters<typeof evalsha>) => {
-        await new Promise((resolve) => setTimeout(resolve, SCRIPT_DELAY_MS));
+        await late();
         return evalsha(...args);
       }) as typeof slow.evalsha;
+      // Batched outcomes queue their scripts in a pipeline: a pipeline holding one sends late too.
+      const pipeline = slow.pipeline.bind(slow);
+      slow.pipeline = ((...args: Parameters<typeof pipeline>) => {
+        const queued = pipeline(...args);
+        const queuedEvalsha = queued.evalsha.bind(queued);
+        const exec = queued.exec.bind(queued);
+        let scripted = false;
+        queued.evalsha = ((...script: Parameters<typeof queuedEvalsha>) => {
+          scripted = true;
+          return queuedEvalsha(...script);
+        }) as typeof queued.evalsha;
+        queued.exec = (async (...execArgs: Parameters<typeof exec>) => {
+          if (scripted) await late();
+          return exec(...execArgs);
+        }) as typeof queued.exec;
+        return queued;
+      }) as typeof slow.pipeline;
     });
 
     afterEach(async () => {
@@ -128,9 +164,25 @@ describe("GroupQueueProcessor - adaptive slots", () => {
 
     /** @scenario "Slow queue scripts during a backlog do not grow slots past what the store serves" */
     it("still never runs more than four times what the store serves", async () => {
-      const { peak } = await runBacklog({ connection: slow });
+      const { peak, finished } = await runBacklog({ connection: slow });
 
+      // A consumer stuck on its late scripts runs nothing; this one still drains the store.
+      expect(finished).toBeGreaterThanOrEqual(SLOW_FINISHED_FLOOR);
       expect(peak).toBeLessThanOrEqual(STORE_SERVES * 4);
     }, 40_000);
+  });
+
+  describe("given a backlog where every job fails fast", () => {
+    /** @scenario "A failure wave during a backlog does not grow slots" */
+    it("never runs more jobs at once than it was configured for", async () => {
+      const { peak, finished } = await runBacklog({
+        connection: redis,
+        failing: true,
+        runMs: FAILURE_RUN_MS,
+      });
+
+      expect(finished).toBeGreaterThanOrEqual(FAILURE_FINISHED_FLOOR);
+      expect(peak).toBeLessThanOrEqual(CONFIGURED);
+    }, 30_000);
   });
 });

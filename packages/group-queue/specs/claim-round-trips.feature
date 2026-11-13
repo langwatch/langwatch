@@ -126,6 +126,19 @@ Feature: A claim's bookkeeping in few round trips
     Then the dispatcher claims for the free slots without waiting for a signal
 
   @unit
+  Scenario: Slots freed one at a time gather into one claim per gap
+    Given a consumer with every slot taken and a backlog of ready groups
+    When its jobs finish one at a time, fewer than a full claim of 32 between claims
+    Then the dispatcher waits until 10 ms have passed since its last claim
+    And claims once for every slot freed meanwhile
+
+  @integration
+  Scenario: A backlog of short jobs keeps the claim rate bounded
+    Given a consumer with 100 slots and a backlog of 20 ms jobs across many tenants
+    When it drains the backlog
+    Then it claims at most 100 times a second for small claims, plus once per 32 jobs it runs
+
+  @unit
   Scenario: A slot waiting on its next claim during a backlog counts as busy
     Given a consumer whose last claim found a job for every slot it asked for
     When the adaptive slot count measures how many slots are taken

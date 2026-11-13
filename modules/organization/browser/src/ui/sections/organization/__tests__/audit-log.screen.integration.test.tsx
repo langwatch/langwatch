@@ -319,7 +319,11 @@ describe("given an Enterprise organization with a mixed audit history", () => {
           actorUserId: "op-1",
           actorUser: { id: "op-1", name: "Olivia", email: "olivia@langwatch.ai" },
           action: "staffAccess.write",
-          staffAccess: { principal: "LangWatch Support", reason: "fix the broken evaluator" },
+          staffAccess: {
+            principal: "LangWatch Support",
+            reason: "fix the broken evaluator",
+            approvedBy: { id: "op-1" },
+          },
         }),
       ];
       state.totalCount = 1;
@@ -334,6 +338,34 @@ describe("given an Enterprise organization with a mixed audit history", () => {
       const detail = screen.getByTestId("audit-log-detail");
       expect(within(detail).getByText("Approved by")).toBeInTheDocument();
       expect(within(detail).getByText("fix the broken evaluator")).toBeInTheDocument();
+    });
+
+    /** @scenario "A revoked or expired staff access row names its approver, not whoever ended it" */
+    it("names the approver and, separately, the operator who revoked the access", async () => {
+      state.auditLogs = [
+        auditRow({
+          userId: "op-1",
+          user: { id: "op-1", name: "Olivia", email: "olivia@langwatch.ai" },
+          actorUserId: "op-2",
+          actorUser: { id: "op-2", name: "Pedro", email: "pedro@langwatch.ai" },
+          action: "staffAccess.revoked",
+          staffAccess: {
+            principal: "LangWatch Staff Read",
+            reason: "check usage",
+            approvedBy: { id: "op-1" },
+            revokedBy: { id: "op-2" },
+          },
+        }),
+      ];
+      state.totalCount = 1;
+      renderWithOrganizationHost(<AuditLogScreen />, planHost());
+
+      const entry = screen.getByTestId("audit-log-entry");
+      expect(within(entry).getByText("Approved by olivia@langwatch.ai")).toBeInTheDocument();
+      await userEvent.click(within(entry).getByRole("button", { name: "Details" }));
+      const detail = screen.getByTestId("audit-log-detail");
+      expect(within(detail).getByText("Revoked by")).toBeInTheDocument();
+      expect(within(detail).getByText("pedro@langwatch.ai")).toBeInTheDocument();
     });
 
     /** @scenario "An operator's impersonation reads in the customer's audit log" */

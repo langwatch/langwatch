@@ -17,6 +17,7 @@ export class AdminAuditService extends AdminAuditSink {
     userId: string;
     organizationId?: string | undefined;
     action: string;
+    target?: { kind: string; id: string } | undefined;
     args: Record<string, unknown>;
     req: AdminAuditRequest;
   }): Promise<void> {
@@ -25,6 +26,7 @@ export class AdminAuditService extends AdminAuditSink {
       userId: entry.userId,
       ...(entry.organizationId ? { organizationId: entry.organizationId } : {}),
       action: entry.action,
+      ...(entry.target ? { targetKind: entry.target.kind, targetId: entry.target.id } : {}),
       // A JSON round trip turns dates into strings and drops undefined fields.
       args: auditLogJsonValueSchema.parse(JSON.parse(JSON.stringify(entry.args))),
       ...(entry.req.remoteAddress ? { ipAddress: entry.req.remoteAddress } : {}),

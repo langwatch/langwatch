@@ -363,7 +363,7 @@ Answers at `/api/prompt-playground/2026-08-20/prompt.execute`.
 
 ```typescript
 type Body = z.infer<typeof executeRequestSchema>; // ../contract/src/prompt.playground-execute.ts:43
-// Response: inline, src/transport/prompt-execute.rest.ts:23
+// Response: inline, src/transport/prompt-execute.rest.ts:24
 type Response = unknown;
 ```
 
@@ -557,7 +557,7 @@ type Response = z.infer<typeof promptWireSchema>; // ../contract/src/prompt-rest
 
 Sync/upsert a prompt with local content
 
-Permission `prompts:create or prompts:update`. Declared at `src/transport/prompt.rest.ts:381`.
+Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:381`.
 
 Answers at `/api/prompts/:id{.+?}/sync`, `/api/v1/prompts/:id{.+?}/sync`.
 
@@ -571,7 +571,7 @@ type Response = z.infer<typeof promptSyncResultSchema>; // ../contract/src/promp
 
 Update a prompt
 
-Permission `prompts:update`. Declared at `src/transport/prompt.rest.ts:413`.
+Permission `prompts:update`. Declared at `src/transport/prompt.rest.ts:411`.
 
 Answers at `/api/prompts/:id{.+}`, `/api/v1/prompts/:id{.+}`.
 

@@ -166,13 +166,13 @@ interface Params {
   storedObjectId: string;
   filename: string;
 }
-// Response: inline, src/transport/stored-object-file.rest.ts:59
+// Response: inline, src/transport/stored-object-file.rest.ts:60
 type Response = unknown;
 ```
 
 #### `GET,HEAD /api/files/:projectId/:storedObjectId` · `readProjectStoredObjectBytes`
 
-Authenticated: an object is addressed by its id, so the project that owns it is a read the module makes; the key is then refused unless that owner is its own project. Declared at `src/transport/stored-object-file.rest.ts:73`.
+Authenticated: an object is addressed by its id, so the project that owns it is a read the module makes; the key is then refused unless that owner is its own project. Declared at `src/transport/stored-object-file.rest.ts:74`.
 
 Answers at `/api/files/:projectId/:storedObjectId`, `/api/v1/files/:projectId/:storedObjectId`.
 
@@ -186,13 +186,13 @@ interface Params {
 interface Query {
   filename?: string;
 }
-// Response: inline, src/transport/stored-object-file.rest.ts:77
+// Response: inline, src/transport/stored-object-file.rest.ts:79
 type Response = unknown;
 ```
 
 #### `GET,HEAD /api/files/:storedObjectId` · `readStoredObjectBytes`
 
-Authenticated: an object is addressed by its id, so the project that owns it is a read the module makes; the key is then refused unless that owner is its own project. Declared at `src/transport/stored-object-file.rest.ts:91`.
+Authenticated: an object is addressed by its id, so the project that owns it is a read the module makes; the key is then refused unless that owner is its own project. Declared at `src/transport/stored-object-file.rest.ts:93`.
 
 Answers at `/api/files/:storedObjectId`, `/api/v1/files/:storedObjectId`.
 
@@ -202,7 +202,7 @@ interface Params {
   storedObjectId: string;
 }
 type Query = z.infer<typeof storedObjectFileRouteFilenameQuerySchema>; // ../contract/src/stored-object-file-route.ts:56
-// Response: inline, src/transport/stored-object-file.rest.ts:95
+// Response: inline, src/transport/stored-object-file.rest.ts:98
 type Response = unknown;
 ```
 

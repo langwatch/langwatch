@@ -47,7 +47,8 @@ type RequesterDeps = Readonly<{
 
 /**
  * An operator's enrolled agents: a passkey ceremony mints a 90-day `lwsr_` requester key, stored
- * only as a hash, which can create and redeem access requests and nothing else (ADR-202).
+ * only as a hash, which can create, poll, redeem and end its own access requests and nothing
+ * else (ADR-202).
  */
 export class StaffAccessRequesterService {
   private constructor(private readonly deps: RequesterDeps) {}
@@ -145,14 +146,26 @@ export class StaffAccessRequesterService {
     return found.flat();
   }
 
-  /** @throws {StaffAccessNotFoundError} for another operator's requester or one already revoked */
-  async revoke({ userId, requesterId }: { userId: string; requesterId: string }): Promise<void> {
+  /**
+   * Marks one of the operator's agents revoked, so its key is refused from now on. Ending its
+   * sessions is the session service's part of the same revoke.
+   * @throws {StaffAccessNotFoundError} for another operator's requester or one already revoked
+   */
+  async revoke({
+    userId,
+    requesterId,
+  }: {
+    userId: string;
+    requesterId: string;
+  }): Promise<StaffAccessRequesterRow> {
     const revoked = await this.deps.requesters.revoke({
       id: requesterId,
       ownerUserId: userId,
       at: this.deps.now(),
     });
-    if (!revoked) throw new StaffAccessNotFoundError();
+    const [row] = await this.deps.requesters.findById({ id: requesterId });
+    if (!revoked || !row) throw new StaffAccessNotFoundError();
+    return row;
   }
 
   /**

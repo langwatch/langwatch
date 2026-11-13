@@ -144,6 +144,37 @@ function PhaseBanner({ phase, view }: { phase: ApprovalPhase; view: StaffAccessA
       </Banner>
     );
   }
+  if (phase === "lapsed") {
+    return (
+      <Banner
+        status="info"
+        placement="inline"
+        title="Approval lapsed"
+        data-testid="staff-access-phase-lapsed"
+      >
+        The agent never picked up its key, so it got no access. Ask it to request access again.
+      </Banner>
+    );
+  }
+  if (phase === "live") {
+    return (
+      <Banner
+        status="success"
+        placement="inline"
+        title="In use"
+        data-testid="staff-access-phase-live"
+      >
+        The agent picked up its key. Access lasts one hour from pickup.
+      </Banner>
+    );
+  }
+  if (phase === "ended") {
+    return (
+      <Banner status="info" placement="inline" title="Ended" data-testid="staff-access-phase-ended">
+        The agent's hour of access is over and its key no longer works.
+      </Banner>
+    );
+  }
   if (phase === "denied") {
     return (
       <Banner

@@ -20,7 +20,7 @@ import {
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 
-import { setupCommand } from "../../model/staff-access-copy.ts";
+import { SETUP_COMMAND } from "../../model/staff-access-copy.ts";
 import { PasskeyFailure } from "../elements/passkey-failure.tsx";
 
 export function EnrolAgentDialog({
@@ -67,6 +67,9 @@ export function EnrolAgentDialog({
         onClose={close}
         title={`${enrolled.requester.name} is enrolled`}
         size="md"
+        // The key is shown once: only Done closes it, never a stray click or Escape.
+        closeOnInteractOutside={false}
+        closeOnEscape={false}
         cancelLabel={null}
         primaryAction={{ label: "Done", onClick: close, "data-testid": "staff-access-enrol-done" }}
       >
@@ -114,7 +117,6 @@ export function EnrolAgentDialog({
 }
 
 function EnrolledKey({ requesterKey }: { requesterKey: string }) {
-  const command = setupCommand(requesterKey);
   return (
     <VStack align="stretch" gap={4}>
       <Alert.Root status="warning">
@@ -128,10 +130,13 @@ function EnrolledKey({ requesterKey }: { requesterKey: string }) {
       </Alert.Root>
       <CopyLine label="Requester key" value={requesterKey} testId="staff-access-requester-key" />
       <CopyLine
-        label="Run this on the machine your agent uses"
-        value={command}
+        label="Copy the key, then run this on the machine your agent uses"
+        value={SETUP_COMMAND}
         testId="staff-access-setup-command"
       />
+      <Text textStyle="sm" color="fg.muted">
+        Without a clipboard command, run langwatch ops setup and paste the key when it asks.
+      </Text>
     </VStack>
   );
 }

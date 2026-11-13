@@ -7,6 +7,8 @@ import type {
   StaffAccessRequestRow,
 } from "../staff-access.repository.ts";
 
+const UNDECIDED = ["pending", "approving", "approved"];
+
 function isAfter(moment: Instant, at: Instant): boolean {
   return Temporal.Instant.compare(moment, at) > 0;
 }
@@ -72,7 +74,7 @@ export class MemoryStaffAccessRequestRepository implements StaffAccessRequestRep
     return this.#all().filter(
       (row) =>
         row.revokedAt === null &&
-        (((row.status === "pending" || row.status === "approved") && isAfter(row.expiresAt, at)) ||
+        ((UNDECIDED.includes(row.status) && isAfter(row.expiresAt, at)) ||
           (row.status === "redeemed" &&
             row.accessExpiresAt !== null &&
             isAfter(row.accessExpiresAt, at))),
@@ -89,27 +91,37 @@ export class MemoryStaffAccessRequestRepository implements StaffAccessRequestRep
     return this.#all()
       .filter(
         (row) =>
-          row.status === "redeemed" &&
-          row.revokedAt === null &&
           row.endAuditedAt === null &&
-          row.accessExpiresAt !== null &&
-          !isAfter(row.accessExpiresAt, at),
+          (row.revokedAt === null
+            ? (row.status === "redeemed" &&
+                row.accessExpiresAt !== null &&
+                !isAfter(row.accessExpiresAt, at)) ||
+              ((row.status === "approving" || row.status === "approved") &&
+                !isAfter(row.expiresAt, at))
+            : row.signedHash !== null),
       )
+      .toSorted((a, b) => Temporal.Instant.compare(a.createdAt, b.createdAt))
       .slice(0, limit);
   }
 
-  async approve(input: StaffAccessApproval): Promise<boolean> {
+  async claimApproval(input: StaffAccessApproval): Promise<boolean> {
     const row = this.#rows.get(input.id);
     if (!row || row.status !== "pending" || !isAfter(row.expiresAt, input.at)) return false;
     this.#rows.set(input.id, {
       ...row,
-      status: "approved",
-      approvedAt: input.at,
+      status: "approving",
       spendApproved: input.spendApproved,
       approvalCredentialId: input.credentialId,
       approvalSignature: input.signature,
       signedHash: input.signedHash,
     });
+    return true;
+  }
+
+  async confirmApproval({ id, at }: { id: string; at: Instant }): Promise<boolean> {
+    const row = this.#rows.get(id);
+    if (!row || row.status !== "approving" || row.revokedAt !== null) return false;
+    this.#rows.set(id, { ...row, status: "approved", approvedAt: at });
     return true;
   }
 
@@ -163,7 +175,7 @@ export class MemoryStaffAccessRequestRepository implements StaffAccessRequestRep
     cause: string;
   }): Promise<boolean> {
     const row = this.#rows.get(id);
-    if (!row || !["pending", "approved", "redeemed"].includes(row.status)) return false;
+    if (!row || ![...UNDECIDED, "redeemed"].includes(row.status)) return false;
     if (row.revokedAt !== null || row.endAuditedAt !== null) return false;
     if (row.accessExpiresAt !== null && !isAfter(row.accessExpiresAt, at)) return false;
     this.#rows.set(id, {
@@ -172,21 +184,15 @@ export class MemoryStaffAccessRequestRepository implements StaffAccessRequestRep
       revokedAt: at,
       revokedByUserId: byUserId,
       revokeCause: cause,
-      endAuditedAt: at,
     });
     return true;
   }
 
-  async claimEndAudit({ id, at }: { id: string; at: Instant }): Promise<boolean> {
+  async markEndAudited({ id, at }: { id: string; at: Instant }): Promise<boolean> {
     const row = this.#rows.get(id);
-    if (!row || row.endAuditedAt !== null || row.revokedAt !== null) return false;
+    if (!row || row.endAuditedAt !== null) return false;
     this.#rows.set(id, { ...row, endAuditedAt: at });
     return true;
-  }
-
-  async releaseEndAudit({ id }: { id: string }): Promise<void> {
-    const row = this.#rows.get(id);
-    if (row) this.#rows.set(id, { ...row, endAuditedAt: null });
   }
 
   #all(): StaffAccessRequestRow[] {

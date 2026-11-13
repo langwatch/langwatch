@@ -72,8 +72,10 @@ type Minted = Readonly<{ actor: Actor; projectId: string }>;
 const ADMIT_ALL: RestStaffAccessGate = {
   admit: async () => ({
     staff: { principal: "LangWatch Support", approverUserId: "operator-1", reason: null },
+    spendApproved: false,
     finish: async () => {},
   }),
+  refused: async () => {},
 };
 
 /** A door that admits the key at `scope` and records what it resolved. */

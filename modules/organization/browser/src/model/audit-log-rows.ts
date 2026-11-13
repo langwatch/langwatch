@@ -82,6 +82,7 @@ const NAMED_ACTIONS: Readonly<Record<string, string>> = {
   "staffAccess.revoked": "Revoked LangWatch staff access",
   "staffAccess.expired": "LangWatch staff access ended",
   "admin/impersonate": "Started impersonating a member",
+  "admin/impersonate.stop": "Stopped impersonating a member",
   "admin/impersonate.expired": "Impersonation ended",
 };
 
@@ -128,7 +129,13 @@ export type AuditActor =
   | { kind: "apiKey"; id: string }
   | { kind: "impersonation"; operator: Person; subject: Person }
   | ({ kind: "operator"; reason: string | null } & Person)
-  | { kind: "staff"; principal: string; approvedBy: string | null; reason: string | null }
+  | {
+      kind: "staff";
+      principal: string;
+      approvedBy: string | null;
+      revokedBy: string | null;
+      reason: string | null;
+    }
   | { kind: "unresolved"; id: string }
   | { kind: "anonymous" }
   | { kind: "system" };
@@ -137,13 +144,28 @@ function text(value: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? value : null;
 }
 
-/** A staff access row (ADR-202): its principal and reason, approved by the operator it names. */
+type StaffPerson = { id: string; name?: string | null; email?: string | null } | null | undefined;
+
+/**
+ * How a staff row names an operator: from its metadata, else from whichever of the row's own
+ * user columns holds that id. The row's actor is whoever ended it, never the approver as such.
+ */
+function staffPersonLabel({ who, log }: { who: StaffPerson; log: ActorFields }): string | null {
+  if (!who) return null;
+  const recorded = text(who.email) ?? text(who.name);
+  if (recorded) return recorded;
+  const resolved = [log.actorUser, log.user].find((user) => user?.id === who.id);
+  return resolved?.email ?? resolved?.name ?? null;
+}
+
+/** A staff access row (ADR-202): its principal and reason, who approved it and who revoked it. */
 function staffActor(log: ActorFields): AuditActor | null {
   if (!log.staffAccess) return null;
   return {
     kind: "staff",
     principal: log.staffAccess.principal,
-    approvedBy: log.actorUser?.email ?? log.actorUser?.name ?? null,
+    approvedBy: staffPersonLabel({ who: log.staffAccess.approvedBy, log }),
+    revokedBy: staffPersonLabel({ who: log.staffAccess.revokedBy, log }),
     reason: text(log.staffAccess.reason),
   };
 }

@@ -1,12 +1,14 @@
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { StaffAccessScope } from "@langwatch/authz-contract";
+import { createLogger } from "@langwatch/observability";
 import {
   STAFF_ACCESS_PRINCIPAL,
   STAFF_ACCESS_REVOKE_ALL_CONFIRMATION,
   StaffAccessAlreadyEndedError,
   StaffAccessConfirmationMismatchError,
   StaffAccessNotFoundError,
+  type StaffAccessRequestStatus,
   type StaffAccessSessionView,
 } from "@langwatch/staff-access-contract";
 import type { Instant } from "@langwatch/time";
@@ -22,7 +24,10 @@ import {
   shownStatus,
   STAFF_ACCESS_RECENT_WINDOW_MS,
 } from "../rules/staff-access.rules.ts";
+import type { StaffAccessNoticeService } from "./staff-access-notice.service.ts";
 import type { StaffAccessRequesterService } from "./staff-access-requester.service.ts";
+
+const logger = createLogger("langwatch:staff-access:session");
 
 const RECENT_SESSIONS_LIMIT = 100;
 const SWEEP_BATCH = 100;
@@ -31,8 +36,9 @@ type SessionDeps = Readonly<{
   requests: StaffAccessRequestRepository;
   requesters: StaffAccessRequesterService;
   apiKeys: Pick<ApiKeyApi, "revokeStaffAccessKey">;
-  auditLog: Pick<AuditLogApi, "record">;
+  auditLog: Pick<AuditLogApi, "record" | "hasRecordedSince">;
   users: Pick<UserApi, "findById">;
+  notices: StaffAccessNoticeService;
   now: () => Instant;
 }>;
 
@@ -84,15 +90,72 @@ export class StaffAccessSessionService {
   }: {
     userId: string;
     confirmation: string;
-  }): Promise<{ revoked: number }> {
+  }): Promise<{ revoked: number; failed: number }> {
     if (confirmation.trim().toLowerCase() !== STAFF_ACCESS_REVOKE_ALL_CONFIRMATION) {
       throw new StaffAccessConfirmationMismatchError();
     }
     const live = await this.deps.requests.findLive({ at: this.deps.now() });
-    const ended = await Promise.all(
-      live.map((row) => this.endSession({ row, byUserId: userId, cause: "revoked_all" })),
+    return this.endEach({ rows: live, byUserId: userId, cause: "revoked_all" });
+  }
+
+  /**
+   * Revokes one of the operator's enrolled agents and ends every live session and undecided
+   * request it made, so its keys stop at once; the other operators are told.
+   * @throws {StaffAccessNotFoundError} for another operator's agent or one already revoked
+   */
+  async revokeRequester({
+    userId,
+    requesterId,
+  }: {
+    userId: string;
+    requesterId: string;
+  }): Promise<{ revoked: number; failed: number }> {
+    const requester = await this.deps.requesters.revoke({ userId, requesterId });
+    const live = await this.deps.requests.findLive({ at: this.deps.now() });
+    const ended = await this.endEach({
+      rows: live.filter((row) => row.requesterId === requesterId),
+      byUserId: userId,
+      cause: "requester_revoked",
+    });
+    await this.deps.notices.tellOtherOperators({
+      actingUserId: userId,
+      subject: "An operator revoked an enrolled agent",
+      lines: [
+        { label: "Agent", value: requester.name },
+        { label: "Sessions and requests ended", value: String(ended.revoked) },
+      ],
+      idempotencyKey: `staff-access-requester-revoked:${requesterId}`,
+    });
+    return ended;
+  }
+
+  /** Ends each row on its own, so one failure leaves the others ended and is counted. */
+  private async endEach({
+    rows,
+    byUserId,
+    cause,
+  }: {
+    rows: readonly StaffAccessRequestRow[];
+    byUserId: string;
+    cause: string;
+  }): Promise<{ revoked: number; failed: number }> {
+    const settled = await Promise.allSettled(
+      rows.map((row) => this.endSession({ row, byUserId, cause })),
     );
-    return { revoked: ended.filter(Boolean).length };
+    let revoked = 0;
+    let failed = 0;
+    for (const [index, outcome] of settled.entries()) {
+      if (outcome.status === "fulfilled") {
+        if (outcome.value) revoked += 1;
+        continue;
+      }
+      failed += 1;
+      logger.error(
+        { error: outcome.reason, requestId: rows[index]?.id, cause },
+        "a staff access session did not end cleanly; the sweep retries its end",
+      );
+    }
+    return { revoked, failed };
   }
 
   /** Live and recent sessions across every operator, newest first. */
@@ -105,23 +168,20 @@ export class StaffAccessSessionService {
     return this.viewsOf({ rows });
   }
 
-  /** Audits each session whose hour passed unrevoked, once; a failed write retries next tick. */
+  /**
+   * Tells the customer of every end not yet audited: a natural expiry, or a revoke whose key
+   * revoke or audit write failed. A row is marked only after its write, so a failure retries
+   * on the next tick and a crash can at worst write one row twice.
+   */
   async sweepExpiredSessions({ at }: { at: Instant }): Promise<{ audited: number }> {
     const ended = await this.deps.requests.findEndedUnaudited({ at, limit: SWEEP_BATCH });
     let audited = 0;
     for (const row of ended) {
-      if (!(await this.deps.requests.claimEndAudit({ id: row.id, at }))) continue;
       try {
-        await this.recordEnd({
-          row,
-          action: "staffAccess.expired",
-          byUserId: null,
-          cause: "expired",
-        });
+        await this.auditEnd({ row, at });
         audited += 1;
       } catch (error) {
-        await this.deps.requests.releaseEndAudit({ id: row.id });
-        throw error;
+        logger.error({ error, requestId: row.id }, "a staff access end was not audited; retrying");
       }
     }
     return { audited };
@@ -140,7 +200,10 @@ export class StaffAccessSessionService {
     return this.deps.requests.findByApiKeyId({ apiKeyId });
   }
 
-  /** Ends a live session once, revokes its key and audits the end; false when it was not live. */
+  /**
+   * Ends a live session or request once, revokes its key and audits the end; false when it was
+   * not live. A failure after the revoke leaves the end for the sweep to finish.
+   */
   async endSession({
     row,
     byUserId,
@@ -153,13 +216,46 @@ export class StaffAccessSessionService {
     const at = this.deps.now();
     if (!(await this.deps.requests.revoke({ id: row.id, at, byUserId, cause }))) return false;
     const [current] = await this.deps.requests.findById({ id: row.id });
-    const apiKeyId = current?.apiKeyId ?? row.apiKeyId;
-    if (apiKeyId) await this.deps.apiKeys.revokeStaffAccessKey({ apiKeyId });
-    // An undecided request never reached the customer, so only an approved one is audited there.
-    if ((current?.approvedAt ?? row.approvedAt) !== null) {
-      await this.recordEnd({ row, action: "staffAccess.revoked", byUserId, cause });
-    }
+    const ended = current ?? {
+      ...row,
+      revokedAt: at,
+      revokedByUserId: byUserId,
+      revokeCause: cause,
+    };
+    // An approval still being written is finished by the sweep, once its audit row settled.
+    if (ended.signedHash !== null && ended.approvedAt === null) return true;
+    await this.auditEnd({ row: ended, at });
     return true;
+  }
+
+  /** Revokes the key of a revoked row and writes its end row if the customer saw it approved. */
+  private async auditEnd({ row, at }: { row: StaffAccessRequestRow; at: Instant }): Promise<void> {
+    if (row.revokedAt !== null && row.apiKeyId) {
+      await this.deps.apiKeys.revokeStaffAccessKey({ apiKeyId: row.apiKeyId });
+    }
+    if (await this.customerSawApproval({ row })) {
+      await this.recordEnd({
+        row,
+        action: row.revokedAt !== null ? "staffAccess.revoked" : "staffAccess.expired",
+        byUserId: row.revokedAt !== null ? row.revokedByUserId : null,
+        cause: row.revokedAt !== null ? (row.revokeCause ?? "revoked") : "expired",
+      });
+    }
+    if (row.signedHash !== null) await this.deps.requests.markEndAudited({ id: row.id, at });
+  }
+
+  /** A confirmed approval was audited; one never confirmed is asked of the audit log. */
+  private async customerSawApproval({ row }: { row: StaffAccessRequestRow }): Promise<boolean> {
+    if (!row.organizationId || row.signedHash === null) return false;
+    if (row.approvedAt !== null) return true;
+    return this.deps.auditLog.hasRecordedSince({
+      userId: row.ownerUserId,
+      action: "staffAccess.approved",
+      targetKind: "staffAccess",
+      targetId: row.id,
+      sinceMs: row.createdAt.epochMilliseconds,
+      organizationId: row.organizationId,
+    });
   }
 
   private async recordEnd({
@@ -174,6 +270,10 @@ export class StaffAccessSessionService {
     cause: string;
   }): Promise<void> {
     if (!row.organizationId) return;
+    const [approvedBy, revokedBy] = await Promise.all([
+      this.personOf({ id: row.ownerUserId }),
+      byUserId ? this.personOf({ id: byUserId }) : null,
+    ]);
     await this.deps.auditLog.record({
       organizationId: row.organizationId,
       userId: row.ownerUserId,
@@ -183,7 +283,8 @@ export class StaffAccessSessionService {
       targetId: row.id,
       metadata: {
         principal: STAFF_ACCESS_PRINCIPAL,
-        approvedBy: { id: row.ownerUserId },
+        approvedBy,
+        ...(revokedBy ? { revokedBy } : {}),
         reason: row.reason,
         scopes: row.scopes,
         cause,
@@ -191,10 +292,25 @@ export class StaffAccessSessionService {
     });
   }
 
+  private async personOf({
+    id,
+  }: {
+    id: string;
+  }): Promise<{ id: string; name: string | null; email: string | null }> {
+    const user = await this.deps.users.findById({ id });
+    return { id, name: user?.name ?? null, email: user?.email ?? null };
+  }
+
   private async rowOf({ id }: { id: string }): Promise<StaffAccessRequestRow> {
     const [row] = await this.deps.requests.findById({ id });
     if (!row) throw new StaffAccessNotFoundError();
     return row;
+  }
+
+  /** The status a reader sees; an approval still being written reads as pending. */
+  statusOf({ row, at }: { row: StaffAccessRequestRow; at: Instant }): StaffAccessRequestStatus {
+    const status = row.status === "approving" ? "pending" : row.status;
+    return shownStatus({ ...row, status, at });
   }
 
   async viewsOf({
@@ -213,7 +329,7 @@ export class StaffAccessSessionService {
 
     return rows.map((row) => ({
       requestId: row.id,
-      status: shownStatus({ ...row, at }),
+      status: this.statusOf({ row, at }),
       scopes: row.scopes as StaffAccessScope[],
       organizationId: row.organizationId,
       organizationName: row.organizationName,

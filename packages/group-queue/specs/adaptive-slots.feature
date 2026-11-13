@@ -5,7 +5,8 @@ Feature: A consumer's slots follow the throughput the system absorbs
 
   The configured concurrency (GLOBAL_QUEUE_CONCURRENCY, 100 by default) is the floor: a consumer
   starts there and never runs fewer. Once a second it measures the jobs that finished: completed
-  jobs per second, their median duration and the share that failed, waiting for 50 finished jobs
+  jobs per second (a failed or handed-back job is not completed), their median duration and the
+  share that failed, waiting for 50 finished jobs
   or ten seconds, and how many slots were taken as each finished; while the last claim found a
   job for every slot it asked for, a slot waiting on its next claim counts as taken. With nine in ten slots taken
   on average and the event loop under 85% busy it grows by a quarter,
@@ -28,9 +29,10 @@ Feature: A consumer's slots follow the throughput the system absorbs
   Scenario: Slow queue scripts during a backlog do not grow slots past what the store serves
     Given a consumer configured for two jobs at once
     And a backlog of jobs that share a store which serves only four at a time
-    And every queue script, claims included, answering 15 ms late
+    And every queue script, claims and pipelined outcomes included, answering 15 ms late
     When the consumer runs the backlog for several measurements
-    Then it never runs more than four times the four the store serves
+    Then it still finishes jobs throughout
+    And it never runs more than four times the four the store serves
 
   @unit
   Scenario: Slots grow by a quarter while each step raises completed jobs per second
@@ -93,3 +95,18 @@ Feature: A consumer's slots follow the throughput the system absorbs
     When fewer than 50 have finished within ten seconds
     Then it takes no measurement yet
     And once enough have finished it measures completed jobs per second, their median duration, the failed share and the slots taken
+
+  @unit
+  Scenario: Failed and handed-back jobs do not count as throughput
+    Given a consumer with every slot taken whose jobs fail or are handed back at a steady share
+    When more jobs leave their slots after a growth step, but no more of them complete
+    Then the step is undone
+    And a consumer whose finished jobs were all handed back never grows
+
+  @integration
+  Scenario: A failure wave during a backlog does not grow slots
+    Given a consumer configured for two jobs at once
+    And a backlog of jobs that each fail fast
+    When the consumer runs the backlog for several measurements
+    Then it never runs more than the two jobs at once it was configured for
+    And it still ran jobs throughout

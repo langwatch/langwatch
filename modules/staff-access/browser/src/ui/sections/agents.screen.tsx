@@ -207,7 +207,7 @@ function AgentsBody({
         open={revokingAgent !== null}
         onClose={() => setRevokingAgent(null)}
         title={`Revoke ${revokingAgent?.name ?? "this agent"}`}
-        description="Its key stops working and it can no longer ask you for access."
+        description="Its key stops working, it can no longer ask you for access, and every session and request it holds ends now."
         confirmLabel="Revoke"
         loading={agents.revokingAgent}
         onConfirm={() => {

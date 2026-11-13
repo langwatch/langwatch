@@ -1,7 +1,7 @@
 /** The kill switch's confirmation: the operator types the phrase the server checks. */
 
 import { Dialog } from "@langwatch/design-system/dialog";
-import { Field, Input, Text, VStack } from "@langwatch/design-system/primitives";
+import { Alert, Field, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { STAFF_ACCESS_REVOKE_ALL_CONFIRMATION } from "@langwatch/staff-access-contract";
 import { useState } from "react";
@@ -15,18 +15,20 @@ export function RevokeAllDialog({
   open: boolean;
   onClose: () => void;
   revoking: boolean;
-  revokeEverything: (input: { confirmation: string }) => Promise<{ revoked: number }>;
+  revokeEverything: (input: {
+    confirmation: string;
+  }) => Promise<{ revoked: number; failed: number }>;
 }) {
   const [typed, setTyped] = useState("");
   const [mismatch, setMismatch] = useState(false);
   const [failure, setFailure] = useState<unknown>(null);
-  const [revoked, setRevoked] = useState<number | null>(null);
+  const [result, setResult] = useState<{ revoked: number; failed: number } | null>(null);
 
   const close = () => {
     setTyped("");
     setMismatch(false);
     setFailure(null);
-    setRevoked(null);
+    setResult(null);
     onClose();
   };
 
@@ -37,13 +39,13 @@ export function RevokeAllDialog({
     }
     setFailure(null);
     try {
-      setRevoked((await revokeEverything({ confirmation: typed.trim() })).revoked);
+      setResult(await revokeEverything({ confirmation: typed.trim() }));
     } catch (error) {
       setFailure(error);
     }
   };
 
-  if (revoked !== null) {
+  if (result !== null) {
     return (
       <Dialog
         open={open}
@@ -52,11 +54,26 @@ export function RevokeAllDialog({
         cancelLabel={null}
         primaryAction={{ label: "Done", onClick: close }}
       >
-        <Text data-testid="staff-access-revoke-all-result">
-          {revoked === 1
-            ? "1 session was ended. Its key stopped working at once."
-            : `${revoked} sessions were ended. Their keys stopped working at once.`}
-        </Text>
+        <VStack align="stretch" gap={3}>
+          <Text data-testid="staff-access-revoke-all-result">
+            {result.revoked === 1
+              ? "1 session was ended. Its key stopped working at once."
+              : `${result.revoked} sessions were ended. Their keys stopped working at once.`}
+          </Text>
+          {result.failed > 0 && (
+            <Alert.Root status="warning" data-testid="staff-access-revoke-all-failed">
+              <Alert.Indicator />
+              <Alert.Content>
+                <Alert.Title>
+                  {result.failed === 1
+                    ? "1 session did not end cleanly"
+                    : `${result.failed} sessions did not end cleanly`}
+                </Alert.Title>
+                <Alert.Description>Run Revoke all again to retry them.</Alert.Description>
+              </Alert.Content>
+            </Alert.Root>
+          )}
+        </VStack>
       </Dialog>
     );
   }

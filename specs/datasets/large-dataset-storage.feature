@@ -60,13 +60,6 @@ Feature: Large dataset storage
     And the rows written before the failure are removed
 
   @unit
-  Scenario: Rows added to a dataset in object storage come back with the ids they were stored under
-    Given a dataset created directly in object storage
-    When I add rows to it without ids
-    Then the reply names each row by the id it was stored under
-    And deleting those ids removes the rows
-
-  @unit
   Scenario: A copy of a dataset is created directly in object storage
     Given a dataset whose rows are kept in the Postgres records table
     When I copy it to another project

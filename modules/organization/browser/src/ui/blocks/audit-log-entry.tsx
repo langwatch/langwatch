@@ -409,6 +409,9 @@ function accessFacts(actor: AuditActor): { label: string; value: ReactNode }[] {
     ...(actor.kind === "staff" && actor.approvedBy
       ? [{ label: "Approved by", value: <Value>{actor.approvedBy}</Value> }]
       : []),
+    ...(actor.kind === "staff" && actor.revokedBy
+      ? [{ label: "Revoked by", value: <Value>{actor.revokedBy}</Value> }]
+      : []),
     ...(actor.reason
       ? [
           {

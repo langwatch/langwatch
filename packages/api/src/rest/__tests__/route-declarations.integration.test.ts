@@ -343,6 +343,41 @@ describe("given a route that declares the trail it leaves", () => {
     });
   });
 
+  describe("when a route starts a run", () => {
+    const runRoute = () =>
+      defineRestRouter(KeyApi)
+        .withNamespace("api-keys")
+        .withVersion(VERSION)
+        .post("/run", "createApiKey")
+        .keepsRecords()
+        .withoutAudit("run, not a change")
+        .withPermission("evaluations:create");
+
+    /** @scenario "A run route says whether it spends" */
+    it("refuses the route unless it declares spends() or withoutSpend with a reason", () => {
+      expect(() => runRoute().handle(async () => void 0)).toThrow(
+        /REST createApiKey starts a run: declare spends\(\) or withoutSpend/,
+      );
+      expect(() =>
+        runRoute()
+          .spends()
+          .handle(async () => void 0),
+      ).not.toThrow();
+      expect(() =>
+        runRoute()
+          .withoutSpend("stops a run")
+          .handle(async () => void 0),
+      ).not.toThrow();
+    });
+
+    it("refuses an empty reason and a second spend declaration", () => {
+      expect(() => runRoute().withoutSpend(" ")).toThrow(/withoutSpend needs a reason/);
+      expect(() => runRoute().spends().withoutSpend("stops a run")).toThrow(
+        /already declared spends\(\) or withoutSpend\(\)/,
+      );
+    });
+  });
+
   describe("when a route declares whether it leaves a trail twice", () => {
     it("refuses withoutAudit after withAudit", () => {
       expect(() =>

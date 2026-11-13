@@ -276,7 +276,7 @@ type Response = z.infer<typeof instantEvalResultsSchema>; // ../contract/src/ins
 
 Sample a run
 
-Permission `analytics:view`. Declared at `src/transport/instant-eval.rest.ts:181`.
+Permission `analytics:view`. Declared at `src/transport/instant-eval.rest.ts:183`.
 
 Answers at `/api/v1/instant-evals/:id/sample`.
 

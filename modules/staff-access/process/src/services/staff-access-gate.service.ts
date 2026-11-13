@@ -5,14 +5,18 @@ import {
   StaffAccessOperatorLostError,
   StaffAccessRevokedError,
   StaffAccessUnavailableError,
+  StaffContentNotApprovedError,
   StaffSpendNotApprovedError,
+  StaffWriteNotAllowedError,
 } from "@langwatch/api";
 import type {
   RestStaffAccessGate,
   RestStaffAccessReceipt,
+  RestStaffAccessRefusal,
   RestStaffAccessRequest,
 } from "@langwatch/api/rest";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import { STAFF_WRITES_WITHOUT_SPEND } from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { OpsApi } from "@langwatch/ops-contract";
@@ -29,16 +33,41 @@ import type { StaffAccessSessionService } from "./staff-access-session.service.t
 
 const logger = createLogger("langwatch:staff-access:gate");
 
-const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+const WRITES_WITHOUT_SPEND: ReadonlySet<string> = new Set(STAFF_WRITES_WITHOUT_SPEND);
+
+type Refusal =
+  | StaffAccessRevokedError
+  | StaffAccessExpiredError
+  | StaffAccessIpMismatchError
+  | StaffAccessOperatorLostError
+  | StaffSpendNotApprovedError
+  | StaffContentNotApprovedError
+  | StaffWriteNotAllowedError;
 
 /**
- * Whether a request changes the organization: a read sent as a POST (trace search, analytics)
- * asks only `:view` permissions and is no write. A route that asks none falls back to its method.
+ * What a live session may do on a route, failing closed (ADR-202). A read passes unless it serves
+ * content to a key without `org:content`. A write never removes or disables a record; without the
+ * spend tick it passes only when every permission it asks is a dataset write.
  */
-function writes(request: RestStaffAccessRequest): boolean {
-  if (READ_METHODS.has(request.method.toUpperCase())) return false;
+function routeRefusal({
+  session,
+  request,
+}: {
+  session: StaffAccessRequestRow;
+  request: RestStaffAccessRequest;
+}): Refusal | null {
+  if (request.spends && !session.spendApproved) return new StaffSpendNotApprovedError();
+  if (request.servesContent && !session.scopes.includes("org:content")) {
+    return new StaffContentNotApprovedError();
+  }
+  if (!request.writes) return null;
+  if (request.confirms) return new StaffWriteNotAllowedError();
+  if (session.spendApproved) return null;
   const asked = request.permissions;
-  return asked.length === 0 || !asked.every((permission) => permission.endsWith(":view"));
+  if (asked.length > 0 && asked.every((permission) => WRITES_WITHOUT_SPEND.has(permission))) {
+    return null;
+  }
+  return new StaffSpendNotApprovedError();
 }
 
 type GateDeps = Readonly<{
@@ -66,28 +95,29 @@ export class StaffAccessGateService implements RestStaffAccessGate {
     if (!(await this.deps.availability.isOpen())) throw new StaffAccessUnavailableError();
     const [session] = await this.deps.sessions.findByApiKeyId({ apiKeyId: request.apiKeyId });
     const at = this.deps.now();
-    await this.assertLive({ session, request, at });
-    const live = session as StaffAccessRequestRow;
+    if (!session) throw new StaffAccessRevokedError();
+    const refusal =
+      (await this.liveRefusal({ session, request, at })) ?? routeRefusal({ session, request });
+    if (refusal) {
+      await this.trailRefusal({
+        session,
+        at,
+        refusal: { ...request, status: refusal.httpStatus, errorCode: refusal.code },
+      });
+      throw refusal;
+    }
+    const live = session;
 
     const eventId = generate("staffevent").toString();
     try {
       await this.deps.events.create({
+        ...this.trailRow({ session: live, request, at }),
         id: eventId,
-        requestId: live.id,
-        at,
-        method: request.method,
-        path: request.path,
-        operation: request.operation,
-        permissions: [...request.permissions],
-        organizationId: live.organizationId,
-        projectId: request.scope?.tier === "project" ? request.scope.id : null,
         status: null,
         errorCode: null,
         durationMs: null,
-        ipAddress: request.ipAddress,
-        userAgent: request.userAgent,
       });
-      if (writes(request) && live.organizationId) {
+      if (request.writes && live.organizationId) {
         await this.deps.auditLog.record({
           organizationId: live.organizationId,
           ...(request.scope?.tier === "project" ? { projectId: request.scope.id } : {}),
@@ -119,30 +149,85 @@ export class StaffAccessGateService implements RestStaffAccessGate {
         approverUserId: live.ownerUserId,
         reason: live.reason,
       },
+      spendApproved: live.spendApproved,
       finish: (outcome) => this.deps.events.finish({ id: eventId, ...outcome }),
     };
   }
 
-  private async assertLive({
+  /** A staff key's request refused before `admit` (its permission, another project) is trailed. */
+  async refused(refusal: RestStaffAccessRefusal): Promise<void> {
+    const [session] = await this.deps.sessions.findByApiKeyId({ apiKeyId: refusal.apiKeyId });
+    if (!session) return;
+    await this.trailRefusal({ session, at: this.deps.now(), refusal });
+  }
+
+  /** The trail row of a refused request, written with its answer. A failed write is logged. */
+  private async trailRefusal({
+    session,
+    at,
+    refusal,
+  }: {
+    session: StaffAccessRequestRow;
+    at: Instant;
+    refusal: RestStaffAccessRefusal;
+  }): Promise<void> {
+    try {
+      await this.deps.events.create({
+        ...this.trailRow({ session, request: refusal, at }),
+        id: generate("staffevent").toString(),
+        status: refusal.status,
+        errorCode: refusal.errorCode,
+        durationMs: 0,
+      });
+    } catch (error) {
+      logger.error({ error, requestId: session.id }, "a refused staff request was not trailed");
+    }
+  }
+
+  private trailRow({
     session,
     request,
     at,
   }: {
-    session: StaffAccessRequestRow | undefined;
+    session: StaffAccessRequestRow;
     request: RestStaffAccessRequest;
     at: Instant;
-  }): Promise<void> {
-    if (!session || session.revokedAt !== null || session.status !== "redeemed") {
-      throw new StaffAccessRevokedError();
+  }) {
+    return {
+      requestId: session.id,
+      at,
+      method: request.method,
+      path: request.path,
+      operation: request.operation,
+      permissions: [...request.permissions],
+      organizationId: session.organizationId,
+      projectId: request.scope?.tier === "project" ? request.scope.id : null,
+      ipAddress: request.ipAddress,
+      userAgent: request.userAgent,
+    };
+  }
+
+  /** Why the session itself no longer admits anything, or null while it is live. */
+  private async liveRefusal({
+    session,
+    request,
+    at,
+  }: {
+    session: StaffAccessRequestRow;
+    request: RestStaffAccessRequest;
+    at: Instant;
+  }): Promise<Refusal | null> {
+    if (session.revokedAt !== null || session.status !== "redeemed") {
+      return new StaffAccessRevokedError();
     }
     if (session.accessExpiresAt === null || hasPassed({ moment: session.accessExpiresAt, at })) {
-      throw new StaffAccessExpiredError();
+      return new StaffAccessExpiredError();
     }
-    if (session.pinnedIp !== request.ipAddress) throw new StaffAccessIpMismatchError();
+    if (session.pinnedIp !== request.ipAddress) return new StaffAccessIpMismatchError();
     const operators = await this.deps.ops.listPlatformOperators();
     if (!operators.some((operator) => operator.userId === session.ownerUserId)) {
-      throw new StaffAccessOperatorLostError();
+      return new StaffAccessOperatorLostError();
     }
-    if (request.spends && !session.spendApproved) throw new StaffSpendNotApprovedError();
+    return null;
   }
 }

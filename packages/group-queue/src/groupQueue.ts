@@ -2067,6 +2067,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       return;
     }
 
+    this.adaptiveSlots.jobCompleted();
+
     // PAST THE POINT OF NO RETURN: the slot is completed, so this needs its own
     // catch — the outer one treats a throw as a FAILED job and would re-stage the
     // drained siblings and retry a job whose slot is already completed,
