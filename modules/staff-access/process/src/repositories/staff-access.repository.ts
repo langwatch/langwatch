@@ -34,6 +34,10 @@ export type StaffAccessRequestRow = Readonly<{
   scopes: string[];
   organizationId: string | null;
   organizationName: string | null;
+  counterpartOrganizationId: string | null;
+  counterpartOrganizationName: string | null;
+  /** What a copy target may create, fixed when the request was made; empty otherwise. */
+  copyGrant: string[];
   reason: string;
   codeChallenge: string;
   machine: string;
@@ -73,6 +77,20 @@ export type StaffAccessEventRow = Readonly<{
   durationMs: number | null;
   ipAddress: string | null;
   userAgent: string | null;
+}>;
+
+/** One object an organization copy made: which source object became which target object. */
+export type StaffAccessCopyLedgerRow = Readonly<{
+  id: string;
+  requestId: string;
+  sourceOrganizationId: string;
+  targetOrganizationId: string;
+  kind: string;
+  sourceId: string;
+  targetId: string;
+  sourceProjectId: string;
+  targetProjectId: string;
+  createdAt: Instant;
 }>;
 
 export interface StaffAccessRequesterRepository {
@@ -169,4 +187,14 @@ export interface StaffAccessEventRepository {
     durationMs: number;
   }): Promise<void>;
   findByRequest(input: { requestId: string }): Promise<StaffAccessEventRow[]>;
+}
+
+export interface StaffAccessCopyLedgerRepository {
+  /** Every object earlier copies made from the source organization into the target one. */
+  findForPair(input: {
+    sourceOrganizationId: string;
+    targetOrganizationId: string;
+  }): Promise<StaffAccessCopyLedgerRow[]>;
+  /** Records one copied object; false when the target already holds a copy of that source. */
+  record(row: StaffAccessCopyLedgerRow): Promise<boolean>;
 }

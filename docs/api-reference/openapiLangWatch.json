@@ -17091,7 +17091,8 @@
                                           "members:view",
                                           "braids:manage",
                                           "spans:braided",
-                                          "opsRead:view"
+                                          "opsRead:view",
+                                          "opsCopy:create"
                                         ]
                                       }
                                     ]
@@ -17322,7 +17323,8 @@
                                     "members:view",
                                     "braids:manage",
                                     "spans:braided",
-                                    "opsRead:view"
+                                    "opsRead:view",
+                                    "opsCopy:create"
                                   ]
                                 }
                               ]
@@ -17953,7 +17955,8 @@
                                                   "members:view",
                                                   "braids:manage",
                                                   "spans:braided",
-                                                  "opsRead:view"
+                                                  "opsRead:view",
+                                                  "opsCopy:create"
                                                 ]
                                               }
                                             ]
@@ -18184,7 +18187,8 @@
                                             "members:view",
                                             "braids:manage",
                                             "spans:braided",
-                                            "opsRead:view"
+                                            "opsRead:view",
+                                            "opsCopy:create"
                                           ]
                                         }
                                       ]
@@ -18636,7 +18640,8 @@
                                         "members:view",
                                         "braids:manage",
                                         "spans:braided",
-                                        "opsRead:view"
+                                        "opsRead:view",
+                                        "opsCopy:create"
                                       ]
                                     }
                                   ]
@@ -110395,12 +110400,14 @@
                 "properties": {
                   "scopes": {
                     "minItems": 1,
-                    "maxItems": 4,
+                    "maxItems": 5,
                     "type": "array",
                     "items": {
                       "type": "string",
                       "enum": [
                         "ops:read",
+                        "copy:source",
+                        "copy:target",
                         "org:metadata",
                         "org:content",
                         "org:support"
@@ -110408,6 +110415,11 @@
                     }
                   },
                   "organization": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "counterpartOrganization": {
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 200
@@ -110563,6 +110575,8 @@
                         "type": "string",
                         "enum": [
                           "ops:read",
+                          "copy:source",
+                          "copy:target",
                           "org:metadata",
                           "org:content",
                           "org:support"
@@ -110964,6 +110978,252 @@
           "permissions": [
             "opsRead:view"
           ]
+        }
+      }
+    },
+    "/api/v1/staff-access/ops/copies": {
+      "post": {
+        "operationId": "copyStaffAccessOrganization",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "source": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "slug": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "slug",
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "target": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "slug": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "slug",
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "dryRun": {
+                      "type": "boolean"
+                    },
+                    "stoppedBecause": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "project",
+                              "evaluator",
+                              "monitor",
+                              "prompt",
+                              "dataset"
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "sourceId": {
+                            "type": "string"
+                          },
+                          "sourceProjectId": {
+                            "type": "string"
+                          },
+                          "outcome": {
+                            "type": "string",
+                            "enum": [
+                              "planned",
+                              "copied",
+                              "already_copied",
+                              "skipped",
+                              "failed",
+                              "stopped"
+                            ]
+                          },
+                          "targetId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "targetProjectId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "reason": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "name",
+                          "sourceId",
+                          "sourceProjectId",
+                          "outcome",
+                          "targetId",
+                          "targetProjectId",
+                          "reason"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "totals": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string",
+                        "enum": [
+                          "planned",
+                          "copied",
+                          "already_copied",
+                          "skipped",
+                          "failed",
+                          "stopped"
+                        ]
+                      },
+                      "additionalProperties": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "required": [
+                        "planned",
+                        "copied",
+                        "already_copied",
+                        "skipped",
+                        "failed",
+                        "stopped"
+                      ],
+                      "properties": {
+                        "planned": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "copied": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "already_copied": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "skipped": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "failed": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "stopped": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "source",
+                    "target",
+                    "dryRun",
+                    "stoppedBecause",
+                    "items",
+                    "totals"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "internal"
+          ],
+          "permissions": [
+            "opsCopy:create"
+          ]
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sourceOpsToken": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  },
+                  "projects": {
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    }
+                  },
+                  "dryRun": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "sourceOpsToken"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
         }
       }
     },

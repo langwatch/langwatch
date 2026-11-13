@@ -32,6 +32,7 @@ let stateDir: string;
 let workDir: string;
 let codeChallenge = "";
 let statusPolls = 0;
+let failedPolls = 0;
 let requestBody: Record<string, unknown> = {};
 let redeemCalls = 0;
 let endCalls = 0;
@@ -120,7 +121,13 @@ const staffRoutes: Record<string, (body: string) => Reply> = {
   },
   "GET /api/staff-access/requests/req_1": () => {
     statusPolls++;
-    return { status: 200, payload: { status: statusPolls > 1 ? "approved" : "pending" } };
+    if (statusPolls <= failedPolls) {
+      return { status: 503, payload: { error: "main thread did not answer" } };
+    }
+    return {
+      status: 200,
+      payload: { status: statusPolls > failedPolls + 1 ? "approved" : "pending" },
+    };
   },
   "POST /api/staff-access/requests/req_1/redeem": (body) => {
     redeemCalls++;
@@ -191,6 +198,7 @@ beforeEach(() => {
   workDir = fs.mkdtempSync(path.join(os.tmpdir(), "lw-ops-work-"));
   codeChallenge = "";
   statusPolls = 0;
+  failedPolls = 0;
   requestBody = {};
   redeemCalls = 0;
   endCalls = 0;
@@ -252,6 +260,30 @@ describe("langwatch ops access", () => {
     });
     expect(fs.existsSync(path.join(workDir, ".env"))).toBe(false);
     expect(fs.existsSync(path.join(stateDir, "ops-pending.json"))).toBe(false);
+  }, 30_000);
+
+  /** @scenario "The CLI keeps waiting through a status read the server failed to answer" */
+  it("keeps waiting through a failed status read and redeems once approved", async () => {
+    failedPolls = 1;
+    await run(["ops", "setup"], {}, { input: `${REQUESTER_KEY}\n` });
+
+    const result = await run([
+      "ops",
+      "access",
+      "request",
+      "--scope",
+      "org:content",
+      "--org",
+      "acme",
+      "--reason",
+      "ACME reports missing traces since Monday",
+      "-o",
+      "json",
+    ]);
+
+    expect(result.exitCode).toBe(0);
+    expect(statusPolls).toBeGreaterThanOrEqual(3);
+    expect(redeemCalls).toBe(1);
   }, 30_000);
 
   /** @scenario "Setup reads the requester key from stdin" */

@@ -36,8 +36,20 @@ describe("AuthzModule.effectivePermissionsFor", () => {
 
       expect(answer).toEqual({
         scope: ORG_SCOPE,
-        permissions: ["organization:view", "ops:view", "ops:manage", "opsRead:view"],
-        organizationPermissions: ["organization:view", "ops:view", "ops:manage", "opsRead:view"],
+        permissions: [
+          "organization:view",
+          "ops:view",
+          "ops:manage",
+          "opsRead:view",
+          "opsCopy:create",
+        ],
+        organizationPermissions: [
+          "organization:view",
+          "ops:view",
+          "ops:manage",
+          "opsRead:view",
+          "opsCopy:create",
+        ],
       });
     });
   });

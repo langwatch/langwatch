@@ -64,6 +64,9 @@ const staffAccessSessionViewSchemaDefinition = z.object({
   scopes: z.array(staffAccessScopeSchema),
   organizationId: z.string().nullable(),
   organizationName: z.string().nullable(),
+  /** A copy side's other organization: the target of a source, the source of a target. */
+  counterpartOrganizationId: z.string().nullable(),
+  counterpartOrganizationName: z.string().nullable(),
   reason: z.string(),
   machine: z.string(),
   requestIp: z.string().nullable(),
@@ -94,6 +97,8 @@ const staffAccessApprovalViewSchemaDefinition = z.object({
   typedNameRequired: z.object({ withSpend: z.boolean(), withoutSpend: z.boolean() }),
   /** Spend can be ticked only for a support request. */
   spendOffered: z.boolean(),
+  /** What a copy target lets the server create there; the passkey signs it. Empty otherwise. */
+  copyGrant: z.array(z.string()),
 });
 export interface StaffAccessApprovalViewSchema extends Named<
   typeof staffAccessApprovalViewSchemaDefinition

@@ -11,6 +11,7 @@ import {
   type PasskeyAssertionResponse,
   PasskeyAssertionRefusedError,
 } from "@langwatch/auth-contract";
+import { namesOrganization, type StaffAccessScope } from "@langwatch/authz-contract";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
@@ -26,11 +27,13 @@ import type { UserApi } from "@langwatch/user-contract";
 
 import type { StaffAccessRepositories } from "../../../repositories/staff-access.repositories.ts";
 import { StaffAccessModule } from "../../staff-access.app.ts";
+import { copyCatalog } from "./copy-catalog.ts";
 
 export const OLIVIA = "user_olivia";
 export const PEDRO = "user_pedro";
 export const ACME = { id: "org_acme", slug: "acme", name: "ACME" };
 export const GLOBEX = { id: "org_globex", slug: "globex", name: "Globex" };
+export const INITECH = { id: "org_initech", slug: "initech", name: "Initech" };
 export const AGENT_IP = "203.0.113.7";
 export const VERIFIER = "v".repeat(43);
 export const CHALLENGE = createHash("sha256").update(VERIFIER).digest("base64url");
@@ -141,7 +144,8 @@ export function staffAccessWorld({
     countUsageForMembers: async ({ memberUserIds }) => ({ signedInUsers: memberUserIds.length }),
   });
 
-  const summaries = [ACME, GLOBEX].map((organization) => ({
+  const copy = copyCatalog();
+  const summaries = [ACME, GLOBEX, INITECH].map((organization) => ({
     ...organization,
     createdAt: Temporal.Instant.from("2025-01-01T00:00:00Z"),
   }));
@@ -150,14 +154,13 @@ export function staffAccessWorld({
       summaries.find((summary) => summary.id === id) ?? null,
     listProvisioningSummaries: async () => summaries,
     getAllMembers: async () => [{ id: "member_1" }, { id: "member_2" }] as never,
+    listTeams: copy.organizations.listTeams as never,
   });
 
   const projects = createApiFixture<ProjectApi>({
-    listByOrganization: async ({ organizationId }) =>
-      ({
-        data: [{ id: `${organizationId}_project`, slug: "acme-support", name: "acme-support" }],
-        pagination: { page: 1, limit: 100, total: 1 },
-      }) as never,
+    listByOrganization: copy.projects.listByOrganization as never,
+    findById: copy.projects.findById as never,
+    createInOrganization: copy.projects.createInOrganization as never,
     listIdsByOrganization: async ({ organizationId }) => [`${organizationId}_project`],
   });
 
@@ -253,6 +256,10 @@ export function staffAccessWorld({
       traces: createApiFixture<TraceApi>({
         countUsage: async () => ({ traces: 42, spans: 300 }),
       }),
+      evaluators: copy.evaluators,
+      monitors: copy.monitors,
+      prompts: copy.prompts,
+      datasets: copy.datasets,
     },
     now: () => state.at,
   } as Parameters<typeof StaffAccessModule.create>[0]);
@@ -299,23 +306,25 @@ export function staffAccessWorld({
     state.at = state.at.add({ minutes });
   }
 
-  return { app, state, repositories, operator, enrol, approve, advance, requesterSession };
+  return { app, state, repositories, copy, operator, enrol, approve, advance, requesterSession };
 }
 
 /** A valid request body for the scopes given. */
 export function requestBody({
   scopes,
   organization = ACME.slug,
+  counterpartOrganization,
   reason = "fix ACME's broken evaluator",
 }: {
-  scopes: ("ops:read" | "org:metadata" | "org:content" | "org:support")[];
+  scopes: StaffAccessScope[];
   organization?: string;
+  counterpartOrganization?: string;
   reason?: string;
 }) {
-  const reachesOrganization = scopes.some((scope) => scope !== "ops:read");
   return {
     scopes,
-    ...(reachesOrganization ? { organization } : {}),
+    ...(namesOrganization(scopes) ? { organization } : {}),
+    ...(counterpartOrganization ? { counterpartOrganization } : {}),
     reason,
     codeChallenge: CHALLENGE,
     codeChallengeMethod: "S256" as const,

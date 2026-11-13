@@ -47,6 +47,6 @@ Anything else dataset needs belongs to another module and is reached through its
 
 ## Who depends on dataset
 
-[automation](../automation/README.md), [evaluation](../evaluation/README.md), [experiment](../experiment/README.md), [langy](../langy/README.md), [onboarding](../onboarding/README.md), [ops](../ops/README.md), [workflow](../workflow/README.md) (as a peer).
+[automation](../automation/README.md), [evaluation](../evaluation/README.md), [experiment](../experiment/README.md), [langy](../langy/README.md), [onboarding](../onboarding/README.md), [ops](../ops/README.md), [staff-access](../staff-access/README.md), [workflow](../workflow/README.md) (as a peer).
 
 <!-- readme:generated:end -->

@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import {
   ACME,
   AGENT_IP,
+  GLOBEX,
   requestBody,
   staffAccessWorld,
   VERIFIER,
@@ -109,6 +110,71 @@ describe("given the staff access REST family", () => {
           body: {},
         }),
       ).resolves.toMatchObject({ status: 200, body: { ended: true } });
+    });
+  });
+
+  describe("when an agent copies ACME into Globex over the wire", () => {
+    /** @scenario "The source ops token never shows in an answer, a trail row or an audit row" */
+    it("answers the copy and never echoes the source token", async () => {
+      const { w, send } = mount();
+      const agent = await w.enrol();
+      const side = async (organization: typeof ACME, other: typeof ACME, scope: string) => {
+        const created = await send({
+          method: "POST",
+          path: "/api/staff-access/requests",
+          bearer: agent.requesterKey,
+          body: requestBody({
+            scopes: [scope as "copy:source" | "copy:target"],
+            organization: organization.slug,
+            counterpartOrganization: other.slug,
+          }),
+        });
+        const requestId = String(created.body.requestId);
+        await w.approve({
+          choice: { requestId, spendApproved: false, typedOrganizationName: organization.name },
+        });
+        const redeemed = await send({
+          method: "POST",
+          path: `/api/staff-access/requests/${requestId}/redeem`,
+          bearer: agent.requesterKey,
+          body: { codeVerifier: VERIFIER },
+        });
+        expect(redeemed.body.apiKey).toBeUndefined();
+        return String(redeemed.body.opsToken);
+      };
+      const sourceToken = await side(ACME, GLOBEX, "copy:source");
+      const targetToken = await side(GLOBEX, ACME, "copy:target");
+      const secretOf = (token: string) => token.split("_").at(-1) ?? token;
+
+      const dryRun = await send({
+        method: "POST",
+        path: "/api/staff-access/ops/copies",
+        bearer: targetToken,
+        body: { sourceOpsToken: sourceToken, dryRun: true },
+      });
+      const malformed = await send({
+        method: "POST",
+        path: "/api/staff-access/ops/copies",
+        bearer: targetToken,
+        body: { sourceOpsToken: sourceToken, dryRun: "yes" },
+      });
+      const unknown = await send({
+        method: "POST",
+        path: "/api/staff-access/ops/copies",
+        bearer: targetToken,
+        body: { sourceOpsToken: `${sourceToken}x` },
+      });
+
+      expect(dryRun).toMatchObject({ status: 200, body: { dryRun: true, stoppedBecause: null } });
+      expect(malformed.status).toBeGreaterThanOrEqual(400);
+      expect(unknown).toMatchObject({ status: 401, body: { code: "staff_copy_source_invalid" } });
+      const trail = await Promise.all(
+        (await w.app.overview(w.operator("user_olivia"))).sessions.map((session) =>
+          w.repositories.events.findByRequest({ requestId: session.requestId }),
+        ),
+      );
+      const written = JSON.stringify([dryRun, malformed, unknown, trail, w.state.audit]);
+      expect(written).not.toContain(secretOf(sourceToken));
     });
   });
 

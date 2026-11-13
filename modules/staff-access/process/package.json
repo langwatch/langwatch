@@ -18,7 +18,7 @@
   "scripts": {
     "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run",
-    "test:integration": "vitest run --config vitest.integration.config.ts"
+    "test:integration": "VITEST_MAX_WORKERS=1 vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
@@ -28,11 +28,15 @@
     "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/coding-agent-contract": "workspace:*",
+    "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/gateway-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/mail": "workspace:*",
+    "@langwatch/monitor-contract": "workspace:*",
     "@langwatch/notification-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
@@ -40,6 +44,7 @@
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/staff-access-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",

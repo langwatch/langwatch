@@ -29,6 +29,7 @@ const FORBIDDEN_RESOURCES = [
   "playground",
   "ops",
   "opsRead",
+  "opsCopy",
   "auditLog",
   "gatewaySpend",
 ];

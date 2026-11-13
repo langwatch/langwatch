@@ -2812,6 +2812,9 @@ export interface LwqlPrismaRows {
     readonly scopes: "String[]";
     readonly organizationId: "String?";
     readonly organizationName: "String?";
+    readonly counterpartOrganizationId: "String?";
+    readonly counterpartOrganizationName: "String?";
+    readonly copyGrant: "String[]";
     readonly reason: "String";
     readonly codeChallenge: "String";
     readonly machine: "String";
@@ -2850,5 +2853,17 @@ export interface LwqlPrismaRows {
     readonly durationMs: "Int?";
     readonly ipAddress: "String?";
     readonly userAgent: "String?";
+  };
+  readonly StaffAccessCopyLedger: {
+    readonly id: "String";
+    readonly requestId: "String";
+    readonly sourceOrganizationId: "String";
+    readonly targetOrganizationId: "String";
+    readonly kind: "String";
+    readonly sourceId: "String";
+    readonly targetId: "String";
+    readonly sourceProjectId: "String";
+    readonly targetProjectId: "String";
+    readonly createdAt: "DateTime";
   };
 }

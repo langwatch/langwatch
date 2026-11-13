@@ -1,5 +1,9 @@
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import { type StaffAccessScope, staffAccessPermissions } from "@langwatch/authz-contract";
+import {
+  reachesOrganization,
+  type StaffAccessScope,
+  staffAccessPermissions,
+} from "@langwatch/authz-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
   STAFF_ACCESS_OPS_TOKEN_PREFIX,
@@ -11,12 +15,7 @@ import type {
   StaffAccessRequestRepository,
   StaffAccessRequestRow,
 } from "../repositories/staff-access.repository.ts";
-import {
-  isoText,
-  mintToken,
-  reachesOrganization,
-  staffKeyKindOf,
-} from "../rules/staff-access.rules.ts";
+import { isoText, mintsOpsToken, mintToken, staffKeyKindOf } from "../rules/staff-access.rules.ts";
 
 const PROJECTS_LISTED = 100;
 
@@ -51,22 +50,23 @@ export class StaffAccessRedemptionService {
             kind: staffKeyKindOf(scopes),
           })
         : null;
-    const opsToken = scopes.includes("ops:read") ? mintToken(STAFF_ACCESS_OPS_TOKEN_PREFIX) : null;
+    const opsToken = mintsOpsToken(scopes) ? mintToken(STAFF_ACCESS_OPS_TOKEN_PREFIX) : null;
     await this.deps.requests.attachCredentials({
       id: row.id,
       apiKeyId: organizationKey?.apiKeyId ?? null,
       hashedOpsToken: opsToken?.hashedSecret ?? null,
       opsTokenLookupId: opsToken?.lookupId ?? null,
     });
-    const projects = row.organizationId
-      ? (
-          await this.deps.projects.listByOrganization({
-            organizationId: row.organizationId,
-            page: 1,
-            limit: PROJECTS_LISTED,
-          })
-        ).data.map((project) => ({ id: project.id, slug: project.slug, name: project.name }))
-      : [];
+    const projects =
+      organizationKey && row.organizationId
+        ? (
+            await this.deps.projects.listByOrganization({
+              organizationId: row.organizationId,
+              page: 1,
+              limit: PROJECTS_LISTED,
+            })
+          ).data.map((project) => ({ id: project.id, slug: project.slug, name: project.name }))
+        : [];
 
     return {
       ...(organizationKey ? { apiKey: organizationKey.token } : {}),

@@ -25207,6 +25207,7 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1LangyUpdate                   GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "langy:update"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1LangyView                     GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "langy:view"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1MembersView                   GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "members:view"
+	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1OpsCopyCreate                 GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "opsCopy:create"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1OpsManage                     GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "ops:manage"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1OpsReadView                   GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "opsRead:view"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1OpsView                       GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "ops:view"
@@ -25430,6 +25431,8 @@ func (e GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1) Valid()
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1LangyView:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1MembersView:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1OpsCopyCreate:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1OpsManage:
 		return true
@@ -25684,6 +25687,7 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1LangyUpdate                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "langy:update"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1LangyView                     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "langy:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1MembersView                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "members:view"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1OpsCopyCreate                 GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "opsCopy:create"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1OpsManage                     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "ops:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1OpsReadView                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "opsRead:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1OpsView                       GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "ops:view"
@@ -25907,6 +25911,8 @@ func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1) V
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1LangyView:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1MembersView:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1OpsCopyCreate:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1OpsManage:
 		return true
@@ -26161,6 +26167,7 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1LangyUpdate                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "langy:update"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1LangyView                     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "langy:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1MembersView                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "members:view"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1OpsCopyCreate                 GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "opsCopy:create"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1OpsManage                     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "ops:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1OpsReadView                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "opsRead:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1OpsView                       GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "ops:view"
@@ -26384,6 +26391,8 @@ func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1) V
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1LangyView:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1MembersView:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1OpsCopyCreate:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1OpsManage:
 		return true
@@ -26758,6 +26767,7 @@ const (
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1LangyUpdate                   GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "langy:update"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1LangyView                     GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "langy:view"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1MembersView                   GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "members:view"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1OpsCopyCreate                 GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "opsCopy:create"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1OpsManage                     GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "ops:manage"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1OpsReadView                   GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "opsRead:view"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1OpsView                       GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "ops:view"
@@ -26981,6 +26991,8 @@ func (e GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1) Valid() bool {
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1LangyView:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1MembersView:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1OpsCopyCreate:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1OpsManage:
 		return true
@@ -27235,6 +27247,7 @@ const (
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1LangyUpdate                   GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "langy:update"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1LangyView                     GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "langy:view"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1MembersView                   GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "members:view"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1OpsCopyCreate                 GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "opsCopy:create"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1OpsManage                     GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "ops:manage"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1OpsReadView                   GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "opsRead:view"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1OpsView                       GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "ops:view"
@@ -27458,6 +27471,8 @@ func (e GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1) Valid() bool {
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1LangyView:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1MembersView:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1OpsCopyCreate:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1OpsManage:
 		return true
@@ -30069,6 +30084,63 @@ func (e GetApiSlackConnections200JSONResponseBodyScopeType) Valid() bool {
 	}
 }
 
+// Defines values for CopyStaffAccessOrganization200JSONResponseBodyItemsKind.
+const (
+	CopyStaffAccessOrganization200JSONResponseBodyItemsKindDataset   CopyStaffAccessOrganization200JSONResponseBodyItemsKind = "dataset"
+	CopyStaffAccessOrganization200JSONResponseBodyItemsKindEvaluator CopyStaffAccessOrganization200JSONResponseBodyItemsKind = "evaluator"
+	CopyStaffAccessOrganization200JSONResponseBodyItemsKindMonitor   CopyStaffAccessOrganization200JSONResponseBodyItemsKind = "monitor"
+	CopyStaffAccessOrganization200JSONResponseBodyItemsKindProject   CopyStaffAccessOrganization200JSONResponseBodyItemsKind = "project"
+	CopyStaffAccessOrganization200JSONResponseBodyItemsKindPrompt    CopyStaffAccessOrganization200JSONResponseBodyItemsKind = "prompt"
+)
+
+// Valid indicates whether the value is a known member of the CopyStaffAccessOrganization200JSONResponseBodyItemsKind enum.
+func (e CopyStaffAccessOrganization200JSONResponseBodyItemsKind) Valid() bool {
+	switch e {
+	case CopyStaffAccessOrganization200JSONResponseBodyItemsKindDataset:
+		return true
+	case CopyStaffAccessOrganization200JSONResponseBodyItemsKindEvaluator:
+		return true
+	case CopyStaffAccessOrganization200JSONResponseBodyItemsKindMonitor:
+		return true
+	case CopyStaffAccessOrganization200JSONResponseBodyItemsKindProject:
+		return true
+	case CopyStaffAccessOrganization200JSONResponseBodyItemsKindPrompt:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CopyStaffAccessOrganization200JSONResponseBodyItemsOutcome.
+const (
+	CopyStaffAccessOrganization200JSONResponseBodyItemsOutcomeAlreadyCopied CopyStaffAccessOrganization200JSONResponseBodyItemsOutcome = "already_copied"
+	CopyStaffAccessOrganization200JSONResponseBodyItemsOutcomeCopied        CopyStaffAccessOrganization200JSONResponseBodyItemsOutcome = "copied"
+	CopyStaffAccessOrganization200JSONResponseBodyItemsOutcomeFailed        CopyStaffAccessOrganization200JSONResponseBodyItemsOutcome = "failed"
+	CopyStaffAccessOrganization200JSONResponseBodyItemsOutcomePlanned       CopyStaffAccessOrganization200JSONResponseBodyItemsOutcome = "planned"
+	CopyStaffAccessOrganization200JSONResponseBodyItemsOutcomeSkipped       CopyStaffAccessOrganization200JSONResponseBodyItemsOutcome = "skipped"
+	CopyStaffAccessOrganization200JSONResponseBodyItemsOutcomeStopped       CopyStaffAccessOrganization200JSONResponseBodyItemsOutcome = "stopped"
+)
+
+// Valid indicates whether the value is a known member of the CopyStaffAccessOrganization200JSONResponseBodyItemsOutcome enum.
+func (e CopyStaffAccessOrganization200JSONResponseBodyItemsOutcome) Valid() bool {
+	switch e {
+	case CopyStaffAccessOrganization200JSONResponseBodyItemsOutcomeAlreadyCopied:
+		return true
+	case CopyStaffAccessOrganization200JSONResponseBodyItemsOutcomeCopied:
+		return true
+	case CopyStaffAccessOrganization200JSONResponseBodyItemsOutcomeFailed:
+		return true
+	case CopyStaffAccessOrganization200JSONResponseBodyItemsOutcomePlanned:
+		return true
+	case CopyStaffAccessOrganization200JSONResponseBodyItemsOutcomeSkipped:
+		return true
+	case CopyStaffAccessOrganization200JSONResponseBodyItemsOutcomeStopped:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateStaffAccessRequestJSONBodyCodeChallengeMethod.
 const (
 	S256 CreateStaffAccessRequestJSONBodyCodeChallengeMethod = "S256"
@@ -30086,6 +30158,8 @@ func (e CreateStaffAccessRequestJSONBodyCodeChallengeMethod) Valid() bool {
 
 // Defines values for CreateStaffAccessRequestJSONBodyScopes.
 const (
+	CreateStaffAccessRequestJSONBodyScopesCopySource  CreateStaffAccessRequestJSONBodyScopes = "copy:source"
+	CreateStaffAccessRequestJSONBodyScopesCopyTarget  CreateStaffAccessRequestJSONBodyScopes = "copy:target"
 	CreateStaffAccessRequestJSONBodyScopesOpsRead     CreateStaffAccessRequestJSONBodyScopes = "ops:read"
 	CreateStaffAccessRequestJSONBodyScopesOrgContent  CreateStaffAccessRequestJSONBodyScopes = "org:content"
 	CreateStaffAccessRequestJSONBodyScopesOrgMetadata CreateStaffAccessRequestJSONBodyScopes = "org:metadata"
@@ -30095,6 +30169,10 @@ const (
 // Valid indicates whether the value is a known member of the CreateStaffAccessRequestJSONBodyScopes enum.
 func (e CreateStaffAccessRequestJSONBodyScopes) Valid() bool {
 	switch e {
+	case CreateStaffAccessRequestJSONBodyScopesCopySource:
+		return true
+	case CreateStaffAccessRequestJSONBodyScopesCopyTarget:
+		return true
 	case CreateStaffAccessRequestJSONBodyScopesOpsRead:
 		return true
 	case CreateStaffAccessRequestJSONBodyScopesOrgContent:
@@ -30155,6 +30233,8 @@ func (e EndStaffAccessSession200JSONResponseBodyEnded) Valid() bool {
 
 // Defines values for RedeemStaffAccessRequest200JSONResponseBodyScopes.
 const (
+	RedeemStaffAccessRequest200JSONResponseBodyScopesCopySource  RedeemStaffAccessRequest200JSONResponseBodyScopes = "copy:source"
+	RedeemStaffAccessRequest200JSONResponseBodyScopesCopyTarget  RedeemStaffAccessRequest200JSONResponseBodyScopes = "copy:target"
 	RedeemStaffAccessRequest200JSONResponseBodyScopesOpsRead     RedeemStaffAccessRequest200JSONResponseBodyScopes = "ops:read"
 	RedeemStaffAccessRequest200JSONResponseBodyScopesOrgContent  RedeemStaffAccessRequest200JSONResponseBodyScopes = "org:content"
 	RedeemStaffAccessRequest200JSONResponseBodyScopesOrgMetadata RedeemStaffAccessRequest200JSONResponseBodyScopes = "org:metadata"
@@ -30164,6 +30244,10 @@ const (
 // Valid indicates whether the value is a known member of the RedeemStaffAccessRequest200JSONResponseBodyScopes enum.
 func (e RedeemStaffAccessRequest200JSONResponseBodyScopes) Valid() bool {
 	switch e {
+	case RedeemStaffAccessRequest200JSONResponseBodyScopesCopySource:
+		return true
+	case RedeemStaffAccessRequest200JSONResponseBodyScopesCopyTarget:
+		return true
 	case RedeemStaffAccessRequest200JSONResponseBodyScopesOpsRead:
 		return true
 	case RedeemStaffAccessRequest200JSONResponseBodyScopesOrgContent:
@@ -36209,22 +36293,22 @@ func (e PatchApiWebhooksV1EndpointsById200JSONResponseBodyData1Status) Valid() b
 
 // Defines values for GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome.
 const (
-	GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcomePending   GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome = "pending"
-	GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcomeRetryable GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome = "retryable"
-	GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcomeSuccess   GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome = "success"
-	GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcomeTerminal  GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome = "terminal"
+	Pending   GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome = "pending"
+	Retryable GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome = "retryable"
+	Success   GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome = "success"
+	Terminal  GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome = "terminal"
 )
 
 // Valid indicates whether the value is a known member of the GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome enum.
 func (e GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome) Valid() bool {
 	switch e {
-	case GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcomePending:
+	case Pending:
 		return true
-	case GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcomeRetryable:
+	case Retryable:
 		return true
-	case GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcomeSuccess:
+	case Success:
 		return true
-	case GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcomeTerminal:
+	case Terminal:
 		return true
 	default:
 		return false
@@ -52831,6 +52915,30 @@ type GetApiSlackConnections200JSONResponseBodyKind string
 // GetApiSlackConnections200JSONResponseBodyScopeType defines parameters for GetApiSlackConnections.
 type GetApiSlackConnections200JSONResponseBodyScopeType string
 
+// CopyStaffAccessOrganizationJSONBody defines parameters for CopyStaffAccessOrganization.
+type CopyStaffAccessOrganizationJSONBody struct {
+	DryRun         *bool     `json:"dryRun,omitempty"`
+	Projects       *[]string `json:"projects,omitempty"`
+	SourceOpsToken string    `json:"sourceOpsToken"`
+}
+
+// CopyStaffAccessOrganization200JSONResponseBodyItemsKind defines parameters for CopyStaffAccessOrganization.
+type CopyStaffAccessOrganization200JSONResponseBodyItemsKind string
+
+// CopyStaffAccessOrganization200JSONResponseBodyItemsOutcome defines parameters for CopyStaffAccessOrganization.
+type CopyStaffAccessOrganization200JSONResponseBodyItemsOutcome string
+
+// CopyStaffAccessOrganization200JSONResponseBody_Totals defines parameters for CopyStaffAccessOrganization.
+type CopyStaffAccessOrganization200JSONResponseBody_Totals struct {
+	AlreadyCopied        int            `json:"already_copied"`
+	Copied               int            `json:"copied"`
+	Failed               int            `json:"failed"`
+	Planned              int            `json:"planned"`
+	Skipped              int            `json:"skipped"`
+	Stopped              int            `json:"stopped"`
+	AdditionalProperties map[string]int `json:"-"`
+}
+
 // ListStaffAccessOrganizationsParams defines parameters for ListStaffAccessOrganizations.
 type ListStaffAccessOrganizationsParams struct {
 	Query *string `form:"query,omitempty" json:"query,omitempty"`
@@ -52838,12 +52946,13 @@ type ListStaffAccessOrganizationsParams struct {
 
 // CreateStaffAccessRequestJSONBody defines parameters for CreateStaffAccessRequest.
 type CreateStaffAccessRequestJSONBody struct {
-	CodeChallenge       string                                              `json:"codeChallenge"`
-	CodeChallengeMethod CreateStaffAccessRequestJSONBodyCodeChallengeMethod `json:"codeChallengeMethod"`
-	Machine             string                                              `json:"machine"`
-	Organization        *string                                             `json:"organization,omitempty"`
-	Reason              string                                              `json:"reason"`
-	Scopes              []CreateStaffAccessRequestJSONBodyScopes            `json:"scopes"`
+	CodeChallenge           string                                              `json:"codeChallenge"`
+	CodeChallengeMethod     CreateStaffAccessRequestJSONBodyCodeChallengeMethod `json:"codeChallengeMethod"`
+	CounterpartOrganization *string                                             `json:"counterpartOrganization,omitempty"`
+	Machine                 string                                              `json:"machine"`
+	Organization            *string                                             `json:"organization,omitempty"`
+	Reason                  string                                              `json:"reason"`
+	Scopes                  []CreateStaffAccessRequestJSONBodyScopes            `json:"scopes"`
 }
 
 // CreateStaffAccessRequestJSONBodyCodeChallengeMethod defines parameters for CreateStaffAccessRequest.
@@ -57769,6 +57878,9 @@ type DeleteApiSecretsByIdJSONRequestBody DeleteApiSecretsByIdJSONBody
 
 // PutApiSecretsByIdJSONRequestBody defines body for PutApiSecretsById for application/json ContentType.
 type PutApiSecretsByIdJSONRequestBody PutApiSecretsByIdJSONBody
+
+// CopyStaffAccessOrganizationJSONRequestBody defines body for CopyStaffAccessOrganization for application/json ContentType.
+type CopyStaffAccessOrganizationJSONRequestBody CopyStaffAccessOrganizationJSONBody
 
 // CreateStaffAccessRequestJSONRequestBody defines body for CreateStaffAccessRequest for application/json ContentType.
 type CreateStaffAccessRequestJSONRequestBody CreateStaffAccessRequestJSONBody
@@ -65509,6 +65621,137 @@ func (a PostApiScenarioEventsJSONBody_2_Messages_0_Content_1_Item) MarshalJSON()
 	object["metadata"], err = json.Marshal(a.Metadata)
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling 'metadata': %w", err)
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for CopyStaffAccessOrganization200JSONResponseBody_Totals. Returns the specified
+// element and whether it was found
+func (a CopyStaffAccessOrganization200JSONResponseBody_Totals) Get(fieldName string) (value int, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for CopyStaffAccessOrganization200JSONResponseBody_Totals
+func (a *CopyStaffAccessOrganization200JSONResponseBody_Totals) Set(fieldName string, value int) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]int)
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for CopyStaffAccessOrganization200JSONResponseBody_Totals to handle AdditionalProperties
+func (a *CopyStaffAccessOrganization200JSONResponseBody_Totals) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["already_copied"]; found {
+		err = json.Unmarshal(raw, &a.AlreadyCopied)
+		if err != nil {
+			return fmt.Errorf("error reading 'already_copied': %w", err)
+		}
+		delete(object, "already_copied")
+	}
+
+	if raw, found := object["copied"]; found {
+		err = json.Unmarshal(raw, &a.Copied)
+		if err != nil {
+			return fmt.Errorf("error reading 'copied': %w", err)
+		}
+		delete(object, "copied")
+	}
+
+	if raw, found := object["failed"]; found {
+		err = json.Unmarshal(raw, &a.Failed)
+		if err != nil {
+			return fmt.Errorf("error reading 'failed': %w", err)
+		}
+		delete(object, "failed")
+	}
+
+	if raw, found := object["planned"]; found {
+		err = json.Unmarshal(raw, &a.Planned)
+		if err != nil {
+			return fmt.Errorf("error reading 'planned': %w", err)
+		}
+		delete(object, "planned")
+	}
+
+	if raw, found := object["skipped"]; found {
+		err = json.Unmarshal(raw, &a.Skipped)
+		if err != nil {
+			return fmt.Errorf("error reading 'skipped': %w", err)
+		}
+		delete(object, "skipped")
+	}
+
+	if raw, found := object["stopped"]; found {
+		err = json.Unmarshal(raw, &a.Stopped)
+		if err != nil {
+			return fmt.Errorf("error reading 'stopped': %w", err)
+		}
+		delete(object, "stopped")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]int)
+		for fieldName, fieldBuf := range object {
+			var fieldVal int
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for CopyStaffAccessOrganization200JSONResponseBody_Totals to handle AdditionalProperties
+func (a CopyStaffAccessOrganization200JSONResponseBody_Totals) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["already_copied"], err = json.Marshal(a.AlreadyCopied)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'already_copied': %w", err)
+	}
+
+	object["copied"], err = json.Marshal(a.Copied)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'copied': %w", err)
+	}
+
+	object["failed"], err = json.Marshal(a.Failed)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'failed': %w", err)
+	}
+
+	object["planned"], err = json.Marshal(a.Planned)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'planned': %w", err)
+	}
+
+	object["skipped"], err = json.Marshal(a.Skipped)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'skipped': %w", err)
+	}
+
+	object["stopped"], err = json.Marshal(a.Stopped)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'stopped': %w", err)
 	}
 
 	for fieldName, field := range a.AdditionalProperties {
@@ -128759,6 +129002,11 @@ type ClientInterface interface {
 	// GetApiSlackConnections request
 	GetApiSlackConnections(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// CopyStaffAccessOrganizationWithBody request with any body
+	CopyStaffAccessOrganizationWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CopyStaffAccessOrganization(ctx context.Context, body CopyStaffAccessOrganizationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListStaffAccessOrganizations request
 	ListStaffAccessOrganizations(ctx context.Context, params *ListStaffAccessOrganizationsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -134991,6 +135239,30 @@ func (c *Client) GetApiSimulationRunsByScenarioRunId(ctx context.Context, scenar
 
 func (c *Client) GetApiSlackConnections(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetApiSlackConnectionsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CopyStaffAccessOrganizationWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCopyStaffAccessOrganizationRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CopyStaffAccessOrganization(ctx context.Context, body CopyStaffAccessOrganizationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCopyStaffAccessOrganizationRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -152090,6 +152362,46 @@ func NewGetApiSlackConnectionsRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewCopyStaffAccessOrganizationRequest calls the generic CopyStaffAccessOrganization builder with application/json body
+func NewCopyStaffAccessOrganizationRequest(server string, body CopyStaffAccessOrganizationJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCopyStaffAccessOrganizationRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCopyStaffAccessOrganizationRequestWithBody generates requests for CopyStaffAccessOrganization with any type of body
+func NewCopyStaffAccessOrganizationRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/staff-access/ops/copies")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewListStaffAccessOrganizationsRequest generates requests for ListStaffAccessOrganizations
 func NewListStaffAccessOrganizationsRequest(server string, params *ListStaffAccessOrganizationsParams) (*http.Request, error) {
 	var err error
@@ -156558,6 +156870,11 @@ type ClientWithResponsesInterface interface {
 
 	// GetApiSlackConnectionsWithResponse request
 	GetApiSlackConnectionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiSlackConnectionsResponse, error)
+
+	// CopyStaffAccessOrganizationWithBodyWithResponse request with any body
+	CopyStaffAccessOrganizationWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CopyStaffAccessOrganizationResponse, error)
+
+	CopyStaffAccessOrganizationWithResponse(ctx context.Context, body CopyStaffAccessOrganizationJSONRequestBody, reqEditors ...RequestEditorFn) (*CopyStaffAccessOrganizationResponse, error)
 
 	// ListStaffAccessOrganizationsWithResponse request
 	ListStaffAccessOrganizationsWithResponse(ctx context.Context, params *ListStaffAccessOrganizationsParams, reqEditors ...RequestEditorFn) (*ListStaffAccessOrganizationsResponse, error)
@@ -180497,6 +180814,60 @@ func (r GetApiSlackConnectionsResponse) ContentType() string {
 	return ""
 }
 
+type CopyStaffAccessOrganizationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		DryRun bool `json:"dryRun"`
+		Items  []struct {
+			Kind            CopyStaffAccessOrganization200JSONResponseBodyItemsKind    `json:"kind"`
+			Name            string                                                     `json:"name"`
+			Outcome         CopyStaffAccessOrganization200JSONResponseBodyItemsOutcome `json:"outcome"`
+			Reason          *string                                                    `json:"reason"`
+			SourceId        string                                                     `json:"sourceId"`
+			SourceProjectId string                                                     `json:"sourceProjectId"`
+			TargetId        *string                                                    `json:"targetId"`
+			TargetProjectId *string                                                    `json:"targetProjectId"`
+		} `json:"items"`
+		Source struct {
+			Id   string `json:"id"`
+			Name string `json:"name"`
+			Slug string `json:"slug"`
+		} `json:"source"`
+		StoppedBecause *string `json:"stoppedBecause"`
+		Target         struct {
+			Id   string `json:"id"`
+			Name string `json:"name"`
+			Slug string `json:"slug"`
+		} `json:"target"`
+		Totals CopyStaffAccessOrganization200JSONResponseBody_Totals `json:"totals"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r CopyStaffAccessOrganizationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CopyStaffAccessOrganizationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CopyStaffAccessOrganizationResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ListStaffAccessOrganizationsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -188098,6 +188469,23 @@ func (c *ClientWithResponses) GetApiSlackConnectionsWithResponse(ctx context.Con
 		return nil, err
 	}
 	return ParseGetApiSlackConnectionsResponse(rsp)
+}
+
+// CopyStaffAccessOrganizationWithBodyWithResponse request with arbitrary body returning *CopyStaffAccessOrganizationResponse
+func (c *ClientWithResponses) CopyStaffAccessOrganizationWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CopyStaffAccessOrganizationResponse, error) {
+	rsp, err := c.CopyStaffAccessOrganizationWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCopyStaffAccessOrganizationResponse(rsp)
+}
+
+func (c *ClientWithResponses) CopyStaffAccessOrganizationWithResponse(ctx context.Context, body CopyStaffAccessOrganizationJSONRequestBody, reqEditors ...RequestEditorFn) (*CopyStaffAccessOrganizationResponse, error) {
+	rsp, err := c.CopyStaffAccessOrganization(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCopyStaffAccessOrganizationResponse(rsp)
 }
 
 // ListStaffAccessOrganizationsWithResponse request returning *ListStaffAccessOrganizationsResponse
@@ -214785,6 +215173,56 @@ func ParseGetApiSlackConnectionsResponse(rsp *http.Response) (*GetApiSlackConnec
 
 			// SlackTeamName The Slack workspace a bot connection posts into.
 			SlackTeamName *string `json:"slackTeamName"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCopyStaffAccessOrganizationResponse parses an HTTP response from a CopyStaffAccessOrganizationWithResponse call
+func ParseCopyStaffAccessOrganizationResponse(rsp *http.Response) (*CopyStaffAccessOrganizationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CopyStaffAccessOrganizationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			DryRun bool `json:"dryRun"`
+			Items  []struct {
+				Kind            CopyStaffAccessOrganization200JSONResponseBodyItemsKind    `json:"kind"`
+				Name            string                                                     `json:"name"`
+				Outcome         CopyStaffAccessOrganization200JSONResponseBodyItemsOutcome `json:"outcome"`
+				Reason          *string                                                    `json:"reason"`
+				SourceId        string                                                     `json:"sourceId"`
+				SourceProjectId string                                                     `json:"sourceProjectId"`
+				TargetId        *string                                                    `json:"targetId"`
+				TargetProjectId *string                                                    `json:"targetProjectId"`
+			} `json:"items"`
+			Source struct {
+				Id   string `json:"id"`
+				Name string `json:"name"`
+				Slug string `json:"slug"`
+			} `json:"source"`
+			StoppedBecause *string `json:"stoppedBecause"`
+			Target         struct {
+				Id   string `json:"id"`
+				Name string `json:"name"`
+				Slug string `json:"slug"`
+			} `json:"target"`
+			Totals CopyStaffAccessOrganization200JSONResponseBody_Totals `json:"totals"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err

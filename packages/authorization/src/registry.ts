@@ -231,6 +231,11 @@ export const AUTHZ_RESOURCES = {
     actions: ["view"],
     scopes: ["platform"],
   },
+  // An approved staff agent copying projects between two organizations, each approved apart.
+  opsCopy: {
+    actions: ["create"],
+    scopes: ["platform"],
+  },
 } as const satisfies Record<
   string,
   {

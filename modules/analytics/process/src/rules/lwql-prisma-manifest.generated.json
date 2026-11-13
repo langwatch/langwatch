@@ -28771,6 +28771,33 @@
           "documentation": ""
         },
         {
+          "name": "counterpartOrganizationId",
+          "columnName": "counterpartOrganizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "A copy side's other organization, signed with the approval (staff-access module ADR-002)."
+        },
+        {
+          "name": "counterpartOrganizationName",
+          "columnName": "counterpartOrganizationName",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "copyGrant",
+          "columnName": "copyGrant",
+          "type": "String",
+          "kind": "scalar",
+          "isList": true,
+          "isOptional": false,
+          "documentation": "What a copy target may create, fixed when asked; shown, signed and enforced as stored."
+        },
+        {
           "name": "reason",
           "columnName": "reason",
           "type": "String",
@@ -29102,6 +29129,106 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": true,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "StaffAccessCopyLedger",
+      "tableName": "StaffAccessCopyLedger",
+      "documentation": "The organization copy ledger (staff-access module ADR-002): which source object a copy made\nwhich target object from, so a rerun into the same organization adds only what is new.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "requestId",
+          "columnName": "requestId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "sourceOrganizationId",
+          "columnName": "sourceOrganizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "targetOrganizationId",
+          "columnName": "targetOrganizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "kind",
+          "columnName": "kind",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "sourceId",
+          "columnName": "sourceId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "targetId",
+          "columnName": "targetId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "sourceProjectId",
+          "columnName": "sourceProjectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "targetProjectId",
+          "columnName": "targetProjectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
           "documentation": ""
         }
       ]

@@ -3,6 +3,8 @@ import { moduleApi, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import type {
+  StaffAccessCopyBody,
+  StaffAccessCopyReport,
   StaffAccessOrganizationList,
   StaffAccessQueueSummary,
   StaffAccessRedeemed,
@@ -101,6 +103,13 @@ export interface StaffAccessApi {
     input: StaffAccessAgent & { organization: string },
   ): Promise<StaffAccessUsage>;
   getQueueSummary(input: StaffAccessAgent): Promise<StaffAccessQueueSummary>;
+  /**
+   * Copies the allowlisted setup of the source session's organization into the bearer session's
+   * organization (module ADR-002). Both approvals are checked and audited before anything runs.
+   */
+  copyOrganization(
+    input: StaffAccessAgent & { body: StaffAccessCopyBody },
+  ): Promise<StaffAccessCopyReport>;
 
   /** Audits every session whose hour passed with no revoke, once each. */
   sweepExpiredSessions(input: { at: number }): Promise<{ audited: number }>;

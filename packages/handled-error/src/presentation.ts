@@ -2858,6 +2858,34 @@ const presentations = {
     describe: () =>
       "The development secrets source could not be read. Sign in to it and try again.",
   },
+  staff_copy_source_invalid: {
+    title: "The copy's source session is not valid",
+    describe: () =>
+      "An organization copy names its source session by that session's own ops token, and this one was not recognised.",
+  },
+  staff_copy_scope_missing: {
+    title: "This approval does not cover a copy",
+    describe: () =>
+      "A copy needs one approval for copy:source on the source organization and one for copy:target on the target, each naming the other organization.",
+  },
+  staff_copy_same_organization: {
+    title: "The source and target are the same organization",
+    describe: () => "A copy goes from one organization into a different one.",
+  },
+  staff_copy_approvals_mismatch: {
+    title: "The two approvals do not belong together",
+    describe: () => "Both approvals of a copy must come from the same agent and the same operator.",
+  },
+  staff_copy_direction_mismatch: {
+    title: "The two approvals name different copies",
+    describe: () =>
+      "Each approval of a copy names the other organization, and these two do not name each other.",
+  },
+  staff_copy_window_closed: {
+    title: "The source approval is no longer live",
+    describe: () =>
+      "Both approvals of a copy must be live at the same time, and the source one expired, ended or was revoked.",
+  },
   staff_access_unavailable: {
     title: "Staff access is not available here",
     describe: () =>

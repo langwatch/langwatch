@@ -1,5 +1,6 @@
 import chalk from "chalk";
 
+import { isLangWatchHandledError } from "../../../internal/api/errors";
 import { getEndpoint } from "../../utils/endpoint";
 import { commandValidationError } from "../../utils/errorOutput";
 import {
@@ -137,7 +138,7 @@ const redeemInto = async ({
 };
 
 /** Polls the request until it is decided or its approval window closes. */
-const waitForDecision = async ({
+export const waitForDecision = async ({
   requestId,
   endpoint,
   requesterKey,
@@ -150,19 +151,43 @@ const waitForDecision = async ({
 }): Promise<string> => {
   const deadline = Date.parse(expiresAt);
   for (;;) {
-    const current = await staffAccessFetch<RequestStatus>({
-      method: "GET",
-      path: `/api/staff-access/requests/${encodeURIComponent(requestId)}`,
-      bearer: requesterKey,
-      endpoint,
-    });
-    if (current.status !== "pending") return current.status;
+    const current = await pollStatus({ requestId, endpoint, requesterKey });
+    if (current && current.status !== "pending") return current.status;
     if (Number.isFinite(deadline) && Date.now() >= deadline) return "expired";
     await sleep(OPS_POLL_INTERVAL_MS);
   }
 };
 
-const refuseUndecided = ({ requestId, status }: { requestId: string; status: string }): never => {
+/** One status read; a failed read the platform did not refuse by name answers undefined. */
+const pollStatus = async ({
+  requestId,
+  endpoint,
+  requesterKey,
+}: {
+  requestId: string;
+  endpoint: string;
+  requesterKey: string;
+}): Promise<RequestStatus | undefined> => {
+  try {
+    return await staffAccessFetch<RequestStatus>({
+      method: "GET",
+      path: `/api/staff-access/requests/${encodeURIComponent(requestId)}`,
+      bearer: requesterKey,
+      endpoint,
+    });
+  } catch (error) {
+    if (isLangWatchHandledError(error) && error.httpStatus < 500) throw error;
+    return undefined;
+  }
+};
+
+export const refuseUndecided = ({
+  requestId,
+  status,
+}: {
+  requestId: string;
+  status: string;
+}): never => {
   forgetPendingRequest({ requestId });
   if (status === "denied") throw opsAuthError(`Request ${requestId} was denied.`);
   if (status === "expired") {

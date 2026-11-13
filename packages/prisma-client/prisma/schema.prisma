@@ -7836,6 +7836,11 @@ model StaffAccessRequest {
   scopes               String[]
   organizationId       String?
   organizationName     String?
+  /// A copy side's other organization, signed with the approval (staff-access module ADR-002).
+  counterpartOrganizationId   String?
+  counterpartOrganizationName String?
+  /// What a copy target may create, fixed when asked; shown, signed and enforced as stored.
+  copyGrant            String[]  @default([])
   reason               String
   codeChallenge        String
   machine              String
@@ -7882,4 +7887,22 @@ model StaffAccessEvent {
   userAgent      String?
 
   @@index([requestId, at])
+}
+
+/// The organization copy ledger (staff-access module ADR-002): which source object a copy made
+/// which target object from, so a rerun into the same organization adds only what is new.
+model StaffAccessCopyLedger {
+  id                   String   @id
+  requestId            String
+  sourceOrganizationId String
+  targetOrganizationId String
+  kind                 String
+  sourceId             String
+  targetId             String
+  sourceProjectId      String
+  targetProjectId      String
+  createdAt            DateTime @default(now())
+
+  @@unique([targetOrganizationId, kind, sourceId])
+  @@index([sourceOrganizationId, targetOrganizationId], map: "StaffAccessCopyLedger_pair_idx")
 }

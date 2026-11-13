@@ -1108,6 +1108,26 @@ const registry = {
       "The report expired or was never stored; ask the install to send the step's diagnostics again",
     ],
   },
+  staff_copy_source_invalid: {
+    tips: ["Request the source access again and pass its ops token"],
+  },
+  staff_copy_scope_missing: {
+    tips: [
+      "Request copy:source on the source and copy:target on the target, each naming the other organization",
+    ],
+  },
+  staff_copy_same_organization: {
+    tips: ["Copy into a different organization"],
+  },
+  staff_copy_approvals_mismatch: {
+    tips: ["Request both approvals from the same agent and approve them as the same operator"],
+  },
+  staff_copy_direction_mismatch: {
+    tips: ["Request both approvals again with langwatch ops copy, which names both organizations"],
+  },
+  staff_copy_window_closed: {
+    tips: ["Request both approvals again, so both are live together"],
+  },
   staff_access_unavailable: {
     tips: ["Staff access is off on this deployment; ask a platform operator"],
   },

@@ -14,12 +14,54 @@ export const STAFF_SUPPORT_ROLE_KEY = "staff-support" as const;
 /** Every scope an operator may approve for an agent. */
 export const STAFF_ACCESS_SCOPES = [
   "ops:read",
+  "copy:source",
+  "copy:target",
   "org:metadata",
   "org:content",
   "org:support",
 ] as const;
 
 export type StaffAccessScope = (typeof STAFF_ACCESS_SCOPES)[number];
+
+/** The two sides of an organization copy; each is approved alone and names both organizations. */
+export const STAFF_ACCESS_COPY_SCOPES: readonly StaffAccessScope[] = ["copy:source", "copy:target"];
+
+/** The scopes answered by the staff access door; they never mint an organization key. */
+export const STAFF_ACCESS_PLATFORM_SCOPES: readonly StaffAccessScope[] = [
+  "ops:read",
+  ...STAFF_ACCESS_COPY_SCOPES,
+];
+
+/** Whether the scopes reach into one organization, which mints an organization key. */
+export function reachesOrganization(scopes: readonly StaffAccessScope[]): boolean {
+  return scopes.some((scope) => !STAFF_ACCESS_PLATFORM_SCOPES.includes(scope));
+}
+
+/** Whether the request names an organization: an organization key or a side of a copy. */
+export function namesOrganization(scopes: readonly StaffAccessScope[]): boolean {
+  return (
+    reachesOrganization(scopes) || scopes.some((scope) => STAFF_ACCESS_COPY_SCOPES.includes(scope))
+  );
+}
+
+/**
+ * Exactly what an approved `copy:target` lets the server create in the target organization:
+ * projects, evaluators, monitors (created, then paused), prompt versions and datasets. The
+ * approval page lists it and the passkey signs it; the copy checks each item against it.
+ */
+export const STAFF_COPY_TARGET_PERMISSIONS: readonly AuthzPermission[] = [
+  "project:create",
+  "evaluations:create",
+  "evaluations:update",
+  "prompts:create",
+  "prompts:update",
+  "datasets:create",
+];
+
+/** The grant a set of scopes gives a copy in its target organization; empty for any other. */
+export function staffCopyGrant(scopes: readonly string[]): AuthzPermission[] {
+  return scopes.includes("copy:target") ? [...STAFF_COPY_TARGET_PERMISSIONS] : [];
+}
 
 /**
  * How an organization is set up and used: projects, analytics, cost, evaluator and trigger
@@ -72,16 +114,15 @@ export const STAFF_WRITES_WITHOUT_SPEND: readonly AuthzPermission[] = [
 ];
 
 /**
- * The permissions an approved set of scopes grants in its one organization, each once. `ops:read`
- * grants none here: it is answered by the staff access door, never by a key in an organization.
+ * The permissions an approved set of scopes grants in its one organization's key, each once.
+ * `ops:read` and the copy scopes grant none here: the staff access door answers them, never a key.
  */
 export function staffAccessPermissions({
   scopes,
 }: {
   scopes: readonly StaffAccessScope[];
 }): AuthzPermission[] {
-  const reachesOrganization = scopes.some((scope) => scope !== "ops:read");
-  if (!reachesOrganization) return [];
+  if (!reachesOrganization(scopes)) return [];
 
   const granted = new Set<AuthzPermission>(STAFF_READER_METADATA_PERMISSIONS);
   if (scopes.includes("org:content")) {
