@@ -149,7 +149,8 @@ function LicenseDetails({ license }: { license: License }) {
       <Detail label="License id">{license.licenseId}</Detail>
       <Detail label="Plan">{license.planType}</Detail>
       <Detail label="Seats">
-        {license.maxMembers} full, {liteSeatsText(license)}
+        {license.maxMembers} full, {liteSeatsText(license)}, {license.maxMembersDeveloper ?? 0}{" "}
+        Developer
       </Detail>
       <Detail label="Issued">{formatDate(license.issuedAt)}</Detail>
       <Detail label="Term ends">{formatDate(license.expiresAt)}</Detail>
@@ -325,6 +326,7 @@ function ChangeSeatsSection({ license, onChanged }: { license: License; onChange
 function ReissueSection({ license }: { license: License }) {
   const commands = useLicenseCommands();
   const [seats, setSeats] = useState(() => license.maxMembers.toString());
+  const [developers, setDevelopers] = useState(() => developerSeatsOf(license));
   const [expires, setExpires] = useState("");
   const [issuedKey, setIssuedKey] = useState<string | null>(null);
 
@@ -332,6 +334,7 @@ function ReissueSection({ license }: { license: License }) {
   if (seatsFrom !== license) {
     setSeatsFrom(license);
     setSeats(license.maxMembers.toString());
+    setDevelopers(developerSeatsOf(license));
   }
 
   // Only another license clears the key shown. Reissuing refetches this one,
@@ -361,6 +364,15 @@ function ReissueSection({ license }: { license: License }) {
           />
         </Field.Root>
         <Field.Root>
+          <Field.Label>Developer seats</Field.Label>
+          <Input
+            type="number"
+            min={0}
+            value={developers}
+            onChange={(event) => setDevelopers(event.target.value)}
+          />
+        </Field.Root>
+        <Field.Root>
           <Field.Label>New term end</Field.Label>
           <Input type="date" value={expires} onChange={(event) => setExpires(event.target.value)} />
         </Field.Root>
@@ -373,7 +385,12 @@ function ReissueSection({ license }: { license: License }) {
           const iso = dateInputToISO(expires);
           if (!iso) return;
           commands.reissue.mutate(
-            { id: license.id, maxMembers: Number(seats), expiresAt: iso },
+            {
+              id: license.id,
+              maxMembers: Number(seats),
+              ...(developers.trim() === "" ? {} : { maxMembersDeveloper: Number(developers) }),
+              expiresAt: iso,
+            },
             { onSuccess: (result) => setIssuedKey(result.licenseKey) },
           );
         }}
@@ -412,6 +429,10 @@ function DrawerActions({
       ) : null}
     </HStack>
   );
+}
+
+function developerSeatsOf(license: License): string {
+  return String(license.maxMembersDeveloper ?? 0);
 }
 
 function liteSeatsText(license: License): string {

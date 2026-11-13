@@ -34,6 +34,7 @@ interface IssueForm {
   planType: PlanType;
   maxMembers: string;
   maxMembersLite: string;
+  maxMembersDeveloper: string;
   expiresAt: string;
   terms: TermsForm;
   licenseKey: string;
@@ -49,6 +50,7 @@ function emptyIssueForm(): IssueForm {
     planType: "ENTERPRISE",
     maxMembers: "10",
     maxMembersLite: "",
+    maxMembersDeveloper: "",
     expiresAt: "",
     terms: termsFormFrom(null),
     licenseKey: "",
@@ -113,6 +115,9 @@ function sendForm({
       planType: form.planType,
       maxMembers: Number(form.maxMembers),
       ...(form.maxMembersLite.trim() === "" ? {} : { maxMembersLite: Number(form.maxMembersLite) }),
+      ...(form.maxMembersDeveloper.trim() === ""
+        ? {}
+        : { maxMembersDeveloper: Number(form.maxMembersDeveloper) }),
       expiresAt: iso,
       terms: termsPayload(form.terms),
     },
@@ -265,6 +270,18 @@ export function LicenseIssueDrawer({ open, onClose }: { open: boolean; onClose: 
                       setForm((c) => ({ ...c, maxMembersLite: event.target.value }))
                     }
                     placeholder="Plan default"
+                  />
+                </Field.Root>
+                <Field.Root>
+                  <Field.Label>Developer seats</Field.Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={form.maxMembersDeveloper}
+                    onChange={(event) =>
+                      setForm((c) => ({ ...c, maxMembersDeveloper: event.target.value }))
+                    }
+                    placeholder="None"
                   />
                 </Field.Root>
                 <Field.Root required invalid={problems.expiresAt !== undefined}>

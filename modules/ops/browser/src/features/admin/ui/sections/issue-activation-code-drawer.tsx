@@ -37,6 +37,7 @@ interface Draft {
   planType: PlanType;
   maxMembers: string;
   maxMembersLite: string;
+  maxMembersDeveloper: string;
   licenseTermDays: string;
   services: Service[];
   expiresOn: string;
@@ -53,6 +54,7 @@ function emptyDraft(): Draft {
     planType: "ENTERPRISE",
     maxMembers: "25",
     maxMembersLite: "",
+    maxMembersDeveloper: "",
     licenseTermDays: String(DEFAULT_TERM_DAYS),
     services: [...SERVICES],
     expiresOn: isoDaysFromNow(DEFAULT_CODE_DAYS),
@@ -125,6 +127,9 @@ export function IssueActivationCodeDrawer({
         ...(draft.maxMembersLite.trim() === ""
           ? {}
           : { maxMembersLite: Number(draft.maxMembersLite) }),
+        ...(draft.maxMembersDeveloper.trim() === ""
+          ? {}
+          : { maxMembersDeveloper: Number(draft.maxMembersDeveloper) }),
         licenseTermDays: Number(draft.licenseTermDays),
         services: draft.services,
         expiresAt,
@@ -265,6 +270,16 @@ function TermsFields({
             value={draft.maxMembersLite}
             onChange={(event) => set("maxMembersLite", event.target.value)}
             placeholder="Plan default"
+          />
+        </Field.Root>
+        <Field.Root>
+          <Field.Label>Developer seats</Field.Label>
+          <Input
+            type="number"
+            min={0}
+            value={draft.maxMembersDeveloper}
+            onChange={(event) => set("maxMembersDeveloper", event.target.value)}
+            placeholder="None"
           />
         </Field.Root>
       </HStack>

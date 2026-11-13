@@ -14,6 +14,7 @@ export type LicenseMintRequest = Readonly<{
   planType: string;
   maxMembers?: number;
   maxMembersLite?: number;
+  maxMembersDeveloper?: number;
   maxMessagesPerMonth?: number;
   expiresAt?: Instant;
   email?: string;
@@ -59,6 +60,9 @@ export class LicenseMintService {
       planType: request.planType,
       maxMembers: request.maxMembers ?? DEFAULT_MAX_MEMBERS,
       ...(request.maxMembersLite === undefined ? {} : { maxMembersLite: request.maxMembersLite }),
+      ...(request.maxMembersDeveloper === undefined
+        ? {}
+        : { maxMembersDeveloper: request.maxMembersDeveloper }),
       ...(request.maxMessagesPerMonth === undefined
         ? {}
         : { maxMessagesPerMonth: request.maxMessagesPerMonth }),

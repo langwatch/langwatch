@@ -141,6 +141,24 @@ describe("LicenseMintService", () => {
     });
   });
 
+  describe("given the script states Developer seats", () => {
+    /** @scenario The mint script states Developer seats */
+    it("signs them into the license and records them on the registry row", async () => {
+      const { mint, repository, organizations } = harness({ goneBeforeWrite: false });
+
+      await mint.applyToOrganization({
+        organizationId: "org-acme",
+        planType: "ENTERPRISE",
+        maxMembersDeveloper: 2,
+      });
+
+      const licenseKey = organizations.licenses.get("org-acme")?.licenseKey ?? "";
+      const signed = NodeLicenseCryptographyService.create().parseLicenseKey(licenseKey);
+      expect(signed?.data.plan.maxMembersDeveloper).toBe(2);
+      expect((await registryRows(repository))[0]?.maxMembersDeveloper).toBe(2);
+    });
+  });
+
   describe("given writing the license onto the organization fails", () => {
     /** @scenario "A minted license whose organization write fails leaves no registry row" */
     it("deletes the registry row it wrote and fails the mint", async () => {

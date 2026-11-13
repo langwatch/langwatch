@@ -4,7 +4,8 @@ import type { LicenseMintRequest } from "../services/license-mint.service.ts";
 
 const USAGE =
   "generate-license --org-id <organizationId> [--plan ENTERPRISE|GROWTH|PRO] [--max-members <N>]" +
-  " [--max-members-lite <N>] [--max-messages-per-month <N>] [--expires-at <YYYY-MM-DD>]" +
+  " [--max-members-lite <N>] [--max-members-developer <N>] [--max-messages-per-month <N>]" +
+  " [--expires-at <YYYY-MM-DD>]" +
   " [--email <addr>]";
 
 /** A quota is a whole number; "50GB" or "1.9" is a typo, never 50 or 1. */
@@ -41,6 +42,10 @@ export function parseGenerateLicenseArgs(args: readonly string[]): LicenseMintRe
       Object.assign(request, { maxMembers: parseQuota("--max-members", value) }),
     "--max-members-lite": (value) =>
       Object.assign(request, { maxMembersLite: parseQuota("--max-members-lite", value) }),
+    "--max-members-developer": (value) =>
+      Object.assign(request, {
+        maxMembersDeveloper: parseQuota("--max-members-developer", value),
+      }),
     "--max-messages-per-month": (value) =>
       Object.assign(request, {
         maxMessagesPerMonth: parseQuota("--max-messages-per-month", value),
