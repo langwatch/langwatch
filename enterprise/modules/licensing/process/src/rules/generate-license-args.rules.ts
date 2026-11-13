@@ -57,7 +57,8 @@ export function parseGenerateLicenseArgs(args: readonly string[]): LicenseMintRe
     const flag = args[index] ?? "";
     const value = args[index + 1];
     const apply = fields[flag];
-    if (apply === undefined || value === undefined) continue;
+    if (apply === undefined) continue;
+    if (value === undefined) throw new Error(`${flag} requires a value\n${USAGE}`);
     apply(value);
     index++;
   }

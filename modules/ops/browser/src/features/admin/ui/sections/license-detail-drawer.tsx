@@ -379,7 +379,7 @@ function ReissueSection({ license }: { license: License }) {
       </SimpleGrid>
       <Button
         size="sm"
-        disabled={expires === "" || seats === ""}
+        disabled={expires === "" || seats === "" || developers.trim() === ""}
         loading={commands.reissue.isPending}
         onClick={() => {
           const iso = dateInputToISO(expires);
@@ -388,7 +388,7 @@ function ReissueSection({ license }: { license: License }) {
             {
               id: license.id,
               maxMembers: Number(seats),
-              ...(developers.trim() === "" ? {} : { maxMembersDeveloper: Number(developers) }),
+              maxMembersDeveloper: Number(developers),
               expiresAt: iso,
             },
             { onSuccess: (result) => setIssuedKey(result.licenseKey) },

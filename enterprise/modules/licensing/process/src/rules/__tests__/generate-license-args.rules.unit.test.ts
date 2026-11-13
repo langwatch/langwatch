@@ -63,4 +63,10 @@ describe("parseGenerateLicenseArgs", () => {
 
     expect(parseGenerateLicenseArgs(["--org-id", "o", flag, "3"])).toMatchObject({ [seat]: 3 });
   });
+
+  it("refuses a recognised flag given no value, rather than dropping it", () => {
+    expect(() => parseGenerateLicenseArgs(["--org-id", "o", "--max-members-developer"])).toThrow(
+      "--max-members-developer requires a value",
+    );
+  });
 });

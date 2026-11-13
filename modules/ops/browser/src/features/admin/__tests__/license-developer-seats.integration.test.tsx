@@ -139,4 +139,14 @@ describe("LicenseDetailDrawer, Developer seats", () => {
     expect(reissue).toHaveBeenCalledTimes(1);
     expect(reissue.mock.calls[0]?.[0]).toMatchObject({ id: "il_1", maxMembersDeveloper: 7 });
   });
+
+  it("will not reissue while the Developer seats field is empty", () => {
+    renderDrawer(license());
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Developer seats" }), {
+      target: { value: "" },
+    });
+    fireEvent.change(screen.getByLabelText("New term end"), { target: { value: "2028-01-01" } });
+
+    expect(screen.getByRole("button", { name: "Reissue license" })).toBeDisabled();
+  });
 });

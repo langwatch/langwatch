@@ -9,6 +9,7 @@ import {
 } from "@langwatch/enterprise-license-signing";
 import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 import type { OrganizationProvisioningSummary } from "@langwatch/organization-contract";
+import { MAX_STATED_SEATS } from "@langwatch/plans";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -156,6 +157,22 @@ describe("LicenseMintService", () => {
       const signed = NodeLicenseCryptographyService.create().parseLicenseKey(licenseKey);
       expect(signed?.data.plan.maxMembersDeveloper).toBe(2);
       expect((await registryRows(repository))[0]?.maxMembersDeveloper).toBe(2);
+    });
+  });
+
+  describe("given the script states more Developer seats than the seat column holds", () => {
+    it("refuses before signing anything", async () => {
+      const { mint, repository, organizations } = harness({ goneBeforeWrite: false });
+
+      await expect(
+        mint.applyToOrganization({
+          organizationId: "org-acme",
+          planType: "ENTERPRISE",
+          maxMembersDeveloper: MAX_STATED_SEATS + 1,
+        }),
+      ).rejects.toThrow(`at most ${MAX_STATED_SEATS}`);
+      expect(await registryRows(repository)).toEqual([]);
+      expect(organizations.licenses.size).toBe(0);
     });
   });
 
