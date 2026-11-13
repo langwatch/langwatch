@@ -14,6 +14,16 @@ export const organizationApiScopeSchema: OrganizationApiScopeSchema =
   organizationApiScopeSchemaDefinition;
 export type OrganizationApiScope = z.infer<typeof organizationApiScopeSchema>;
 
+/** The docs playground switch an administrator saves for one organization. */
+const organizationApiSaveDocsPlaygroundPolicyInputSchemaDefinition = z
+  .object({ organizationId: z.string(), docsPlaygroundSessionsEnabled: z.boolean() })
+  .strict();
+export interface OrganizationApiSaveDocsPlaygroundPolicyInputSchema extends Named<
+  typeof organizationApiSaveDocsPlaygroundPolicyInputSchemaDefinition
+> {}
+export const organizationApiSaveDocsPlaygroundPolicyInputSchema: OrganizationApiSaveDocsPlaygroundPolicyInputSchema =
+  organizationApiSaveDocsPlaygroundPolicyInputSchemaDefinition;
+
 /** One member of one organization. */
 const organizationApiMemberScopeSchemaDefinition = z.object({
   userId: z.string(),

@@ -151,7 +151,14 @@ export const apiKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof apiKey
         browserSession,
         projectId: input.projectId,
         docsOrigin: input.docsOrigin,
+        access: input.access,
+        lifetimeMinutes: input.lifetimeMinutes,
       }),
     )
+
+    // The consent page's first read: whether the project's organization turned the flow off.
+    .procedure("docsSessionAvailability")
+    .withPermission("project:view", { via: "projectId" })
+    .handle(({ app, input }) => app.getDocsSessionAvailability({ projectId: input.projectId }))
 
     .build();

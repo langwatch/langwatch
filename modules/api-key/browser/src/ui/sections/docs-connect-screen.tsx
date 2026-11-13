@@ -1,15 +1,23 @@
 /**
  * `/connect/docs`: the docs playground's consent popup (ADR-185). A member lets one registered
- * docs site act as them in one project for five minutes. The key is posted only to the session
- * frame that opened the popup, at this app's own origin, never to the docs page.
+ * docs site act as them in one project, read-only or fully, for 5 to 60 minutes. The key is
+ * posted only to the session frame that opened the popup, at this app's own origin.
  */
 
+import {
+  DOCS_SESSION_KEY_LIFETIME_MINUTES,
+  docsSessionKeyLifetimeMinutesSchema,
+  type DocsSessionKeyAccess,
+  type DocsSessionKeyLifetimeMinutes,
+} from "@langwatch/api-key-contract";
 import { BrandedCard, BrandedCardPage } from "@langwatch/design-system/branded-card";
 import { Box, Button, HStack, Stack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Radio, RadioGroup } from "@langwatch/design-system/radio";
+import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import { Clock3 } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { useAuthorizeHost } from "../../model/authorize-host.ts";
+import { useAuthorizeHost, type DocsOpener } from "../../model/authorize-host.ts";
 import {
   deniedMessage,
   grantedMessage,
@@ -43,6 +51,8 @@ export default function DocsConnect() {
   const { query } = host.route();
   const { projectId } = host.scope();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [access, setAccess] = useState<DocsSessionKeyAccess>("full");
+  const [lifetimeMinutes, setLifetimeMinutes] = useState<DocsSessionKeyLifetimeMinutes>(5);
 
   useEffect(() => {
     if (status !== "unauthenticated") return;
@@ -70,11 +80,32 @@ export default function DocsConnect() {
     );
   }
 
+  const availability = host.docsSessionAvailability();
+  if (availability === "disabled") {
+    return (
+      <BrandedCardPage>
+        <BrandedCard
+          title="Your organisation turned this off"
+          intro="Your organisation does not let the docs playground use your account. Paste an API key into the playground instead."
+        >
+          <Button variant="outline" onClick={handleDenyOf({ host, opener, state: request.state })}>
+            Close
+          </Button>
+        </BrandedCard>
+      </BrandedCardPage>
+    );
+  }
+
   const handleAllow = async () => {
     if (!projectId) return;
     setIsSubmitting(true);
     try {
-      const minted = await host.mintDocsSessionKey({ projectId, docsOrigin: request.origin });
+      const minted = await host.mintDocsSessionKey({
+        projectId,
+        docsOrigin: request.origin,
+        access,
+        lifetimeMinutes,
+      });
       opener.post({
         message: grantedMessage({ state: request.state, minted }),
         targetOrigin: host.appOrigin(),
@@ -86,13 +117,7 @@ export default function DocsConnect() {
     }
   };
 
-  const handleDeny = () => {
-    opener.post({
-      message: deniedMessage({ state: request.state }),
-      targetOrigin: host.appOrigin(),
-    });
-    host.closeWindow();
-  };
+  const handleDeny = handleDenyOf({ host, opener, state: request.state });
 
   return (
     <BrandedCardPage>
@@ -127,15 +152,55 @@ export default function DocsConnect() {
             </Text>
             {host.projectSwitcher()}
           </HStack>
-          <StatusCard palette="blue" icon={Clock3} title="Access ends after 5 minutes">
-            It may do anything you can do in this project, until then or until you sign out.
+          <VStack align="stretch" gap={2}>
+            <Text textStyle="sm" color="fg.muted">
+              What the docs may do
+            </Text>
+            <RadioGroup
+              value={access}
+              onValueChange={(details) => setAccess(details.value === "read" ? "read" : "full")}
+              data-testid="docs-connect-access"
+            >
+              <VStack align="stretch" gap={2}>
+                <Radio value="full">Everything you can do in this project</Radio>
+                <Radio value="read">Read only</Radio>
+              </VStack>
+            </RadioGroup>
+          </VStack>
+          <HStack width="full" justify="space-between">
+            <Text textStyle="sm" color="fg.muted">
+              Access lasts
+            </Text>
+            <SegmentedControl
+              size="xs"
+              aria-label="How long access lasts"
+              value={String(lifetimeMinutes)}
+              onValueChange={(details) => {
+                const parsed = docsSessionKeyLifetimeMinutesSchema.safeParse(Number(details.value));
+                if (parsed.success) setLifetimeMinutes(parsed.data);
+              }}
+              items={DOCS_SESSION_KEY_LIFETIME_MINUTES.map((minutes) => ({
+                value: String(minutes),
+                label: `${minutes} min`,
+              }))}
+              data-testid="docs-connect-lifetime"
+            />
+          </HStack>
+          <StatusCard
+            palette="blue"
+            icon={Clock3}
+            title={`Access ends after ${lifetimeMinutes} minutes`}
+          >
+            {access === "read"
+              ? "It may read anything you can read in this project, until then or until you sign out."
+              : "It may do anything you can do in this project, until then or until you sign out."}
           </StatusCard>
           <Stack direction={{ base: "column", sm: "row" }} gap={3}>
             <Button
               colorPalette="orange"
               flex={1}
               onClick={handleAllow}
-              disabled={!projectId || isSubmitting}
+              disabled={!projectId || isSubmitting || availability !== "enabled"}
               loading={isSubmitting}
             >
               Allow
@@ -154,4 +219,20 @@ export default function DocsConnect() {
       </BrandedCard>
     </BrandedCardPage>
   );
+}
+
+/** Deny, and Close on a refusal: the frame hears no key and the popup closes. */
+function handleDenyOf({
+  host,
+  opener,
+  state,
+}: {
+  host: ReturnType<typeof useAuthorizeHost>;
+  opener: DocsOpener;
+  state: string;
+}) {
+  return () => {
+    opener.post({ message: deniedMessage({ state }), targetOrigin: host.appOrigin() });
+    host.closeWindow();
+  };
 }

@@ -12,6 +12,7 @@ import {
   type ResolvedApiKeyCredential,
   API_KEY_PREFIX,
   CLI_LOGIN_KEY_NAME_PREFIX,
+  DOCS_SESSION_API_KEY_NAME,
   LANGY_SESSION_API_KEY_NAME,
   WORKFLOW_RUN_API_KEY_NAME,
 } from "@langwatch/api-key-contract";
@@ -52,6 +53,10 @@ const DATE_FIELDS = new Set(["expiresAt", "revokedAt", "lastUsedAt", "createdAt"
 const verifiedKey = (lookupId: string) => `pat:${lookupId}`;
 const unknownKey = (hash: string) => `unknown:${hash}`;
 const legacyKey = (hash: string) => `legacy:${hash}`;
+
+function isDocsSessionKey(key: Pick<ApiKey, "name" | "isSystemManaged">): boolean {
+  return key.isSystemManaged === true && key.name === DOCS_SESSION_API_KEY_NAME;
+}
 
 function publicApiKey(row: StoredApiKey): ApiKey {
   const { hashedSecret: _hashedSecret, ...key } = row;
@@ -119,11 +124,29 @@ export class ApiKeyTokenResolutionService {
   }
 
   /**
+   * A docs session key authenticates only while its organization lets the docs playground
+   * connect (ADR-185, 2026-11-13). Asked live, never held, so turning it off ends them at once.
+   */
+  private async findAnswer(input: {
+    token: string;
+    projectId: string | null;
+    withProject: boolean;
+  }): Promise<HeldAnswer | null> {
+    const held = await this.findHeldAnswer(input);
+    if (!held || !isDocsSessionKey(held.answer)) return held;
+    const policy = await this.options.organizations.getDocsPlaygroundPolicy({
+      organizationId: held.answer.organizationId,
+    });
+
+    return policy.docsPlaygroundSessionsEnabled ? held : null;
+  }
+
+  /**
    * Redis first, then Postgres. A held answer counts only for the exact token whose hash it
    * carries, so a wrong secret is verified in full; it lapses at the key's own expiry when
    * that comes sooner. A revoke's refusal is final. A failed read throws and nothing is held.
    */
-  private async findAnswer(input: {
+  private async findHeldAnswer(input: {
     token: string;
     projectId: string | null;
     withProject: boolean;

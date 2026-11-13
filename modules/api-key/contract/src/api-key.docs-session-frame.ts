@@ -151,7 +151,7 @@ const FRAME_RUNTIME = String.raw`function (config) {
     timeout: "LangWatch did not answer within two minutes. Try again, or paste an API key.",
     ended: "Your access ended. Connect again to keep sending.",
     disconnected: "Disconnected.",
-    local: "Disconnected here. LangWatch could not be reached, so the access ends on its own within five minutes.",
+    local: "Disconnected here. LangWatch could not be reached, so the access still ends on its own when it expires, within an hour at most.",
     notEmbedded: "Open this from the API playground in the docs."
   };
   var METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];

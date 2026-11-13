@@ -1451,6 +1451,11 @@ const presentations = {
     describe: () =>
       "The documentation site that opened this page is not registered with this LangWatch installation. Paste an API key into the playground instead.",
   },
+  docs_playground_sessions_disabled: {
+    title: "Your organisation turned this off",
+    describe: () =>
+      "Your organisation does not let the documentation playground use your account. Paste an API key into the playground instead.",
+  },
   api_key_scope_violation: {
     title: "You don't have access for this",
     describe: () =>

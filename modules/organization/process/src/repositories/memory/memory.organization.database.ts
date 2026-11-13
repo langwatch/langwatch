@@ -56,6 +56,8 @@ export interface MemoryOrganizationRow {
   joinerRole?: "MEMBER" | "DEVELOPER";
   /** The CLI/device session ceiling in days; absent reads as unbounded. */
   maxSessionDurationDays?: number;
+  /** Whether the docs playground may connect (ADR-185); absent reads as on. */
+  docsPlaygroundSessionsEnabled?: boolean;
   /** The sign-in security columns (GAC-09, GAC-10); absent reads as no rule. */
   lockoutAfterFailedAttempts?: number;
   lockoutMinutes?: number;

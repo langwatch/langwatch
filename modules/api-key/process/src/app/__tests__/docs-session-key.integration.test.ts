@@ -7,6 +7,8 @@ import {
   ApiKeyNotFoundError,
   DocsOriginNotRegisteredError,
   DOCS_SESSION_KEY_LIFETIME_MS,
+  type DocsSessionKeyAccess,
+  type DocsSessionKeyLifetimeMinutes,
 } from "@langwatch/api-key-contract";
 import { ALL_PERMISSIONS, PermissionDeniedError } from "@langwatch/authorization";
 import {
@@ -97,6 +99,7 @@ function projectWithTeam(id: string): ProjectWithTeam {
 async function appOver(
   options: { maxSessionDurationDays?: number; grants?: CollectedGrants } = {},
 ) {
+  const organization = { docsPlaygroundSessionsEnabled: true };
   const engine = new AuthzEngine();
   const member = { grants: options.grants ?? memberGrants("member") };
   const apiKeys = MemoryApiKeyRepository.create({ memory: MemoryApiKeyDatabase.create() });
@@ -140,6 +143,7 @@ async function appOver(
         getSessionPolicy: async () => ({
           maxSessionDurationDays: options.maxSessionDurationDays ?? 0,
         }),
+        getDocsPlaygroundPolicy: async () => ({ ...organization }),
       }),
       projects: createApiFixture<ProjectApi>({
         findPersonalWorkspaceOwner: async () => null,
@@ -150,7 +154,7 @@ async function appOver(
     config: { docsOrigins: void 0, isSaas: true, publicBaseUrl: "https://app.langwatch.ai" },
   });
 
-  return { app, engine, member, apiKeys, getScope, attachBindings, definedRoles };
+  return { app, engine, member, organization, apiKeys, getScope, attachBindings, definedRoles };
 }
 
 function minting({
@@ -158,18 +162,37 @@ function minting({
   startedAt = new Date(Date.now() - 60_000).toISOString(),
   expiresAt = new Date(Date.now() + 86_400_000).toISOString(),
   projectId = PROJECT_ID,
+  access = "full",
+  lifetimeMinutes = 5,
 }: {
   sessionId?: string;
   startedAt?: string | null;
   expiresAt?: string | null;
   projectId?: string;
+  access?: DocsSessionKeyAccess;
+  lifetimeMinutes?: DocsSessionKeyLifetimeMinutes;
 } = {}) {
   return {
     userId: USER_ID,
     browserSession: { id: sessionId, startedAt, expiresAt },
     projectId,
     docsOrigin: DOCS_ORIGIN,
+    access,
+    lifetimeMinutes,
   };
+}
+
+/** The key's own grants, as authz collects them for the custom role its mint defined. */
+function keyGrantsOf({ keyId, permissions }: { keyId: string; permissions: string[] }) {
+  return {
+    principal: { type: "apiKey", id: keyId },
+    organizationId: ORG_ID,
+    organizationRole: null,
+    isOrgMember: false,
+    membershipDisabled: false,
+    bindings: [{ roleKey: "custom:docs", scopeType: "PROJECT", scopeId: PROJECT_ID }],
+    customRolePermissions: new Map([["docs", permissions]]),
+  } satisfies CollectedGrants;
 }
 
 describe("given a member signed in with access to two projects", () => {
@@ -345,5 +368,111 @@ describe("given two docs session keys minted by one browser session", () => {
     expect(await app.findVerifiedToken({ token: first.token })).toBeNull();
     expect(await app.findVerifiedToken({ token: second.token })).toBeNull();
     expect(await app.findVerifiedToken({ token: elsewhere.token })).not.toBeNull();
+  });
+});
+
+describe("given a member who chose read-only access", () => {
+  /** @scenario "A member grants read-only access" */
+  it("passes reads and refuses every change, still capped by the member's live grants", async () => {
+    const { app, engine, member, definedRoles } = await appOver();
+    const minted = await app.mintDocsSessionKey(minting({ access: "read" }));
+    const verified = await app.findVerifiedToken({ token: minted.token });
+    const permissions = definedRoles[0]!;
+    expect(permissions.length).toBeGreaterThan(0);
+    expect(permissions.every((permission) => permission.endsWith(":view"))).toBe(true);
+    const asKey = (permission: string) =>
+      engine.decideWithCeiling({
+        keyGrants: keyGrantsOf({ keyId: verified!.id, permissions }),
+        ownerGrants: member.grants,
+        permission,
+        scope: SCOPE,
+      }).allowed;
+
+    expect(asKey("traces:view")).toBe(true);
+    expect(asKey("traces:update")).toBe(false);
+    expect(asKey("datasets:create")).toBe(false);
+
+    member.grants = memberGrants(null);
+    expect(asKey("traces:view")).toBe(false);
+  });
+
+  it("keeps the full member's changes on a full-access key", async () => {
+    const { app, definedRoles } = await appOver();
+    await app.mintDocsSessionKey(minting({ access: "full" }));
+
+    expect(definedRoles[0]).toContain("traces:update");
+  });
+});
+
+describe("given a member who chose how long the key lasts", () => {
+  /** @scenario "A member chooses how long the key lasts, up to one hour" */
+  it("lasts the 30 minutes chosen, or less when the session or the ceiling ends first", async () => {
+    const { app } = await appOver();
+    const before = Date.now();
+
+    const minted = await app.mintDocsSessionKey(minting({ lifetimeMinutes: 30 }));
+    expect(minted.expiresIn).toBe(30 * 60);
+    expect(Date.parse(minted.expiresAt) - before).toBeLessThanOrEqual(30 * 60_000 + 1_000);
+
+    const sessionEnds = new Date(Date.now() + 10 * 60_000).toISOString();
+    const shorter = await app.mintDocsSessionKey(
+      minting({ lifetimeMinutes: 30, expiresAt: sessionEnds }),
+    );
+    expect(Date.parse(shorter.expiresAt)).toBeLessThanOrEqual(Date.parse(sessionEnds));
+  });
+
+  /** @scenario "A member chooses how long the key lasts, up to one hour" */
+  it("refuses a request for more than an hour and mints nothing", async () => {
+    const { app, apiKeys } = await appOver();
+    const create = vi.spyOn(apiKeys, "create");
+
+    await expect(
+      app.mintDocsSessionKey({
+        ...minting(),
+        lifetimeMinutes: 120 as DocsSessionKeyLifetimeMinutes,
+      }),
+    ).rejects.toMatchObject({
+      issues: [expect.objectContaining({ path: ["lifetimeMinutes"] })],
+    });
+    expect(create).not.toHaveBeenCalled();
+  });
+});
+
+describe("given an organisation that turned docs playground sessions off", () => {
+  /** @scenario "An organisation turns the playground session off" */
+  it("says so to the consent page, mints nothing and ends the keys already minted", async () => {
+    const { app, apiKeys, organization } = await appOver();
+    const live = await app.mintDocsSessionKey(minting());
+    expect(await app.findVerifiedToken({ token: live.token })).not.toBeNull();
+    const create = vi.spyOn(apiKeys, "create");
+
+    organization.docsPlaygroundSessionsEnabled = false;
+
+    await expect(app.getDocsSessionAvailability({ projectId: PROJECT_ID })).resolves.toEqual({
+      enabled: false,
+    });
+    await expect(app.mintDocsSessionKey(minting())).rejects.toMatchObject({
+      code: "docs_playground_sessions_disabled",
+      httpStatus: 403,
+    });
+    expect(create).not.toHaveBeenCalled();
+    expect(await app.findVerifiedToken({ token: live.token })).toBeNull();
+    expect(await app.findResolvedToken({ token: live.token, projectId: PROJECT_ID })).toBeNull();
+  });
+
+  it("leaves every other key of the organisation authenticating", async () => {
+    const { app, organization } = await appOver();
+    const { token } = await app.create({
+      name: "Customer key",
+      userId: USER_ID,
+      createdByUserId: USER_ID,
+      organizationId: ORG_ID,
+      permissionMode: "all",
+      bindings: [{ role: "MEMBER", scopeType: "PROJECT", scopeId: PROJECT_ID }],
+    });
+
+    organization.docsPlaygroundSessionsEnabled = false;
+
+    expect(await app.findVerifiedToken({ token })).not.toBeNull();
   });
 });

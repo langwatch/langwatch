@@ -1,4 +1,5 @@
 import type {
+  DocsPlaygroundPolicy,
   OrganizationJoinSetting,
   SignInSecurityPolicy,
 } from "@langwatch/organization-contract";
@@ -44,6 +45,17 @@ export class OrganizationSignInPolicyService {
     maxSessionDurationDays: number;
   }): Promise<void> {
     return this.repository.saveSessionPolicy(input);
+  }
+
+  getDocsPlaygroundPolicy(input: { organizationId: string }): Promise<DocsPlaygroundPolicy> {
+    return this.repository.getDocsPlaygroundPolicy(input);
+  }
+
+  saveDocsPlaygroundPolicy(input: {
+    organizationId: string;
+    docsPlaygroundSessionsEnabled: boolean;
+  }): Promise<void> {
+    return this.repository.saveDocsPlaygroundPolicy(input);
   }
 
   getSignInSecurityPolicy(input: { organizationId: string }): Promise<SignInSecurityPolicy> {

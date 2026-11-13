@@ -69,14 +69,14 @@ Feature: Docs session keys for the documentation playground
     Then the registered origin is allowed, without credentials
     And the unregistered origin gets no CORS allowance
 
-  @integration @unimplemented
+  @integration
   Scenario: A member grants read-only access
     Given a member on the consent page
     When they choose "Read only" and allow access
     Then the docs session key passes operations that only read
     And an operation that changes anything is refused with status 403
 
-  @integration @unimplemented
+  @integration
   Scenario: A member chooses how long the key lasts, up to one hour
     Given a member on the consent page
     When they choose 30 minutes and allow access
@@ -84,7 +84,7 @@ Feature: Docs session keys for the documentation playground
     When a mint request asks for more than one hour
     Then it is refused and no key is minted
 
-  @integration @unimplemented
+  @integration
   Scenario: An organisation turns the playground session off
     Given an organisation admin turned off docs playground sessions
     When a member of that organisation opens the consent page

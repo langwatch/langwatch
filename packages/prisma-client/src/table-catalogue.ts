@@ -670,6 +670,7 @@ export const prismaModelFieldCatalogue = {
     "privateDataplaneSeenAt",
     "maxSessionDurationDays",
     "mfaRequired",
+    "docsPlaygroundSessionsEnabled",
     "lockoutAfterFailedAttempts",
     "lockoutMinutes",
     "sessionIdleTimeoutMinutes",

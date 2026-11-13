@@ -109,6 +109,7 @@ import type {
   OrganizationJoinSetting,
   SignInSecurityPolicy,
   SignUpVerdict,
+  DocsPlaygroundPolicy,
 } from "./organization.ts";
 import type * as organizationModule from "./organization.ts";
 import type {
@@ -409,6 +410,15 @@ export interface OrganizationApi {
    * address resolving to nobody and the session path's early-out.
    */
   findConfiguredSignInSecurityPolicies(): Promise<SignInSecurityPolicy[]>;
+  /**
+   * Whether members may connect the docs playground (ADR-185); api-key asks at mint and on every
+   * docs session key it authenticates. An unknown organization reads as off.
+   */
+  getDocsPlaygroundPolicy(input: { organizationId: string }): Promise<DocsPlaygroundPolicy>;
+  saveDocsPlaygroundPolicy(input: {
+    organizationId: string;
+    docsPlaygroundSessionsEnabled: boolean;
+  }): Promise<void>;
   /**
    * The organization's pricing model and currency, for workers deciding on its behalf. A system
    * read: no caller. An unknown organization has no model and the schema's default currency.

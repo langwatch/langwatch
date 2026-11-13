@@ -42,6 +42,7 @@ import {
   apiKeyServerConfig,
   docsOriginsOf,
   type ApiKeyServerConfig,
+  type DocsSessionAvailability,
   type DocsSessionKeyMinted,
   type DocsSessionRevoked,
   type MintDocsSessionKeyInput,
@@ -312,6 +313,9 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
   }
   mintDocsSessionKey(input: MintDocsSessionKeyInput): Promise<DocsSessionKeyMinted> {
     return this.#docsSessionKeys.mint(input);
+  }
+  getDocsSessionAvailability(input: { projectId: string }): Promise<DocsSessionAvailability> {
+    return this.#docsSessionKeys.availability(input);
   }
   revokeDocsSessionKeys(input: RevokeDocsSessionKeysInput): Promise<DocsSessionRevoked> {
     return this.#docsSessionKeys.revoke(input);

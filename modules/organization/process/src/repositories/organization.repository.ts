@@ -13,6 +13,7 @@ import type {
   OrganizationUsageCount,
   PricingModel,
   SignInSecurityPolicy,
+  DocsPlaygroundPolicy,
   OrganizationCurrency,
 } from "@langwatch/organization-contract";
 import type { Project } from "@langwatch/project-contract";
@@ -134,6 +135,14 @@ export abstract class OrganizationRepository {
   abstract saveSessionPolicy(input: {
     organizationId: string;
     maxSessionDurationDays: number;
+  }): Promise<void>;
+  /** Whether the docs playground may connect (ADR-185); an unknown organization reads as off. */
+  abstract getDocsPlaygroundPolicy(input: {
+    organizationId: string;
+  }): Promise<DocsPlaygroundPolicy>;
+  abstract saveDocsPlaygroundPolicy(input: {
+    organizationId: string;
+    docsPlaygroundSessionsEnabled: boolean;
   }): Promise<void>;
   /** The four sign-in security columns (GAC-09, GAC-10); throws OrganizationNotFoundError. */
   abstract getSignInSecurityPolicy(input: {

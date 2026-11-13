@@ -264,6 +264,22 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
     return { success: true as const, teamsLeftWithoutAdmin };
   })
 
+  /** A security policy of the organization's, so an administrator's to read and to change. */
+  .procedure("getDocsPlaygroundPolicy")
+  .withPermission("organization:manage")
+  .handle(({ app, input }) => app.getDocsPlaygroundPolicy({ organizationId: input.organizationId }))
+
+  .procedure("saveDocsPlaygroundPolicy")
+  .withPermission("organization:manage")
+  .handle(async ({ app, input }) => {
+    await app.saveDocsPlaygroundPolicy({
+      organizationId: input.organizationId,
+      docsPlaygroundSessionsEnabled: input.docsPlaygroundSessionsEnabled,
+    });
+
+    return { success: true as const };
+  })
+
   .procedure("getAuditLogs")
   .withEntitlement("enterprise", { feature: "AUDIT_LOGS" })
   .withMiddlewareContext(organizationSessionPersonContext)

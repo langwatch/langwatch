@@ -510,7 +510,7 @@ describe("the docs session frame", () => {
       byId("disconnect").click();
 
       await vi.waitFor(() =>
-        expect(byId("status").textContent).toMatch(/ends on its own within five minutes/),
+        expect(byId("status").textContent).toMatch(/still ends on its own when it expires/),
       );
     });
 
@@ -525,6 +525,21 @@ describe("the docs session frame", () => {
         url: "/api/docs-session",
         init: { method: "DELETE", keepalive: true },
       });
+    });
+
+    /** @scenario "The connection survives moving to another docs page but not a reload" */
+    it("keeps the key in memory only, so a reload's fresh frame starts disconnected", () => {
+      const first = mountFrame();
+      first.connect();
+      expect(first.states().at(-1)).toMatchObject({ connected: true, project: "Checkout" });
+      expect(first.frame.localStorage.length + first.frame.sessionStorage.length).toBe(0);
+      expect(first.frame.document.cookie).toBe("");
+
+      first.frame.dispatchEvent(new first.frame.Event("pagehide"));
+      const reloaded = mountFrame();
+
+      expect(reloaded.states().at(-1)).toMatchObject({ connected: false });
+      expect(reloaded.byId("connect").hidden).toBe(false);
     });
 
     /** @scenario "The frame ends the connection when access ends" */

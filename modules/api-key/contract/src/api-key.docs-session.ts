@@ -1,5 +1,5 @@
 /**
- * Docs session keys (ADR-185, dev/docs/adr/185-docs-session-credentials.md): a five-minute key
+ * Docs session keys (ADR-185, dev/docs/adr/185-docs-session-credentials.md): a short-lived key
  * the documentation playground holds in memory, acting as one member in one project.
  * The consent page, the mint and the revocation all speak the shapes below.
  */
@@ -7,8 +7,31 @@ import { HandledError, remediation } from "@langwatch/handled-error";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-/** The longest a docs session key lives; the browser session or the ceiling may end it sooner. */
+/** The default life of a docs session key; the browser session or the ceiling may end it sooner. */
 export const DOCS_SESSION_KEY_LIFETIME_MS = 5 * 60 * 1000;
+
+/** The lives a member may choose on the consent page, in minutes; nothing longer is minted. */
+export const DOCS_SESSION_KEY_LIFETIME_MINUTES = [5, 15, 30, 60] as const;
+export const DOCS_SESSION_KEY_MAX_LIFETIME_MS = 60 * 60 * 1000;
+
+const docsSessionKeyLifetimeMinutesSchemaDefinition = z.union(
+  DOCS_SESSION_KEY_LIFETIME_MINUTES.map((minutes) => z.literal(minutes)),
+);
+export interface DocsSessionKeyLifetimeMinutesSchema extends Named<
+  typeof docsSessionKeyLifetimeMinutesSchemaDefinition
+> {}
+export const docsSessionKeyLifetimeMinutesSchema: DocsSessionKeyLifetimeMinutesSchema =
+  docsSessionKeyLifetimeMinutesSchemaDefinition;
+export type DocsSessionKeyLifetimeMinutes = z.infer<typeof docsSessionKeyLifetimeMinutesSchema>;
+
+/** What the key may do: everything the member may do in the project, or only reads (`*:view`). */
+const docsSessionKeyAccessSchemaDefinition = z.enum(["full", "read"]);
+export interface DocsSessionKeyAccessSchema extends Named<
+  typeof docsSessionKeyAccessSchemaDefinition
+> {}
+export const docsSessionKeyAccessSchema: DocsSessionKeyAccessSchema =
+  docsSessionKeyAccessSchemaDefinition;
+export type DocsSessionKeyAccess = z.infer<typeof docsSessionKeyAccessSchema>;
 
 /** The `type` of every message the consent popup posts to the docs. */
 export const DOCS_SESSION_MESSAGE_TYPE = "langwatch:docs-session" as const;
@@ -21,13 +44,36 @@ const docsOriginSchema = z.string().min(1).max(2048);
 
 /** What the consent page sends when the member allows access. */
 const apiKeyTrpcMintDocsSessionKeyInputSchemaDefinition = z
-  .object({ projectId: z.string().min(1), docsOrigin: docsOriginSchema })
+  .object({
+    projectId: z.string().min(1),
+    docsOrigin: docsOriginSchema,
+    access: docsSessionKeyAccessSchema,
+    lifetimeMinutes: docsSessionKeyLifetimeMinutesSchema,
+  })
   .strict();
 export interface ApiKeyTrpcMintDocsSessionKeyInputSchema extends Named<
   typeof apiKeyTrpcMintDocsSessionKeyInputSchemaDefinition
 > {}
 export const apiKeyTrpcMintDocsSessionKeyInputSchema: ApiKeyTrpcMintDocsSessionKeyInputSchema =
   apiKeyTrpcMintDocsSessionKeyInputSchemaDefinition;
+
+/** Whether the consent page may offer a key for this project: its organisation's switch. */
+const apiKeyTrpcDocsSessionAvailabilityInputSchemaDefinition = z
+  .object({ projectId: z.string().min(1) })
+  .strict();
+export interface ApiKeyTrpcDocsSessionAvailabilityInputSchema extends Named<
+  typeof apiKeyTrpcDocsSessionAvailabilityInputSchemaDefinition
+> {}
+export const apiKeyTrpcDocsSessionAvailabilityInputSchema: ApiKeyTrpcDocsSessionAvailabilityInputSchema =
+  apiKeyTrpcDocsSessionAvailabilityInputSchemaDefinition;
+
+const docsSessionAvailabilitySchemaDefinition = z.object({ enabled: z.boolean() }).strict();
+export interface DocsSessionAvailabilitySchema extends Named<
+  typeof docsSessionAvailabilitySchemaDefinition
+> {}
+export const docsSessionAvailabilitySchema: DocsSessionAvailabilitySchema =
+  docsSessionAvailabilitySchemaDefinition;
+export type DocsSessionAvailability = z.infer<typeof docsSessionAvailabilitySchema>;
 
 /** The one-time answer: the token, when it dies, and the project it acts in. */
 const docsSessionKeyMintedSchemaDefinition = z
@@ -48,8 +94,8 @@ export type DocsSessionKeyMinted = z.infer<typeof docsSessionKeyMintedSchema>;
 
 /**
  * `ApiKeyApi.mintDocsSessionKey`: the verified caller, the browser session that asked and its
- * window (null for a caller on no browser session, which is refused), the chosen project and
- * the docs origin the key is handed to.
+ * window (null for a caller on no browser session, which is refused), the chosen project, the
+ * docs origin the key is handed to, and the access and lifetime the member chose.
  */
 const mintDocsSessionKeyInputSchemaDefinition = z
   .object({
@@ -65,6 +111,8 @@ const mintDocsSessionKeyInputSchemaDefinition = z
       .nullable(),
     projectId: z.string().min(1),
     docsOrigin: docsOriginSchema,
+    access: docsSessionKeyAccessSchema,
+    lifetimeMinutes: docsSessionKeyLifetimeMinutesSchema,
   })
   .strict();
 export interface MintDocsSessionKeyInputSchema extends Named<
@@ -142,5 +190,19 @@ export class DocsOriginNotRegisteredError extends HandledError {
       { httpStatus: 403, fault: "customer", ...remediation("docs_origin_not_registered") },
     );
     this.name = "DocsOriginNotRegisteredError";
+  }
+}
+
+/** The organisation turned docs playground sessions off: no key is minted, none authenticates. */
+export class DocsPlaygroundSessionsDisabledError extends HandledError {
+  declare readonly code: "docs_playground_sessions_disabled";
+
+  constructor() {
+    super(
+      "docs_playground_sessions_disabled",
+      "Your organisation turned off connecting the documentation playground to your account",
+      { httpStatus: 403, fault: "customer", ...remediation("docs_playground_sessions_disabled") },
+    );
+    this.name = "DocsPlaygroundSessionsDisabledError";
   }
 }

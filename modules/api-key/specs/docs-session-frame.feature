@@ -71,7 +71,7 @@ Feature: The docs session frame keeps the key on the app's origin
     And disconnecting or unloading asks the app to revoke the key
     And when a request answers 403 the frame says the reader's access does not allow it
 
-  @integration @unimplemented
+  @integration
   Scenario: The connection survives moving to another docs page but not a reload
     Given the playground is connected through the session frame
     When the reader opens another docs page in the same tab

@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const { standing, mint } = vi.hoisted(() => ({
   standing: {
     options: [] as unknown[],
+    availabilityOptions: [] as unknown[],
     refetch: vi.fn(
       async (): Promise<{ data?: { permissions: string[] }; error?: Error | null }> => ({
         data: { permissions: [] },
@@ -46,6 +47,13 @@ vi.mock("../api-key-api.ts", () => ({
     apiKey: {
       create: { useMutation: () => ({ mutateAsync: mint, reset: vi.fn() }) },
       mintDocsSessionKey: { useMutation: () => ({ mutateAsync: vi.fn(), reset: vi.fn() }) },
+      // Read only on the docs consent page; every other page leaves it disabled.
+      docsSessionAvailability: {
+        useQuery: (_input: unknown, options: unknown) => {
+          standing.availabilityOptions.push(options);
+          return { data: void 0, isError: false };
+        },
+      },
     },
   },
 }));
@@ -57,6 +65,7 @@ import AuthorizeHostMount from "../authorize-host-mount.tsx";
 afterEach(() => {
   cleanup();
   standing.options.length = 0;
+  standing.availabilityOptions.length = 0;
   standing.refetch.mockClear();
   mint.mockClear();
 });
@@ -86,6 +95,7 @@ describe("AuthorizeHostMount", () => {
         standing.options.every((options) => (options as { enabled?: boolean }).enabled === false),
       ).toBe(true);
       expect(standing.refetch).not.toHaveBeenCalled();
+      expect(standing.availabilityOptions).toContainEqual({ enabled: false });
     });
   });
 

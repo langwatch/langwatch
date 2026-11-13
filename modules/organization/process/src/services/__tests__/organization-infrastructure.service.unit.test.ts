@@ -79,6 +79,12 @@ class StubRepository extends OrganizationRepository {
 
   async saveSessionPolicy(): Promise<void> {}
 
+  async getDocsPlaygroundPolicy(): Promise<{ docsPlaygroundSessionsEnabled: boolean }> {
+    return { docsPlaygroundSessionsEnabled: true };
+  }
+
+  async saveDocsPlaygroundPolicy(): Promise<void> {}
+
   async getSignInSecurityPolicy(): Promise<never> {
     throw new Error("not used");
   }

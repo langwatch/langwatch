@@ -6,11 +6,13 @@ export function showSession() {
   if (manual) manual.hidden = frameConnection() !== null;
 }
 
-/** Embeds the app's session frame where the page left room for it; none on other endpoints. */
+/**
+ * Embeds the app's session frame, or keeps the one a previous page embedded, over the room this
+ * page leaves for it; none on endpoints that leave none.
+ */
 export function startSession() {
-  const container = document.querySelector<HTMLElement>("[data-docs-session-frame]");
-  if (!container) return;
-  mountFrame({ container });
+  if (!document.querySelector("[data-docs-session-frame]")) return;
+  mountFrame();
   showSession();
 }
 
