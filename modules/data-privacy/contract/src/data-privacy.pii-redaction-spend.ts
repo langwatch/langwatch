@@ -17,6 +17,12 @@ export const PII_REDACTION_REQUEST_TYPE = "pii_redaction";
 /** The model the ledger names for a PII redaction call. */
 export const PII_REDACTION_SPEND_MODEL = "pii-redaction-model";
 
+/**
+ * Above this many characters in a batch's texts combined (one span's), the batch skips the model
+ * and goes to Presidio: the process routes by it and the settings page names it.
+ */
+export const PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS = 8_000;
+
 /** The published price: 0.00005 dollars per 100 characters sent to the model. */
 export const PII_REDACTION_NANO_USD_PER_CHARACTER = 500;
 

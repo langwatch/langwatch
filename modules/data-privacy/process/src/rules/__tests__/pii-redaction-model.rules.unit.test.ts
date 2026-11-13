@@ -1,9 +1,9 @@
+import { PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS } from "@langwatch/data-privacy-contract/pii-redaction-spend";
 import { describe, expect, it } from "vitest";
 
 import {
   batchCharactersOf,
   isBatchTooLongForModel,
-  PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS,
   piiRedactionModelTargetOf,
 } from "../pii-redaction-model.rules.ts";
 
