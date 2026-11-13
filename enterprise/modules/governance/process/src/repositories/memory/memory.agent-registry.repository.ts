@@ -33,6 +33,7 @@ function byPosition(a: AgentRegistryEntry, b: AgentRegistryEntry): number {
 export class MemoryAgentRegistryRepository extends AgentRegistryRepository {
   private readonly rows: MemoryRow[] = [];
   private readonly events: MemoryEvent[] = [];
+  private readonly baselines = new Set<string>();
   private sequence = 0n;
 
   private constructor() {
@@ -46,12 +47,14 @@ export class MemoryAgentRegistryRepository extends AgentRegistryRepository {
   async applyChanges({
     organizationId,
     plan,
-    deliveryRecordedAt = null,
+    baselineAt,
   }: {
     organizationId: string;
     plan: (stored: StoredRegistryEntry[]) => RegistryChangeSet;
-    deliveryRecordedAt?: Instant | null;
+    baselineAt: Instant;
   }): Promise<AgentRegistryEvent[]> {
+    const deliveryRecordedAt = this.baselines.has(organizationId) ? null : baselineAt;
+    this.baselines.add(organizationId);
     const stored = this.rows
       .filter((row) => row.organizationId === organizationId)
       .map(({ id, sourceKey, fingerprint, entry }) => ({ id, sourceKey, fingerprint, entry }));

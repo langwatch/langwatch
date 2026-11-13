@@ -1,5 +1,5 @@
 -- Governance's agent registry and its change feed
--- (enterprise/modules/governance/specs/agent-registry.feature). Both tables are new and empty.
+-- (enterprise/modules/governance/specs/agent-registry.feature). All three tables are new and empty.
 CREATE TABLE IF NOT EXISTS "AgentRegistryEntry" (
     "id" TEXT NOT NULL,
     "organizationId" TEXT NOT NULL,
@@ -33,6 +33,13 @@ CREATE TABLE IF NOT EXISTS "AgentRegistryEvent" (
     CONSTRAINT "AgentRegistryEvent_pkey" PRIMARY KEY ("id")
 );
 
+CREATE TABLE IF NOT EXISTS "AgentRegistryBaseline" (
+    "organizationId" TEXT NOT NULL,
+    "baselinedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "AgentRegistryBaseline_pkey" PRIMARY KEY ("organizationId")
+);
+
 CREATE UNIQUE INDEX IF NOT EXISTS "AgentRegistryEntry_organizationId_sourceKey_key"
   ON "AgentRegistryEntry"("organizationId", "sourceKey");
 CREATE INDEX IF NOT EXISTS "AgentRegistryEntry_organizationId_updatedAt_idx"
@@ -44,6 +51,7 @@ CREATE INDEX IF NOT EXISTS "AgentRegistryEvent_organizationId_deliveryRecordedAt
 CREATE INDEX IF NOT EXISTS "AgentRegistryEvent_organizationId_entryId_idx"
   ON "AgentRegistryEvent"("organizationId", "entryId");
 
--- Down (manual rollback): both tables are new.
+-- Down (manual rollback): all three tables are new.
+-- DROP TABLE IF EXISTS "AgentRegistryBaseline";
 -- DROP TABLE IF EXISTS "AgentRegistryEvent";
 -- DROP TABLE IF EXISTS "AgentRegistryEntry";

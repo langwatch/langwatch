@@ -187,6 +187,7 @@ async function buildApi({
             return () => `${names[0] ?? "x"}-${at}-${++next}`;
           })(),
         }),
+      baselineAt: Temporal.Instant.from(at),
     });
 
   const get = (path: string) => hono.request(path, { headers: { Authorization: `Bearer ${KEY}` } });

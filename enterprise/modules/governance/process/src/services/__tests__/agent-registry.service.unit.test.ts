@@ -1,7 +1,5 @@
 /** Spec: enterprise/modules/governance/specs/agent-registry.feature */
 import type { Agent, AgentApi } from "@langwatch/agent-contract";
-import type { ProcessHandlerContext } from "@langwatch/eventing";
-import { intentAccessorOf } from "@langwatch/eventing/testing";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
@@ -12,11 +10,6 @@ import type { WebhookApi, WebhookEndpointView } from "@langwatch/webhook-contrac
 import { describe, expect, it, vi } from "vitest";
 
 import type { AgentRegistryDeliveryIntent } from "../../features/registry/eventing/agent-registry-delivery.process.ts";
-import {
-  AGENT_REGISTRY_TRAFFIC_INITIAL_STATE,
-  type AgentRegistryTrafficIntents,
-  agentRegistryTrafficWake,
-} from "../../features/registry/eventing/agent-registry-traffic.process.ts";
 import { AgentRegistryReadsService } from "../../features/registry/services/agent-registry-reads.service.ts";
 import {
   type AgentRegistryDeliveryOutbox,
@@ -66,16 +59,6 @@ function endpoint(id: string, enabledEvents: string[]): WebhookEndpointView {
   };
 }
 
-const wakeAt = (at: number): ProcessHandlerContext<AgentRegistryTrafficIntents> => ({
-  at,
-  now: at,
-  key: "agentRegistryTraffic",
-  projectId: "__global__",
-  intent: intentAccessorOf({
-    pass: (key, payload) => ({ intentType: "pass", messageKey: key, payload }),
-  }),
-});
-
 const OUTBOX_DOWN = new Error("outbox unavailable");
 const AGENT_STORE_DOWN = new Error("agent store unavailable");
 
@@ -112,9 +95,11 @@ function setup({
     failAgents: boolean;
     holdNextList?: Promise<void>;
     claimedTotal?: number;
+    enterprise: Set<string>;
   } = {
     agents,
     failAgents: false,
+    enterprise: new Set(enterpriseOrganizationIds),
   };
   const registry = MemoryAgentRegistryRepository.create();
   const outbox = new RecordingOutbox();
@@ -159,8 +144,7 @@ function setup({
     traces: createApiFixture<TraceApi>({ findAgentsSeen: async () => traffic }),
     webhooks: createApiFixture<WebhookApi>({ getAll: async () => endpoints }),
     entitlements: {
-      hasEnterprisePlan: async (organizationId) =>
-        enterpriseOrganizationIds.includes(organizationId),
+      hasEnterprisePlan: async (organizationId) => state.enterprise.has(organizationId),
     },
     outbox: () => outbox,
     publicBaseUrl: "https://app.langwatch.test",
@@ -195,12 +179,15 @@ describe("AgentRegistryService", () => {
   describe("when a reconcile appends an event", () => {
     /** @scenario Every new event is pushed once to each subscribed webhook endpoint */
     it("records one intent for the subscribed endpoint keyed by the event id", async () => {
-      const { service, outbox, registry } = setup({
+      const { service, outbox, registry, state } = setup({
+        agents: [],
         endpoints: [
           endpoint("hook-governance", ["governance.agent.*"]),
           endpoint("hook-gateway", ["gateway.*"]),
         ],
       });
+      await service.reconcileOrganization({ organizationId: ORG });
+      state.agents = [connectedAgent("agent-1", "Field agent")];
 
       await service.reconcileOrganization({ organizationId: ORG });
 
@@ -215,7 +202,9 @@ describe("AgentRegistryService", () => {
   describe("when an event's push was never recorded", () => {
     /** @scenario An event whose push was not recorded is pushed by the next reconcile */
     it("records its intents on the next reconcile with nothing changed", async () => {
-      const { service, outbox } = setup();
+      const { service, outbox, state } = setup({ agents: [] });
+      await service.reconcileOrganization({ organizationId: ORG });
+      state.agents = [connectedAgent("agent-1", "Field agent")];
       outbox.failNext = true;
       await expect(service.reconcileOrganization({ organizationId: ORG })).rejects.toBe(
         OUTBOX_DOWN,
@@ -304,22 +293,77 @@ describe("AgentRegistryService", () => {
     });
   });
 
-  describe("when the first walk reaches an organisation the deploy seed has not", () => {
-    /** @scenario The first walk over every organisation announces no existing agent */
-    it("records the agents but sends no intent to the governance.* endpoint", async () => {
-      const { service, registry, outbox } = setup({
-        agents: [connectedAgent("agent-1", "Field agent"), connectedAgent("agent-2", "Desk agent")],
+  describe("when a project trigger reaches an organisation with no baseline", () => {
+    /** @scenario An organisation's first reconcile from any trigger is a silent baseline */
+    it("records the existing agents silently, then pushes the next new agent", async () => {
+      const existing = [
+        connectedAgent("agent-1", "Field agent"),
+        connectedAgent("agent-2", "Desk"),
+      ];
+      const { service, registry, outbox, state } = setup({
+        agents: existing,
         endpoints: [endpoint("hook-governance", ["governance.*"])],
       });
-      const first = agentRegistryTrafficWake(AGENT_REGISTRY_TRAFFIC_INITIAL_STATE, wakeAt(1_000));
-      const pass = first.intents?.[0]?.payload as { everyOrganization: boolean; announce: boolean };
 
-      await service.reconcileTraffic(pass);
+      await service.reconcileOrganization({ organizationId: ORG });
 
-      expect(pass).toMatchObject({ everyOrganization: true, announce: false });
       expect(outbox.intents).toHaveLength(0);
-      const entries = await registry.findEntries({ organizationId: ORG, limit: 10 });
-      expect(entries).toHaveLength(2);
+      await expect(registry.findEntries({ organizationId: ORG, limit: 10 })).resolves.toHaveLength(
+        2,
+      );
+
+      state.agents = [...existing, connectedAgent("agent-3", "New agent")];
+      await service.reconcileOrganization({ organizationId: ORG });
+
+      expect(outbox.intents.map((intent) => intent.eventType)).toEqual([
+        "governance.agent.registered",
+      ]);
+    });
+  });
+
+  describe("when an organisation upgrades to Enterprise and a walk reaches it", () => {
+    /** @scenario An organisation's first reconcile after it upgrades to Enterprise is a silent baseline */
+    it("records its agents silently, then pushes the next new agent", async () => {
+      const existing = [
+        connectedAgent("agent-1", "Field agent"),
+        connectedAgent("agent-2", "Desk"),
+      ];
+      const { service, outbox, state } = setup({
+        agents: existing,
+        enterpriseOrganizationIds: [],
+        endpoints: [endpoint("hook-governance", ["governance.*"])],
+      });
+      await service.reconcileTraffic({ everyOrganization: true });
+      state.enterprise.add(ORG);
+
+      await service.reconcileTraffic({ everyOrganization: true });
+
+      expect(outbox.intents).toHaveLength(0);
+
+      state.agents = [...existing, connectedAgent("agent-3", "New agent")];
+      await service.reconcileTraffic({ everyOrganization: true });
+
+      expect(outbox.intents.map((intent) => intent.eventType)).toEqual([
+        "governance.agent.registered",
+      ]);
+    });
+  });
+
+  describe("when an organisation with no agents is baselined and then gains one", () => {
+    /** @scenario An organisation baselined with no agents pushes its first agent */
+    it("pushes the new agent", async () => {
+      const { service, outbox, state } = setup({
+        agents: [],
+        endpoints: [endpoint("hook-governance", ["governance.*"])],
+      });
+      await service.reconcileOrganization({ organizationId: ORG });
+
+      state.agents = [connectedAgent("agent-1", "Field agent")];
+      await service.reconcileOrganization({ organizationId: ORG });
+
+      expect(outbox.intents.map((intent) => intent.eventType)).toEqual([
+        "governance.agent.registered",
+      ]);
     });
   });
 

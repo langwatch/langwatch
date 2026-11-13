@@ -248,6 +248,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // The governance agent registry and its feed: every read and write names one organization.
   AgentRegistryEntry: {},
   AgentRegistryEvent: {},
+  AgentRegistryBaseline: {},
   IdentityMatch: {},
   // Candidate matches the suggestion job computed (ADR-128 §12). The job
   // rewrites one organization's rows per pass and the review surface reads one

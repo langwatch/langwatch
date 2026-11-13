@@ -27479,6 +27479,34 @@
       ]
     },
     {
+      "name": "AgentRegistryBaseline",
+      "tableName": "AgentRegistryBaseline",
+      "documentation": "An organisation's registry baseline: its first reconcile, written as already pushed so the\nagents it already had are not announced. Every reconcile after it pushes its changes.",
+      "primaryKey": [
+        "organizationId"
+      ],
+      "fields": [
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "baselinedAt",
+          "columnName": "baselinedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
       "name": "IdentityMatch",
       "tableName": "IdentityMatch",
       "documentation": "The dated match table: \"`user_abc123` on Anthropic is platform user #42,\nvalid from March 3\", closed when it stops being true.\n\nDating is what makes a re-issued email address survivable: the leaver's link\ncloses at offboarding, the new hire gets a new link, and January's spend\nstays with January's person. A correction closes the old row and opens a new\none; nothing is ever silently rewritten.",

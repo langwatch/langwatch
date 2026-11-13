@@ -9,6 +9,9 @@ Feature: Agent registry with ARD discovery and change events
   change appends a numbered event to the organisation's feed, which is read by cursor and pushed
   to the organisation's webhook endpoints that subscribe to `governance.agent.*`. The registry is
   an Enterprise feature: its routes refuse other plans and no reconcile touches their organisations.
+  An organisation's first reconcile, whatever triggers it and including right after it upgrades to
+  Enterprise, is a silent baseline: its existing agents enter the feed but are not pushed. Changes
+  after the baseline are pushed.
   Docs: docs/governance/agent-registry.mdx
 
   Background:
@@ -217,12 +220,26 @@ Feature: Agent registry with ARD discovery and change events
     And passes within the next day walk only the organisations the registry holds
 
   @unit
-  Scenario: The first walk over every organisation announces no existing agent
-    Given an organisation the deploy seed has not reached, with two agents
+  Scenario: An organisation's first reconcile from any trigger is a silent baseline
+    Given an Enterprise organisation the registry has not reconciled yet, with two agents
     And a webhook endpoint subscribed to "governance.*"
-    When the first traffic pass walks every organisation
-    Then the registry holds both agents
-    And no webhook delivery is recorded for them
+    When an agent change in one of its projects triggers its first reconcile
+    Then the registry holds both agents and no webhook delivery is recorded for them
+    When a third agent is added and the organisation is reconciled again
+    Then one "governance.agent.registered" delivery is recorded
+
+  @unit
+  Scenario: An organisation's first reconcile after it upgrades to Enterprise is a silent baseline
+    Given an organisation with two agents on another plan, which walks skip
+    When it upgrades to Enterprise and the next walk reaches it
+    Then no webhook delivery is recorded for its existing agents
+    And a later new agent is pushed once
+
+  @unit
+  Scenario: An organisation baselined with no agents pushes its first agent
+    Given an Enterprise organisation reconciled once with no agents
+    When it gains an agent and is reconciled again
+    Then one "governance.agent.registered" delivery is recorded
 
   @unit
   Scenario: An interrupted walk resumes from its cursor on the next pass
@@ -230,6 +247,12 @@ Feature: Agent registry with ARD discovery and change events
     When the next traffic pass runs
     Then it walks again from after "org-100"
     And the walk counts as completed only when it reaches the last organisation
+
+  @unit
+  Scenario: A walk's saved cursor never moves back
+    Given two passes resuming the same open walk
+    When the pass that is behind saves its cursor after the one that is ahead
+    Then the walk keeps the cursor of the pass that is ahead
 
   @unit
   Scenario: A walk pass whose walk another pass finished reconciles nothing
@@ -259,10 +282,11 @@ Feature: Agent registry with ARD discovery and change events
     And no webhook delivery is recorded for it
 
   @integration
-  Scenario: A seed's events are written as pushed in the same commit that appends them
-    Given a reconcile that does not announce its events
-    When it appends a registration
-    Then no undelivered event is left, even if nothing runs after the commit
+  Scenario: An organisation's baseline and its first events are written as pushed in one commit
+    Given an organisation the registry has not reconciled yet
+    When its first reconcile appends a registration
+    Then the baseline is written and no undelivered event is left, even if nothing runs after the commit
+    And a reconcile with no change still writes the baseline, so the next agent is pushed
 
   @unit
   Scenario: A recorded agent change reconciles the agent's organisation

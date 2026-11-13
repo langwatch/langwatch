@@ -134,7 +134,7 @@ Every event has the same shape:
 
 - A change to an agent in a LangWatch project updates the registry within seconds of the save or archive.
 - A listing from an ingestion source updates it right after the listing runs.
-- When an upgrade first fills the registry, the events for agents that already existed are written to the feed but not pushed to webhooks. The first daily pass over every organization does the same.
+- The first sync of an organization is a silent baseline: the events for agents it already has are written to the feed but not pushed to webhooks. That holds whatever starts the sync, including right after the organization moves to the Enterprise plan. Every change after the baseline is pushed.
 - Traffic is read every 15 minutes for organizations that already hold a registry, once a day for every organization, and on each of the two triggers above. A daily pass that is interrupted resumes where it stopped on the next 15-minute pass. A traced agent a read did not return stays as it is while its last sighting is inside the 30-day window.
 
 ### Reading the feed by cursor

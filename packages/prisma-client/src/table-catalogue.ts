@@ -195,6 +195,7 @@ export const prismaTableCatalogue = {
   "DiscoveredAgent": "DiscoveredAgent",
   "AgentRegistryEntry": "AgentRegistryEntry",
   "AgentRegistryEvent": "AgentRegistryEvent",
+  "AgentRegistryBaseline": "AgentRegistryBaseline",
   "IdentityMatch": "IdentityMatch",
   "GovernanceTenantHistory": "GovernanceTenantHistory",
   "ErasedIdentifierSuppression": "ErasedIdentifierSuppression",
@@ -3186,6 +3187,10 @@ export const prismaModelFieldCatalogue = {
     "occurredAt",
     "deliveryRecordedAt"
   ],
+  "AgentRegistryBaseline": [
+    "organizationId",
+    "baselinedAt"
+  ],
   "IdentityMatch": [
     "id",
     "organizationId",
@@ -3955,6 +3960,7 @@ export const prismaRelationCatalogue = {
   "DiscoveredAgent": {},
   "AgentRegistryEntry": {},
   "AgentRegistryEvent": {},
+  "AgentRegistryBaseline": {},
   "IdentityMatch": {},
   "GovernanceTenantHistory": {},
   "ErasedIdentifierSuppression": {},

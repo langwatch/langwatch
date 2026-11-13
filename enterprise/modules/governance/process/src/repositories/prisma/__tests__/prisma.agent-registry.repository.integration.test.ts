@@ -9,7 +9,7 @@ import {
   PrismaConnectionService,
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
-import { Temporal, type Instant } from "@langwatch/time";
+import { Temporal } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it } from "vitest";
 
@@ -71,18 +71,16 @@ describe.skipIf(!connection)("PrismaAgentRegistryRepository", () => {
     organizationId,
     drafts,
     at,
-    deliveryRecordedAt,
   }: {
     organizationId: string;
     drafts: RegistryDraft[];
     at: string;
-    deliveryRecordedAt?: Instant;
   }) =>
     repository().applyChanges({
       organizationId,
       plan: (stored) =>
         planRegistryChanges({ stored, drafts, now: Temporal.Instant.from(at), newId }),
-      ...(deliveryRecordedAt ? { deliveryRecordedAt } : {}),
+      baselineAt: Temporal.Instant.from(at),
     });
 
   /** alpha and beta registered on the 10th; alpha versioned and beta removed on the 11th. */
@@ -107,6 +105,7 @@ describe.skipIf(!connection)("PrismaAgentRegistryRepository", () => {
     const organizationId = { in: organizations };
     await prisma().agentRegistryEvent.deleteMany({ where: { organizationId } });
     await prisma().agentRegistryEntry.deleteMany({ where: { organizationId } });
+    await prisma().agentRegistryBaseline.deleteMany({ where: { organizationId } });
   });
 
   describe("given reconciles that register, version and remove agents", () => {
@@ -161,11 +160,14 @@ describe.skipIf(!connection)("PrismaAgentRegistryRepository", () => {
       expect(recent.entries.map((entry) => entry.version)).toEqual([2, 2]);
     });
 
-    it("lists undelivered events until their fan-out is marked", async () => {
+    it("lists undelivered events after the baseline until their fan-out is marked", async () => {
       const organizationId = await seeded();
 
       const pending = await repository().findUndeliveredEvents({ organizationId, limit: 10 });
-      expect(pending).toHaveLength(4);
+      expect(pending.map((event) => event.type)).toEqual([
+        "governance.agent.versioned",
+        "governance.agent.removed",
+      ]);
 
       await repository().markDeliveryRecorded({
         organizationId,
@@ -184,22 +186,34 @@ describe.skipIf(!connection)("PrismaAgentRegistryRepository", () => {
     });
   });
 
-  describe("given a reconcile that writes its events as already pushed", () => {
-    /** @scenario A seed's events are written as pushed in the same commit that appends them */
-    it("appends them with no undelivered event left", async () => {
+  describe("given an organisation's first reconcile", () => {
+    /** @scenario An organisation's baseline and its first events are written as pushed in one commit */
+    it("writes the baseline and leaves no undelivered event", async () => {
       const organizationId = newOrganization();
 
       const appended = await reconcile({
         organizationId,
         drafts: [draft("alpha")],
         at: "2026-11-10T00:00:00Z",
-        deliveryRecordedAt: Temporal.Instant.from("2026-11-10T00:00:00Z"),
       });
 
       expect(appended.map((event) => event.type)).toEqual(["governance.agent.registered"]);
       await expect(
         repository().findUndeliveredEvents({ organizationId, limit: 10 }),
       ).resolves.toEqual([]);
+      await expect(
+        prisma().agentRegistryBaseline.findUnique({ where: { organizationId } }),
+      ).resolves.toMatchObject({ baselinedAt: new Date("2026-11-10T00:00:00Z") });
+    });
+
+    it("writes the baseline even when nothing changed", async () => {
+      const organizationId = newOrganization();
+
+      await reconcile({ organizationId, drafts: [], at: "2026-11-10T00:00:00Z" });
+      await reconcile({ organizationId, drafts: [draft("alpha")], at: "2026-11-11T00:00:00Z" });
+
+      const pending = await repository().findUndeliveredEvents({ organizationId, limit: 10 });
+      expect(pending.map((event) => event.type)).toEqual(["governance.agent.registered"]);
     });
   });
 

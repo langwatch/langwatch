@@ -17,8 +17,6 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export const agentRegistryTrafficPassSchema = z.object({
   scheduledFor: z.number().int(),
   everyOrganization: z.boolean().default(false),
-  /** Off until a walk has completed once, so the first walk announces no existing agent. */
-  announce: z.boolean().default(true),
 });
 export const agentRegistryTrafficStateSchema = z.object({
   lastPassAt: z.number().nullable(),
@@ -27,6 +25,8 @@ export const agentRegistryTrafficStateSchema = z.object({
   /** Set while a walk is unfinished; the next pass resumes after `walkAfter`. */
   walkStartedAt: z.number().nullable().default(null),
   walkAfter: z.string().nullable().default(null),
+  /** Organisations the open walk has passed; a save that is not further along is dropped. */
+  walkDone: z.number().int().default(0),
 });
 export type AgentRegistryTrafficState = z.infer<typeof agentRegistryTrafficStateSchema>;
 export const AGENT_REGISTRY_TRAFFIC_INITIAL_STATE: AgentRegistryTrafficState = {
@@ -34,6 +34,7 @@ export const AGENT_REGISTRY_TRAFFIC_INITIAL_STATE: AgentRegistryTrafficState = {
   lastFullPassAt: null,
   walkStartedAt: null,
   walkAfter: null,
+  walkDone: 0,
 };
 
 export type AgentRegistryTrafficIntents = {
@@ -46,16 +47,11 @@ export const agentRegistryTrafficWake: WakeHandler<
 > = (state, ctx) => {
   const walkDue = state.lastFullPassAt === null || ctx.at - state.lastFullPassAt >= DAY_MS;
   const walkStartedAt = state.walkStartedAt ?? (walkDue ? ctx.at : null);
+  // While a walk is open every pass walks, so held organisations wait for the cursor to reach them.
   const everyOrganization = walkStartedAt !== null;
   return {
     state: { ...state, lastPassAt: ctx.at, walkStartedAt },
-    intents: [
-      ctx.intent("pass", `pass:${ctx.at}`, {
-        scheduledFor: ctx.at,
-        everyOrganization,
-        announce: state.lastFullPassAt !== null,
-      }),
-    ],
+    intents: [ctx.intent("pass", `pass:${ctx.at}`, { scheduledFor: ctx.at, everyOrganization })],
   };
 };
 
@@ -63,38 +59,38 @@ export const agentRegistryTrafficWake: WakeHandler<
 export interface AgentRegistryWalkCheckpoint {
   /** The unfinished walk's cursor, or `closed` when another pass already finished it. */
   getProgress(): Promise<
-    { walk: "open"; startedAt: number; after: string | null } | { walk: "closed" }
+    { walk: "open"; startedAt: number; after: string | null; done: number } | { walk: "closed" }
   >;
-  /** Both write only while the walk that started at `startedAt` is still the open one. */
-  save(input: { startedAt: number; after: string }): Promise<void>;
+  /**
+   * Both write only while the walk that started at `startedAt` is still the open one; a save
+   * whose `done` is not past the stored one keeps the stored cursor.
+   */
+  save(input: { startedAt: number; after: string; done: number }): Promise<void>;
   complete(input: { startedAt: number }): Promise<void>;
 }
 
 type TrafficReconcile = (input: {
   everyOrganization: boolean;
-  announce: boolean;
   after?: string;
-  onPage?: (page: { afterOrganizationId: string }) => Promise<void>;
+  onPage?: (page: { afterOrganizationId: string; organizations: number }) => Promise<void>;
 }) => Promise<{ organizations: number; complete: boolean }>;
 
 /** A walk pass resumes the open walk; one whose walk another pass already finished does nothing. */
 async function walkEveryOrganization({
   reconcile,
-  announce,
   checkpoint,
 }: {
   reconcile: TrafficReconcile;
-  announce: boolean;
   checkpoint: AgentRegistryWalkCheckpoint;
 }): Promise<void> {
   const progress = await checkpoint.getProgress();
   if (progress.walk === "closed") return;
-  const { startedAt, after } = progress;
+  const { startedAt, after, done } = progress;
   const { complete } = await reconcile({
     everyOrganization: true,
-    announce,
     ...(after === null ? {} : { after }),
-    onPage: ({ afterOrganizationId }) => checkpoint.save({ startedAt, after: afterOrganizationId }),
+    onPage: ({ afterOrganizationId, organizations }) =>
+      checkpoint.save({ startedAt, after: afterOrganizationId, done: done + organizations }),
   });
   if (complete) await checkpoint.complete({ startedAt });
 }
@@ -105,15 +101,15 @@ export function runAgentRegistryTraffic(deps: {
   deleteDispatchedBefore: (params: { processName: string; before: number }) => Promise<number>;
   now: () => number;
 }): (
-  pass: { everyOrganization: boolean; announce: boolean },
+  pass: { everyOrganization: boolean },
   checkpoint: AgentRegistryWalkCheckpoint,
 ) => Promise<void> {
-  return async ({ everyOrganization, announce }, checkpoint) => {
+  return async ({ everyOrganization }, checkpoint) => {
     const startedAt = deps.now();
     if (everyOrganization) {
-      await walkEveryOrganization({ reconcile: deps.reconcile, announce, checkpoint });
+      await walkEveryOrganization({ reconcile: deps.reconcile, checkpoint });
     } else {
-      await deps.reconcile({ everyOrganization: false, announce });
+      await deps.reconcile({ everyOrganization: false });
     }
     await deps
       .deleteDispatchedBefore({

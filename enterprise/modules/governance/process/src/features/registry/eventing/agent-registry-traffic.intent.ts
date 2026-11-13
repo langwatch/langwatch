@@ -54,15 +54,24 @@ export function agentRegistryWalkCheckpoint({
       const state = agentRegistryTrafficStateSchema.parse(current.state);
       return state.walkStartedAt === null
         ? { walk: "closed" }
-        : { walk: "open", startedAt: state.walkStartedAt, after: state.walkAfter };
+        : {
+            walk: "open",
+            startedAt: state.walkStartedAt,
+            after: state.walkAfter,
+            done: state.walkDone,
+          };
     },
-    save: ({ startedAt, after }) => update(startedAt, (state) => ({ ...state, walkAfter: after })),
+    save: ({ startedAt, after, done }) =>
+      update(startedAt, (state) =>
+        done > state.walkDone ? { ...state, walkAfter: after, walkDone: done } : state,
+      ),
     complete: ({ startedAt }) =>
       update(startedAt, (state, at) => ({
         ...state,
         lastFullPassAt: at,
         walkStartedAt: null,
         walkAfter: null,
+        walkDone: 0,
       })),
   };
 }

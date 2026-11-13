@@ -26,11 +26,13 @@ const ORGANIZATION_PAGE_LIMIT = 100;
 /** One scheduled traffic pass, as the traffic process asks it. */
 export type AgentRegistryTrafficPass = {
   everyOrganization?: boolean;
-  announce?: boolean;
   after?: string;
-  onPage?: (page: { afterOrganizationId: string }) => Promise<void>;
+  onPage?: (page: WalkPage) => Promise<void>;
   signal?: AbortSignal;
 };
+
+/** A walk's progress after one page: its last organisation and how many this call reconciled. */
+export type WalkPage = { afterOrganizationId: string; organizations: number };
 
 type AgentRegistryDependencies = {
   registry: AgentRegistryRepository;
@@ -81,16 +83,14 @@ export class AgentRegistryService {
 
   /**
    * Rebuilds the organisation's entries from its sources, appends what changed, fans it out. A
-   * read another reconcile's commit overtook plans nothing and is read again. With `announce`
-   * off the appended events stay in the feed but are pushed to no webhook. An organisation
-   * without the Enterprise plan is left untouched.
+   * read another reconcile's commit overtook plans nothing and is read again. An organisation's
+   * first reconcile is its silent baseline: its events stay in the feed but are pushed to no
+   * webhook. An organisation without the Enterprise plan is left untouched.
    */
   async reconcileOrganization({
     organizationId,
-    announce = true,
   }: {
     organizationId: string;
-    announce?: boolean;
   }): Promise<{ events: number }> {
     if (!(await this.deps.entitlements.hasEnterprisePlan(organizationId))) return { events: 0 };
     let events = 0;
@@ -105,7 +105,7 @@ export class AgentRegistryService {
           superseded = changedSince({ stored, readAt });
           return planRegistryChanges({ stored, drafts, now, newId: this.deps.newId, readAt, keep });
         },
-        ...(announce ? {} : { deliveryRecordedAt: now }),
+        baselineAt: now,
       });
       events += appended.length;
       if (!superseded) break;
@@ -121,14 +121,12 @@ export class AgentRegistryService {
    */
   async reconcileTraffic({
     everyOrganization = false,
-    announce = true,
     after,
     onPage,
     signal,
   }: AgentRegistryTrafficPass = {}): Promise<{ organizations: number; complete: boolean }> {
     if (everyOrganization) {
       const { organizations, complete } = await this.seedAll({
-        announce,
         ...(after === undefined ? {} : { after }),
         ...(onPage ? { onPage } : {}),
         ...(signal ? { signal } : {}),
@@ -144,7 +142,7 @@ export class AgentRegistryService {
         limit: ORGANIZATION_PAGE_LIMIT,
       });
       for (const organizationId of ids) {
-        await this.reconcileLogged({ organizationId, announce });
+        await this.reconcileLogged({ organizationId });
         organizations += 1;
       }
       hasMore = ids.length === ORGANIZATION_PAGE_LIMIT;
@@ -154,19 +152,17 @@ export class AgentRegistryService {
   }
 
   /**
-   * Every organisation, once. The deploy step that fills the registry announces nothing, so
-   * existing `governance.*` webhook subscribers get no burst for agents that already existed.
+   * Every organisation, once: the deploy step that fills the registry and the daily walk. Each
+   * organisation's first reconcile is its baseline, so no burst for agents that already existed.
    */
   async seedAll({
     after,
     signal,
     onPage,
-    announce = false,
   }: {
     after?: string;
     signal?: AbortSignal;
-    announce?: boolean;
-    onPage?: (page: { afterOrganizationId: string }) => Promise<void>;
+    onPage?: (page: WalkPage) => Promise<void>;
   }): Promise<{ afterOrganizationId: string | null; organizations: number; complete: boolean }> {
     let cursor = after;
     let organizations = 0;
@@ -177,13 +173,13 @@ export class AgentRegistryService {
         limit: ORGANIZATION_PAGE_LIMIT,
       });
       for (const organizationId of page.ids) {
-        await this.reconcileLogged({ organizationId, announce });
+        await this.reconcileLogged({ organizationId });
         organizations += 1;
       }
       const last = page.ids.at(-1);
       if (last !== undefined) {
         cursor = last;
-        await onPage?.({ afterOrganizationId: last });
+        await onPage?.({ afterOrganizationId: last, organizations });
       }
       hasMore = page.next !== null;
     }
@@ -221,15 +217,9 @@ export class AgentRegistryService {
     });
   }
 
-  private async reconcileLogged({
-    organizationId,
-    announce = true,
-  }: {
-    organizationId: string;
-    announce?: boolean;
-  }): Promise<void> {
+  private async reconcileLogged({ organizationId }: { organizationId: string }): Promise<void> {
     try {
-      await this.reconcileOrganization({ organizationId, announce });
+      await this.reconcileOrganization({ organizationId });
     } catch (error) {
       this.deps.logger.warn(
         { organizationId, error },

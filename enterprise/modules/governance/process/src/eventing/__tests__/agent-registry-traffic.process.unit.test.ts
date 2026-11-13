@@ -31,7 +31,7 @@ const wakeAt = (at: number): ProcessHandlerContext<AgentRegistryTrafficIntents> 
   }),
 });
 
-type PassPayload = { everyOrganization: boolean; announce: boolean };
+type PassPayload = { everyOrganization: boolean };
 const payloadOf = (evolution: ReturnType<typeof agentRegistryTrafficWake>) =>
   evolution.intents?.[0]?.payload as PassPayload;
 
@@ -96,7 +96,7 @@ describe("runAgentRegistryTraffic()", () => {
     it("reconciles, then deletes its own dispatched rows older than seven days", async () => {
       const { run, calls, pruned, walks } = pass();
 
-      await run({ everyOrganization: false, announce: true }, NO_WALK);
+      await run({ everyOrganization: false }, NO_WALK);
 
       expect(calls).toEqual(["reconcile", "prune"]);
       expect(walks).toEqual([false]);
@@ -108,9 +108,7 @@ describe("runAgentRegistryTraffic()", () => {
     it("succeeds when the prune fails", async () => {
       const { run } = pass({ failPrune: true });
 
-      await expect(
-        run({ everyOrganization: false, announce: true }, NO_WALK),
-      ).resolves.toBeUndefined();
+      await expect(run({ everyOrganization: false }, NO_WALK)).resolves.toBeUndefined();
     });
   });
 
@@ -125,7 +123,9 @@ describe("runAgentRegistryTraffic()", () => {
           reconcile: async ({ after, onPage }) => {
             startedFrom.push(after);
             const complete = await walk((cursor) =>
-              onPage ? onPage({ afterOrganizationId: cursor }) : Promise.resolve(),
+              onPage
+                ? onPage({ afterOrganizationId: cursor, organizations: 1 })
+                : Promise.resolve(),
             );
             return { organizations: 1, complete };
           },
@@ -145,7 +145,7 @@ describe("runAgentRegistryTraffic()", () => {
         await read(),
         wakeAt(NOW + AGENT_REGISTRY_TRAFFIC_INTERVAL_MS),
       );
-      expect(payloadOf(next)).toMatchObject({ everyOrganization: true, announce: false });
+      expect(payloadOf(next)).toMatchObject({ everyOrganization: true });
       await run(async (onPage) => {
         await onPage("org-200");
         return true;
@@ -167,7 +167,7 @@ describe("a walk pass after its walk was finished", () => {
     it("does not reconcile", async () => {
       const { run, calls } = pass();
 
-      await run({ everyOrganization: true, announce: false }, NO_WALK);
+      await run({ everyOrganization: true }, NO_WALK);
 
       expect(calls).toEqual(["prune"]);
     });
@@ -180,13 +180,28 @@ describe("a walk pass after its walk was finished", () => {
       const { checkpoint, read } = await processRow(first.state);
 
       await checkpoint.complete({ startedAt: NOW });
-      await checkpoint.save({ startedAt: NOW, after: "org-stale" });
+      await checkpoint.save({ startedAt: NOW, after: "org-stale", done: 1 });
 
       expect(await read()).toMatchObject({
         lastFullPassAt: NOW + DAY_MS,
         walkStartedAt: null,
         walkAfter: null,
       });
+    });
+  });
+});
+
+describe("two passes saving the same open walk", () => {
+  describe("when the pass that is behind saves last", () => {
+    /** @scenario A walk's saved cursor never moves back */
+    it("keeps the cursor of the pass that got further", async () => {
+      const first = agentRegistryTrafficWake(AGENT_REGISTRY_TRAFFIC_INITIAL_STATE, wakeAt(NOW));
+      const { checkpoint, read } = await processRow(first.state);
+
+      await checkpoint.save({ startedAt: NOW, after: "org-300", done: 300 });
+      await checkpoint.save({ startedAt: NOW, after: "org-100", done: 100 });
+
+      expect(await read()).toMatchObject({ walkAfter: "org-300", walkDone: 300 });
     });
   });
 });
@@ -203,9 +218,9 @@ describe("agentRegistryTrafficWake()", () => {
       );
       const dayLater = agentRegistryTrafficWake(next.state, wakeAt(NOW + DAY_MS));
 
-      expect(payloadOf(first)).toMatchObject({ everyOrganization: true, announce: false });
+      expect(payloadOf(first)).toMatchObject({ everyOrganization: true });
       expect(payloadOf(next)).toMatchObject({ everyOrganization: false });
-      expect(payloadOf(dayLater)).toMatchObject({ everyOrganization: true, announce: true });
+      expect(payloadOf(dayLater)).toMatchObject({ everyOrganization: true });
     });
   });
 });

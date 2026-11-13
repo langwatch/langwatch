@@ -19,13 +19,14 @@ export type RegistryEntryPosition = { updatedAt: string; id: string };
 export abstract class AgentRegistryRepository {
   /**
    * Reads the organisation's rows, asks `plan` what changed and writes it, one organisation at a
-   * time, so feed sequences commit in order. Returns the events it appended; with
-   * `deliveryRecordedAt` they are written as already pushed, in the same commit.
+   * time, so feed sequences commit in order. Returns the events it appended. An organisation
+   * without a baseline is baselined at `baselineAt` in the same commit, even with no change, and
+   * that commit's events are written as already pushed.
    */
   abstract applyChanges(input: {
     organizationId: string;
     plan: (stored: StoredRegistryEntry[]) => RegistryChangeSet;
-    deliveryRecordedAt?: Instant;
+    baselineAt: Instant;
   }): Promise<AgentRegistryEvent[]>;
   /** Organisations holding any entry, in id order after `after`; the traffic pass walks them. */
   abstract findOrganizationIds(input: { after?: string; limit: number }): Promise<string[]>;

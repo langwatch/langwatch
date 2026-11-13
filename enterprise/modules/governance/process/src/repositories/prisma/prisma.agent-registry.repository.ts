@@ -127,11 +127,11 @@ export class PrismaAgentRegistryRepository extends AgentRegistryRepository {
   async applyChanges({
     organizationId,
     plan,
-    deliveryRecordedAt,
+    baselineAt,
   }: {
     organizationId: string;
     plan: (stored: StoredRegistryEntry[]) => RegistryChangeSet;
-    deliveryRecordedAt?: Instant;
+    baselineAt: Instant;
   }): Promise<AgentRegistryEvent[]> {
     return this.prisma.$transaction(
       async (transaction) => {
@@ -145,6 +145,16 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`agent-registry:${organizationId
           select: { id: true, sourceKey: true, fingerprint: true, entry: true },
         });
         const changes = plan(rows.map((row) => ({ ...row, entry: entryOf(row.entry) })));
+        const baselined = await transaction.agentRegistryBaseline.findUnique({
+          where: { organizationId },
+          select: { organizationId: true },
+        });
+        const deliveryRecordedAt = baselined ? null : toDate(baselineAt);
+        if (!baselined) {
+          await transaction.agentRegistryBaseline.create({
+            data: { organizationId, baselinedAt: toDate(baselineAt) },
+          });
+        }
 
         await writeEntries({ transaction, organizationId, writes: changes.writes });
 
@@ -160,7 +170,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`agent-registry:${organizationId
               toVersion: draft.toVersion,
               payload: jsonOf({ tool: draft.tool, agent: draft.agent }),
               occurredAt: toDate(draft.occurredAt),
-              ...(deliveryRecordedAt ? { deliveryRecordedAt: toDate(deliveryRecordedAt) } : {}),
+              deliveryRecordedAt,
             },
           });
           appended.push(eventOf(row));

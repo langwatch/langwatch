@@ -2655,6 +2655,10 @@ export interface LwqlPrismaRows {
     readonly occurredAt: "DateTime";
     readonly deliveryRecordedAt: "DateTime?";
   };
+  readonly AgentRegistryBaseline: {
+    readonly organizationId: "String";
+    readonly baselinedAt: "DateTime";
+  };
   readonly IdentityMatch: {
     readonly id: "String";
     readonly organizationId: "String";
