@@ -172,6 +172,7 @@ function accessPolicyExtension({
             ...new Set([
               ...routePermissions(route),
               ...(route.furtherPermissions ?? []).map((asked) => asked.permission),
+              ...(route.permissionsWhenPresent ?? []).map((asked) => asked.permission),
             ]),
           ]
         : [],

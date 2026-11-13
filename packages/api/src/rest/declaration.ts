@@ -565,6 +565,9 @@ export type RestFurtherPermission = Readonly<{
   target: Extract<RestPermissionTarget, { at: "route" }>;
 }>;
 
+/** A permission asked, beside the route's own and at its scope, when the input carries `field`. */
+export type RestPermissionWhenPresent = Readonly<{ field: string; permission: AuthzPermission }>;
+
 /** The input field a route target is named by: its `field`, else its `param`. */
 export function routeTargetField(target: Readonly<{ param: string; field?: string }>): string {
   return target.field ?? target.param;
@@ -608,6 +611,8 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly permissionTarget?: RestPermissionTarget;
   /** Present exactly when the route asks at several targets: each after the first, in order. */
   readonly furtherPermissions?: readonly RestFurtherPermission[];
+  /** Present exactly when a permission is asked only for an input carrying a field. */
+  readonly permissionsWhenPresent?: readonly RestPermissionWhenPresent[];
   /** How far the key door asks it; absent means the key's project, else its organization. */
   readonly permissionReach?: RestPermissionReach["at"];
   /** Present exactly when `permission` is asked at the platform, with how it refuses (E4). */
@@ -749,6 +754,7 @@ type RouteState = Readonly<{
   permissionBy?: InputPermission;
   permissionTarget?: RestPermissionTarget;
   furtherPermissions?: readonly RestFurtherPermission[];
+  permissionsWhenPresent?: readonly RestPermissionWhenPresent[];
   permissionReach?: RestPermissionReach["at"];
   permissionPlatform?: PlatformPermissionDeclaration;
   key?: true;
@@ -1412,6 +1418,45 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
   }
 
   /**
+   * One more permission, asked at the scope the route's own was asked at, only when the parsed
+   * input carries `field`: a field that does more than the route's permission covers, such as
+   * a prompt update that also moves a deployment tag.
+   */
+  withPermissionWhenPresent({
+    field,
+    permission,
+  }: Readonly<{
+    field: Extract<keyof RouteInput<S["params"], S["query"], S["body"]>, string>;
+    permission: AuthzPermission;
+  }>): RouteBuilder<Api, S> {
+    const { permission: first, permissionBy, permissionPlatform, access } = this.state;
+    if (!first || permissionBy || permissionPlatform || access) {
+      throw new Error(
+        `REST ${this.operation}: withPermissionWhenPresent follows a withPermission that names ` +
+          "one permission or several",
+      );
+    }
+    assertNotPlatformPermission({ address: `REST ${this.operation}`, permissions: [permission] });
+    if (!inputCarries({ input: this.state.input, field })) {
+      throw new Error(
+        `REST ${this.operation} asks a permission when "${field}" is present, a field its input does not parse`,
+      );
+    }
+    const declared = this.state.permissionsWhenPresent ?? [];
+    if (declared.some((each) => each.field === field)) {
+      throw new Error(`REST ${this.operation} asks a permission when "${field}" is present twice`);
+    }
+
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: { ...this.state, permissionsWhenPresent: [...declared, { field, permission }] },
+    });
+  }
+
+  /**
    * Declares how the route is reached instead of naming a permission:
    * `publicRoute` resolves no credential, so its handler gets a null actor/scope
    * and the document publishes no security requirement; `anyAuthenticated` still opens the door.
@@ -2050,6 +2095,7 @@ function accessParts(
   | "permissionBy"
   | "permissionTarget"
   | "furtherPermissions"
+  | "permissionsWhenPresent"
   | "permissionReach"
   | "permissionPlatform"
 > {
@@ -2074,8 +2120,24 @@ function accessParts(
     ...(state.permissions ? { permissions: state.permissions } : {}),
     ...(state.permissionTarget ? { permissionTarget: state.permissionTarget } : {}),
     ...(state.furtherPermissions ? { furtherPermissions: state.furtherPermissions } : {}),
+    ...(state.permissionsWhenPresent
+      ? { permissionsWhenPresent: state.permissionsWhenPresent }
+      : {}),
     ...(state.permissionReach ? { permissionReach: state.permissionReach } : {}),
   };
+}
+
+/** Whether the route's body schema names `field` at its top level, through an intersection. */
+function inputCarries({ input, field }: { input: unknown; field: string }): boolean {
+  if (input instanceof z.ZodObject) return Object.hasOwn(input.shape, field);
+  if (input instanceof z.ZodIntersection) {
+    return (
+      inputCarries({ input: input.def.left, field }) ||
+      inputCarries({ input: input.def.right, field })
+    );
+  }
+
+  return false;
 }
 
 function declaredParts(state: RouteState): Partial<RestTransportRoute<unknown>> {

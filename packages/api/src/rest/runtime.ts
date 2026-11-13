@@ -705,6 +705,20 @@ function assertAfterBodyPorts({
     );
   }
 
+  if (route.permissionsWhenPresent && !door.authorize) {
+    throw new Error(
+      `REST ${address} asks a permission for an input field after its door, and this runtime ` +
+        "supplied no identity.authorize",
+    );
+  }
+
+  if (route.permissionsWhenPresent && credential === "browser" && !route.permissionTarget) {
+    throw new Error(
+      `REST ${address} asks a permission for an input field at the credential's own scope, and ` +
+        "the browser door resolves none: name the scope on the route",
+    );
+  }
+
   if (!route.permissionBy || route.permissionTarget || credential !== "browser") return;
 
   const bare = Object.values(route.permissionBy.map).some((entry) => typeof entry === "string");
@@ -1590,6 +1604,15 @@ function handlerMiddleware<Api>({
 
       const target = await checkRouteScope({ route, caller, door, ports, input, context });
       const further = await checkFurtherTargets({ route, caller, door, ports, input, context });
+      const whenPresent = await checkPermissionsWhenPresent({
+        route,
+        caller,
+        door,
+        ports,
+        input,
+        context,
+        scope: target ?? caller.scope,
+      });
       const capabilities = { route, ports, context, family, version, caller, input } as const;
 
       // The scope access resolved: the one a route's own path named when it named
@@ -1607,13 +1630,14 @@ function handlerMiddleware<Api>({
 
       await countCall(capabilities);
 
-      return { decision, target, further, capabilities, resolved, authorize };
+      return { decision, target, further, whenPresent, capabilities, resolved, authorize };
     })().catch(async (error: unknown) => {
       // A staff key refused before the gate (another project, a missing permission) is trailed too.
       await recordStaffRefusal({ gate: ports.staffAccess, error, ...staffInput, scope: null });
       throw error;
     });
-    const { decision, target, further, capabilities, resolved, authorize } = authorized;
+    const { decision, target, further, whenPresent, capabilities, resolved, authorize } =
+      authorized;
 
     // After every permission check and before any answer, a stored one included: a staff key's
     // request is recorded before it is served, or refused.
@@ -1621,6 +1645,7 @@ function handlerMiddleware<Api>({
       gate: ports.staffAccess,
       servedDoors: ports.servedDoors === true,
       ...staffInput,
+      permissions: [...staffInput.permissions, ...whenPresent],
       scope: resolved,
     });
 
@@ -2436,6 +2461,56 @@ async function checkFurtherTargets({
   }
 
   return asked;
+}
+
+/**
+ * Each permission declared for an input field, asked when the parsed input carries the field, at
+ * the scope the route's own permission was asked at, with the same refusal (CLAUDE.md rule 6).
+ */
+async function checkPermissionsWhenPresent({
+  route,
+  caller,
+  door,
+  ports,
+  input,
+  context,
+  scope,
+}: {
+  route: RestTransportRoute<unknown>;
+  caller: RestCaller;
+  door: RestIdentity;
+  ports: RestRuntimeMembers;
+  input: unknown;
+  context: Context;
+  scope: AuthzDeclaredScopeId | null;
+}): Promise<readonly AuthzPermission[]> {
+  const present = (route.permissionsWhenPresent ?? []).filter(({ field }) =>
+    inputHolds({ input, field }),
+  );
+  if (present.length === 0) return [];
+  if (!scope)
+    throw new Error(`REST ${route.operation} asks a permission for a field with no scope`);
+
+  const authorize = ports.authorization.forRequest(context.req.raw);
+  for (const { permission } of present) {
+    const decision = await requireAuthorize(door)({ caller, permission, target: scope });
+
+    assertRouteScopePermission({
+      permission,
+      target: scope,
+      decision: await gatedDecision({ decisions: authorize, scope, decision }),
+      ...(ports.denials ? { denials: ports.denials } : {}),
+    });
+  }
+
+  return present.map(({ permission }) => permission);
+}
+
+/** Whether the parsed input carries `field` with a value; an omitted optional field is absent. */
+function inputHolds({ input, field }: { input: unknown; field: string }): boolean {
+  if (typeof input !== "object" || input === null || !Object.hasOwn(input, field)) return false;
+
+  return Reflect.get(input, field) !== undefined;
 }
 
 /** One proof per proof-bearing route target, by the field naming it; the first's is reused. */
