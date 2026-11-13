@@ -57,6 +57,8 @@ describe("given the access-model definition built with the app reader's credenti
   if (!reader) throw new Error("the definition carries no app reader");
   const ddl = accessModelDefinition.renderDdl(definition);
   const usersD = load(accessModelDefinition.renderUsersD(definition)) as UsersD;
+  const tenantPolicies = reader.rowPolicies.filter((p) => p.database === NAMES.database);
+  const hiddenPolicies = reader.rowPolicies.filter((p) => p.database === "system");
 
   /** @scenario "The access model defines the app reader beside the LangWatchQL identity" */
   it("defines the reader and leaves the LangWatchQL identity as it renders without the reader", () => {
@@ -104,8 +106,9 @@ describe("given the access-model definition built with the app reader's credenti
       "toString(getSetting('SQL_langwatch_tenancy_enforce')) = '0' OR " +
       "has(arrayFilter(tenant -> notEmpty(tenant), " +
       `splitByChar(',', getSetting('SQL_langwatch_tenant_ids'))), ${column})`;
-    expect(reader.rowPolicies).toHaveLength(APP_READER_TENANT_TABLES.length);
-    for (const policy of reader.rowPolicies) {
+    expect(tenantPolicies).toHaveLength(APP_READER_TENANT_TABLES.length);
+    expect(tenantPolicies.length + hiddenPolicies.length).toBe(reader.rowPolicies.length);
+    for (const policy of tenantPolicies) {
       const column = policy.table === "stored_objects" ? "project_id" : "TenantId";
       expect(policy).toEqual({
         name: `${policy.table}_app_tenant`,
@@ -114,6 +117,25 @@ describe("given the access-model definition built with the app reader's credenti
         predicate: predicateFor(column),
       });
     }
+  });
+
+  /** @scenario "The app reader cannot read its own query log" */
+  it("hides system.user_query_log behind a policy admitting no row, with no grant on it", () => {
+    expect(hiddenPolicies).toEqual([
+      {
+        name: "user_query_log_app_hidden",
+        database: "system",
+        table: "user_query_log",
+        predicate: "0",
+      },
+    ]);
+    expect(reader.grants.filter(({ database }) => database === "system")).toEqual([]);
+    expect(ddl).toContain(
+      "CREATE ROW POLICY OR REPLACE user_query_log_app_hidden ON system.user_query_log\n" +
+        "  USING 0\n  TO langwatch_app_reader",
+    );
+    expect(usersD.users[APP_READER_NAMES.user]?.databases.system?.user_query_log?.filter).toBe("0");
+    expect(usersD.users[NAMES.restrictedUser]?.databases.system).toBeUndefined();
   });
 
   /** @scenario "App reader policies never share a name with a LangWatchQL policy" */
@@ -129,7 +151,7 @@ describe("given the access-model definition built with the app reader's credenti
   /** @scenario "The app reader is granted SELECT on the tenant tables and nothing else" */
   it("grants SELECT on exactly the tables its policies bound, every column", () => {
     expect(reader.grants).toEqual(
-      reader.rowPolicies.map(({ database, table }) => ({ database, table })),
+      tenantPolicies.map(({ database, table }) => ({ database, table })),
     );
     const readerGrants = ddl.filter(
       (s) => s.startsWith("GRANT") && s.endsWith(" TO langwatch_app_reader"),

@@ -34,6 +34,13 @@ Feature: ClickHouse row policies bound the application's reads to the request's 
     And "stored_objects" is bounded on "project_id" and every other tenant table on "TenantId"
 
   @unit
+  Scenario: The app reader cannot read its own query log
+    Given the access-model definition built with the app reader's credential
+    Then the app reader carries a row policy admitting no row on "system.user_query_log"
+    And it is granted nothing in the "system" database
+    And the DDL and users.d emitters both render that policy
+
+  @unit
   Scenario: App reader policies never share a name with a LangWatchQL policy
     Given the access-model definition built with the app reader's credential
     Then no app reader policy has the name of a LangWatchQL policy on the same table
@@ -62,9 +69,15 @@ Feature: ClickHouse row policies bound the application's reads to the request's 
   @unit
   Scenario: Every table the migrations leave with a tenant column has an app reader policy
     Given the ClickHouse migrations replayed into the tables they leave behind
-    Then every table carrying "TenantId" or "project_id" has an app reader policy on that column
+    Then every table carrying "TenantId" or "project_id" has an app reader policy on that column, or is classified as never granted with its reason
     And a table carrying neither fails the guard by name until it is classified
-    And no app reader policy names a table the migrations do not leave
+    And no app reader policy or classification names a table the migrations do not leave
+
+  @unit
+  Scenario: The app reader is never granted the LangWatchQL key map or eventing's log
+    Given the ClickHouse migrations replayed into the tables they leave behind
+    Then "lwql_api_key_tenant_map", "event_log" and "event_log_id_index" are classified as never granted to the app reader
+    And the access-model definition gives the app reader no grant and no row policy on any of them
 
   @unit
   Scenario: Every deduplicating tenant table leads its sorting key with its tenant column
@@ -80,9 +93,25 @@ Feature: ClickHouse row policies bound the application's reads to the request's 
   @integration
   Scenario: An enforcing reader naming tenant A reads only tenant A's rows in every query shape
     Given the app reader provisioned from the rendered DDL with enforce pinned to 1
-    And rows of tenants A and B in the tenant tables
-    When the reader runs a plain read, a CTE, a UNION ALL, a join, a subquery and an IN subquery with "SQL_langwatch_tenant_ids" naming tenant A
-    Then every result holds tenant A's rows only
+    And rows of tenants A and B in the tenant tables, sharing the join keys across tenants
+    And a row of tenant B alone on the inner side of a join and of an IN subquery
+    When the reader runs a plain read, a CTE, a UNION ALL, inner, left and right joins, a subquery and an IN subquery with "SQL_langwatch_tenant_ids" naming tenant A
+    Then every result holds exactly tenant A's rows, counted, on both sides of every join
+
+  @integration
+  Scenario: The tenant set is read as exact comma-separated ids
+    Given the app reader provisioned from the rendered DDL with enforce pinned to 1
+    And rows of a tenant whose id has tenant A's id as a prefix
+    When the reader names tenant A, the longer id, their shared prefix, empty entries, a space before an id, or tenants A and B
+    Then it reads the rows of each id named exactly, and an entry carrying a space or a bare prefix matches no tenant
+
+  @integration
+  Scenario: A reader for one tenant cannot read another tenant's logged statements
+    Given the app reader provisioned from the rendered DDL with enforce pinned to 1
+    And the reader ran a statement for tenant B, which the server logged
+    When the reader for tenant A reads "system.user_query_log"
+    Then it reads none of tenant B's statements
+    And reading "system.query_log", "system.processes", "system.query_views_log" or "system.text_log" is refused for want of a grant
 
   @integration
   Scenario: An enforcing reader without a tenant set reads no rows

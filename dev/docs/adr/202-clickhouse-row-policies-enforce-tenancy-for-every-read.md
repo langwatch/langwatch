@@ -33,6 +33,8 @@ Three steps, each shippable alone, in this order.
 - The profile pins, `CONST`: `use_query_condition_cache = 0` and `use_query_cache = 0` unless measured safe on the server version (ADR-200 found the condition cache crossing tenants on 25.10 with a setting-keyed policy), `allow_introspection_functions = 0`, and the fence's existing pins. The tenant setting itself stays changeable, with `log_query_settings` left on: tenant ids are not secrets, unlike the LangWatchQL capability.
 - The access model is one more entry in ADR-159's single typed definition, delivered by its two emitters: rendered `users.d` (chart-managed and `clickhouse-serverless`) and SQL DDL (ClickHouse Cloud, BYO). It is never a goose migration: goose DDL for access entities reaches one replica only, the reason ADR-159 rejected `ON CLUSTER`.
 - A table without a policy is readable in full by every user (ADR-200 item 4, confirmed on 26.8; haven sets `users_without_row_policies_can_read_rows` to true explicitly). A guard test therefore fails when a table carrying a tenant column has no policy in the definition, and the migration-safety scan refuses a new tenant table without one.
+- **Tenant tables the reader is never granted.** `lwql_api_key_tenant_map` holds `KeyHash`, which ADR-200 keeps to the LangWatchQL identity. `event_log` and `event_log_id_index` are eventing's: it reads its own log through its own surface (ARCHITECTURE.md §7), and slice 2 decides which identity it uses. The reader has no grant and no policy on any of them, so a read fails closed for want of a grant. The guard test classifies each with its reason and still fails on any table it does not classify.
+- **The reader's own query log.** On 26.8 every user holds an implicit `SELECT` on `system.user_query_log`, which lists the statements and settings logged under that user's name; `REVOKE` does not remove it. Every tenant shares the reader, so a read for tenant A could list tenant B's statements and tenant set. The reader therefore carries one more row policy, `USING 0` on `system.user_query_log`, which both emitters render (`CREATE ROW POLICY`, and `databases.system.user_query_log.filter` in users.d). `query_log`, `processes`, `query_views_log` and `text_log` need a grant the reader does not hold. Rejected: `log_queries = 0 CONST`, which drops every application read from the operator's `query_log`; a server-side switch, which provisioning cannot check on a target.
 
 ### 2. A typed query builder
 
@@ -60,15 +62,15 @@ Open option, not decided: windows only (no conditions) could move into the polic
 
 Row policies filter `SELECT` only. A second user, `langwatch_app_system` (name open), has no row policy and is used only where a read must span tenants or where the policy must not apply.
 
-| Path | Identity | Why |
-| --- | --- | --- |
-| Inserts (projections, event appends, coalesced inserts) | system, or reader if verified safe | Row policies do not filter `INSERT`. The risk is materialised views (next row) |
-| Materialised views triggered by an insert (id-index fills, rollups) | system until proven | Must be tested: if the MV's `SELECT` over the inserted block applies the reader's policy and no setting is present, the MV writes nothing. Silent data loss, not a leak |
-| Goose migrations, `pnpm task upgrade` (tasks app) | system (today's admin URL) | DDL, `INSERT ... SELECT` backfills, all tenants |
-| Background steps that walk every tenant (`SKIP_TENANT_CHECK` today) | system | Retention, id-index fill, replay, storage footprint, usage meters |
-| Mutations (`ALTER ... DELETE`, lightweight delete) | system | Not filtered by policies; already tenant-predicated in text |
-| Worker reads for one tenant (projections reading back, subscribers) | reader | Same as api |
-| api reads | reader | The point of this ADR |
+| Path                                                                | Identity                           | Why                                                                                                                                                                     |
+| ------------------------------------------------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Inserts (projections, event appends, coalesced inserts)             | system, or reader if verified safe | Row policies do not filter `INSERT`. The risk is materialised views (next row)                                                                                          |
+| Materialised views triggered by an insert (id-index fills, rollups) | system until proven                | Must be tested: if the MV's `SELECT` over the inserted block applies the reader's policy and no setting is present, the MV writes nothing. Silent data loss, not a leak |
+| Goose migrations, `pnpm task upgrade` (tasks app)                   | system (today's admin URL)         | DDL, `INSERT ... SELECT` backfills, all tenants                                                                                                                         |
+| Background steps that walk every tenant (`SKIP_TENANT_CHECK` today) | system                             | Retention, id-index fill, replay, storage footprint, usage meters                                                                                                       |
+| Mutations (`ALTER ... DELETE`, lightweight delete)                  | system                             | Not filtered by policies; already tenant-predicated in text                                                                                                             |
+| Worker reads for one tenant (projections reading back, subscribers) | reader                             | Same as api                                                                                                                                                             |
+| api reads                                                           | reader                             | The point of this ADR                                                                                                                                                   |
 
 Keeping the exempt identity narrow:
 
@@ -150,6 +152,7 @@ Migration path: about 139 non-test TypeScript files under ClickHouse repository 
 3. Whether routed and BYOC targets without the access model refuse reads (fail closed) or keep today's text checks until provisioned.
 4. Whether the builder is hand-written in `packages/clickhouse-client` or adopts an existing library.
 5. Whether `use_query_condition_cache = 0` on the reader is acceptable for performance, or the app's ClickHouse must reach 26.8 first.
+6. Whether the LangWatchQL user gets the same `USING 0` policy on `system.user_query_log`. It holds the same implicit grant and is shared by every tenant. Its validator refuses the `system` database, masking hides the capability and `log_query_settings = 0` empties `Settings`, but other tenants' statement text and `log_comment` sit behind the validator alone. Not changed in slice 1.
 
 ## References
 

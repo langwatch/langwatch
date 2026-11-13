@@ -1,14 +1,47 @@
 /** Guards the app reader's tenant-table list against the schema the migrations build (ADR-202). */
 import { describe, expect, it } from "vitest";
 
+import type { PostgresNamedCollection } from "../../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
 import { APP_READER_TENANT_TABLES } from "../../rules/app-reader-access.rules.ts";
+import { LangWatchQLAccessModelDefinitionService } from "../langwatch-ql-access-model-definition.service.ts";
+import type { LangWatchQLNames } from "../langwatch-ql-access-model.service.ts";
 import { migratedTables } from "./support/clickhouse-migration-tables.ts";
+
+const accessModelDefinition = LangWatchQLAccessModelDefinitionService.create();
+
+const NAMES: LangWatchQLNames = {
+  database: "langwatch",
+  restrictedUser: "langwatch_lwql",
+  settingsProfile: "langwatch_profile",
+  keyMapTable: "lwql_api_key_tenant_map",
+  tenantSetting: "custom_api_key_hash",
+};
+
+const NAMED_COLLECTION: PostgresNamedCollection = {
+  collection: "lwql_postgres",
+  host: "pg.internal",
+  port: 5432,
+  database: "langwatch",
+  user: "lwql_ro",
+  password: "unused",
+};
 
 /** Column names that hold the owning tenant; a table with neither is unclassified. */
 const TENANT_COLUMNS = ["TenantId", "project_id"] as const;
 
 /** Tables the migrations leave that hold no tenant rows, each with why. None today. */
 const TABLES_WITHOUT_TENANT: Readonly<Record<string, string>> = {};
+
+const EVENTING_OWNS =
+  "eventing reads its own log through its own surface (§7); slice 2 decides which identity it uses";
+
+/** Tenant tables the app reader is never granted, so it reads none of their rows; each with why. */
+const TABLES_NOT_GRANTED: Readonly<Record<string, string>> = {
+  lwql_api_key_tenant_map:
+    "KeyHash is the LangWatchQL capability's hash; ADR-200 keeps it to the LangWatchQL identity",
+  event_log: EVENTING_OWNS,
+  event_log_id_index: EVENTING_OWNS,
+};
 
 /** Engines that collapse rows sharing a sorting key, so `FINAL` must not span tenants. */
 const COLLAPSING_ENGINE =
@@ -44,16 +77,35 @@ describe("given the ClickHouse migrations replayed into the tables they leave be
     const unpoliced = tables
       .filter((t) => {
         const column = tenantColumnOf(t.columns);
-        return column ? policed.get(t.name) !== column : !(t.name in TABLES_WITHOUT_TENANT);
+        if (!column) return !(t.name in TABLES_WITHOUT_TENANT);
+        return t.name in TABLES_NOT_GRANTED ? false : policed.get(t.name) !== column;
       })
       .map((t) => `${t.name} (${t.migration}): ${tenantColumnOf(t.columns) ?? "no tenant column"}`);
     expect(unpoliced, "add each table to APP_READER_TENANT_TABLES or classify it").toEqual([]);
 
+    const classified = [...Object.keys(TABLES_WITHOUT_TENANT), ...Object.keys(TABLES_NOT_GRANTED)];
     const live = new Set(tables.map((t) => t.name));
-    const stale = [...policed.keys(), ...Object.keys(TABLES_WITHOUT_TENANT)].filter(
-      (name) => !live.has(name),
-    );
+    const stale = [...policed.keys(), ...classified].filter((name) => !live.has(name));
     expect(stale, "the migrations no longer leave these tables").toEqual([]);
+  });
+
+  /** @scenario "The app reader is never granted the LangWatchQL key map or eventing's log" */
+  it("grants the reader no table it is classified as never granted", () => {
+    const withTenantColumn = tables.filter((t) => tenantColumnOf(t.columns)).map((t) => t.name);
+    expect(
+      Object.keys(TABLES_NOT_GRANTED).filter((name) => !withTenantColumn.includes(name)),
+    ).toEqual([]);
+    expect([...policed.keys()].filter((name) => name in TABLES_NOT_GRANTED)).toEqual([]);
+    const reader = accessModelDefinition.build({
+      names: NAMES,
+      passwordSha256Hex: "a".repeat(64),
+      namedCollection: NAMED_COLLECTION,
+      sourceDatabase: NAMES.database,
+      appReader: { passwordSha256Hex: "b".repeat(64) },
+    }).appReader;
+    const reached = [...(reader?.grants ?? []), ...(reader?.rowPolicies ?? [])].map((t) => t.table);
+    expect(reader?.grants.length).toBeGreaterThan(50);
+    expect(reached.filter((table) => table in TABLES_NOT_GRANTED)).toEqual([]);
   });
 
   /** @scenario "Every deduplicating tenant table leads its sorting key with its tenant column" */

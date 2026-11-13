@@ -175,6 +175,16 @@ export class LangWatchQLAccessModelService {
     return `${sqlText.assertIdentifier(table, "table")}_app_tenant`;
   }
 
+  /** The policy hiding one system table from the app reader; distinct from a tenant policy. */
+  appReaderHiddenPolicyName(table: string): string {
+    return `${sqlText.assertIdentifier(table, "table")}_app_hidden`;
+  }
+
+  /** Admits no row: the reader reads nothing of a table it cannot be refused. */
+  appReaderHiddenPredicate(): string {
+    return "0";
+  }
+
   keyMapPolicyName(keyMapTable: string): string {
     return keyMapPolicyName(keyMapTable);
   }

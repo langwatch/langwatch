@@ -13,6 +13,7 @@ import type { PostgresNamedCollection } from "../features/provisioning/services/
 import { LangWatchQLViewProvisioningService } from "../features/provisioning/services/langwatch-ql-view-provisioning.service.ts";
 import { LangWatchQLViewStatementsService } from "../features/provisioning/services/langwatch-ql-view-statements.service.ts";
 import {
+  APP_READER_HIDDEN_SYSTEM_TABLES,
   APP_READER_NAMES,
   APP_READER_SETTINGS_PREFIX,
   APP_READER_TENANT_TABLES,
@@ -435,7 +436,10 @@ export class LangWatchQLAccessModelDefinitionService {
     return [keyMapPolicy, ...tablePolicies];
   }
 
-  /** SELECT on, and one tenant policy over, each tenant table; no other grant (ADR-202). */
+  /**
+   * SELECT on, and one tenant policy over, each tenant table; no other grant. A policy admitting
+   * no row hides each implicitly granted system table (ADR-202).
+   */
   #appReader({
     passwordSha256Hex,
     enforce = false,
@@ -452,12 +456,20 @@ export class LangWatchQLAccessModelDefinitionService {
         settings: this.appReaderProfileSettings({ enforce }),
       },
       grants: APP_READER_TENANT_TABLES.map(({ table }) => ({ database: sourceDatabase, table })),
-      rowPolicies: APP_READER_TENANT_TABLES.map(({ table, tenantColumn }) => ({
-        name: accessModel.appReaderPolicyName(table),
-        database: sourceDatabase,
-        table,
-        predicate: accessModel.appReaderTenantPredicate({ tenantColumn }),
-      })),
+      rowPolicies: [
+        ...APP_READER_TENANT_TABLES.map(({ table, tenantColumn }) => ({
+          name: accessModel.appReaderPolicyName(table),
+          database: sourceDatabase,
+          table,
+          predicate: accessModel.appReaderTenantPredicate({ tenantColumn }),
+        })),
+        ...APP_READER_HIDDEN_SYSTEM_TABLES.map(({ database, table }) => ({
+          name: accessModel.appReaderHiddenPolicyName(table),
+          database,
+          table,
+          predicate: accessModel.appReaderHiddenPredicate(),
+        })),
+      ],
     };
   }
 }

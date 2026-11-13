@@ -18,7 +18,10 @@ export const APP_READER_NAMES = {
 /** The `custom_settings_prefixes` entry the server must declare for the reader's settings. */
 export const APP_READER_SETTINGS_PREFIX = "SQL_";
 
-/** Tenant tables keyed on `TenantId`, as the ClickHouse migrations leave them. */
+/**
+ * Tenant tables keyed on `TenantId`, as the ClickHouse migrations leave them. The LangWatchQL key
+ * map and eventing's log are never granted to the reader; the guard test names them with why.
+ */
 const TENANT_ID_TABLES = [
   "automation_audit",
   "billable_events",
@@ -36,8 +39,6 @@ const TENANT_ID_TABLES = [
   "evaluation_runs",
   "evaluation_runs_by_trace_id_index",
   "evaluation_runs_id_index",
-  "event_log",
-  "event_log_id_index",
   "experiment_run_items",
   "experiment_runs",
   "experiment_runs_by_experiment_id_index",
@@ -58,7 +59,6 @@ const TENANT_ID_TABLES = [
   "langy_messages",
   "log_records",
   "log_usage_estimates",
-  "lwql_api_key_tenant_map",
   "metric_data_points",
   "metric_series",
   "metric_time_rollups",
@@ -93,4 +93,12 @@ const TENANT_ID_TABLES = [
 export const APP_READER_TENANT_TABLES: readonly LangWatchQLTable[] = [
   ...TENANT_ID_TABLES.map((table) => ({ table, tenantColumn: "TenantId" })),
   { table: "stored_objects", tenantColumn: "project_id" },
+];
+
+/**
+ * System tables 26.8 grants every user implicitly, which `REVOKE` does not remove. Every tenant
+ * shares the reader, so a policy admitting no row hides each one (ADR-202).
+ */
+export const APP_READER_HIDDEN_SYSTEM_TABLES: readonly { database: string; table: string }[] = [
+  { database: "system", table: "user_query_log" },
 ];
