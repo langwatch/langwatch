@@ -4,6 +4,7 @@
 import { type BraidConditionCompileResult } from "@langwatch/authz-contract/braid-condition-compiler";
 import { Menu } from "@langwatch/design-system/menu";
 import {
+  Alert,
   Box,
   Button,
   Code,
@@ -13,7 +14,7 @@ import {
   Text,
   Textarea,
 } from "@langwatch/design-system/primitives";
-import { AlertTriangle, CheckCircle2, ChevronDown, Plus } from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { insertAttribute } from "../../../../model/braids/braid-draft.ts";
@@ -39,7 +40,7 @@ function RefusedText({ text, at }: { text: string; at: number }) {
       display="block"
       whiteSpace="pre-wrap"
       fontVariantLigatures="none"
-      fontSize="sm"
+      textStyle="sm"
       padding={2}
       data-testid="braid-condition-refused"
     >
@@ -61,6 +62,7 @@ function RefusedText({ text, at }: { text: string; at: number }) {
 function CheckLine({
   check,
   empty,
+  touched,
   held,
   ownerName,
   readerName,
@@ -68,6 +70,7 @@ function CheckLine({
 }: {
   check: BraidConditionCompileResult;
   empty: boolean;
+  touched: boolean;
   held: boolean;
   ownerName: string;
   readerName: string;
@@ -75,45 +78,47 @@ function CheckLine({
 }) {
   if (held) {
     return (
-      <Text fontSize="xs" color="fg.muted" data-testid="braid-condition-check">
+      <Field.HelperText data-testid="braid-condition-check">
         Type the value between the quotes.
-      </Text>
+      </Field.HelperText>
     );
   }
   if (!check.ok) {
     return (
-      <HStack
-        gap={2}
-        align="start"
-        color="fg.error"
-        fontSize="xs"
-        role="alert"
-        data-testid="braid-condition-check"
-      >
-        <AlertTriangle size={12} aria-hidden />
-        <Text>{`${check.construct[0]?.toUpperCase() ?? ""}${check.construct.slice(1)} isn't supported. ${check.fix}`}</Text>
-      </HStack>
+      <Field.ErrorText role="alert" data-testid="braid-condition-check">
+        {`${check.construct[0]?.toUpperCase() ?? ""}${check.construct.slice(1)} isn't supported. ${check.fix}`}
+      </Field.ErrorText>
+    );
+  }
+  if (empty && !touched) {
+    return (
+      <Field.HelperText data-testid="braid-condition-check">
+        {`Which ${ownerName} spans to show. Left empty, all of them show.`}
+      </Field.HelperText>
     );
   }
   if (empty) {
     return (
-      <HStack gap={1.5} color="fg.warning" fontSize="xs" data-testid="braid-condition-check">
-        <AlertTriangle size={12} aria-hidden />
-        <Text>{`No condition: every span from ${ownerName} shows in ${readerName}'s traces.`}</Text>
-      </HStack>
+      <Alert.Root status="warning" size="sm" data-testid="braid-condition-empty">
+        <Alert.Indicator />
+        <Alert.Title fontWeight="normal">
+          {`No condition: every span from ${ownerName} shows in ${readerName}'s traces.`}
+        </Alert.Title>
+      </Alert.Root>
     );
   }
   return (
-    <HStack gap={1.5} color="fg.success" fontSize="xs" data-testid="braid-condition-check">
-      <CheckCircle2 size={12} aria-hidden />
-      <Text>{verified ? "Looks good · signed calls only" : "Looks good"}</Text>
-    </HStack>
+    <Field.HelperText data-testid="braid-condition-check">
+      {verified ? "Looks good, signed calls only" : "Looks good"}
+    </Field.HelperText>
   );
 }
 
 export function BraidConditionField(props: BraidConditionFieldProps) {
   const textarea = useRef<HTMLTextAreaElement>(null);
   const [caret, setCaret] = useState<number | null>(null);
+  // The no-condition warning waits until the field has been used, so it never greets a new braid.
+  const [touched, setTouched] = useState(false);
   // An inserted comparison's empty quotes are not refused until the text changes: the admin has
   // not typed the value yet. Save stays disabled meanwhile, since the condition does not compile.
   const [inserted, setInserted] = useState<{ where: string; quoteAt: number } | null>(null);
@@ -141,7 +146,7 @@ export function BraidConditionField(props: BraidConditionFieldProps) {
       <HStack justify="space-between" width="full">
         <Field.Label>
           Condition{" "}
-          <Text as="span" color="fg.muted" fontSize="xs" fontWeight="normal">
+          <Text as="span" color="fg.muted" textStyle="xs" fontWeight="normal">
             OTTL
           </Text>
         </Field.Label>
@@ -158,7 +163,7 @@ export function BraidConditionField(props: BraidConditionFieldProps) {
               <ChevronDown size={12} aria-hidden />
             </Button>
           </Menu.Trigger>
-          <Menu.Content maxHeight="280px" overflowY="auto">
+          <Menu.Content maxHeight="72" overflowY="auto">
             {props.attributeKeys.map(({ key, spanCount }) => (
               <Menu.Item
                 key={key}
@@ -167,12 +172,12 @@ export function BraidConditionField(props: BraidConditionFieldProps) {
                 data-testid="braid-attribute"
               >
                 <HStack justify="space-between" width="full" gap={4}>
-                  <Text fontFamily="mono" fontSize="sm">
+                  <Text fontFamily="mono" textStyle="sm">
                     {key}
                   </Text>
                   <Text
                     color="fg.muted"
-                    fontSize="xs"
+                    textStyle="xs"
                   >{`${spanCount.toLocaleString("en-GB")} spans`}</Text>
                 </HStack>
               </Menu.Item>
@@ -184,10 +189,14 @@ export function BraidConditionField(props: BraidConditionFieldProps) {
         ref={textarea}
         aria-label="Condition"
         value={props.value}
-        onChange={(event) => props.onChange(event.target.value)}
+        onChange={(event) => {
+          setTouched(true);
+          props.onChange(event.target.value);
+        }}
+        onBlur={() => setTouched(true)}
         fontFamily="mono"
         fontVariantLigatures="none"
-        fontSize="sm"
+        textStyle="sm"
         rows={4}
         spellCheck={false}
         placeholder={'attributes["orchestrator"] == "web"'}
@@ -198,6 +207,7 @@ export function BraidConditionField(props: BraidConditionFieldProps) {
         <CheckLine
           check={props.check}
           empty={props.value.trim().length === 0}
+          touched={touched}
           held={held}
           ownerName={props.ownerName}
           readerName={props.readerName}

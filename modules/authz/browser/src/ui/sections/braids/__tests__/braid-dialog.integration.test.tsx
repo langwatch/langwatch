@@ -44,8 +44,11 @@ function openDialog({ braid = "new" }: { braid?: string } = {}) {
   return { host, user: userEvent.setup() };
 }
 
+/** The Into picker, named by its field label. */
+const intoPicker = () => screen.getByRole("combobox", { name: "Into" });
+
 async function pickReader(user: ReturnType<typeof userEvent.setup>, name = "orchestrator") {
-  await user.click(screen.getByTestId("braid-into"));
+  await user.click(intoPicker());
   const option = screen
     .getAllByTestId("braid-target")
     .find((item) => within(item).queryByText(name));
@@ -112,15 +115,14 @@ describe("the braid dialog", () => {
           "Show specialists's spans inside another project's traces. Nothing is copied.",
         ),
       ).toBeInTheDocument();
-      expect(screen.getByTestId("braid-from")).toHaveTextContent("specialists");
-      expect(screen.getByRole("button", { name: "Into, pick a project" })).toBeInTheDocument();
-      await user.click(screen.getByTestId("braid-into"));
-      expect(screen.getByRole("menuitem", { name: "orchestrator" })).toBeInTheDocument();
+      expect(screen.getByTestId("braid-from")).toHaveValue("specialists");
+      expect(screen.getByTestId("braid-from")).toHaveAttribute("readonly");
+      expect(intoPicker()).toHaveTextContent("Pick a project");
+      await user.click(intoPicker());
+      expect(screen.getByRole("option", { name: "orchestrator" })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: "specialists, this project" })).toBeInTheDocument();
       expect(
-        screen.getByRole("menuitem", { name: "specialists, this project" }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("menuitem", { name: "rollup, aggregate projects can't be braided" }),
+        screen.getByRole("option", { name: "rollup, aggregate projects can't be braided" }),
       ).toBeInTheDocument();
       const options = screen.getAllByTestId("braid-target");
       expect(options).toHaveLength(3);
@@ -135,11 +137,11 @@ describe("the braid dialog", () => {
 
   describe("when ana picks a reader", () => {
     /** @scenario The braid starts from this project and picks where it goes */
-    it("names the Into button by the picked project", async () => {
+    it("names the Into picker by the picked project", async () => {
       const { user } = openDialog();
       await pickReader(user);
 
-      expect(screen.getByRole("button", { name: "Into, orchestrator" })).toBeInTheDocument();
+      expect(intoPicker()).toHaveTextContent("orchestrator");
     });
   });
 
@@ -188,11 +190,11 @@ describe("the braid dialog", () => {
         await pickReader(user);
         await writeCondition(user, 'attributes["team"] == "billing"');
 
-        expect(await screen.findByTestId("braid-preview-counts")).toHaveTextContent(
-          "1,500 of 4,902 traces get spans",
+        expect(await screen.findByTestId("braid-preview-figure")).toHaveTextContent(
+          "1,500 of 4,902",
         );
         expect(screen.getByTestId("braid-preview-added")).toHaveTextContent(
-          "This braid shows 2,400 more spans than the other braid from specialists alone.",
+          "Adds 2,400 spans that the other braid doesn't show.",
         );
         expect(braidTraces.state.previewAsked).toHaveBeenLastCalledWith(
           expect.not.objectContaining({ braidId: expect.anything() }),
@@ -215,7 +217,7 @@ describe("the braid dialog", () => {
         await writeCondition(user, CONDITION);
 
         expect(await screen.findByTestId("braid-preview-added")).toHaveTextContent(
-          "This braid shows no more spans than the other braid from specialists alone.",
+          "Adds no spans: the other braid already shows every span this one would.",
         );
       });
     });
@@ -229,7 +231,7 @@ describe("the braid dialog", () => {
       ];
       const { user } = openDialog();
 
-      await user.click(screen.getByTestId("braid-into"));
+      await user.click(intoPicker());
       expect(screen.queryByText("orchestrator")).not.toBeInTheDocument();
       expect(screen.getByTestId("braid-targets-note")).toHaveTextContent(
         "A braid can only go into a project whose traces you can read.",
@@ -294,6 +296,20 @@ describe("the braid dialog", () => {
       await writeCondition(user, CONDITION);
       expect(screen.getByTestId("braid-condition-check")).toHaveTextContent("Looks good");
       expect(screen.getByTestId("braid-save")).toBeEnabled();
+    });
+  });
+
+  describe("when the condition is empty", () => {
+    /** @scenario The condition is checked as it is typed */
+    it("warns that every span shows only once ana has used the field", async () => {
+      const { user } = openDialog();
+      await pickReader(user);
+
+      expect(screen.queryByTestId("braid-condition-empty")).toBeNull();
+      await user.type(screen.getByTestId("braid-condition"), "a");
+      await user.clear(screen.getByTestId("braid-condition"));
+
+      expect(screen.getByTestId("braid-condition-empty")).toBeInTheDocument();
     });
   });
 
@@ -443,8 +459,8 @@ describe("the braid dialog", () => {
       await writeCondition(user, `${CONDITION} and Verified("orchestrator")`);
 
       const counts = await screen.findByTestId("braid-preview-counts");
-      expect(counts).toHaveTextContent("1,500 of 4,902 traces get spans");
-      expect(counts).toHaveTextContent("Every specialists span1,200");
+      expect(screen.getByTestId("braid-preview-figure")).toHaveTextContent("1,500 of 4,902");
+      expect(counts).toHaveTextContent("All specialists spans show1,200");
       expect(screen.getByTestId("braid-preview-capped")).toBeInTheDocument();
       expect(screen.getByTestId("braid-preview-unsigned")).toHaveTextContent(
         "37 spans had no valid signature and stay hidden.",
@@ -605,7 +621,7 @@ describe("the braid dialog", () => {
       const { user } = openDialog({ braid: "b-1" });
 
       expect(screen.getByTestId("braid-condition")).toHaveValue(CONDITION);
-      expect(screen.getByTestId("braid-into")).toBeDisabled();
+      expect(intoPicker()).toBeDisabled();
       expect(screen.getByTestId("braid-save")).toBeDisabled();
 
       const changed = `${CONDITION} and attributes["team"] == "billing"`;

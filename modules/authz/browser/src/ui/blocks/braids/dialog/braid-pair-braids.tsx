@@ -24,13 +24,13 @@ export function BraidPairBraids({
   return (
     <Card variant="frame" padding="sm" data-testid="braid-pair-braids">
       <Stack gap={2}>
-        <Text fontSize="sm" fontWeight="medium">
+        <Text textStyle="sm" fontWeight="medium">
           {pairBraidsPhrase({ readerName, ownerName, count: braids.length })}
         </Text>
         {braids.map((braid) => (
           <Stack key={braid.braidId} gap={1} data-testid="braid-pair-braid">
             <BraidCondition where={braid.where} />
-            <Text fontSize="xs" color="fg.muted">
+            <Text textStyle="xs" color="fg.muted">
               {`From ${day(braid.fromMs)} · ${
                 braid.expiresAtMs === null ? "No end date" : `Until ${day(braid.expiresAtMs)}`
               }`}

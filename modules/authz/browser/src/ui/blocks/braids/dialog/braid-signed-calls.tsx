@@ -3,10 +3,10 @@
 
 import { Link } from "@langwatch/browser-host/link";
 import { InlineCode } from "@langwatch/design-system/inline-code";
-import { HStack, Stack, Text } from "@langwatch/design-system/primitives";
+import { Alert, Box, Stack } from "@langwatch/design-system/primitives";
+import { SettingsField } from "@langwatch/design-system/settings-field";
 import { Switch } from "@langwatch/design-system/switch";
 import { formatDistanceToNow } from "@langwatch/time";
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
 
 import { BRAIDS_GUIDE_HREF } from "../../../../model/braids/braids.ts";
 
@@ -41,42 +41,35 @@ function SigningLine({
       ? `last used ${formatDistanceToNow(signing.lastUsedAt)} ago`
       : "not used yet";
     return (
-      <HStack gap={1.5} color="fg.success" fontSize="xs" data-testid="braid-signing-key">
-        <CheckCircle2 size={12} aria-hidden />
-        <Text>{`${readerName} signs its calls · key “${signing.keyName}”, ${used}`}</Text>
-      </HStack>
+      <Alert.Root status="success" size="sm" data-testid="braid-signing-key">
+        <Alert.Indicator />
+        <Alert.Title fontWeight="normal">
+          {`${readerName} signs its calls · key “${signing.keyName}”, ${used}`}
+        </Alert.Title>
+      </Alert.Root>
     );
   }
   if (signing.state === "none" && on) {
     return (
-      <HStack
-        gap={1.5}
-        align="start"
-        color="fg.warning"
-        fontSize="xs"
-        data-testid="braid-signing-key"
-      >
-        <AlertTriangle size={12} aria-hidden />
-        {keysHref ? (
-          <Text>
-            {`${readerName} doesn't sign its calls yet, so nothing will show. `}
-            <Link href={keysHref} isExternal data-testid="braid-create-key">
-              Create a key (opens in a new tab)
-            </Link>
+      <Alert.Root status="warning" size="sm" data-testid="braid-signing-key">
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Title>{`${readerName} doesn't sign its calls yet, so nothing will show.`}</Alert.Title>
+          <Alert.Description>
+            {keysHref ? (
+              <Link href={keysHref} isExternal data-testid="braid-create-key">
+                Create a key (opens in a new tab)
+              </Link>
+            ) : (
+              `Create a key under Signing keys in ${readerName}'s Braids settings.`
+            )}
             {" · "}
             <Link href={`${BRAIDS_GUIDE_HREF}#signing`} isExternal>
               How signing works
             </Link>
-          </Text>
-        ) : (
-          <Text>
-            {`${readerName} doesn't sign its calls yet, so nothing will show. Create a key under Signing keys in ${readerName}'s Braids settings. `}
-            <Link href={`${BRAIDS_GUIDE_HREF}#signing`} isExternal>
-              How signing works
-            </Link>
-          </Text>
-        )}
-      </HStack>
+          </Alert.Description>
+        </Alert.Content>
+      </Alert.Root>
     );
   }
   return null;
@@ -85,31 +78,37 @@ function SigningLine({
 export function BraidSignedCalls(props: BraidSignedCallsProps) {
   const reader = props.readerName ?? "the other project";
   return (
-    <HStack gap={4} align="start" justify="space-between">
-      <Stack gap={1}>
-        <Text textStyle="sm" fontWeight="medium">
-          Only signed calls
-        </Text>
-        <Text textStyle="xs" color="fg.muted">
-          {`Show spans only when ${reader} really made the call. Adds `}
-          <InlineCode variant="neutral">{`Verified("${props.entryKey}")`}</InlineCode> to the
-          condition.
-        </Text>
-        {props.readerName ? (
-          <SigningLine
-            readerName={props.readerName}
-            signing={props.signing}
-            on={props.on}
-            keysHref={props.readerKeysHref}
+    <Stack gap={2}>
+      {/* The Box keeps the field the last row of its own group, so no rule draws under it. */}
+      <Box>
+        <SettingsField
+          layout="inline"
+          controlAlign="end"
+          label="Only signed calls"
+          hint={
+            <>
+              {`Show spans only when ${reader} really made the call. Adds `}
+              <InlineCode variant="neutral">{`Verified("${props.entryKey}")`}</InlineCode> to the
+              condition.
+            </>
+          }
+        >
+          <Switch
+            checked={props.on}
+            onCheckedChange={({ checked }) => props.onChange(checked)}
+            aria-label="Only signed calls"
+            data-testid="braid-signed-calls"
           />
-        ) : null}
-      </Stack>
-      <Switch
-        checked={props.on}
-        onCheckedChange={({ checked }) => props.onChange(checked)}
-        aria-label="Only signed calls"
-        data-testid="braid-signed-calls"
-      />
-    </HStack>
+        </SettingsField>
+      </Box>
+      {props.readerName ? (
+        <SigningLine
+          readerName={props.readerName}
+          signing={props.signing}
+          on={props.on}
+          keysHref={props.readerKeysHref}
+        />
+      ) : null}
+    </Stack>
   );
 }
