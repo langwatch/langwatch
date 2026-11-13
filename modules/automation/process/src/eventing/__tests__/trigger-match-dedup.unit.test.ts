@@ -21,6 +21,9 @@ import {
   automationPeerSubscribers,
   inertPeerReactions,
 } from "../../__tests__/fixtures/pipeline-test-harness.ts";
+import type { AutomationMatchRecordMetricsSink } from "../../features/runaway/services/automation-match-record-metrics.service.ts";
+import type { AutomationTriggerMatchRecorder } from "../../features/settlement/services/automation-trigger-match-dispatcher.service.ts";
+import type { AutomationTraceTriggerCatalogueRepository } from "../../repositories/automation-trace-trigger-catalogue.repository.ts";
 import type { AutomationEvaluationTraceSummary } from "../../services/automation-evaluation-subscriber.service.ts";
 import type { AutomationEvaluationTriggerFilter } from "../../services/automation-evaluation-trigger-filter.service.ts";
 import {
@@ -62,6 +65,24 @@ function trigger(id: string): TriggerSummary {
 }
 
 const TRIGGERS = [trigger("trigger-a"), trigger("trigger-b")];
+
+function triggerCatalogue() {
+  return createApiFixture<
+    Pick<AutomationTraceTriggerCatalogueRepository, "findActiveTraceTriggersForProject">
+  >({ findActiveTraceTriggersForProject: async () => TRIGGERS });
+}
+
+function recorderInto(sent: Match[]): AutomationTriggerMatchRecorder {
+  return createApiFixture<AutomationTriggerMatchRecorder>({
+    send: async (match) => void sent.push(match),
+  });
+}
+
+function inertMetrics() {
+  return createApiFixture<Pick<AutomationMatchRecordMetricsSink, "countRecorded">>({
+    countRecorded: () => undefined,
+  });
+}
 
 function event(input: {
   type: string;
@@ -179,9 +200,9 @@ async function matchTraces(events: readonly Event[]): Promise<Match[]> {
   for (const staged of events) {
     await handleTraceAlertTriggerMatch(
       {
-        triggers: { findActiveTraceTriggersForProject: async () => TRIGGERS },
-        triggerMatches: { send: async (match) => void sent.push(match) },
-        metrics: { countRecorded: () => undefined },
+        triggers: triggerCatalogue(),
+        triggerMatches: recorderInto(sent),
+        metrics: inertMetrics(),
       },
       { occurredAt: staged.occurredAt },
       { tenantId: TENANT, aggregateId: staged.aggregateId },
@@ -196,15 +217,15 @@ async function matchEvaluations(
 ): Promise<Match[]> {
   const sent: Match[] = [];
   const deps = {
-    automation: { findActiveTraceTriggersForProject: async () => TRIGGERS },
+    automation: triggerCatalogue(),
     traces: createApiFixture<AutomationEvaluationTraceSummary>({
       findSummary: async () => traceSummary(),
     }),
-    triggerMatches: { send: async (match: Match) => void sent.push(match) },
+    triggerMatches: recorderInto(sent),
     evaluationFilters: createApiFixture<AutomationEvaluationTriggerFilter>({
       readsEvaluations: () => true,
     }),
-    metrics: { countRecorded: () => undefined },
+    metrics: inertMetrics(),
   };
   for (const evaluation of evaluations) {
     await handleEvaluationAlertTriggerMatch(
@@ -330,6 +351,27 @@ describe("trigger match deduplication before staging", () => {
         const staged = stageMatches(await matchEvaluations(settledFrom(woken)));
 
         expect(settledFrom(woken).map(({ status }) => status)).toContain("processed");
+        expect(staged.map((match) => match.triggerId).toSorted()).toEqual([
+          "trigger-a",
+          "trigger-b",
+        ]);
+      });
+    });
+
+    describe("when a stale settled event for the same trace is redelivered", () => {
+      /** @scenario "A stale evaluation event never hides a fresh settled one" */
+      it("stages the stale event on its own, so the fresh job still matches", async () => {
+        const fresh = reported({ evaluationId: "eval-1", status: "processed", occurredAt: NOW });
+        const stale = reported({
+          evaluationId: "eval-0",
+          status: "processed",
+          occurredAt: NOW - 2 * 60 * 60 * 1000,
+        });
+
+        const woken = stageOnLane("evaluationReportedTriggerMatch", [fresh, stale]);
+        const staged = stageMatches(await matchEvaluations(settledFrom(woken)));
+
+        expect(woken).toEqual([fresh, stale]);
         expect(staged.map((match) => match.triggerId).toSorted()).toEqual([
           "trigger-a",
           "trigger-b",

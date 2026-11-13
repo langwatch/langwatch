@@ -4,7 +4,10 @@ import { nowInstant } from "@langwatch/time";
 
 import type { AutomationMatchRecordMetricsSink } from "../features/runaway/services/automation-match-record-metrics.service.ts";
 import type { AutomationTriggerMatchRecorder } from "../features/settlement/services/automation-trigger-match-dispatcher.service.ts";
-import { isTerminalEvaluationStatus } from "../rules/evaluation-match-dedup.rules.ts";
+import {
+  isStaleEvaluationEvent,
+  isTerminalEvaluationStatus,
+} from "../rules/evaluation-match-dedup.rules.ts";
 import type { AutomationEvaluationTraceSummary } from "../services/automation-evaluation-subscriber.service.ts";
 import type { AutomationEvaluationTriggerFilter } from "../services/automation-evaluation-trigger-filter.service.ts";
 
@@ -44,9 +47,7 @@ export async function handleEvaluationAlertTriggerMatch(
   event: EvaluationEvent,
   context: { tenantId: string; state: EvaluationState },
 ): Promise<void> {
-  // Stale by processing time: a monitor evaluation's occurredAt is its span end (business time)
-  const processedAt = event.createdAt ?? event.occurredAt;
-  if (processedAt < nowInstant().epochMilliseconds - 60 * 60 * 1000) return;
+  if (isStaleEvaluationEvent({ event, now: nowInstant().epochMilliseconds })) return;
   const evaluation = context.state;
   if (!isTerminalEvaluationStatus(evaluation.status)) return;
   if (!evaluation.traceId) return;

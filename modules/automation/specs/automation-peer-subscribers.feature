@@ -67,6 +67,13 @@ Feature: Automation reacts to trace's and evaluation's existing events from its 
     Then the settled evaluation still matches its triggers
 
   @unit
+  Scenario: A stale evaluation event never hides a fresh settled one
+    Given a fresh settled evaluation of a trace is waiting in the evaluation lane
+    When a settled evaluation event older than an hour for the same trace is redelivered
+    Then the stale event waits on its own
+    And the fresh evaluation still matches its triggers
+
+  @unit
   Scenario: The trigger match queue drops only what the match identity drops
     Given two trigger matches for one trigger and trace
     When both are staged

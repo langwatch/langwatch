@@ -23,6 +23,7 @@ import {
   type LaneAlias,
   type RetentionPolicyResolver,
 } from "@langwatch/eventing";
+import { nowInstant } from "@langwatch/time";
 import {
   ORIGIN_RESOLVED_EVENT_TYPE,
   originResolvedEventDataSchema,
@@ -195,10 +196,12 @@ function settlePerTrace(input: { lane: string; delay: number; ttlMs: number }) {
   return {
     delay: input.delay,
     deduplication: {
-      makeId: (event: Event) => evaluationMatchDedupeId({ lane: input.lane, event }),
+      makeId: (event: Event) =>
+        evaluationMatchDedupeId({ lane: input.lane, event, now: nowInstant().epochMilliseconds }),
       ttlMs: input.ttlMs,
     },
-    groupKeyFn: evaluationMatchGroupKey,
+    groupKeyFn: (event: Event) =>
+      evaluationMatchGroupKey({ event, now: nowInstant().epochMilliseconds }),
   };
 }
 

@@ -101,8 +101,10 @@ export function automationPeerSubscribers(
     settlement: new InertSettlementExecutor(),
     scheduledIntents: new InertScheduledIntents(),
     retention: new InertIntentRetention(),
-    reports: { dispatch: async () => {} },
-    reportRuns: { settleRun: async () => {} },
+    reports: createApiFixture<AutomationsPipelineDeps["reports"]>({ dispatch: async () => {} }),
+    reportRuns: createApiFixture<AutomationsPipelineDeps["reportRuns"]>({
+      settleRun: async () => {},
+    }),
     peerReactions,
   });
   const subscribers = new Map<string, EventSubscriberDefinition>();
@@ -122,8 +124,10 @@ export function automationCommandOptions(name: string): CommandHandlerOptions<ne
     settlement: new InertSettlementExecutor(),
     scheduledIntents: new InertScheduledIntents(),
     retention: new InertIntentRetention(),
-    reports: { dispatch: async () => {} },
-    reportRuns: { settleRun: async () => {} },
+    reports: createApiFixture<AutomationsPipelineDeps["reports"]>({ dispatch: async () => {} }),
+    reportRuns: createApiFixture<AutomationsPipelineDeps["reportRuns"]>({
+      settleRun: async () => {},
+    }),
     peerReactions: inertPeerReactions,
   });
   return pipeline.commands.find((command) => command.definition.name === name)?.definition.options;
