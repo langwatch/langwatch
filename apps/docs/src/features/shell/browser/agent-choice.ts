@@ -30,6 +30,7 @@ type Reel = {
 };
 type Drag = {
   id: number;
+  pick: HTMLElement;
   startY: number;
   from: number;
   moved: boolean;
@@ -205,12 +206,20 @@ function onPointerDown(event: PointerEvent) {
   const from = motion.matches ? grab({ pick }).position : CODING_AGENTS.indexOf(chosen);
   if (reel) Object.assign(reel, { goal: from, target: undefined });
   const sample = { time: event.timeStamp, y: event.clientY };
-  drag = { id: event.pointerId, startY: event.clientY, from, moved: false, samples: [sample] };
+  drag = {
+    id: event.pointerId,
+    pick,
+    startY: event.clientY,
+    from,
+    moved: false,
+    samples: [sample],
+  };
 }
 
+/* A drag follows its pointer anywhere on the page, not only over the launcher it started on. */
 function onPointerMove(event: PointerEvent) {
-  const pick = event.target instanceof Element ? event.target.closest<HTMLElement>(PICK) : null;
-  if (!pick || drag?.id !== event.pointerId) return;
+  if (!drag || drag.id !== event.pointerId) return;
+  const { pick } = drag;
   const dy = event.clientY - drag.startY;
   if (Math.abs(dy) > 4) drag.moved = true;
   drag.samples = [...drag.samples, { time: event.timeStamp, y: event.clientY }].slice(-12);
@@ -221,9 +230,8 @@ function onPointerMove(event: PointerEvent) {
 }
 
 function onPointerEnd(event: Event) {
-  const pick = event.target instanceof Element ? event.target.closest<HTMLElement>(PICK) : null;
-  if (pick && event instanceof PointerEvent && drag?.id === event.pointerId)
-    release({ event, pick });
+  if (event instanceof PointerEvent && drag?.id === event.pointerId)
+    release({ event, pick: drag.pick });
 }
 
 function onWheel(event: WheelEvent) {
@@ -275,8 +283,8 @@ function onMotionChange() {
 /** Wires the sidebar agent launcher: drag, wheel and select turn it; left alone, it stays put. */
 export function startAgentChoice() {
   document.addEventListener("pointerdown", onPointerDown);
-  document.addEventListener("pointermove", onPointerMove);
-  for (const type of ["pointerup", "pointercancel"]) document.addEventListener(type, onPointerEnd);
+  window.addEventListener("pointermove", onPointerMove);
+  for (const type of ["pointerup", "pointercancel"]) window.addEventListener(type, onPointerEnd);
   document.addEventListener("wheel", onWheel, { passive: false });
   document.addEventListener("change", onChange);
   document.addEventListener("pointerover", onApproach);
