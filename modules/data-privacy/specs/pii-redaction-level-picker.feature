@@ -7,9 +7,12 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
   # detection, which finds emails, phones, cards, IPs and national IDs but no names
   # or street addresses. The picker reads and writes the organization's own privacy
   # rule through the same setForScope call the rule drawer saves with, changing only
-  # its PII level. Everything here is behind release_pii_redaction_model_enabled:
-  # with the flag off for the organization the page and the drawer are as they were.
-  # The price shown is derived from the rate billing charges (ADR-201).
+  # its PII level. Everything here is behind release_pii_redaction_model_enabled on
+  # LangWatch Cloud: with the flag off for the organization, or on a self-hosted
+  # deployment, the page and the drawer are as they were. The browser cannot see
+  # whether the deployment names a model endpoint, so Cloud plus the flag is the gate.
+  # The price shown is derived from the rate billing charges (ADR-201); organizations
+  # on release_pii_redaction_model_free see Strict as included instead.
 
   Background:
     Given an organization "acme" with a team "platform" and a project "web-app"
@@ -43,7 +46,7 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
   Scenario: Picking Strict writes the organization rule and shows Strict's example
     Given release_pii_redaction_model_enabled is on for "acme"
     And an organization rule on "acme" that drops trace input and leaves PII inheriting
-    When an admin picks Strict in the organization PII level picker
+    When an admin picks Strict in the organization PII level picker and confirms
     Then the organization rule is saved with PII level strict
     And the rule still drops trace input
     And the synthetic example shows the name and the address masked
@@ -60,7 +63,7 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
     Given release_pii_redaction_model_enabled is on for "acme"
     And the organization's PII level resolves to Essential
     And saving the organization rule fails
-    When an admin picks Strict in the organization PII level picker
+    When an admin picks Strict in the organization PII level picker and confirms
     Then the host is told the save failed
     And the picker still shows Essential selected
 
@@ -75,8 +78,8 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
   Scenario: The billing and fallback small print sits behind the price
     Given release_pii_redaction_model_enabled is on for "acme"
     When an admin opens the information beside Strict's price
-    Then it says only Strict spans are billed, with no quota or plan
-    And it says a span falls back to the standard detector when the model is unavailable or the span is over 8,000 characters
+    Then it says only spans the model redacts are billed, with no quota or plan, and fallbacks are free
+    And it says a span falls back to the standard detector when the model is unavailable or the span's text is over 8,000 characters in total
 
   @unit
   Scenario: The price is derived from the rate billing charges
@@ -111,3 +114,48 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
     And the organization's PII level resolves to Strict
     When an admin opens the Data Privacy page for project "web-app"
     Then the effective summary reads "Strict · LangWatch PII Redaction Model" for PII redaction
+
+  @integration
+  Scenario: Turning on Strict asks to confirm with the price
+    Given release_pii_redaction_model_enabled is on for "acme"
+    And the organization's PII level resolves to Essential
+    When an admin picks Strict in the organization PII level picker
+    Then a confirmation names the LangWatch PII Redaction Model and its price
+    And nothing is saved until the admin confirms
+    When the admin cancels
+    Then nothing is saved and Essential stays picked
+
+  @integration
+  Scenario: A free organization sees Strict as included and turns it on without a price
+    Given release_pii_redaction_model_enabled is on for "acme"
+    And release_pii_redaction_model_free is on for "acme"
+    When an admin opens the Data Privacy page for project "web-app"
+    Then Strict reads "Included for your organization" and names no price
+    When the admin picks Strict
+    Then the organization rule is saved with PII level strict without a confirmation
+    And the page does not say Strict is billed
+
+  @integration
+  Scenario: An organization on Custom sees its level and confirms replacing it
+    Given release_pii_redaction_model_enabled is on for "acme"
+    And an organization rule on "acme" with PII level custom and two entities
+    When an admin opens the Data Privacy page for project "web-app"
+    Then the picker shows the organization on "Custom (2 types)" with neither level picked
+    When the admin picks Essential
+    Then a confirmation says it replaces the custom PII settings
+    And the organization rule is saved with PII level essential once the admin confirms
+
+  @integration
+  Scenario: An organization with PII redaction off sees its level
+    Given release_pii_redaction_model_enabled is on for "acme"
+    And the organization's PII level resolves to Off
+    When an admin opens the Data Privacy page for project "web-app"
+    Then the picker shows the organization on "Off" with neither level picked
+
+  @integration
+  Scenario: A self-hosted deployment shows no model and no price
+    Given a self-hosted deployment
+    And release_pii_redaction_model_enabled is on for "acme"
+    When an admin opens the Data Privacy page for project "web-app"
+    Then the page shows no organization PII level picker
+    And the page names no price and no LangWatch PII Redaction Model
