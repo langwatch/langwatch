@@ -16,7 +16,6 @@ import {
   type ReadStoredObjectResult,
   type StoreStoredObjectFromBytesInput,
   type StoreStoredObjectFromBytesResult,
-  type StoredObjectByteStream,
   type StoredObjectDeliveryAudience,
   type StoredObjectHead,
   type StoredObjectMetadata,
@@ -167,18 +166,6 @@ export class StoredObjectService {
     return value !== null;
   }
 
-  /**
-   * An unread body still holds its pooled socket, and `return()` on an iterator never started
-   * runs no cleanup; destroying the stream is what hands the socket back.
-   */
-  private static releaseUnread(bytes: StoredObjectByteStream): void {
-    if (bytes instanceof Readable) {
-      bytes.destroy();
-      return;
-    }
-    void bytes[Symbol.asyncIterator]().return?.();
-  }
-
   /** Postgres first; the legacy index answers only for an object it never held. */
   private async probe(input: { projectId: string; id: string }): Promise<StoredObjectProbe> {
     const value = await this.options.records.findById({ tenantId: input.projectId, id: input.id });
@@ -195,7 +182,7 @@ export class StoredObjectService {
           address: this.getStorage(value),
         }),
       );
-      StoredObjectService.releaseUnread(bytes);
+      await bytes[Symbol.asyncIterator]().return?.();
     } catch (error) {
       if (error instanceof HandledError && error.code === "stored_object_not_found") {
         return { status: "missing", ...facts };

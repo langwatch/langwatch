@@ -3,7 +3,6 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import { memoryObjectStorage } from "@langwatch/process-stores";
 import {
   StoredObjectNotFoundError,
-  type StoredObjectByteStream,
   type StoredObjectDeliveryCapability,
   type StoredObjectOwnerResolver,
   type StoredObjectStorageDestination,
@@ -70,7 +69,7 @@ export class MemoryStoredObjectStorage extends StoredObjectBytesRepository {
     return { byteLength: 3, sha256: STORED_OBJECT_TEST_SHA256 };
   }
 
-  async getBytes(): Promise<StoredObjectByteStream> {
+  async getBytes() {
     const bytes = this.bytes;
 
     return (async function* () {

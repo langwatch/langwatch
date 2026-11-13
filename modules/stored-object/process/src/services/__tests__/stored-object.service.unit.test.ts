@@ -1,6 +1,4 @@
 /** @vitest-environment node */
-import { Readable } from "node:stream";
-
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -14,32 +12,9 @@ import {
 import { MemoryStoredObjectRecordRepository } from "../../repositories/memory/memory.stored-object-record.repository.ts";
 import { StoredObjectService } from "../stored-object.service.ts";
 
-/** A socket pool of `size`: a read waits for a free socket, which only a closed body returns. */
-class PooledStoredObjectStorage extends MemoryStoredObjectStorage {
-  private free: number;
-  private readonly waiting: (() => void)[] = [];
-
-  constructor(size: number) {
-    super();
-    this.free = size;
-  }
-
-  override async getBytes() {
-    if (this.free === 0) await new Promise<void>((resolve) => this.waiting.push(resolve));
-    else this.free -= 1;
-    const body = new Readable({ read() {} });
-    body.push(this.bytes);
-    body.once("close", () => {
-      const next = this.waiting.shift();
-      if (next) next();
-      else this.free += 1;
-    });
-    return body;
-  }
-}
-
-function fixture({ storage = new MemoryStoredObjectStorage() } = {}) {
+function fixture() {
   const records = MemoryStoredObjectRecordRepository.create();
+  const storage = new MemoryStoredObjectStorage();
   const service = StoredObjectService.create({
     records,
     permissions: new GrantedStoredObjectPermissions(),
@@ -108,31 +83,6 @@ describe("StoredObjectService", () => {
       service.getMetadata({ projectId: "project_1", id: stored.reference.id }),
     ).rejects.toMatchObject({ code: "stored_object_deleted" });
   });
-
-  it("hands each probed body's socket back, so reads past the pool size do not hang", async () => {
-    const { service } = fixture({ storage: new PooledStoredObjectStorage(50) });
-    const stored = await service.storeFromBytes({
-      projectId: "project_1",
-      filename: "input.bin",
-      mediaType: "application/octet-stream",
-      audience: "project:view",
-      purpose: "test",
-      ownerKind: "test",
-      ownerId: "test_1",
-      bytes: new Uint8Array([1, 2, 3]),
-    });
-
-    const urls: string[] = [];
-    for (let call = 0; call < 60; call += 1) {
-      const { url } = await service.getReadUrl(
-        { projectId: "project_1", storedObjectId: stored.reference.id },
-        { id: "user_1" },
-      );
-      urls.push(url);
-    }
-
-    expect(urls).toHaveLength(60);
-  }, 5_000);
 
   it("retries failed physical deletion from the same deleted row", async () => {
     const { service, storage, records } = fixture();

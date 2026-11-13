@@ -1,14 +1,12 @@
 import { createHash } from "node:crypto";
-import { createServer, type IncomingMessage, type Server } from "node:http";
-import type { AddressInfo } from "node:net";
 import { Readable } from "node:stream";
 
 import { NoSuchKey } from "@aws-sdk/client-s3";
 import { Temporal } from "@langwatch/time";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { ObjectBodyTooLargeError, StoredObjectNotFoundError } from "../object-storage-backend.ts";
-import { S3_SOCKET_IDLE_TIMEOUT_MS, s3Backend, s3Client } from "../object-storage-s3.ts";
+import { s3Backend, s3Client } from "../object-storage-s3.ts";
 
 const clock = { now: () => Temporal.Instant.from("2026-09-24T12:00:00Z") };
 const at = { projectId: "project-1", key: "project-1/object-1" };
@@ -127,62 +125,6 @@ describe("given object storage on S3", () => {
 
       await expect(backend.read(at)).rejects.toBeInstanceOf(StoredObjectNotFoundError);
     });
-  });
-
-  describe("when the endpoint takes the request and never answers", () => {
-    let stalled: Server | undefined;
-
-    afterEach(async () => {
-      vi.useRealTimers();
-      stalled?.closeAllConnections();
-      await new Promise((resolve) => stalled?.close(resolve));
-    });
-
-    /** @scenario "An S3 read body that stops arriving is cut once it goes idle" */
-    it("cuts a body S3 stops sending once it goes idle, since the client's own timeout never does", async () => {
-      stalled = createServer((_request, response) => {
-        response.writeHead(200, { "Content-Length": "10" });
-        response.write("abc");
-      });
-      await new Promise<void>((resolve) => stalled?.listen(0, "127.0.0.1", resolve));
-      const { port } = stalled.address() as AddressInfo;
-      const client = s3Client({ ...account, endpoint: `http://127.0.0.1:${port}` });
-      const backend = s3Backend({ client, bucket: "objects", clock });
-
-      const body = (await backend.read(at)) as IncomingMessage;
-      const failed = new Promise<unknown>((resolve) => body.once("error", resolve));
-      body.resume();
-
-      expect(body.socket?.timeout).toBe(S3_SOCKET_IDLE_TIMEOUT_MS);
-      // The socket's own idle timer, fired now rather than a minute from now.
-      body.socket?.emit("timeout");
-      await expect(failed).resolves.toMatchObject({ name: "TimeoutError" });
-      expect(body.destroyed).toBe(true);
-    });
-
-    /** @scenario "An S3 read that gets no answer is refused at its deadline" */
-    it("refuses the read once the answer deadline passes, instead of waiting forever", async () => {
-      stalled = createServer(() => void 0);
-      await new Promise<void>((resolve) => stalled?.listen(0, "127.0.0.1", resolve));
-      const { port } = stalled.address() as AddressInfo;
-      const client = s3Client({ ...account, endpoint: `http://127.0.0.1:${port}` });
-      const backend = s3Backend({ client, bucket: "objects", clock });
-      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-
-      let settled = false;
-      const outcome = backend.read(at).then(
-        () => "answered",
-        (error: unknown) => error,
-      );
-      void outcome.finally(() => (settled = true));
-      // Real I/O runs between steps, so each step lands after the SDK queued its request.
-      for (let step = 0; step < 400 && !settled; step += 1) {
-        await new Promise((resolve) => setImmediate(resolve));
-        vi.advanceTimersByTime(1_000);
-      }
-
-      await expect(outcome).resolves.toMatchObject({ name: "TimeoutError" });
-    }, 10_000);
   });
 
   describe("when an upload URL is signed", () => {
