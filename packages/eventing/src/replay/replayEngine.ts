@@ -501,7 +501,9 @@ class FoldMapReplayRun {
     return true;
   }
 
-  /** Whether a map lane runs in this batch: its rows land mid-stream, so a rerun would append twice. */
+  /**
+   * Whether a map lane runs in this batch: its rows land mid-stream, so a rerun would append twice.
+   */
   private batchHasMapLane(batchKeys: string[]): boolean {
     return batchKeys.some((key) =>
       this.aggregateProjectionMap
@@ -510,7 +512,9 @@ class FoldMapReplayRun {
     );
   }
 
-  /** The failure's text; a lone aggregate still over the memory limit is named, never its tenant. */
+  /**
+   * The failure's text; a lone aggregate still over the memory limit is named, never its tenant.
+   */
   private describeFailure({ error, batchKeys }: { error: unknown; batchKeys: string[] }): string {
     const errorMsg = error instanceof Error ? error.message : String(error);
     const [onlyKey] = batchKeys;
