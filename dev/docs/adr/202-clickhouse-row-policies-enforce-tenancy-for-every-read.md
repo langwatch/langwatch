@@ -145,15 +145,15 @@ Migration path: about 139 non-test TypeScript files under ClickHouse repository 
 3. The api never holds the system credential. Api-side reads that skip the tenant check today move behind the worker or tasks.
 4. Self-hosted installs run one release in shadow before enforcing.
 5. The LangWatchQL user gets the same `USING 0` policy on `system.user_query_log` through the same code path, so both emitters render it. Its name carries the user (`user_query_log_hidden_<user>`), so it never replaces the app reader's `user_query_log_app_hidden` or another install's on a shared server. Alex, 2026-11-13: fixed in #9549.
+6. Routed and BYOC targets get the access model the way migrations reach them: provisioning walks every target the router knows. A target without the model refuses reader traffic for its organisations by name; it never keeps the text checks alone.
 
 ## Open questions for Alex
 
 1. Whether shared and braid windows move into the policy later, or stay in the fence and builder for good.
 2. Whether inserts move to the reader identity once MV behaviour is proven, or stay on the system identity.
-3. Whether routed and BYOC targets without the access model refuse reads (fail closed) or keep today's text checks until provisioned.
-4. Whether the builder is hand-written in `packages/clickhouse-client` or adopts an existing library.
-5. Whether `use_query_condition_cache = 0` on the reader is acceptable for performance, or the app's ClickHouse must reach 26.8 first.
-6. Whether the reader's names (`langwatch_app_reader`, its profile and policies) become configurable per install. They are fixed today, so two installs sharing one server would replace each other's reader and grants. That fails closed, not open, but it rules out sharing a server until decided.
+3. Whether the builder is hand-written in `packages/clickhouse-client` or adopts an existing library.
+4. Whether `use_query_condition_cache = 0` on the reader is acceptable for performance, or the app's ClickHouse must reach 26.8 first.
+5. Whether the reader's names (`langwatch_app_reader`, its profile and policies) become configurable per install. They are fixed today, so two installs sharing one server would replace each other's reader and grants. That fails closed, not open, but it rules out sharing a server until decided.
 
 ## References
 
