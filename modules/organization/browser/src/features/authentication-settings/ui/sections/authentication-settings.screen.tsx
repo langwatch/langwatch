@@ -50,7 +50,7 @@ export default function AuthenticationSettingsScreen() {
           onNavigate={(href) => host.navigate(href)}
         />
       </PageLayout.Header>
-      <Box paddingTop={4}>
+      <Box>
         <AuthenticationSettings host={host} organizationId={organizationId} />
       </Box>
     </>
@@ -69,7 +69,7 @@ export function AuthenticationSettings({
   const organizationName = host.organization()?.name;
 
   return (
-    <VStack align="stretch" gap={6} width="full" paddingTop={4}>
+    <VStack align="stretch" gap={6} width="full">
       <Text color="fg.muted">
         {organizationName
           ? `Manage sign-in, provisioning, and security policies for ${organizationName}.`

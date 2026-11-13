@@ -87,6 +87,8 @@ const MEASURED_OPS_PAGES = [...instanceGroup().items, ...cloudAdminGroup().items
 const PAGE_INSET = "var(--chakra-spacing-6)";
 /** Settings-style page bodies read in one centred column this wide, under a full-width header. */
 const SETTINGS_MEASURE = "1248px";
+/** The space between a page's header rule and its body: `PageLayout.Container`'s top padding. */
+const PAGE_GAP = "var(--chakra-spacing-6)";
 
 /**
  * Settings, gateway, instance and Cloud admin pages read in the centred settings column.
@@ -114,6 +116,8 @@ function PageMeasure({ pathname, children }: { pathname: string; children: React
           marginInline: "auto",
         },
         "& [data-page-container]": { paddingInline: 0 },
+        // A body that is not a `PageLayout.Container` gets the gap the container draws itself.
+        "& [data-page-header] + :not(button, [data-page-container])": { marginTop: PAGE_GAP },
       }}
     >
       {children}

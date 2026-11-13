@@ -146,7 +146,7 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
           </PageLayout.HeaderButton>
         )}
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="start" paddingTop={4}>
+      <VStack gap={6} width="full" align="start">
         <Text color="fg.muted">
           Control what trace content LangWatch stores, who can see it, and how secrets and PII are
           scrubbed, at any scope, inherited down to projects.
@@ -201,7 +201,7 @@ function DataPrivacyLoading() {
       <PageLayout.Header>
         <PageLayout.Heading>Data Privacy</PageLayout.Heading>
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="start" paddingTop={4} aria-busy="true">
+      <VStack gap={6} width="full" align="start" aria-busy="true">
         <SkeletonText noOfLines={1} width="md" />
         <Card padding="lg">
           <VStack gap={4} align="stretch">
