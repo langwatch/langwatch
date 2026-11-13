@@ -100,10 +100,15 @@ describe("while the typed fields load", () => {
     expect(control("name").value).toBe("early");
     expect(bodyText()).toBe(before);
     await actThenSettle(() => typedFields.open());
-    /* The lazy chunk can take more than a tick to arrive on a loaded runner. */
-    await vi.waitFor(() => expect(body().name).toBe("early"), { timeout: 4_000 });
-    await vi.waitFor(() => expect(example("curl")).toContain("limit=7"), { timeout: 4_000 });
+    /* The lazy chunk can take more than a tick to arrive on a loaded runner; wait inside act. */
+    for (let tries = 0; tries < 80 && !example("curl").includes("limit=7"); tries++) {
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+    }
+    expect(body().name).toBe("early");
     expect(example("curl")).toContain("early");
+    expect(example("curl")).toContain("limit=7");
   });
 });
 
