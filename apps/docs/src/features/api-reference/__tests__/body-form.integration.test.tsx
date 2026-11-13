@@ -277,6 +277,14 @@ describe("when the reader switches between the form and JSON", () => {
   });
 
   /** @scenario "Switch the request body between the form and JSON" */
+  it("switches to JSON with a required field still empty", async () => {
+    await type({ element: control("name"), value: "" });
+    await press({ selector: modeButton("json") });
+    expect(panel("json")?.hidden).toBe(false);
+    expect(document.querySelector("[data-request-error]")).toBeNull();
+  });
+
+  /** @scenario "Switch the request body between the form and JSON" */
   it("takes edited JSON back into the form", async () => {
     await type({
       element: byId("pg-body"),

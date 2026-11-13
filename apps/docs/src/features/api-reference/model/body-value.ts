@@ -62,10 +62,12 @@ function readGroup({
   group,
   entries,
   errors,
+  unfilled = [],
 }: {
   group: GroupField;
   entries: FormEntries;
   errors: Record<string, string>;
+  unfilled?: string[];
 }): Read {
   const value: Record<string, unknown> = {};
   const missing: FormField[] = [];
@@ -78,7 +80,10 @@ function readGroup({
   const present = Object.keys(value).length > 0 || group.required || group.path.length === 0;
   if (!present) return { present: false };
   Object.assign(errors, inner);
-  for (const field of missing) errors[`body:${field.key}`] ??= `${field.name} is required.`;
+  for (const field of missing) {
+    unfilled.push(`body:${field.key}`);
+    errors[`body:${field.key}`] ??= `${field.name} is required.`;
+  }
   return { present: true, value };
 }
 
@@ -94,12 +99,14 @@ export function readBodyForm({
   form: GroupField;
   entries: FormEntries;
   extra?: Record<string, unknown>;
-}): { body: string; errors: Record<string, string> } {
+}): { body: string; errors: Record<string, string>; unfilled: string[] } {
   const errors: Record<string, string> = {};
-  const read = readGroup({ group: form, entries, errors });
+  const unfilled: string[] = [];
+  const read = readGroup({ group: form, entries, errors, unfilled });
   const value = { ...(read.value as Record<string, unknown>), ...extra };
-  if (!form.required && Object.keys(value).length === 0) return { body: "", errors: {} };
-  return { body: JSON.stringify(value, null, 2), errors };
+  if (!form.required && Object.keys(value).length === 0)
+    return { body: "", errors: {}, unfilled: [] };
+  return { body: JSON.stringify(value, null, 2), errors, unfilled };
 }
 
 function writeList({

@@ -119,7 +119,11 @@ export function setBodyMode({ operation, mode }: { operation: Operation; mode: "
   if (!form || mode === bodyMode()) return;
   if (mode === "json") {
     const read = readForm({ operation });
-    if (read && Object.keys(read.errors).length) return showErrors({ errors: read.errors });
+    /* An empty required field can be filled in JSON just as well; only a broken value blocks. */
+    const blocking = Object.entries(read?.errors ?? {}).filter(
+      ([key]) => !read?.unfilled.includes(key),
+    );
+    if (blocking.length) return showErrors({ errors: Object.fromEntries(blocking) });
     syncFormToBody({ operation });
     showErrors({ errors: {} });
     showMode({ mode });
