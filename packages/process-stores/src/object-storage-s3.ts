@@ -2,6 +2,7 @@
  * S3 and S3-compatible storage as one placed backend: streamed PUT and GET,
  * and an upload URL whose signature covers content-type and content-length.
  */
+import { IncomingMessage } from "node:http";
 import { Readable } from "node:stream";
 
 import {
@@ -36,21 +37,25 @@ import {
 
 const SIGNED_UPLOAD_HEADERS = new Set(["content-type", "content-length"]);
 
+/** No socket idles past this, so a stalled transfer is cut and its socket freed. */
+const S3_IDLE_MS = 120_000;
+
 /**
  * Every call ends: connect within 5 s, an answer's headers within 60 s (a wait for a free
- * socket included), and no socket idles past 120 s, so a stalled body is cut and its socket
- * freed. A long download or upload that keeps moving is never cut (tasks#1173).
+ * socket included), an idle upload within S3_IDLE_MS. A transfer that keeps moving is never
+ * cut (tasks#1173).
  */
 const S3_REQUEST_HANDLER = {
   connectionTimeout: 5_000,
   requestTimeout: 60_000,
   throwOnRequestTimeout: true,
-  socketTimeout: 120_000,
+  socketTimeout: S3_IDLE_MS,
 } as const;
 
 interface S3Place {
   readonly client: S3Client;
   readonly bucket: string;
+  readonly bodyIdleMs: number;
 }
 
 /**
@@ -124,12 +129,27 @@ async function writeObject(options: {
   return measured.digest();
 }
 
+/**
+ * The SDK drops its own idle timer once an answer's headers arrive, so a body that then stalls,
+ * or is never read, would hold its socket for good: the body carries its own idle limit.
+ */
+function idleBounded(body: Readable, key: string, idleMs: number): Readable {
+  if (!(body instanceof IncomingMessage)) return body;
+  body.setTimeout(idleMs, () => {
+    const stalled = new Error(`S3 sent no bytes of "${key}" for ${idleMs} ms.`);
+    body.destroy(Object.assign(stalled, { name: "TimeoutError" }));
+  });
+  return body;
+}
+
 async function readObject(place: S3Place, at: StoredObjectAddress): Promise<Readable> {
   try {
     const response = await place.client.send(
       new GetObjectCommand({ Bucket: place.bucket, Key: at.key }),
     );
-    if (response.Body instanceof Readable) return response.Body;
+    if (response.Body instanceof Readable) {
+      return idleBounded(response.Body, at.key, place.bodyIdleMs);
+    }
     throw new Error(`S3 answered "${at.key}" without a readable body.`);
   } catch (error) {
     if (isMissing(error)) throw new StoredObjectNotFoundError(at.projectId, at.key);
@@ -201,8 +221,13 @@ export function s3Backend(options: {
   client: S3Client;
   bucket: string;
   clock: Clock;
+  bodyIdleMs?: number;
 }): ObjectBackend {
-  const place: S3Place = { client: options.client, bucket: options.bucket };
+  const place: S3Place = {
+    client: options.client,
+    bucket: options.bucket,
+    bodyIdleMs: options.bodyIdleMs ?? S3_IDLE_MS,
+  };
   return {
     destination: { kind: "s3", bucket: place.bucket },
     write: (at, body, facts) => writeObject({ place, at, body, facts }),

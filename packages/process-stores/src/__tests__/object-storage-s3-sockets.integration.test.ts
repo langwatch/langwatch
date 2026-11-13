@@ -219,3 +219,24 @@ describe("given an S3 client with a short request timeout", () => {
     });
   });
 });
+
+describe("given an S3 backend with a short body idle limit", () => {
+  describe("when a body's headers arrive at once and then its bytes stop", () => {
+    /** @scenario "A body that stops arriving is cut after the idle limit" */
+    it("ends the read with a timeout and closes the connection", async () => {
+      const s3 = await fakeS3(endlessBody);
+      const client = s3Client({ bucket: "objects", endpoint: s3.endpoint, credentials });
+      const backend = s3Backend({ client, bucket: "objects", clock, bodyIdleMs: 300 });
+
+      const body = await backend.read(at);
+      const drained = (async () => {
+        for await (const chunk of body) void chunk;
+      })();
+
+      await expect(within(drained, 3_000, "the stalled body")).rejects.toMatchObject({
+        name: "TimeoutError",
+      });
+      await vi.waitFor(() => expect(s3.openSockets()).toBe(0), { timeout: 2_000 });
+    });
+  });
+});

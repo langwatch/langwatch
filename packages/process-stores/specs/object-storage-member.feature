@@ -134,3 +134,10 @@ Feature: The object-storage member
     When S3 accepts a request and never answers it
     Then the request fails with a TimeoutError instead of holding its socket
     And a download whose body keeps arriving, or an upload still being acknowledged, is not cut
+
+  @integration
+  Scenario: A body that stops arriving is cut after the idle limit
+    Given object storage on S3
+    When an object's headers arrive and its bytes then stop for longer than the idle limit
+    Then the read fails with a TimeoutError
+    And the connection is closed, so its socket returns to the pool
