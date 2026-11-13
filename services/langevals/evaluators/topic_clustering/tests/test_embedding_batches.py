@@ -107,9 +107,33 @@ def test_a_batch_rate_limited_on_every_try_is_raised(monkeypatch):
     assert single_calls == []
 
 
+# @scenario "A batch still rate limited after its retries is raised to the caller"
+def test_a_later_batch_rate_limit_is_raised_when_an_earlier_batch_failed(monkeypatch):
+    second_batch_started = threading.Event()
+    single_calls = []
+
+    def fail_then_limit(*, input, **_params):
+        if not isinstance(input, list):
+            single_calls.append(input)
+            return answer(input)
+        if input[0] == "text-0":
+            assert second_batch_started.wait(timeout=5)
+            raise litellm.exceptions.APIConnectionError(message="reset", **PROVIDER)
+        second_batch_started.set()
+        raise litellm.exceptions.RateLimitError(message="slow down", **PROVIDER)
+
+    monkeypatch.setattr(litellm, "embedding", fail_then_limit)
+
+    with pytest.raises(litellm.exceptions.RateLimitError):
+        utils.generate_embeddings(TEXTS[:40], PARAMS, max_workers=2)
+
+    assert single_calls == []
+
+
 # @scenario "Any other failed embedding batch falls back to one call per input"
 def test_any_other_batch_failure_falls_back_after_the_batches_in_flight(monkeypatch):
     lock = threading.Lock()
+    all_batches_started = threading.Barrier(3, timeout=5)
     last_batch_returned = []
     single_calls_started = []
 
@@ -118,6 +142,7 @@ def test_any_other_batch_failure_falls_back_after_the_batches_in_flight(monkeypa
             with lock:
                 single_calls_started.append(time.monotonic())
             return answer(input)
+        all_batches_started.wait()
         if input[0] == "text-0":
             raise litellm.exceptions.APIConnectionError(message="reset", **PROVIDER)
         time.sleep(0.2)

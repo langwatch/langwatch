@@ -120,8 +120,9 @@ def generate_embeddings_threaded(
 EMBEDDING_BATCH_CONCURRENCY = 8
 
 
-# Concurrent batches meet a provider's rate limit sooner, and one failed batch
-# sends the whole page to the per-text fallback, so a 429 is retried in place.
+# Concurrent batches meet a provider's rate limit sooner, so a 429 is retried in
+# place. One still limited after its retries is raised to the caller, never sent
+# to the per-input fallback, which would only add load to the same provider.
 @retry(
     retry=retry_if_exception_type(litellm.exceptions.RateLimitError),
     wait=wait_exponential(min=2, max=20),
@@ -139,6 +140,22 @@ def _embed_batch(
         normalize_embedding_dimensions(item["embedding"], target_dim=dimensions)
         for item in response.data
     ]
+
+
+def _refusal_among(
+    futures: list[concurrent.futures.Future],
+) -> Optional[BaseException]:
+    """The first auth or rate-limit error among the batches that finished."""
+    for future in futures:
+        if not future.done() or future.cancelled():
+            continue
+        error = future.exception()
+        if isinstance(
+            error,
+            (litellm.exceptions.AuthenticationError, litellm.exceptions.RateLimitError),
+        ):
+            return error
+    return None
 
 
 def generate_embeddings(
@@ -216,6 +233,12 @@ def generate_embeddings(
         executor.shutdown(wait=True, cancel_futures=True)
 
     if fall_back_to_threaded:
+        # A batch that finished after the first failure may hold a refusal the
+        # fallback must not run into.
+        refusal = _refusal_among(futures)
+        if refusal is not None:
+            logger.warning("Embedding batch refused, not falling back", error=str(refusal))
+            raise refusal
         return generate_embeddings_threaded(texts, embeddings_litellm_params)
 
     if last_error and errors == len(batches):

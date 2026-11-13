@@ -137,6 +137,7 @@ Feature: Topic clustering runs on langevals
     When langevals embeds a page
     Then the rate limit is raised to the caller
     And no per-input fallback calls are made
+    And the same holds when an earlier batch failed for another reason
 
   @unit
   Scenario: Any other failed embedding batch falls back to one call per input
