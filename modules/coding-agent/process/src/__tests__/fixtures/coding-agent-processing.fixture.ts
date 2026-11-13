@@ -115,6 +115,10 @@ export class TestModelProviderService implements ModelProviderApi {
     return this.priced(model);
   }
 
+  listForProjectWithServedModels(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+
   listForProject(): Promise<[]> {
     return Promise.resolve([]);
   }

@@ -227,6 +227,9 @@ export interface QueueSimulationRunInput {
   /** The models the suite's plan was configured with; each is recorded only when set. */
   simulatorModel?: string | null | undefined;
   judgeModel?: string | null | undefined;
+  /** The plan's judge trace wait in ms; recorded only when set, winning over the scenario's. */
+  traceQuietPeriodMs?: number | null | undefined;
+  traceWaitTimeoutMs?: number | null | undefined;
   /** A suite run's evaluators, its test suite's and its plan's, pinned as the suite queues it. */
   evaluators?: RunEvaluators | undefined;
   /** "Rerun and keep data": skip the agent's teardown for this one run (ADR-180). */

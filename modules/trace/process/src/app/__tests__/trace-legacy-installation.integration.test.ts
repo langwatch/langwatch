@@ -95,6 +95,7 @@ function bootTraceApp(options: {
     traces: {
       braidReads: MemoryNullTraceBraidReadsRepository.create(),
       existence: {
+        findProjectsHoldingTrace: async () => [],
         findExistingTraceIds: async ({ traceIds }) => [...traceIds],
         countUsage: async () => ({ traces: 0, spans: 0 }),
         findTraceCosts: async () => [],

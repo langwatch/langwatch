@@ -256,10 +256,11 @@ function runScenarioTurns({
       // An http target's own spans land in the trace each turn propagates,
       // so the judge fetches them back from the platform's trace API before
       // any verdict. The wait budget comes from the prefetcher's per-project
-      // ingest-lag measurement.
+      // ingest-lag measurement unless the plan or scenario set one.
       ...buildRemoteTraceRunConfig({
         targetType: target.type,
         traceWaitTimeoutMs: jobData.traceWaitTimeoutMs,
+        traceQuietPeriodMs: jobData.traceQuietPeriodMs,
         langwatchEndpoint,
         langwatchApiKey,
       }),

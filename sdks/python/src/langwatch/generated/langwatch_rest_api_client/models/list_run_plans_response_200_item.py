@@ -42,6 +42,12 @@ class ListRunPlansResponse200Item:
         created_at (str): When the plan was created.
         updated_at (str): When the plan was last written.
         platform_url (str): Where to open this run plan in the LangWatch platform.
+        trace_quiet_period_ms (int | None | Unset): Milliseconds the agent's trace must stay unchanged before the judge
+            reads it, or null for the scenario setting or the project's recommendation. Absent on servers that predate judge
+            trace settings.
+        trace_wait_timeout_ms (int | None | Unset): Milliseconds the judge waits for the agent's trace before a verdict,
+            or null for the scenario setting or the project's recommendation. Absent on servers that predate judge trace
+            settings.
         evaluators (list[ListRunPlansResponse200ItemEvaluatorsItem] | Unset): The plan's own evaluators. Absent on
             servers that predate evaluators on this family.
     """
@@ -65,6 +71,8 @@ class ListRunPlansResponse200Item:
     created_at: str
     updated_at: str
     platform_url: str
+    trace_quiet_period_ms: int | None | Unset = UNSET
+    trace_wait_timeout_ms: int | None | Unset = UNSET
     evaluators: list[ListRunPlansResponse200ItemEvaluatorsItem] | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
@@ -114,6 +122,18 @@ class ListRunPlansResponse200Item:
 
         platform_url = self.platform_url
 
+        trace_quiet_period_ms: int | None | Unset
+        if isinstance(self.trace_quiet_period_ms, Unset):
+            trace_quiet_period_ms = UNSET
+        else:
+            trace_quiet_period_ms = self.trace_quiet_period_ms
+
+        trace_wait_timeout_ms: int | None | Unset
+        if isinstance(self.trace_wait_timeout_ms, Unset):
+            trace_wait_timeout_ms = UNSET
+        else:
+            trace_wait_timeout_ms = self.trace_wait_timeout_ms
+
         evaluators: list[dict[str, Any]] | Unset = UNSET
         if not isinstance(self.evaluators, Unset):
             evaluators = []
@@ -141,6 +161,10 @@ class ListRunPlansResponse200Item:
                 "platformUrl": platform_url,
             }
         )
+        if trace_quiet_period_ms is not UNSET:
+            field_dict["traceQuietPeriodMs"] = trace_quiet_period_ms
+        if trace_wait_timeout_ms is not UNSET:
+            field_dict["traceWaitTimeoutMs"] = trace_wait_timeout_ms
         if evaluators is not UNSET:
             field_dict["evaluators"] = evaluators
 
@@ -242,6 +266,24 @@ class ListRunPlansResponse200Item:
 
         platform_url = d.pop("platformUrl")
 
+        def _parse_trace_quiet_period_ms(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        trace_quiet_period_ms = _parse_trace_quiet_period_ms(d.pop("traceQuietPeriodMs", UNSET))
+
+        def _parse_trace_wait_timeout_ms(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        trace_wait_timeout_ms = _parse_trace_wait_timeout_ms(d.pop("traceWaitTimeoutMs", UNSET))
+
         _evaluators = d.pop("evaluators", UNSET)
         evaluators: list[ListRunPlansResponse200ItemEvaluatorsItem] | Unset = UNSET
         if _evaluators is not UNSET:
@@ -266,6 +308,8 @@ class ListRunPlansResponse200Item:
             created_at=created_at,
             updated_at=updated_at,
             platform_url=platform_url,
+            trace_quiet_period_ms=trace_quiet_period_ms,
+            trace_wait_timeout_ms=trace_wait_timeout_ms,
             evaluators=evaluators,
         )
 

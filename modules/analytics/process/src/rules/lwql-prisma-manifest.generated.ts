@@ -1274,6 +1274,7 @@ export interface LwqlPrismaRows {
     readonly PendingHandoffTurnId: "String?";
     readonly RunToken: "String?";
     readonly ArchivedAt: "Float?";
+    readonly CiFollowUpsInARow: "Int";
     readonly CreatedAt: "Float";
     readonly UpdatedAt: "Float";
     readonly OccurredAt: "Float";
@@ -1326,6 +1327,16 @@ export interface LwqlPrismaRows {
     readonly AcceptedAt: "Float";
     readonly LastEventId: "String";
     readonly ProjectionVersion: "String";
+  };
+  readonly LangyPullRequest: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly RepositoryFullName: "String";
+    readonly PrNumber: "Int";
+    readonly ConversationId: "String";
+    readonly UserId: "String";
+    readonly OpenedAt: "Float";
+    readonly SourceEventId: "String";
   };
   readonly LangyMessageProjection: {
     readonly id: "String";
@@ -1734,6 +1745,8 @@ export interface LwqlPrismaRows {
     readonly parameters: "Json?";
     readonly simulatorModel: "String?";
     readonly judgeModel: "String?";
+    readonly traceQuietPeriodMs: "Int?";
+    readonly traceWaitTimeoutMs: "Int?";
     readonly maxTurns: "Int?";
     readonly minTurns: "Int?";
     readonly fields: "Json?";
@@ -1769,6 +1782,8 @@ export interface LwqlPrismaRows {
     readonly labels: "String[]";
     readonly simulatorModel: "String?";
     readonly judgeModel: "String?";
+    readonly traceQuietPeriodMs: "Int?";
+    readonly traceWaitTimeoutMs: "Int?";
     readonly kind: "String";
     readonly scope: "Json?";
     readonly fields: "Json?";

@@ -4,6 +4,10 @@ import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
 import { evaluatorAttachmentsSchema, parseEvaluatorAttachments } from "./evaluator-attachments.ts";
+import {
+  traceQuietPeriodMsSchema,
+  traceWaitTimeoutMsSchema,
+} from "./features/run/run-trace-wait.ts";
 import { scenarioParameterDefinitionsSchema } from "./scenario.parameters.ts";
 import {
   parseScenarioFieldValues,
@@ -40,6 +44,10 @@ const scenarioSchemaDefinition = z
     parameters: jsonValueSchema,
     simulatorModel: z.string().nullable(),
     judgeModel: z.string().nullable(),
+    // The judge's verdict-time trace wait in ms; null resolves the project's measured value.
+    // Optional so pre-column fixtures still parse.
+    traceQuietPeriodMs: z.number().int().nullish(),
+    traceWaitTimeoutMs: z.number().int().nullish(),
     maxTurns: z.number().int().nullable(),
     minTurns: z.number().int().nullable(),
     // The value this scenario carries for each field its test suite declares,
@@ -80,6 +88,9 @@ const scenarioTestSuiteSchemaDefinition = z
     labels: z.array(z.string()),
     simulatorModel: z.string().nullable(),
     judgeModel: z.string().nullable(),
+    // A test suite sets no trace wait of its own; optional so pre-column rows still parse.
+    traceQuietPeriodMs: z.number().int().nullish(),
+    traceWaitTimeoutMs: z.number().int().nullish(),
     kind: z.literal("test_suite"),
     scope: jsonValueSchema.nullable(),
     fields: z.preprocess((raw) => parseSuiteFieldDefinitions(raw), suiteFieldDefinitionsSchema),
@@ -170,6 +181,8 @@ const scenarioFieldsShape = {
   parameters: scenarioParameterDefinitionsSchema.nullable().optional(),
   simulatorModel: z.string().nullable().optional(),
   judgeModel: z.string().nullable().optional(),
+  traceQuietPeriodMs: traceQuietPeriodMsSchema.nullable().optional(),
+  traceWaitTimeoutMs: traceWaitTimeoutMsSchema.nullable().optional(),
   maxTurns: z.number().int().min(1).max(100).nullable().optional(),
   minTurns: z.number().int().min(0).max(100).nullable().optional(),
   lastUpdatedById: z.string().nullable().optional(),

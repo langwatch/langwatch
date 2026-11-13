@@ -636,6 +636,8 @@ const EXECUTION_FIELD_REFUSALS = {
   repeatCount: "A test suite has no repeat count; it travels with each run",
   simulatorModel: "A test suite has no simulator model; it travels with each run",
   judgeModel: "A test suite has no judge model; it travels with each run",
+  traceQuietPeriodMs: "A test suite has no trace quiet period; it travels with each run",
+  traceWaitTimeoutMs: "A test suite has no trace wait; it travels with each run",
 } as const;
 
 function refuseExecutionSettings(input: UpdateSuiteCommand): void {
@@ -678,6 +680,9 @@ export interface SuiteExecution {
      */
     simulatorModel?: string | null;
     judgeModel?: string | null;
+    /** The plan's judge trace wait in ms, stamped on every run; it wins over the scenario's. */
+    traceQuietPeriodMs?: number | null;
+    traceWaitTimeoutMs?: number | null;
   }): Promise<SuiteRunResult>;
 }
 

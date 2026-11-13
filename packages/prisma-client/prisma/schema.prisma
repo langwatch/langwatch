@@ -3557,6 +3557,8 @@ model LangyConversationProjection {
   /// Per-conversation HMAC key for worker stream frames; server-side only.
   RunToken             String?                    @map("runToken")
   ArchivedAt           Float?                     @map("archivedAt")
+  /// Messages CI started on a pull request since the person last wrote.
+  CiFollowUpsInARow    Int                        @default(0) @map("ciFollowUpsInARow")
   CreatedAt            Float                      @map("createdAt")
   UpdatedAt            Float                      @map("updatedAt")
   /// Business time of the latest applied event.
@@ -3644,6 +3646,27 @@ model LangyConversationTurnProjection {
 
   @@unique([projectId, ConversationId, TurnId])
   @@index([projectId, ConversationId, UpdatedAt])
+}
+
+/// One pull request Langy opened, from the answer whose `gh pr create` printed it. Finished
+/// checks look it up by repository and number to wake the conversation; the daily pull request
+/// cap counts a person's rows by day. Rebuilt by a projection replay.
+model LangyPullRequest {
+  id                 String @id @default(nanoid())
+  projectId          String
+  /// `owner/repo`, lowercased: GitHub matches repository names without case.
+  RepositoryFullName String @map("repositoryFullName")
+  PrNumber           Int    @map("prNumber")
+  ConversationId     String @map("conversationId")
+  /// The conversation's owner, who opened it through Langy.
+  UserId             String @map("userId")
+  /// When the answer that opened it was recorded (epoch ms).
+  OpenedAt           Float  @map("openedAt")
+  /// The agent_responded event it came from.
+  SourceEventId      String @map("sourceEventId")
+
+  @@unique([RepositoryFullName, PrNumber])
+  @@index([UserId, OpenedAt])
 }
 
 /// Rebuildable operational message fact. One source event produces one row.
@@ -4577,6 +4600,11 @@ model Scenario {
   // DEFAULT-role models. See specs/scenarios/scenario-model-selection.feature.
   simulatorModel  String?
   judgeModel      String?
+  // The judge's verdict-time trace wait: how long the span set must hold still
+  // and the first wait budget, in ms. Null resolves the project's measured
+  // value. See specs/scenarios/judge-trace-wait-settings.feature.
+  traceQuietPeriodMs Int?
+  traceWaitTimeoutMs Int?
   maxTurns        Int?
   minTurns        Int?
   // The value this scenario carries for each field its test suite declares,
@@ -4669,6 +4697,10 @@ model SimulationSuite {
   // specs/suites/suite-model-selection.feature.
   simulatorModel     String?
   judgeModel         String?
+  // The plan-wide judge trace wait in ms, winning over each scenario's own
+  // the way the models do. See specs/scenarios/judge-trace-wait-settings.feature.
+  traceQuietPeriodMs Int?
+  traceWaitTimeoutMs Int?
   // "test_suite" | "run_plan" (see SUITE_KINDS in server/suites/types.ts). A
   // test suite groups scenarios through Scenario.testSuiteId; a run plan is
   // hand-assembled. String rather than a Prisma enum so a new kind needs no

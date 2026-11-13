@@ -591,6 +591,14 @@ export function isTurnInPanelScope({
 }
 
 /**
+ * May a read keyed on this conversation run yet? A conversation this tab just minted answers
+ * "not found" until its projection folds, so its reads wait for the confirmation.
+ */
+export function selectConversationReadable(s: LangyState, id: string | null | undefined) {
+  return !!id && s.unconfirmedConversations[id] !== true;
+}
+
+/**
  * The open conversation, if it belongs to `projectId`. The scope reset clears it one render
  * after a move, so reads pairing the new project with the old id answer "not found".
  */

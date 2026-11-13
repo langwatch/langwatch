@@ -12,9 +12,11 @@ export interface LangyDatabase {
   readonly virtualKey: PrismaClient["virtualKey"];
   readonly langyConversationProjection: PrismaClient["langyConversationProjection"];
   readonly langyConversationTurnProjection: PrismaClient["langyConversationTurnProjection"];
+  readonly langyPullRequest: PrismaClient["langyPullRequest"];
   readonly langyMessageProjection: PrismaClient["langyMessageProjection"];
   readonly langyTurnRequest: PrismaClient["langyTurnRequest"];
   readonly langyActiveTurn: PrismaClient["langyActiveTurn"];
+  readonly $queryRaw: PrismaClient["$queryRaw"];
   $transaction<T>(
     operation: (transaction: LangyDatabaseTransaction) => Promise<T>,
     options?: { isolationLevel?: Prisma.TransactionIsolationLevel },

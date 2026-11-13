@@ -90,6 +90,7 @@ export const prismaTableCatalogue = {
   "LangyTurnRequest": "LangyTurnRequest",
   "LangyActiveTurn": "LangyActiveTurn",
   "LangyConversationTurnProjection": "LangyConversationTurnProjection",
+  "LangyPullRequest": "LangyPullRequest",
   "LangyMessageProjection": "LangyMessageProjection",
   "ProjectSecret": "ProjectSecret",
   "TriggerSent": "TriggerSent",
@@ -1659,6 +1660,7 @@ export const prismaModelFieldCatalogue = {
     "PendingHandoffTurnId",
     "RunToken",
     "ArchivedAt",
+    "CiFollowUpsInARow",
     "CreatedAt",
     "UpdatedAt",
     "OccurredAt",
@@ -1711,6 +1713,16 @@ export const prismaModelFieldCatalogue = {
     "AcceptedAt",
     "LastEventId",
     "ProjectionVersion"
+  ],
+  "LangyPullRequest": [
+    "id",
+    "projectId",
+    "RepositoryFullName",
+    "PrNumber",
+    "ConversationId",
+    "UserId",
+    "OpenedAt",
+    "SourceEventId"
   ],
   "LangyMessageProjection": [
     "id",
@@ -2199,6 +2211,8 @@ export const prismaModelFieldCatalogue = {
     "parameters",
     "simulatorModel",
     "judgeModel",
+    "traceQuietPeriodMs",
+    "traceWaitTimeoutMs",
     "maxTurns",
     "minTurns",
     "fields",
@@ -2239,6 +2253,8 @@ export const prismaModelFieldCatalogue = {
     "labels",
     "simulatorModel",
     "judgeModel",
+    "traceQuietPeriodMs",
+    "traceWaitTimeoutMs",
     "kind",
     "scope",
     "fields",
@@ -3628,6 +3644,7 @@ export const prismaRelationCatalogue = {
   "LangyTurnRequest": {},
   "LangyActiveTurn": {},
   "LangyConversationTurnProjection": {},
+  "LangyPullRequest": {},
   "LangyMessageProjection": {},
   "ProjectSecret": {
     "project": "Project",

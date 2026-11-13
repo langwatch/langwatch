@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`TraceApi`)
 
-Peers call these through the token, declared at `../contract/src/trace.api.ts:199`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/trace.api.ts:200`; nothing else in this package is public.
 It extends `TraceOtlpIngestApi`.
 
 #### `extractInlineMediaFromEvent`
@@ -103,10 +103,12 @@ Main's `getNormalizedSpansByTraceId`: a trace's stored spans, attributes unresol
 findNormalizedSpansByTraceId(input: { authorization: Authorization; traceId: string; limit?: number; }): Promise<NormalizedSpan[]>;
 ```
 
-#### `resolveIngestWaitTimeout`
+#### `resolveTraceSettleSettings`
+
+The project's recommended verdict-time trace wait, measured on its own span arrivals.
 
 ```typescript
-resolveIngestWaitTimeout(input: TraceIngestWaitInput): Promise<number>;
+resolveTraceSettleSettings(input: TraceIngestWaitInput): Promise<TraceSettleSettings>;
 ```
 
 #### `getEvaluationSpans`
@@ -1296,7 +1298,7 @@ type Response = unknown;
 
 |             |                                      |
 | ----------- | ------------------------------------ |
-| Declared at | `src/transport/traces.rest.ts:307`   |
+| Declared at | `src/transport/traces.rest.ts:308`   |
 | Base URL    | `/api/traces`, twin `/api/v1/traces` |
 | Addressing  | dated                                |
 | Credential  | project                              |
@@ -1306,21 +1308,38 @@ type Response = unknown;
 
 Search traces for a project
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:311`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:312`.
 
 Answers at `/api/traces/search`, `/api/v1/traces/search`; also, undocumented, `/api/traces/2026-08-07/search`, `/api/v1/traces/2026-08-07/search`, `/api/traces/latest/search`, `/api/v1/traces/latest/search`.
 
 ```typescript
 type Body = z.infer<typeof traceSearchBodySchema>; // ../contract/src/trace-rest.schemas.ts:124
-// Response: inline, src/transport/traces.rest.ts:316
+// Response: inline, src/transport/traces.rest.ts:317
 type Response = unknown;
+```
+
+#### `GET /settle-settings` · `getTraceSettleSettings`
+
+Recommended trace wait for a scenario judge
+
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:339`.
+
+Answers at `/api/traces/settle-settings`, `/api/v1/traces/settle-settings`; also, undocumented, `/api/traces/2026-08-07/settle-settings`, `/api/v1/traces/2026-08-07/settle-settings`, `/api/traces/latest/settle-settings`, `/api/v1/traces/latest/settle-settings`.
+
+```typescript
+// Response: traceSettleSettingsSchema, ../contract/src/trace.queries.ts:76
+interface Response {
+  waitTimeoutMs: number;
+  waitExtensionMs: number;
+  quietPeriodMs: number;
+}
 ```
 
 #### `GET /facets` · `getTraceFacets`
 
 Discover what the trace filter fields hold
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:338`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:363`.
 
 Answers at `/api/traces/facets`, `/api/v1/traces/facets`; also, undocumented, `/api/traces/2026-08-07/facets`, `/api/v1/traces/2026-08-07/facets`, `/api/traces/latest/facets`, `/api/v1/traces/latest/facets`.
 
@@ -1342,7 +1361,7 @@ type Response = Record<string, unknown>;
 
 Derived coding-agent transcript for a trace: what the agent did, in order, with per-call token and cost economics. Empty entries for traces without coding-agent content.
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:371`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:396`.
 
 Answers at `/api/traces/:traceId/transcript`, `/api/v1/traces/:traceId/transcript`; also, undocumented, `/api/traces/2026-08-07/:traceId/transcript`, `/api/v1/traces/2026-08-07/:traceId/transcript`, `/api/traces/latest/:traceId/transcript`, `/api/v1/traces/latest/:traceId/transcript`.
 
@@ -1358,7 +1377,7 @@ type Response = z.infer<typeof transcriptRestResponseSchema>; // ../contract/src
 
 Update metadata on a trace after creation. Inserts a synthetic span carrying the new attributes through the standard ingestion pipeline. New keys are added, existing keys are updated, missing keys are preserved. Labels replace entirely.
 
-Permission `traces:update`. Declared at `src/transport/traces.rest.ts:410`.
+Permission `traces:update`. Declared at `src/transport/traces.rest.ts:435`.
 
 Answers at `/api/traces/:traceId/metadata`, `/api/v1/traces/:traceId/metadata`; also, undocumented, `/api/traces/2026-08-07/:traceId/metadata`, `/api/v1/traces/2026-08-07/:traceId/metadata`, `/api/traces/latest/:traceId/metadata`, `/api/v1/traces/latest/:traceId/metadata`.
 
@@ -1378,7 +1397,7 @@ interface Response {
 
 Get a single trace by ID.
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:436`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:461`.
 
 Answers at `/api/traces/:traceId`, `/api/v1/traces/:traceId`; also, undocumented, `/api/traces/2026-08-07/:traceId`, `/api/v1/traces/2026-08-07/:traceId`, `/api/traces/latest/:traceId`, `/api/v1/traces/latest/:traceId`.
 

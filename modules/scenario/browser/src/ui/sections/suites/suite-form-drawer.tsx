@@ -39,7 +39,9 @@ import { useArchivedItemsResolution } from "../../../behavior/suites/use-archive
 import { useSuiteRunMutation } from "../../../behavior/suites/use-suite-run-mutation.ts";
 import { useSuite } from "../../../behavior/suites/use-suite.ts";
 import { useTestSuites } from "../../../behavior/suites/use-test-suites.ts";
+import { judgeTraceWaitMsOf } from "../../../model/judge-trace-wait.ts";
 import { type SuiteFormData } from "../../../model/suite/suite-form.types.ts";
+import { JudgeTraceWaitSettings } from "../../elements/judge-trace-wait-settings.tsx";
 import { ScenarioPicker } from "../../elements/suite/pickers/scenario-picker.tsx";
 import { TargetPicker } from "../../elements/suite/pickers/target-picker.tsx";
 import { ScenarioFormDrawer } from "../scenarios/scenario-form-drawer.tsx";
@@ -67,6 +69,7 @@ function buildMutationPayload(data: SuiteFormData, projectId: string) {
     labels: data.labels,
     simulatorModel: data.simulatorModel,
     judgeModel: data.judgeModel,
+    ...judgeTraceWaitMsOf(data.traceWait),
   };
 }
 
@@ -324,6 +327,14 @@ export function SuiteFormDrawer(props: SuiteFormDrawerProps) {
                   {errors.judgeModel.message}
                 </Text>
               )}
+              <JudgeTraceWaitSettings
+                value={suiteForm.traceWait}
+                errors={{
+                  quietPeriod: errors.traceWait?.quietPeriodSeconds?.message,
+                  waitTimeout: errors.traceWait?.waitTimeoutSeconds?.message,
+                }}
+                onChange={suiteForm.setTraceWait}
+              />
             </VStack>
 
             {/* Execution Options */}

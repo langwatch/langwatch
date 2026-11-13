@@ -39,3 +39,32 @@ export function isTurnErrorOutlived({
 
   return compareLangyEventCursors(transcriptCursor, recorded.cursor) >= 0;
 }
+
+/**
+ * A live error nothing could name, on a turn the record holds as running (or saw complete before
+ * the transcript caught up): the connection broke, not the turn, and "Try again" would start a
+ * second one. Spec: specs/langy/langy-turn-recovery.feature
+ */
+export function isLiveErrorOnRunningTurn({
+  errorCode,
+  interrupted,
+  turnInFlight,
+  recorded,
+}: {
+  errorCode: string;
+  interrupted: InterruptedTurn | null;
+  /** This tab still holds the interrupted turn as in flight. */
+  turnInFlight: boolean;
+  recorded: Pick<RecordedTurn, "turnId" | "status">;
+}): boolean {
+  if (errorCode !== "unknown") return false;
+  if (!interrupted || interrupted.completedAlready) return false;
+  const recordedStatus = recorded.turnId === interrupted.turnId ? recorded.status : null;
+  if (
+    recordedStatus === LANGY_CONVERSATION_TURN_STATUS.FAILED ||
+    recordedStatus === LANGY_CONVERSATION_TURN_STATUS.STOPPED
+  ) {
+    return false;
+  }
+  return turnInFlight || recordedStatus === LANGY_CONVERSATION_TURN_STATUS.COMPLETED;
+}

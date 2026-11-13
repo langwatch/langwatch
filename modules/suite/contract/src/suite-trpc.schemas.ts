@@ -10,6 +10,8 @@ import {
   runNoteSchema,
   runParameterValuesSchema,
   scenarioTestSuiteSchema,
+  traceQuietPeriodMsSchema,
+  traceWaitTimeoutMsSchema,
   suiteFieldDefinitionsSchema,
 } from "@langwatch/scenario-contract";
 import { z } from "zod";
@@ -49,6 +51,9 @@ const suiteDefinitionShape = {
   // (scenarios.user_simulator / scenarios.judge).
   simulatorModel: modelOverrideSchema.nullish(),
   judgeModel: modelOverrideSchema.nullish(),
+  // The plan-wide judge trace wait in ms; null = the scenario's, else the project's.
+  traceQuietPeriodMs: traceQuietPeriodMsSchema.nullish(),
+  traceWaitTimeoutMs: traceWaitTimeoutMsSchema.nullish(),
 };
 
 /** A run plan is created with the rule it covers, the scenarios it names, or both. */

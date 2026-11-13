@@ -14,6 +14,15 @@ const OPENAI_GPT5_PRO: ReasoningConfig = {
   canDisable: false,
 };
 
+/** OpenAI's 400 names these three for gpt-5.2-pro; a call without an effort runs medium. */
+const OPENAI_GPT52_PRO: ReasoningConfig = {
+  supported: true,
+  parameterName: "reasoning_effort",
+  allowedValues: ["medium", "high", "xhigh"],
+  defaultValue: "medium",
+  canDisable: false,
+};
+
 const OPENAI_GPT51: ReasoningConfig = {
   supported: true,
   parameterName: "reasoning_effort",
@@ -97,8 +106,12 @@ const DEEPSEEK_R1: ReasoningConfig = {
 /** Ordered: the first rule whose model-id test matches decides the configuration. */
 const REASONING_RULES: readonly { matches: (id: string) => boolean; config: ReasoningConfig }[] = [
   {
-    matches: (id) => id.includes("openai/") && includesAny(id, ["gpt-5-pro", "gpt-5.2-pro"]),
+    matches: (id) => id.includes("openai/") && id.includes("gpt-5-pro"),
     config: OPENAI_GPT5_PRO,
+  },
+  {
+    matches: (id) => id.includes("openai/") && id.includes("gpt-5.2-pro"),
+    config: OPENAI_GPT52_PRO,
   },
   {
     matches: (id) => id.includes("openai/") && includesAny(id, ["gpt-5.2", "gpt-5.3"]),

@@ -362,6 +362,22 @@ describe("given a run a suite queued", () => {
       judgeModel: "openai/gpt-5",
     });
   });
+
+  /** @scenario "A run plan's trace wait settings travel with each run it queues" */
+  it("records the plan's judge trace wait in the reserved namespace, and nothing when unset", async () => {
+    const withWait = await harness();
+    const without = await harness();
+
+    await withWait.queue({ traceQuietPeriodMs: 12_000, traceWaitTimeoutMs: 90_000 });
+    await without.queue({ traceQuietPeriodMs: null, traceWaitTimeoutMs: undefined });
+
+    expect(withWait.metadata().langwatch).toMatchObject({
+      traceQuietPeriodMs: 12_000,
+      traceWaitTimeoutMs: 90_000,
+    });
+    expect(without.metadata().langwatch).not.toHaveProperty("traceQuietPeriodMs");
+    expect(without.metadata().langwatch).not.toHaveProperty("traceWaitTimeoutMs");
+  });
 });
 
 describe("ScenarioModule.getRunDataForAllSuites", () => {

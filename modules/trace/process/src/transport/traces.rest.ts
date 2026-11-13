@@ -28,6 +28,7 @@ import {
   traceSearchBodySchema,
   traceSearchResponseSchema,
   tracesRestCredentialSchema,
+  traceSettleSettingsSchema,
   transcriptRestResponseSchema,
   type CompiledProjection,
   type Protections,
@@ -331,6 +332,30 @@ function createTracesRest() {
         mediaType: "application/json",
       }),
     );
+
+  // GET /settle-settings - the project's recommended verdict-time trace wait for a scenario
+  // judge. Registered BEFORE :traceId so "settle-settings" is never read as a trace id.
+  router = router
+    .get("/settle-settings", "getTraceSettleSettings")
+    .withPermission("traces:view", { legacyKey: "legacy_project_key_traces_read" })
+    .withOutput(traceSettleSettingsSchema)
+    .withDocs({
+      operationId: "getApiTracesSettleSettings",
+      summary: "Recommended trace wait for a scenario judge",
+      description:
+        "How long a scenario judge should wait for this project's traces before a verdict: " +
+        "the first wait, the one extension it may ask for, and how long the span set must " +
+        "hold still. Measured on the project's own ingest; defaults without history.",
+      tags: ["Traces"],
+      responses: {
+        200: {
+          description: "The recommended wait, extension and quiet period, in milliseconds",
+          content: { "application/json": { schema: resolver(traceSettleSettingsSchema) } },
+        },
+        ...SHARED_ERROR_ANSWERS,
+      },
+    })
+    .handle(({ app, scope }) => app.resolveTraceSettleSettings({ projectId: scope.id }));
 
   // GET /facets - what the trace filter fields hold. Registered BEFORE
   // :traceId so "facets" is never read as a trace id.

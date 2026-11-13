@@ -46,7 +46,6 @@ function handoff(): LangyTurnHandoff {
       organizationId: "organization-1",
     },
     runToken: "run-token",
-    permitReserved: false,
   };
 }
 

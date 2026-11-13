@@ -95,6 +95,7 @@ import {
   type TopicCountsResult,
   type Trace,
   type TraceIngestWaitInput,
+  type TraceSettleSettings,
   type TraceCanonicalisationService,
   type TraceExportDownload,
   type TraceExportDownloadInput,
@@ -298,6 +299,11 @@ import type {
   TraceLegacyReadRepository,
 } from "../features/legacy/repositories/trace-legacy-read.repository.ts";
 import {
+  normaliseTraceLookupId,
+  traceIdLookupKinds,
+  type TraceByIdRead,
+} from "../features/legacy/rules/trace-id-lookup.rules.ts";
+import {
   type GenerateFilterConditionsResult,
   translateLegacyFilters,
 } from "../features/legacy/rules/trace-legacy-filter-conditions.rules.ts";
@@ -311,8 +317,8 @@ import {
 } from "../features/legacy/rules/trace-legacy-search-body.rules.ts";
 import { LegacyFilterMatchingService } from "../features/legacy/services/legacy-filter-matching.service.ts";
 import { LegacyTraceMappingService } from "../features/legacy/services/legacy-trace-mapping.service.ts";
+import { AmbiguousTraceIdPrefixError } from "../features/legacy/services/trace-alternate-id.service.ts";
 import {
-  AmbiguousTraceIdPrefixError,
   TraceLegacyReadService,
   type BlobResolutionDeps,
 } from "../features/legacy/services/trace-legacy-read.service.ts";
@@ -352,6 +358,7 @@ import { TraceDrawerReadService } from "../features/read/services/trace-drawer-r
 import { TraceListService } from "../features/read/services/trace-list-read.service.ts";
 import { TraceLogRecordIOService } from "../features/read/services/trace-log-record-io.service.ts";
 import { LogRecordStorageService } from "../features/read/services/trace-log-record-read.service.ts";
+import { TraceOtherProjectLookupService } from "../features/read/services/trace-other-project-lookup.service.ts";
 import { TraceReadBoundsService } from "../features/read/services/trace-read-bounds.service.ts";
 import {
   TraceReadFullIoService,
@@ -819,6 +826,8 @@ export interface TraceAppDependencies {
    * reaches it: absent members raise by name, never admit a caller.
    */
   ingestCredential?: TraceIngestCredentialService;
+  /** Where a by-id miss is looked for next: the organisation's other readable projects. */
+  otherProjectLookup?: TraceOtherProjectLookupService;
   /** The plan's monthly allowance both ingestion doors ask; absent, a test graph meters nothing. */
   ingestAllowance?: TraceIngestAllowanceService;
   /** Trace's fold of governance's billing fact; its pipeline folds, the OTLP door reads. */
@@ -1337,6 +1346,11 @@ export class TraceModule implements TraceApi, CollectorApp {
             }),
           }
         : {}),
+      otherProjectLookup: TraceOtherProjectLookupService.create({
+        projects: options.projects,
+        authz: options.protections.authz,
+        existence: options.repositories.existence,
+      }),
       ...(options.ingestAllowance ? { ingestAllowance: options.ingestAllowance } : {}),
       ingestSourceBilling,
       publicBaseUrl: options.publicBaseUrl,
@@ -1719,8 +1733,8 @@ export class TraceModule implements TraceApi, CollectorApp {
     return this.#exportDownload.download(input);
   }
 
-  resolveIngestWaitTimeout(input: TraceIngestWaitInput): Promise<number> {
-    return this.#getTree().resolveIngestWaitTimeout(input);
+  resolveTraceSettleSettings(input: TraceIngestWaitInput): Promise<TraceSettleSettings> {
+    return this.#getTree().resolveTraceSettleSettings(input);
   }
 
   formatSpansDigest(input: { spans: Span[] }): Promise<string> {
@@ -1874,6 +1888,10 @@ export class TraceModule implements TraceApi, CollectorApp {
     });
   }
   async findTrace(input: TraceFindTraceInput): Promise<Trace | undefined> {
+    return this.#findTraceById(input);
+  }
+
+  async #findTraceById(input: TraceFindTraceInput): Promise<TraceByIdRead | undefined> {
     return this.#contentReader.findTrace({
       ...input,
       authorization: await this.#authorizeContentRead({
@@ -3827,9 +3845,57 @@ export class TraceModule implements TraceApi, CollectorApp {
     await TraceMetadataWriteService.create({ ingest }).updateTraceMetadata(input);
   }
 
-  /** Port of main's REST transcript route: the key's protections, the trace, its transcript. */
-  /** `GET /api/traces/:traceId` for an API key: the trace, its evaluations and its address. */
+  /**
+   * `GET /api/traces/:traceId` for an API key. A miss is looked for only in the organisation's
+   * other projects the key itself may read and served from there; otherwise trace_not_found.
+   * Spec: trace-lookup-by-id.feature.
+   */
   async getTraceByIdForApiKey(input: {
+    projectId: string;
+    traceId: string;
+    format: "digest" | "json";
+    projectSlug: string;
+    principal: PrincipalRef | null;
+  }): Promise<Record<string, unknown>> {
+    try {
+      return await this.#renderTraceForApiKey(input);
+    } catch (error) {
+      if (!(error instanceof TraceNotFoundError)) throw error;
+      const normalisedId = normaliseTraceLookupId(input.traceId);
+      const lookup = this.#dependencies.otherProjectLookup
+        ? await this.#dependencies.otherProjectLookup.locate({
+            projectId: input.projectId,
+            traceId: normalisedId,
+            principal: input.principal,
+          })
+        : { searchedProjectSlugs: [] };
+      const located = lookup.located;
+      if (located) {
+        const served = await this.#renderTraceForApiKey({
+          ...input,
+          projectId: located.project.id,
+          projectSlug: located.project.slug,
+        });
+        return {
+          ...served,
+          project: {
+            id: located.project.id,
+            slug: located.project.slug,
+            name: located.project.name,
+          },
+        };
+      }
+      throw new TraceNotFoundError(input.traceId, {
+        searched: {
+          normalisedId,
+          projectSlugs: [input.projectSlug, ...lookup.searchedProjectSlugs],
+          as: traceIdLookupKinds(normalisedId),
+        },
+      });
+    }
+  }
+
+  async #renderTraceForApiKey(input: {
     projectId: string;
     traceId: string;
     format: "digest" | "json";
@@ -3853,17 +3919,34 @@ export class TraceModule implements TraceApi, CollectorApp {
       projectSlug: input.projectSlug,
       path: tracePath({ traceId: resolvedTraceId, occurredAtMs: trace.timestamps?.started_at }),
     });
+    const notes = {
+      ...(trace.lookup
+        ? {
+            requested_id: trace.lookup.requestedId,
+            resolved_from: trace.lookup.resolvedFrom,
+          }
+        : {}),
+      ...(trace.stillIngesting ? { still_ingesting: true } : {}),
+    };
+    const { lookup: _lookup, stillIngesting: _stillIngesting, ...plain } = trace;
     if (input.format === "digest") {
       return {
         trace_id: resolvedTraceId,
-        formatted_trace: await this.formatSpansDigest({ spans: trace.spans ?? [] }),
-        timestamps: trace.timestamps,
-        metadata: trace.metadata,
+        formatted_trace: await this.formatSpansDigest({ spans: plain.spans ?? [] }),
+        timestamps: plain.timestamps,
+        metadata: plain.metadata,
         evaluations,
         platformUrl,
+        ...notes,
       };
     }
-    return { ...trace, evaluations, ascii_tree: generateAsciiTree(trace.spans), platformUrl };
+    return {
+      ...plain,
+      evaluations,
+      ascii_tree: generateAsciiTree(plain.spans),
+      platformUrl,
+      ...notes,
+    };
   }
 
   async readTraceTranscript(input: {
@@ -3889,10 +3972,10 @@ export class TraceModule implements TraceApi, CollectorApp {
     traceId: string;
     protections: Protections;
     withEditOverlay?: boolean;
-  }): Promise<Trace> {
-    let trace: Trace | undefined;
+  }): Promise<TraceByIdRead> {
+    let trace: TraceByIdRead | undefined;
     try {
-      trace = await this.findTrace(input);
+      trace = await this.#findTraceById(input);
     } catch (err) {
       if (err instanceof AmbiguousTraceIdPrefixError) {
         throw new TraceIdAmbiguousError(input.traceId, err.candidateTraceIds);

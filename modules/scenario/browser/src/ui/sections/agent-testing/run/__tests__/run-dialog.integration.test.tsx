@@ -487,6 +487,38 @@ describe("<RunDialog/>", () => {
     );
   });
 
+  /** @scenario "The judge settings show the trace wait inputs in seconds" */
+  it("opens a stored plan's judge trace wait in seconds and runs it in milliseconds", async () => {
+    const user = userEvent.setup();
+    mockAgentsGetAll.mockReturnValue({ data: [ONLINE_AGENT] });
+    renderDialog(suiteSubject({ traceQuietPeriodMs: 15_000, traceWaitTimeoutMs: null }));
+
+    expect(screen.getByTestId("run-dialog-models")).toBeInTheDocument();
+    expect(screen.getByLabelText("Quiet period")).toHaveValue(15);
+    const wait = screen.getByLabelText("Max trace wait") as HTMLInputElement;
+    expect(wait.placeholder).toBe("30");
+
+    await user.type(wait, "500");
+    await user.click(screen.getByTestId("run-dialog-agent-agent_1"));
+    await user.click(screen.getByTestId("run-dialog-run"));
+    expect(mockSuitesRunPlan).not.toHaveBeenCalled();
+    expect(
+      screen.getByText("Max trace wait must be between 1 and 300 seconds"),
+    ).toBeInTheDocument();
+
+    await user.clear(wait);
+    await user.type(wait, "120");
+    await user.click(screen.getByTestId("run-dialog-run"));
+    expect(mockSuitesRunPlan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({
+          traceQuietPeriodMs: 15_000,
+          traceWaitTimeoutMs: 120_000,
+        }),
+      }),
+    );
+  });
+
   // --- Chips ---
 
   /** @scenario "The note chip adds a note field" */
@@ -1572,6 +1604,8 @@ function configurationEntry(
     lastRunAt?: Date;
     scope?: unknown;
     usesNote?: boolean;
+    traceQuietPeriodMs?: number | null;
+    traceWaitTimeoutMs?: number | null;
   } = {},
 ) {
   const configuration = {
@@ -1583,6 +1617,8 @@ function configurationEntry(
     repeatCount: overrides.repeatCount ?? 1,
     simulatorModel: null,
     judgeModel: null,
+    traceQuietPeriodMs: overrides.traceQuietPeriodMs ?? null,
+    traceWaitTimeoutMs: overrides.traceWaitTimeoutMs ?? null,
   };
   const runParameters = overrides.runParameters ?? {};
   return {
@@ -1778,6 +1814,70 @@ describe("the run name", () => {
 
     expect(screen.queryByTestId("run-note-field")).not.toBeInTheDocument();
     expect(screen.getByTestId("customize-chip-note")).toBeInTheDocument();
+  });
+
+  /** @scenario "Choosing a previous configuration restores its judge trace wait settings" */
+  it("refills the judge trace wait of the chosen configuration and runs with it", async () => {
+    const user = userEvent.setup();
+    mockRunConfigurations.mockReturnValue({
+      data: [
+        configurationEntry({
+          planName: "Slow exporter refunds",
+          traceQuietPeriodMs: 20_000,
+          traceWaitTimeoutMs: 90_000,
+          lastRunAt: new Date("2026-08-20T10:00:00.000Z"),
+        }),
+        configurationEntry({ planName: "Slow exporter refunds" }),
+      ],
+      isLoading: false,
+    });
+    renderDialog(suiteSubject());
+
+    await user.click(screen.getByTestId("run-dialog-name-caret"));
+    const options = within(await screen.findByTestId("run-dialog-name-options")).getAllByRole(
+      "button",
+    );
+    // The same plan ran without them too, so the row says what sets it apart.
+    expect(options[0]).toHaveTextContent("quiet 20s, trace wait 90s");
+    expect(options[1]).not.toHaveTextContent("quiet");
+    await user.click(options[0]!);
+
+    expect(screen.getByTestId("run-dialog-models")).toBeInTheDocument();
+    expect(screen.getByLabelText("Quiet period")).toHaveValue(20);
+    expect(screen.getByLabelText("Max trace wait")).toHaveValue(90);
+
+    await user.click(screen.getByTestId("run-dialog-run"));
+    expect(mockSuitesRunPlan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({
+          traceQuietPeriodMs: 20_000,
+          traceWaitTimeoutMs: 90_000,
+        }),
+      }),
+    );
+  });
+
+  /** @scenario "Choosing a previous configuration restores its judge trace wait settings" */
+  it("clears the judge trace wait when the chosen configuration set none", async () => {
+    const user = userEvent.setup();
+    mockRunConfigurations.mockReturnValue({
+      data: [configurationEntry({ planName: "Plain refunds" })],
+      isLoading: false,
+    });
+    renderDialog(suiteSubject({ traceQuietPeriodMs: 15_000, traceWaitTimeoutMs: 60_000 }));
+
+    await user.click(screen.getByTestId("run-dialog-name-caret"));
+    await user.click(
+      within(await screen.findByTestId("run-dialog-name-options")).getAllByRole("button")[0]!,
+    );
+
+    expect(screen.queryByTestId("run-dialog-models")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("run-dialog-run"));
+    expect(mockSuitesRunPlan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({ traceQuietPeriodMs: null, traceWaitTimeoutMs: null }),
+      }),
+    );
   });
 
   /** @scenario "Picking a configuration refills the dialog and opens what it used" */

@@ -120,3 +120,16 @@ export interface LangyStreamEntrySchema extends Named<typeof langyStreamEntrySch
 export const langyStreamEntrySchema: LangyStreamEntrySchema = langyStreamEntrySchemaDefinition;
 
 export type LangyStreamEntry = z.infer<typeof langyStreamEntrySchema>;
+
+/**
+ * An entry as `onTurnStream` sends it: `cursor` is its id in the turn's buffer, so a reader
+ * that reattaches skips what it already has by id. A synthesized terminal has none.
+ */
+const langyStreamFrameSchemaDefinition = z.intersection(
+  langyStreamEntrySchema,
+  z.object({ cursor: z.string().optional() }),
+);
+export interface LangyStreamFrameSchema extends Named<typeof langyStreamFrameSchemaDefinition> {}
+export const langyStreamFrameSchema: LangyStreamFrameSchema = langyStreamFrameSchemaDefinition;
+
+export type LangyStreamFrame = z.infer<typeof langyStreamFrameSchema>;

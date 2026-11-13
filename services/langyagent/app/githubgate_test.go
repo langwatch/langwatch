@@ -226,6 +226,49 @@ func TestGithubGate_WithCredential(t *testing.T) {
 	})
 }
 
+// Only git and gh saying the token cannot reach the repository ends the turn;
+// any other failure of a GitHub-reaching command goes back to the agent.
+// @scenario "A failed GitHub command that is not about repository access keeps the turn going"
+// @scenario "Git or gh saying the repository cannot be reached ends the turn on the repository card"
+func TestGithubGate_RepoNotAccessibleClassification(t *testing.T) {
+	notAccessible := map[string]string{
+		"git clone of a repository outside the installation": "Cloning into 'other'...\nremote: Repository not found.\nfatal: repository 'https://github.com/acme/other.git/' not found",
+		"git push with a read-only token":                    "remote: Permission to acme/service-x.git denied to langwatch[bot].\nfatal: unable to access 'https://github.com/acme/service-x.git/': The requested URL returned error: 403",
+		"gh on a repository the token cannot see":            "GraphQL: Could not resolve to a Repository with the name 'acme/other'. (repository)",
+	}
+	for name, output := range notAccessible {
+		t.Run(name, func(t *testing.T) {
+			gate := newGithubGate(true, func() {})
+			gate.Observe(toolEndFrame(t, "git push -u origin HEAD", true, output))
+			if _, code, tripped := gate.Tripped(); !tripped || code != codeGithubRepoNotAccessible {
+				t.Errorf("tripped=%v code=%q, want %s", tripped, code, codeGithubRepoNotAccessible)
+			}
+		})
+	}
+
+	agentsToHandle := map[string]struct{ command, output string }{
+		// The replay's case: a label the repository does not have.
+		"a missing label": {
+			"git commit -am 'fix(retriever): keep numbers' && git push && gh pr edit 2 --add-label 'fix(retriever)'",
+			"'fix(retriever)' not found",
+		},
+		"a missing tool after a push": {"git push && pytest -q", "/bin/bash: line 1: pytest: command not found"},
+		"a missing pull request":      {"gh pr view 99", "GraphQL: Could not resolve to a PullRequest with the number of 99. (repository.pullRequest)"},
+		"a missing file on the API":   {"gh api repos/acme/service-x/contents/nope.md", "gh: Not Found (HTTP 404)"},
+		"a missing branch":            {"git push origin nope", "error: src refspec nope does not match any"},
+	}
+	for name, failure := range agentsToHandle {
+		t.Run(name, func(t *testing.T) {
+			canceled := false
+			gate := newGithubGate(true, func() { canceled = true })
+			gate.Observe(toolEndFrame(t, failure.command, true, failure.output))
+			if _, code, tripped := gate.Tripped(); tripped || canceled {
+				t.Errorf("tripped with %q: the agent sees this failure and keeps working", code)
+			}
+		})
+	}
+}
+
 // The gate trips at most once — the first trip wins and later frames are ignored.
 func TestGithubGate_TripsOnce(t *testing.T) {
 	cancels := 0

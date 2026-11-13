@@ -8,6 +8,10 @@ import {
 } from "@langwatch/experiment-contract";
 import { z } from "zod";
 
+import {
+  rowPassRatesOf,
+  type RowPassRate,
+} from "../../model/batch-evaluation-results.run-repeat.ts";
 import { disambiguateNames } from "./batch-results/presentation.tsx";
 
 const jsonRecordSchema = z.record(z.string(), z.unknown());
@@ -226,6 +230,10 @@ export type BatchEvaluationData = {
    * evaluator after target columns.
    */
   comparisonColumns?: BatchComparisonColumn[];
+  /** How many times the run repeated every dataset row; absent ran each once. */
+  repeat?: number;
+  /** A repeated run's pass rate per dataset row and target, keyed `${datasetRow}:${targetId}`. */
+  rowPassRates?: Map<string, RowPassRate>;
   /** Row data */
   rows: BatchResultRow[];
 };
@@ -522,6 +530,9 @@ export const transformBatchEvaluationData = (data: ExperimentRunWithItems): Batc
     evaluatorIds: Array.from(evaluatorNames.keys()),
     evaluatorNames: Object.fromEntries(evaluatorNames),
     comparisonColumns: detectComparisonColumns(evaluations, targetColumns, rows),
+    ...(data.repeat && data.repeat > 1
+      ? { repeat: data.repeat, rowPassRates: rowPassRatesOf({ rows, repeat: data.repeat }) }
+      : {}),
     rows,
   };
 };

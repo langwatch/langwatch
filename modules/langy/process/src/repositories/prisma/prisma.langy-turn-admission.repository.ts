@@ -52,13 +52,14 @@ async function claimIn(
   const step = await leaseReceipt({ tx, input, lease });
   if ("answer" in step) return step.answer;
   const { conversationId, turnId, id } = step.receipt;
-  if (await leaseActiveTurn({ tx, input, lease, conversationId, turnId })) {
+  const holder = await leaseActiveTurn({ tx, input, lease, conversationId, turnId });
+  if (holder.kind === "taken") {
     return { kind: "claimed", claimToken: lease.claimToken, conversationId, turnId };
   }
   await tx.langyTurnRequest.deleteMany({
     where: { projectId: input.projectId, id, status: PREPARING, leaseOwner: lease.claimToken },
   });
-  return { kind: "busy" };
+  return { kind: "busy", conversationId, heldTurnId: holder.heldTurnId };
 }
 
 /**
@@ -148,7 +149,7 @@ function isAbandoned(active: ActiveRow, now: Date): boolean {
   return now.getTime() - active.updatedAt.getTime() > COMMITTED_ABANDON_MS;
 }
 
-/** Takes the conversation's one active turn for this send, or reports it is held by another. */
+/** Takes the conversation's one active turn for this send, or names the turn holding it. */
 async function leaseActiveTurn({
   tx,
   input,
@@ -161,7 +162,7 @@ async function leaseActiveTurn({
   lease: Lease;
   conversationId: string;
   turnId: string;
-}): Promise<boolean> {
+}): Promise<{ kind: "taken" } | { kind: "held"; heldTurnId: string }> {
   const active = await tx.langyActiveTurn.findUnique({
     where: {
       projectId: input.projectId,
@@ -179,16 +180,16 @@ async function leaseActiveTurn({
     await tx.langyActiveTurn.create({
       data: { projectId: input.projectId, conversationId, turnId, ...held },
     });
-    return true;
+    return { kind: "taken" };
   }
   const where = { id: active.id, projectId: input.projectId };
   if (active.turnId === turnId) {
     await tx.langyActiveTurn.update({ where, data: held });
-    return true;
+    return { kind: "taken" };
   }
-  if (!isAbandoned(active, lease.now)) return false;
+  if (!isAbandoned(active, lease.now)) return { kind: "held", heldTurnId: active.turnId };
   await tx.langyActiveTurn.update({ where, data: { turnId, ...held } });
-  return true;
+  return { kind: "taken" };
 }
 
 /**

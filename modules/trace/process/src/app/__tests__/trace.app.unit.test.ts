@@ -19,10 +19,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import { aggregateProof, ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import { MemoryNullTraceBraidReadsRepository } from "../../features/braid/repositories/memory/memory.null-trace-braid-reads.repository.ts";
+import type { TraceOtherProjectLookupService } from "../../features/read/services/trace-other-project-lookup.service.ts";
 import { TraceSummaryService } from "../../features/read/services/trace-summary-read.service.ts";
 import type { TraceSpanCostSuggestion } from "../../features/span/services/span-cost-suggestion.service.ts";
 import { MemoryTraceEvaluationRunsRepository } from "../../repositories/memory/memory.trace-evaluation-runs.repository.ts";
 import { MemoryTraceSummaryRepository } from "../../repositories/memory/memory.trace-summary.repository.ts";
+import type { TraceViewerProtectionService } from "../../services/trace-viewer-protection.service.ts";
 import type { TraceLegacyRead } from "../../services/trace-viewer.service.ts";
 import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
 import {
@@ -81,6 +83,7 @@ function harness(
     getByTraceId: TraceSummaryReader["getByTraceId"];
     summary: TraceSummaryReader;
     evaluationRuns: MemoryTraceEvaluationRunsRepository;
+    otherProjectLookup: Pick<TraceOtherProjectLookupService, "locate">;
   }> = {},
 ) {
   const tryGetById = vi.fn<TraceLegacyRead["findById"]>(
@@ -129,6 +132,7 @@ function harness(
     traces: {
       braidReads: MemoryNullTraceBraidReadsRepository.create(),
       existence: {
+        findProjectsHoldingTrace: async () => [],
         findExistingTraceIds: async ({ traceIds }) => [...traceIds],
         countUsage: async () => ({ traces: 0, spans: 0 }),
         findTraceCosts: async () => [],
@@ -157,6 +161,14 @@ function harness(
     } as ProjectApi,
     requestBounds: createTraceTestRequestBounds(),
     exportBounds: null,
+    publicBaseUrl: "https://app.example.test",
+    protections: createApiFixture<TraceViewerProtectionService>(
+      { resolveForApiKey: async () => PROTECTIONS },
+      "viewer protections",
+    ),
+    ...(reads.otherProjectLookup
+      ? { otherProjectLookup: reads.otherProjectLookup as TraceOtherProjectLookupService }
+      : {}),
   });
 
   return {
@@ -603,6 +615,118 @@ describe("TraceModule", () => {
           app.readSampleTraces({ query, protections: PROTECTIONS, pageSize: 10 }),
         ).resolves.toEqual([]);
         expect(getTracesWithSpans).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("when getting a trace by id for an API key", () => {
+    const OTHER = {
+      id: "project-other",
+      slug: "other-slug",
+      name: "Other",
+      teamId: "team-1",
+      organizationId: "org-1",
+      isPersonal: false,
+      ownerUserId: null,
+      kind: "standard",
+    };
+    const get = (app: TraceModule, traceId = "trace-1") =>
+      app.getTraceByIdForApiKey({
+        projectId: "project-own",
+        traceId,
+        format: "json",
+        projectSlug: "own-slug",
+        principal: { type: "apiKey", id: "key-1" },
+      });
+
+    describe("given the trace is in another project the key may read", () => {
+      it("serves it from there and names that project", async () => {
+        const { app } = harness({
+          findById: async ({ projectId }) =>
+            projectId === OTHER.id ? traceRow("trace-1") : undefined,
+          otherProjectLookup: {
+            locate: async () => ({
+              located: { project: OTHER },
+              searchedProjectSlugs: [OTHER.slug],
+            }),
+          },
+        });
+
+        const answer = await get(app);
+
+        expect(answer.trace_id).toBe("trace-1");
+        expect(answer.project).toEqual({ id: OTHER.id, slug: OTHER.slug, name: OTHER.name });
+      });
+    });
+
+    describe("given no project the caller can read holds the id", () => {
+      it("answers a retryable trace_not_found saying what was searched", async () => {
+        const { app } = harness({
+          findById: async () => undefined,
+          otherProjectLookup: {
+            locate: async () => ({ searchedProjectSlugs: [OTHER.slug] }),
+          },
+        });
+
+        await expect(get(app, " TRACE-1 ")).rejects.toMatchObject({
+          code: "trace_not_found",
+          retryable: true,
+          meta: {
+            searched: { normalisedId: "TRACE-1", projectSlugs: ["own-slug", OTHER.slug] },
+          },
+        });
+      });
+    });
+
+    describe("given an id no project holds", () => {
+      const searchedAs = async (traceId: string) => {
+        const { app } = harness({
+          findById: async () => undefined,
+          otherProjectLookup: { locate: async () => ({ searchedProjectSlugs: [] }) },
+        });
+        const error: unknown = await get(app, traceId).catch((e: unknown) => e);
+        return (error as { meta: { searched: { as: string[] } } }).meta.searched.as;
+      };
+
+      /** @scenario "A trace_not_found names only the id kinds the lookup tried" */
+      it("names only the id kinds the lookup tried for that id", async () => {
+        expect(await searchedAs("0123456789abcdef0123456789abcdef")).toEqual([
+          "trace_id",
+          "stored_spans",
+        ]);
+        expect(await searchedAs("0123456789ABCDEF")).toEqual([
+          "trace_id",
+          "stored_spans",
+          "trace_id_prefix",
+          "span_id",
+        ]);
+        expect(await searchedAs("scenariorun_abc")).toEqual([
+          "trace_id",
+          "stored_spans",
+          "scenario_run_id",
+        ]);
+      });
+    });
+
+    describe("given the trace was found by a span id while it is still being stored", () => {
+      it("says how it was found and that it is still ingesting", async () => {
+        const { app } = harness({
+          findById: async () => ({
+            ...traceRow("trace-1"),
+            lookup: { requestedId: "span-1", resolvedFrom: "span_id" as const },
+            stillIngesting: true as const,
+          }),
+        });
+
+        const answer = await get(app, "span-1");
+
+        expect(answer).toMatchObject({
+          trace_id: "trace-1",
+          requested_id: "span-1",
+          resolved_from: "span_id",
+          still_ingesting: true,
+        });
+        expect(answer).not.toHaveProperty("lookup");
       });
     });
   });

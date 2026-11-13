@@ -1,6 +1,6 @@
 ---
 title: What Langy Can Do in Your GitHub
-description: Langy touches your code only through a GitHub App that opens bot-authored pull requests; the app private key is the only stored credential, tokens are minted per turn with two write scopes, and the install is the access boundary.
+description: Langy touches your code only through a GitHub App that opens bot-authored pull requests; the app private key is the only stored credential, tokens are minted per turn with only the scopes the installation granted, and the install is the access boundary.
 sidebarTitle: GitHub access
 keywords:
   - langy github permissions
@@ -15,7 +15,7 @@ Langy contributes to your code in exactly one way: **bot-authored pull requests 
 - **No per-user OAuth.** Installing the app does not ask a user to authorize it against their GitHub account. The bot-authored flow uses no user OAuth at all.
 - **The app private key is the only stored credential.** It lives only in the control plane (as `GITHUB_LANGY_PRIVATE_KEY`) and never reaches a worker. When it is unset, the GitHub feature is silently off.
 - **Installation tokens are minted per turn.** Each turn mints a fresh 1-hour installation token, cached in Redis just under its lifetime and never persisted. The worker receives it as the `GH_TOKEN` environment variable only; no token is written to disk.
-- **Least privilege at mint time.** Tokens are minted with only `contents:write` and `pull_requests:write`, scoped to the installation's repositories, or to a single repository when the turn targets one.
+- **Least privilege at mint time.** Tokens are minted with `contents:write` and `pull_requests:write`, plus `actions:write`, `checks:read` and `workflows:write` when the installation granted them, scoped to the installation's repositories, or to a single repository when the turn targets one.
 
 Inside the worker, `git config credential.helper '!gh auth git-credential'` wires `git` to read the token from the environment, so there is no `.gitconfig` or `.git-credentials` on disk.
 
@@ -37,9 +37,18 @@ These are the only repository permissions the app requests:
 | ------------- | -------------- |
 | Contents      | Read and write |
 | Pull requests | Read and write |
+| Actions       | Read and write |
+| Checks        | Read           |
+| Workflows     | Read and write |
 | Metadata      | Read           |
 
-The app subscribes to the `pull_request` event, plus the installation lifecycle that GitHub sends automatically (`installation`, `installation_repositories`). The event is what links a pull request to the coding-agent sessions that worked on it.
+Actions lets Langy read the workflow runs and logs on its pull requests and start a run of a workflow that offers `workflow_dispatch`. Checks lets it read the checks on its pull requests. Workflows lets it push changes to `.github/workflows/` when it sets up a pipeline that runs your scenarios or experiments on pull requests. All three are optional: an installation that has not accepted them keeps working without them.
+
+The app subscribes to the `pull_request` and `check_suite` events, plus the installation lifecycle that GitHub sends automatically (`installation`, `installation_repositories`). The `pull_request` event is what links a pull request to the coding-agent sessions that worked on it.
+
+The `check_suite` event tells LangWatch that CI finished on a pull request. Only completed suites on a `langy/` branch of the repository itself are read, and only when every check on that commit has finished. LangWatch then starts a follow-up turn in the conversation that opened the pull request.
+
+That turn acts as the conversation's owner, can read but not change anything in LangWatch, and holds a GitHub token for that one repository. Automatic follow-ups stop after a few in a row until the person writes again.
 
 These are the fields the platform keeps from it:
 
@@ -56,7 +65,8 @@ The event carries no file content and no diff.
 <Note>
   `Contents: Read and write` is what lets Langy clone a repository, create a branch, and push
   commits to that branch. It does not let Langy merge; merging a pull request is a separate action
-  that a human takes in GitHub after review.
+  that a human takes in GitHub after review. GitHub cannot limit a token to one branch, so branch
+  protection on your default branch is what keeps every push on a pull request branch.
 </Note>
 
 ## Disconnecting

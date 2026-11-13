@@ -9,6 +9,11 @@
 import type { EvaluatorAttachment } from "@langwatch/scenario-contract";
 import { useEffect, useState } from "react";
 
+import {
+  hasJudgeTraceWait,
+  type JudgeTraceWaitInput,
+  judgeTraceWaitInputOf,
+} from "../../../../model/judge-trace-wait.ts";
 import type { CompareRow } from "../run-compare/compare-rows.ts";
 import type { RunScope } from "./run-configuration.ts";
 import type { RunDialogSubject } from "./run-dialog-types.ts";
@@ -27,6 +32,11 @@ export function initialScopeOf(subject: RunDialogSubject | null): RunScope {
   // Run all and New run plan both start on everything; only New run plan can
   // then narrow it.
   return { mode: "all" };
+}
+
+/** The judge's trace wait a stored plan opens on; every other subject starts unset. */
+function initialTraceWaitOf(subject: RunDialogSubject | null): JudgeTraceWaitInput {
+  return judgeTraceWaitInputOf(subject?.kind === "suite" ? subject : {});
 }
 
 /** True for the one entry point where the scope is still being chosen. */
@@ -51,9 +61,14 @@ export function useRunPlanFields({
   // The targets of a comparison. Empty outside compare mode: the run then
   // goes against the one agent the target section holds.
   const [compareRows, setCompareRows] = useState<CompareRow[]>([]);
-  const [showModels, setShowModels] = useState(false);
+  const [showModels, setShowModels] = useState(() =>
+    hasJudgeTraceWait(initialTraceWaitOf(subject)),
+  );
   const [simulatorModel, setSimulatorModel] = useState<string | null>(null);
   const [judgeModel, setJudgeModel] = useState<string | null>(null);
+  const [traceWait, setTraceWait] = useState<JudgeTraceWaitInput>(() =>
+    initialTraceWaitOf(subject),
+  );
   const [showRepeat, setShowRepeat] = useState(false);
   const [repeatCount, setRepeatCount] = useState(1);
   // The plan's own evaluators, beside the ones the suites in scope attach.
@@ -67,7 +82,9 @@ export function useRunPlanFields({
   useEffect(() => {
     setScope(initialScopeOf(subject));
     setCompareRows([]);
-    setShowModels(false);
+    const initialTraceWait = initialTraceWaitOf(subject);
+    setTraceWait(initialTraceWait);
+    setShowModels(hasJudgeTraceWait(initialTraceWait));
     setSimulatorModel(null);
     setJudgeModel(null);
     setShowRepeat(false);
@@ -91,6 +108,8 @@ export function useRunPlanFields({
     setSimulatorModel,
     judgeModel,
     setJudgeModel,
+    traceWait,
+    setTraceWait,
     showRepeat,
     setShowRepeat,
     repeatCount,

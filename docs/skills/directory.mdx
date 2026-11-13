@@ -492,6 +492,26 @@ langwatch experiment list --format json
 
 If the CLI supports a more specific read or run for the installed version, discover it with `langwatch experiment --help` before using it.
 
+## Use Experiments to Measure a Change
+
+An experiment is the yardstick for a prompt, model, retrieval or code change. Run the current version first, then the candidate on the same dataset and evaluators. When the application samples at non-zero temperature, run each version more than once (`langwatch experiment run <slug>` again, or the script again) and compare per row: a row that fails on one run and passes on the next is variation, not a regression. Two runs of the same version can differ by more than the change you are testing.
+`langwatch experiment run <slug> --repeat <n> --wait` (1 to 5) runs every row n times in one run and prints each row's pass rate, so one command shows which rows pass only some of the time.
+
+Improving an agent works like an experiment, whatever the layer you change: a prompt, code, retrieval, a tool or a test. One attempt is rarely the answer, and an unmeasured change is a guess.
+
+1. **Set an attempts budget.** Before the first change, decide how many hypotheses the problem is worth, given what one measurement costs (a dataset run, a scenario suite, a CI cycle). Say the number and the reason in one line. Revise it as you learn: a cheap measurement or a promising lead earns more attempts, an expensive or flat one fewer.
+2. **Measure the baseline first,** with what the environment offers: a platform experiment, a scenario run with `--repeat`, the repository's own tests and linters, its CI. That measurement is the yardstick for every attempt, so note the items, the number of runs and the evaluators.
+3. **Read the variation before you call anything a failure.** A model sampling at non-zero temperature, a simulated user and an LLM judge all vary between runs. Run each item more than once and read its pass rate ("failed 3 of 3", "failed 1 of 3"), not a single verdict. Diagnose the items that fail consistently first. An item that passes on some runs and fails on others is an unstable behaviour: look for what makes it unstable (an ambiguous instruction, a retrieval step that sometimes misses), never patch the one bad output.
+4. **State the hypothesis before the change:** the cause, the change, and what it predicts will move. For example: "refund answers quote the old policy because retrieval ranks the outdated page first; ranking recent pages higher should raise the pass rate on policy questions and leave the rest unchanged." Rank the hypotheses you considered and say why you chose this one. When the user is there to answer, let them choose. When no one can answer (an in-product assistant, an unattended run), write the ranking and your choice with its reason, then proceed.
+5. **Change one thing on a branch and measure the candidate exactly like the baseline:** same items, same number of runs, same evaluators. Compare per item, not only the total.
+6. **Keep some items out of the loop.** Build the fix from part of the failing items and check it on items you did not read. A fix that lifts only the items it was built from is fitted to them.
+7. **Open a pull request only on a measured win.** Its description carries the hypothesis, the baseline and candidate results over the same items, and the runs that produced them. When the candidate does not win, open nothing: say what the result taught you, adjust, and take the next hypothesis. When nothing in reach can measure the change (the agent cannot run here and no platform run reaches the branch), say so and present the change as untested, never as an improvement.
+8. **Stop when the budget is spent or the results stop moving,** and report every attempt: hypothesis, result, verdict. "Nothing beat the baseline, and this is what we learned" is a result.
+
+**Fix the class, in every layer.** Code that recognises the evaluation questions (a keyword check, a hardcoded answer, a special case for one input) is not a fix. It passes the items it names and breaks the ones that look like them. Ask whether the change would help a new question of the same kind, one not in the test set. If not, keep diagnosing.
+
+**Tests you write are not the evidence.** You may write and edit tests, scenarios, datasets and expected answers. A test you wrote checks that the code does what you meant, not that what you meant is right. A grading change made in the same piece of work as the agent change never counts as evidence for that change: disclose it in the pull request, justify it against real traces or conversations, and measure the agent change against the grading that existed before.
+
 ## Consultant Mode
 
 After delivering initial results, transition to consultant mode to help the user get maximum value.
@@ -512,6 +532,7 @@ Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask gene
 - Do not report an inconclusive or errored comparison as a tie.
 - Do not guess SDK APIs when the installed documentation is available.
 - Do not stop after writing the experiment. Run it and inspect the real result.
+- Do not declare a winner from one run of each version when outputs vary; compare repeated runs per row.
 ````
 
         </div>
@@ -912,7 +933,7 @@ If the user's request is **general** ("add scenarios", "test my agent"):
 - Generate comprehensive coverage (happy path, edge cases, error handling)
 - When the agent is connected to the platform, read the run parameters it declares before you propose anything (`langwatch agent get <id> --format json`, under `parameters`). Each one is a lever the team built into the agent: cover it with one scenario per value that changes the expected behavior, and offer a comparison run across an option list (see Read the agent's levers in the Platform Approach)
 - For conversational agents, include multi-turn scenarios, because that's where the interesting edge cases live (context retention, topic switching, recovery from misunderstandings)
-- ALWAYS run the tests after writing them, and report the result in the same answer. With the Code approach, that means waiting: run `pytest` or `vitest` in the foreground with a timeout that covers every simulation, and never hand it to a background task or end the answer with "I will report when it finishes". A code run you did not wait for is not a run: the turn ends, the report never arrives, and the user is left with test files nobody has seen pass. With the Platform approach, a run is scheduled rather than executed in your process, so do not block on `--wait` in an interactive turn: trigger it, hand over the link, and say what the page will show (see step 5 of the Platform Approach). Report the result: how many scenarios ran, which passed, and what the failures said. Stop after two rounds of fixes and report what still fails, with what you tried. A loop that keeps rerunning the suite spends the time of the user and tells them nothing until it ends. If they fail, first decide which side is wrong. Change the test only when you have evidence that its criteria or its fixture are wrong; otherwise the agent is what needs the fix (see Improving the Agent When a Scenario Fails below). A scenario that goes green because its assertions got weaker has tested nothing.
+- ALWAYS run the tests after writing them, and report the result in the same answer. With the Code approach, that means waiting: run `pytest` or `vitest` in the foreground with a timeout that covers every simulation, and never hand it to a background task or end the answer with "I will report when it finishes". A code run you did not wait for is not a run: the turn ends, the report never arrives, and the user is left with test files no one has seen pass. With the Platform approach, a run is scheduled rather than executed in your process, so do not block on `--wait` in an interactive turn: trigger it, hand over the link, and say what the page will show (see step 5 of the Platform Approach). Report the result: how many scenarios ran, which passed, and what the failures said. When you go on to fix failures, set an attempts budget first and stop when it is spent, reporting what still fails and what you tried (see Improving the Agent When a Scenario Fails). A loop that keeps rerunning the suite with no budget spends the user's money and tells them nothing until it ends. If they fail, first decide which side is wrong. Change the test only when you have evidence that its criteria or its fixture are wrong; otherwise the agent is what needs the fix (see Improving the Agent When a Scenario Fails below). A scenario that goes green because its assertions got weaker has tested nothing.
 - After tests are green, transition to consultant mode (see Consultant Mode below) and suggest 2-3 domain-specific improvements.
 
 If the user's request is **specific** ("test the refund flow"):
@@ -947,6 +968,13 @@ Best practices:
 
 ## Improving the Agent When a Scenario Fails
 
+Before you change anything:
+
+1. **Read the scenario and the conversations it produced.** Would a real user bring this situation, and do the criteria grade what that user needs? A scenario that tests nothing real is rewritten or removed with the reason stated, never made to pass.
+2. **Run it several times.** A simulated user and a judge make every run a sample. Use `--repeat` on `scenario run`, `suite run` and `run-plan run`, or run the test several times in code, and read the pass rate.
+3. **Treat flakiness as a real problem.** A scenario that passes on some runs and fails on others shows the agent behaving differently on nearly the same input. Find what changes between the passing and the failing conversations and fix that.
+4. **Fix the agent, never the scenario's reach.** Weakening the criteria, scripting the user onto the one path that works, or rewriting the situation around what the agent does today makes the scenario pass and tests nothing. A criteria or situation change needs its own evidence from real traces or conversations, and is reported apart from the agent change.
+
 A failing test tells you WHERE the agent fails, not that the prompt is where to fix it. One more rule is the cheapest edit that turns it green, and a prompt maintained that way overfits: it passes exactly the cases it was patched against and degrades everywhere else.
 
 1. **Diagnose the layer.** Five can own a failure: the harness (tools, permissions, context assembly), the model, the knowledge (skills, docs, retrieval), the prompt, or the test itself. The prompt is the last resort. If the fix is "never use tool X", remove tool X from the configuration. Diagnose from the failing run's trace: it holds every tool call, and the assembled input too where the project captures content.
@@ -957,6 +985,21 @@ A failing test tells you WHERE the agent fails, not that the prompt is where to 
 6. **Keep the judge independent of the prompt.** Grade user outcomes and verified side effects, never the agent's own rules restated. A rubric that quotes the prompt grades obedience, not quality.
 
 Your harness, codebase and model decide which levers exist. Full guide: [Improving your Agent](https://scenario.langwatch.ai/best-practices/improving-your-agent).
+
+Improving an agent works like an experiment, whatever the layer you change: a prompt, code, retrieval, a tool or a test. One attempt is rarely the answer, and an unmeasured change is a guess.
+
+1. **Set an attempts budget.** Before the first change, decide how many hypotheses the problem is worth, given what one measurement costs (a dataset run, a scenario suite, a CI cycle). Say the number and the reason in one line. Revise it as you learn: a cheap measurement or a promising lead earns more attempts, an expensive or flat one fewer.
+2. **Measure the baseline first,** with what the environment offers: a platform experiment, a scenario run with `--repeat`, the repository's own tests and linters, its CI. That measurement is the yardstick for every attempt, so note the items, the number of runs and the evaluators.
+3. **Read the variation before you call anything a failure.** A model sampling at non-zero temperature, a simulated user and an LLM judge all vary between runs. Run each item more than once and read its pass rate ("failed 3 of 3", "failed 1 of 3"), not a single verdict. Diagnose the items that fail consistently first. An item that passes on some runs and fails on others is an unstable behaviour: look for what makes it unstable (an ambiguous instruction, a retrieval step that sometimes misses), never patch the one bad output.
+4. **State the hypothesis before the change:** the cause, the change, and what it predicts will move. For example: "refund answers quote the old policy because retrieval ranks the outdated page first; ranking recent pages higher should raise the pass rate on policy questions and leave the rest unchanged." Rank the hypotheses you considered and say why you chose this one. When the user is there to answer, let them choose. When no one can answer (an in-product assistant, an unattended run), write the ranking and your choice with its reason, then proceed.
+5. **Change one thing on a branch and measure the candidate exactly like the baseline:** same items, same number of runs, same evaluators. Compare per item, not only the total.
+6. **Keep some items out of the loop.** Build the fix from part of the failing items and check it on items you did not read. A fix that lifts only the items it was built from is fitted to them.
+7. **Open a pull request only on a measured win.** Its description carries the hypothesis, the baseline and candidate results over the same items, and the runs that produced them. When the candidate does not win, open nothing: say what the result taught you, adjust, and take the next hypothesis. When nothing in reach can measure the change (the agent cannot run here and no platform run reaches the branch), say so and present the change as untested, never as an improvement.
+8. **Stop when the budget is spent or the results stop moving,** and report every attempt: hypothesis, result, verdict. "Nothing beat the baseline, and this is what we learned" is a result.
+
+**Fix the class, in every layer.** Code that recognises the evaluation questions (a keyword check, a hardcoded answer, a special case for one input) is not a fix. It passes the items it names and breaks the ones that look like them. Ask whether the change would help a new question of the same kind, one not in the test set. If not, keep diagnosing.
+
+**Tests you write are not the evidence.** You may write and edit tests, scenarios, datasets and expected answers. A test you wrote checks that the code does what you meant, not that what you meant is right. A grading change made in the same piece of work as the agent change never counts as evidence for that change: disclose it in the pull request, justify it against real traces or conversations, and measure the agent change against the grading that existed before.
 
 In Langy, do not print the fix for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
 
@@ -1875,7 +1918,7 @@ Through MCP the same surface is `platform_create_test_suite` and `platform_updat
 
 ### Iterating
 
-Review the results, sharpen the scenario with `langwatch scenario update <id> --criteria "…"`, and run it again. ALWAYS run the scenario. An unrun scenario is worth nothing.
+Review the results and read the conversations. Change the criteria with `langwatch scenario update <id> --criteria "…"` only when the conversations show they grade the wrong thing, never to let a failing agent pass, and run it again. ALWAYS run the scenario. An unrun scenario is worth nothing.
 
 ### When the choice is the user's, ask
 
@@ -1938,6 +1981,7 @@ Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask gene
 
 - This path uses the CLI. Do NOT write code files
 - Write criteria as natural language descriptions, not regex patterns
+- Do NOT judge a scenario from one run; repeat it and read the pass rate and the conversations
 - Create focused scenarios. Each should test one specific behavior
 - Do NOT treat a test suite as a run configuration. A test suite holds a name, its scenarios, its fields and its evaluators: targets, repeat count and models belong to the run plan, and are given at run time
 - Do NOT write a golden answer into the criteria ("the SQL must be SELECT quarter, SUM(amount) ..."). Declare a field on the suite, put the value on the scenario with `--field`, and attach an evaluator that reads it. The judge grades behavior; an evaluator compares against the known answer
@@ -4274,6 +4318,26 @@ langwatch experiment list --format json
 
 If the CLI supports a more specific read or run for the installed version, discover it with `langwatch experiment --help` before using it.
 
+## Use Experiments to Measure a Change
+
+An experiment is the yardstick for a prompt, model, retrieval or code change. Run the current version first, then the candidate on the same dataset and evaluators. When the application samples at non-zero temperature, run each version more than once (`langwatch experiment run <slug>` again, or the script again) and compare per row: a row that fails on one run and passes on the next is variation, not a regression. Two runs of the same version can differ by more than the change you are testing.
+`langwatch experiment run <slug> --repeat <n> --wait` (1 to 5) runs every row n times in one run and prints each row's pass rate, so one command shows which rows pass only some of the time.
+
+Improving an agent works like an experiment, whatever the layer you change: a prompt, code, retrieval, a tool or a test. One attempt is rarely the answer, and an unmeasured change is a guess.
+
+1. **Set an attempts budget.** Before the first change, decide how many hypotheses the problem is worth, given what one measurement costs (a dataset run, a scenario suite, a CI cycle). Say the number and the reason in one line. Revise it as you learn: a cheap measurement or a promising lead earns more attempts, an expensive or flat one fewer.
+2. **Measure the baseline first,** with what the environment offers: a platform experiment, a scenario run with `--repeat`, the repository's own tests and linters, its CI. That measurement is the yardstick for every attempt, so note the items, the number of runs and the evaluators.
+3. **Read the variation before you call anything a failure.** A model sampling at non-zero temperature, a simulated user and an LLM judge all vary between runs. Run each item more than once and read its pass rate ("failed 3 of 3", "failed 1 of 3"), not a single verdict. Diagnose the items that fail consistently first. An item that passes on some runs and fails on others is an unstable behaviour: look for what makes it unstable (an ambiguous instruction, a retrieval step that sometimes misses), never patch the one bad output.
+4. **State the hypothesis before the change:** the cause, the change, and what it predicts will move. For example: "refund answers quote the old policy because retrieval ranks the outdated page first; ranking recent pages higher should raise the pass rate on policy questions and leave the rest unchanged." Rank the hypotheses you considered and say why you chose this one. When the user is there to answer, let them choose. When no one can answer (an in-product assistant, an unattended run), write the ranking and your choice with its reason, then proceed.
+5. **Change one thing on a branch and measure the candidate exactly like the baseline:** same items, same number of runs, same evaluators. Compare per item, not only the total.
+6. **Keep some items out of the loop.** Build the fix from part of the failing items and check it on items you did not read. A fix that lifts only the items it was built from is fitted to them.
+7. **Open a pull request only on a measured win.** Its description carries the hypothesis, the baseline and candidate results over the same items, and the runs that produced them. When the candidate does not win, open nothing: say what the result taught you, adjust, and take the next hypothesis. When nothing in reach can measure the change (the agent cannot run here and no platform run reaches the branch), say so and present the change as untested, never as an improvement.
+8. **Stop when the budget is spent or the results stop moving,** and report every attempt: hypothesis, result, verdict. "Nothing beat the baseline, and this is what we learned" is a result.
+
+**Fix the class, in every layer.** Code that recognises the evaluation questions (a keyword check, a hardcoded answer, a special case for one input) is not a fix. It passes the items it names and breaks the ones that look like them. Ask whether the change would help a new question of the same kind, one not in the test set. If not, keep diagnosing.
+
+**Tests you write are not the evidence.** You may write and edit tests, scenarios, datasets and expected answers. A test you wrote checks that the code does what you meant, not that what you meant is right. A grading change made in the same piece of work as the agent change never counts as evidence for that change: disclose it in the pull request, justify it against real traces or conversations, and measure the agent change against the grading that existed before.
+
 ## Consultant Mode
 
 After delivering initial results, transition to consultant mode to help the user get maximum value.
@@ -4294,6 +4358,7 @@ Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask gene
 - Do not report an inconclusive or errored comparison as a tie.
 - Do not guess SDK APIs when the installed documentation is available.
 - Do not stop after writing the experiment. Run it and inspect the real result.
+- Do not declare a winner from one run of each version when outputs vary; compare repeated runs per row.
 
 ---
 
@@ -4451,7 +4516,7 @@ If the user's request is **general** ("add scenarios", "test my agent"):
 - Generate comprehensive coverage (happy path, edge cases, error handling)
 - When the agent is connected to the platform, read the run parameters it declares before you propose anything (`langwatch agent get <id> --format json`, under `parameters`). Each one is a lever the team built into the agent: cover it with one scenario per value that changes the expected behavior, and offer a comparison run across an option list (see Read the agent's levers in the Platform Approach)
 - For conversational agents, include multi-turn scenarios, because that's where the interesting edge cases live (context retention, topic switching, recovery from misunderstandings)
-- ALWAYS run the tests after writing them, and report the result in the same answer. With the Code approach, that means waiting: run `pytest` or `vitest` in the foreground with a timeout that covers every simulation, and never hand it to a background task or end the answer with "I will report when it finishes". A code run you did not wait for is not a run: the turn ends, the report never arrives, and the user is left with test files nobody has seen pass. With the Platform approach, a run is scheduled rather than executed in your process, so do not block on `--wait` in an interactive turn: trigger it, hand over the link, and say what the page will show (see step 5 of the Platform Approach). Report the result: how many scenarios ran, which passed, and what the failures said. Stop after two rounds of fixes and report what still fails, with what you tried. A loop that keeps rerunning the suite spends the time of the user and tells them nothing until it ends. If they fail, first decide which side is wrong. Change the test only when you have evidence that its criteria or its fixture are wrong; otherwise the agent is what needs the fix (see Improving the Agent When a Scenario Fails below). A scenario that goes green because its assertions got weaker has tested nothing.
+- ALWAYS run the tests after writing them, and report the result in the same answer. With the Code approach, that means waiting: run `pytest` or `vitest` in the foreground with a timeout that covers every simulation, and never hand it to a background task or end the answer with "I will report when it finishes". A code run you did not wait for is not a run: the turn ends, the report never arrives, and the user is left with test files no one has seen pass. With the Platform approach, a run is scheduled rather than executed in your process, so do not block on `--wait` in an interactive turn: trigger it, hand over the link, and say what the page will show (see step 5 of the Platform Approach). Report the result: how many scenarios ran, which passed, and what the failures said. When you go on to fix failures, set an attempts budget first and stop when it is spent, reporting what still fails and what you tried (see Improving the Agent When a Scenario Fails). A loop that keeps rerunning the suite with no budget spends the user's money and tells them nothing until it ends. If they fail, first decide which side is wrong. Change the test only when you have evidence that its criteria or its fixture are wrong; otherwise the agent is what needs the fix (see Improving the Agent When a Scenario Fails below). A scenario that goes green because its assertions got weaker has tested nothing.
 - After tests are green, transition to consultant mode (see Consultant Mode below) and suggest 2-3 domain-specific improvements.
 
 If the user's request is **specific** ("test the refund flow"):
@@ -4486,6 +4551,13 @@ Best practices:
 
 ## Improving the Agent When a Scenario Fails
 
+Before you change anything:
+
+1. **Read the scenario and the conversations it produced.** Would a real user bring this situation, and do the criteria grade what that user needs? A scenario that tests nothing real is rewritten or removed with the reason stated, never made to pass.
+2. **Run it several times.** A simulated user and a judge make every run a sample. Use `--repeat` on `scenario run`, `suite run` and `run-plan run`, or run the test several times in code, and read the pass rate.
+3. **Treat flakiness as a real problem.** A scenario that passes on some runs and fails on others shows the agent behaving differently on nearly the same input. Find what changes between the passing and the failing conversations and fix that.
+4. **Fix the agent, never the scenario's reach.** Weakening the criteria, scripting the user onto the one path that works, or rewriting the situation around what the agent does today makes the scenario pass and tests nothing. A criteria or situation change needs its own evidence from real traces or conversations, and is reported apart from the agent change.
+
 A failing test tells you WHERE the agent fails, not that the prompt is where to fix it. One more rule is the cheapest edit that turns it green, and a prompt maintained that way overfits: it passes exactly the cases it was patched against and degrades everywhere else.
 
 1. **Diagnose the layer.** Five can own a failure: the harness (tools, permissions, context assembly), the model, the knowledge (skills, docs, retrieval), the prompt, or the test itself. The prompt is the last resort. If the fix is "never use tool X", remove tool X from the configuration. Diagnose from the failing run's trace: it holds every tool call, and the assembled input too where the project captures content.
@@ -4496,6 +4568,8 @@ A failing test tells you WHERE the agent fails, not that the prompt is where to 
 6. **Keep the judge independent of the prompt.** Grade user outcomes and verified side effects, never the agent's own rules restated. A rubric that quotes the prompt grades obedience, not quality.
 
 Your harness, codebase and model decide which levers exist. Full guide: [Improving your Agent](https://scenario.langwatch.ai/best-practices/improving-your-agent).
+
+(see "MeasuredImprovement" above)
 
 In Langy, do not print the fix for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
 
@@ -5370,7 +5444,7 @@ Through MCP the same surface is `platform_create_test_suite` and `platform_updat
 
 ### Iterating
 
-Review the results, sharpen the scenario with `langwatch scenario update <id> --criteria "…"`, and run it again. ALWAYS run the scenario. An unrun scenario is worth nothing.
+Review the results and read the conversations. Change the criteria with `langwatch scenario update <id> --criteria "…"` only when the conversations show they grade the wrong thing, never to let a failing agent pass, and run it again. ALWAYS run the scenario. An unrun scenario is worth nothing.
 
 ### When the choice is the user's, ask
 
@@ -5425,6 +5499,7 @@ Once tests are green, summarize what you delivered and suggest 2-3 domain-specif
 
 - This path uses the CLI. Do NOT write code files
 - Write criteria as natural language descriptions, not regex patterns
+- Do NOT judge a scenario from one run; repeat it and read the pass rate and the conversations
 - Create focused scenarios. Each should test one specific behavior
 - Do NOT treat a test suite as a run configuration. A test suite holds a name, its scenarios, its fields and its evaluators: targets, repeat count and models belong to the run plan, and are given at run time
 - Do NOT write a golden answer into the criteria ("the SQL must be SELECT quarter, SUM(amount) ..."). Declare a field on the suite, put the value on the scenario with `--field`, and attach an evaluator that reads it. The judge grades behavior; an evaluator compares against the known answer
@@ -5594,11 +5669,13 @@ For each significant finding, build an explicit hypothesis chain and present it 
 - **Hypothesis**: the suspected cause ("the retrieval step returns stale documents for date-sensitive questions")
 - **Proposed test**: how to prove or disprove it cheaply (a scenario test, an experiment, an evaluator watching prod)
 - **Proposed fix if confirmed**: the prompt, code, or configuration change
-- **Expected effect**: which metric should move, by roughly how much
+- **Expected effect**: which metric should move, by roughly how much, and which items should not move at all
 
-Present 2-4 hypotheses ranked by expected impact over effort, then stop and ask which to pursue: end your turn with that question and execute nothing until the user answers. Permission to act autonomously does not waive this gate; it exists so the user understands and agrees with the reasoning before anything is created, and an unrequested change is worth less than an understood one. If the user pushes back, refine the hypothesis with them; they know their domain.
+Rank the hypotheses by expected impact over effort. Before ranking, check each one against the evidence: a hypothesis that the failing traces do not show is a guess, however plausible it sounds.
 
-The only exception is an environment where asking is truly impossible (for example an in-product agent whose platform rules forbid ending on a question). There, and only there, present the ranked hypotheses, state in one line which one you are executing and why, and proceed with the top-ranked one. The explanation duty stays either way.
+When the user can answer, stop and ask which to pursue: end your turn with that question and execute nothing until they answer. Permission to act autonomously does not waive this step; it exists so the user understands and agrees with the reasoning before anything is created, and an unrequested change is worth less than an understood one. If the user pushes back, refine the hypothesis with them; they know their domain.
+
+When your instructions say to proceed without asking (an in-product assistant, an unattended or scheduled run), the step still happens in writing: the ranked hypotheses, the one you are taking first, and why. Then proceed. The explanation duty stays either way.
 
 ## Step 4: Execute the Chosen Hypotheses
 
@@ -5606,7 +5683,7 @@ Each hypothesis becomes real artifacts. Pick the right tool per case:
 
 ### Reproduce failures as scenario tests
 
-Turn real failing traces into scenario tests that fail today and pass once fixed. Read what happened with `langwatch trace get <traceId> -f json`, then follow the `scenarios` skill (`langwatch scenario-docs getting-started`) to write them. The trace tells you what the conversation did; the scenario reproduces it with test data of your own.
+Turn real failing traces into scenario tests that reproduce the failure. Run them more than once before you trust them: a scenario that fails on every run reproduces the problem, one that fails on some runs shows an unstable behaviour, which is also worth fixing, but measured by its pass rate. Read what happened with `langwatch trace get <traceId> -f json`, then follow the `scenarios` skill (`langwatch scenario-docs getting-started`) to write them. The trace tells you what the conversation did; the scenario reproduces it with test data of your own.
 
 A scenario is a simulation, so its inputs are test data and never the customer's. Invent every identifier it needs, the names, emails, order, ticket and account ids, and keep only the shape of the original: its length, language, format and the property that triggers the failure. A `[REDACTED]` value is the same case with nothing to recover, so invent a stand-in rather than asking anyone for the original. The real conversation stays in the trace, linked from the test or the scenario description, and raw customer content never reaches a scenario, a test, a fixture or a PR.
 
@@ -5614,9 +5691,26 @@ Write the invented identifier into the situation instead of leaving a role unnam
 
 Then make the lookup resolve. When the agent looks one of those identifiers up, its fixtures or test data need a record to find: use an identifier the data already carries, or add the record in the same change. A scenario whose lookup always misses proves the miss rather than the behaviour you are chasing, and it can never go green.
 
+### Measure every change
+
+Improving an agent works like an experiment, whatever the layer you change: a prompt, code, retrieval, a tool or a test. One attempt is rarely the answer, and an unmeasured change is a guess.
+
+1. **Set an attempts budget.** Before the first change, decide how many hypotheses the problem is worth, given what one measurement costs (a dataset run, a scenario suite, a CI cycle). Say the number and the reason in one line. Revise it as you learn: a cheap measurement or a promising lead earns more attempts, an expensive or flat one fewer.
+2. **Measure the baseline first,** with what the environment offers: a platform experiment, a scenario run with `--repeat`, the repository's own tests and linters, its CI. That measurement is the yardstick for every attempt, so note the items, the number of runs and the evaluators.
+3. **Read the variation before you call anything a failure.** A model sampling at non-zero temperature, a simulated user and an LLM judge all vary between runs. Run each item more than once and read its pass rate ("failed 3 of 3", "failed 1 of 3"), not a single verdict. Diagnose the items that fail consistently first. An item that passes on some runs and fails on others is an unstable behaviour: look for what makes it unstable (an ambiguous instruction, a retrieval step that sometimes misses), never patch the one bad output.
+4. **State the hypothesis before the change:** the cause, the change, and what it predicts will move. For example: "refund answers quote the old policy because retrieval ranks the outdated page first; ranking recent pages higher should raise the pass rate on policy questions and leave the rest unchanged." Rank the hypotheses you considered and say why you chose this one. When the user is there to answer, let them choose. When no one can answer (an in-product assistant, an unattended run), write the ranking and your choice with its reason, then proceed.
+5. **Change one thing on a branch and measure the candidate exactly like the baseline:** same items, same number of runs, same evaluators. Compare per item, not only the total.
+6. **Keep some items out of the loop.** Build the fix from part of the failing items and check it on items you did not read. A fix that lifts only the items it was built from is fitted to them.
+7. **Open a pull request only on a measured win.** Its description carries the hypothesis, the baseline and candidate results over the same items, and the runs that produced them. When the candidate does not win, open nothing: say what the result taught you, adjust, and take the next hypothesis. When nothing in reach can measure the change (the agent cannot run here and no platform run reaches the branch), say so and present the change as untested, never as an improvement.
+8. **Stop when the budget is spent or the results stop moving,** and report every attempt: hypothesis, result, verdict. "Nothing beat the baseline, and this is what we learned" is a result.
+
+**Fix the class, in every layer.** Code that recognises the evaluation questions (a keyword check, a hardcoded answer, a special case for one input) is not a fix. It passes the items it names and breaks the ones that look like them. Ask whether the change would help a new question of the same kind, one not in the test set. If not, keep diagnosing.
+
+**Tests you write are not the evidence.** You may write and edit tests, scenarios, datasets and expected answers. A test you wrote checks that the code does what you meant, not that what you meant is right. A grading change made in the same piece of work as the agent change never counts as evidence for that change: disclose it in the pull request, justify it against real traces or conversations, and measure the agent change against the grading that existed before.
+
 ### Change prompts and code as a reviewable PR
 
-Make the fix on a branch: prompt edits (versioned through the `prompts` skill when prompts are managed in LangWatch), retrieval or tool-code changes, guardrails. The PR description must tell the whole story: observation, hypothesis, evidence links, what changed, and which scenario test proves it. The user reviews and merges; you never push to main.
+Make the fix on a branch: prompt edits (versioned through the `prompts` skill when prompts are managed in LangWatch), retrieval or tool-code changes, guardrails. Open the PR once the measurement above shows a win. The description tells the whole story: observation, hypothesis, evidence links, what changed, and the baseline and candidate results that show it helped. The user reviews and merges; you never push to main.
 
 Pick the layer before you edit, and report the prompt's size change in the PR:
 
@@ -5644,7 +5738,7 @@ Examples: an LLM-judge evaluator flagging stale-data answers, a monitor on refus
 
 ### Settle open questions with experiments
 
-When two approaches compete (two prompts, two models, two retrieval settings), run an experiment instead of arguing: build a dataset from real traces (`datasets` skill), then run it once per variant with `langwatch experiment run <slug> --param model=<variant>` and compare. A `--param name=value` pair is a constant value merged into every dataset row, so each run pins one variant against the same dataset.
+When two approaches compete (two prompts, two models, two retrieval settings), run an experiment instead of arguing: build a dataset from real traces (`datasets` skill), then run it per variant with `langwatch experiment run <slug> --param model=<variant>`, more than once when outputs vary, and compare per item. A `--param name=value` pair is a constant value merged into every dataset row, so each run pins one variant against the same dataset.
 
 LangWatch's free plan has limits on prompts, scenarios, evaluators, experiments, and datasets. When you hit a limit, the API returns `"Free plan limit of N reached..."` with an upgrade link.
 
@@ -5659,8 +5753,8 @@ How to handle:
 
 After executing:
 
-1. Run the new scenario tests and show the results, including failures
-2. Summarize: hypothesis, what was built, what it proved, links to everything created
+1. Report every attempt: hypothesis, baseline and candidate results, verdict, including the ones that did not win
+2. Summarize what was built, what it proved, and links to everything created
 3. Point at the metric to watch and offer to re-check after the fix ships ("once merged, run `/agent-performance` again next week and compare")
 4. Ask which hypothesis to tackle next, and stop cleanly when the user says enough
 
@@ -5668,7 +5762,9 @@ After executing:
 
 - Do NOT propose changes without production evidence behind them; "best practice says so" is not a hypothesis
 - Do NOT skip the explanation; if the user cannot restate why the hypothesis is plausible, you explained it badly
-- Do NOT build all hypotheses at once; execute the agreed ones, show results, then continue
+- Do NOT build all hypotheses at once; one change per measurement, or you cannot tell which one moved the number
+- Do NOT open a PR the measurement did not support, and do not call one-off failures bugs before repeated runs say they are consistent
+- Do NOT make code recognise the evaluation questions (keyword checks, hardcoded answers); that is overfitting in code, the same as a prompt patched per failure
 - Do NOT copy a customer's identifiers out of a trace into a scenario, a test or a PR; invent stand-ins, name them in the situation, and seed the record the agent looks up
 - Do NOT paste raw customer content from traces into committed tests or PR text; link the trace instead
 - Do NOT merge or push anything yourself; changes ship as PRs the user reviews
@@ -6414,7 +6510,9 @@ langwatch experiment results <slug> --run-id <id> --limit 50 -o json
 - `--wait <seconds>` keeps reading until the run has ended and every result it reported is stored. Results are stored after the run reports them, so a read taken straight after a large run holds only part of it; the CLI warns on stderr when that happens. Pass `--run-id <id> --wait 600` after a run you just started, and treat exit status 2 as "still partial".
 - `--evaluator <name>` shows one evaluator's column when several ran: is the regression concentrated in one evaluator (a scoring problem) or spread across all of them (a real behavior regression)?
 
-For each failing row, note the input, the expected output (from the dataset), and the actual output. Rows that fail the SAME way point at one root cause; rows that fail differently suggest flakiness or a noisy evaluator.
+For each failing row, note the input, the expected output (from the dataset), and the actual output. Rows that fail the SAME way point at one root cause; rows that fail differently suggest variation or a noisy evaluator.
+
+Before you diagnose a row, check whether it fails consistently. Compare it across the runs you have (`list-runs`, then `results --run-id`), or run the experiment again. A row that failed once and passed in other runs is variation until more runs say otherwise; a row that fails every time is where the root cause is. When most failures are one-offs, report that, and treat the instability itself as the finding.
 
 ## Step 3: Inspect the Evaluators
 
@@ -6434,12 +6532,27 @@ Before blaming the agent, rule out the scorer:
 1. Compare the failing run against the last passing one: what changed (prompt version, model, dataset, code)? `git log` on prompts and agent code usually answers this directly.
 2. If rows fail on retrieval or context: inspect a production trace of the same path (`langwatch trace search` / `langwatch trace get`; see the `debug-with-langwatch` recipe).
 3. If the dataset itself looks wrong (stale expected outputs, bad rows), fix the dataset. Use `langwatch dataset get <slugOrId>` to inspect it.
-4. Apply the fix and re-run:
+4. Apply the fix as a measured change, never as a single re-run that happens to come back green:
 
 ```bash
 langwatch experiment run <slug> --wait
 langwatch experiment status <slug> -o json
 ```
+
+Improving an agent works like an experiment, whatever the layer you change: a prompt, code, retrieval, a tool or a test. One attempt is rarely the answer, and an unmeasured change is a guess.
+
+1. **Set an attempts budget.** Before the first change, decide how many hypotheses the problem is worth, given what one measurement costs (a dataset run, a scenario suite, a CI cycle). Say the number and the reason in one line. Revise it as you learn: a cheap measurement or a promising lead earns more attempts, an expensive or flat one fewer.
+2. **Measure the baseline first,** with what the environment offers: a platform experiment, a scenario run with `--repeat`, the repository's own tests and linters, its CI. That measurement is the yardstick for every attempt, so note the items, the number of runs and the evaluators.
+3. **Read the variation before you call anything a failure.** A model sampling at non-zero temperature, a simulated user and an LLM judge all vary between runs. Run each item more than once and read its pass rate ("failed 3 of 3", "failed 1 of 3"), not a single verdict. Diagnose the items that fail consistently first. An item that passes on some runs and fails on others is an unstable behaviour: look for what makes it unstable (an ambiguous instruction, a retrieval step that sometimes misses), never patch the one bad output.
+4. **State the hypothesis before the change:** the cause, the change, and what it predicts will move. For example: "refund answers quote the old policy because retrieval ranks the outdated page first; ranking recent pages higher should raise the pass rate on policy questions and leave the rest unchanged." Rank the hypotheses you considered and say why you chose this one. When the user is there to answer, let them choose. When no one can answer (an in-product assistant, an unattended run), write the ranking and your choice with its reason, then proceed.
+5. **Change one thing on a branch and measure the candidate exactly like the baseline:** same items, same number of runs, same evaluators. Compare per item, not only the total.
+6. **Keep some items out of the loop.** Build the fix from part of the failing items and check it on items you did not read. A fix that lifts only the items it was built from is fitted to them.
+7. **Open a pull request only on a measured win.** Its description carries the hypothesis, the baseline and candidate results over the same items, and the runs that produced them. When the candidate does not win, open nothing: say what the result taught you, adjust, and take the next hypothesis. When nothing in reach can measure the change (the agent cannot run here and no platform run reaches the branch), say so and present the change as untested, never as an improvement.
+8. **Stop when the budget is spent or the results stop moving,** and report every attempt: hypothesis, result, verdict. "Nothing beat the baseline, and this is what we learned" is a result.
+
+**Fix the class, in every layer.** Code that recognises the evaluation questions (a keyword check, a hardcoded answer, a special case for one input) is not a fix. It passes the items it names and breaks the ones that look like them. Ask whether the change would help a new question of the same kind, one not in the test set. If not, keep diagnosing.
+
+**Tests you write are not the evidence.** You may write and edit tests, scenarios, datasets and expected answers. A test you wrote checks that the code does what you meant, not that what you meant is right. A grading change made in the same piece of work as the agent change never counts as evidence for that change: disclose it in the pull request, justify it against real traces or conversations, and measure the agent change against the grading that existed before.
 
 ## Step 5: Prevent the Recurrence
 
@@ -7830,6 +7943,8 @@ langwatch trace facets <field> --start-date <from> --end-date <to> --format json
 
 Read the reference once per session. Use `trace facets` every time the concept maps to a field whose values you have not seen, because values differ per project: an event named `thumbs_up_down` in one project is `feedback` in another.
 
+A filter refused with `filter_field_unknown` carries `meta.hint`, the field it most likely meant, and `meta.knownFields`: fix the filter from them rather than dropping it for an unfiltered search.
+
 If any of these three is refused as an unknown command or an unknown option, the CLI on this worker is older than this skill. Say that, name the command that was refused and the version `langwatch --version` reports, and stop: an older CLI cannot list the fields or filter the search, so a search that runs without them would answer "none found" for a project that has results.
 
 ## Step 3: Search every form the concept can take
@@ -7839,8 +7954,8 @@ A concept can be recorded in several places. One empty search says one form is e
 1. **Events.** `langwatch trace facets event` lists the event names in the window. Thumbs down is the predefined event `thumbs_up_down` with a vote of `-1`: `event:thumbs_up_down AND event.attribute.event.metrics.vote:-1`. A custom event may carry the same meaning under another name or attribute, so read the facet values rather than assuming the predefined one.
 2. **Annotations.** Reviewers and end users also leave thumbs and comments as annotations: `langwatch trace facets annotation`, then `annotation:<value>`.
 3. **Evaluator results.** A sentiment, satisfaction or quality evaluator may already label the concept: `langwatch trace facets evaluatorLabel`, `evaluatorVerdict:fail`, `evaluator:<name>`.
-4. **Trace attributes and labels.** Applications often stamp their own field: `langwatch trace facets label`, and `langwatch trace facets` with no field, which lists every facet with its top values and the attribute keys in use. Filter on one with `trace.attribute.<key>:<value>`.
-5. **The text itself.** A phrase search with `-q "<phrase>"` when the concept shows up in what the user or the agent wrote.
+4. **Trace attributes and labels.** Applications often stamp their own field: `langwatch trace facets label`, and `langwatch trace facets` with no field, which lists every facet with its top values and the attribute keys in use. The metadata labels are `label:<name>`, not `metadata.labels`. Filter on any other attribute with `trace.attribute.<key>:<value>`.
+5. **The text itself.** No field holds the input or output text, so there is no `input:` or `output:`. Search it with `-q "<phrase>"`, or with a quoted phrase and no field inside `--filter`, when the concept shows up in what the user or the agent wrote.
 6. **A wider window.** When every form is empty in the page's window, run the best form again over 90 days. If it matches there, say so and offer the wider window; do not change the page's window without saying it.
 
 Then check the result is what it claims to be: read three of the matched traces with `langwatch trace get <traceId>` and confirm they show the concept. A filter that matches the wrong thing is worse than an empty one.

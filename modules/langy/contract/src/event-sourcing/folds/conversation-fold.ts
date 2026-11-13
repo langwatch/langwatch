@@ -60,6 +60,8 @@ export interface LangyConversationStateData {
   /** Per-conversation `runToken` HMAC key. SERVER-ONLY: worker-provisioning path only. */
   RunToken: string | null;
   ArchivedAt: number | null;
+  /** Messages CI started on a pull request since the person last wrote; theirs resets it to 0. */
+  CiFollowUpsInARow: number;
   CreatedAt: number;
   UpdatedAt: number;
   LastEventOccurredAt: number;
@@ -91,6 +93,7 @@ export function initLangyConversationState(): LangyConversationStateFoldState {
     PendingHandoffTurnId: null,
     RunToken: null,
     ArchivedAt: null,
+    CiFollowUpsInARow: 0,
   };
 }
 
@@ -236,7 +239,17 @@ function foldMessageRecorded<S extends LangyConversationStateFoldState>(
         : nextStatus(state, state.Status),
     MessageCount: state.MessageCount + 1,
     LastActivityAt: event.occurredAt,
+    CiFollowUpsInARow: nextCiFollowUpsInARow(state, event.data),
   };
+}
+
+/** A message CI started counts one more in a row; one the person wrote starts again from 0. */
+function nextCiFollowUpsInARow(
+  state: LangyConversationStateFoldState,
+  message: Pick<LangyMessageRecordedEventData, "role" | "ciFollowUp">,
+): number {
+  if (message.role !== "user") return state.CiFollowUpsInARow;
+  return message.ciFollowUp ? state.CiFollowUpsInARow + 1 : 0;
 }
 
 function foldAgentResponseFailed<S extends LangyConversationStateFoldState>(

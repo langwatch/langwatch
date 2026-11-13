@@ -426,12 +426,16 @@ const presentations = {
   trace_not_found: {
     title: "Trace not found",
     describe: () =>
-      "It may have been deleted, or it may still be arriving. Traces take a few seconds to appear.",
+      "No project you can read holds this id yet. If it was just sent, it may still be arriving: try again in a few seconds. Otherwise it may have passed the retention window.",
   },
   trace_attribute_values_withheld: {
     title: "Attribute values withheld",
     describe: () =>
       "This project hides captured input or output from you, or an attribute policy restricts this key to an audience you are not in. Facet a named field instead, such as model, status or evaluator, or call the facets endpoint with no field to see what this project has.",
+  },
+  scenario_run_has_many_traces: {
+    title: "That is a scenario run id",
+    describe: () => "The run produced several traces. Pick one of the listed trace ids to open it.",
   },
   trace_id_ambiguous: {
     title: "Trace ID is ambiguous",
@@ -493,7 +497,8 @@ const presentations = {
     title: "Unknown filter field",
     describe: (error) => {
       const field = str(error, "field", "");
-      return field ? `There's no field called "${field}".` : "";
+      const hint = str(error, "hint", "");
+      return field ? [`There's no field called "${field}".`, hint].filter(Boolean).join(" ") : "";
     },
   },
   filter_value_refused: {

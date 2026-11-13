@@ -60,6 +60,7 @@ import {
   type ModelProviderPlaygroundRequest,
   type ModelProviderListOrganizationInput,
   type ModelProviderListProjectInput,
+  type ModelProviderWithServedModels,
   type BuiltInModel,
   type DecisionModelResolution,
   type ModelProviderResolution,
@@ -108,6 +109,11 @@ import {
 } from "../features/model-cost/services/model-cost-preview.service.ts";
 import { ModelCostRegexSafetyService } from "../features/model-cost/services/model-cost-regex-safety.service.ts";
 import { ModelLimitsService } from "../features/model-cost/services/model-limits.service.ts";
+import {
+  HttpModelProviderModelListService,
+  type ModelProviderModelList,
+} from "../features/served-models/services/http-model-provider-model-list.service.ts";
+import { ModelProviderServedModelsService } from "../features/served-models/services/model-provider-served-models.service.ts";
 import type { ModelProviderRepositories } from "../repositories/model-provider.repositories.ts";
 import { AiCallFailureService } from "../services/ai-call-failure.service.ts";
 import { ManagedModelProviderGatewayService } from "../services/managed-model-provider-gateway.service.ts";
@@ -170,6 +176,8 @@ export interface ModelProviderInfrastructure {
   spans: ModelCostPreviewSpanReader;
   /** The spend ledger platform calls write their usage to; absent writes nothing (ADR-193). */
   spend?: ModelProviderSpend;
+  /** Asks a provider which models it serves; absent, pickers offer the whole catalogue. */
+  modelList?: ModelProviderModelList;
 }
 
 /** The identifier format this deployment mints a provider, default or cost in. */
@@ -344,8 +352,9 @@ export class ModelProviderModule implements ModelProviderApi {
     dependencies: Pick<ModelProviderSetup["dependencies"], "projects" | "managed">;
   }): ModelProviderInfrastructure {
     // The catalogue's probe and `credentialProbe` are one behaviour behind the fence: one instance.
+    const egress = SsrfModelProviderEgressService.create({ policy: config.egress });
     const probe = HttpModelProviderCredentialProbeService.create({
-      egress: SsrfModelProviderEgressService.create({ policy: config.egress }),
+      egress,
       environment: config.environment,
       deployedBaseUrls: config.probeBaseUrls,
     });
@@ -377,6 +386,10 @@ export class ModelProviderModule implements ModelProviderApi {
       codexAccounts: CodexAccountService.create({ issuer: config.codexOAuthIssuer }),
       spans: channels.spans,
       spend: channels.spend,
+      modelList: HttpModelProviderModelListService.create({
+        egress,
+        deployedBaseUrls: config.probeBaseUrls,
+      }),
     };
   }
 
@@ -420,6 +433,8 @@ export class ModelProviderModule implements ModelProviderApi {
   /** The read, write, defaults and cost lifecycles, over the chosen backend. */
   readonly #modelProviders: ModelProviderGateway;
   readonly #credentialProbe: ModelProviderCredentialProbe;
+  readonly #servedModels: ModelProviderServedModelsService | undefined;
+  readonly #providerRows: ModelProviderRepositories["providers"];
   readonly #codexAccounts: ModelProviderCodexDeviceFlow;
   readonly #spans: ModelCostPreviewSpanReader;
   /**
@@ -481,6 +496,13 @@ export class ModelProviderModule implements ModelProviderApi {
       ModelProviderAuthorizationService.create(dependencies.permissions),
     );
     this.#credentialProbe = infrastructure.credentialProbe;
+    this.#providerRows = repositories.providers;
+    this.#servedModels = infrastructure.modelList
+      ? ModelProviderServedModelsService.create({
+          modelList: infrastructure.modelList,
+          listings: repositories.servedModels,
+        })
+      : undefined;
     this.#codexAccounts = infrastructure.codexAccounts;
     this.#spans = infrastructure.spans;
     // The same install-wide fallback map `ModelProviderBuildConfig.environment` carries.
@@ -585,9 +607,54 @@ export class ModelProviderModule implements ModelProviderApi {
     return this.#modelProviders.listForOrganization(input);
   }
 
+  /** `listForProject`, each row carrying the ids its provider's own model list answers with. */
+  async listForProjectWithServedModels(
+    input: ModelProviderListProjectInput,
+  ): Promise<ModelProviderWithServedModels[]> {
+    const [providers, served] = await Promise.all([
+      this.listForProject(input),
+      this.#servedModelsForProject(input),
+    ]);
+    return providers.map((provider) => ({
+      ...provider,
+      servedModels: served[provider.provider] ?? null,
+    }));
+  }
+
+  /** Per provider key the project runs on, its list's ids; absent when not asked or no answer. */
+  async #servedModelsForProject(
+    input: ModelProviderListProjectInput,
+  ): Promise<Record<string, string[]>> {
+    if (!this.#servedModels) return {};
+    const providers = await this.getExecutionProviders(input);
+    return this.#servedModels.getServedModels(
+      Object.values(providers).flatMap((provider) =>
+        provider.enabled && provider.customKeys
+          ? [{ provider: provider.provider, customKeys: provider.customKeys }]
+          : [],
+      ),
+    );
+  }
+
   /** Stores or replaces a provider row, attributed to the caller. */
-  upsert(input: ModelProviderWriteRequest, by: ModelProviderCaller): Promise<ModelProvider> {
-    return this.#modelProviders.upsert({ ...input, actorId: by.id });
+  async upsert(input: ModelProviderWriteRequest, by: ModelProviderCaller): Promise<ModelProvider> {
+    const saved = await this.#modelProviders.upsert({ ...input, actorId: by.id });
+    this.#refreshServedModels(saved);
+    return saved;
+  }
+
+  /** Asks the saved provider's model list again in the background; a failure keeps what is held. */
+  #refreshServedModels(saved: ModelProvider): void {
+    const servedModels = this.#servedModels;
+    if (!servedModels || !saved.enabled) return;
+    void this.#providerRows
+      .getById({ id: saved.id, organizationId: saved.organizationId })
+      .then((row) =>
+        row.customKeys
+          ? servedModels.refresh({ provider: row.provider, customKeys: row.customKeys })
+          : undefined,
+      )
+      .catch(() => undefined);
   }
 
   /**
@@ -595,8 +662,10 @@ export class ModelProviderModule implements ModelProviderApi {
    * the key was already held to `project:update` on its one project. The provider
    * string names that project's own row, as main's did.
    */
-  upsertUnattributed(input: ModelProviderWriteRequest): Promise<ModelProvider> {
-    return this.#modelProviders.upsertByProviderKey(input);
+  async upsertUnattributed(input: ModelProviderWriteRequest): Promise<ModelProvider> {
+    const saved = await this.#modelProviders.upsertByProviderKey(input);
+    this.#refreshServedModels(saved);
+    return saved;
   }
 
   /** Removes a provider row, attributed to the caller. */

@@ -1,7 +1,8 @@
 /** Which models a picker offers, from the providers a project has stored. Pure: consumers fetch. */
 import { isCodexModel, isModelAllowedForFeature } from "./catalog/codex-restrictions.ts";
 import { findDecisionModel, isOwnDecisionModelId } from "./catalog/decision-models.ts";
-import { allLitellmModels } from "./catalog/model-catalog.ts";
+import { isLatestAlias } from "./catalog/latest-aliases.ts";
+import { allLitellmModels, isChatSurfaceCatalogModel } from "./catalog/model-catalog.ts";
 import type { ModelOption } from "./model-options.ts";
 import { buildCustomModelDisplayNames, modelDisplayLabel } from "./model-provider-display-names.ts";
 import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "./model-provider-registry.ts";
@@ -150,6 +151,7 @@ const mergeProviderRowsByKey = (
         existing.customEmbeddingsModels,
         row.customEmbeddingsModels,
       ),
+      servedModels: existing.servedModels ?? row.servedModels ?? null,
     };
   }
   return byKey;
@@ -200,6 +202,36 @@ const enabledCustomModelIds = (
   return ids;
 };
 
+/**
+ * Per provider key, the bare ids its own model list answered with, or none to trust the catalogue.
+ * A list sharing no id with the catalogue names models another way (a proxy's own aliases), so it
+ * proves nothing about which catalogue ids answer and the catalogue is kept.
+ */
+const servedModelSets = (
+  modelProviders: Record<string, MaybeStoredModelProvider>,
+  options: string[],
+): Map<string, Set<string>> => {
+  const sets = new Map<string, Set<string>>();
+  for (const [providerKey, config] of Object.entries(modelProviders)) {
+    if (!config.servedModels?.length) continue;
+    const served = new Set(config.servedModels);
+    const prefix = `${providerKey}/`;
+    const overlaps = options.some(
+      (option) => option.startsWith(prefix) && served.has(option.slice(prefix.length)),
+    );
+    if (overlaps) sets.set(providerKey, served);
+  }
+  return sets;
+};
+
+/** Whether the provider's own model list, when known, carries this registry id. */
+const isServedByProvider = (option: string, served: Map<string, Set<string>>): boolean => {
+  const provider = option.split("/")[0]!;
+  const set = served.get(provider);
+  if (!set || isLatestAlias(option)) return true;
+  return set.has(option.slice(provider.length + 1));
+};
+
 /** Combines registry models (`options`, filtered by `mode`) with custom models, custom first. */
 export const getCustomModels = (
   modelProviders: Record<string, MaybeStoredModelProvider>,
@@ -209,6 +241,7 @@ export const getCustomModels = (
   const customModelIds = enabledCustomModelIds(modelProviders, mode);
   const registryModelIds: string[] = [];
   const customSet = new Set(customModelIds);
+  const served = servedModelSets(modelProviders, options);
 
   // Include registry models from enabled providers, filtered by mode
   for (const option of options) {
@@ -217,6 +250,8 @@ export const getCustomModels = (
 
     const registryMode = allLitellmModels[option]?.mode;
     if (registryMode && registryMode !== mode) continue;
+    if (mode === "chat" && !isChatSurfaceCatalogModel(option)) continue;
+    if (!isServedByProvider(option, served)) continue;
 
     // Skip if already added as a custom model (same ID)
     if (customSet.has(option)) continue;

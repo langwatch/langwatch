@@ -8,6 +8,7 @@ metadata:
 ---
 
 import CliSetup from "../../_shared/cli-setup.mdx";
+import MeasuredImprovement from "../../_shared/measured-improvement.mdx";
 
 # Triage Failing Experiments and Evaluations
 
@@ -43,7 +44,9 @@ langwatch experiment results <slug> --run-id <id> --limit 50 -o json
 - `--wait <seconds>` keeps reading until the run has ended and every result it reported is stored. Results are stored after the run reports them, so a read taken straight after a large run holds only part of it; the CLI warns on stderr when that happens. Pass `--run-id <id> --wait 600` after a run you just started, and treat exit status 2 as "still partial".
 - `--evaluator <name>` shows one evaluator's column when several ran: is the regression concentrated in one evaluator (a scoring problem) or spread across all of them (a real behavior regression)?
 
-For each failing row, note the input, the expected output (from the dataset), and the actual output. Rows that fail the SAME way point at one root cause; rows that fail differently suggest flakiness or a noisy evaluator.
+For each failing row, note the input, the expected output (from the dataset), and the actual output. Rows that fail the SAME way point at one root cause; rows that fail differently suggest variation or a noisy evaluator.
+
+Before you diagnose a row, check whether it fails consistently. Compare it across the runs you have (`list-runs`, then `results --run-id`), or run the experiment again. A row that failed once and passed in other runs is variation until more runs say otherwise; a row that fails every time is where the root cause is. When most failures are one-offs, report that, and treat the instability itself as the finding.
 
 ## Step 3: Inspect the Evaluators
 
@@ -63,12 +66,14 @@ Before blaming the agent, rule out the scorer:
 1. Compare the failing run against the last passing one: what changed (prompt version, model, dataset, code)? `git log` on prompts and agent code usually answers this directly.
 2. If rows fail on retrieval or context: inspect a production trace of the same path (`langwatch trace search` / `langwatch trace get`; see the `debug-with-langwatch` recipe).
 3. If the dataset itself looks wrong (stale expected outputs, bad rows), fix the dataset. Use `langwatch dataset get <slugOrId>` to inspect it.
-4. Apply the fix and re-run:
+4. Apply the fix as a measured change, never as a single re-run that happens to come back green:
 
 ```bash
 langwatch experiment run <slug> --wait
 langwatch experiment status <slug> -o json
 ```
+
+<MeasuredImprovement />
 
 ## Step 5: Prevent the Recurrence
 

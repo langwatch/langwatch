@@ -1,4 +1,4 @@
-import type { LangyStreamEntry } from "@langwatch/langy-contract";
+import type { LangyStreamEntry, LangyStreamFrame } from "@langwatch/langy-contract";
 
 import type { LangyStreamRead } from "../../../repositories/langy-token-buffer.repository.ts";
 import type { SettlementOutcome, TurnHealth } from "../../../rules/langy-turn-settlement.rules.ts";
@@ -122,13 +122,13 @@ export class LangyTurnTailService {
   async *streamTurnEntries({
     release,
     ...deps
-  }: TailDeps & { release: () => void }): AsyncGenerator<LangyStreamEntry> {
+  }: TailDeps & { release: () => void }): AsyncGenerator<LangyStreamFrame> {
     const { conversationId, turnId, buffer } = deps;
     try {
       // Drain the buffered prefix, then tail the live edge from where it ended.
       const { reads, lastId } = await buffer.readTail({ conversationId, turnId });
-      for (const { entry } of reads) {
-        yield entry;
+      for (const { id, entry } of reads) {
+        yield { ...entry, cursor: id };
         if (isTerminal(entry)) {
           return;
         }
@@ -156,7 +156,7 @@ export class LangyTurnTailService {
     pollMs,
     confirmPolls,
     delay,
-  }: TailDeps & { fromId: string }): AsyncGenerator<LangyStreamEntry> {
+  }: TailDeps & { fromId: string }): AsyncGenerator<LangyStreamFrame> {
     const settle = new AbortController();
     const followSignal = AbortSignal.any([signal, settle.signal]);
     let synthesized: LangyStreamEntry | null = null;
@@ -188,13 +188,13 @@ export class LangyTurnTailService {
       .catch(() => undefined);
 
     try {
-      for await (const { entry } of buffer.follow({
+      for await (const { id, entry } of buffer.follow({
         conversationId,
         turnId,
         fromId,
         signal: followSignal,
       })) {
-        yield entry;
+        yield { ...entry, cursor: id };
         // A real terminal reached the buffer. Returning here is what keeps a
         // synthesized one from ever overriding it: the yield below is past the
         // end of this generator.

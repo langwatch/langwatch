@@ -72,7 +72,7 @@ import {
   type LangyConversationListPageDto,
   type LangyConversationMessagesDto,
   type LangyPanelCall,
-  type LangyStreamEntry,
+  type LangyStreamFrame,
   type langyAnswerLocalPermissionInputSchema,
   type langyAnswerQuestionInputSchema,
   type langyClaimUiActionInputSchema,
@@ -130,6 +130,7 @@ import { LangyConversationEventLogService } from "../features/conversation/servi
 import { LangyConversationUpdateService } from "../features/conversation/services/langy-conversation-update.service.ts";
 import { LangyConfirmationAnswersService } from "../features/delete-confirmation/services/langy-confirmation-answers.service.ts";
 import { LangyDeleteConfirmationService } from "../features/delete-confirmation/services/langy-delete-confirmation.service.ts";
+import { LangyCiFollowUpService } from "../features/github/services/langy-ci-follow-up.service.ts";
 import { LangyGithubPrPermitService } from "../features/github/services/langy-github-pr-permit.service.ts";
 import {
   LANGY_GITHUB_PRS_PER_DAY,
@@ -207,6 +208,8 @@ type LangyAppDependencies = {
   turnBounds: LangyTurnsBoundsService;
   /** Turns a module starts for a person who is not at the keyboard, read-only. */
   unattendedTurns: LangyUnattendedTurnService;
+  /** Turns CI starts on the pull requests Langy opened. */
+  ciFollowUps: LangyCiFollowUpService;
   virtualKeyProvisioning: LangyVirtualKeyProvisioningService;
   /** The rollout gate and key-owner bridge every key-authenticated door runs. */
   callers: LangyRestCallerService;
@@ -402,6 +405,7 @@ export class LangyModule implements LangyApiContract {
     const conversationProcessing = EventingLangyConversationAdapter.create({
       langyConversationProjectionStore: persistence.langyConversationState,
       langyConversationTurnProjectionStore: persistence.langyConversationTurnState,
+      langyPullRequestStore: persistence.langyPullRequests,
       langyMessageProjectionStore: persistence.langyMessageStorage,
       langyAnalyticsEventProjectionStore: LangyAnalyticsEventStorageService.create({
         sink: setup.repositories.analyticsEvents,
@@ -482,6 +486,15 @@ export class LangyModule implements LangyApiContract {
       unattendedTurns: LangyUnattendedTurnService.create({
         users: setup.dependencies.users,
         projects: setup.dependencies.projects,
+        featureFlags: setup.dependencies.featureFlags,
+        bounds: turnBounds,
+        turns: langy,
+      }),
+      ciFollowUps: LangyCiFollowUpService.create({
+        pullRequests: setup.repositories.pullRequests,
+        conversations: persistence.langyConversationState,
+        projects: setup.dependencies.projects,
+        users: setup.dependencies.users,
         featureFlags: setup.dependencies.featureFlags,
         bounds: turnBounds,
         turns: langy,
@@ -580,7 +593,7 @@ export class LangyModule implements LangyApiContract {
         worker,
         tokenBuffer: repositories.tokenBuffer.open(),
         permits: LangyGithubPrPermitService.create(
-          LangyGithubPrQuotaService.create({ counts: repositories.githubPrCounts }),
+          LangyGithubPrQuotaService.create({ pullRequests: repositories.pullRequests }),
         ),
         perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
         sessionKeys,
@@ -690,6 +703,7 @@ export class LangyModule implements LangyApiContract {
   maintenanceEventingPipeline(): StaticPipelineDefinition<never> {
     return buildLangyMaintenancePipeline({
       virtualKeyProvisioning: this.dependencies.virtualKeyProvisioning,
+      ciFollowUps: this.dependencies.ciFollowUps,
     });
   }
 
@@ -1125,7 +1139,7 @@ export class LangyModule implements LangyApiContract {
 
   watchTurnStream(
     input: LangyPanelCall<typeof langyTurnStreamInputSchema> & { signal?: AbortSignal },
-  ): AsyncIterable<LangyStreamEntry> {
+  ): AsyncIterable<LangyStreamFrame> {
     return this.dependencies.panelTurnStream.watchTurnStream(input);
   }
 

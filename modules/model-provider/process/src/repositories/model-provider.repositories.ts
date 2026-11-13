@@ -1,6 +1,7 @@
 import type { ModelCostRepository } from "./model-cost.repository.ts";
 import type { ModelDefaultRepository } from "./model-default.repository.ts";
 import type { ModelProviderRateLimitRepository } from "./model-provider-rate-limit.repository.ts";
+import type { ModelProviderServedModelsRepository } from "./model-provider-served-models.repository.ts";
 import type { ModelProviderRepository } from "./model-provider.repository.ts";
 
 /**
@@ -13,4 +14,6 @@ export interface ModelProviderRepositories {
   readonly costs: ModelCostRepository;
   /** The fixed windows a connection test is metered in. */
   readonly rateLimits: ModelProviderRateLimitRepository;
+  /** The cached answers of providers' own model lists, shared by every replica. */
+  readonly servedModels: ModelProviderServedModelsRepository;
 }

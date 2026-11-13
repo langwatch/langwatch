@@ -110,7 +110,7 @@ class TestTraces extends AutomationSettlementTraceRepository {
     this.classifications.push(input.query);
     return this.classification;
   }
-  resolveIngestWaitTimeout(): never {
+  resolveTraceSettleSettings(): never {
     return unavailable();
   }
   findSummary(): never {

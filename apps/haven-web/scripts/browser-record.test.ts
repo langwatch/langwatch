@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import { chromium } from "playwright";
+
 import {
   WALK_CAP,
+  describeElement,
   missingQuery,
   pushWalk,
   queriesOf,
@@ -97,4 +100,28 @@ void test("a walk's last step takes the queries that arrive after it, until it i
     url: "/b",
     queries: [{ method: "POST", path: "trpc:team.create", status: 200 }],
   });
+});
+
+/** @scenario "The browser never prints what a credential field holds" */
+void test("a recorded credential field is secret and its value never names it", async (t) => {
+  const browser = await chromium.launch().catch(() => null);
+  if (!browser) return t.skip("no Chromium on this machine");
+  try {
+    const page = await browser.newPage();
+    await page.setContent(`
+      <input id=pw type=password value="hunter2-secret">
+      <input id=otp autocomplete="one-time-code" value="123456">
+      <input id=card autocomplete="cc-number" value="4242424242424242">
+      <input id=plain value="hello">`);
+    for (const id of ["pw", "otp", "card"]) {
+      const described = await page.locator(`#${id}`).evaluate(describeElement);
+      assert.equal(described.secret, true, id);
+      assert.equal(described.name, "", id);
+    }
+    const plain = await page.locator("#plain").evaluate(describeElement);
+    assert.equal(plain.secret, false);
+    assert.equal(plain.name, "hello");
+  } finally {
+    await browser.close();
+  }
 });

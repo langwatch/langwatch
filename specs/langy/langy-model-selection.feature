@@ -111,6 +111,32 @@ Feature: Langy runs on the model the project chose
     And a model the project can serve is seeded unchanged
 
   @unit
+  Scenario: The composer waits for the resolved default before seeding
+    Given the project's providers answered before the resolved Langy default
+    When the composer seeds its model
+    Then it holds no model until the default answers
+    And then it holds the resolved default, not the first model in the menu
+
+  # A seed is not a pick. When the menu answered before the default was
+  # reachable (the allowlist or the provider list landed late), the composer
+  # used to keep the first model of the menu for the whole session, so a
+  # default made the day before looked lost.
+  @unit
+  Scenario: A seed taken before the default was reachable gives way to the default
+    Given the composer seeded a model while the resolved default was not yet in its menu
+    And the user has not picked a model and no reopened conversation set one
+    When the project's menu then serves the resolved default
+    Then the composer holds the resolved default
+    And a model the user picked is never replaced
+
+  @unit
+  Scenario: A default no provider serves is named, not swapped silently
+    Given Langy's resolved default is a model none of the project's providers serves
+    When every model read has answered
+    Then a notice above the composer names the default and the model this chat uses instead
+    And the user can dismiss it
+
+  @unit
   Scenario: The composer follows a default-model change made in settings
     Given the composer's model was seeded from the resolved default
     When the default model configuration is saved or removed while the panel is open

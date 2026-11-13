@@ -11,8 +11,14 @@ import {
 
 import type { GithubModule } from "../app/github.app.ts";
 import type { GithubRepositories } from "../repositories/github.repositories.ts";
-import { RecordInstallationConnectedCommand } from "./github-lifecycle.commands.ts";
-import { githubInstallationConnectedEventSchema } from "./github-lifecycle.events.ts";
+import {
+  RecordInstallationConnectedCommand,
+  RecordPullRequestChecksCompletedCommand,
+} from "./github-lifecycle.commands.ts";
+import {
+  githubInstallationConnectedEventSchema,
+  githubPullRequestChecksCompletedEventSchema,
+} from "./github-lifecycle.events.ts";
 
 /**
  * github_lifecycle: GitHub records its installation facts; peers react from their own
@@ -23,8 +29,12 @@ function buildGithubLifecyclePipeline() {
     name: GITHUB_LIFECYCLE_PIPELINE_NAME,
     aggregate: defineAggregate({ type: GITHUB_INSTALLATION_AGGREGATE_TYPE }),
   })
-    .withEvents([githubInstallationConnectedEventSchema])
+    .withEvents([
+      githubInstallationConnectedEventSchema,
+      githubPullRequestChecksCompletedEventSchema,
+    ])
     .withCommand("recordInstallationConnected", RecordInstallationConnectedCommand)
+    .withCommand("recordPullRequestChecksCompleted", RecordPullRequestChecksCompletedCommand)
     .build();
 }
 

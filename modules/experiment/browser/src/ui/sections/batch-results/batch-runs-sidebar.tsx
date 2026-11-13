@@ -32,6 +32,7 @@ import {
 } from "../../../model/batch-evaluation-results.run-state.ts";
 import { RunConcurrencyBadge } from "../../elements/batch-results/run-concurrency-badge.tsx";
 import { RunDisplayName } from "../../elements/batch-results/run-display-name.tsx";
+import { RunRepeatBadge } from "../../elements/batch-results/run-repeat-badge.tsx";
 import { formatTimeAgo, getColorForString } from "./presentation.tsx";
 
 /**
@@ -54,6 +55,8 @@ export type BatchRunSummary = {
   total?: number | null;
   /** Cells the run kept in flight; absent for a run that recorded none. */
   concurrency?: number | null;
+  /** How many times the run repeated every dataset row; absent ran each once. */
+  repeat?: number | null;
   /** The run's targets as it recorded them, for the agent label each ran at. */
   targets?: RunTargetLike[] | null;
   summary: {
@@ -310,12 +313,13 @@ const MAX_LABEL_BADGES = 2;
 const concurrencyExplanationId = (runId: string) => `run-concurrency-explanation-${runId}`;
 
 /**
- * The agent version each label resolved to and the run's concurrency, as badges, when it recorded
- * them.
+ * The agent version each label resolved to, the run's concurrency and its repeat, as badges, when
+ * it recorded them.
  */
 const RunSettingsLine = ({ run }: { run: BatchRunSummary }) => {
   const labels = runAgentLabelsOf(run.targets);
-  if (labels.length === 0 && !run.concurrency) return null;
+  const repeated = !!run.repeat && run.repeat > 1;
+  if (labels.length === 0 && !run.concurrency && !repeated) return null;
   const shown = labels.slice(0, MAX_LABEL_BADGES);
   const folded = labels.slice(MAX_LABEL_BADGES);
 
@@ -349,6 +353,9 @@ const RunSettingsLine = ({ run }: { run: BatchRunSummary }) => {
           explanationId={concurrencyExplanationId(run.runId)}
           testId={`run-concurrency-${run.runId}`}
         />
+      ) : null}
+      {repeated && run.repeat ? (
+        <RunRepeatBadge repeat={run.repeat} testId={`run-repeat-${run.runId}`} />
       ) : null}
     </HStack>
   );

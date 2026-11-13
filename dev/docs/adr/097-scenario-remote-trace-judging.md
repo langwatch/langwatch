@@ -40,8 +40,18 @@ Parent resolution settled traces too early in practice. A tool span that ends af
 
 The judge also maps each criterion by its schema key instead of by position, and reports the criteria it could not decide as `inconclusiveCriteria` next to `unmetCriteria` (an inconclusive criterion is still unmet). The platform stores them in `simulation_runs.InconclusiveCriteria`, the run detail reads them apart from the failed ones, and the export carries them.
 
+## Amendment (2026-11-12): seven second quiet period, adaptive per project, configurable
+
+A two second quiet period settled flat traces too early: when the agent's spans hang straight off the scenario span, every parent resolves after the first OpenTelemetry batch flush, and the next flush lands five seconds later (the BatchSpanProcessor default in the JavaScript, Python, Go and Java SDKs, the LangWatch SDKs included). The quiet period now defaults to seven seconds, the flush plus about two seconds of ingest and network.
+
+The trace module measures it per project beside the ingest lag, in the same query: per trace in `stored_spans`, the longest silence between two span arrivals (each span counted at its first `CreatedAt`), p95 over the last 7 days. The quiet period is `max(7s, clamp(p95, 3s, 30s))`, the default under 20 traces with two or more spans, cached with the wait budget for an hour. `TraceApi.resolveTraceSettleSettings` answers the wait, the extension and the quiet period together, and `GET /api/traces/settle-settings` serves the same answer to the scenario SDK for code-first runs.
+
+People can override both values where they pick the judge model: a run plan's setting wins over the scenario's, which wins over the project's recommendation (quiet 0 to 60 seconds, wait 1 to 300 seconds). The extension stays the 30 second cap.
+
+Remote fetching stays off for prompt, code, workflow and voice targets. None of them puts spans in LangWatch under the turn's trace id: a prompt target calls the model from the scenario child, nlpgo runs code and workflow executions with `do_not_trace`, and a voice platform never receives the trace context. Turning it on would only add the full wait and an inconclusive verdict.
+
 ## References
 
 - Related ADRs: ADR-098 (agent dev tunnel)
-- Specs: `specs/scenarios/http-header-templating.feature`, `specs/scenarios/remote-trace-judging.feature`, scenario repo `specs/remote-trace-fetching.feature`
+- Specs: `specs/scenarios/http-header-templating.feature`, `specs/scenarios/remote-trace-judging.feature`, `specs/scenarios/judge-trace-wait-settings.feature`, scenario repo `specs/remote-trace-fetching.feature`
 - Review draft: https://nexus.langwatch.ai/wiki/scenario-remote-traces-adr

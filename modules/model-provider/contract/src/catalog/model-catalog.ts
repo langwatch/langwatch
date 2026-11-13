@@ -170,10 +170,40 @@ export function hasVariantSuffix(modelId: string): boolean {
   );
 }
 
+/** The batch-priced tier the catalog lists as `<model>:batch`: a price, not a callable model. */
+const isBatchTier = (modelId: string): boolean => modelId.endsWith(":batch");
+
+/**
+ * The catalog's source names OpenAI's pro reasoning mode as `gpt-<version>-<tier>-pro`
+ * (`gpt-6-sol-pro`), which OpenAI does not serve: it answers 404 model_not_found. OpenAI's own
+ * pro models carry no tier (`gpt-5.5-pro`).
+ */
+const isUnservedOpenAITierPro = (modelId: string): boolean =>
+  /^openai\/gpt-\d+(?:\.\d+)?-[a-z]+-pro$/.test(modelId);
+
+/** Whether a model picker may offer this catalog id: a call naming it reaches a real model. */
+export function isPickableCatalogModel(modelId: string): boolean {
+  return !hasVariantSuffix(modelId) && !isBatchTier(modelId) && !isUnservedOpenAITierPro(modelId);
+}
+
+/**
+ * Whether a chat picker may offer this catalog id: its answer is text a chat turn can read.
+ * Audio, realtime and image-generation models refuse a plain chat call, and deep research
+ * needs a search tool attached to every request. Routers (`openrouter/auto`) stay.
+ */
+export function isChatSurfaceCatalogModel(modelId: string): boolean {
+  if (/deep-research/.test(modelId)) return false;
+  const entry = llmModels.models[modelId];
+  if (!entry) return true;
+  const output = entry.modality.split("->")[1] ?? "";
+  if (output.includes("audio")) return false;
+  return !output.includes("image") || modelId.startsWith("openrouter/");
+}
+
 export const allLitellmModels: Record<string, { mode: "chat" | "embedding" | "audio" | "image" }> =
   Object.fromEntries(
     Object.entries(llmModels.models)
-      .filter(([id]) => !hasVariantSuffix(id))
+      .filter(([id]) => isPickableCatalogModel(id))
       .map(([id, model]) => [id, { mode: model.mode }]),
   );
 

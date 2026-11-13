@@ -182,6 +182,12 @@ async function runTestSuite(params: {
       ...(input.repeatCount !== undefined && { repeatCount: input.repeatCount }),
       ...(input.simulatorModel !== undefined && { simulatorModel: input.simulatorModel }),
       ...(input.judgeModel !== undefined && { judgeModel: input.judgeModel }),
+      ...(input.traceQuietPeriodMs !== undefined && {
+        traceQuietPeriodMs: input.traceQuietPeriodMs,
+      }),
+      ...(input.traceWaitTimeoutMs !== undefined && {
+        traceWaitTimeoutMs: input.traceWaitTimeoutMs,
+      }),
     },
     idempotencyKey: input.idempotencyKey ?? `api-${generate("suite").toString()}`,
     ...(input.parameters !== undefined && { parameters: input.parameters }),

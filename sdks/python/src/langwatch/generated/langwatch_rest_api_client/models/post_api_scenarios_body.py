@@ -31,6 +31,10 @@ class PostApiScenariosBody:
         simulator_model (None | str | Unset): Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the
             project default.
         judge_model (None | str | Unset): Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default.
+        trace_quiet_period_ms (int | None | Unset): Milliseconds (0 to 60000) the agent's trace must stay unchanged
+            before the judge reads it. Null uses the project's recommendation.
+        trace_wait_timeout_ms (int | None | Unset): Milliseconds (1000 to 300000) the judge waits for the agent's trace
+            before a verdict. Null uses the project's recommendation.
         max_turns (int | None | Unset): Maximum conversation turns for a run of this scenario. Null uses the default.
         min_turns (int | None | Unset): Minimum conversation turns before the judge may end the run. Null uses the
             default.
@@ -49,6 +53,8 @@ class PostApiScenariosBody:
     parameters: list[PostApiScenariosBodyParametersItem] | Unset = UNSET
     simulator_model: None | str | Unset = UNSET
     judge_model: None | str | Unset = UNSET
+    trace_quiet_period_ms: int | None | Unset = UNSET
+    trace_wait_timeout_ms: int | None | Unset = UNSET
     max_turns: int | None | Unset = UNSET
     min_turns: int | None | Unset = UNSET
     test_suite_id: None | str | Unset = UNSET
@@ -86,6 +92,18 @@ class PostApiScenariosBody:
             judge_model = UNSET
         else:
             judge_model = self.judge_model
+
+        trace_quiet_period_ms: int | None | Unset
+        if isinstance(self.trace_quiet_period_ms, Unset):
+            trace_quiet_period_ms = UNSET
+        else:
+            trace_quiet_period_ms = self.trace_quiet_period_ms
+
+        trace_wait_timeout_ms: int | None | Unset
+        if isinstance(self.trace_wait_timeout_ms, Unset):
+            trace_wait_timeout_ms = UNSET
+        else:
+            trace_wait_timeout_ms = self.trace_wait_timeout_ms
 
         max_turns: int | None | Unset
         if isinstance(self.max_turns, Unset):
@@ -127,6 +145,10 @@ class PostApiScenariosBody:
             field_dict["simulatorModel"] = simulator_model
         if judge_model is not UNSET:
             field_dict["judgeModel"] = judge_model
+        if trace_quiet_period_ms is not UNSET:
+            field_dict["traceQuietPeriodMs"] = trace_quiet_period_ms
+        if trace_wait_timeout_ms is not UNSET:
+            field_dict["traceWaitTimeoutMs"] = trace_wait_timeout_ms
         if max_turns is not UNSET:
             field_dict["maxTurns"] = max_turns
         if min_turns is not UNSET:
@@ -179,6 +201,24 @@ class PostApiScenariosBody:
 
         judge_model = _parse_judge_model(d.pop("judgeModel", UNSET))
 
+        def _parse_trace_quiet_period_ms(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        trace_quiet_period_ms = _parse_trace_quiet_period_ms(d.pop("traceQuietPeriodMs", UNSET))
+
+        def _parse_trace_wait_timeout_ms(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        trace_wait_timeout_ms = _parse_trace_wait_timeout_ms(d.pop("traceWaitTimeoutMs", UNSET))
+
         def _parse_max_turns(data: object) -> int | None | Unset:
             if data is None:
                 return data
@@ -221,6 +261,8 @@ class PostApiScenariosBody:
             parameters=parameters,
             simulator_model=simulator_model,
             judge_model=judge_model,
+            trace_quiet_period_ms=trace_quiet_period_ms,
+            trace_wait_timeout_ms=trace_wait_timeout_ms,
             max_turns=max_turns,
             min_turns=min_turns,
             test_suite_id=test_suite_id,

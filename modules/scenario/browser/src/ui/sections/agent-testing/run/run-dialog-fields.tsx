@@ -9,6 +9,7 @@ import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { useEffect, useRef } from "react";
 
 import { HandledErrorAlert } from "../../../../behavior/errors.tsx";
+import { EMPTY_JUDGE_TRACE_WAIT_INPUT } from "../../../../model/judge-trace-wait.ts";
 import { MissingProviderNotice } from "../../../elements/agent-testing/run/missing-provider-notice.tsx";
 import { RunNoteField } from "../../../elements/agent-testing/run/run-note-field.tsx";
 import { CustomizeChips } from "../../../elements/agent-testing/shared/customize-chips.tsx";
@@ -34,10 +35,13 @@ function AddedBlocks({ form, isBusy }: { form: RunDialogForm; isBusy: boolean })
           judgeModel={form.judgeModel}
           onSimulatorChange={form.setSimulatorModel}
           onJudgeChange={form.setJudgeModel}
+          traceWait={form.traceWait}
+          onTraceWaitChange={form.setTraceWait}
           onRemove={() => {
             form.setShowModels(false);
             form.setSimulatorModel(null);
             form.setJudgeModel(null);
+            form.setTraceWait(EMPTY_JUDGE_TRACE_WAIT_INPUT);
           }}
         />
       )}

@@ -226,7 +226,7 @@ Permission `scenarios:view`. Declared at `src/transport/run-plans.rest.ts:161`.
 Answers at `/api/v1/run-plans`.
 
 ```typescript
-// Query: runPlanListQuerySchema, ../contract/src/suite-rest.schemas.ts:53
+// Query: runPlanListQuerySchema, ../contract/src/suite-rest.schemas.ts:55
 interface Query {
   includeArchived?: string;
 }
@@ -242,8 +242,8 @@ Permission `scenarios:create`. Declared at `src/transport/run-plans.rest.ts:179`
 Answers at `/api/v1/run-plans/run`.
 
 ```typescript
-type Body = z.infer<typeof runPlanRunInputSchema>; // src/rules/suite-wire-v1.rules.ts:111
-type Response = z.infer<typeof runPlanRunResultSchema>; // src/rules/suite-wire-v1.rules.ts:171
+type Body = z.infer<typeof runPlanRunInputSchema>; // src/rules/suite-wire-v1.rules.ts:128
+type Response = z.infer<typeof runPlanRunResultSchema>; // src/rules/suite-wire-v1.rules.ts:189
 ```
 
 #### `GET /:id` · `getRunPlan`
@@ -255,11 +255,11 @@ Permission `scenarios:view`. Declared at `src/transport/run-plans.rest.ts:202`.
 Answers at `/api/v1/run-plans/:id`.
 
 ```typescript
-// Params: runPlanIdParamsSchema, ../contract/src/suite-rest.schemas.ts:45
+// Params: runPlanIdParamsSchema, ../contract/src/suite-rest.schemas.ts:47
 interface Params {
   id: string;
 }
-type Response = z.infer<typeof runPlanWireSchema>; // ../contract/src/suite-rest.schemas.ts:443
+type Response = z.infer<typeof runPlanWireSchema>; // ../contract/src/suite-rest.schemas.ts:471
 ```
 
 #### `POST /:id/run` · `rerunRunPlan`
@@ -271,14 +271,14 @@ Permission `scenarios:create`. Declared at `src/transport/run-plans.rest.ts:217`
 Answers at `/api/v1/run-plans/:id/run`.
 
 ```typescript
-type Params = z.infer<typeof runPlanIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:45
-// Body: rerunInputSchema, src/rules/suite-wire-v1.rules.ts:128
+type Params = z.infer<typeof runPlanIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:47
+// Body: rerunInputSchema, src/rules/suite-wire-v1.rules.ts:145
 interface Body {
   idempotencyKey?: string;
   parameters?: Record<string, string | number | boolean>;
   note?: string;
 }
-type Response = z.infer<typeof runPlanRunResultSchema>; // src/rules/suite-wire-v1.rules.ts:171
+type Response = z.infer<typeof runPlanRunResultSchema>; // src/rules/suite-wire-v1.rules.ts:189
 ```
 
 #### `DELETE /:id` · `archiveRunPlan`
@@ -290,8 +290,8 @@ Permission `scenarios:manage`. Declared at `src/transport/run-plans.rest.ts:243`
 Answers at `/api/v1/run-plans/:id`.
 
 ```typescript
-type Params = z.infer<typeof runPlanIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:45
-// Response: runPlanArchiveResultSchema, ../contract/src/suite-rest.schemas.ts:63
+type Params = z.infer<typeof runPlanIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:47
+// Response: runPlanArchiveResultSchema, ../contract/src/suite-rest.schemas.ts:65
 interface Response {
   id: string;
   archived: true;
@@ -302,7 +302,7 @@ interface Response {
 
 |             |                                          |
 | ----------- | ---------------------------------------- |
-| Declared at | `src/transport/suites-alias.rest.ts:412` |
+| Declared at | `src/transport/suites-alias.rest.ts:425` |
 | Base URL    | `/api/suites`, twin `/api/v1/suites`     |
 | Addressing  | dated                                    |
 | Credential  | project                                  |
@@ -313,101 +313,101 @@ interface Response {
 
 List all non-archived suites for the project. By default only custom run plans are returned; pass kind=folder for test suites.
 
-Permission `scenarios:view`. Declared at `src/transport/suites-alias.rest.ts:418`.
+Permission `scenarios:view`. Declared at `src/transport/suites-alias.rest.ts:431`.
 
 Answers at `/api/suites`, `/api/v1/suites`; also, undocumented, `/api/suites/2026-08-07`, `/api/v1/suites/2026-08-07`, `/api/suites/latest`, `/api/v1/suites/latest`.
 
 ```typescript
-// Query: listSuitesQuerySchema, ../contract/src/suite-rest.schemas.ts:244
+// Query: listSuitesQuerySchema, ../contract/src/suite-rest.schemas.ts:246
 interface Query {
   kind?: "custom" | "folder";
 }
-// Response: z.array(suiteResponseWithPlatformUrlSchema) (inline, src/transport/suites-alias.rest.ts:421)
+// Response: z.array(suiteResponseWithPlatformUrlSchema) (inline, src/transport/suites-alias.rest.ts:434)
 ```
 
 #### `GET /:id` · `getApiSuitesById`
 
 Get a suite (run plan) by its ID.
 
-Permission `scenarios:view`. Declared at `src/transport/suites-alias.rest.ts:437`.
+Permission `scenarios:view`. Declared at `src/transport/suites-alias.rest.ts:450`.
 
 Answers at `/api/suites/:id`, `/api/v1/suites/:id`; also, undocumented, `/api/suites/2026-08-07/:id`, `/api/v1/suites/2026-08-07/:id`, `/api/suites/latest/:id`, `/api/v1/suites/latest/:id`.
 
 ```typescript
-// Params: suiteAliasIdParamsSchema, ../contract/src/suite-rest.schemas.ts:340
+// Params: suiteAliasIdParamsSchema, ../contract/src/suite-rest.schemas.ts:352
 interface Params {
   id: string;
 }
-type Response = z.infer<typeof suiteResponseWithPlatformUrlSchema>; // ../contract/src/suite-rest.schemas.ts:145
+type Response = z.infer<typeof suiteResponseWithPlatformUrlSchema>; // ../contract/src/suite-rest.schemas.ts:147
 ```
 
 #### `POST /` · `postApiSuites`
 
 Create a new suite (run plan).
 
-Permission `scenarios:create`. Declared at `src/transport/suites-alias.rest.ts:458`.
+Permission `scenarios:create`. Declared at `src/transport/suites-alias.rest.ts:471`.
 
 Answers at `/api/suites`, `/api/v1/suites`; also, undocumented, `/api/suites/2026-08-07`, `/api/v1/suites/2026-08-07`, `/api/suites/latest`, `/api/v1/suites/latest`.
 
 ```typescript
-type Body = z.infer<typeof createSuiteInputSchema>; // ../contract/src/suite-rest.schemas.ts:233
-type Response = z.infer<typeof suiteResponseWithPlatformUrlSchema>; // ../contract/src/suite-rest.schemas.ts:145
+type Body = z.infer<typeof createSuiteInputSchema>; // ../contract/src/suite-rest.schemas.ts:235
+type Response = z.infer<typeof suiteResponseWithPlatformUrlSchema>; // ../contract/src/suite-rest.schemas.ts:147
 ```
 
 #### `PATCH /:id` · `patchApiSuitesById`
 
 Update a suite (run plan).
 
-Permission `scenarios:update`. Declared at `src/transport/suites-alias.rest.ts:478`.
+Permission `scenarios:update`. Declared at `src/transport/suites-alias.rest.ts:491`.
 
 Answers at `/api/suites/:id`, `/api/v1/suites/:id`; also, undocumented, `/api/suites/2026-08-07/:id`, `/api/v1/suites/2026-08-07/:id`, `/api/suites/latest/:id`, `/api/v1/suites/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof suiteAliasIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:340
-type Body = z.infer<typeof updateSuiteInputSchema>; // ../contract/src/suite-rest.schemas.ts:256
-type Response = z.infer<typeof suiteResponseWithPlatformUrlSchema>; // ../contract/src/suite-rest.schemas.ts:145
+type Params = z.infer<typeof suiteAliasIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:352
+type Body = z.infer<typeof updateSuiteInputSchema>; // ../contract/src/suite-rest.schemas.ts:258
+type Response = z.infer<typeof suiteResponseWithPlatformUrlSchema>; // ../contract/src/suite-rest.schemas.ts:147
 ```
 
 #### `POST /:id/duplicate` · `postApiSuitesByIdDuplicate`
 
 Duplicate a suite (run plan).
 
-Permission `scenarios:create`. Declared at `src/transport/suites-alias.rest.ts:498`.
+Permission `scenarios:create`. Declared at `src/transport/suites-alias.rest.ts:511`.
 
 Answers at `/api/suites/:id/duplicate`, `/api/v1/suites/:id/duplicate`; also, undocumented, `/api/suites/2026-08-07/:id/duplicate`, `/api/v1/suites/2026-08-07/:id/duplicate`, `/api/suites/latest/:id/duplicate`, `/api/v1/suites/latest/:id/duplicate`.
 
 ```typescript
-type Params = z.infer<typeof suiteAliasIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:340
-// Body: duplicateSuiteBodySchema, ../contract/src/suite-rest.schemas.ts:348
+type Params = z.infer<typeof suiteAliasIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:352
+// Body: duplicateSuiteBodySchema, ../contract/src/suite-rest.schemas.ts:360
 type Body = Record<string, unknown>;
-type Response = z.infer<typeof suiteResponseWithPlatformUrlSchema>; // ../contract/src/suite-rest.schemas.ts:145
+type Response = z.infer<typeof suiteResponseWithPlatformUrlSchema>; // ../contract/src/suite-rest.schemas.ts:147
 ```
 
 #### `POST /:id/run` · `postApiSuitesByIdRun`
 
 Trigger a suite run. Schedules scenario executions for all active scenarios x targets x repeatCount. When the id names a test suite, the targets, the repeat count and the models are read from the body.
 
-Permission `scenarios:create`. Declared at `src/transport/suites-alias.rest.ts:520`.
+Permission `scenarios:create`. Declared at `src/transport/suites-alias.rest.ts:533`.
 
 Answers at `/api/suites/:id/run`, `/api/v1/suites/:id/run`; also, undocumented, `/api/suites/2026-08-07/:id/run`, `/api/v1/suites/2026-08-07/:id/run`, `/api/suites/latest/:id/run`, `/api/v1/suites/latest/:id/run`.
 
 ```typescript
-type Params = z.infer<typeof suiteAliasIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:340
-type Body = z.infer<typeof runSuiteInputSchema>; // ../contract/src/suite-rest.schemas.ts:306
-type Response = z.infer<typeof suiteRunResultSchema>; // ../contract/src/suite-rest.schemas.ts:333
+type Params = z.infer<typeof suiteAliasIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:352
+type Body = z.infer<typeof runSuiteInputSchema>; // ../contract/src/suite-rest.schemas.ts:318
+type Response = z.infer<typeof suiteRunResultSchema>; // ../contract/src/suite-rest.schemas.ts:345
 ```
 
 #### `DELETE /:id` · `deleteApiSuitesById`
 
 Archive (soft-delete) a suite. Archiving a test suite also archives every scenario filed in it, in one transaction.
 
-Permission `scenarios:manage`. Declared at `src/transport/suites-alias.rest.ts:546`.
+Permission `scenarios:manage`. Declared at `src/transport/suites-alias.rest.ts:559`.
 
 Answers at `/api/suites/:id`, `/api/v1/suites/:id`; also, undocumented, `/api/suites/2026-08-07/:id`, `/api/v1/suites/2026-08-07/:id`, `/api/suites/latest/:id`, `/api/v1/suites/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof suiteAliasIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:340
-// Response: archivedSuiteSchema, ../contract/src/suite-rest.schemas.ts:351
+type Params = z.infer<typeof suiteAliasIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:352
+// Response: archivedSuiteSchema, ../contract/src/suite-rest.schemas.ts:363
 interface Response {
   id: string;
   archived: boolean;
@@ -418,7 +418,7 @@ interface Response {
 
 |             |                                         |
 | ----------- | --------------------------------------- |
-| Declared at | `src/transport/test-suites.rest.ts:221` |
+| Declared at | `src/transport/test-suites.rest.ts:227` |
 | Base URL    | `/api/v1/test-suites`                   |
 | Addressing  | v1-only                                 |
 | Credential  | project                                 |
@@ -427,72 +427,72 @@ interface Response {
 
 List the project's test suites. Archived suites are left out unless includeArchived is set. Run plans are not test suites and are listed by the run plans family.
 
-Permission `scenarios:view`. Declared at `src/transport/test-suites.rest.ts:226`.
+Permission `scenarios:view`. Declared at `src/transport/test-suites.rest.ts:232`.
 
 Answers at `/api/v1/test-suites`.
 
 ```typescript
-// Query: testSuiteListQuerySchema, ../contract/src/suite-rest.schemas.ts:81
+// Query: testSuiteListQuerySchema, ../contract/src/suite-rest.schemas.ts:83
 interface Query {
   includeArchived?: string;
 }
-// Response: z.array(testSuiteWireSchema) (inline, src/transport/test-suites.rest.ts:229)
+// Response: z.array(testSuiteWireSchema) (inline, src/transport/test-suites.rest.ts:235)
 ```
 
 #### `POST /` · `createTestSuite`
 
 Create a test suite. It starts empty: scenarios join it by being filed into it, and the targets a run goes against are sent with the run. It may declare fields and attach evaluators from the start.
 
-Permission `scenarios:create`. Declared at `src/transport/test-suites.rest.ts:242`.
+Permission `scenarios:create`. Declared at `src/transport/test-suites.rest.ts:248`.
 
 Answers at `/api/v1/test-suites`.
 
 ```typescript
-type Body = z.infer<typeof testSuiteCreateInputSchema>; // src/rules/suite-wire-v1.rules.ts:246
-type Response = z.infer<typeof testSuiteWireSchema>; // src/rules/suite-wire-v1.rules.ts:201
+type Body = z.infer<typeof testSuiteCreateInputSchema>; // src/rules/suite-wire-v1.rules.ts:264
+type Response = z.infer<typeof testSuiteWireSchema>; // src/rules/suite-wire-v1.rules.ts:219
 ```
 
 #### `GET /:id` · `getTestSuite`
 
 Read one test suite
 
-Permission `scenarios:view`. Declared at `src/transport/test-suites.rest.ts:268`.
+Permission `scenarios:view`. Declared at `src/transport/test-suites.rest.ts:274`.
 
 Answers at `/api/v1/test-suites/:id`.
 
 ```typescript
-// Params: testSuiteIdParamsSchema, ../contract/src/suite-rest.schemas.ts:70
+// Params: testSuiteIdParamsSchema, ../contract/src/suite-rest.schemas.ts:72
 interface Params {
   id: string;
 }
-type Response = z.infer<typeof testSuiteDetailWireSchema>; // src/rules/suite-wire-v1.rules.ts:234
+type Response = z.infer<typeof testSuiteDetailWireSchema>; // src/rules/suite-wire-v1.rules.ts:252
 ```
 
 #### `PATCH /:id` · `updateTestSuite`
 
 Edit a test suite: its name, the fields it declares, the evaluators attached to it. Send only what changes. The slug is kept on a rename, so links and run history stay where they are.
 
-Permission `scenarios:update`. Declared at `src/transport/test-suites.rest.ts:289`.
+Permission `scenarios:update`. Declared at `src/transport/test-suites.rest.ts:295`.
 
 Answers at `/api/v1/test-suites/:id`.
 
 ```typescript
-type Params = z.infer<typeof testSuiteIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:70
-type Body = z.infer<typeof testSuiteUpdateInputSchema>; // src/rules/suite-wire-v1.rules.ts:257
-type Response = z.infer<typeof testSuiteWireSchema>; // src/rules/suite-wire-v1.rules.ts:201
+type Params = z.infer<typeof testSuiteIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:72
+type Body = z.infer<typeof testSuiteUpdateInputSchema>; // src/rules/suite-wire-v1.rules.ts:275
+type Response = z.infer<typeof testSuiteWireSchema>; // src/rules/suite-wire-v1.rules.ts:219
 ```
 
 #### `DELETE /:id` · `archiveTestSuite`
 
 Archive a test suite. The scenarios filed in it are archived with it, in one step, because the suite is where they live.
 
-Permission `scenarios:manage`. Declared at `src/transport/test-suites.rest.ts:312`.
+Permission `scenarios:manage`. Declared at `src/transport/test-suites.rest.ts:318`.
 
 Answers at `/api/v1/test-suites/:id`.
 
 ```typescript
-type Params = z.infer<typeof testSuiteIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:70
-// Response: testSuiteArchiveResultSchema, ../contract/src/suite-rest.schemas.ts:91
+type Params = z.infer<typeof testSuiteIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:72
+// Response: testSuiteArchiveResultSchema, ../contract/src/suite-rest.schemas.ts:93
 interface Response {
   id: string;
   archived: true;
@@ -503,14 +503,14 @@ interface Response {
 
 Run a test suite
 
-Permission `scenarios:create`. Declared at `src/transport/test-suites.rest.ts:336`.
+Permission `scenarios:create`. Declared at `src/transport/test-suites.rest.ts:342`.
 
 Answers at `/api/v1/test-suites/:id/run`.
 
 ```typescript
-type Params = z.infer<typeof testSuiteIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:70
-type Body = z.infer<typeof testSuiteRunInputSchema>; // src/rules/suite-wire-v1.rules.ts:131
-type Response = z.infer<typeof runPlanRunResultSchema>; // src/rules/suite-wire-v1.rules.ts:171
+type Params = z.infer<typeof testSuiteIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:72
+type Body = z.infer<typeof testSuiteRunInputSchema>; // src/rules/suite-wire-v1.rules.ts:148
+type Response = z.infer<typeof runPlanRunResultSchema>; // src/rules/suite-wire-v1.rules.ts:189
 ```
 
 ## tRPC transport
@@ -535,11 +535,11 @@ Contract `../contract/src/suite.trpc.ts:35`, router `src/transport/suite.trpc.ts
 
 ```typescript
 // suites.create
-type Input = z.infer<typeof createSuiteTrpcInputSchema>; // ../contract/src/suite-trpc.schemas.ts:79
-type Output = z.infer<typeof suiteSchema>; // ../contract/src/suite.ts:134
+type Input = z.infer<typeof createSuiteTrpcInputSchema>; // ../contract/src/suite-trpc.schemas.ts:84
+type Output = z.infer<typeof suiteSchema>; // ../contract/src/suite.ts:139
 
 // suites.getAll
-// Input: listSuitesTrpcInputSchema, ../contract/src/suite-trpc.schemas.ts:165
+// Input: listSuitesTrpcInputSchema, ../contract/src/suite-trpc.schemas.ts:170
 interface Input {
   projectId: string;
   kinds?: ("test_suite" | "run_plan")[];
@@ -547,35 +547,35 @@ interface Input {
 // Output: suiteOrTestSuiteSchema.array() (inline, ../contract/src/suite.trpc.ts:44)
 
 // suites.getById
-// Input: suiteTrpcIdInputSchema, ../contract/src/suite-trpc.schemas.ts:32
+// Input: suiteTrpcIdInputSchema, ../contract/src/suite-trpc.schemas.ts:34
 interface Input {
   projectId: string;
   id: string;
 }
-type Output = z.infer<typeof suiteOrTestSuiteSchema>; // ../contract/src/suite-trpc.schemas.ts:231
+type Output = z.infer<typeof suiteOrTestSuiteSchema>; // ../contract/src/suite-trpc.schemas.ts:236
 
 // suites.update
-type Input = z.infer<typeof updateSuiteTrpcInputSchema>; // ../contract/src/suite-trpc.schemas.ts:99
-type Output = z.infer<typeof suiteOrTestSuiteSchema>; // ../contract/src/suite-trpc.schemas.ts:231
+type Input = z.infer<typeof updateSuiteTrpcInputSchema>; // ../contract/src/suite-trpc.schemas.ts:104
+type Output = z.infer<typeof suiteOrTestSuiteSchema>; // ../contract/src/suite-trpc.schemas.ts:236
 
 // suites.duplicate
-type Input = z.infer<typeof suiteTrpcIdInputSchema>; // ../contract/src/suite-trpc.schemas.ts:32
-type Output = z.infer<typeof suiteSchema>; // ../contract/src/suite.ts:134
+type Input = z.infer<typeof suiteTrpcIdInputSchema>; // ../contract/src/suite-trpc.schemas.ts:34
+type Output = z.infer<typeof suiteSchema>; // ../contract/src/suite.ts:139
 
 // suites.archive
-type Input = z.infer<typeof suiteTrpcIdInputSchema>; // ../contract/src/suite-trpc.schemas.ts:32
-type Output = z.infer<typeof suiteSchema>; // ../contract/src/suite.ts:134
+type Input = z.infer<typeof suiteTrpcIdInputSchema>; // ../contract/src/suite-trpc.schemas.ts:34
+type Output = z.infer<typeof suiteSchema>; // ../contract/src/suite.ts:139
 
 // suites.resolveArchivedNames
-type Input = z.infer<typeof suiteArchivedNamesTrpcInputSchema>; // ../contract/src/suite-trpc.schemas.ts:176
-// Output: suiteArchivedNamesSchema, ../contract/src/suite-trpc.schemas.ts:243
+type Input = z.infer<typeof suiteArchivedNamesTrpcInputSchema>; // ../contract/src/suite-trpc.schemas.ts:181
+// Output: suiteArchivedNamesSchema, ../contract/src/suite-trpc.schemas.ts:248
 interface Output {
   scenarios: Record<string, string>;
   targets: Record<string, string>;
 }
 
 // suites.run
-// Input: runSuiteTrpcInputSchema, ../contract/src/suite-trpc.schemas.ts:129
+// Input: runSuiteTrpcInputSchema, ../contract/src/suite-trpc.schemas.ts:134
 interface Input {
   projectId: string;
   id: string;
@@ -584,18 +584,18 @@ interface Input {
   parameters?: Record<string, string | number | boolean>;
   note?: string;
 }
-type Output = z.infer<typeof suiteRunReceiptSchema>; // ../contract/src/suite-trpc.schemas.ts:265
+type Output = z.infer<typeof suiteRunReceiptSchema>; // ../contract/src/suite-trpc.schemas.ts:270
 
 // suites.runPlan
-type Input = z.infer<typeof runPlanTrpcInputSchema>; // ../contract/src/suite-trpc.schemas.ts:143
-type Output = z.infer<typeof suiteRunPlanReceiptSchema>; // ../contract/src/suite-trpc.schemas.ts:289
+type Input = z.infer<typeof runPlanTrpcInputSchema>; // ../contract/src/suite-trpc.schemas.ts:148
+type Output = z.infer<typeof suiteRunPlanReceiptSchema>; // ../contract/src/suite-trpc.schemas.ts:294
 
 // suites.runAll
-type Input = z.infer<typeof runAllSuitesTrpcInputSchema>; // ../contract/src/suite-trpc.schemas.ts:155
-type Output = z.infer<typeof suiteRunAllReceiptSchema>; // ../contract/src/suite-trpc.schemas.ts:276
+type Input = z.infer<typeof runAllSuitesTrpcInputSchema>; // ../contract/src/suite-trpc.schemas.ts:160
+type Output = z.infer<typeof suiteRunAllReceiptSchema>; // ../contract/src/suite-trpc.schemas.ts:281
 
 // suites.getSummaries
-// Input: suiteSummariesTrpcInputSchema, ../contract/src/suite-trpc.schemas.ts:187
+// Input: suiteSummariesTrpcInputSchema, ../contract/src/suite-trpc.schemas.ts:192
 interface Input {
   projectId: string;
   startDate?: number;
@@ -627,36 +627,36 @@ Contract `../contract/src/suite.trpc.ts:105`, router `src/transport/test-suite.t
 
 ```typescript
 // suites.testSuites.create
-type Input = z.infer<typeof createTestSuiteTrpcInputSchema>; // ../contract/src/suite-trpc.schemas.ts:199
-type Output = z.infer<typeof scenarioTestSuiteSchema>; // ../../scenario/contract/src/scenario.ts:93
+type Input = z.infer<typeof createTestSuiteTrpcInputSchema>; // ../contract/src/suite-trpc.schemas.ts:204
+type Output = z.infer<typeof scenarioTestSuiteSchema>; // ../../scenario/contract/src/scenario.ts:104
 
 // suites.testSuites.getAll
-// Input: suiteProjectInputSchema, ../contract/src/suite-trpc.schemas.ts:27
+// Input: suiteProjectInputSchema, ../contract/src/suite-trpc.schemas.ts:29
 interface Input {
   projectId: string;
 }
 // Output: scenarioTestSuiteSchema.array() (inline, ../contract/src/suite.trpc.ts:113)
 
 // suites.testSuites.rename
-// Input: renameTestSuiteTrpcInputSchema, ../contract/src/suite-trpc.schemas.ts:209
+// Input: renameTestSuiteTrpcInputSchema, ../contract/src/suite-trpc.schemas.ts:214
 interface Input {
   projectId: string;
   testSuiteId: string;
   name: string;
 }
-type Output = z.infer<typeof scenarioTestSuiteSchema>; // ../../scenario/contract/src/scenario.ts:93
+type Output = z.infer<typeof scenarioTestSuiteSchema>; // ../../scenario/contract/src/scenario.ts:104
 
 // suites.testSuites.update
-type Input = z.infer<typeof updateTestSuiteTrpcInputSchema>; // ../contract/src/suite-trpc.schemas.ts:222
-type Output = z.infer<typeof scenarioTestSuiteSchema>; // ../../scenario/contract/src/scenario.ts:93
+type Input = z.infer<typeof updateTestSuiteTrpcInputSchema>; // ../contract/src/suite-trpc.schemas.ts:227
+type Output = z.infer<typeof scenarioTestSuiteSchema>; // ../../scenario/contract/src/scenario.ts:104
 
 // suites.testSuites.archive
-// Input: testSuiteTrpcIdInputSchema, ../contract/src/suite-trpc.schemas.ts:39
+// Input: testSuiteTrpcIdInputSchema, ../contract/src/suite-trpc.schemas.ts:41
 interface Input {
   projectId: string;
   testSuiteId: string;
 }
-type Output = z.infer<typeof scenarioTestSuiteSchema>; // ../../scenario/contract/src/scenario.ts:93
+type Output = z.infer<typeof scenarioTestSuiteSchema>; // ../../scenario/contract/src/scenario.ts:104
 ```
 
 ## Sockets

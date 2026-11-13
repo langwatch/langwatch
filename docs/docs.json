@@ -1149,6 +1149,7 @@
             "pages": [
               "api-reference/traces/overview",
               "api-reference/traces/discover-what-the-trace-filter-fields-hold",
+              "api-reference/traces/recommended-trace-wait-for-a-scenario-judge",
               "api-reference/traces/search",
               "api-reference/traces/get-trace",
               "api-reference/traces/get-transcript",

@@ -535,6 +535,14 @@ Each command uses the values differently:
 langwatch experiment run <experiment-slug> --dataset-version 1
 ```
 
+To see how often each row passes when outputs vary, add `--repeat <n>`, from 1 to 5. The server runs every dataset row that many times against every target in one run. With `--wait`, the output lists each dataset row's pass rate per target, such as `Row 1 · support-prompt: 2/3 passed (67%)`, and the JSON output carries the same numbers under `rowPassRates`.
+
+A repetition fails when its target errors or any evaluator fails it, and one with no pass or fail verdict is left out of the count. A repeated run does not write its outputs back into the experiment's workbench; its results page numbers each row by dataset row and repetition and adds a Pass rate column.
+
+```bash
+langwatch experiment run <experiment-slug> --repeat 3 --wait
+```
+
 ### Inspect simulation runs
 
 Every scenario execution produces a **simulation run** you can inspect after the fact, full conversation, judge verdict, reasoning, met/unmet criteria, cost, and duration.

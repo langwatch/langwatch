@@ -733,6 +733,7 @@ export const APP_ERROR_CODES = [
   "scenario_reserved_set_id",
   "scenario_run_export_forbidden",
   "scenario_run_export_unauthenticated",
+  "scenario_run_has_many_traces",
   "scenario_run_rejected",
   "scenario_secret_parameter_conflict",
   "scenario_secret_parameter_in_text",

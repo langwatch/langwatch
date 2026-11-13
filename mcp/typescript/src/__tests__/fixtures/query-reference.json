@@ -14303,6 +14303,14 @@
               "available": true
             },
             {
+              "name": "CiFollowUpsInARow",
+              "type": "Int32",
+              "description": "Messages CI started on a pull request since the person last wrote.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
               "name": "CreatedAt",
               "type": "Float64",
               "description": "CreatedAt",
@@ -17007,6 +17015,22 @@
               "available": true
             },
             {
+              "name": "TraceQuietPeriodMs",
+              "type": "Nullable(Int32)",
+              "description": "TraceQuietPeriodMs",
+              "unit": "ms",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TraceWaitTimeoutMs",
+              "type": "Nullable(Int32)",
+              "description": "TraceWaitTimeoutMs",
+              "unit": "ms",
+              "gates": [],
+              "available": true
+            },
+            {
               "name": "MaxTurns",
               "type": "Nullable(Int32)",
               "description": "MaxTurns",
@@ -17439,6 +17463,22 @@
               "type": "Nullable(String)",
               "description": "JudgeModel",
               "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TraceQuietPeriodMs",
+              "type": "Nullable(Int32)",
+              "description": "TraceQuietPeriodMs",
+              "unit": "ms",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TraceWaitTimeoutMs",
+              "type": "Nullable(Int32)",
+              "description": "TraceWaitTimeoutMs",
+              "unit": "ms",
               "gates": [],
               "available": true
             },

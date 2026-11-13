@@ -13,6 +13,7 @@ import {
   type TargetConfig,
   targetConfigSchema,
   MAX_CONCURRENCY,
+  MAX_RUN_REPEAT,
 } from "../../experiment-workbench.ts";
 
 /**
@@ -257,6 +258,8 @@ const runInputsBodySchemaDefinition = z
     row_indices: z.array(z.number().int().nonnegative()).optional(),
     /** Cells in flight at once for this run only; never saved to the experiment. */
     concurrency: z.number().int().min(1).max(MAX_CONCURRENCY).optional(),
+    /** How many times every dataset row runs against every target in this run. */
+    repeat: z.number().int().min(1).max(MAX_RUN_REPEAT).optional(),
   })
   .refine((b) => !(b.data && b.dataset_id), {
     message: "Pass either inline data or a dataset_id, not both",

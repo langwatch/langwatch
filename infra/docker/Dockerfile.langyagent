@@ -246,9 +246,14 @@ ARG LANGWATCH_CLI_VERSION=0.31.0
 # that belongs in the shell. Without these three names present, one session
 # lost `--jq`, then `jq`, then `python` in a row while `python3` sat installed
 # under a name it did not try.
+# `ripgrep` and `fd-find` back the harness's own grep and find tools, which
+# look for `rg` and `fd`/`fdfind` on PATH and otherwise try to download them
+# from GitHub, which the worker's egress policy refuses: without them every
+# code search in a cloned repository fails.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl git ca-certificates python3 python-is-python3 jq util-linux \
-    && rm -rf /var/lib/apt/lists/*
+    curl git ca-certificates python3 python-is-python3 jq util-linux ripgrep fd-find \
+    && rm -rf /var/lib/apt/lists/* \
+    && rg --version && fdfind --version
 # NOTE: `iptables` is no longer installed. The old loopback OWNER-match DROP
 # rule (services/langyagent/iptables.go) that closed the sibling-worker
 # exfiltration path is removed under ADR-033 Fix A′ — a worker has no listener
@@ -275,6 +280,20 @@ RUN curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_CLI_VERSION}/
 
 # There is no Node runtime dependency here: the worker and the LangWatch CLI
 # are both Bun-compiled standalone binaries.
+#
+# A cloned repository's own checks (unit tests, lints) are the agent's to run,
+# so it needs a way to install a project's dependencies without root. `uv`
+# covers Python: `uv sync`, `uv run`, `uv pip install` and a managed
+# interpreter, all under the worker's per-session $HOME. Node is NOT baked in:
+# projects pin different majors, and the official tarball unpacks into $HOME
+# in seconds (skills/github explains the path). `make` runs the targets many
+# repositories wrap their checks in. Everything fetched goes through the
+# worker's egress policy like any other request.
+# COPY --from takes no build arg, so the uv pin lives in the image reference.
+COPY --from=ghcr.io/astral-sh/uv:0.9.5 /uv /uvx /usr/local/bin/
+RUN apt-get update && apt-get install -y --no-install-recommends make \
+    && rm -rf /var/lib/apt/lists/* \
+    && uv --version
 
 # The `langwatch` CLI as a single self-contained native binary, compiled from
 # THIS repo's sdks/typescript/ by the cli-builder stage — no longer

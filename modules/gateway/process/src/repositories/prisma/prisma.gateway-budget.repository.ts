@@ -480,6 +480,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
         resetsAt: true,
         lastResetAt: true,
         cycleAnchorAt: true,
+        timezone: true,
       },
     });
     return rows.map((row) => ({
@@ -901,7 +902,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     await this.assertProviderWithinOrganization(input);
 
     const resetsAt = GatewayWindow.nextBoundaryFor({
-      budget: { window: input.window, cycleAnchorAt },
+      budget: { window: input.window, cycleAnchorAt, timezone: input.timezone ?? null },
     });
     const projectId = extractScopeProjectId(input.scope);
 
@@ -1138,6 +1139,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
               budget: {
                 window: existing.window,
                 cycleAnchorAt: existing.cycleAnchorAt ? fromDate(existing.cycleAnchorAt) : null,
+                timezone: existing.timezone,
               },
               now: fromDate(now),
             }),
@@ -1322,9 +1324,11 @@ function budgetPeriodOf(budget: GatewayBudget): {
   currentPeriodStartedAt: Instant;
   lastResetAt: Instant | null;
   cycleAnchorAt: Instant | null;
+  timezone: string | null;
 } {
   return {
     window: budget.window,
+    timezone: budget.timezone,
     currentPeriodStartedAt: fromDate(budget.currentPeriodStartedAt),
     lastResetAt: budget.lastResetAt ? fromDate(budget.lastResetAt) : null,
     cycleAnchorAt: budget.cycleAnchorAt ? fromDate(budget.cycleAnchorAt) : null,

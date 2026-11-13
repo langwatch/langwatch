@@ -23,6 +23,7 @@ import type {
 
 import type { LangyModule } from "../app/langy.app.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
+import type { LangyPullRequestsOpenedRecord } from "../rules/langy-ci-follow-up.rules.ts";
 import {
   LangyAnalyticsEventMapProjection,
   type LangyAnalyticsEventProjectionRecord,
@@ -82,6 +83,7 @@ import {
 } from "./langy-conversation.intent.ts";
 import { langyConversationProcess } from "./langy-conversation.process.ts";
 import { LangyMessageOperationalMapProjection } from "./langy-message-operational.projection.ts";
+import { LangyPullRequestsMapProjection } from "./langy-pull-requests.projection.ts";
 
 export interface LangyConversationProcessingPipelineDeps {
   langyConversationProjectionStore: StateProjectionStore<LangyConversationStateData>;
@@ -91,6 +93,8 @@ export interface LangyConversationProcessingPipelineDeps {
    * state (status, answer parts, tool-call lifecycle) for one-read rendering.
    */
   langyConversationTurnProjectionStore: StateProjectionStore<LangyConversationTurnData>;
+  /** One row per pull request Langy opened, for CI to find the conversation to wake. */
+  langyPullRequestStore: AppendStore<LangyPullRequestsOpenedRecord>;
   langyMessageProjectionStore: AppendStore<LangyMessageProjectionRecord>;
   /** Content-free event-grain ClickHouse analytics; never an operational read. */
   langyAnalyticsEventProjectionStore: AppendStore<LangyAnalyticsEventProjectionRecord>;
@@ -168,6 +172,9 @@ export function buildLangyConversationPipeline(
       LangyMessageOperationalMapProjection.create({
         store: deps.langyMessageProjectionStore,
       }),
+    )
+    .withClickHouseMapProjection(
+      LangyPullRequestsMapProjection.create({ store: deps.langyPullRequestStore }),
     )
     .withClickHouseMapProjection(
       LangyAnalyticsEventMapProjection.create({

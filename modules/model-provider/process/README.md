@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable model-provider operations shared by process peers after composition.
 
-Peers call these through the token, declared at `../contract/src/model-provider.api.ts:199`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/model-provider.api.ts:204`; nothing else in this package is public.
 
 #### `estimateCost`
 
@@ -64,6 +64,14 @@ findRowServingModel(input: { projectId: string; provider: string; model: string;
 
 ```typescript
 getExecutionProviders(input: ModelProviderListProjectInput): Promise<Record<string, ModelProviderExecution>>;
+```
+
+#### `listForProjectWithServedModels`
+
+`listForProject`, each row carrying the bare ids its provider's own model list answers with (cached per credential), or null when the provider was not asked or did not answer.
+
+```typescript
+listForProjectWithServedModels(input: ModelProviderListProjectInput): Promise<ModelProviderWithServedModels[]>;
 ```
 
 #### `prepareExecution`
@@ -667,7 +675,7 @@ interface Input {
 
 // modelProvider.update
 type Input = z.infer<typeof modelProviderUpdateTrpcInputSchema>; // ../contract/src/model-provider.trpc-schemas.ts:142
-type Output = z.infer<typeof modelProviderListEntrySchema>; // ../contract/src/model-provider-list-entry.ts:51
+type Output = z.infer<typeof modelProviderListEntrySchema>; // ../contract/src/model-provider-list-entry.ts:56
 
 // modelProvider.delete
 // Input: modelProviderDeleteTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:155
@@ -901,8 +909,8 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                                         | Environment variable                           | Declared at                                   |
 | ------ | -------------------------------------------- | ---------------------------------------------- | --------------------------------------------- |
-| secret | `...ModelProviderModule.platformCredentials` | ≈ `...ModelProviderModule.platformCredentials` | `src/app/model-provider.app.ts:262`           |
-| secret | `...ModelProviderModule.operationalSecrets`  | ≈ `...ModelProviderModule.operationalSecrets`  | `src/app/model-provider.app.ts:263`           |
+| secret | `...ModelProviderModule.platformCredentials` | ≈ `...ModelProviderModule.platformCredentials` | `src/app/model-provider.app.ts:270`           |
+| secret | `...ModelProviderModule.operationalSecrets`  | ≈ `...ModelProviderModule.operationalSecrets`  | `src/app/model-provider.app.ts:271`           |
 | config | `blockLocalHttpCalls`                        | `BLOCK_LOCAL_HTTP_CALLS`                       | `../contract/src/model-provider.config.ts:31` |
 | config | `allowedProxyHosts`                          | `ALLOWED_PROXY_HOSTS`                          | `../contract/src/model-provider.config.ts:32` |
 | config | `defaultModel`                               | `LANGWATCH_DEFAULT_MODEL`                      | `../contract/src/model-provider.config.ts:33` |

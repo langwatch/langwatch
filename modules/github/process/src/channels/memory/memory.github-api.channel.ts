@@ -4,6 +4,8 @@ import { nowInstant } from "@langwatch/time";
 
 import type {
   GithubAppClient,
+  GithubCheckRunSummary,
+  GithubCheckSuiteSummary,
   GithubInstallationDetails,
   GithubInstallationToken,
   GithubPullRequestSummary,
@@ -11,7 +13,10 @@ import type {
 } from "../../app/github.app.ts";
 import { GithubInstallationNotFoundError } from "../github-api.channel.ts";
 
-type MemoryGithubInstallation = GithubInstallationDetails;
+type MemoryGithubInstallation = Omit<GithubInstallationDetails, "permissions"> & {
+  permissions?: Record<string, string>;
+};
+type MemoryCommitChecks = { suites: GithubCheckSuiteSummary[]; runs: GithubCheckRunSummary[] };
 type MemoryGithubPullRequest = GithubPullRequestSummary & { owner: string; repo: string };
 
 /**
@@ -22,6 +27,10 @@ type MemoryGithubPullRequest = GithubPullRequestSummary & { owner: string; repo:
 export class MemoryGithubApiAdapter implements GithubAppClient {
   private readonly installations = new Map<string, MemoryGithubInstallation>();
   private readonly pullRequests: MemoryGithubPullRequest[] = [];
+  private readonly commitChecks = new Map<string, MemoryCommitChecks>();
+  private readonly refusedCommits = new Set<string>();
+  /** Every mint asked of this client, in order, so a test can read what was asked for. */
+  readonly mints: MintInstallationTokenInput[] = [];
 
   private constructor(private readonly appConfigured: boolean) {}
 
@@ -39,6 +48,16 @@ export class MemoryGithubApiAdapter implements GithubAppClient {
     this.pullRequests.push(pullRequest);
   }
 
+  /** States the check suites and runs GitHub lists for one commit. */
+  seedCommitChecks(input: { owner: string; repo: string; sha: string } & MemoryCommitChecks): void {
+    this.commitChecks.set(commitKey(input), { suites: input.suites, runs: input.runs });
+  }
+
+  /** Makes listing one commit's checks fail the way a GitHub error would. */
+  refuseCommitChecks(input: { owner: string; repo: string; sha: string }): void {
+    this.refusedCommits.add(commitKey(input));
+  }
+
   get configured(): boolean {
     return this.appConfigured;
   }
@@ -51,10 +70,11 @@ export class MemoryGithubApiAdapter implements GithubAppClient {
     const installation = this.installations.get(installationId);
     if (!installation) throw new GithubInstallationNotFoundError(installationId);
 
-    return installation;
+    return { ...installation, permissions: installation.permissions ?? {} };
   }
 
   async mintInstallationToken(input: MintInstallationTokenInput): Promise<GithubInstallationToken> {
+    this.mints.push(input);
     if (!this.installations.has(input.installationId)) {
       throw new GithubInstallationNotFoundError(input.installationId);
     }
@@ -100,4 +120,33 @@ export class MemoryGithubApiAdapter implements GithubAppClient {
 
     return pullRequest;
   }
+
+  async listCommitCheckSuites(input: {
+    token: string;
+    owner: string;
+    repo: string;
+    sha: string;
+  }): Promise<GithubCheckSuiteSummary[]> {
+    return this.readCommit(input).suites;
+  }
+
+  async listCommitCheckRuns(input: {
+    token: string;
+    owner: string;
+    repo: string;
+    sha: string;
+  }): Promise<GithubCheckRunSummary[]> {
+    return this.readCommit(input).runs;
+  }
+
+  private readCommit(input: { owner: string; repo: string; sha: string }): MemoryCommitChecks {
+    if (this.refusedCommits.has(commitKey(input))) {
+      throw new Error("GitHub repository read failed: 500");
+    }
+    return this.commitChecks.get(commitKey(input)) ?? { suites: [], runs: [] };
+  }
+}
+
+function commitKey(input: { owner: string; repo: string; sha: string }): string {
+  return `${input.owner}/${input.repo}@${input.sha}`.toLowerCase();
 }

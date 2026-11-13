@@ -51,6 +51,9 @@ export type RunDialogSubject =
        * attach. The dialog opens on them, so a repeat run keeps its checks.
        */
       evaluators?: EvaluatorAttachment[];
+      /** The judge's trace wait the stored plan holds; the dialog opens on it. */
+      traceQuietPeriodMs?: number | null;
+      traceWaitTimeoutMs?: number | null;
     }
   | {
       kind: "case";

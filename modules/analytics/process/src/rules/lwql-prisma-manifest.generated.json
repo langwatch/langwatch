@@ -13460,6 +13460,15 @@
           "documentation": ""
         },
         {
+          "name": "CiFollowUpsInARow",
+          "columnName": "ciFollowUpsInARow",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Messages CI started on a pull request since the person last wrote."
+        },
+        {
           "name": "CreatedAt",
           "columnName": "createdAt",
           "type": "Float",
@@ -13902,6 +13911,88 @@
           "isList": false,
           "isOptional": false,
           "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "LangyPullRequest",
+      "tableName": "LangyPullRequest",
+      "documentation": "One pull request Langy opened, from the answer whose `gh pr create` printed it. Finished\nchecks look it up by repository and number to wake the conversation; the daily pull request\ncap counts a person's rows by day. Rebuilt by a projection replay.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "RepositoryFullName",
+          "columnName": "repositoryFullName",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "`owner/repo`, lowercased: GitHub matches repository names without case."
+        },
+        {
+          "name": "PrNumber",
+          "columnName": "prNumber",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "ConversationId",
+          "columnName": "conversationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "UserId",
+          "columnName": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The conversation's owner, who opened it through Langy."
+        },
+        {
+          "name": "OpenedAt",
+          "columnName": "openedAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "When the answer that opened it was recorded (epoch ms)."
+        },
+        {
+          "name": "SourceEventId",
+          "columnName": "sourceEventId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The agent_responded event it came from."
         }
       ]
     },
@@ -18632,6 +18723,24 @@
           "documentation": ""
         },
         {
+          "name": "traceQuietPeriodMs",
+          "columnName": "traceQuietPeriodMs",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "traceWaitTimeoutMs",
+          "columnName": "traceWaitTimeoutMs",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
           "name": "maxTurns",
           "columnName": "maxTurns",
           "type": "Int",
@@ -19011,6 +19120,24 @@
           "name": "judgeModel",
           "columnName": "judgeModel",
           "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "traceQuietPeriodMs",
+          "columnName": "traceQuietPeriodMs",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "traceWaitTimeoutMs",
+          "columnName": "traceWaitTimeoutMs",
+          "type": "Int",
           "kind": "scalar",
           "isList": false,
           "isOptional": true,

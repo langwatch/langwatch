@@ -5,6 +5,7 @@ import { z } from "zod";
 import { FieldMappingSchema } from "../../resolve-field-mappings.ts";
 import { runParameterValuesSchema } from "../../scenario.parameters.ts";
 import { callerVoiceConfigSchema } from "../../voice/caller-voice.config.ts";
+import { traceQuietPeriodMsSchema, traceWaitTimeoutMsSchema } from "../run/run-trace-wait.ts";
 import { scenarioRunHooksSchema } from "./scenario-hooks.ts";
 
 // ============================================================================
@@ -419,10 +420,12 @@ export interface TargetConfigSchema extends Named<typeof TargetConfigSchemaDefin
 export const TargetConfigSchema: TargetConfigSchema = TargetConfigSchemaDefinition;
 export type TargetConfig = z.infer<typeof TargetConfigSchema>;
 
-/** A suite plan's model picks for a run it queued, which win over the scenario's own. */
+/** A suite plan's model and judge trace wait picks for a run it queued; they beat the case's. */
 const runPlanModelsSchemaDefinition = z.object({
   simulatorModel: z.string().optional(),
   judgeModel: z.string().optional(),
+  traceQuietPeriodMs: traceQuietPeriodMsSchema.optional(),
+  traceWaitTimeoutMs: traceWaitTimeoutMsSchema.optional(),
 });
 export interface RunPlanModelsSchema extends Named<typeof runPlanModelsSchemaDefinition> {}
 export const runPlanModelsSchema: RunPlanModelsSchema = runPlanModelsSchemaDefinition;
@@ -522,10 +525,12 @@ const ChildProcessJobDataSchemaDefinition = z
     target: TargetConfigSchema,
     /**
      * Total time (ms) the judge waits at verdict for an http target's remote traces to
-     * arrive and stabilize. Computed from the project's own ingest lag; absent for
-     * non-http targets and pre-budget jobs, in which case the SDK's default applies.
+     * arrive and stabilize: the plan's, else the scenario's, else the project's measured
+     * value. Absent for non-http targets and pre-budget jobs: the SDK's default applies.
      */
     traceWaitTimeoutMs: z.number().optional(),
+    /** How long (ms) the span set must hold still before the judge reads it; same resolution. */
+    traceQuietPeriodMs: z.number().optional(),
     /**
      * A fixed conversation for the run. Present on an agent test run only:
      * the user's messages are written down, no simulator plays the person and

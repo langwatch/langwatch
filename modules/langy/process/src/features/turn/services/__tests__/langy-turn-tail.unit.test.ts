@@ -1,4 +1,4 @@
-import type { LangyStreamEntry } from "@langwatch/langy-contract";
+import type { LangyStreamEntry, LangyStreamFrame } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { LangyStreamRead } from "../../../../repositories/langy-token-buffer.repository.ts";
@@ -78,13 +78,17 @@ function createBuffer({
   };
 }
 
-/** Collect what the tail yields, without blocking the test on it. */
-function pump(entries: AsyncGenerator<LangyStreamEntry>) {
+/** Collect what the tail yields (entries apart from their cursors), without blocking on it. */
+function pump(entries: AsyncGenerator<LangyStreamFrame>) {
   const received: LangyStreamEntry[] = [];
+  const cursors: (string | undefined)[] = [];
   const done = (async () => {
-    for await (const entry of entries) received.push(entry);
+    for await (const { cursor, ...entry } of entries) {
+      received.push(entry as LangyStreamEntry);
+      cursors.push(cursor);
+    }
   })();
-  return { received, done };
+  return { received, cursors, done };
 }
 
 describe("streamTurnEntries", () => {
@@ -222,7 +226,7 @@ describe("streamTurnEntries", () => {
       const follow = vi.fn(() => live.follow({}));
       const release = vi.fn();
 
-      const { received, done } = pump(
+      const { received, cursors, done } = pump(
         tailService.streamTurnEntries({
           ...CONVERSATION,
           buffer: {
@@ -242,6 +246,7 @@ describe("streamTurnEntries", () => {
 
       await done;
       expect(received).toEqual([{ type: "delta", text: "hi" }, { type: "end" }]);
+      expect(cursors).toEqual(["0-0", "0-1"]);
       expect(follow).not.toHaveBeenCalled();
       expect(release).toHaveBeenCalledTimes(1);
     });

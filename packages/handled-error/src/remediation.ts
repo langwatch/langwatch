@@ -96,10 +96,18 @@ const registry = {
   // ---- traces ----
   trace_not_found: {
     tips: [
-      "Check the trace id; traces are deleted after the retention window",
       "If you just sent this trace, retry in a few seconds; ingestion is asynchronous",
+      "The id was looked up as a trace id, a trace id prefix, a span id and a scenario run id, in this project and every project of the organisation you can read",
+      'Find it by what it contained instead: `langwatch trace search -q "<text>" --since 30d`',
+      "Traces are deleted after the project's retention window",
     ],
     docsPath: "/platform/data-retention",
+  },
+  scenario_run_has_many_traces: {
+    tips: [
+      "Open one of the listed traces: `langwatch trace get <traceId>`",
+      'List them all: `langwatch trace search --filter "scenarioRun:<scenarioRunId>" --since 30d`',
+    ],
   },
   span_not_found: {
     tips: ["Check the span id; spans are deleted with their trace after the retention window"],
@@ -133,7 +141,12 @@ const registry = {
     ],
   },
   filter_field_unknown: {
-    tips: ["Use one of the fields listed in meta.knownFields", "Field names are case-sensitive"],
+    tips: [
+      "Use one of the fields listed in meta.knownFields; meta.hint names the likely one",
+      "Field names are case-sensitive",
+      "Text in the trace input or output has no field: search it with a quoted phrase and no field, or -q",
+      "`label:<name>` matches the trace's metadata labels",
+    ],
   },
   filter_value_refused: {
     tips: [

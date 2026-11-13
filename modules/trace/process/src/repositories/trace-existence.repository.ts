@@ -11,6 +11,12 @@ export abstract class TraceExistenceRepository {
     traceIds: readonly string[];
   }): Promise<string[]>;
 
+  /** Which of these projects hold this trace id, as a summary or as stored spans. */
+  abstract findProjectsHoldingTrace(input: {
+    projectIds: readonly string[];
+    traceId: string;
+  }): Promise<string[]>;
+
   /** The latest summary cost of each named trace inside the window; unknown ids are absent. */
   abstract findTraceCosts(input: {
     projectId: string;

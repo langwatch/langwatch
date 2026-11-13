@@ -45,7 +45,8 @@ export const langyTurnHandoffSchema = z
     modelOverride: z.string().optional(),
     credentials: langyWorkerCredentialsSchema,
     runToken: z.string().min(1),
-    permitReserved: z.boolean(),
+    /** No permit is reserved any more; kept so a replica on the previous release still parses. */
+    permitReserved: z.boolean().optional(),
     resumeToken: z.string().optional(),
   })
   .strict();

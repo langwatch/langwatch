@@ -90,6 +90,7 @@ export class ExperimentWorkbenchRunService {
         request: { state: saved.state, scope: saved.scope },
         data: saved.data,
         concurrency: saved.runInputs.concurrency ?? runs.concurrency,
+        ...(saved.repeat ? { repeat: saved.repeat } : {}),
         origin: "saved",
         actor: workbenchActorFrom({ credential: input.credential }),
         experimentSlug: slug,
@@ -125,7 +126,8 @@ export class ExperimentWorkbenchRunService {
       };
     }
     const runUrl = this.#runUrl({ projectSlug: input.projectSlug, slug, runId });
-    const run = savedRun({ persistResults: runsSavedDataset(saved.runInputs), runUrl });
+    const persistResults = !saved.repeat && runsSavedDataset(saved.runInputs);
+    const run = savedRun({ persistResults, runUrl });
     await this.#runsOn().startRun(run);
 
     return {

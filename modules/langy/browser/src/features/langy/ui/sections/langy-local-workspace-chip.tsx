@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { describeError } from "../../../../behavior/errors.tsx";
 import { api } from "../../../../behavior/langy-api.ts";
 import { useLangyLocalControlStore } from "../../../../behavior/langy-local-control.store.ts";
+import { selectConversationReadable, useLangyStore } from "../../../../behavior/langy.store.ts";
 import { parseLangyLocalWorkspace } from "../../../../model/langy-local-workspace.ts";
 
 export interface LangyLocalWorkspaceChipProps {
@@ -22,15 +23,16 @@ export function LangyLocalWorkspaceChip({
   conversationId,
 }: LangyLocalWorkspaceChipProps) {
   const workspaceRevision = useLangyLocalControlStore((s) => s.workspaceRevision);
+  const readable = useLangyStore((s) => selectConversationReadable(s, conversationId));
   const workspace = api.langy.getLocalWorkspace.useQuery(
     { projectId, conversationId },
-    { select: parseLangyLocalWorkspace, enabled: !!projectId && !!conversationId },
+    { select: parseLangyLocalWorkspace, enabled: !!projectId && readable },
   );
   const refetch = workspace.refetch;
   useEffect(() => {
-    if (workspaceRevision === 0) return;
+    if (workspaceRevision === 0 || !readable) return;
     void refetch();
-  }, [workspaceRevision, refetch]);
+  }, [workspaceRevision, refetch, readable]);
 
   const [confirming, setConfirming] = useState(false);
   const folder = workspace.data?.workspace;

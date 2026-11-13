@@ -42,6 +42,8 @@ export interface ScenarioFetcher {
     labels: string[];
     simulatorModel?: string | null;
     judgeModel?: string | null;
+    traceQuietPeriodMs?: number | null;
+    traceWaitTimeoutMs?: number | null;
     parameters?: unknown;
     maxTurns?: number | null;
     minTurns?: number | null;
@@ -98,6 +100,8 @@ export interface ModelParamsProvider {
 
 export interface TraceWaitBudgetResolver {
   resolveTraceWaitTimeoutMs: (input: { projectId: string }) => Promise<number>;
+  /** The project's recommended quiet period; seven seconds when a test names none. */
+  quietPeriodMs?: number;
 }
 
 export interface ScenarioPrefetchFixture {
@@ -415,8 +419,11 @@ export function createTestScenarioExecutionPrefetcherService(
         })),
     }),
     traces: createApiFixture<TraceApi>({
-      resolveIngestWaitTimeout: (input) =>
-        deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs(input),
+      resolveTraceSettleSettings: async (input) => ({
+        waitTimeoutMs: await deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs(input),
+        waitExtensionMs: 30_000,
+        quietPeriodMs: deps.traceWaitBudgetResolver.quietPeriodMs ?? 7_000,
+      }),
     }),
     apiKeys: createApiFixture<ApiKeyApi>({
       mintRunKey: vi.fn().mockResolvedValue("run-key"),

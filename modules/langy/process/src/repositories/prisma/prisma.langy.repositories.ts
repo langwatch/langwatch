@@ -6,6 +6,7 @@ import { PrismaLangyConversationRepository } from "./prisma.langy-conversation.r
 import { PrismaLangyCredentialRepository } from "./prisma.langy-credential.repository.ts";
 import { PrismaLangyMessageProjectionRepository } from "./prisma.langy-message-projection.repository.ts";
 import { PrismaLangyMessageRepository } from "./prisma.langy-message.repository.ts";
+import { PrismaLangyPullRequestRepository } from "./prisma.langy-pull-request.repository.ts";
 import { PrismaLangySessionKeyRepository } from "./prisma.langy-session-key.repository.ts";
 import { PrismaLangyTurnAdmissionRepository } from "./prisma.langy-turn-admission.repository.ts";
 
@@ -19,6 +20,7 @@ export class PrismaLangyRepositories {
       admission: PrismaLangyTurnAdmissionRepository.create(database),
       conversationState: PrismaLangyConversationProjectionRepository.create(database),
       conversationTurnState: PrismaLangyConversationTurnProjectionRepository.create(database),
+      pullRequests: PrismaLangyPullRequestRepository.create(database),
       messageStorage: PrismaLangyMessageProjectionRepository.create(database),
       sessionKeys: PrismaLangySessionKeyRepository.create(database),
     };
