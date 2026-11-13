@@ -175,8 +175,9 @@ Feature: A module fills a new read model at deploy by replaying a projection lan
     Then every report it saves and returns names the instant its first run replayed from
 
   # A heavy tenant's batch can outgrow ClickHouse's per-query memory limit on its event query. That
-  # failure is the batch's size, so the batch splits in halves, as the group queue's batches do
-  # (packages/group-queue/specs/batch-bisection.feature); any other failure stops the lane as before.
+  # failure is the batch's size, so the batch splits in halves down to one aggregate. Unlike the
+  # group queue's bisection (LANGWATCH_GQ_BISECTION_SPLIT_BUDGET), it has no budget: its depth is
+  # bounded by log2 of the batch size. Any other failure stops the lane as before.
 
   @unit
   Scenario: A batch over the query memory limit is split until it fits
@@ -198,6 +199,13 @@ Feature: A module fills a new read model at deploy by replaying a projection lan
     When the step replays the lane
     Then the lane fails with the original error, naming the aggregate's type and id
     And the message names no tenant
+
+  @unit
+  Scenario: A worker stop between the halves of a split batch ends the replay
+    Given a batch split for the query memory limit whose first half completed
+    When the worker stops before the second half starts
+    Then the replay ends with the stop and the second half is not replayed
+    And the lane's live delivery is resumed
 
   @unit
   Scenario: A batch failing for any other reason fails the lane without splitting

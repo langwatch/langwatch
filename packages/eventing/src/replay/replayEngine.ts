@@ -462,9 +462,9 @@ class FoldMapReplayRun {
   }
 
   /**
-   * A statement over its own memory limit fails on the batch's size, so the batch clears its
-   * markers and runs again as two halves. Fold writes happen only after the whole stream, so a
-   * half rebuilds from init() with nothing of the failed attempt applied.
+   * Over its own memory limit a statement fails on the batch's size: clear markers, rerun halves.
+   * Fold writes follow the stream, so a half re-folds from init() (a failed flush only rewrote rows
+   * that replace each other); map lanes write mid-stream, so a half re-appends rows this run wrote.
    */
   private async splitBatch({
     error,
@@ -488,9 +488,10 @@ class FoldMapReplayRun {
       aggKeys: batchKeys,
       log: this.log,
     });
-    this.callbacks?.signal?.throwIfAborted();
     const middle = Math.ceil(batchKeys.length / 2);
     for (const half of [batchKeys.slice(0, middle), batchKeys.slice(middle)]) {
+      // A stop between halves keeps the completed sets, as a stop between batches does.
+      this.callbacks?.signal?.throwIfAborted();
       if (!(await this.runOneBatch({ batchKeys: half, batchNum }))) return false;
     }
     return true;
