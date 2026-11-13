@@ -250,6 +250,8 @@ export function createEvaluatorRest(): Readonly<{
       .withInput(createEvaluatorInputSchema)
       .withCredential("project", { key: true })
       .withPermission("evaluations:create")
+      // An evaluator's config picks the model a monitor or run pays for.
+      .spends()
       .withOutput(evaluatorWireSchema)
       .withDocs({
         description:
@@ -273,6 +275,8 @@ export function createEvaluatorRest(): Readonly<{
       .withInput(updateEvaluatorInputSchema)
       .withCredential("project", { key: true })
       .withPermission("evaluations:update")
+      // Live monitors run the evaluator's current config, so changing it changes what they spend.
+      .spends()
       .withOutput(evaluatorWireSchema)
       .withDocs({
         description: "Update an existing evaluator",
