@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { AgentApi } from "@langwatch/agent-contract";
 import {
   AGENT_REGISTRY_ARD_ENTRY_LIMIT,
   type AgentRegistryEntry,
@@ -14,9 +13,7 @@ import {
 import { generate } from "@langwatch/ksuid";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
-import type { TraceApi } from "@langwatch/trace-contract";
 import { eventMatches, type WebhookApi } from "@langwatch/webhook-contract";
 import { z } from "zod";
 
@@ -24,11 +21,17 @@ import type {
   AgentRegistryRepository,
   RegistryEntryPosition,
 } from "../../../repositories/agent-registry.repository.ts";
-import type { DiscoveredAgentRepository } from "../../../repositories/discovered-agent.repository.ts";
 import type { AgentRegistryDeliveryIntent } from "../eventing/agent-registry-delivery.process.ts";
 import { ardManifestOf, ardPublisherOf, ardSearch } from "../rules/registry-ard.rules.ts";
-import { planRegistryChanges, registryTimestamp } from "../rules/registry-reconcile.rules.ts";
-import { AgentRegistrySourcesService } from "./agent-registry-sources.service.ts";
+import {
+  changedSince,
+  planRegistryChanges,
+  registryTimestamp,
+} from "../rules/registry-reconcile.rules.ts";
+import {
+  AgentRegistrySourcesService,
+  type AgentRegistrySourcesDependencies,
+} from "./agent-registry-sources.service.ts";
 
 /** Where the registry records its webhook fan-out; governance's outbox in the worker. */
 export interface AgentRegistryDeliveryOutbox {
@@ -36,6 +39,8 @@ export interface AgentRegistryDeliveryOutbox {
 }
 
 const FAN_OUT_BATCH = 500;
+/** A read another reconcile overtook is read again; past this the newer commit stands. */
+const RECONCILE_ATTEMPTS = 3;
 const ORGANIZATION_PAGE_LIMIT = 100;
 
 const entryCursorSchema = z.object({ u: z.iso.datetime({ offset: true }), i: z.string().min(1) });
@@ -62,11 +67,7 @@ function decodeCursor(cursor: string): RegistryEntryPosition {
 type AgentRegistryDependencies = {
   registry: AgentRegistryRepository;
   sources: AgentRegistrySourcesService;
-  discoveredAgents: Pick<DiscoveredAgentRepository, "findForRegistry">;
-  agents: Pick<AgentApi, "list" | "platformUrl">;
-  projects: Pick<ProjectApi, "findLiveNonGovernanceIdsByOrganization" | "listNamesByIds">;
-  organizations: Pick<OrganizationApi, "findMembersWithDepartments" | "listAllIds">;
-  traces: Pick<TraceApi, "findAgentsSeen">;
+  organizations: Pick<OrganizationApi, "listAllIds">;
   webhooks: Pick<WebhookApi, "getAll">;
   /** Present in the worker, where the delivery process runs; the api records no fan-out. */
   outbox: () => AgentRegistryDeliveryOutbox | undefined;
@@ -89,31 +90,63 @@ export class AgentRegistryService {
     now = nowInstant,
     newId = () => generate("agentreg").toString(),
     ...deps
-  }: Omit<AgentRegistryDependencies, "sources" | "logger" | "now" | "newId"> & {
-    logger?: Logger;
-    now?: () => Instant;
-    newId?: () => string;
-  }): AgentRegistryService {
-    const sources = AgentRegistrySourcesService.create({ ...deps, now });
-    return new AgentRegistryService({ ...deps, sources, logger, now, newId });
+  }: Omit<AgentRegistryDependencies, "sources" | "organizations" | "logger" | "now" | "newId"> &
+    Omit<AgentRegistrySourcesDependencies, "organizations" | "now"> & {
+      organizations: Pick<OrganizationApi, "findMembersWithDepartments" | "listAllIds">;
+      logger?: Logger;
+      now?: () => Instant;
+      newId?: () => string;
+    }): AgentRegistryService {
+    const { discoveredAgents, agents, projects, traces, ...own } = deps;
+    const sources = AgentRegistrySourcesService.create({
+      discoveredAgents,
+      agents,
+      projects,
+      traces,
+      organizations: own.organizations,
+      publicBaseUrl: own.publicBaseUrl,
+      now,
+    });
+    return new AgentRegistryService({ ...own, sources, logger, now, newId });
   }
 
-  /** Rebuilds the organisation's entries from its sources, appends what changed, fans it out. */
+  /**
+   * Rebuilds the organisation's entries from its sources, appends what changed, fans it out. A
+   * read another reconcile's commit overtook plans nothing and is read again. With `announce`
+   * off the appended events stay in the feed but are pushed to no webhook.
+   */
   async reconcileOrganization({
     organizationId,
+    announce = true,
   }: {
     organizationId: string;
+    announce?: boolean;
   }): Promise<{ events: number }> {
-    const readAt = this.deps.now();
-    const { drafts, keep } = await this.deps.sources.read({ organizationId });
-    const now = this.deps.now();
-    const events = await this.deps.registry.applyChanges({
-      organizationId,
-      plan: (stored) =>
-        planRegistryChanges({ stored, drafts, now, newId: this.deps.newId, readAt, keep }),
-    });
+    let events = 0;
+    for (let attempt = 1; attempt <= RECONCILE_ATTEMPTS; attempt++) {
+      const readAt = this.deps.now();
+      const { drafts, keep } = await this.deps.sources.read({ organizationId });
+      const now = this.deps.now();
+      let superseded = false;
+      const appended = await this.deps.registry.applyChanges({
+        organizationId,
+        plan: (stored) => {
+          superseded = changedSince({ stored, readAt });
+          return planRegistryChanges({ stored, drafts, now, newId: this.deps.newId, readAt, keep });
+        },
+      });
+      events += appended.length;
+      if (!announce && appended.length > 0) {
+        await this.deps.registry.markDeliveryRecorded({
+          organizationId,
+          eventIds: appended.map((event) => event.id),
+          at: this.deps.now(),
+        });
+      }
+      if (!superseded) break;
+    }
     await this.fanOutPending({ organizationId });
-    return { events: events.length };
+    return { events };
   }
 
   /**
@@ -127,7 +160,10 @@ export class AgentRegistryService {
     organizations: number;
   }> {
     if (everyOrganization) {
-      const { organizations } = await this.seedAll(signal ? { signal } : {});
+      const { organizations } = await this.seedAll({
+        announce: true,
+        ...(signal ? { signal } : {}),
+      });
       return { organizations };
     }
     let organizations = 0;
@@ -148,14 +184,19 @@ export class AgentRegistryService {
     return { organizations };
   }
 
-  /** Every organisation, once: the deploy step that fills the registry. */
+  /**
+   * Every organisation, once. The deploy step that fills the registry announces nothing, so
+   * existing `governance.*` webhook subscribers get no burst for agents that already existed.
+   */
   async seedAll({
     after,
     signal,
     onPage,
+    announce = false,
   }: {
     after?: string;
     signal?: AbortSignal;
+    announce?: boolean;
     onPage?: (page: { afterOrganizationId: string }) => Promise<void>;
   }): Promise<{ afterOrganizationId: string | null; organizations: number }> {
     let cursor = after;
@@ -167,7 +208,7 @@ export class AgentRegistryService {
         limit: ORGANIZATION_PAGE_LIMIT,
       });
       for (const organizationId of page.ids) {
-        await this.reconcileLogged({ organizationId });
+        await this.reconcileLogged({ organizationId, announce });
         organizations += 1;
       }
       const last = page.ids.at(-1);
@@ -316,9 +357,15 @@ export class AgentRegistryService {
     return ardSearch({ manifest: await this.ardManifest({ organizationId }), request });
   }
 
-  private async reconcileLogged({ organizationId }: { organizationId: string }): Promise<void> {
+  private async reconcileLogged({
+    organizationId,
+    announce = true,
+  }: {
+    organizationId: string;
+    announce?: boolean;
+  }): Promise<void> {
     try {
-      await this.reconcileOrganization({ organizationId });
+      await this.reconcileOrganization({ organizationId, announce });
     } catch (error) {
       this.deps.logger.warn(
         { organizationId, error },

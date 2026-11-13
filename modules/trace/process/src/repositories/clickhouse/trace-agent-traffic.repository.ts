@@ -1,21 +1,23 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { TraceAgentSeen } from "@langwatch/trace-contract";
+import { z } from "zod";
 
 import { TraceAgentTrafficRepository } from "../trace-agent-traffic.repository.ts";
 
-type AgentSeenRow = {
-  agentName: string;
-  agentId: string;
-  model: string;
-  spanCount: string | number;
-  firstSeenMs: string | number;
-  lastSeenMs: string | number;
-};
+const agentSeenRowSchema = z.object({
+  agentName: z.string(),
+  agentId: z.string(),
+  model: z.string(),
+  spanCount: z.coerce.number(),
+  firstSeenMs: z.coerce.number(),
+  lastSeenMs: z.coerce.number(),
+});
+type AgentSeenRow = z.input<typeof agentSeenRowSchema>;
 
 /**
  * Distinct `gen_ai.agent.name` over `stored_spans`, bounded by `StartTime` so only the window's
- * partitions are read. Id and model are the latest non-empty values, ties broken by value, so a
- * stable agent reads the same on every pass. Span counts may include unmerged duplicates.
+ * partitions are read. Id and model are the non-empty values on most spans, ties broken by value,
+ * so an agent mixing models reads the same on every pass. Counts may include unmerged duplicates.
  */
 export class TraceAgentTrafficClickHouseRepository extends TraceAgentTrafficRepository {
   readonly #clickhouse: ClickHouseQueryClient;
@@ -39,37 +41,41 @@ export class TraceAgentTrafficClickHouseRepository extends TraceAgentTrafficRepo
       table: "stored_spans",
       sql: `
         SELECT
-          SpanAttributes['gen_ai.agent.name'] AS agentName,
-          argMaxIf(
-            SpanAttributes['gen_ai.agent.id'],
-            (StartTime, SpanAttributes['gen_ai.agent.id']),
-            SpanAttributes['gen_ai.agent.id'] != ''
-          ) AS agentId,
-          argMaxIf(
-            SpanAttributes['gen_ai.request.model'],
-            (StartTime, SpanAttributes['gen_ai.request.model']),
-            SpanAttributes['gen_ai.request.model'] != ''
-          ) AS model,
-          count() AS spanCount,
-          toUnixTimestamp64Milli(min(StartTime)) AS firstSeenMs,
-          toUnixTimestamp64Milli(max(StartTime)) AS lastSeenMs
-        FROM stored_spans
-        WHERE TenantId = {tenantId:String}
-          AND StartTime >= fromUnixTimestamp64Milli({since:Int64})
-          AND SpanAttributes['gen_ai.agent.name'] != ''
+          agentName,
+          sumMapIf([seenId], [spans], seenId != '') AS ids,
+          sumMapIf([seenModel], [spans], seenModel != '') AS models,
+          arrayReverseSort((key, count) -> (count, key), ids.1, ids.2)[1] AS agentId,
+          arrayReverseSort((key, count) -> (count, key), models.1, models.2)[1] AS model,
+          sum(spans) AS spanCount,
+          toUnixTimestamp64Milli(min(firstAt)) AS firstSeenMs,
+          toUnixTimestamp64Milli(max(lastAt)) AS lastSeenMs
+        FROM (
+          SELECT
+            SpanAttributes['gen_ai.agent.name'] AS agentName,
+            SpanAttributes['gen_ai.agent.id'] AS seenId,
+            SpanAttributes['gen_ai.request.model'] AS seenModel,
+            count() AS spans,
+            min(StartTime) AS firstAt,
+            max(StartTime) AS lastAt
+          FROM stored_spans
+          WHERE TenantId = {tenantId:String}
+            AND StartTime >= fromUnixTimestamp64Milli({since:Int64})
+            AND SpanAttributes['gen_ai.agent.name'] != ''
+          GROUP BY agentName, seenId, seenModel
+        )
         GROUP BY agentName
         ORDER BY spanCount DESC, agentName
         LIMIT {limit:UInt32}
       `,
       params: { tenantId: input.tenantId, since: input.sinceMs, limit: input.limit },
     });
-    return result.rows.map((row) => ({
-      agentName: row.agentName,
-      agentId: row.agentId === "" ? null : row.agentId,
-      model: row.model === "" ? null : row.model,
-      spanCount: Number(row.spanCount),
-      firstSeenMs: Number(row.firstSeenMs),
-      lastSeenMs: Number(row.lastSeenMs),
-    }));
+    return result.rows.map((raw) => {
+      const row = agentSeenRowSchema.parse(raw);
+      return {
+        ...row,
+        agentId: row.agentId === "" ? null : row.agentId,
+        model: row.model === "" ? null : row.model,
+      };
+    });
   }
 }

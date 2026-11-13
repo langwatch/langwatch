@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  * The agents-seen read against production schema: an agent whose spans name two models and two
- * ids reads its latest ones, the same on every read.
+ * ids reads the ones on most spans, not the latest, the same on every read.
  * @see modules/trace/specs/trace-agent-traffic.feature
  */
 import type { ClickHouseClient } from "@clickhouse/client";
@@ -73,18 +73,26 @@ beforeAll(async () => {
   // Separate inserts leave unmerged parts, so part order cannot pick the answer.
   for (const row of [
     spanRow({
-      offsetMs: 3_000,
-      attributes: {
-        "gen_ai.agent.name": "planner",
-        "gen_ai.agent.id": "planner-v2",
-        "gen_ai.request.model": "gpt-5",
-      },
-    }),
-    spanRow({
       offsetMs: 0,
       attributes: {
         "gen_ai.agent.name": "planner",
         "gen_ai.agent.id": "planner-v1",
+        "gen_ai.request.model": "gpt-5",
+      },
+    }),
+    spanRow({
+      offsetMs: 2_000,
+      attributes: {
+        "gen_ai.agent.name": "planner",
+        "gen_ai.agent.id": "planner-v1",
+        "gen_ai.request.model": "gpt-5",
+      },
+    }),
+    spanRow({
+      offsetMs: 3_000,
+      attributes: {
+        "gen_ai.agent.name": "planner",
+        "gen_ai.agent.id": "planner-v2",
         "gen_ai.request.model": "gpt-5-mini",
       },
     }),
@@ -110,8 +118,8 @@ afterAll(async () => {
 
 describe.skipIf(!clickHouseConfigured)("TraceAgentTrafficClickHouseRepository", () => {
   describe("given an agent whose spans name two models and two ids", () => {
-    /** @scenario An agent seen with two models reads its latest model on every read */
-    it("answers the latest non-empty model and id, the same on every read", async () => {
+    /** @scenario An agent seen with two models reads its most-used model on every read */
+    it("answers the non-empty model and id on most spans, the same on every read", async () => {
       const read = () => repo.findAgentsSeen({ tenantId, sinceMs: base - 1_000, limit: 10 });
 
       const first = await read();
@@ -120,9 +128,9 @@ describe.skipIf(!clickHouseConfigured)("TraceAgentTrafficClickHouseRepository", 
       expect(first).toEqual([
         {
           agentName: "planner",
-          agentId: "planner-v2",
+          agentId: "planner-v1",
           model: "gpt-5",
-          spanCount: 3,
+          spanCount: 4,
           firstSeenMs: base,
           lastSeenMs: base + 5_000,
         },

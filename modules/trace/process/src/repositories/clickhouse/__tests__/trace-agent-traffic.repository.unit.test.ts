@@ -89,13 +89,15 @@ describe("MemoryTraceAgentTrafficRepository", () => {
     });
   });
 
-  describe("when an agent's spans carry an empty id or model before a real one", () => {
-    /** @scenario The in-memory twin skips empty ids and models like the stored read */
-    it("answers the latest non-empty id and model", async () => {
+  describe("when an agent's spans mix models and carry empty values", () => {
+    /** @scenario The in-memory twin picks the most-used id and model like the stored read */
+    it("answers the id and model on most spans", async () => {
       const repository = MemoryTraceAgentTrafficRepository.create();
       const span = { tenantId: "project-1", agentName: "planner" };
       repository.record({ ...span, startTimeMs: 1_100, agentId: "agent-7", model: "gpt-5" });
-      repository.record({ ...span, startTimeMs: 1_200, agentId: "", model: "" });
+      repository.record({ ...span, startTimeMs: 1_200, agentId: "agent-7", model: "gpt-5" });
+      repository.record({ ...span, startTimeMs: 1_300, agentId: "agent-8", model: "gpt-5-mini" });
+      repository.record({ ...span, startTimeMs: 1_400, agentId: "", model: "" });
 
       const [seen] = await repository.findAgentsSeen({
         tenantId: "project-1",
@@ -103,7 +105,7 @@ describe("MemoryTraceAgentTrafficRepository", () => {
         limit: 10,
       });
 
-      expect(seen).toMatchObject({ agentId: "agent-7", model: "gpt-5", spanCount: 2 });
+      expect(seen).toMatchObject({ agentId: "agent-7", model: "gpt-5", spanCount: 4 });
     });
   });
 });

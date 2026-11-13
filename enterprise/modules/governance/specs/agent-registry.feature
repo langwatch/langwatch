@@ -38,10 +38,11 @@ Feature: Agent registry with ARD discovery and change events
     And no part of the entry carries the bearer token
 
   @unit
-  Scenario: An HTTP agent's URL is published without user info or credential parameters
-    Given an HTTP agent calling "https://bot:secret@agent.acme.test/run?api_key=secret&region=eu"
+  Scenario: An HTTP agent's URL is published as its origin and path only
+    Given an HTTP agent calling "https://bot:secret@agent.acme.test/run?code=secret&region=eu#secret"
     When the registry builds its entry
-    Then the entry lists the endpoint "https://agent.acme.test/run?region=eu"
+    Then the entry lists the endpoint "https://agent.acme.test/run"
+    And no part of the entry, which change events carry whole, holds the user info, query or fragment
 
   @unit
   Scenario: A Copilot Studio agent a source listed becomes a discovered entry with its environment endpoint
@@ -62,6 +63,13 @@ Feature: Agent registry with ARD discovery and change events
     And a LangWatch agent named "support bot" exists
     When the registry builds its drafts
     Then no traffic draft is built for either
+
+  @unit
+  Scenario: A traced agent named like another project's agent is still flagged shadow
+    Given project "project-1" defines an agent "assistant"
+    And project "project-2"'s spans name an agent "Assistant"
+    When the registry builds its drafts
+    Then a traffic draft flagged shadow is built for "Assistant" in "project-2"
 
   @unit
   Scenario: A traced agent carrying a listed provider's agent id is not flagged shadow
@@ -134,6 +142,13 @@ Feature: Agent registry with ARD discovery and change events
     Then it writes and announces nothing
 
   @unit
+  Scenario: A project whose agent read came back incomplete removes none of its agents
+    Given the registry holds two agents of one project
+    And the project's agent pages, read while an agent is edited, return one agent of two
+    When the registry reconciles
+    Then both agents stay active
+
+  @unit
   Scenario: A traffic read that hit its cap removes no traced agent it did not read
     Given a project whose traffic read returned the per-project cap of agent names
     And the registry holds a traced agent of that project the read did not return
@@ -151,9 +166,16 @@ Feature: Agent registry with ARD discovery and change events
   @unit
   Scenario: The daily traffic pass also reaches organisations the registry does not hold
     Given an organisation that holds no registry entry yet
-    When the first traffic pass of a UTC day runs
+    When a traffic pass runs a day or more after the last full pass
     Then the pass walks every organisation and reconciles that one too
-    And later passes that day walk only the organisations the registry holds
+    And passes within the next day walk only the organisations the registry holds
+
+  @unit
+  Scenario: The deploy seed fills the feed without pushing webhooks
+    Given an organisation with one agent and a webhook endpoint subscribed to "governance.agent.*"
+    When the deploy step seeds the registry
+    Then the feed holds the "governance.agent.registered" event
+    And no webhook delivery is recorded for it
 
   @unit
   Scenario: A recorded agent change reconciles the agent's organisation

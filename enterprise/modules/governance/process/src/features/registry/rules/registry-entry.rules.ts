@@ -197,21 +197,15 @@ function endpointsOf({
   return endpoints;
 }
 
-const CREDENTIAL_PARAMETER = /key|token|secret|sig|pass|auth|credential|code/i;
-
 /**
- * An HTTP agent's own URL as the registry may publish it: without user info and without query
- * parameters that look like credentials. A URL that does not parse publishes no endpoint.
+ * An HTTP agent's URL as the registry may publish it: origin and path only. User info, query and
+ * fragment can hold credentials (`?code=` function keys), so none of them is published. A URL
+ * that does not parse publishes no endpoint.
  */
 export function httpInvokeEndpoints(raw: string): AgentRegistryEndpoint[] {
   if (!URL.canParse(raw)) return [];
   const url = new URL(raw);
-  url.username = "";
-  url.password = "";
-  for (const name of new Set(url.searchParams.keys())) {
-    if (CREDENTIAL_PARAMETER.test(name)) url.searchParams.delete(name);
-  }
-  return [{ kind: "invoke", url: url.toString(), protocol: "http" }];
+  return [{ kind: "invoke", url: `${url.origin}${url.pathname}`, protocol: "http" }];
 }
 
 function describedBy(agent: Agent): Pick<RegistryDraft, "description"> {

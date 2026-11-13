@@ -54,7 +54,7 @@ export class AgentRegistrySourcesService {
     const projectIds = await this.deps.projects.findLiveNonGovernanceIdsByOrganization({
       organizationId,
     });
-    const [agents, discovered, members, projects] = await Promise.all([
+    const [{ agents, incompleteProjects }, discovered, members, projects] = await Promise.all([
       this.agentsOf(projectIds),
       this.deps.discoveredAgents.findForRegistry({ organizationId }),
       this.deps.organizations.findMembersWithDepartments({ organizationId }),
@@ -98,22 +98,35 @@ export class AgentRegistrySourcesService {
         }),
       })),
     );
+    const keepTraffic = keepsUnreadTraffic({ seen });
     return {
       drafts: [...listed, ...trafficAgentDrafts({ seen, listed })],
-      keep: keepsUnreadTraffic({ seen }),
+      keep: (held) =>
+        keepTraffic(held) ||
+        (held.entry.source === "langwatch" &&
+          held.entry.project_id !== null &&
+          incompleteProjects.has(held.entry.project_id)),
     };
   }
 
-  private async agentsOf(projectIds: readonly string[]): Promise<Agent[]> {
-    const agents: Agent[] = [];
+  /** A project whose pages, read by offset, came back short of their total read incomplete. */
+  private async agentsOf(
+    projectIds: readonly string[],
+  ): Promise<{ agents: Agent[]; incompleteProjects: Set<string> }> {
+    const agents = new Map<string, Agent>();
+    const incompleteProjects = new Set<string>();
     for (const projectId of projectIds) {
+      const before = agents.size;
       let totalPages = 1;
+      let total = 0;
       for (let page = 1; page <= totalPages; page++) {
         const result = await this.deps.agents.list({ projectId, page, limit: AGENTS_PAGE_LIMIT });
-        agents.push(...result.data);
+        for (const agent of result.data) agents.set(agent.id, agent);
         totalPages = result.pagination.totalPages;
+        total = result.pagination.total;
       }
+      if (agents.size - before < total) incompleteProjects.add(projectId);
     }
-    return agents;
+    return { agents: [...agents.values()], incompleteProjects };
   }
 }

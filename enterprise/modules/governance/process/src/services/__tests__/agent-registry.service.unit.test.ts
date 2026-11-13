@@ -4,10 +4,10 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { Temporal } from "@langwatch/time";
+import { Temporal, type Instant } from "@langwatch/time";
 import type { TraceApi, TraceAgentSeen } from "@langwatch/trace-contract";
 import type { WebhookApi, WebhookEndpointView } from "@langwatch/webhook-contract";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { AgentRegistryDeliveryIntent } from "../../features/registry/eventing/agent-registry-delivery.process.ts";
 import {
@@ -76,13 +76,23 @@ function setup({
   endpoints = [endpoint("hook-governance", ["governance.agent.*"])],
   traffic = [],
   organizationIds = [ORG],
+  now = () => NOW,
 }: {
   agents?: Agent[];
   endpoints?: WebhookEndpointView[];
   traffic?: TraceAgentSeen[];
   organizationIds?: string[];
+  now?: () => Instant;
 } = {}) {
-  const state = { agents, failAgents: false };
+  const state: {
+    agents: Agent[];
+    failAgents: boolean;
+    holdNextList?: Promise<void>;
+    claimedTotal?: number;
+  } = {
+    agents,
+    failAgents: false,
+  };
   const registry = MemoryAgentRegistryRepository.create();
   const outbox = new RecordingOutbox();
   const reconciled: string[] = [];
@@ -93,7 +103,11 @@ function setup({
       list: async ({ projectId }) => {
         if (state.failAgents) throw new Error("agent store unavailable");
         const data = state.agents.filter((agent) => agent.projectId === projectId);
-        return { data, pagination: { page: 1, limit: 200, total: data.length, totalPages: 1 } };
+        const hold = state.holdNextList;
+        state.holdNextList = undefined;
+        await hold;
+        const total = state.claimedTotal ?? data.length;
+        return { data, pagination: { page: 1, limit: 200, total, totalPages: 1 } };
       },
       platformUrl: ({ agentId }) => `https://app.langwatch.test/agents/${agentId}`,
     }),
@@ -124,7 +138,7 @@ function setup({
     outbox: () => outbox,
     publicBaseUrl: "https://app.langwatch.test",
     logger: createTestLogger().logger,
-    now: () => NOW,
+    now,
   });
   return { service, registry, outbox, state, reconciled };
 }
@@ -224,13 +238,30 @@ describe("AgentRegistryService", () => {
 
   describe("when the daily traffic pass walks every organisation", () => {
     /** @scenario The daily traffic pass also reaches organisations the registry does not hold */
-    it("reconciles an organisation that holds no entry yet", async () => {
-      const { service, reconciled } = setup({ agents: [], organizationIds: [ORG, "org-new"] });
+    it("registers a traces-only organisation's agent as shadow", async () => {
+      const { service, registry, reconciled } = setup({
+        agents: [],
+        traffic: [
+          {
+            agentName: "shadow-bot",
+            agentId: null,
+            model: null,
+            spanCount: 3,
+            firstSeenMs: NOW.epochMilliseconds - 60_000,
+            lastSeenMs: NOW.epochMilliseconds,
+          },
+        ],
+        organizationIds: [ORG],
+      });
+      await expect(service.reconcileTraffic()).resolves.toEqual({ organizations: 0 });
 
       await expect(service.reconcileTraffic({ everyOrganization: true })).resolves.toEqual({
-        organizations: 2,
+        organizations: 1,
       });
-      expect(reconciled.toSorted()).toEqual([ORG, "org-new"]);
+
+      expect(reconciled).toEqual([ORG]);
+      const entries = await registry.findEntries({ organizationId: ORG, limit: 10 });
+      expect(entries.map((entry) => [entry.name, entry.shadow])).toEqual([["shadow-bot", true]]);
     });
   });
 
@@ -243,6 +274,64 @@ describe("AgentRegistryService", () => {
       await expect(
         service.listEntries({ organizationId: ORG, limit: 10, cursor }),
       ).rejects.toMatchObject({ code: "validation_error" });
+    });
+  });
+
+  describe("when two reconciles of one organisation interleave", () => {
+    /** @scenario A reconcile whose sources were read before a newer commit plans nothing */
+    it("announces no removal for the agent the newer read registered", async () => {
+      let tick = 0;
+      const clock = () => NOW.add({ seconds: ++tick });
+      const { service, registry, state } = setup({ agents: [], now: clock });
+      let release = () => undefined as void;
+      state.holdNextList = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+
+      const stale = service.reconcileOrganization({ organizationId: ORG });
+      await vi.waitFor(() => expect(state.holdNextList).toBeUndefined());
+      state.agents = [connectedAgent("agent-x", "Late agent")];
+      await service.reconcileOrganization({ organizationId: ORG });
+      release();
+      await stale;
+
+      const feed = await registry.findEventsAfter({ organizationId: ORG, limit: 10 });
+      expect(feed.map((event) => event.type)).toEqual(["governance.agent.registered"]);
+      const [entry] = await registry.findEntries({ organizationId: ORG, limit: 10 });
+      expect(entry?.status).toBe("active");
+    });
+  });
+
+  describe("when a project's agent pages come back short of their total", () => {
+    /** @scenario A project whose agent read came back incomplete removes none of its agents */
+    it("removes no agent of that project", async () => {
+      const { service, registry, state } = setup({
+        agents: [connectedAgent("agent-1", "Field agent"), connectedAgent("agent-2", "Desk agent")],
+      });
+      await service.reconcileOrganization({ organizationId: ORG });
+      state.agents = [connectedAgent("agent-1", "Field agent")];
+      state.claimedTotal = 2;
+
+      await service.reconcileOrganization({ organizationId: ORG });
+
+      const entries = await registry.findEntries({ organizationId: ORG, limit: 10 });
+      expect(entries.map((entry) => entry.status)).toEqual(["active", "active"]);
+    });
+  });
+
+  describe("when the deploy seed fills the registry", () => {
+    /** @scenario The deploy seed fills the feed without pushing webhooks */
+    it("appends the events and records no delivery intent", async () => {
+      const { service, registry, outbox } = setup();
+
+      await service.seedAll({});
+
+      const feed = await registry.findEventsAfter({ organizationId: ORG, limit: 10 });
+      expect(feed.map((event) => event.type)).toEqual(["governance.agent.registered"]);
+      expect(outbox.intents).toEqual([]);
+      await expect(
+        registry.findUndeliveredEvents({ organizationId: ORG, limit: 10 }),
+      ).resolves.toEqual([]);
     });
   });
 });

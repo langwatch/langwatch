@@ -45,7 +45,8 @@ function modelOf(model: string | null): RegistryDraft["model"] {
 /**
  * Agents the traces name that no listed source accounts for, as observed drafts flagged shadow.
  * A trace agent matches a listed one by `gen_ai.agent.id` equal to a LangWatch agent's id or a
- * provider's agent id, or by the same name ignoring case. Spec: specs/agent-registry.feature
+ * provider's agent id, or by name ignoring case: a LangWatch agent's in its own project, a
+ * provider agent's anywhere. Spec: specs/agent-registry.feature
  */
 export function trafficAgentDrafts({
   seen,
@@ -54,13 +55,16 @@ export function trafficAgentDrafts({
   seen: readonly { projectId: string; agents: readonly TraceAgentSeen[] }[];
   listed: readonly RegistryDraft[];
 }): RegistryDraft[] {
-  const listedNames = new Set(listed.map((draft) => normalised(draft.name)));
+  const nameKey = (projectId: string | null, name: string) =>
+    `${projectId ?? "*"}:${normalised(name)}`;
+  const listedNames = new Set(listed.map((draft) => nameKey(draft.project_id, draft.name)));
   const listedIds = new Set(listed.flatMap((draft) => draft.matchIds ?? []));
   const drafts: RegistryDraft[] = [];
   for (const { projectId, agents } of seen) {
     for (const agent of agents) {
       if (agent.agentId && listedIds.has(agent.agentId)) continue;
-      if (listedNames.has(normalised(agent.agentName))) continue;
+      if (listedNames.has(nameKey(projectId, agent.agentName))) continue;
+      if (listedNames.has(nameKey(null, agent.agentName))) continue;
       drafts.push({
         sourceKey: `traffic:${projectId}:${agent.agentName}`,
         source: "traffic",

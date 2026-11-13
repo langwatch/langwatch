@@ -116,21 +116,21 @@ describe("langwatchAgentDraft()", () => {
 });
 
 describe("langwatchAgentDraft() with credentials in the URL", () => {
-  describe("given an HTTP agent whose URL carries user info and a key parameter", () => {
-    /** @scenario An HTTP agent's URL is published without user info or credential parameters */
-    it("publishes the URL without them", () => {
+  describe("given an HTTP agent whose URL carries user info, a query and a fragment", () => {
+    /** @scenario An HTTP agent's URL is published as its origin and path only */
+    it("publishes only the origin and path", () => {
       const draft = draftOf({
         ...record("agent-4", "Keyed agent"),
         type: "http",
         config: {
-          url: "https://bot:pw-very-secret@agent.acme.test/run?api_key=k-very-secret&region=eu",
+          url: "https://bot:pw-very-secret@agent.acme.test/run?code=k-very-secret&region=eu#t-very-secret",
           method: "POST",
         },
       });
 
       expect(draft.endpoints).toContainEqual({
         kind: "invoke",
-        url: "https://agent.acme.test/run?region=eu",
+        url: "https://agent.acme.test/run",
         protocol: "http",
       });
       expect(JSON.stringify(draft)).not.toMatch(/very-secret/);
@@ -211,6 +211,22 @@ describe("trafficAgentDrafts()", () => {
       });
 
       expect(drafts).toEqual([]);
+    });
+  });
+
+  describe("given a traced agent sharing a name with an agent of another project", () => {
+    /** @scenario A traced agent named like another project's agent is still flagged shadow */
+    it("builds a traffic draft for it", () => {
+      const listed = draftOf({ ...record("agent-9", "assistant"), type: "signature", config: {} });
+
+      const drafts = trafficAgentDrafts({
+        seen: [{ projectId: "project-2", agents: [seenAgent("Assistant")] }],
+        listed: [listed],
+      });
+
+      expect(drafts.map((draft) => [draft.name, draft.project_id])).toEqual([
+        ["Assistant", "project-2"],
+      ]);
     });
   });
 

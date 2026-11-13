@@ -4,9 +4,9 @@ import { z } from "zod";
 /** One agent a project's spans named in `gen_ai.agent.name` over a window. */
 const traceAgentSeenSchemaDefinition = z.object({
   agentName: z.string().min(1),
-  /** The latest non-empty `gen_ai.agent.id` its spans carried. */
+  /** The non-empty `gen_ai.agent.id` on most of its spans, ties broken by value. */
   agentId: z.string().nullable(),
-  /** The latest non-empty `gen_ai.request.model` its spans carried. */
+  /** The non-empty `gen_ai.request.model` on most of its spans, ties broken by value. */
   model: z.string().nullable(),
   /** Spans in the window; an ordering signal, unmerged duplicates may count twice. */
   spanCount: z.number().int().nonnegative(),

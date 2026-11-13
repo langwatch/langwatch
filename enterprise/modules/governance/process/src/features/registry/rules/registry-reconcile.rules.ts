@@ -230,8 +230,17 @@ function planObserved(
   return { writes: [{ ...row, entry: candidate }], events };
 }
 
-function changedAfter(entry: AgentRegistryEntry, readAt: Instant): boolean {
-  return Temporal.Instant.compare(Temporal.Instant.from(entry.updated_at), readAt) > 0;
+/** Whether another reconcile committed to these rows after `readAt`. */
+export function changedSince({
+  stored,
+  readAt,
+}: {
+  stored: readonly StoredRegistryEntry[];
+  readAt: Instant;
+}): boolean {
+  return stored.some(
+    (row) => Temporal.Instant.compare(Temporal.Instant.from(row.entry.updated_at), readAt) > 0,
+  );
 }
 
 /** A held agent no draft names any more: one removal, never a deletion. */
@@ -284,9 +293,7 @@ export function planRegistryChanges({
   readAt?: Instant;
   keep?: (held: StoredRegistryEntry) => boolean;
 }): RegistryChangeSet {
-  if (readAt && stored.some((row) => changedAfter(row.entry, readAt))) {
-    return { writes: [], events: [] };
-  }
+  if (readAt && changedSince({ stored, readAt })) return { writes: [], events: [] };
   const context: PlanContext = { newId, now, at: registryTimestamp(now) };
   const bySourceKey = new Map(stored.map((row) => [row.sourceKey, row]));
   const plans = drafts.map((draft) => {

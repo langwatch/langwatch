@@ -10,18 +10,19 @@ type RecordedAgentSpan = {
   model?: string;
 };
 
-/** Non-empty values latest first by start time, ties by the greater value, as ClickHouse picks. */
-function latestFirst(
+/** Non-empty values by how many spans carry them, ties by greater value, as ClickHouse picks. */
+function mostUsedFirst(
   spans: readonly RecordedAgentSpan[],
   valueOf: (span: RecordedAgentSpan) => string | undefined,
 ): string[] {
-  return spans
-    .flatMap((span) => {
-      const value = valueOf(span);
-      return value ? [{ at: span.startTimeMs, value }] : [];
-    })
-    .toSorted((a, b) => b.at - a.at || Number(b.value > a.value) - Number(b.value < a.value))
-    .map(({ value }) => value);
+  const counts = new Map<string, number>();
+  for (const span of spans) {
+    const value = valueOf(span);
+    if (value) counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .toSorted(([a, x], [b, y]) => y - x || Number(b > a) - Number(b < a))
+    .map(([value]) => value);
 }
 
 /** In-memory twin of the agent traffic read, exact over the spans a test records. */
@@ -54,8 +55,8 @@ export class MemoryTraceAgentTrafficRepository extends TraceAgentTrafficReposito
     return [...byName.entries()]
       .map(([agentName, spans]) => ({
         agentName,
-        agentId: latestFirst(spans, (span) => span.agentId)[0] ?? null,
-        model: latestFirst(spans, (span) => span.model)[0] ?? null,
+        agentId: mostUsedFirst(spans, (span) => span.agentId)[0] ?? null,
+        model: mostUsedFirst(spans, (span) => span.model)[0] ?? null,
         spanCount: spans.length,
         firstSeenMs: Math.min(...spans.map((span) => span.startTimeMs)),
         lastSeenMs: Math.max(...spans.map((span) => span.startTimeMs)),

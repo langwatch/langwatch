@@ -15,7 +15,7 @@ The agent registry lists every agent LangWatch can see in your organization, wit
 | [Ingestion sources](/ai-governance/ingestion-sources/index) that list agents | `databricks`, `copilot_studio` | `discovered` | Name, provider id, the provider's workspace or environment URL, the provider's last modified time |
 | Your traces and gateway calls | `traffic` | `observed` | Any `gen_ai.agent.name` on a span in the last 30 days, with `gen_ai.agent.id` and `gen_ai.request.model` when present |
 
-A traced agent is matched to a listed one when its `gen_ai.agent.id` equals a LangWatch agent id or a provider's agent id (such as a Databricks Genie space id), or when its name equals a listed agent's name, ignoring case. A traced agent with no match is registered with `shadow: true` and a `governance.agent.flagged_shadow` event. That is how agents running outside your inventory show up.
+A traced agent is matched to a listed one when its `gen_ai.agent.id` equals a LangWatch agent id or a provider's agent id (such as a Databricks Genie space id), or when its name equals, ignoring case, the name of a LangWatch agent in the same project or of an agent listed by an ingestion source. A traced agent with no match is registered with `shadow: true` and a `governance.agent.flagged_shadow` event. That is how agents running outside your inventory show up.
 
 A LangWatch agent that is archived or deleted, and a traced agent that has sent no traffic for 30 days, is kept with `status: "removed"`; entries are never deleted. Agents from ingestion sources stay active once listed.
 
@@ -97,7 +97,7 @@ curl -s "$LANGWATCH_ENDPOINT/api/governance/registry/agents?limit=50" \
 - `source_version` is the version the source names, when it names one: the prompt version of a LangWatch prompt-based agent, the last modified time of a Copilot Studio agent.
 - `tools` lists what the agent can be called with, each with a JSON Schema of its arguments. A prompt-based, code, workflow or HTTP agent has one `invoke` tool built from its declared inputs and outputs. A connected agent has one `call` tool built from its declared parameters; a secret parameter is marked `writeOnly` and never carries its default.
 - `instructions` is the system prompt of a prompt-based agent, and `null` where LangWatch does not hold one.
-- Credentials an HTTP agent holds (auth, headers) never appear in an entry. Its URL is published without user info and without query parameters whose names look like credentials, such as `api_key` or `token`.
+- Credentials an HTTP agent holds (auth, headers) never appear in an entry. Its URL is published as origin and path only: user info, query string and fragment are left out, since they can carry keys such as `?code=`.
 
 ## Change events
 
@@ -132,6 +132,7 @@ Every event has the same shape:
 
 - A change to an agent in a LangWatch project updates the registry within seconds of the save or archive.
 - A listing from an ingestion source updates it right after the listing runs.
+- When an upgrade first fills the registry, the events for agents that already existed are written to the feed but not pushed to webhooks.
 - Traffic is read every 15 minutes for organizations that already hold a registry, once a day for every organization, and on each of the two triggers above. When a project names more agents than one read returns, traced agents the read did not return are kept as they are.
 
 ### Reading the feed by cursor

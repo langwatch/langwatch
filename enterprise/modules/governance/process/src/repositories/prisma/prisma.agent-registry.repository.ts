@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import {
+  AGENT_REGISTRY_EVENT_TYPES,
   AgentRegistryEntryNotFoundError,
   agentRegistryEntrySchema,
   type AgentRegistryEntry,
   type AgentRegistryEvent,
-  type AgentRegistryEventType,
   type AgentRegistryStatus,
 } from "@langwatch/enterprise-governance-contract";
 import { skipTenantCheck } from "@langwatch/prisma-client";
@@ -51,7 +51,7 @@ function eventOf(row: EventRow): AgentRegistryEvent {
     sequence: row.sequence,
     draft: {
       id: row.id,
-      type: row.type as AgentRegistryEventType,
+      type: eventTypeSchema.parse(row.type),
       entryId: row.entryId,
       fromVersion: row.fromVersion,
       toVersion: row.toVersion,
@@ -66,8 +66,13 @@ function entryOf(value: Prisma.JsonValue): AgentRegistryEntry {
   return agentRegistryEntrySchema.parse(value);
 }
 
+const eventTypeSchema = z.enum(AGENT_REGISTRY_EVENT_TYPES);
+const inputJsonSchema = z.custom<Prisma.InputJsonValue>(
+  (value) => value !== null && value !== undefined,
+);
+
 function jsonOf(value: unknown): Prisma.InputJsonValue {
-  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+  return inputJsonSchema.parse(JSON.parse(JSON.stringify(value)));
 }
 
 export class PrismaAgentRegistryRepository extends AgentRegistryRepository {

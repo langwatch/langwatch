@@ -17,7 +17,6 @@ import {
   type Event,
   EventSchema,
   EventSourcing,
-  type EventSubscriberDefinition,
 } from "@langwatch/eventing";
 import { EventStoreMemory, InMemoryProcessStore } from "@langwatch/eventing/testing";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -141,29 +140,19 @@ describe("the agent registry pipeline", () => {
 
   describe("when changes to one project's agents arrive in a burst", () => {
     /** @scenario A burst of changes to one project's agents settles into one reconcile */
-    it("settles both lanes for five seconds under one key per project", () => {
-      const definition = buildAgentRegistryPipeline(setup({ reconciled: [] }));
-      const subscribers = new Map<string, EventSubscriberDefinition>();
-      const registry = createApiFixture<
-        Parameters<NonNullable<typeof definition.globalProjections>[number]["register"]>[0]
-      >({
-        registerEventSubscriber: (subscriber) => void subscribers.set(subscriber.name, subscriber),
-      });
-      for (const projection of definition.globalProjections ?? []) projection.register(registry);
-      const lanes = [...subscribers.values()];
-      const one = fact({ id: "evt_1", type: AGENT_CHANGED_EVENT_TYPE, agentId: "agent_1", at: 1 });
-      const two = fact({ id: "evt_2", type: AGENT_CHANGED_EVENT_TYPE, agentId: "agent_2", at: 2 });
-      const elsewhere = { ...two, data: { ...(two.data as object), projectId: "project_other" } };
+    it("reconciles the project once", async () => {
+      const { reconciled, record } = world();
 
-      expect(lanes).toHaveLength(2);
-      for (const lane of lanes) {
-        expect(lane.options?.delay).toBe(5_000);
-        const deduplication = lane.options?.deduplication;
-        const keyOf = (event: Event) =>
-          typeof deduplication === "object" ? deduplication.makeId?.(event) : undefined;
-        expect(keyOf(one)).toBe(keyOf(two));
-        expect(keyOf(one)).not.toBe(keyOf(elsewhere));
-      }
-    });
+      await Promise.all(
+        ["agent_1", "agent_2", "agent_3"].map((agentId, index) =>
+          record([
+            fact({ id: `evt_${index}`, type: AGENT_CHANGED_EVENT_TYPE, agentId, at: index + 1 }),
+          ]),
+        ),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 1_000));
+
+      expect(reconciled).toEqual([PROJECT]);
+    }, 25_000);
   });
 });
