@@ -22,6 +22,7 @@ import type {
   RecordPresenceSettingChangedCommandData,
   RecordSignedUpCommandData,
   RecordTraceSharingDisabledCommandData,
+  RecordDocsPlaygroundSessionsDisabledCommandData,
 } from "../eventing/organization-lifecycle.events.ts";
 
 type Sender<Data> = Pick<EventingCommandSender<Data>, "send">;
@@ -42,6 +43,7 @@ export type OrganizationLifecycleSenders = Readonly<{
     "send" | "sendBatch"
   >;
   recordTraceSharingDisabled: Sender<RecordTraceSharingDisabledCommandData>;
+  recordDocsPlaygroundSessionsDisabled: Sender<RecordDocsPlaygroundSessionsDisabledCommandData>;
   recordMemberDisabled: Sender<RecordMemberDisabledCommandData>;
   recordMemberEnabled: Sender<RecordMemberEnabledCommandData>;
   recordMemberRemoved: Sender<RecordMemberRemovedCommandData>;
@@ -156,6 +158,15 @@ export class OrganizationLifecycleNoticeService {
     }>,
   ): Promise<void> {
     const sender = this.#senders?.recordTraceSharingDisabled;
+    if (!sender) throw new Error("organization_lifecycle is not registered in this process");
+    await sender.send({ ...this.#envelope(input.organizationId), ...input });
+  }
+
+  /** Docs playground sessions off; awaited and loud, since api-key revokes keys only on this. */
+  async docsPlaygroundSessionsDisabled(
+    input: Readonly<{ organizationId: string; changedByUserId: string | null }>,
+  ): Promise<void> {
+    const sender = this.#senders?.recordDocsPlaygroundSessionsDisabled;
     if (!sender) throw new Error("organization_lifecycle is not registered in this process");
     await sender.send({ ...this.#envelope(input.organizationId), ...input });
   }

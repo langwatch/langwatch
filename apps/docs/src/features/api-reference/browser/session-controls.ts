@@ -1,4 +1,5 @@
 import { frameConnection, mountFrame, onConnectionChange } from "./docs-session.ts";
+import { FRAME_ROOM_SELECTOR } from "./frame-placement.ts";
 
 /** Hides the pasted key while the frame sends as the reader, and shows it again after. */
 export function showSession() {
@@ -11,7 +12,7 @@ export function showSession() {
  * page leaves for it; none on endpoints that leave none.
  */
 export function startSession() {
-  if (!document.querySelector("[data-docs-session-frame]")) return;
+  if (!document.querySelector(FRAME_ROOM_SELECTOR)) return;
   mountFrame();
   showSession();
 }

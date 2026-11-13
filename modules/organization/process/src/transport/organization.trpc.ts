@@ -271,10 +271,11 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("saveDocsPlaygroundPolicy")
   .withPermission("organization:manage")
-  .handle(async ({ app, input }) => {
+  .handle(async ({ app, input, actor }) => {
     await app.saveDocsPlaygroundPolicy({
       organizationId: input.organizationId,
       docsPlaygroundSessionsEnabled: input.docsPlaygroundSessionsEnabled,
+      changedByUserId: actor.id,
     });
 
     return { success: true as const };

@@ -91,3 +91,24 @@ Feature: Docs session keys for the documentation playground
     Then it says their organisation turned this off
     And no key can be minted
     And docs session keys already minted for that organisation stop authenticating
+
+  @unit
+  Scenario: Turning the playground session off revokes the organisation's docs session keys
+    Given live docs session keys in an organisation, and a run key minted under one of them
+    When an organisation admin turns docs playground sessions off
+    Then organization records that the playground session was turned off
+    And every live docs session key of that organisation is revoked, with the keys minted under it
+    And docs session keys of other organisations keep working
+
+  @integration
+  Scenario: Turning the playground session on again does not revive revoked keys
+    Given an organisation admin turned docs playground sessions off and its keys were revoked
+    When the admin turns them on again
+    Then the revoked keys still do not authenticate
+    And a member can connect again with a new key
+
+  @integration
+  Scenario: Closing the turned-off consent page tells the frame why
+    Given an organisation admin turned off docs playground sessions
+    When the member closes the consent page
+    Then the frame is told the organisation turned this off, not that the member declined

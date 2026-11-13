@@ -202,13 +202,17 @@ holds it. What fixes it is that the token never enters the docs page.
 - **An organisation may turn the playground session off.** An admin setting on the
   organisation's security policies, on by default. When off, the consent page refuses and
   says the organisation turned it off, no key is minted, and live docs session keys of that
-  organisation stop authenticating. The pasted-key path is untouched.
+  organisation stop authenticating at once. Turning it off also revokes them, with every key
+  minted under one: organization records `lw.organization.docs_playground_sessions_disabled`
+  and api-key revokes from its own side (api-key depends on organization, so a call back would
+  be a peer cycle). Turning it on again revives none. The pasted-key path is untouched.
 - **The key survives page changes, not a reload.** The docs swap pages in place
   (`docs:navigated`), so the session frame is mounted once in the persistent shell, outside the
   swapped content, and every playground on every page talks to that one frame. A reload, a
   full page load or closing the tab unloads it and the key with it. The key still never
   enters storage. Supersedes "the frame unloading clears the key" only in that a page change
-  no longer unloads the frame.
+  no longer unloads the frame. Leaving a page cancels every request it left waiting in the
+  frame, and a confirmation the frame shows again restarts its press delay.
 
 ### Consequences
 

@@ -9,6 +9,7 @@ import { defineProcessModule, type PublishedProcessModule } from "@langwatch/pro
 
 import { ApiKeyModule } from "./app/api-key.app.ts";
 import { apiKeyEventing } from "./eventing/api-key.pipeline.ts";
+import { docsPlaygroundRevocationEventing } from "./eventing/docs-playground-revocation.pipeline.ts";
 import { apiKeyRepositories } from "./repositories/api-key-repositories.registry.ts";
 import { apiKeyDocsSessionRest } from "./transport/api-key-docs-session.rest.ts";
 import { apiKeyOrganizationsRest } from "./transport/api-key-organizations.rest.ts";
@@ -56,4 +57,5 @@ export const apiKeyProcessModule: PublishedProcessModule<"api-key", ApiKeyApi> =
         apiKeyId: keyCredentialOfDoor({ door: "project", request }).apiKeyId,
       }),
     })
-    .withEventing(apiKeyEventing);
+    .withEventing(apiKeyEventing)
+    .withEventing(docsPlaygroundRevocationEventing);

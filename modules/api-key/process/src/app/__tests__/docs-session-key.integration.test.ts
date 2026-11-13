@@ -5,6 +5,7 @@
  */
 import {
   ApiKeyNotFoundError,
+  DOCS_SESSION_API_KEY_NAME,
   DocsOriginNotRegisteredError,
   DOCS_SESSION_KEY_LIFETIME_MS,
   type DocsSessionKeyAccess,
@@ -17,7 +18,12 @@ import {
   type AuthzScopeRef,
   type CollectedGrants,
 } from "@langwatch/authz-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createTenantId, type Event, type EventSubscriberDefinition } from "@langwatch/eventing";
+import {
+  ORGANIZATION_DOCS_PLAYGROUND_SESSIONS_DISABLED_EVENT_TYPE,
+  ORGANIZATION_DOCS_PLAYGROUND_SESSIONS_DISABLED_EVENT_VERSION,
+  type OrganizationApi,
+} from "@langwatch/organization-contract";
 import type { ProjectApi, ProjectWithTeam } from "@langwatch/project-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { MemorySharedCredentialStore } from "@langwatch/secrets/shared-credential";
@@ -148,6 +154,7 @@ async function appOver(
       projects: createApiFixture<ProjectApi>({
         findPersonalWorkspaceOwner: async () => null,
         getWithTeam: async (id: string) => projectWithTeam(id),
+        findIdByLegacyApiKey: async () => null,
       }),
     },
     secrets: resolver.scopeTo("api-key", Object.values(ApiKeyModule.secrets)),
@@ -474,5 +481,157 @@ describe("given an organisation that turned docs playground sessions off", () =>
     organization.docsPlaygroundSessionsEnabled = false;
 
     expect(await app.findVerifiedToken({ token })).not.toBeNull();
+  });
+});
+
+/** organization's fact that the playground session was switched off, as the event log holds it. */
+function sessionsDisabled({
+  id = "event-1",
+  organizationId = ORG_ID,
+}: { id?: string; organizationId?: string } = {}): Event {
+  return {
+    id,
+    aggregateId: organizationId,
+    aggregateType: "organization",
+    tenantId: createTenantId(organizationId),
+    createdAt: 1_500,
+    occurredAt: 1_500,
+    type: ORGANIZATION_DOCS_PLAYGROUND_SESSIONS_DISABLED_EVENT_TYPE,
+    version: ORGANIZATION_DOCS_PLAYGROUND_SESSIONS_DISABLED_EVENT_VERSION,
+    data: { tenantId: organizationId, organizationId, occurredAt: 1_500, changedByUserId: USER_ID },
+  };
+}
+
+/** api-key's peer lane on that fact, mounted from the module's own pipeline. */
+function revocationLane(app: ApiKeyModule): EventSubscriberDefinition {
+  const pipeline = app.docsPlaygroundRevocationPipeline();
+  const lanes = new Map<string, EventSubscriberDefinition>();
+  const registry = createApiFixture<
+    Parameters<NonNullable<typeof pipeline.globalProjections>[number]["register"]>[0]
+  >({
+    registerEventSubscriber: (subscriber) => void lanes.set(subscriber.name, subscriber),
+  });
+  for (const projection of pipeline.globalProjections ?? []) projection.register(registry);
+  const lane = lanes.get("api_key_docs_playground_revocation.apiKeyDocsPlaygroundSessionsDisabled");
+  if (!lane) throw new Error("no docs playground revocation lane mounted");
+  return lane;
+}
+
+describe("given live docs session keys and a run key minted under one", () => {
+  async function withKeys() {
+    const fixture = await appOver();
+    const { app } = fixture;
+    const first = await app.mintDocsSessionKey(minting({ sessionId: "session-1" }));
+    const second = await app.mintDocsSessionKey(minting({ sessionId: "session-2" }));
+    const parent = await app.findVerifiedToken({ token: first.token });
+    const child = await app.create({
+      name: "Run key",
+      userId: USER_ID,
+      createdByUserId: USER_ID,
+      organizationId: ORG_ID,
+      permissionMode: "all",
+      bindings: [{ role: "MEMBER", scopeType: "PROJECT", scopeId: PROJECT_ID }],
+      parentApiKeyId: parent!.id,
+    });
+    /* Another organisation's docs key, written as its own mint would leave the row. */
+    const elsewhere = await fixture.apiKeys.create({
+      name: DOCS_SESSION_API_KEY_NAME,
+      description: null,
+      lookupId: "lookup-elsewhere",
+      hashedSecret: "hash",
+      permissionMode: "restricted",
+      userId: USER_ID,
+      createdByUserId: USER_ID,
+      organizationId: "organization-2",
+      expiresAt: null,
+      ingestSourceType: null,
+      ingestionTemplateId: null,
+      isSystemManaged: true,
+      startsDisabled: false,
+      grants: [],
+    });
+
+    return { ...fixture, first, second, child, elsewhere };
+  }
+
+  describe("when organization records the playground session turned off", () => {
+    /** @scenario "Turning the playground session off revokes the organisation's docs session keys" */
+    it("revokes every docs session key and the run key under one, and no other organisation's", async () => {
+      const { app, apiKeys, organization, first, second, child, elsewhere } = await withKeys();
+      organization.docsPlaygroundSessionsEnabled = false;
+      /* The switch alone stops the docs keys, not a key minted under one: only the revoke does. */
+      expect(await app.findVerifiedToken({ token: child.token })).not.toBeNull();
+
+      await revocationLane(app).handle(sessionsDisabled(), {
+        tenantId: ORG_ID,
+        aggregateId: ORG_ID,
+      });
+
+      for (const token of [first.token, second.token, child.token]) {
+        expect(await app.findVerifiedToken({ token })).toBeNull();
+      }
+      expect(await apiKeys.findById({ id: child.apiKey.id })).toMatchObject({
+        revokedAt: expect.any(Date),
+      });
+      expect(await apiKeys.findById({ id: elsewhere.id })).toMatchObject({
+        revokedAt: null,
+      });
+    });
+
+    /** @scenario "Turning the playground session off revokes the organisation's docs session keys" */
+    it("keys a redelivery alike and finds nothing left to revoke", async () => {
+      const { app } = await withKeys();
+      const lane = revocationLane(app);
+      const context = { tenantId: ORG_ID, aggregateId: ORG_ID };
+
+      await lane.handle(sessionsDisabled(), context);
+      await expect(
+        lane.handle(sessionsDisabled({ id: "redelivered" }), context),
+      ).resolves.not.toThrow();
+
+      const strategy = lane.options?.deduplication;
+      if (strategy === undefined || strategy === "aggregate") throw new Error("no own dedup id");
+      expect(strategy.makeId(sessionsDisabled())).toBe(
+        strategy.makeId(sessionsDisabled({ id: "redelivered" })),
+      );
+    });
+  });
+
+  describe("when the admin turns the playground session on again", () => {
+    /** @scenario "Turning the playground session on again does not revive revoked keys" */
+    it("keeps the revoked keys refused and lets the member connect with a new key", async () => {
+      const { app, organization, first, child } = await withKeys();
+      organization.docsPlaygroundSessionsEnabled = false;
+      await revocationLane(app).handle(sessionsDisabled(), {
+        tenantId: ORG_ID,
+        aggregateId: ORG_ID,
+      });
+
+      organization.docsPlaygroundSessionsEnabled = true;
+
+      expect(await app.findVerifiedToken({ token: first.token })).toBeNull();
+      expect(await app.findResolvedToken({ token: first.token, projectId: PROJECT_ID })).toBeNull();
+      expect(await app.findVerifiedToken({ token: child.token })).toBeNull();
+      const fresh = await app.mintDocsSessionKey(minting({ sessionId: "session-3" }));
+      expect(await app.findVerifiedToken({ token: fresh.token })).not.toBeNull();
+    });
+  });
+});
+
+describe("given a docs session key while its organisation's switch is off", () => {
+  /** @scenario "An organisation turns the playground session off" */
+  it("is refused at the organisation door too", async () => {
+    const { app, organization } = await appOver();
+    const minted = await app.mintDocsSessionKey(minting());
+    await expect(app.resolveOrganizationToken({ token: minted.token })).resolves.toMatchObject({
+      ok: true,
+    });
+
+    organization.docsPlaygroundSessionsEnabled = false;
+
+    await expect(app.resolveOrganizationToken({ token: minted.token })).resolves.toEqual({
+      ok: false,
+      reason: "unusable_credential",
+    });
   });
 });

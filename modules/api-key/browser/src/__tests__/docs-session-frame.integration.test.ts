@@ -240,6 +240,23 @@ describe("the docs session frame", () => {
       expect(byId("status").textContent).toMatch(/did not allow access/);
     });
 
+    /** @scenario "The frame says when the organisation turned the session off" */
+    it("says the organisation turned this off, not that the reader declined", () => {
+      const { byId, fromPopup, state, states } = mountFrame();
+      byId("connect").click();
+      fromPopup({
+        type: "langwatch:docs-session",
+        version: 1,
+        state: state(),
+        outcome: "disabled",
+      });
+
+      expect(byId("status").textContent).toMatch(/Your organisation turned this off/);
+      expect(byId("status").textContent).not.toMatch(/did not allow access/);
+      expect(states().at(-1)).toMatchObject({ connected: false });
+      expect(byId("connect").hasAttribute("disabled")).toBe(false);
+    });
+
     /** @scenario "The frame reports why connecting did not work" */
     it("says the window closed before answering", async () => {
       const { byId, popup } = mountFrame();
@@ -363,6 +380,32 @@ describe("the docs session frame", () => {
 
       expect(sent).toEqual([]);
       expect(byId("confirm").hidden).toBe(false);
+    });
+
+    /** @scenario "A confirmation hidden and shown again waits its delay again" */
+    it("restarts the press delay when the docs show the frame again", async () => {
+      const { connect, fromDocs, sent, byId, answers, press } = mountFrame({
+        timings: { confirmDelayMs: 40 },
+      });
+      connect();
+      fromDocs({
+        kind: "send",
+        id: "w5",
+        method: "POST",
+        path: "/api/v1/dataset",
+        headers: {},
+        body: "{}",
+      });
+      await new Promise((resolve) => setTimeout(resolve, 60));
+
+      fromDocs({ kind: "shown" });
+      press(byId("confirm-send"));
+      expect(sent).toEqual([]);
+      expect(byId("confirm").hidden).toBe(false);
+
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      press(byId("confirm-send"));
+      await vi.waitFor(() => expect(answers("w5")).toHaveLength(1));
     });
 
     /** @scenario "A request that changes data waits for the reader inside the frame" */

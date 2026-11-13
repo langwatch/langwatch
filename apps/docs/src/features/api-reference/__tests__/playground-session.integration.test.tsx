@@ -319,14 +319,24 @@ describe("when I move to another docs page in the same tab", () => {
     expect(frameConnection()).toEqual({ project: "Checkout agent" });
 
     /* The next page leaves room for it again: the same frame lies over it, still connected. */
+    const decoy = document.createElement("div");
+    decoy.dataset.docsSessionFrame = "";
+    decoy.getBoundingClientRect = () => new DOMRect(0, 0, 900, 900);
+    const playground = document.createElement("div");
+    playground.dataset.docsPlayground = "";
     const nextRoom = document.createElement("div");
     nextRoom.dataset.docsSessionFrame = "";
     /* jsdom lays nothing out: the room says where a browser would have drawn it. */
     const drawn = new DOMRect(24, 300, 480, 148);
     nextRoom.getBoundingClientRect = () => drawn;
-    layout.append(nextRoom);
+    playground.append(nextRoom);
+    /* Content placed ahead of the playground claims no room: only the playground's counts. */
+    layout.append(decoy, playground);
+    toFrame = [];
     await act(async () => document.dispatchEvent(new Event("docs:navigated")));
     await settle();
+    /* Shown again, the frame restarts the press delay of any confirmation it holds. */
+    expect(toFrame.map(({ message }) => message.kind)).toContain("shown");
     expect(document.querySelectorAll("iframe.docs-session-frame")).toHaveLength(1);
     expect(frame()).toBe(kept);
     expect(nextRoom.style.height).not.toBe("0px");
@@ -336,6 +346,30 @@ describe("when I move to another docs page in the same tab", () => {
       "24px",
       "480px",
     ]);
+    expect(decoy.style.height).toBe("");
     expect(frameConnection()).toEqual({ project: "Checkout agent" });
+  });
+});
+
+/* After the move above: the frame is held outside the content, so it still answers. */
+describe("when I leave a page while a request waits in the frame", () => {
+  /** @scenario "Leaving a page cancels the requests still waiting in the frame" */
+  it("asks the frame to cancel it and answers that it was not sent", async () => {
+    await connectedIn("Checkout agent");
+    const answer = sendThroughFrame({
+      request: { method: "POST", path: "/api/dataset", headers: {}, body: "{}" },
+      signal: new AbortController().signal,
+    });
+    const [{ message }] = sends() as [(typeof toFrame)[number]];
+
+    document.dispatchEvent(new Event("docs:leaving"));
+
+    await expect(answer).resolves.toEqual({ kind: "failed", reason: "cancelled" });
+    expect(toFrame.at(-1)?.message).toMatchObject({
+      type: "langwatch:docs-frame",
+      version: 1,
+      kind: "cancel",
+      id: message.id,
+    });
   });
 });

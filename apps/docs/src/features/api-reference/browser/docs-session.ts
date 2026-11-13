@@ -83,8 +83,21 @@ export function mountFrame() {
   frame.title = "Use my LangWatch account";
   frame.className = "docs-session-frame";
   frame.referrerPolicy = "no-referrer";
-  holdFrame({ element: frame });
+  holdFrame({ element: frame, whenShown: () => toFrame({ kind: "shown" }) });
   window.addEventListener("message", onMessage);
+  document.addEventListener("docs:leaving", cancelWaiting);
+}
+
+/**
+ * The page that asked is going, so nothing it asked for may still be waiting: a confirmation
+ * left open would greet the next page's reader with someone else's write.
+ */
+function cancelWaiting() {
+  for (const [id, resolve] of waiting) {
+    toFrame({ kind: "cancel", id });
+    resolve({ kind: "failed", reason: "cancelled" });
+  }
+  waiting.clear();
 }
 
 function toFrame(message: Record<string, unknown>) {

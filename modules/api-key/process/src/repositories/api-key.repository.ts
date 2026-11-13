@@ -130,6 +130,11 @@ export abstract class ApiKeyRepository {
     name: string;
     browserSessionIds: readonly string[];
   }): Promise<{ id: string; organizationId: string }[]>;
+  /** One organization's unrevoked system-managed keys of one name, whoever they act as. */
+  abstract findLiveSystemManagedByName(input: {
+    organizationId: string;
+    name: string;
+  }): Promise<{ id: string }[]>;
   /** One organization's unrevoked CLI login keys past their session at `now`. */
   abstract findElapsedLoginKeys(input: {
     organizationId: string;

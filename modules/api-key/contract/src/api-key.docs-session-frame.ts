@@ -146,6 +146,7 @@ const FRAME_RUNTIME = String.raw`function (config) {
     idle: "Or paste an API key below.",
     waiting: "Waiting for LangWatch…",
     denied: "You did not allow access. Paste an API key below instead.",
+    disabled: "Your organisation turned this off. Paste an API key below instead.",
     blocked: "Your browser blocked the LangWatch window. Allow pop-ups for this site, or paste an API key below.",
     closed: "The LangWatch window closed before access was granted. Try again, or paste an API key.",
     timeout: "LangWatch did not answer within two minutes. Try again, or paste an API key.",
@@ -225,7 +226,7 @@ const FRAME_RUNTIME = String.raw`function (config) {
     if (!data || typeof data !== "object") return null;
     if (data.type !== config.consentType || data.version !== config.consentVersion) return null;
     if (typeof data.state !== "string" || !STATE_PATTERN.test(data.state) || data.state !== state) return null;
-    if (data.outcome === "denied") return { outcome: "denied" };
+    if (data.outcome === "denied" || data.outcome === "disabled") return { outcome: data.outcome };
     if (data.outcome !== "granted") return null;
     var project = data.project;
     if (typeof data.token !== "string" || data.token.length < 16) return null;
@@ -253,7 +254,7 @@ const FRAME_RUNTIME = String.raw`function (config) {
       if (event.origin !== location.origin || event.source !== popup) return;
       var answer = readAnswer(event.data, state);
       if (!answer) return;
-      if (answer.outcome === "denied") return finish(NOTES.denied);
+      if (answer.outcome !== "granted") return finish(NOTES[answer.outcome]);
       waiting = null;
       window.removeEventListener("message", onAnswer);
       window.clearInterval(watch);
@@ -378,10 +379,28 @@ const FRAME_RUNTIME = String.raw`function (config) {
     confirmPanel.hidden = false;
   }
 
+  /*
+   * A confirmation shown again starts its delay again: one that waited while the docs hid the
+   * frame (a page change) must not be ready the moment it reappears under the reader's pointer.
+   */
+  function restartDelay() {
+    if (pending) pending.shownAt = performance.now();
+    pressedAt = null;
+  }
+  if (typeof IntersectionObserver === "function") {
+    new IntersectionObserver(function (entries) {
+      if (entries.some(function (entry) { return entry.isIntersecting; })) restartDelay();
+    }).observe(confirmPanel);
+  }
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible") restartDelay();
+  });
+
   window.addEventListener("message", function (event) {
     if (event.source !== window.parent || event.origin !== config.docsOrigin || !embedded) return;
     var data = event.data;
     if (!data || typeof data !== "object" || data.type !== config.frameType || data.version !== config.frameVersion) return;
+    if (data.kind === "shown") return restartDelay();
     if (data.kind === "cancel" && typeof data.id === "string") {
       if (pending && pending.request.id === data.id) dismissConfirm("cancelled");
       if (inFlight[data.id]) inFlight[data.id].abort("cancelled");

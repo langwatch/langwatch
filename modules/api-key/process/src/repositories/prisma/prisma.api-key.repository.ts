@@ -317,6 +317,20 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
     });
   }
 
+  async findLiveSystemManagedByName(input: {
+    organizationId: string;
+    name: string;
+  }): Promise<{ id: string }[]> {
+    return this.database.apiKey.findMany({
+      where: {
+        organizationId: input.organizationId,
+        name: input.name,
+        isSystemManaged: true,
+        revokedAt: null,
+      },
+      select: { id: true },
+    });
+  }
   async findLiveLoginKeys(input: {
     organizationId: string;
   }): Promise<{ id: string; createdAt: Instant; expiresAt: Instant }[]> {

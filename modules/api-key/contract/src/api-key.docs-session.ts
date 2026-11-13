@@ -139,7 +139,8 @@ export type RevokeDocsSessionKeysInput = z.infer<typeof revokeDocsSessionKeysInp
 
 /**
  * What the consent popup posts to the docs window that opened it, at the docs' exact origin:
- * the minted key on Allow, or only the refusal on Deny. `state` echoes the docs' own nonce.
+ * the minted key on Allow, only the refusal on Deny, or that the organisation turned it off.
+ * `state` echoes the docs' own nonce.
  */
 const docsSessionMessageSchemaDefinition = z.discriminatedUnion("outcome", [
   z
@@ -160,6 +161,15 @@ const docsSessionMessageSchemaDefinition = z.discriminatedUnion("outcome", [
       version: z.literal(DOCS_SESSION_MESSAGE_VERSION),
       state: z.string().regex(DOCS_SESSION_STATE_PATTERN),
       outcome: z.literal("denied"),
+    })
+    .strict(),
+  /* The organisation turned the playground session off; the frame says so, not "declined". */
+  z
+    .object({
+      type: z.literal(DOCS_SESSION_MESSAGE_TYPE),
+      version: z.literal(DOCS_SESSION_MESSAGE_VERSION),
+      state: z.string().regex(DOCS_SESSION_STATE_PATTERN),
+      outcome: z.literal("disabled"),
     })
     .strict(),
 ]);

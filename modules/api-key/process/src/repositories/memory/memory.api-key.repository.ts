@@ -186,6 +186,19 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
     return rows.map(({ id, organizationId }) => ({ id, organizationId }));
   }
 
+  async findLiveSystemManagedByName(input: {
+    organizationId: string;
+    name: string;
+  }): Promise<{ id: string }[]> {
+    return this.#list(
+      (key) =>
+        key.organizationId === input.organizationId &&
+        key.name === input.name &&
+        key.isSystemManaged === true &&
+        key.revokedAt === null,
+    ).map(({ id }) => ({ id }));
+  }
+
   async findIngestKeysForUser(input: {
     organizationId: string;
     userId: string;

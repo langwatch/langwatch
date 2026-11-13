@@ -19,9 +19,9 @@ import { useEffect, useState } from "react";
 
 import { useAuthorizeHost, type DocsOpener } from "../../model/authorize-host.ts";
 import {
-  deniedMessage,
   grantedMessage,
   readDocsConnectRequest,
+  refusedMessage,
   type DocsConnectRefusal,
 } from "../../model/docs-connect.ts";
 import { StatusCard } from "../blocks/status-card.tsx";
@@ -88,7 +88,10 @@ export default function DocsConnect() {
           title="Your organisation turned this off"
           intro="Your organisation does not let the docs playground use your account. Paste an API key into the playground instead."
         >
-          <Button variant="outline" onClick={handleDenyOf({ host, opener, state: request.state })}>
+          <Button
+            variant="outline"
+            onClick={handleRefuseOf({ host, opener, state: request.state, outcome: "disabled" })}
+          >
             Close
           </Button>
         </BrandedCard>
@@ -117,7 +120,7 @@ export default function DocsConnect() {
     }
   };
 
-  const handleDeny = handleDenyOf({ host, opener, state: request.state });
+  const handleDeny = handleRefuseOf({ host, opener, state: request.state, outcome: "denied" });
 
   return (
     <BrandedCardPage>
@@ -221,18 +224,20 @@ export default function DocsConnect() {
   );
 }
 
-/** Deny, and Close on a refusal: the frame hears no key and the popup closes. */
-function handleDenyOf({
+/** Deny, and Close when the organisation turned this off: the frame hears why, and no key. */
+function handleRefuseOf({
   host,
   opener,
   state,
+  outcome,
 }: {
   host: ReturnType<typeof useAuthorizeHost>;
   opener: DocsOpener;
   state: string;
+  outcome: "denied" | "disabled";
 }) {
   return () => {
-    opener.post({ message: deniedMessage({ state }), targetOrigin: host.appOrigin() });
+    opener.post({ message: refusedMessage({ state, outcome }), targetOrigin: host.appOrigin() });
     host.closeWindow();
   };
 }

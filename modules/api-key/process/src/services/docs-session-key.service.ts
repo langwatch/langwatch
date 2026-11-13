@@ -31,8 +31,11 @@ const logger = createLogger("langwatch:api-key:docs-session");
 
 type DocsSessionKeyServiceOptions = Readonly<{
   apiKeys: Pick<ApiKeyApi, "create">;
-  lifecycle: Pick<ApiKeyLifecycleService, "revokeSystemManaged">;
-  repository: Pick<ApiKeyRepository, "findById" | "findLiveBySessions">;
+  lifecycle: Pick<ApiKeyLifecycleService, "revokeSystemManaged" | "revokeChildren">;
+  repository: Pick<
+    ApiKeyRepository,
+    "findById" | "findLiveBySessions" | "findLiveSystemManagedByName"
+  >;
   authz: Pick<AuthzApi, "getScope" | "effectivePermissions">;
   organizations: Pick<OrganizationApi, "getSessionPolicy" | "getDocsPlaygroundPolicy">;
   projects: Pick<ProjectApi, "getWithTeam">;
@@ -166,6 +169,36 @@ export class DocsSessionKeyService {
     if (keys.length > 0) logger.info({ count: keys.length, cause }, "revoked docs session keys");
 
     return { revoked: true };
+  }
+
+  /**
+   * The organisation turned the playground session off: every live docs session key goes, with
+   * the keys minted under one, so turning it on again revives none (ADR-185). Idempotent.
+   */
+  async revokeForOrganization({ organizationId }: { organizationId: string }): Promise<number> {
+    const keys = await this.options.repository.findLiveSystemManagedByName({
+      organizationId,
+      name: DOCS_SESSION_API_KEY_NAME,
+    });
+    for (const key of keys) {
+      await this.options.lifecycle.revokeSystemManaged({
+        id: key.id,
+        organizationId,
+        callerUserId: null,
+        cause: "session",
+      });
+      await this.options.lifecycle.revokeChildren({
+        parentApiKeyId: key.id,
+        organizationId,
+        callerUserId: null,
+        cause: "session",
+      });
+    }
+    if (keys.length > 0) {
+      logger.info({ count: keys.length, organizationId }, "revoked an organisation's docs keys");
+    }
+
+    return keys.length;
   }
 
   /** The presenting key, only when it is a docs session key: no other key revokes this way. */

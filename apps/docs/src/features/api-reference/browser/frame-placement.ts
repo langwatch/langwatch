@@ -6,17 +6,30 @@ import { FRAME_MARGIN, frameBox } from "../model/docs-session.ts";
  * the DOM reloads it, so it never moves: it is laid over the room each page leaves for it.
  */
 
+/** The room the playground leaves for the frame; one anywhere else on the page never draws it. */
+export const FRAME_ROOM_SELECTOR = "[data-docs-playground] [data-docs-session-frame]";
+
 let host: HTMLElement | null = null;
 let frame: HTMLIFrameElement | null = null;
 let room: HTMLElement | null = null;
 /* The frame's room before it says how tall it is, as docs.css first draws it. */
 let height = 40;
 let scheduled = 0;
+let shown = false;
+/* Tells the frame it is visible again, so a confirmation it holds restarts its press delay. */
+let onShown: () => void = () => {};
 /* Absent only where the browser has no ResizeObserver; scrolling and resizing still place it. */
 const resized = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(schedule);
 
 /** Puts `element` in the persistent host and lays it over the current page's room. */
-export function holdFrame({ element }: { element: HTMLIFrameElement }) {
+export function holdFrame({
+  element,
+  whenShown,
+}: {
+  element: HTMLIFrameElement;
+  whenShown: () => void;
+}) {
+  onShown = whenShown;
   host = document.createElement("div");
   host.dataset.docsSessionHost = "";
   Object.assign(host.style, { position: "absolute", top: "0", left: "0", width: "0", height: "0" });
@@ -40,7 +53,7 @@ export function setFrameHeight({ px }: { px: number }) {
 
 /** Finds the room the current page leaves for the frame, if any, and lays the frame over it. */
 export function findRoom() {
-  const next = document.querySelector<HTMLElement>("[data-docs-session-frame]");
+  const next = document.querySelector<HTMLElement>(FRAME_ROOM_SELECTOR);
   if (next !== room) {
     if (room) resized?.unobserve(room);
     room = next;
@@ -67,7 +80,10 @@ function place() {
     room: room?.getBoundingClientRect() ?? null,
     host: host.getBoundingClientRect(),
   });
-  frame.style.visibility = box && ready ? "" : "hidden";
+  const visible = Boolean(box && ready);
+  frame.style.visibility = visible ? "" : "hidden";
+  if (visible && !shown) onShown();
+  shown = visible;
   if (!box) return;
   frame.style.top = `${box.top}px`;
   frame.style.left = `${box.left}px`;

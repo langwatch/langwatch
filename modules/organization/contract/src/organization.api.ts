@@ -415,9 +415,11 @@ export interface OrganizationApi {
    * docs session key it authenticates. An unknown organization reads as off.
    */
   getDocsPlaygroundPolicy(input: { organizationId: string }): Promise<DocsPlaygroundPolicy>;
+  /** Turning it off records a fact on which api-key revokes the organisation's live docs keys. */
   saveDocsPlaygroundPolicy(input: {
     organizationId: string;
     docsPlaygroundSessionsEnabled: boolean;
+    changedByUserId?: string | null;
   }): Promise<void>;
   /**
    * The organization's pricing model and currency, for workers deciding on its behalf. A system

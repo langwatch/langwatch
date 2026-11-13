@@ -4,6 +4,7 @@
  * @see modules/api-key/specs/docs-session-keys.feature
  */
 
+import { docsSessionMessageSchema } from "@langwatch/api-key-contract";
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
@@ -184,10 +185,24 @@ describe("given an organisation that turned docs playground sessions off", () =>
     expect(host.docsMints).toEqual([]);
     expect(host.posted).toEqual([
       {
-        message: { type: "langwatch:docs-session", version: 1, state: STATE, outcome: "denied" },
+        message: { type: "langwatch:docs-session", version: 1, state: STATE, outcome: "disabled" },
         targetOrigin: APP,
       },
     ]);
+  });
+
+  /** @scenario "Closing the turned-off consent page tells the frame why" */
+  it("posts a message the contract reads as turned off, not as declined", async () => {
+    const host = hostWith({ docsSessionAvailability: "disabled" });
+    renderWithAuthorizeHost(<DocsConnect />, host);
+
+    await press("Close");
+    const [posted] = host.posted;
+    expect(docsSessionMessageSchema.parse(posted?.message)).toMatchObject({ outcome: "disabled" });
+    expect(
+      docsSessionMessageSchema.safeParse({ ...(posted?.message as object), token: "sk-lw-x" })
+        .success,
+    ).toBe(false);
   });
 
   it("holds Allow until the switch has been read", () => {
