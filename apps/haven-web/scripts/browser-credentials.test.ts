@@ -22,6 +22,7 @@ const snapshot = [
 
 const values = ["hunter2-secret", "pw1", "123456"];
 
+/** @scenario "The browser never prints what a credential field holds" */
 void test("a credential field's value reads *** in a snapshot, whatever its length", () => {
   const out = redactCredentials({ text: snapshot, values });
   assert.match(out, /textbox "Password" \[ref=e5\]: \*\*\*$/m);
@@ -31,21 +32,25 @@ void test("a credential field's value reads *** in a snapshot, whatever its leng
   for (const value of values) assert.equal(out.includes(value), false, value);
 });
 
+/** @scenario "The browser never prints what a credential field holds" */
 void test("a long credential value is hidden outside its field too", () => {
   const out = redactCredentials({ text: snapshot, values });
   assert.match(out, /your password is \*\*\*$/m);
 });
 
+/** @scenario "The browser never prints what a credential field holds" */
 void test("a short value is hidden only where a field shows it", () => {
   assert.equal(redactCredentials({ text: "step pw1 of 3", values: ["pw1"] }), "step pw1 of 3");
 });
 
+/** @scenario "The browser never prints what a credential field holds" */
 void test("the diff an action prints carries no credential value", () => {
   const before = '- textbox "Password" [ref=e5]';
   const after = redactCredentials({ text: '- textbox "Password" [ref=e5]: pw1', values: ["pw1"] });
   assert.equal(JSON.stringify(diffSnapshots({ before, after })).includes("pw1"), false);
 });
 
+/** @scenario "The browser never prints what a credential field holds" */
 void test("the page reports its password and credential-autocomplete values only", async (t) => {
   const browser = await chromium.launch().catch(() => null);
   if (!browser) return t.skip("no Chromium on this machine");
