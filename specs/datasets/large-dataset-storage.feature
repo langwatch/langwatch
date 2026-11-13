@@ -46,11 +46,18 @@ Feature: Large dataset storage
 
   @unit
   Scenario: A failed create leaves no dataset behind
-    Given object storage refuses the write of a new dataset's rows
+    Given object storage refuses the write of a new dataset's rows, or the dataset itself cannot be saved
     When I create a new dataset with rows
     Then the create fails
     And no dataset with that name exists
     And the rows written before the failure are removed
+
+  @unit
+  Scenario: A create that cannot tell whether its dataset was saved keeps the rows
+    Given the save of a new dataset fails after its rows were written
+    When the dataset turns out to be saved, or checking for it fails too
+    Then the create fails
+    And the rows written for it are kept
 
   @unit
   Scenario: A new dataset refuses two rows with the same id
@@ -65,6 +72,13 @@ Feature: Large dataset storage
     When I copy it to another project
     Then the copy's rows are stored in object storage as chunks
     And the copy's rows are not stored in the Postgres records table
+
+  @unit
+  Scenario: Copying a legacy single-file dataset
+    Given a dataset the previous release kept as one stored file
+    When I copy it to another project
+    Then the copy's rows are stored in object storage as chunks
+    And the copy has every row of the file
 
   @unit
   Scenario: Rows added to a dataset in object storage come back with the ids they were stored under

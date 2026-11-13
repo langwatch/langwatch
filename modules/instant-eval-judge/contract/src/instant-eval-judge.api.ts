@@ -57,12 +57,17 @@ export interface InstantEvalJudgeApi {
 export const InstantEvalJudgeApi = moduleApi<InstantEvalJudgeApi>()("instant-eval-judge");
 
 /** The request shapes an own decision model speaks, one channel each (ADR-182 decision 8). */
-export const INSTANT_EVAL_DECISION_WIRES = ["openai_decisions", "jev", "cloudflare_jev"] as const;
+export const INSTANT_EVAL_DECISION_WIRES = [
+  "openai_decisions",
+  "jev",
+  "cloudflare_jev",
+  "gemini_decisions",
+] as const;
 
 export type InstantEvalDecisionWire = (typeof INSTANT_EVAL_DECISION_WIRES)[number];
 
-/** How the key travels: `Authorization: Bearer`, or Azure's `api-key` header. */
-export type InstantEvalDecisionAuthHeader = "bearer" | "api_key";
+/** How the key travels: `Authorization: Bearer`, Azure's `api-key` or Google's `x-goog-api-key`. */
+export type InstantEvalDecisionAuthHeader = "bearer" | "api_key" | "goog_api_key";
 
 /**
  * An organization's own decision model, resolved by the caller from Default models. The judge

@@ -171,6 +171,74 @@ describe("creating a dataset", () => {
     });
   });
 
+  describe("when the dataset row insert commits but its reply is lost", () => {
+    /** @scenario "A create that cannot tell whether its dataset was saved keeps the rows" */
+    it("keeps the written chunks, so the saved dataset still reads its rows", async () => {
+      const { repositories, reaped } = recordingReaps();
+      const create = repositories.content.create.bind(repositories.content);
+      vi.spyOn(repositories.content, "create").mockImplementation(async (input) => {
+        await create(input);
+        throw new Error("the connection dropped after the commit");
+      });
+      const app = createDatasetTestApp({ repositories });
+
+      await expect(
+        app.upsertDataset({
+          projectId,
+          name: "Reply Lost",
+          columnTypes,
+          datasetRecords: [{ question: "saved after all" }],
+        }),
+      ).rejects.toThrow("the connection dropped after the commit");
+
+      expect(reaped).toEqual([]);
+      const saved = await repositories.datasets.findBySlug({ projectId, slug: "reply-lost" });
+      expect(saved).not.toBeNull();
+      const page = await app.getDatasetPage({
+        projectId,
+        slugOrId: saved!.id,
+        page: 1,
+        limit: 10,
+      });
+      expect(page.datasetRecords.map((record) => record.entry)).toEqual([
+        { question: "saved after all" },
+      ]);
+    });
+  });
+
+  describe("when the dataset row insert fails and the check for the row fails too", () => {
+    /** @scenario "A create that cannot tell whether its dataset was saved keeps the rows" */
+    it("keeps the written chunks", async () => {
+      const { repositories, reaped } = recordingReaps();
+      const attempted: string[] = [];
+      vi.spyOn(repositories.content, "create").mockImplementation(async (input) => {
+        attempted.push(input.id ?? "");
+        throw new Error("the database is unavailable");
+      });
+      vi.spyOn(repositories.content, "findOne").mockRejectedValue(
+        new Error("the database is still unavailable"),
+      );
+      const app = createDatasetTestApp({ repositories });
+
+      await expect(
+        app.upsertDataset({
+          projectId,
+          name: "Unknown Outcome",
+          columnTypes,
+          datasetRecords: [{ question: "kept" }],
+        }),
+      ).rejects.toThrow("the database is unavailable");
+
+      expect(reaped).toEqual([]);
+      const chunk = await repositories.chunks.readChunk({
+        projectId,
+        datasetId: attempted[0]!,
+        index: 0,
+      });
+      expect(chunk).toHaveLength(1);
+    });
+  });
+
   describe("given two rows with the same id", () => {
     /** @scenario "A new dataset refuses two rows with the same id" */
     it("refuses the create, leaves no dataset row and reaps what it wrote", async () => {

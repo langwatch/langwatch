@@ -53,6 +53,26 @@ Feature: Release manifests order every migration step release by release
     When the manifests are loaded
     Then loading is refused naming the step id and both releases
 
+  @integration
+  Scenario: Two goose files sharing a numeric prefix are refused before the upgrade registers steps
+    Given an image tree with two goose files that share a numeric prefix
+    When the upgrade runs
+    Then the run is recorded as failed, naming the shared step id and both files
+    And none of the image's steps is registered and nothing is applied
+
+  @unit
+  Scenario: A step id two goose files share is found with every file behind it
+    Given an image tree whose goose files map to one step id, such as 125_a.sql and 00125_b.sql
+    When its image steps are checked for a repeated id
+    Then the shared step id is found, naming every goose file that maps to it
+    And distinct prefixes and files that are not goose migrations are never named
+
+  @unit
+  Scenario: Listing the image steps of a tree with a shared prefix does not throw
+    Given an image tree with two goose files that share a numeric prefix
+    When the image steps are listed, as api and worker boot and read-only upgrade status and plan do
+    Then the steps are returned and nothing is refused
+
   @unit
   Scenario: The shipped deprecation register names the retired project scope tables
     Given packages/upgrade/releases/deprecations/deprecations.json as this image ships it
