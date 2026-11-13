@@ -26,9 +26,19 @@ export type RestStaffAccessRequest = Readonly<{
   scope: AuthzDeclaredScopeId | null;
   /** The route starts a run that spends the organization's money (`.spends()`). */
   spends: boolean;
+  /** The route changes something, by its declared kind rather than its permissions. */
+  writes: boolean;
+  /** The route removes or disables a record (`.withConfirmation`). */
+  confirms: boolean;
+  /** The route answers content under a metadata permission (`.servesContent()`). */
+  servesContent: boolean;
   ipAddress: string | null;
   userAgent: string | null;
 }>;
+
+/** A staff key's request the runtime refused before the gate admitted it, with its answer. */
+export type RestStaffAccessRefusal = RestStaffAccessRequest &
+  Readonly<{ status: number; errorCode: string | null }>;
 
 /** How the admitted request ended, told once after the route answered or failed. */
 export type RestStaffAccessOutcome = Readonly<{
@@ -46,19 +56,29 @@ export type RestStaffAccessIdentity = Readonly<{
 
 export type RestStaffAccessReceipt = Readonly<{
   staff: RestStaffAccessIdentity;
+  /** Whether the session was approved to spend: a handler that may charge reads it. */
+  spendApproved: boolean;
   finish(outcome: RestStaffAccessOutcome): Promise<void>;
 }>;
 
 const ADMITTED_STAFF = Symbol.for("langwatch.api.staffAccess");
+const ADMITTED_STAFF_SPEND = Symbol.for("langwatch.api.staffAccessSpend");
 
 /** The staff identity the gate admitted this request under, or none for any other caller. */
 export function admittedStaffOf(request: Request): RestStaffAccessIdentity | undefined {
   return (request as { [ADMITTED_STAFF]?: RestStaffAccessIdentity })[ADMITTED_STAFF];
 }
 
+/** Whether the gate admitted this staff request with spend approval; false for none admitted. */
+export function admittedStaffMaySpend(request: Request): boolean {
+  return (request as { [ADMITTED_STAFF_SPEND]?: boolean })[ADMITTED_STAFF_SPEND] === true;
+}
+
 export type RestStaffAccessGate = Readonly<{
   /** Writes the trail row before the handler; throws a HandledError to refuse. */
   admit(request: RestStaffAccessRequest): Promise<RestStaffAccessReceipt>;
+  /** Writes the trail row of a request refused before `admit`, such as by its permission. */
+  refused(refusal: RestStaffAccessRefusal): Promise<void>;
 }>;
 
 export type StaffAccessGateBinding = Readonly<{ staffAccessGate: RestStaffAccessGate }>;
@@ -103,16 +123,10 @@ export async function admitStaffRequest({
   operation,
   permissions,
   scope,
-  spends,
-}: {
+  route,
+}: StaffRequestInput & {
   gate: RestStaffAccessGate | undefined;
   servedDoors: boolean;
-  credential: string;
-  request: Request;
-  operation: string;
-  permissions: readonly string[];
-  scope: AuthzDeclaredScopeId | null;
-  spends: boolean;
 }): Promise<StaffReceipt | undefined> {
   if (!isKeyDoor(credential)) return undefined;
   const recorded = recordedKeyCredentialOf({ door: credential, request });
@@ -126,21 +140,76 @@ export async function admitStaffRequest({
   if (!gate || !key.apiKeyId) throw new StaffAccessUnavailableError();
 
   const startedAt = performance.now();
-  const receipt = await gate.admit({
-    apiKeyId: key.apiKeyId,
+  const receipt = await gate.admit(
+    staffRequestOf({ apiKeyId: key.apiKeyId, request, operation, permissions, scope, route }),
+  );
+
+  Object.defineProperty(request, ADMITTED_STAFF, { value: receipt.staff, enumerable: false });
+  Object.defineProperty(request, ADMITTED_STAFF_SPEND, {
+    value: receipt.spendApproved,
+    enumerable: false,
+  });
+
+  return { receipt, startedAt };
+}
+
+/** What the runtime knows of a route a staff key called, before or at the gate. */
+export type StaffRequestInput = Readonly<{
+  credential: string;
+  request: Request;
+  operation: string;
+  permissions: readonly string[];
+  scope: AuthzDeclaredScopeId | null;
+  route: Readonly<{ spends: boolean; writes: boolean; confirms: boolean; servesContent: boolean }>;
+}>;
+
+function staffRequestOf({
+  apiKeyId,
+  request,
+  operation,
+  permissions,
+  scope,
+  route,
+}: Omit<StaffRequestInput, "credential"> & { apiKeyId: string }): RestStaffAccessRequest {
+  return {
+    apiKeyId,
     method: request.method,
     path: new URL(request.url).pathname,
     operation,
     permissions,
     scope,
-    spends,
+    ...route,
     ipAddress: ClientAddress.resolvedFor(request) ?? null,
     userAgent: request.headers.get("user-agent"),
-  });
+  };
+}
 
-  Object.defineProperty(request, ADMITTED_STAFF, { value: receipt.staff, enumerable: false });
+/**
+ * Tells the gate a staff key's request was refused before it was admitted (a permission, a
+ * scope or a plan refusal), so the trail holds it too. Silent for any other caller; a failed
+ * write is logged, never thrown, so the caller still gets the original refusal.
+ */
+export async function recordStaffRefusal({
+  gate,
+  error,
+  ...input
+}: StaffRequestInput & { gate: RestStaffAccessGate | undefined; error: unknown }): Promise<void> {
+  if (!gate || !isKeyDoor(input.credential)) return;
+  const recorded = recordedKeyCredentialOf({ door: input.credential, request: input.request });
+  if (!recorded) return;
+  const key = keyCredentialOf(recorded);
+  if (key.isStaffAccessKey !== true || !key.apiKeyId) return;
 
-  return { receipt, startedAt };
+  const handled = HandledError.isHandled(error) ? error : null;
+  await gate
+    .refused({
+      ...staffRequestOf({ apiKeyId: key.apiKeyId, ...input }),
+      status: handled?.httpStatus ?? 500,
+      errorCode: handled?.code ?? null,
+    })
+    .catch((failure: unknown) => {
+      logger.warn({ error: failure }, "a refused staff access request could not be recorded");
+    });
 }
 
 /** An admitted request: the gate's receipt and when the gate let it in. */

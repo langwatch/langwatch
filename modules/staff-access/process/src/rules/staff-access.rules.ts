@@ -42,16 +42,14 @@ export function staffKeyKindOf(scopes: readonly StaffAccessScope[]): "support" |
   return scopes.includes("org:support") ? "support" : "read";
 }
 
-/** Content always needs the name typed; support only once spend is ticked. */
+/** Content and support always need the name typed, with or without spend. */
 export function typedNameRequired({
   scopes,
-  spendApproved,
 }: {
   scopes: readonly StaffAccessScope[];
   spendApproved: boolean;
 }): boolean {
-  if (scopes.includes("org:content")) return true;
-  return spendApproved && scopes.includes("org:support");
+  return scopes.includes("org:content") || scopes.includes("org:support");
 }
 
 export function organizationNameMatches({

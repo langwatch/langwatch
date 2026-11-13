@@ -74,11 +74,11 @@ Feature: Ops agent access approval
     Then it is refused with "organization_name_mismatch"
 
   @integration
-  Scenario: Support with spend needs the organization name typed
+  Scenario: Support needs the organization name typed, with or without spend
     Given a pending request for "org:support" on "ACME"
-    When Olivia ticks spend and types no organization name
+    When Olivia types no organization name, with or without the spend tick
     Then the ceremony is refused with "organization_name_mismatch"
-    And without the spend tick the ceremony is offered without typing
+    And with the name typed it is offered
 
   @integration
   Scenario: The passkey signs a hash of exactly what is shown

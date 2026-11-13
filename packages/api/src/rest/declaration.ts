@@ -641,6 +641,10 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly refusedOnAggregate?: true;
   /** Present exactly when the route starts a run that spends the organization's money. */
   readonly spends?: true;
+  /** Present exactly when a run route says why it spends nothing. */
+  readonly spendExempt?: string;
+  /** Present exactly when the route answers what an organization's users or runs wrote. */
+  readonly servesContent?: true;
   /** Present exactly when operator flags open the route to a legacy project key. */
   readonly legacyKeyScopes?: readonly [string, ...string[]];
   /** Present exactly when the route's create is replayable under a caller key. */
@@ -730,6 +734,8 @@ type RouteState = Readonly<{
   mintsCredential?: AuthzPermission;
   refusedOnAggregate?: true;
   spends?: true;
+  spendExempt?: string;
+  servesContent?: true;
   legacyKeyScopes?: readonly [string, ...string[]];
   idempotency?: RestIdempotency;
   rawResponse?: RestRawResponse;
@@ -1182,7 +1188,7 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
    * key approved without spend is refused here (ADR-202); every new run route declares this.
    */
   spends(): RouteBuilder<Api, S> {
-    if (this.state.spends) throw new Error("REST route already declared spends()");
+    assertSpendUndeclared(this.state);
 
     return new RouteBuilder<Api, S>({
       router: this.router,
@@ -1190,6 +1196,36 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
       path: this.path,
       operation: this.operation,
       state: { ...this.state, spends: true },
+    });
+  }
+
+  /** A run route that spends nothing (an abort, a test delivery); the reason says why. */
+  withoutSpend(reason: string): RouteBuilder<Api, S> {
+    if (reason.trim().length === 0) throw new Error("REST withoutSpend needs a reason");
+    assertSpendUndeclared(this.state);
+
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: { ...this.state, spendExempt: reason },
+    });
+  }
+
+  /**
+   * The route answers what an organization's users or runs wrote (run results, stored files)
+   * though its permission is a metadata one: a staff key approved without `org:content` is refused.
+   */
+  servesContent(): RouteBuilder<Api, S> {
+    if (this.state.servesContent) throw new Error("REST route already declared servesContent()");
+
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: { ...this.state, servesContent: true },
     });
   }
 
@@ -1888,6 +1924,41 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
 
 const WRITE_METHODS: ReadonlySet<HttpMethod> = new Set(["post", "put", "patch", "delete"]);
 
+/** The `withoutAudit` reason of a read the route takes as a POST (a search, a query). */
+export const READ_SENT_AS_A_POST = "read sent as a POST";
+
+/** The `withoutAudit` reason of a route that starts a run. */
+export const RUN_NOT_A_CHANGE = "run, not a change";
+
+/**
+ * Whether the route changes something, from what it declared: a read method, or a POST whose
+ * `withoutAudit` says it is a read, is none. The staff gate decides from this (ADR-202).
+ */
+export function routeWrites(
+  route: Pick<RestTransportRoute<unknown>, "method" | "methods" | "auditExempt">,
+): boolean {
+  if (route.auditExempt === READ_SENT_AS_A_POST) return false;
+
+  return (route.methods ?? [route.method]).some((each) => WRITE_METHODS.has(each));
+}
+
+/** A run route says whether it spends: `spends()`, or `withoutSpend("<reason>")` (ADR-202). */
+function assertSpendDeclared({ operation, state }: { operation: string; state: RouteState }): void {
+  if (state.auditExempt !== RUN_NOT_A_CHANGE) return;
+  if (state.spends || state.spendExempt !== void 0) return;
+
+  throw new Error(
+    `REST ${operation} starts a run: declare spends() or withoutSpend("<why it spends nothing>")`,
+  );
+}
+
+/** A route says once whether it spends. */
+function assertSpendUndeclared(state: RouteState): void {
+  if (state.spends || state.spendExempt !== void 0) {
+    throw new Error("REST route already declared spends() or withoutSpend()");
+  }
+}
+
 /** A write route says whether it leaves a trail (E11): `withAudit` or `withoutAudit`. */
 function assertAuditDeclared({
   method,
@@ -2042,6 +2113,8 @@ function doorParts(state: RouteState): Partial<RestTransportRoute<unknown>> {
     ...(state.mintsCredential ? { mintsCredential: state.mintsCredential } : {}),
     ...(state.refusedOnAggregate ? { refusedOnAggregate: state.refusedOnAggregate } : {}),
     ...(state.spends ? { spends: state.spends } : {}),
+    ...(state.spendExempt ? { spendExempt: state.spendExempt } : {}),
+    ...(state.servesContent ? { servesContent: state.servesContent } : {}),
     ...(state.legacyKeyScopes ? { legacyKeyScopes: state.legacyKeyScopes } : {}),
     ...(state.credential ? { credential: state.credential } : {}),
     ...(state.key ? { key: state.key } : {}),
@@ -2576,6 +2649,7 @@ function assertRouteReady({
   assertPublicRouteConstraints({ operation, state });
   assertAuditDeclared({ method, operation, state });
   assertConfirmationDeclared({ method, operation, state });
+  assertSpendDeclared({ operation, state });
 
   if (state.answers && state.status !== void 0) {
     throw new Error(`REST ${operation} declares responds(), so its status is the answer's own`);

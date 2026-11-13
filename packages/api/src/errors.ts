@@ -292,6 +292,30 @@ export class StaffSpendNotApprovedError extends HandledError {
   }
 }
 
+/** A staff key approved without `org:content` asked a route that serves content. */
+export class StaffContentNotApprovedError extends HandledError {
+  constructor() {
+    super("staff_content_not_approved", "This staff access was not approved to read content", {
+      httpStatus: 403,
+      fault: "customer",
+      ...remediation("staff_content_not_approved"),
+    });
+    this.name = "StaffContentNotApprovedError";
+  }
+}
+
+/** A staff key asked a write no staff access may make: a removal, or one no bag allows. */
+export class StaffWriteNotAllowedError extends HandledError {
+  constructor() {
+    super("staff_write_not_allowed", "Staff access cannot make this change", {
+      httpStatus: 403,
+      fault: "customer",
+      ...remediation("staff_write_not_allowed"),
+    });
+    this.name = "StaffWriteNotAllowedError";
+  }
+}
+
 /** The staff trail row could not be written before the handler, so the request is refused. */
 export class StaffAccessAuditUnavailableError extends HandledError {
   constructor() {

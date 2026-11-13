@@ -26,7 +26,6 @@ function sinkRecording() {
 
 describe("ApiDoorAuditService.restAudit", () => {
   describe("given a change made with a staff key", () => {
-    /** @scenario "The change's own audit row names LangWatch Support and the approver" */
     it("names the staff principal and reason, with the approving operator as the actor", async () => {
       const { sink, recorded } = sinkRecording();
 

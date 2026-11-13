@@ -2881,9 +2881,19 @@ const presentations = {
       "The operator who approved this access no longer holds the platform operator grant, so it stopped.",
   },
   staff_spend_not_approved: {
-    title: "This access cannot start a run",
+    title: "This access cannot start or change runs",
     describe: () =>
-      "Starting a run spends the organization's money, and this access was approved without that.",
+      "Runs, evaluators, monitors, scenarios and dashboards spend the organization's money, and this access was approved without that. It may change datasets only.",
+  },
+  staff_content_not_approved: {
+    title: "This access cannot read content",
+    describe: () =>
+      "Run results and stored files hold what the organization's users wrote, and this access was approved without content.",
+  },
+  staff_write_not_allowed: {
+    title: "Staff access cannot make this change",
+    describe: () =>
+      "Staff access never removes or switches off a record, and only changes what it was approved for.",
   },
   staff_access_audit_unavailable: {
     title: "Staff access could not be recorded",

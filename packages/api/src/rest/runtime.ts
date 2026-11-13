@@ -91,6 +91,7 @@ import {
   permissionOf,
   routePermissions,
   routeTargetField,
+  routeWrites,
   type RestDeprecation,
   type RestDoorCredential,
   type RestPermissionTarget,
@@ -163,6 +164,7 @@ import {
   admitStaffRequest,
   admittedStaffOf,
   finishingStaffRequest,
+  recordStaffRefusal,
   type RestStaffAccessGate,
 } from "./staff-access.ts";
 
@@ -866,6 +868,7 @@ function routeStack<Api>({
     route,
     credential,
     ports,
+    family,
     template: `${route.method.toUpperCase()} ${basePathOf(declaration)}${route.path}`,
   });
   const refusal = routeRefusal({ route, door: doorOf({ credential, ports }) });
@@ -960,11 +963,13 @@ function authenticateMiddleware({
   route,
   credential,
   ports,
+  family,
   template,
 }: {
   route: RestTransportRoute<unknown>;
   credential: RestDoorCredential;
   ports: RestRuntimeMembers;
+  family: string;
   /** The route as `METHOD /path/:param`, which the door may log; never the concrete URL. */
   template: string;
 }): MiddlewareHandler {
@@ -977,6 +982,15 @@ function authenticateMiddleware({
         credential,
         request: context.req.raw,
         rawBody: context.get(ROUTE_RAW_BODY),
+      }).catch(async (error: unknown) => {
+        // A door that resolved a staff key and then refused its permission: the trail holds it.
+        await recordStaffRefusal({
+          gate: ports.staffAccess,
+          error,
+          ...staffRequestInput({ route, credential, request: context.req.raw, family }),
+          scope: null,
+        });
+        throw error;
       });
 
       // The door is told the admitted kinds; the runtime still refuses one it let through.
@@ -1555,50 +1569,59 @@ function handlerMiddleware<Api>({
       return answerWith({ context, next, route, result: anonymous });
     }
 
-    const decision = await decideRouteCaller({ route, ports, options, context, caller, input });
+    const staffInput = staffRequestInput({ route, credential, request: context.req.raw, family });
 
-    if (route.mintsCredential) {
-      refuseImpersonatedMint({
-        permission: route.mintsCredential,
-        actor: decision.actor,
-        scope: decision.scope,
-        address: `REST ${family}.${route.operation}`,
-      });
-    }
+    const authorized = await (async () => {
+      const decision = await decideRouteCaller({ route, ports, options, context, caller, input });
 
-    // Plan first (Q31): the door only identified, so the plan is asked at its scope.
-    if (planFirst(route)) {
-      await checkEntitlement({ route, ports, scope: decision.scope, input, family });
-    }
+      if (route.mintsCredential) {
+        refuseImpersonatedMint({
+          permission: route.mintsCredential,
+          actor: decision.actor,
+          scope: decision.scope,
+          address: `REST ${family}.${route.operation}`,
+        });
+      }
 
-    const target = await checkRouteScope({ route, caller, door, ports, input, context });
-    const further = await checkFurtherTargets({ route, caller, door, ports, input, context });
-    const capabilities = { route, ports, context, family, version, caller, input } as const;
+      // Plan first (Q31): the door only identified, so the plan is asked at its scope.
+      if (planFirst(route)) {
+        await checkEntitlement({ route, ports, scope: decision.scope, input, family });
+      }
 
-    // The scope access resolved: the one a route's own path named when it named
-    // one, and the door's own otherwise. Both the plan question and the
-    // idempotency tenancy are asked about exactly this scope.
-    const resolved = target ?? decision.scope;
-    const authorize = ports.authorization.forRequest(context.req.raw);
+      const target = await checkRouteScope({ route, caller, door, ports, input, context });
+      const further = await checkFurtherTargets({ route, caller, door, ports, input, context });
+      const capabilities = { route, ports, context, family, version, caller, input } as const;
 
-    await assertRouteSecondFactor({ caller, actor: decision.actor, scope: resolved, authorize });
+      // The scope access resolved: the one a route's own path named when it named
+      // one, and the door's own otherwise. Both the plan question and the
+      // idempotency tenancy are asked about exactly this scope.
+      const resolved = target ?? decision.scope;
+      const authorize = ports.authorization.forRequest(context.req.raw);
 
-    if (!planFirst(route)) await checkEntitlement({ route, ports, scope: resolved, input, family });
-    await refuseAggregateWrite({ route, ports, scope: resolved, request: context.req.raw });
+      await assertRouteSecondFactor({ caller, actor: decision.actor, scope: resolved, authorize });
 
-    await countCall(capabilities);
+      if (!planFirst(route)) {
+        await checkEntitlement({ route, ports, scope: resolved, input, family });
+      }
+      await refuseAggregateWrite({ route, ports, scope: resolved, request: context.req.raw });
+
+      await countCall(capabilities);
+
+      return { decision, target, further, capabilities, resolved, authorize };
+    })().catch(async (error: unknown) => {
+      // A staff key refused before the gate (another project, a missing permission) is trailed too.
+      await recordStaffRefusal({ gate: ports.staffAccess, error, ...staffInput, scope: null });
+      throw error;
+    });
+    const { decision, target, further, capabilities, resolved, authorize } = authorized;
 
     // After every permission check and before any answer, a stored one included: a staff key's
     // request is recorded before it is served, or refused.
     const admitted = await admitStaffRequest({
       gate: ports.staffAccess,
       servedDoors: ports.servedDoors === true,
-      credential,
-      request: context.req.raw,
-      operation: `${family}.${route.operation}`,
-      permissions: routePermissions(route),
+      ...staffInput,
       scope: resolved,
-      spends: route.spends === true,
     });
 
     return finishingStaffRequest({
@@ -1623,6 +1646,32 @@ function handlerMiddleware<Api>({
         }),
     });
   };
+}
+
+/** What the staff gate is told of a route a staff key called, by its declaration (ADR-202). */
+function staffRequestInput({
+  route,
+  credential,
+  request,
+  family,
+}: {
+  route: RestTransportRoute<unknown>;
+  credential: RestDoorCredential;
+  request: Request;
+  family: string;
+}) {
+  return {
+    credential,
+    request,
+    operation: `${family}.${route.operation}`,
+    permissions: routePermissions(route),
+    route: {
+      spends: route.spends === true,
+      writes: routeWrites(route),
+      confirms: route.confirmation !== undefined,
+      servesContent: route.servesContent === true,
+    },
+  } as const;
 }
 
 /** The stored answer, or the handler's under its proof, confirmation and audit. */

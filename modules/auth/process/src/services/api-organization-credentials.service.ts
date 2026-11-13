@@ -7,6 +7,7 @@ import {
   OrganizationPermissionError,
 } from "@langwatch/api";
 import type { ApiKeyApi, ResolvedOrganizationApiKeyToken } from "@langwatch/api-key-contract";
+import { recordOrganizationCredential } from "@langwatch/api/rest";
 import type { AuthzPermission, PermissionDecision } from "@langwatch/authorization";
 import { AuthzScopeNotFoundError, type AuthzApi } from "@langwatch/authz-contract";
 import type { Logger } from "@langwatch/observability";
@@ -57,7 +58,11 @@ export class ApiOrganizationCredentialsService {
         scope: { type: "org", id: resolved.organizationId },
         permission,
       });
-      if (!allowed) throw new OrganizationPermissionError(permission);
+      if (!allowed) {
+        // A staff key's refusal is trailed by the runtime, which needs the key it refused (ADR-202).
+        if (resolved.isStaffAccessKey) recordOrganizationCredential(input.request, resolved);
+        throw new OrganizationPermissionError(permission);
+      }
     }
 
     return identified;

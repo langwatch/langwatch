@@ -24,10 +24,17 @@ import { createRestRuntime } from "../runtime.ts";
 import type {
   RestStaffAccessGate,
   RestStaffAccessOutcome,
+  RestStaffAccessRefusal,
   RestStaffAccessRequest,
 } from "../staff-access.ts";
 
 const VERSION = "2026-10-05";
+
+class KeyPermissionDeniedError extends HandledError {
+  constructor() {
+    super("api_key_permission_denied", "denied", { httpStatus: 403 });
+  }
+}
 
 class RunFailedError extends HandledError {
   constructor() {
@@ -38,6 +45,9 @@ class RunFailedError extends HandledError {
 interface ItemsApi {
   list(): Promise<unknown>;
   run(): Promise<unknown>;
+  search(): Promise<unknown>;
+  remove(): Promise<unknown>;
+  results(): Promise<unknown>;
 }
 
 const ItemsApi = moduleApi<ItemsApi>()("evaluator");
@@ -70,13 +80,19 @@ const KEYS: Record<string, RestResolvedProjectCredential> = {
   },
 };
 
+/** Refuses any permission named here after recording the key, as the project door does. */
+const REFUSED_PERMISSIONS = new Set(["secrets:view"]);
+
 const door: RestIdentity = {
-  authenticate: ({ request }) => {
+  authenticate: ({ request, permissions }) => {
     const token = request.headers.get("x-auth-token") ?? "";
     if (token === "unrecorded") return CALLER;
     const resolved = KEYS[token];
     if (!resolved) throw new Error("unknown test key");
     recordProjectCredential(request, resolved);
+    if (permissions?.some((permission) => REFUSED_PERMISSIONS.has(permission))) {
+      throw new KeyPermissionDeniedError();
+    }
     return CALLER;
   },
 };
@@ -116,6 +132,40 @@ const router = defineRestRouter(ItemsApi)
     await app.run();
     return { started: true };
   })
+  .post("/search", "search")
+  .withoutAudit("read sent as a POST")
+  .keepsRecords()
+  .withPermission("traces:view")
+  .withOutput(z.object({ items: z.array(z.string()) }))
+  .handle(async ({ app }) => {
+    await app.search();
+    return { items: [] };
+  })
+  .post("/remove", "remove")
+  .withAudit("items.remove")
+  .withInput(z.object({ id: z.string() }))
+  .withConfirmation({ resource: "item", action: "delete", idParam: "id", name: async () => null })
+  .withPermission("evaluations:update")
+  .withOutput(z.object({ removed: z.boolean() }))
+  .handle(async ({ app }) => {
+    await app.remove();
+    return { removed: true };
+  })
+  .get("/results", "results")
+  .withPermission("evaluations:view")
+  .servesContent()
+  .withOutput(z.object({ items: z.array(z.string()) }))
+  .handle(async ({ app }) => {
+    await app.results();
+    return { items: [] };
+  })
+  .get("/secrets", "secrets")
+  .withPermission("secrets:view")
+  .withOutput(z.object({ items: z.array(z.string()) }))
+  .handle(async ({ app }) => {
+    await app.list();
+    return { items: [] };
+  })
   .get("/organization", "listOrganization")
   .withCredential("organization")
   .withPermission("organization:view")
@@ -131,6 +181,7 @@ let order: string[];
 let admitted: RestStaffAccessRequest[];
 let finished: RestStaffAccessOutcome[];
 let audited: RestAuditRow[];
+let refusals: RestStaffAccessRefusal[];
 
 const STAFF = {
   principal: "LangWatch Support",
@@ -140,6 +191,9 @@ const STAFF = {
 let runFails: boolean;
 
 const app: ItemsApi = {
+  search: async () => void order.push("handler"),
+  remove: async () => void order.push("handler"),
+  results: async () => void order.push("handler"),
   list: async () => void order.push("handler"),
   run: async () => {
     order.push("handler");
@@ -163,12 +217,17 @@ function recordingGate({
       if (refusal) throw refusal;
       return {
         staff: STAFF,
+        spendApproved: false,
         finish: async (outcome) => {
           order.push("finish");
           finished.push(outcome);
           if (finishFails) throw new Error("trail store down");
         },
       };
+    },
+    refused: async (refusal) => {
+      order.push("refused");
+      refusals.push(refusal);
     },
   };
 }
@@ -178,11 +237,13 @@ async function call({
   token = "staff",
   method = "GET",
   path = "/",
+  body,
 }: {
   gate: RestStaffAccessGate | undefined;
   token?: string;
   method?: string;
   path?: string;
+  body?: unknown;
 }) {
   const runtime = createRestRuntime({
     authorization: authorizationPort,
@@ -204,6 +265,7 @@ async function call({
       "x-auth-token": token,
       "user-agent": "langwatch-cli/1.0",
     },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 
   return { status: response.status, body: (await response.json()) as { code?: string } };
@@ -214,6 +276,7 @@ beforeEach(() => {
   admitted = [];
   finished = [];
   audited = [];
+  refusals = [];
   runFails = false;
 });
 
@@ -265,6 +328,9 @@ describe("the staff access gate", () => {
           permissions: ["prompts:view"],
           scope: { tier: "project", id: "project-1" },
           spends: false,
+          writes: false,
+          confirms: false,
+          servesContent: false,
           ipAddress: null,
           userAgent: "langwatch-cli/1.0",
         },
@@ -332,6 +398,61 @@ describe("the staff access gate", () => {
 
       expect(answer.status).toBe(200);
       expect(order).toEqual(["admit", "handler", "finish"]);
+    });
+
+    /** @scenario "The customer's log tells reads from writes by the route's declared kind" */
+    it("tells the gate a POST is a write, and a declared read sent as a POST is not", async () => {
+      await call({ gate: recordingGate(), method: "POST", path: "/run" });
+      await call({ gate: recordingGate(), method: "POST", path: "/search" });
+
+      expect(admitted.map(({ operation, writes }) => ({ operation, writes }))).toEqual([
+        { operation: "items.run", writes: true },
+        { operation: "items.search", writes: false },
+      ]);
+    });
+
+    it("tells the gate a route asks a confirmation or serves content", async () => {
+      await call({
+        gate: recordingGate(),
+        method: "POST",
+        path: "/remove",
+        body: { id: "item-1" },
+      });
+      await call({ gate: recordingGate(), path: "/results" });
+
+      expect(
+        admitted.map(({ operation, confirms, servesContent }) => ({
+          operation,
+          confirms,
+          servesContent,
+        })),
+      ).toEqual([
+        { operation: "items.remove", confirms: true, servesContent: false },
+        { operation: "items.results", confirms: false, servesContent: true },
+      ]);
+    });
+
+    /** @scenario "Refused staff calls leave a trail row" */
+    it("reports a refusal before the gate, so the trail holds it, and still answers it", async () => {
+      const answer = await call({ gate: recordingGate(), path: "/secrets" });
+
+      expect(answer).toMatchObject({ status: 403, body: { code: "api_key_permission_denied" } });
+      expect(order).toEqual(["refused"]);
+      expect(refusals).toMatchObject([
+        {
+          apiKeyId: "staff-key",
+          operation: "items.secrets",
+          permissions: ["secrets:view"],
+          status: 403,
+          errorCode: "api_key_permission_denied",
+        },
+      ]);
+    });
+
+    it("reports no refusal for a key that is no staff key", async () => {
+      await call({ gate: recordingGate(), token: "customer", path: "/secrets" });
+
+      expect(refusals).toEqual([]);
     });
 
     it("asks the gate at the organization door too", async () => {

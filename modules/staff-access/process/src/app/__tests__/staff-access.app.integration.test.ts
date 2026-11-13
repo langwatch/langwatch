@@ -61,6 +61,9 @@ function gateRequest(overrides: Partial<RestStaffAccessRequest> & { apiKeyId: st
     permissions: ["traces:view"],
     scope: { tier: "project" as const, id: `${ACME.id}_project` },
     spends: false,
+    writes: false,
+    confirms: false,
+    servesContent: false,
     ipAddress: AGENT_IP,
     userAgent: "langwatch-cli",
     ...overrides,
@@ -95,7 +98,7 @@ function scenarios(backend: Backend): void {
     },
   ) {
     const { agent, requestId } = await pending(w, scopes);
-    const typed = scopes.includes("org:content") || spendApproved;
+    const typed = scopes.includes("org:content") || scopes.includes("org:support");
     await w.approve({
       choice: {
         requestId,
@@ -296,16 +299,23 @@ function scenarios(backend: Backend): void {
         ).resolves.toBe("organization_name_mismatch");
       });
 
-      /** @scenario "Support with spend needs the organization name typed" */
-      it("asks for the typed name only once spend is ticked", async () => {
+      /** @scenario "Support needs the organization name typed, with or without spend" */
+      it("asks for the typed name with or without the spend tick", async () => {
         const w = world();
         const { requestId } = await pending(w, ["org:support"]);
 
+        for (const spendApproved of [true, false]) {
+          await expect(
+            codeOf(w.app.approvalOptions({ ...w.operator(OLIVIA), requestId, spendApproved })),
+          ).resolves.toBe("organization_name_mismatch");
+        }
         await expect(
-          codeOf(w.app.approvalOptions({ ...w.operator(OLIVIA), requestId, spendApproved: true })),
-        ).resolves.toBe("organization_name_mismatch");
-        await expect(
-          w.app.approvalOptions({ ...w.operator(OLIVIA), requestId, spendApproved: false }),
+          w.app.approvalOptions({
+            ...w.operator(OLIVIA),
+            requestId,
+            spendApproved: false,
+            typedOrganizationName: ACME.name,
+          }),
         ).resolves.toMatchObject({ userVerification: "required" });
       });
 
@@ -326,6 +336,7 @@ function scenarios(backend: Backend): void {
               ...w.operator(OLIVIA),
               requestId,
               spendApproved: false,
+              typedOrganizationName: ACME.name,
               assertion: assertionOver({ challenge: withSpend.challenge }),
             }),
           ),
@@ -366,7 +377,9 @@ function scenarios(backend: Backend): void {
         const { requestId } = await pending(w, ["org:support"]);
         w.state.mail.length = 0;
 
-        await w.approve({ choice: { requestId, spendApproved: false } });
+        await w.approve({
+          choice: { requestId, spendApproved: false, typedOrganizationName: ACME.name },
+        });
 
         expect(w.state.audit).toEqual([
           expect.objectContaining({
@@ -517,6 +530,7 @@ function scenarios(backend: Backend): void {
             path: "/api/suites/run",
             permissions: ["scenarios:create"],
             spends: true,
+            writes: true,
           }),
         );
         await receipt.finish({ status: 201, errorCode: null, durationMs: 12 });
@@ -529,6 +543,145 @@ function scenarios(backend: Backend): void {
         });
         await expect(w.repositories.events.findByRequest({ requestId })).resolves.toEqual([
           expect.objectContaining({ path: "/api/suites/run", status: 201, ipAddress: AGENT_IP }),
+        ]);
+      });
+
+      /** @scenario "A support key without the spend tick changes datasets only" */
+      it("admits a dataset write and refuses an evaluator edit without the spend tick", async () => {
+        const w = world();
+        await redeemed(w, { scopes: ["org:support"] });
+        const apiKeyId = w.state.minted[0]?.apiKeyId ?? "";
+        const write = { apiKeyId, method: "POST", writes: true } as const;
+
+        await expect(
+          w.app.staffAccessGate.admit(gateRequest({ ...write, permissions: ["datasets:create"] })),
+        ).resolves.toMatchObject({ spendApproved: false });
+        await expect(
+          codeOf(
+            w.app.staffAccessGate.admit(
+              gateRequest({ ...write, method: "PUT", permissions: ["evaluations:update"] }),
+            ),
+          ),
+        ).resolves.toBe("staff_spend_not_approved");
+      });
+
+      /** @scenario "A staff key fails closed on writes no bag names" */
+      it("refuses a write that asks no permission, unless the session may spend", async () => {
+        const w = world();
+        await redeemed(w, { scopes: ["org:support"] });
+        const apiKeyId = w.state.minted[0]?.apiKeyId ?? "";
+
+        await expect(
+          codeOf(
+            w.app.staffAccessGate.admit(
+              gateRequest({ apiKeyId, method: "POST", writes: true, permissions: [] }),
+            ),
+          ),
+        ).resolves.toBe("staff_spend_not_approved");
+      });
+
+      /** @scenario "A staff key never removes or switches off a record" */
+      it("refuses a route that asks for a confirmation, even with spend approved", async () => {
+        const w = world();
+        await redeemed(w, { scopes: ["org:support"], spendApproved: true });
+        const apiKeyId = w.state.minted[0]?.apiKeyId ?? "";
+
+        await expect(
+          codeOf(
+            w.app.staffAccessGate.admit(
+              gateRequest({
+                apiKeyId,
+                method: "POST",
+                writes: true,
+                confirms: true,
+                permissions: ["evaluations:update"],
+              }),
+            ),
+          ),
+        ).resolves.toBe("staff_write_not_allowed");
+      });
+
+      /** @scenario "A metadata key cannot read run results or stored files" */
+      it("refuses a content route to a key approved without org:content", async () => {
+        const w = world();
+        await redeemed(w, { scopes: ["org:metadata"] });
+        const apiKeyId = w.state.minted[0]?.apiKeyId ?? "";
+        const results = gateRequest({
+          apiKeyId,
+          path: "/api/experiments/runs/run-1/results",
+          permissions: ["evaluations:view"],
+          servesContent: true,
+        });
+
+        await expect(codeOf(w.app.staffAccessGate.admit(results))).resolves.toBe(
+          "staff_content_not_approved",
+        );
+      });
+
+      it("admits a content route to a key approved with org:content", async () => {
+        const w = world();
+        await redeemed(w, { scopes: ["org:content"] });
+        const apiKeyId = w.state.minted[0]?.apiKeyId ?? "";
+
+        await expect(
+          w.app.staffAccessGate.admit(gateRequest({ apiKeyId, servesContent: true })),
+        ).resolves.toMatchObject({ spendApproved: false });
+      });
+
+      /** @scenario "The customer's log tells reads from writes by the route's declared kind" */
+      it("writes staffAccess.write for a declared write, not for a read sent as a POST", async () => {
+        const w = world();
+        await redeemed(w, { scopes: ["org:support"], spendApproved: true });
+        const apiKeyId = w.state.minted[0]?.apiKeyId ?? "";
+        const written = () => w.state.audit.filter(({ action }) => action === "staffAccess.write");
+
+        await w.app.staffAccessGate.admit(
+          gateRequest({ apiKeyId, method: "POST", path: "/api/v1/query", permissions: [] }),
+        );
+        expect(written()).toEqual([]);
+
+        await w.app.staffAccessGate.admit(
+          gateRequest({
+            apiKeyId,
+            method: "POST",
+            path: "/api/onboarding/complete",
+            permissions: ["project:view"],
+            writes: true,
+          }),
+        );
+        expect(written()).toEqual([
+          expect.objectContaining({
+            metadata: expect.objectContaining({ path: "/api/onboarding/complete" }),
+          }),
+        ]);
+      });
+
+      /** @scenario "Refused staff calls leave a trail row" */
+      it("trails a refusal at the gate and one the runtime reports before it", async () => {
+        const w = world();
+        const { requestId } = await redeemed(w, { scopes: ["org:content"] });
+        const apiKeyId = w.state.minted[0]?.apiKeyId ?? "";
+
+        await codeOf(
+          w.app.staffAccessGate.admit(gateRequest({ apiKeyId, ipAddress: "198.51.100.9" })),
+        );
+        await w.app.staffAccessGate.refused({
+          ...gateRequest({ apiKeyId, path: "/api/secrets", permissions: ["secrets:view"] }),
+          status: 403,
+          errorCode: "api_key_permission_denied",
+        });
+
+        await expect(w.repositories.events.findByRequest({ requestId })).resolves.toEqual([
+          expect.objectContaining({
+            ipAddress: "198.51.100.9",
+            status: 403,
+            errorCode: "staff_access_ip_mismatch",
+          }),
+          expect.objectContaining({
+            path: "/api/secrets",
+            status: 403,
+            errorCode: "api_key_permission_denied",
+          }),
         ]);
       });
 

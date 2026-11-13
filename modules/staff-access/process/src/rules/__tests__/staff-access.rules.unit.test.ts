@@ -41,7 +41,7 @@ describe("approvalChallengeOf", () => {
 describe("typedNameRequired", () => {
   it("asks for content always and for support only with spend", () => {
     expect(typedNameRequired({ scopes: ["org:content"], spendApproved: false })).toBe(true);
-    expect(typedNameRequired({ scopes: ["org:support"], spendApproved: false })).toBe(false);
+    expect(typedNameRequired({ scopes: ["org:support"], spendApproved: false })).toBe(true);
     expect(typedNameRequired({ scopes: ["org:support"], spendApproved: true })).toBe(true);
     expect(typedNameRequired({ scopes: ["org:metadata"], spendApproved: false })).toBe(false);
   });

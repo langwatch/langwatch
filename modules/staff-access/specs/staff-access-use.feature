@@ -18,6 +18,13 @@ Feature: Using ops agent access
     Given the scopes "org:metadata", "org:content" and "org:support"
     Then metadata holds no trace read, content adds trace reads, and support adds the write bag
 
+  @unit
+  Scenario: The support bag holds no prompt or trigger write
+    Given the staff-support permission bag
+    Then it holds no prompt write, since a prompt write can deploy to production
+    And it holds no trigger write, since a trigger sends trace content out
+    And prompt text is content, not metadata
+
   @integration
   Scenario: A read key reads traces, analytics and LWQL in its organization
     Given a redeemed "org:content" key on ACME
@@ -38,18 +45,79 @@ Feature: Using ops agent access
     Then it is refused
 
   @integration
-  Scenario: A support key creates an evaluator and a prompt as LangWatch Support
-    Given a redeemed "org:support" key on ACME
-    When the agent creates an evaluator and a prompt
+  Scenario: A metadata key cannot read run results or stored files
+    Given a redeemed "org:metadata" key on ACME
+    When the agent reads an experiment run's results or a stored file
+    Then it is refused 403 with "staff_content_not_approved"
+
+  @integration
+  Scenario: A support key creates an evaluator and a dataset as LangWatch Support
+    Given a redeemed "org:support" key on ACME approved with the spend tick
+    When the agent creates an evaluator and a dataset
     Then both are created
     And ACME's audit log holds a "staffAccess.write" row for each, naming LangWatch Support, Olivia and the reason
 
-  @unit
+  @integration
   Scenario: The change's own audit row names LangWatch Support and the approver
-    Given a redeemed "org:support" key on ACME approved by Olivia
+    Given a redeemed "org:support" key on ACME approved by Olivia with the spend tick
     When the agent creates a monitor
     Then the "monitors.create" audit row names LangWatch Support and the reason
     And its actor is Olivia, not the key
+
+  @integration
+  Scenario: A support key without the spend tick changes datasets only
+    Given a redeemed "org:support" key on ACME approved without the spend tick
+    When the agent writes a dataset and edits an evaluator
+    Then the dataset write is admitted
+    And the evaluator edit is refused 403 with "staff_spend_not_approved"
+
+  @integration
+  Scenario: A run route says whether it spends
+    Given a route declared withoutAudit("run, not a change")
+    When it declares neither spends() nor withoutSpend with a reason
+    Then the declaration is refused where it is written
+
+  @integration
+  Scenario: A staff key fails closed on writes no bag names
+    Given a redeemed "org:support" key on ACME approved without the spend tick
+    When the agent calls a write route that asks no permission
+    Then it is refused 403 with "staff_spend_not_approved"
+
+  @integration
+  Scenario: A staff key never removes or switches off a record
+    Given a redeemed "org:support" key on ACME approved with the spend tick
+    When the agent calls a route that asks for a confirmation, such as pausing an alert
+    Then it is refused 403 with "staff_write_not_allowed"
+
+  @integration
+  Scenario: The customer's log tells reads from writes by the route's declared kind
+    Given a redeemed "org:support" key on ACME approved with the spend tick
+    When the agent runs an LWQL query and then completes an onboarding step
+    Then only the onboarding step writes a "staffAccess.write" row
+
+  @unit
+  Scenario: A staff key without the spend tick cannot run LWQL eval functions
+    Given a redeemed key on ACME approved without the spend tick
+    When the agent runs an LWQL query that calls eval()
+    Then the eval functions are off for that query
+
+  @integration
+  Scenario: A staff key never reaches the public health probes
+    Given a redeemed staff key on ACME
+    When the agent calls the scenarios, triggers, workflows or evaluations health probe
+    Then each answers 401 as for no key, and no run starts
+
+  @unit
+  Scenario: A staff key that names no project is told no project names
+    Given a redeemed staff key on ACME
+    When the agent calls a project route without "X-Project-Id"
+    Then it is refused with "project_required" and an empty project list
+
+  @integration
+  Scenario: Refused staff calls leave a trail row
+    Given a redeemed "org:content" key on ACME
+    When it is refused for its address, or by a route's permission before the gate
+    Then each refusal wrote a trail row with its status and error code
 
   @integration
   Scenario: A support key cannot touch members, API keys or secrets

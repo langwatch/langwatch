@@ -1126,6 +1126,12 @@ const registry = {
   staff_spend_not_approved: {
     tips: ["Request support access again and ask the operator to allow runs"],
   },
+  staff_content_not_approved: {
+    tips: ["Request access again with the org:content scope"],
+  },
+  staff_write_not_allowed: {
+    tips: ["Ask a member of the organization to make this change"],
+  },
   staff_access_audit_unavailable: {
     tips: ["Try again in a moment"],
   },

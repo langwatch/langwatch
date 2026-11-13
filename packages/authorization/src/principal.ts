@@ -141,6 +141,8 @@ export type RestKeyCredentialPrincipal =
       isLangySessionKey?: boolean;
       /** Set on an approved staff agent's key (ADR-202): every request passes the staff gate. */
       isStaffAccessKey?: boolean;
+      /** On a staff key the gate admitted: whether its session was approved to spend. */
+      staffSpendApproved?: boolean;
     }>;
 
 /**
