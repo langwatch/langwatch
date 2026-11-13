@@ -5,7 +5,11 @@ import { ClickHouseUnavailableError } from "@langwatch/analytics-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { RestIdentity } from "@langwatch/api/hosting";
 import type { RestDeclaredResult } from "@langwatch/api/rest";
-import { type AuthzPermission, PermissionDeniedError } from "@langwatch/authorization";
+import {
+  type AuthzPermission,
+  ImpersonationCannotMintCredentialError,
+  PermissionDeniedError,
+} from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
@@ -2668,11 +2672,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     callerProjectId?: string | undefined;
   }): Promise<void> {
     const { actor, organizationId, scopes, traceProjectId, guardrailAttachments } = input;
-    refuseImpersonatedMint({
-      impersonatorId: input.impersonatorId,
-      permission: "virtualKeys:create",
-      organizationId,
-    });
+    refuseImpersonatedMint({ impersonatorId: input.impersonatorId });
     if (input.callerProjectId === undefined) {
       await this.authorizeVirtualKeyScopeSelection({
         actor,
@@ -2769,11 +2769,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     permission: AuthzPermission;
   }): Promise<VirtualKeyWithScopes> {
     if (input.permission === "virtualKeys:rotate") {
-      refuseImpersonatedMint({
-        impersonatorId: input.impersonatorId,
-        permission: input.permission,
-        organizationId: input.organizationId,
-      });
+      refuseImpersonatedMint({ impersonatorId: input.impersonatorId });
     }
     const existing = await this.#dependencies.getExistingVirtualKey({
       organizationId: input.organizationId,
@@ -2863,15 +2859,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
 }
 
 /** An operator acting as a member holds no grant to issue credentials as them (F05). */
-function refuseImpersonatedMint(input: {
-  impersonatorId: string | undefined;
-  permission: AuthzPermission;
-  organizationId: string;
-}): void {
+function refuseImpersonatedMint(input: { impersonatorId: string | undefined }): void {
   if (!input.impersonatorId) return;
-  throw new PermissionDeniedError({
-    permission: input.permission,
-    scope: { type: "organization", id: input.organizationId },
-    denialReason: "no-grant",
-  });
+  throw new ImpersonationCannotMintCredentialError();
 }

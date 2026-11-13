@@ -1552,12 +1552,7 @@ function check<TContext extends object>({
     }
 
     if (mintsCredential) {
-      refuseImpersonatedMint({
-        permission: mintsCredential,
-        actor: decision.actor,
-        scope: decision.scope,
-        address: `tRPC ${procedure}`,
-      });
+      refuseImpersonatedMint({ actor: decision.actor });
     }
 
     // After access, never before it: a caller who may not do this at all is

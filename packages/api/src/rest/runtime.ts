@@ -1543,12 +1543,7 @@ function handlerMiddleware<Api>({
     const decision = await decideRouteCaller({ route, ports, options, context, caller, input });
 
     if (route.mintsCredential) {
-      refuseImpersonatedMint({
-        permission: route.mintsCredential,
-        actor: decision.actor,
-        scope: decision.scope,
-        address: `REST ${family}.${route.operation}`,
-      });
+      refuseImpersonatedMint({ actor: decision.actor });
     }
 
     // Plan first (Q31): the door only identified, so the plan is asked at its scope.

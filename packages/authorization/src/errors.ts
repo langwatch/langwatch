@@ -62,6 +62,23 @@ export class PermissionDeniedError extends HandledError {
   }
 }
 
+/**
+ * An operator acting as a member asked to mint or rotate a credential as them. No grant
+ * allows it, so naming a permission to ask for would send them on an errand that cannot end.
+ */
+export class ImpersonationCannotMintCredentialError extends HandledError {
+  declare readonly code: "impersonation_cannot_mint_credential";
+
+  constructor() {
+    super(
+      "impersonation_cannot_mint_credential",
+      "Keys cannot be created or rotated while impersonating.",
+      { httpStatus: 403, fault: "customer" },
+    );
+    this.name = "ImpersonationCannotMintCredentialError";
+  }
+}
+
 /** A named scope field had no usable id, so the client can correct its input. */
 export class BlankScopeIdError extends HandledError {
   declare readonly code: "validation_error";

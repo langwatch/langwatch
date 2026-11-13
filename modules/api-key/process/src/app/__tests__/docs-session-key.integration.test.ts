@@ -8,7 +8,7 @@ import {
   DocsOriginNotRegisteredError,
   DOCS_SESSION_KEY_LIFETIME_MS,
 } from "@langwatch/api-key-contract";
-import { ALL_PERMISSIONS, PermissionDeniedError } from "@langwatch/authorization";
+import { ALL_PERMISSIONS } from "@langwatch/authorization";
 import {
   AuthzEngine,
   type AuthzApi,
@@ -284,14 +284,13 @@ describe("given an unregistered docs origin", () => {
 
 describe("given an operator impersonating a member", () => {
   /** @scenario "No docs session key is minted while an operator acts as another member" */
-  it("refuses with permission_denied before any read or write", async () => {
+  it("refuses with impersonation_cannot_mint_credential before any read or write", async () => {
     const { app, apiKeys, getScope } = await appOver();
     const create = vi.spyOn(apiKeys, "create");
 
     const refused = app.mintDocsSessionKey({ ...minting(), impersonatorId: "operator-1" });
 
-    await expect(refused).rejects.toBeInstanceOf(PermissionDeniedError);
-    await expect(refused).rejects.toMatchObject({ code: "permission_denied" });
+    await expect(refused).rejects.toMatchObject({ code: "impersonation_cannot_mint_credential" });
     expect(getScope).not.toHaveBeenCalled();
     expect(create).not.toHaveBeenCalled();
   });
