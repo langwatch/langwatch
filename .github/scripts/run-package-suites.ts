@@ -320,8 +320,8 @@ export interface SuiteJob {
 }
 
 /**
- * The lanes that may not overlap across packages. Integration files run
- * serially against one shared datastore; a browser lane installs Chromium
+ * The serial lanes: no two of their suites overlap, across packages or lanes. Integration
+ * files run serially against one shared datastore; a browser lane installs Chromium
  * through apt, which holds a machine-wide lock. Everything else is `shared`.
  */
 const LANES: Record<string, "integration" | "browser"> = {
@@ -460,7 +460,7 @@ export const runJobs = async ({
 };
 
 /**
- * The shard-wide keys a job holds while it runs: its package, its lane, and heavy.
+ * The shard-wide keys a job holds while it runs: package, `serial` for lane jobs, heavy.
  * Integration and browser jobs share one `serial` key, so they never overlap; a browser
  * run failed to load its test file 3/3 while an integration run overlapped it (tasks#1178).
  */
