@@ -78,7 +78,7 @@
     "concurrently": "catalog:",
     "knip": "catalog:",
     "nx": "23.2.1",
-    "oxfmt": "0.70.0",
+    "oxfmt": "0.76.0",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
     "tsrs": "catalog:",
