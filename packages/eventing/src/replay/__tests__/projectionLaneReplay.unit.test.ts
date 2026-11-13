@@ -227,12 +227,23 @@ function foldLane({
 }
 
 /** A map lane appending one row per member added, in the order it writes them. */
-function mapLane({ rows }: { rows: string[] }): RegisteredMapProjection {
+function mapLane({
+  rows,
+  appendFailure,
+}: {
+  rows: string[];
+  appendFailure?: () => Error;
+}): RegisteredMapProjection {
   const definition: MapProjectionDefinition<string, Event> = {
     name: MAP_LANE,
     eventTypes: ["directory.member_added"],
     map: (event) => event.id,
-    store: { append: async (row) => void rows.push(row) },
+    store: {
+      append: async (row) => {
+        if (appendFailure) throw appendFailure();
+        rows.push(row);
+      },
+    },
   };
   return {
     projectionName: MAP_LANE,
@@ -297,7 +308,7 @@ function setUpTwoTenants({
   return { redis, readModel, stamped, log, replayer, tenantsDone, onTenantComplete };
 }
 
-function setUp() {
+function setUp({ mapAppendFailure }: { mapAppendFailure?: () => Error } = {}) {
   const store = memoryRedisStore();
   const hdel = async (key: unknown, ...fields: unknown[]) => {
     const hash = store.hashes.get(String(key));
@@ -329,7 +340,7 @@ function setUp() {
         writes: { count: 0 },
       }),
     ],
-    mapProjections: [mapLane({ rows: mapRows })],
+    mapProjections: [mapLane({ rows: mapRows, appendFailure: mapAppendFailure })],
     stateProjections: [],
   };
   const replayer = projectionLaneReplayer({
@@ -345,6 +356,17 @@ function seedThreeMore(log: SeededLog): void {
     seededEvent({ n: 4, aggregateId: "directory-c" }),
     seededEvent({ n: 5, aggregateId: "directory-d" }),
     seededEvent({ n: 6, aggregateId: "directory-e" }),
+  );
+}
+
+/** Tenant 1's one event and tenant 2's more than a drain's worth, so both share one batch. */
+function seedHeavyTenantBesideLight(log: SeededLog): void {
+  log.events.length = 0;
+  log.events.push(
+    seededEvent({ n: 1, aggregateId: "directory-a", tenantId: "tenant-1" }),
+    ...Array.from({ length: MAP_DRAIN_ROWS + 10 }, (_, i) =>
+      seededEvent({ n: 2 + i, aggregateId: "directory-b", tenantId: "tenant-2" }),
+    ),
   );
 }
 
@@ -810,6 +832,56 @@ describe("projectionLaneReplayer", () => {
 
       expect(streamed).toEqual([2]);
       expect(mapRows).toHaveLength(MAP_DRAIN_ROWS);
+    });
+
+    /** @scenario "A map lane over the query memory limit while flushing its rows fails without splitting" */
+    it("fails the lane on that batch without replaying a half when the final flush hits the limit", async () => {
+      const { log, replayer } = setUp({ mapAppendFailure: queryMemoryLimitError });
+      const stream = log.streamEventsForAggregates.bind(log);
+      const streamed: number[] = [];
+      log.streamEventsForAggregates = async (input) => {
+        streamed.push(input.aggregateIds.length);
+        return stream(input);
+      };
+
+      await expect(
+        replayer.replayLane({ lane: MAP_LANE, since: FROM_START, dryRun: false }),
+      ).rejects.toThrow(
+        `Replaying "${MAP_LANE}" failed in 1 batch(es): ${queryMemoryLimitError().message}`,
+      );
+
+      expect(streamed).toEqual([2]);
+    });
+  });
+
+  describe("given a map lane batch spanning two tenants whose streams run side by side", () => {
+    /** @scenario "A tenant stream still running when another hits the query memory limit writes no row of its own" */
+    it("stops the other tenant's stream before splitting, so each row is written once", async () => {
+      const clean = setUp();
+      seedHeavyTenantBesideLight(clean.log);
+      await clean.replayer.replayLane({ lane: MAP_LANE, since: FROM_START, dryRun: false });
+      const { log, mapRows, replayer } = setUp();
+      seedHeavyTenantBesideLight(log);
+      const stream = log.streamEventsForAggregates.bind(log);
+      let tenantOneFailed = false;
+      log.streamEventsForAggregates = async (input) => {
+        if (input.tenantId !== "tenant-1" || tenantOneFailed) return stream(input);
+        tenantOneFailed = true;
+        await Promise.resolve();
+        throw queryMemoryLimitError();
+      };
+
+      const result = await replayer.replayLane({
+        lane: MAP_LANE,
+        since: FROM_START,
+        dryRun: false,
+      });
+      // A stream left running by the failed attempt would write its rows once the loop is free.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(mapRows.length - new Set(mapRows).size).toBe(0);
+      expect(mapRows.toSorted()).toEqual(clean.mapRows.toSorted());
+      expect(result).toMatchObject({ aggregatesReplayed: 2, totalEvents: MAP_DRAIN_ROWS + 11 });
     });
   });
 });

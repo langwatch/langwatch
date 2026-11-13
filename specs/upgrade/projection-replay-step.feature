@@ -229,3 +229,17 @@ Feature: A module fills a new read model at deploy by replaying a projection lan
     And the batch has already written some of its rows when the limit is hit
     When the step replays the lane
     Then the lane fails on that batch with its error and no half is replayed
+
+  @unit
+  Scenario: A map lane over the query memory limit while flushing its rows fails without splitting
+    Given a map lane's batch whose rows are buffered when the final flush hits the per-query memory limit
+    When the step replays the lane
+    Then the lane fails on that batch with its error and no half is replayed
+
+  @unit
+  Scenario: A tenant stream still running when another hits the query memory limit writes no row of its own
+    Given a map lane's batch spanning two tenants whose event streams run side by side
+    And one tenant's stream hits the memory limit while the other is still reading more rows than a drain holds
+    When the step replays the lane
+    Then the other tenant's stream stops before the batch is split
+    And every row is written once, as a replay that never hit the limit writes them

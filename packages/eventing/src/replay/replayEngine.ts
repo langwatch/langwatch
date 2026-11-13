@@ -948,14 +948,18 @@ function makeOnEvent({
   counter,
   emit,
   mapWrites,
+  abort,
 }: {
   aggregateProjectionMap: AggregateProjectionMap;
   accumulators: BatchAccumulators;
   counter: { eventsProcessed: number };
   emit: EmitFn;
   mapWrites: MapWrites;
+  abort: AbortSignal;
 }): (event: ReplayEvent) => void | Promise<void> {
   return (event) => {
+    // A sibling stream failed: stop applying and draining so this attempt's map writes are final.
+    abort.throwIfAborted();
     const key = aggregateKey({
       tenantId: event.tenantId,
       aggregateType: event.aggregateType,
@@ -1014,31 +1018,46 @@ async function streamApplyAndWrite({
   emit("replay", 0);
   const accumulators = buildAccumulators({ ctx, groups, selected });
   const counter = { eventsProcessed: 0 };
+  const abort = new AbortController();
   const onEvent = makeOnEvent({
     aggregateProjectionMap,
     accumulators,
     counter,
     emit,
     mapWrites,
+    abort: abort.signal,
   });
 
+  // pMapLimited abandons in-flight calls on a rejection, so streams settle here instead: the
+  // first failure aborts the siblings and is rethrown once every one has stopped writing.
+  const failure: { failed: boolean; error: unknown } = { failed: false, error: undefined };
   await pMapLimited({
     items: [...groups.byTenant.entries()],
     fn: async ([tenantId, entries]) => {
+      if (abort.signal.aborted) return;
       const aggIds = entries.filter((e) => allCutoffs.has(e.key)).map((e) => e.aggregateId);
       if (aggIds.length === 0) return;
 
-      await ctx.eventSource.streamEventsForAggregates({
-        tenantId,
-        aggregateIds: aggIds,
-        eventTypes: selected.allEventTypes,
-        cutoffs: allCutoffs,
-        occurredAtBounds: boundsByTenant.get(tenantId),
-        onEvent,
-      });
+      try {
+        await ctx.eventSource.streamEventsForAggregates({
+          tenantId,
+          aggregateIds: aggIds,
+          eventTypes: selected.allEventTypes,
+          cutoffs: allCutoffs,
+          occurredAtBounds: boundsByTenant.get(tenantId),
+          onEvent,
+        });
+      } catch (error) {
+        if (!failure.failed) {
+          failure.failed = true;
+          failure.error = error;
+          abort.abort(error);
+        }
+      }
     },
     concurrency,
   });
+  if (failure.failed) throw failure.error;
 
   emit("write", counter.eventsProcessed);
   for (const [, acc] of accumulators.foldAccumulators) {
