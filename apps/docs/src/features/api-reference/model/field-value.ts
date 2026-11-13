@@ -116,8 +116,13 @@ export function scalarValue({ field, raw }: { field: ScalarField; raw: string })
       return { value: field.options.find((option) => optionText({ option }) === raw) ?? raw };
     case "boolean":
       return { value: raw === "true" };
-    default:
+    case "number":
+    case "integer":
       return numberValue({ field, raw });
+    default: {
+      const unknown: never = field.kind;
+      throw new Error(`no value reader for a ${String(unknown)} field`);
+    }
   }
 }
 

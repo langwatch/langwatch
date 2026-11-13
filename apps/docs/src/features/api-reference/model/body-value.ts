@@ -129,6 +129,11 @@ function writeList({
     entries[field.key] = [];
     return;
   }
+  /* An optional list sent empty would vanish from the form's body: keep it in JSON. */
+  if (Array.isArray(value) && value.length === 0 && !field.required) {
+    misfits.push(field.path.join("."));
+    return;
+  }
   const rows = Array.isArray(value)
     ? value.map((item) => scalarInput({ field: field.item, value: item }))
     : [null];
@@ -148,7 +153,8 @@ function writeNested({
   misfits: string[];
 }) {
   const name = field.path.join(".");
-  if (value !== void 0 && !isRecord(value)) {
+  const emptyOptional = isRecord(value) && Object.keys(value).length === 0 && !field.required;
+  if ((value !== void 0 && !isRecord(value)) || emptyOptional) {
     misfits.push(name);
     return;
   }
@@ -173,7 +179,8 @@ function writeField({
     entries[field.key] = [value === void 0 ? "" : JSON.stringify(value, null, 2)];
     return;
   }
-  const input = scalarInput({ field, value });
+  /* An empty string reads back as no value at all, so the form cannot keep it. */
+  const input = value === "" ? null : scalarInput({ field, value });
   if (input === null) misfits.push(field.path.join("."));
   else entries[field.key] = [input];
 }

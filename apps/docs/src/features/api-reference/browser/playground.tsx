@@ -83,6 +83,46 @@ function frameOutcome({ answer }: { answer: FrameAnswer }): Outcome {
   };
 }
 
+/** Sends from this page with the pasted key; null once the send was cancelled by a newer one. */
+async function sendDirect({
+  operation,
+  request,
+  abort,
+}: {
+  operation: Operation;
+  request: ReturnType<typeof liveRequest>;
+  abort: AbortController;
+}): Promise<Outcome | null> {
+  const timer = window.setTimeout(() => abort.abort("timeout"), 30_000);
+  const started = performance.now();
+  try {
+    const response = await fetch(request.url, {
+      method: operation.method,
+      headers: request.headers,
+      body: request.body,
+      signal: abort.signal,
+      credentials: "omit",
+      redirect: "error",
+      cache: "no-store",
+    });
+    const body = await response.text();
+    if (abort.signal.aborted) return null;
+    return {
+      kind: "response",
+      status: response.status,
+      statusText: response.statusText,
+      contentType: response.headers.get("content-type") ?? "unknown",
+      ms: Math.round(performance.now() - started),
+      body,
+      headers: [...response.headers.entries()],
+    };
+  } catch {
+    return requestErrorOutcome({ signal: abort.signal });
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 function PlaygroundRuntime({ operation }: { operation: Operation }) {
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
   const tools = useRequestTools();
@@ -95,7 +135,12 @@ function PlaygroundRuntime({ operation }: { operation: Operation }) {
     [],
   );
   const send = async () => {
+    pending.current?.abort();
+    const abort = new AbortController();
+    pending.current = abort;
     const { syncFormToBody, requestState, paramErrors, readForm } = await loadRequestTools();
+    /* A page change while the tools load cancels this send before anything is read. */
+    if (abort.signal.aborted) return;
     syncFormToBody({ operation });
     const state = requestState({ operation });
     /* Signed in, the frame sends as the reader and this page never holds the key. */
@@ -113,9 +158,6 @@ function PlaygroundRuntime({ operation }: { operation: Operation }) {
     });
     showErrors({ errors });
     if (Object.keys(errors).length) return;
-    pending.current?.abort();
-    const abort = new AbortController();
-    pending.current = abort;
     setOutcome({ kind: "sending" });
     if (viaFrame) {
       const answer = await sendThroughFrame({
@@ -125,35 +167,12 @@ function PlaygroundRuntime({ operation }: { operation: Operation }) {
       if (pending.current === abort) setOutcome(frameOutcome({ answer }));
       return;
     }
-    const request = liveRequest({ operation, state, key });
-    const timer = window.setTimeout(() => abort.abort("timeout"), 30_000);
-    const started = performance.now();
-    try {
-      const response = await fetch(request.url, {
-        method: operation.method,
-        headers: request.headers,
-        body: request.body,
-        signal: abort.signal,
-        credentials: "omit",
-        redirect: "error",
-        cache: "no-store",
-      });
-      const body = await response.text();
-      if (abort.signal.aborted) return;
-      setOutcome({
-        kind: "response",
-        status: response.status,
-        statusText: response.statusText,
-        contentType: response.headers.get("content-type") ?? "unknown",
-        ms: Math.round(performance.now() - started),
-        body,
-        headers: [...response.headers.entries()],
-      });
-    } catch {
-      if (pending.current === abort) setOutcome(requestErrorOutcome({ signal: abort.signal }));
-    } finally {
-      window.clearTimeout(timer);
-    }
+    const answer = await sendDirect({
+      operation,
+      request: liveRequest({ operation, state, key }),
+      abort,
+    });
+    if (pending.current === abort && answer) setOutcome(answer);
   };
   useEffect(() => {
     const button = document.getElementById("pg-send");

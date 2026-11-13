@@ -138,6 +138,12 @@ Feature: Read and navigate the generated documentation
     When they choose Form
     Then they stay in JSON with the reason to edit that field as JSON, and the value is unchanged
 
+  @unit
+  Scenario: An empty value the form would drop stays in JSON
+    Given the reader's JSON holds an empty string, an empty optional list or an empty optional object
+    When they choose Form
+    Then they stay in JSON with the reason to edit that field as JSON, and the value is unchanged
+
   @integration
   Scenario: Keep what the reader typed while the typed fields load
     Given the reader opened Try it and the typed fields have not loaded yet

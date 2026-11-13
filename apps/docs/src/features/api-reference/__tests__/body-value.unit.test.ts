@@ -24,6 +24,8 @@ const operation = operationSchema.parse({
           required: ["name"],
           properties: {
             name: { type: "string" },
+            note: { type: "string" },
+            tags: { type: "array", items: { type: "string" } },
             at: { type: "string", format: "date-time" },
             atMs: { type: "number", description: "Unix epoch in milliseconds." },
             window: {
@@ -94,5 +96,19 @@ describe("given JSON with a date the picker cannot hold", () => {
       ok: true,
       entries: { at: ["2026-01-01T00:00:00"], atMs: ["2026-01-01T00:00:00"] },
     });
+  });
+});
+
+describe("given JSON with an empty value the form would drop", () => {
+  /** @scenario "An empty value the form would drop stays in JSON" */
+  it("keeps an empty string, optional list or optional object in JSON, with the reason", () => {
+    for (const value of [{ note: "" }, { tags: [] }, { window: {} }]) {
+      const read = bodyFormEntries({ form: form(), text: JSON.stringify({ name: "a", ...value }) });
+
+      expect(read).toEqual({
+        ok: false,
+        reason: `The form cannot show ${Object.keys(value)[0]}. Edit it as JSON.`,
+      });
+    }
   });
 });
