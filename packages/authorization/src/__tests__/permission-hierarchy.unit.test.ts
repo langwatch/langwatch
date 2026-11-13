@@ -283,7 +283,10 @@ describe("the append-only registry", () => {
   /** @scenario "The braid permission is appended last in the registry and is never grantable" */
   it("appends spans:braided right after braids:manage, with only later appends behind it", () => {
     expect(findPermissionIndex(SPAN_BRAID_PERMISSION)).toBe(INDICES_BEFORE_BRAIDS.length + 1);
-    expect(ALL_PERMISSIONS.slice(INDICES_BEFORE_BRAIDS.length + 2)).toEqual(["opsRead:view"]);
+    expect(ALL_PERMISSIONS.slice(INDICES_BEFORE_BRAIDS.length + 2)).toEqual([
+      "opsRead:view",
+      "opsCopy:create",
+    ]);
   });
 
   /** @scenario "The braid permission is appended last in the registry and is never grantable" */
