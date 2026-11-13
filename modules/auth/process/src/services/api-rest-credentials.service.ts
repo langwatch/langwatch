@@ -168,7 +168,7 @@ export class ApiRestCredentialsService {
       const routeScopes = input.legacyKeyScopes;
       const route = routeTemplateOf(input.request);
       if (!(await this.#projectHolds({ credential, permission, route, routeScopes }))) {
-        // A staff key's refusal is trailed by the runtime, which needs the key it refused (ADR-202).
+        // The runtime trails a staff key's refusal and needs the key it refused (ADR-202).
         if (credential.resolved.type === "apiKey" && credential.resolved.isStaffAccessKey) {
           recordProjectCredential(input.request, credential.resolved);
         }

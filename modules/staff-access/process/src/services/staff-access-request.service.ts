@@ -6,7 +6,7 @@ import type {
   PasskeyAssertionOptions,
   PasskeyAssertionResponse,
 } from "@langwatch/auth-contract";
-import { type StaffAccessScope, staffAccessPermissions } from "@langwatch/authz-contract";
+import type { StaffAccessScope } from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type {
@@ -15,7 +15,6 @@ import type {
 } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
-  STAFF_ACCESS_OPS_TOKEN_PREFIX,
   STAFF_ACCESS_PRINCIPAL,
   StaffAccessAlreadyRedeemedError,
   StaffAccessInvalidCodeVerifierError,
@@ -31,7 +30,7 @@ import {
   type StaffAccessRequestStatusAnswer,
   type StaffAccessSessionView,
 } from "@langwatch/staff-access-contract";
-import { type Instant, toDate } from "@langwatch/time";
+import type { Instant } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 
 import type {
@@ -44,7 +43,6 @@ import {
   assertRedeemable,
   isoText,
   later,
-  mintToken,
   organizationNameMatches,
   pkceChallengeOf,
   reachesOrganization,
@@ -52,14 +50,12 @@ import {
   STAFF_ACCESS_REQUEST_TTL_MS,
   STAFF_ACCESS_REQUESTS_PER_HOUR,
   STAFF_ACCESS_SESSION_TTL_MS,
-  staffKeyKindOf,
   typedNameRequired,
 } from "../rules/staff-access.rules.ts";
 import type { StaffAccessNoticeService } from "./staff-access-notice.service.ts";
+import { StaffAccessRedemptionService } from "./staff-access-redemption.service.ts";
 import type { StaffAccessRequesterService } from "./staff-access-requester.service.ts";
 import type { StaffAccessSessionService } from "./staff-access-session.service.ts";
-
-const PROJECTS_LISTED = 100;
 
 const logger = createLogger("langwatch:staff-access:request");
 
@@ -92,7 +88,11 @@ type Choice = Readonly<{
  * verifier for one hour, and any operator can end it. Every transition is one atomic claim.
  */
 export class StaffAccessRequestService {
-  private constructor(private readonly deps: RequestDeps) {}
+  private readonly credentials: StaffAccessRedemptionService;
+
+  private constructor(private readonly deps: RequestDeps) {
+    this.credentials = StaffAccessRedemptionService.create(deps);
+  }
 
   static create(deps: RequestDeps): StaffAccessRequestService {
     return new StaffAccessRequestService(deps);
@@ -372,7 +372,7 @@ export class StaffAccessRequestService {
 
     let redeemedAnswer: StaffAccessRedeemed;
     try {
-      redeemedAnswer = await this.mintCredentials({ row, accessExpiresAt });
+      redeemedAnswer = await this.credentials.mintCredentials({ row, accessExpiresAt });
     } catch (error) {
       await this.deps.sessions.endSession({ row, byUserId: null, cause: "mint_failed" });
       throw error;
@@ -390,50 +390,6 @@ export class StaffAccessRequestService {
       idempotencyKey: `staff-access-redeemed:${row.id}`,
     });
     return redeemedAnswer;
-  }
-
-  private async mintCredentials({
-    row,
-    accessExpiresAt,
-  }: {
-    row: StaffAccessRequestRow;
-    accessExpiresAt: Instant;
-  }): Promise<StaffAccessRedeemed> {
-    const scopes = row.scopes as StaffAccessScope[];
-    const organizationKey =
-      reachesOrganization(scopes) && row.organizationId
-        ? await this.deps.apiKeys.mintStaffAccessKey({
-            organizationId: row.organizationId,
-            permissions: staffAccessPermissions({ scopes }),
-            expiresAt: toDate(accessExpiresAt),
-            kind: staffKeyKindOf(scopes),
-          })
-        : null;
-    const opsToken = scopes.includes("ops:read") ? mintToken(STAFF_ACCESS_OPS_TOKEN_PREFIX) : null;
-    await this.deps.requests.attachCredentials({
-      id: row.id,
-      apiKeyId: organizationKey?.apiKeyId ?? null,
-      hashedOpsToken: opsToken?.hashedSecret ?? null,
-      opsTokenLookupId: opsToken?.lookupId ?? null,
-    });
-    const projects = row.organizationId
-      ? (
-          await this.deps.projects.listByOrganization({
-            organizationId: row.organizationId,
-            page: 1,
-            limit: PROJECTS_LISTED,
-          })
-        ).data.map((project) => ({ id: project.id, slug: project.slug, name: project.name }))
-      : [];
-
-    return {
-      ...(organizationKey ? { apiKey: organizationKey.token } : {}),
-      ...(opsToken ? { opsToken: opsToken.token } : {}),
-      ...(row.organizationId ? { organizationId: row.organizationId } : {}),
-      projects,
-      scopes,
-      expiresAt: isoText(accessExpiresAt),
-    };
   }
 
   /** Every check a decision needs, then the hash it signs. */
