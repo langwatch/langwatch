@@ -16,10 +16,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { TraceAnalyticsRow } from "#eventing/trace-derived.projection";
 
-import {
-  TRACE_ANALYTICS_MATERIALIZED_METADATA_COLUMNS,
-} from "../../../rules/trace-widget-columns.rules.ts";
 import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
+import { TRACE_ANALYTICS_MATERIALIZED_METADATA_COLUMNS } from "../../../rules/trace-widget-columns.rules.ts";
 import { TRACE_ID_INDEXES } from "../clickhouse.trace-id-indexes.database.ts";
 import type { TraceClickHouseWriteClient } from "../clickhouse.trace-member-client.repository.ts";
 import { TraceAnalyticsClickHouseRepository } from "../trace-metrics-analytics.repository.ts";

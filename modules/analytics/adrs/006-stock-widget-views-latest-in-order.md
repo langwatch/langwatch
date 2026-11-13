@@ -41,11 +41,11 @@ new MATERIALIZED column.
    `metadata.environment` falls back to `metadata.env`. The projection version is bumped. The
    nine goose 00126 columns are computed by the database from `Attributes` (amended 2026-11-13).
 4. **The MATERIALIZED handover (expand/contract).** The nine 00126 columns stay MATERIALIZED, so
-   every writer, old or new, gets them. The contract step is `MODIFY COLUMN ... REMOVE
-   MATERIALIZED`: metadata only, and safe only once every part holds the values (the 00126 step
-   stored them) and every writer writes them. It must not run until the fold writes the nine
-   again (amended 2026-11-13). New column names instead would leave rows older than the replay
-   without values and nine duplicate columns.
+   every writer, old or new, gets them. The contract step is
+   `MODIFY COLUMN ... REMOVE MATERIALIZED`: metadata only, and safe only once every part holds the
+   values (the 00126 step stored them) and every writer writes them. It must not run until the
+   fold writes the nine again (amended 2026-11-13). New column names instead would leave rows
+   older than the replay without values and nine duplicate columns.
 5. **Span columns from a map projection.** A new map projection, `spanAnalytics`, beside
    `spanStorage`, writes `span_analytics` (ReplacingMergeTree(ProjectedAt), partitioned by
    `toYearWeek(StartTime)`, ordered by `(TenantId, TraceId, SpanId)`, no maps), and the
