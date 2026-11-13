@@ -79,8 +79,8 @@ describe("TraceEvaluationAnalyticsClickHouseRepository", () => {
 
       await writeThenRead(repository);
 
-      expect(inserts).toEqual([
-        { clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 } },
+      expect(inserts.map((insert) => insert.clickhouse_settings)).toEqual([
+        { async_insert: 1, wait_for_async_insert: 1 },
       ]);
       expect(reads).toHaveLength(1);
       expect(reads[0]?.settings).not.toHaveProperty("select_sequential_consistency");
@@ -94,13 +94,11 @@ describe("TraceEvaluationAnalyticsClickHouseRepository", () => {
 
       await writeThenRead(repository);
 
-      expect(inserts).toEqual([
+      expect(inserts.map((insert) => insert.clickhouse_settings)).toEqual([
         {
-          clickhouse_settings: {
-            async_insert: 0,
-            insert_quorum: "auto",
-            insert_quorum_parallel: 0,
-          },
+          async_insert: 0,
+          insert_quorum: "auto",
+          insert_quorum_parallel: 0,
         },
       ]);
       expect(reads).toHaveLength(1);
