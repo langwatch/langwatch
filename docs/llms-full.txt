@@ -43516,7 +43516,7 @@ With every step recorded you can sort that out after the fact, compare one run a
 ## 1. Track a run
 
 ```bash
-pip install "langwatch[dspy]" "dspy[optuna]"
+pip install "langwatch[dspy]>=1.3.0" "dspy[optuna]"
 ```
 
 MIPROv2 needs the `optuna` extra; other optimizers run without it.
