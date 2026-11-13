@@ -239,6 +239,19 @@ describe("given date-time parameters bound as ISO instants", () => {
         label: "2026-11-01T00:00:00Z",
       });
     });
+
+    it("leaves a name declared as both DateTime and DateTime64 as bound", async () => {
+      queryMock.mockResolvedValueOnce({ json: async () => ({ data: [], meta: [] }) });
+
+      await executor.execute({
+        sql: "SELECT {t:DateTime} AS a, {t:DateTime64(9)} AS b FROM analytics.traces",
+        parameters: { t: "2026-11-01T00:00:00.5Z" },
+        projectIds: PROJECT_IDS,
+        tenantCapability: TENANT_A_CAPABILITY,
+      });
+
+      expect(queryMock.mock.lastCall?.[0].query_params).toEqual({ t: "2026-11-01T00:00:00.5Z" });
+    });
   });
 });
 

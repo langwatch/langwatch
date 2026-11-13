@@ -43,9 +43,16 @@ export function bindLangWatchQLInstantParameters({
   sql: string;
   parameters: Readonly<Record<string, unknown>>;
 }): Readonly<Record<string, unknown>> {
-  const bound = { ...parameters };
+  const kindsByName = new Map<string, Set<string>>();
   for (const [, name, kind] of sql.matchAll(DATE_TIME_PLACEHOLDER)) {
-    if (name === undefined) continue;
+    if (name === undefined || kind === undefined) continue;
+    kindsByName.set(name, (kindsByName.get(name) ?? new Set()).add(kind));
+  }
+  const bound = { ...parameters };
+  for (const [name, kinds] of kindsByName) {
+    // One name declared both ways: either text would lose meaning for one, so ClickHouse decides.
+    if (kinds.size > 1) continue;
+    const [kind] = kinds;
     const value = bound[name];
     if (typeof value !== "string" || !ISO_INSTANT_WITH_OFFSET.test(value.trim())) continue;
     bound[name] = unixSecondsText({ value: value.trim(), subSecond: kind === "DateTime64" });
