@@ -726,8 +726,9 @@ jobs:
     # 1,017 integration files, and that corpus is gone — what is left are
     # package suites, which this job already discovers. Standing the datastores
     # up here is what keeps their integration halves running for real instead
-    # of self-skipping into a green job.
-    timeout-minutes: ${{ needs.changes.outputs.suites-one-job == 'true' && 120 || 45 }}
+    # of self-skipping into a green job. One job running every suite cold takes
+    # 100-125 minutes on main, so 120 cut full runs off just before the end.
+    timeout-minutes: ${{ needs.changes.outputs.suites-one-job == 'true' && 180 || 45 }}
 
     services:
       redis:
