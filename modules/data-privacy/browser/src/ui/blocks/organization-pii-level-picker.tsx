@@ -62,33 +62,40 @@ function StrictGaps() {
 
 /**
  * The organization's PII level, Essential or Strict, with the example of what the shown level
- * stores. `level` null means the organization is on Off or Custom: nothing is picked.
+ * stores. `level` null means the organization is on Off or Custom, named by `otherLevelLabel`.
  */
 export function OrganizationPiiLevelPicker({
   level,
+  otherLevelLabel,
+  free,
   canWrite,
   isSaving,
   onPick,
 }: {
   level: OrganizationPiiLevel | null;
+  otherLevelLabel: string;
+  free: boolean;
   canWrite: boolean;
   isSaving: boolean;
   onPick: (level: OrganizationPiiLevel) => void;
 }) {
   const disabled = !canWrite || isSaving;
+  const currentLabel = level ? LEVEL_LABELS[level] : otherLevelLabel;
   return (
     <SettingsSection
       divided={false}
       title="PII redaction level for this organization"
       badge={
-        level ? (
-          <StatusChip
-            tone={level === "strict" ? "good" : "neutral"}
-            label={`Organization on ${LEVEL_LABELS[level]}`}
-          />
-        ) : undefined
+        <StatusChip
+          tone={level === "strict" ? "good" : "neutral"}
+          label={`Organization on ${currentLabel}`}
+        />
       }
-      hint="Rules inherit this unless they set their own level."
+      hint={
+        level
+          ? "Rules inherit this unless they set their own level."
+          : `Rules inherit ${currentLabel} unless they set their own level. Pick Essential or Strict to replace it.`
+      }
     >
       <VStack align="stretch" gap={3} width="full">
         <RadioCard.Root
@@ -141,7 +148,7 @@ export function OrganizationPiiLevelPicker({
                   <Text fontSize="xs" color="fg.muted">
                     {PII_REDACTION_MODEL_NAME}
                   </Text>
-                  <PiiRedactionModelPrice />
+                  <PiiRedactionModelPrice free={free} />
                   <List.Root paddingLeft={4} fontSize="sm" color="fg.muted" gap={0.5}>
                     <List.Item>Names and full street addresses in 8 languages</List.Item>
                     <List.Item>Plus everything Essential finds</List.Item>
@@ -164,7 +171,7 @@ export function OrganizationPiiLevelPicker({
             </VStack>
           </Card>
         )}
-        {level === "strict" && (
+        {level === "strict" && !free && (
           <Text fontSize="xs" color="fg.muted">
             Strict is billed from the next trace. Pick Essential to stop it.
           </Text>

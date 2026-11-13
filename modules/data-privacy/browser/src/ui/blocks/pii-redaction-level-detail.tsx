@@ -11,7 +11,7 @@ import { PiiRedactionExample } from "../elements/pii-redaction-example.tsx";
 import { PiiRedactionModelPrice } from "../elements/pii-redaction-model-price.tsx";
 
 /** In the rule drawer: what the rule's level runs, Strict's price, and what it stores. */
-export function PiiRedactionLevelDetail({ level }: { level: PiiLevel }) {
+export function PiiRedactionLevelDetail({ level, free }: { level: PiiLevel; free: boolean }) {
   const shown = organizationPiiLevel(level);
   if (!shown) return null;
   return (
@@ -25,7 +25,7 @@ export function PiiRedactionLevelDetail({ level }: { level: PiiLevel }) {
             <Badge size="sm" variant="subtle" colorPalette="green">
               {PII_REDACTION_MODEL_NAME}
             </Badge>
-            <PiiRedactionModelPrice />
+            <PiiRedactionModelPrice free={free} />
           </>
         ) : (
           <Badge size="sm" variant="subtle" colorPalette="gray">

@@ -9,6 +9,7 @@ import type {
   DataPrivacySnapshot,
 } from "@langwatch/data-privacy-contract";
 import { Card } from "@langwatch/design-system/card";
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Skeleton, SkeletonText, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import {
@@ -24,7 +25,7 @@ import {
 import { useMemo, useState } from "react";
 
 import { dataPrivacyApi } from "../../behavior/data-privacy-api.ts";
-import { usePiiRedactionModelOffered } from "../../behavior/use-pii-redaction-model-offered.ts";
+import { usePiiRedactionModelOffer } from "../../behavior/use-pii-redaction-model-offer.ts";
 import {
   PRIVACY_RULE_NEW_VALUE,
   PRIVACY_RULE_QUERY_KEY,
@@ -38,9 +39,12 @@ import {
   ruleMatchesScopeFilter,
 } from "../../model/data-privacy-rule-filter.ts";
 import {
+  levelChangeConfirmation,
   organizationPiiLevel,
   organizationRule,
   type OrganizationPiiLevel,
+  otherPiiLevelLabel,
+  type PiiRedactionModelOffer,
   withOrganizationPiiLevel,
 } from "../../model/pii-redaction-level-offer.ts";
 import { EffectiveSummary } from "../blocks/effective-summary.tsx";
@@ -61,7 +65,7 @@ export default function DataPrivacyScreen() {
 
 function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projectId: string }) {
   const { teamId } = host.scope();
-  const piiRedactionModelOffered = usePiiRedactionModelOffered();
+  const piiRedactionModelOffer = usePiiRedactionModelOffer();
   const utils = dataPrivacyApi.useUtils();
   const snapshotQuery = dataPrivacyApi.dataPrivacy.getSnapshot.useQuery({ projectId });
 
@@ -161,8 +165,9 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
           scrubbed, at any scope, inherited down to projects.
         </Text>
 
-        {piiRedactionModelOffered && snapshot && (
+        {piiRedactionModelOffer && snapshot && (
           <OrganizationPiiLevelMount
+            free={piiRedactionModelOffer.free}
             host={host}
             projectId={projectId}
             snapshot={snapshot}
@@ -193,7 +198,7 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
             snapshot={snapshot}
             scopeFilter={scopeFilter}
             currentTeamId={teamId ?? null}
-            piiRedactionModelOffered={piiRedactionModelOffered}
+            piiRedactionModelOffer={piiRedactionModelOffer}
           />
         )}
 
@@ -206,7 +211,7 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
             editingRule={privacyRuleForAddress(ruleAddress, snapshot.rules)}
             onClose={closeRuleDrawer}
             onSaved={() => void invalidate()}
-            piiRedactionModelOffered={piiRedactionModelOffered}
+            piiRedactionModelOffer={piiRedactionModelOffer}
           />
         )}
       </VStack>
@@ -244,7 +249,7 @@ function PrivacyRuleDrawerMount({
   editingRule,
   onClose,
   onSaved,
-  piiRedactionModelOffered,
+  piiRedactionModelOffer,
 }: {
   host: DataPrivacyHostApi;
   projectId: string;
@@ -253,7 +258,7 @@ function PrivacyRuleDrawerMount({
   editingRule: DataPrivacyRule | null;
   onClose: () => void;
   onSaved: () => void;
-  piiRedactionModelOffered: boolean;
+  piiRedactionModelOffer: PiiRedactionModelOffer;
 }) {
   const { organizationId, teamId } = host.scope();
   const setForScope = dataPrivacyApi.dataPrivacy.setForScope.useMutation();
@@ -290,7 +295,7 @@ function PrivacyRuleDrawerMount({
       effectiveOrganization={snapshot.effectiveOrganization}
       projectId={projectId}
       isSaving={setForScope.isPending}
-      piiRedactionModelOffered={piiRedactionModelOffered}
+      piiRedactionModelOffer={piiRedactionModelOffer}
       scopePicker={({ value, onChange }) => (
         <ScopeChipPicker<ScopeChipPickerScopeType>
           value={value}
@@ -314,14 +319,17 @@ function PrivacyRuleDrawerMount({
 
 /**
  * The organization's Essential or Strict picker over its own rule, saved with the drawer's
- * setForScope. A pick shows at once and stays until the snapshot's level moves or the save fails.
+ * setForScope. Strict at a price, or replacing Custom, asks first. A pick shows at once and stays
+ * until the snapshot's level moves or the save fails.
  */
 function OrganizationPiiLevelMount({
+  free,
   host,
   projectId,
   snapshot,
   onSaved,
 }: {
+  free: boolean;
   host: DataPrivacyHostApi;
   projectId: string;
   snapshot: DataPrivacySnapshot;
@@ -332,14 +340,19 @@ function OrganizationPiiLevelMount({
     level: OrganizationPiiLevel;
     over: OrganizationPiiLevel | null;
   } | null>(null);
+  const [asking, setAsking] = useState<OrganizationPiiLevel | null>(null);
   const organizationId = snapshot.available.organization?.id ?? host.scope().organizationId;
   if (!organizationId || !snapshot.effectiveOrganization) return null;
 
-  const stored = organizationPiiLevel(snapshot.effectiveOrganization.pii.level);
+  const storedPii = snapshot.effectiveOrganization.pii;
+  const stored = organizationPiiLevel(storedPii.level);
   const shown = picked && picked.over === stored ? picked.level : stored;
   const ownRule = organizationRule({ rules: snapshot.rules, organizationId });
+  const confirmation = asking
+    ? levelChangeConfirmation({ from: storedPii.level, to: asking, free })
+    : null;
 
-  const pick = async (level: OrganizationPiiLevel) => {
+  const save = async (level: OrganizationPiiLevel) => {
     setPicked({ level, over: stored });
     try {
       await setForScope.mutateAsync({
@@ -358,13 +371,37 @@ function OrganizationPiiLevelMount({
     }
   };
 
+  const pick = (level: OrganizationPiiLevel) => {
+    if (levelChangeConfirmation({ from: storedPii.level, to: level, free })) setAsking(level);
+    else void save(level);
+  };
+
   return (
-    <OrganizationPiiLevelPicker
-      level={shown}
-      canWrite={snapshot.available.organization !== null}
-      isSaving={setForScope.isPending}
-      onPick={(level) => void pick(level)}
-    />
+    <>
+      <OrganizationPiiLevelPicker
+        level={shown}
+        otherLevelLabel={otherPiiLevelLabel({
+          level: storedPii.level,
+          entityCount: storedPii.entities.length,
+        })}
+        free={free}
+        canWrite={snapshot.available.organization !== null}
+        isSaving={setForScope.isPending}
+        onPick={pick}
+      />
+      <ConfirmDialog
+        open={confirmation !== null}
+        onClose={() => setAsking(null)}
+        onConfirm={() => {
+          if (asking) void save(asking);
+          setAsking(null);
+        }}
+        title={confirmation?.title ?? ""}
+        description={confirmation?.description ?? ""}
+        confirmLabel={confirmation?.confirmLabel}
+        tone="default"
+      />
+    </>
   );
 }
 

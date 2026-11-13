@@ -20,6 +20,7 @@ import {
   STRICT_ADDED_PII_ENTITY_LABELS,
   STRICT_ADDED_PII_SUMMARY,
 } from "../../model/pii-entity-labels.ts";
+import type { PiiRedactionModelOffer } from "../../model/pii-redaction-level-offer.ts";
 import { PatternListField } from "../elements/pattern-list-field.tsx";
 import { PiiEntityToggleGroup } from "../elements/pii-entity-toggle-group.tsx";
 import { PiiRedactionLevelDetail } from "./pii-redaction-level-detail.tsx";
@@ -58,13 +59,13 @@ function HelpTip({ content }: { content: string }) {
 export function PiiRedactionFields({
   form,
   inheritedLevel,
-  piiRedactionModelOffered = false,
+  piiRedactionModelOffer = null,
   onChange,
 }: {
   form: PiiFields;
   inheritedLevel: PiiLevel;
-  /** What the level runs, Strict's price and the example (release_pii_redaction_model_enabled). */
-  piiRedactionModelOffered?: boolean;
+  /** What the level runs, Strict's price and the example; null hides them. */
+  piiRedactionModelOffer?: PiiRedactionModelOffer;
   onChange: (patch: Partial<PiiFields>) => void;
 }) {
   const toggleEntity = (entity: string) =>
@@ -129,9 +130,10 @@ export function PiiRedactionFields({
           {inheritedHint(PII_VALUE_LABELS[inheritedLevel])}
         </Text>
       )}
-      {piiRedactionModelOffered && (
+      {piiRedactionModelOffer && (
         <PiiRedactionLevelDetail
           level={form.piiChoice === "inherit" ? inheritedLevel : form.piiChoice}
+          free={piiRedactionModelOffer.free}
         />
       )}
       {form.piiChoice === "custom" && (

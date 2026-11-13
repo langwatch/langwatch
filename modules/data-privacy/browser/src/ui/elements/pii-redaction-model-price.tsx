@@ -7,23 +7,27 @@ import {
   PII_REDACTION_MODEL_PRICE_UNIT,
   STRICT_BILLING_NOTE,
   STRICT_FALLBACK_NOTE,
+  STRICT_FREE_NOTE,
 } from "../../model/pii-redaction-level-offer.ts";
 
-/** "$0.50 per 1M characters, pay as you go", with the billing and fallback notes behind an (i). */
-export function PiiRedactionModelPrice() {
+/**
+ * "$0.50 per 1M characters, pay as you go", or "Included for your organization" when free, with
+ * the billing and fallback notes behind an (i).
+ */
+export function PiiRedactionModelPrice({ free }: { free: boolean }) {
   return (
     <HStack gap={1.5} wrap="wrap" align="center" data-testid="pii-redaction-model-price">
       <Text fontSize="sm" fontWeight="600">
-        {PII_REDACTION_MODEL_PRICE}
+        {free ? "Included" : PII_REDACTION_MODEL_PRICE}
       </Text>
       <Text fontSize="xs" color="fg.muted">
-        {PII_REDACTION_MODEL_PRICE_UNIT}
+        {free ? "for your organization" : PII_REDACTION_MODEL_PRICE_UNIT}
       </Text>
       <Tooltip
         contentProps={{ maxWidth: "320px" }}
         content={
           <VStack align="start" gap={1.5}>
-            <Text>{STRICT_BILLING_NOTE}</Text>
+            <Text>{free ? STRICT_FREE_NOTE : STRICT_BILLING_NOTE}</Text>
             <Text>{STRICT_FALLBACK_NOTE}</Text>
           </VStack>
         }

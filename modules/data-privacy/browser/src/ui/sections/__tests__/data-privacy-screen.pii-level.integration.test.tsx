@@ -4,8 +4,13 @@
  * Spec: modules/data-privacy/specs/pii-redaction-level-picker.feature
  */
 
-import { UiHostServiceProvider } from "@langwatch/browser-host/capabilities";
+import {
+  UiHostServiceProvider,
+  UiHostServicesContextProvider,
+  type UiHostServices,
+} from "@langwatch/browser-host/capabilities";
 import { UiFlagsService, type UiFlags } from "@langwatch/browser-host/feature-flag";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import {
   type DataPrivacyRule,
   type DataPrivacySnapshot,
@@ -45,16 +50,18 @@ vi.mock("../../../behavior/data-privacy-api.ts", () => ({
   },
 }));
 
-function resolved(level: PiiLevel): ResolvedDataPrivacy {
-  return { ...PLATFORM_DEFAULT_DATA_PRIVACY, pii: { level, entities: [], exceptPatterns: [] } };
+function resolved(level: PiiLevel, entities: string[] = []): ResolvedDataPrivacy {
+  return { ...PLATFORM_DEFAULT_DATA_PRIVACY, pii: { level, entities, exceptPatterns: [] } };
 }
 
 function snapshotWith({
   level = "essential",
+  entities = [],
   rules = [],
   canWriteOrganization = true,
 }: {
   level?: PiiLevel;
+  entities?: string[];
   rules?: DataPrivacyRule[];
   canWriteOrganization?: boolean;
 } = {}): DataPrivacySnapshot {
@@ -67,9 +74,9 @@ function snapshotWith({
       projects: [{ id: "proj-1", name: "Web App", teamId: "team-1" }],
     },
     audienceOptions: { groups: [] },
-    effective: resolved(level),
-    effectiveTeam: resolved(level),
-    effectiveOrganization: resolved(level),
+    effective: resolved(level, entities),
+    effectiveTeam: resolved(level, entities),
+    effectiveOrganization: resolved(level, entities),
     rules,
   };
 }
@@ -105,20 +112,58 @@ class TestPrivacyHost extends DataPrivacyHostApi {
   }
 }
 
-function renderScreen({ flagOn }: { flagOn: boolean }) {
+function renderScreen({
+  flagOn,
+  free = false,
+  isSaaS = true,
+}: {
+  flagOn: boolean;
+  free?: boolean;
+  isSaaS?: boolean;
+}) {
   const host = new TestPrivacyHost();
-  const flags: UiFlags = {
-    flag: ({ name }) => (name === "release_pii_redaction_model_enabled" ? flagOn : false),
+  const answers: Record<string, boolean> = {
+    release_pii_redaction_model_enabled: flagOn,
+    release_pii_redaction_model_free: free,
+  };
+  const flags: UiFlags = { flag: ({ name }) => answers[name] ?? false };
+
+  const services: UiHostServices = {
+    ...createUiHostServicesFromHost({
+      route: () => ({ params: {}, query: {} }),
+      navigate: () => {},
+    }),
+    deployment: {
+      isDevelopment: false,
+      isSaaS,
+      appBaseUrl: "http://localhost",
+      hasNlpService: true,
+      hasLangevals: true,
+      hasEmailProvider: false,
+      hasCloudOps: false,
+    },
   };
   renderWithDesignSystem(
-    <UiHostServiceProvider value={new Map([[UiFlagsService.name, flags]])}>
-      <DataPrivacyHostProvider value={host}>
-        <DataPrivacyScreen />
-      </DataPrivacyHostProvider>
-    </UiHostServiceProvider>,
+    <UiHostServicesContextProvider value={services}>
+      <UiHostServiceProvider value={new Map([[UiFlagsService.name, flags]])}>
+        <DataPrivacyHostProvider value={host}>
+          <DataPrivacyScreen />
+        </DataPrivacyHostProvider>
+      </UiHostServiceProvider>
+    </UiHostServicesContextProvider>,
   );
   return host;
 }
+
+const confirmStrict = async () =>
+  userEvent.setup().click(await screen.findByRole("button", { name: "Turn on Strict" }));
+const noModelOrPrice = () => {
+  expect(
+    screen.queryByRole("radiogroup", { name: "PII redaction level for this organization" }),
+  ).toBeNull();
+  expect(screen.queryByText(/LangWatch PII Redaction Model/)).toBeNull();
+  expect(screen.queryByText(/\$0\.50/)).toBeNull();
+};
 
 const picker = () =>
   screen.getByRole("radiogroup", { name: "PII redaction level for this organization" });
@@ -145,11 +190,7 @@ describe("given the Data Privacy page", () => {
     it("shows no picker, no price, no model and the summary as before", () => {
       renderScreen({ flagOn: false });
 
-      expect(
-        screen.queryByRole("radiogroup", { name: "PII redaction level for this organization" }),
-      ).toBeNull();
-      expect(screen.queryByText(/LangWatch PII Redaction Model/)).toBeNull();
-      expect(screen.queryByText(/\$0\.50/)).toBeNull();
+      noModelOrPrice();
       expect(effectivePii()).toBe("PII redactionEssential");
     });
   });
@@ -192,6 +233,7 @@ describe("given the Data Privacy page", () => {
       const host = renderScreen({ flagOn: true });
 
       await userEvent.setup().click(levelRadio("Strict"));
+      await confirmStrict();
 
       await waitFor(() => expect(setForScope).toHaveBeenCalledTimes(1));
       expect(setForScope).toHaveBeenCalledWith({
@@ -237,6 +279,7 @@ describe("given the Data Privacy page", () => {
       const host = renderScreen({ flagOn: true });
 
       await userEvent.setup().click(levelRadio("Strict"));
+      await confirmStrict();
 
       await waitFor(() => expect(host.failures).toHaveLength(1));
       expect(host.failures[0]).toEqual({
@@ -267,12 +310,12 @@ describe("given the Data Privacy page", () => {
 
       expect(
         await screen.findByText(
-          "Pay as you go, no quota or plan. Only Strict spans are billed; Essential stays included.",
+          "Pay as you go, no quota or plan. Only spans the model redacts are billed; spans that fall back to the standard detector are free. Essential stays included.",
         ),
       ).toBeInTheDocument();
       expect(
         screen.getByText(
-          "Strict falls back to the standard detector for a span when the model is unavailable or the span is over 8,000 characters.",
+          "Strict falls back to the standard detector for a span when the model is unavailable or the span's text is very long (over 8,000 characters in total).",
         ),
       ).toBeInTheDocument();
     });
@@ -285,6 +328,104 @@ describe("given the Data Privacy page", () => {
       renderScreen({ flagOn: true });
 
       expect(effectivePii()).toBe("PII redactionStrict · LangWatch PII Redaction Model");
+    });
+  });
+
+  describe("when an admin picks Strict and then cancels", () => {
+    /** @scenario Turning on Strict asks to confirm with the price */
+    it("asks with the model and its price and saves nothing on cancel", async () => {
+      renderScreen({ flagOn: true });
+      const user = userEvent.setup();
+
+      await user.click(levelRadio("Strict"));
+
+      const dialog = await screen.findByRole("dialog", { name: "Turn on Strict?" });
+      expect(dialog.textContent).toContain(
+        "Strict uses the LangWatch PII Redaction Model at $0.50 per 1M characters, pay as you go. Turn it on?",
+      );
+      expect(setForScope).not.toHaveBeenCalled();
+
+      await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(setForScope).not.toHaveBeenCalled();
+      expect(pickedLevel()).toBe("Essential");
+    });
+  });
+
+  describe("when the organization is on the free list", () => {
+    /** @scenario A free organization sees Strict as included and turns it on without a price */
+    it("shows Strict as included and saves it without asking", async () => {
+      renderScreen({ flagOn: true, free: true });
+
+      expect(screen.getByTestId("pii-redaction-model-price").textContent).toBe(
+        "Includedfor your organization",
+      );
+      expect(screen.queryByText(/\$0\.50/)).toBeNull();
+
+      await userEvent.setup().click(levelRadio("Strict"));
+
+      await waitFor(() =>
+        expect(setForScope).toHaveBeenCalledWith(
+          expect.objectContaining({ config: { pii: { level: "strict" } } }),
+        ),
+      );
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(screen.queryByText(/billed from the next trace/)).toBeNull();
+    });
+  });
+
+  describe("when the organization is on Custom", () => {
+    /** @scenario An organization on Custom sees its level and confirms replacing it */
+    it("names Custom, picks neither level and asks before replacing it", async () => {
+      state.snapshot = snapshotWith({
+        level: "custom",
+        entities: ["PERSON", "EMAIL_ADDRESS"],
+        rules: [
+          organizationRuleWith({ pii: { level: "custom", entities: ["EMAIL_ADDRESS", "PERSON"] } }),
+        ],
+      });
+      renderScreen({ flagOn: true });
+      const user = userEvent.setup();
+
+      expect(screen.getByText("Organization on Custom (2 types)")).toBeInTheDocument();
+      expect(pickedLevel()).toBeUndefined();
+
+      await user.click(levelRadio("Essential"));
+      const dialog = await screen.findByRole("dialog", { name: "Replace custom PII settings?" });
+      expect(dialog.textContent).toContain(
+        "This replaces your custom PII settings with Essential.",
+      );
+      expect(setForScope).not.toHaveBeenCalled();
+
+      await user.click(within(dialog).getByRole("button", { name: "Replace" }));
+
+      await waitFor(() =>
+        expect(setForScope).toHaveBeenCalledWith(
+          expect.objectContaining({ config: { pii: { level: "essential" } } }),
+        ),
+      );
+    });
+  });
+
+  describe("when the organization has PII redaction off", () => {
+    /** @scenario An organization with PII redaction off sees its level */
+    it("names Off and picks neither level", () => {
+      state.snapshot = snapshotWith({ level: "disabled" });
+      renderScreen({ flagOn: true });
+
+      expect(screen.getByText("Organization on Off")).toBeInTheDocument();
+      expect(pickedLevel()).toBeUndefined();
+    });
+  });
+
+  describe("when the deployment is self-hosted", () => {
+    /** @scenario A self-hosted deployment shows no model and no price */
+    it("shows no picker, model or price even with the flag on", () => {
+      renderScreen({ flagOn: true, isSaaS: false });
+
+      noModelOrPrice();
+      expect(effectivePii()).toBe("PII redactionEssential");
     });
   });
 });

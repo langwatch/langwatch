@@ -12,7 +12,10 @@ import {
   DISPOSITION_LABELS,
   PII_LABELS,
 } from "../../model/data-privacy-labels.ts";
-import { PII_REDACTION_MODEL_NAME } from "../../model/pii-redaction-level-offer.ts";
+import {
+  PII_REDACTION_MODEL_NAME,
+  type PiiRedactionModelOffer,
+} from "../../model/pii-redaction-level-offer.ts";
 
 /**
  * What is ACTUALLY applied once the rules above cascade down. Declared
@@ -76,16 +79,19 @@ export function EffectiveSummary({
   snapshot,
   scopeFilter,
   currentTeamId,
-  piiRedactionModelOffered = false,
+  piiRedactionModelOffer = null,
 }: {
   snapshot: DataPrivacySnapshot;
   scopeFilter: EffectiveScopeSelection;
   currentTeamId: string | null;
-  /** release_pii_redaction_model_enabled for the organization. */
-  piiRedactionModelOffered?: boolean;
+  /** The Strict offer; null names levels as before. */
+  piiRedactionModelOffer?: PiiRedactionModelOffer;
 }) {
   const { effective, scopeLabel } = pickEffectiveForScope(snapshot, scopeFilter, currentTeamId);
-  const piiValue = piiLevelLabel({ pii: effective.pii, piiRedactionModelOffered });
+  const piiValue = piiLevelLabel({
+    pii: effective.pii,
+    piiRedactionModelOffered: piiRedactionModelOffer !== null,
+  });
   const secretsValue = `${effective.secrets.enabled ? "On" : "Off"}${
     effective.secrets.customPatterns.length > 0
       ? ` · ${effective.secrets.customPatterns.length} custom ${
