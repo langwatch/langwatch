@@ -86,6 +86,7 @@ export class TraceEvaluationOutcomesMigrationService {
       });
       for (const { id: projectId } of page.projects) {
         let latest = report;
+        let skipped = false;
         try {
           report = await this.recordProject({
             projectId,
@@ -106,10 +107,13 @@ export class TraceEvaluationOutcomesMigrationService {
             "the evaluation outcomes step skipped a project that is archived or gone",
           );
           report = { ...report, skippedProjects: report.skippedProjects + 1 };
+          skipped = true;
         }
-        if (signal.aborted) return report;
+        // A skip is saved even when aborted, or the resume would revisit the gone project uncounted.
+        if (signal.aborted && !skipped) return report;
         report = { ...report, afterProjectId: projectId, inProject: null };
         if (!dryRun) await onPage(report);
+        if (skipped && signal.aborted) return report;
       }
       after = page.next ?? undefined;
     } while (after !== undefined);

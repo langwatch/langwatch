@@ -346,8 +346,10 @@ describe("TraceEvaluationOutcomesMigrationService", () => {
     async function backfillWith({
       failure,
       resumeFrom = null,
+      abortWhenGone = false,
     }: {
       failure: Error;
+      abortWhenGone?: boolean;
       resumeFrom?: EvaluationOutcomesBackfillReport | null;
     }) {
       const { evaluations, anchors } = await compose();
@@ -365,12 +367,16 @@ describe("TraceEvaluationOutcomesMigrationService", () => {
       });
       const sent: RecordEvaluationOutcomeCommandData[] = [];
       const saved: EvaluationOutcomesBackfillReport[] = [];
+      const controller = new AbortController();
       const warned: unknown[] = [];
       const backfill = TraceEvaluationOutcomesMigrationService.create({
         projects,
         evaluations: {
           listEvaluationOutcomes: async (input) => {
-            if (input.tenantId === archivedId) throw failure;
+            if (input.tenantId === archivedId) {
+              if (abortWhenGone) controller.abort();
+              throw failure;
+            }
             return evaluations.listEvaluationOutcomes(input);
           },
         },
@@ -383,7 +389,7 @@ describe("TraceEvaluationOutcomesMigrationService", () => {
         backfill.recordEvaluationOutcomes({
           resumeFrom,
           dryRun: false,
-          signal: new AbortController().signal,
+          signal: controller.signal,
           onPage: async (report) => void saved.push(report),
         });
       return { run, sent, saved, warned };
@@ -409,6 +415,20 @@ describe("TraceEvaluationOutcomesMigrationService", () => {
     });
 
     /** @scenario "The backfill skips a project archived since its evaluations" */
+    it("saves the skip even when the run is aborted as the project is found gone", async () => {
+      const { run, saved } = await backfillWith({ failure: projectGone, abortWhenGone: true });
+
+      const report = await run();
+
+      expect(report).toMatchObject({
+        afterProjectId: archivedId,
+        inProject: null,
+        skippedProjects: 1,
+      });
+      expect(saved.at(-1)).toEqual(report);
+    });
+
+    /** @scenario "The backfill skips a project archived since its evaluations" */
     it("skips a project archived after part of it was saved", async () => {
       const { run, sent } = await backfillWith({
         failure: projectGone,
@@ -429,7 +449,13 @@ describe("TraceEvaluationOutcomesMigrationService", () => {
       const report = await run();
 
       expect(sent.map(({ evaluationId }) => evaluationId)).toEqual(["evaluation-a"]);
-      expect(report).toMatchObject({ skippedProjects: 1, inProject: null, afterProjectId: TENANT });
+      expect(report).toMatchObject({
+        projects: 2,
+        outcomes: 2,
+        skippedProjects: 1,
+        inProject: null,
+        afterProjectId: TENANT,
+      });
     });
 
     /** @scenario "The backfill skips a project archived since its evaluations" */
@@ -466,15 +492,17 @@ describe("TraceEvaluationOutcomesMigrationService", () => {
         now: () => EVALUATED_AT + 60_000,
       });
 
+      const saved: EvaluationOutcomesBackfillReport[] = [];
       const report = await backfill.recordEvaluationOutcomes({
         resumeFrom: null,
         dryRun: false,
         signal: new AbortController().signal,
-        onPage: async () => {},
+        onPage: async (checkpoint) => void saved.push(checkpoint),
       });
 
       expect(sent.map(({ evaluationId }) => evaluationId)).toEqual(["evaluation-1"]);
       expect(report).toMatchObject({ projects: 1, outcomes: 1, skippedProjects: 1 });
+      expect(saved.at(-1)).toMatchObject({ outcomes: 1, skippedProjects: 1, inProject: null });
     });
 
     /** @scenario "The backfill still fails on any other error" */
