@@ -123,7 +123,6 @@ import type {
 } from "./features/registry/agent-registry-ard.ts";
 import type {
   AgentRegistryEntry,
-  AgentRegistryEvent,
   AgentRegistryEventPage,
   AgentRegistryPage,
   AgentRegistryStatus,
@@ -483,11 +482,13 @@ export interface GovernanceRestApi {
   }): Promise<AgentRegistryPage>;
   /** Throws `agent_registry_entry_not_found` for an id outside the organisation. */
   getRegistryAgent(input: { organizationId: string; id: string }): Promise<AgentRegistryEntry>;
-  /** Every recorded change of one agent, oldest first; each carries the entry at its version. */
-  findRegistryAgentVersions(input: {
+  /** One agent's changes after a sequence, oldest first; each carries the entry at its version. */
+  listRegistryAgentVersions(input: {
     organizationId: string;
     id: string;
-  }): Promise<AgentRegistryEvent[]>;
+    cursor?: string;
+    limit: number;
+  }): Promise<AgentRegistryEventPage>;
   /** The organisation's change feed after a sequence, in order. */
   listRegistryEvents(input: {
     organizationId: string;

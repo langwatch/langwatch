@@ -8,7 +8,7 @@ Feature: Agent registry with ARD discovery and change events
   published as an Agentic Resource Discovery (ARD v0.91) manifest with search. Every material
   change appends a numbered event to the organisation's feed, which is read by cursor and pushed
   to the organisation's webhook endpoints that subscribe to `governance.agent.*`.
-  Docs: docs/ai-gateway/governance/agent-registry.mdx
+  Docs: docs/governance/agent-registry.mdx
 
   Background:
     Given an organisation with a project and an organisation API key holding governance:view
@@ -57,6 +57,13 @@ Feature: Agent registry with ARD discovery and change events
     When the registry builds its drafts
     Then no traffic draft is built for either
 
+  @unit
+  Scenario: A traced agent carrying a listed provider's agent id is not flagged shadow
+    Given a Databricks Genie space "space-42" a source listed
+    And the project's spans name an agent "genie-runner" whose gen_ai.agent.id is "space-42"
+    When the registry builds its drafts
+    Then no traffic draft is built for it
+
   # Versions and change events
 
   @unit
@@ -101,6 +108,13 @@ Feature: Agent registry with ARD discovery and change events
     And one "governance.agent.removed" event is appended
 
   @unit
+  Scenario: An agent's versions are read in pages, oldest first
+    Given the registry holds an agent changed to version 3
+    When a client reads its versions two at a time
+    Then the first page holds versions 1 and 2 with a cursor
+    And the page after that cursor holds version 3 and no cursor
+
+  @unit
   Scenario: A source that cannot be read removes nothing
     Given the registry holds active agents
     When reading the organisation's agents fails during a reconcile
@@ -114,11 +128,42 @@ Feature: Agent registry with ARD discovery and change events
     When the traffic pass runs
     Then the registry reconciles both organisations
 
-  @integration
+  @unit
   Scenario: A recorded agent change reconciles the agent's organisation
     Given the agent module records that an agent in the project changed
     When governance's subscriber handles the fact
     Then the registry reconciles the project's organisation
+
+  @unit
+  Scenario: A recorded agent archive reconciles the agent's organisation
+    Given the agent module records that an agent in the project was archived
+    When governance's subscriber handles the fact
+    Then the registry reconciles the project's organisation
+
+  @unit
+  Scenario: A burst of changes to one project's agents settles into one reconcile
+    Given the agent module records three changes to agents in the same project within the settle window
+    When governance's subscriber handles the facts
+    Then the registry reconciles the project's organisation once
+
+  @unit
+  Scenario: A traffic pass prunes its own bookkeeping older than a week
+    When a scheduled traffic pass runs
+    Then the registry reconciles the organisations it holds
+    And the pass's dispatched outbox rows older than seven days are deleted
+    And a failed prune leaves the pass successful
+
+  @unit
+  Scenario: A listing run reconciles the organisation's registry
+    Given an ingestion source listed its agents
+    When the listing is saved
+    Then the registry reconciles the organisation
+
+  @unit
+  Scenario: A registry reconcile that fails after a listing leaves the listing saved
+    Given an ingestion source listed its agents
+    When the registry reconcile after the listing fails
+    Then the listing is still saved and the failure is logged
 
   @unit
   Scenario: Every new event is pushed once to each subscribed webhook endpoint

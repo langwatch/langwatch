@@ -186,4 +186,27 @@ describe("trafficAgentDrafts()", () => {
       expect(drafts).toEqual([]);
     });
   });
+
+  describe("given a traced agent whose id is a provider's agent id", () => {
+    /** @scenario A traced agent carrying a listed provider's agent id is not flagged shadow */
+    it("builds no traffic draft for it", () => {
+      const seen = Temporal.Instant.from("2026-11-10T00:00:00Z");
+      const listed = discoveredAgentDraft({
+        id: "disc-1",
+        source: "databricks",
+        rawAgentId: "space-42",
+        displayText: "Revenue Analyst",
+        metadata: {},
+        firstSeenAt: seen,
+        lastSeenAt: seen,
+      });
+
+      const drafts = trafficAgentDrafts({
+        seen: [{ projectId: "project-1", agents: [seenAgent("genie-runner", "space-42")] }],
+        listed: [listed],
+      });
+
+      expect(drafts).toEqual([]);
+    });
+  });
 });

@@ -170,11 +170,20 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`agent-registry:${organizationId
     return rows.map((row) => row.organizationId);
   }
 
-  async findEntries({ organizationId }: { organizationId: string }): Promise<AgentRegistryEntry[]> {
+  async findEntries({
+    organizationId,
+    status,
+    limit,
+  }: {
+    organizationId: string;
+    status?: AgentRegistryStatus;
+    limit: number;
+  }): Promise<AgentRegistryEntry[]> {
     const rows = await this.prisma.agentRegistryEntry.findMany({
-      where: { organizationId },
+      where: { organizationId, ...(status ? { status } : {}) },
       select: { entry: true },
       orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+      take: limit,
     });
     return rows.map((row) => entryOf(row.entry));
   }
@@ -249,13 +258,22 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`agent-registry:${organizationId
   async findEventsOfEntry({
     organizationId,
     entryId,
+    after,
+    limit,
   }: {
     organizationId: string;
     entryId: string;
+    after?: bigint;
+    limit: number;
   }): Promise<AgentRegistryEvent[]> {
     const rows = await this.prisma.agentRegistryEvent.findMany({
-      where: { organizationId, entryId },
+      where: {
+        organizationId,
+        entryId,
+        ...(after === undefined ? {} : { sequence: { gt: after } }),
+      },
       orderBy: { sequence: "asc" },
+      take: limit,
     });
     return rows.map(eventOf);
   }

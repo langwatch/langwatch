@@ -131,6 +131,8 @@ export const agentRegistryEventSchema: AgentRegistryEventSchema =
 export type AgentRegistryEvent = z.infer<typeof agentRegistryEventSchema>;
 
 export const AGENT_REGISTRY_PAGE_LIMIT_MAX = 200;
+/** The most active agents the ARD manifest and search read, oldest update first. */
+export const AGENT_REGISTRY_ARD_ENTRY_LIMIT = 1000;
 
 const agentRegistryListQuerySchemaDefinition = z.object({
   limit: z.coerce.number().int().min(1).max(AGENT_REGISTRY_PAGE_LIMIT_MAX).default(50),
@@ -191,15 +193,6 @@ export interface AgentRegistryEventsResponseSchema extends Named<
 export const agentRegistryEventsResponseSchema: AgentRegistryEventsResponseSchema =
   agentRegistryEventsResponseSchemaDefinition;
 export type AgentRegistryEventPage = z.infer<typeof agentRegistryEventsResponseSchema>;
-
-const agentRegistryVersionsResponseSchemaDefinition = z.object({
-  data: agentRegistryEventSchema.array(),
-});
-export interface AgentRegistryVersionsResponseSchema extends Named<
-  typeof agentRegistryVersionsResponseSchemaDefinition
-> {}
-export const agentRegistryVersionsResponseSchema: AgentRegistryVersionsResponseSchema =
-  agentRegistryVersionsResponseSchemaDefinition;
 
 /** The JSON Schema documents a consumer validates entries and events with. */
 const agentRegistrySchemaResponseSchemaDefinition = z.object({

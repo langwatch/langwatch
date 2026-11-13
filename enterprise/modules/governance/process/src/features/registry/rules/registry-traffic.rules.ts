@@ -1,5 +1,5 @@
-import { Temporal } from "@langwatch/time";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { Temporal } from "@langwatch/time";
 import type { TraceAgentSeen } from "@langwatch/trace-contract";
 
 import type { RegistryDraft } from "./registry-entry.rules.ts";
@@ -26,8 +26,8 @@ function modelOf(model: string | null): RegistryDraft["model"] {
 
 /**
  * Agents the traces name that no listed source accounts for, as observed drafts flagged shadow.
- * A trace agent matches a listed one by `gen_ai.agent.id` equal to the listed agent's id, or by
- * the same name ignoring case. Spec: specs/agent-registry.feature
+ * A trace agent matches a listed one by `gen_ai.agent.id` equal to a LangWatch agent's id or a
+ * provider's agent id, or by the same name ignoring case. Spec: specs/agent-registry.feature
  */
 export function trafficAgentDrafts({
   seen,
@@ -37,9 +37,7 @@ export function trafficAgentDrafts({
   listed: readonly RegistryDraft[];
 }): RegistryDraft[] {
   const listedNames = new Set(listed.map((draft) => normalised(draft.name)));
-  const listedIds = new Set(
-    listed.map((draft) => draft.sourceKey.slice(draft.sourceKey.indexOf(":") + 1)),
-  );
+  const listedIds = new Set(listed.flatMap((draft) => draft.matchIds ?? []));
   const drafts: RegistryDraft[] = [];
   for (const { projectId, agents } of seen) {
     for (const agent of agents) {

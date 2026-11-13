@@ -15,9 +15,9 @@ The agent registry lists every agent LangWatch can see in your organization, wit
 | [Ingestion sources](/ai-governance/ingestion-sources/index) that list agents | `databricks`, `copilot_studio` | `discovered` | Name, provider id, the provider's workspace or environment URL, the provider's last modified time |
 | Your traces and gateway calls | `traffic` | `observed` | Any `gen_ai.agent.name` on a span in the last 30 days, with `gen_ai.agent.id` and `gen_ai.request.model` when present |
 
-A traced agent is matched to a listed one when its `gen_ai.agent.id` equals a LangWatch agent id, or when its name equals a listed agent's name, ignoring case. A traced agent that matches nothing is registered with `shadow: true` and a `governance.agent.flagged_shadow` event. That is how agents running outside your inventory show up.
+A traced agent is matched to a listed one when its `gen_ai.agent.id` equals a LangWatch agent id or a provider's agent id (such as a Databricks Genie space id), or when its name equals a listed agent's name, ignoring case. A traced agent with no match is registered with `shadow: true` and a `governance.agent.flagged_shadow` event. That is how agents running outside your inventory show up.
 
-An agent whose source no longer lists it, or that has sent no traffic for 30 days, is kept with `status: "removed"`. Nothing is deleted.
+A LangWatch agent that is archived or deleted, and a traced agent that has sent no traffic for 30 days, is kept with `status: "removed"`; entries are never deleted. Agents from ingestion sources stay active once listed.
 
 ## Authentication
 
@@ -29,7 +29,7 @@ Every route takes an organization API key in `Authorization: Bearer <key>`. The 
 |---|---|
 | `GET /api/governance/registry/agents` | The registry, a page at a time |
 | `GET /api/governance/registry/agents/{id}` | One entry |
-| `GET /api/governance/registry/agents/{id}/versions` | Every change event of one entry, oldest first |
+| `GET /api/governance/registry/agents/{id}/versions` | The change events of one entry, oldest first, paged like the change feed |
 | `GET /api/governance/registry/events?cursor=` | The change feed, in order |
 | `GET /api/governance/registry/ard.json` | The registry as an ARD v0.91 manifest |
 | `POST /api/governance/registry/ard/search` | ARD search |
@@ -108,7 +108,7 @@ Each material change appends one or more events to the organization's feed:
 | `governance.agent.registered` | An agent enters the registry, at version 1 |
 | `governance.agent.versioned` | An entry's material fields change; carries `from_version` and `to_version` |
 | `governance.agent.tool_deprecated` | A tool left the agent's latest definition. The tool stays in `tools` with `status: "deprecated"` and `deprecated_in_version` |
-| `governance.agent.removed` | The source no longer lists the agent, or a traced agent sent nothing for 30 days |
+| `governance.agent.removed` | A LangWatch agent was archived or deleted, or a traced agent sent no traffic for 30 days |
 | `governance.agent.flagged_shadow` | A traced agent matches no listed source |
 
 Every event has the same shape:
@@ -136,7 +136,7 @@ Every event has the same shape:
 
 ### Reading the feed by cursor
 
-`GET /api/governance/registry/events` returns events in `sequence` order. Pass the last `sequence` you processed as `cursor` to read what came after it; `next_cursor` is null when you have caught up. `limit` is 1 to 200, default 100. Sequences only grow, so a consumer that stores its cursor never misses or repeats an event.
+`GET /api/governance/registry/events` returns events in `sequence` order. Pass the last `sequence` you processed as `cursor` to read what came after it; `next_cursor` is null when you have caught up. `limit` is 1 to 200, default 100; `/versions` takes the same `limit` and `cursor`. Sequences only grow, so a consumer that stores its cursor never misses or repeats an event.
 
 ```bash
 curl -s "$LANGWATCH_ENDPOINT/api/governance/registry/events?cursor=1041" \
@@ -158,7 +158,7 @@ Each event is delivered in the standard webhook envelope, with the event above a
 
 ## ARD v0.91
 
-`GET /api/governance/registry/ard.json` returns the active entries as an ARD manifest:
+`GET /api/governance/registry/ard.json` returns the active entries as an ARD manifest, up to 1,000 entries in order of last change, oldest first. Use the REST list to read a larger registry in full:
 
 ```json
 {

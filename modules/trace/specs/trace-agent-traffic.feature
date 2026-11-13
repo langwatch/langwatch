@@ -16,3 +16,9 @@ Feature: Agents seen in a project's traffic
     Given a project with a span naming "planner" before the window and a span with no agent name
     When the agents seen since the window start are read
     Then no agent is answered
+
+  @integration
+  Scenario: An agent seen with two models reads its latest model on every read
+    Given a project whose spans for agent "planner" name model "gpt-5-mini" and later model "gpt-5"
+    When the agents seen since the window start are read twice
+    Then both reads answer "planner" with model "gpt-5" and its latest agent id

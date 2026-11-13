@@ -14,7 +14,8 @@ type AgentSeenRow = {
 
 /**
  * Distinct `gen_ai.agent.name` over `stored_spans`, bounded by `StartTime` so only the window's
- * partitions are read. Span counts may include not-yet-merged duplicates: an order, not a tally.
+ * partitions are read. Id and model are the latest non-empty values, ties broken by value, so a
+ * stable agent reads the same on every pass. Span counts may include unmerged duplicates.
  */
 export class TraceAgentTrafficClickHouseRepository extends TraceAgentTrafficRepository {
   readonly #clickhouse: ClickHouseQueryClient;
@@ -39,8 +40,16 @@ export class TraceAgentTrafficClickHouseRepository extends TraceAgentTrafficRepo
       sql: `
         SELECT
           SpanAttributes['gen_ai.agent.name'] AS agentName,
-          anyIf(SpanAttributes['gen_ai.agent.id'], SpanAttributes['gen_ai.agent.id'] != '') AS agentId,
-          anyIf(SpanAttributes['gen_ai.request.model'], SpanAttributes['gen_ai.request.model'] != '') AS model,
+          argMaxIf(
+            SpanAttributes['gen_ai.agent.id'],
+            (StartTime, SpanAttributes['gen_ai.agent.id']),
+            SpanAttributes['gen_ai.agent.id'] != ''
+          ) AS agentId,
+          argMaxIf(
+            SpanAttributes['gen_ai.request.model'],
+            (StartTime, SpanAttributes['gen_ai.request.model']),
+            SpanAttributes['gen_ai.request.model'] != ''
+          ) AS model,
           count() AS spanCount,
           toUnixTimestamp64Milli(min(StartTime)) AS firstSeenMs,
           toUnixTimestamp64Milli(max(StartTime)) AS lastSeenMs

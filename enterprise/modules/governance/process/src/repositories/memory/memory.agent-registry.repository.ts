@@ -87,8 +87,19 @@ export class MemoryAgentRegistryRepository extends AgentRegistryRepository {
       .slice(0, limit);
   }
 
-  async findEntries({ organizationId }: { organizationId: string }): Promise<AgentRegistryEntry[]> {
-    return this.entriesOf(organizationId).toSorted(byPosition);
+  async findEntries({
+    organizationId,
+    status,
+    limit,
+  }: {
+    organizationId: string;
+    status?: AgentRegistryStatus;
+    limit: number;
+  }): Promise<AgentRegistryEntry[]> {
+    return this.entriesOf(organizationId)
+      .filter((entry) => !status || entry.status === status)
+      .toSorted(byPosition)
+      .slice(0, limit);
   }
 
   async listEntries({
@@ -147,12 +158,18 @@ export class MemoryAgentRegistryRepository extends AgentRegistryRepository {
   async findEventsOfEntry({
     organizationId,
     entryId,
+    after,
+    limit,
   }: {
     organizationId: string;
     entryId: string;
+    after?: bigint;
+    limit: number;
   }): Promise<AgentRegistryEvent[]> {
     return this.eventsOf(organizationId)
       .filter(({ event }) => event.agent_id === entryId)
+      .filter(({ event }) => after === undefined || BigInt(event.sequence) > after)
+      .slice(0, limit)
       .map(({ event }) => structuredClone(event));
   }
 

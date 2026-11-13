@@ -1,7 +1,8 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { Agent, AgentApi } from "@langwatch/agent-contract";
 import {
+  AGENT_REGISTRY_ARD_ENTRY_LIMIT,
   type AgentRegistryEntry,
-  type AgentRegistryEvent,
   type AgentRegistryEventPage,
   type AgentRegistryPage,
   type AgentRegistryStatus,
@@ -10,7 +11,6 @@ import {
   type ArdSearchResponse,
   GovernanceValidationError,
 } from "@langwatch/enterprise-governance-contract";
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { generate } from "@langwatch/ksuid";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -241,12 +241,28 @@ export class AgentRegistryService {
     return this.deps.registry.getEntry(input);
   }
 
-  async findVersions(input: { organizationId: string; id: string }): Promise<AgentRegistryEvent[]> {
-    await this.deps.registry.getEntry(input);
-    return this.deps.registry.findEventsOfEntry({
-      organizationId: input.organizationId,
-      entryId: input.id,
+  async listVersions({
+    organizationId,
+    id,
+    cursor,
+    limit,
+  }: {
+    organizationId: string;
+    id: string;
+    cursor?: string;
+    limit: number;
+  }): Promise<AgentRegistryEventPage> {
+    await this.deps.registry.getEntry({ organizationId, id });
+    const events = await this.deps.registry.findEventsOfEntry({
+      organizationId,
+      entryId: id,
+      ...(cursor ? { after: BigInt(cursor) } : {}),
+      limit,
     });
+    return {
+      data: events,
+      next_cursor: events.length === limit ? (events.at(-1)?.sequence ?? null) : null,
+    };
   }
 
   async listEvents({
@@ -270,7 +286,11 @@ export class AgentRegistryService {
   }
 
   async ardManifest({ organizationId }: { organizationId: string }): Promise<ArdManifest> {
-    const entries = await this.deps.registry.findEntries({ organizationId });
+    const entries = await this.deps.registry.findEntries({
+      organizationId,
+      status: "active",
+      limit: AGENT_REGISTRY_ARD_ENTRY_LIMIT,
+    });
     const updatedAt =
       entries
         .map((entry) => entry.updated_at)

@@ -694,6 +694,7 @@
 /features/querying-your-data
 /features/topic-clustering
 /features/webhooks
+/governance/agent-registry
 /guardrails/overview
 /guardrails/setting-up-guardrails
 /hybrid-setup

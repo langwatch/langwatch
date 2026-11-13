@@ -28,6 +28,8 @@ export type RegistryDraft = Omit<
   | "removed_at"
 > & {
   sourceKey: string;
+  /** Ids a traced agent's `gen_ai.agent.id` may carry for this agent; never stored. */
+  matchIds?: readonly string[];
   tools: RegistryDraftTool[];
   firstSeenAt: Instant;
   lastSeenAt: Instant | null;
@@ -225,6 +227,7 @@ export function langwatchAgentDraft({
     agent.type === "signature" ? signatureFields(agent.config) : NO_SIGNATURE_FIELDS;
   return {
     sourceKey: `langwatch:${agent.id}`,
+    matchIds: [agent.id],
     source: "langwatch",
     management: "managed",
     shadow: false,
@@ -270,6 +273,7 @@ export function discoveredAgentDraft(agent: DiscoveredRegistryRecord): RegistryD
     metadataText(agent.metadata, "environmentUrl") ?? metadataText(agent.metadata, "workspaceUrl");
   return {
     sourceKey: `discovered:${agent.id}`,
+    matchIds: [agent.rawAgentId],
     source: agent.source,
     management: "discovered",
     shadow: false,

@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The ingestion-template operations the governance REST family calls.
 
-Peers call these through the token, declared at `../contract/src/governance.api.ts:186`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/governance.api.ts:185`; nothing else in this package is public.
 
 #### `registerMcpTools`
 
@@ -722,12 +722,12 @@ Throws `agent_registry_entry_not_found` for an id outside the organisation.
 getRegistryAgent(input: { organizationId: string; id: string }): Promise<AgentRegistryEntry>;
 ```
 
-#### `findRegistryAgentVersions`
+#### `listRegistryAgentVersions`
 
-Every recorded change of one agent, oldest first; each carries the entry at its version.
+One agent's changes after a sequence, oldest first; each carries the entry at its version.
 
 ```typescript
-findRegistryAgentVersions(input: { organizationId: string; id: string; }): Promise<AgentRegistryEvent[]>;
+listRegistryAgentVersions(input: { organizationId: string; id: string; cursor?: string; limit: number; }): Promise<AgentRegistryEventPage>;
 ```
 
 #### `listRegistryEvents`
@@ -756,7 +756,7 @@ searchRegistryArd(input: { organizationId: string; request: ArdSearchRequest; })
 
 |             |                                           |
 | ----------- | ----------------------------------------- |
-| Declared at | `src/transport/agent-registry.rest.ts:33` |
+| Declared at | `src/transport/agent-registry.rest.ts:32` |
 | Base URL    | none: each route's path is its address    |
 | Addressing  | literal                                   |
 | Credential  | organization                              |
@@ -765,77 +765,78 @@ searchRegistryArd(input: { organizationId: string; request: ArdSearchRequest; })
 
 List the organisation's agent registry
 
-Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:40`.
+Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:39`.
 
 Answers at `/api/governance/registry/agents`, `/api/v1/governance/registry/agents`.
 
 ```typescript
-// Query: agentRegistryListQuerySchema, ../contract/src/features/registry/agent-registry.ts:145
+// Query: agentRegistryListQuerySchema, ../contract/src/features/registry/agent-registry.ts:147
 interface Query {
   limit?: number;
   cursor?: string;
   updated_since?: string;
   status?: "active" | "removed";
 }
-type Response = z.infer<typeof agentRegistryListResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:155
+type Response = z.infer<typeof agentRegistryListResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:157
 ```
 
 #### `GET /api/governance/registry/agents/:agentId` · `getRegistryAgent`
 
 Get one registry agent
 
-Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:62`.
+Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:61`.
 
 Answers at `/api/governance/registry/agents/:agentId`, `/api/v1/governance/registry/agents/:agentId`.
 
 ```typescript
-// Params: agentRegistryParamsSchema, ../contract/src/features/registry/agent-registry.ts:163
+// Params: agentRegistryParamsSchema, ../contract/src/features/registry/agent-registry.ts:165
 interface Params {
   agentId: string;
 }
-type Response = z.infer<typeof agentRegistryDetailResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:170
+type Response = z.infer<typeof agentRegistryDetailResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:172
 ```
 
-#### `GET /api/governance/registry/agents/:agentId/versions` · `findRegistryAgentVersions`
+#### `GET /api/governance/registry/agents/:agentId/versions` · `listRegistryAgentVersions`
 
 List one registry agent's versions
 
-Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:78`.
+Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:77`.
 
 Answers at `/api/governance/registry/agents/:agentId/versions`, `/api/v1/governance/registry/agents/:agentId/versions`.
 
 ```typescript
-type Params = z.infer<typeof agentRegistryParamsSchema>; // ../contract/src/features/registry/agent-registry.ts:163
-type Response = z.infer<typeof agentRegistryVersionsResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:202
+type Params = z.infer<typeof agentRegistryParamsSchema>; // ../contract/src/features/registry/agent-registry.ts:165
+// Query: agentRegistryEventsQuerySchema, ../contract/src/features/registry/agent-registry.ts:183
+interface Query {
+  limit?: number;
+  cursor?: string;
+}
+type Response = z.infer<typeof agentRegistryEventsResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:194
 ```
 
 #### `GET /api/governance/registry/events` · `listRegistryEvents`
 
 Read the registry change feed
 
-Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:94`.
+Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:99`.
 
 Answers at `/api/governance/registry/events`, `/api/v1/governance/registry/events`.
 
 ```typescript
-// Query: agentRegistryEventsQuerySchema, ../contract/src/features/registry/agent-registry.ts:181
-interface Query {
-  limit?: number;
-  cursor?: string;
-}
-type Response = z.infer<typeof agentRegistryEventsResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:192
+type Query = z.infer<typeof agentRegistryEventsQuerySchema>; // ../contract/src/features/registry/agent-registry.ts:183
+type Response = z.infer<typeof agentRegistryEventsResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:194
 ```
 
 #### `GET /api/governance/registry/schema` · `getRegistrySchema`
 
 Get the registry's JSON Schemas
 
-Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:114`.
+Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:119`.
 
 Answers at `/api/governance/registry/schema`, `/api/v1/governance/registry/schema`.
 
 ```typescript
-// Response: agentRegistrySchemaResponseSchema, ../contract/src/features/registry/agent-registry.ts:213
+// Response: agentRegistrySchemaResponseSchema, ../contract/src/features/registry/agent-registry.ts:206
 interface Response {
   entry: Record<string, unknown>;
   event: Record<string, unknown>;
@@ -846,7 +847,7 @@ interface Response {
 
 Get the registry as an ARD manifest
 
-Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:127`.
+Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:132`.
 
 Answers at `/api/governance/registry/ard.json`, `/api/v1/governance/registry/ard.json`.
 
@@ -858,7 +859,7 @@ type Response = z.infer<typeof ardManifestSchema>; // ../contract/src/features/r
 
 Search the registry (ARD search)
 
-Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:140`.
+Permission `governance:view`. Declared at `src/transport/agent-registry.rest.ts:145`.
 
 Answers at `/api/governance/registry/ard/search`, `/api/v1/governance/registry/ard/search`.
 
@@ -2362,7 +2363,7 @@ Declared at `src/features/registry/eventing/agent-registry.pipeline.ts:83`.
 
 | Kind   | Leaf                       | Environment variable                  | Declared at                               |
 | ------ | -------------------------- | ------------------------------------- | ----------------------------------------- |
-| secret | `–`                        | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:527`           |
+| secret | `–`                        | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:526`           |
 | config | `gatewayPublicUrl`         | `LW_GATEWAY_PUBLIC_URL`               | `../contract/src/governance.config.ts:41` |
 | config | `gatewayInternalUrl`       | `LW_GATEWAY_INTERNAL_URL`             | `../contract/src/governance.config.ts:42` |
 | config | `gatewayLegacyUrl`         | `LW_GATEWAY_BASE_URL`                 | `../contract/src/governance.config.ts:43` |

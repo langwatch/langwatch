@@ -15,7 +15,6 @@ import {
   agentRegistryListResponseSchema,
   agentRegistryParamsSchema,
   agentRegistrySchemaResponseSchema,
-  agentRegistryVersionsResponseSchema,
   ardManifestSchema,
   ardSearchRequestSchema,
   ardSearchResponseSchema,
@@ -75,21 +74,27 @@ export const agentRegistryRest = defineRestRouter(GovernanceRestApi)
     data: await app.getRegistryAgent({ organizationId: scope.id, id: input.agentId }),
   }))
 
-  .get("/api/governance/registry/agents/:agentId/versions", "findRegistryAgentVersions")
+  .get("/api/governance/registry/agents/:agentId/versions", "listRegistryAgentVersions")
   .withParams(agentRegistryParamsSchema)
+  .withQuery(agentRegistryEventsQuerySchema)
   .withPermission("governance:view")
-  .withOutput(agentRegistryVersionsResponseSchema)
+  .withOutput(agentRegistryEventsResponseSchema)
   .withDocs({
     operationId: "getApiGovernanceRegistryAgentsByIdVersions",
     summary: "List one registry agent's versions",
     tags: TAGS,
     description:
-      "Every change event recorded for the agent, oldest first. Each carries `from_version`, `to_version` and the entry as it stood at `to_version`.",
+      "The change events recorded for the agent, oldest first, one page at a time. Each carries `from_version`, `to_version` and the entry as it stood at `to_version`. Pass `next_cursor` back as `cursor` for the next page; it is null on the last page.",
     responses: { ...baseResponses },
   })
-  .handle(async ({ app, input, scope }) => ({
-    data: await app.findRegistryAgentVersions({ organizationId: scope.id, id: input.agentId }),
-  }))
+  .handle(({ app, input, scope }) =>
+    app.listRegistryAgentVersions({
+      organizationId: scope.id,
+      id: input.agentId,
+      ...(input.cursor ? { cursor: input.cursor } : {}),
+      limit: input.limit,
+    }),
+  )
 
   .get("/api/governance/registry/events", "listRegistryEvents")
   .withQuery(agentRegistryEventsQuerySchema)
@@ -132,7 +137,7 @@ export const agentRegistryRest = defineRestRouter(GovernanceRestApi)
     summary: "Get the registry as an ARD manifest",
     tags: TAGS,
     description:
-      "The organisation's active agents as an Agentic Resource Discovery (ARD v0.91) manifest. Each entry has a `urn:air:<host>:<organization id>:agent:<id>` identifier, type `application/agent-card+json` and the registry entry inline as `data`.",
+      "The organisation's active agents, up to 1,000 in order of last change, as an Agentic Resource Discovery (ARD v0.91) manifest. Each entry has a `urn:air:<host>:<organization id>:agent:<id>` identifier, type `application/agent-card+json` and the registry entry inline as `data`.",
     responses: { ...baseResponses },
   })
   .handle(({ app, scope }) => app.getRegistryArdManifest({ organizationId: scope.id }))

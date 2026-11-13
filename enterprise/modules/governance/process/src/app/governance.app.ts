@@ -135,7 +135,6 @@ import {
   type OrganizationSessionPolicyShape,
   type GovernanceAgentRow,
   type AgentRegistryEntry,
-  type AgentRegistryEvent,
   type AgentRegistryEventPage,
   type AgentRegistryPage,
   type AgentRegistryStatus,
@@ -1749,11 +1748,13 @@ export class GovernanceModule implements GovernanceRestApi {
     return this.agentRegistry.getEntry(input);
   }
 
-  findRegistryAgentVersions(input: {
+  listRegistryAgentVersions(input: {
     organizationId: string;
     id: string;
-  }): Promise<AgentRegistryEvent[]> {
-    return this.agentRegistry.findVersions(input);
+    cursor?: string;
+    limit: number;
+  }): Promise<AgentRegistryEventPage> {
+    return this.agentRegistry.listVersions(input);
   }
 
   listRegistryEvents(input: {

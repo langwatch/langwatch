@@ -27,7 +27,12 @@ export abstract class AgentRegistryRepository {
   }): Promise<AgentRegistryEvent[]>;
   /** Organisations holding any entry, in id order after `after`; the traffic pass walks them. */
   abstract findOrganizationIds(input: { after?: string; limit: number }): Promise<string[]>;
-  abstract findEntries(input: { organizationId: string }): Promise<AgentRegistryEntry[]>;
+  /** At most `limit` entries, oldest update first. */
+  abstract findEntries(input: {
+    organizationId: string;
+    status?: AgentRegistryStatus;
+    limit: number;
+  }): Promise<AgentRegistryEntry[]>;
   abstract listEntries(input: {
     organizationId: string;
     limit: number;
@@ -45,6 +50,8 @@ export abstract class AgentRegistryRepository {
   abstract findEventsOfEntry(input: {
     organizationId: string;
     entryId: string;
+    after?: bigint;
+    limit: number;
   }): Promise<AgentRegistryEvent[]>;
   /** Events whose webhook fan-out is not yet recorded, oldest first. */
   abstract findUndeliveredEvents(input: {

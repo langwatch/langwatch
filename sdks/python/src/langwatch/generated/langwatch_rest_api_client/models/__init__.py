@@ -1678,6 +1678,208 @@ from .get_api_governance_ingestion_templates_response_400 import GetApiGovernanc
 from .get_api_governance_ingestion_templates_response_401 import GetApiGovernanceIngestionTemplatesResponse401
 from .get_api_governance_ingestion_templates_response_422 import GetApiGovernanceIngestionTemplatesResponse422
 from .get_api_governance_ingestion_templates_response_500 import GetApiGovernanceIngestionTemplatesResponse500
+from .get_api_governance_registry_agents_by_id_response_200 import GetApiGovernanceRegistryAgentsByIdResponse200
+from .get_api_governance_registry_agents_by_id_response_200_data import (
+    GetApiGovernanceRegistryAgentsByIdResponse200Data,
+)
+from .get_api_governance_registry_agents_by_id_response_200_data_endpoints_item import (
+    GetApiGovernanceRegistryAgentsByIdResponse200DataEndpointsItem,
+)
+from .get_api_governance_registry_agents_by_id_response_200_data_endpoints_item_kind import (
+    GetApiGovernanceRegistryAgentsByIdResponse200DataEndpointsItemKind,
+)
+from .get_api_governance_registry_agents_by_id_response_200_data_management import (
+    GetApiGovernanceRegistryAgentsByIdResponse200DataManagement,
+)
+from .get_api_governance_registry_agents_by_id_response_200_data_model_type_0 import (
+    GetApiGovernanceRegistryAgentsByIdResponse200DataModelType0,
+)
+from .get_api_governance_registry_agents_by_id_response_200_data_model_type_0_parameters import (
+    GetApiGovernanceRegistryAgentsByIdResponse200DataModelType0Parameters,
+)
+from .get_api_governance_registry_agents_by_id_response_200_data_owner_type_0 import (
+    GetApiGovernanceRegistryAgentsByIdResponse200DataOwnerType0,
+)
+from .get_api_governance_registry_agents_by_id_response_200_data_source import (
+    GetApiGovernanceRegistryAgentsByIdResponse200DataSource,
+)
+from .get_api_governance_registry_agents_by_id_response_200_data_status import (
+    GetApiGovernanceRegistryAgentsByIdResponse200DataStatus,
+)
+from .get_api_governance_registry_agents_by_id_response_200_data_tools_item import (
+    GetApiGovernanceRegistryAgentsByIdResponse200DataToolsItem,
+)
+from .get_api_governance_registry_agents_by_id_response_200_data_tools_item_input_schema import (
+    GetApiGovernanceRegistryAgentsByIdResponse200DataToolsItemInputSchema,
+)
+from .get_api_governance_registry_agents_by_id_response_200_data_tools_item_output_schema_type_0 import (
+    GetApiGovernanceRegistryAgentsByIdResponse200DataToolsItemOutputSchemaType0,
+)
+from .get_api_governance_registry_agents_by_id_response_200_data_tools_item_status import (
+    GetApiGovernanceRegistryAgentsByIdResponse200DataToolsItemStatus,
+)
+from .get_api_governance_registry_agents_by_id_response_400 import GetApiGovernanceRegistryAgentsByIdResponse400
+from .get_api_governance_registry_agents_by_id_response_401 import GetApiGovernanceRegistryAgentsByIdResponse401
+from .get_api_governance_registry_agents_by_id_response_422 import GetApiGovernanceRegistryAgentsByIdResponse422
+from .get_api_governance_registry_agents_by_id_response_500 import GetApiGovernanceRegistryAgentsByIdResponse500
+from .get_api_governance_registry_agents_by_id_versions_response_200 import (
+    GetApiGovernanceRegistryAgentsByIdVersionsResponse200,
+)
+from .get_api_governance_registry_agents_by_id_versions_response_200_data_item import (
+    GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItem,
+)
+from .get_api_governance_registry_agents_by_id_versions_response_200_data_item_agent import (
+    GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgent,
+)
+from .get_api_governance_registry_agents_by_id_versions_response_200_data_item_agent_endpoints_item import (
+    GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentEndpointsItem,
+)
+from .get_api_governance_registry_agents_by_id_versions_response_200_data_item_agent_endpoints_item_kind import (
+    GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentEndpointsItemKind,
+)
+from .get_api_governance_registry_agents_by_id_versions_response_200_data_item_agent_management import (
+    GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentManagement,
+)
+from .get_api_governance_registry_agents_by_id_versions_response_200_data_item_agent_model_type_0 import (
+    GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentModelType0,
+)
+from .get_api_governance_registry_agents_by_id_versions_response_200_data_item_agent_model_type_0_parameters import (
+    GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentModelType0Parameters,
+)
+from .get_api_governance_registry_agents_by_id_versions_response_200_data_item_agent_owner_type_0 import (
+    GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentOwnerType0,
+)
+from .get_api_governance_registry_agents_by_id_versions_response_200_data_item_agent_source import (
+    GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentSource,
+)
+from .get_api_governance_registry_agents_by_id_versions_response_200_data_item_agent_status import (
+    GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentStatus,
+)
+from .get_api_governance_registry_agents_by_id_versions_response_200_data_item_agent_tools_item import (
+    GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentToolsItem,
+)
+from .get_api_governance_registry_agents_by_id_versions_response_200_data_item_agent_tools_item_input_schema import (
+    GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentToolsItemInputSchema,
+)
+from .get_api_governance_registry_agents_by_id_versions_response_200_data_item_agent_tools_item_output_schema_type_0 import (
+    GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentToolsItemOutputSchemaType0,
+)
+from .get_api_governance_registry_agents_by_id_versions_response_200_data_item_agent_tools_item_status import (
+    GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentToolsItemStatus,
+)
+from .get_api_governance_registry_agents_by_id_versions_response_200_data_item_type import (
+    GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemType,
+)
+from .get_api_governance_registry_agents_by_id_versions_response_400 import (
+    GetApiGovernanceRegistryAgentsByIdVersionsResponse400,
+)
+from .get_api_governance_registry_agents_by_id_versions_response_401 import (
+    GetApiGovernanceRegistryAgentsByIdVersionsResponse401,
+)
+from .get_api_governance_registry_agents_by_id_versions_response_422 import (
+    GetApiGovernanceRegistryAgentsByIdVersionsResponse422,
+)
+from .get_api_governance_registry_agents_by_id_versions_response_500 import (
+    GetApiGovernanceRegistryAgentsByIdVersionsResponse500,
+)
+from .get_api_governance_registry_agents_response_200 import GetApiGovernanceRegistryAgentsResponse200
+from .get_api_governance_registry_agents_response_200_data_item import GetApiGovernanceRegistryAgentsResponse200DataItem
+from .get_api_governance_registry_agents_response_200_data_item_endpoints_item import (
+    GetApiGovernanceRegistryAgentsResponse200DataItemEndpointsItem,
+)
+from .get_api_governance_registry_agents_response_200_data_item_endpoints_item_kind import (
+    GetApiGovernanceRegistryAgentsResponse200DataItemEndpointsItemKind,
+)
+from .get_api_governance_registry_agents_response_200_data_item_management import (
+    GetApiGovernanceRegistryAgentsResponse200DataItemManagement,
+)
+from .get_api_governance_registry_agents_response_200_data_item_model_type_0 import (
+    GetApiGovernanceRegistryAgentsResponse200DataItemModelType0,
+)
+from .get_api_governance_registry_agents_response_200_data_item_model_type_0_parameters import (
+    GetApiGovernanceRegistryAgentsResponse200DataItemModelType0Parameters,
+)
+from .get_api_governance_registry_agents_response_200_data_item_owner_type_0 import (
+    GetApiGovernanceRegistryAgentsResponse200DataItemOwnerType0,
+)
+from .get_api_governance_registry_agents_response_200_data_item_source import (
+    GetApiGovernanceRegistryAgentsResponse200DataItemSource,
+)
+from .get_api_governance_registry_agents_response_200_data_item_status import (
+    GetApiGovernanceRegistryAgentsResponse200DataItemStatus,
+)
+from .get_api_governance_registry_agents_response_200_data_item_tools_item import (
+    GetApiGovernanceRegistryAgentsResponse200DataItemToolsItem,
+)
+from .get_api_governance_registry_agents_response_200_data_item_tools_item_input_schema import (
+    GetApiGovernanceRegistryAgentsResponse200DataItemToolsItemInputSchema,
+)
+from .get_api_governance_registry_agents_response_200_data_item_tools_item_output_schema_type_0 import (
+    GetApiGovernanceRegistryAgentsResponse200DataItemToolsItemOutputSchemaType0,
+)
+from .get_api_governance_registry_agents_response_200_data_item_tools_item_status import (
+    GetApiGovernanceRegistryAgentsResponse200DataItemToolsItemStatus,
+)
+from .get_api_governance_registry_agents_response_400 import GetApiGovernanceRegistryAgentsResponse400
+from .get_api_governance_registry_agents_response_401 import GetApiGovernanceRegistryAgentsResponse401
+from .get_api_governance_registry_agents_response_422 import GetApiGovernanceRegistryAgentsResponse422
+from .get_api_governance_registry_agents_response_500 import GetApiGovernanceRegistryAgentsResponse500
+from .get_api_governance_registry_agents_status import GetApiGovernanceRegistryAgentsStatus
+from .get_api_governance_registry_events_response_200 import GetApiGovernanceRegistryEventsResponse200
+from .get_api_governance_registry_events_response_200_data_item import GetApiGovernanceRegistryEventsResponse200DataItem
+from .get_api_governance_registry_events_response_200_data_item_agent import (
+    GetApiGovernanceRegistryEventsResponse200DataItemAgent,
+)
+from .get_api_governance_registry_events_response_200_data_item_agent_endpoints_item import (
+    GetApiGovernanceRegistryEventsResponse200DataItemAgentEndpointsItem,
+)
+from .get_api_governance_registry_events_response_200_data_item_agent_endpoints_item_kind import (
+    GetApiGovernanceRegistryEventsResponse200DataItemAgentEndpointsItemKind,
+)
+from .get_api_governance_registry_events_response_200_data_item_agent_management import (
+    GetApiGovernanceRegistryEventsResponse200DataItemAgentManagement,
+)
+from .get_api_governance_registry_events_response_200_data_item_agent_model_type_0 import (
+    GetApiGovernanceRegistryEventsResponse200DataItemAgentModelType0,
+)
+from .get_api_governance_registry_events_response_200_data_item_agent_model_type_0_parameters import (
+    GetApiGovernanceRegistryEventsResponse200DataItemAgentModelType0Parameters,
+)
+from .get_api_governance_registry_events_response_200_data_item_agent_owner_type_0 import (
+    GetApiGovernanceRegistryEventsResponse200DataItemAgentOwnerType0,
+)
+from .get_api_governance_registry_events_response_200_data_item_agent_source import (
+    GetApiGovernanceRegistryEventsResponse200DataItemAgentSource,
+)
+from .get_api_governance_registry_events_response_200_data_item_agent_status import (
+    GetApiGovernanceRegistryEventsResponse200DataItemAgentStatus,
+)
+from .get_api_governance_registry_events_response_200_data_item_agent_tools_item import (
+    GetApiGovernanceRegistryEventsResponse200DataItemAgentToolsItem,
+)
+from .get_api_governance_registry_events_response_200_data_item_agent_tools_item_input_schema import (
+    GetApiGovernanceRegistryEventsResponse200DataItemAgentToolsItemInputSchema,
+)
+from .get_api_governance_registry_events_response_200_data_item_agent_tools_item_output_schema_type_0 import (
+    GetApiGovernanceRegistryEventsResponse200DataItemAgentToolsItemOutputSchemaType0,
+)
+from .get_api_governance_registry_events_response_200_data_item_agent_tools_item_status import (
+    GetApiGovernanceRegistryEventsResponse200DataItemAgentToolsItemStatus,
+)
+from .get_api_governance_registry_events_response_200_data_item_type import (
+    GetApiGovernanceRegistryEventsResponse200DataItemType,
+)
+from .get_api_governance_registry_events_response_400 import GetApiGovernanceRegistryEventsResponse400
+from .get_api_governance_registry_events_response_401 import GetApiGovernanceRegistryEventsResponse401
+from .get_api_governance_registry_events_response_422 import GetApiGovernanceRegistryEventsResponse422
+from .get_api_governance_registry_events_response_500 import GetApiGovernanceRegistryEventsResponse500
+from .get_api_governance_registry_schema_response_200 import GetApiGovernanceRegistrySchemaResponse200
+from .get_api_governance_registry_schema_response_200_entry import GetApiGovernanceRegistrySchemaResponse200Entry
+from .get_api_governance_registry_schema_response_200_event import GetApiGovernanceRegistrySchemaResponse200Event
+from .get_api_governance_registry_schema_response_400 import GetApiGovernanceRegistrySchemaResponse400
+from .get_api_governance_registry_schema_response_401 import GetApiGovernanceRegistrySchemaResponse401
+from .get_api_governance_registry_schema_response_422 import GetApiGovernanceRegistrySchemaResponse422
+from .get_api_governance_registry_schema_response_500 import GetApiGovernanceRegistrySchemaResponse500
 from .get_api_graphs_by_id_response_200 import GetApiGraphsByIdResponse200
 from .get_api_graphs_by_id_response_200_filters_type_0 import GetApiGraphsByIdResponse200FiltersType0
 from .get_api_graphs_by_id_response_200_graph import GetApiGraphsByIdResponse200Graph
@@ -6305,6 +6507,60 @@ from .post_api_governance_ingestion_templates_response_400 import PostApiGoverna
 from .post_api_governance_ingestion_templates_response_401 import PostApiGovernanceIngestionTemplatesResponse401
 from .post_api_governance_ingestion_templates_response_422 import PostApiGovernanceIngestionTemplatesResponse422
 from .post_api_governance_ingestion_templates_response_500 import PostApiGovernanceIngestionTemplatesResponse500
+from .post_api_governance_registry_ard_search_body import PostApiGovernanceRegistryArdSearchBody
+from .post_api_governance_registry_ard_search_body_federation import PostApiGovernanceRegistryArdSearchBodyFederation
+from .post_api_governance_registry_ard_search_body_query import PostApiGovernanceRegistryArdSearchBodyQuery
+from .post_api_governance_registry_ard_search_body_query_filter import PostApiGovernanceRegistryArdSearchBodyQueryFilter
+from .post_api_governance_registry_ard_search_response_200 import PostApiGovernanceRegistryArdSearchResponse200
+from .post_api_governance_registry_ard_search_response_200_results_item import (
+    PostApiGovernanceRegistryArdSearchResponse200ResultsItem,
+)
+from .post_api_governance_registry_ard_search_response_200_results_item_data import (
+    PostApiGovernanceRegistryArdSearchResponse200ResultsItemData,
+)
+from .post_api_governance_registry_ard_search_response_200_results_item_data_endpoints_item import (
+    PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataEndpointsItem,
+)
+from .post_api_governance_registry_ard_search_response_200_results_item_data_endpoints_item_kind import (
+    PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataEndpointsItemKind,
+)
+from .post_api_governance_registry_ard_search_response_200_results_item_data_management import (
+    PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataManagement,
+)
+from .post_api_governance_registry_ard_search_response_200_results_item_data_model_type_0 import (
+    PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataModelType0,
+)
+from .post_api_governance_registry_ard_search_response_200_results_item_data_model_type_0_parameters import (
+    PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataModelType0Parameters,
+)
+from .post_api_governance_registry_ard_search_response_200_results_item_data_owner_type_0 import (
+    PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataOwnerType0,
+)
+from .post_api_governance_registry_ard_search_response_200_results_item_data_source import (
+    PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataSource,
+)
+from .post_api_governance_registry_ard_search_response_200_results_item_data_status import (
+    PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataStatus,
+)
+from .post_api_governance_registry_ard_search_response_200_results_item_data_tools_item import (
+    PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataToolsItem,
+)
+from .post_api_governance_registry_ard_search_response_200_results_item_data_tools_item_input_schema import (
+    PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataToolsItemInputSchema,
+)
+from .post_api_governance_registry_ard_search_response_200_results_item_data_tools_item_output_schema_type_0 import (
+    PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataToolsItemOutputSchemaType0,
+)
+from .post_api_governance_registry_ard_search_response_200_results_item_data_tools_item_status import (
+    PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataToolsItemStatus,
+)
+from .post_api_governance_registry_ard_search_response_200_results_item_metadata import (
+    PostApiGovernanceRegistryArdSearchResponse200ResultsItemMetadata,
+)
+from .post_api_governance_registry_ard_search_response_400 import PostApiGovernanceRegistryArdSearchResponse400
+from .post_api_governance_registry_ard_search_response_401 import PostApiGovernanceRegistryArdSearchResponse401
+from .post_api_governance_registry_ard_search_response_422 import PostApiGovernanceRegistryArdSearchResponse422
+from .post_api_governance_registry_ard_search_response_500 import PostApiGovernanceRegistryArdSearchResponse500
 from .post_api_graphs_body import PostApiGraphsBody
 from .post_api_graphs_body_filters import PostApiGraphsBodyFilters
 from .post_api_graphs_body_graph import PostApiGraphsBodyGraph
@@ -10396,6 +10652,90 @@ __all__ = (
     "GetApiGovernanceIngestionTemplatesResponse401",
     "GetApiGovernanceIngestionTemplatesResponse422",
     "GetApiGovernanceIngestionTemplatesResponse500",
+    "GetApiGovernanceRegistryAgentsByIdResponse200",
+    "GetApiGovernanceRegistryAgentsByIdResponse200Data",
+    "GetApiGovernanceRegistryAgentsByIdResponse200DataEndpointsItem",
+    "GetApiGovernanceRegistryAgentsByIdResponse200DataEndpointsItemKind",
+    "GetApiGovernanceRegistryAgentsByIdResponse200DataManagement",
+    "GetApiGovernanceRegistryAgentsByIdResponse200DataModelType0",
+    "GetApiGovernanceRegistryAgentsByIdResponse200DataModelType0Parameters",
+    "GetApiGovernanceRegistryAgentsByIdResponse200DataOwnerType0",
+    "GetApiGovernanceRegistryAgentsByIdResponse200DataSource",
+    "GetApiGovernanceRegistryAgentsByIdResponse200DataStatus",
+    "GetApiGovernanceRegistryAgentsByIdResponse200DataToolsItem",
+    "GetApiGovernanceRegistryAgentsByIdResponse200DataToolsItemInputSchema",
+    "GetApiGovernanceRegistryAgentsByIdResponse200DataToolsItemOutputSchemaType0",
+    "GetApiGovernanceRegistryAgentsByIdResponse200DataToolsItemStatus",
+    "GetApiGovernanceRegistryAgentsByIdResponse400",
+    "GetApiGovernanceRegistryAgentsByIdResponse401",
+    "GetApiGovernanceRegistryAgentsByIdResponse422",
+    "GetApiGovernanceRegistryAgentsByIdResponse500",
+    "GetApiGovernanceRegistryAgentsByIdVersionsResponse200",
+    "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItem",
+    "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgent",
+    "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentEndpointsItem",
+    "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentEndpointsItemKind",
+    "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentManagement",
+    "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentModelType0",
+    "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentModelType0Parameters",
+    "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentOwnerType0",
+    "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentSource",
+    "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentStatus",
+    "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentToolsItem",
+    "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentToolsItemInputSchema",
+    "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentToolsItemOutputSchemaType0",
+    "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentToolsItemStatus",
+    "GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemType",
+    "GetApiGovernanceRegistryAgentsByIdVersionsResponse400",
+    "GetApiGovernanceRegistryAgentsByIdVersionsResponse401",
+    "GetApiGovernanceRegistryAgentsByIdVersionsResponse422",
+    "GetApiGovernanceRegistryAgentsByIdVersionsResponse500",
+    "GetApiGovernanceRegistryAgentsResponse200",
+    "GetApiGovernanceRegistryAgentsResponse200DataItem",
+    "GetApiGovernanceRegistryAgentsResponse200DataItemEndpointsItem",
+    "GetApiGovernanceRegistryAgentsResponse200DataItemEndpointsItemKind",
+    "GetApiGovernanceRegistryAgentsResponse200DataItemManagement",
+    "GetApiGovernanceRegistryAgentsResponse200DataItemModelType0",
+    "GetApiGovernanceRegistryAgentsResponse200DataItemModelType0Parameters",
+    "GetApiGovernanceRegistryAgentsResponse200DataItemOwnerType0",
+    "GetApiGovernanceRegistryAgentsResponse200DataItemSource",
+    "GetApiGovernanceRegistryAgentsResponse200DataItemStatus",
+    "GetApiGovernanceRegistryAgentsResponse200DataItemToolsItem",
+    "GetApiGovernanceRegistryAgentsResponse200DataItemToolsItemInputSchema",
+    "GetApiGovernanceRegistryAgentsResponse200DataItemToolsItemOutputSchemaType0",
+    "GetApiGovernanceRegistryAgentsResponse200DataItemToolsItemStatus",
+    "GetApiGovernanceRegistryAgentsResponse400",
+    "GetApiGovernanceRegistryAgentsResponse401",
+    "GetApiGovernanceRegistryAgentsResponse422",
+    "GetApiGovernanceRegistryAgentsResponse500",
+    "GetApiGovernanceRegistryAgentsStatus",
+    "GetApiGovernanceRegistryEventsResponse200",
+    "GetApiGovernanceRegistryEventsResponse200DataItem",
+    "GetApiGovernanceRegistryEventsResponse200DataItemAgent",
+    "GetApiGovernanceRegistryEventsResponse200DataItemAgentEndpointsItem",
+    "GetApiGovernanceRegistryEventsResponse200DataItemAgentEndpointsItemKind",
+    "GetApiGovernanceRegistryEventsResponse200DataItemAgentManagement",
+    "GetApiGovernanceRegistryEventsResponse200DataItemAgentModelType0",
+    "GetApiGovernanceRegistryEventsResponse200DataItemAgentModelType0Parameters",
+    "GetApiGovernanceRegistryEventsResponse200DataItemAgentOwnerType0",
+    "GetApiGovernanceRegistryEventsResponse200DataItemAgentSource",
+    "GetApiGovernanceRegistryEventsResponse200DataItemAgentStatus",
+    "GetApiGovernanceRegistryEventsResponse200DataItemAgentToolsItem",
+    "GetApiGovernanceRegistryEventsResponse200DataItemAgentToolsItemInputSchema",
+    "GetApiGovernanceRegistryEventsResponse200DataItemAgentToolsItemOutputSchemaType0",
+    "GetApiGovernanceRegistryEventsResponse200DataItemAgentToolsItemStatus",
+    "GetApiGovernanceRegistryEventsResponse200DataItemType",
+    "GetApiGovernanceRegistryEventsResponse400",
+    "GetApiGovernanceRegistryEventsResponse401",
+    "GetApiGovernanceRegistryEventsResponse422",
+    "GetApiGovernanceRegistryEventsResponse500",
+    "GetApiGovernanceRegistrySchemaResponse200",
+    "GetApiGovernanceRegistrySchemaResponse200Entry",
+    "GetApiGovernanceRegistrySchemaResponse200Event",
+    "GetApiGovernanceRegistrySchemaResponse400",
+    "GetApiGovernanceRegistrySchemaResponse401",
+    "GetApiGovernanceRegistrySchemaResponse422",
+    "GetApiGovernanceRegistrySchemaResponse500",
     "GetApiGraphsByIdResponse200",
     "GetApiGraphsByIdResponse200FiltersType0",
     "GetApiGraphsByIdResponse200Graph",
@@ -12681,6 +13021,30 @@ __all__ = (
     "PostApiGovernanceIngestionTemplatesResponse401",
     "PostApiGovernanceIngestionTemplatesResponse422",
     "PostApiGovernanceIngestionTemplatesResponse500",
+    "PostApiGovernanceRegistryArdSearchBody",
+    "PostApiGovernanceRegistryArdSearchBodyFederation",
+    "PostApiGovernanceRegistryArdSearchBodyQuery",
+    "PostApiGovernanceRegistryArdSearchBodyQueryFilter",
+    "PostApiGovernanceRegistryArdSearchResponse200",
+    "PostApiGovernanceRegistryArdSearchResponse200ResultsItem",
+    "PostApiGovernanceRegistryArdSearchResponse200ResultsItemData",
+    "PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataEndpointsItem",
+    "PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataEndpointsItemKind",
+    "PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataManagement",
+    "PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataModelType0",
+    "PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataModelType0Parameters",
+    "PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataOwnerType0",
+    "PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataSource",
+    "PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataStatus",
+    "PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataToolsItem",
+    "PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataToolsItemInputSchema",
+    "PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataToolsItemOutputSchemaType0",
+    "PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataToolsItemStatus",
+    "PostApiGovernanceRegistryArdSearchResponse200ResultsItemMetadata",
+    "PostApiGovernanceRegistryArdSearchResponse400",
+    "PostApiGovernanceRegistryArdSearchResponse401",
+    "PostApiGovernanceRegistryArdSearchResponse422",
+    "PostApiGovernanceRegistryArdSearchResponse500",
     "PostApiGraphsBody",
     "PostApiGraphsBodyFilters",
     "PostApiGraphsBodyGraph",

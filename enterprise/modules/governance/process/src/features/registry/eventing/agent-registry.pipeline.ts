@@ -73,7 +73,7 @@ type AgentRegistryApp = Pick<
   | "reconcileAgentRegistryTraffic"
 >;
 
-function buildAgentRegistryPipeline({
+export function buildAgentRegistryPipeline({
   app,
   processStore,
 }: EventingSetup<unknown, AgentRegistryApp>): StaticPipelineDefinition<never> {

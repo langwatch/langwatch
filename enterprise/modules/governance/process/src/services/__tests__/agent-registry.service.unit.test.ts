@@ -141,7 +141,7 @@ describe("AgentRegistryService", () => {
         "agent store unavailable",
       );
 
-      const entries = await registry.findEntries({ organizationId: ORG });
+      const entries = await registry.findEntries({ organizationId: ORG, limit: 100 });
       expect(entries.map((entry) => [entry.status, entry.version])).toEqual([["active", 1]]);
     });
   });
@@ -193,6 +193,32 @@ describe("AgentRegistryService", () => {
 
       await expect(service.reconcileHeldOrganizations()).resolves.toEqual({ organizations: 2 });
       expect(reconciled.toSorted()).toEqual([ORG, "org-2"]);
+    });
+  });
+
+  describe("when an agent's versions are read one page at a time", () => {
+    /** @scenario An agent's versions are read in pages, oldest first */
+    it("answers each page after the cursor and a null cursor on the last", async () => {
+      const { service, registry, state } = setup();
+      for (const name of ["Field agent", "Field agent v2", "Field agent v3"]) {
+        state.agents = [connectedAgent("agent-1", name)];
+        await service.reconcileOrganization({ organizationId: ORG });
+      }
+      const [entry] = await registry.findEntries({ organizationId: ORG, limit: 10 });
+      const id = entry?.id ?? "";
+
+      const first = await service.listVersions({ organizationId: ORG, id, limit: 2 });
+      const second = await service.listVersions({
+        organizationId: ORG,
+        id,
+        cursor: first.next_cursor ?? undefined,
+        limit: 2,
+      });
+
+      expect(first.data.map((event) => event.to_version)).toEqual([1, 2]);
+      expect(first.next_cursor).not.toBeNull();
+      expect(second.data.map((event) => event.to_version)).toEqual([3]);
+      expect(second.next_cursor).toBeNull();
     });
   });
 });

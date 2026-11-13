@@ -259,13 +259,15 @@ describe("the agent registry REST family", () => {
   });
 
   describe("given the agent module recorded a change in a project", () => {
-    /** @scenario A recorded agent change reconciles the agent's organisation */
     it("reconciles the project's organisation into the registry", async () => {
       const { app, repositories } = await buildApi();
 
       await app.reconcileAgentRegistryForProject({ projectId: "project-1" });
 
-      const entries = await repositories.agentRegistry.findEntries({ organizationId: ORG });
+      const entries = await repositories.agentRegistry.findEntries({
+        organizationId: ORG,
+        limit: 100,
+      });
       expect(entries.map((entry) => entry.name)).toEqual(["Field agent"]);
     });
   });

@@ -81,7 +81,7 @@ describe.skipIf(!connection)("PrismaAgentRegistryRepository", () => {
         "2026-11-11T00:00:00Z",
       );
 
-      const entries = await repository().findEntries({ organizationId: ORG });
+      const entries = await repository().findEntries({ organizationId: ORG, limit: 100 });
       expect(entries.map((entry) => [entry.name, entry.status, entry.version])).toEqual([
         ["alpha", "active", 2],
         ["beta", "removed", 2],

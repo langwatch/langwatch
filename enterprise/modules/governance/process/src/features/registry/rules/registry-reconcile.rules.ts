@@ -129,7 +129,13 @@ function entryOf({
   firstSeenAt: string;
   updatedAt: string;
 }): AgentRegistryEntry {
-  const { sourceKey: _sourceKey, firstSeenAt: _first, lastSeenAt, ...described } = draft;
+  const {
+    sourceKey: _sourceKey,
+    matchIds: _matchIds,
+    firstSeenAt: _first,
+    lastSeenAt,
+    ...described
+  } = draft;
   return {
     ...described,
     id,
