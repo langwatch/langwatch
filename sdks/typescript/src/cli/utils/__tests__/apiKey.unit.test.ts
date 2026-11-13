@@ -68,7 +68,9 @@ import {
 import {
   loginElsewhereMessage,
   loginMadeElsewhere,
+  PERSONAL_PROJECT_PENDING_WAIT_MS,
   resolveCredentials,
+  resolvePersonCredentials,
   SESSION_REVALIDATE_WINDOW_MS,
 } from "../apiKey";
 import { setOutputFormat } from "../errorOutput";
@@ -305,6 +307,75 @@ describe("resolveCredentials()", () => {
       expect(stored.cli_api_key).toBeUndefined();
       expect(stored.cli_api_key_scope).toBeUndefined();
       expect(mockedSaveConfig).toHaveBeenCalled();
+    });
+
+    describe("given a new account whose personal project is still being set up", () => {
+      const stillPending = () =>
+        new SessionApiError(500, "server_error", "personal-project exchange failed (500)");
+      const newLogin = (extra: Record<string, unknown> = {}) =>
+        loggedInConfig({ cli_api_key: "sk-lw-lookup01_secret01", ...extra });
+
+      beforeEach(() => {
+        vi.useFakeTimers();
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it("asks again until the personal project is ready, and names it", async () => {
+        mockedLoadConfig.mockReturnValue(newLogin() as never);
+        mockedFetchPersonalProject
+          .mockRejectedValueOnce(stillPending())
+          .mockRejectedValueOnce(stillPending())
+          .mockResolvedValueOnce({
+            id: "proj_new",
+            slug: "personal-new",
+            name: "Personal Workspace",
+          } as never);
+
+        const resolving = resolvePersonCredentials();
+        await vi.runAllTimersAsync();
+        const resolved = await resolving;
+
+        expect(mockedFetchPersonalProject).toHaveBeenCalledTimes(3);
+        expect(resolved?.projectId).toBe("proj_new");
+      });
+
+      it("stops asking within a few seconds and keeps the login key", async () => {
+        mockedLoadConfig.mockReturnValue(newLogin() as never);
+        mockedFetchPersonalProject.mockRejectedValue(stillPending());
+        const startedAt = Date.now();
+
+        const resolving = resolvePersonCredentials();
+        await vi.runAllTimersAsync();
+        const resolved = await resolving;
+
+        expect(mockedFetchPersonalProject.mock.calls.length).toBeGreaterThan(1);
+        expect(Date.now() - startedAt).toBeLessThanOrEqual(PERSONAL_PROJECT_PENDING_WAIT_MS);
+        expect(resolved?.apiKey).toBe("sk-lw-lookup01_secret01");
+        expect(resolved?.projectId).toBeUndefined();
+      });
+
+      it("asks once when a personal project is already known", async () => {
+        mockedLoadConfig.mockReturnValue(newLogin(stalePersonal()) as never);
+        mockedFetchPersonalProject.mockRejectedValue(stillPending());
+
+        const resolved = await resolvePersonCredentials();
+
+        expect(mockedFetchPersonalProject).toHaveBeenCalledTimes(1);
+        expect(resolved?.projectId).toBe("proj_1");
+      });
+
+      it("asks once for a command that does not act as the person", async () => {
+        mockedLoadConfig.mockReturnValue(newLogin() as never);
+        mockedFetchPersonalProject.mockRejectedValue(stillPending());
+
+        const resolved = await resolveCredentials();
+
+        expect(mockedFetchPersonalProject).toHaveBeenCalledTimes(1);
+        expect(resolved.apiKey).toBe("sk-lw-lookup01_secret01");
+      });
     });
 
     it("targets the project --project names, not the personal project", async () => {

@@ -20,6 +20,7 @@ import {
   ensureSignedIn,
   isGitRepository,
   loginElsewhereMessage,
+  NO_PROJECT_YET_MESSAGE,
   packageManagerOf,
   platformTakesTheKey,
   resolveShareRoot,
@@ -576,6 +577,97 @@ describe("given the share-control command", () => {
       await expect(api.list()).rejects.toThrow(
         "Only the person Langy asked can approve a request; ask Langy for the code change again to get your own. A request is single use, so a second approval of the same one is refused.",
       );
+    });
+
+    describe("given a login key that names no project", () => {
+      const LOGIN_KEY = "sk-lw-lookup01_secret01";
+      const projectRequired = (projects: { id: string; name: string }[]) => ({
+        status: 400,
+        body: {
+          code: "project_required",
+          message:
+            "This API key is not bound to a single project, so the request has to name one. Send the project id in the X-Project-Id header, or pass --project <id|slug> to the CLI.",
+          meta: { projects },
+        },
+      });
+
+      /** A fetch that answers each call with the next answer in line. */
+      const fetchInTurn = (answers: { status?: number; body: unknown }[]) => {
+        const calls: { url: string; init?: RequestInit }[] = [];
+        const impl = (async (url: string, init?: RequestInit) => {
+          calls.push({ url, ...(init === undefined ? {} : { init }) });
+          const answer = answers[calls.length - 1] ?? { status: 500, body: {} };
+          return {
+            ok: (answer.status ?? 200) < 400,
+            status: answer.status ?? 200,
+            text: async () => JSON.stringify(answer.body),
+          } as Response;
+        }) as unknown as typeof fetch;
+        return { impl, calls };
+      };
+
+      const authorizationOf = (call: { init?: RequestInit }): string =>
+        (call.init!.headers as Record<string, string>).authorization!;
+      const onProject = (projectId: string): string =>
+        `Basic ${Buffer.from(`${projectId}:${LOGIN_KEY}`).toString("base64")}`;
+
+      it("lists again on a project the key reaches, and approves on the request's own project", async () => {
+        const { impl, calls } = fetchInTurn([
+          projectRequired([
+            { id: "project_a", name: "ACME Shop" },
+            { id: "project_b", name: "ACME Lab" },
+          ]),
+          { body: { requests: [requestNamed("req_1", "Instrument tracing")] } },
+          { body: { sessionKey: "lsk_1", endpoint: ENDPOINT, conversation: {} } },
+        ]);
+        const api = createControlApi({ endpoint: ENDPOINT, apiKey: LOGIN_KEY, fetchImpl: impl });
+
+        const requests = await api.list();
+        await api.approve({
+          requestId: "req_1",
+          workspace: { root: "/work/acme", name: "acme", os: "darwin" },
+        });
+
+        expect(requests).toHaveLength(1);
+        expect(calls).toHaveLength(3);
+        expect(authorizationOf(calls[1]!)).toBe(onProject("project_a"));
+        expect(authorizationOf(calls[2]!)).toBe(onProject("project_1"));
+      });
+
+      it("cancels on the request's own project", async () => {
+        const { impl, calls } = fetchInTurn([
+          projectRequired([{ id: "project_a", name: "ACME Shop" }]),
+          { body: { requests: [requestNamed("req_1", "Instrument tracing")] } },
+          { body: { cancelled: true } },
+        ]);
+        const api = createControlApi({ endpoint: ENDPOINT, apiKey: LOGIN_KEY, fetchImpl: impl });
+
+        await api.list();
+        await api.cancel({ requestId: "req_1" });
+
+        expect(calls[2]!.url).toBe(`${ENDPOINT}/api/v1/langy/control/requests/req_1/cancel`);
+        expect(authorizationOf(calls[2]!)).toBe(onProject("project_1"));
+      });
+
+      it("says what to do when the key reaches no project yet, never the raw refusal", async () => {
+        const { impl } = fetchInTurn([projectRequired([])]);
+        const api = createControlApi({ endpoint: ENDPOINT, apiKey: LOGIN_KEY, fetchImpl: impl });
+
+        const failure = (await api.list().catch((e) => e)) as Error;
+
+        expect(failure).toBeInstanceOf(ShareControlError);
+        expect(failure.message).toBe(NO_PROJECT_YET_MESSAGE);
+        expect(failure.message).not.toContain("--project");
+        expect(failure.message).not.toContain("X-Project-Id");
+      });
+
+      it("takes the key as usable, so the command never signs in again over it", async () => {
+        const { impl } = fetchInTurn([projectRequired([])]);
+
+        expect(
+          await platformTakesTheKey({ endpoint: ENDPOINT, apiKey: LOGIN_KEY }, { fetchImpl: impl }),
+        ).toBe(true);
+      });
     });
   });
 
