@@ -3,8 +3,29 @@
  * ADR-038 v6).
  */
 
-/** Query flag on /onboarding/welcome: a member of an organization asked to create another one. */
+/**
+ * Query flag on /onboarding/welcome: a member of an organization asked to create another one.
+ * "1" when asked; the created organization's id once this page created it, so a reload resumes it.
+ */
 export const NEW_ORGANIZATION_PARAM = "new_organization";
+const NEW_ORGANIZATION_ASKED = "1";
+
+export type NewOrganizationRequest = {
+  wanted: boolean;
+  /** The organization this page created for the request, once it has. */
+  createdOrganizationId: string | undefined;
+};
+
+export function readNewOrganizationRequest(
+  value: string | string[] | undefined,
+): NewOrganizationRequest {
+  const flag = Array.isArray(value) ? value[0] : value;
+  if (!flag) return { wanted: false, createdOrganizationId: undefined };
+  return {
+    wanted: true,
+    createdOrganizationId: flag === NEW_ORGANIZATION_ASKED ? undefined : flag,
+  };
+}
 
 interface WelcomeOrg {
   primaryIntent: string | null;

@@ -148,6 +148,7 @@ const SAAS_DEPLOYMENT: UiDeployment = {
 
 const failures: OnboardingFailureNotice[] = [];
 const hardRedirects: string[] = [];
+const queryWrites: Readonly<Record<string, string | undefined>>[] = [];
 let organizations: OnboardingOrganization[] = [];
 
 class WelcomeTestHost extends OnboardingHostApi {
@@ -173,7 +174,9 @@ class WelcomeTestHost extends OnboardingHostApi {
   hardRedirect(to: string) {
     hardRedirects.push(to);
   }
-  setQuery() {}
+  setQuery(next: Readonly<Record<string, string | undefined>>) {
+    queryWrites.push(next);
+  }
   featureFlag({ name }: ReleaseFlagToken): OnboardingFlagReading {
     return { enabled: flags[name] ?? false, isLoading: false };
   }
@@ -269,6 +272,7 @@ describe("WelcomeScreen in the guided variant", () => {
     organizations = [];
     routerState.query = {};
     failures.length = 0;
+    queryWrites.length = 0;
     push.mockReset();
     initializeOrganization.mockReset();
     invalidateOrganizations.mockReset();
@@ -342,6 +346,26 @@ describe("WelcomeScreen in the guided variant", () => {
       expect(takeover).toHaveAttribute("data-phase", "hello");
       expect(screen.queryByLabelText("Organization name")).not.toBeInTheDocument();
       expect(push).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Creating the new organization records it in the welcome address" */
+    it("names the created organization in the address when a member asked for a new one", async () => {
+      routerState.query = { new_organization: "1" };
+      initializeOrganization.mockImplementation((_input, options) =>
+        options.onSuccess?.({ organizationId: "org_new", projectSlug: "acme-proj" }),
+      );
+      await reachTailorStep();
+      await userEvent.click(screen.getByText("Company"));
+      await userEvent.click(await screen.findByRole("radio", { name: "11-50" }));
+      await userEvent.click(await screen.findByRole("radio", { name: "Cloud" }));
+      fireEvent.click(next());
+
+      expect(await screen.findByTestId("guided-takeover")).toHaveAttribute("data-org", "org_new");
+      await waitFor(() =>
+        expect(queryWrites).toContainEqual(
+          expect.objectContaining({ new_organization: "org_new" }),
+        ),
+      );
     });
 
     /** @scenario "A failed organization creation keeps the user on the tailor step" */
@@ -441,6 +465,28 @@ describe("WelcomeScreen in the guided variant", () => {
       renderWelcome();
       await waitFor(() => expect(push).toHaveBeenCalledWith("/acme-proj"));
       expect(screen.queryByTestId("guided-takeover")).not.toBeInTheDocument();
+    });
+
+    /** @scenario "A member asking for a new organization gets the form, not their organization's guide" */
+    it("draws the creation form instead of resuming the guide of an organization they had", async () => {
+      routerState.query = { new_organization: "1" };
+      organizations = [guidedOrganization({ paths: [], donePaths: [] })];
+      renderWelcome();
+      expect(await screen.findByLabelText("Organization name")).toBeInTheDocument();
+      expect(screen.queryByTestId("guided-takeover")).not.toBeInTheDocument();
+      expect(push).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A reloaded new-organization welcome resumes the organization it created" */
+    it("resumes the guide of the organization the address names after a reload", async () => {
+      routerState.query = { new_organization: "org_2" };
+      organizations = [
+        guidedOrganization({ paths: [], donePaths: [] }),
+        { ...guidedOrganization({ paths: [], donePaths: [] }), id: "org_2", name: "Second" },
+      ];
+      renderWelcome();
+      const takeover = await screen.findByTestId("guided-takeover");
+      expect(takeover).toHaveAttribute("data-org", "org_2");
     });
 
     it("hands a pending continuation to the takeover", async () => {

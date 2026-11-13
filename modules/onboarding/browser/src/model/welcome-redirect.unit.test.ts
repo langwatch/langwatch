@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveWelcomeRedirect } from "./welcome-redirect.ts";
+import { readNewOrganizationRequest, resolveWelcomeRedirect } from "./welcome-redirect.ts";
 
 /**
  * ADR-038 v6: the welcome screen's redirect decision. Belonging to an
@@ -130,6 +130,30 @@ describe("resolveWelcomeRedirect", () => {
           wantsNewOrganization: true,
         }),
       ).toEqual({ kind: "onboard" });
+    });
+  });
+});
+
+describe("readNewOrganizationRequest", () => {
+  it("reads no request when the flag is absent", () => {
+    expect(readNewOrganizationRequest(undefined)).toEqual({
+      wanted: false,
+      createdOrganizationId: undefined,
+    });
+  });
+
+  it("reads a fresh request with nothing created yet", () => {
+    expect(readNewOrganizationRequest("1")).toEqual({
+      wanted: true,
+      createdOrganizationId: undefined,
+    });
+  });
+
+  /** @scenario A reloaded new-organization welcome resumes the organization it created */
+  it("keeps the created organization named in the address after a reload", () => {
+    expect(readNewOrganizationRequest("organization_new")).toEqual({
+      wanted: true,
+      createdOrganizationId: "organization_new",
     });
   });
 });

@@ -13,6 +13,7 @@ import {
   type OnboardingFormData,
   OnboardingScreenIndex,
 } from "../../behavior/types.ts";
+import { useNewOrganizationRequest } from "../../behavior/use-new-organization-request.ts";
 import { useOnboardingFlow } from "../../behavior/use-onboarding-flow.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 import { useRequiredSession } from "../../behavior/use-required-session.ts";
@@ -30,7 +31,6 @@ import { TAKEOVER_FADE_MS } from "../../features/guided-onboarding/ui/takeover/t
 import { getSafeReturnToPath } from "../../model/get-safe-return-to-path.ts";
 import { useOnboardingHost } from "../../model/onboarding-host.ts";
 import {
-  NEW_ORGANIZATION_PARAM,
   resolveWelcomeRedirect,
   type WelcomeRedirectDecision,
 } from "../../model/welcome-redirect.ts";
@@ -299,13 +299,13 @@ export const WelcomeScreen: React.FC = () => {
   // fresh signup here with return_to=/cli/auth?user_code=… so the approval
   // survives onboarding). Only relative in-app paths are honored.
   const returnTo = getSafeReturnToPath(router.query.return_to);
-  // Set by "New organization" in the organization menu: a member creating another one.
-  const wantsNewOrganization = router.query[NEW_ORGANIZATION_PARAM] === "1";
+  const { wantsNewOrganization, createdOrganizationId, landAfterCreate } =
+    useNewOrganizationRequest({ created });
 
   const resume = resolveWelcomeResume({
     organizations,
     wantsNewOrganization,
-    createdOrganizationId: created?.organizationId,
+    createdOrganizationId,
   });
   const { takeover, landing } = splitGuidedResume(resume);
 
@@ -363,13 +363,12 @@ export const WelcomeScreen: React.FC = () => {
           // analytics is the application's, and a port method the host could only
           // answer with nothing is worse than its absence.
 
-          host.hardRedirect(
-            initializedLandingPath({
-              returnTo,
-              isGovernanceTrack,
-              projectSlug: response.projectSlug,
-            }),
-          );
+          const landing = initializedLandingPath({
+            returnTo,
+            isGovernanceTrack,
+            projectSlug: response.projectSlug,
+          });
+          landAfterCreate({ landing, organizationId: response.organizationId });
         },
         // Through the registry, not a hardcoded sentence. This threw the error away and told
         // everyone to "try again or contact support" — advice that cannot resolve a plan limit,

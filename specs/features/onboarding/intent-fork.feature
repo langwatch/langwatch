@@ -158,6 +158,32 @@ Feature: Onboarding forks on declared intent — Agent Governance vs LLMOps
       When the welcome screen decides where they go
       Then they are sent to organization creation
 
+    @integration
+    Scenario: A member asking for a new organization gets the form, not their organization's guide
+      Given the user belongs to an organization whose guided onboarding has not ended
+      And they came from "New organization" in the organization menu
+      When the welcome page opens
+      Then it draws the organization creation form
+      And it does not resume the guide of the organization they already had
+
+    @integration
+    Scenario: Creating the new organization records it in the welcome address
+      Given a member came from "New organization" in the organization menu
+      When the guided flow creates the organization
+      Then the welcome address names the organization it created
+
+    @unit
+    Scenario: A reloaded new-organization welcome resumes the organization it created
+      Given a member created an organization from "New organization"
+      When the welcome address is read again after a reload
+      Then it still names the organization that page created
+
+    @unit
+    Scenario: The coding-agent track of a new organization lands in that organization
+      Given a member created an organization from "New organization" on the coding-agent track
+      When the welcome screen picks the landing
+      Then the landing selects the new organization by its slug
+
   Rule: the governance track provisions the signer's personal workspace
 
     # Coding-agent usage lands in a personal workspace, so /me is empty until
