@@ -467,7 +467,7 @@ watchConversationUpdates(input: LangyPanelCall<typeof langyProjectInputSchema> &
 #### `watchTurnStream`
 
 ```typescript
-watchTurnStream(input: LangyPanelCall<typeof langyTurnStreamInputSchema> & { signal?: AbortSignal }): AsyncIterable<LangyStreamEntry>;
+watchTurnStream(input: LangyPanelCall<typeof langyTurnStreamInputSchema> & { signal?: AbortSignal }): AsyncIterable<LangyStreamFrame>;
 ```
 
 #### `getPanelLocalRecord`
@@ -989,7 +989,7 @@ Contract `../contract/src/langy.trpc.ts:58`, router `src/transport/langy.trpc.ts
 | `langy.recordFeedback`           | mutation     | Permission `langy:create` | `langyRecordFeedbackInputSchema`          | –                                     |
 | `langy.feedbackPromptShown`      | mutation     | Permission `langy:create` | `langyFeedbackPromptShownInputSchema`     | –                                     |
 | `langy.onConversationUpdate`     | subscription | Permission `langy:view`   | `langyProjectInputSchema`                 | `langyConversationUpdateFrameSchema`  |
-| `langy.onTurnStream`             | subscription | Permission `langy:view`   | `langyTurnStreamInputSchema`              | `langyStreamEntrySchema`              |
+| `langy.onTurnStream`             | subscription | Permission `langy:view`   | `langyTurnStreamInputSchema`              | `langyStreamFrameSchema`              |
 
 ```typescript
 // langy.list
@@ -1275,7 +1275,7 @@ interface Input {
   conversationId: string;
   turnId: string;
 }
-type Output = z.infer<typeof langyStreamEntrySchema>; // ../contract/src/langy.stream-entry.ts:120
+type Output = z.infer<typeof langyStreamFrameSchema>; // ../contract/src/langy.stream-entry.ts:133
 ```
 
 ### `langyEgress`

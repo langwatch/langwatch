@@ -95,12 +95,7 @@ function resolveEventSource(
 
 /** The observer one subscription reports to: tRPC's, as the link hands it over. */
 interface SseSubscriptionObserver<TRouter extends AnyRouter> {
-  next(value: {
-    result:
-      | { type: "started" }
-      | { type: "data"; data: unknown }
-      | { type: "state"; state: "pending"; error: null };
-  }): void;
+  next(value: { result: { type: "started" } | { type: "data"; data: unknown } }): void;
   error(error: TRPCClientError<TRouter>): void;
   complete(): void;
 }
@@ -163,17 +158,9 @@ class SseSubscription<TRouter extends AnyRouter> {
     this.close();
   }
 
-  /**
-   * `started` is said once. A reopen is said as a connection state instead: the server answers
-   * every new connection from the beginning, so a subscriber that replays must know it reopened.
-   */
   private onOpen(): void {
     this.reconnectAttempts = 0;
-    if (this.closed) return;
-    if (this.startedSent) {
-      this.input.observer.next({ result: { type: "state", state: "pending", error: null } });
-      return;
-    }
+    if (this.closed || this.startedSent) return;
     this.startedSent = true;
     this.input.observer.next({ result: { type: "started" } });
   }

@@ -80,13 +80,12 @@ type Watch = {
   data: unknown[];
   errors: string[];
   started: number;
-  reconnected: number;
   completed: number;
 };
 
 function clientOver(
   options: { url?: string } = {},
-): Omit<Watch, "data" | "errors" | "started" | "reconnected" | "completed"> {
+): Omit<Watch, "data" | "errors" | "started" | "completed"> {
   const { ctor, opened } = channelRecorder();
   const client = createTRPCClient<AnyRouter>({
     links: [
@@ -107,19 +106,10 @@ function watch(
   options: { url?: string } = {},
 ): Watch & { stop: () => void } {
   const { client, opened } = clientOver(options);
-  const state = {
-    data: [] as unknown[],
-    errors: [] as string[],
-    started: 0,
-    reconnected: 0,
-    completed: 0,
-  };
+  const state = { data: [] as unknown[], errors: [] as string[], started: 0, completed: 0 };
   const subscription = client.subscription(path, input, {
     onStarted: () => {
       state.started += 1;
-    },
-    onConnectionStateChange: (connection) => {
-      if (connection.state === "pending") state.reconnected += 1;
     },
     onData: (value) => state.data.push(value),
     onError: (error) => state.errors.push(error.message),
@@ -139,9 +129,6 @@ function watch(
     },
     get started() {
       return state.started;
-    },
-    get reconnected() {
-      return state.reconnected;
     },
     get completed() {
       return state.completed;
@@ -347,22 +334,6 @@ describe("given the link that carries a live procedure", () => {
       live.opened[1]!.accept();
 
       expect(live.started).toBe(1);
-    });
-
-    /** @scenario "A reopened channel tells the screen it is connected again" */
-    it("tells the screen it is connected again on every reopen, not on the first open", () => {
-      const live = watch();
-      live.opened[0]!.accept();
-      expect(live.reconnected).toBe(0);
-
-      live.opened[0]!.drop();
-      vi.advanceTimersByTime(1000);
-      live.opened[1]!.accept();
-      live.opened[1]!.drop();
-      vi.advanceTimersByTime(1000);
-      live.opened[2]!.accept();
-
-      expect(live.reconnected).toBe(2);
     });
   });
 
