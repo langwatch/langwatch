@@ -422,8 +422,9 @@ const startReady = ({
 
 /**
  * Runs every job, at most `concurrency` at once, in order where it can. A package
- * runs one script at a time, `integration` and `browser` hold one slot each, and a
- * heavy job runs alone. Every job runs even after one fails.
+ * runs one script at a time, `integration` and `browser` jobs together hold one
+ * slot, so no two of them overlap, and a heavy job runs alone. Every job runs even
+ * after one fails.
  */
 export const runJobs = async ({
   jobs,
@@ -463,13 +464,13 @@ export const runJobs = async ({
 
 /**
  * The shard-wide keys a job holds while it runs: its package, its lane, and heavy.
- * An integration and a browser job both hold each other's lane key, so they never overlap.
+ * Integration and browser jobs hold one shared `serial` key, so they never overlap.
  */
 const keysOf = (job: SuiteJob, isHeavy: (pkg: DiscoveredPackage) => boolean): string[] => {
   const lane = laneOf(job.script);
   return [
     `package:${job.pkg.name}`,
-    ...(lane === "shared" ? [] : ["integration", "browser"]),
+    ...(lane === "shared" ? [] : ["serial"]),
     ...(isHeavy(job.pkg) ? ["heavy"] : []),
   ];
 };
