@@ -11,7 +11,6 @@ import {
   namesOrganization,
   reachesOrganization,
   staffAccessPermissions,
-  staffCopyGrant,
 } from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
 import type {
@@ -253,7 +252,7 @@ export class StaffAccessRequestService {
                   copy: {
                     counterpartOrganizationId: row.counterpartOrganizationId,
                     counterpartOrganizationName: row.counterpartOrganizationName,
-                    grant: staffCopyGrant(row.scopes),
+                    grant: row.copyGrant,
                   },
                 }
               : {}),
@@ -488,7 +487,7 @@ export class StaffAccessRequestService {
         withoutSpend: typedNameRequired({ scopes, spendApproved: false }),
       },
       spendOffered: scopes.includes("org:support"),
-      copyGrant: staffCopyGrant(scopes),
+      copyGrant: row.copyGrant,
     };
   }
 }

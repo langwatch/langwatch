@@ -95,6 +95,12 @@ Feature: Copying an organization's setup into another organization
     When a copy runs with a dataset in its plan
     Then the dataset is skipped with "outside_copy_grant" and the rest is made
 
+  @integration
+  Scenario: A copy runs on the grant stored with the request, not today's
+    Given a target request whose stored grant has no "datasets:create" because it was made before a deploy added it
+    When Olivia approves it and the agent copies ACME into Globex
+    Then the approval page lists the stored grant, the passkey signs it, and the dataset is skipped with "outside_copy_grant"
+
   @integration @unit
   Scenario: A revoked approval stops a running copy
     Given a copy is running

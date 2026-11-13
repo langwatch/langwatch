@@ -7369,6 +7369,8 @@ model StaffAccessRequest {
   /// A copy side's other organization, signed with the approval (staff-access module ADR-002).
   counterpartOrganizationId   String?
   counterpartOrganizationName String?
+  /// What a copy target may create, fixed when asked; shown, signed and enforced as stored.
+  copyGrant            String[]  @default([])
   reason               String
   codeChallenge        String
   machine              String

@@ -33,9 +33,11 @@ The copy is an ops operation of the `staff-access` module:
 - **The target grant is signed.** `copy:target` grants exactly what a copy
   creates (`STAFF_COPY_TARGET_PERMISSIONS`: `project:create`,
   `evaluations:create`, `evaluations:update`, `prompts:create`,
-  `prompts:update`, `datasets:create`). The approval page lists it, the
-  passkey signs it, and the run checks each item against it before making it;
-  an item outside the grant is skipped with `outside_copy_grant`.
+  `prompts:update`, `datasets:create`). The list is stored on the request row
+  (`copyGrant`) when the request is made. The approval page shows that stored
+  list, the passkey signs it, and the run checks each item against it before
+  making it, so a deploy that changes the constant never widens a request
+  already made. An item outside the grant is skipped with `outside_copy_grant`.
 - **No organization key.** Copy scopes are platform scopes: redeeming either
   side answers only an ops token. The server reads the source itself through
   the owners' APIs, so the agent never holds a key that reads the source's

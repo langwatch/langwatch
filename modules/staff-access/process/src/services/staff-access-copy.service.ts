@@ -4,7 +4,6 @@ import {
   StaffAccessOperatorLostError,
 } from "@langwatch/api";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
-import { staffCopyGrant } from "@langwatch/authz-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -139,7 +138,7 @@ export class StaffAccessCopyService {
             requestId: target.row.id,
             source: source.organization,
             target: target.organization,
-            grant: staffCopyGrant(target.row.scopes),
+            grant: target.row.copyGrant,
             stillLive: () => this.stopReason({ source, target }),
           });
       if (stoppedBecause !== null) {

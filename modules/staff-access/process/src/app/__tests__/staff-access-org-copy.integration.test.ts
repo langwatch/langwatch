@@ -419,6 +419,40 @@ function scenarios(backend: Backend): void {
       });
     });
 
+    describe("when the target grant changed after the target request was made", () => {
+      /** @scenario "A copy runs on the grant stored with the request, not today's" */
+      it("shows, signs and enforces the grant stored on the request", async () => {
+        const w = world();
+        const seeded = seedAcme(w);
+        const requests = w.repositories.requests;
+        const create = requests.create.bind(requests);
+        requests.create = (row) =>
+          create({
+            ...row,
+            copyGrant: row.copyGrant.filter((permission) => permission !== "datasets:create"),
+          });
+        const { source, target } = await pairedApprovals(w);
+        const [stored] = await requests.findById({ id: target.requestId });
+
+        const view = await w.app.getApprovalRequest({
+          ...w.operator(OLIVIA),
+          requestId: target.requestId,
+        });
+        const report = await w.app.copyOrganization({
+          session: target.session,
+          body: { sourceOpsToken: source.opsToken, projects: [seeded.project.id] },
+        });
+
+        expect(stored?.copyGrant).not.toContain("datasets:create");
+        expect(view.copyGrant).toEqual(stored?.copyGrant);
+        expect(report.items.find((item) => item.kind === "dataset")).toMatchObject({
+          outcome: "skipped",
+          reason: "outside_copy_grant",
+        });
+        expect(report.totals.copied).toBe(4);
+      });
+    });
+
     describe("when the agent redeems the copy approvals", () => {
       /** @scenario "A copy approval mints only an ops token, never an organization key" */
       it("answers an ops token and no organization key for either side", async () => {

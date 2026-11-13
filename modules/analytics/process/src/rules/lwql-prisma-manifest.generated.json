@@ -26635,6 +26635,15 @@
           "documentation": ""
         },
         {
+          "name": "copyGrant",
+          "columnName": "copyGrant",
+          "type": "String",
+          "kind": "scalar",
+          "isList": true,
+          "isOptional": false,
+          "documentation": "What a copy target may create, fixed when asked; shown, signed and enforced as stored."
+        },
+        {
           "name": "reason",
           "columnName": "reason",
           "type": "String",

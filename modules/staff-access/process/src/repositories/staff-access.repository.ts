@@ -36,6 +36,8 @@ export type StaffAccessRequestRow = Readonly<{
   organizationName: string | null;
   counterpartOrganizationId: string | null;
   counterpartOrganizationName: string | null;
+  /** What a copy target may create, fixed when the request was made; empty otherwise. */
+  copyGrant: string[];
   reason: string;
   codeChallenge: string;
   machine: string;
