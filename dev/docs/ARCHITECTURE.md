@@ -1916,7 +1916,7 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
 - A minted session key (langy's local-control sessions) authenticates at its own door, which puts the actor and
   project on the request; no handler reads the key's headers (Alex, 2026-09-25).
 - No key, token or secret is minted while the actor carries an impersonator (Alex, 2026-10-01). An endpoint that mints
-  declares `.mintsCredential(permission)` and the tRPC and REST runtime refuses it before the handler; a service
+  declares `.mintsCredential()` and the tRPC and REST runtime refuses it before the handler; a service
   guard per door stays for callers that are not a transport. Door names are the typed snake_case union `api_key`,
   `scim_token`, `internal_secret`, `instance_admin`, `session_key`, `cli_token`, `otlp_ingest` (an OTLP exporter's
   key, bound by trace; verified before the body and handed over as `session`, Alex 2026-10-10 W02-DOOR-SHAPE), `licence_token` (a

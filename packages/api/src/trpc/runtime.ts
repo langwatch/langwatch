@@ -436,7 +436,7 @@ export type TrpcProcedureRequest<TContext extends object> = Readonly<{
   /** Present exactly when the procedure asks the tenant to hold an entitlement. */
   entitlement?: EntitlementGate;
   /** Present exactly when the procedure mints a credential: the permission its refusal names. */
-  mintsCredential?: AuthzPermission;
+  mintsCredential?: true;
   /** Present exactly when a mutation is refused on an aggregate though its permission is exempt. */
   refusedOnAggregate?: true;
   /** Present exactly when the procedure's audit row names a target its input does not. */
@@ -557,9 +557,7 @@ export interface TrpcRouterAccess<
    * ImpersonationCannotMintCredentialError whenever the actor carries an impersonatorId,
    * after access and before the handler.
    */
-  mintsCredential(
-    permission: AuthzPermission,
-  ): TrpcRouterAccess<Api, Contract, Implemented, Name, Contexts>;
+  mintsCredential(): TrpcRouterAccess<Api, Contract, Implemented, Name, Contexts>;
   /**
    * The mutation writes under its project although its permission is exempt from the aggregate
    * write guard, so the door refuses it on an aggregate (ADR-177 decision 8). Refused on a query.
@@ -715,7 +713,7 @@ type Implementation = Readonly<{
   access: TrpcAccess;
   furtherPermissions?: readonly TrpcFurtherPermission[];
   entitlement?: EntitlementGate;
-  mintsCredential?: AuthzPermission;
+  mintsCredential?: true;
   refusedOnAggregate?: true;
   audit?: TrpcAuditTarget;
   onRefused?: TrpcRefusalHook<unknown, unknown>;
@@ -764,7 +762,7 @@ type PermissionArgument =
 /** What a selected procedure has declared beside its middleware context, before its access. */
 type ProcedureMarks = Readonly<{
   entitlement?: EntitlementGate;
-  mintsCredential?: AuthzPermission;
+  mintsCredential?: true;
   refusedOnAggregate?: true;
   audit?: TrpcAuditTarget;
   onRefused?: TrpcRefusalHook<unknown, unknown>;
@@ -883,8 +881,7 @@ function routerBuilder<Api, Contract extends BuiltTrpcContract, Implemented exte
           entitlement: { entitlement: named, ...options },
         });
       },
-      mintsCredential: (permission: AuthzPermission) =>
-        selected(name, contexts, { ...marks, mintsCredential: permission }),
+      mintsCredential: () => selected(name, contexts, { ...marks, mintsCredential: true }),
       refusedOnAggregate: () => {
         assertRefusableOnAggregate({ contract, name, declared: marks.refusedOnAggregate });
 
@@ -1620,7 +1617,7 @@ function access<TContext extends object>({
   procedure: string;
   kind: TrpcContractMember["kind"];
   entitlement?: EntitlementGate;
-  mintsCredential?: AuthzPermission;
+  mintsCredential?: true;
   refusedOnAggregate: boolean;
   onRefused?: TrpcRefusalHook<unknown, unknown>;
   app: (ctx: TContext) => unknown;
@@ -1675,7 +1672,7 @@ function check<TContext extends object>({
   procedure: string;
   kind: TrpcContractMember["kind"];
   entitlement?: EntitlementGate;
-  mintsCredential?: AuthzPermission;
+  mintsCredential?: true;
   refusedOnAggregate: boolean;
   onRefused?: TrpcRefusalHook<unknown, unknown>;
   app: (ctx: TContext) => unknown;
