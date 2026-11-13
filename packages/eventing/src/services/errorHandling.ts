@@ -689,8 +689,6 @@ function projectGoneAt({ error, depth }: { error: unknown; depth: number }): boo
   return projectGoneAt({ error: Reflect.get(error, "cause"), depth: depth + 1 });
 }
 
-const MAX_QUERY_MEMORY_CAUSE_DEPTH = 8;
-
 /** ClickHouse's per-query memory limit, in both its older and newer wording. */
 const QUERY_MEMORY_LIMIT_FRAGMENTS = [
   "Query memory limit exceeded",
@@ -706,8 +704,7 @@ export function isQueryMemoryLimitExceeded(error: unknown): boolean {
 }
 
 function queryMemoryLimitAt({ error, depth }: { error: unknown; depth: number }): boolean {
-  if (depth > MAX_QUERY_MEMORY_CAUSE_DEPTH || error === null || typeof error !== "object")
-    return false;
+  if (depth > MAX_CAUSE_DEPTH || error === null || typeof error !== "object") return false;
   const message = Reflect.get(error, "message");
   if (
     typeof message === "string" &&
