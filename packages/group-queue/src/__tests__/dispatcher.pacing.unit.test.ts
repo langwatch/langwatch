@@ -1,7 +1,7 @@
 /**
  * The dispatcher's pace between claims: a claim that filled every free slot is followed at once,
  * one that found fewer jobs than it asked for pauses 25 ms, and a full consumer claims again as a
- * slot frees, with no queue signal. Spec: specs/claim-round-trips.feature.
+ * slot frees, with no signal, at most once per 10 ms for a few. Spec: claim-round-trips.feature.
  */
 import { createTestLogger } from "@langwatch/test-harness";
 import fastq from "fastq";
@@ -11,6 +11,8 @@ import { GroupQueueDispatcher } from "../dispatcher.ts";
 import type { ClaimedBatch, DispatchResult } from "../scripts.ts";
 
 const SLOTS = 4;
+/** The least time between claims for fewer free slots than a full claim. */
+const CLAIM_GAP_MS = 10;
 
 const nextTurn = () => new Promise<void>((resolve) => setImmediate(resolve));
 
@@ -70,6 +72,7 @@ function startDispatcher({
     activeTtlSec: 300,
     signalTimeoutSec: 5,
     logger: createTestLogger().logger,
+    clockMs: () => Date.now(),
   });
   dispatcher.start();
   const grow = (to: number) => {
@@ -82,7 +85,7 @@ function startDispatcher({
 
 describe("GroupQueueDispatcher pacing", () => {
   beforeEach(() => {
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
   });
 
   afterEach(() => {
@@ -137,9 +140,38 @@ describe("GroupQueueDispatcher pacing", () => {
       expect(asked).toEqual([SLOTS]);
 
       finish.shift()?.();
+      await vi.advanceTimersByTimeAsync(CLAIM_GAP_MS);
       await settle();
 
       expect(asked).toEqual([SLOTS, 1]);
+      stop();
+    });
+  });
+
+  describe("given every slot taken and its jobs finishing one at a time", () => {
+    /** @scenario "Slots freed one at a time gather into one claim per gap" */
+    it("waits out the 10 ms gap since the last claim and claims for every slot freed meanwhile", async () => {
+      const finish: (() => void)[] = [];
+      const { asked, stop } = startDispatcher({
+        found: (want) => want,
+        work: () => new Promise<void>((resolve) => finish.push(resolve)),
+      });
+
+      await settle();
+      expect(asked).toEqual([SLOTS]);
+
+      finish.shift()?.();
+      await settle();
+      finish.shift()?.();
+      await settle();
+      finish.shift()?.();
+      await settle();
+      expect(asked).toEqual([SLOTS]);
+
+      await vi.advanceTimersByTimeAsync(CLAIM_GAP_MS);
+      await settle();
+
+      expect(asked).toEqual([SLOTS, 3]);
       stop();
     });
   });
@@ -154,6 +186,7 @@ describe("GroupQueueDispatcher pacing", () => {
 
       await settle();
       grow(SLOTS + 2);
+      await vi.advanceTimersByTimeAsync(CLAIM_GAP_MS);
       await settle();
 
       expect(asked).toEqual([SLOTS, 2]);

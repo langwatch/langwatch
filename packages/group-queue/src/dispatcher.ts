@@ -1,3 +1,5 @@
+import { performance } from "node:perf_hooks";
+
 import type { Logger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import type fastq from "fastq";
@@ -9,6 +11,10 @@ import type { DispatchedWork, DispatchResult, GroupStagingScripts } from "./scri
 const MAX_BATCH_SIZE = 200;
 /** The pause after a claim that found fewer jobs than free slots, so arrivals gather. */
 const DRAINED_PAUSE_MS = 25;
+/** A claim for this many free slots, or for all of them, goes at once: a backlog to drain. */
+const FULL_CLAIM = 32;
+/** The least time between claims for fewer free slots, so freed slots gather into one claim. */
+const MIN_CLAIM_GAP_MS = 10;
 
 /** The shortest BRPOP wait: a due-but-unclaimable group cannot spin the loop faster. */
 const MIN_SIGNAL_WAIT_MS = 50;
@@ -60,6 +66,8 @@ export class GroupQueueDispatcher {
   private slotFreed = false;
   /** The last claim found a job for every slot it asked for: more work is waiting. */
   private backlogged = false;
+  /** When the last claim was sent, for the gap between small claims. */
+  private lastClaimAtMs = Number.NEGATIVE_INFINITY;
   /** The open list that claims first next time, so each list leads in turn. */
   private nextList = 0;
   /** Each candidates set the last listed claim scanned, and the clock it scanned below. */
@@ -94,6 +102,8 @@ export class GroupQueueDispatcher {
       claimGuardWorkerId?: () => string | undefined;
       /** This worker: the claim passes over a group whose job it handed back. */
       workerId?: string;
+      /** Monotonic milliseconds for the gap between claims; performance.now by default. */
+      clockMs?: () => number;
     },
   ) {}
 
@@ -453,17 +463,38 @@ export class GroupQueueDispatcher {
     return { groupBatch: { ...batching, maxClaims: MAX_BATCH_SIZE } };
   }
 
+  private clockMs(): number {
+    return this.params.clockMs ? this.params.clockMs() : performance.now();
+  }
+
+  private freeSlots(): number {
+    const { processingQueue } = this.params;
+    return this.slots() - processingQueue.length() - processingQueue.running();
+  }
+
+  /**
+   * A few free slots wait out the gap since the last claim, so each finished job does not cost
+   * its own claim: claims stay under 1000 / MIN_CLAIM_GAP_MS a second plus one per FULL_CLAIM jobs.
+   */
+  private async gatherFreedSlots(): Promise<void> {
+    const free = this.freeSlots();
+    if (free <= 0 || free >= Math.min(FULL_CLAIM, this.slots())) return;
+    const waitMs = this.lastClaimAtMs + MIN_CLAIM_GAP_MS - this.clockMs();
+    if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs));
+  }
+
   /** One claim for every free slot: how many it asked for and how many it got. */
   private async dispatchBatch(): Promise<{ requested: number; claimed: number }> {
-    if (this.paused) return { requested: 0, claimed: 0 };
+    await this.gatherFreedSlots();
+    if (this.paused || this.shutdownRequested) return { requested: 0, claimed: 0 };
     this.slotFreed = false;
-    const availableSlots =
-      this.slots() - this.params.processingQueue.length() - this.params.processingQueue.running();
+    const availableSlots = this.freeSlots();
     if (availableSlots <= 0) {
       return { requested: 0, claimed: 0 };
     }
 
     const maxJobs = Math.min(availableSlots, MAX_BATCH_SIZE);
+    this.lastClaimAtMs = this.clockMs();
     let claimed = 0;
 
     for (const work of await this.claim(maxJobs)) {
