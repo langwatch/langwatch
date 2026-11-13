@@ -5,10 +5,13 @@ import { firstGrapheme } from "../../first-grapheme.ts";
 import { getAvatarFillForString } from "../../rotating-colors.ts";
 import { Avatar } from "./avatar.tsx";
 
-export type ProjectAvatarSize = "sm" | "md";
+export type ProjectAvatarSize = "xs" | "sm" | "md";
 
-/** Bubble diameter as a size token: `sm` in lists and switchers, `md` where it leads a row. */
-const DIAMETER: Record<ProjectAvatarSize, string> = { sm: "5", md: "6" };
+/**
+ * Bubble diameter as a size token: `xs` beside a dense line (a span in a trace tree), `sm` in
+ * lists and switchers, `md` where it leads a row.
+ */
+const DIAMETER: Record<ProjectAvatarSize, string> = { xs: "4", sm: "5", md: "6" };
 
 export interface ProjectAvatarProps {
   name: string;
@@ -27,6 +30,7 @@ export function ProjectAvatar({ name, size = "sm" }: ProjectAvatarProps) {
       background={getAvatarFillForString(initial)}
       width={DIAMETER[size]}
       height={DIAMETER[size]}
+      textStyle={size === "xs" ? "micro" : undefined}
     >
       <Avatar.Fallback>{initial}</Avatar.Fallback>
     </Avatar.Root>

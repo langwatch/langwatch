@@ -2,12 +2,13 @@
 // its fix, and repeated in one line below. Monaco loads only when the field first shows.
 
 import { type BraidConditionCompileResult } from "@langwatch/authz-contract/braid-condition-compiler";
+import { Link } from "@langwatch/browser-host/link";
 import { useColorMode } from "@langwatch/design-system/color-mode";
-import { Alert, Box, Field, Text } from "@langwatch/design-system/primitives";
+import { Alert, Box, Field, HStack, Stack, Text } from "@langwatch/design-system/primitives";
 import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import type { OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
-import { lazy, Suspense, useEffect, useId, useState } from "react";
+import { lazy, type ReactNode, Suspense, useEffect, useId, useState } from "react";
 
 import {
   closeSuggestionsOnEscape,
@@ -20,12 +21,13 @@ import {
   useBraidConditionEditor,
 } from "../../../../behavior/use-braid-condition-editor.ts";
 import { BRAID_CONDITION_LANGUAGE_ID } from "../../../../model/braids/braid-condition-language.ts";
+import { BRAIDS_GUIDE_HREF } from "../../../../model/braids/braids.ts";
 
 const MonacoEditor = lazy(() => import("@monaco-editor/react"));
 
 const LINE_PX = 20;
 const PADDING_PX = 6;
-const MIN_HEIGHT = LINE_PX + 2 * PADDING_PX;
+const MIN_HEIGHT = 2 * LINE_PX + 2 * PADDING_PX;
 const MAX_HEIGHT = 4 * LINE_PX + 2 * PADDING_PX;
 const BORDER_PX = 1;
 /** How long typing must pause before a refusal is marked, so a half-typed key is not refused. */
@@ -82,6 +84,8 @@ export type BraidConditionFieldProps = {
   attributeKeys: readonly { key: string; spanCount: number }[];
   /** Puts the caret in the condition once the editor has loaded, so Edit opens on it. */
   focusOnLoad?: boolean;
+  /** An option that edits the condition, set directly under the editor. */
+  children?: ReactNode;
 };
 
 /** Where a refusal's mark ends: the next space after its offset, or the text's end. */
@@ -114,14 +118,7 @@ function CheckLine({
       </Field.ErrorText>
     );
   }
-  if (empty && !touched) {
-    return (
-      <Field.HelperText data-testid="braid-condition-check">
-        {`Which ${ownerName} spans to show. Left empty, all of them show.`}
-      </Field.HelperText>
-    );
-  }
-  if (empty) {
+  if (empty && touched) {
     return (
       <Alert.Root status="warning" size="sm" data-testid="braid-condition-empty">
         <Alert.Indicator />
@@ -180,61 +177,73 @@ export function BraidConditionField(props: BraidConditionFieldProps) {
   };
 
   return (
-    <Field.Root invalid={refusal !== undefined}>
-      <Field.Label>
-        Condition{" "}
-        <Text as="span" color="fg.muted" textStyle="xs" fontWeight="normal">
-          OTTL
-        </Text>
-      </Field.Label>
-      <Box
-        width="full"
-        height={`${height + 2 * BORDER_PX}px`}
-        borderWidth={`${BORDER_PX}px`}
-        borderColor={refusal ? "border.error" : "border"}
-        borderRadius="l2"
-        overflow="hidden"
-        _focusWithin={{ outline: "2px solid", outlineColor: "colorPalette.focusRing" }}
-        css={{
-          "& .monaco-editor, & .monaco-editor *": NO_LIGATURES,
-          // Monaco hangs the list from the caret's line; clear the padding and border below it.
-          "& .suggest-widget": { marginTop: `${PADDING_PX + BORDER_PX + 2}px` },
-        }}
-      >
-        <Suspense
-          fallback={
-            <Text paddingX={2} paddingY={1.5} color="fg.muted" textStyle="sm">
-              Loading the editor
-            </Text>
-          }
+    <Stack gap={2}>
+      <Field.Root invalid={refusal !== undefined}>
+        <Stack gap={0.5} width="full" marginBottom={1}>
+          <HStack justify="space-between" align="baseline" gap={3}>
+            <Field.Label>Condition</Field.Label>
+            <HStack gap={1} textStyle="caption" color="fg.muted">
+              <Text>OTTL</Text>
+              <Text aria-hidden>·</Text>
+              <Link href={`${BRAIDS_GUIDE_HREF}#conditions`} isExternal>
+                Help
+              </Link>
+            </HStack>
+          </HStack>
+          <Text textStyle="caption" color="fg.muted">
+            {`Which ${props.ownerName} spans ${props.readerName} sees. Left empty, all of them.`}
+          </Text>
+        </Stack>
+        <Box
+          width="full"
+          height={`${height + 2 * BORDER_PX}px`}
+          borderWidth={`${BORDER_PX}px`}
+          borderColor={refusal ? "border.error" : "border"}
+          borderRadius="l2"
+          overflow="hidden"
+          _focusWithin={{ outline: "2px solid", outlineColor: "colorPalette.focusRing" }}
+          css={{
+            "& .monaco-editor, & .monaco-editor *": NO_LIGATURES,
+            // Monaco hangs the list from the caret's line; clear the padding and border below it.
+            "& .suggest-widget": { marginTop: `${PADDING_PX + BORDER_PX + 2}px` },
+          }}
         >
-          <MonacoEditor
-            height="100%"
-            path={modelPath}
-            language={BRAID_CONDITION_LANGUAGE_ID}
-            defaultValue={props.value}
-            theme={braidConditionThemeName(dark)}
-            onChange={(next: string | undefined) => {
-              setTouched(true);
-              props.onChange(next ?? "");
-            }}
-            beforeMount={(monaco) => {
-              registerBraidConditionLanguage(monaco);
-              defineBraidConditionTheme({ monaco, name: braidConditionThemeName(dark), dark });
-            }}
-            onMount={handleMount}
-            options={editorOptions(contentHeight > MAX_HEIGHT)}
-            wrapperProps={{ "data-testid": "braid-condition" }}
-          />
-        </Suspense>
-      </Box>
-      <CheckLine
-        check={check}
-        empty={props.value.trim().length === 0}
-        touched={touched}
-        ownerName={props.ownerName}
-        readerName={props.readerName}
-      />
-    </Field.Root>
+          <Suspense
+            fallback={
+              <Text paddingX={2} paddingY={1.5} color="fg.muted" textStyle="sm">
+                Loading the editor
+              </Text>
+            }
+          >
+            <MonacoEditor
+              height="100%"
+              path={modelPath}
+              language={BRAID_CONDITION_LANGUAGE_ID}
+              defaultValue={props.value}
+              theme={braidConditionThemeName(dark)}
+              onChange={(next: string | undefined) => {
+                setTouched(true);
+                props.onChange(next ?? "");
+              }}
+              beforeMount={(monaco) => {
+                registerBraidConditionLanguage(monaco);
+                defineBraidConditionTheme({ monaco, name: braidConditionThemeName(dark), dark });
+              }}
+              onMount={handleMount}
+              options={editorOptions(contentHeight > MAX_HEIGHT)}
+              wrapperProps={{ "data-testid": "braid-condition" }}
+            />
+          </Suspense>
+        </Box>
+        <CheckLine
+          check={check}
+          empty={props.value.trim().length === 0}
+          touched={touched}
+          ownerName={props.ownerName}
+          readerName={props.readerName}
+        />
+      </Field.Root>
+      {props.children}
+    </Stack>
   );
 }

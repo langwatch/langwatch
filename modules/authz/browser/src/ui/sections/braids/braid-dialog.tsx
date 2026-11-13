@@ -9,9 +9,10 @@ import { Banner } from "@langwatch/design-system/banner";
 import { Card } from "@langwatch/design-system/card";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Box, Grid, HStack, Stack, Text } from "@langwatch/design-system/primitives";
+import { SmallLabel } from "@langwatch/design-system/small-label";
 import { nowInstant } from "@langwatch/time";
 import { Lock } from "lucide-react";
-import { useRef, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 
 import {
   useBraidPreview,
@@ -41,18 +42,16 @@ import {
 } from "../../../model/braids/braid-draft.ts";
 import { braidProject, braidsSigningKeysHref } from "../../../model/braids/braids.ts";
 import { BraidConditionField } from "../../blocks/braids/dialog/braid-condition-field.tsx";
-import { BraidPairBraids } from "../../blocks/braids/dialog/braid-pair-braids.tsx";
 import {
   BraidPreviewPanel,
   type BraidPreviewPanelProps,
-  TestTrace,
-  type TestTraceProps,
 } from "../../blocks/braids/dialog/braid-preview-panel.tsx";
 import { BraidRouteFields } from "../../blocks/braids/dialog/braid-route-fields.tsx";
 import {
   BraidSignedCalls,
   type ReaderSigning,
 } from "../../blocks/braids/dialog/braid-signed-calls.tsx";
+import type { TestTraceProps } from "../../blocks/braids/dialog/braid-trace-tree.tsx";
 import { BraidWindowFields } from "../../blocks/braids/dialog/braid-window-fields.tsx";
 
 export type BraidDialogProps = {
@@ -130,6 +129,16 @@ function saveBlockedReason({
   return "Change the braid to save it";
 }
 
+/** A group of the form under a quiet overline: Route, Which spans, Active. */
+function FieldGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <Stack as="section" gap={3} aria-label={title}>
+      <SmallLabel>{title}</SmallLabel>
+      {children}
+    </Stack>
+  );
+}
+
 export function BraidDialog({
   projectId,
   editing,
@@ -184,6 +193,8 @@ export function BraidDialog({
   const verifiedKey = verifiedKeyIn(draft.where);
   const entryKey =
     verifiedKey ?? signedEntryKey({ where: draft.where, readerName: reader?.name ?? "" });
+  const setSignedCalls = (on: boolean) =>
+    change({ where: withSignedCalls({ where: draft.where, on, key: entryKey }) });
 
   const previewState = previewStateOf({ hasReader: !!reader, conditionOk: check.ok, preview });
   const testState = testStateOf({ traceId: testedTraceId, tested });
@@ -228,60 +239,63 @@ export function BraidDialog({
         gap={8}
         alignItems="start"
       >
-        <Stack gap={5}>
+        <Stack gap={7}>
           {save.refusal ? (
             <Banner status="error" title="The braid wasn't saved">
               {save.refusal}
             </Banner>
           ) : null}
-          <BraidRouteFields
-            owner={owner}
-            reader={reader}
-            options={options}
-            someLeftOut={someLeftOut}
-            listedOnly={projects.length > targetProjects.length ? targetProjects.length : undefined}
-            isLoading={targets.isLoading}
-            loadFailed={targets.isError}
-            onRetry={() => void targets.refetch()}
-            readerFixed={!!editing}
-            onPick={(readerProjectId) => change({ readerProjectId })}
-            intoRef={intoTrigger}
-          />
-          {reader ? (
-            <BraidPairBraids readerName={reader.name} ownerName={owner.name} braids={onPair} />
-          ) : null}
-          <BraidConditionField
-            value={draft.where}
-            onChange={(where) => change({ where })}
-            check={check}
-            ownerName={owner.name}
-            readerName={reader?.name ?? "the other project"}
-            verified={verifiedKey !== undefined}
-            attributeKeys={attributeKeys.data?.keys ?? []}
-            focusOnLoad={!!editing}
-          />
-          <BraidSignedCalls
-            on={verifiedKey !== undefined}
-            onChange={(on) =>
-              change({ where: withSignedCalls({ where: draft.where, on, key: entryKey }) })
-            }
-            entryKey={entryKey}
-            readerName={reader?.name}
-            signing={signingOf(signing)}
-            readerKeysHref={
-              readerSlug ? braidsSigningKeysHref({ projectSlug: readerSlug }) : undefined
-            }
-          />
-          <BraidWindowFields
-            fromMs={draft.fromMs}
-            ends={draft.ends}
-            nowMs={nowMs}
-            ownerName={owner.name}
-            readerName={reader?.name ?? "the other project"}
-            onFrom={(fromMs) => change({ fromMs })}
-            onEnds={(ends) => change({ ends })}
-          />
-          {reader ? <TestTrace test={testState} onTest={setTestedTraceId} /> : null}
+          <FieldGroup title="Route">
+            <BraidRouteFields
+              owner={owner}
+              reader={reader}
+              options={options}
+              someLeftOut={someLeftOut}
+              listedOnly={
+                projects.length > targetProjects.length ? targetProjects.length : undefined
+              }
+              isLoading={targets.isLoading}
+              loadFailed={targets.isError}
+              onRetry={() => void targets.refetch()}
+              readerFixed={!!editing}
+              onPick={(readerProjectId) => change({ readerProjectId })}
+              intoRef={intoTrigger}
+            />
+          </FieldGroup>
+          <FieldGroup title="Which spans">
+            <BraidConditionField
+              value={draft.where}
+              onChange={(where) => change({ where })}
+              check={check}
+              ownerName={owner.name}
+              readerName={reader?.name ?? "the other project"}
+              verified={verifiedKey !== undefined}
+              attributeKeys={attributeKeys.data?.keys ?? []}
+              focusOnLoad={!!editing}
+            >
+              <BraidSignedCalls
+                on={verifiedKey !== undefined}
+                onChange={setSignedCalls}
+                entryKey={entryKey}
+                readerName={reader?.name}
+                signing={signingOf(signing)}
+                readerKeysHref={
+                  readerSlug ? braidsSigningKeysHref({ projectSlug: readerSlug }) : undefined
+                }
+              />
+            </BraidConditionField>
+          </FieldGroup>
+          <FieldGroup title="Active">
+            <BraidWindowFields
+              fromMs={draft.fromMs}
+              ends={draft.ends}
+              nowMs={nowMs}
+              ownerName={owner.name}
+              readerName={reader?.name ?? "the other project"}
+              onFrom={(fromMs) => change({ fromMs })}
+              onEnds={(ends) => change({ ends })}
+            />
+          </FieldGroup>
         </Stack>
         <Box position={{ base: "static", lg: "sticky" }} top={0}>
           <Card variant="nested">
@@ -295,8 +309,11 @@ export function BraidDialog({
                 /\battributes\s*\[/.test(draft.where) &&
                 verifiedKey === undefined
               }
+              onSignedCalls={() => setSignedCalls(true)}
               viewers={viewers.data ? viewersPhrase(viewers.data) : undefined}
-              exampleFolded={testState.state === "ready"}
+              pairBraids={reader ? onPair : []}
+              test={testState}
+              onTest={setTestedTraceId}
             />
           </Card>
         </Box>

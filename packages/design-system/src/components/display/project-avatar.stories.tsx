@@ -14,7 +14,7 @@ const meta = {
   component: ProjectAvatar,
   tags: ["autodocs"],
   args: { name: "Payments agent" },
-  argTypes: { size: { control: "inline-radio", options: ["sm", "md"] } },
+  argTypes: { size: { control: "inline-radio", options: ["xs", "sm", "md"] } },
 } satisfies Meta<typeof ProjectAvatar>;
 
 export default meta;
@@ -23,6 +23,9 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {};
 
 export const Medium: Story = { args: { size: "md" } };
+
+/** Beside a dense line, such as a span in a trace tree. */
+export const ExtraSmall: Story = { args: { size: "xs" } };
 
 /** A leading emoji is kept whole, flags and families included. */
 export const EmojiNames: Story = {

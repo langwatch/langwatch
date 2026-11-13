@@ -149,7 +149,7 @@ describe("the braid dialog", () => {
 
   describe("when the picked reader already has a braid from this project", () => {
     /** @scenario The dialog says what the reader already sees from this project */
-    it("lists each braid on the pair with its condition and window above the condition", async () => {
+    it("lists each braid on the pair with its condition and window in the preview", async () => {
       braidsFake.state.project = {
         intoOtherProjects: [liveBraid({ expiresAtMs: null })],
         fromOtherProjects: [],
@@ -193,7 +193,7 @@ describe("the braid dialog", () => {
         await writeCondition(user, 'attributes["team"] == "billing"');
 
         expect(await screen.findByTestId("braid-preview-figure")).toHaveTextContent(
-          "1,500 of 4,902",
+          "1,500 / 4,902",
         );
         expect(screen.getByTestId("braid-preview-added")).toHaveTextContent(
           "Adds 2,400 spans that the other braid doesn't show.",
@@ -219,7 +219,7 @@ describe("the braid dialog", () => {
         await writeCondition(user, CONDITION);
 
         expect(await screen.findByTestId("braid-preview-added")).toHaveTextContent(
-          "Adds no spans: the other braid already shows every span this one would.",
+          "Adds no spans: the other braid already shows them.",
         );
       });
     });
@@ -475,11 +475,11 @@ describe("the braid dialog", () => {
       await writeCondition(user, `${CONDITION} and Verified("orchestrator")`);
 
       const counts = await screen.findByTestId("braid-preview-counts");
-      expect(screen.getByTestId("braid-preview-figure")).toHaveTextContent("1,500 of 4,902");
+      expect(screen.getByTestId("braid-preview-figure")).toHaveTextContent("1,500 / 4,902");
       expect(within(counts).getByTestId("braid-preview-legend")).toHaveTextContent(
-        "All 1,200Some 300None 3,402",
+        "1,200 every span300 some3,402 none",
       );
-      expect(within(counts).getByTitle("All specialists spans show")).toBeInTheDocument();
+      expect(within(counts).getByTitle("Every specialists span shows")).toBeInTheDocument();
       expect(screen.getByTestId("braid-preview-capped")).toBeInTheDocument();
       expect(screen.getByTestId("braid-preview-unsigned")).toHaveTextContent(
         "37 spans had no valid signature and stay hidden.",
@@ -492,7 +492,7 @@ describe("the braid dialog", () => {
     });
 
     /** @scenario The preview counts what the reader will see as the condition changes */
-    it("shows an example trace, the braided spans marked and the rest struck through, for ana only", async () => {
+    it("warns once that anyone can set the tag, offering signed calls, and shows an example trace for ana only", async () => {
       braidTraces.state.preview = previewOf({
         traces: { every: 1200, some: 300, none: 3402, total: 4902, capped: false },
         example: {
@@ -508,17 +508,21 @@ describe("the braid dialog", () => {
       await pickReader(user);
       await writeCondition(user, CONDITION);
 
-      expect(await screen.findByTestId("braid-preview-unsigned-hint")).toHaveTextContent(
-        "Anyone can set a tag",
-      );
+      const warning = await screen.findByTestId("braid-preview-unsigned-hint");
+      expect(warning).toHaveTextContent("Anyone can set this tag");
       await user.click(await screen.findByRole("button", { name: "Show an example trace" }));
       const example = screen.getByTestId("braid-preview-example");
       expect(example).toHaveTextContent("Only you see it.");
+      expect(screen.getByTestId("braid-preview-example-summary")).toHaveTextContent(
+        "1 span braided in · 1 withheld",
+      );
       const spans = within(example).getAllByTestId("braid-example-span");
       expect(spans.map((row) => row.dataset.kind)).toEqual(["own", "braided", "withheld"]);
-      expect(within(spans[2] as HTMLElement).getByText("fraud_check")).toHaveStyle({
-        textDecoration: "line-through",
-      });
+      expect(spans[2]).toHaveTextContent("fraud_checknot braided");
+
+      await user.click(within(warning).getByRole("button", { name: "Turn on only signed calls" }));
+      expect(screen.getByRole("checkbox", { name: "Only signed calls" })).toBeChecked();
+      expect(screen.queryByTestId("braid-preview-unsigned-hint")).toBeNull();
     });
 
     it("shows no example when no trace gets spans", async () => {
@@ -573,7 +577,7 @@ describe("the braid dialog", () => {
     });
 
     /** @scenario Testing a trace shows it exactly as the reader will see it */
-    it("shows the reader's spans, the braided ones marked and the rest struck through", async () => {
+    it("shows the reader's spans, the braided ones with their project and the rest marked not braided", async () => {
       braidTraces.state.testTrace = {
         found: true,
         nodes: [
@@ -593,11 +597,13 @@ describe("the braid dialog", () => {
       );
       const trace = await screen.findByTestId("braid-test-trace");
       expect(trace).toHaveTextContent("Only you see this test; nothing is saved.");
+      expect(screen.getByTestId("braid-test-trace-summary")).toHaveTextContent(
+        "1 span braided in · 1 withheld",
+      );
       const spans = within(trace).getAllByTestId("braid-test-span");
       expect(spans.map((row) => row.dataset.kind)).toEqual(["own", "braided", "withheld"]);
-      expect(within(spans[2] as HTMLElement).getByText("fraud_check")).toHaveStyle({
-        textDecoration: "line-through",
-      });
+      expect(within(spans[1] as HTMLElement).getByTitle("From specialists")).toBeInTheDocument();
+      expect(spans[2]).toHaveTextContent("fraud_checknot braided");
     });
   });
 
@@ -608,7 +614,7 @@ describe("the braid dialog", () => {
       await pickReader(user);
 
       expect(screen.getByTestId("braid-viewers")).toHaveTextContent(
-        "14 people in orchestrator will see these spans",
+        /14 people\s*in orchestrator will see these spans/,
       );
     });
   });

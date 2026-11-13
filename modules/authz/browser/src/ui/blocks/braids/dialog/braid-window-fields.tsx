@@ -70,22 +70,11 @@ export function BraidWindowFields(props: BraidWindowFieldsProps) {
     else props.onEnds({ kind: "never" });
   };
   const summary = (
-    <HStack gap={1} textStyle="sm" color="fg.muted" data-testid="braid-window-summary">
-      <Text>
+    <HStack justify="space-between" gap={3} data-testid="braid-window-summary">
+      <Text textStyle="body">
         <WindowSummary fromMs={props.fromMs} ends={props.ends} nowMs={props.nowMs} />
       </Text>
-      <Text aria-hidden>·</Text>
-      <Button
-        variant="plain"
-        size="xs"
-        height="auto"
-        minWidth={0}
-        padding={0}
-        color="fg.muted"
-        textDecoration="underline"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-      >
+      <Button variant="ghost" size="xs" aria-expanded={open} onClick={() => setOpen(!open)}>
         {open ? "Done" : "Change"}
       </Button>
     </HStack>

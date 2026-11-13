@@ -71,13 +71,19 @@ export function BraidSignedCalls(props: BraidSignedCallsProps) {
   const reader = props.readerName ?? "the other project";
   return (
     <Stack gap={2}>
-      {/* Stacked, as a dialog's fields are, with the switch beside its caption. */}
-      <HStack justify="space-between" align="start" gap={4}>
-        <Stack gap={0.5}>
-          <Text textStyle="sm" fontWeight="medium">
-            Only signed calls
-          </Text>
-          <Text textStyle="sm" color="fg.muted">
+      <HStack
+        justify="space-between"
+        align="center"
+        gap={4}
+        borderWidth="1px"
+        borderColor={props.on ? "border.emphasized" : "border"}
+        borderRadius="l2"
+        paddingX={3}
+        paddingY={2.5}
+      >
+        <Stack gap={0}>
+          <Text textStyle="label">Only signed calls</Text>
+          <Text textStyle="caption" color="fg.muted">
             {`Show spans only when ${reader} really made the call.`}
           </Text>
         </Stack>

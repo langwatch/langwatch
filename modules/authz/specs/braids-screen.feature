@@ -59,15 +59,15 @@ Feature: The Braids screen
     Scenario: The dialog says what the reader already sees from this project
       Given a live braid from "specialists" into "orchestrator"
       When ana picks "orchestrator" for a new braid
-      Then one quiet line says there is 1 other braid into "orchestrator"
-      And showing it lists that braid's condition and data window above the condition
+      Then one quiet line in the preview says there is 1 other braid into "orchestrator"
+      And showing it lists that braid's condition and data window
 
     @integration
     Scenario: A further braid on the same pair says what it adds
       Given a live braid from "specialists" into "orchestrator"
       When ana previews another braid from "specialists" into "orchestrator"
       Then the preview counts what "orchestrator" will see with both braids
-      And says how many more spans the new braid shows, or warns in one line when it adds none
+      And says in one quiet line how many more spans the new braid shows, or that it adds none
 
     @integration
     Scenario: The condition is checked as it is typed
@@ -100,14 +100,16 @@ Feature: The Braids screen
       When ana stops typing a supported condition
       Then the preview counts "orchestrator" traces over the last 7 days that get every, some or none of their "specialists" spans
       And with only signed calls on it counts the spans that stay hidden for having no valid signature
-      And a compact legend on one line says how many traces get every, some or no spans
-      And when the condition reads attributes without only signed calls, one quiet line under the headline warns that anyone can set a tag
-      And an example trace, folded until ana opens it, marks the braided spans and strikes through the rest, seen by ana only
+      And a plain legend on one line under the bar says how many traces get every span, some or none
+      And when the condition reads attributes without only signed calls, one warning says anyone can set this tag and offers to turn on only signed calls
+      And an example trace, folded until ana opens it, shows the braided spans with their project and marks the rest not braided, seen by ana only
 
     @integration
     Scenario: Testing a trace shows it exactly as the reader will see it
       When ana tests the condition against an "orchestrator" trace id
       Then that trace is shown with exactly the spans "orchestrator" will see
+      And a summary first says how many spans are braided in and how many are withheld
+      And "orchestrator"'s own spans are quiet context, each braided span carries the "specialists" avatar and each withheld span is marked not braided
 
     @integration
     Scenario: A tested trace folds the preview's example trace
