@@ -1,5 +1,5 @@
-import type { AgentRegistryEntry } from "@langwatch/enterprise-governance-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import type { AgentRegistryEntry } from "@langwatch/enterprise-governance-contract";
 import { Temporal } from "@langwatch/time";
 import type { TraceAgentSeen } from "@langwatch/trace-contract";
 

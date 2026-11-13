@@ -30,7 +30,6 @@ type AgentRegistryDependencies = {
   webhooks: Pick<WebhookApi, "getAll">;
   /** Present in the worker, where the delivery process runs; the api records no fan-out. */
   outbox: () => AgentRegistryDeliveryOutbox | undefined;
-  publicBaseUrl: string;
   logger: Logger;
   now: () => Instant;
   newId: () => string;
@@ -56,14 +55,14 @@ export class AgentRegistryService {
       now?: () => Instant;
       newId?: () => string;
     }): AgentRegistryService {
-    const { discoveredAgents, agents, projects, traces, ...own } = deps;
+    const { discoveredAgents, agents, projects, traces, publicBaseUrl, ...own } = deps;
     const sources = AgentRegistrySourcesService.create({
       discoveredAgents,
       agents,
       projects,
       traces,
       organizations: own.organizations,
-      publicBaseUrl: own.publicBaseUrl,
+      publicBaseUrl,
       now,
     });
     return new AgentRegistryService({ ...own, sources, logger, now, newId });
