@@ -10,6 +10,7 @@ import {
 } from "@langwatch/analytics-contract/langwatch-ql-limits";
 
 import { LangWatchQLAppFunctionStatementsService } from "../features/provisioning/services/langwatch-ql-app-function-statements.service.ts";
+import { APP_READER_NAMES } from "../rules/app-reader-access.rules.ts";
 import { clickHouseLiteral } from "../rules/langwatch-ql-sql-literal.rules.ts";
 import { LangWatchQLSqlTextService } from "../services/langwatch-ql-sql-text.service.ts";
 
@@ -72,6 +73,16 @@ const LWQL_TENANT_PREDICATE_TEMPLATE =
  */
 const LWQL_KEY_MAP_SELF_FILTER_TEMPLATE =
   "has(splitByChar(',', getSetting('{tenantSetting}')), {keyHash})";
+
+/**
+ * The app reader's tenant predicate (ADR-202): every row while the profile pins enforce to 0
+ * (shadow), else rows of a non-empty id in the request's set; `toString` reads a string or a
+ * number alike. `has` over the constant array prunes the primary key on 26.8, `IN` not.
+ */
+const APP_READER_TENANT_PREDICATE_TEMPLATE =
+  "toString(getSetting('{enforceSetting}')) = '0' OR " +
+  "has(arrayFilter(tenant -> notEmpty(tenant), splitByChar(',', getSetting('{tenantSetting}'))), " +
+  "{tenantColumn})";
 
 /** `database.table`, with the LangWatchQL database filled in when none is named. */
 function qualifiedName(names: LangWatchQLNames, table: string, database?: string): string {
@@ -148,6 +159,20 @@ export class LangWatchQLAccessModelService {
 
   rowPolicyName(table: string): string {
     return policyName(table);
+  }
+
+  /** The app reader's row-policy predicate over one tenant table (ADR-202). */
+  appReaderTenantPredicate({ tenantColumn }: { tenantColumn: string }): string {
+    return renderPredicateTemplate(APP_READER_TENANT_PREDICATE_TEMPLATE, {
+      enforceSetting: sqlText.assertIdentifier(APP_READER_NAMES.enforceSetting, "enforceSetting"),
+      tenantSetting: sqlText.assertIdentifier(APP_READER_NAMES.tenantSetting, "tenantSetting"),
+      tenantColumn: sqlText.assertIdentifier(tenantColumn, "tenantColumn"),
+    });
+  }
+
+  /** Distinct from {@link rowPolicyName}: a SQL policy is named per table, not per user. */
+  appReaderPolicyName(table: string): string {
+    return `${sqlText.assertIdentifier(table, "table")}_app_tenant`;
   }
 
   keyMapPolicyName(keyMapTable: string): string {

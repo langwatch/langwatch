@@ -1,7 +1,7 @@
 /**
- * The one typed LangWatchQL access model and its two emitters: SQL DDL for a SQL-driven
- * access store, and the users.d/config.d YAML a config-store ClickHouse loads (ADR-159).
- * @see specs/lwql/access-model.feature
+ * The one typed access model, LangWatchQL's (ADR-159) and the app reader's (ADR-202), and its two
+ * emitters: SQL DDL for a SQL access store, users.d/config.d YAML for a config-store ClickHouse.
+ * @see specs/lwql/access-model.feature · specs/clickhouse/app-reader-row-policies.feature
  */
 
 import {
@@ -12,6 +12,11 @@ import {
 import type { PostgresNamedCollection } from "../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
 import { LangWatchQLViewProvisioningService } from "../features/provisioning/services/langwatch-ql-view-provisioning.service.ts";
 import { LangWatchQLViewStatementsService } from "../features/provisioning/services/langwatch-ql-view-statements.service.ts";
+import {
+  APP_READER_NAMES,
+  APP_READER_SETTINGS_PREFIX,
+  APP_READER_TENANT_TABLES,
+} from "../rules/app-reader-access.rules.ts";
 import { clickHouseLiteral } from "../rules/langwatch-ql-sql-literal.rules.ts";
 import { flooredViewNames } from "../rules/lwql-dedup-floor.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules.ts";
@@ -59,15 +64,21 @@ interface LwqlRowPolicyTarget {
   readonly predicate: string;
 }
 
-export interface LwqlAccessModelDefinition {
-  readonly customSettingsPrefix: string;
+/** One ClickHouse identity: its user, the profile it carries, its grants and row policies. */
+export interface LwqlAccessIdentity {
   readonly user: { readonly name: string; readonly passwordSha256Hex: string };
   readonly profile: { readonly name: string; readonly settings: readonly LwqlProfileSetting[] };
   readonly grants: readonly LwqlGrantTarget[];
   readonly rowPolicies: readonly LwqlRowPolicyTarget[];
+}
+
+export interface LwqlAccessModelDefinition extends LwqlAccessIdentity {
+  readonly customSettingsPrefix: string;
   readonly namedCollection: PostgresNamedCollection;
   /** Further names config.d delivers with the same connection, for tables bound to them. */
   readonly namedCollectionAliases: readonly string[];
+  /** The application's restricted reader (ADR-202), once its credential is supplied. */
+  readonly appReader?: LwqlAccessIdentity;
 }
 
 export interface RenderedConfigFile {
@@ -108,8 +119,13 @@ function yamlDocument(tree: YamlValue): string {
   return `${writeYaml(tree).replace(/^\n/, "")}\n`;
 }
 
+/** Config files carry a custom setting as a Field dump, so a string one keeps its quotes. */
 function settingYamlValue(setting: LwqlProfileSetting): YamlValue {
   if (!setting.quoted) return Number(setting.value);
+  const custom = [LWQL_CUSTOM_SETTINGS_PREFIX, APP_READER_SETTINGS_PREFIX].some((prefix) =>
+    setting.name.startsWith(prefix),
+  );
+  if (custom) return `'${setting.value}'`;
   return setting.value === "" ? "''" : String(setting.value);
 }
 
@@ -176,6 +192,31 @@ export class LangWatchQLAccessModelDefinitionService {
     ];
   }
 
+  /**
+   * The app reader's tenant set starts empty and stays the client's to set; the enforce switch
+   * and the cache and introspection pins are `CONST` (ADR-200: the condition cache crossed
+   * tenants).
+   */
+  appReaderProfileSettings({ enforce }: { enforce: boolean }): LwqlProfileSetting[] {
+    return [
+      {
+        name: APP_READER_NAMES.tenantSetting,
+        value: "",
+        quoted: true,
+        constraint: "changeable_in_readonly",
+      },
+      {
+        name: APP_READER_NAMES.enforceSetting,
+        value: enforce ? "1" : "0",
+        quoted: true,
+        constraint: "const",
+      },
+      { name: "use_query_cache", value: 0, constraint: "const" },
+      { name: "use_query_condition_cache", value: 0, constraint: "const" },
+      { name: "allow_introspection_functions", value: 0, constraint: "const" },
+    ];
+  }
+
   build({
     names,
     passwordSha256Hex,
@@ -184,6 +225,7 @@ export class LangWatchQLAccessModelDefinitionService {
     sourceDatabase,
     limits = DEFAULT_LWQL_RESOURCE_LIMITS,
     views = LWQL_VIEW_CATALOG,
+    appReader,
   }: {
     names: LangWatchQLNames;
     passwordSha256Hex: string;
@@ -192,6 +234,8 @@ export class LangWatchQLAccessModelDefinitionService {
     sourceDatabase: string;
     limits?: LangWatchQLResourceLimits;
     views?: readonly LangWatchQLViewDefinition[];
+    /** The app reader's credential hash; `enforce` defaults to shadow (ADR-202 Rollout). */
+    appReader?: { passwordSha256Hex: string; enforce?: boolean };
   }): LwqlAccessModelDefinition {
     return {
       customSettingsPrefix: LWQL_CUSTOM_SETTINGS_PREFIX,
@@ -201,29 +245,38 @@ export class LangWatchQLAccessModelDefinitionService {
       rowPolicies: this.#rowPolicies({ names, sourceDatabase, views }),
       namedCollection,
       namedCollectionAliases,
+      ...(appReader ? { appReader: this.#appReader({ ...appReader, sourceDatabase }) } : {}),
     };
   }
 
-  /** Profile, user, row policies, then grants — the order a SQL access store needs. */
+  /** Per identity, LangWatchQL's first: profile, user, row policies, then grants. */
   renderDdl(definition: LwqlAccessModelDefinition): string[] {
-    const user = definition.user.name;
-    const settings = definition.profile.settings
+    return [
+      ...this.#identityDdl(definition),
+      ...(definition.appReader ? this.#identityDdl(definition.appReader) : []),
+    ];
+  }
+
+  /** Profile, user, row policies, then grants — the order a SQL access store needs. */
+  #identityDdl(identity: LwqlAccessIdentity): string[] {
+    const user = identity.user.name;
+    const settings = identity.profile.settings
       .map(
         (setting) => `${setting.name} = ${settingLiteral(setting)} ${settingConstraint(setting)}`,
       )
       .join(",\n           ");
     return [
-      `CREATE SETTINGS PROFILE OR REPLACE ${definition.profile.name}\n  SETTINGS ${settings}`,
+      `CREATE SETTINGS PROFILE OR REPLACE ${identity.profile.name}\n  SETTINGS ${settings}`,
       `CREATE USER OR REPLACE ${user} ` +
-        `IDENTIFIED WITH sha256_hash BY '${definition.user.passwordSha256Hex}' ` +
-        `SETTINGS PROFILE ${definition.profile.name}`,
-      ...definition.rowPolicies.map(
+        `IDENTIFIED WITH sha256_hash BY '${identity.user.passwordSha256Hex}' ` +
+        `SETTINGS PROFILE ${identity.profile.name}`,
+      ...identity.rowPolicies.map(
         (policy) =>
           `CREATE ROW POLICY OR REPLACE ${policy.name} ON ${policy.database}.${policy.table}\n` +
           `  USING ${policy.predicate}\n` +
           `  TO ${user}`,
       ),
-      ...definition.grants.map(
+      ...identity.grants.map(
         (grant) => `GRANT ${selectClause(grant)} ON ${grant.database}.${grant.table} TO ${user}`,
       ),
     ];
@@ -261,34 +314,36 @@ export class LangWatchQLAccessModelDefinitionService {
     ];
   }
 
+  /** One profile and one user per identity, LangWatchQL's first, in a single users.d document. */
   renderUsersD(definition: LwqlAccessModelDefinition): string {
-    const settings: Record<string, YamlValue> = {};
-    const constraints: Record<string, YamlValue> = {};
-    for (const setting of definition.profile.settings) {
-      settings[setting.name] = settingYamlValue(setting);
-      constraints[setting.name] = { [setting.constraint]: "" };
-    }
-    const databases: Record<string, Record<string, YamlValue>> = {};
-    for (const policy of definition.rowPolicies) {
-      const tables = (databases[policy.database] ??= {});
-      tables[policy.table] = { filter: policy.predicate };
-    }
-    return yamlDocument({
-      profiles: { [definition.profile.name]: { ...settings, constraints } },
-      users: {
-        [definition.user.name]: {
-          password_sha256_hex: definition.user.passwordSha256Hex,
-          networks: { ip: LWQL_USER_NETWORKS_IP },
-          profile: definition.profile.name,
-          grants: {
-            query: definition.grants.map(
-              (grant) => `GRANT ${selectClause(grant)} ON ${grant.database}.${grant.table}`,
-            ),
-          },
-          databases,
+    const profiles: Record<string, YamlValue> = {};
+    const users: Record<string, YamlValue> = {};
+    for (const identity of [definition, ...(definition.appReader ? [definition.appReader] : [])]) {
+      const settings: Record<string, YamlValue> = {};
+      const constraints: Record<string, YamlValue> = {};
+      for (const setting of identity.profile.settings) {
+        settings[setting.name] = settingYamlValue(setting);
+        constraints[setting.name] = { [setting.constraint]: "" };
+      }
+      const databases: Record<string, Record<string, YamlValue>> = {};
+      for (const policy of identity.rowPolicies) {
+        const tables = (databases[policy.database] ??= {});
+        tables[policy.table] = { filter: policy.predicate };
+      }
+      profiles[identity.profile.name] = { ...settings, constraints };
+      users[identity.user.name] = {
+        password_sha256_hex: identity.user.passwordSha256Hex,
+        networks: { ip: LWQL_USER_NETWORKS_IP },
+        profile: identity.profile.name,
+        grants: {
+          query: identity.grants.map(
+            (grant) => `GRANT ${selectClause(grant)} ON ${grant.database}.${grant.table}`,
+          ),
         },
-      },
-    });
+        databases,
+      };
+    }
+    return yamlDocument({ profiles, users });
   }
 
   renderNamedCollectionConfig(definition: LwqlAccessModelDefinition): string {
@@ -378,5 +433,31 @@ export class LangWatchQLAccessModelDefinitionService {
         }),
       }));
     return [keyMapPolicy, ...tablePolicies];
+  }
+
+  /** SELECT on, and one tenant policy over, each tenant table; no other grant (ADR-202). */
+  #appReader({
+    passwordSha256Hex,
+    enforce = false,
+    sourceDatabase,
+  }: {
+    passwordSha256Hex: string;
+    enforce?: boolean;
+    sourceDatabase: string;
+  }): LwqlAccessIdentity {
+    return {
+      user: { name: APP_READER_NAMES.user, passwordSha256Hex },
+      profile: {
+        name: APP_READER_NAMES.settingsProfile,
+        settings: this.appReaderProfileSettings({ enforce }),
+      },
+      grants: APP_READER_TENANT_TABLES.map(({ table }) => ({ database: sourceDatabase, table })),
+      rowPolicies: APP_READER_TENANT_TABLES.map(({ table, tenantColumn }) => ({
+        name: accessModel.appReaderPolicyName(table),
+        database: sourceDatabase,
+        table,
+        predicate: accessModel.appReaderTenantPredicate({ tenantColumn }),
+      })),
+    };
   }
 }
