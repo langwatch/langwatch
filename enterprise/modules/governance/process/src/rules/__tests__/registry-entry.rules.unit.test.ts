@@ -7,7 +7,11 @@ import {
   discoveredAgentDraft,
   langwatchAgentDraft,
 } from "../../features/registry/rules/registry-entry.rules.ts";
-import { trafficAgentDrafts } from "../../features/registry/rules/registry-traffic.rules.ts";
+import {
+  keepsUnreadTraffic,
+  REGISTRY_TRAFFIC_LIMIT_PER_PROJECT,
+  trafficAgentDrafts,
+} from "../../features/registry/rules/registry-traffic.rules.ts";
 
 const CREATED = new Date("2026-11-01T10:00:00.000Z");
 const BASE = "https://app.langwatch.test";
@@ -111,6 +115,29 @@ describe("langwatchAgentDraft()", () => {
   });
 });
 
+describe("langwatchAgentDraft() with credentials in the URL", () => {
+  describe("given an HTTP agent whose URL carries user info and a key parameter", () => {
+    /** @scenario An HTTP agent's URL is published without user info or credential parameters */
+    it("publishes the URL without them", () => {
+      const draft = draftOf({
+        ...record("agent-4", "Keyed agent"),
+        type: "http",
+        config: {
+          url: "https://bot:pw-very-secret@agent.acme.test/run?api_key=k-very-secret&region=eu",
+          method: "POST",
+        },
+      });
+
+      expect(draft.endpoints).toContainEqual({
+        kind: "invoke",
+        url: "https://agent.acme.test/run?region=eu",
+        protocol: "http",
+      });
+      expect(JSON.stringify(draft)).not.toMatch(/very-secret/);
+    });
+  });
+});
+
 describe("discoveredAgentDraft()", () => {
   describe("given a Copilot Studio agent", () => {
     /** @scenario A Copilot Studio agent a source listed becomes a discovered entry with its environment endpoint */
@@ -207,6 +234,37 @@ describe("trafficAgentDrafts()", () => {
       });
 
       expect(drafts).toEqual([]);
+    });
+  });
+});
+
+describe("keepsUnreadTraffic()", () => {
+  const seen = (count: number) =>
+    Array.from({ length: count }, (_, index) => ({
+      agentName: `agent-${index}`,
+      agentId: null,
+      model: null,
+      spanCount: 1,
+      firstSeenMs: 1_000,
+      lastSeenMs: 2_000,
+    }));
+  const held = (source: string, projectId: string) => ({
+    entry: { source, project_id: projectId },
+  });
+
+  describe("given one project read at its cap and one below it", () => {
+    /** @scenario A traffic read that hit its cap removes no traced agent it did not read */
+    it("keeps only the capped project's traffic entries", () => {
+      const keep = keepsUnreadTraffic({
+        seen: [
+          { projectId: "project-full", agents: seen(REGISTRY_TRAFFIC_LIMIT_PER_PROJECT) },
+          { projectId: "project-small", agents: seen(3) },
+        ],
+      });
+
+      expect(keep(held("traffic", "project-full"))).toBe(true);
+      expect(keep(held("traffic", "project-small"))).toBe(false);
+      expect(keep(held("langwatch", "project-full"))).toBe(false);
     });
   });
 });

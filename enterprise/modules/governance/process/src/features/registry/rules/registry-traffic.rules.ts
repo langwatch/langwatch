@@ -9,6 +9,24 @@ export const REGISTRY_TRAFFIC_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 /** Distinct agent names read per project per reconcile. */
 export const REGISTRY_TRAFFIC_LIMIT_PER_PROJECT = 200;
 
+/**
+ * Whether a held traffic entry survives a read that hit the per-project cap: the names past the
+ * cap are unread, not gone. Spec: specs/agent-registry.feature
+ */
+export function keepsUnreadTraffic({
+  seen,
+}: {
+  seen: readonly { projectId: string; agents: readonly TraceAgentSeen[] }[];
+}): (held: { entry: { source: string; project_id: string | null } }) => boolean {
+  const capped = new Set(
+    seen
+      .filter(({ agents }) => agents.length >= REGISTRY_TRAFFIC_LIMIT_PER_PROJECT)
+      .map(({ projectId }) => projectId),
+  );
+  return ({ entry }) =>
+    entry.source === "traffic" && entry.project_id !== null && capped.has(entry.project_id);
+}
+
 function normalised(name: string): string {
   return name.trim().toLowerCase();
 }

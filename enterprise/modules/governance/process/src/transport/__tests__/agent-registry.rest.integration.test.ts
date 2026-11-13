@@ -220,10 +220,10 @@ describe("the agent registry REST family", () => {
       const { get } = await buildApi();
 
       const response = await get("/api/governance/registry/agents/unknown");
-      const body = (await response.json()) as { error: { code: string } };
+      const body = (await response.json()) as { code: string };
 
       expect(response.status).toBe(404);
-      expect(JSON.stringify(body)).toContain("agent_registry_entry_not_found");
+      expect(body.code).toBe("agent_registry_entry_not_found");
     });
   });
 

@@ -10,6 +10,20 @@ type RecordedAgentSpan = {
   model?: string;
 };
 
+/** Non-empty values latest first by start time, ties by the greater value, as ClickHouse picks. */
+function latestFirst(
+  spans: readonly RecordedAgentSpan[],
+  valueOf: (span: RecordedAgentSpan) => string | undefined,
+): string[] {
+  return spans
+    .flatMap((span) => {
+      const value = valueOf(span);
+      return value ? [{ at: span.startTimeMs, value }] : [];
+    })
+    .toSorted((a, b) => b.at - a.at || Number(b.value > a.value) - Number(b.value < a.value))
+    .map(({ value }) => value);
+}
+
 /** In-memory twin of the agent traffic read, exact over the spans a test records. */
 export class MemoryTraceAgentTrafficRepository extends TraceAgentTrafficRepository {
   readonly #spans: RecordedAgentSpan[] = [];
@@ -31,28 +45,21 @@ export class MemoryTraceAgentTrafficRepository extends TraceAgentTrafficReposito
     sinceMs: number;
     limit: number;
   }): Promise<TraceAgentSeen[]> {
-    const byName = new Map<string, TraceAgentSeen>();
+    const byName = new Map<string, RecordedAgentSpan[]>();
     for (const span of this.#spans) {
       if (span.tenantId !== input.tenantId || span.startTimeMs < input.sinceMs) continue;
       if (span.agentName === "") continue;
-      const seen = byName.get(span.agentName) ?? {
-        agentName: span.agentName,
-        agentId: null,
-        model: null,
-        spanCount: 0,
-        firstSeenMs: span.startTimeMs,
-        lastSeenMs: span.startTimeMs,
-      };
-      byName.set(span.agentName, {
-        ...seen,
-        agentId: seen.agentId ?? span.agentId ?? null,
-        model: seen.model ?? span.model ?? null,
-        spanCount: seen.spanCount + 1,
-        firstSeenMs: Math.min(seen.firstSeenMs, span.startTimeMs),
-        lastSeenMs: Math.max(seen.lastSeenMs, span.startTimeMs),
-      });
+      byName.set(span.agentName, [...(byName.get(span.agentName) ?? []), span]);
     }
-    return [...byName.values()]
+    return [...byName.entries()]
+      .map(([agentName, spans]) => ({
+        agentName,
+        agentId: latestFirst(spans, (span) => span.agentId)[0] ?? null,
+        model: latestFirst(spans, (span) => span.model)[0] ?? null,
+        spanCount: spans.length,
+        firstSeenMs: Math.min(...spans.map((span) => span.startTimeMs)),
+        lastSeenMs: Math.max(...spans.map((span) => span.startTimeMs)),
+      }))
       .toSorted((a, b) => b.spanCount - a.spanCount || a.agentName.localeCompare(b.agentName))
       .slice(0, input.limit);
   }

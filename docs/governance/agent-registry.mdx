@@ -97,7 +97,7 @@ curl -s "$LANGWATCH_ENDPOINT/api/governance/registry/agents?limit=50" \
 - `source_version` is the version the source names, when it names one: the prompt version of a LangWatch prompt-based agent, the last modified time of a Copilot Studio agent.
 - `tools` lists what the agent can be called with, each with a JSON Schema of its arguments. A prompt-based, code, workflow or HTTP agent has one `invoke` tool built from its declared inputs and outputs. A connected agent has one `call` tool built from its declared parameters; a secret parameter is marked `writeOnly` and never carries its default.
 - `instructions` is the system prompt of a prompt-based agent, and `null` where LangWatch does not hold one.
-- Credentials an HTTP agent holds (auth, headers) never appear in an entry.
+- Credentials an HTTP agent holds (auth, headers) never appear in an entry. Its URL is published without user info and without query parameters whose names look like credentials, such as `api_key` or `token`.
 
 ## Change events
 
@@ -132,7 +132,7 @@ Every event has the same shape:
 
 - A change to an agent in a LangWatch project updates the registry within seconds of the save or archive.
 - A listing from an ingestion source updates it right after the listing runs.
-- Traffic is read every 15 minutes for organizations that already hold a registry, and on each of the two triggers above.
+- Traffic is read every 15 minutes for organizations that already hold a registry, once a day for every organization, and on each of the two triggers above. When a project names more agents than one read returns, traced agents the read did not return are kept as they are.
 
 ### Reading the feed by cursor
 

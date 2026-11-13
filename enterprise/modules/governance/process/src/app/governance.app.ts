@@ -1729,9 +1729,11 @@ export class GovernanceModule implements GovernanceRestApi {
     await this.agentRegistry.reconcileOrganization({ organizationId });
   }
 
-  /** The scheduled traffic pass over every organisation the registry holds. */
-  reconcileAgentRegistryTraffic(): Promise<{ organizations: number }> {
-    return this.agentRegistry.reconcileHeldOrganizations();
+  /** The scheduled traffic pass: the organisations the registry holds, or every organisation. */
+  reconcileAgentRegistryTraffic(
+    input: { everyOrganization?: boolean } = {},
+  ): Promise<{ organizations: number }> {
+    return this.agentRegistry.reconcileTraffic(input);
   }
 
   listRegistryAgents(input: {

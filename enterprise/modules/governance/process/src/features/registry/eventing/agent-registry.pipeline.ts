@@ -124,7 +124,7 @@ export function buildAgentRegistryPipeline({
           "pass",
           agentRegistryTrafficPassSchema,
           runAgentRegistryTraffic({
-            reconcile: () => app.reconcileAgentRegistryTraffic(),
+            reconcile: (input) => app.reconcileAgentRegistryTraffic(input),
             deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
             now: () => nowInstant().epochMilliseconds,
           }),

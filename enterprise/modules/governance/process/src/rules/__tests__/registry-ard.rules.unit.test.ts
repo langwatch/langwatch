@@ -118,4 +118,18 @@ describe("ardSearch()", () => {
       expect(parsed.success).toBe(false);
     });
   });
+
+  describe("given a filter key that names an inherited property", () => {
+    /** @scenario ARD search treats a filter on an inherited property as no match */
+    it("answers no results instead of failing", () => {
+      const response = ardSearch({
+        manifest: manifest([entry()]),
+        request: ardSearchRequestSchema.parse({
+          query: { text: "support", filter: { toString: ["x"], "data.constructor": ["y"] } },
+        }),
+      });
+
+      expect(response.results).toEqual([]);
+    });
+  });
 });

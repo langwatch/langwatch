@@ -230,6 +230,10 @@ function planObserved(
   return { writes: [{ ...row, entry: candidate }], events };
 }
 
+function changedAfter(entry: AgentRegistryEntry, readAt: Instant): boolean {
+  return Temporal.Instant.compare(Temporal.Instant.from(entry.updated_at), readAt) > 0;
+}
+
 /** A held agent no draft names any more: one removal, never a deletion. */
 function planRemoved(held: StoredRegistryEntry, context: PlanContext): RegistryChangeSet {
   if (held.entry.status === "removed") return { writes: [], events: [] };
@@ -260,21 +264,29 @@ function planRemoved(held: StoredRegistryEntry, context: PlanContext): RegistryC
 }
 
 /**
- * What the registry must write and announce for drafts observed now against what it holds. A
- * held agent no draft names is removed; a removed one that returns is versioned back to active.
- * A last-seen move alone rewrites the row and announces nothing. Spec: specs/agent-registry.feature
+ * What the registry must write and announce for drafts read at `readAt` against what it holds. A
+ * held agent no draft names is removed unless `keep` holds it; a removed one that returns is
+ * versioned back to active. A row changed after `readAt` means a newer reconcile committed, so
+ * the stale drafts plan nothing. Spec: specs/agent-registry.feature
  */
 export function planRegistryChanges({
   stored,
   drafts,
   now,
   newId,
+  readAt,
+  keep = () => false,
 }: {
   stored: readonly StoredRegistryEntry[];
   drafts: readonly RegistryDraft[];
   now: Instant;
   newId: () => string;
+  readAt?: Instant;
+  keep?: (held: StoredRegistryEntry) => boolean;
 }): RegistryChangeSet {
+  if (readAt && stored.some((row) => changedAfter(row.entry, readAt))) {
+    return { writes: [], events: [] };
+  }
   const context: PlanContext = { newId, now, at: registryTimestamp(now) };
   const bySourceKey = new Map(stored.map((row) => [row.sourceKey, row]));
   const plans = drafts.map((draft) => {
@@ -282,7 +294,8 @@ export function planRegistryChanges({
     bySourceKey.delete(draft.sourceKey);
     return held ? planObserved(draft, held, context) : planRegistered(draft, context);
   });
-  plans.push(...[...bySourceKey.values()].map((held) => planRemoved(held, context)));
+  const absent = [...bySourceKey.values()].filter((held) => !keep(held));
+  plans.push(...absent.map((held) => planRemoved(held, context)));
   return {
     writes: plans.flatMap((plan) => plan.writes),
     events: plans.flatMap((plan) => plan.events),

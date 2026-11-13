@@ -96,7 +96,7 @@ function termValues(entry: ArdEntry, path: string): string[] {
   const read = (root: unknown, segments: string[]): unknown =>
     segments.reduce<unknown>(
       (value, segment) =>
-        value !== null && typeof value === "object"
+        value !== null && typeof value === "object" && Object.hasOwn(value, segment)
           ? (value as Record<string, unknown>)[segment]
           : undefined,
       root,

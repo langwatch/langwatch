@@ -191,7 +191,7 @@ describe("AgentRegistryService", () => {
       await service.seedAll({});
       reconciled.length = 0;
 
-      await expect(service.reconcileHeldOrganizations()).resolves.toEqual({ organizations: 2 });
+      await expect(service.reconcileTraffic()).resolves.toEqual({ organizations: 2 });
       expect(reconciled.toSorted()).toEqual([ORG, "org-2"]);
     });
   });
@@ -219,6 +219,30 @@ describe("AgentRegistryService", () => {
       expect(first.next_cursor).not.toBeNull();
       expect(second.data.map((event) => event.to_version)).toEqual([3]);
       expect(second.next_cursor).toBeNull();
+    });
+  });
+
+  describe("when the daily traffic pass walks every organisation", () => {
+    /** @scenario The daily traffic pass also reaches organisations the registry does not hold */
+    it("reconciles an organisation that holds no entry yet", async () => {
+      const { service, reconciled } = setup({ agents: [], organizationIds: [ORG, "org-new"] });
+
+      await expect(service.reconcileTraffic({ everyOrganization: true })).resolves.toEqual({
+        organizations: 2,
+      });
+      expect(reconciled.toSorted()).toEqual([ORG, "org-new"]);
+    });
+  });
+
+  describe("when a listing cursor carries a timestamp that does not parse", () => {
+    /** @scenario A listing cursor this registry never returned is refused */
+    it("refuses it as a validation error", async () => {
+      const { service } = setup();
+      const cursor = Buffer.from(JSON.stringify({ u: "not-a-date", i: "x" })).toString("base64url");
+
+      await expect(
+        service.listEntries({ organizationId: ORG, limit: 10, cursor }),
+      ).rejects.toMatchObject({ code: "validation_error" });
     });
   });
 });

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { Agent, AgentApi } from "@langwatch/agent-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
 import {
   AGENT_REGISTRY_ARD_ENTRY_LIMIT,
   type AgentRegistryEntry,
@@ -25,32 +25,20 @@ import type {
   RegistryEntryPosition,
 } from "../../../repositories/agent-registry.repository.ts";
 import type { DiscoveredAgentRepository } from "../../../repositories/discovered-agent.repository.ts";
-import { AGENT_SOURCE_BY_PROVIDER } from "../../agents/rules/agent-inventory.rules.ts";
-import { memberNames } from "../../identity/rules/member-names.rules.ts";
 import type { AgentRegistryDeliveryIntent } from "../eventing/agent-registry-delivery.process.ts";
 import { ardManifestOf, ardPublisherOf, ardSearch } from "../rules/registry-ard.rules.ts";
-import {
-  discoveredAgentDraft,
-  langwatchAgentDraft,
-  type RegistryDraft,
-} from "../rules/registry-entry.rules.ts";
 import { planRegistryChanges, registryTimestamp } from "../rules/registry-reconcile.rules.ts";
-import {
-  REGISTRY_TRAFFIC_LIMIT_PER_PROJECT,
-  REGISTRY_TRAFFIC_WINDOW_MS,
-  trafficAgentDrafts,
-} from "../rules/registry-traffic.rules.ts";
+import { AgentRegistrySourcesService } from "./agent-registry-sources.service.ts";
 
 /** Where the registry records its webhook fan-out; governance's outbox in the worker. */
 export interface AgentRegistryDeliveryOutbox {
   record(intents: readonly AgentRegistryDeliveryIntent[]): Promise<void>;
 }
 
-const AGENTS_PAGE_LIMIT = 200;
 const FAN_OUT_BATCH = 500;
 const ORGANIZATION_PAGE_LIMIT = 100;
 
-const entryCursorSchema = z.object({ u: z.string().min(1), i: z.string().min(1) });
+const entryCursorSchema = z.object({ u: z.iso.datetime({ offset: true }), i: z.string().min(1) });
 
 function encodeCursor(position: RegistryEntryPosition): string {
   return Buffer.from(JSON.stringify({ u: position.updatedAt, i: position.id })).toString(
@@ -73,6 +61,7 @@ function decodeCursor(cursor: string): RegistryEntryPosition {
 
 type AgentRegistryDependencies = {
   registry: AgentRegistryRepository;
+  sources: AgentRegistrySourcesService;
   discoveredAgents: Pick<DiscoveredAgentRepository, "findForRegistry">;
   agents: Pick<AgentApi, "list" | "platformUrl">;
   projects: Pick<ProjectApi, "findLiveNonGovernanceIdsByOrganization" | "listNamesByIds">;
@@ -100,12 +89,13 @@ export class AgentRegistryService {
     now = nowInstant,
     newId = () => generate("agentreg").toString(),
     ...deps
-  }: Omit<AgentRegistryDependencies, "logger" | "now" | "newId"> & {
+  }: Omit<AgentRegistryDependencies, "sources" | "logger" | "now" | "newId"> & {
     logger?: Logger;
     now?: () => Instant;
     newId?: () => string;
   }): AgentRegistryService {
-    return new AgentRegistryService({ ...deps, logger, now, newId });
+    const sources = AgentRegistrySourcesService.create({ ...deps, now });
+    return new AgentRegistryService({ ...deps, sources, logger, now, newId });
   }
 
   /** Rebuilds the organisation's entries from its sources, appends what changed, fans it out. */
@@ -114,20 +104,32 @@ export class AgentRegistryService {
   }: {
     organizationId: string;
   }): Promise<{ events: number }> {
-    const drafts = await this.draftsOf({ organizationId });
+    const readAt = this.deps.now();
+    const { drafts, keep } = await this.deps.sources.read({ organizationId });
     const now = this.deps.now();
     const events = await this.deps.registry.applyChanges({
       organizationId,
-      plan: (stored) => planRegistryChanges({ stored, drafts, now, newId: this.deps.newId }),
+      plan: (stored) =>
+        planRegistryChanges({ stored, drafts, now, newId: this.deps.newId, readAt, keep }),
     });
     await this.fanOutPending({ organizationId });
     return { events: events.length };
   }
 
-  /** Every organisation the registry already holds, reconciled; the scheduled traffic pass. */
-  async reconcileHeldOrganizations({ signal }: { signal?: AbortSignal } = {}): Promise<{
+  /**
+   * The scheduled traffic pass: every organisation the registry holds, or every organisation when
+   * `everyOrganization` is set, so one whose first agent shows only in traces is reached too.
+   */
+  async reconcileTraffic({
+    everyOrganization = false,
+    signal,
+  }: { everyOrganization?: boolean; signal?: AbortSignal } = {}): Promise<{
     organizations: number;
   }> {
+    if (everyOrganization) {
+      const { organizations } = await this.seedAll(signal ? { signal } : {});
+      return { organizations };
+    }
     let organizations = 0;
     let after: string | undefined;
     let hasMore = true;
@@ -323,70 +325,5 @@ export class AgentRegistryService {
         "agent registry reconcile failed for one organisation; the next trigger retries it",
       );
     }
-  }
-
-  private async draftsOf({ organizationId }: { organizationId: string }): Promise<RegistryDraft[]> {
-    const projectIds = await this.deps.projects.findLiveNonGovernanceIdsByOrganization({
-      organizationId,
-    });
-    const [agents, discovered, members, projects] = await Promise.all([
-      this.agentsOf(projectIds),
-      this.deps.discoveredAgents.findForRegistry({ organizationId }),
-      this.deps.organizations.findMembersWithDepartments({ organizationId }),
-      projectIds.length > 0
-        ? this.deps.projects.listNamesByIds({ projectIds })
-        : Promise.resolve([]),
-    ]);
-    const names = memberNames(members);
-    const slugs = new Map(projects.map((project) => [project.id, project.slug]));
-    const base = this.deps.publicBaseUrl;
-
-    const listed: RegistryDraft[] = agents.map((agent) => {
-      const slug = slugs.get(agent.projectId);
-      return langwatchAgentDraft({
-        agent,
-        ownerName: agent.ownerUserId ? (names.get(agent.ownerUserId) ?? null) : null,
-        publicBaseUrl: base,
-        consoleUrl: slug
-          ? this.deps.agents.platformUrl({
-              projectSlug: slug,
-              agentId: agent.id,
-              agentType: agent.type,
-            })
-          : null,
-      });
-    });
-    for (const row of discovered) {
-      const source = AGENT_SOURCE_BY_PROVIDER.get(row.provider);
-      if (source === "databricks" || source === "copilot_studio") {
-        listed.push(discoveredAgentDraft({ ...row, source }));
-      }
-    }
-
-    const since = this.deps.now().epochMilliseconds - REGISTRY_TRAFFIC_WINDOW_MS;
-    const seen = await Promise.all(
-      projectIds.map(async (projectId) => ({
-        projectId,
-        agents: await this.deps.traces.findAgentsSeen({
-          projectId,
-          sinceMs: since,
-          limit: REGISTRY_TRAFFIC_LIMIT_PER_PROJECT,
-        }),
-      })),
-    );
-    return [...listed, ...trafficAgentDrafts({ seen, listed })];
-  }
-
-  private async agentsOf(projectIds: readonly string[]): Promise<Agent[]> {
-    const agents: Agent[] = [];
-    for (const projectId of projectIds) {
-      let totalPages = 1;
-      for (let page = 1; page <= totalPages; page++) {
-        const result = await this.deps.agents.list({ projectId, page, limit: AGENTS_PAGE_LIMIT });
-        agents.push(...result.data);
-        totalPages = result.pagination.totalPages;
-      }
-    }
-    return agents;
   }
 }

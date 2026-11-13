@@ -38,6 +38,12 @@ Feature: Agent registry with ARD discovery and change events
     And no part of the entry carries the bearer token
 
   @unit
+  Scenario: An HTTP agent's URL is published without user info or credential parameters
+    Given an HTTP agent calling "https://bot:secret@agent.acme.test/run?api_key=secret&region=eu"
+    When the registry builds its entry
+    Then the entry lists the endpoint "https://agent.acme.test/run?region=eu"
+
+  @unit
   Scenario: A Copilot Studio agent a source listed becomes a discovered entry with its environment endpoint
     Given a discovered Copilot Studio agent in environment "https://org.crm.dynamics.com"
     When the registry builds its entry
@@ -120,6 +126,20 @@ Feature: Agent registry with ARD discovery and change events
     When reading the organisation's agents fails during a reconcile
     Then the reconcile fails and every entry keeps its status and version
 
+  @unit
+  Scenario: A reconcile whose sources were read before a newer commit plans nothing
+    Given a reconcile read its sources
+    And another reconcile for the same organisation committed after that read
+    When the first reconcile plans its changes
+    Then it writes and announces nothing
+
+  @unit
+  Scenario: A traffic read that hit its cap removes no traced agent it did not read
+    Given a project whose traffic read returned the per-project cap of agent names
+    And the registry holds a traced agent of that project the read did not return
+    When the registry reconciles
+    Then that traced agent stays as it was
+
   # Event-sourced triggers and webhook push
 
   @unit
@@ -127,6 +147,13 @@ Feature: Agent registry with ARD discovery and change events
     Given two organisations hold registry entries
     When the traffic pass runs
     Then the registry reconciles both organisations
+
+  @unit
+  Scenario: The daily traffic pass also reaches organisations the registry does not hold
+    Given an organisation that holds no registry entry yet
+    When the first traffic pass of a UTC day runs
+    Then the pass walks every organisation and reconciles that one too
+    And later passes that day walk only the organisations the registry holds
 
   @unit
   Scenario: A recorded agent change reconciles the agent's organisation
@@ -199,6 +226,12 @@ Feature: Agent registry with ARD discovery and change events
     When GET /api/governance/registry/agents is asked with updated_since this morning
     Then only today's entry is returned
 
+  @unit
+  Scenario: A listing cursor this registry never returned is refused
+    Given a cursor whose timestamp does not parse
+    When the registry list is asked with it
+    Then the request is refused as a validation error
+
   @integration
   Scenario: An unknown registry id is a 404
     When GET /api/governance/registry/agents/unknown is asked
@@ -237,6 +270,12 @@ Feature: Agent registry with ARD discovery and change events
     Given entries "Billing assistant" and "Support bot"
     When ARD search asks for text "billing" with filter source ["langwatch"]
     Then "Billing assistant" is the first result with a score between 0 and 100
+
+  @unit
+  Scenario: ARD search treats a filter on an inherited property as no match
+    Given an entry "Support bot"
+    When ARD search asks for text "support" with filters on "toString" and "data.constructor"
+    Then no result is answered and the search does not fail
 
   @unit
   Scenario: ARD search with no text is refused

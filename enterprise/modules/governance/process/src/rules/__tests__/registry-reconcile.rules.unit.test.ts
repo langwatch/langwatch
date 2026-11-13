@@ -161,4 +161,39 @@ describe("planRegistryChanges()", () => {
       expect(changes.events.map((event) => event.type)).toEqual(["governance.agent.removed"]);
     });
   });
+
+  describe("when another reconcile committed after these drafts were read", () => {
+    /** @scenario A reconcile whose sources were read before a newer commit plans nothing */
+    it("writes and announces nothing", () => {
+      const newer = registered([draft()]);
+
+      const changes = planRegistryChanges({
+        stored: held(newer),
+        drafts: [],
+        now: T1,
+        newId: idsFrom("stale"),
+        readAt: T0.subtract({ minutes: 1 }),
+      });
+
+      expect(changes).toEqual({ writes: [], events: [] });
+    });
+  });
+
+  describe("when a held agent is absent but kept", () => {
+    /** @scenario A traffic read that hit its cap removes no traced agent it did not read */
+    it("leaves it as it was", () => {
+      const first = registered([draft({ sourceKey: "traffic:project-1:planner" })]);
+
+      const changes = planRegistryChanges({
+        stored: held(first),
+        drafts: [],
+        now: T1,
+        newId: idsFrom("second"),
+        readAt: T1,
+        keep: () => true,
+      });
+
+      expect(changes).toEqual({ writes: [], events: [] });
+    });
+  });
 });

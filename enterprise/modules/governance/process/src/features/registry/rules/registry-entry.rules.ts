@@ -191,10 +191,27 @@ function endpointsOf({
     });
   }
   if (agent.type === "http") {
-    endpoints.push({ kind: "invoke", url: agent.config.url, protocol: "http" });
+    endpoints.push(...httpInvokeEndpoints(agent.config.url));
   }
   if (consoleUrl) endpoints.push({ kind: "console", url: consoleUrl, protocol: "https" });
   return endpoints;
+}
+
+const CREDENTIAL_PARAMETER = /key|token|secret|sig|pass|auth|credential|code/i;
+
+/**
+ * An HTTP agent's own URL as the registry may publish it: without user info and without query
+ * parameters that look like credentials. A URL that does not parse publishes no endpoint.
+ */
+export function httpInvokeEndpoints(raw: string): AgentRegistryEndpoint[] {
+  if (!URL.canParse(raw)) return [];
+  const url = new URL(raw);
+  url.username = "";
+  url.password = "";
+  for (const name of new Set(url.searchParams.keys())) {
+    if (CREDENTIAL_PARAMETER.test(name)) url.searchParams.delete(name);
+  }
+  return [{ kind: "invoke", url: url.toString(), protocol: "http" }];
 }
 
 function describedBy(agent: Agent): Pick<RegistryDraft, "description"> {

@@ -88,4 +88,22 @@ describe("MemoryTraceAgentTrafficRepository", () => {
       ).resolves.toEqual([]);
     });
   });
+
+  describe("when an agent's spans carry an empty id or model before a real one", () => {
+    /** @scenario The in-memory twin skips empty ids and models like the stored read */
+    it("answers the latest non-empty id and model", async () => {
+      const repository = MemoryTraceAgentTrafficRepository.create();
+      const span = { tenantId: "project-1", agentName: "planner" };
+      repository.record({ ...span, startTimeMs: 1_100, agentId: "agent-7", model: "gpt-5" });
+      repository.record({ ...span, startTimeMs: 1_200, agentId: "", model: "" });
+
+      const [seen] = await repository.findAgentsSeen({
+        tenantId: "project-1",
+        sinceMs: 1_000,
+        limit: 10,
+      });
+
+      expect(seen).toMatchObject({ agentId: "agent-7", model: "gpt-5", spanCount: 2 });
+    });
+  });
 });

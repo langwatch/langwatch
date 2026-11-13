@@ -3,6 +3,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  AGENT_REGISTRY_TRAFFIC_INTERVAL_MS,
   AGENT_REGISTRY_TRAFFIC_PROCESS_NAME,
   runAgentRegistryTraffic,
 } from "../agent-registry-traffic.process.ts";
@@ -10,12 +11,14 @@ import {
 const NOW = 1_800_000_000_000;
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
-function pass({ failPrune = false }: { failPrune?: boolean } = {}) {
+function pass({ failPrune = false, now = NOW }: { failPrune?: boolean; now?: number } = {}) {
   const calls: string[] = [];
+  const walks: boolean[] = [];
   const pruned: { processName: string; before: number }[] = [];
   const run = runAgentRegistryTraffic({
-    reconcile: async () => {
+    reconcile: async ({ everyOrganization }) => {
       calls.push("reconcile");
+      walks.push(everyOrganization);
       return { organizations: 2 };
     },
     deleteDispatchedBefore: async (params) => {
@@ -24,9 +27,9 @@ function pass({ failPrune = false }: { failPrune?: boolean } = {}) {
       if (failPrune) throw new Error("process store unavailable");
       return 3;
     },
-    now: () => NOW,
+    now: () => now,
   });
-  return { run, calls, pruned };
+  return { run, calls, pruned, walks };
 }
 
 describe("runAgentRegistryTraffic()", () => {
@@ -47,6 +50,22 @@ describe("runAgentRegistryTraffic()", () => {
       const { run } = pass({ failPrune: true });
 
       await expect(run()).resolves.toBeUndefined();
+    });
+  });
+
+  describe("when passes run through a day", () => {
+    /** @scenario The daily traffic pass also reaches organisations the registry does not hold */
+    it("walks every organisation on the day's first pass only", async () => {
+      const DAY_MS = 24 * 60 * 60 * 1000;
+      const midnight = Math.floor(NOW / DAY_MS) * DAY_MS;
+      const first = pass({ now: midnight + 60_000 });
+      const later = pass({ now: midnight + AGENT_REGISTRY_TRAFFIC_INTERVAL_MS + 60_000 });
+
+      await first.run();
+      await later.run();
+
+      expect(first.walks).toEqual([true]);
+      expect(later.walks).toEqual([false]);
     });
   });
 });
