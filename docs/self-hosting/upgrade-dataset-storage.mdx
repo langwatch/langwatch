@@ -54,8 +54,9 @@ app:
     bucket: "your-dataset-bucket"
     providers:
       awsS3:
-        # AWS only: your bucket's region (rendered as S3_REGION). Remove this
-        # line for MinIO or other S3-compatible services.
+        # Your bucket's region (rendered as S3_REGION). Required for AWS. For MinIO
+        # or other S3-compatible services, set the region the service expects, or
+        # remove this line to sign as "auto".
         region:
           value: "<your-bucket-region>"
         accessKeyId:
