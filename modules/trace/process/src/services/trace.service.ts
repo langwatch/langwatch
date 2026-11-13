@@ -168,7 +168,13 @@ export class TraceService {
     return spanTreePageSchema.parse({
       nodes,
       nextCursor:
-        page.hasMore && last ? { startTimeMs: last.startTimeMs, spanId: last.spanId } : null,
+        page.hasMore && last
+          ? {
+              startTimeMs: last.startTimeMs,
+              spanId: last.spanId,
+              ownerProjectId: last.ownerProjectId ?? null,
+            }
+          : null,
     });
   }
 

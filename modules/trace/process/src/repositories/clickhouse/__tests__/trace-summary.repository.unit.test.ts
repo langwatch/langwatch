@@ -30,10 +30,10 @@ const heavyRow = {
   TraceId: "t1",
   Version: "v1",
   Attributes: {},
-  OccurredAt: "0",
+  OccurredAtMs: "0",
   EarliestSpanStartMs: "0",
   CreatedAt: "0",
-  UpdatedAt: "0",
+  UpdatedAtMs: "0",
   ComputedIOSchemaVersion: "v1",
   ComputedInput: "log-input",
   ComputedOutput: "log-output",
@@ -248,7 +248,7 @@ describe("given the trace-summary row carries a storage anchor", () => {
         {
           ...heavyRow,
           Version: TRACE_SUMMARY_PROJECTION_VERSION_PRE_STORAGE_ANCHOR,
-          OccurredAt: baselineMs,
+          OccurredAtMs: baselineMs,
           // The column did not exist when this row was written, so ClickHouse
           // reads it back as its DEFAULT 0. Decoding that as the baseline would
           // reset the trace's duration to start from its next span.
@@ -274,7 +274,7 @@ describe("given the trace-summary row carries a storage anchor", () => {
         {
           ...heavyRow,
           Version: TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
-          OccurredAt: anchorMs,
+          OccurredAtMs: anchorMs,
           EarliestSpanStartMs: baselineMs,
         },
       ]);
@@ -298,7 +298,7 @@ describe("given the trace-summary row carries a storage anchor", () => {
           // ordinary schema bump. It is still post-split, so the anchor must not
           // be handed back as the trace's start.
           Version: "2027-03-01",
-          OccurredAt: anchorMs,
+          OccurredAtMs: anchorMs,
           EarliestSpanStartMs: baselineMs,
         },
       ]);

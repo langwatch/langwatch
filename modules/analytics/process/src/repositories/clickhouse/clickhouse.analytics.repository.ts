@@ -203,7 +203,7 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
       const topDocs = (await result.json()) as {
         documentId: string;
         count: string | number;
-        traceId: string;
+        trace_id: string;
         content?: string;
         total: string | number;
       }[];
@@ -213,7 +213,7 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
         topDocuments: topDocs.map((doc) => ({
           documentId: doc.documentId,
           count: typeof doc.count === "string" ? parseInt(doc.count, 10) : doc.count,
-          traceId: doc.traceId,
+          traceId: doc.trace_id,
           content: doc.content,
         })),
         totalUniqueDocuments: typeof total === "string" ? parseInt(total, 10) : total,

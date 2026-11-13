@@ -198,6 +198,31 @@ export function stampTreeRelease({
   return stampRelease({ release, previous, cutAt, current: tree, shipped, ownerOf });
 }
 
+/**
+ * The first step id the image declares twice (two goose files with one numeric prefix), with the
+ * goose files behind it: the ledger registers ids in one upsert, which Postgres rejects on a
+ * repeat.
+ */
+export function duplicateStep({
+  steps,
+  gooseFiles,
+}: {
+  steps: readonly Pick<ManifestStep, "id">[];
+  gooseFiles: readonly string[];
+}): { id: string; files: string[]; message: string } | null {
+  const seen = new Set<string>();
+  for (const { id } of steps) {
+    if (!seen.has(id)) {
+      seen.add(id);
+      continue;
+    }
+    const files = gooseFiles.filter((file) => gooseStepId({ file }) === id);
+    const message = `two migrations share step id ${id}: ${files.join(", ")}; renumber the one that has not been applied yet`;
+    return { id, files, message };
+  }
+  return null;
+}
+
 /** Every Prisma folder and goose file this image ships, as steps (ids per blitz plan 5.3). */
 export function imageSteps({
   release,

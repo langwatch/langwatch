@@ -296,10 +296,18 @@ export type {
   IdIndexRegistryStatements,
 } from "./idBound.ts";
 export { hasIdBound, ID_BOUND_MARKER, idBoundOf, IdIndexRegistry, readIdBound } from "./idBound.ts";
-export type { TenantScopeTimeColumn } from "@langwatch/clickhouse-markers";
-export { tenantScope, tenantSet } from "@langwatch/clickhouse-markers";
+export type { HeldTraceBound, TenantScopeTimeColumn } from "@langwatch/clickhouse-markers";
+export {
+  tenantScope,
+  tenantScopeForLatestVersion,
+  tenantScopeWithConditions,
+  tenantSet,
+} from "@langwatch/clickhouse-markers";
+export { refuseOverBudget, STATEMENT_BYTE_BUDGET } from "./statementBudget.ts";
 export {
   AuthorizedClickHouse,
+  braidConditionExpression,
+  conditionsExpression,
   expandFragment,
   expandStatement,
   fenceExpression,

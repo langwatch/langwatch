@@ -59,7 +59,7 @@ type DatasetRef = Pick<Dataset, "id" | "projectId">;
 
 export class DatasetSingleFileService implements Omit<
   DatasetContent,
-  "copyDataset" | "updateColumns"
+  "createDataset" | "copyDataset" | "updateColumns"
 > {
   static create(options: {
     files: DatasetSingleFileRepository;

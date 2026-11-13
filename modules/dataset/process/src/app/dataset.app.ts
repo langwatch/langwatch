@@ -1011,6 +1011,9 @@ export abstract class DatasetNormalizeQueue {
   abstract enqueueNormalize(input: { datasetId: string; projectId: string }): Promise<void>;
 }
 
+/** One row a new dataset is born with; without an id, the row gets a fresh one. */
+export type DatasetSeedRow = { id?: string | undefined; entry: Record<string, unknown> };
+
 /** Content-layout operations for s3_jsonl datasets. Keeps storage decisions
  * out of routes and process-globals out of service.
  */
@@ -1057,6 +1060,14 @@ export abstract class DatasetContent {
     dataset: Dataset;
     input: DeleteDatasetRecordsInput;
   }): Promise<{ count: number }>;
+  /** A new dataset born in object storage: chunks first, then its row (ADR-032 v13). */
+  abstract createDataset(input: {
+    projectId: string;
+    name: string;
+    slug: string;
+    columnTypes: Dataset["columnTypes"];
+    rows: AsyncIterable<DatasetSeedRow> | Iterable<DatasetSeedRow>;
+  }): Promise<Dataset>;
   abstract copyDataset(input: {
     source: Dataset;
     sourceProjectId: string;

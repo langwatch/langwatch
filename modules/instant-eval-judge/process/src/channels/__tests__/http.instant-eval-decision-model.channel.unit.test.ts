@@ -137,6 +137,39 @@ describe("HttpInstantEvalDecisionModelChannel", () => {
     });
   });
 
+  describe("when the model is Gemini's", () => {
+    /** @scenario "A Gemini decision model is sent to Gemini with the key in Google's own header" */
+    it("sends the key in x-goog-api-key and never as a bearer token", async () => {
+      const geminiOrigin = "https://generativelanguage.googleapis.com";
+      const geminiPath = "/v1beta/decisions";
+      let headers: Record<string, string> = {};
+      agent
+        .get(geminiOrigin)
+        .intercept({ path: geminiPath, method: "POST" })
+        .reply(200, (request) => {
+          headers = request.headers as Record<string, string>;
+          return { answers: { annoyed: { type: "noul", noul: 0.7, confidence: 0.7 } } };
+        });
+
+      const judgement = await channel().classify({
+        text: "I am fed up",
+        questions: [QUESTION],
+        decisionModel: {
+          model: "gemini/decisions:gemini-decision-1",
+          wire: "gemini_decisions",
+          providerModel: "gemini-decision-1",
+          endpoint: `${geminiOrigin}${geminiPath}`,
+          authHeader: "goog_api_key",
+          apiKey: "gemini-key",
+        },
+      });
+
+      expect(headers["x-goog-api-key"]).toBe("gemini-key");
+      expect(headers.authorization).toBeUndefined();
+      expect(judgement.verdicts).toEqual([{ questionId: "annoyed", probability: 0.7 }]);
+    });
+  });
+
   describe("when the provider redirects elsewhere", () => {
     /** @scenario "An Azure key is never sent to a host outside Azure" */
     it("does not follow the redirect, so the key never leaves for the new host", async () => {

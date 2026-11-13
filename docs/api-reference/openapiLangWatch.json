@@ -17088,7 +17088,9 @@
                                           "subscription:manage",
                                           "seatRequests:view",
                                           "seatRequests:manage",
-                                          "members:view"
+                                          "members:view",
+                                          "braids:manage",
+                                          "spans:braided"
                                         ]
                                       }
                                     ]
@@ -17316,7 +17318,9 @@
                                     "subscription:manage",
                                     "seatRequests:view",
                                     "seatRequests:manage",
-                                    "members:view"
+                                    "members:view",
+                                    "braids:manage",
+                                    "spans:braided"
                                   ]
                                 }
                               ]
@@ -17944,7 +17948,9 @@
                                                   "subscription:manage",
                                                   "seatRequests:view",
                                                   "seatRequests:manage",
-                                                  "members:view"
+                                                  "members:view",
+                                                  "braids:manage",
+                                                  "spans:braided"
                                                 ]
                                               }
                                             ]
@@ -18172,7 +18178,9 @@
                                             "subscription:manage",
                                             "seatRequests:view",
                                             "seatRequests:manage",
-                                            "members:view"
+                                            "members:view",
+                                            "braids:manage",
+                                            "spans:braided"
                                           ]
                                         }
                                       ]
@@ -18621,7 +18629,9 @@
                                         "subscription:manage",
                                         "seatRequests:view",
                                         "seatRequests:manage",
-                                        "members:view"
+                                        "members:view",
+                                        "braids:manage",
+                                        "spans:braided"
                                       ]
                                     }
                                   ]

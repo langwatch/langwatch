@@ -146,6 +146,7 @@ describe("the LangWatchQL catalog is opt-in", () => {
     const PINNED_VIEWS: readonly (readonly [string, string])[] = [
       ["traces", "trace_summaries"],
       ["spans", "stored_spans"],
+      ["span_metrics", "span_analytics"],
       ["evaluations", "evaluation_runs"],
       ["simulations", "simulation_runs"],
       ["trace_metrics", "trace_analytics"],
@@ -153,6 +154,8 @@ describe("the LangWatchQL catalog is opt-in", () => {
       ["model_usage_by_minute", "trace_analytics_rollup"],
       ["evaluation_metrics", "evaluation_analytics"],
       ["evaluation_metrics_by_minute", "evaluation_analytics_rollup"],
+      ["trace_evaluation_metrics", "trace_evaluation_analytics"],
+      ["trace_evaluation_checks", "trace_evaluation_analytics"],
       ["coding_sessions", "coding_agent_sessions"],
       ["coding_session_events", "coding_agent_session_events"],
       ["coding_tool_results", "stored_spans"],
@@ -277,10 +280,10 @@ describe("the LangWatchQL catalog is opt-in", () => {
     ];
 
     /** @scenario "The catalog view names match the pinned list" */
-    it("equals the pinned list of 130 views, in order", () => {
+    it("equals the pinned list of 133 views, in order", () => {
       const actual = LWQL_VIEW_CATALOG.map((view) => [view.name, view.sourceTable] as const);
       expect(actual).toEqual(PINNED_VIEWS);
-      expect(PINNED_VIEWS).toHaveLength(130);
+      expect(PINNED_VIEWS).toHaveLength(133);
     });
   });
 });

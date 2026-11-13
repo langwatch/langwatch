@@ -196,7 +196,12 @@ describe("given the People & access group", () => {
     it("offers Teams & projects right after Users, on the Users page's teams tab", () => {
       expect(
         accessHrefsIn({ hasOrganizationPermission: (p) => p === "organization:manage" }),
-      ).toEqual(["/settings/directory", "/settings/directory?tab=teams", "/settings/roles"]);
+      ).toEqual([
+        "/settings/directory",
+        "/settings/directory?tab=teams",
+        "/settings/roles",
+        "/settings/organization-braids",
+      ]);
     });
 
     /** @scenario "Teams & projects asks who may manage the organization the way its tab does" */
@@ -278,18 +283,23 @@ describe("given a plan that lacks Enterprise", () => {
   describe("when the menu is built", () => {
     /** @scenario "A plan without Enterprise sees its entries locked" */
     it("offers the enterprise entries locked", () => {
-      expect(lockedHrefsIn({ hasPermission: () => true })).toEqual([
+      expect(
+        lockedHrefsIn({ hasPermission: () => true, hasOrganizationPermission: () => true }),
+      ).toEqual([
         "/settings/audit-log",
         "/settings/roles",
+        "/settings/organization-braids",
+        "/settings/braids",
       ]);
     });
 
     /** @scenario "A plan without Enterprise sees its entries locked" */
     it("still hides an entry the reader lacks the permission for", () => {
-      expect(lockedHrefsIn({})).toEqual(["/settings/roles"]);
+      expect(lockedHrefsIn({})).toEqual(["/settings/roles", "/settings/braids"]);
       expect(lockedHrefsIn({ hasPermission: (p) => p === "auditLog:view" })).toEqual([
         "/settings/audit-log",
         "/settings/roles",
+        "/settings/braids",
       ]);
     });
 

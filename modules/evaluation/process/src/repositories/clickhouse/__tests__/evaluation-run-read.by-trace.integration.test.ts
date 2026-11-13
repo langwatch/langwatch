@@ -190,10 +190,10 @@ describe("given a trace whose evaluation runs are stored", () => {
         authorization: proof(),
         projectId: "tenant_member_a",
       });
-      expect(narrowed).not.toBeNull();
-      const result = narrowed
-        ? await reads.findByTraceId({ authorization: narrowed, traceId: SHARED_TRACE_ID })
-        : [];
+      const result = await reads.findByTraceId({
+        authorization: narrowed,
+        traceId: SHARED_TRACE_ID,
+      });
 
       expect(result.map((run) => run.evaluatorId)).toEqual(["monitor-a"]);
     });

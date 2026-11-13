@@ -211,8 +211,17 @@ func TestCatalogSeedsRealPriceIDs(t *testing.T) {
 		t.Fatalf("product not expanded: %v", seat["product"])
 	}
 	_, meters := g.stripe(http.MethodGet, "/v1/billing/meters", "limit=10")
-	m := meters["data"].([]any)[0].(map[string]any)
-	if m["id"] != eventsMtr || m["event_name"] != "langwatch_billable_events" {
+	// Meters are seeded from a map, so listing order is not fixed.
+	var m map[string]any
+	for _, candidate := range meters["data"].([]any) {
+		if c := candidate.(map[string]any); c["id"] == eventsMtr {
+			m = c
+		}
+	}
+	if m == nil {
+		t.Fatalf("meter %s not listed: %v", eventsMtr, meters["data"])
+	}
+	if m["event_name"] != "langwatch_billable_events" {
 		t.Fatalf("meter %v", m)
 	}
 }

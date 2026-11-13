@@ -647,12 +647,12 @@ Feature: Authorization grants
     And the platform is never an anonymous actor
 
   # ═══ Braid grants, read before they are written ═══════════════════════
-  # ADR-185 (Braids) writes a braid as a shared project-reader grant on a
+  # ADR-201 (Braids) writes a braid as a shared project-reader grant on a
   # span condition, with its compiled where and the braid a change replaces.
   # The release before it reads those facts, so a worker still on it during a
   # rolling upgrade folds a braid's attach rather than refusing and retrying
-  # it. It never honours one: braids are honoured from the release that ships
-  # their fence.
+  # it. Braids are honoured from the release that ships their fence
+  # (modules/authz/specs/braids.feature).
 
   @unit
   Scenario: A braid's attach is read before braids are written
@@ -689,13 +689,6 @@ Feature: Authorization grants
     When it is read back
     Then it names that braid
     And a later write of the same row naming another braid replaces it
-
-  @unit
-  Scenario: A braid is never honoured before the release that ships its fence
-    Given a reader project holding braids with and without a condition beside a trace read
-    When a proof is minted for the reader
-    Then the trace read is in the proof
-    And no braid is
 
   @integration
   Scenario: The aggregate reconciler never revokes or reattaches a braid

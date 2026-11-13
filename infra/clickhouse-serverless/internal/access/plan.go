@@ -99,7 +99,7 @@ func Plan(f *File, in Inputs, now time.Time) Planned {
 			}
 			user["auth_methods"] = methods
 		}
-		planExtras(&p, u, user)
+		planExtras(&p, u, user, in.Constraints)
 		p.Users[u.Name] = user
 	}
 	return p
