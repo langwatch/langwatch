@@ -15,6 +15,16 @@ function isSharedRuleCall(node) {
   );
 }
 
+/** `aws.build(options)` or `this.#aws.build(options)`: the @langwatch/aws-client transport. */
+function isTransportBuild(node) {
+  const { callee } = node;
+  if (callee.type !== "MemberExpression" || callee.computed) return false;
+  if (callee.property.name !== "build" || node.arguments.length === 0) return false;
+  const owner = callee.object;
+  const name = owner.type === "MemberExpression" ? owner.property.name : owner.name;
+  return name === "aws";
+}
+
 function propertyName(property) {
   if (property.computed) return undefined;
   if (property.key.type === "Identifier") return property.key.name;
@@ -69,9 +79,12 @@ const READERS = {
     if (node.operator === "&&") return { ...right, always: false };
     return eitherPath(optionsOf(context, node.left, depth + 1), right);
   },
-  // A builder such as aws.build(options) passes its first argument through.
+  // Only the AWS transport's build(options) is known to pass the region on; any other call
+  // may replace it, so its result is unreadable.
   CallExpression: (context, node, depth) =>
-    node.arguments.length === 0 ? NO_OPTIONS : optionsOf(context, node.arguments[0], depth + 1),
+    isTransportBuild(node)
+      ? optionsOf(context, node.arguments[0], depth + 1)
+      : { ...NO_OPTIONS, unreadable: node },
   Identifier: (context, node, depth) => {
     const init = constInitOf(context, node);
     return init ? optionsOf(context, init, depth + 1) : { ...NO_OPTIONS, unreadable: node };

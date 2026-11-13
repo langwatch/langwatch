@@ -60,6 +60,23 @@ new S3Client({ ...aws.build({ region, endpoint }), forcePathStyle: true });`;
         "unreadableOptions",
       ]);
     });
+
+    /** @scenario "An S3 client whose options the rule cannot read is reported" */
+    it("reports unreadableOptions for a helper call, which may replace the region", () => {
+      const code = `function makeOptions(options) { return { ...options, region: "auto" }; }
+new S3Client(makeOptions({ region: s3RegionOf(config) }));`;
+      expect(messageIds(code)).toEqual(["unreadableOptions"]);
+      const spread = "new S3Client({ ...makeOptions({ region: s3RegionOf(config) }) });";
+      expect(messageIds(spread)).toEqual(["unreadableOptions"]);
+    });
+
+    /** @scenario "A region from the shared rule is accepted" */
+    it("reads through the AWS transport's build, which passes the region on", () => {
+      const code = `const region = s3RegionOf(config);
+new S3Client({ ...aws.build({ region }) });
+new S3Client({ ...this.aws.build({ region }) });`;
+      expect(messageIds(code)).toEqual([]);
+    });
   });
 
   describe("when the options are bound to a name first", () => {

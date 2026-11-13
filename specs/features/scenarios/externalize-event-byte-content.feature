@@ -750,9 +750,10 @@ Feature: Externalize event byte content to stored_objects
 
   @unit
   Scenario: Helm chart passes the awsS3 provider's region to every process
-    Given the awsS3 dataplane provider with region "eu-north1"
+    Given the awsS3 dataplane provider with region.value "eu-north1"
     When the chart renders
     Then the app, the workers and every hook that carries the S3 settings carry S3_REGION=eu-north1
+    And a region.secretKeyRef reaches the same containers as a secret reference
     And with no region set no S3_REGION is rendered
 
   @unit

@@ -73960,7 +73960,8 @@ app:
       awsS3:
         # AWS only: your bucket's region (rendered as S3_REGION). Remove this
         # line for MinIO or other S3-compatible services.
-        region: "<your-bucket-region>"
+        region:
+          value: "<your-bucket-region>"
         accessKeyId:
           secretKeyRef: { name: "your-secret", key: "accessKeyId" }
         secretAccessKey:

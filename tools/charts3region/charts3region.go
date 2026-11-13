@@ -1,5 +1,5 @@
 // Package charts3region checks that the langwatch chart hands
-// app.dataplane.providers.awsS3.region to every process carrying the S3
+// app.dataplane.providers.awsS3.region (value or secretKeyRef) to every process carrying the S3
 // settings as S3_REGION, and renders no S3_REGION when it is unset, so the
 // shared region rule decides.
 //
@@ -29,8 +29,11 @@ const (
 // Region is the value the checks set and expect back.
 const Region = "eu-north1"
 
+// SecretRegion is how Values reports a region read from the secret s3, key region.
+const SecretRegion = "secret:s3/region"
+
 // awsS3Values renders the awsS3 provider with an endpoint and keys, the posture
-// R2 broke, plus the region line when region is not empty.
+// R2 broke, plus a region line when region (YAML for the field) is not empty.
 func awsS3Values(region string) string {
 	regionLine := ""
 	if region != "" {
@@ -55,12 +58,17 @@ type Check struct {
 	Expect Assertion
 }
 
-// Checks are the cases in order: region set, then region unset.
+// Checks are the cases in order: region as a value, from a secret, then unset.
 var Checks = []Check{
 	{
 		Name:   "the region reaches the app, the workers and every container with the S3 settings",
-		Values: awsS3Values(Region),
+		Values: awsS3Values("{ value: " + Region + " }"),
 		Expect: RegionEverywhere(Region),
+	},
+	{
+		Name:   "a region from a secret reaches every container with the S3 settings",
+		Values: awsS3Values("{ secretKeyRef: { name: s3, key: region } }"),
+		Expect: RegionEverywhere(SecretRegion),
 	},
 	{
 		Name:   "with no region set nothing renders S3_REGION",
@@ -93,21 +101,35 @@ type Container struct {
 	Env    []EnvVar
 }
 
-// EnvVar is one literal env entry.
+// EnvVar is one env entry, a literal value or a secret reference.
 type EnvVar struct {
-	Name  string `yaml:"name"`
-	Value string `yaml:"value"`
+	Name      string `yaml:"name"`
+	Value     string `yaml:"value"`
+	ValueFrom struct {
+		SecretKeyRef struct {
+			Name string `yaml:"name"`
+			Key  string `yaml:"key"`
+		} `yaml:"secretKeyRef"`
+	} `yaml:"valueFrom"`
 }
 
-// Values lists every value the container declares for name, in order.
+// Values lists every value the container declares for name, in order; a secret
+// reference reads as secret:<name>/<key>.
 func (c Container) Values(name string) []string {
 	var values []string
 	for _, env := range c.Env {
 		if env.Name == name {
-			values = append(values, env.Value)
+			values = append(values, env.literal())
 		}
 	}
 	return values
+}
+
+func (e EnvVar) literal() string {
+	if ref := e.ValueFrom.SecretKeyRef; ref.Name != "" {
+		return "secret:" + ref.Name + "/" + ref.Key
+	}
+	return e.Value
 }
 
 // Containers reads every container and init container of every rendered document.
