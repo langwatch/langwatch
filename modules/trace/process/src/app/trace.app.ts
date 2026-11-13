@@ -3846,9 +3846,9 @@ export class TraceModule implements TraceApi, CollectorApp {
   }
 
   /**
-   * `GET /api/traces/:traceId` for an API key: the trace, its evaluations and its address. An id
-   * the key's project does not hold is looked for in the organisation's other projects the key or
-   * its owner may read, then served from there or named (spec: trace-lookup-by-id.feature).
+   * `GET /api/traces/:traceId` for an API key. A miss is looked for only in the organisation's
+   * other projects the key itself may read and served from there; otherwise trace_not_found.
+   * Spec: trace-lookup-by-id.feature.
    */
   async getTraceByIdForApiKey(input: {
     projectId: string;

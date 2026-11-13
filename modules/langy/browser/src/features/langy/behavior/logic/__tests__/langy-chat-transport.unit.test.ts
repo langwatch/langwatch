@@ -467,7 +467,6 @@ describe("createLangyChatTransport", () => {
       onData: (entry: unknown) => void;
       onError: (err: unknown) => void;
       onComplete: () => void;
-      onConnectionStateChange?: (state: { state: string }) => void;
     };
     const handlersOf = (call: number) => subscription.mock.calls[call]![2] as StreamHandlers;
 
@@ -528,7 +527,6 @@ describe("createLangyChatTransport", () => {
     it("skips what a reopened connection replays", async () => {
       handlersOf(0).onData({ type: "delta", text: "one", cursor: "100-0" });
       handlersOf(0).onData({ type: "delta", text: "two", cursor: "100-1" });
-      handlersOf(0).onConnectionStateChange?.({ state: "pending" });
       handlersOf(0).onData({ type: "delta", text: "one", cursor: "100-0" });
       handlersOf(0).onData({ type: "delta", text: "two", cursor: "100-1" });
       handlersOf(0).onData({ type: "delta", text: "three", cursor: "101-0" });
