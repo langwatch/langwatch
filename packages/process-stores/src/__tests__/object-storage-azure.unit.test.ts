@@ -105,6 +105,34 @@ describe("given object storage on Azure Blob with an account key", () => {
     });
   });
 
+  describe("when a module asks whether an object exists", () => {
+    /** @scenario "Azure and filesystem existence checks read no body" */
+    it("sends one HEAD for the blob and answers true for a held one", async () => {
+      status = 200;
+
+      await expect(backend().exists(at)).resolves.toBe(true);
+      expect(received).toMatchObject([
+        { method: "HEAD", url: `/devstoreaccount1/objects/${at.key}` },
+      ]);
+    });
+
+    /** @scenario "Azure and filesystem existence checks read no body" */
+    it("answers false for a blob the container does not hold", async () => {
+      status = 404;
+
+      await expect(backend().exists(at)).resolves.toBe(false);
+    });
+
+    /** @scenario "Azure and filesystem existence checks read no body" */
+    it("fails on a refusal instead of answering false", async () => {
+      status = 403;
+
+      await expect(backend().exists(at)).rejects.toThrow(
+        /existence check was denied \(403\).*Storage Blob Data Contributor/,
+      );
+    });
+  });
+
   describe("when an upload URL is signed", () => {
     /** @scenario "An Azure upload URL is a SAS that may only create and write the one blob" */
     it("answers a blob SAS with create and write permission", async () => {

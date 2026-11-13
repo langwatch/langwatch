@@ -121,6 +121,7 @@ async function writeObject(options: {
         ContentType: facts.contentType,
       }),
       // The answer comes once the whole body is sent, so a wall clock would cap the upload's size.
+      // The handler's socketTimeout still cuts an upload that stops moving for S3_IDLE_MS.
       { requestTimeout: 0 },
     );
   } catch (error) {

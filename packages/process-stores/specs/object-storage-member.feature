@@ -121,6 +121,14 @@ Feature: The object-storage member
     Then the member sends a HEAD request and never a GET
     And it answers true for a held object and false for one S3 does not hold
 
+  @unit
+  Scenario: Azure and filesystem existence checks read no body
+    Given object storage on Azure Blob, or on the local filesystem
+    When a module asks whether an object exists
+    Then Azure sends a HEAD request and the filesystem reads only the file's metadata
+    And each answers true for a held object and false for an absent one
+    And a refusal other than absence fails the check instead of answering false
+
   @integration
   Scenario: A body a reader stops early gives its connection back
     Given object storage on S3 with a pool of 50 sockets
@@ -140,4 +148,11 @@ Feature: The object-storage member
     Given object storage on S3
     When an object's headers arrive and its bytes then stop for longer than the idle limit
     Then the read fails with a TimeoutError
+    And the connection is closed, so its socket returns to the pool
+
+  @integration
+  Scenario: An upload that stops moving is cut after the idle limit
+    Given an S3 client
+    When S3 stops taking an upload's bytes and never answers, for longer than the idle limit
+    Then the write fails with a TimeoutError
     And the connection is closed, so its socket returns to the pool

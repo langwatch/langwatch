@@ -82,7 +82,7 @@ function storageOn(endpoint: string): ObjectStorage {
 }
 
 interface ConfigurableHandler {
-  updateHttpClientConfig(key: "requestTimeout", value: number): void;
+  updateHttpClientConfig(key: "requestTimeout" | "socketTimeout", value: number): void;
 }
 
 function isConfigurable(handler: object): handler is ConfigurableHandler {
@@ -216,6 +216,34 @@ describe("given an S3 client with a short request timeout", () => {
           contentType: "text/plain",
         }),
       ).resolves.toMatchObject({ byteLength: 5 });
+    });
+  });
+});
+
+describe("given an S3 client with a short socket idle limit", () => {
+  describe("when S3 stops taking an upload's bytes and never answers", () => {
+    /** @scenario "An upload that stops moving is cut after the idle limit" */
+    it("fails the write with a timeout and closes the connection", async () => {
+      const stalled: IncomingMessage[] = [];
+      const s3 = await fakeS3((request) => stalled.push(request.pause()));
+      const client = s3Client({ bucket: "objects", endpoint: s3.endpoint, credentials });
+      const handler: object = client.config.requestHandler;
+      if (!isConfigurable(handler)) throw new Error("The S3 client holds no configurable handler.");
+      handler.updateHttpClientConfig("socketTimeout", 300);
+      const backend = s3Backend({ client, bucket: "objects", clock });
+      const size = 32 * 1024 * 1024;
+
+      const write = backend.write(at, Readable.from([Buffer.alloc(size, 97)]), {
+        byteLength: size,
+        contentType: "application/octet-stream",
+      });
+
+      await expect(within(write, 5_000, "the stalled upload")).rejects.toMatchObject({
+        name: "TimeoutError",
+      });
+      // A peer that reads nothing never sees the close, so read on: a live client keeps sending.
+      for (const request of stalled) request.resume();
+      await vi.waitFor(() => expect(s3.openSockets()).toBe(0), { timeout: 2_000 });
     });
   });
 });
