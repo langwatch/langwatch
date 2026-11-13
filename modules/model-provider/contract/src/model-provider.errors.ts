@@ -486,12 +486,20 @@ export class ModelDefaultUserKeyRequiredError extends HandledError {
   }
 }
 
-/** Keeps the established default-model validation envelope at the service boundary. */
+/**
+ * Keeps the established default-model validation envelope at the service boundary.
+ * The reason also goes in `meta.formErrors`: the wire message is replaced by the
+ * code, and that is the only place the `validation_error` presenter reads it from.
+ */
 export class ModelDefaultValidationError extends HandledError {
   declare readonly code: "validation_error";
 
   constructor(message: string) {
-    super("validation_error", message, { httpStatus: 422, fault: "customer" });
+    super("validation_error", message, {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { formErrors: [message] },
+    });
     this.name = "ModelDefaultValidationError";
   }
 }
