@@ -120,6 +120,7 @@ export type AttributedUserBudgetTemplate = {
   resetsAt: Instant;
   lastResetAt: Instant | null;
   cycleAnchorAt: Instant | null;
+  timezone: string | null;
 };
 
 /** When one budget's bucket last rolled over. */

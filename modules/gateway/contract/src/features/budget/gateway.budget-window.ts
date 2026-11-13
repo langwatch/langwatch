@@ -1,6 +1,7 @@
 /**
  * Budget window math. Pure functions — no DB, no I/O. Given a window type and an anchor time,
- * compute the next reset instant. For now windows are computed in UTC.
+ * compute the next reset instant. Calendar windows roll at midnight in the budget's timezone
+ * (UTC when it has none); anchored windows follow their anchor.
  */
 import { type Instant, nowInstant, Temporal, toEpochMs, type ZonedDateTime } from "@langwatch/time";
 
@@ -39,14 +40,23 @@ const NEVER_RESETS_AT = Temporal.PlainDateTime.from({ year: 9999, month: 12, day
   .toZonedDateTime(UTC)
   .toInstant();
 
-/** UTC wall clock for an instant. Every window boundary below is computed on it. */
+/** UTC wall clock for an instant. Anchored cycles are computed on it. */
 function utcClock(at: Instant): ZonedDateTime {
   return at.toZonedDateTimeISO(UTC);
 }
 
-/** `getUTCDay()`'s numbering — Sunday 0 through Saturday 6 — off a UTC clock. */
-function utcDayOfWeek(clock: ZonedDateTime): number {
-  return clock.dayOfWeek % 7;
+/**
+ * The IANA zone a budget's calendar windows roll in. Empty, missing or unknown names fall back
+ * to UTC, so a bad value on a row can never stop enforcement.
+ */
+export function resolveBudgetTimeZone(timezone: string | null | undefined): string {
+  const name = timezone?.trim();
+  if (!name) return UTC;
+  try {
+    return Temporal.Instant.fromEpochMilliseconds(0).toZonedDateTimeISO(name).timeZoneId;
+  } catch {
+    return UTC;
+  }
 }
 
 /**
@@ -167,24 +177,64 @@ export class GatewayWindow {
     return GatewayWindow.monthlyCycleStart({ anchorAt, cycles: elapsedMonths + 1 });
   }
 
-  static nextResetAt(window: GatewayBudgetWindow, now: Instant = nowInstant()): Instant {
-    const clock = utcClock(now).with({ millisecond: 0, microsecond: 0, nanosecond: 0 });
+  /**
+   * Start of the calendar period containing `now`, on the wall clock of `timezone`. Day, week
+   * (ISO, Monday) and month boundaries are local midnights, so a DST change gives a 23 or 25
+   * hour day instead of shifting the boundary.
+   */
+  static calendarPeriodStart({
+    window,
+    now = nowInstant(),
+    timezone,
+  }: {
+    window: GatewayBudgetWindow;
+    now?: Instant;
+    timezone?: string | null;
+  }): Instant {
+    const clock = now
+      .toZonedDateTimeISO(resolveBudgetTimeZone(timezone))
+      .with({ millisecond: 0, microsecond: 0, nanosecond: 0 });
+    switch (window) {
+      case "MINUTE":
+        return clock.with({ second: 0 }).toInstant();
+      case "HOUR":
+        return clock.with({ minute: 0, second: 0 }).toInstant();
+      case "DAY":
+        return clock.startOfDay().toInstant();
+      case "WEEK":
+        return clock
+          .toPlainDate()
+          .subtract({ days: clock.dayOfWeek - 1 })
+          .toZonedDateTime(clock.timeZoneId)
+          .toInstant();
+      case "MONTH":
+        return clock.toPlainDate().with({ day: 1 }).toZonedDateTime(clock.timeZoneId).toInstant();
+      case "TOTAL":
+      case "MANUAL":
+        return Temporal.Instant.fromEpochMilliseconds(0);
+    }
+  }
+
+  static nextResetAt(
+    window: GatewayBudgetWindow,
+    now: Instant = nowInstant(),
+    timezone?: string | null,
+  ): Instant {
+    const zone = resolveBudgetTimeZone(timezone);
+    const start = GatewayWindow.calendarPeriodStart({ window, now, timezone: zone });
+    const clock = start.toZonedDateTimeISO(zone);
 
     switch (window) {
       case "MINUTE":
-        return clock.with({ second: 0 }).add({ minutes: 1 }).toInstant();
+        return clock.add({ minutes: 1 }).toInstant();
       case "HOUR":
-        return clock.with({ minute: 0, second: 0 }).add({ hours: 1 }).toInstant();
+        return clock.add({ hours: 1 }).toInstant();
       case "DAY":
-        return clock.startOfDay().add({ days: 1 }).toInstant();
-      case "WEEK": {
-        // Reset on Monday 00:00 UTC. Sun=0, Mon=1, ..., Sat=6.
-        const day = utcDayOfWeek(clock);
-        const daysUntilNextMonday = day === 1 ? 7 : (8 - day) % 7;
-        return clock.startOfDay().add({ days: daysUntilNextMonday }).toInstant();
-      }
+        return clock.toPlainDate().add({ days: 1 }).toZonedDateTime(zone).toInstant();
+      case "WEEK":
+        return clock.toPlainDate().add({ days: 7 }).toZonedDateTime(zone).toInstant();
       case "MONTH":
-        return clock.startOfDay().with({ day: 1 }).add({ months: 1 }).toInstant();
+        return clock.toPlainDate().add({ months: 1 }).toZonedDateTime(zone).toInstant();
       case "TOTAL":
       case "MANUAL":
         // Neither rolls: TOTAL never resets, MANUAL moves only through an
@@ -202,7 +252,11 @@ export class GatewayWindow {
     budget,
     now = nowInstant(),
   }: {
-    budget: { window: GatewayBudgetWindow; cycleAnchorAt: Instant | null };
+    budget: {
+      window: GatewayBudgetWindow;
+      cycleAnchorAt: Instant | null;
+      timezone: string | null;
+    };
     now?: Instant;
   }): Instant {
     if (budget.cycleAnchorAt && GatewayWindow.isCyclicWindow(budget.window)) {
@@ -212,7 +266,7 @@ export class GatewayWindow {
         now,
       });
     }
-    return GatewayWindow.nextResetAt(budget.window, now);
+    return GatewayWindow.nextResetAt(budget.window, now, budget.timezone);
   }
 
   static shouldResetBudget(

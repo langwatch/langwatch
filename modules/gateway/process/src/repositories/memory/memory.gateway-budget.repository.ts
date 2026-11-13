@@ -423,7 +423,7 @@ export class MemoryGatewayBudgetRepository extends GatewayBudgetRepository {
           spentUsd: memoryGatewayDecimal("0"),
           currentPeriodStartedAt: now,
           resetsAt: GatewayWindow.nextBoundaryFor({
-            budget: { window: input.window, cycleAnchorAt },
+            budget: { window: input.window, cycleAnchorAt, timezone: input.timezone ?? null },
           }),
           lastResetAt: null,
           cycleAnchorAt,
@@ -561,7 +561,11 @@ export class MemoryGatewayBudgetRepository extends GatewayBudgetRepository {
       currentPeriodStartedAt: now,
       lastResetAt: now,
       resetsAt: GatewayWindow.nextBoundaryFor({
-        budget: { window: existing.window, cycleAnchorAt: existing.cycleAnchorAt },
+        budget: {
+          window: existing.window,
+          cycleAnchorAt: existing.cycleAnchorAt,
+          timezone: existing.timezone,
+        },
         now,
       }),
       spentUsd: memoryGatewayDecimal("0"),
@@ -676,6 +680,7 @@ export class MemoryGatewayBudgetRepository extends GatewayBudgetRepository {
         resetsAt: budget.resetsAt,
         lastResetAt: budget.lastResetAt,
         cycleAnchorAt: budget.cycleAnchorAt,
+        timezone: budget.timezone,
       }));
   }
 
