@@ -1,20 +1,11 @@
-// The condition, checked as it is typed: a refusal underlines where it starts and says the fix,
-// and an attribute the owner's spans carry is inserted at the cursor with the caret in its quotes.
+// The condition, coloured and checked as it is typed: a refusal is underlined in place, its fix in
+// one line below, and an attribute the owner's spans carry goes in at the cursor, caret in quotes.
 
 import { type BraidConditionCompileResult } from "@langwatch/authz-contract/braid-condition-compiler";
+import { ExpressionTextarea } from "@langwatch/design-system/expression-textarea";
 import { Menu } from "@langwatch/design-system/menu";
-import {
-  Alert,
-  Box,
-  Button,
-  Code,
-  Field,
-  HStack,
-  Stack,
-  Text,
-  Textarea,
-} from "@langwatch/design-system/primitives";
-import { ChevronDown, CircleCheck, Plus } from "lucide-react";
+import { Alert, Button, Field, HStack, Stack, Text } from "@langwatch/design-system/primitives";
+import { ChevronDown, Plus } from "lucide-react";
 import { type RefObject, useEffect, useRef, useState } from "react";
 
 import { insertAttribute } from "../../../../model/braids/braid-draft.ts";
@@ -31,34 +22,10 @@ export type BraidConditionFieldProps = {
   textareaRef?: RefObject<HTMLTextAreaElement | null>;
 };
 
-/** The text with the refused construct underlined from its offset to the next space. */
-function RefusedText({ text, at }: { text: string; at: number }) {
-  const end = Math.max(
-    at + 1,
-    text.slice(at).search(/\s/) === -1 ? text.length : at + text.slice(at).search(/\s/),
-  );
-  return (
-    <Code
-      display="block"
-      whiteSpace="pre-wrap"
-      fontVariantLigatures="none"
-      textStyle="sm"
-      padding={2}
-      data-testid="braid-condition-refused"
-    >
-      {text.slice(0, at)}
-      <Box
-        as="mark"
-        bg="transparent"
-        color="fg.error"
-        textDecoration="underline wavy"
-        textDecorationColor="fg.error"
-      >
-        {text.slice(at, end) || " "}
-      </Box>
-      {text.slice(end)}
-    </Code>
-  );
+/** Where a refusal's underline ends: the next space after its offset, or the text's end. */
+function refusedEnd({ text, at }: { text: string; at: number }): number {
+  const space = text.slice(at).search(/\s/);
+  return Math.max(at + 1, space === -1 ? text.length : at + space);
 }
 
 function CheckLine({
@@ -68,7 +35,6 @@ function CheckLine({
   held,
   ownerName,
   readerName,
-  verified,
 }: {
   check: BraidConditionCompileResult;
   empty: boolean;
@@ -76,7 +42,6 @@ function CheckLine({
   held: boolean;
   ownerName: string;
   readerName: string;
-  verified: boolean;
 }) {
   if (held) {
     return (
@@ -109,14 +74,7 @@ function CheckLine({
       </Alert.Root>
     );
   }
-  return (
-    <Field.HelperText color="fg.success" data-testid="braid-condition-check">
-      <HStack as="span" gap={1.5}>
-        <CircleCheck size={12} aria-hidden />
-        {verified ? "Looks good, signed calls only" : "Looks good"}
-      </HStack>
-    </Field.HelperText>
-  );
+  return null;
 }
 
 export function BraidConditionField(props: BraidConditionFieldProps) {
@@ -133,6 +91,10 @@ export function BraidConditionField(props: BraidConditionFieldProps) {
     inserted !== null &&
     inserted.where === props.value &&
     inserted.quoteAt === props.check.at;
+  const refusal =
+    !props.check.ok && !held
+      ? { at: props.check.at, end: refusedEnd({ text: props.value, at: props.check.at }) }
+      : undefined;
   useEffect(() => {
     if (caret === null || !textarea.current) return;
     textarea.current.focus();
@@ -148,7 +110,7 @@ export function BraidConditionField(props: BraidConditionFieldProps) {
   };
 
   return (
-    <Field.Root invalid={!props.check.ok && !held}>
+    <Field.Root invalid={refusal !== undefined}>
       <HStack justify="space-between" width="full">
         <Field.Label>
           Condition{" "}
@@ -191,7 +153,7 @@ export function BraidConditionField(props: BraidConditionFieldProps) {
           </Menu.Content>
         </Menu.Root>
       </HStack>
-      <Textarea
+      <ExpressionTextarea
         ref={textarea}
         aria-label="Condition"
         value={props.value}
@@ -200,16 +162,13 @@ export function BraidConditionField(props: BraidConditionFieldProps) {
           props.onChange(event.target.value);
         }}
         onBlur={() => setTouched(true)}
-        fontFamily="mono"
-        fontVariantLigatures="none"
-        textStyle="sm"
+        mark={refusal}
         rows={4}
         spellCheck={false}
         placeholder={'attributes["orchestrator"] == "web"'}
         data-testid="braid-condition"
       />
       <Stack gap={1.5} width="full">
-        {props.check.ok || held ? null : <RefusedText text={props.value} at={props.check.at} />}
         <CheckLine
           check={props.check}
           empty={props.value.trim().length === 0}
@@ -217,7 +176,6 @@ export function BraidConditionField(props: BraidConditionFieldProps) {
           held={held}
           ownerName={props.ownerName}
           readerName={props.readerName}
-          verified={props.verified}
         />
       </Stack>
     </Field.Root>

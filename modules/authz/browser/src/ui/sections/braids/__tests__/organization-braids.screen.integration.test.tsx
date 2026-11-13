@@ -60,6 +60,17 @@ describe("OrganizationBraidsScreen", () => {
       expect(host.successes[0]?.title).toBe("Braids are kept to organisation admins");
     });
 
+    /** @scenario An organisation admin chooses who may braid */
+    it("links the guide under the description, with no header buttons", () => {
+      renderAs();
+      const links = screen.getByTestId("braids-page-links");
+      expect(within(links).getByRole("link", { name: /How braids work/ })).toHaveAttribute(
+        "href",
+        "https://langwatch.ai/docs/features/braids",
+      );
+      expect(within(links).queryByTestId("braids-organization-link")).not.toBeInTheDocument();
+    });
+
     it("Below Enterprise the setting shows the upsell, not a dead control", () => {
       renderAs({ isEnterprise: false });
       expect(screen.getByTestId("braids-policy-upsell")).toHaveTextContent(

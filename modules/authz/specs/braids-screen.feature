@@ -21,8 +21,9 @@ Feature: The Braids screen
       Given "specialists" has no braids
       When ana opens Braids in the project settings
       Then the page says in one sentence what a braid does, with a link to the guide
-      And it offers New braid and a link to the guide in the page header
-      And it shows tabs for braids into other projects, braids from other projects and signing keys, each with its count
+      And the page header offers only the project switcher and New braid
+      And a quiet line under the page description links to the guide
+      And the Signing keys section follows, with no empty braid sections
 
     @integration
     Scenario: The project Braids page header offers the project switcher
@@ -58,21 +59,22 @@ Feature: The Braids screen
     Scenario: The dialog says what the reader already sees from this project
       Given a live braid from "specialists" into "orchestrator"
       When ana picks "orchestrator" for a new braid
-      Then the dialog says "orchestrator" already sees spans from 1 braid from "specialists"
-      And it shows that braid's condition and data window above the condition
+      Then one quiet line says there is 1 other braid into "orchestrator"
+      And showing it lists that braid's condition and data window above the condition
 
     @integration
     Scenario: A further braid on the same pair says what it adds
       Given a live braid from "specialists" into "orchestrator"
       When ana previews another braid from "specialists" into "orchestrator"
       Then the preview counts what "orchestrator" will see with both braids
-      And says how many more spans the new braid shows
+      And says how many more spans the new braid shows, or warns in one line when it adds none
 
     @integration
     Scenario: The condition is checked as it is typed
       When ana types attributes["orchestrator"] == "web" or attributes["team"] == "a"
-      Then the editor marks the or and explains how to write the condition instead
+      Then the editor underlines the or in place and explains in one line how to write the condition instead
       And the create button stays disabled until the condition is supported
+      And a supported condition gets no remark under the field
 
     @integration
     Scenario: The attributes this project's spans carry can be inserted into the condition
@@ -85,7 +87,7 @@ Feature: The Braids screen
       When ana turns on only signed calls
       Then Verified("orchestrator") is added to the condition
       And deleting it from the condition turns the switch off
-      And the switch says which key "orchestrator" signs with and when it was last used
+      And a key in use goes unmentioned, while a key that has never signed a call gets a one-line warning
 
     @integration
     Scenario: Only signed calls offers to set up signing when the reader has no key
@@ -97,7 +99,9 @@ Feature: The Braids screen
       When ana stops typing a supported condition
       Then the preview counts "orchestrator" traces over the last 7 days that get every, some or none of their "specialists" spans
       And with only signed calls on it counts the spans that stay hidden for having no valid signature
-      And it shows an example trace with the braided spans marked and the rest struck through, seen by ana only
+      And a compact legend on one line says how many traces get every, some or no spans
+      And without only signed calls one quiet line under the headline warns that anyone can set a tag
+      And an example trace, folded until ana opens it, marks the braided spans and strikes through the rest, seen by ana only
 
     @integration
     Scenario: Testing a trace shows it exactly as the reader will see it
@@ -139,6 +143,13 @@ Feature: The Braids screen
       And its menu offers Edit, View in audit log and Remove braid
       And View in audit log names both projects, never the braid's grant id
 
+    @integration
+    Scenario: A braid condition reads with syntax highlighting
+      Given a braid whose condition is attributes["orchestrator"] == "web" and Verified("orchestrator")
+      When ana reads it in the braids list, the pair's braids in the dialog or the condition editor
+      Then its fields, strings, operators, the joining word and the function call each take their own colour
+      And the whole condition is still its text, with the full condition as the title where it is cut
+
     @unit
     Scenario: View in audit log from the reader's side opens the owner's project
       Given a live braid from "specialists" into "orchestrator"
@@ -152,27 +163,29 @@ Feature: The Braids screen
       Then each row's From shows the time as well as the day
       And a braid alone on its pair shows only the day
 
+    @integration
+    Scenario: The page stacks its braids and signing keys in titled sections
+      Given a live braid from "specialists" into "orchestrator"
+      When ana opens Braids
+      Then the sections "Shown in other projects", "Shown here from other projects" and "Signing keys" follow one another
+      And each braid section names how many braids it holds
+      And an empty section says so in one muted line, with no empty-state illustration
+
     @unit
-    Scenario: A link opens the Braids page on its Signing keys tab
-      When a link names the Signing keys tab of another project's Braids page
-      Then the project switch opens that project and the page lands on Signing keys
+    Scenario: A link opens the Braids page at its Signing keys
+      When a link names the Signing keys section of another project's Braids page
+      Then the project switch opens that project and the page scrolls to Signing keys
 
     @integration
-    Scenario: The header's main action follows the open tab
-      Given ana may create braids
-      When ana opens the Signing keys tab
-      Then the header offers New signing key in place of New braid
-      And the key shows once on the tab, in its empty state
-
-    @integration
-    Scenario: The Braids page header opens New signing key on the Signing keys tab
-      When ana chooses New signing key in the page header
-      Then the signing keys panel opens its create dialog, once
+    Scenario: The Signing keys section opens New signing key
+      When ana chooses New signing key in the Signing keys section heading
+      Then the signing keys panel is asked to open its create dialog
+      And a member who cannot manage keys is offered no New signing key
 
     @integration
     Scenario: The project Braids page links to every braid in the organisation
       When ana opens Braids in the project settings
-      Then the page links to all braids in the organisation
+      Then a quiet line under the page description links to all braids in the organisation
       And a member who cannot open the organisation's Braids is offered no such link
 
     @integration
@@ -202,6 +215,7 @@ Feature: The Braids screen
     Scenario: An organisation admin chooses who may braid
       When ana opens Braids in the organisation settings
       Then every braid in the organisation is listed
+      And the guide is a quiet link under the page description, with no header buttons
       And a setting offers to keep braids to organisation admins, saying project admins can braid until it is on
 
     @integration
@@ -226,12 +240,6 @@ Feature: The Braids screen
       Given a live braid from "specialists" into "orchestrator"
       And the organisation has left Enterprise
       When ana opens Braids
-      Then a banner says braids are paused and start again on upgrade
+      Then a banner above the sections says braids are paused and start again on upgrade
       And each braid row is marked paused once, where its activity would be
-
-    @integration
-    Scenario: A paused page's empty tab points at the tab holding the braids
-      Given a live braid from "specialists" into "orchestrator"
-      And the organisation has left Enterprise
-      When ana opens braids from other projects
-      Then one line points to braids into other projects, with no empty-state illustration
+      And the Signing keys section says signing keys need the Enterprise plan, with no New signing key

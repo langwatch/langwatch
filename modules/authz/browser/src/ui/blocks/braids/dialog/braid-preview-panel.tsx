@@ -2,7 +2,6 @@
 // spans with the pair's live braids and this one, the spans this one adds, the calls held back for
 // want of a signature and an example trace; TestTrace runs one trace id, seen by you only.
 
-import { Banner } from "@langwatch/design-system/banner";
 import { Card } from "@langwatch/design-system/card";
 import { FeatureMark } from "@langwatch/design-system/feature-mark";
 import { MeterBar } from "@langwatch/design-system/meter-bar";
@@ -18,7 +17,8 @@ import {
   Text,
 } from "@langwatch/design-system/primitives";
 import { StatTileFigure } from "@langwatch/design-system/stat-tile";
-import { ChevronDown, ChevronUp, Plus, ShieldCheck, Users } from "lucide-react";
+import { ChevronDown, ChevronUp, Plus, ShieldCheck, TriangleAlert, Users } from "lucide-react";
+import type React from "react";
 import { useState } from "react";
 
 import type { TestTraceRow } from "../../../../model/braids/braid-draft.ts";
@@ -60,22 +60,24 @@ export type TestTraceProps = {
 
 const count = (value: number) => value.toLocaleString("en-GB");
 
-/** `track` is the meter's empty part: its swatch is outlined so it reads against the card. */
+/** One entry of the meter's inline legend; `track` is the empty part, its swatch outlined. */
 function Legend({
   colour,
   label,
+  title,
   value,
   track = false,
 }: {
   colour: string;
   label: string;
+  title: string;
   value: number;
   track?: boolean;
 }) {
   return (
-    <HStack gap={2} textStyle="sm">
+    <HStack as="span" gap={1} title={title}>
       <Box
-        boxSize="2.5"
+        boxSize="2"
         borderRadius="sm"
         bg={colour}
         borderWidth={track ? "1px" : undefined}
@@ -83,10 +85,7 @@ function Legend({
         flexShrink={0}
         aria-hidden
       />
-      <Text flex={1} color="fg.muted">
-        {label}
-      </Text>
-      <Text fontVariantNumeric="tabular-nums">{count(value)}</Text>
+      <Text as="span">{`${label} ${count(value)}`}</Text>
     </HStack>
   );
 }
@@ -95,10 +94,13 @@ function Counts({
   ownerName,
   readerName,
   traces,
+  hint,
 }: {
   ownerName: string;
   readerName: string;
   traces: BraidPreviewCounts;
+  /** One line under the headline, such as the unsigned-tag caution. */
+  hint?: React.ReactNode;
 }) {
   if (traces.total === 0) {
     return (
@@ -109,10 +111,11 @@ function Counts({
   }
   const share = (value: number) => value / traces.total;
   return (
-    <Stack gap={3} data-testid="braid-preview-counts">
+    <Stack gap={2} data-testid="braid-preview-counts">
       <StatTileFigure data-testid="braid-preview-figure">
         {`${count(traces.every + traces.some)} of ${count(traces.total)} traces`}
       </StatTileFigure>
+      {hint}
       <MeterBar
         width="full"
         height="2"
@@ -121,16 +124,33 @@ function Counts({
           { ratio: share(traces.some), color: "blue.muted" },
         ]}
       />
-      <Stack gap={1}>
-        <Legend colour="blue.solid" label={`All ${ownerName} spans show`} value={traces.every} />
-        <Legend colour="blue.muted" label={`Some ${ownerName} spans show`} value={traces.some} />
+      <HStack
+        gap={3}
+        textStyle="xs"
+        color="fg.muted"
+        fontVariantNumeric="tabular-nums"
+        data-testid="braid-preview-legend"
+      >
+        <Legend
+          colour="blue.solid"
+          label="All"
+          title={`All ${ownerName} spans show`}
+          value={traces.every}
+        />
+        <Legend
+          colour="blue.muted"
+          label="Some"
+          title={`Some ${ownerName} spans show`}
+          value={traces.some}
+        />
         <Legend
           colour="border.subtle"
           track
-          label={`No ${ownerName} spans show`}
+          label="None"
+          title={`No ${ownerName} spans show`}
           value={traces.none}
         />
-      </Stack>
+      </HStack>
       {traces.capped ? (
         <Text textStyle="xs" color="fg.muted" data-testid="braid-preview-capped">
           {`Counted over the most recent ${count(traces.total)} traces only; there are more.`}
@@ -192,30 +212,28 @@ function TraceRows({
   );
 }
 
-/** The preview's example trace; folded while a tested trace shows, until opened. */
+/** The preview's example trace: starts folded, and folds again when a trace is tested. */
 function ExampleTrace({ rows, folded }: { rows: TestTraceRow[]; folded: boolean }) {
   const [opened, setOpened] = useState(false);
-  const shown = !folded || opened;
+  const [wasFolded, setWasFolded] = useState(folded);
+  if (folded !== wasFolded) {
+    setWasFolded(folded);
+    if (folded) setOpened(false);
+  }
   return (
     <Stack gap={2}>
-      <HStack justify="space-between">
-        <Text fontWeight="medium" textStyle="sm">
-          An example trace
-        </Text>
-        {folded ? (
-          <Button
-            size="xs"
-            variant="ghost"
-            aria-expanded={shown}
-            onClick={() => setOpened(!opened)}
-            data-testid="braid-preview-example-toggle"
-          >
-            {shown ? <ChevronUp size={12} aria-hidden /> : <ChevronDown size={12} aria-hidden />}
-            {shown ? "Hide" : "Show"}
-          </Button>
-        ) : null}
-      </HStack>
-      {shown ? (
+      <Button
+        size="xs"
+        variant="ghost"
+        alignSelf="start"
+        aria-expanded={opened}
+        onClick={() => setOpened(!opened)}
+        data-testid="braid-preview-example-toggle"
+      >
+        {opened ? <ChevronUp size={12} aria-hidden /> : <ChevronDown size={12} aria-hidden />}
+        {opened ? "Hide the example trace" : "Show an example trace"}
+      </Button>
+      {opened ? (
         <TraceRows
           rows={rows}
           note="The newest trace in the last 7 days that gets spans. Only you see it."
@@ -321,13 +339,9 @@ export function BraidPreviewPanel(props: BraidPreviewPanelProps) {
             ownerName={props.ownerName}
             readerName={props.readerName ?? "The project"}
             traces={preview.traces}
+            hint={props.unsignedWarning ? <UnsignedHint reader={reader} /> : undefined}
           />
-          {preview.added ? (
-            <HStack gap={2} textStyle="sm" color="fg.muted" data-testid="braid-preview-added">
-              <Plus size={14} aria-hidden />
-              <Text>{addedPhrase(preview.added)}</Text>
-            </HStack>
-          ) : null}
+          {preview.added ? <AddedLine added={preview.added} /> : null}
           {preview.unsignedHidden !== null && preview.unsignedHidden > 0 ? (
             <HStack gap={2} textStyle="sm" color="fg.muted" data-testid="braid-preview-unsigned">
               <ShieldCheck size={14} aria-hidden />
@@ -339,11 +353,6 @@ export function BraidPreviewPanel(props: BraidPreviewPanelProps) {
           ) : null}
         </>
       ) : null}
-      {props.unsignedWarning ? (
-        <Banner status="warning" title="Anyone can set a tag">
-          {`Without signing, any caller that sets this tag can get spans shown in ${reader}.`}
-        </Banner>
-      ) : null}
       {props.viewers ? (
         <HStack gap={2} textStyle="sm" color="fg.muted" data-testid="braid-viewers">
           <Users size={14} aria-hidden />
@@ -351,6 +360,32 @@ export function BraidPreviewPanel(props: BraidPreviewPanelProps) {
         </HStack>
       ) : null}
     </Stack>
+  );
+}
+
+/** Without signing, a tag is only a claim: one quiet caution under the headline. */
+function UnsignedHint({ reader }: { reader: string }) {
+  return (
+    <HStack gap={1.5} textStyle="xs" color="fg.warning" data-testid="braid-preview-unsigned-hint">
+      <TriangleAlert size={12} aria-hidden />
+      <Text>{`Anyone can set a tag: without signing, any caller can get spans shown in ${reader}.`}</Text>
+    </HStack>
+  );
+}
+
+/** What this braid adds; adding nothing is the case worth a warning. */
+function AddedLine({ added }: { added: { spans: number; braids: number } }) {
+  const nothing = added.spans === 0;
+  return (
+    <HStack
+      gap={1.5}
+      textStyle={nothing ? "xs" : "sm"}
+      color={nothing ? "fg.warning" : "fg.muted"}
+      data-testid="braid-preview-added"
+    >
+      {nothing ? <TriangleAlert size={12} aria-hidden /> : <Plus size={14} aria-hidden />}
+      <Text>{addedPhrase(added)}</Text>
+    </HStack>
   );
 }
 

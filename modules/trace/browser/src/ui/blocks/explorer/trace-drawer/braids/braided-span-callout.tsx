@@ -1,7 +1,7 @@
 import { Link } from "@langwatch/browser-host/link";
 import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import { FeatureMark } from "@langwatch/design-system/feature-mark";
-import { InlineCode } from "@langwatch/design-system/inline-code";
+import { HighlightedExpression } from "@langwatch/design-system/highlighted-expression";
 import { Box, Text } from "@langwatch/design-system/primitives";
 import type { SpanBraid } from "@langwatch/trace-contract";
 import { Fragment } from "react";
@@ -54,15 +54,7 @@ function ShownBecause({ braid }: { braid: SpanBraid }) {
       {braid.matchedConditions.map((condition, index) => (
         <Fragment key={condition}>
           {index > 0 ? " or " : null}
-          <InlineCode
-            fontVariantLigatures="none"
-            display="inline"
-            whiteSpace="normal"
-            overflowWrap="break-word"
-            boxDecorationBreak="clone"
-          >
-            {condition}
-          </InlineCode>
+          <HighlightedExpression layout="wrap" code={condition} />
         </Fragment>
       ))}
       .

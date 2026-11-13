@@ -1,12 +1,9 @@
-// Only signed calls: the switch and `Verified("k")` in the condition are one setting. It names the
-// key the reader signs with, or says the reader does not sign yet and where to set it up.
+// Only signed calls: the switch and `Verified("k")` in the condition are one setting. It speaks up
+// only when signing is in the way: the reader has no key yet, or its key has never signed a call.
 
 import { Link } from "@langwatch/browser-host/link";
-import { InlineCode } from "@langwatch/design-system/inline-code";
-import { Alert, Box, HStack, Stack, Text } from "@langwatch/design-system/primitives";
+import { Alert, HStack, Stack, Text } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
-import { formatDistanceToNow } from "@langwatch/time";
-import { ShieldCheck } from "lucide-react";
 
 import { BRAIDS_GUIDE_HREF } from "../../../../model/braids/braids.ts";
 
@@ -25,6 +22,7 @@ export type BraidSignedCallsProps = {
   readerKeysHref?: string | undefined;
 };
 
+/** Says something only when signing is in the way: no key yet, or a key that never signed. */
 function SigningLine({
   readerName,
   signing,
@@ -36,43 +34,37 @@ function SigningLine({
   signing: ReaderSigning;
   keysHref: string | undefined;
 }) {
-  if (signing.state === "signs") {
-    const used = signing.lastUsedAt
-      ? `last used ${formatDistanceToNow(signing.lastUsedAt)} ago`
-      : "not used yet";
-    return (
-      <HStack gap={1.5} textStyle="sm" color="fg.muted" data-testid="braid-signing-key">
-        <Box as="span" color="fg.success" flexShrink={0}>
-          <ShieldCheck size={14} aria-hidden />
-        </Box>
-        <Text>{`${readerName} signs its calls · key “${signing.keyName}”, ${used}`}</Text>
-      </HStack>
-    );
-  }
-  if (signing.state === "none" && on) {
+  if (!on) return null;
+  if (signing.state === "signs" && signing.lastUsedAt === null) {
     return (
       <Alert.Root status="warning" size="sm" data-testid="braid-signing-key">
         <Alert.Indicator />
-        <Alert.Content>
-          <Alert.Title>{`${readerName} doesn't sign its calls yet, so nothing will show.`}</Alert.Title>
-          <Alert.Description>
-            {keysHref ? (
-              <Link href={keysHref} isExternal data-testid="braid-create-key">
-                Create a key (opens in a new tab)
-              </Link>
-            ) : (
-              `Create a key under Signing keys in ${readerName}'s Braids settings.`
-            )}
-            {" · "}
-            <Link href={`${BRAIDS_GUIDE_HREF}#signing`} isExternal>
-              How signing works
-            </Link>
-          </Alert.Description>
-        </Alert.Content>
+        <Alert.Title fontWeight="normal">
+          {`${readerName}'s key “${signing.keyName}” has not signed a call yet, so nothing shows until it does.`}
+        </Alert.Title>
       </Alert.Root>
     );
   }
-  return null;
+  if (signing.state !== "none") return null;
+  return (
+    <Alert.Root status="warning" size="sm" data-testid="braid-signing-key">
+      <Alert.Indicator />
+      <Alert.Title fontWeight="normal">
+        {`${readerName} doesn't sign its calls yet, so nothing will show. `}
+        {keysHref ? (
+          <Link href={keysHref} isExternal data-testid="braid-create-key">
+            Create a key (opens in a new tab)
+          </Link>
+        ) : (
+          `Create a key under Signing keys in ${readerName}'s Braids settings.`
+        )}
+        {" · "}
+        <Link href={`${BRAIDS_GUIDE_HREF}#signing`} isExternal>
+          How signing works
+        </Link>
+      </Alert.Title>
+    </Alert.Root>
+  );
 }
 
 export function BraidSignedCalls(props: BraidSignedCallsProps) {
@@ -86,9 +78,7 @@ export function BraidSignedCalls(props: BraidSignedCallsProps) {
             Only signed calls
           </Text>
           <Text textStyle="sm" color="fg.muted">
-            {`Show spans only when ${reader} really made the call. Adds `}
-            <InlineCode variant="neutral">{`Verified("${props.entryKey}")`}</InlineCode> to the
-            condition.
+            {`Show spans only when ${reader} really made the call.`}
           </Text>
         </Stack>
         <Switch

@@ -55,7 +55,10 @@ function renderAs({
   return renderWithAuthzHost(<BraidsScreen />, host);
 }
 
+const scrollIntoView = vi.fn();
+
 beforeEach(() => {
+  Element.prototype.scrollIntoView = scrollIntoView;
   const { state } = braidsFake;
   state.project = { intoOtherProjects: [], fromOtherProjects: [] };
   state.keptToAdmins = false;
@@ -87,13 +90,49 @@ describe("BraidsScreen", () => {
         "https://langwatch.ai/docs/features/braids",
       );
       expect(screen.getByRole("button", { name: /New braid/ })).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: /How braids work/ })).toHaveAttribute(
+      const links = screen.getByTestId("braids-page-links");
+      expect(within(links).getByRole("link", { name: /How braids work/ })).toHaveAttribute(
         "href",
         "https://langwatch.ai/docs/features/braids",
       );
-      expect(screen.getByRole("tab", { name: /Into other projects/ })).toHaveTextContent("0");
-      expect(screen.getByRole("tab", { name: /From other projects/ })).toHaveTextContent("0");
-      expect(screen.getByRole("tab", { name: /Signing keys/ })).toBeInTheDocument();
+      expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("braids-section-into")).not.toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Signing keys" })).toBeInTheDocument();
+    });
+
+    /** @scenario A project with no braids says what a braid does */
+    it("offers only the project switcher and New braid as header buttons", () => {
+      renderAs({
+        grants: new Set([...ADMIN, "organization:manage"]),
+        projectSwitcher: <button type="button">specialists</button>,
+      });
+      const header = screen.getByTestId("new-braid-header").parentElement;
+      expect(header).not.toBeNull();
+      expect(
+        within(header as HTMLElement)
+          .getAllByRole("button")
+          .map((button) => button.textContent),
+      ).toEqual(["specialists", "New braid"]);
+    });
+
+    /** @scenario The page stacks its braids and signing keys in titled sections */
+    it("The page stacks its braids and signing keys in titled sections", () => {
+      braidsFake.state.project = { intoOtherProjects: [liveBraid()], fromOtherProjects: [] };
+      renderAs();
+      expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual([
+        "Shown in other projects",
+        "Shown here from other projects",
+        "Signing keys",
+      ]);
+      expect(screen.getByTestId("braids-count-into")).toHaveTextContent("1");
+      expect(screen.getByTestId("braids-count-from")).toHaveTextContent("0");
+      expect(
+        within(screen.getByTestId("braids-section-into")).getByTestId("braid-row"),
+      ).toBeVisible();
+      expect(screen.getByTestId("braids-none-from")).toHaveTextContent(
+        "No project shows its spans in specialists yet.",
+      );
+      expect(screen.queryByTestId("braids-empty-into")).not.toBeInTheDocument();
     });
     /** @scenario Each braid row shows where it goes, its condition, its access and its activity */
     it("Each braid row shows where it goes, its condition, its access and its activity", async () => {
@@ -102,7 +141,7 @@ describe("BraidsScreen", () => {
       renderAs();
       const row = screen.getByTestId("braid-row");
       expect(within(row).getByText("orchestrator")).toBeInTheDocument();
-      expect(within(row).getByText('attributes["orchestrator"] == "web"')).toBeInTheDocument();
+      expect(within(row).getByTitle('attributes["orchestrator"] == "web"')).toBeInTheDocument();
       expect(within(row).getByTestId("braid-window-from")).toHaveTextContent(/^From .*2026$/);
       expect(within(row).getByTestId("braid-window-until")).toHaveTextContent(/^Until .*2026$/);
       expect(within(row).getByText(/^Created/)).toBeInTheDocument();
@@ -135,7 +174,6 @@ describe("BraidsScreen", () => {
       braidsFake.state.project = { intoOtherProjects: [], fromOtherProjects: [liveBraid()] };
       const user = userEvent.setup();
       renderAs({ projectId: "p-orch", structure: SLUGGED });
-      await user.click(screen.getByRole("tab", { name: /From other projects/ }));
       await user.click(
         within(await screen.findByTestId("braid-row")).getByTestId("braid-row-actions"),
       );
@@ -161,32 +199,32 @@ describe("BraidsScreen", () => {
       await waitFor(() => expect(host.successes[0]?.title).toBe("Braid removed"));
     });
 
-    /** @scenario The header's main action follows the open tab */
-    it("offers no New braid in the header on the Signing keys tab", async () => {
-      renderAs({ query: { tab: "keys" } });
-      expect(await screen.findByRole("tab", { name: /Signing keys/ })).toHaveAttribute(
-        "aria-selected",
-        "true",
-      );
-      expect(screen.queryByTestId("new-braid-header")).not.toBeInTheDocument();
-    });
-
-    /** @scenario The header's main action follows the open tab */
-    /** @scenario The Braids page header opens New signing key on the Signing keys tab */
-    it("offers New signing key in the header on the Signing keys tab, asking the panel for it", async () => {
-      const { host } = renderAs({ query: { tab: "keys" } });
+    /** @scenario The Signing keys section opens New signing key */
+    it("The Signing keys section opens New signing key", async () => {
+      const { host } = renderAs();
       const user = userEvent.setup();
 
-      await user.click(await screen.findByTestId("new-signing-key-header"));
+      await user.click(
+        within(screen.getByTestId("braids-section-keys")).getByRole("button", {
+          name: /New signing key/,
+        }),
+      );
 
-      expect(host.queries.at(-1)).toEqual({ tab: "keys", signingKey: "new" });
+      expect(host.queries.at(-1)).toEqual({ signingKey: "new" });
+    });
+
+    /** @scenario The Signing keys section opens New signing key */
+    it("offers no New signing key to whoever cannot manage keys", () => {
+      renderAs({ grants: MEMBER });
+      expect(screen.queryByTestId("new-signing-key")).not.toBeInTheDocument();
     });
 
     /** @scenario The project Braids page links to every braid in the organisation */
     it("links to every braid in the organisation for whoever may open that view", () => {
       renderAs({ grants: new Set([...ADMIN, "organization:manage"]) });
 
-      expect(screen.getByRole("link", { name: "All braids in Acme" })).toHaveAttribute(
+      const links = screen.getByTestId("braids-page-links");
+      expect(within(links).getByRole("link", { name: "All braids in Acme" })).toHaveAttribute(
         "href",
         "/settings/organization-braids",
       );
@@ -199,26 +237,11 @@ describe("BraidsScreen", () => {
       expect(screen.queryByTestId("braids-organization-link")).not.toBeInTheDocument();
     });
 
-    /** @scenario The header's main action follows the open tab */
-    it("offers New braid in the header on the Braids tab", async () => {
-      renderAs({});
-      expect(await screen.findByTestId("new-braid-header")).toBeInTheDocument();
-    });
-
-    it("opens on Signing keys when the link names that tab, and writes a picked tab back", async () => {
-      const { host } = renderAs({ query: { tab: "keys" } });
-
-      expect(await screen.findByRole("tab", { name: /Signing keys/ })).toHaveAttribute(
-        "aria-selected",
-        "true",
-      );
-      const user = userEvent.setup();
-      await user.click(screen.getByRole("tab", { name: /From other projects/ }));
-      expect(screen.getByRole("tab", { name: /From other projects/ })).toHaveAttribute(
-        "aria-selected",
-        "true",
-      );
-      expect(host.queries.at(-1)).toEqual({ tab: "from" });
+    it("scrolls to the section a link names, once the braids are in", async () => {
+      braidsFake.state.project = { intoOtherProjects: [liveBraid()], fromOtherProjects: [] };
+      renderAs({ query: { section: "keys" } });
+      const keys = screen.getByTestId("braids-section-keys");
+      await waitFor(() => expect(scrollIntoView.mock.contexts).toContain(keys));
     });
 
     /** @scenario The reader's admins may remove a braid from their side but not change it */
@@ -226,10 +249,9 @@ describe("BraidsScreen", () => {
       braidsFake.state.project = { intoOtherProjects: [], fromOtherProjects: [liveBraid()] };
       const user = userEvent.setup();
       renderAs({ projectId: "p-orch" });
-      await user.click(screen.getByRole("tab", { name: /From other projects/ }));
-      const row = await screen.findByTestId("braid-row");
+      const row = within(screen.getByTestId("braids-section-from")).getByTestId("braid-row");
       expect(within(row).getByText("specialists")).toBeInTheDocument();
-      expect(within(row).getByText('attributes["orchestrator"] == "web"')).toBeInTheDocument();
+      expect(within(row).getByTitle('attributes["orchestrator"] == "web"')).toBeInTheDocument();
       await user.click(within(row).getByTestId("braid-row-actions"));
       expect(await screen.findByRole("menuitem", { name: "Remove braid" })).toBeInTheDocument();
       expect(screen.queryByRole("menuitem", { name: "Edit" })).not.toBeInTheDocument();
@@ -282,7 +304,7 @@ describe("BraidsScreen", () => {
       expect(
         within(upsell).getByRole("link", { name: "Talk to us about Enterprise" }),
       ).toBeInTheDocument();
-      expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("braids-section-keys")).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /New braid/ })).not.toBeInTheDocument();
       expect(screen.getAllByRole("link", { name: /How braids work/ })).toHaveLength(1);
     });
@@ -294,23 +316,6 @@ describe("BraidsScreen", () => {
       const badge = screen.getByTestId("braids-enterprise-badge");
       expect(within(badge).getByLabelText("Enterprise")).toBeInTheDocument();
       expect(badge).not.toHaveTextContent("Enterprise");
-    });
-
-    /** @scenario A paused page's empty tab points at the tab holding the braids */
-    it("points an empty tab at the tab holding the braids, without the empty illustration", async () => {
-      braidsFake.state.project = { intoOtherProjects: [liveBraid()], fromOtherProjects: [] };
-      renderAs({ isEnterprise: false });
-      const user = userEvent.setup();
-
-      await user.click(screen.getByRole("tab", { name: /From other projects/ }));
-      const pointer = await screen.findByTestId("braids-on-other-tab");
-      expect(screen.queryByTestId("braids-empty-from")).not.toBeInTheDocument();
-      await user.click(within(pointer).getByRole("button", { name: "Into other projects" }));
-
-      expect(screen.getByRole("tab", { name: /Into other projects/ })).toHaveAttribute(
-        "aria-selected",
-        "true",
-      );
     });
 
     /** @scenario After leaving Enterprise the page says braids are paused and kept */
@@ -330,6 +335,9 @@ describe("BraidsScreen", () => {
         expect(within(row).queryByTestId("braid-activity")).not.toBeInTheDocument();
       }
       expect(screen.queryByRole("button", { name: /New braid/ })).not.toBeInTheDocument();
+      expect(screen.getByTestId("braids-none-from")).toBeInTheDocument();
+      expect(screen.getByTestId("braids-signing-keys-paused")).toBeInTheDocument();
+      expect(screen.queryByTestId("new-signing-key")).not.toBeInTheDocument();
     });
   });
 });

@@ -156,10 +156,10 @@ describe("the braid dialog", () => {
       await pickReader(user);
 
       const pair = screen.getByTestId("braid-pair-braids");
-      expect(pair).toHaveTextContent(
-        "orchestrator already sees spans from 1 braid from specialists",
-      );
-      expect(within(pair).getByText(CONDITION)).toBeInTheDocument();
+      expect(pair).toHaveTextContent("1 other braid into orchestrator");
+      expect(within(pair).queryByTitle(CONDITION)).toBeNull();
+      await user.click(within(pair).getByRole("button", { name: "Show" }));
+      expect(within(pair).getByTitle(CONDITION)).toBeInTheDocument();
       expect(pair).toHaveTextContent(/From .*2026 · No end date/);
     });
 
@@ -290,11 +290,15 @@ describe("the braid dialog", () => {
       await writeCondition(user, `${CONDITION} or attributes["team"] == "a"`);
 
       expect(screen.getByTestId("braid-condition-check")).toHaveAttribute("role", "alert");
-      expect(within(screen.getByTestId("braid-condition-refused")).getByText("or")).toBeVisible();
+      const marked = screen
+        .getByTestId("expression-textarea-highlight")
+        .querySelector("[data-mark]");
+      expect(marked).toHaveTextContent("or");
       expect(screen.getByTestId("braid-save")).toBeDisabled();
 
       await writeCondition(user, CONDITION);
-      expect(screen.getByTestId("braid-condition-check")).toHaveTextContent("Looks good");
+      // A supported condition needs no remark.
+      expect(screen.queryByTestId("braid-condition-check")).toBeNull();
       expect(screen.getByTestId("braid-save")).toBeEnabled();
     });
   });
@@ -349,7 +353,7 @@ describe("the braid dialog", () => {
       expect(screen.getByTestId("braid-condition")).toHaveValue(
         'attributes["orchestrator"] == "web"',
       );
-      expect(screen.getByTestId("braid-condition-check")).toHaveTextContent("Looks good");
+      expect(screen.queryByTestId("braid-condition-check")).toBeNull();
     });
 
     it("refuses the empty value once ana changes the text without filling it in", async () => {
@@ -372,7 +376,7 @@ describe("the braid dialog", () => {
 
   describe("when the reader has a signing key in use", () => {
     /** @scenario The signed calls switch and the condition stay in step */
-    it("adds and removes Verified with the switch and names the key", async () => {
+    it("adds and removes Verified with the switch and says nothing of a key in use", async () => {
       braidsFake.state.readerSigning = {
         keyName: "Production",
         lastUsedAt: "2026-10-22T09:00:00Z",
@@ -386,12 +390,25 @@ describe("the braid dialog", () => {
         `${CONDITION} and Verified("orchestrator")`,
       );
       expect(screen.getByRole("checkbox", { name: "Only signed calls" })).toBeChecked();
-      expect(screen.getByTestId("braid-signing-key")).toHaveTextContent(
-        /orchestrator signs its calls · key “Production”, last used .+ ago/,
-      );
+      // A key in use is not a problem, so nothing is said about it.
+      expect(screen.queryByTestId("braid-signing-key")).not.toBeInTheDocument();
 
       await writeCondition(user, CONDITION);
       expect(screen.getByRole("checkbox", { name: "Only signed calls" })).not.toBeChecked();
+    });
+  });
+
+  describe("when the reader's signing key has never signed a call", () => {
+    /** @scenario The signed calls switch and the condition stay in step */
+    it("warns in one line that nothing shows until the key signs", async () => {
+      braidsFake.state.readerSigning = { keyName: "Production", lastUsedAt: null };
+      const { user } = openDialog();
+      await pickReader(user);
+
+      await user.click(screen.getByRole("checkbox", { name: "Only signed calls" }));
+      expect(screen.getByTestId("braid-signing-key")).toHaveTextContent(
+        "orchestrator's key “Production” has not signed a call yet",
+      );
     });
   });
 
@@ -441,7 +458,7 @@ describe("the braid dialog", () => {
       expect(create).toHaveAttribute("target", "_blank");
       expect(create).toHaveAttribute(
         "href",
-        "/orchestrator-x1?return_to=%2Fsettings%2Fbraids%3Ftab%3Dkeys",
+        "/orchestrator-x1?return_to=%2Fsettings%2Fbraids%3Fsection%3Dkeys",
       );
       expect(within(line).getByRole("link", { name: "How signing works" })).toBeInTheDocument();
     });
@@ -460,7 +477,10 @@ describe("the braid dialog", () => {
 
       const counts = await screen.findByTestId("braid-preview-counts");
       expect(screen.getByTestId("braid-preview-figure")).toHaveTextContent("1,500 of 4,902");
-      expect(counts).toHaveTextContent("All specialists spans show1,200");
+      expect(within(counts).getByTestId("braid-preview-legend")).toHaveTextContent(
+        "All 1,200Some 300None 3,402",
+      );
+      expect(within(counts).getByTitle("All specialists spans show")).toBeInTheDocument();
       expect(screen.getByTestId("braid-preview-capped")).toBeInTheDocument();
       expect(screen.getByTestId("braid-preview-unsigned")).toHaveTextContent(
         "37 spans had no valid signature and stay hidden.",
@@ -469,6 +489,7 @@ describe("the braid dialog", () => {
         expect.objectContaining({ projectId: "p-spec", readerProjectId: "p-orch" }),
       );
       expect(screen.queryByTestId("braid-preview-added")).toBeNull();
+      expect(screen.queryByTestId("braid-preview-unsigned-hint")).toBeNull();
     });
 
     /** @scenario The preview counts what the reader will see as the condition changes */
@@ -488,7 +509,11 @@ describe("the braid dialog", () => {
       await pickReader(user);
       await writeCondition(user, CONDITION);
 
-      const example = await screen.findByTestId("braid-preview-example");
+      expect(await screen.findByTestId("braid-preview-unsigned-hint")).toHaveTextContent(
+        "Anyone can set a tag",
+      );
+      await user.click(await screen.findByRole("button", { name: "Show an example trace" }));
+      const example = screen.getByTestId("braid-preview-example");
       expect(example).toHaveTextContent("Only you see it.");
       const spans = within(example).getAllByTestId("braid-example-span");
       expect(spans.map((row) => row.dataset.kind)).toEqual(["own", "braided", "withheld"]);
@@ -503,7 +528,7 @@ describe("the braid dialog", () => {
       await writeCondition(user, CONDITION);
 
       await screen.findByTestId("braid-preview-counts");
-      expect(screen.queryByTestId("braid-preview-example")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Show an example trace" })).toBeNull();
     });
 
     it("says the reader has no traces to count instead of counting none of none", async () => {
@@ -535,14 +560,16 @@ describe("the braid dialog", () => {
       const { user } = openDialog();
       await pickReader(user);
       await writeCondition(user, CONDITION);
-      expect(await screen.findByTestId("braid-preview-example")).toBeInTheDocument();
+      expect(screen.queryByTestId("braid-preview-example")).toBeNull();
+      await user.click(await screen.findByRole("button", { name: "Show an example trace" }));
+      expect(screen.getByTestId("braid-preview-example")).toBeInTheDocument();
 
       await user.type(screen.getByRole("textbox", { name: "Trace id" }), "4bf92f3577b34da6");
       await user.click(screen.getByTestId("braid-test"));
 
       expect(await screen.findByTestId("braid-test-trace")).toBeInTheDocument();
       expect(screen.queryByTestId("braid-preview-example")).toBeNull();
-      await user.click(screen.getByRole("button", { name: "Show" }));
+      await user.click(screen.getByRole("button", { name: "Show an example trace" }));
       expect(screen.getByTestId("braid-preview-example")).toBeInTheDocument();
     });
 
