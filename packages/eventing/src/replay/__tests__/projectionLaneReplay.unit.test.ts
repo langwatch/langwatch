@@ -309,6 +309,46 @@ function setUp() {
   return { redis, readModel, otherReadModel, writes, log, replayer };
 }
 
+/** ClickHouse's refusal for one statement over its own memory limit, as the client raises it. */
+const queryMemoryLimitError = () =>
+  Object.assign(
+    new Error(
+      "Query memory limit exceeded: would use 4.76 GiB (attempt to allocate chunk of 4.00 MiB), maximum: 4.66 GiB",
+    ),
+    { code: "241" },
+  );
+
+/** Fails the log's event query for any batch over `maxAggregates`, after `eventsFirst` events. */
+function failStreamsAbove({
+  log,
+  maxAggregates,
+  eventsFirst = 0,
+  failure = queryMemoryLimitError,
+}: {
+  log: SeededLog;
+  maxAggregates: number;
+  eventsFirst?: number;
+  failure?: () => Error;
+}): { streamed: number[] } {
+  const stream = log.streamEventsForAggregates.bind(log);
+  const streamed: number[] = [];
+  log.streamEventsForAggregates = async (input) => {
+    streamed.push(input.aggregateIds.length);
+    if (input.aggregateIds.length <= maxAggregates) return stream(input);
+    let yielded = 0;
+    await stream({
+      ...input,
+      onEvent: async (event) => {
+        if (yielded >= eventsFirst) throw failure();
+        yielded++;
+        await input.onEvent(event);
+      },
+    });
+    throw failure();
+  };
+  return { streamed };
+}
+
 describe("projectionLaneReplayer", () => {
   describe("given an empty read model and a seeded owner's log", () => {
     /** @scenario "A replay step fills an empty read model from its owner's log" */
@@ -550,6 +590,72 @@ describe("projectionLaneReplayer", () => {
 
       expect(second.aggregatesReplayed).toBe(1);
       expect(readModel.get("directory-a")).toBe(2);
+    });
+  });
+
+  describe("given a batch whose event query outgrows ClickHouse's per-query memory limit", () => {
+    /** @scenario "A batch over the query memory limit is split until it fits" */
+    it("replays the batch as halves and folds each aggregate as a clean replay does", async () => {
+      const clean = setUp();
+      await clean.replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false });
+      const { log, readModel, replayer } = setUp();
+      const { streamed } = failStreamsAbove({ log, maxAggregates: 1 });
+
+      const result = await replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false });
+
+      expect(streamed).toEqual([2, 1, 1]);
+      expect(Object.fromEntries(readModel)).toEqual(Object.fromEntries(clean.readModel));
+      expect(result).toMatchObject({ aggregatesReplayed: 2, totalEvents: 3 });
+    });
+
+    /** @scenario "A batch that hits the query memory limit mid-stream is not applied twice" */
+    it("writes nothing of the failed attempt when the limit lands after some events", async () => {
+      const clean = setUp();
+      await clean.replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false });
+      const { log, readModel, writes, replayer } = setUp();
+      failStreamsAbove({ log, maxAggregates: 1, eventsFirst: 1 });
+
+      await replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false });
+
+      expect(Object.fromEntries(readModel)).toEqual(Object.fromEntries(clean.readModel));
+      expect(writes.count).toBe(clean.writes.count);
+    });
+
+    /** @scenario "A single aggregate still over the query memory limit fails the lane by name" */
+    it("fails the lane with the original error, naming the aggregate but not its tenant", async () => {
+      const { log, replayer } = setUp();
+      const { streamed } = failStreamsAbove({ log, maxAggregates: 0 });
+
+      const failure: unknown = await replayer
+        .replayLane({ lane: LANE, since: FROM_START, dryRun: false })
+        .catch((error: unknown) => error);
+
+      expect(streamed).toEqual([2, 1]);
+      expect(failure).toBeInstanceOf(Error);
+      const message = failure instanceof Error ? failure.message : "";
+      expect(message).toContain(`Replaying "${LANE}" failed in 1 batch(es): `);
+      expect(message).toContain(queryMemoryLimitError().message);
+      expect(message).toContain("directory directory-a");
+      expect(message).not.toContain("tenant-1");
+    });
+  });
+
+  describe("given a batch whose event query fails for another reason", () => {
+    /** @scenario "A batch failing for any other reason fails the lane without splitting" */
+    it("fails the lane on that batch without replaying a half", async () => {
+      const { log, readModel, replayer } = setUp();
+      const { streamed } = failStreamsAbove({
+        log,
+        maxAggregates: 0,
+        failure: () => new Error("the log's connection dropped"),
+      });
+
+      await expect(
+        replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false }),
+      ).rejects.toThrow(`Replaying "${LANE}" failed in 1 batch(es): the log's connection dropped`);
+
+      expect(streamed).toEqual([2]);
+      expect(readModel.size).toBe(0);
     });
   });
 });
