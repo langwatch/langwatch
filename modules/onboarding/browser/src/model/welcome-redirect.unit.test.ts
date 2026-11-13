@@ -119,4 +119,17 @@ describe("resolveWelcomeRedirect", () => {
       ).toEqual({ kind: "onboard" });
     });
   });
+
+  describe("when a member asks for a new organization", () => {
+    /** @scenario A member who asks for a new organization is onboarded */
+    it("onboards them even though they already belong to an organization", () => {
+      expect(
+        resolveWelcomeRedirect({
+          organizations: [org("LLM_OPS", [{ isPersonal: false, projects: [{ slug: "demo" }] }])],
+          currentProjectSlug: "demo",
+          wantsNewOrganization: true,
+        }),
+      ).toEqual({ kind: "onboard" });
+    });
+  });
 });

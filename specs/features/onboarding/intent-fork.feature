@@ -151,6 +151,13 @@ Feature: Onboarding forks on declared intent — Agent Governance vs LLMOps
       When the welcome screen decides where they go
       Then they are sent to organization creation
 
+    @unit
+    Scenario: A member who asks for a new organization is onboarded
+      Given the user belongs to an organization with a shared project
+      And they came from "New organization" in the organization menu
+      When the welcome screen decides where they go
+      Then they are sent to organization creation
+
   Rule: the governance track provisions the signer's personal workspace
 
     # Coding-agent usage lands in a personal workspace, so /me is empty until

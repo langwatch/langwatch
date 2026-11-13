@@ -3,6 +3,9 @@
  * ADR-038 v6).
  */
 
+/** Query flag on /onboarding/welcome: a member of an organization asked to create another one. */
+export const NEW_ORGANIZATION_PARAM = "new_organization";
+
 interface WelcomeOrg {
   primaryIntent: string | null;
   teams: readonly {
@@ -19,10 +22,15 @@ export type WelcomeRedirectDecision =
 export function resolveWelcomeRedirect({
   organizations,
   currentProjectSlug,
+  wantsNewOrganization = false,
 }: {
   organizations: readonly WelcomeOrg[] | undefined;
   currentProjectSlug: string | null;
+  /** The member asked for another organization from the organization menu. */
+  wantsNewOrganization?: boolean;
 }): WelcomeRedirectDecision {
+  if (wantsNewOrganization) return { kind: "onboard" };
+
   const sharedTeams = (org: WelcomeOrg) => org.teams.filter((t) => !t.isPersonal);
 
   const hasAnyProject =

@@ -4,7 +4,7 @@ import { Box, HStack, VStack } from "@langwatch/design-system/primitives";
 import { guidedPathLanding } from "@langwatch/onboarding-contract";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
-import { type ComponentProps, useEffect, useMemo, useRef, useState } from "react";
+import { type ComponentProps, useEffect, useRef, useState } from "react";
 
 import { api } from "../../behavior/onboarding-api.ts";
 import { registerOnboardingExperiment } from "../../behavior/onboarding-experiment-registration.ts";
@@ -30,6 +30,7 @@ import { TAKEOVER_FADE_MS } from "../../features/guided-onboarding/ui/takeover/t
 import { getSafeReturnToPath } from "../../model/get-safe-return-to-path.ts";
 import { useOnboardingHost } from "../../model/onboarding-host.ts";
 import {
+  NEW_ORGANIZATION_PARAM,
   resolveWelcomeRedirect,
   type WelcomeRedirectDecision,
 } from "../../model/welcome-redirect.ts";
@@ -224,6 +225,26 @@ const SCREEN_SLIDE_VARIANTS = {
   }),
 };
 
+/**
+ * A guided organization whose takeover is unfinished resumes from the durable state instead of
+ * being sent into the product. A member asking for a new organization resumes only the one this
+ * page created, never one they already had.
+ */
+function resolveWelcomeResume({
+  organizations,
+  wantsNewOrganization,
+  createdOrganizationId,
+}: {
+  organizations: Parameters<typeof resolveGuidedResume>[0]["organizations"];
+  wantsNewOrganization: boolean;
+  createdOrganizationId: string | undefined;
+}) {
+  if (!wantsNewOrganization) return resolveGuidedResume({ organizations });
+  return resolveGuidedResume({
+    organizations: organizations?.filter((org) => org.id === createdOrganizationId),
+  });
+}
+
 function splitGuidedResume(resume: ReturnType<typeof resolveGuidedResume>) {
   if (resume?.phase !== "landing") return { takeover: resume, landing: null };
   return {
@@ -274,15 +295,19 @@ export const WelcomeScreen: React.FC = () => {
   const { created, leavingCard, isCreating, createGuidedOrganization } =
     useGuidedOrganizationCreate({ getFormData, navigation, fadeMs: TAKEOVER_FADE_MS });
 
-  // A guided organization whose takeover is unfinished resumes from the durable state instead of
-  // being sent into the product; with the provider recorded, the resume is the landing.
-  const resume = useMemo(() => resolveGuidedResume({ organizations }), [organizations]);
-  const { takeover, landing } = splitGuidedResume(resume);
-
   // Same-origin continuation (e.g. the CLI device-approval page sends a
   // fresh signup here with return_to=/cli/auth?user_code=… so the approval
   // survives onboarding). Only relative in-app paths are honored.
   const returnTo = getSafeReturnToPath(router.query.return_to);
+  // Set by "New organization" in the organization menu: a member creating another one.
+  const wantsNewOrganization = router.query[NEW_ORGANIZATION_PARAM] === "1";
+
+  const resume = resolveWelcomeResume({
+    organizations,
+    wantsNewOrganization,
+    createdOrganizationId: created?.organizationId,
+  });
+  const { takeover, landing } = splitGuidedResume(resume);
 
   useEffect(() => {
     // Nothing is decided while the org data loads, nor for the organization this page just
@@ -294,6 +319,7 @@ export const WelcomeScreen: React.FC = () => {
       : resolveWelcomeRedirect({
           organizations,
           currentProjectSlug: project?.slug ?? null,
+          wantsNewOrganization,
         });
 
     if (decision.kind === "onboard") {
@@ -313,6 +339,7 @@ export const WelcomeScreen: React.FC = () => {
     takeover,
     landing,
     router,
+    wantsNewOrganization,
   ]);
 
   function handleFinalizeSubmit() {
