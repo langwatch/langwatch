@@ -113,3 +113,17 @@ Feature: The object-storage member
     Given object storage on Azure Blob
     When a key segment holds a space, "?", "#" or "%"
     Then the request and the signed URL name the blob with each segment percent-encoded
+
+  @unit
+  Scenario: An S3 read that gets no answer is refused at its deadline
+    Given object storage on an S3 endpoint that takes the request and never answers
+    When a module reads an object
+    Then the read is refused with a TimeoutError once the answer deadline passes
+    And it does not wait for the endpoint forever
+
+  @unit
+  Scenario: An S3 read body that stops arriving is cut once it goes idle
+    Given object storage on an S3 endpoint that sends an object's headers and then stalls
+    When a module reads the object and the body stays idle past the idle timeout
+    Then the body is destroyed with a TimeoutError
+    And its socket goes back to the pool rather than staying held

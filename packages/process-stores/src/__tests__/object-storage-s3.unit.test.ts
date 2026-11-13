@@ -138,7 +138,8 @@ describe("given object storage on S3", () => {
       await new Promise((resolve) => stalled?.close(resolve));
     });
 
-    it("arms an idle timeout on a body S3 stops sending, since the client's own never does", async () => {
+    /** @scenario "An S3 read body that stops arriving is cut once it goes idle" */
+    it("cuts a body S3 stops sending once it goes idle, since the client's own timeout never does", async () => {
       stalled = createServer((_request, response) => {
         response.writeHead(200, { "Content-Length": "10" });
         response.write("abc");
@@ -148,12 +149,18 @@ describe("given object storage on S3", () => {
       const client = s3Client({ ...account, endpoint: `http://127.0.0.1:${port}` });
       const backend = s3Backend({ client, bucket: "objects", clock });
 
-      const body = await backend.read(at);
+      const body = (await backend.read(at)) as IncomingMessage;
+      const failed = new Promise<unknown>((resolve) => body.once("error", resolve));
+      body.resume();
 
-      expect((body as IncomingMessage).socket?.timeout).toBe(S3_SOCKET_IDLE_TIMEOUT_MS);
-      (body as IncomingMessage).destroy();
+      expect(body.socket?.timeout).toBe(S3_SOCKET_IDLE_TIMEOUT_MS);
+      // The socket's own idle timer, fired now rather than a minute from now.
+      body.socket?.emit("timeout");
+      await expect(failed).resolves.toMatchObject({ name: "TimeoutError" });
+      expect(body.destroyed).toBe(true);
     });
 
+    /** @scenario "An S3 read that gets no answer is refused at its deadline" */
     it("refuses the read once the answer deadline passes, instead of waiting forever", async () => {
       stalled = createServer(() => void 0);
       await new Promise<void>((resolve) => stalled?.listen(0, "127.0.0.1", resolve));

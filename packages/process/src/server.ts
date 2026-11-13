@@ -480,10 +480,10 @@ export class Server {
     const settled = Promise.allSettled(this.handlers).then(() => true as const);
     const unwindExpired = delay(HANDLER_UNWIND_MS, false as const, { ref: false });
     if (await Promise.race([settled, unwindExpired])) return;
-    this.logger.warn?.(
-      { unwindMs: HANDLER_UNWIND_MS, handlers: this.handlers.size },
-      `${this.name}: handlers still running after their requests were cut; the stores close under them`,
-    );
+    const fields = { unwindMs: HANDLER_UNWIND_MS, handlers: this.handlers.size };
+    const line = `${this.name}: handlers still running after their requests were cut; the stores close under them`;
+    if (this.logger.warn) this.logger.warn(fields, line);
+    else this.logger.info(fields, line);
   }
 
   /**

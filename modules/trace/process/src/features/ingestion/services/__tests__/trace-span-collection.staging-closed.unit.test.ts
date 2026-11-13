@@ -98,6 +98,7 @@ const stagingClosed = () =>
   new QueueStagingClosedError({ queueName: "{event-sourcing/jobs}", operation: "sendEach" });
 
 describe("given shutdown closed queue staging while a request was still handing off spans", () => {
+  /** @scenario "Spans refused because shutdown closed queue staging are logged once per request" */
   it("fails every span and logs the request once, at warn", async () => {
     const { service, lines } = collecting(stagingClosed);
 
@@ -112,6 +113,7 @@ describe("given shutdown closed queue staging while a request was still handing 
     ]);
   });
 
+  /** @scenario "Spans refused because shutdown closed queue staging are logged once per request" */
   it("logs a single span's refusal once, at warn", async () => {
     const { service, lines } = collecting(stagingClosed);
 
@@ -123,6 +125,7 @@ describe("given shutdown closed queue staging while a request was still handing 
 });
 
 describe("given the hand-off fails for any other reason", () => {
+  /** @scenario "Spans the pipeline fails for any other reason are each logged as an error" */
   it("still logs each span at error", async () => {
     const { service, lines } = collecting(() => new Error("redis unreachable"));
 

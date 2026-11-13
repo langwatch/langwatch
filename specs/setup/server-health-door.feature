@@ -110,7 +110,7 @@ Feature: The process boundary's built-in health door
     Scenario: A handler cut at the drain grace gets a short unwind before the stores close
       Given an application request outlives the drain grace
       When the server cuts its response
-      Then the handler's request signal is aborted
+      Then the handler sees its response closed
       And the components stop only once the handler settles, or the unwind budget runs out
 
     @unit
