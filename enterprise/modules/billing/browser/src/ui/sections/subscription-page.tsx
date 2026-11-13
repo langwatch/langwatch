@@ -534,6 +534,7 @@ export function SubscriptionPage() {
         isLoading={organizationWithMembers.isLoading}
         mode={drawerMode}
         inUse={seatUsageN}
+        developersInUse={usage.data?.membersDeveloperCount ?? 0}
         held={heldSeats}
         price={seatPrice}
         onInvite={seatPurchase.invite}

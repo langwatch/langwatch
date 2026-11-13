@@ -28,7 +28,9 @@ import { seatQuoteOf } from "../../model/seat-change-summary.ts";
 import {
   billingDayOrUndefined,
   type DeveloperSeatPlan,
+  developerMinimumHint,
   developerSeatHint,
+  developerSeatMinimum,
   freeSeatPlan,
   type GrowthSeatPlan,
   growthMinimumSeats,
@@ -124,6 +126,7 @@ export function UserManagementDrawer({
   isLoading,
   mode,
   inUse,
+  developersInUse,
   held,
   price,
   onInvite,
@@ -139,6 +142,8 @@ export function UserManagementDrawer({
   mode: SeatDrawerMode;
   /** Full seats held now, members and open invites as enforcement counts them. */
   inUse: number;
+  /** Developer seats held now, members and open invites, the floor the server enforces. */
+  developersInUse: number;
   /** Of `inUse`, the seats held for people who left a full seat, as the server lists them. */
   held: HeldSeats;
   price: SeatPrice;
@@ -163,6 +168,7 @@ export function UserManagementDrawer({
     open,
     mode: mode.kind === "growth" ? mode : undefined,
     inUse,
+    developersInUse,
     held,
     invites: emails.length,
     price,
@@ -453,11 +459,19 @@ function OtherSeatTypes({ growth, price }: { growth: GrowthSeats; price: SeatPri
               </VStack>
               <SeatStepper
                 value={developer.target}
-                minimum={0}
+                minimum={growth.developerMinimum}
                 onChange={growth.setDeveloperTarget}
                 label="Developer seats"
                 testId="developer-seats-stepper"
               />
+            </HStack>
+          )}
+          {growth.developerHint && (
+            <HStack gap={2} align="start" color="fg.muted" data-testid="developer-seats-minimum">
+              <Box flexShrink={0} paddingTop={0.5}>
+                <Info size={14} />
+              </Box>
+              <Text textStyle="bodySm">{growth.developerHint}</Text>
             </HStack>
           )}
         </VStack>
@@ -495,6 +509,7 @@ function useGrowthSeats({
   open,
   mode,
   inUse,
+  developersInUse,
   held,
   invites,
   price,
@@ -502,6 +517,7 @@ function useGrowthSeats({
   open: boolean;
   mode: Extract<SeatDrawerMode, { kind: "growth" }> | undefined;
   inUse: number;
+  developersInUse: number;
   held: HeldSeats;
   invites: number;
   price: SeatPrice;
@@ -562,12 +578,19 @@ function useGrowthSeats({
     quoteReason({ needed: developerAdded && !developerQuote.data, failed: developerQuote.isError });
   const day = billingDayOrUndefined(quote?.appliesAt ?? plan.periodEndsAt);
 
+  const developerFloor = developer
+    ? { current: developer.current, inUse: developersInUse }
+    : { current: 0, inUse: 0 };
   return {
     seats,
     minimum,
     setRequested,
     developer,
     setDeveloperTarget,
+    developerMinimum: developerSeatMinimum(developerFloor),
+    developerHint: developer
+      ? developerMinimumHint({ ...developerFloor, target: developer.target })
+      : undefined,
     view: growthSeatPlan(plan),
     pendingReason,
     priceFailed: pendingReason === PRICE_FAILED,

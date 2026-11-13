@@ -65,6 +65,25 @@ export function developerSeatHint({ price, unitCents }: { price: SeatPrice; unit
   return `Their own project only, nothing shared. ${money(price, unitCents)}${price.periodSuffix} each.`;
 }
 
+/** The Developer stepper's floor: the Developers in use, never above the seats billed now. */
+export function developerSeatMinimum({ current, inUse }: { current: number; inUse: number }) {
+  return Math.min(current, inUse);
+}
+
+/** Why the Developer stepper stopped lowering, once it reaches the Developers in use. */
+export function developerMinimumHint({
+  target,
+  current,
+  inUse,
+}: {
+  target: number;
+  current: number;
+  inUse: number;
+}): string | undefined {
+  if (inUse === 0 || target > inUse || target >= current) return undefined;
+  return `${people(inUse)} use Developer seats. Remove someone in Users to go lower.`;
+}
+
 /** "€87/mo", "excl. VAT" and "3 seats × €29", the seat dialog's live total. */
 export function upgradeTotal({ seats, price }: { seats: number; price: SeatPrice }) {
   return {
