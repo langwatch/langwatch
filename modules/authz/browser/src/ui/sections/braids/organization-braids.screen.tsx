@@ -124,7 +124,7 @@ export default function OrganizationBraidsScreen() {
     return (
       <>
         <OrganizationBraidsHeader />
-        <Stack gap={4} paddingTop={4} data-testid="organization-braids-loading">
+        <Stack gap={4} data-testid="organization-braids-loading">
           <Skeleton height="72px" borderRadius="md" />
           <Skeleton height="160px" borderRadius="md" />
         </Stack>
@@ -143,7 +143,7 @@ export default function OrganizationBraidsScreen() {
       <OrganizationBraidsHeader locked={!isEnterprise} />
       <Stack gap={0}>
         {paused ? (
-          <Box paddingY={4}>
+          <Box paddingBottom={4}>
             <Banner status="warning" title="Braids are paused">
               Braids need the Enterprise plan. They are kept and start working again when you
               upgrade.

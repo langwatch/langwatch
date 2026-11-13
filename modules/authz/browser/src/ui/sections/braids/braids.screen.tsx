@@ -111,7 +111,7 @@ function LoadingBraids() {
   return (
     <>
       <BraidsHeader />
-      <Stack gap={4} paddingTop={4} data-testid="braids-loading">
+      <Stack gap={4} data-testid="braids-loading">
         <Skeleton height="32px" width="420px" />
         <Skeleton height="160px" borderRadius="md" />
       </Stack>
@@ -207,7 +207,7 @@ function BraidsNotices({
 }) {
   if (!paused && !keptToAdmins) return null;
   return (
-    <Stack gap={4} paddingY={4}>
+    <Stack gap={4} paddingBottom={4}>
       {paused ? <PausedBanner total={total} /> : null}
       {keptToAdmins ? <KeptToAdminsBanner /> : null}
     </Stack>
@@ -278,7 +278,7 @@ export default function BraidsScreen() {
     return (
       <>
         <BraidsHeader />
-        <Box paddingTop={4}>
+        <Box>
           <SectionErrorNotice title="Couldn't load this project's braids" />
         </Box>
       </>
@@ -296,7 +296,7 @@ export default function BraidsScreen() {
     return (
       <>
         <BraidsHeader projectName={projectName} locked />
-        <Box paddingTop={4}>
+        <Box>
           <BraidsEnterpriseUpsell />
         </Box>
       </>
