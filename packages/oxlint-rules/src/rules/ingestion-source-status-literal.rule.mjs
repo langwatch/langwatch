@@ -43,7 +43,7 @@ export const ingestionSourceStatusLiteralRule = defineRule({
     statusLiteral: {
       what: 'A source `status` is compared with "{{state}}" in `{{path}}`.',
       why: "Whether a source takes events is decided once; a second spelling drifts and lets a disabled source ingest.",
-      fix: "Call `ingestionSourceIsLive(source)` or `ingestionSourceStatusIsOff(status)` from `@langwatch/enterprise-governance-contract`.",
+      fix: "Call `ingestionSourceIsLive(source)` or `ingestionSourceStatusIsOff(status)` from `@langwatch/enterprise-governance-contract`. Read the `contract` skill.",
     },
   },
   create(context, file) {
