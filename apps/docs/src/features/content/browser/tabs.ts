@@ -1,4 +1,4 @@
-import { conceal } from "../../../lib/slide.ts";
+import { conceal } from "../../../lib/conceal.ts";
 
 const ROOT = '[data-scope="tabs"][data-part="root"]';
 
