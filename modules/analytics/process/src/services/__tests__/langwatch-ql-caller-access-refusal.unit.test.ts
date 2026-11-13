@@ -97,11 +97,13 @@ describe("given a column the caller's protections gate", () => {
     service.reportFailure({ projectId: "project-1", sql: STOCK_COST_SQL, error });
 
     expect(error.meta.violations).toEqual(
-      expect.arrayContaining([expect.objectContaining({
+      expect.arrayContaining([
+        expect.objectContaining({
           code: "GATED_COLUMN",
           message: expect.stringContaining("TotalCost"),
           missingGates: ["cost:view"],
-        }),]),
+        }),
+      ]),
     );
     expect(accessRefusals.isCallerAccessRefusal({ error })).toBe(true);
     expect(accessRefusals.isCallerOwnRefusal({ error })).toBe(true);
