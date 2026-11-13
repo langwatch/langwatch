@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 from typing import Any, Literal, Optional
 
 import spacy
@@ -40,6 +41,20 @@ LOCATION_ENTITY = "LOCATION"
 # LOCATION is here because the model splits a name across both: in Titlecase
 # it reads Maria Fernanda as a person and Costa Pereira as a place.
 CASE_SENSITIVE_ENTITIES = (PERSON_ENTITY, LOCATION_ENTITY)
+
+# What may sit between a surname written first and the forename after it.
+SURNAME_FIRST_GAP = re.compile(r"\s*,\s*")
+
+
+def _precedes_person(*, content: str, end: int, results: list[Any]) -> bool:
+    """Whether a comma and a first-pass PERSON span follow `end` (SURNAME, Forename)."""
+    return any(
+        result.entity_type == "PERSON"
+        and result.start > end
+        and SURNAME_FIRST_GAP.fullmatch(content[end : result.start])
+        for result in results
+    )
+
 
 def _covers(outer: Any, inner: Any) -> bool:
     return outer.start <= inner.start and outer.end >= inner.end
@@ -154,13 +169,14 @@ class PresidioPIIDetectionEvaluator(
         super().preload()
 
     def _results_from_normalised_casing(
-        self, *, content: str, entities: list[str]
+        self, *, content: str, entities: list[str], results: list[Any]
     ) -> list[Any]:
         """The `entities` spans only a case-normalised copy of `content` sees.
 
         `entities` is case-sensitive only: the code, currency and identifier
         recognisers need the capitals. Skipped when no rewritten word sits
-        beside another, since no span could pass without one.
+        beside another, since no span could pass without one. A one-word span
+        counts when a comma and a person from `results` follow it.
         """
         normalised = normalise_allcaps_runs(content)
         if not could_hold_a_rewritten_name(original=content, normalised=normalised):
@@ -179,6 +195,9 @@ class PresidioPIIDetectionEvaluator(
                 start=result.start,
                 end=result.end,
                 vectors=self.word_vectors,
+                precedes_person=_precedes_person(
+                    content=content, end=result.end, results=results
+                ),
             )
         ]
 
@@ -192,7 +211,7 @@ class PresidioPIIDetectionEvaluator(
         reaches the whole of it.
         """
         additions = self._results_from_normalised_casing(
-            content=content, entities=entities
+            content=content, entities=entities, results=results
         )
         if not additions:
             return results
