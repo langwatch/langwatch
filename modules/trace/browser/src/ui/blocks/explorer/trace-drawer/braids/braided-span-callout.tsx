@@ -1,3 +1,4 @@
+import { Link } from "@langwatch/browser-host/link";
 import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import { FeatureMark } from "@langwatch/design-system/feature-mark";
 import { InlineCode } from "@langwatch/design-system/inline-code";
@@ -6,8 +7,8 @@ import type { SpanBraid } from "@langwatch/trace-contract";
 import { Fragment } from "react";
 
 /**
- * Says why a span from another project shows in this trace. "Open in" is
- * offered only to someone who can open the owner, and only with a place to go.
+ * Says why a span from another project shows in this trace. "Open in" is offered only to someone
+ * who can open the owner, and only with a place to go; a condition stays whole on one line.
  */
 export function BraidedSpanCallout({
   braid,
@@ -27,7 +28,7 @@ export function BraidedSpanCallout({
         action={
           canOpen ? (
             <BannerAction asChild>
-              <a href={ownerHref}>Open in {braid.ownerName}</a>
+              <Link href={ownerHref}>Open in {braid.ownerName}</Link>
             </BannerAction>
           ) : undefined
         }
@@ -53,9 +54,7 @@ function ShownBecause({ braid }: { braid: SpanBraid }) {
       {braid.matchedConditions.map((condition, index) => (
         <Fragment key={condition}>
           {index > 0 ? " or " : null}
-          <InlineCode whiteSpace="normal" fontVariantLigatures="none">
-            {condition}
-          </InlineCode>
+          <InlineCode fontVariantLigatures="none">{condition}</InlineCode>
         </Fragment>
       ))}
       .
