@@ -323,6 +323,8 @@ export interface SuiteJob {
  * The lanes that may not overlap across packages. Integration files run
  * serially against one shared datastore; a browser lane installs Chromium
  * through apt, which holds a machine-wide lock. Everything else is `shared`.
+ * An integration and a browser suite never overlap either: a browser run failed
+ * to load its test file 3/3 while an integration run overlapped it (tasks#1178).
  */
 const LANES: Record<string, "integration" | "browser"> = {
   "test:integration": "integration",
@@ -459,12 +461,15 @@ export const runJobs = async ({
   return statuses;
 };
 
-/** The shard-wide keys a job holds while it runs: its package, its lane, and heavy. */
+/**
+ * The shard-wide keys a job holds while it runs: its package, its lane, and heavy.
+ * An integration and a browser job both hold each other's lane key, so they never overlap.
+ */
 const keysOf = (job: SuiteJob, isHeavy: (pkg: DiscoveredPackage) => boolean): string[] => {
   const lane = laneOf(job.script);
   return [
     `package:${job.pkg.name}`,
-    ...(lane === "shared" ? [] : [lane]),
+    ...(lane === "shared" ? [] : ["integration", "browser"]),
     ...(isHeavy(job.pkg) ? ["heavy"] : []),
   ];
 };
