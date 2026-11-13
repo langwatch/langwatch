@@ -1,7 +1,8 @@
 /**
  * Staff access keys through the installed REST door (ADR-202): the api and worker booted wholly
  * live, a requester key asking over the wire, and the redeemed key minted by the real api-key
- * module. Only the passkey ceremony is skipped: the approval columns are written directly.
+ * module. Only the passkey ceremony is skipped: the approval columns, spend included, are
+ * written directly.
  * @vitest-environment node
  * @see modules/staff-access/specs/staff-access-use.feature
  * @see modules/staff-access/specs/staff-access-approval.feature
@@ -185,7 +186,13 @@ describe.skipIf(!stores)("given staff access keys on the live api", () => {
   }
 
   /** The agent asks over the wire, Olivia's approval lands, and the agent redeems a real key. */
-  async function redeemedKey({ scopes }: { scopes: Scope[] }) {
+  async function redeemedKey({
+    scopes,
+    spendApproved = false,
+  }: {
+    scopes: Scope[];
+    spendApproved?: boolean;
+  }) {
     const requesterKey = await enrolledRequester();
     const asked = await call({
       path: "/api/staff-access/requests",
@@ -208,6 +215,7 @@ describe.skipIf(!stores)("given staff access keys on the live api", () => {
       data: {
         status: "approved",
         approvedAt: new Date(),
+        spendApproved,
         approvalCredentialId: "credential1",
         approvalSignature: "c2lnbmVk",
         signedHash: "approved-in-test",
@@ -311,6 +319,8 @@ describe.skipIf(!stores)("given staff access keys on the live api", () => {
         where: { tenantId: organization.id },
       });
       await prisma.evaluator.deleteMany({ where: { projectId: organization.projectId } });
+      await prisma.monitor.deleteMany({ where: { projectId: organization.projectId } });
+      await prisma.dataset.deleteMany({ where: { projectId: organization.projectId } });
       await prisma.llmPromptConfigVersion.deleteMany({
         where: { projectId: organization.projectId },
       });
@@ -412,6 +422,7 @@ describe.skipIf(!stores)("given staff access keys on the live api", () => {
       );
       expect(writtenPaths).not.toContain("/api/traces/search");
       expect(writtenPaths).not.toContain("/api/analytics/timeseries");
+      expect(writtenPaths).not.toContain("/api/v1/query");
     });
   });
 
@@ -434,8 +445,9 @@ describe.skipIf(!stores)("given staff access keys on the live api", () => {
 
   describe("when a metadata key on ACME searches traces", () => {
     /** @scenario "A metadata key cannot read trace content" */
-    it("is refused 403 and the trace never leaves", async () => {
-      const { apiKey } = await redeemedKey({ scopes: ["org:metadata"] });
+    /** @scenario "Refused staff calls leave a trail row" */
+    it("is refused 403, the trace never leaves, and the refusal is trailed", async () => {
+      const { apiKey, requestId } = await redeemedKey({ scopes: ["org:metadata"] });
 
       const answered = await traceSearch({ bearer: apiKey, projectId: acme.projectId });
 
@@ -444,13 +456,43 @@ describe.skipIf(!stores)("given staff access keys on the live api", () => {
         code: "api_key_permission_denied",
       });
       expect(answered.text).not.toContain(acmeTrace);
+      const trail = await prisma.staffAccessEvent.findMany({ where: { requestId } });
+      expect(trail.map(({ path, status, errorCode }) => ({ path, status, errorCode }))).toEqual([
+        { path: "/api/traces/search", status: 403, errorCode: "api_key_permission_denied" },
+      ]);
     });
   });
 
-  describe("when a support key on ACME creates an evaluator and a prompt", () => {
-    /** @scenario "A support key creates an evaluator and a prompt as LangWatch Support" */
+  describe("when a metadata key on ACME reads run results or a stored file", () => {
+    /** @scenario "A metadata key cannot read run results or stored files" */
+    it("is refused 403 with staff_content_not_approved on both", async () => {
+      const { apiKey } = await redeemedKey({ scopes: ["org:metadata"] });
+
+      const results = await call({
+        path: "/api/experiments/runs/run-missing/results",
+        bearer: apiKey,
+        projectId: acme.projectId,
+      });
+      const file = await call({
+        path: `/api/files/${acme.projectId}/object-missing`,
+        bearer: apiKey,
+        projectId: acme.projectId,
+      });
+
+      expect([results, file].map(({ status, code }) => ({ status, code }))).toEqual([
+        { status: 403, code: "staff_content_not_approved" },
+        { status: 403, code: "staff_content_not_approved" },
+      ]);
+    });
+  });
+
+  describe("when a support key on ACME approved to spend creates an evaluator and a dataset", () => {
+    /** @scenario "A support key creates an evaluator and a dataset as LangWatch Support" */
     it("creates both and ACME's audit log names LangWatch Support, Olivia and the reason for each", async () => {
-      const { apiKey, requestId } = await redeemedKey({ scopes: ["org:support"] });
+      const { apiKey, requestId } = await redeemedKey({
+        scopes: ["org:support"],
+        spendApproved: true,
+      });
 
       const evaluator = await call({
         path: "/api/evaluators",
@@ -462,24 +504,25 @@ describe.skipIf(!stores)("given staff access keys on the live api", () => {
           config: { evaluatorType: "langevals/exact_match" },
         },
       });
-      const prompt = await call({
-        path: "/api/prompts",
+      const dataset = await call({
+        path: "/api/dataset",
         method: "POST",
         bearer: apiKey,
         projectId: acme.projectId,
-        body: { handle: `staff-support-${ns}`, prompt: "Answer in one short paragraph." },
+        body: { name: `staff-support-${ns}` },
       });
 
       expect(evaluator.status, evaluator.text).toBe(200);
-      expect(prompt.status, prompt.text).toBe(200);
+      expect(dataset.status, dataset.text).toBe(201);
       expect(
         await prisma.evaluator.count({
           where: { projectId: acme.projectId, name: `Staff exact match ${ns}` },
         }),
       ).toBe(1);
-      const promptId = z.object({ id: z.string() }).parse(prompt.json).id;
       expect(
-        await prisma.llmPromptConfig.count({ where: { projectId: acme.projectId, id: promptId } }),
+        await prisma.dataset.count({
+          where: { projectId: acme.projectId, name: `staff-support-${ns}` },
+        }),
       ).toBe(1);
 
       const rows = await prisma.auditLog.findMany({
@@ -517,11 +560,93 @@ describe.skipIf(!stores)("given staff access keys on the live api", () => {
             principal: PRINCIPAL,
             reason: REASON,
             approvedBy: { id: oliviaId },
-            path: "/api/prompts",
+            path: "/api/dataset",
           }),
         },
       ]);
       expect(await prisma.staffAccessEvent.count({ where: { requestId } })).toBe(2);
+    });
+  });
+
+  describe("when a support key on ACME approved to spend creates a monitor", () => {
+    /** @scenario "The change's own audit row names LangWatch Support and the approver" */
+    it("writes the monitors.create row naming LangWatch Support and the reason, acted by Olivia", async () => {
+      const { apiKey } = await redeemedKey({ scopes: ["org:support"], spendApproved: true });
+      const evaluator = await call({
+        path: "/api/evaluators",
+        method: "POST",
+        bearer: apiKey,
+        projectId: acme.projectId,
+        body: {
+          name: `Staff monitor evaluator ${ns}`,
+          config: { evaluatorType: "langevals/exact_match" },
+        },
+      });
+      const { id: evaluatorId } = z.object({ id: z.string() }).parse(evaluator.json);
+
+      const monitor = await call({
+        path: "/api/monitors",
+        method: "POST",
+        bearer: apiKey,
+        projectId: acme.projectId,
+        body: {
+          name: `Staff monitor ${ns}`,
+          checkType: "langevals/exact_match",
+          evaluatorId,
+          mappings: {},
+        },
+      });
+
+      expect(monitor.status, monitor.text).toBe(201);
+      const rows = await prisma.auditLog.findMany({
+        where: { organizationId: acme.id, action: "monitors.create" },
+      });
+      expect(rows.map(({ actorUserId, metadata }) => ({ actorUserId, metadata }))).toEqual([
+        {
+          actorUserId: oliviaId,
+          metadata: expect.objectContaining({ staffPrincipal: PRINCIPAL, staffReason: REASON }),
+        },
+      ]);
+    });
+  });
+
+  describe("when a support key on ACME approved without spend writes", () => {
+    /** @scenario "A support key without the spend tick changes datasets only" */
+    it("creates a dataset and is refused an evaluator and a monitor", async () => {
+      const { apiKey } = await redeemedKey({ scopes: ["org:support"] });
+
+      const dataset = await call({
+        path: "/api/dataset",
+        method: "POST",
+        bearer: apiKey,
+        projectId: acme.projectId,
+        body: { name: `staff-no-spend-${ns}` },
+      });
+      const evaluator = await call({
+        path: "/api/evaluators",
+        method: "POST",
+        bearer: apiKey,
+        projectId: acme.projectId,
+        body: { name: `No spend ${ns}`, config: { evaluatorType: "langevals/exact_match" } },
+      });
+      const monitor = await call({
+        path: "/api/monitors",
+        method: "POST",
+        bearer: apiKey,
+        projectId: acme.projectId,
+        body: { name: `No spend ${ns}`, checkType: "langevals/exact_match", mappings: {} },
+      });
+
+      expect(dataset.status, dataset.text).toBe(201);
+      expect([evaluator, monitor].map(({ status, code }) => ({ status, code }))).toEqual([
+        { status: 403, code: "staff_spend_not_approved" },
+        { status: 403, code: "staff_spend_not_approved" },
+      ]);
+      expect(
+        await prisma.evaluator.count({
+          where: { projectId: acme.projectId, name: `No spend ${ns}` },
+        }),
+      ).toBe(0);
     });
   });
 
