@@ -8,11 +8,13 @@ import type { EventSubscriberContext } from "@langwatch/eventing";
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
+  SHARE_CONTROL_COMMAND,
 } from "@langwatch/langy-contract";
 import type { RequestWebPushDeliveryCommand } from "@langwatch/notification-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  LangyLocalControlRequestedEventSchema,
   LangyToolCallSucceededEventSchema,
   LangyUserWaitStartedEventSchema,
   type LangyConversationProcessingEvent,
@@ -77,6 +79,26 @@ function waitStarted(): LangyConversationProcessingEvent {
       waitId: "wait-1",
       kind: "permission",
       expiresAt: T0 + 600_000,
+    },
+  });
+}
+
+function folderShareRequested(): LangyConversationProcessingEvent {
+  return LangyLocalControlRequestedEventSchema.parse({
+    id: "evt_share",
+    aggregateId: CONVERSATION_ID,
+    aggregateType: "langy_conversation",
+    tenantId: PROJECT_ID,
+    createdAt: T0,
+    occurredAt: T0,
+    type: LANGY_CONVERSATION_EVENT_TYPES.LOCAL_CONTROL_REQUESTED,
+    version: LANGY_CONVERSATION_EVENT_VERSIONS.LOCAL_CONTROL_REQUESTED,
+    data: {
+      conversationId: CONVERSATION_ID,
+      requestId: "request-1",
+      userId: USER_ID,
+      expiresAt: T0 + 600_000,
+      command: SHARE_CONTROL_COMMAND,
     },
   });
 }
@@ -175,6 +197,31 @@ describe("given a person who turned Langy notifications on", () => {
         title: "Langy needs a decision",
         body: 'Waiting on you in "Weekly costs".',
       });
+    });
+  });
+
+  describe("when Langy puts up the card asking to share a folder", () => {
+    /** @scenario "A card waiting on the person reaches them through Web Push" */
+    it("is a candidate and pushes that Langy needs a decision", async () => {
+      const { subscriber, requests } = harness();
+
+      expect(subscriber.eventTypes).toContain(
+        LANGY_CONVERSATION_EVENT_TYPES.LOCAL_CONTROL_REQUESTED,
+      );
+      expect(subscriber.options?.enqueue?.filter?.(folderShareRequested())).toBe(true);
+      await subscriber.handle(folderShareRequested(), context);
+
+      expect(requests).toEqual([
+        expect.objectContaining({
+          userId: USER_ID,
+          idempotencyKey: "langy:evt_share",
+          message: expect.objectContaining({
+            title: "Langy needs a decision",
+            body: 'Waiting on you in "Weekly costs".',
+            tag: `langy:${CONVERSATION_ID}`,
+          }),
+        }),
+      ]);
     });
   });
 

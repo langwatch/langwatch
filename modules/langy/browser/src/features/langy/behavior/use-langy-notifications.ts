@@ -22,8 +22,9 @@ import {
   readNotifyCall,
   type LangyNotificationEvent,
   type LangyPushDeviceState,
+  type LangyPushSetupFailure,
 } from "../../../model/langy-notifications.ts";
-import { useLangyPushDevice } from "./use-langy-web-push.ts";
+import { useLangyPushDevice, useLangyPushSetupFailure } from "./use-langy-web-push.ts";
 
 export type LangyNotificationChoice = "enabled" | "declined" | null;
 
@@ -37,6 +38,10 @@ export type LangyNotificationPreferenceState = {
   active: boolean;
   /** This browser's push standing; the tab notifies only when it is `unavailable`. */
   pushDevice: LangyPushDeviceState;
+  /** Why setting this browser up for push last failed, or null when it did not. */
+  pushSetupFailure: LangyPushSetupFailure | null;
+  /** Sets this browser up for push again, after a failure the person can retry. */
+  retryPushSetup: () => Promise<void>;
   isSaving: boolean;
   /**
    * Asks the browser, then turns Langy notifications on when it allows them and subscribes
@@ -65,6 +70,10 @@ export function useLangyNotificationPreference(): LangyNotificationPreferenceSta
 
   const device = useLangyPushDevice();
   const pushState = useWebPushDeviceState();
+  const pushSetupFailure = useLangyPushSetupFailure();
+  const retryPushSetup = async () => {
+    await device.subscribe();
+  };
 
   const choice = preference.data?.choice ?? null;
   const enable = useCallback(async () => {
@@ -87,6 +96,8 @@ export function useLangyNotificationPreference(): LangyNotificationPreferenceSta
     permission,
     active: choice === "enabled" && permission === "granted",
     pushDevice: pushState,
+    pushSetupFailure,
+    retryPushSetup,
     isSaving: save.isPending,
     enable,
     decline,

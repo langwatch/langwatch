@@ -12,14 +12,16 @@ import {
   ensureWebPushSubscription,
   listenToWebPushWorker,
   removeWebPushSubscription,
+  type WebPushSubscriptionJson,
 } from "@langwatch/browser-host/web-push";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { LANGY_NOTIFICATION_TOPIC } from "@langwatch/langy-contract";
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 
 import { api } from "../../../behavior/langy-api.ts";
 import { useLangyStore } from "../../../behavior/langy.store.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import type { LangyPushSetupFailure } from "../../../model/langy-notifications.ts";
 
 const TAG_PREFIX = "langy:";
 
@@ -40,6 +42,39 @@ export function projectSlugOfLink(url: string): string | null {
   }
 }
 
+let setupFailure: LangyPushSetupFailure | null = null;
+/** Bumped by every setup and turn-off, so only the latest one may write the failure. */
+let setupAttempt = 0;
+const setupFailureListeners = new Set<() => void>();
+
+function recordSetupFailure(next: LangyPushSetupFailure | null): void {
+  if (next === setupFailure) return;
+  setupFailure = next;
+  for (const listener of setupFailureListeners) listener();
+}
+
+function readSetupFailure(): LangyPushSetupFailure | null {
+  return setupFailure;
+}
+
+/** Forgets the last failure and any setup still on its way; for a fresh page in tests. */
+export function resetLangyPushSetupFailure(): void {
+  setupAttempt += 1;
+  recordSetupFailure(null);
+}
+
+/** Why this browser's last push setup failed, shared by every caller; null once one worked. */
+export function useLangyPushSetupFailure(): LangyPushSetupFailure | null {
+  return useSyncExternalStore(
+    (listener) => {
+      setupFailureListeners.add(listener);
+      return () => setupFailureListeners.delete(listener);
+    },
+    readSetupFailure,
+    readSetupFailure,
+  );
+}
+
 /** Subscribing and forgetting this browser, for the choice's enable and turn-off. */
 export function useLangyPushDevice(): {
   subscribe: () => Promise<boolean>;
@@ -49,37 +84,56 @@ export function useLangyPushDevice(): {
   const save = api.notification.subscribeWebPush.useMutation();
   const forget = api.notification.unsubscribeWebPush.useMutation();
 
-  const subscribe = useCallback(async () => {
-    if (!checkWebPushSupport()) return false;
-    const publicKey = await utils.notification.webPushPublicKey
-      .fetch({})
-      .then(({ publicKey: key }) => key)
-      .catch(() => null);
-    // Without the key the browser's own subscription, if any, still stands: the device keeps
-    // whatever standing it had, so a blip never turns the tab into a second sender.
-    if (!publicKey) return false;
-    const subscription = await ensureWebPushSubscription(publicKey);
-    if (!subscription) return false;
-    try {
-      await save.mutateAsync({ ...subscription, userAgent: navigator.userAgent.slice(0, 512) });
-      return true;
-    } catch (error) {
-      // A push service the server never sends to: drop the subscription so this device falls
-      // back to the tab. Any other failure leaves it subscribed and the next page load stores
-      // it again; the tab stays quiet rather than risk a second notification.
-      if (readHandledError(error)?.code === "web_push_endpoint_refused") {
-        await removeWebPushSubscription({ unusable: true });
-      }
-      return false;
-    }
-  }, [utils, save]);
+  const subscribe = async () => {
+    setupAttempt += 1;
+    const attempt = setupAttempt;
+    const failure = await subscribeThisBrowser({
+      fetchPublicKey: () => utils.notification.webPushPublicKey.fetch({}),
+      save: (input) => save.mutateAsync(input),
+    });
+    if (attempt === setupAttempt) recordSetupFailure(failure);
+    return failure === null;
+  };
 
-  const unsubscribe = useCallback(async () => {
+  const unsubscribe = async () => {
+    resetLangyPushSetupFailure();
     const endpoint = await removeWebPushSubscription();
     if (endpoint) await forget.mutateAsync({ endpoint }).catch(() => undefined);
-  }, [forget]);
+  };
 
   return { subscribe, unsubscribe };
+}
+
+/** Subscribes this browser and stores it; answers why it failed, or null when it worked. */
+async function subscribeThisBrowser({
+  fetchPublicKey,
+  save,
+}: {
+  fetchPublicKey: () => Promise<{ publicKey: string }>;
+  save: (input: WebPushSubscriptionJson & { userAgent: string }) => Promise<unknown>;
+}): Promise<LangyPushSetupFailure | null> {
+  if (!checkWebPushSupport()) return "unsupported";
+  const publicKey = await fetchPublicKey()
+    .then(({ publicKey: key }) => key)
+    .catch(() => null);
+  // Without the key the browser's own subscription, if any, still stands: the device keeps
+  // whatever standing it had, so a blip never turns the tab into a second sender.
+  if (!publicKey) return "server_unreachable";
+  const subscription = await ensureWebPushSubscription(publicKey);
+  if (!subscription) return "browser_refused";
+  try {
+    await save({ ...subscription, userAgent: navigator.userAgent.slice(0, 512) });
+    return null;
+  } catch (error) {
+    // A push service the server never sends to: drop the subscription so this device falls
+    // back to the tab. Any other failure leaves it subscribed and the next page load stores
+    // it again; the tab stays quiet rather than risk a second notification.
+    if (readHandledError(error)?.code === "web_push_endpoint_refused") {
+      await removeWebPushSubscription({ unusable: true });
+      return "push_service_refused";
+    }
+    return "save_failed";
+  }
 }
 
 /**
