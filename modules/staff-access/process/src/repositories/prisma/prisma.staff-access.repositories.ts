@@ -6,6 +6,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { StaffAccessRepositories } from "../staff-access.repositories.ts";
 import { PrismaStaffAccessChallengeRepository } from "./prisma.staff-access-challenge.repository.ts";
+import { PrismaStaffAccessCopyLedgerRepository } from "./prisma.staff-access-copy-ledger.repository.ts";
 import { PrismaStaffAccessEventRepository } from "./prisma.staff-access-event.repository.ts";
 import { PrismaStaffAccessRequestRepository } from "./prisma.staff-access-request.repository.ts";
 import { PrismaStaffAccessRequesterRepository } from "./prisma.staff-access-requester.repository.ts";
@@ -19,6 +20,7 @@ export class PostgresStaffAccessRepositories {
       challenges: PrismaStaffAccessChallengeRepository.create(members.prisma),
       requests: PrismaStaffAccessRequestRepository.create(members.prisma),
       events: PrismaStaffAccessEventRepository.create(members.prisma),
+      copyLedger: PrismaStaffAccessCopyLedgerRepository.create(members.prisma),
     };
   }
 }

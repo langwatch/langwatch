@@ -172,3 +172,74 @@ export class StaffAccessNotConfiguredError extends HandledError {
     this.name = "StaffAccessNotConfiguredError";
   }
 }
+
+/** The source ops token of an organization copy is no session this server issued. */
+export class StaffCopySourceInvalidError extends HandledError {
+  declare readonly code: "staff_copy_source_invalid";
+
+  constructor() {
+    super("staff_copy_source_invalid", "The source session of this copy is not valid.", {
+      httpStatus: 401,
+      fault: "customer",
+      ...remediation("staff_copy_source_invalid"),
+    });
+    this.name = "StaffCopySourceInvalidError";
+  }
+}
+
+/** One side of a copy lacks its scopes: `ops:copy` with `org:content` or with `org:support`. */
+export class StaffCopyScopeMissingError extends HandledError {
+  declare readonly code: "staff_copy_scope_missing";
+
+  constructor({ side }: { side: "source" | "target" }) {
+    super(
+      "staff_copy_scope_missing",
+      side === "source"
+        ? "The source session was not approved for ops:copy with org:content."
+        : "The target session was not approved for ops:copy with org:support.",
+      { httpStatus: 403, fault: "customer", ...remediation("staff_copy_scope_missing") },
+    );
+    this.name = "StaffCopyScopeMissingError";
+  }
+}
+
+export class StaffCopySameOrganizationError extends HandledError {
+  declare readonly code: "staff_copy_same_organization";
+
+  constructor() {
+    super("staff_copy_same_organization", "The source and target are the same organization.", {
+      httpStatus: 400,
+      fault: "customer",
+      ...remediation("staff_copy_same_organization"),
+    });
+    this.name = "StaffCopySameOrganizationError";
+  }
+}
+
+/** The two approvals belong to different agents or operators. */
+export class StaffCopyApprovalsMismatchError extends HandledError {
+  declare readonly code: "staff_copy_approvals_mismatch";
+
+  constructor() {
+    super(
+      "staff_copy_approvals_mismatch",
+      "Both approvals of a copy must come from the same agent and operator.",
+      { httpStatus: 403, fault: "customer", ...remediation("staff_copy_approvals_mismatch") },
+    );
+    this.name = "StaffCopyApprovalsMismatchError";
+  }
+}
+
+/** The source approval is not live in the target's window: expired, ended or revoked. */
+export class StaffCopyWindowClosedError extends HandledError {
+  declare readonly code: "staff_copy_window_closed";
+
+  constructor() {
+    super(
+      "staff_copy_window_closed",
+      "The source approval is no longer live; both approvals must be live at once.",
+      { httpStatus: 403, fault: "customer", ...remediation("staff_copy_window_closed") },
+    );
+    this.name = "StaffCopyWindowClosedError";
+  }
+}

@@ -75,6 +75,20 @@ export type StaffAccessEventRow = Readonly<{
   userAgent: string | null;
 }>;
 
+/** One object an organization copy made: which source object became which target object. */
+export type StaffAccessCopyLedgerRow = Readonly<{
+  id: string;
+  requestId: string;
+  sourceOrganizationId: string;
+  targetOrganizationId: string;
+  kind: string;
+  sourceId: string;
+  targetId: string;
+  sourceProjectId: string;
+  targetProjectId: string;
+  createdAt: Instant;
+}>;
+
 export interface StaffAccessRequesterRepository {
   create(row: StaffAccessRequesterRow): Promise<void>;
   findByLookupId(input: { lookupId: string }): Promise<StaffAccessRequesterRow[]>;
@@ -162,4 +176,14 @@ export interface StaffAccessEventRepository {
     durationMs: number;
   }): Promise<void>;
   findByRequest(input: { requestId: string }): Promise<StaffAccessEventRow[]>;
+}
+
+export interface StaffAccessCopyLedgerRepository {
+  /** Every object earlier copies made from the source organization into the target one. */
+  findForPair(input: {
+    sourceOrganizationId: string;
+    targetOrganizationId: string;
+  }): Promise<StaffAccessCopyLedgerRow[]>;
+  /** Records one copied object; false when the target already holds a copy of that source. */
+  record(row: StaffAccessCopyLedgerRow): Promise<boolean>;
 }

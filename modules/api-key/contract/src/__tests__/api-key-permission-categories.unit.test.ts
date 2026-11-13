@@ -56,7 +56,7 @@ describe("PERMISSION_CATEGORIES", () => {
     // which can never ride on an API key — so no category may name one.
     const categorizable = new Set<string>(categorizablePermissions());
     const platformOnly = ALL_PERMISSIONS.filter((permission) => !categorizable.has(permission));
-    expect(platformOnly).toEqual(["ops:view", "ops:manage", "opsRead:view"]);
+    expect(platformOnly).toEqual(["ops:view", "ops:manage", "opsRead:view", "opsCopy:create"]);
 
     const platformInCategory = platformOnly.filter((permission) => owners.has(permission));
     expect(

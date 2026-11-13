@@ -75,6 +75,7 @@ class GetApiV1QueryReferenceResponse200LwqlSchemaViewsItemColumnsItemGatesItemTy
     LANGYMANAGE = "langy:manage"
     LANGYUPDATE = "langy:update"
     LANGYVIEW = "langy:view"
+    OPSCOPYCREATE = "opsCopy:create"
     OPSMANAGE = "ops:manage"
     OPSREADVIEW = "opsRead:view"
     OPSVIEW = "ops:view"

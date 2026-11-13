@@ -213,6 +213,7 @@ export const PLATFORM_OPERATOR_PERMISSIONS: readonly AuthzPermission[] = [
   "ops:view",
   "ops:manage",
   "opsRead:view",
+  "opsCopy:create",
 ];
 
 const ROLE_PERMISSION_SETS: Record<BuiltinRoleKey, ReadonlySet<string>> = {

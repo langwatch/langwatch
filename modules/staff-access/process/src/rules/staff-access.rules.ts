@@ -32,9 +32,9 @@ export const STAFF_ACCESS_USAGE_CLASSIFICATION =
   "still call. membersSignedIn counts members holding a live browser session, which is UI use. " +
   "An organization with API figures and no signed-in members uses LangWatch through the API only.";
 
-/** Whether the scopes reach into one organization, which mints an organization key. */
-export function reachesOrganization(scopes: readonly StaffAccessScope[]): boolean {
-  return scopes.some((scope) => scope !== "ops:read");
+/** The scopes that mint an `lwsa_` ops token, answered by the staff access door. */
+export function mintsOpsToken(scopes: readonly StaffAccessScope[]): boolean {
+  return scopes.includes("ops:read") || scopes.includes("ops:copy");
 }
 
 /** Support writes as "LangWatch Support"; anything else reads as "LangWatch Staff Read". */
@@ -42,7 +42,7 @@ export function staffKeyKindOf(scopes: readonly StaffAccessScope[]): "support" |
   return scopes.includes("org:support") ? "support" : "read";
 }
 
-/** Content always needs the name typed; support only once spend is ticked. */
+/** Content and a copy always need the name typed; support only once spend is ticked. */
 export function typedNameRequired({
   scopes,
   spendApproved,
@@ -50,7 +50,7 @@ export function typedNameRequired({
   scopes: readonly StaffAccessScope[];
   spendApproved: boolean;
 }): boolean {
-  if (scopes.includes("org:content")) return true;
+  if (scopes.includes("org:content") || scopes.includes("ops:copy")) return true;
   return spendApproved && scopes.includes("org:support");
 }
 

@@ -2591,4 +2591,16 @@ export interface LwqlPrismaRows {
     readonly ipAddress: "String?";
     readonly userAgent: "String?";
   };
+  readonly StaffAccessCopyLedger: {
+    readonly id: "String";
+    readonly requestId: "String";
+    readonly sourceOrganizationId: "String";
+    readonly targetOrganizationId: "String";
+    readonly kind: "String";
+    readonly sourceId: "String";
+    readonly targetId: "String";
+    readonly sourceProjectId: "String";
+    readonly targetProjectId: "String";
+    readonly createdAt: "DateTime";
+  };
 }

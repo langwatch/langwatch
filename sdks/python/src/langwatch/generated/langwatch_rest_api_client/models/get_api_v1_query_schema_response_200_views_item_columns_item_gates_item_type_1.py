@@ -75,6 +75,7 @@ class GetApiV1QuerySchemaResponse200ViewsItemColumnsItemGatesItemType1(str, Enum
     LANGYMANAGE = "langy:manage"
     LANGYUPDATE = "langy:update"
     LANGYVIEW = "langy:view"
+    OPSCOPYCREATE = "opsCopy:create"
     OPSMANAGE = "ops:manage"
     OPSREADVIEW = "opsRead:view"
     OPSVIEW = "ops:view"

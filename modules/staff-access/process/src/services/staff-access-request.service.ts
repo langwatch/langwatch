@@ -6,7 +6,8 @@ import type {
   PasskeyAssertionOptions,
   PasskeyAssertionResponse,
 } from "@langwatch/auth-contract";
-import { type StaffAccessScope, staffAccessPermissions } from "@langwatch/authz-contract";
+import type { StaffAccessScope } from "@langwatch/authz-contract";
+import { reachesOrganization, staffAccessPermissions } from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
 import type {
   OrganizationApi,
@@ -45,8 +46,8 @@ import {
   later,
   mintToken,
   organizationNameMatches,
+  mintsOpsToken,
   pkceChallengeOf,
-  reachesOrganization,
   shownStatus,
   STAFF_ACCESS_RATE_WINDOW_MS,
   STAFF_ACCESS_REQUEST_TTL_MS,
@@ -372,7 +373,7 @@ export class StaffAccessRequestService {
             kind: staffKeyKindOf(scopes),
           })
         : null;
-    const opsToken = scopes.includes("ops:read") ? mintToken(STAFF_ACCESS_OPS_TOKEN_PREFIX) : null;
+    const opsToken = mintsOpsToken(scopes) ? mintToken(STAFF_ACCESS_OPS_TOKEN_PREFIX) : null;
     await this.deps.requests.attachCredentials({
       id: row.id,
       apiKeyId: organizationKey?.apiKeyId ?? null,

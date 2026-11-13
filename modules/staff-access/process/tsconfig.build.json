@@ -36,6 +36,9 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../prompt/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../project/contract/tsconfig.build.json"
     },
     {
@@ -57,10 +60,16 @@
       "path": "../../notification/contract/tsconfig.build.json"
     },
     {
+      "path": "../../monitor/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/mail/tsconfig.build.json"
     },
     {
       "path": "../../../packages/ksuid/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
       "path": "../../gateway/contract/tsconfig.build.json"
@@ -70,6 +79,12 @@
     },
     {
       "path": "../../../packages/eventing/tsconfig.build.json"
+    },
+    {
+      "path": "../../evaluator/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../dataset/contract/tsconfig.build.json"
     },
     {
       "path": "../../coding-agent/contract/tsconfig.build.json"

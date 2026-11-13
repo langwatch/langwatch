@@ -110,6 +110,7 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/docs-session":
     "Live surface, intentionally undocumented: the docs playground's own revoke call for its session key (ADR-185), not an API for integrations.",
   "/api/checkup": UNDOCUMENTED_CHECKUP,
+  "/api/v1/staff-access/ops/copies": UNDOCUMENTED_STAFF_ACCESS,
   "/api/v1/staff-access/ops/organizations": UNDOCUMENTED_STAFF_ACCESS,
   "/api/v1/staff-access/ops/organizations/{organization}/usage": UNDOCUMENTED_STAFF_ACCESS,
   "/api/v1/staff-access/ops/queues": UNDOCUMENTED_STAFF_ACCESS,

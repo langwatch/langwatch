@@ -14,12 +14,21 @@ export const STAFF_SUPPORT_ROLE_KEY = "staff-support" as const;
 /** Every scope an operator may approve for an agent. */
 export const STAFF_ACCESS_SCOPES = [
   "ops:read",
+  "ops:copy",
   "org:metadata",
   "org:content",
   "org:support",
 ] as const;
 
 export type StaffAccessScope = (typeof STAFF_ACCESS_SCOPES)[number];
+
+/** The scopes answered by the staff access door, which reach no organization on their own. */
+export const STAFF_ACCESS_PLATFORM_SCOPES: readonly StaffAccessScope[] = ["ops:read", "ops:copy"];
+
+/** Whether the scopes reach into one organization, which mints an organization key. */
+export function reachesOrganization(scopes: readonly StaffAccessScope[]): boolean {
+  return scopes.some((scope) => !STAFF_ACCESS_PLATFORM_SCOPES.includes(scope));
+}
 
 /** How an organization is set up and used, with no trace, dataset or run content. */
 export const STAFF_READER_METADATA_PERMISSIONS: readonly AuthzPermission[] = [
@@ -60,15 +69,14 @@ export const STAFF_SUPPORT_WRITE_PERMISSIONS: readonly AuthzPermission[] = [
 
 /**
  * The permissions an approved set of scopes grants in its one organization, each once. `ops:read`
- * grants none here: it is answered by the staff access door, never by a key in an organization.
+ * and `ops:copy` grant none here: the staff access door answers them, never a key.
  */
 export function staffAccessPermissions({
   scopes,
 }: {
   scopes: readonly StaffAccessScope[];
 }): AuthzPermission[] {
-  const reachesOrganization = scopes.some((scope) => scope !== "ops:read");
-  if (!reachesOrganization) return [];
+  if (!reachesOrganization(scopes)) return [];
 
   const granted = new Set<AuthzPermission>(STAFF_READER_METADATA_PERMISSIONS);
   if (scopes.includes("org:content")) {

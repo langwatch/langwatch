@@ -129,6 +129,9 @@ const GLOBAL_MODELS = [
   // the operator, never a tenant, like Passkey.
   "StaffAccessRequester",
   "StaffAccessChallenge",
+  // The organization copy ledger: one row spans a source and a target organization, written and
+  // read only by the staff-access copy, never by a customer surface.
+  "StaffAccessCopyLedger",
 ] as const;
 
 /**

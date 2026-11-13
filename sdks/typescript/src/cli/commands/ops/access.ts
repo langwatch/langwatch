@@ -134,7 +134,7 @@ const redeemInto = async ({
 };
 
 /** Polls the request until it is decided or its approval window closes. */
-const waitForDecision = async ({
+export const waitForDecision = async ({
   requestId,
   endpoint,
   requesterKey,
@@ -159,7 +159,13 @@ const waitForDecision = async ({
   }
 };
 
-const refuseUndecided = ({ requestId, status }: { requestId: string; status: string }): never => {
+export const refuseUndecided = ({
+  requestId,
+  status,
+}: {
+  requestId: string;
+  status: string;
+}): never => {
   forgetPendingRequest({ requestId });
   if (status === "denied") throw opsAuthError(`Request ${requestId} was denied.`);
   if (status === "expired") {

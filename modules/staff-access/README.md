@@ -11,19 +11,20 @@ Staff access lets a platform operator's coding agent reach production for one ho
 | Classification | core (`modules/catalogue.json`)                                                                                          |
 | Subjects       | staff-access                                                                                                             |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                                                 |
-| Api token      | `StaffAccessApi` = `moduleApi<StaffAccessApi>()("staff-access")`, `contract/src/staff-access.api.ts:107` (18 operations) |
+| Api token      | `StaffAccessApi` = `moduleApi<StaffAccessApi>()("staff-access")`, `contract/src/staff-access.api.ts:116` (19 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                               |
 
 ## What staff-access owns
 
-| Kind            | Name                        | Declared at                                                                      |
-| --------------- | --------------------------- | -------------------------------------------------------------------------------- |
-| Postgres table  | `StaffAccessChallenge`      | `process/src/repositories/prisma/prisma.staff-access-challenge.repository.ts:17` |
-| Postgres table  | `StaffAccessEvent`          | `process/src/repositories/prisma/prisma.staff-access-event.repository.ts:14`     |
-| Postgres table  | `StaffAccessRequest`        | `process/src/repositories/prisma/prisma.staff-access-request.repository.ts:19`   |
-| Postgres table  | `StaffAccessRequester`      | `process/src/repositories/prisma/prisma.staff-access-requester.repository.ts:17` |
-| Stores required | prisma                      | `process/src/repositories/prisma/prisma.staff-access.repositories.ts:14`         |
-| Config          | `publicBaseUrl` (BASE_HOST) | `contract/src/staff-access.config.ts:5`                                          |
+| Kind            | Name                        | Declared at                                                                        |
+| --------------- | --------------------------- | ---------------------------------------------------------------------------------- |
+| Postgres table  | `StaffAccessChallenge`      | `process/src/repositories/prisma/prisma.staff-access-challenge.repository.ts:17`   |
+| Postgres table  | `StaffAccessCopyLedger`     | `process/src/repositories/prisma/prisma.staff-access-copy-ledger.repository.ts:14` |
+| Postgres table  | `StaffAccessEvent`          | `process/src/repositories/prisma/prisma.staff-access-event.repository.ts:14`       |
+| Postgres table  | `StaffAccessRequest`        | `process/src/repositories/prisma/prisma.staff-access-request.repository.ts:19`     |
+| Postgres table  | `StaffAccessRequester`      | `process/src/repositories/prisma/prisma.staff-access-requester.repository.ts:17`   |
+| Stores required | prisma                      | `process/src/repositories/prisma/prisma.staff-access.repositories.ts:15`           |
+| Config          | `publicBaseUrl` (BASE_HOST) | `contract/src/staff-access.config.ts:5`                                            |
 
 Anything else staff-access needs belongs to another module and is reached through its `*Api`.
 
@@ -35,12 +36,16 @@ Anything else staff-access needs belongs to another module and is reached throug
 | `auditLog`      | `AuditLogApi`         | [audit-log](../audit-log/README.md)       |
 | `auth`          | `AuthApi`             | [auth](../auth/README.md)                 |
 | `codingAgents`  | `CodingAgentApi`      | [coding-agent](../coding-agent/README.md) |
+| `datasets`      | `DatasetApi`          | [dataset](../dataset/README.md)           |
+| `evaluators`    | `EvaluatorApi`        | [evaluator](../evaluator/README.md)       |
 | `featureFlags`  | `FeatureFlagApi`      | [feature-flag](../feature-flag/README.md) |
 | `gateway`       | `GatewayApi`          | [gateway](../gateway/README.md)           |
+| `monitors`      | `MonitorApi`          | [monitor](../monitor/README.md)           |
 | `notifications` | `NotificationService` | [notification](../notification/README.md) |
 | `ops`           | `OpsApi`              | [ops](../ops/README.md)                   |
 | `organizations` | `OrganizationApi`     | [organization](../organization/README.md) |
 | `projects`      | `ProjectApi`          | [project](../project/README.md)           |
+| `prompts`       | `PromptApi`           | [prompt](../prompt/README.md)             |
 | `traces`        | `TraceApi`            | [trace](../trace/README.md)               |
 | `users`         | `UserApi`             | [user](../user/README.md)                 |
 

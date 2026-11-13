@@ -1,12 +1,14 @@
 /**
  * The agent's wire under `/api/staff-access` (ADR-193), behind the `staff_access` door. A
- * requester key asks, checks, redeems and ends; an ops token reads the `ops:read` allowlist.
- * Spec: modules/staff-access/specs/staff-access-approval.feature
+ * requester key asks, checks, redeems and ends; an ops token reads the `ops:read` allowlist
+ * and copies an organization. Specs: modules/staff-access/specs/
  */
 import { anyAuthenticated } from "@langwatch/api/access";
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import {
   StaffAccessApi,
+  staffAccessCopyBodySchema,
+  staffAccessCopyReportSchema,
   staffAccessDoorSessionSchema,
   staffAccessEndedSchema,
   staffAccessNoBodySchema,
@@ -27,7 +29,7 @@ const AGENT = anyAuthenticated({
   reason:
     "the bearer is an operator's enrolled agent or one approved session; each operation answers only that agent's own requests",
 });
-const OPS_READ = { at: "platform", refusal: "hidden" } as const;
+const OPS_PLATFORM = { at: "platform", refusal: "hidden" } as const;
 
 export const staffAccessRest = defineRestRouter(StaffAccessApi)
   .withNamespace("staff-access")
@@ -73,7 +75,7 @@ export const staffAccessRest = defineRestRouter(StaffAccessApi)
 
   .get("/api/staff-access/ops/organizations", "listStaffAccessOrganizations")
   .withQuery(staffAccessOrganizationsQuerySchema)
-  .withPermission("opsRead:view", OPS_READ)
+  .withPermission("opsRead:view", OPS_PLATFORM)
   .withOutput(staffAccessOrganizationListSchema)
   .handle(({ app, session, input }) =>
     app.listOrganizations({ session, ...(input.query ? { query: input.query } : {}) }),
@@ -81,14 +83,24 @@ export const staffAccessRest = defineRestRouter(StaffAccessApi)
 
   .get("/api/staff-access/ops/organizations/:organization/usage", "getStaffAccessOrganizationUsage")
   .withParams(staffAccessOrganizationParamsSchema)
-  .withPermission("opsRead:view", OPS_READ)
+  .withPermission("opsRead:view", OPS_PLATFORM)
   .withOutput(staffAccessUsageSchema)
   .handle(({ app, session, input }) =>
     app.getOrganizationUsage({ session, organization: input.organization }),
   )
 
   .get("/api/staff-access/ops/queues", "getStaffAccessQueueSummary")
-  .withPermission("opsRead:view", OPS_READ)
+  .withPermission("opsRead:view", OPS_PLATFORM)
   .withOutput(staffAccessQueueSummarySchema)
   .handle(({ app, session }) => app.getQueueSummary({ session }))
+
+  .post("/api/staff-access/ops/copies", "copyStaffAccessOrganization")
+  .keepsRecords()
+  .withoutAudit(
+    "the copy writes its own trail rows and both organizations' audit rows before it runs",
+  )
+  .withInput(staffAccessCopyBodySchema)
+  .withPermission("opsCopy:create", OPS_PLATFORM)
+  .withOutput(staffAccessCopyReportSchema)
+  .handle(({ app, session, input }) => app.copyOrganization({ session, body: input }))
   .build();

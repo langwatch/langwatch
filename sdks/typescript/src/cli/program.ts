@@ -6122,7 +6122,7 @@ function registerOpsCommands(program: Command): void {
       )
       .option(
         "--scope <scope>",
-        "ops:read, org:metadata, org:content or org:support; repeat for more",
+        "ops:read, ops:copy, org:metadata, org:content or org:support; repeat for more",
         collectScope,
         [],
       )
@@ -6195,6 +6195,33 @@ function registerOpsCommands(program: Command): void {
     run(async () => {
       const { opsUsageCommand } = await import("./commands/ops/read.js");
       return (organization: string) => opsUsageCommand({ organization });
+    }),
+  );
+
+  emitsResult(
+    opsCmd
+      .command("copy")
+      .description(
+        "Copy projects with their evaluators, monitors, prompts and datasets from one organization into another; asks one approval per organization",
+      )
+      .requiredOption("--from <idOrSlug>", "The source organization")
+      .requiredOption("--to <idOrSlug>", "The target organization")
+      .option(
+        "--projects <idsOrSlugs>",
+        "Comma-separated source projects; every project when left out",
+      )
+      .option("--reason <text>", "Why the copy is needed; shown to the approver and both customers")
+      .option("--dry-run", "List what would be copied and copy nothing")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    run(async () => {
+      const { opsCopyCommand } = await import("./commands/ops/copy.js");
+      return (options: {
+        from: string;
+        to: string;
+        projects?: string;
+        reason?: string;
+        dryRun?: boolean;
+      }) => opsCopyCommand(options);
     }),
   );
 }

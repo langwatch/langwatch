@@ -2,6 +2,7 @@
  * The agent's wire under `/api/staff-access` (ADR-193): request, status, redeem and end with
  * a requester key; the `ops:read` allowlist with an ops token. Read by the `langwatch` CLI.
  */
+import { reachesOrganization } from "@langwatch/authz-contract";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
@@ -16,7 +17,7 @@ const base64UrlSchema = z.string().regex(/^[A-Za-z0-9_-]+$/, "base64url without 
 
 const staffAccessRequestBodySchemaDefinition = z
   .object({
-    scopes: z.array(staffAccessScopeSchema).min(1).max(4),
+    scopes: z.array(staffAccessScopeSchema).min(1).max(5),
     /** The organization's id or slug; required by, and only with, an organization scope. */
     organization: z.string().trim().min(1).max(200).optional(),
     reason: z.string().trim().min(1).max(STAFF_ACCESS_REASON_MAX_LENGTH),
@@ -30,19 +31,27 @@ const staffAccessRequestBodySchemaDefinition = z
     if (new Set(body.scopes).size !== body.scopes.length) {
       context.addIssue({ code: "custom", path: ["scopes"], message: "Each scope once." });
     }
-    const reachesOrganization = body.scopes.some((scope) => scope !== "ops:read");
-    if (reachesOrganization && body.organization === undefined) {
+    const organizationScoped = reachesOrganization(body.scopes);
+    if (organizationScoped && body.organization === undefined) {
       context.addIssue({
         code: "custom",
         path: ["organization"],
         message: "An organization scope needs the organization's id or slug.",
       });
     }
-    if (!reachesOrganization && body.organization !== undefined) {
+    if (!organizationScoped && body.organization !== undefined) {
       context.addIssue({
         code: "custom",
         path: ["organization"],
         message: "Only an organization scope names an organization.",
+      });
+    }
+    const copySide = body.scopes.includes("org:content") || body.scopes.includes("org:support");
+    if (body.scopes.includes("ops:copy") && !copySide) {
+      context.addIssue({
+        code: "custom",
+        path: ["scopes"],
+        message: "ops:copy comes with org:content (the source) or org:support (the target).",
       });
     }
   });
@@ -195,3 +204,75 @@ export interface StaffAccessQueueSummarySchema extends Named<
 export const staffAccessQueueSummarySchema: StaffAccessQueueSummarySchema =
   staffAccessQueueSummarySchemaDefinition;
 export type StaffAccessQueueSummary = z.infer<typeof staffAccessQueueSummarySchema>;
+
+/** What an organization copy copies, in the order it runs: later kinds point at earlier ones. */
+export const STAFF_ACCESS_COPY_KINDS = [
+  "project",
+  "evaluator",
+  "monitor",
+  "prompt",
+  "dataset",
+] as const;
+export const staffAccessCopyKindSchema = z.enum(STAFF_ACCESS_COPY_KINDS);
+export type StaffAccessCopyKind = z.infer<typeof staffAccessCopyKindSchema>;
+
+/**
+ * An organization copy (ADR-193, module ADR-002). The bearer is the target session's ops token;
+ * the source session proves itself with its own ops token here, never by id alone.
+ */
+const staffAccessCopyBodySchemaDefinition = z
+  .object({
+    sourceOpsToken: z.string().min(1).max(300),
+    /** Source project ids or slugs; every live project when left out. */
+    projects: z.array(z.string().trim().min(1).max(200)).min(1).max(100).optional(),
+    dryRun: z.boolean().optional(),
+  })
+  .strict();
+export interface StaffAccessCopyBodySchema extends Named<
+  typeof staffAccessCopyBodySchemaDefinition
+> {}
+export const staffAccessCopyBodySchema: StaffAccessCopyBodySchema =
+  staffAccessCopyBodySchemaDefinition;
+export type StaffAccessCopyBody = z.infer<typeof staffAccessCopyBodySchema>;
+
+export const staffAccessCopyOutcomeSchema = z.enum([
+  "planned",
+  "copied",
+  "already_copied",
+  "skipped",
+  "failed",
+]);
+export type StaffAccessCopyOutcome = z.infer<typeof staffAccessCopyOutcomeSchema>;
+
+const staffAccessCopyItemSchemaDefinition = z.object({
+  kind: staffAccessCopyKindSchema,
+  name: z.string(),
+  sourceId: z.string(),
+  sourceProjectId: z.string(),
+  outcome: staffAccessCopyOutcomeSchema,
+  targetId: z.string().nullable(),
+  targetProjectId: z.string().nullable(),
+  /** Why an item was skipped or failed: an error code or a short plain reason. */
+  reason: z.string().nullable(),
+});
+export type StaffAccessCopyItem = z.infer<typeof staffAccessCopyItemSchemaDefinition>;
+
+const staffAccessCopyOrganizationSchemaDefinition = z.object({
+  id: z.string(),
+  slug: z.string(),
+  name: z.string(),
+});
+
+const staffAccessCopyReportSchemaDefinition = z.object({
+  source: staffAccessCopyOrganizationSchemaDefinition,
+  target: staffAccessCopyOrganizationSchemaDefinition,
+  dryRun: z.boolean(),
+  items: z.array(staffAccessCopyItemSchemaDefinition),
+  totals: z.record(staffAccessCopyOutcomeSchema, z.number().int()),
+});
+export interface StaffAccessCopyReportSchema extends Named<
+  typeof staffAccessCopyReportSchemaDefinition
+> {}
+export const staffAccessCopyReportSchema: StaffAccessCopyReportSchema =
+  staffAccessCopyReportSchemaDefinition;
+export type StaffAccessCopyReport = z.infer<typeof staffAccessCopyReportSchema>;

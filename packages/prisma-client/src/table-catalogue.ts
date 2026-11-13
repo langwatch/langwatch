@@ -187,7 +187,8 @@ export const prismaTableCatalogue = {
   "StaffAccessRequester": "StaffAccessRequester",
   "StaffAccessChallenge": "StaffAccessChallenge",
   "StaffAccessRequest": "StaffAccessRequest",
-  "StaffAccessEvent": "StaffAccessEvent"
+  "StaffAccessEvent": "StaffAccessEvent",
+  "StaffAccessCopyLedger": "StaffAccessCopyLedger"
 } as const;
 
 export const prismaModelFieldCatalogue = {
@@ -3099,6 +3100,18 @@ export const prismaModelFieldCatalogue = {
     "durationMs",
     "ipAddress",
     "userAgent"
+  ],
+  "StaffAccessCopyLedger": [
+    "id",
+    "requestId",
+    "sourceOrganizationId",
+    "targetOrganizationId",
+    "kind",
+    "sourceId",
+    "targetId",
+    "sourceProjectId",
+    "targetProjectId",
+    "createdAt"
   ]
 } as const;
 
@@ -3704,7 +3717,8 @@ export const prismaRelationCatalogue = {
   "StaffAccessRequester": {},
   "StaffAccessChallenge": {},
   "StaffAccessRequest": {},
-  "StaffAccessEvent": {}
+  "StaffAccessEvent": {},
+  "StaffAccessCopyLedger": {}
 } as const;
 
 export type PrismaTableModel = keyof typeof prismaTableCatalogue;

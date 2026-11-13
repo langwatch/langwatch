@@ -24,6 +24,10 @@ export const SCOPE_COPY: Readonly<Record<StaffAccessScopeName, ScopeCopy>> = {
     label: "Ops read",
     line: "Platform health and which organizations use which features. No customer content.",
   },
+  "ops:copy": {
+    label: "Organization copy",
+    line: "Lets the agent copy projects with their evaluators, monitors, prompts and datasets between this organization and one other, each side approved on its own. Never secrets, keys, members or billing.",
+  },
 };
 
 export const STATUS_LABEL: Readonly<Record<StaffAccessRequestStatus, string>> = {
