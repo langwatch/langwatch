@@ -1,8 +1,5 @@
 /** Spec: specs/upgrade/projection-replay-step.feature. */
-import {
-  memoryRedisDouble,
-  memoryRedisStore,
-} from "@langwatch/test-harness/client-doubles/redis";
+import { memoryRedisDouble, memoryRedisStore } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
 import type { Event } from "../../domain/types.ts";
