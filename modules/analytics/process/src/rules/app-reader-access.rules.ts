@@ -97,8 +97,9 @@ export const APP_READER_TENANT_TABLES: readonly LangWatchQLTable[] = [
 
 /**
  * System tables 26.8 grants every user implicitly, which `REVOKE` does not remove. Every tenant
- * shares the reader, so a policy admitting no row hides each one (ADR-202).
+ * shares the app reader and the LangWatchQL user, so a policy admitting no row hides each one
+ * from both (ADR-202).
  */
-export const APP_READER_HIDDEN_SYSTEM_TABLES: readonly { database: string; table: string }[] = [
+export const HIDDEN_SYSTEM_TABLES: readonly { database: string; table: string }[] = [
   { database: "system", table: "user_query_log" },
 ];

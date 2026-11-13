@@ -274,4 +274,24 @@ describe("LangWatchQL access-model emitter parity", () => {
       expect(fromYaml.namedCollection).toEqual(expected.namedCollection);
     });
   });
+
+  describe("when either emitter renders the restricted user's implicit query log", () => {
+    /** @scenario "Both emitters hide the restricted user's query log under a policy of its own" */
+    it("hides system.user_query_log behind a policy admitting no row, with no grant on it", () => {
+      expect(definition.rowPolicies.filter(({ database }) => database === "system")).toEqual([
+        {
+          name: "user_query_log_hidden_langwatch_lwql",
+          database: "system",
+          table: "user_query_log",
+          predicate: "0",
+        },
+      ]);
+      expect(definition.grants.filter(({ database }) => database === "system")).toEqual([]);
+      expect(accessModelDefinition.renderDdl(definition)).toContain(
+        "CREATE ROW POLICY OR REPLACE user_query_log_hidden_langwatch_lwql ON system.user_query_log\n" +
+          "  USING 0\n  TO langwatch_lwql",
+      );
+      expect(fromYaml.policies).toContain("system.user_query_log=0");
+    });
+  });
 });

@@ -294,6 +294,44 @@ describe("given LangWatchQL provisioned on a real ClickHouse with two tenants", 
     });
   });
 
+  describe("when another tenant's statement sits in the restricted user's own query log", () => {
+    /** @scenario "The restricted user cannot read another tenant's logged statements, even past the validator" */
+    it("hides tenant B's statement text and log_comment from the restricted user reading for tenant A", async () => {
+      const marker = `lwql-history-${randomBytes(6).toString("hex")}`;
+      // Straight to ClickHouse, past the validator that refuses `system`: the server holds alone.
+      const tenantBForItsProject = await harness.restrictedClient({
+        keyHash: harness.tenantB.keyHash,
+        projectIds: [harness.tenantB.tenantId],
+      });
+      await selectRows(
+        tenantBForItsProject,
+        `SELECT count() AS n, '${marker}-b' AS m FROM ${database}.traces`,
+      );
+      await harness.applyAsAdmin(["SYSTEM FLUSH LOGS"]);
+      // Searched as two halves, so no probe's own text holds the marker it looks for.
+      const holdsMarker = `position(query, concat('${marker}', '-b')) > 0`;
+
+      const logged = await selectRows<{ log_comment: string }>(
+        harness.admin,
+        `SELECT log_comment FROM system.query_log WHERE type = 'QueryFinish' ` +
+          `AND user = '${harness.names.restrictedUser}' AND ${holdsMarker}`,
+      );
+      expect(logged, "the server logged tenant B's statement").toEqual([
+        { log_comment: `lwql:project=${harness.tenantB.tenantId}` },
+      ]);
+      expect(
+        await selectRows(
+          tenantA,
+          `SELECT query, log_comment FROM system.user_query_log ` +
+            `WHERE ${holdsMarker} OR position(log_comment, '${harness.tenantB.tenantId}') > 0`,
+        ),
+      ).toEqual([]);
+      expect(
+        await selectScalar(tenantA, "SELECT toUInt32(count()) AS value FROM system.user_query_log"),
+      ).toBe(0);
+    });
+  });
+
   describe("when both tenants run the same filtered query", () => {
     /** @scenario "The query condition cache never carries one tenant's result into another's" */
     it("keeps the condition cache off for the restricted user, and each tenant its own count", async () => {

@@ -135,7 +135,19 @@ describe("given the access-model definition built with the app reader's credenti
         "  USING 0\n  TO langwatch_app_reader",
     );
     expect(usersD.users[APP_READER_NAMES.user]?.databases.system?.user_query_log?.filter).toBe("0");
-    expect(usersD.users[NAMES.restrictedUser]?.databases.system).toBeUndefined();
+  });
+
+  /** @scenario "Both emitters hide the restricted user's query log under a policy of its own" */
+  it("names the LangWatchQL user's query-log policy apart from the reader's, so neither replaces the other", () => {
+    const systemPolicyStatements = ddl.filter((statement) =>
+      statement.startsWith("CREATE ROW POLICY OR REPLACE user_query_log_"),
+    );
+    expect(systemPolicyStatements).toEqual([
+      "CREATE ROW POLICY OR REPLACE user_query_log_hidden_langwatch_lwql ON system.user_query_log\n" +
+        "  USING 0\n  TO langwatch_lwql",
+      "CREATE ROW POLICY OR REPLACE user_query_log_app_hidden ON system.user_query_log\n" +
+        "  USING 0\n  TO langwatch_app_reader",
+    ]);
   });
 
   /** @scenario "App reader policies never share a name with a LangWatchQL policy" */

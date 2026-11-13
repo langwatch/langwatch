@@ -180,8 +180,17 @@ export class LangWatchQLAccessModelService {
     return `${sqlText.assertIdentifier(table, "table")}_app_hidden`;
   }
 
-  /** Admits no row: the reader reads nothing of a table it cannot be refused. */
-  appReaderHiddenPredicate(): string {
+  /**
+   * The LangWatchQL user's policy hiding one system table. Named per user, since the table is
+   * server-wide: two installs sharing a server never replace each other's.
+   */
+  hiddenPolicyName({ names, table }: { names: LangWatchQLNames; table: string }): string {
+    const user = sqlText.assertIdentifier(names.restrictedUser, "restrictedUser");
+    return `${sqlText.assertIdentifier(table, "table")}_hidden_${user}`;
+  }
+
+  /** Admits no row: a shared identity reads nothing of a table it cannot be refused. */
+  hiddenPredicate(): string {
     return "0";
   }
 

@@ -13,10 +13,10 @@ import type { PostgresNamedCollection } from "../features/provisioning/services/
 import { LangWatchQLViewProvisioningService } from "../features/provisioning/services/langwatch-ql-view-provisioning.service.ts";
 import { LangWatchQLViewStatementsService } from "../features/provisioning/services/langwatch-ql-view-statements.service.ts";
 import {
-  APP_READER_HIDDEN_SYSTEM_TABLES,
   APP_READER_NAMES,
   APP_READER_SETTINGS_PREFIX,
   APP_READER_TENANT_TABLES,
+  HIDDEN_SYSTEM_TABLES,
 } from "../rules/app-reader-access.rules.ts";
 import { clickHouseLiteral } from "../rules/langwatch-ql-sql-literal.rules.ts";
 import { flooredViewNames } from "../rules/lwql-dedup-floor.rules.ts";
@@ -433,7 +433,24 @@ export class LangWatchQLAccessModelDefinitionService {
           sourceDatabase,
         }),
       }));
-    return [keyMapPolicy, ...tablePolicies];
+    const hidden = this.#hiddenSystemTablePolicies({
+      policyName: (table) => accessModel.hiddenPolicyName({ names, table }),
+    });
+    return [keyMapPolicy, ...tablePolicies, ...hidden];
+  }
+
+  /** A policy admitting no row on each system table every user is granted implicitly (ADR-202). */
+  #hiddenSystemTablePolicies({
+    policyName,
+  }: {
+    policyName: (table: string) => string;
+  }): LwqlRowPolicyTarget[] {
+    return HIDDEN_SYSTEM_TABLES.map(({ database, table }) => ({
+      name: policyName(table),
+      database,
+      table,
+      predicate: accessModel.hiddenPredicate(),
+    }));
   }
 
   /**
@@ -463,12 +480,9 @@ export class LangWatchQLAccessModelDefinitionService {
           table,
           predicate: accessModel.appReaderTenantPredicate({ tenantColumn }),
         })),
-        ...APP_READER_HIDDEN_SYSTEM_TABLES.map(({ database, table }) => ({
-          name: accessModel.appReaderHiddenPolicyName(table),
-          database,
-          table,
-          predicate: accessModel.appReaderHiddenPredicate(),
-        })),
+        ...this.#hiddenSystemTablePolicies({
+          policyName: (table) => accessModel.appReaderHiddenPolicyName(table),
+        }),
       ],
     };
   }
