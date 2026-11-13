@@ -1,9 +1,13 @@
 import { allModelOptions } from "@langwatch/model-provider-contract";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { api } from "../../../../behavior/langy-api.ts";
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
-import { resolveComposerModel } from "../../../composer/model/langy-composer-model.ts";
+import {
+  resolveComposerModel,
+  unservedDefaultModel,
+} from "../../../composer/model/langy-composer-model.ts";
+import type { LangyErrorPresentation } from "../logic/langy-error-explainer.ts";
 import { useLangyModelOptions } from "./use-langy-model-options.ts";
 
 /**
@@ -22,6 +26,9 @@ const MODEL_QUERY_OPTIONS = { staleTime: 300_000, refetchOnWindowFocus: false } 
 export function useLangyComposerModel({ projectId }: { projectId: string | undefined }) {
   const modelOverride = useLangyStore((s) => s.modelOverride);
   const setModelOverride = useLangyStore((s) => s.setModelOverride);
+  const seedFollowsDefault = useLangyStore(
+    (s) => !s.isModelPickedByUser && s.modelSeededForConversationId === null,
+  );
 
   const resolvedDefaultQuery = api.modelProvider.getResolvedDefault.useQuery(
     { projectId: projectId ?? "", featureKey: LANGY_GATE_FEATURE_KEY },
@@ -67,21 +74,36 @@ export function useLangyComposerModel({ projectId }: { projectId: string | undef
       resolvedDefault: resolvedDefaultModel,
       resolvedDefaultSettled,
       reachable: reachableModels,
+      seedFollowsDefault,
     });
     if (next) setModelOverride(next);
   }, [
     resolvedDefaultModel,
     resolvedDefaultSettled,
+    seedFollowsDefault,
     modelOverride,
     reachableModels,
     setModelOverride,
   ]);
+
+  const unservedDefault = unservedDefaultModel({
+    resolvedDefault: resolvedDefaultModel,
+    settled: settled && !resolvedDefaultQuery.isPending,
+    reachable: reachableModels,
+  });
+  const [dismissedUnserved, setDismissedUnserved] = useState<string | null>(null);
 
   return {
     modelOverride,
     modelOptions,
     reachableModels,
     langyDefaultModel,
+    /** Names a resolved default no connected provider serves, instead of switching silently. */
+    unservedDefaultNotice:
+      unservedDefault && unservedDefault !== dismissedUnserved
+        ? unservedDefaultPresentation({ defaultModel: unservedDefault, current: modelOverride })
+        : null,
+    dismissUnservedDefault: () => setDismissedUnserved(unservedDefault),
     langyNeedsModel,
     /** Both model reads have answered, so "no model" is a fact rather than a wait. */
     modelQueriesSettled: settled,
@@ -114,4 +136,21 @@ export function useFollowConversationModel({
       model: conversationLastModel,
     });
   }, [activeConversationId, conversationLastModel, reachableModels]);
+}
+
+function unservedDefaultPresentation({
+  defaultModel,
+  current,
+}: {
+  defaultModel: string;
+  current: string;
+}): LangyErrorPresentation {
+  return {
+    kind: "langy_default_model_unserved",
+    title: `Langy's default model ${defaultModel} isn't available`,
+    description: current
+      ? `None of this project's model providers serves it right now, so this chat uses ${current}.`
+      : "None of this project's model providers serves it right now.",
+    render: "composer-notice",
+  };
 }

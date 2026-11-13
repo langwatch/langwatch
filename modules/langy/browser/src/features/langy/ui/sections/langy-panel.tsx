@@ -729,6 +729,11 @@ function LangyPanel({
                     presentation={failure.turnError}
                     onDismiss={engine.clearError}
                   />
+                  <LangyComposerNotice
+                    floating={floating}
+                    presentation={model.unservedDefaultNotice}
+                    onDismiss={model.dismissUnservedDefault}
+                  />
                   {view.timeTravel && (
                     <LangyTimeTravelVeil floating={floating} atMs={view.timeTravel.atMs} />
                   )}
