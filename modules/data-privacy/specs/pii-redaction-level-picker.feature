@@ -8,9 +8,10 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
   # or street addresses. The picker reads and writes the organization's own privacy
   # rule through the same setForScope call the rule drawer saves with, changing only
   # its PII level. Everything here is behind release_pii_redaction_model_enabled on
-  # LangWatch Cloud: with the flag off for the organization, or on a self-hosted
-  # deployment, the page and the drawer are as they were. The browser cannot see
-  # whether the deployment names a model endpoint, so Cloud plus the flag is the gate.
+  # LangWatch Cloud: with the flag off for the organization the page and the drawer
+  # are as they were. The browser cannot see whether the deployment names a model
+  # endpoint, so Cloud plus the flag is the gate; on a self-hosted deployment the
+  # drawer says Strict there is the rule-based detector (decision of 4 Nov).
   # The price shown is derived from the rate billing charges (ADR-201); organizations
   # on release_pii_redaction_model_free see Strict as included instead.
 
@@ -50,6 +51,7 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
     Then the organization rule is saved with PII level strict
     And the rule still drops trace input
     And the synthetic example shows the name and the address masked
+    And the page says projects or teams with their own Strict rule keep it when the organization moves to Essential
 
   @integration
   Scenario: Picking Essential on a Strict organization writes Essential back
@@ -78,8 +80,8 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
   Scenario: The billing and fallback small print sits behind the price
     Given release_pii_redaction_model_enabled is on for "acme"
     When an admin opens the information beside Strict's price
-    Then it says only spans the model redacts are billed, with no quota or plan, and fallbacks are free
-    And it says a span falls back to the standard detector when the model is unavailable or the span's text is over 8,000 characters in total
+    Then it says every span the model answers is billed by the characters sent, even when it finds nothing, with no quota or plan, and fallbacks are free
+    And it says a span goes to the rule-based detector (Presidio) when the model is unavailable or the span's text is over 8,000 characters in total, and can then go to Google Cloud DLP
 
   @unit
   Scenario: The price is derived from the rate billing charges
@@ -153,9 +155,35 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
     Then the picker shows the organization on "Off" with neither level picked
 
   @integration
-  Scenario: A self-hosted deployment shows no model and no price
+  Scenario: A self-hosted deployment says Strict there is rule-based
     Given a self-hosted deployment
-    And release_pii_redaction_model_enabled is on for "acme"
     When an admin opens the Data Privacy page for project "web-app"
-    Then the page shows no organization PII level picker
-    And the page names no price and no LangWatch PII Redaction Model
+    Then the page shows no organization PII level picker and no price
+    When the admin sets a rule's PII redaction to Strict in the drawer
+    Then the drawer says "Strict here uses the rule-based detector. The LangWatch PII Redaction Model is available on LangWatch Cloud."
+
+  @integration
+  Scenario: A level changed elsewhere after a pick shows the stored level
+    Given release_pii_redaction_model_enabled is on for "acme"
+    And the organization's PII level resolves to Essential
+    When an admin picks Strict in the organization PII level picker and confirms
+    And the stored level becomes Strict
+    And a rule change later sets the organization back to Essential
+    Then the picker shows Essential
+
+  @integration
+  Scenario: Saving a rule at Strict asks to confirm with the price
+    Given release_pii_redaction_model_enabled is on for "acme"
+    And a project rule on "web-app" with PII level essential
+    When an admin sets that rule's PII redaction to Strict in the drawer and saves
+    Then a confirmation names the LangWatch PII Redaction Model and its price
+    And the rule is saved only once the admin confirms
+
+  @unit
+  Scenario: Saving a rule asks for the price only when it turns Strict on at a price
+    Then a rule already on Strict, a free organization, a self-hosted deployment and a level other than Strict save without asking
+
+  @unit
+  Scenario: The settings page names the model's own length limit
+    Given the process routes a span over PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS to Presidio
+    Then the fallback note names that same limit, read from the contract
