@@ -108,10 +108,13 @@ export class TraceSpanCollectionService {
     const ref = spanDedupRefOf(input);
     const [claim = UNANSWERED_CLAIM] = await this.options.dedup.claimProcessing([ref]);
     const closed: StagingClosedTally = { spans: 0, tenantId: input.tenantId };
-    const result = await this.collectClaimed({ input, claim, closed });
-    if (result.status === "collected") await this.options.dedup.confirmProcessed([ref]);
-    this.reportStagingClosed(closed);
-    return result;
+    try {
+      const result = await this.collectClaimed({ input, claim, closed });
+      if (result.status === "collected") await this.options.dedup.confirmProcessed([ref]);
+      return result;
+    } finally {
+      this.reportStagingClosed(closed);
+    }
   }
 
   /** Spans in order, claimed and confirmed per batch rather than per span. */
