@@ -245,7 +245,7 @@ Feature: Two-step verification - one setup per person, and organizations that re
     Then not one of them produces a session that proved no second factor
     And no code path can mint one
 
-  # A passkey approval (ADR-193) is a signature over the hash of one request:
+  # A passkey approval (ADR-202) is a signature over the hash of one request:
   # the challenge is that hash, so the signature proves the person approved
   # that request and nothing else. It does not refresh, upgrade or record
   # anything on the session that carried it, so it reopens no step-up.

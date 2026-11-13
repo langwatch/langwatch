@@ -34,7 +34,7 @@ type DoorDeps = Readonly<{
 }>;
 
 /**
- * The `staff_access` door (ADR-193). It reads the bearer itself: an `lwsr_` requester key stands
+ * The `staff_access` door (ADR-202). It reads the bearer itself: an `lwsr_` requester key stands
  * for an enrolled agent, an `lwsa_` ops token for one live redeemed session pinned to its
  * address. It answers `opsRead:view` from that session's scopes and nothing else.
  */

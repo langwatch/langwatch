@@ -25,6 +25,7 @@ import type { UpgradeDiagnosticsService } from "../../features/upgrades/services
 import { MemoryOpsRepositories } from "../../repositories/memory/memory.ops.repositories.ts";
 import type { OpsRepositories } from "../../repositories/ops.repositories.ts";
 import { AdminAccessService } from "../../services/admin-access.service.ts";
+import type { SeatSharingCheckService } from "../../services/seat-sharing-check.service.ts";
 import {
   OpsModule,
   type OpsAppInfrastructure,
@@ -82,6 +83,7 @@ export type OpsTestAppOptions = Readonly<{
   authz?: AuthzApi;
   repositories?: OpsRepositories;
   checkup?: OpsCheckupService;
+  seatSharing?: SeatSharingCheckService;
   upgradeDiagnostics?: UpgradeDiagnosticsService;
 }>;
 
@@ -159,6 +161,7 @@ export function createOpsTestApp(options: OpsTestAppOptions = {}): OpsTestApp {
     },
     repositories,
     ...(options.checkup === undefined ? {} : { checkup: options.checkup }),
+    ...(options.seatSharing === undefined ? {} : { seatSharing: options.seatSharing }),
     ...(options.upgradeDiagnostics === undefined
       ? {}
       : { upgradeDiagnostics: options.upgradeDiagnostics }),

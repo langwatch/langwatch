@@ -42,7 +42,10 @@ function claimsOf(declaration: { router: TrpcRouterMount<never, never> }): Decla
 
 describe("given the role transport declared by the feature", () => {
   describe("when a process mounts it on its own tRPC root", () => {
-    /** @scenario "The role transport moves without changing who may call it" */
+    /**
+     * @scenario "The role transport moves without changing who may call it"
+     * @scenario "Directory reads declare members:view and writes stay at organization:manage"
+     */
     it("publishes the same procedure names, each with its access decision declared", () => {
       const claims = claimsOf(roleTrpcTransport);
 
@@ -59,8 +62,12 @@ describe("given the role transport declared by the feature", () => {
       );
       expect(Object.keys(claims).toSorted()).toEqual(Object.keys(roleTrpc.members).toSorted());
 
+      const reads: Record<string, string> = {
+        getById: "organization:view",
+        getAll: "members:view",
+      };
       for (const [name, claimed] of Object.entries(claims)) {
-        expect(claimed).toContain(name === "getById" ? "organization:view" : "organization:manage");
+        expect(claimed).toContain(reads[name] ?? "organization:manage");
       }
     });
 

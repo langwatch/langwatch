@@ -45,7 +45,7 @@ describe("AuthzModule.create", () => {
     const pipeline = app.eventingPipeline();
     expect(pipeline.metadata.name).toBe(AUTHZ_GRANT_PIPELINE_NAME);
     expect([...pipeline.mapProjections.keys()]).toEqual(["authzGrantsWrite"]);
-    expect([...pipeline.eventSubscribers.keys()]).toEqual(["auditTrail"]);
+    expect([...pipeline.eventSubscribers.keys()]).toEqual(["auditTrail", "braidChangeRevoke"]);
     expect([...pipeline.mapSubscribers.keys()]).toEqual(["sessionVersion"]);
     expect(app.engineMigration().name).toBe(AUTHZ_ENGINE_MIGRATION_NAME);
     expect(audited).toEqual([]);

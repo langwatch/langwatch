@@ -1,52 +1,33 @@
-// What a role can do and who holds one (main's RolesPanel): the predefined ladder
-// first, then the organization's own roles; counts and holders fold out of the assignments.
+// What a role can do and who holds one: the built-in roles as one boxed list, Billing
+// last, then the organization's own roles in the same rows.
+// Spec: specs/identity/org-access-cluster.feature
 
 import { Link } from "@langwatch/browser-host/link";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
-  Box,
   Button,
-  Heading,
   HStack,
   Skeleton,
   Spacer,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { Plus, ShieldCheck } from "lucide-react";
+import { SettingList } from "@langwatch/design-system/settings-card";
+import { Plus } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
-import { authzApi, type RouterOutputs } from "../../behavior/authz-api.ts";
+import { authzApi } from "../../behavior/authz-api.ts";
+import { type CustomRole, useRoleCatalogue } from "../../behavior/use-role-catalogue.ts";
 import { useAuthzHost } from "../../model/authz-host.ts";
-import {
-  BUILTIN_ROLE_CARDS,
-  builtinRoleGrantedPermissions,
-  peopleHoldingBuiltinRole,
-} from "../../model/builtin-roles.ts";
 import type { ManagedGrant } from "../../model/managed-grant.ts";
-import {
-  holdersOfCustomRole,
-  peopleHoldingCustomRole,
-  scopesOfCustomRole,
-} from "../../model/role-holders.ts";
-import { BuiltinRoleCard, CustomRoleCard } from "../blocks/role-cards.tsx";
-import { RoleDetailDialog } from "../blocks/role-detail-dialog.tsx";
+import { RoleDetailDrawerToken } from "../../model/role-detail-drawer.ts";
+import { peopleHoldingCustomRole } from "../../model/role-holders.ts";
+import { RoleRow } from "../blocks/role-row.tsx";
 import { SectionErrorNotice } from "../elements/section-error-notice.tsx";
 import { RoleDialog } from "./role-dialog.tsx";
 
-type Role = RouterOutputs["role"]["getAll"][number];
-
-type RoleDetail = { title: string; description: string | null; permissions: readonly string[] };
-
-type OpenDialog =
-  | { kind: "none" }
-  | { kind: "create" }
-  | { kind: "edit"; role: Role }
-  | ({ kind: "detail" } & RoleDetail);
-
-const NO_ASSIGNMENTS: ManagedGrant[] = [];
+type OpenDialog = { kind: "none" } | { kind: "create" } | { kind: "edit"; role: CustomRole };
 
 export function RolesPanel({
   organizationId,
@@ -59,19 +40,11 @@ export function RolesPanel({
 }) {
   const host = useAuthzHost();
   const [dialog, setDialog] = useState<OpenDialog>({ kind: "none" });
-  const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
+  const [roleToDelete, setRoleToDelete] = useState<CustomRole | null>(null);
 
   const utils = authzApi.useUtils();
-  const roles = authzApi.role.getAll.useQuery({ organizationId });
-  const assignments = authzApi.authz.listManagedGrants.useQuery(
-    { organizationId },
-    { enabled: !!organizationId },
-  );
-  const assignmentRows = assignments.data ?? NO_ASSIGNMENTS;
-  // Losing the assignments costs the counts and holders, never the roles;
-  // null is "unknown", not zero.
-  const assignmentsUnavailable = assignments.isError;
-  const countsPending = assignments.isLoading || assignmentsUnavailable;
+  const catalogue = useRoleCatalogue({ organizationId });
+  const openRole = (role: string) => host.openOverlay(RoleDetailDrawerToken, { role });
 
   const deleteRole = authzApi.role.delete.useMutation({
     onSuccess: () => {
@@ -82,114 +55,82 @@ export function RolesPanel({
     onError: (error) => host.failed({ error, fallbackTitle: "Couldn't delete this role" }),
   });
 
-  const closeDialog = () => setDialog({ kind: "none" });
-
   return (
-    <VStack align="stretch" width="full" gap={8}>
-      <VStack align="stretch" width="full" gap={4}>
-        <SectionHeading
-          title="Predefined roles"
-          hint="Three roles cover most teams. They cannot be changed or deleted."
-        />
-        {assignmentsUnavailable && (
-          <SectionErrorNotice title="Couldn't work out who holds each role" />
-        )}
-        <Box
-          width="full"
-          display="grid"
-          gridTemplateColumns="repeat(auto-fit, minmax(280px, 1fr))"
-          gap={4}
-        >
-          {BUILTIN_ROLE_CARDS.map((card) => (
-            <BuiltinRoleCard
-              key={card.teamRole}
-              card={card}
-              people={
-                countsPending
-                  ? null
-                  : peopleHoldingBuiltinRole({ bindings: assignmentRows, teamRole: card.teamRole })
-              }
-              totalPermissions={builtinRoleGrantedPermissions(card.teamRole).length}
-              onOpenDetail={() =>
-                setDialog({
-                  kind: "detail",
-                  title: card.name,
-                  description: card.description,
-                  permissions: builtinRoleGrantedPermissions(card.teamRole),
-                })
-              }
-            />
-          ))}
-        </Box>
-      </VStack>
-
-      <VStack align="stretch" width="full" gap={4}>
-        <SectionHeading
-          title="Custom roles"
-          hint="Scoped grants for people who need one thing and nothing else."
-          right={
-            <Tooltip
-              content="You need permission to manage this organization to write a role."
-              disabled={canManage}
-            >
-              <Button
-                size="sm"
-                colorPalette="orange"
-                onClick={() => setDialog({ kind: "create" })}
-                disabled={!canManage}
-                data-testid="authz-role-create"
-              >
-                <Plus size={14} aria-hidden />
-                New role
-              </Button>
-            </Tooltip>
-          }
-        />
-
-        {roles.isError ? (
-          <SectionErrorNotice title="Couldn't load your custom roles" />
-        ) : (
-          <CustomRoleCards
-            roles={roles.data}
-            assignments={assignmentsUnavailable ? null : assignmentRows}
-            canManage={canManage}
-            onOpenDetail={(role) =>
-              setDialog({
-                kind: "detail",
-                title: role.name,
-                description: role.description,
-                permissions: role.permissions,
-              })
-            }
-            onEdit={(role) => setDialog({ kind: "edit", role })}
-            onDelete={setRoleToDelete}
+    <VStack align="stretch" width="full" gap={3.5}>
+      {catalogue.assignmentsUnavailable && (
+        <SectionErrorNotice title="Couldn't work out who holds each role" />
+      )}
+      <SettingList variant="boxed" data-testid="builtin-roles">
+        {catalogue.builtin.map((entry) => (
+          <RoleRow
+            key={entry.key}
+            dot={entry.dot}
+            name={entry.name}
+            description={entry.description}
+            people={entry.people}
+            permissions={entry.permissions.length}
+            action={<RowAction label="See what it can do" onClick={() => openRole(entry.key)} />}
+            data-testid={`builtin-role-${entry.key}`}
           />
-        )}
+        ))}
+      </SettingList>
 
-        {canReadAuditLog && (
-          <Text fontSize="xs" color="fg.muted">
-            Every role you write, change or hand to somebody is recorded in the{" "}
-            <Link href="/settings/audit-log" fontSize="xs">
-              audit log
-            </Link>
-            .
-          </Text>
+      <HStack width="full" align="baseline" gap={2.5} marginTop={1.5}>
+        <Text as="h3" textStyle="cardTitle" color="fg">
+          Custom roles
+        </Text>
+        <Text textStyle="bodySm" color="fg.muted">
+          Scoped grants for people who need one thing and nothing else.
+        </Text>
+        <Spacer />
+        {canManage && (
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => setDialog({ kind: "create" })}
+            data-testid="authz-role-create"
+          >
+            <Plus size={12} aria-hidden />
+            New role
+          </Button>
         )}
-      </VStack>
+      </HStack>
+
+      {catalogue.roles.isError ? (
+        <SectionErrorNotice title="Couldn't load your custom roles" />
+      ) : (
+        <CustomRoleRows
+          roles={catalogue.roles.data}
+          assignments={catalogue.assignments}
+          canManage={canManage}
+          onOpen={(role) => openRole(role.id)}
+          onEdit={(role) => setDialog({ kind: "edit", role })}
+        />
+      )}
+
+      {canReadAuditLog && (
+        <Text fontSize="xs" color="fg.muted">
+          Every role you write, change or hand to somebody is recorded in the{" "}
+          <Link href="/settings/audit-log" fontSize="xs">
+            audit log
+          </Link>
+          .
+        </Text>
+      )}
 
       <RoleDialog
         open={dialog.kind === "create" || dialog.kind === "edit"}
         organizationId={organizationId}
         editing={dialog.kind === "edit" ? dialog.role : null}
-        onClose={closeDialog}
-      />
-
-      <RoleDetailDialog
-        open={dialog.kind === "detail"}
-        onClose={closeDialog}
-        title={dialog.kind === "detail" ? dialog.title : ""}
-        description={dialog.kind === "detail" ? dialog.description : null}
-        permissions={dialog.kind === "detail" ? dialog.permissions : []}
+        onClose={() => setDialog({ kind: "none" })}
+        onDelete={
+          dialog.kind === "edit"
+            ? () => {
+                setRoleToDelete(dialog.role);
+                setDialog({ kind: "none" });
+              }
+            : void 0
+        }
       />
 
       <ConfirmDialog
@@ -214,83 +155,74 @@ export function RolesPanel({
   );
 }
 
+function RowAction({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <Button
+      size="xs"
+      variant="ghost"
+      color="fg.muted"
+      textStyle="caption"
+      fontWeight="medium"
+      onClick={onClick}
+    >
+      {label}
+    </Button>
+  );
+}
+
 /** The organization's own roles; `assignments` is null when they could not be read. */
-function CustomRoleCards({
+function CustomRoleRows({
   roles,
   assignments,
   canManage,
-  onOpenDetail,
+  onOpen,
   onEdit,
-  onDelete,
 }: {
-  roles: readonly Role[] | undefined;
+  roles: readonly CustomRole[] | undefined;
   assignments: readonly ManagedGrant[] | null;
   canManage: boolean;
-  onOpenDetail: (role: Role) => void;
-  onEdit: (role: Role) => void;
-  onDelete: (role: Role) => void;
-}) {
+  onOpen: (role: CustomRole) => void;
+  onEdit: (role: CustomRole) => void;
+}): ReactNode {
   if (!roles) {
     return (
-      <VStack align="stretch" width="full" gap={4}>
-        <Skeleton height="96px" borderRadius="xl" />
-        <Skeleton height="96px" borderRadius="xl" />
+      <VStack align="stretch" width="full" gap={2}>
+        <Skeleton height="40px" borderRadius="lg" />
+        <Skeleton height="40px" borderRadius="lg" />
       </VStack>
     );
   }
   if (roles.length === 0) {
     return (
       <NoDataInfoBlock
-        title="No custom roles yet"
-        description="Write one when somebody needs a narrower slice of access than Admin, Member or Viewer gives them."
-        icon={<ShieldCheck />}
+        size="line"
+        title="No custom roles yet. Write one when somebody needs a narrower slice of access than Admin, Member or Viewer gives them."
       />
     );
   }
 
   return (
-    <VStack align="stretch" width="full" gap={4}>
-      {roles.map((role) => {
-        const input = { assignments: assignments ?? [], customRoleId: role.id };
-        return (
-          <CustomRoleCard
-            key={role.id}
-            role={role}
-            canManage={canManage}
-            holders={holdersOfCustomRole(input)}
-            scopes={scopesOfCustomRole(input)}
-            people={assignments ? peopleHoldingCustomRole(input) : null}
-            onOpenDetail={() => onOpenDetail(role)}
-            onEdit={() => onEdit(role)}
-            onDelete={() => onDelete(role)}
-          />
-        );
-      })}
-    </VStack>
-  );
-}
-
-function SectionHeading({
-  title,
-  hint,
-  right,
-}: {
-  title: string;
-  hint: string;
-  right?: ReactNode;
-}) {
-  return (
-    <HStack width="full" align="start">
-      <Box>
-        <Heading size="sm" as="h3">
-          {title}
-        </Heading>
-        <Text color="fg.muted" fontSize="sm">
-          {hint}
-        </Text>
-      </Box>
-      <Spacer />
-      {right}
-    </HStack>
+    <SettingList variant="boxed" data-testid="custom-roles">
+      {roles.map((role) => (
+        <RoleRow
+          key={role.id}
+          dot={null}
+          name={role.name}
+          description={role.description}
+          people={
+            assignments ? peopleHoldingCustomRole({ assignments, customRoleId: role.id }) : null
+          }
+          permissions={role.permissions.length}
+          action={
+            canManage ? (
+              <RowAction label="Edit" onClick={() => onEdit(role)} />
+            ) : (
+              <RowAction label="See what it can do" onClick={() => onOpen(role)} />
+            )
+          }
+          data-testid={`custom-role-${role.id}`}
+        />
+      ))}
+    </SettingList>
   );
 }

@@ -865,6 +865,10 @@ export function DatasetEditorTable({
       store.getState().records.find((r) => r.id === recordId),
     [store],
   );
+  const resolveColumns = useCallback(
+    () => store.getState().columns.map((column) => column.name),
+    [store],
+  );
   const onStatus = useCallback(
     (state: AutosaveState, error?: string) => setAutosave(state, error),
     [setAutosave],
@@ -873,6 +877,7 @@ export function DatasetEditorTable({
     projectId: project?.id,
     pendingSavedChanges,
     resolveFullRecord,
+    resolveColumns,
     clearPendingChange,
     onStatus,
     // After a deletion settles, refresh the server total so the pager reflects

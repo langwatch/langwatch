@@ -1,5 +1,5 @@
 /**
- * Staff access keys (ADR-193): ownerless, system-managed, restricted to the staff bags at
+ * Staff access keys (ADR-202): ownerless, system-managed, restricted to the staff bags at
  * organization scope, hidden from listings, under names a customer may not take.
  * @vitest-environment node
  * @see modules/staff-access/specs/staff-access-use.feature
@@ -32,6 +32,8 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { MemoryApiKeyAnswerCacheRepository } from "../../repositories/memory/memory.api-key-answer-cache.repository.ts";
+import { MemorySigningKeyUsageRepository } from "../../repositories/memory/memory.signing-key-usage.repository.ts";
+import { MemorySigningKeyRepository } from "../../repositories/memory/memory.signing-key.repository.ts";
 import { PrismaApiKeyRepository } from "../../repositories/prisma/prisma.api-key.repository.ts";
 import { ApiKeyModule } from "../api-key.app.ts";
 
@@ -114,6 +116,8 @@ describe.skipIf(!DB_URL)("staff access keys on Postgres", () => {
         answers: MemoryApiKeyAnswerCacheRepository.create(),
         sandboxKeys: MemorySharedCredentialStore.create(),
         runKeys: MemorySharedCredentialStore.create(),
+        signingKeys: MemorySigningKeyRepository.create(),
+        signingKeyUsage: MemorySigningKeyUsageRepository.create(),
       },
       dependencies: {
         authorization,

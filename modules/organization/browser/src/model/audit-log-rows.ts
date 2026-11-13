@@ -137,7 +137,7 @@ function text(value: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? value : null;
 }
 
-/** A staff access row (ADR-193): its principal and reason, approved by the operator it names. */
+/** A staff access row (ADR-202): its principal and reason, approved by the operator it names. */
 function staffActor(log: ActorFields): AuditActor | null {
   if (!log.staffAccess) return null;
   return {

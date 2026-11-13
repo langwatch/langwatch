@@ -17,6 +17,7 @@ import {
 import { buildNav, resolveRedirect, siteRedirects } from "../features/navigation/compile.ts";
 import { publishSearchIndex, sourceSearchIndex } from "../features/search/compile.ts";
 import { appRoot } from "../paths.ts";
+import { PAGE_TOKENS } from "./audit/budgets.ts";
 import {
   composeDocument,
   islandHead,
@@ -76,7 +77,7 @@ function serveSource({
     const exported = exportSlug({ pathname });
     const slug = Object.hasOwn(nav.pages, exported) ? exported : `${exported}/index`;
     if (!Object.hasOwn(nav.pages, slug)) return void response.writeHead(404).end("Not found");
-    const body = pageMarkdown({ docsRoot, slug });
+    const body = pageMarkdown({ docsRoot, slug, pageTokens: PAGE_TOKENS });
     return send({ response, type: "text/markdown; charset=utf-8", body });
   }
   const [, top = ""] = pathname.split("/");

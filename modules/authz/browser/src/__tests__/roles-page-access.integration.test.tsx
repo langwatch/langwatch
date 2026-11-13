@@ -18,6 +18,7 @@ const { api } = vi.hoisted(() => {
     }),
     authz: {
       listManagedGrants: { useQuery: () => ({ data: [], isLoading: false, isError: false }) },
+      listBillingMembers: { useQuery: () => ({ data: [], isLoading: false, isError: false }) },
     },
     role: {
       getAll: { useQuery: () => ({ data: [], isLoading: false, isError: false }) },
@@ -54,7 +55,11 @@ class Reader extends UiSession {
     return null;
   }
 
-  hasPermission(permission: string): boolean {
+  hasPermission(_permission: string): boolean {
+    return false;
+  }
+
+  hasOrganizationPermission(permission: string): boolean {
     return this.grants.includes(permission);
   }
 
@@ -76,7 +81,7 @@ async function openRolesPage(grants: readonly string[]) {
         new Reader(grants),
       )}
     >
-      <AuthzHostProvider value={new FakeAuthzHost()}>
+      <AuthzHostProvider value={new FakeAuthzHost({ grants: new Set(grants) })}>
         <Page />
       </AuthzHostProvider>
     </UiHostServicesContextProvider>,
@@ -85,9 +90,9 @@ async function openRolesPage(grants: readonly string[]) {
 
 describe("the Roles & access page", () => {
   describe("given a reader who may manage the organization", () => {
-    /** @scenario Only an organization manager reaches the RBAC pages */
+    /** @scenario An organization manager reaches the RBAC pages */
     it("opens, framed in the settings chrome", async () => {
-      await openRolesPage(["organization:manage", "organization:view"]);
+      await openRolesPage(["organization:manage", "members:view", "organization:view"]);
 
       expect(await screen.findByText("Admin")).toBeInTheDocument();
       expect(screen.queryByText(/You don't have access to/)).not.toBeInTheDocument();
@@ -98,16 +103,27 @@ describe("the Roles & access page", () => {
     });
   });
 
+  describe("given a member who may read the members but not manage the organization", () => {
+    /** @scenario Every member reads the RBAC pages without a way to change them */
+    it("opens with the roles listed and offers no new role", async () => {
+      await openRolesPage(["members:view", "organization:view"]);
+
+      expect(await screen.findByText("Admin")).toBeInTheDocument();
+      expect(screen.queryByText(/You don't have access to/)).not.toBeInTheDocument();
+      expect(screen.queryByTestId("authz-role-create")).not.toBeInTheDocument();
+    });
+  });
+
   describe("given a reader who may only view the organization", () => {
-    /** @scenario A member is refused the RBAC pages */
+    /** @scenario A reader without the members view is refused the RBAC pages */
     it("is refused, naming the grant the page needs, and the page stays in the settings chrome", async () => {
       await openRolesPage(["organization:view"]);
 
       expect(await screen.findByText(/You don't have access to/)).toBeInTheDocument();
-      expect(screen.getByText("Missing permission: organization:manage")).toBeInTheDocument();
+      expect(screen.getByText("Missing permission: members:view")).toBeInTheDocument();
       expect(screen.queryByText("Admin")).not.toBeInTheDocument();
       expect(authzWeb.installation.screens[ROLES_PAGE]).toMatchObject({
-        requires: "organization:manage",
+        requires: "members:view",
         within: "settings",
       });
     });

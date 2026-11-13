@@ -482,7 +482,7 @@ describe("AnalyticsService", () => {
                   {
                     documentId: "doc-1",
                     count: "3",
-                    traceId: "trace-1",
+                    trace_id: "trace-1",
                     content: "hello",
                     total: "7",
                   },

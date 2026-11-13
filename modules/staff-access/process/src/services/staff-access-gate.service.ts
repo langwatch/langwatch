@@ -51,7 +51,7 @@ type GateDeps = Readonly<{
 }>;
 
 /**
- * The gate every staff key's request passes before its handler (ADR-193): a live session, from
+ * The gate every staff key's request passes before its handler (ADR-202): a live session, from
  * its pinned address, approved by a current operator, spending only when approved to. The trail
  * row comes first, a write also lands in the customer's audit log, and a failed write refuses.
  */

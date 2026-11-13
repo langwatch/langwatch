@@ -4,7 +4,7 @@ import {
 } from "@langwatch/organization-contract";
 
 /**
- * The staff access an audit row records (ADR-193): the gate's own `staffAccess.*` rows hold it as
+ * The staff access an audit row records (ADR-202): the gate's own `staffAccess.*` rows hold it as
  * their metadata, and a change made with a staff key carries `staffPrincipal` and `staffReason`.
  */
 export function extractAuditStaffAccess({

@@ -72,6 +72,8 @@ export interface AuthSessionRepository {
   countSignedInUsers(input: { at: number }): Promise<number>;
   /** The same count, among these people only. */
   countSignedInUsersAmong(input: { userIds: readonly string[]; at: number }): Promise<number>;
+  /** Which of these people used a browser session at or after `since` (epoch ms). */
+  findSessionUsersSince(input: { userIds: readonly string[]; since: number }): Promise<string[]>;
   /** The session a token names, expired or not; empty when no row holds it. */
   findExpiryByToken(input: { token: string }): Promise<SessionExpiry[]>;
   /** The amr the session recorded; empty when the session is gone. */

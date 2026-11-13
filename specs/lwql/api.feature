@@ -154,11 +154,11 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then none is present, because dictionaries are not subject to row policies
 
   @integration
-  Scenario: Key hash is auditable in the query log without exposing the raw key
+  Scenario: The query log names the tenant without the raw key or its hash
     Given the restricted identity ran a query carrying tenant-a's key-hash context
     When the server's query log is inspected for that query
-    Then the log entry carries the key hash
-    And the raw API key appears nowhere in the log entry
+    Then the log entry's comment names tenant-a's project
+    And neither the key hash nor the raw API key appears anywhere in the log entry
 
   @integration
   Scenario: Revoking a key hash from the key map takes effect within the stated revocation bound
@@ -254,7 +254,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When a view whose source sorts by a column its write path moves is inspected
     Then it declares that one row is one record rather than one sort key
     And a view that declares a grain narrower than its engine's key declares a strategy that can deliver it
-    And the views whose sort keys hold still keep the shipped default
+    And the views whose sort keys hold still keep the shipped default, read their latest version in order without FINAL, read rows written once as written, or settle retraction pairs without FINAL
 
   @integration
   Scenario: A pre-aggregated view returns one merged row per bucket
@@ -304,6 +304,12 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When the restricted identity selects that record through the LangWatchQL view
     Then one row is returned
     And it carries the newer version's values
+
+  @integration
+  Scenario: A plain span_metrics read counts a residual duplicate span
+    Given span_analytics holds two copies of one span, a residual duplicate ADR-034 accepts
+    When the restricted identity selects that span through the span_metrics view
+    Then both copies are returned, because a plain read does not deduplicate
 
   @integration
   Scenario: A column no LangWatchQL view exposes is unreachable, not merely unselected
@@ -982,10 +988,41 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   # every other stack's engine tables at its own PostgreSQL database.
   @unit
   Scenario: Each ClickHouse database provisions its own named collection
-    Given two LangWatchQL databases on the same ClickHouse server
+    Given two LangWatchQL databases on the same ClickHouse server, in sql mode
     When the self-provisioning statements are rendered for each
     Then each creates a named collection whose name carries its own database
     And each database's PostgreSQL-engine tables read only through its own collection
+
+  # A config store belongs to one server, and released chart installs bound their engine
+  # tables to lwql_postgres. ClickHouse refuses to attach a table whose collection is gone,
+  # and the upgrade converges before the ClickHouse pods roll onto the new config.
+  @unit
+  Scenario: Rendered mode keeps the named collection released chart installs bound their engine tables to
+    Given LWQL_ACCESS_MODEL_MODE is unset or "rendered"
+    When the access config is rendered and the provisioning statements run
+    Then the delivered collection and every PostgreSQL-engine table name lwql_postgres
+    And an upgrade's converge that runs before the ClickHouse pods roll finds that collection already mounted
+    And the rolled pods attach every engine table the previous release created
+
+  # A server whose previous config delivered only lwql_postgres_<database> keeps its tables
+  # bound to that name through the pre-roll converge, so the new config must deliver it too.
+  # Only a hand-made SQL collection of that name on a chart ClickHouse would clash (670).
+  @unit
+  Scenario: Rendered mode also delivers the per-database collection name a previous config bound tables to
+    Given LWQL_ACCESS_MODEL_MODE is unset or "rendered"
+    When the access config is rendered
+    Then config.d delivers lwql_postgres_<database> beside lwql_postgres with the same connection
+    And a table bound to either name still attaches once the ClickHouse pods roll
+
+  # One catalog read per converge.
+  @unit
+  Scenario: A rendered converge binds each engine table to a collection the server holds
+    Given LWQL_ACCESS_MODEL_MODE is unset or "rendered"
+    And the server may hold lwql_postgres, lwql_postgres_<database>, or both
+    When a converge or the reconvergence check creates or replaces an engine table
+    Then the table keeps its current binding while that collection exists on the server
+    And otherwise it binds to lwql_postgres when the server holds it, else to lwql_postgres_<database>
+    And with neither on the server it binds to lwql_postgres and fails with 669, as before
 
   # A 669 outside a NAMED COLLECTION statement means the collection is absent: the
   # engine table was never created, and every view over it would fail later as
@@ -1222,6 +1259,28 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And a sql-mode deploy stamps them unprobed only once its own batch rewrote the collection, and reads first where that rewrite was skipped
     And the next check reads again
 
+  # An unqualified relation resolves through the reader role's search_path, which provisioning never
+  # sets, so a probe without a schema can fail UNKNOWN_TABLE where the views live elsewhere.
+  @unit
+  Scenario: The collection probe reads the approved view in the app's PostgreSQL schema
+    Given the approved views live in a PostgreSQL schema other than public
+    When the check reads through the named collection and with the app's own values
+    Then both reads bind that schema as a query parameter, so neither fails for the schema alone
+
+  # The reader role's search_path is never set and its default can exclude the app schema, so an
+  # engine table names it itself.
+  @unit
+  Scenario: Engine tables read the app's PostgreSQL schema
+    Given the app's PostgreSQL schema is langwatch_db
+    When the engine table statements are built
+    Then every engine table names that schema in its ENGINE clause
+
+  @unit
+  Scenario: The reconvergence check rebuilds an engine table built before the schema was pinned
+    Given an engine table stamped by a fingerprint that did not include the schema
+    When the reconvergence check runs
+    Then it names that engine table as drift
+
   # A replica that has not loaded the new collection would build its copy of a replaced table on
   # the old values, so on a cluster (CLICKHOUSE_CLUSTER, set by the chart past one replica) each
   # read runs on every replica.
@@ -1252,6 +1311,13 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And once the collection holds the new password the check rebuilds them, stamped
     And they answer after every reader connection is ended, so no pool keeps the old password
     And a worker still on the old password rebuilds nothing
+
+  @integration
+  Scenario: An sql-mode deploy rotates the reader password while engine tables use the collection
+    Given an sql-mode install whose engine tables read through the app's named collection
+    When the reader's password changes and a second deploy converges
+    Then the deploy writes the collection in place, never dropping one the tables use
+    And the engine tables answer on the new password
 
   @e2e
   Scenario: A three-replica deployment reconverges LangWatchQL after provisioning failed during a ClickHouse outage
@@ -1323,8 +1389,8 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 # AC "empty/garbage key context yields zero rows, never all rows"
 #   → Scenario: Empty key context yields zero rows, never all rows
 #   → Scenario: Garbage key context yields zero rows, never all rows
-# AC "key-hash appears in query_log without exposing the raw key"
-#   → Scenario: Key hash is auditable in the query log without exposing the raw key
+# AC "key-hash appears in query_log without exposing the raw key" (ADR-200: the project, not the hash)
+#   → Scenario: The query log names the tenant without the raw key or its hash
 # AC "key-map refresh has a bounded revocation lag"
 #   → Scenario: Revoking a key hash from the key map takes effect within the stated revocation bound
 # (supporting invariants of the same proof: baseline read, key-map hygiene, multi-statement)
@@ -1377,6 +1443,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 #  views are usable at scale)
 #   → Scenario: A LangWatchQL view returns only the calling tenant's rows
 #   → Scenario: A LangWatchQL view returns one row per logical record, the latest version
+#   → Scenario: A plain span_metrics read counts a residual duplicate span
 #   → Scenario: A column no LangWatchQL view exposes is unreachable, not merely unselected
 #   → Scenario: Reading the physical fact table directly is policed the same way
 #   → Scenario: Row policies leave the application's own reads untouched

@@ -44,7 +44,7 @@ const loadEnvFileScoped = (): void => {
 export interface ResolvedCredentials {
   apiKey: string;
   /**
-   * Where the key came from: an explicit argument, a live ops session file (ADR-193), the
+   * Where the key came from: an explicit argument, a live ops session file (ADR-202), the
    * environment / caller's .env, or the stored device session's personal project.
    */
   source: "flag" | "ops-session" | "env" | "session";
@@ -287,7 +287,7 @@ async function resolveFromSession({
 }
 
 /**
- * The ops session's key (ADR-193), or nothing when there is no live session with one for this
+ * The ops session's key (ADR-202), or nothing when there is no live session with one for this
  * endpoint. Its project is `--project` matched against the session's projects, else the session
  * default; `LANGWATCH_PROJECT_ID` is ignored, it names a project of the folder, not the session.
  */

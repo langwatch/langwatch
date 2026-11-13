@@ -53,7 +53,7 @@ export type RestResolvedProjectCredential =
       isLangySessionKey?: boolean;
       /** Set on an ownerless run key minted for a run nobody started: it acts as the system. */
       isUnattendedRunKey?: boolean;
-      /** Set on an approved staff agent's key (ADR-193): every request passes the staff gate. */
+      /** Set on an approved staff agent's key (ADR-202): every request passes the staff gate. */
       isStaffAccessKey?: boolean;
       project: RestProjectIdentity;
     }
@@ -76,7 +76,7 @@ export type RestResolvedOrganizationCredential = {
   organizationId: string;
   /** Set when the key belongs to an agent session rather than a person. */
   isLangySessionKey?: boolean;
-  /** Set on an approved staff agent's key (ADR-193): every request passes the staff gate. */
+  /** Set on an approved staff agent's key (ADR-202): every request passes the staff gate. */
   isStaffAccessKey?: boolean;
 };
 
@@ -139,7 +139,7 @@ export type RestKeyCredentialPrincipal =
       resolvedProject?: Readonly<{ id: string; teamId: string }>;
       /** Set when the key belongs to an agent session, so its removals still need the click. */
       isLangySessionKey?: boolean;
-      /** Set on an approved staff agent's key (ADR-193): every request passes the staff gate. */
+      /** Set on an approved staff agent's key (ADR-202): every request passes the staff gate. */
       isStaffAccessKey?: boolean;
     }>;
 

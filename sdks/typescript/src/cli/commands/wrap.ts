@@ -45,3 +45,7 @@ export const wrapOpencode = async (args: string[]): Promise<void> => {
 export const wrapGrok = async (args: string[]): Promise<void> => {
   await runWrapped("grok", args);
 };
+
+export const wrapPi = async (args: string[]): Promise<void> => {
+  await runWrapped("pi", args);
+};

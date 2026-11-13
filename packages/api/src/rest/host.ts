@@ -117,7 +117,7 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
     authz: Authorize;
     /** Where a Langy key's confirmation clicks are kept; absent, marked routes refuse it. */
     confirmations?: RestConfirmationGate | undefined;
-    /** Where a staff key's requests are recorded (ADR-193); absent, every staff key is refused. */
+    /** Where a staff key's requests are recorded (ADR-202); absent, every staff key is refused. */
     staffAccess?: RestStaffAccessGate | undefined;
   }): RestHost {
     return new RestHost(options);

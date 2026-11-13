@@ -18,7 +18,7 @@ Monitors: the checks that run an evaluator over incoming traces, their definitio
 
 | Kind           | Name                        | Declared at                                                       |
 | -------------- | --------------------------- | ----------------------------------------------------------------- |
-| Postgres table | `Monitor`                   | `process/src/repositories/prisma/prisma.monitor.repository.ts:77` |
+| Postgres table | `Monitor`                   | `process/src/repositories/prisma/prisma.monitor.repository.ts:78` |
 | Config         | `publicBaseUrl` (BASE_HOST) | `contract/src/monitor.config.ts:5`                                |
 
 Anything else monitor needs belongs to another module and is reached through its `*Api`.

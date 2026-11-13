@@ -7,16 +7,11 @@
 import {
   type AccessLevel,
   type ApiKeyRole,
-  categorizablePermissions,
   PERMISSION_CATEGORIES,
   type PermissionCategory,
 } from "@langwatch/api-key-contract";
 import { permissionSatisfiedBy } from "@langwatch/authorization";
-import {
-  bindingScopeCanGrantPermission,
-  builtinRolePermissions,
-  roleKeyForTeamRole,
-} from "@langwatch/authz-contract";
+import { builtinRolePermissions, roleKeyForTeamRole } from "@langwatch/authz-contract";
 
 /** The team-role vocabulary the API key surfaces speak. */
 export type ApiKeyTeamRole = "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
@@ -224,96 +219,6 @@ function fullAccessSelections(
   return selections;
 }
 
-export function getUserPermissionsAtScope({
-  myBindings,
-  scopeType,
-  scopeId,
-  organizationId,
-  orgProjects,
-  isServiceKey,
-  getTeamRolePermissions: getRolePerms = teamRolePermissions,
-}: {
-  myBindings: { scopeType: string; scopeId: string; role: string }[] | undefined;
-  scopeType: string;
-  scopeId: string;
-  organizationId: string;
-  orgProjects: { id: string; teamId: string }[];
-  isServiceKey: boolean;
-  getTeamRolePermissions?: (role: string) => string[];
-}): string[] {
-  // Service keys and organization admins can grant anything grantable: the
-  // permission resolver short-circuits an ORGANIZATION-scoped ADMIN binding to
-  // full access, so the team-role bags (which carry no organization, gateway,
-  // governance or playground permissions) understate their ceiling.
-  if (isServiceKey) return categorizablePermissions();
-
-  const binding = findBindingAtScope({
-    bindings: myBindings,
-    scopeType,
-    scopeId,
-    organizationId,
-    orgProjects,
-  });
-  if (!binding) return [];
-  if (binding.scopeType === "ORGANIZATION" && binding.role === "ADMIN") {
-    return categorizablePermissions();
-  }
-  // A non-ADMIN ORGANIZATION-scoped builtin binding grants the org-member bag
-  // only, narrowed to what a binding at the REQUESTED scope may carry: both
-  // bag permissions are org-exclusive, and the CLI mint strips org-exclusive
-  // permissions from a selection with no ORGANIZATION binding
-  // (`filterToGrantable`).
-  if (binding.scopeType === "ORGANIZATION" && binding.role !== "CUSTOM") {
-    return [...builtinRolePermissions("org-member")].filter((permission) =>
-      bindingScopeCanGrantPermission({
-        scopeType: scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
-        permission,
-      }),
-    );
-  }
-  return getRolePerms(binding.role);
-}
-
-/**
- * The ceiling for a key bound to several scopes: the intersection of what
- * the caller holds at each. One list serves every binding on a key —
- * `assertSelectionWithinCeiling` refuses the whole selection otherwise.
- */
-export function getUserPermissionsAcrossScopes({
-  myBindings,
-  scopes,
-  organizationId,
-  orgProjects,
-  isServiceKey,
-  getTeamRolePermissions: getRolePerms = teamRolePermissions,
-}: {
-  myBindings: { scopeType: string; scopeId: string; role: string }[] | undefined;
-  scopes: { scopeType: string; scopeId: string }[];
-  organizationId: string;
-  orgProjects: { id: string; teamId: string }[];
-  isServiceKey: boolean;
-  getTeamRolePermissions?: (role: string) => string[];
-}): string[] {
-  const perScope = scopes.map(
-    (scope) =>
-      new Set(
-        getUserPermissionsAtScope({
-          myBindings,
-          scopeType: scope.scopeType,
-          scopeId: scope.scopeId,
-          organizationId,
-          orgProjects,
-          isServiceKey,
-          getTeamRolePermissions: getRolePerms,
-        }),
-      ),
-  );
-
-  const [first, ...rest] = perScope;
-  if (!first) return [];
-  return [...first].filter((permission) => rest.every((held) => held.has(permission)));
-}
-
 /**
  * Narrows category selections to what the moving ceiling still allows:
  * write falls back to read where read survives, else to none. A category
@@ -322,13 +227,16 @@ export function getUserPermissionsAcrossScopes({
 export function clampSelectionsToAvailability({
   selections,
   userPermissions,
+  categories = PERMISSION_CATEGORIES,
 }: {
   selections: Record<string, AccessLevel | "none">;
   userPermissions: string[];
+  /** The categories the selections speak; the CLI approval passes `cliPermissionCategories()`. */
+  categories?: readonly PermissionCategory[];
 }): Record<string, AccessLevel | "none"> {
   const clamped: Record<string, AccessLevel | "none"> = {};
   for (const [key, level] of Object.entries(selections)) {
-    const category = PERMISSION_CATEGORIES.find((c) => c.key === key);
+    const category = categories.find((c) => c.key === key);
     clamped[key] =
       level === "none" || !category
         ? "none"

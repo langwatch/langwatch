@@ -648,6 +648,22 @@ export type TraceApiMap = {
     getAllForProjectForFrontend: {
       query: { input: ProjectScope; output: Record<string, ModelProviderFrontendRead> };
     };
+    /** The decision models a judge may run on here; the server weighs keys and flags. */
+    listDecisionModelsForProject: {
+      query: { input: ProjectScope; output: { value: string; label: string }[] };
+    };
+    /** Pins one role's model on one scope: the eval popover sets the project's Instant Evals. */
+    setRoleAssignmentForScope: {
+      mutation: {
+        input: {
+          scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+          scopeId: string;
+          role: "INSTANT_EVALS";
+          model: string | null;
+        };
+        output: { ok: true };
+      };
+    };
   };
 
   personalWorkspaceFeatures: {

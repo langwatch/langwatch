@@ -1,6 +1,6 @@
 Feature: Ops agent access from the CLI
   The agent uses the same `langwatch` CLI customers use. The key lives in a 0600 session file,
-  never in `.env`. ADR-193.
+  never in `.env`. ADR-202.
 
   @integration
   Scenario: The CLI requests, waits for approval and stores the key in a private session file

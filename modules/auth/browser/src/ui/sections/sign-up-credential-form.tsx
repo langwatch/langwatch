@@ -8,6 +8,7 @@ import { z } from "zod";
 
 import { authApi as api } from "../../behavior/auth-api.ts";
 import { signIn } from "../../behavior/auth-client.tsx";
+import { forgetHeldAddressProof } from "../../behavior/held-address-proof.ts";
 import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { applyHandledErrorToForm } from "../../model/apply-handled-error-to-form.ts";
 import { authFailureMessage } from "../../model/auth-failure-message.ts";
@@ -137,6 +138,8 @@ export function SignUpCredentialForm({
       setServerErrorIsOnTheForm(applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }));
       return;
     }
+    // Registering spent the proof: a reload has no step left to resume.
+    forgetHeldAddressProof();
 
     setIsSigningIn(true);
     let message: string | null = null;

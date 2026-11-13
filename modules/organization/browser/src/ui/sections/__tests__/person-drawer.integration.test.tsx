@@ -6,12 +6,15 @@
  */
 import "@testing-library/jest-dom/vitest";
 import { cleanup, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FakeOrganizationHost, renderWithOrganizationHost } from "../../../testing.tsx";
 
 const state = vi.hoisted(() => ({
   member: null as unknown,
+  billingHolders: [] as { userId: string }[],
+  setBilling: [] as unknown[],
   provenance: {} as Record<string, unknown>,
   provenanceFails: false,
 }));
@@ -24,7 +27,9 @@ vi.mock("../../../behavior/organization-api.ts", () => {
         organization: {
           getMemberById: invalidator,
           getOrganizationWithMembersAndTheirTeams: invalidator,
+          listHeldSeats: invalidator,
         },
+        authz: { listBillingMembers: invalidator },
         limits: { getUsage: invalidator },
         licenseEnforcement: { checkLimit: invalidator },
       }),
@@ -32,8 +37,22 @@ vi.mock("../../../behavior/organization-api.ts", () => {
         getMemberById: {
           useQuery: () => ({ data: state.member, isError: false, error: null }),
         },
+        getSeatRemovalPreview: {
+          useQuery: () => ({ data: undefined, isSuccess: false, isError: false }),
+        },
         deleteMember: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
         setMemberDisabled: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+      },
+      authz: {
+        listBillingMembers: {
+          useQuery: () => ({ data: state.billingHolders, isLoading: false, isError: false }),
+        },
+        setMemberBillingRole: {
+          useMutation: () => ({
+            mutate: (input: unknown) => state.setBilling.push(input),
+            isPending: false,
+          }),
+        },
       },
     },
   };
@@ -99,8 +118,29 @@ describe("given a person opened from the members list", () => {
     state.member = sam;
     state.provenance = { "user-sam": { source: "invited" } };
     state.provenanceFails = false;
+    state.billingHolders = [];
+    state.setBilling = [];
   });
   afterEach(() => cleanup());
+
+  describe("when an administrator toggles Billing", () => {
+    /** @scenario "Admin grants and revokes Billing" */
+    it("grants it to a member without it, and shows the badge on a holder", async () => {
+      renderDrawer();
+      await screen.findByTestId("person-address-state");
+      expect(screen.queryByTestId("person-billing-badge")).toBeNull();
+
+      await userEvent.click(screen.getByTestId("person-billing-switch"));
+      expect(state.setBilling).toEqual([
+        expect.objectContaining({ userId: "user-sam", holds: true }),
+      ]);
+
+      cleanup();
+      state.billingHolders = [{ userId: "user-sam" }];
+      renderDrawer();
+      expect(await screen.findByTestId("person-billing-badge")).toHaveTextContent("Billing");
+    });
+  });
 
   describe("when the drawer renders", () => {
     /** @scenario The drawer answers who, what and what next */

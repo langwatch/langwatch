@@ -1,5 +1,5 @@
 /**
- * Every refusal the staff access flow raises (ADR-193). A surface that is off, a request that is
+ * Every refusal the staff access flow raises (ADR-202). A surface that is off, a request that is
  * not the caller's, and an unknown id all answer the same `not_found`, so none discloses anything.
  * The gate's refusals (revoked, expired, address, operator, spend) are `@langwatch/api`'s.
  */

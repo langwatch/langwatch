@@ -162,7 +162,12 @@ export class OrganizationLifecycleNoticeService {
 
   /** A seat taken away; awaited and loud, since user ends the sessions only on this record. */
   async memberDisabled(
-    input: Readonly<{ organizationId: string; userId: string; disabledByUserId: string | null }>,
+    input: Readonly<{
+      organizationId: string;
+      userId: string;
+      disabledByUserId: string | null;
+      heldFullSeat?: boolean;
+    }>,
   ): Promise<void> {
     const sender = this.#senders?.recordMemberDisabled;
     if (!sender) throw new Error("organization_lifecycle is not registered in this process");
@@ -196,7 +201,7 @@ export class OrganizationLifecycleNoticeService {
 
   /** An organization now exists; awaited and loud, since prompt seeds tags only on this record. */
   async created(
-    input: Readonly<{ organizationId: string; organizationName: string }>,
+    input: Readonly<{ organizationId: string; organizationName: string; userId?: string }>,
   ): Promise<void> {
     const sender = this.#senders?.recordCreated;
     if (!sender) throw new Error("organization_lifecycle is not registered in this process");

@@ -1,13 +1,20 @@
 import {
   upsertDatasetInputSchema,
   DatasetNameTakenError,
+  DatasetStaleColumnsError,
   type Dataset,
   type UpsertDatasetInput,
 } from "@langwatch/dataset-contract";
+import { ValidationError } from "@langwatch/handled-error";
 
+import type { DatasetContent, DatasetSeedRow } from "../app/dataset.app.ts";
+import type { LockedDatasetRecords } from "../repositories/dataset-record.repository.ts";
 import type { DatasetUpdateInput } from "../repositories/dataset.repository.ts";
+import { mapPreviousColumnsToNewColumns } from "../rules/dataset-chunk-lines.rules.ts";
+import { columnEditMovesValues, columnRenameProblems } from "../rules/dataset-columns.rules.ts";
 import { onceMaxBytes } from "../rules/dataset-inline-file.rules.ts";
 import { datasetSlugOf } from "../rules/dataset-selection.rules.ts";
+import { isSingleFileDataset } from "../rules/dataset-single-file.rules.ts";
 import type { DatasetServiceOptions } from "./dataset.service.ts";
 
 type DatasetUpsertDeps = {
@@ -18,6 +25,8 @@ type DatasetUpsertDeps = {
 };
 
 type ParsedUpsert = ReturnType<typeof upsertDatasetInputSchema.parse>;
+
+const RECORD_PAGE_SIZE = 1000;
 
 /** Creates a dataset, with its first records, or renames and retypes an existing one. */
 export class DatasetUpsertService {
@@ -59,30 +68,143 @@ export class DatasetUpsertService {
       slug: existing.slug,
       columnTypes: parsed.columnTypes,
     };
-    if (
-      existing.contentLayout === "s3_jsonl" &&
-      options.content &&
-      JSON.stringify(existing.columnTypes) !== JSON.stringify(parsed.columnTypes)
-    ) {
+    const columnsChanged =
+      JSON.stringify(existing.columnTypes) !== JSON.stringify(parsed.columnTypes);
+    const columnEdit = {
+      previousColumns: existing.columnTypes,
+      newColumns: parsed.columnTypes,
+      renames: parsed.columnRenames,
+    };
+    const renameProblems = columnRenameProblems(columnEdit);
+    if (renameProblems.length > 0) {
+      throw new ValidationError(`Invalid column renames: ${renameProblems.join("; ")}.`, {
+        fault: "customer",
+        meta: { fieldErrors: { columnRenames: renameProblems } },
+      });
+    }
+    const movesValues = columnEditMovesValues(columnEdit);
+    const rewrites = columnsChanged || movesValues;
+    if (existing.contentLayout === "s3_jsonl" && options.content && rewrites) {
       return options.content.updateColumns({
         dataset: existing,
         projectId: parsed.projectId,
         name,
         slug: existing.slug,
         columnTypes: parsed.columnTypes,
+        ...(parsed.columnRenames ? { columnRenames: parsed.columnRenames } : {}),
       });
     }
 
-    return options.repository.update(update);
+    const lockedLayout =
+      (isSingleFileDataset(existing) && options.singleFile !== undefined) ||
+      existing.contentLayout === "postgres";
+    if (rewrites && isSingleFileDataset(existing) && options.singleFile) {
+      await options.singleFile.updateColumns({
+        dataset: existing,
+        columnTypes: parsed.columnTypes,
+        columnRenames: parsed.columnRenames,
+      });
+    } else if (rewrites && existing.contentLayout === "postgres") {
+      await this.migrateRecordColumns({ dataset: existing, parsed, movesValues });
+    }
+    // Unchanged columns, or columns stored under the lock: writing them could undo a later edit.
+    const { columnTypes: _kept, ...named } = update;
+    const writesColumns = columnsChanged && !lockedLayout;
+    return options.repository.update(writesColumns ? update : named);
+  }
+
+  /**
+   * Re-keys every Postgres record and stores the new columns in one transaction under the
+   * dataset's lock, which record writes also take, so no write lands between the two.
+   */
+  private async migrateRecordColumns({
+    dataset,
+    parsed,
+    movesValues,
+  }: {
+    dataset: Dataset;
+    parsed: ParsedUpsert;
+    /** False for a type change, reorder or addition: the columns change, no record does. */
+    movesValues: boolean;
+  }): Promise<void> {
+    const key = { datasetId: dataset.id, projectId: dataset.projectId };
+    await this.deps.options.records.withDatasetLock(key, async (records) => {
+      const current = await records.columnTypes();
+      if (JSON.stringify(current) !== JSON.stringify(dataset.columnTypes)) {
+        throw new DatasetStaleColumnsError();
+      }
+      if (movesValues) await this.rekeyRecords({ records, dataset, parsed });
+      await records.setColumnTypes(parsed.columnTypes);
+    });
+  }
+
+  private async rekeyRecords({
+    records,
+    dataset,
+    parsed,
+  }: {
+    records: LockedDatasetRecords;
+    dataset: Dataset;
+    parsed: ParsedUpsert;
+  }): Promise<void> {
+    const key = { datasetId: dataset.id, projectId: dataset.projectId };
+    const stored: Awaited<ReturnType<typeof records.findPage>> = [];
+    let page = await records.findPage({ ...key, limit: RECORD_PAGE_SIZE });
+    stored.push(...page);
+    while (page.length === RECORD_PAGE_SIZE) {
+      const cursorId = page.at(-1)!.id;
+      page = await records.findPage({ ...key, limit: RECORD_PAGE_SIZE, cursorId });
+      stored.push(...page);
+    }
+    const remapped = mapPreviousColumnsToNewColumns({
+      records: stored.map((record) => record.entry),
+      previousColumns: dataset.columnTypes,
+      newColumns: parsed.columnTypes,
+      renames: parsed.columnRenames,
+    });
+    if (stored.length > 0) {
+      await records.replaceAll({
+        ...key,
+        entries: stored.map((record, index) => ({ ...remapped[index], id: record.id })),
+      });
+    }
+  }
+
+  /** A dataset born in object storage with rows whose files are already stored, as a copy's are. */
+  async createWithStoredRows(input: {
+    content: DatasetContent;
+    projectId: string;
+    name: string;
+    columnTypes: Dataset["columnTypes"];
+    rows: AsyncIterable<DatasetSeedRow>;
+  }): Promise<Dataset> {
+    const slug = await this.freeSlugOf({ projectId: input.projectId, name: input.name });
+
+    return input.content.createDataset({
+      projectId: input.projectId,
+      name: input.name,
+      slug,
+      columnTypes: input.columnTypes,
+      rows: input.rows,
+    });
+  }
+
+  private async freeSlugOf(input: { projectId: string; name: string }): Promise<string> {
+    const slug = datasetSlugOf(input.name);
+    const conflict = await this.deps.options.repository.findBySlug({
+      projectId: input.projectId,
+      slug,
+    });
+    if (conflict) {
+      throw new DatasetNameTakenError();
+    }
+
+    return slug;
   }
 
   private async create({ parsed, name }: { parsed: ParsedUpsert; name: string }): Promise<Dataset> {
     const { options } = this.deps;
-    const slug = datasetSlugOf(name);
-    const conflict = await options.repository.findBySlug({ projectId: parsed.projectId, slug });
-    if (conflict) {
-      throw new DatasetNameTakenError();
-    }
+    const slug = await this.freeSlugOf({ projectId: parsed.projectId, name });
 
     if (parsed.datasetRecords && parsed.datasetRecords.length > 0) {
       const maxBytes = onceMaxBytes(() =>
@@ -104,6 +226,18 @@ export class DatasetUpsertService {
       });
     }
 
+    if (options.content) {
+      return options.content.createDataset({
+        projectId: parsed.projectId,
+        name,
+        slug,
+        columnTypes: parsed.columnTypes,
+        rows: (parsed.datasetRecords ?? []).map(({ id, ...entry }) => ({ id, entry })),
+      });
+    }
+
+    // Only a composition with no object storage (a unit test) still makes a
+    // Postgres-layout dataset.
     const created = await options.repository.create({
       projectId: parsed.projectId,
       name,

@@ -13,13 +13,12 @@ import {
   SHIPPED_LWQL_DEDUP,
   LangWatchQLViewStatementsService,
 } from "../../features/provisioning/services/langwatch-ql-view-statements.service.ts";
+import { flooredViewName, flooredViewNames } from "../../rules/lwql-dedup-floor.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
+import type { LangWatchQLDedupStrategy } from "../../rules/lwql-view-dedup-shape.rules.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import { LangWatchQLAccessModelService } from "../../services/langwatch-ql-access-model.service.ts";
-import {
-  LangWatchQLCatalogShapesService,
-  type LangWatchQLDedupStrategy,
-} from "../../services/langwatch-ql-catalog-shapes.service.ts";
+import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
 import {
   CLICKHOUSE_ERROR_CODE,
   DEDUP_FIXTURE,
@@ -46,6 +45,7 @@ import {
   selectScalar,
   startLangWatchQLClickHouse,
   startLangWatchQLPostgres,
+  UNMAPPED_KEY_HASH,
 } from "./lwql-clickhouse-harness.ts";
 import { validateLangWatchQL } from "./lwql-validate.ts";
 import { LangWatchQLAccessAuditService } from "./support/langwatch-ql-access-audit.service.ts";
@@ -60,6 +60,12 @@ const catalogShapes = LangWatchQLCatalogShapesService.create();
 
 /** A column no view exposes, so the grant must make it unreachable. */
 const OFF_CATALOG_COLUMN = "ProjectionId";
+
+/**
+ * Views read plainly over a superseding engine, because their writer appends each key once:
+ * SpanAnalyticsStore looks a span's key up first (ADR-034 amendment, 2026-11-12).
+ */
+const WRITTEN_ONCE_OVER_REPLACING: ReadonlySet<string> = new Set(["span_metrics"]);
 
 /** The eight expression positions the content-gating policy enumerates. */
 const GATED_COLUMN_POSITIONS = (database: string) =>
@@ -261,19 +267,30 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
         `${view.sourceTable} is not on the server — the migrations did not run`,
       ).toBeDefined();
 
+      // A settled source is a VersionedCollapsingMergeTree, which appends its version column to
+      // the sort key; the catalogue keeps that column out (analytics ADR-007). A settled view
+      // that sums its signs groups by its grain, so its key is that grain, not the source's.
+      const settled = view.dedup.strategy === "settled";
+      const groupedSettled = settled && view.dedup.aggregating === true;
+      const sortingKey = source!.sorting_key
+        .split(", ")
+        .filter((column) => !settled || column !== view.dedup.versionColumn);
+
       // The catalog names its keys as callers see them; the engine sorts by the source columns.
-      const sortingKey = source!.sorting_key.split(", ");
+      const declaredKey = view.dedup.keyColumns.map((key) =>
+        catalogShapes.physicalColumn(view, key),
+      );
       expect(
-        view.dedup.keyColumns.map((key) => catalogShapes.physicalColumn(view, key)),
+        groupedSettled ? sortingKey : declaredKey,
         `${view.name} declares a key its source does not sort by`,
       ).toEqual(sortingKey);
 
       // The grain can be narrower than the sort key — that is what a
       // time-leading analytics table is — but never something the engine does
       // not sort by, which would be a row identity no dedup shape can honour.
-      for (const column of catalogShapes
-        .grainColumns(view)
-        .map((key) => catalogShapes.physicalColumn(view, key))) {
+      for (const column of (groupedSettled ? [] : catalogShapes.grainColumns(view)).map((key) =>
+        catalogShapes.physicalColumn(view, key),
+      )) {
         expect(
           sortingKey,
           `${view.name} calls ${column} part of its grain, but ${view.sourceTable} does not sort by it`,
@@ -282,14 +299,25 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
 
       // The engine family, both ways round: an entry says its rows are summed
       // or superseded, and the table has to be the engine that does it.
+      // A settled view's rows are collapsed by sign: its aggregating flag and version column
+      // describe the view's GROUP BY, not an aggregating or replacing engine.
       expect(
         source!.engine.includes("AggregatingMergeTree"),
         `${view.name} declares aggregating=${String(Boolean(view.dedup.aggregating))} over ${source!.engine}`,
-      ).toBe(Boolean(view.dedup.aggregating));
+      ).toBe(Boolean(view.dedup.aggregating) && !settled);
+      const writtenOnce = WRITTEN_ONCE_OVER_REPLACING.has(view.name);
+      expect(
+        writtenOnce ? [view.dedup.strategy, view.dedup.versionColumn] : ["none", undefined],
+        `${view.name} is read plainly`,
+      ).toEqual(["none", undefined]);
       expect(
         source!.engine.includes("ReplacingMergeTree"),
         `${view.name} declares versionColumn=${String(view.dedup.versionColumn)} over ${source!.engine}`,
-      ).toBe(view.dedup.versionColumn !== undefined);
+      ).toBe((view.dedup.versionColumn !== undefined && !settled) || writtenOnce);
+      expect(
+        source!.engine.includes("VersionedCollapsingMergeTree"),
+        `${view.name} declares strategy=${String(view.dedup.strategy)} over ${source!.engine}`,
+      ).toBe(settled);
 
       // And the *named* version column is the engine's own, which is the trap
       // `stored_spans` sets: it supersedes on `StartTime`, not `UpdatedAt`.
@@ -297,7 +325,12 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
       expect(
         engineArguments,
         `${view.name} reads ${source!.engine_full}, which supersedes on nothing`,
-      ).toEqual(expect.arrayContaining(view.dedup.versionColumn ? [view.dedup.versionColumn] : []));
+      ).toEqual(
+        expect.arrayContaining([
+          ...(view.dedup.versionColumn ? [view.dedup.versionColumn] : []),
+          ...(settled && view.dedup.signColumn ? [view.dedup.signColumn] : []),
+        ]),
+      );
     }
   });
 
@@ -363,6 +396,33 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
     }
   });
 
+  /** @scenario "A floored twin returns only the calling tenant's rows" */
+  it("returns its own tenant's rows and none of the other tenant's, for every floored twin", async () => {
+    // A floor before every seeded row: the bound hides nothing, so an empty read fails the check.
+    const wholeHistory = "toDateTime64('1970-01-02 00:00:00', 3)";
+    const twins = LWQL_VIEW_CATALOG.filter((view) => flooredViewNames([view]).length > 0);
+    expect(twins.length, "no floored twin in the catalog to check").toBeGreaterThan(0);
+    expect(twins.map((view) => flooredViewName(view.name))).toEqual([
+      "evaluation_metrics__floor",
+      "trace_evaluation_metrics__floor",
+      "trace_evaluation_checks__floor",
+    ]);
+    for (const view of twins) {
+      const twin = flooredViewName(view.name);
+      await recordSeedControl({
+        harness,
+        table: view.sourceTable,
+        database: facts,
+        tenantColumn: "TenantId",
+      });
+      const rows = await selectRows<{ TenantId: string }>(
+        tenantA,
+        `SELECT DISTINCT TenantId FROM ${database}.${twin}(lwql_floor = ${wholeHistory})`,
+      );
+      expectOnlyTenantA({ rows, tenantColumn: "TenantId", harness, context: `${twin} twin` });
+    }
+  });
+
   /** @scenario "Garbage key context yields zero rows, never all rows" */
   it("returns zero rows through the views for a garbage key context", async () => {
     const control = await recordSeedControl({
@@ -372,7 +432,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
       tenantColumn: "TenantId",
     });
     const garbage = await harness.restrictedClient({
-      keyHash: "not-a-real-key-hash",
+      keyHash: UNMAPPED_KEY_HASH,
     });
     for (const view of LWQL_VIEW_CATALOG) {
       const count = await selectScalar<string>(
@@ -1095,7 +1155,8 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
           viewStatements.viewStatement({
             names: harness.names,
             sourceDatabase: facts,
-            view,
+            // Pinned as the entry's own: `traces` pins latest-in-order (ADR-006), which wins.
+            view: { ...view, dedup: { ...view.dedup, strategy } },
             dedup: strategy,
           }),
         ]);
@@ -1263,5 +1324,67 @@ describe("given traces assigned to topics when a caller asks for traffic by topi
       [`Topic ${a.tenantId} 1`, 3],
       [`Topic ${a.tenantId} 2`, 2],
     ]);
+  });
+});
+
+describe("given the LangWatchQL views provisioned over the shipped fact tables when a span's residual duplicate reached span_analytics", () => {
+  /**
+   * ADR-034 accepts a residual duplicate (a re-sent span missing the lookup), and span_metrics
+   * is read plainly, so a read counts it. This pins that behaviour so a future dedup is a
+   * visible change.
+   */
+  /** @scenario "A plain span_metrics read counts a residual duplicate span" */
+  it("returns both copies of the span through span_metrics", async () => {
+    const traceId = `${harness.tenantA.tenantId}-residual-duplicate-trace`;
+    const spanId = `${harness.tenantA.tenantId}-residual-duplicate-span`;
+    const at = SEED_RECENT_WEEK.from;
+    const copy = {
+      TenantId: harness.tenantA.tenantId,
+      TraceId: traceId,
+      SpanId: spanId,
+      StartTime: at,
+      EndTime: at,
+      DurationMs: 5,
+      SpanName: "residual duplicate",
+      SpanKind: 1,
+      ProjectedAt: at,
+    };
+    // Unmerged parts: a merge would hide the duplicate this case reads. Restarted in the finally.
+    await harness.admin.command({ query: `SYSTEM STOP MERGES ${facts}.span_analytics` });
+    try {
+      // Two inserts, so the copies are two parts: a single insert could be deduplicated on write.
+      await harness.admin.insert({
+        table: `${facts}.span_analytics`,
+        format: "JSONEachRow",
+        values: [copy],
+      });
+      await harness.admin.insert({
+        table: `${facts}.span_analytics`,
+        format: "JSONEachRow",
+        values: [{ ...copy, DurationMs: 7 }],
+      });
+
+      // The control: without it, "two rows" is satisfied by a table that never held two.
+      const stored = await selectRows<{ SpanId: string }>(
+        harness.admin,
+        `SELECT SpanId FROM ${facts}.span_analytics ` +
+          `WHERE TenantId = '${harness.tenantA.tenantId}' AND TraceId = '${traceId}'`,
+      );
+      expect(
+        stored,
+        "the source table does not hold two copies, so this case is not exercised",
+      ).toHaveLength(2);
+
+      const read = await selectRows<{ SpanId: string }>(
+        tenantA,
+        `SELECT SpanId FROM ${database}.span_metrics WHERE TraceId = '${traceId}'`,
+      );
+      expect(
+        read.map((row) => row.SpanId),
+        "span_metrics deduplicated a residual duplicate, which ADR-034 says a plain read does not do",
+      ).toEqual([spanId, spanId]);
+    } finally {
+      await harness.admin.command({ query: `SYSTEM START MERGES ${facts}.span_analytics` });
+    }
   });
 });

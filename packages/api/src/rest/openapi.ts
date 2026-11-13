@@ -166,7 +166,15 @@ function accessPolicyExtension({
   return {
     kind: "handlerManaged",
     credential: [CREDENTIAL_CLASS_BY_DOOR[reaches]],
-    permissions: route.permission || route.permissionBy ? routePermissions(route) : [],
+    permissions:
+      route.permission || route.permissionBy
+        ? [
+            ...new Set([
+              ...routePermissions(route),
+              ...(route.furtherPermissions ?? []).map((asked) => asked.permission),
+            ]),
+          ]
+        : [],
   };
 }
 

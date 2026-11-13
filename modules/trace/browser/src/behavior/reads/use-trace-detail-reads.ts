@@ -30,6 +30,19 @@ export function useTraceEventsRead({ projectId, traceId, occurredAtMs, tenantId 
   });
 }
 
+export function useTraceLogsRead({
+  projectId,
+  traceId,
+  occurredAtMs,
+  tenantId,
+  enabled = true,
+}: TraceRead & { enabled?: boolean }) {
+  return api.traces.traceLogs.useQuery(
+    { projectId, traceId, occurredAtMs, ...(tenantId ? { tenantId } : {}) },
+    { enabled },
+  );
+}
+
 export function useResourceInfoRead({ projectId, traceId, occurredAtMs, tenantId }: TraceRead) {
   return api.traces.resourceInfo.useQuery({
     projectId,

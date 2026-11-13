@@ -71,6 +71,7 @@ import { sharedSetupIsAHookRule } from "./rules/shared-setup-is-a-hook.rule.mjs"
 import { signatureMirrorRule } from "./rules/signature-mirror.rule.mjs";
 import { skipTenantCheckReasonRule } from "./rules/skip-tenant-check-reason.rule.mjs";
 import { sliceReaderIsAHookRule } from "./rules/slice-reader-is-a-hook.rule.mjs";
+import { spanBraidHonourOwnerRule } from "./rules/span-braid-honour-owner.rule.mjs";
 import { standInCastRule } from "./rules/stand-in-cast.rule.mjs";
 import { storeContainmentRule } from "./rules/store-containment.rule.mjs";
 import { suppressionStatesWhyRuleFor } from "./rules/suppression-states-why.rule.mjs";
@@ -151,6 +152,7 @@ const HOUSE_RULES = [
   serviceDoesNotOpenAChannelRule,
   serviceLoadsItsOwnConfigRule,
   sharedSetupIsAHookRule,
+  spanBraidHonourOwnerRule,
   standInCastRule,
   temporalOnlyRule,
   testDescriptionIsAnActionRule,
@@ -252,6 +254,7 @@ export {
   serviceDoesNotOpenAChannelRule,
   serviceLoadsItsOwnConfigRule,
   sharedSetupIsAHookRule,
+  spanBraidHonourOwnerRule,
   standInCastRule,
   temporalOnlyRule,
   testDescriptionIsAnActionRule,

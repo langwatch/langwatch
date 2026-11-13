@@ -120,7 +120,7 @@ export class PrismaStaffAccessRequestRepository
   async approve(input: StaffAccessApproval): Promise<boolean> {
     const changed = await this.database.$executeRaw`
       ${skipTenantCheck({
-        // A platform staff access request, decided by its id (ADR-193).
+        // A platform staff access request, decided by its id (ADR-202).
         SKIP_TENANT_CHECK: true,
       })}
       UPDATE "StaffAccessRequest"
@@ -135,7 +135,7 @@ export class PrismaStaffAccessRequestRepository
   async deny({ id, at }: { id: string; at: Instant }): Promise<boolean> {
     const changed = await this.database.$executeRaw`
       ${skipTenantCheck({
-        // A platform staff access request, decided by its id (ADR-193).
+        // A platform staff access request, decided by its id (ADR-202).
         SKIP_TENANT_CHECK: true,
       })}
       UPDATE "StaffAccessRequest" SET "status" = 'denied'
@@ -146,7 +146,7 @@ export class PrismaStaffAccessRequestRepository
   async redeem(input: StaffAccessRedemption): Promise<boolean> {
     const changed = await this.database.$executeRaw`
       ${skipTenantCheck({
-        // A platform staff access request, redeemed once by its id (ADR-193).
+        // A platform staff access request, redeemed once by its id (ADR-202).
         SKIP_TENANT_CHECK: true,
       })}
       UPDATE "StaffAccessRequest"
@@ -187,7 +187,7 @@ export class PrismaStaffAccessRequestRepository
   }): Promise<boolean> {
     const changed = await this.database.$executeRaw`
       ${skipTenantCheck({
-        // A platform staff access session, revoked by its id (ADR-193).
+        // A platform staff access session, revoked by its id (ADR-202).
         SKIP_TENANT_CHECK: true,
       })}
       UPDATE "StaffAccessRequest"
@@ -202,7 +202,7 @@ export class PrismaStaffAccessRequestRepository
   async claimEndAudit({ id, at }: { id: string; at: Instant }): Promise<boolean> {
     const changed = await this.database.$executeRaw`
       ${skipTenantCheck({
-        // A platform staff access session's end, audited once by its id (ADR-193).
+        // A platform staff access session's end, audited once by its id (ADR-202).
         SKIP_TENANT_CHECK: true,
       })}
       UPDATE "StaffAccessRequest" SET "endAuditedAt" = ${toDate(at)}

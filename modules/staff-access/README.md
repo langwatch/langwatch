@@ -1,6 +1,6 @@
 # staff-access
 
-Staff access lets a platform operator's coding agent reach production for one hour at a time. The agent asks with a requester key, the operator approves each request with a passkey on a page that shows exactly what the signature approves, and the agent redeems once for a key pinned to its address. Every request that key makes is recorded before it runs. See [ADR-193](../../dev/docs/adr/193-ops-agent-access.md).
+Staff access lets a platform operator's coding agent reach production for one hour at a time. The agent asks with a requester key, the operator approves each request with a passkey on a page that shows exactly what the signature approves, and the agent redeems once for a key pinned to its address. Every request that key makes is recorded before it runs. See [ADR-202](../../dev/docs/adr/202-ops-agent-access.md).
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 

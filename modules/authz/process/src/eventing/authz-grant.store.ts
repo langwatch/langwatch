@@ -3,10 +3,16 @@
  * behind every grant mutation, waiting (bounded) for the projection to land
  * attach- and role-shaped writes before returning (ADR-007's breaker doctrine).
  */
-import type { LedgerActor } from "@langwatch/authorization";
+import {
+  type GrantCondition,
+  isGrantablePermission,
+  type LedgerActor,
+} from "@langwatch/authorization";
 import {
   AuthzGrantNotConfirmedError,
+  BILLING_ROLE_KEY,
   bindingScopeCanGrantPermission,
+  GRANT_SOURCE_BRAID,
   GrantValidationError,
   PlatformPermissionNotAssignableError,
   PLATFORM_OPERATOR_ROLE_ID,
@@ -153,6 +159,18 @@ function refusePlatformTenant(organizationId: string): void {
   if (organizationId === PLATFORM_TENANT_ID) {
     throw new GrantValidationError("The platform tier is not an organization", { organizationId });
   }
+}
+
+/**
+ * No role, custom or a key's own, may list a permission minted onto a proof and never granted
+ * (`spans:braided`, ADR-201 §3), whether the role listed it before or not.
+ */
+function refuseMintedOnlyPermissions(permissions: readonly string[]): void {
+  const minted = permissions.filter((permission) => !isGrantablePermission(permission));
+  if (minted.length === 0) return;
+  throw new GrantValidationError("A role cannot list a permission that is never granted", {
+    permissions: minted,
+  });
 }
 
 /**
@@ -553,6 +571,49 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     return { grantId, wasAttached: true };
   }
 
+  /** ADR-201 §1: one braid's grant under a fresh id; the caller holds the reader's lock. */
+  async attachBraidGrant({
+    organizationId,
+    readerProjectId,
+    ownerProjectId,
+    condition,
+    expiresAtMs,
+    replacesGrantId,
+    actor,
+  }: {
+    organizationId: string;
+    readerProjectId: string;
+    ownerProjectId: string;
+    condition: GrantCondition;
+    expiresAtMs?: number;
+    replacesGrantId?: string;
+    actor: LedgerActor;
+  }): Promise<{ grantId: string }> {
+    refusePlatformTenant(organizationId);
+    const grantId = newAuthzGrantId();
+    await (
+      await this.commands()
+    ).commands.attachGrant.send({
+      tenantId: organizationId,
+      organizationId,
+      commandId: this.options.newCommandId?.() ?? newCommandId(),
+      grant: {
+        grantId,
+        principal: { type: "project", id: readerProjectId },
+        roleKey: sharedProjectReadsOf({ organizationId, readerProjectId }).roleKey,
+        scope: { type: "PROJECT", id: ownerProjectId },
+        condition,
+        ...(expiresAtMs === undefined ? {} : { expiresAtMs }),
+        ...(replacesGrantId === undefined ? {} : { replacesGrantId }),
+        source: GRANT_SOURCE_BRAID,
+        actor,
+        occurredAtMs: this.now(),
+      },
+    });
+    await this.awaitSharedProjectGrants({ organizationId, grantIds: [grantId] });
+    return { grantId };
+  }
+
   /** One read-your-writes wait for a batch of shared reads; bumps the epoch once they land. */
   async awaitSharedProjectGrants({
     organizationId,
@@ -635,17 +696,19 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     bindingIds,
     actor,
     reason,
+    commandId,
   }: {
     organizationId: string;
     bindingIds: string[];
     actor: LedgerActor;
     reason?: string;
+    commandId?: string;
   }): Promise<void> {
     // A revoke names its grant id: a selector cannot address an aggregate,
     // so resolving "every grant this principal holds" into ids is the
     // caller's job now, and the deny below is what makes that safe.
     const revokedAtMs = this.now();
-    const batchId = this.options.newCommandId?.() ?? newCommandId();
+    const batchId = commandId ?? this.options.newCommandId?.() ?? newCommandId();
     const senders = (await this.commands()).commands;
     // One send at a time: in memory mode a send resolves once its job ran, and a batch as wide as
     // the queue's concurrency starves the projection jobs those commands wait on. A move onto the
@@ -739,11 +802,14 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     bindingIds,
     actor,
     reason,
+    commandId,
   }: {
     organizationId: string;
     bindingIds: string[];
     actor: LedgerActor;
     reason?: string;
+    /** A stable id makes a resent revocation the same fact (its idempotency key). */
+    commandId?: string;
   }): Promise<void> {
     refusePlatformTenant(organizationId);
     if (bindingIds.length === 0) return;
@@ -752,12 +818,14 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
       bindingIds: string[];
       actor: LedgerActor;
       reason?: string;
+      commandId?: string;
     } = {
       organizationId,
       bindingIds,
       actor,
     };
     if (reason) revocation.reason = reason;
+    if (commandId) revocation.commandId = commandId;
     await this.appendGrantRevocation(revocation);
   }
 
@@ -881,6 +949,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     requireProjection?: boolean;
   }): Promise<void> {
     refusePlatformTenant(organizationId);
+    refuseMintedOnlyPermissions(permissions);
     if (kind === "custom") {
       await this.refuseAddedPlatformPermissions({ organizationId, roleId, permissions });
     }
@@ -1057,6 +1126,86 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
       actor,
       ...(reason ? { reason } : {}),
     });
+  }
+
+  /**
+   * Attach one Billing grant: the user at their organization's own scope, fenced to the
+   * membership's lifetime. Who may grant it is the route's; the service decides whether to.
+   */
+  async attachBillingGrant({
+    organizationId,
+    grantId,
+    userId,
+    actor,
+    source,
+    commandId,
+  }: {
+    organizationId: string;
+    grantId: string;
+    userId: string;
+    actor: LedgerActor;
+    source: LedgerWriteSource;
+    commandId: string;
+  }): Promise<void> {
+    refusePlatformTenant(organizationId);
+    const [stamp] = await this.options.membershipStamps.findLockedStamps({
+      organizationId,
+      userIds: [userId],
+    });
+    if (!stamp) throw new BindingMissingError();
+    const occurredAtMs = this.now();
+    await (
+      await this.commands()
+    ).commands.attachGrant.send({
+      tenantId: organizationId,
+      organizationId,
+      commandId,
+      grant: {
+        grantId,
+        principal: { type: "user", id: userId },
+        roleKey: BILLING_ROLE_KEY,
+        scope: { type: "ORGANIZATION", id: organizationId },
+        source,
+        actor,
+        occurredAtMs,
+        membershipStamp: stamp.membershipStamp,
+      },
+    });
+    await this.awaitProjection({
+      what: `attach of billing grant ${grantId}`,
+      organizationId,
+      check: async () =>
+        (await this.options.reads.countLandedGrants({
+          organizationId,
+          grants: [
+            {
+              id: grantId,
+              principalType: "USER",
+              principalId: userId,
+              roleKey: BILLING_ROLE_KEY,
+              scopeType: "ORGANIZATION",
+              scopeId: organizationId,
+            },
+          ],
+          occurredSince: Temporal.Instant.fromEpochMilliseconds(occurredAtMs),
+        })) === 1,
+    });
+    await this.options.epoch.bump({ organizationId });
+  }
+
+  /** Revoke Billing grants by id; the deny lands synchronously, as every revoke's does. */
+  async revokeBillingGrants({
+    organizationId,
+    grantIds,
+    actor,
+  }: {
+    organizationId: string;
+    grantIds: string[];
+    actor: LedgerActor;
+  }): Promise<void> {
+    refusePlatformTenant(organizationId);
+    if (grantIds.length === 0) return;
+    await this.appendGrantRevocation({ organizationId, bindingIds: grantIds, actor });
   }
 
   /**

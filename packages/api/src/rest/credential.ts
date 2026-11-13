@@ -312,7 +312,7 @@ export function admittedOwnerlessProjectKeyFor({
 }
 
 /**
- * Whether an organization or key door admitted an ownerless staff access key (ADR-193). Such a
+ * Whether an organization or key door admitted an ownerless staff access key (ADR-202). Such a
  * door asked the key's own grant at any project a route named, so that project's proof is the
  * door's; other ownerless keys there stay refused, as before.
  */

@@ -10,6 +10,8 @@ import {
   type UiFeedback,
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
+import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useMemo, type ReactNode } from "react";
 
 import {
@@ -28,19 +30,22 @@ class HostServiceAuthzHost extends AuthzHostApi {
   constructor(
     private readonly deps: {
       organizationId: string | undefined;
+      projectId: string | undefined;
       session: UiSession;
       feedback: UiFeedback;
       plan: AuthzPlanReading;
       structure: AuthzOrganizationStructure;
       route: AuthzRouteReading;
       setQuery: AuthzHostApi["setQuery"];
+      openOverlay: <Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>) => void;
+      closeOverlay: () => void;
     },
   ) {
     super();
   }
 
   scope(): AuthzHostScope {
-    return { organizationId: this.deps.organizationId };
+    return { organizationId: this.deps.organizationId, projectId: this.deps.projectId };
   }
 
   hasPermission(permission: string): boolean {
@@ -66,6 +71,14 @@ class HostServiceAuthzHost extends AuthzHostApi {
     this.deps.setQuery(next, options);
   }
 
+  openOverlay<Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>): void {
+    this.deps.openOverlay(drawer, props);
+  }
+
+  closeOverlay(): void {
+    this.deps.closeOverlay();
+  }
+
   succeeded(notice: AuthzSuccessNotice): void {
     this.deps.feedback.succeeded(notice);
   }
@@ -82,8 +95,9 @@ class HostServiceAuthzHost extends AuthzHostApi {
  */
 export default function AuthzHostMount({ children }: { children?: ReactNode }) {
   const { session, feedback, route } = useUiHostServices();
+  const { openDrawer, closeDrawer } = useDrawer();
   const { query } = route.reading();
-  const { organizationId } = useUiScope().activeScope();
+  const { organizationId, projectId } = useUiScope().activeScope();
   // The plan tier only: the session-cached read, not the monthly usage count.
   const activePlan = authzApi.plan.getActivePlan.useQuery(
     { organizationId: organizationId ?? "" },
@@ -106,7 +120,12 @@ export default function AuthzHostMount({ children }: { children?: ReactNode }) {
       organizationName: organization?.name,
       teams: teams.map((team) => ({ id: team.id, name: team.name })),
       projects: teams.flatMap((team) =>
-        team.projects.map((project) => ({ id: project.id, name: project.name, teamId: team.id })),
+        team.projects.map((project) => ({
+          id: project.id,
+          name: project.name,
+          slug: project.slug,
+          teamId: team.id,
+        })),
       ),
     };
   }, [organizations.data, organizationId]);
@@ -114,14 +133,28 @@ export default function AuthzHostMount({ children }: { children?: ReactNode }) {
     () =>
       new HostServiceAuthzHost({
         organizationId: organizationId ?? void 0,
+        projectId: projectId ?? void 0,
         session,
         feedback,
         plan,
         structure,
         route: { query },
         setQuery: (next, options) => route.setQuery(next, options),
+        openOverlay: (drawer, props) => openDrawer(drawer, props),
+        closeOverlay: () => closeDrawer(),
       }),
-    [organizationId, session, feedback, plan, structure, query, route],
+    [
+      organizationId,
+      projectId,
+      session,
+      feedback,
+      plan,
+      structure,
+      query,
+      route,
+      openDrawer,
+      closeDrawer,
+    ],
   );
   return <AuthzHostProvider value={host}>{children}</AuthzHostProvider>;
 }

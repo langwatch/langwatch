@@ -1,6 +1,6 @@
 Feature: Ops agent access pages
   The operator's pages for agent access: /ops/agents to enrol agents, watch sessions and revoke
-  them, and /ops/agents/approve/:requestId to approve one request with a passkey. ADR-193.
+  them, and /ops/agents/approve/:requestId to approve one request with a passkey. ADR-202.
 
   Background:
     Given cloud ops is on and the system flag "ops_agent_access_enabled" is on

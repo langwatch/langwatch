@@ -54,6 +54,7 @@ const door: AuthApi = {
   findDialableIdentityProviderOrigins: () => unreached("findDialableIdentityProviderOrigins"),
   findMountedSocialMethodIds: () => unreached("findMountedSocialMethodIds"),
   getImpersonation: () => unreached("getImpersonation"),
+  findSessionUsersSince: () => unreached("findSessionUsersSince"),
   startImpersonation: () => unreached("startImpersonation"),
   stopImpersonation: () => unreached("stopImpersonation"),
   hasPasskey: () => unreached("hasPasskey"),

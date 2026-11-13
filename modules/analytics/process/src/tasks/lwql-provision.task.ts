@@ -12,13 +12,17 @@ import { Task } from "@langwatch/task";
 import { lwqlAppFunctionNames } from "../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
 import { canProvisionAppFunctions } from "../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
 import {
+  LangWatchQLCollectionBindingService,
+  type LwqlAccessModelMode,
+  type LwqlCollectionProbe,
+} from "../features/provisioning/services/langwatch-ql-collection-binding.service.ts";
+import {
   LangWatchQLProductionProvisioningService,
   LWQL_POSTGRES_READER_ROLE,
 } from "../features/provisioning/services/langwatch-ql-production-provisioning.service.ts";
 import {
   LangWatchQLSelfProvisioningService,
   type LwqlAppOwnedDrift,
-  type LwqlCollectionProbe,
   type LwqlPostgresGap,
   type LwqlSelfProvisionRequest,
 } from "../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
@@ -26,6 +30,7 @@ import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/cli
 import type { LwqlProvisioningDatabase } from "../repositories/langwatch-ql-postgres.repository.ts";
 import type {
   LangWatchQLProvisioningRepository,
+  LwqlCollectionState,
   ProvisioningFailureLevel,
   SkippedProvisioningStatement,
 } from "../repositories/langwatch-ql-provisioning.repository.ts";
@@ -43,6 +48,7 @@ import { LangWatchQLSqlModeClusterGuardService } from "../services/langwatch-ql-
 const lwqlProvisioning = LangWatchQLProductionProvisioningService.create();
 const clusterGuard = LangWatchQLSqlModeClusterGuardService.create();
 const selfProvisioning = LangWatchQLSelfProvisioningService.create();
+const collectionBinding = LangWatchQLCollectionBindingService.create();
 
 /** One global key: the self-provision convergence is a singleton, not per tenant. */
 const LWQL_SELF_PROVISION_LOCK_KEY = "lwql:self-provision";
@@ -257,12 +263,14 @@ async function probeCollection({
       repository.probePostgresCollection({
         collection: probe.collection,
         relation: probe.relation,
+        schema: probe.schema,
         cluster,
       }),
     appCredentials: () =>
       repository.probePostgresCredentials({
         credentials: probe.connection,
         relation: probe.relation,
+        schema: probe.schema,
         cluster,
       }),
   };
@@ -272,6 +280,23 @@ async function probeCollection({
     } catch (error) {
       return { shown: false, read, error };
     }
+  }
+  return { shown: true };
+}
+
+/** Every collection the engine tables bind to must hold the app's values. */
+async function probeCollections({
+  repository,
+  probes,
+  cluster,
+}: {
+  repository: LangWatchQLProvisioningRepository;
+  probes: readonly LwqlCollectionProbe[];
+  cluster: string | undefined;
+}): Promise<LwqlCollectionProbeResult> {
+  for (const probe of probes) {
+    const result = await probeCollection({ repository, probe, cluster });
+    if (!result.shown) return result;
   }
   return { shown: true };
 }
@@ -292,23 +317,33 @@ async function gateEngineTables({
   repository,
   request,
   names,
+  schema,
+  mode,
+  server,
   only,
   cluster,
 }: {
   repository: LangWatchQLProvisioningRepository;
   request: Extract<LwqlSelfProvisionRequest, { complete: true }>;
   names: LangWatchQLNames;
+  schema: string;
+  mode: LwqlAccessModelMode;
+  server: LwqlCollectionState;
   only: readonly string[] | undefined;
   /** `CLICKHOUSE_CLUSTER`: set, both reads must pass on every replica. */
   cluster: string | undefined;
 }): Promise<LwqlEngineTableGate> {
   const engineTables = selfProvisioning.engineTablesIn({ only });
   if (engineTables.length === 0) return { collectionLoaded: false, only };
-  const probe = selfProvisioning.collectionProbe({
+  const probes = collectionBinding.collectionProbes({
     names,
     postgres: { endpoint: request.endpoint, readerPassword: request.postgresReaderPassword },
+    schema,
+    mode,
+    server,
+    engineTables,
   });
-  const result = await probeCollection({ repository, probe, cluster });
+  const result = await probeCollections({ repository, probes, cluster });
   if (result.shown) return { collectionLoaded: true, only };
   const { read, error } = result;
   logger.warn(
@@ -353,6 +388,7 @@ async function convergeClickHouse({
   source,
   request,
   names,
+  schema,
   sourceDatabase,
   failureLevel,
   only,
@@ -361,6 +397,7 @@ async function convergeClickHouse({
   source: Readonly<Record<string, string | undefined>>;
   request: Extract<LwqlSelfProvisionRequest, { complete: true }>;
   names: LangWatchQLNames;
+  schema: string;
   sourceDatabase: string;
   failureLevel: ProvisioningFailureLevel;
   /** The drifted objects alone; absent, the whole ClickHouse half. */
@@ -372,14 +409,24 @@ async function convergeClickHouse({
   if (mode === "sql") {
     await clusterGuard.assertSafe({ query: (sql) => repository.queryRows(sql), source });
   }
+  // Both modes read it: sql mode never writes a collection a config file defines.
+  const server = await repository.readCollectionState({
+    database: names.database,
+    candidates:
+      mode === "rendered"
+        ? collectionBinding.renderedCollectionCandidates({ names })
+        : [collectionBinding.namedCollection({ names, mode })],
+  });
   const render = ({ collectionLoaded, only: drifted }: LwqlEngineTableGate) =>
     selfProvisioning.clickHouseStatements({
       names,
       restrictedPassword: request.connection.password,
       sourceDatabase,
       postgres: { endpoint: request.endpoint, readerPassword: request.postgresReaderPassword },
+      schema,
       includeAppFunctions,
       mode,
+      server,
       collectionLoaded,
       ...(drifted === undefined ? {} : { only: drifted }),
     });
@@ -390,6 +437,9 @@ async function convergeClickHouse({
       repository,
       request,
       names,
+      schema,
+      mode,
+      server,
       only,
       cluster: source.CLICKHOUSE_CLUSTER || undefined,
     });
@@ -402,7 +452,9 @@ async function convergeClickHouse({
     const statements = render(unprobed);
     const split = afterNamedCollection(statements);
     const head = await run(statements.slice(0, split));
-    gate = head.some((s) => isNamedCollectionKind(s.kind)) ? await gateByProbe() : unprobed;
+    // No collection statement ran (a config file owns it), or one was skipped: probe first.
+    const unwritten = split === 0 || head.some((s) => isNamedCollectionKind(s.kind));
+    gate = unwritten ? await gateByProbe() : unprobed;
     skipped = [...head, ...(await run(render(gate).slice(split)))];
   } else {
     gate = await gateByProbe();
@@ -538,6 +590,7 @@ async function convergeLocked({
           source: plan.settings,
           request: plan.request,
           names: plan.names,
+          schema: plan.schema,
           sourceDatabase,
           failureLevel,
           only: only?.clickHouse,
@@ -643,9 +696,9 @@ export async function findLwqlAppOwnedDrift({
 }): Promise<LwqlAppOwnedDrift> {
   const { names, request } = plan;
   const relations = selfProvisioning.appOwnedRelations({ names });
-  const credentialFingerprint = selfProvisioning.credentialFingerprint({
-    names,
+  const credentialFingerprint = collectionBinding.credentialFingerprint({
     postgres: { endpoint: request.endpoint, readerPassword: request.postgresReaderPassword },
+    schema: plan.schema,
   });
   const clickHouse = await withProvisioningRepository({
     open: plan.openRepository,

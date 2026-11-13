@@ -184,7 +184,48 @@ export const AUTHZ_RESOURCES = {
     actions: ["view", "manage"],
     scopes: ["organization"],
   },
-  // ADR-193. Allowlisted cross-organization reads an approved staff agent may make. Platform-tier
+  // Moving a deploy label ("production") of an agent or an evaluator, and
+  // archiving one that carries a label. Editing stays `evaluations:*`, so a
+  // custom role can edit without deciding what production runs.
+  agents: {
+    actions: ["deploy"],
+    scopes: ["project", "team", "organization"],
+  },
+  evaluators: {
+    actions: ["deploy"],
+    scopes: ["project", "team", "organization"],
+  },
+  // Starting a paid subscription (`upgrade`), and changing a live one: seats, the billing
+  // portal, invoices (`manage`). The Billing role holds both without taking a seat.
+  subscription: {
+    actions: ["upgrade", "manage"],
+    scopes: ["organization"],
+  },
+  // Requests to approve a seat for someone the seat limit held back or admitted as Lite.
+  seatRequests: {
+    actions: ["view", "manage"],
+    scopes: ["organization"],
+  },
+  // The member directory and the roles each member holds. Every organization role reads it;
+  // changing it stays `organization:manage`.
+  members: {
+    actions: ["view"],
+    scopes: ["organization"],
+  },
+  // ADR-201 §2: who may share matching spans into another project's traces.
+  // Its own resource, appended last: a `traces:braid` action would move every
+  // later bitset index. Admin-only; `traces:share` stays the public share link.
+  braids: {
+    actions: ["manage"],
+    scopes: ["project", "team", "organization"],
+  },
+  // ADR-201 §3: the one permission a braid grant carries, minted onto it at proof time and read
+  // only by the span read. No scope: no role, custom role, key or binding can ever confer it.
+  spans: {
+    actions: ["braided"],
+    scopes: [],
+  },
+  // ADR-202. Allowlisted cross-organization reads an approved staff agent may make. Platform-tier
   // only, like `ops`, and never `ops:view`: an agent token answers it from its approved session.
   opsRead: {
     actions: ["view"],
@@ -240,6 +281,25 @@ export function isRegistryPermission(value: string): value is AuthzPermission {
   return PERMISSION_INDEX.has(value);
 }
 
+/** The permission a braid grant carries in a proof, and the only one (ADR-201 §3). */
+export const SPAN_BRAID_PERMISSION = "spans:braided" as const satisfies RegistryPermission;
+
+/**
+ * Whether any grant may confer `permission`: false for a permission declared at no scope, which
+ * is minted onto a proof and never granted. A string outside the registry is not refused here.
+ */
+export function isGrantablePermission(permission: string): boolean {
+  const def = (AUTHZ_RESOURCES as Record<string, { scopes: readonly string[] } | undefined>)[
+    permissionResource(permission)
+  ];
+  return def === undefined || def.scopes.length > 0;
+}
+
+/** A registry permission a role, custom role or key may list: never a minted-only one. */
+export const grantablePermissionSchema = authzPermissionSchema.refine(isGrantablePermission, {
+  message: "is minted onto a proof and never granted",
+});
+
 /** Bitset index for a permission, or undefined for unknown strings. */
 export function findPermissionIndex(permission: string): number | undefined {
   return PERMISSION_INDEX.get(permission);
@@ -265,6 +325,13 @@ const MANAGE_IMPLIED_ACTIONS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * Never implied by `manage`: only a direct grant satisfies these. Deleting
+ * the organization is irreversible, so holding `organization:manage` (a CLI
+ * `--management` key, a key minted by one) must not reach it.
+ */
+const NEVER_IMPLIED_BY_MANAGE: ReadonlySet<string> = new Set(["organization:delete"]);
+
+/**
  * True when `requested` is satisfied by the `granted` set, applying the
  * manage-implication rule. `granted` may contain non-registry strings
  * (legacy custom-role rows) — membership is string-based on purpose.
@@ -277,6 +344,7 @@ export function permissionSatisfiedBy({
   requested: string;
 }): boolean {
   if (granted.has(requested)) return true;
+  if (NEVER_IMPLIED_BY_MANAGE.has(requested)) return false;
   const separator = requested.lastIndexOf(":");
   if (separator === -1) return false;
   const action = requested.slice(separator + 1);

@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const OWN_DECISION_MODEL = {
   value: "openai/decisions:gpt-6-luna",
-  label: "OpenAI Decisions (gpt-6-luna)",
+  label: "gpt-6-luna",
 };
 
 const state = vi.hoisted(() => ({
@@ -48,7 +48,10 @@ vi.mock("../../../../behavior/evaluator-api.ts", () => ({
     },
     instantEval: {
       access: {
-        useQuery: () => ({ data: { released: true, offer: "enable" }, isLoading: false }),
+        useQuery: () => ({
+          data: { released: true, hostedReleased: true, offer: "enable" },
+          isLoading: false,
+        }),
       },
     },
   },

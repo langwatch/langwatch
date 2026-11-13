@@ -6,7 +6,7 @@
 [use](../specs/staff-access-use.feature),
 [pages](../specs/staff-access-pages.feature),
 [CLI](../specs/staff-access-cli.feature).
-Product decision: [ADR-193](../../../dev/docs/adr/193-ops-agent-access.md).
+Product decision: [ADR-202](../../../dev/docs/adr/202-ops-agent-access.md).
 
 ## Context
 

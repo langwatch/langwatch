@@ -1,16 +1,12 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import {
-  CHANGELOG_TOKENS,
-  parseReleases,
-  readReleases,
-  withReleaseNotes,
-} from "../compile/releases.ts";
+import { approximateTokens } from "../../../lib/page-tokens.ts";
+import { pageMarkdown } from "../../discovery/compile.ts";
+import { parseReleases, readReleases, withReleaseNotes } from "../compile/releases.ts";
 
 const compare = "https://github.com/langwatch/langwatch/compare/v1...v2";
 const source = `# Changelog
@@ -44,6 +40,21 @@ describe("when a release note links both its pull request and its commit", () =>
     expect(entry?.body).toContain(`* editor shows inputs ${lone}`);
   });
 });
+
+const leftOut = "## About this copy";
+
+function changelogProject({ changelog }: { changelog: string }) {
+  const project = mkdtempSync(path.join(os.tmpdir(), "docs-releases-budget-"));
+  const docsRoot = path.join(project, "docs");
+  mkdirSync(docsRoot);
+  writeFileSync(path.join(project, "CHANGELOG.md"), changelog);
+  writeFileSync(path.join(docsRoot, "docs.json"), "{}");
+  writeFileSync(
+    path.join(docsRoot, "changelog.mdx"),
+    "---\ntitle: Changelog\n---\n<ReleaseNotes />\n\n## Older releases",
+  );
+  return { docsRoot, dispose: () => rmSync(project, { recursive: true, force: true }) };
+}
 
 describe("when the repository publishes release notes", () => {
   /** @scenario "Read published release notes" */
@@ -100,6 +111,125 @@ describe("when the repository publishes release notes", () => {
   });
 });
 
+describe("when the newest releases are longer than the page token budget", () => {
+  const pageTokens = 2000;
+  const note = "* **traces:** a long note\n";
+  const notesOf = ({ share }: { share: number }) =>
+    note.repeat(Math.ceil((pageTokens * 4 * share) / note.length));
+  /** @scenario "Keep the changelog Markdown export within the page token budget" */
+  it("exports the newest release and a note, while the page keeps every release", () => {
+    const long = notesOf({ share: 2 / 3 });
+    const { docsRoot, dispose } = changelogProject({
+      changelog:
+        `## [3.0.0](${compare}) (2026-11-02)\n### Features\n${long}` +
+        `## [2.9.0](${compare}) (2026-10-21)\n### Features\n${long}` +
+        `## [2.8.0](${compare}) (2026-10-01)\n### Features\n* Small fix\n`,
+    });
+    try {
+      const markdown = pageMarkdown({
+        docsRoot,
+        slug: "changelog",
+        pageTokens,
+      });
+      expect(approximateTokens({ text: markdown })).toBeLessThanOrEqual(pageTokens);
+      expect(markdown).toContain("## Release v3.0.0");
+      expect(markdown).not.toContain("## Release v2.9.0");
+      expect(markdown).not.toContain("## Release v2.8.0");
+      expect(markdown.indexOf("## Release v3.0.0")).toBeLessThan(markdown.indexOf(leftOut));
+      expect(markdown.indexOf(leftOut)).toBeLessThan(markdown.indexOf("## Older releases"));
+
+      const page = withReleaseNotes({
+        source: readFileSync(path.join(docsRoot, "changelog.mdx"), "utf8"),
+        slug: "changelog",
+        docsRoot,
+      });
+      for (const version of ["3.0.0", "2.9.0", "2.8.0"])
+        expect(page).toContain(`## Release v${version}`);
+      expect(page).not.toContain(leftOut);
+    } finally {
+      dispose();
+    }
+  });
+
+  /** @scenario "Keep the changelog Markdown export within the page token budget" */
+  it("keeps no release, only the note, when the newest alone is over the budget", () => {
+    const { docsRoot, dispose } = changelogProject({
+      changelog:
+        `## [3.0.0](${compare}) (2026-11-02)\n### Features\n${notesOf({ share: 1.2 })}` +
+        `## [2.9.0](${compare}) (2026-10-21)\n### Features\n* Small fix\n`,
+    });
+    try {
+      const markdown = pageMarkdown({
+        docsRoot,
+        slug: "changelog",
+        pageTokens,
+      });
+      expect(markdown).not.toContain("## Release v");
+      expect(markdown).toContain(leftOut);
+      expect(markdown).toContain("repository CHANGELOG");
+      expect(approximateTokens({ text: markdown })).toBeLessThanOrEqual(pageTokens);
+    } finally {
+      dispose();
+    }
+  });
+});
+
+describe("when only some of the older releases fit the page token budget", () => {
+  const long = "* **traces:** a long note\n".repeat(200);
+  const release = ({ version, day }: { version: string; day: string }) =>
+    `## [${version}](${compare}) (2026-10-${day})\n### Features\n${long}`;
+  const all =
+    release({ version: "3.0.0", day: "21" }) +
+    release({ version: "2.9.0", day: "11" }) +
+    release({ version: "2.8.0", day: "01" });
+
+  function exportOf({ changelog, pageTokens }: { changelog: string; pageTokens: number }) {
+    const { docsRoot, dispose } = changelogProject({ changelog });
+    try {
+      return pageMarkdown({ docsRoot, slug: "changelog", pageTokens });
+    } finally {
+      dispose();
+    }
+  }
+  const tokens = ({ text }: { text: string }) => approximateTokens({ text });
+
+  /** @scenario "Keep the changelog Markdown export within the page token budget" */
+  it("keeps the newest releases that fit and notes the rest are left out", () => {
+    // One token under the untrimmed export: three releases cannot fit, while two plus the note do.
+    const twoFit = tokens({ text: exportOf({ changelog: all, pageTokens: Infinity }) }) - 1;
+    const markdown = exportOf({ changelog: all, pageTokens: twoFit });
+    expect(markdown).toContain("## Release v3.0.0");
+    expect(markdown).toContain("## Release v2.9.0");
+    expect(markdown).not.toContain("## Release v2.8.0");
+    expect(markdown).toContain(leftOut);
+    expect(tokens({ text: markdown })).toBeLessThanOrEqual(twoFit);
+  });
+
+  /** @scenario "Keep the changelog Markdown export within the page token budget" */
+  it("keeps every release and adds no note when they all fit", () => {
+    const markdown = exportOf({
+      changelog: all,
+      pageTokens: tokens({ text: exportOf({ changelog: all, pageTokens: Infinity }) }),
+    });
+    for (const version of ["3.0.0", "2.9.0", "2.8.0"])
+      expect(markdown).toContain(`## Release v${version}`);
+    expect(markdown).not.toContain(leftOut);
+  });
+
+  /** @scenario "Keep the changelog Markdown export within the page token budget" */
+  it("keeps every release and adds no note when the caller sets no budget", () => {
+    const { docsRoot, dispose } = changelogProject({ changelog: all });
+    try {
+      const markdown = pageMarkdown({ docsRoot, slug: "changelog" });
+      for (const version of ["3.0.0", "2.9.0", "2.8.0"])
+        expect(markdown).toContain(`## Release v${version}`);
+      expect(markdown).not.toContain(leftOut);
+    } finally {
+      dispose();
+    }
+  });
+});
+
 describe("when a page asks for the latest releases", () => {
   /** @scenario "Show what is new on the home page" */
   it("lists the newest releases with version, date and summary, linking to the changelog", () => {
@@ -125,104 +255,5 @@ describe("when a page asks for the latest releases", () => {
     } finally {
       rmSync(project, { recursive: true, force: true });
     }
-  });
-});
-
-/** A release whose notes hold `lines` fix entries of about 100 characters each. */
-const bigRelease = ({ version, lines }: { version: string; lines: number }) => {
-  const tag = `https://github.com/langwatch/langwatch/compare/langwatch@v0.0.1...langwatch@v${version}`;
-  const fixes = Array.from(
-    { length: lines },
-    (_, index) =>
-      `* **area:** fix number ${index} of release ${version}, written long enough to count`,
-  ).join("\n");
-  return `## [${version}](${tag}) (2026-10-0${version.split(".")[1]})\n### Bug Fixes\n${fixes}\n`;
-};
-
-const changelogOf = ({ source }: { source: string }) => {
-  const project = mkdtempSync(path.join(os.tmpdir(), "docs-changelog-budget-"));
-  const docsRoot = path.join(project, "docs");
-  mkdirSync(docsRoot);
-  try {
-    writeFileSync(path.join(project, "CHANGELOG.md"), source);
-    return withReleaseNotes({
-      source: "Intro\n\n<ReleaseNotes />\n\n## Older releases\n\n[Full changelog](https://x)",
-      slug: "changelog",
-      docsRoot,
-    });
-  } finally {
-    rmSync(project, { recursive: true, force: true });
-  }
-};
-
-describe("when the newest releases are too long for one page", () => {
-  /** @scenario "Keep the changelog within the page token budget" */
-  it("keeps the newest releases that fit and leaves the rest to the older releases link", () => {
-    const page = changelogOf({
-      source: ["3.5.0", "3.4.0", "3.3.0", "3.2.0", "3.1.0"]
-        .map((version) => bigRelease({ version, lines: 100 }))
-        .join(""),
-    });
-
-    expect(Math.ceil(page.length / 4)).toBeLessThanOrEqual(CHANGELOG_TOKENS);
-    expect(page).toContain("## Release v3.5.0");
-    expect(page).toContain("## Release v3.4.0");
-    expect(page).not.toContain("## Release v3.1.0");
-    expect(page).not.toContain("Read the full notes");
-    expect(page).toContain("## Older releases");
-  });
-
-  /** @scenario "Keep the changelog within the page token budget" */
-  it("cuts the newest release's notes and links its release page when it alone is too long", () => {
-    const page = changelogOf({
-      source:
-        bigRelease({ version: "3.9.0", lines: 600 }) + bigRelease({ version: "3.8.0", lines: 5 }),
-    });
-
-    expect(Math.ceil(page.length / 4)).toBeLessThanOrEqual(CHANGELOG_TOKENS);
-    expect(page).toContain("## Release v3.9.0");
-    expect(page).toContain("fix number 0 of release 3.9.0");
-    expect(page).not.toContain("fix number 599 of release 3.9.0");
-    expect(page).not.toContain("## Release v3.8.0");
-    expect(page).toContain(
-      "[Read the full notes](https://github.com/langwatch/langwatch/releases/tag/langwatch@v3.9.0).",
-    );
-    expect(page).toContain("## Older releases");
-  });
-
-  /** @scenario "Keep the changelog within the page token budget" */
-  it("links a release the changelog has no room for to its GitHub release instead", () => {
-    const project = mkdtempSync(path.join(os.tmpdir(), "docs-whats-new-budget-"));
-    const docsRoot = path.join(project, "docs");
-    mkdirSync(docsRoot);
-    try {
-      writeFileSync(
-        path.join(project, "CHANGELOG.md"),
-        ["3.3.0", "3.2.0", "3.1.0"].map((version) => bigRelease({ version, lines: 140 })).join(""),
-      );
-      writeFileSync(path.join(docsRoot, "changelog.mdx"), "Intro\n\n<ReleaseNotes />\n");
-      const shown = withReleaseNotes({ source: "<ReleaseNotes />", slug: "changelog", docsRoot });
-      const home = withReleaseNotes({ source: "<WhatsNew />", slug: "introduction", docsRoot });
-
-      expect(shown).not.toContain("## Release v3.1.0");
-      expect(home).toContain("[v3.3.0](/changelog#release-v330)");
-      expect(home).toContain(
-        "[v3.1.0](https://github.com/langwatch/langwatch/releases/tag/langwatch@v3.1.0)",
-      );
-    } finally {
-      rmSync(project, { recursive: true, force: true });
-    }
-  });
-
-  /** @scenario "Keep the changelog within the page token budget" */
-  it("fits the repository's own changelog page", () => {
-    const docsRoot = fileURLToPath(new URL("../../../../../../docs", import.meta.url));
-    const page = withReleaseNotes({
-      source: readFileSync(path.join(docsRoot, "changelog.mdx"), "utf8"),
-      slug: "changelog",
-      docsRoot,
-    });
-    expect(page).toContain("## Release v");
-    expect(Math.ceil(page.length / 4)).toBeLessThanOrEqual(CHANGELOG_TOKENS);
   });
 });

@@ -1,5 +1,5 @@
 /**
- * The agent's wire under `/api/staff-access` (ADR-193): request, status, redeem and end with
+ * The agent's wire under `/api/staff-access` (ADR-202): request, status, redeem and end with
  * a requester key; the `ops:read` allowlist with an ops token. Read by the `langwatch` CLI.
  */
 import type { Named } from "@langwatch/module";

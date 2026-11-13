@@ -1,6 +1,6 @@
 /**
  * Every request by an approved staff agent's key passes the staff access gate after its
- * authorization and before its handler (ADR-193). The gate here is a recording double: what it
+ * authorization and before its handler (ADR-202). The gate here is a recording double: what it
  * records and refuses is the staff-access module's business, and its own suite proves that.
  * @vitest-environment node
  * @see modules/staff-access/specs/staff-access-use.feature (bound end to end by staff-access)

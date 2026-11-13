@@ -6,6 +6,7 @@ import { Settings as SettingsIcon } from "lucide-react";
 
 import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
 import { useReachableProducts } from "../../behavior/use-reachable-products.ts";
+import { writeDashboardsSidebarHint } from "../../model/dashboards-sidebar-hint.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import { PRODUCTS, type ProductDefinition, type ProductId } from "../../model/products.ts";
 import { NavigationLink } from "../elements/navigation-link.tsx";
@@ -32,6 +33,9 @@ export function ProductIconRail({
     if (product.id === activeProductId && !isSettingsActive) return;
     const home = product.homeHref({ projectSlug });
     if (!home) return;
+    // Choosing Dashboards means its own sidebar, whatever page the reader left.
+    if (product.id === "dashboards")
+      writeDashboardsSidebarHint({ hint: "dashboards", projectId: host.project()?.id });
     host.navigate(home);
   };
 

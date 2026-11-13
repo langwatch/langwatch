@@ -11,7 +11,14 @@ export const SIGNED_UP_EVENT_TYPE = "lw.auth.signed_up" as const;
 export const APP_PAGE_OPENED_EVENT_TYPE = "lw.auth.app_page_opened" as const;
 
 /** The pages whose opening is announced. */
-export const appPageSchema = z.enum(["me_sessions"]);
+export const appPageSchema = z.enum([
+  "me_sessions",
+  "me_overview",
+  "settings_usage",
+  "settings_plans",
+  "settings_subscription",
+  "governance_costs",
+]);
 export type AppPage = z.infer<typeof appPageSchema>;
 
 /** A member of some organization minted a session; the tenant is the person. */
@@ -33,6 +40,8 @@ const ssoAutoAddedEventDataSchemaDefinition = z.object({
   userId: z.string().min(1),
   organizationId: z.string().min(1),
   organizationName: z.string(),
+  /** The role the person was admitted with; absent on events stored before it was recorded. */
+  role: z.string().optional(),
   occurredAt: z.number().int().nonnegative(),
 });
 export interface SsoAutoAddedEventDataSchema extends Named<

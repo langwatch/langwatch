@@ -32,3 +32,8 @@ Feature: Reusable entity detail patterns
     Given an activity with a relative time
     When the reader focuses its time
     Then the exact ISO instant and Unix milliseconds are available
+
+  @integration
+  Scenario: A version list names who wrote each version
+    Given versions written by a user, a deleted user, an API key and LangWatch
+    Then each row names the user, "Unknown user", "API key" or "LangWatch"

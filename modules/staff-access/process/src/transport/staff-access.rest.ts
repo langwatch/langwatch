@@ -1,5 +1,5 @@
 /**
- * The agent's wire under `/api/staff-access` (ADR-193), behind the `staff_access` door. A
+ * The agent's wire under `/api/staff-access` (ADR-202), behind the `staff_access` door. A
  * requester key asks, checks, redeems and ends; an ops token reads the `ops:read` allowlist.
  * Spec: modules/staff-access/specs/staff-access-approval.feature
  */

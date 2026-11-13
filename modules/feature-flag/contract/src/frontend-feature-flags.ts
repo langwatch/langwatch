@@ -29,6 +29,9 @@ export const FRONTEND_FEATURE_FLAGS = [
   // launcher orb. Swaps only the CLOSED-state affordance; opening, the
   // panel and Cmd/Ctrl+I are identical either way.
   "release_ui_langy_peek_dock_enabled",
+  // The code access card's share command names who asked (`--as <email>`).
+  // On once the SDK release carrying `langy --as` is on npm.
+  "release_ui_langy_share_command_names_asker",
   // Bradley-Terry leaderboard chart on the experiments-v3 results page
   // (issue #5103, specs/experiments/comparison-leaderboard.feature). Off by
   // default — power-user surface, additive to the existing win-rate chart.
@@ -51,6 +54,8 @@ export const FRONTEND_FEATURE_FLAGS = [
   "release_instant_evals",
   // The own decision models in the Instant Evals column of Default models (ADR-182).
   "release_instant_evals_own_decision_model",
+  // LangWatch Evals Preview says it routes through the LangWatch Judge (ADR-190).
+  "release_instant_evals_judge_router",
   // The guided onboarding variant, read on the welcome flow with the user's
   // id, which the percentage rollout buckets on (guided-onboarding-variant.feature).
   "experiment_onboarding_langy_guided",

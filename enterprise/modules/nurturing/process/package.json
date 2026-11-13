@@ -2,7 +2,7 @@
   "name": "@langwatch/enterprise-nurturing-process",
   "version": "0.1.0",
   "private": true,
-  "description": "Customer.io nurturing and server-side PostHog product milestones: owners record signals, nurturing names no peer.",
+  "description": "Customer.io nurturing and server-side PostHog product milestones: nurturing learns from the owners' events and keeps its own copies.",
   "license": "SEE LICENSE IN ../../../LICENSE.md",
   "files": [
     "src"
@@ -27,8 +27,11 @@
     "@langwatch/enterprise-nurturing-contract": "workspace:*",
     "@langwatch/enterprise-saas-contract": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",
+    "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/experiment-contract": "workspace:*",
+    "@langwatch/group-queue": "workspace:*",
+    "@langwatch/insight-contract": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",

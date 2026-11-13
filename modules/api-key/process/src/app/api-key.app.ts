@@ -49,6 +49,15 @@ import {
   type RevokeStaffAccessKeyInput,
   type StaffAccessKeyMinted,
   type RevokeDocsSessionKeysInput,
+  type BraidSignatureVerdict,
+  type CreateSigningKeyInput,
+  type FindSigningKeysInput,
+  type IssuedSigningKey,
+  type ProjectSigning,
+  type RevokeSigningKeyInput,
+  type RotateSigningKeyInput,
+  type SigningKey,
+  type VerifyBraidSignatureInput,
 } from "@langwatch/api-key-contract";
 import { PermissionDeniedError } from "@langwatch/authorization";
 import { AuthzApi, newAuthzGrantId } from "@langwatch/authz-contract";
@@ -57,9 +66,10 @@ import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi, type PaginatedProjects } from "@langwatch/project-contract";
 import {
+  apiKeyPepper,
   credentialsSecret,
   credentialsSecretPrevious,
-  Secret,
+  intoKeyPepper,
   sessionSecret,
   type ScopedSecrets,
 } from "@langwatch/secrets";
@@ -69,6 +79,7 @@ import type { ApiKeyRepositories } from "../repositories/api-key.repositories.ts
 import { AgentSandboxKeyService } from "../services/agent-sandbox-key.service.ts";
 import { ApiKeyTokenService } from "../services/api-key-token.service.ts";
 import { ApiKeyService } from "../services/api-key.service.ts";
+import { BraidSignatureVerificationService } from "../services/braid-signature-verification.service.ts";
 import { DocsSessionKeyService } from "../services/docs-session-key.service.ts";
 import { IngestionKeyMintService } from "../services/ingestion-key-mint.service.ts";
 import { LegacyApiKeyGrantService } from "../services/legacy-api-key-grant.service.ts";
@@ -80,6 +91,7 @@ import {
   type VisibleProjectsQuery,
 } from "../services/project-provisioning.service.ts";
 import { RunKeyMintService } from "../services/run-key-mint.service.ts";
+import { SigningKeyService } from "../services/signing-key.service.ts";
 import { StaffAccessKeyService } from "../services/staff-access-key.service.ts";
 import type { ApiKeyOrganizationsDoorApi } from "../transport/api-key-organizations.rest.ts";
 import type { ApiKeyProjectsDoorApi } from "../transport/api-key-projects.rest.ts";
@@ -154,16 +166,11 @@ function scopeNames(
 async function apiKeyPeppers(
   secrets: ScopedSecrets,
 ): Promise<{ pepper: string; previousPepper: string | undefined }> {
-  const { pepper, pepperFallback, pepperLastFallback, pepperPrevious } = ApiKeyModule.secrets;
-  const answered = await secrets.into(pepper, (primary) =>
-    secrets.into(pepperFallback, (credentials) =>
-      secrets.into(pepperLastFallback, (session) =>
-        secrets.into(pepperPrevious, (previous) => ({
-          pepper: [primary, credentials, session].find((value) => value !== void 0 && value !== ""),
-          previousPepper: primary ? void 0 : previous || void 0,
-        })),
-      ),
-    ),
+  const answered = await intoKeyPepper(secrets, (chosen, fromApiKeyPepper) =>
+    secrets.into(ApiKeyModule.secrets.pepperPrevious, (previous) => ({
+      pepper: chosen,
+      previousPepper: fromApiKeyPepper ? void 0 : previous || void 0,
+    })),
   );
   if (answered.pepper === void 0) {
     throw new ConfigParseError([
@@ -185,7 +192,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
 
   /** Main's pepper chain, first set wins: API_KEY_PEPPER, CREDENTIALS_SECRET, NEXTAUTH_SECRET. */
   static readonly secrets = {
-    pepper: Secret.load("API_KEY_PEPPER", { optional: true }),
+    pepper: apiKeyPepper,
     pepperFallback: credentialsSecret,
     pepperLastFallback: sessionSecret,
     /** Verifies keys hashed before a CREDENTIALS_SECRET rotation; each re-hashes on next use. */
@@ -251,8 +258,21 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
       organizations: setup.dependencies.organizations,
     });
 
+    const braidSignatures = BraidSignatureVerificationService.create({
+      keys: setup.repositories.signingKeys,
+      usage: setup.repositories.signingKeyUsage,
+    });
+    const signingKeys = SigningKeyService.create({
+      keys: setup.repositories.signingKeys,
+      usage: setup.repositories.signingKeyUsage,
+      projects: setup.dependencies.projects,
+      braidSignatures,
+    });
+
     return new ApiKeyModule({
       service,
+      signingKeys,
+      braidSignatures,
       authorization,
       runKeys,
       sandboxKeys,
@@ -266,6 +286,8 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
 
   private constructor(deps: {
     service: ApiKeyService;
+    signingKeys: SigningKeyService;
+    braidSignatures: BraidSignatureVerificationService;
     authorization: AuthzApi;
     runKeys: RunKeyMintService;
     sandboxKeys: AgentSandboxKeyService;
@@ -276,6 +298,8 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
     organizationProvisioning: OrganizationProvisioningService;
   }) {
     this.#service = deps.service;
+    this.#signingKeys = deps.signingKeys;
+    this.#braidSignatures = deps.braidSignatures;
     this.#authorization = deps.authorization;
     this.#runKeys = deps.runKeys;
     this.#sandboxKeys = deps.sandboxKeys;
@@ -287,6 +311,8 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
   }
 
   readonly #service: ApiKeyService;
+  readonly #signingKeys: SigningKeyService;
+  readonly #braidSignatures: BraidSignatureVerificationService;
   readonly #authorization: AuthzApi;
   readonly #runKeys: RunKeyMintService;
   readonly #sandboxKeys: AgentSandboxKeyService;
@@ -555,6 +581,32 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
   }
 
   /**
+   * What a restricted key's permission rows may offer, read off the mint's own resolver so a
+   * group grant counts. Another owner's ceiling is asked only by an organization admin, the
+   * one who may assign a key to someone else; anyone else is answered for themselves.
+   */
+  async listGrantablePermissions(
+    input: Readonly<{
+      organizationId: string;
+      scopes: { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
+      ownerUserId?: string;
+    }>,
+    by: ApiKeyCaller,
+  ): Promise<string[]> {
+    await this.#ensureMember(input.organizationId, by);
+    const ownerUserId = input.ownerUserId ?? by.id;
+    if (ownerUserId !== by.id && !(await this.#isOrganizationAdmin(input.organizationId, by))) {
+      throw new ApiKeyAdminRequiredError("assign-to-another-user");
+    }
+
+    return this.#service.grantablePermissions({
+      principal: { type: "user", id: ownerUserId },
+      organizationId: input.organizationId,
+      scopes: input.scopes,
+    });
+  }
+
+  /**
    * One key id resolved to a display name, for a caller who already has the id. Answers null
    * identically for an id that does not exist and one that belongs to another organization, so
    * it cannot be used to enumerate.
@@ -735,6 +787,32 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
     });
   }
 
+  /**
+   * A new secret for one key, answered once; the old one is refused at once. The same caller rule
+   * as revoke, and like a mint an operator acting as a member may not do it.
+   */
+  async rotateKey(
+    input: Readonly<{ organizationId: string; apiKeyId: string }>,
+    by: ApiKeyCaller,
+  ): Promise<{ token: string; apiKey: ApiKey }> {
+    if (by.impersonatorId) {
+      throw new PermissionDeniedError({
+        permission: "organization:view",
+        scope: { type: "organization", id: input.organizationId },
+        denialReason: "no-grant",
+      });
+    }
+    await this.#ensureMember(input.organizationId, by);
+    const callerIsAdmin = await this.#isOrganizationAdmin(input.organizationId, by);
+
+    return this.#service.rotate({
+      id: input.apiKeyId,
+      callerUserId: by.id,
+      callerIsAdmin,
+      organizationId: input.organizationId,
+    });
+  }
+
   /** The organization's projects, for the restricted-permission picker. */
   async listOrganizationProjects(
     input: Readonly<{ organizationId: string }>,
@@ -765,6 +843,30 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
     await this.#ensureMember(input.organizationId, by);
     if (!(await this.#isOrganizationAdmin(input.organizationId, by))) return [];
     return this.#service.getOrgMembers({ organizationId: input.organizationId });
+  }
+
+  async findSigningKeys(input: FindSigningKeysInput): Promise<SigningKey[]> {
+    return this.#signingKeys.find(input);
+  }
+
+  async findProjectSigning(input: FindSigningKeysInput): Promise<ProjectSigning> {
+    return this.#signingKeys.findProjectSigning(input);
+  }
+
+  async createSigningKey(input: CreateSigningKeyInput): Promise<IssuedSigningKey> {
+    return this.#signingKeys.create(input);
+  }
+
+  async rotateSigningKey(input: RotateSigningKeyInput): Promise<IssuedSigningKey> {
+    return this.#signingKeys.rotate(input);
+  }
+
+  async revokeSigningKey(input: RevokeSigningKeyInput): Promise<SigningKey> {
+    return this.#signingKeys.revoke(input);
+  }
+
+  async verifyBraidSignature(input: VerifyBraidSignatureInput): Promise<BraidSignatureVerdict> {
+    return this.#braidSignatures.verify(input);
   }
 
   #ensureMember(organizationId: string, by: ApiKeyCaller): Promise<void> {

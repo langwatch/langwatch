@@ -59,7 +59,7 @@ type StaffAccessSetup = FeatureSetup<
 
 type StaffAccessRequesterSession = Extract<StaffAccessDoorSession, { kind: "requester" }>;
 
-/** Ops agent access (ADR-193): enrolment, passkey approval, one-hour sessions and their trail. */
+/** Ops agent access (ADR-202): enrolment, passkey approval, one-hour sessions and their trail. */
 export class StaffAccessModule implements StaffAccessApiContract {
   static readonly contract = StaffAccessApi;
   static readonly config = staffAccessConfig;

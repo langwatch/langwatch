@@ -7,11 +7,14 @@ import {
   billingConfig,
   BillingPriceCatalogue,
   billingSecrets,
+  stripePricesFile,
   type BillingServerConfig,
   type BillingAuditRecordedEventData,
   type BillingStaff,
   type BillingDisplayInvoice,
   type ConnectedAddCommitRequest,
+  type DeveloperSeatQuote,
+  type DeveloperSeats,
   type Currency,
   type SubscribablePlan,
   type SubscriptionBillingInterval,
@@ -48,6 +51,7 @@ import type { BillingChannels } from "../channels/billing.channels.ts";
 import type { ConnectedStatementMailChannel } from "../channels/connected-statement-mail.channel.ts";
 import { SlackBillingSubscriptionNotifierChannel } from "../channels/slack/slack.billing-subscription-notifier.channel.ts";
 import { SlackBillingWebhookHostChannel } from "../channels/slack/slack.billing-webhook-host.channel.ts";
+import type { StripeSubscriptionsChannel } from "../channels/stripe-subscriptions.channel.ts";
 import type { BillingLifecyclePipeline } from "../eventing/billing-lifecycle.pipeline.ts";
 import {
   type BillingReportingDefinition,
@@ -63,8 +67,10 @@ import { ConnectedSeatChangeService } from "../features/connected-billing/servic
 import { ConnectedUsageCeilingService } from "../features/connected-billing/services/connected-usage-ceiling.service.ts";
 import { LicensePurchaseDeliveryService } from "../features/license-purchase/services/license-purchase-delivery.service.ts";
 import { LicensePurchaseService } from "../features/license-purchase/services/license-purchase.service.ts";
+import { LicenseRenewalService } from "../features/license-purchase/services/license-renewal.service.ts";
 import { LicensingLicenseGeneratorService } from "../features/license-purchase/services/licensing-license-generator.service.ts";
 import type { BillingRepositories } from "../repositories/billing.repositories.ts";
+import { carriesPiiRedactionPrice } from "../rules/pii-redaction-meter.rules.ts";
 import { isStripeTestModeKey } from "../rules/stripe-mode.rules.ts";
 import {
   planLimitCooldown,
@@ -73,6 +79,7 @@ import {
 } from "../services/billing-alert-cooldown.service.ts";
 import { BillingErrorReporterService } from "../services/billing-error-reporter.service.ts";
 import { BillingLifecycleAnnouncerService } from "../services/billing-lifecycle-announcer.service.ts";
+import type { CheckoutBillingRoles } from "../services/billing-starter-role.service.ts";
 import { StripeWebhookReceiptService } from "../services/billing-stripe-webhook-receipt.service.ts";
 import {
   EEWebhookService,
@@ -81,16 +88,25 @@ import {
 import { NotificationService as BillingUsageNoticeService } from "../services/billing-usage-notice.service.ts";
 import { CurrencyService } from "../services/currency.service.ts";
 import { CustomerService } from "../services/customer.service.ts";
+import { DeveloperSeatService } from "../services/developer-seat.service.ts";
 import { InstantEvalSpendQueryService } from "../services/instant-eval-spend-query.service.ts";
 import { OrganizationPricingService } from "../services/organization-pricing.service.ts";
+import { PiiRedactionSpendQueryService } from "../services/pii-redaction-spend-query.service.ts";
 import { PlanLimitAlertService } from "../services/plan-limit-alert.service.ts";
 import { SaaSPlanProviderService } from "../services/plan-provider.service.ts";
 import { ResourceLimitAlertService } from "../services/resource-limit-alert.service.ts";
 import { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
+import {
+  type SeatLineRepairOutcome,
+  SeatLineRepairService,
+} from "../services/seat-line-repair.service.ts";
 import { StripeCustomerCurrencyService } from "../services/stripe-customer-currency.service.ts";
 import { StripeErrorTranslatorService } from "../services/stripe-error-translator.service.ts";
 import { SubscriptionItemCalculatorService } from "../services/subscription-item-calculator.service.ts";
-import { BillingSubscriptionService } from "../services/subscription.service.ts";
+import {
+  BillingSubscriptionService,
+  type SeatsInUseCounter,
+} from "../services/subscription.service.ts";
 import { UsageLimitOrganizationService } from "../services/usage-limit-organization.service.ts";
 import {
   StripeUsageReportingBuilder,
@@ -114,7 +130,11 @@ type BillingSetup = FeatureSetup<
 /** The license registry's view of a customer's terms and seats. */
 type ConnectedLicensing = Pick<
   LicensingApi,
-  "getContractTerms" | "raiseContractCommit" | "getConnectedSeats" | "findSeatChanges"
+  | "getContractTerms"
+  | "raiseContractCommit"
+  | "getConnectedSeats"
+  | "findSeatChanges"
+  | "countFullSeatsInUse"
 >;
 
 /** The peers connected billing reads and gates through, each only as wide as it is used. */
@@ -135,6 +155,8 @@ type StripeWebhookComposition = Readonly<{
   host: BillingWebhookHost;
   /** Main's licence purchase: signs, records, mails and announces; absent without the key. */
   licensePurchase?: LicensePurchaseHandler;
+  /** Delivers a renewed licence subscription's next term, as a purchase is; absent without the key. */
+  licenseRenewal?: Pick<LicensePurchaseService, "mintRenewal" | "sendRenewal">;
   /** Clears a trial's licence once its subscription activates; licensing owns it. */
   licenses: Pick<LicensingApi, "removeLicense" | "getLicenseStatus">;
 }>;
@@ -148,6 +170,8 @@ type SubscriptionComposition = Readonly<{
 type SubscriptionDoor = Readonly<{
   customers: CustomerService;
   subscriptions: BillingSubscriptionService;
+  seatLines: SeatLineRepairService;
+  developerSeats: DeveloperSeatService;
 }>;
 
 type ConnectedBilling = Readonly<{
@@ -211,6 +235,7 @@ export class BillingModule
       repositories: setup.repositories,
       config: setup.config,
       peers: setup.dependencies,
+      billingRoles: setup.dependencies.authorization,
       stripe,
       usageReporting: () =>
         StripeUsageReportingBuilder.create({
@@ -225,6 +250,7 @@ export class BillingModule
         host: SlackBillingWebhookHostChannel.create({ notices }),
         licenses: setup.dependencies.licensing,
         licensePurchase,
+        licenseRenewal: licensePurchase,
       },
       subscription: {
         notifier: SlackBillingSubscriptionNotifierChannel.create({ notices }),
@@ -332,6 +358,7 @@ export class BillingModule
     webhook,
     subscription,
     lifecycle,
+    billingRoles,
   }: {
     repositories: Pick<
       BillingRepositories,
@@ -344,6 +371,7 @@ export class BillingModule
       | "organizationPricing"
       | "webhookSubscriptions"
       | "webhookOrganizations"
+      | "licenseRenewalClaims"
       | "seatEventSubscriptions"
       | "organizations"
       | "gatewaySpend"
@@ -368,6 +396,8 @@ export class BillingModule
     subscription?: SubscriptionComposition;
     /** Records the checkout and subscription changes for peers; absent where a suite composes none. */
     lifecycle?: BillingLifecycleAnnouncerService;
+    /** Hands the Billing role to a checkout's starter; absent where a suite composes none. */
+    billingRoles?: CheckoutBillingRoles;
   }): BillingModule {
     const { isSaas, nodeEnvironment } = config;
     const repository = repositories.connectedBilling;
@@ -400,6 +430,7 @@ export class BillingModule
         usageWarnings,
         nodeEnvironment,
         usageReporting: isSaas ? usageReporting : void 0,
+        stripeSubscriptions: stripe?.channels.subscriptions,
       }),
     };
     if (!stripe) {
@@ -441,6 +472,7 @@ export class BillingModule
             licensePaymentLinkId: config.licensePaymentLinkId,
             connectedBilling: billing,
             announcer: lifecycle,
+            billingRoles,
           })
         : BillingModule.#undispatchedWebhook(),
       subscriptions:
@@ -450,6 +482,7 @@ export class BillingModule
               stripe,
               nodeEnvironment,
               repositories,
+              seatsInUse: licensing,
             })
           : void 0,
       connected: {
@@ -490,10 +523,12 @@ export class BillingModule
     stripe,
     nodeEnvironment,
     repositories,
+    seatsInUse,
   }: {
     subscription: SubscriptionComposition;
     stripe: Pick<BillingStripe, "channels">;
     nodeEnvironment: string | undefined;
+    seatsInUse: SeatsInUseCounter;
     repositories: Pick<
       BillingRepositories,
       "subscriptions" | "organizations" | "seatEventSubscriptions"
@@ -521,6 +556,18 @@ export class BillingModule
         }),
         notifier: subscription.notifier,
         stripeErrors,
+        seatsInUse,
+      }),
+      seatLines: SeatLineRepairService.create({
+        stripeSubscriptions,
+        subscriptions: repositories.seatEventSubscriptions,
+        prices,
+      }),
+      developerSeats: DeveloperSeatService.create({
+        stripeSubscriptions,
+        subscriptions: repositories.seatEventSubscriptions,
+        prices,
+        unitAmountOf: (priceId) => stripePricesFile.prices[priceId]?.unitAmount ?? null,
       }),
     };
   }
@@ -564,6 +611,7 @@ export class BillingModule
     customerId: string;
     currency?: Currency;
     billingInterval?: SubscriptionBillingInterval;
+    startedByUserId?: string;
   }): Promise<{ url: string | null }> {
     return this.#subscriptionDoor.subscriptions.createOrUpdateSubscription(input);
   }
@@ -587,6 +635,25 @@ export class BillingModule
     newTotalSeats: number;
   }): Promise<unknown> {
     return this.#subscriptionDoor.subscriptions.previewProration(input);
+  }
+
+  async developerSeats(input: { organizationId: string }): Promise<DeveloperSeats> {
+    return this.#subscriptionDoor.developerSeats.developerSeats(input);
+  }
+
+  async previewDeveloperSeats(input: {
+    organizationId: string;
+    quantity: number;
+  }): Promise<DeveloperSeatQuote> {
+    return this.#subscriptionDoor.developerSeats.previewDeveloperSeats(input);
+  }
+
+  async setDeveloperSeats(input: {
+    organizationId: string;
+    quantity: number;
+    quotedAt?: number;
+  }): Promise<{ success: boolean }> {
+    return this.#subscriptionDoor.developerSeats.setDeveloperSeats(input);
   }
 
   async notifyProspective(input: {
@@ -631,19 +698,36 @@ export class BillingModule
     licensePaymentLinkId,
     connectedBilling,
     announcer,
+    billingRoles,
   }: {
     announcer: BillingLifecycleAnnouncerService | undefined;
+    /** The Billing role a completed checkout hands its starter. */
+    billingRoles: CheckoutBillingRoles | undefined;
     webhook: StripeWebhookComposition;
     isSaas: boolean;
     stripe: BillingStripe;
     nodeEnvironment: string | undefined;
-    repositories: Pick<BillingRepositories, "webhookSubscriptions" | "webhookOrganizations">;
+    repositories: Pick<
+      BillingRepositories,
+      "webhookSubscriptions" | "webhookOrganizations" | "licenseRenewalClaims"
+    >;
     licensePaymentLinkId: string | undefined;
     connectedBilling: ConnectedBillingService;
   }): StripeWebhookReceiptService {
     const prices = BillingPriceCatalogue.create(
       getStripeEnvironmentFromNodeEnv(nodeEnvironment),
     ).prices;
+    const renewalIssuer = webhook.licenseRenewal;
+    const licenseRenewal =
+      licensePaymentLinkId && renewalIssuer
+        ? LicenseRenewalService.create({
+            licensePaymentLinkId,
+            subscriptions: repositories.webhookSubscriptions,
+            stripeSubscriptions: stripe.channels.subscriptions,
+            claims: repositories.licenseRenewalClaims,
+            issuer: renewalIssuer,
+          })
+        : undefined;
     const events = EEWebhookService.create({
       subscriptionRepository: repositories.webhookSubscriptions,
       organizationRepository: repositories.webhookOrganizations,
@@ -652,8 +736,10 @@ export class BillingModule
       licensePaymentLinkId,
       licenses: webhook.licenses,
       licensePurchaseHandler: webhook.licensePurchase,
+      ...(licenseRenewal ? { licenseRenewal } : {}),
       host: webhook.host,
       connectedBilling,
+      ...(billingRoles ? { billingRoles } : {}),
       ...(announcer ? { announcer } : {}),
     });
     return StripeWebhookReceiptService.create({
@@ -736,6 +822,16 @@ export class BillingModule
     return this.#resourceLimitAlerts.notifyResourceLimitReached(input);
   }
 
+  notifySalesOfSeatRequest(input: {
+    organizationId: string;
+    organizationName: string;
+    plan: string;
+    seats: number;
+    requestedSeats: number;
+  }): Promise<void> {
+    return this.#resourceLimitAlerts.notifySalesOfSeatRequest(input);
+  }
+
   getPricingModel(input: {
     organizationId: string;
   }): Promise<{ pricingModel: BillingPricingModel | null }> {
@@ -814,6 +910,7 @@ export class BillingModule
     usageWarnings,
     usageReporting,
     nodeEnvironment,
+    stripeSubscriptions,
   }: {
     repositories: Pick<
       BillingRepositories,
@@ -824,6 +921,8 @@ export class BillingModule
     usageWarnings: UsageWarningService;
     usageReporting: (() => UsageReportingService) | undefined;
     nodeEnvironment: string | undefined;
+    /** Absent where no Stripe key is held: nothing reports there, so the PII month waits. */
+    stripeSubscriptions: StripeSubscriptionsChannel | undefined;
   }): BillingReportingPipeline {
     const projects = {
       findProjectIds: (organizationId: string) => facts.findProjectIds(organizationId),
@@ -834,6 +933,15 @@ export class BillingModule
       sumSpendNanoUsdByRequestType: (input) =>
         repositories.gatewaySpend.sumSpendNanoUsdByRequestType(input),
     });
+    const piiRedactionSpend = PiiRedactionSpendQueryService.create({
+      isSpendSourceAvailable: () => repositories.gatewaySpend.isSpendSourceAvailable(),
+      listProjectIds: ({ organizationId }) => projects.findProjectIds(organizationId),
+      sumSpendNanoUsdByRequestType: (input) =>
+        repositories.gatewaySpend.sumSpendNanoUsdByRequestType(input),
+    });
+    const catalogue = () =>
+      BillingPriceCatalogue.create(getStripeEnvironmentFromNodeEnv(nodeEnvironment));
+    const meters = () => catalogue().meters;
     const ceiling = ConnectedUsageCeilingService.create({
       licensing: peers.licensing,
       gateway: repositories.gatewaySpend,
@@ -847,9 +955,17 @@ export class BillingModule
       billingCheckpoints: repositories.checkpoints,
       getUsageReportingService: () => (reporter ??= usageReporting?.()),
       queryInstantEvalSpendTotal: (input) => instantEvalSpend.queryInstantEvalSpendTotal(input),
-      isInstantEvalMeterProvisioned: () =>
-        BillingPriceCatalogue.create(getStripeEnvironmentFromNodeEnv(nodeEnvironment)).meters
-          .INSTANT_EVAL_USD !== undefined,
+      isInstantEvalMeterProvisioned: () => meters().INSTANT_EVAL_USD !== undefined,
+      queryPiiRedactionSpendTotal: (input) => piiRedactionSpend.queryPiiRedactionSpendTotal(input),
+      isPiiRedactionMeterProvisioned: () => meters().PII_REDACTION_USD !== undefined,
+      hasPiiRedactionPrice: async ({ stripeCustomerId }) =>
+        stripeSubscriptions !== void 0 &&
+        carriesPiiRedactionPrice({
+          subscriptions: await stripeSubscriptions.listCustomerSubscriptions({
+            customerId: stripeCustomerId,
+          }),
+          priceId: catalogue().prices.GROWTH_PII_REDACTION_USD,
+        }),
       organizationCache: repositories.organizationCache,
       errorReporter: BillingErrorReporterService.create(),
       connectedUsageCeiling: async (input) => {
@@ -883,6 +999,7 @@ export class BillingModule
     input: { organizationId: string },
     staff: BillingStaff,
   ): Promise<ConnectedBillingOverview> {
+    if (!this.#isSaas) throw new ConnectedBillingUnavailableError();
     await this.#record({
       staff,
       action: "connectedBilling.get",
@@ -1014,6 +1131,12 @@ export class BillingModule
       throw new Error("This billing app was composed without a lifecycle pipeline");
     }
     return this.#lifecycle;
+  }
+
+  /** Puts back seat lines Stripe refused to roll back; nothing where no subscription door is composed. */
+  async repairSeatLines(): Promise<SeatLineRepairOutcome> {
+    if (!this.#subscriptions) return { repaired: 0, pending: 0, failed: 0, flagged: 0 };
+    return this.#subscriptions.seatLines.repairSeatLines();
   }
 
   /** Every row it reads and every invoice it raises is Cloud's: an install runs nothing. */

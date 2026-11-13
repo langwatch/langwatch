@@ -179,7 +179,7 @@ export type EnrichedAuditLog = {
   channel: AuditChannel | null;
   /** The API key the call presented: a service key acting alone, or a person's own key. */
   apiKeyId: string | null;
-  /** Set on staff access rows (ADR-193); the approving operator is `actorUser`. */
+  /** Set on staff access rows (ADR-202); the approving operator is `actorUser`. */
   staffAccess: AuditStaffAccess | null;
 };
 
@@ -195,7 +195,7 @@ export interface AuditImpersonationMetadataSchema extends Named<
 export const auditImpersonationMetadataSchema: AuditImpersonationMetadataSchema =
   auditImpersonationMetadataSchemaDefinition;
 
-/** What a staff access row (ADR-193) carries: the principal that acted and the approval reason. */
+/** What a staff access row (ADR-202) carries: the principal that acted and the approval reason. */
 const auditStaffAccessMetadataSchemaDefinition = z.object({
   principal: z.string().min(1),
   reason: z.string().nullable().catch(null),

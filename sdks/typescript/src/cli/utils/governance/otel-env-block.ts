@@ -21,6 +21,9 @@ export const SOURCE_TYPE_BY_TOOL: Record<string, string> = {
   code: "copilot_vscode",
   // `grok_cli`, as the receiver stamps it, so no other xAI surface reads as this CLI.
   grok: "grok_cli",
+  // `pi_cli`, not `pi`: the slug is a provenance label, and pi's harness also
+  // runs outside a CLI. ADR-188 Constants.
+  pi: "pi_cli",
 };
 
 /**
@@ -149,6 +152,19 @@ export function buildOtelEnvBlock(
         OTEL_LOG_TOOL_DETAILS: "1",
         OTEL_LOG_TOOL_CONTENT: "1",
         ...base,
+      };
+    case "pi":
+      // Our extension (ADR-188) reads only the traces names. Logs and metrics
+      // are pinned off for pi's own exporter when pi ships one, since unset
+      // would start it. Content capture is on, as for copilot.
+      return {
+        OTEL_TRACES_EXPORTER: "otlp",
+        OTEL_LOGS_EXPORTER: "none",
+        OTEL_METRICS_EXPORTER: "none",
+        OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT: "true",
+        OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf",
+        ...base,
+        OTEL_RESOURCE_ATTRIBUTES: "service.name=pi",
       };
     default:
       return base;

@@ -1,3 +1,4 @@
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { Evaluator } from "@langwatch/evaluator-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
@@ -10,6 +11,7 @@ import type {
 } from "../../repositories/evaluator.repository.ts";
 import type { EvaluatorCodeExecution } from "../evaluator-code-execution.service.ts";
 import { EvaluatorHistoryService } from "../evaluator-history.service.ts";
+import { EvaluatorVersionService } from "../evaluator-version.service.ts";
 import { EvaluatorService } from "../evaluator.service.ts";
 
 /** The wire form of a config: what the repository row holds once persisted. */
@@ -35,6 +37,14 @@ function unusedRepository(): EvaluatorRepository {
     update: notUsedHere,
     archive: notUsedHere,
     updateNameAndConfig: notUsedHere,
+    findVersions: notUsedHere,
+    findVersion: notUsedHere,
+    latestVersionNumbers: notUsedHere,
+    findLabels: notUsedHere,
+    assignLabel: notUsedHere,
+    removeLabel: notUsedHere,
+    findUnversioned: notUsedHere,
+    backfillFirstVersion: notUsedHere,
   };
 }
 
@@ -94,6 +104,12 @@ function buildService() {
 
   return EvaluatorService.create({
     repository,
+    versions: EvaluatorVersionService.create({
+      repository,
+      users: createApiFixture<UserApi>({ getProfiles: async () => [] }),
+      permissions: createApiFixture<AuthzApi>({}),
+      auditLog: { listEntityHistory: async () => [] },
+    }),
     workflows,
     history: EvaluatorHistoryService.create({
       auditLog: {

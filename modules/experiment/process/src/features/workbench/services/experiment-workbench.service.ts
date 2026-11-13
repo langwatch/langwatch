@@ -121,6 +121,7 @@ export class ExperimentWorkbenchService {
 
     const current = target.state;
     await this.references.assertAllExist({ projectId: command.projectId, state });
+    await this.references.pinDatasetVersions({ projectId: command.projectId, state });
 
     const written = await this.repository.writeWorkbenchState({
       projectId: command.projectId,
@@ -150,6 +151,7 @@ export class ExperimentWorkbenchService {
     const command = createEvaluationsV3InputSchema.parse(input);
     const state = parseWorkbenchState(command.state);
     await this.references.assertAllExist({ projectId: command.projectId, state });
+    await this.references.pinDatasetVersions({ projectId: command.projectId, state });
     const id = command.id ?? this.newId();
     const name =
       state.name ||

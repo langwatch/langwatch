@@ -5,7 +5,7 @@ import type {
   TraceModelSpendWindow,
 } from "@langwatch/trace-contract";
 
-/** One tenant's trace summaries in a window, grouped by the value one attribute holds. */
+/** Trace summaries in a window, grouped by the value one attribute holds. */
 export abstract class TraceAttributeSpendRepository {
   abstract findSpendByAttributeValue(input: {
     tenantId: string;
@@ -14,13 +14,13 @@ export abstract class TraceAttributeSpendRepository {
     window: TraceModelSpendWindow;
   }): Promise<TraceAttributeValueSpend[]>;
   abstract findAttributeUsageBuckets(input: {
-    tenantId: string;
+    tenantIds: readonly string[];
     attributeKey: string;
     window: TraceModelSpendWindow;
     values?: string[];
   }): Promise<TraceAttributeUsageBucket[]>;
   abstract findAttributedTraces(input: {
-    tenantId: string;
+    tenantIds: readonly string[];
     attributeKey: string;
     window: TraceModelSpendWindow;
     values?: string[];

@@ -248,6 +248,8 @@ export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
     const [organizations, memberCounts, connections] = await Promise.all([
       this.prisma.organization.findMany({
         where: { id: { in: organizationIds } },
+        // Oldest first, then by id: the matcher's stable sort by size keeps this as the tiebreak.
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
         select: {
           id: true,
           name: true,

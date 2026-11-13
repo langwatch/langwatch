@@ -101,12 +101,15 @@ Feature: A name written in capitals is still redacted
   38 were clean. The first build of the second pass dropped that to 33 of 38,
   because ERP, SOW or CFO turned into Erp, Sow or Cfo and were read as
   surnames, and the shape rule above is what brought it back to 37 of 38. The
-  corpus is now 49 strings with two known false positives, named one by one
+  corpus is now 54 strings with two known false positives, named one by one
   in the test: one predates the second pass, and one is a product line named
   after its founder, which has the shape and the words of a name because it
   holds one. A third fails the build. If it does, the second pass is
   inventing people on a shape nobody has priced. Fix the rule. Do not loosen
-  the corpus or the list.
+  the corpus or the list. The same corpus runs with places switched on, and
+  the second pass may add no place over it. Five of its strings put a
+  non-name where a place would go (moved to API KEY overnight); without the
+  name-word rule the second pass reads every one of them as a place.
 
   Against a rule that demanded every rewritten word be four letters or more,
   the side-by-side clause lifted wholly capitalised names with a short word
@@ -172,9 +175,25 @@ Feature: A name written in capitals is still redacted
 
     @unit
     Scenario: The second pass is skipped when the only capitals are short words
-      Given content whose only wholly capitalised words are short and stand apart
+      Given content whose only wholly capitalised words are short
+      And no two of them are separated by whitespace alone
       When the content is analysed for personal information
       Then the content is analysed once and not twice
+
+    @unit
+    Scenario: The second pass is skipped when every capitalised word is its own field
+      Given trace data whose capitalised words are quoted values such as "method": "POST"
+      And each is cut off from its neighbours by a quote beside a colon, comma or semicolon
+      When the content is analysed for personal information
+      Then the content is analysed once and not twice
+
+    @unit
+    Scenario: The second pass still runs for a capitalised word that may join another
+      Given a capitalised word of four or more letters, or two capitalised words side by side
+      And a neighbouring word joined to it by a space, comma, colon, quote, bracket, apostrophe or dash
+      And no quote beside a colon, comma or semicolon between them
+      When the content is analysed for personal information
+      Then the content is analysed twice
 
     @unit
     Scenario: The second pass also looks for places when places are redacted
@@ -223,6 +242,14 @@ Feature: A name written in capitals is still redacted
       Given capitalised merchant, carrier, department, product, code and heading strings
       When the content is analysed for personal information
       Then no person span is reported over any of them
+
+    @unit
+    Scenario: The second pass adds no place over an ALL-CAPS string that is not one
+      Given capitalised non-names, five of them standing where a place would go
+      And person and location detection are both switched on
+      When the content is analysed for personal information
+      Then each of those five is analysed a second time
+      And the second analysis adds no place span over any of them
 
     @unit
     Scenario: A titlecased acronym is not harvested as a name

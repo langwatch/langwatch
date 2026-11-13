@@ -1,24 +1,18 @@
 // The /authorize page's token: the device-flow defaults capped at what the person holds.
 // Spec: specs/api-keys/api-keys-v2.feature
 
-import { defaultCliKeyPermissions } from "@langwatch/api-key-contract";
+import { categorizablePermissions, defaultCliKeyPermissions } from "@langwatch/api-key-contract";
 import { bindingScopeCanGrantPermission } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 
-import { getUserPermissionsAtScope } from "../api-key-permissions.ts";
+import { teamRolePermissions } from "../api-key-permissions.ts";
 import { cappedDeviceFlowPermissions, projectTokenInput } from "../project-token-input.ts";
 
 const ORG = "org-1";
 
+// A team role inherited onto the project: the role's bag.
 function heldOnProject(role: string) {
-  return getUserPermissionsAtScope({
-    myBindings: [{ scopeType: "TEAM", scopeId: "team-1", role }],
-    scopeType: "PROJECT",
-    scopeId: "alpha",
-    organizationId: ORG,
-    orgProjects: [{ id: "alpha", teamId: "team-1" }],
-    isServiceKey: false,
-  });
+  return teamRolePermissions(role);
 }
 
 describe("given a team viewer on project alpha", () => {
@@ -48,14 +42,8 @@ describe("given a team viewer on project alpha", () => {
 describe("given an organization admin", () => {
   describe("when the authorize page caps the defaults", () => {
     it("keeps only permissions a project binding can grant", () => {
-      const held = getUserPermissionsAtScope({
-        myBindings: [{ scopeType: "ORGANIZATION", scopeId: ORG, role: "ADMIN" }],
-        scopeType: "PROJECT",
-        scopeId: "alpha",
-        organizationId: ORG,
-        orgProjects: [{ id: "alpha", teamId: "team-1" }],
-        isServiceKey: false,
-      });
+      // An organization admin holds every categorizable permission.
+      const held = categorizablePermissions();
       const permissions = cappedDeviceFlowPermissions({ held: [...held, "organization:view"] });
 
       expect(permissions.length).toBeGreaterThan(0);

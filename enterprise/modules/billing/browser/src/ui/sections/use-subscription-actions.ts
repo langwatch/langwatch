@@ -1,9 +1,4 @@
-// The seat-quote modal is a shared zustand singleton: opening it here and
-// mounting it in the chrome layout is one modal, not a copy.
-import { useLentHooks } from "@langwatch/browser-host/lent";
 import { isGrowthSeatEventPlan } from "@langwatch/enterprise-billing-contract";
-import { UpgradeModalToken } from "@langwatch/enterprise-licensing-client";
-import type { MemberType } from "@langwatch/enterprise-licensing-contract";
 
 import { billingApi } from "../../behavior/billing-api.ts";
 import { useBillingHost } from "../../model/billing-host.ts";
@@ -12,24 +7,16 @@ import {
   type Currency,
   resolveGrowthSeatPlanType,
 } from "../../model/billing-plans.ts";
-import { type PlannedUser } from "../../model/subscription-types.ts";
+import { OrganizationUserRole } from "../../model/prisma-types.ts";
 
 type TRPCRefetchFn = { refetch: () => unknown };
 
-function memberTypeToRole(memberType: MemberType): "MEMBER" | "EXTERNAL" | "DEVELOPER" {
-  if (memberType === "FullMember") return "MEMBER";
-  if (memberType === "Developer") return "DEVELOPER";
-  return "EXTERNAL";
-}
-
-/** The planned users that carry an address, as checkout invites. */
-function plannedInvites(plannedUsers: PlannedUser[]) {
-  return plannedUsers
-    .filter((u) => u.email.trim() !== "")
-    .map((u) => ({
-      email: u.email.trim(),
-      role: memberTypeToRole(u.memberType),
-    }));
+/** Addresses the checkout invites into full seats once it is paid. */
+function checkoutInvites(emails: string[]) {
+  return emails
+    .map((email) => email.trim())
+    .filter((email) => email !== "")
+    .map((email) => ({ email, role: OrganizationUserRole.MEMBER }));
 }
 
 /** The seat-event plan a seat change bills on: the active one, else the one for this cut. */
@@ -84,13 +71,36 @@ async function leaveToAnsweredUrl({
   }
 }
 
+type SeatChangeMutation = ReturnType<
+  typeof billingApi.subscription.addTeamMemberOrEvents.useMutation
+>["mutateAsync"];
+
+/** Sends a seat count to billing; a failure is reported to the host and answers false. */
+async function applySeatChange({
+  mutateAsync,
+  host,
+  input,
+  onApplied,
+}: {
+  mutateAsync: SeatChangeMutation;
+  host: BillingHost;
+  input: Parameters<SeatChangeMutation>[0];
+  onApplied: () => void;
+}): Promise<boolean> {
+  try {
+    assertSeatChangeWentThrough(await mutateAsync(input));
+    onApplied();
+    return true;
+  } catch (error) {
+    host.failed({ error, fallbackTitle: "Couldn't update your seats" });
+    return false;
+  }
+}
+
 export function useSubscriptionActions({
   organizationId,
   currency,
   billingPeriod,
-  totalFullMembers,
-  currentMaxMembers,
-  plannedUsers,
   onSeatsUpdated,
   organizationWithMembers,
   activePlanType,
@@ -98,24 +108,22 @@ export function useSubscriptionActions({
   organizationId: string | undefined;
   currency: Currency;
   billingPeriod: BillingInterval;
-  totalFullMembers: number;
-  currentMaxMembers?: number;
-  plannedUsers: PlannedUser[];
   onSeatsUpdated: () => void;
   organizationWithMembers: TRPCRefetchFn;
   activePlanType?: string;
 }) {
   const host = useBillingHost();
-  const upgradeModal = useLentHooks(UpgradeModalToken);
 
   const createSubscription = billingApi.subscription.create.useMutation();
   const upgradeWithInvites = billingApi.invite.upgradeWithInvites.useMutation();
   const addTeamMemberOrEvents = billingApi.subscription.addTeamMemberOrEvents.useMutation();
   const manageSubscription = billingApi.subscription.manage.useMutation();
 
-  const handleUpgrade = async () => {
+  /** Leaves for the Growth checkout for `seats`; the addresses are invited once it is paid. */
+  const handleUpgrade = async ({ seats, emails = [] }: { seats: number; emails?: string[] }) => {
     if (!organizationId) return;
-    const invites = plannedInvites(plannedUsers);
+    // A member who may not invite still buys the seats; an admin sends the invitations.
+    const invites = host.canInviteMembers() ? checkoutInvites(emails) : [];
 
     await leaveToAnsweredUrl({
       host,
@@ -127,47 +135,44 @@ export function useSubscriptionActions({
               baseUrl: host.applicationOrigin(),
               currency,
               billingInterval: billingPeriod,
-              totalSeats: totalFullMembers,
+              totalSeats: seats,
               invites,
             })
           : createSubscription.mutateAsync({
               organizationId,
               baseUrl: host.applicationOrigin(),
               plan: resolveGrowthSeatPlanType({ currency, interval: billingPeriod }),
-              membersToAdd: totalFullMembers,
+              membersToAdd: seats,
               currency,
               billingInterval: billingPeriod,
             }),
     });
   };
 
-  const handleUpdateSeats = () => {
-    if (!organizationId) return;
-
-    const updateTotalMembers = totalFullMembers;
-
-    upgradeModal?.openSeats({
-      organizationId,
-      currentSeats: currentMaxMembers ?? totalFullMembers,
-      newSeats: updateTotalMembers,
-      onConfirm: async (quotedAt) => {
-        try {
-          const result = await addTeamMemberOrEvents.mutateAsync({
-            organizationId,
-            plan: seatChangePlan({ activePlanType, currency, billingPeriod }),
-            upgradeMembers: true,
-            upgradeTraces: false,
-            totalMembers: updateTotalMembers,
-            totalTraces: 0,
-            quotedAt,
-          });
-          assertSeatChangeWentThrough(result);
-          onSeatsUpdated();
-          host.succeeded({ title: "Seats updated successfully" });
-          void organizationWithMembers.refetch();
-        } catch (error) {
-          host.failed({ error, fallbackTitle: "Couldn't update your seats" });
-        }
+  /** Commits a seat count; a failure is reported and answers false, success says nothing. */
+  const commitSeats = async ({
+    newSeats,
+    quotedAt,
+  }: {
+    newSeats: number;
+    quotedAt: number | undefined;
+  }): Promise<boolean> => {
+    if (!organizationId) return false;
+    return applySeatChange({
+      mutateAsync: addTeamMemberOrEvents.mutateAsync,
+      host,
+      input: {
+        organizationId,
+        plan: seatChangePlan({ activePlanType, currency, billingPeriod }),
+        upgradeMembers: true,
+        upgradeTraces: false,
+        totalMembers: newSeats,
+        totalTraces: 0,
+        quotedAt,
+      },
+      onApplied: () => {
+        onSeatsUpdated();
+        void organizationWithMembers.refetch();
       },
     });
   };
@@ -185,10 +190,9 @@ export function useSubscriptionActions({
 
   return {
     handleUpgrade,
-    handleUpdateSeats,
+    commitSeats,
     handleManageSubscription,
     isUpgradeLoading: createSubscription.isPending || upgradeWithInvites.isPending,
-    isUpdateSeatsLoading: addTeamMemberOrEvents.isPending,
     isManageLoading: manageSubscription.isPending,
   };
 }

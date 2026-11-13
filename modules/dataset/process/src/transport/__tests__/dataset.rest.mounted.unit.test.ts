@@ -437,6 +437,24 @@ describe("the mounted dataset REST family", () => {
       });
     });
 
+    /** @scenario "A save that deletes one column and renames another keeps the renamed column's values" */
+    it("hands the column renames it was sent to the application", async () => {
+      const { send, stub } = mount({ upsertDataset: vi.fn(async () => dataset) as never });
+
+      const response = await send("PATCH", "/api/dataset/old-name", {
+        columnTypes: [{ name: "reference", type: "string" }],
+        columnRenames: [{ from: "expected_output", to: "reference" }],
+      });
+
+      expect(response.status).toBe(200);
+      expect(stub.upsertDataset).toHaveBeenCalledWith(
+        expect.objectContaining({
+          columnTypes: [{ name: "reference", type: "string" }],
+          columnRenames: [{ from: "expected_output", to: "reference" }],
+        }),
+      );
+    });
+
     /** @scenario "Update dataset does not enforce plan limits" */
     it("runs no allowance step, so a project at its ceiling still edits what it has", async () => {
       const { send } = mount();
@@ -658,6 +676,7 @@ describe("the mounted dataset REST family", () => {
         slugOrId: "my-dataset",
         projectId: "project-1",
         entries: [{ input: "hello" }],
+        editedBy: { kind: "user", id: "user-1" },
       });
       await expect(response.json()).resolves.toMatchObject({
         data: [{ id: "rec-1", entry: { input: "hello" } }],
@@ -672,6 +691,7 @@ describe("the mounted dataset REST family", () => {
         slugOrId: "dataset_xyz",
         projectId: "project-1",
         entries: [{ input: "x" }],
+        editedBy: { kind: "user", id: "user-1" },
       });
     });
 
@@ -770,6 +790,7 @@ describe("the mounted dataset REST family", () => {
         slugOrId: "my-dataset",
         projectId: "project-1",
         recordIds: ["rec-1", "rec-2"],
+        editedBy: { kind: "user", id: "user-1" },
       });
     });
 
@@ -888,6 +909,7 @@ describe("the mounted dataset REST family", () => {
         projectId: "project-1",
         recordId: "rec-1",
         updatedRecord: { input: "updated" },
+        editedBy: { kind: "user", id: "user-1" },
       });
     });
 

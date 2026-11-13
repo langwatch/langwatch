@@ -85,7 +85,7 @@ type Choice = Readonly<{
 }>;
 
 /**
- * Access requests from asking to ending (ADR-193): the agent asks, its owner approves with a
+ * Access requests from asking to ending (ADR-202): the agent asks, its owner approves with a
  * passkey over the hash of exactly what the page shows, the agent redeems once with its PKCE
  * verifier for one hour, and any operator can end it. Every transition is one atomic claim.
  */

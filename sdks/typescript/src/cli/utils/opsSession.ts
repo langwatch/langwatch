@@ -1,5 +1,5 @@
 /**
- * Local state of the ops agent (ADR-193): the requester key, pending PKCE verifiers and the live
+ * Local state of the ops agent (ADR-202): the requester key, pending PKCE verifiers and the live
  * staff access session. Every file is 0600 in a 0700 directory, written atomically. Never `.env`.
  * @see modules/staff-access/specs/staff-access-cli.feature
  */
