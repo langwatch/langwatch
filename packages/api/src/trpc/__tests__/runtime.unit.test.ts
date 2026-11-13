@@ -1259,7 +1259,7 @@ describe("a procedure declared as minting a credential", () => {
     });
     const declaration = defineTrpcRouter(KeysApi, keysContract)
       .procedure("createKey")
-      .mintsCredential("organization:view")
+      .mintsCredential()
       .withPermission("organization:view")
       .handle(() => {
         handle();
@@ -1304,7 +1304,7 @@ describe("a procedure declared as minting a credential", () => {
     expect(() =>
       defineTrpcRouter(KeysApi, keysContract)
         .procedure("createKey")
-        .mintsCredential("organization:view")
+        .mintsCredential()
         .withAccess(publicRoute({ reason: "no caller" })),
     ).toThrow(/mints a credential, so it cannot run with no caller/);
   });
