@@ -81,6 +81,16 @@ function buildModelEntry(model: LangyWorkerModelConfig): Record<string, unknown>
   };
   const catalog = catalogEntryFor(model);
   if (!catalog) {
+    // The manager leaves OpenAI reasoning unspecified so known models use
+    // pi's capabilities. Keep its former default only for uncatalogued models;
+    // an explicit override, including false, still wins.
+    if (
+      model.id.startsWith("openai/") &&
+      model.api === "openai-responses" &&
+      model.reasoning === void 0
+    ) {
+      configEntry.reasoning = true;
+    }
     const compat = uncataloguedCompat(model);
     return compat ? { ...configEntry, compat } : configEntry;
   }

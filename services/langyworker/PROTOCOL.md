@@ -199,3 +199,11 @@ The wrapper turns `model` into a generated pi `models.json` under
 `process.env[baseUrlEnv]` (boot fails and names it when unset), `apiKey` is written
 as the env REFERENCE `"$<apiKeyEnv>"` so the secret never lands on disk, and
 every other model key is passed through verbatim.
+
+### OpenAI reasoning defaults
+
+For `openai/*` Responses models the manager omits `reasoning`. The worker uses
+pi's catalogue capability when the model is known, so non-reasoning models do
+not send reasoning parameters. An uncatalogued OpenAI Responses model retains
+the previous reasoning-enabled default. Explicit model settings still override
+catalogue values, including `reasoning: false`.
