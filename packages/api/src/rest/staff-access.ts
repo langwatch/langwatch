@@ -10,7 +10,7 @@ import { createLogger } from "@langwatch/observability";
 import { StaffAccessUnavailableError } from "../errors.ts";
 import type { MiddlewareBinding, TransportPeers } from "../hosting/transport-hosts.ts";
 import { ClientAddress } from "../policy/client-address.ts";
-import { recordedKeyCredentialOf } from "./credential.ts";
+import { recordAdmittedStaffSpend, recordedKeyCredentialOf } from "./credential.ts";
 import { isKeyDoor, keyCredentialOf } from "./key-credential.ts";
 
 const logger = createLogger("langwatch:api:staff-access");
@@ -62,16 +62,10 @@ export type RestStaffAccessReceipt = Readonly<{
 }>;
 
 const ADMITTED_STAFF = Symbol.for("langwatch.api.staffAccess");
-const ADMITTED_STAFF_SPEND = Symbol.for("langwatch.api.staffAccessSpend");
 
 /** The staff identity the gate admitted this request under, or none for any other caller. */
 export function admittedStaffOf(request: Request): RestStaffAccessIdentity | undefined {
   return (request as { [ADMITTED_STAFF]?: RestStaffAccessIdentity })[ADMITTED_STAFF];
-}
-
-/** Whether the gate admitted this staff request with spend approval; false for none admitted. */
-export function admittedStaffMaySpend(request: Request): boolean {
-  return (request as { [ADMITTED_STAFF_SPEND]?: boolean })[ADMITTED_STAFF_SPEND] === true;
 }
 
 export type RestStaffAccessGate = Readonly<{
@@ -145,10 +139,7 @@ export async function admitStaffRequest({
   );
 
   Object.defineProperty(request, ADMITTED_STAFF, { value: receipt.staff, enumerable: false });
-  Object.defineProperty(request, ADMITTED_STAFF_SPEND, {
-    value: receipt.spendApproved,
-    enumerable: false,
-  });
+  recordAdmittedStaffSpend({ request, spendApproved: receipt.spendApproved });
 
   return { receipt, startedAt };
 }

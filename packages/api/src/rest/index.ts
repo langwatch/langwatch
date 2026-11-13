@@ -68,7 +68,6 @@ export {
   openStaffAccessGate,
   type RestStaffAccessGate,
   type RestStaffAccessIdentity,
-  admittedStaffMaySpend,
   type RestStaffAccessOutcome,
   type RestStaffAccessRefusal,
   type RestStaffAccessReceipt,
