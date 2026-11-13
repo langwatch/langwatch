@@ -419,10 +419,9 @@ const startReady = ({
 };
 
 /**
- * Runs every job, at most `concurrency` at once, in order where it can. A package
- * runs one script at a time, `integration` and `browser` jobs together hold one
- * slot, so no two of them overlap, and a heavy job runs alone. Every job runs even
- * after one fails.
+ * Runs every job, at most `concurrency` at once, in order where it can. A package runs
+ * one script at a time, integration and browser jobs share one slot, and a heavy job
+ * runs alone. Every job runs even after one fails.
  */
 export const runJobs = async ({
   jobs,
