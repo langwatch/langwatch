@@ -89,10 +89,10 @@ function buildTrack() {
 
 function markTrack({ current, passed }: { current?: string; passed: boolean[] }) {
   let marked: HTMLAnchorElement | null = null;
-  layout.ticks.forEach(({ tick }, index) => {
+  for (const [index, { tick }] of layout.ticks.entries()) {
     if (passed[index]) marked = tick;
     if (idOf({ link: tick }) === current) marked = tick;
-  });
+  }
   for (const { tick } of layout.ticks) {
     if (tick === marked) tick.setAttribute("aria-current", "location");
     else tick.removeAttribute("aria-current");
