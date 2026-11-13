@@ -136,6 +136,8 @@ Feature: A package's integration suite runs in CI when it declares one
     # for that reason. Browser suites stay one at a time because each installs its
     # browser through apt, which holds a machine-wide lock. Each suite's output is
     # held back and printed as one group when it ends, so two never interleave.
+    # An integration suite and a browser suite never overlap either: this is intended to
+    # prevent the browser import failure in tasks#1178, pending the langwatch/langwatch#9543 run.
 
     @unit
     Scenario: A shard runs several suites at once

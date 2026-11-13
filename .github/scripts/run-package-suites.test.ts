@@ -530,19 +530,21 @@ void describe("given a shard that runs several suites at once", () => {
   void describe("when an integration suite and a browser suite share a shard", () => {
     /** @scenario "An integration suite and a browser suite never run at the same time" */
     void it("never overlaps them, while the unit suites still run alongside", async () => {
-      const serial = ["test:integration", "test:browser"];
+      const isLane = (id: string) => laneOf(id.slice(id.lastIndexOf(" ") + 1)) !== "shared";
       const packages = [pkg("@fix/a", ["test:integration"]), pkg("@fix/b", ["test:browser"])];
       const units = ["d", "e"].map((name) => pkg(`@fix/${name}`, ["test"]));
-      const { overlaps, peak, statuses } = await pool(
+      const { overlaps, statuses } = await pool(
         jobsFor([...packages, ...units], new Map()),
         3,
       );
       for (const running of overlaps) {
-        const serialRunning = running.filter((id) => serial.some((lane) => id.endsWith(lane)));
+        const serialRunning = running.filter(isLane);
         assert.ok(serialRunning.length <= 1, running.join());
       }
       assert.equal(statuses.size, 4);
-      assert.ok(peak > 1);
+      assert.ok(
+        overlaps.some((running) => running.some(isLane) && running.some((id) => !isLane(id))),
+      );
     });
   });
 

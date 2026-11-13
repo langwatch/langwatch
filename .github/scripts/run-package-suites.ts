@@ -320,9 +320,9 @@ export interface SuiteJob {
 }
 
 /**
- * The serial lanes: no two of their suites overlap, across packages or lanes. Integration
- * files run serially against one shared datastore; a browser lane installs Chromium
- * through apt, which holds a machine-wide lock. Everything else is `shared`.
+ * The serial lanes. Integration files share one datastore and a browser lane's apt install
+ * holds a machine-wide lock; across lanes they share one `serial` key, because tasks#1178
+ * saw a browser run fail while an integration run overlapped it. Others are `shared`.
  */
 const LANES: Record<string, "integration" | "browser"> = {
   "test:integration": "integration",
