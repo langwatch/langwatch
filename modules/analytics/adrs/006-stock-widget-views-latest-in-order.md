@@ -37,17 +37,15 @@ new MATERIALIZED column.
    the tie by `Version` (`trace_metrics`, `traces`, `evaluations`, `simulations`,
    `experiment_run_results`, `gateway_request_spend`), as `FINAL` does by keeping the later insert.
 3. **Trace columns from the fold.** The `trace_analytics` fold writes the three ADR-004 columns
-   (goose 00128 adds them as plain `String DEFAULT ''`) and also the nine goose 00126 columns, from
-   the trimmed attribute map it stores. `metadata.environment` falls back to `metadata.env`. The
-   projection version is bumped.
-4. **The MATERIALIZED handover (expand/contract).** The nine 00126 columns stay MATERIALIZED for
-   now, so the previous release, which does not write them, still gets them. The fold writes them
-   explicitly with `insert_allow_materialized_columns = 1` and a named column list, the same value
-   the expression computes. The contract step, in a later release once old writers are gone, is
-   `MODIFY COLUMN ... REMOVE MATERIALIZED`: metadata only, and safe then because every part holds
-   the values (the 00126 step stored them) and every writer writes them. Removing it now would let
-   an old writer write '' and let a part the 00126 step had not reached read ''. New column names
-   instead would leave rows older than the replay without values and nine duplicate columns.
+   (goose 00128 adds them as plain `String DEFAULT ''`) from the trimmed attribute map it stores.
+   `metadata.environment` falls back to `metadata.env`. The projection version is bumped. The
+   nine goose 00126 columns are computed by the database from `Attributes` (amended 2026-11-13).
+4. **The MATERIALIZED handover (expand/contract).** The nine 00126 columns stay MATERIALIZED, so
+   every writer, old or new, gets them. The contract step is
+   `MODIFY COLUMN ... REMOVE MATERIALIZED`: metadata only, and safe only once every part holds the
+   values (the 00126 step stored them) and every writer writes them. It must not run until the
+   fold writes the nine again (amended 2026-11-13). New column names instead would leave rows
+   older than the replay without values and nine duplicate columns.
 5. **Span columns from a map projection.** A new map projection, `spanAnalytics`, beside
    `spanStorage`, writes `span_analytics` (ReplacingMergeTree(ProjectedAt), partitioned by
    `toYearWeek(StartTime)`, ordered by `(TenantId, TraceId, SpanId)`, no maps), and the
@@ -146,6 +144,16 @@ days, two `evaluation_metrics` coverage queries that also fail on main) in every
 - **Row equality.** On seeded versions, duplicates, a replay tie and a moved anchor, with merges
   stopped, each of the nine views returns exactly its FINAL twin's rows (EXCEPT empty both ways),
   for both the `argMax` and the `LIMIT 1 BY` forms.
+
+## Amendment 2026-11-13: the fold does not write the nine MATERIALIZED columns
+
+The fold first wrote the nine 00126 columns with `insert_allow_materialized_columns = 1` and a
+named column list. In production that insert failed with `ILLEGAL_COLUMN` despite the setting;
+the cause is not yet known (async inserts are a candidate). The fold now writes only the three
+plain columns, and the database computes the nine from `Attributes` with the 00126 expressions.
+The contract step (`REMOVE MATERIALIZED`) must not run until the fold writes the nine again and
+that write is proven against ClickHouse with production settings: run now, it would leave the
+nine empty on new rows.
 
 ## Amendment: retraction-pair projections settle instead (ADR-007)
 

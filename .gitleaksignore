@@ -74,3 +74,8 @@ f483fe302e7c3dfb100e1d6fa9c99b6d9a049c20:specs/server/feature-configuration.feat
 # PR #9549: a test-only sha256 of a ClickHouse test user's login was committed as
 # a literal; the test now derives it at runtime, so only this commit carries it.
 ee7e090a89628b5b4dbfc326e722274cccce12d3:modules/analytics/process/src/services/__tests__/app-reader-row-policies.integration.test.ts:generic-api-key:26
+
+# The per-user caps golden test quoted the SHA-256 of the test password "pw".
+# It was never a credential; the test now builds it with sha("pw"), so only
+# this pull request's history still carries the literal.
+394229f593f12061ac86dc2c53b294cb27b8a6d8:infra/clickhouse-serverless/internal/access/caps_test.go:generic-api-key:218

@@ -1129,7 +1129,7 @@ Manage them at **Settings > Model Providers**. The table lists each configuratio
 | OpenAI | API key, or a base URL for an endpoint that needs none |
 | Codex (OpenAI account) | Sign in with your OpenAI account. Used by coding features only |
 | Anthropic | API key, or a base URL |
-| Gemini | API key. Add a project and a location to use Gemini through Vertex AI |
+| Gemini | API key. Add a project and a location to use Gemini through Vertex AI. An AI Studio key also runs [Instant Evals on Gemini Decision 1](/features/instant-evals/own-model) |
 | Azure OpenAI | API key and endpoint, optional API version. **Use API Gateway** switches to an API gateway base URL and version. Optional **Decisions Deployment** and **Microsoft Decision 1 Deployment** name the deployments [Instant Evals can run on](/features/instant-evals/own-model#azure) |
 | Bedrock | AWS access key id, secret access key and region |
 | Vertex AI | Service account JSON, project and location |
@@ -45147,7 +45147,7 @@ The [Questions](/features/instant-evals/questions) page covers criteria, thresho
 ---
 title: Run Instant Evals on your own decision model
 sidebarTitle: Your own model
-keywords: langwatch, instant evals, decision model, own key, bring your own key, azure openai, gpt-6-luna, decisions api, microsoft decision 1, openai, inception, perplexity, cloudflare, typesafe, jev, openrouter, fireworks, default models
+keywords: langwatch, instant evals, decision model, own key, bring your own key, azure openai, gpt-6-luna, decisions api, microsoft decision 1, openai, inception, perplexity, cloudflare, typesafe, jev, openrouter, fireworks, gemini, gemini decision 1, default models
 description: Run Instant Evals on a decision model in your own provider account, set up Azure, and read the rows your model cannot judge.
 ---
 
@@ -45174,6 +45174,7 @@ The picker is one list: LangWatch's **Evals Preview** first, then the models on 
 | OpenRouter            | OpenRouter Microsoft Decision 1 | API key                                                                                          |
 | OpenRouter            | OpenRouter Liquid d1.1          | API key                                                                                          |
 | Fireworks             | Fireworks Rune                  | API key                                                                                          |
+| Gemini                | Gemini Decision 1               | AI Studio API key. Runs on the Gemini Decisions API, not through Vertex AI                       |
 
 `gpt-6-luna` runs on the OpenAI Decisions API, so it needs that model on your OpenAI or Azure account. The other models need no OpenAI account.
 
@@ -50324,7 +50325,7 @@ Open [Experiments](https://app.langwatch.ai/@project/experiments), click **New E
 <Step title="Create the judge">
 On the prompt column, click **Add evaluator**, then **New Evaluator**. Pick the **LLM as Judge** category and **LLM-as-a-Judge Boolean Evaluator**.
 
-Name it, pick the judge model, and replace the default prompt with your criteria. Write the criteria as a checklist the judge can apply to one answer at a time. For example:
+Name it, pick the judge model, and replace the default prompt with your criteria. The model picker also lists **Decision models**, such as OpenAI Decisions API, TypeSafe Jev, Cloudflare Clef or Gemini Decision 1, which answer yes or no, score and category questions on your own provider key. [Your own model](/features/instant-evals/own-model) lists each one and the key it needs. Write the criteria as a checklist the judge can apply to one answer at a time. For example:
 
 ```text
 You are evaluating a business coaching assistant.
