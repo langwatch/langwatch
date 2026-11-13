@@ -407,6 +407,7 @@ export interface LwqlPrismaRows {
     readonly privateDataplaneSeenAt: "DateTime?";
     readonly maxSessionDurationDays: "Int";
     readonly mfaRequired: "Boolean";
+    readonly docsPlaygroundSessionsEnabled: "Boolean";
     readonly lockoutAfterFailedAttempts: "Int";
     readonly lockoutMinutes: "Int";
     readonly sessionIdleTimeoutMinutes: "Int";

@@ -4375,6 +4375,15 @@
           "documentation": "Every member of this organization can prove a second factor (D06). A\nMEMBERSHIP CONDITION, not a session policy: it is asked when a member\nreaches this organization's data, it holds the ones who cannot prove\none at an enrollment gate for THIS organization alone, and it ends no\nsession, ever. Turning it on signs nobody out.\nSpec: specs/identity/mfa-and-session-shape.feature."
         },
         {
+          "name": "docsPlaygroundSessionsEnabled",
+          "columnName": "docsPlaygroundSessionsEnabled",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Whether members may connect the documentation playground to their own access with a\nshort-lived docs session key (ADR-185, amendment of 2026-11-13). On by default; turned off,\nno key is minted and live ones stop authenticating. The pasted-key path is untouched.\nSpec: modules/api-key/specs/docs-session-keys.feature."
+        },
+        {
           "name": "lockoutAfterFailedAttempts",
           "columnName": "lockoutAfterFailedAttempts",
           "type": "Int",
