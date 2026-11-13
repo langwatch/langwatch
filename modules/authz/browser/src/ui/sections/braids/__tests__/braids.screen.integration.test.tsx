@@ -21,6 +21,11 @@ const { braidsFake, braidTraces, liveBraid, STRUCTURE } = await import("./braids
 const { FakeAuthzHost, renderWithAuthzHost } = await import("../../../../testing.tsx");
 const { default: BraidsScreen } = await import("../braids.screen.tsx");
 
+const SLUGGED = {
+  ...STRUCTURE,
+  projects: STRUCTURE.projects.map((project) => ({ ...project, slug: `${project.name}-x2` })),
+};
+
 const ADMIN = new Set(["project:view", "braids:manage"]);
 const MEMBER = new Set(["project:view"]);
 
@@ -30,7 +35,9 @@ function renderAs({
   projectId = "p-spec",
   query = {},
   projectSwitcher,
+  structure = STRUCTURE,
 }: {
+  structure?: typeof STRUCTURE;
   grants?: Set<string>;
   isEnterprise?: boolean;
   projectId?: string;
@@ -41,7 +48,7 @@ function renderAs({
     scope: { organizationId: "org-1", projectId },
     grants,
     plan: { isEnterprise, isLoading: false },
-    structure: STRUCTURE,
+    structure,
     query,
     projectSwitcher,
   });
@@ -111,6 +118,31 @@ describe("BraidsScreen", () => {
         }).toString()}`,
       );
       expect(screen.getByRole("menuitem", { name: "Remove braid" })).toBeInTheDocument();
+    });
+
+    /** @scenario Each braid row shows where it goes, its condition, its access and its activity */
+    it("links an into row straight to the audit log, with no switch into its own project", async () => {
+      braidsFake.state.project = { intoOtherProjects: [liveBraid()], fromOtherProjects: [] };
+      renderAs({ structure: SLUGGED });
+      await openRowMenu();
+      expect(await screen.findByRole("menuitem", { name: "View in audit log" })).toHaveAttribute(
+        "href",
+        expect.stringMatching(/^\/settings\/audit-log\?/),
+      );
+    });
+
+    it("links a from row through the owner's project, where the braid's entries are kept", async () => {
+      braidsFake.state.project = { intoOtherProjects: [], fromOtherProjects: [liveBraid()] };
+      const user = userEvent.setup();
+      renderAs({ projectId: "p-orch", structure: SLUGGED });
+      await user.click(screen.getByRole("tab", { name: /From other projects/ }));
+      await user.click(
+        within(await screen.findByTestId("braid-row")).getByTestId("braid-row-actions"),
+      );
+      expect(await screen.findByRole("menuitem", { name: "View in audit log" })).toHaveAttribute(
+        "href",
+        expect.stringMatching(/^\/specialists-x2\?return_to=%2Fsettings%2Faudit-log/),
+      );
     });
 
     /** @scenario Removing a braid says what stops before it happens */

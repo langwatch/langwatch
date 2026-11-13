@@ -88,13 +88,13 @@ Feature: Settings shell
     Then Audit log and Roles are offered with a small lock
     And the lock reads "Included in Enterprise"
     And an entry I lack the permission for stays hidden
+    And opening a locked entry shows its page title and an Enterprise upsell, never the feature
 
-  @unit
+  @unit @integration
   Scenario: A branded feature's entries wear its mark
     Given the settings menu offers the Braids page
     Then Braids appears once, under Project, never also under People & access
     And the entry draws the Braids mark, the one its pages' titles and empty states draw
-    And opening a locked entry shows its page title and an Enterprise upsell, never the feature
 
   @unit
   Scenario: The organization's braids page lights the one Braids entry

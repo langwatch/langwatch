@@ -15,7 +15,7 @@ import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useLent } from "@langwatch/browser-host/lent";
 import { ProjectSwitcherToken } from "@langwatch/project-client";
 import type { ProjectSwitcherProps } from "@langwatch/project-contract";
-import { Suspense, useMemo, type ComponentType, type ReactNode } from "react";
+import { Suspense, type ComponentType, type ReactNode } from "react";
 
 import {
   AuthzHostApi,
@@ -120,59 +120,38 @@ export default function AuthzHostMount({ children }: { children?: ReactNode }) {
     { enabled: !!organizationId && session.hasPermission("organization:view"), retry: false },
   );
   const planType = activePlan.data?.type;
-  const plan = useMemo(
-    () => ({ isEnterprise: planType === "ENTERPRISE", isLoading: activePlan.isLoading }),
-    [planType, activePlan.isLoading],
-  );
+  const plan = { isEnterprise: planType === "ENTERPRISE", isLoading: activePlan.isLoading };
   // The shell's own workspace read, under the same cache key: no second request.
   const organizations = authzApi.organization.getScopeGraph.useQuery(
     {},
     { enabled: !!session.currentUser() },
   );
-  const structure = useMemo(() => {
-    const organization = organizations.data?.find((candidate) => candidate.id === organizationId);
-    const teams = organization?.teams ?? [];
-    return {
-      organizationName: organization?.name,
-      teams: teams.map((team) => ({ id: team.id, name: team.name })),
-      projects: teams.flatMap((team) =>
-        team.projects.map((project) => ({
-          id: project.id,
-          name: project.name,
-          slug: project.slug,
-          teamId: team.id,
-        })),
-      ),
-    };
-  }, [organizations.data, organizationId]);
-  const host = useMemo(
-    () =>
-      new HostServiceAuthzHost({
-        organizationId: organizationId ?? void 0,
-        projectId: projectId ?? void 0,
-        session,
-        feedback,
-        plan,
-        structure,
-        route: { query },
-        setQuery: (next, options) => route.setQuery(next, options),
-        openOverlay: (drawer, props) => openDrawer(drawer, props),
-        closeOverlay: () => closeDrawer(),
-        Switcher,
-      }),
-    [
-      organizationId,
-      projectId,
-      session,
-      feedback,
-      plan,
-      structure,
-      query,
-      route,
-      openDrawer,
-      closeDrawer,
-      Switcher,
-    ],
-  );
+  const organization = organizations.data?.find((candidate) => candidate.id === organizationId);
+  const teams = organization?.teams ?? [];
+  const structure = {
+    organizationName: organization?.name,
+    teams: teams.map((team) => ({ id: team.id, name: team.name })),
+    projects: teams.flatMap((team) =>
+      team.projects.map((project) => ({
+        id: project.id,
+        name: project.name,
+        slug: project.slug,
+        teamId: team.id,
+      })),
+    ),
+  };
+  const host = new HostServiceAuthzHost({
+    organizationId: organizationId ?? void 0,
+    projectId: projectId ?? void 0,
+    session,
+    feedback,
+    plan,
+    structure,
+    route: { query },
+    setQuery: (next, options) => route.setQuery(next, options),
+    openOverlay: (drawer, props) => openDrawer(drawer, props),
+    closeOverlay: () => closeDrawer(),
+    Switcher,
+  });
   return <AuthzHostProvider value={host}>{children}</AuthzHostProvider>;
 }

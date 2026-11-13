@@ -40,6 +40,13 @@ describe("given a row whose target is a braid", () => {
   });
 
   /** @scenario A braid's entries read as braid changes */
+  it("keeps the generic wording for a verb a braid never records", () => {
+    expect(auditEntryPhrase({ action: "authz.grants.role_change", targetKind: "braid" })).toBe(
+      auditActionPhrase("authz.grants.role_change"),
+    );
+  });
+
+  /** @scenario A braid's entries read as braid changes */
   it("keeps the grant wording on any other target", () => {
     expect(auditEntryPhrase({ action: "authz.grants.attach", targetKind: "role_binding" })).toBe(
       "Attached grant",

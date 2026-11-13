@@ -49,9 +49,15 @@ function RouteArrow() {
   );
 }
 
+/** The loaded options, plus the braid's reader when the list did not load it (edit keeps it). */
+function pickerOptions({ options, reader }: BraidRouteFieldsProps): readonly BraidTargetOption[] {
+  if (!reader || options.some((option) => option.projectId === reader.id)) return options;
+  return [...options, { projectId: reader.id, name: reader.name, selectable: false }];
+}
+
 function IntoPicker(props: BraidRouteFieldsProps) {
   const collection = createListCollection({
-    items: props.options.map((option) => ({
+    items: pickerOptions(props).map((option) => ({
       value: option.projectId,
       label: option.name,
       disabled: !option.selectable,

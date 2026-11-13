@@ -214,4 +214,24 @@ describe("braidTargetOptions", () => {
       expect(options.map((option) => option.projectId)).toEqual(["p-a", "p-b", "p-own"]);
     });
   });
+
+  describe("when another project is refused for a different reason", () => {
+    /** @scenario The braid starts from this project and picks where it goes */
+    it("moves only the braid's own project, by its reason key rather than its words", () => {
+      const { options } = braidTargetOptions({
+        projects: [
+          { id: "p-own", name: "specialists" },
+          { id: "p-agg", name: "everything" },
+          { id: "p-a", name: "alpha" },
+        ],
+        targets: [
+          { projectId: "p-own", selectable: false, reason: "this_project" },
+          { projectId: "p-agg", selectable: false, reason: "aggregate" },
+          { projectId: "p-a", selectable: true },
+        ],
+      });
+
+      expect(options.map((option) => option.projectId)).toEqual(["p-agg", "p-a", "p-own"]);
+    });
+  });
 });

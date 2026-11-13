@@ -176,21 +176,20 @@ export function braidTargetOptions({
   targets: AuthzBraidTargets;
 }): { options: BraidTargetOption[]; someLeftOut: boolean } {
   const decided = new Map(targets.map((target) => [target.projectId, target]));
-  const options = projects.flatMap((project): BraidTargetOption[] => {
+  const listed = projects.flatMap((project) => {
     const target = decided.get(project.id);
-    if (!target) return [];
-    return [
-      {
-        projectId: project.id,
-        name: project.name,
-        selectable: target.selectable,
-        ...(target.reason ? { reason: TARGET_REASONS[target.reason] } : {}),
-      },
-    ];
+    return target ? [{ project, target }] : [];
   });
-  const own = options.filter((option) => option.reason === TARGET_REASONS.this_project);
-  const others = options.filter((option) => option.reason !== TARGET_REASONS.this_project);
-  return { options: [...others, ...own], someLeftOut: options.length < projects.length };
+  const isOwn = ({ target }: (typeof listed)[number]) => target.reason === "this_project";
+  const options = [...listed.filter((entry) => !isOwn(entry)), ...listed.filter(isOwn)].map(
+    ({ project, target }): BraidTargetOption => ({
+      projectId: project.id,
+      name: project.name,
+      selectable: target.selectable,
+      ...(target.reason ? { reason: TARGET_REASONS[target.reason] } : {}),
+    }),
+  );
+  return { options, someLeftOut: options.length < projects.length };
 }
 
 /** "14 people" or "at least 500 people", as the dialog names who will see the spans. */

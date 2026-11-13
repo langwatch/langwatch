@@ -312,6 +312,15 @@ describe("the settings shell in a new navigation mode", () => {
       expect(screen.queryByRole("link", { name: /^Authentication/ })).not.toBeInTheDocument();
     });
 
+    /** @scenario "A branded feature's entries wear its mark" */
+    it("draws the Braids entry with the braids mark, not a stock icon", () => {
+      renderSettingsSidebar();
+
+      const braids = screen.getByRole("link", { name: /^Braids/ });
+      expect(braids.querySelector('[data-feature="braids"]')).not.toBeNull();
+      expect(braids.querySelector('.lucide:not([aria-label="Enterprise"])')).toBeNull();
+    });
+
     /** @scenario "Settings groups read in sentence case" */
     it("labels its groups in sentence case", () => {
       renderSettingsSidebar();

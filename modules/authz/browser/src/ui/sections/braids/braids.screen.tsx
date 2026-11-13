@@ -334,7 +334,6 @@ export default function BraidsScreen() {
       <BraidsTable
         side={side}
         projectName={projectName}
-        projectSlug={projects.find((project) => project.id === projectId)?.slug}
         rows={side === "into" ? rows.into : rows.from}
         paused={paused}
         canEdit={can.canEditInto}

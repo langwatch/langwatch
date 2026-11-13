@@ -658,6 +658,16 @@ describe("the braid dialog", () => {
       );
     });
 
+    /** @scenario Editing a braid saves only a change */
+    it("names its fixed reader even when the project list holds no entry for it", () => {
+      braidsFake.state.project = { intoOtherProjects: [liveBraid()], fromOtherProjects: [] };
+      braidsFake.state.targets = [];
+      openDialog({ braid: "b-1" });
+
+      expect(intoPicker()).toHaveTextContent("orchestrator");
+      expect(intoPicker()).not.toHaveTextContent("Pick a project");
+    });
+
     /** @scenario Testing a trace shows it exactly as the reader will see it */
     it("tests a trace with the draft in place of the braid it edits", async () => {
       braidsFake.state.project = { intoOtherProjects: [liveBraid()], fromOtherProjects: [] };

@@ -98,14 +98,10 @@ export function auditActionPhrase(action: string): string {
   return sentence([...noun, ...verbWords]);
 }
 
-/** A braid's grant verbs as the braid's own; any other braid action keeps its generic phrase. */
+/** The two verbs a braid's grant records (`authz.grants.attach`, `.revoke`), as the braid's own. */
 const BRAID_PHRASES: Readonly<Record<string, string>> = {
   attach: "Created braid",
-  create: "Created braid",
-  update: "Changed braid",
   revoke: "Removed braid",
-  detach: "Removed braid",
-  remove: "Removed braid",
 };
 
 /** An entry's phrase: braid wording when its target is a braid, `auditActionPhrase` otherwise. */
