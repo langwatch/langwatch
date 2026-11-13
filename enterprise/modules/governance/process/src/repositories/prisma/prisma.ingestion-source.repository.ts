@@ -6,7 +6,7 @@ import {
   type PrismaClient,
 } from "@langwatch/prisma-client/generated";
 import type { Encryption } from "@langwatch/process-stores";
-import { fromDate, toDate } from "@langwatch/time";
+import { fromDate, toDate, type Instant } from "@langwatch/time";
 
 import {
   IngestionSourceRepository,
@@ -189,6 +189,14 @@ export class PrismaIngestionSourceRepository extends IngestionSourceRepository {
       data: updateDataOf({ input, credentials: this.credentials }),
     });
     return this.toSource(row);
+  }
+
+  /** The `where` is `ingestionSourceStatusIsOff` as SQL: a row that is off is never written. */
+  async recordEventReceived(id: string, at: Instant): Promise<void> {
+    await this.database.ingestionSource.updateMany({
+      where: { id, status: { in: ["active", "awaiting_first_event"] } },
+      data: { lastEventAt: toDate(at), status: "active" },
+    });
   }
 
   async getUnpricedUsageWindow(id: string): Promise<UnpricedUsageWindow> {

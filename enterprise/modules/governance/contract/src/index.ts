@@ -24,6 +24,7 @@ export * from "./features/cost/governance-cost.trpc.ts";
 export * from "./governance-people.ts";
 export * from "./session-policy.ts";
 export * from "./features/ingestion/source-health.ts";
+export * from "./features/ingestion/source-liveness.ts";
 export * from "./governance.responses.ts";
 export * from "./governance.trpc.ts";
 export * from "./features/ingestion/ingestion-source.ts";

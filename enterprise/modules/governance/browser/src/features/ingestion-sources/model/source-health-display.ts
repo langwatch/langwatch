@@ -2,6 +2,7 @@
 
 import {
   deriveSourceHealth,
+  ingestionSourceStatusIsOff,
   type RunCompleteness,
 } from "@langwatch/enterprise-governance-contract";
 import { CircleAlert, CircleCheck, CircleDashed, CircleDotDashed, CircleX } from "lucide-react";
@@ -99,7 +100,7 @@ export function sourceBadge({
 }): SourceBadge {
   // Checked before health: a source nobody asked to run cannot be failing to
   // run, so its configured state is the honest badge.
-  if (status === "disabled") return SOURCE_STATUS_META.disabled!;
+  if (ingestionSourceStatusIsOff(status)) return SOURCE_STATUS_META.disabled!;
   if (configComplaints.length > 0) return SOURCE_MISCONFIGURED_META;
   // Failing outranks partly collected. A source doing both is one an admin
   // has to go and fix, and a run that stopped early is the milder half of

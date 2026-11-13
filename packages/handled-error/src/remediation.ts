@@ -371,6 +371,14 @@ const registry = {
     docsPath: "/api-reference/api-keys/create-api-key",
   },
 
+  // ---- ingestion sources ----
+  ingestion_source_disabled: {
+    tips: [
+      "Stop the exporter, or ask an organization admin to set the source back to active",
+      "Events refused while the source was disabled are not kept; resend them after re-enabling if you need them",
+    ],
+    docsPath: "/ai-governance/ingestion-sources/index",
+  },
   // ---- ingestion keys ----
   ingestion_key_not_found: {
     tips: [

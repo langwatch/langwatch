@@ -2,6 +2,8 @@
 
 import type { Instant } from "@langwatch/time";
 
+import { ingestionSourceStatusIsOff } from "./source-liveness.ts";
+
 /**
  * Puller health, derived rather than stored (ADR-128).
  *
@@ -126,7 +128,7 @@ export function deriveNoDataSinceNotice({
   /** The newest bucket that run actually read through to. */
   readThroughAt?: Instant | string | null;
 }): NoDataSinceNotice | null {
-  if (status === "disabled") return null;
+  if (ingestionSourceStatusIsOff(status)) return null;
 
   // A run that stopped at a page limit or ran out of time ends with nothing
   // to report as an error, so the failure count says the source is fine and

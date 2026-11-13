@@ -211,6 +211,54 @@ describe("the ingestion-source receivers", () => {
     });
   });
 
+  describe("given a source the admin has disabled", () => {
+    /** @scenario "A disabled push source refuses new batches" */
+    it.each([
+      ["OTLP traces", `/api/ingest/otel/${SOURCE_ID}`, traceBody],
+      ["OTLP logs", `/api/ingest/otel/${SOURCE_ID}/v1/logs`, logBody],
+      ["OTLP metrics", `/api/ingest/otel/${SOURCE_ID}/v1/metrics`, metricBody],
+      ["webhook", `/api/ingest/webhook/${SOURCE_ID}`, JSON.stringify({ event: "one" })],
+    ])("refuses %s with 403 and neither collects nor stamps", async (_door, path, body) => {
+      const api = mountIngest({ source: { ...SOURCE, status: "disabled" } });
+
+      const response = await api.post(path, body);
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "ingestion_source_disabled",
+      });
+      expect(api.traceCollection).not.toHaveBeenCalled();
+      expect(api.ingestionSourceRecordEventReceived).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A disabled source answers a wrong endpoint as unknown" */
+    it("answers its secret on another source's endpoint with the bare 401", async () => {
+      const api = mountIngest({ source: { ...SOURCE, status: "disabled" } });
+
+      const response = await api.post("/api/ingest/otel/src_other", traceBody);
+
+      expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "ingestion_source_unauthorized",
+      });
+    });
+  });
+
+  describe("given a disabled source the admin set back to active", () => {
+    /** @scenario "Re-enabling a disabled source resumes ingestion" */
+    it("accepts the next batch sent with the same secret", async () => {
+      const api = mountIngest({ source: { ...SOURCE, status: "disabled" } });
+      const refused = await api.post(`/api/ingest/otel/${SOURCE_ID}`, traceBody);
+      api.findIngestionSourceByIngestSecret.mockResolvedValue({ ...SOURCE, status: "active" });
+
+      const response = await api.post(`/api/ingest/otel/${SOURCE_ID}`, traceBody);
+
+      expect(refused.status).toBe(403);
+      expect(response.status).toBe(202);
+      expect(api.ingestionSourceRecordEventReceived).toHaveBeenCalledWith(SOURCE_ID);
+    });
+  });
+
   describe("when the per-caller throttle refuses", () => {
     it("sheds at the edge with Retry-After, before the secret lookup", async () => {
       const api = mountIngest({
