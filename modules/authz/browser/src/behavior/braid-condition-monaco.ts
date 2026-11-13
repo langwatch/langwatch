@@ -24,12 +24,44 @@ const THEME_COLORS: readonly (readonly [string, string])[] = [
   ["editorCursor.foreground", "fg"],
   ["editor.selectionBackground", "bg.emphasized"],
   ["editorError.foreground", "fg.error"],
+  ["editorWidget.background", "bg.panel"],
+  ["editorWidget.border", "border"],
+  ["editorHoverWidget.background", "bg.panel"],
+  ["editorHoverWidget.border", "border"],
+  ["editorHoverWidget.foreground", "fg"],
   ["editorSuggestWidget.background", "bg.panel"],
   ["editorSuggestWidget.border", "border"],
   ["editorSuggestWidget.foreground", "fg"],
   ["editorSuggestWidget.selectedBackground", "bg.muted"],
+  ["editorSuggestWidget.selectedForeground", "fg"],
+  ["editorSuggestWidget.selectedIconForeground", "fg"],
   ["editorSuggestWidget.highlightForeground", "blue.fg"],
+  ["editorSuggestWidget.focusHighlightForeground", "blue.fg"],
+  ["editorSuggestWidgetStatus.foreground", "fg.muted"],
+  ["list.hoverBackground", "bg.subtle"],
+  ["list.hoverForeground", "fg"],
 ];
+
+const HEX = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+const RGB = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)(?:\s*[,/]\s*([\d.]+)(%?))?\s*\)$/;
+const SRGB = /^color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+)(%?))?\s*\)$/;
+
+const byte = (value: number) =>
+  Math.round(Math.min(255, Math.max(0, value)))
+    .toString(16)
+    .padStart(2, "0");
+
+/** A computed `rgb()`, `rgba()` or `color(srgb …)` as hex without `#`. */
+function hexOfComputed(value: string): string | undefined {
+  const rgb = RGB.exec(value);
+  const srgb = rgb ? undefined : SRGB.exec(value);
+  const match = rgb ?? srgb;
+  if (!match) return undefined;
+  const scale = rgb ? 1 : 255;
+  const channels = [match[1], match[2], match[3]].map((channel) => byte(Number(channel) * scale));
+  const alpha = match[4] === undefined ? 1 : Number(match[4]) / (match[5] ? 100 : 1);
+  return channels.join("") + (alpha < 1 ? byte(alpha * 255) : "");
+}
 
 /** A token's colour as Monaco's theme wants it (hex, no `#`); undefined keeps Monaco's own. */
 function hexOf(token: string): string | undefined {
@@ -39,7 +71,16 @@ function hexOf(token: string): string | undefined {
   } catch {
     return undefined;
   }
-  return /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(value) ? value.slice(1) : undefined;
+  if (HEX.test(value)) return value.slice(1);
+  // Named colours and `color-mix()` resolve through the browser to `rgb()` or `color(srgb …)`.
+  if (typeof document === "undefined") return undefined;
+  const probe = document.createElement("span");
+  probe.style.color = value;
+  if (!probe.style.color) return undefined;
+  document.body.append(probe);
+  const computed = getComputedStyle(probe).color;
+  probe.remove();
+  return hexOfComputed(computed);
 }
 
 function completionKind({
@@ -145,6 +186,22 @@ export function defineBraidConditionTheme({
     rules,
     colors,
   });
+}
+
+/**
+ * Escape with the suggestion list open closes only the list. The dialog listens for Escape on the
+ * document in the capture phase, ahead of Monaco, so this listens on the window, earlier still.
+ */
+export function closeSuggestionsOnEscape(target: editor.IStandaloneCodeEditor): () => void {
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (event.key !== "Escape" || !target.hasTextFocus()) return;
+    if (!target.getDomNode()?.querySelector(".suggest-widget.visible")) return;
+    event.stopPropagation();
+    event.preventDefault();
+    target.trigger("keyboard", "hideSuggestWidget", undefined);
+  };
+  window.addEventListener("keydown", onKeyDown, { capture: true });
+  return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
 }
 
 /** Hands a model the owner's attribute keys its completion offers. */

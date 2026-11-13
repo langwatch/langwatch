@@ -34,6 +34,16 @@ describe("braidConditionCompletions", () => {
       expect(items[0]?.filterText).toBe('"orchestrator');
     });
 
+    it("offers the keys between auto-closed quotes, replacing the quotes and the bracket", () => {
+      const text = 'attributes[""]';
+      const offset = 'attributes["'.length;
+      const { items, replaceFrom, replaceTo } = at(text, offset);
+      expect(items.map((item) => item.label)).toEqual(["orchestrator", "team"]);
+      expect(text.slice(replaceFrom, replaceTo)).toBe('""]');
+      expect(text.slice(replaceFrom, offset)).toBe('"');
+      expect(items[0]?.filterText).toBe('"orchestrator');
+    });
+
     it("quotes the key itself straight after the bracket", () => {
       const { items, replaceFrom, replaceTo } = at("attributes[]", "attributes[".length);
       expect([replaceFrom, replaceTo]).toEqual(["attributes[".length, "attributes[]".length]);
@@ -66,6 +76,13 @@ describe("braidConditionCompletions", () => {
         "false",
       ]);
       expect(items[0]).toMatchObject({ insertText: 'attributes["$0"]', isSnippet: true });
+    });
+
+    it("still offers the built-ins when the owner's keys could not be looked up", () => {
+      const { items } = braidConditionCompletions({ text: "", offset: 0, attributeKeys: [] });
+      expect(items.map((item) => item.label)).toEqual(
+        expect.arrayContaining(['attributes[""]', 'Verified("")', "and", "or", "not"]),
+      );
     });
 
     it("replaces the word being typed", () => {

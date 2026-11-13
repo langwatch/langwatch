@@ -7,9 +7,10 @@ import { Alert, Box, Field, Text } from "@langwatch/design-system/primitives";
 import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import type { OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
-import { lazy, Suspense, useId, useState } from "react";
+import { lazy, Suspense, useEffect, useId, useState } from "react";
 
 import {
+  closeSuggestionsOnEscape,
   defineBraidConditionTheme,
   registerBraidConditionLanguage,
 } from "../../../../behavior/braid-condition-monaco.ts";
@@ -26,6 +27,10 @@ const LINE_PX = 20;
 const PADDING_PX = 6;
 const MIN_HEIGHT = LINE_PX + 2 * PADDING_PX;
 const MAX_HEIGHT = 4 * LINE_PX + 2 * PADDING_PX;
+const BORDER_PX = 1;
+/** How long typing must pause before a refusal is marked, so a half-typed key is not refused. */
+const SETTLE_MS = 600;
+const NO_LIGATURES = { fontVariantLigatures: "none", fontFeatureSettings: '"liga" 0, "calt" 0' };
 
 const EDITOR_OPTIONS: editor.IStandaloneEditorConstructionOptions = {
   ariaLabel: "Condition",
@@ -33,6 +38,7 @@ const EDITOR_OPTIONS: editor.IStandaloneEditorConstructionOptions = {
   fontFamily: "var(--chakra-fonts-mono)",
   fontSize: TYPE_SCALE_PX.bodySm,
   lineHeight: LINE_PX,
+  fontLigatures: false,
   padding: { top: PADDING_PX, bottom: PADDING_PX },
   minimap: { enabled: false },
   lineNumbers: "off",
@@ -44,7 +50,7 @@ const EDITOR_OPTIONS: editor.IStandaloneEditorConstructionOptions = {
   overviewRulerLanes: 0,
   overviewRulerBorder: false,
   hideCursorInOverviewRuler: true,
-  scrollbar: { vertical: "auto", horizontal: "hidden", alwaysConsumeMouseWheel: false },
+  scrollbar: { vertical: "hidden", horizontal: "hidden", alwaysConsumeMouseWheel: false },
   scrollBeyondLastLine: false,
   wordWrap: "on",
   automaticLayout: true,
@@ -55,6 +61,16 @@ const EDITOR_OPTIONS: editor.IStandaloneEditorConstructionOptions = {
   wordBasedSuggestions: "off",
   tabCompletion: "on",
 };
+
+/** Scrollbars and the wheel only once the condition outgrows the four lines the field shows. */
+function editorOptions(overflowing: boolean): editor.IStandaloneEditorConstructionOptions {
+  if (!overflowing)
+    return {
+      ...EDITOR_OPTIONS,
+      scrollbar: { ...EDITOR_OPTIONS.scrollbar, handleMouseWheel: false },
+    };
+  return { ...EDITOR_OPTIONS, scrollbar: { ...EDITOR_OPTIONS.scrollbar, vertical: "auto" } };
+}
 
 export type BraidConditionFieldProps = {
   value: string;
@@ -122,16 +138,25 @@ export function BraidConditionField(props: BraidConditionFieldProps) {
   const { colorMode } = useColorMode();
   const dark = colorMode === "dark";
   const [mounted, setMounted] = useState<BraidConditionMountedEditor | null>(null);
-  const [height, setHeight] = useState(MIN_HEIGHT);
+  const [contentHeight, setContentHeight] = useState(MIN_HEIGHT);
+  const height = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, contentHeight));
+  // The value a refusal may be marked against: set once typing pauses, or on blur.
+  const [settledValue, setSettledValue] = useState(props.value);
+  useEffect(() => {
+    const timer = setTimeout(() => setSettledValue(props.value), SETTLE_MS);
+    return () => clearTimeout(timer);
+  }, [props.value]);
+  const check: BraidConditionCompileResult =
+    settledValue === props.value || props.check.ok ? props.check : { ok: true };
   // The no-condition warning waits until the field has been used, so it never greets a new braid.
   const [touched, setTouched] = useState(false);
   const modelPath = `inmemory://braid-condition/${useId().replaceAll(":", "")}.ottl`;
-  const refusal = props.check.ok
+  const refusal = check.ok
     ? undefined
     : {
-        at: props.check.at,
-        end: refusedEnd({ text: props.value, at: props.check.at }),
-        message: refusalMessage(props.check),
+        at: check.at,
+        end: refusedEnd({ text: props.value, at: check.at }),
+        message: refusalMessage(check),
       };
 
   useBraidConditionEditor({
@@ -143,11 +168,13 @@ export function BraidConditionField(props: BraidConditionFieldProps) {
   });
 
   const handleMount: OnMount = (mountedEditor, monaco) => {
-    const fit = (contentHeight: number) =>
-      setHeight(Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, contentHeight)));
-    fit(mountedEditor.getContentHeight());
-    mountedEditor.onDidContentSizeChange((event) => fit(event.contentHeight));
-    mountedEditor.onDidBlurEditorText(() => setTouched(true));
+    setContentHeight(mountedEditor.getContentHeight());
+    mountedEditor.onDidContentSizeChange((event) => setContentHeight(event.contentHeight));
+    mountedEditor.onDidBlurEditorText(() => {
+      setTouched(true);
+      setSettledValue(mountedEditor.getValue());
+    });
+    mountedEditor.onDidDispose(closeSuggestionsOnEscape(mountedEditor));
     if (props.focusOnLoad) mountedEditor.focus();
     setMounted({ editor: mountedEditor, monaco });
   };
@@ -162,12 +189,17 @@ export function BraidConditionField(props: BraidConditionFieldProps) {
       </Field.Label>
       <Box
         width="full"
-        height={`${height}px`}
-        borderWidth="1px"
+        height={`${height + 2 * BORDER_PX}px`}
+        borderWidth={`${BORDER_PX}px`}
         borderColor={refusal ? "border.error" : "border"}
         borderRadius="l2"
         overflow="hidden"
         _focusWithin={{ outline: "2px solid", outlineColor: "colorPalette.focusRing" }}
+        css={{
+          "& .monaco-editor, & .monaco-editor *": NO_LIGATURES,
+          // Monaco hangs the list from the caret's line; clear the padding and border below it.
+          "& .suggest-widget": { marginTop: `${PADDING_PX + BORDER_PX + 2}px` },
+        }}
       >
         <Suspense
           fallback={
@@ -191,13 +223,13 @@ export function BraidConditionField(props: BraidConditionFieldProps) {
               defineBraidConditionTheme({ monaco, name: braidConditionThemeName(dark), dark });
             }}
             onMount={handleMount}
-            options={EDITOR_OPTIONS}
+            options={editorOptions(contentHeight > MAX_HEIGHT)}
             wrapperProps={{ "data-testid": "braid-condition" }}
           />
         </Suspense>
       </Box>
       <CheckLine
-        check={props.check}
+        check={check}
         empty={props.value.trim().length === 0}
         touched={touched}
         ownerName={props.ownerName}

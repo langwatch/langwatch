@@ -291,7 +291,11 @@ describe("the braid dialog", () => {
 
       await writeCondition(user, `${CONDITION} or attributes["team"] == "a"`);
 
-      expect(screen.getByTestId("braid-condition-check")).toHaveAttribute("role", "alert");
+      // Marked once typing pauses, never mid-word.
+      expect(screen.queryByTestId("braid-condition-check")).toBeNull();
+      expect(
+        await screen.findByTestId("braid-condition-check", {}, { timeout: 2000 }),
+      ).toHaveAttribute("role", "alert");
       const orAt = CONDITION.length + 1;
       expect(monacoRecorded.markers).toEqual([
         expect.objectContaining({
@@ -347,6 +351,25 @@ describe("the braid dialog", () => {
         ["orchestrator", "1,200 spans"],
         ["team", "3 spans"],
       ]);
+    });
+  });
+
+  describe("when ana presses Escape in the condition", () => {
+    it("closes only the suggestion list while it is open, and the dialog after", async () => {
+      const { host, user } = openDialog();
+      await writeCondition(user, "attributes[");
+      const list = document.createElement("div");
+      list.className = "suggest-widget visible";
+      monacoRecorded.domNode!.append(list);
+      monacoRecorded.triggered = [];
+
+      await user.keyboard("{Escape}");
+      expect(monacoRecorded.triggered).toEqual(["hideSuggestWidget"]);
+      expect(host.queries).toEqual([]);
+
+      list.classList.remove("visible");
+      await user.keyboard("{Escape}");
+      expect(host.queries).toEqual([expect.objectContaining({ braid: undefined })]);
     });
   });
 

@@ -14,7 +14,11 @@ export const monacoRecorded: {
   model?: unknown;
   markers: Marker[];
   themes: string[];
-} = { markers: [], themes: [] };
+  /** The last mounted editor's root, where Monaco hangs its suggestion list. */
+  domNode?: HTMLElement;
+  /** Editor actions run by id, such as `hideSuggestWidget`. */
+  triggered: string[];
+} = { markers: [], themes: [], triggered: [] };
 
 function fakeMonaco() {
   return {
@@ -62,6 +66,7 @@ function FakeMonacoEditor(props: FakeEditorProps) {
       getPositionAt: (offset: number) => ({ lineNumber: 1, column: offset + 1 }),
     };
     monacoRecorded.model = model;
+    monacoRecorded.domNode = element.parentElement ?? undefined;
     props.beforeMount(monaco);
     props.onMount(
       {
@@ -75,18 +80,23 @@ function FakeMonacoEditor(props: FakeEditorProps) {
         getContentHeight: () => 32,
         onDidContentSizeChange: vi.fn(),
         onDidBlurEditorText: (listener: () => void) => element.addEventListener("blur", listener),
+        onDidDispose: vi.fn(),
+        getDomNode: () => element.parentElement,
+        trigger: (_source: string, handlerId: string) => monacoRecorded.triggered.push(handlerId),
       },
       monaco,
     );
   };
   return (
-    <textarea
-      ref={attach}
-      {...props.wrapperProps}
-      aria-label={props.options.ariaLabel}
-      defaultValue={props.defaultValue}
-      onChange={(event) => props.onChange(event.target.value)}
-    />
+    <div>
+      <textarea
+        ref={attach}
+        {...props.wrapperProps}
+        aria-label={props.options.ariaLabel}
+        defaultValue={props.defaultValue}
+        onChange={(event) => props.onChange(event.target.value)}
+      />
+    </div>
   );
 }
 
