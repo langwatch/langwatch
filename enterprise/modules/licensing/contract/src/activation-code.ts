@@ -5,7 +5,7 @@ import type { Named } from "@langwatch/module";
  * section 5), as it leaves the feature. The code itself never crosses: a row holds its hash and hint.
  * @see specs/self-hosting/connected-services/activation-codes.feature
  */
-import { statedLiteSeatsSchema } from "@langwatch/plans";
+import { statedDeveloperSeatsSchema, statedLiteSeatsSchema } from "@langwatch/plans";
 import { z } from "zod";
 
 export const activationCodeStatusSchema = z.enum(["active", "redeemed", "expired", "revoked"]);
@@ -23,6 +23,8 @@ const activationCodeViewSchemaDefinition = z.object({
   maxMembers: z.number(),
   maxMembersLite: z.number().nullable(),
   liteSeatsUnlimited: z.boolean(),
+  /** Null when the licence states none, which sells none. */
+  maxMembersDeveloper: z.number().nullable(),
   /** How long the license this code mints runs for. */
   licenseTermDays: z.number(),
   services: z.array(z.string()),
@@ -75,6 +77,7 @@ const issueActivationCodeInputSchemaDefinition = z.object({
   planType: z.string().min(1),
   maxMembers: z.number().int().min(1),
   maxMembersLite: statedLiteSeatsSchema.optional(),
+  maxMembersDeveloper: statedDeveloperSeatsSchema.optional(),
   licenseTermDays: z.number().int().min(1),
   services: z.array(z.string()).optional(),
   /** ISO 8601. The instant the code stops working. */

@@ -1,8 +1,11 @@
 import type { Named } from "@langwatch/module";
 /** The license registry (ADR-156). `licensing` is an enterprise module, so
  * every shape here is declared locally rather than imported from it. */
-import { statedLiteSeatsSchema } from "@langwatch/plans";
+import { statedDeveloperSeatsSchema, statedLiteSeatsSchema } from "@langwatch/plans";
 import { z } from "zod";
+
+/** The Developer seats an operator may state; the console checks a typed count against it. */
+export const developerSeatsInputSchema = statedDeveloperSeatsSchema;
 
 const issuedLicenseSourceSchema = z.enum(["BACKOFFICE", "PURCHASE", "SCRIPT", "LEGACY_IMPORT"]);
 
@@ -22,6 +25,8 @@ const issuedLicenseViewSchemaDefinition = z.object({
   maxMembers: z.number(),
   maxMembersLite: z.number().nullable(),
   liteSeatsUnlimited: z.boolean(),
+  /** Null when the licence states none, which sells none. */
+  maxMembersDeveloper: z.number().nullable(),
   issuedAt: z.string(),
   expiresAt: z.string(),
   source: issuedLicenseSourceSchema,
@@ -112,6 +117,7 @@ const issueLicenseInputSchemaDefinition = z.object({
   planType: z.string().min(1),
   maxMembers: z.number().int().min(1),
   maxMembersLite: statedLiteSeatsSchema.optional(),
+  maxMembersDeveloper: developerSeatsInputSchema.optional(),
   maxMessagesPerMonth: z.number().int().positive().optional(),
   /** ISO 8601. The instant the term ends. */
   expiresAt: z.string().min(1),
@@ -144,6 +150,7 @@ const reissueLicenseInputSchemaDefinition = z.object({
   id: z.string().min(1),
   maxMembers: z.number().int().min(1).optional(),
   maxMembersLite: statedLiteSeatsSchema.optional(),
+  maxMembersDeveloper: developerSeatsInputSchema.optional(),
   maxMessagesPerMonth: z.number().int().positive().optional(),
   /** ISO 8601. The instant the new term ends. */
   expiresAt: z.string().min(1),

@@ -456,6 +456,7 @@ export interface LwqlPrismaRows {
     readonly maxMembers: "Int";
     readonly maxMembersLite: "Int?";
     readonly liteSeatsUnlimited: "Boolean";
+    readonly maxMembersDeveloper: "Int?";
     readonly issuedAt: "DateTime";
     readonly expiresAt: "DateTime";
     readonly source: "IssuedLicenseSource";
@@ -501,6 +502,7 @@ export interface LwqlPrismaRows {
     readonly maxMembers: "Int";
     readonly maxMembersLite: "Int?";
     readonly liteSeatsUnlimited: "Boolean";
+    readonly maxMembersDeveloper: "Int?";
     readonly licenseTermDays: "Int";
     readonly services: "String[]";
     readonly expiresAt: "DateTime";

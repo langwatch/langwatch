@@ -1,7 +1,7 @@
 import type { Named } from "@langwatch/module";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** What an operator sends the license registry (ADR-156), as main's back office accepted it. */
-import { statedLiteSeatsSchema } from "@langwatch/plans";
+import { statedDeveloperSeatsSchema, statedLiteSeatsSchema } from "@langwatch/plans";
 import { z } from "zod";
 
 import { licenseCustomerSchema, licenseTermsInputSchema } from "./issued-license.ts";
@@ -38,6 +38,7 @@ const issueLicenseInputSchemaDefinition = z.object({
   planType: z.string().min(1),
   maxMembers: z.number().int().min(1),
   maxMembersLite: statedLiteSeatsSchema.optional(),
+  maxMembersDeveloper: statedDeveloperSeatsSchema.optional(),
   maxMessagesPerMonth: z.number().int().positive().optional(),
   /** ISO 8601. The instant the term ends. */
   expiresAt: z.string().min(1),
@@ -71,6 +72,7 @@ const reissueLicenseInputSchemaDefinition = z.object({
   id: z.string().min(1),
   maxMembers: z.number().int().min(1).optional(),
   maxMembersLite: statedLiteSeatsSchema.optional(),
+  maxMembersDeveloper: statedDeveloperSeatsSchema.optional(),
   maxMessagesPerMonth: z.number().int().positive().optional(),
   /** ISO 8601. The instant the new term ends. */
   expiresAt: z.string().min(1),
