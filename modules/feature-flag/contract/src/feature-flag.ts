@@ -156,7 +156,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Sends an organization's strict PII analysis to the PII redaction model instead of Presidio. Off by default; enable per organization through an operator rule. Only takes effect where the deployment names the model (PII_REDACTION_MODEL_ENDPOINT, a Lambda ARN or an HTTP address). Any failure of the model falls back to Presidio, then Google DLP, exactly as an organization with the flag off.",
+      "Sends an organization's strict PII analysis to the PII redaction model instead of Presidio. Off by default; enable per organization through an operator rule. Only takes effect where the deployment names the model (PII_REDACTION_MODEL_ENDPOINT, a Lambda ARN or an HTTP address). Any failure of the model falls back to Presidio, then Google DLP, exactly as an organization with the flag off. It also shows the organization the Essential or Strict picker on the Data Privacy page, with Strict's price and example; off, the page is unchanged.",
   },
   {
     key: "release_pii_redaction_model_free",
