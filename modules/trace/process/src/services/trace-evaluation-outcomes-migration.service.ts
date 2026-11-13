@@ -12,6 +12,8 @@ import type { TraceProcessingCommandsService } from "./trace-processing-commands
 
 const PROJECT_PAGE_SIZE = 500;
 const OUTCOME_PAGE_SIZE = 500;
+/** How many skipped project ids a report keeps; `skippedProjects` keeps the exact count. */
+export const SKIPPED_PROJECT_IDS_REPORTED = 100;
 
 /** How far back the backfill reaches: the stock widgets' longest period (60 days), plus two. */
 export const EVALUATION_OUTCOMES_BACKFILL_HOURS = 62 * 24;
@@ -29,8 +31,13 @@ export const evaluationOutcomesBackfillReportSchema = z.object({
   outcomes: z.number(),
   /** Outcomes whose trace is not stored (aged out, or never ingested), left unrecorded. */
   skippedWithoutTrace: z.number(),
-  /** Projects archived or deleted since their evaluations, skipped whole. */
+  /**
+   * Projects found archived or deleted, before or partway through their outcomes. Each project
+   * counts here or in `projects`, never both; outcomes it sent before still count in `outcomes`.
+   */
   skippedProjects: z.number().default(0),
+  /** The first skipped projects, so one archived for a while can be found and re-run later. */
+  skippedProjectIds: z.array(z.string()).default([]),
 });
 export type EvaluationOutcomesBackfillReport = z.infer<
   typeof evaluationOutcomesBackfillReportSchema
@@ -94,7 +101,7 @@ export class TraceEvaluationOutcomesMigrationService {
     return report;
   }
 
-  /** Records one project, or skips it whole when it is gone; `stop` says the run was aborted. */
+  /** Records one project, or skips it when it is gone; `stop` says the run was aborted. */
   private async recordOrSkipProject({
     projectId,
     report,
@@ -108,34 +115,45 @@ export class TraceEvaluationOutcomesMigrationService {
     signal: AbortSignal;
     onPage: (report: EvaluationOutcomesBackfillReport) => Promise<void>;
   }): Promise<{ report: EvaluationOutcomesBackfillReport; stop: boolean }> {
-    let latest = report;
-    let recorded: EvaluationOutcomesBackfillReport;
-    try {
-      recorded = await this.recordProject({
-        projectId,
-        report,
-        dryRun,
-        signal,
-        onPage: async (saved) => {
-          latest = saved;
-          await onPage(saved);
-        },
-      });
-    } catch (error) {
-      // Pages of this project already sent keep their counts: carry on from the last saved one.
-      if (!isProjectGone(error)) throw error;
-      this.deps.logger.warn(
-        { projectId },
-        "the evaluation outcomes step skipped a project that is archived or gone",
-      );
-      const skipped = { ...latest, skippedProjects: latest.skippedProjects + 1 };
+    const recorded = await this.recordProject({ projectId, report, dryRun, signal, onPage });
+    if (recorded.gone) {
+      const skipped = this.skipProject({ projectId, report: recorded.report });
       // A skip is saved even when aborted, or the resume would revisit the gone project uncounted.
       const advanced = await this.advancePast({ projectId, report: skipped, dryRun, onPage });
       return { report: advanced, stop: signal.aborted };
     }
-    if (signal.aborted) return { report: recorded, stop: true };
-    const advanced = await this.advancePast({ projectId, report: recorded, dryRun, onPage });
+    if (signal.aborted) return { report: recorded.report, stop: true };
+    const advanced = await this.advancePast({
+      projectId,
+      report: recorded.report,
+      dryRun,
+      onPage,
+    });
     return { report: advanced, stop: false };
+  }
+
+  /** Moves a gone project from `projects` (if a page of it was sent) to the skipped ones. */
+  private skipProject({
+    projectId,
+    report,
+  }: {
+    projectId: string;
+    report: EvaluationOutcomesBackfillReport;
+  }): EvaluationOutcomesBackfillReport {
+    this.deps.logger.warn(
+      { projectId },
+      "the evaluation outcomes step skipped a project that is archived or gone",
+    );
+    const counted = report.inProject?.projectId === projectId;
+    return {
+      ...report,
+      projects: counted ? report.projects - 1 : report.projects,
+      skippedProjects: report.skippedProjects + 1,
+      skippedProjectIds: [...report.skippedProjectIds, projectId].slice(
+        0,
+        SKIPPED_PROJECT_IDS_REPORTED,
+      ),
+    };
   }
 
   /** Marks the project done in the report and saves it, unless this is a dry run. */
@@ -164,10 +182,14 @@ export class TraceEvaluationOutcomesMigrationService {
       outcomes: 0,
       skippedWithoutTrace: 0,
       skippedProjects: 0,
+      skippedProjectIds: [],
     };
   }
 
-  /** Sends one project's outcomes page by page, saving after each page it sends. */
+  /**
+   * Sends one project's outcomes page by page, saving after each page it sends. `gone` says the
+   * project was found archived or deleted; the report then holds the pages sent before that.
+   */
   private async recordProject({
     projectId,
     report,
@@ -180,35 +202,55 @@ export class TraceEvaluationOutcomesMigrationService {
     dryRun: boolean;
     signal: AbortSignal;
     onPage: (report: EvaluationOutcomesBackfillReport) => Promise<void>;
-  }): Promise<EvaluationOutcomesBackfillReport> {
+  }): Promise<{ report: EvaluationOutcomesBackfillReport; gone: boolean }> {
     let next = report;
-    let cursor = report.inProject?.projectId === projectId ? report.inProject.after : null;
-    let sentAny = cursor !== null;
-    while (!signal.aborted) {
-      const page = await this.deps.evaluations.listEvaluationOutcomes({
-        tenantId: projectId,
-        sinceMs: report.sinceMs,
-        after: cursor,
-        limit: OUTCOME_PAGE_SIZE,
-      });
-      const last = page.outcomes.at(-1);
-      if (last === undefined) break;
-      const commands = await this.commandsFor({ projectId, outcomes: page.outcomes });
-      if (!dryRun && commands.length > 0)
-        await this.deps.commands.recordEvaluationOutcomes(commands);
-      cursor = { occurredAt: last.occurredAt, evaluationId: last.evaluationId };
-      next = {
-        ...next,
-        projects: sentAny ? next.projects : next.projects + 1,
-        outcomes: next.outcomes + commands.length,
-        skippedWithoutTrace: next.skippedWithoutTrace + page.outcomes.length - commands.length,
-        inProject: { projectId, after: cursor },
-      };
-      sentAny = true;
-      if (!dryRun) await onPage(next);
-      if (page.next === null) break;
+    try {
+      while (!signal.aborted) {
+        const page = await this.recordPage({ projectId, report: next, dryRun });
+        if (page === null) break;
+        next = page.report;
+        if (!dryRun) await onPage(next);
+        if (!page.more) break;
+      }
+    } catch (error) {
+      if (!isProjectGone(error)) throw error;
+      return { report: next, gone: true };
     }
-    return next;
+    return { report: next, gone: false };
+  }
+
+  /** Sends the project's next page of outcomes and counts it; null when none are left. */
+  private async recordPage({
+    projectId,
+    report,
+    dryRun,
+  }: {
+    projectId: string;
+    report: EvaluationOutcomesBackfillReport;
+    dryRun: boolean;
+  }): Promise<{ report: EvaluationOutcomesBackfillReport; more: boolean } | null> {
+    const inThisProject = report.inProject?.projectId === projectId;
+    const page = await this.deps.evaluations.listEvaluationOutcomes({
+      tenantId: projectId,
+      sinceMs: report.sinceMs,
+      after: inThisProject ? (report.inProject?.after ?? null) : null,
+      limit: OUTCOME_PAGE_SIZE,
+    });
+    const last = page.outcomes.at(-1);
+    if (last === undefined) return null;
+    const commands = await this.commandsFor({ projectId, outcomes: page.outcomes });
+    if (!dryRun && commands.length > 0) await this.deps.commands.recordEvaluationOutcomes(commands);
+    const after = { occurredAt: last.occurredAt, evaluationId: last.evaluationId };
+    return {
+      report: {
+        ...report,
+        projects: inThisProject ? report.projects : report.projects + 1,
+        outcomes: report.outcomes + commands.length,
+        skippedWithoutTrace: report.skippedWithoutTrace + page.outcomes.length - commands.length,
+        inProject: { projectId, after },
+      },
+      more: page.next !== null,
+    };
   }
 
   /** The page's outcomes whose trace is stored, each stamped with that trace's OccurredAt. */

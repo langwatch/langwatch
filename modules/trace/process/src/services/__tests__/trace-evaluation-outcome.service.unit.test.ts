@@ -1,5 +1,6 @@
 /** Spec: specs/trace/trace-evaluation-analytics.feature */
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
+import { ProjectNotFoundError } from "@langwatch/project-contract";
 import {
   EVALUATION_OUTCOME_TEXT_MAX_LENGTH,
   type RecordEvaluationOutcomeCommandData,
@@ -339,9 +340,7 @@ describe("TraceEvaluationOutcomesMigrationService", () => {
       }),
     };
 
-    const projectGone = Object.assign(new Error("Project p-archived no longer exists"), {
-      name: "ProjectNotFoundError",
-    });
+    const projectGone = new ProjectNotFoundError("Project p-archived no longer exists");
 
     async function backfillWith({
       failure,
@@ -404,11 +403,17 @@ describe("TraceEvaluationOutcomesMigrationService", () => {
       const report = await run();
 
       expect(sent.map(({ evaluationId }) => evaluationId)).toEqual(["evaluation-a"]);
-      expect(report).toMatchObject({ projects: 1, outcomes: 1, skippedProjects: 1 });
+      expect(report).toMatchObject({
+        projects: 1,
+        outcomes: 1,
+        skippedProjects: 1,
+        skippedProjectIds: [archivedId],
+      });
       expect(saved[0]).toMatchObject({
         afterProjectId: archivedId,
         inProject: null,
         skippedProjects: 1,
+        skippedProjectIds: [archivedId],
       });
       expect(report.afterProjectId).toBe(TENANT);
       expect(warned).toEqual([{ projectId: archivedId }]);
@@ -443,14 +448,16 @@ describe("TraceEvaluationOutcomesMigrationService", () => {
           outcomes: 1,
           skippedWithoutTrace: 0,
           skippedProjects: 0,
+          skippedProjectIds: [],
         },
       });
 
       const report = await run();
 
       expect(sent.map(({ evaluationId }) => evaluationId)).toEqual(["evaluation-a"]);
+      // The archived project moves from `projects` to `skippedProjects`: counted once.
       expect(report).toMatchObject({
-        projects: 2,
+        projects: 1,
         outcomes: 2,
         skippedProjects: 1,
         inProject: null,
@@ -458,8 +465,8 @@ describe("TraceEvaluationOutcomesMigrationService", () => {
       });
     });
 
-    /** @scenario "The backfill skips a project archived since its evaluations" */
-    it("keeps the counts of pages sent before the project was archived", async () => {
+    /** The archived project sends one page of outcomes, then is found gone. */
+    async function backfillArchivedAfterOnePage({ dryRun }: { dryRun: boolean }) {
       const outcome = (index: number) => ({
         evaluationId: `evaluation-${index}`,
         traceId: TRACE_ID,
@@ -495,14 +502,39 @@ describe("TraceEvaluationOutcomesMigrationService", () => {
       const saved: EvaluationOutcomesBackfillReport[] = [];
       const report = await backfill.recordEvaluationOutcomes({
         resumeFrom: null,
-        dryRun: false,
+        dryRun,
         signal: new AbortController().signal,
         onPage: async (checkpoint) => void saved.push(checkpoint),
       });
+      return { report, sent, saved };
+    }
+
+    /** @scenario "The backfill skips a project archived since its evaluations" */
+    it("keeps the counts of pages sent before the project was archived", async () => {
+      const { report, sent, saved } = await backfillArchivedAfterOnePage({ dryRun: false });
 
       expect(sent.map(({ evaluationId }) => evaluationId)).toEqual(["evaluation-1"]);
-      expect(report).toMatchObject({ projects: 1, outcomes: 1, skippedProjects: 1 });
+      expect(report).toMatchObject({
+        projects: 0,
+        outcomes: 1,
+        skippedProjects: 1,
+        skippedProjectIds: [archivedId],
+      });
       expect(saved.at(-1)).toMatchObject({ outcomes: 1, skippedProjects: 1, inProject: null });
+    });
+
+    /** @scenario "The backfill skips a project archived since its evaluations" */
+    it("reports the pages a dry run counted before the project was archived", async () => {
+      const { report, sent, saved } = await backfillArchivedAfterOnePage({ dryRun: true });
+
+      expect(sent).toEqual([]);
+      expect(saved).toEqual([]);
+      expect(report).toMatchObject({
+        projects: 0,
+        outcomes: 1,
+        skippedProjects: 1,
+        skippedProjectIds: [archivedId],
+      });
     });
 
     /** @scenario "The backfill still fails on any other error" */
@@ -527,6 +559,7 @@ describe("TraceEvaluationOutcomesMigrationService", () => {
       });
 
       expect(report.skippedProjects).toBe(0);
+      expect(report.skippedProjectIds).toEqual([]);
     });
   });
 });

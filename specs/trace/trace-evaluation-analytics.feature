@@ -138,7 +138,7 @@ Feature: Each evaluation's outcome is kept beside its trace's columns
   Scenario: The backfill skips a project archived since its evaluations
     Given a project archived since its evaluations, and a live project with a recent outcome
     When the record step runs
-    Then the archived project is skipped and counted, and the live project's outcome is still sent
+    Then the archived project is skipped, counted once with its id kept, and the live project's outcome is still sent
 
   @unit
   Scenario: The backfill still fails on any other error
