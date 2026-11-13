@@ -7,9 +7,6 @@ import { HandledError, remediation } from "@langwatch/handled-error";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-/** The default life of a docs session key; the browser session or the ceiling may end it sooner. */
-export const DOCS_SESSION_KEY_LIFETIME_MS = 5 * 60 * 1000;
-
 /** The lives a member may choose on the consent page, in minutes; nothing longer is minted. */
 export const DOCS_SESSION_KEY_LIFETIME_MINUTES = [5, 15, 30, 60] as const;
 export const DOCS_SESSION_KEY_MAX_LIFETIME_MS = 60 * 60 * 1000;

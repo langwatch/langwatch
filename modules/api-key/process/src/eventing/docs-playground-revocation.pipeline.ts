@@ -14,6 +14,7 @@ import {
   ORGANIZATION_DOCS_PLAYGROUND_SESSIONS_DISABLED_EVENT_TYPE,
   organizationDocsPlaygroundSessionsDisabledEventDataSchema,
 } from "@langwatch/organization-contract";
+import { Temporal } from "@langwatch/time";
 
 import type { ApiKeyModule } from "../app/api-key.app.ts";
 import type { ApiKeyRepositories } from "../repositories/api-key.repositories.ts";
@@ -39,7 +40,7 @@ export function buildDocsPlaygroundRevocationPipeline({
       aggregate: defineAggregate({ type: "global" }),
     })
       .withEvents([])
-      // The revoke re-reads the live keys, so a redelivery finds none left to revoke.
+      // The revoke re-reads the live keys minted by `occurredAt`, so a redelivery finds none.
       .withPeerSubscriber("apiKeyDocsPlaygroundSessionsDisabled", {
         eventType: ORGANIZATION_DOCS_PLAYGROUND_SESSIONS_DISABLED_EVENT_TYPE,
         data: organizationDocsPlaygroundSessionsDisabledEventDataSchema,
@@ -50,8 +51,11 @@ export function buildDocsPlaygroundRevocationPipeline({
             ttlMs: 60_000,
           },
         },
-        handle: async ({ organizationId }) => {
-          await docsSessionKeys.revokeForOrganization({ organizationId });
+        handle: async ({ organizationId, occurredAt }) => {
+          await docsSessionKeys.revokeForOrganization({
+            organizationId,
+            disabledAt: Temporal.Instant.fromEpochMilliseconds(occurredAt),
+          });
         },
       })
       .build()

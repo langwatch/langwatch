@@ -1,11 +1,10 @@
-import {
-  DOCS_SESSION_KEY_LIFETIME_MS,
-  DOCS_SESSION_KEY_MAX_LIFETIME_MS,
-} from "@langwatch/api-key-contract";
+import { DOCS_SESSION_KEY_MAX_LIFETIME_MS } from "@langwatch/api-key-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { docsSessionKeyExpiresAt, docsSessionKeyPermissions } from "../docs-session-key.rules.ts";
+
+const FIVE_MINUTES_MS = 5 * 60 * 1000;
 
 const NOW = Temporal.Instant.from("2026-10-26T12:00:00.000Z").epochMilliseconds;
 const iso = (ms: number) => Temporal.Instant.fromEpochMilliseconds(ms).toString();
@@ -21,7 +20,7 @@ describe("docsSessionKeyExpiresAt", () => {
       maxSessionDurationDays: 0,
     });
 
-    expect(expires.epochMilliseconds).toBe(NOW + DOCS_SESSION_KEY_LIFETIME_MS);
+    expect(expires.epochMilliseconds).toBe(NOW + FIVE_MINUTES_MS);
   });
 
   it("ends with the browser session", () => {

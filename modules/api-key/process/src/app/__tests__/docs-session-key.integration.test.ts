@@ -7,7 +7,6 @@ import {
   ApiKeyNotFoundError,
   DOCS_SESSION_API_KEY_NAME,
   DocsOriginNotRegisteredError,
-  DOCS_SESSION_KEY_LIFETIME_MS,
   type DocsSessionKeyAccess,
   type DocsSessionKeyLifetimeMinutes,
 } from "@langwatch/api-key-contract";
@@ -28,6 +27,7 @@ import type { ProjectApi, ProjectWithTeam } from "@langwatch/project-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { MemorySharedCredentialStore } from "@langwatch/secrets/shared-credential";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { nowInstant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryApiKeyAnswerCacheRepository } from "../../repositories/memory/memory.api-key-answer-cache.repository.ts";
@@ -36,6 +36,8 @@ import { MemoryApiKeyRepository } from "../../repositories/memory/memory.api-key
 import { MemorySigningKeyUsageRepository } from "../../repositories/memory/memory.signing-key-usage.repository.ts";
 import { MemorySigningKeyRepository } from "../../repositories/memory/memory.signing-key.repository.ts";
 import { ApiKeyModule } from "../api-key.app.ts";
+
+const FIVE_MINUTES_MS = 5 * 60 * 1000;
 
 const ORG_ID = "organization-1";
 const PROJECT_ID = "project-1";
@@ -216,9 +218,9 @@ describe("given a member signed in with access to two projects", () => {
 
     expect(minted.project).toEqual({ id: PROJECT_ID, name: "Checkout" });
     const lifetime = Date.parse(minted.expiresAt) - before;
-    expect(lifetime).toBeLessThanOrEqual(DOCS_SESSION_KEY_LIFETIME_MS + 1_000);
-    expect(lifetime).toBeGreaterThan(DOCS_SESSION_KEY_LIFETIME_MS - 5_000);
-    expect(minted.expiresIn).toBe(Math.floor(DOCS_SESSION_KEY_LIFETIME_MS / 1000));
+    expect(lifetime).toBeLessThanOrEqual(FIVE_MINUTES_MS + 1_000);
+    expect(lifetime).toBeGreaterThan(FIVE_MINUTES_MS - 5_000);
+    expect(minted.expiresIn).toBe(Math.floor(FIVE_MINUTES_MS / 1000));
 
     const verified = await app.findVerifiedToken({ token: minted.token });
     expect(verified).not.toBeNull();
@@ -491,17 +493,18 @@ describe("given an organisation that turned docs playground sessions off", () =>
 function sessionsDisabled({
   id = "event-1",
   organizationId = ORG_ID,
-}: { id?: string; organizationId?: string } = {}): Event {
+  occurredAt = nowInstant().epochMilliseconds,
+}: { id?: string; organizationId?: string; occurredAt?: number } = {}): Event {
   return {
     id,
     aggregateId: organizationId,
     aggregateType: "organization",
     tenantId: createTenantId(organizationId),
-    createdAt: 1_500,
-    occurredAt: 1_500,
+    createdAt: occurredAt,
+    occurredAt,
     type: ORGANIZATION_DOCS_PLAYGROUND_SESSIONS_DISABLED_EVENT_TYPE,
     version: ORGANIZATION_DOCS_PLAYGROUND_SESSIONS_DISABLED_EVENT_VERSION,
-    data: { tenantId: organizationId, organizationId, occurredAt: 1_500, changedByUserId: USER_ID },
+    data: { tenantId: organizationId, organizationId, occurredAt, changedByUserId: USER_ID },
   };
 }
 
@@ -586,16 +589,17 @@ describe("given live docs session keys and a run key minted under one", () => {
       const { app } = await withKeys();
       const lane = revocationLane(app);
       const context = { tenantId: ORG_ID, aggregateId: ORG_ID };
+      const occurredAt = nowInstant().epochMilliseconds;
 
-      await lane.handle(sessionsDisabled(), context);
+      await lane.handle(sessionsDisabled({ occurredAt }), context);
       await expect(
-        lane.handle(sessionsDisabled({ id: "redelivered" }), context),
+        lane.handle(sessionsDisabled({ id: "redelivered", occurredAt }), context),
       ).resolves.not.toThrow();
 
       const strategy = lane.options?.deduplication;
       if (strategy === undefined || strategy === "aggregate") throw new Error("no own dedup id");
-      expect(strategy.makeId(sessionsDisabled())).toBe(
-        strategy.makeId(sessionsDisabled({ id: "redelivered" })),
+      expect(strategy.makeId(sessionsDisabled({ occurredAt }))).toBe(
+        strategy.makeId(sessionsDisabled({ id: "redelivered", occurredAt })),
       );
     });
   });
@@ -616,6 +620,24 @@ describe("given live docs session keys and a run key minted under one", () => {
       expect(await app.findResolvedToken({ token: first.token, projectId: PROJECT_ID })).toBeNull();
       expect(await app.findVerifiedToken({ token: child.token })).toBeNull();
       const fresh = await app.mintDocsSessionKey(minting({ sessionId: "session-3" }));
+      expect(await app.findVerifiedToken({ token: fresh.token })).not.toBeNull();
+    });
+
+    /** @scenario "A late revocation leaves keys minted after the switch came back on" */
+    it("revokes only the keys minted by the time it was turned off, however late it lands", async () => {
+      const { app, organization, first, child } = await withKeys();
+      const disabledAt = nowInstant().epochMilliseconds;
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      organization.docsPlaygroundSessionsEnabled = true;
+      const fresh = await app.mintDocsSessionKey(minting({ sessionId: "session-3" }));
+
+      await revocationLane(app).handle(sessionsDisabled({ occurredAt: disabledAt }), {
+        tenantId: ORG_ID,
+        aggregateId: ORG_ID,
+      });
+
+      expect(await app.findVerifiedToken({ token: first.token })).toBeNull();
+      expect(await app.findVerifiedToken({ token: child.token })).toBeNull();
       expect(await app.findVerifiedToken({ token: fresh.token })).not.toBeNull();
     });
   });

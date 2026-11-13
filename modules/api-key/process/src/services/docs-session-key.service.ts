@@ -176,13 +176,21 @@ export class DocsSessionKeyService {
   }
 
   /**
-   * The organisation turned the playground session off: every live docs session key goes, with
-   * the keys minted under one, so turning it on again revives none (ADR-185). Idempotent.
+   * The organisation turned the playground session off at `disabledAt`: every docs session key
+   * minted by then goes, with the keys minted under one, so turning it on again revives none; a
+   * key minted after a later switch back on stays (ADR-185). Idempotent.
    */
-  async revokeForOrganization({ organizationId }: { organizationId: string }): Promise<number> {
+  async revokeForOrganization({
+    organizationId,
+    disabledAt,
+  }: {
+    organizationId: string;
+    disabledAt: Instant;
+  }): Promise<number> {
     const keys = await this.options.repository.findLiveSystemManagedByName({
       organizationId,
       name: DOCS_SESSION_API_KEY_NAME,
+      createdAtOrBefore: disabledAt,
     });
     for (const key of keys) {
       await this.options.lifecycle.revokeSystemManaged({

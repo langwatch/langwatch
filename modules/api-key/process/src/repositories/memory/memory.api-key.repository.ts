@@ -189,13 +189,16 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
   async findLiveSystemManagedByName(input: {
     organizationId: string;
     name: string;
+    createdAtOrBefore: Instant;
   }): Promise<{ id: string }[]> {
+    const createdAtOrBefore = input.createdAtOrBefore.epochMilliseconds;
     return this.#list(
       (key) =>
         key.organizationId === input.organizationId &&
         key.name === input.name &&
         key.isSystemManaged === true &&
-        key.revokedAt === null,
+        key.revokedAt === null &&
+        key.createdAt.getTime() <= createdAtOrBefore,
     ).map(({ id }) => ({ id }));
   }
 

@@ -9,6 +9,7 @@ import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { AuthorizeHostProvider } from "../../../model/authorize-host.ts";
 import { FakeAuthorizeHost, renderWithAuthorizeHost } from "../../../testing.tsx";
 import DocsConnect from "../docs-connect-screen.tsx";
 
@@ -179,7 +180,7 @@ describe("given an organisation that turned docs playground sessions off", () =>
     renderWithAuthorizeHost(<DocsConnect />, host);
 
     expect(screen.getByText("Your organisation turned this off")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Allow" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Allow" })).toBeDisabled();
 
     await press("Close");
     expect(host.docsMints).toEqual([]);
@@ -202,6 +203,30 @@ describe("given an organisation that turned docs playground sessions off", () =>
     expect(
       docsSessionMessageSchema.validate({ ...(posted?.message as object), token: "sk-lw-x" }),
     ).toBe(false);
+  });
+
+  /** @scenario "A member of two organisations switches to a project whose organisation allows it" */
+  it("keeps the project switcher and lets them Allow once they pick an allowed project", async () => {
+    const switcher = <button type="button">Switch project</button>;
+    const off = hostWith({ docsSessionAvailability: "disabled", projectSwitcher: switcher });
+    const { rerender } = renderWithAuthorizeHost(<DocsConnect />, off);
+
+    expect(screen.getByText("Your organisation turned this off")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Switch project" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Allow" })).toBeDisabled();
+
+    /* The host re-reads the switch for the project the picker now holds. */
+    const on = hostWith({ projectId: "proj-2", projectSwitcher: switcher });
+    rerender(
+      <AuthorizeHostProvider value={on}>
+        <DocsConnect />
+      </AuthorizeHostProvider>,
+    );
+
+    expect(screen.queryByText("Your organisation turned this off")).toBeNull();
+    await press("Allow");
+    expect(on.docsMints).toMatchObject([{ projectId: "proj-2", docsOrigin: DOCS }]);
+    expect(off.docsMints).toEqual([]);
   });
 
   it("holds Allow until the switch has been read", () => {

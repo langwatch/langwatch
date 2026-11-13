@@ -120,6 +120,24 @@ Feature: Read and navigate the generated documentation
     And Send request sends that value as the body
     And a required field left empty, or a JSON sub-field that does not parse, prevents sending and is marked on its field
 
+  @unit
+  Scenario: Switch to JSON with a required field empty inside a nested object
+    Given the reader filled part of a nested object in the body form and left its required field empty
+    When they choose JSON
+    Then the editor shows the form's value and the empty field is left for them to fill in JSON
+
+  @unit
+  Scenario: A broken JSON sub-field inside an empty optional object still blocks sending
+    Given an optional object whose only filled field is a JSON sub-field that does not parse
+    When the reader sends or chooses JSON
+    Then the sub-field is marked as invalid JSON and nothing is sent
+
+  @unit
+  Scenario: A date with milliseconds stays in JSON
+    Given the reader's JSON holds a timestamp with milliseconds in a date field
+    When they choose Form
+    Then they stay in JSON with the reason to edit that field as JSON, and the value is unchanged
+
   @integration
   Scenario: Keep what the reader typed while the typed fields load
     Given the reader opened Try it and the typed fields have not loaded yet

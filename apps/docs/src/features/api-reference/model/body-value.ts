@@ -37,13 +37,15 @@ function readField({
   field,
   entries,
   errors,
+  unfilled,
 }: {
   field: FormField;
   entries: FormEntries;
   errors: Record<string, string>;
+  unfilled: string[];
 }): Read {
   const raws = entries[field.key] ?? [];
-  if (field.kind === "group") return readGroup({ group: field, entries, errors });
+  if (field.kind === "group") return readGroup({ group: field, entries, errors, unfilled });
   if (field.kind === "list") return readList({ field, raws, errors });
   if (field.kind === "json") {
     const raw = raws[0] ?? "";
@@ -71,18 +73,19 @@ function readGroup({
 }): Read {
   const value: Record<string, unknown> = {};
   const missing: FormField[] = [];
-  const inner: Record<string, string> = {};
   for (const field of group.fields) {
-    const read = readField({ field, entries, errors: inner });
+    /* A broken value blocks even inside an optional group that is otherwise empty. */
+    const read = readField({ field, entries, errors, unfilled });
     if (read.present) value[field.name] = read.value;
     else if (field.required) missing.push(field);
   }
   const present = Object.keys(value).length > 0 || group.required || group.path.length === 0;
   if (!present) return { present: false };
-  Object.assign(errors, inner);
   for (const field of missing) {
-    unfilled.push(`body:${field.key}`);
-    errors[`body:${field.key}`] ??= `${field.name} is required.`;
+    const key = `body:${field.key}`;
+    if (errors[key] !== void 0) continue;
+    unfilled.push(key);
+    errors[key] = `${field.name} is required.`;
   }
   return { present: true, value };
 }
@@ -104,8 +107,10 @@ export function readBodyForm({
   const unfilled: string[] = [];
   const read = readGroup({ group: form, entries, errors, unfilled });
   const value = { ...(read.value as Record<string, unknown>), ...extra };
-  if (!form.required && Object.keys(value).length === 0)
-    return { body: "", errors: {}, unfilled: [] };
+  if (!form.required && Object.keys(value).length === 0) {
+    const broken = Object.entries(errors).filter(([key]) => !unfilled.includes(key));
+    return { body: "", errors: Object.fromEntries(broken), unfilled: [] };
+  }
   return { body: JSON.stringify(value, null, 2), errors, unfilled };
 }
 

@@ -7,7 +7,7 @@ import type { Parameter } from "./operation.ts";
  * playground island carries neither a Date nor a Temporal polyfill.
  */
 const PICKER = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?$/;
-const ISO = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?)(?:\.\d+)?(Z|[+-]\d{2}:\d{2})$/i;
+const ISO = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?)(?:\.(\d+))?(Z|[+-]\d{2}:\d{2})$/i;
 const DAY_MS = 86_400_000;
 
 /** Days since 1970-01-01 for a proleptic Gregorian date (Hinnant's days_from_civil). */
@@ -57,9 +57,9 @@ export function epochOfPicker({ raw }: { raw: string }): number | null {
   return days * DAY_MS + ((hour * 60 + minute) * 60 + second) * 1000;
 }
 
-/** The picker text, in UTC to the second, for milliseconds since the epoch. */
+/** The picker text, in UTC to the second, for milliseconds since the epoch; null below a second. */
 export function pickerOfEpoch({ ms }: { ms: number }): string | null {
-  if (!Number.isFinite(ms)) return null;
+  if (!Number.isFinite(ms) || ms % 1000 !== 0) return null;
   const days = Math.floor(ms / DAY_MS);
   const { year, month, day } = dateOf({ days });
   const seconds = Math.floor((ms - days * DAY_MS) / 1000);
@@ -67,13 +67,13 @@ export function pickerOfEpoch({ ms }: { ms: number }): string | null {
   return `${pad(year, 4)}-${pad(month)}-${pad(day)}T${time}`;
 }
 
-/** The picker text, in UTC, for an ISO 8601 timestamp with any offset. */
+/** The picker text, in UTC, for an ISO 8601 timestamp with any offset; null below a second. */
 export function pickerOfIso({ iso }: { iso: string }): string | null {
   const match = ISO.exec(iso);
-  if (!match?.[1] || !match[2]) return null;
+  if (!match?.[1] || !match[3] || /[1-9]/.test(match[2] ?? "")) return null;
   const local = epochOfPicker({ raw: match[1] });
   if (local === null) return null;
-  const offset = match[2].toUpperCase() === "Z" ? "+00:00" : match[2];
+  const offset = match[3].toUpperCase() === "Z" ? "+00:00" : match[3];
   const sign = offset.startsWith("-") ? -1 : 1;
   const minutes = Number(offset.slice(1, 3)) * 60 + Number(offset.slice(4, 6));
   return pickerOfEpoch({ ms: local - sign * minutes * 60_000 });

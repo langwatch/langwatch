@@ -320,6 +320,7 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
   async findLiveSystemManagedByName(input: {
     organizationId: string;
     name: string;
+    createdAtOrBefore: Instant;
   }): Promise<{ id: string }[]> {
     return this.database.apiKey.findMany({
       where: {
@@ -327,6 +328,7 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
         name: input.name,
         isSystemManaged: true,
         revokedAt: null,
+        createdAt: { lte: toDate(input.createdAtOrBefore) },
       },
       select: { id: true },
     });

@@ -108,7 +108,22 @@ Feature: Docs session keys for the documentation playground
     And a member can connect again with a new key
 
   @integration
+  Scenario: A late revocation leaves keys minted after the switch came back on
+    Given an organisation admin turned docs playground sessions off and then on again
+    And a member connected with a new key after it was turned on again
+    When api-key revokes for the earlier turn-off only now
+    Then the keys minted before the turn-off are revoked
+    And the new key keeps working
+
+  @integration
   Scenario: Closing the turned-off consent page tells the frame why
     Given an organisation admin turned off docs playground sessions
     When the member closes the consent page
     Then the frame is told the organisation turned this off, not that the member declined
+
+  @integration
+  Scenario: A member of two organisations switches to a project whose organisation allows it
+    Given the consent page opened on a project whose organisation turned docs playground sessions off
+    Then it says that organisation turned this off, keeps the project picker and holds Allow
+    When the member picks a project in an organisation that allows it
+    Then Allow mints a key for that project

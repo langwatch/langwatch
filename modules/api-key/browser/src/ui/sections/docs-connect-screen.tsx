@@ -14,7 +14,7 @@ import { BrandedCard, BrandedCardPage } from "@langwatch/design-system/branded-c
 import { Box, Button, HStack, Stack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Radio, RadioGroup } from "@langwatch/design-system/radio";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
-import { Clock3 } from "lucide-react";
+import { Ban, Clock3 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { useAuthorizeHost, type DocsOpener } from "../../model/authorize-host.ts";
@@ -81,23 +81,7 @@ export default function DocsConnect() {
   }
 
   const availability = host.docsSessionAvailability();
-  if (availability === "disabled") {
-    return (
-      <BrandedCardPage>
-        <BrandedCard
-          title="Your organisation turned this off"
-          intro="Your organisation does not let the docs playground use your account. Paste an API key into the playground instead."
-        >
-          <Button
-            variant="outline"
-            onClick={handleRefuseOf({ host, opener, state: request.state, outcome: "disabled" })}
-          >
-            Close
-          </Button>
-        </BrandedCard>
-      </BrandedCardPage>
-    );
-  }
+  const turnedOff = availability === "disabled";
 
   const handleAllow = async () => {
     if (!projectId) return;
@@ -120,7 +104,13 @@ export default function DocsConnect() {
     }
   };
 
-  const handleDeny = handleRefuseOf({ host, opener, state: request.state, outcome: "denied" });
+  // On a project whose organisation turned this off, leaving tells the frame why (ADR-185).
+  const handleDeny = handleRefuseOf({
+    host,
+    opener,
+    state: request.state,
+    outcome: turnedOff ? "disabled" : "denied",
+  });
 
   return (
     <BrandedCardPage>
@@ -155,6 +145,12 @@ export default function DocsConnect() {
             </Text>
             {host.projectSwitcher()}
           </HStack>
+          {turnedOff && (
+            <StatusCard palette="orange" icon={Ban} title="Your organisation turned this off">
+              This project's organisation does not let the docs playground use your account. Pick a
+              project in another organisation, or paste an API key into the playground instead.
+            </StatusCard>
+          )}
           <VStack align="stretch" gap={2}>
             <Text textStyle="sm" color="fg.muted">
               What the docs may do
@@ -215,7 +211,7 @@ export default function DocsConnect() {
               onClick={handleDeny}
               disabled={isSubmitting}
             >
-              Deny
+              {turnedOff ? "Close" : "Deny"}
             </Button>
           </Stack>
         </VStack>

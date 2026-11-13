@@ -206,6 +206,8 @@ holds it. What fixes it is that the token never enters the docs page.
   minted under one: organization records `lw.organization.docs_playground_sessions_disabled`
   and api-key revokes from its own side (api-key depends on organization, so a call back would
   be a peer cycle). Turning it on again revives none. The pasted-key path is untouched.
+  The revoke takes only keys created at or before the event's `occurredAt`, so a late delivery
+  leaves keys minted after the switch came back on.
 - **The key survives page changes, not a reload.** The docs swap pages in place
   (`docs:navigated`), so the session frame is mounted once in the persistent shell, outside the
   swapped content, and every playground on every page talks to that one frame. A reload, a
