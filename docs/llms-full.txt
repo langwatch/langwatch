@@ -48095,6 +48095,39 @@ await langwatch.experiments.runWithResults("my-experiment", { datasetVersion: 1 
 
 Test suite runs also accept a `parameters` field. There the values apply to every scenario in the run. See [Scenario run parameters](/agent-testing/run-parameters).
 
+### Gate on evaluator results
+
+By default a platform run fails the job only when something breaks: in the SDKs, when a cell errors, and in the CLI, when the run itself fails. A failed evaluation does not fail the job. To stop a merge when quality drops, opt in:
+
+
+  ### Python
+
+```python
+result = langwatch.experiment.run("my-experiment")
+result.print_summary(fail_on_evaluator_failures=True)
+```
+
+  ### TypeScript
+
+```typescript
+const result = await langwatch.experiments.run("my-experiment");
+result.printSummary({ failOnEvaluatorFailures: true });
+```
+
+  ### CLI
+
+```bash
+npx langwatch experiment run my-experiment --wait --fail-on-evaluator-failures
+```
+
+
+
+With the flag, the job exits with code 1 when any evaluator returns a failing verdict or errors instead of judging (a bad key or a timeout, for example), as well as on the default failures. An evaluator that errors on every row gave no verdict, so it never passes the gate.
+
+The CLI flag needs `--wait`. Add `-f json` to the CLI to print the run status as JSON, with each evaluator's passed, failed and errored counts under `summary.evaluators`. An evaluator that only returns scores shows "no verdicts" instead of a pass rate.
+
+The flag needs a server that reports evaluator results. If the run summary has none, the job exits with code 1 and says so, rather than passing without checking.
+
 ---
 
 ## Option 2: Experiments via SDK
@@ -48284,7 +48317,7 @@ Both approaches output a CI-friendly summary:
 The `print_summary()` method:
 
 - Outputs results in a structured format
-- Returns exit code 1 if any evaluations failed (unless `exit_on_failure=False`)
+- Returns exit code 1 on failures (unless `exit_on_failure=False`). For a platform run that means an errored cell; to also fail on failed evaluations, see [Gate on evaluator results](#gate-on-evaluator-results)
 - Provides a link to view detailed results in LangWatch
 
 ---

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import {
   ExperimentsApiServiceError,
@@ -179,6 +179,157 @@ describe("runExperimentCommand()", () => {
       );
 
       await expect(runExperimentCommand("nonexistent", {})).rejects.toThrow(ProcessExitError);
+    });
+  });
+
+  describe("when --wait sees the run complete", () => {
+    const failingVerdict = [
+      { evaluatorId: "ev_1", name: "exact_match", passed: 2, failed: 1, passRate: 66.7 },
+    ];
+    const passingVerdict = [
+      { evaluatorId: "ev_1", name: "exact_match", passed: 3, failed: 0, passRate: 100 },
+    ];
+    const crashedVerdict = [
+      { evaluatorId: "ev_1", name: "exact_match", passed: 0, failed: 0, errored: 3, passRate: 0 },
+    ];
+    const completedWith = (summary: Record<string, unknown>) => ({
+      runId: "run_123",
+      status: "completed",
+      progress: 3,
+      total: 3,
+      summary: { runId: "run_123", totalCells: 3, completedCells: 3, duration: 900, ...summary },
+    });
+
+    beforeEach(() => {
+      process.exitCode = undefined;
+      mockStartRun.mockResolvedValue({ runId: "run_123", status: "running", total: 3 });
+    });
+
+    afterEach(() => {
+      process.exitCode = undefined;
+    });
+
+    /** @scenario "The CLI leaves a completed run green by default, as before" */
+    it("leaves the job green by default, even with failures", async () => {
+      mockGetRunStatus.mockResolvedValue(
+        completedWith({ failedCells: 1, evaluators: failingVerdict }),
+      );
+
+      const result = await runExperimentCommand("quality-check", { wait: true });
+
+      expect(result?.data).toMatchObject({ status: "completed" });
+      expect(process.exitCode).toBeUndefined();
+    });
+
+    /** @scenario "The CLI fails a waited run on a failed evaluation when asked" */
+    it("prints the document and fails the job on a failed evaluation when opted in", async () => {
+      mockGetRunStatus.mockResolvedValue(
+        completedWith({ failedCells: 0, evaluators: failingVerdict }),
+      );
+
+      const result = await runExperimentCommand("quality-check", {
+        wait: true,
+        failOnEvaluatorFailures: true,
+      });
+
+      expect(result?.data).toMatchObject({ status: "completed" });
+      expect(process.exitCode).toBe(1);
+    });
+
+    /** @scenario "The CLI opt-in also fails a waited run on an errored cell" */
+    it("fails the job on an errored cell when opted in", async () => {
+      mockGetRunStatus.mockResolvedValue(
+        completedWith({ failedCells: 1, evaluators: passingVerdict }),
+      );
+
+      await runExperimentCommand("quality-check", { wait: true, failOnEvaluatorFailures: true });
+
+      expect(process.exitCode).toBe(1);
+    });
+
+    /** @scenario "The CLI opt-in fails a waited run whose evaluator crashed" */
+    it("fails the job when an evaluator errored on every row and opted in", async () => {
+      mockGetRunStatus.mockResolvedValue(
+        completedWith({ failedCells: 0, evaluators: crashedVerdict }),
+      );
+
+      await runExperimentCommand("quality-check", { wait: true, failOnEvaluatorFailures: true });
+
+      expect(process.exitCode).toBe(1);
+    });
+
+    it("shows a crashed evaluator's errors and no pass rate in the table summary", async () => {
+      mockGetRunStatus.mockResolvedValue(
+        completedWith({ failedCells: 0, evaluators: crashedVerdict }),
+      );
+      const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+
+      const result = await runExperimentCommand("quality-check", { wait: true });
+      result?.table?.();
+
+      const printed = log.mock.calls.map((call) => String(call[0])).join("\n");
+      expect(printed).toMatch(/exact_match:.*0 passed, 0 failed, .*3 errored.*\(no verdicts\)/);
+    });
+
+    /** @scenario "The CLI opt-in fails a waited run whose summary has no evaluator results" */
+    it("fails the job when opted in and the summary has no evaluator results", async () => {
+      mockGetRunStatus.mockResolvedValue(completedWith({ failedCells: 0 }));
+
+      const result = await runExperimentCommand("quality-check", {
+        wait: true,
+        failOnEvaluatorFailures: true,
+      });
+
+      expect(result?.data).toMatchObject({ status: "completed" });
+      expect(process.exitCode).toBe(1);
+    });
+
+    /** @scenario "The CLI opt-in leaves a clean run green" */
+    it("leaves a clean run green when opted in", async () => {
+      mockGetRunStatus.mockResolvedValue(
+        completedWith({ failedCells: 0, evaluators: passingVerdict }),
+      );
+
+      await runExperimentCommand("quality-check", { wait: true, failOnEvaluatorFailures: true });
+
+      expect(process.exitCode).toBeUndefined();
+    });
+
+    it("lists each evaluator's passed and failed counts in the table summary", async () => {
+      mockGetRunStatus.mockResolvedValue(
+        completedWith({ failedCells: 0, evaluators: failingVerdict }),
+      );
+      const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+
+      const result = await runExperimentCommand("quality-check", { wait: true });
+      result?.table?.();
+
+      const printed = log.mock.calls.map((call) => String(call[0])).join("\n");
+      expect(printed).toMatch(/exact_match:.*2 passed, .*1 failed.*\(66\.7%\)/);
+    });
+
+    /** @scenario "A run that fails on the server fails the job" */
+    it("exits 1 when the server marks the run failed", async () => {
+      mockGetRunStatus.mockResolvedValue({
+        runId: "run_123",
+        status: "failed",
+        progress: 1,
+        total: 3,
+      });
+
+      await expect(runExperimentCommand("quality-check", { wait: true })).rejects.toThrow(
+        ProcessExitError,
+      );
+    });
+  });
+
+  describe("when --fail-on-evaluator-failures is given without --wait", () => {
+    /** @scenario "The evaluator flag without --wait is rejected" */
+    it("rejects the flag before starting a run", async () => {
+      await expect(
+        runExperimentCommand("quality-check", { failOnEvaluatorFailures: true }),
+      ).rejects.toThrow(ProcessExitError);
+      expect(mockStartRun).not.toHaveBeenCalled();
     });
   });
 });

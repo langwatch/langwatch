@@ -54071,8 +54071,13 @@
                               "failed": {
                                 "type": "number"
                               },
-                              "passRate": {
+                              "errored": {
+                                "description": "Cells where the evaluator crashed and gave no verdict",
                                 "type": "number"
+                              },
+                              "passRate": {
+                                "type": "number",
+                                "description": "Percentage of verdicts that passed; 0 when passed and failed are both 0"
                               },
                               "avgScore": {
                                 "type": "number"

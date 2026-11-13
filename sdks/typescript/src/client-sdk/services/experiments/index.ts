@@ -64,6 +64,7 @@ export type {
   ExperimentRunSummary,
   RunExperimentOptions,
   ExperimentRunResult,
+  PrintSummaryOptions,
   RunWithResultsOptions,
   ExperimentRowResult,
   ExperimentRunWithResults,

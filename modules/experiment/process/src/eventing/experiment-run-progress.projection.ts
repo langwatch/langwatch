@@ -9,6 +9,7 @@ import type { ExperimentRunProgressState } from "../repositories/experiment-run-
 import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../rules/experiment-run-event-types.rules.ts";
 import { appendRunFrames, findRunEventFrames } from "../rules/experiment-run-frames.rules.ts";
 import { foldEvaluatorsOf, runCellKey } from "../rules/experiment-run-plan.rules.ts";
+import { summariseEvaluatorVerdicts } from "../rules/experiment-run-summary.rules.ts";
 import { hasFinished, markFinished } from "../rules/experiment-run-window.rules.ts";
 import { runAwaitsStart } from "../rules/experiment-workflow-evaluation.rules.ts";
 import {
@@ -174,7 +175,10 @@ export class ExperimentRunProgressFoldProjection
     });
   }
 
-  /** A scored verdict, named as main named it; a comparison's own verdict is never kept. */
+  /**
+   * A scored verdict, named as main named it; a comparison's own verdict is never kept.
+   * An errored evaluator is kept as errored, so a gate can tell a crash from a pass.
+   */
   handleExperimentRunEvaluatorResult(
     event: EvaluatorResultEvent,
     state: ExperimentRunProgressState,
@@ -185,11 +189,20 @@ export class ExperimentRunProgressFoldProjection
     const key = runCellKey({ rowIndex: data.index, targetId: data.targetId });
     const resultKey = `evaluator:${key}:${data.evaluatorId}`;
     const evaluator = state.evaluators[data.evaluatorId];
-    if (data.status !== "processed" || !evaluator || evaluator.comparison) {
+    if (data.status === "skipped" || !evaluator || evaluator.comparison) {
       return this.streamed({ event, state, resultKey });
     }
 
     const name = (evaluator.recordNamed ? data.evaluatorName : undefined) ?? evaluator.fallbackName;
+    const verdict =
+      data.status === "error"
+        ? { name, errored: true }
+        : {
+            name,
+            ...(data.score != null ? { score: data.score } : {}),
+            ...(data.label != null ? { label: data.label } : {}),
+            ...(data.passed != null ? { passed: data.passed } : {}),
+          };
     return this.streamed({
       event,
       resultKey,
@@ -199,12 +212,7 @@ export class ExperimentRunProgressFoldProjection
           ...state.evaluatorScores,
           [key]: {
             ...state.evaluatorScores[key],
-            [data.evaluatorId]: {
-              name,
-              ...(data.score != null ? { score: data.score } : {}),
-              ...(data.label != null ? { label: data.label } : {}),
-              ...(data.passed != null ? { passed: data.passed } : {}),
-            },
+            [data.evaluatorId]: verdict,
           },
         },
       },
@@ -274,6 +282,11 @@ export class ExperimentRunProgressFoldProjection
       duration: finishedAt - state.startedAt,
       timestamps: { startedAt: state.startedAt, finishedAt },
     };
+    // The verdict tallies a CI job gates on; the streamed `done` frame keeps main's shape.
+    const verdicts = summariseEvaluatorVerdicts({
+      evaluators: state.evaluators,
+      evaluatorScores: state.evaluatorScores,
+    });
     return this.streamed({
       event,
       summary,
@@ -281,7 +294,11 @@ export class ExperimentRunProgressFoldProjection
         ...state,
         status: "completed",
         finishedAt,
-        summary: { ...summary, ...(state.runUrl ? { runUrl: state.runUrl } : {}) },
+        summary: {
+          ...summary,
+          ...verdicts,
+          ...(state.runUrl ? { runUrl: state.runUrl } : {}),
+        },
       },
     });
   }
