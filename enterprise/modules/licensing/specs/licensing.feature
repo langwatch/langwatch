@@ -486,8 +486,9 @@ Feature: Enterprise licensing lifecycle
     Scenario: The admin console states and shows Developer seats
       Given an operator in the backoffice licence screens
       When they issue a licence or an activation code, or reissue a licence
-      Then a Developer seats field sends the typed number, and an empty field sends none
-      And the reissue field starts at the licence's current Developer seats
+      Then issuing sends the typed Developer seats, and an empty field sends none
+      And the reissue field starts at the licence's current Developer seats and must hold a count
+      And a count the licence cannot sign, negative, fractional or above 2147483647, is named on the field and nothing is sent
       And the licence details read its Developer seats, 0 when it states none
 
   # ADR-179: licensing keeps sso's sign-in provider fact with the id of the event it applied.

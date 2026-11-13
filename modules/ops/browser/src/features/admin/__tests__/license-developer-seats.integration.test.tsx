@@ -15,7 +15,12 @@ const { issue, reissue, byId, idle } = vi.hoisted(() => ({
   issue: vi.fn(),
   reissue: vi.fn(),
   byId: { current: undefined as License | undefined },
-  idle: () => ({ mutate: () => undefined, isPending: false }),
+  idle: () => ({
+    mutate: () => {
+      throw new Error("an unexpected licence command was sent");
+    },
+    isPending: false,
+  }),
 }));
 
 vi.mock("../../../behavior/ops-api.ts", () => ({
