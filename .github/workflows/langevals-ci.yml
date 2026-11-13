@@ -168,6 +168,8 @@ jobs:
             evaluators/langevals/tests/test_llm_answer_match_threading.py \
             evaluators/ragas/tests/test_model_to_langchain.py \
             evaluators/ragas/tests/test_token_usage.py \
+            evaluators/topic_clustering/tests/test_embedding_batches.py \
+            evaluators/topic_clustering/tests/test_unpriced_naming_model.py \
             tests/deterministic/ \
             langevals_core/tests/
 

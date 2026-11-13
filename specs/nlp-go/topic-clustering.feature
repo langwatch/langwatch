@@ -113,3 +113,42 @@ Feature: Topic clustering runs on langevals
     Given a batch or incremental clustering run that fails for any other reason
     When langevals answers
     Then it answers with a 500 and logs the failure as an error
+
+  # A page of ~2,000 inputs sent as 99 sequential calls to a provider that
+  # takes ~2.5s a call ran past the gateway's 120s timeout every time.
+  @unit
+  Scenario: Embedding batches for one page are requested concurrently
+    Given a page whose inputs split into more embedding batches than one call carries
+    When langevals embeds the page
+    Then several batches are in flight at once, never more than the concurrency bound
+    And each input keeps its own embedding, in the order it was sent
+    And the provider usage of every batch is counted for the request
+
+  @unit
+  Scenario: A rate-limited embedding batch is retried in place
+    Given an embedding provider that rate limits a batch once, then answers
+    When langevals embeds a page
+    Then that batch is asked again and the page keeps every embedding
+    And no per-input fallback calls are made
+
+  @unit
+  Scenario: Any other failed embedding batch falls back to one call per input
+    Given an embedding provider that fails a batch call for a reason other than auth or rate limits
+    When langevals embeds a page
+    Then the page is embedded again one input per call
+
+  @unit
+  Scenario: Embedding a page stops at a provider auth refusal without retrying input by input
+    Given an embedding provider that refuses the configured key
+    When langevals embeds a page
+    Then the refusal is raised to the caller
+    And no per-input fallback calls are made
+
+  # litellm prices no Cloudflare model, and the unpriced cost used to throw
+  # away every topic name the model had already generated.
+  @unit
+  Scenario: Topic names from a model litellm cannot price are kept
+    Given a naming model that answers with names but has no litellm price
+    When langevals names the topics
+    Then every topic keeps the name the model gave it
+    And the naming cost counts that call as zero
