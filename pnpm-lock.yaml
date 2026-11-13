@@ -6323,9 +6323,15 @@ importers:
       '@langwatch/trace-client':
         specifier: workspace:*
         version: link:../../trace/client
+      '@monaco-editor/react':
+        specifier: 'catalog:'
+        version: 4.7.0(monaco-editor@0.55.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       lucide-react:
         specifier: 'catalog:'
         version: 1.22.0(react@19.2.8)
+      monaco-editor:
+        specifier: 'catalog:'
+        version: 0.55.1
       react-feather:
         specifier: 'catalog:'
         version: 2.0.10(react@19.2.8)

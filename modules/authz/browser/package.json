@@ -34,7 +34,9 @@
     "@langwatch/role-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-client": "workspace:*",
+    "@monaco-editor/react": "catalog:",
     "lucide-react": "catalog:",
+    "monaco-editor": "catalog:",
     "react-feather": "catalog:",
     "react-hook-form": "catalog:"
   },
