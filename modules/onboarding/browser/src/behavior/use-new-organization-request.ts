@@ -10,12 +10,13 @@ import { useOnboardingHost } from "../model/onboarding-host.ts";
 import { NEW_ORGANIZATION_PARAM, readNewOrganizationRequest } from "../model/welcome-redirect.ts";
 import { api } from "./onboarding-api.ts";
 
+/** Scope graph reads before falling back: the organization is committed, so a miss is a blip. */
+const SCOPE_GRAPH_ATTEMPTS = 3;
+
 /**
  * "/" resolves the organization from the remembered selection, which still names the one the
  * member came from; `?org=<slug>` selects the new one first (org-query-param-switch.feature).
  */
-const SCOPE_GRAPH_ATTEMPTS = 3;
-
 export async function selectingNewOrganization({
   landing,
   organizationId,

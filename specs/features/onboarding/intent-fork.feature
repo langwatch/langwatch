@@ -130,6 +130,9 @@ Feature: Onboarding forks on declared intent — Agent Governance vs LLMOps
     # had just accepted an invitation into such an organization was shown "let's
     # kick off by creating your organization", and the screen offered nothing else
     # to do. Reported by a customer whose invited colleague could not escape it.
+    #
+    # The one exception is a member who asks for another organization through
+    # "New organization" in the organization menu: they are onboarded on purpose.
 
     @unit
     Scenario: An invited member of an organization with no shared project goes home
