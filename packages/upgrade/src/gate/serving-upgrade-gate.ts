@@ -16,10 +16,10 @@ import type { UpgradeLease, UpgradeRun } from "../ledger.ts";
 import { loadReleases } from "../manifest/manifest-loader.ts";
 import type { ReleaseTreeSteps } from "../manifest/stamp.ts";
 import type { UpgradePostgres } from "../ports.ts";
-import { writeUpgradeLine } from "../runner/image-upgrade.ts";
+import { configuredClickHouseTargets, writeUpgradeLine } from "../runner/image-upgrade.ts";
 import { UPGRADE_LEASE_NAME } from "../runner/runner-lease.ts";
 import { UpgradeRunnerRepository } from "../runner/runner-ledger.repository.ts";
-import { isPrivateTarget, PRIVATE_TARGET_PREFIX } from "../runner/schema-applier.ts";
+import { PRIVATE_TARGET_PREFIX } from "../runner/schema-applier.ts";
 import { EXIT_CODES, type UpgradeOutcomeCode } from "../runner/upgrade-outcome.ts";
 import { prismaSteps, readPrismaMigrations } from "../seed-sources.ts";
 import { credentialKeyFingerprint } from "../serving-roster/credential-key-fingerprint.ts";
@@ -46,7 +46,7 @@ import {
   UPGRADE_RE_ASK_MS,
 } from "./serving-gate.ts";
 import { SERVING_ROSTER_TIMING } from "./serving-roster-timing.ts";
-import { startTargetCatchUp } from "./target-catch-up.ts";
+import { privateTargetsBehind, startTargetCatchUp } from "./target-catch-up.ts";
 import {
   redisTargetsCatchingUp,
   type TargetsCatchingUpStore,
@@ -104,6 +104,7 @@ export function upgradeGateOver({
   processId,
   firstInstall,
   credentialKeys,
+  clickhouseTargets = [],
   targetsCatchingUp = null,
   warn = emitWarning,
   wait = (ms) => sleep(ms),
@@ -118,6 +119,9 @@ export function upgradeGateOver({
   processId: string;
   firstInstall: FirstInstallUpgrade;
   credentialKeys?: readonly string[];
+  /** Every ClickHouse target the environment configures; a private one with no ledger rows
+   *  counts as behind, so the worker's catch-up pass runs the upgrade that seeds it. */
+  clickhouseTargets?: readonly string[];
   /** The shared list of private ClickHouse targets catching up (T7-F18); null without Redis. */
   targetsCatchingUp?: TargetsCatchingUpStore | null;
   warn?: ServingGateWarn;
@@ -229,6 +233,7 @@ export function upgradeGateOver({
             release,
             warn,
             catchUp: { upgrade: firstInstall, findLeaseHolder, targetsCatchingUp },
+            clickhouseTargets,
             redact: ledgerRedactor({ secretValues }),
           }),
         }
@@ -563,6 +568,7 @@ function backgroundStepsOver({
   release,
   warn,
   catchUp,
+  clickhouseTargets,
   redact,
 }: {
   postgres: UpgradePostgres;
@@ -577,6 +583,7 @@ function backgroundStepsOver({
     findLeaseHolder: UpgradeLeaseHolder;
     targetsCatchingUp: TargetsCatchingUpStore | null;
   };
+  clickhouseTargets: readonly string[];
   redact: LedgerTextRedactor;
 }) {
   const ledger = UpgradeLedgerRepository.create({ postgres, redact });
@@ -609,8 +616,11 @@ function backgroundStepsOver({
       const catchingUp = startTargetCatchUp({
         findTargetsBehind: async () => {
           if (!(await runner.ledgerExists())) return [];
-          const behind = (await ledger.findTargetsBehind()).map(({ target }) => target);
-          return [...new Set(behind.filter((target) => isPrivateTarget({ target })))];
+          return privateTargetsBehind({
+            behind: (await ledger.findTargetsBehind()).map(({ target }) => target),
+            recorded: await ledger.findRecordedTargets(),
+            configured: clickhouseTargets,
+          });
         },
         findLeaseHolder: catchUp.findLeaseHolder,
         upgrade: catchUp.upgrade,
@@ -712,7 +722,12 @@ export async function servingUpgradeGate({
         withStoreUrls(secrets, ({ redis, credentialKeys }) => {
           const databaseUrl = database?.trim();
           if (!databaseUrl) return { ...NO_LEDGER_GATE, runOnce: refuseWithoutDatabase };
-          const stores = { bootModules, databaseUrl, clickhouse, redis, environment };
+          const upgradeEnvironment = upgradeEnvironmentOver({
+            environment,
+            databaseUrl,
+            clickhouse,
+          });
+          const stores = { bootModules, databaseUrl, redis, environment: upgradeEnvironment };
           const upgrade = upgradeIn({ ...stores, admitAtBlockingDone: true });
           const runOnce = async () =>
             EXIT_CODES[(await upgradeIn({ ...stores, admitAtBlockingDone: false })()).code];
@@ -731,6 +746,7 @@ export async function servingUpgradeGate({
             processId: `${hostname()}:${process.pid}:${role}`,
             firstInstall: upgrade,
             credentialKeys,
+            clickhouseTargets: configuredClickHouseTargets({ environment: upgradeEnvironment }),
             targetsCatchingUp: redisTargetsCatchingUp({
               url: redis?.trim() || undefined,
               environment,
@@ -745,33 +761,49 @@ export async function servingUpgradeGate({
   );
 }
 
+/**
+ * The environment the in-process upgrade runs under: the process's, with the resolved store
+ * secrets set. The gate reads its ClickHouse targets from this same environment, so the targets
+ * it counts behind are exactly the ones the upgrade it triggers sees and seeds.
+ */
+export function upgradeEnvironmentOver({
+  environment,
+  databaseUrl,
+  clickhouse,
+}: {
+  environment: Readonly<Record<string, string | undefined>>;
+  databaseUrl: string;
+  clickhouse: string | undefined;
+}): Readonly<Record<string, string | undefined>> {
+  const sharedUrl = clickhouse?.trim();
+  return {
+    ...environment,
+    DATABASE_URL: databaseUrl,
+    ...(sharedUrl ? { CLICKHOUSE_URL: sharedUrl } : {}),
+  };
+}
+
 /** The upgrade this process runs: in-process over its modules, or a refusal where it has none. */
 function upgradeIn({
   bootModules,
   databaseUrl,
-  clickhouse,
   redis,
   environment,
   admitAtBlockingDone,
 }: {
   bootModules: BootUpgradeModules | undefined;
   databaseUrl: string;
-  clickhouse: string | undefined;
   redis: string | undefined;
+  /** The upgrade's environment, from `upgradeEnvironmentOver`. */
   environment: Readonly<Record<string, string | undefined>>;
   /** True for the serving worker, which takes jobs while the run's reconcilers finish. */
   admitAtBlockingDone: boolean;
 }): FirstInstallUpgrade {
   if (!bootModules) return refuseWithoutModules;
-  const sharedUrl = clickhouse?.trim();
   return inProcessUpgrade({
     boot: bootModules,
     databaseUrl,
-    environment: {
-      ...environment,
-      DATABASE_URL: databaseUrl,
-      ...(sharedUrl ? { CLICKHOUSE_URL: sharedUrl } : {}),
-    },
+    environment,
     development: environment.NODE_ENV === "development",
     admitAtBlockingDone,
     openPublisher: redisReadHintPublisher({ url: redis?.trim() || undefined, environment }),

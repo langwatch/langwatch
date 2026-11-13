@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
   clickHouseRunOptions,
   closingLines,
+  configuredClickHouseTargets,
   PRIVATE_TARGET_WAIT_SECONDS,
   noClickHouseLine,
   sqlReader,
@@ -125,6 +126,36 @@ describe("the upgrade's declared upcast steps", () => {
 
       expect(await upcasts()).toEqual([]);
     });
+  });
+});
+
+describe("configuredClickHouseTargets()", () => {
+  it("names the shared route first and each private route by its organisation", () => {
+    const environment = {
+      CLICKHOUSE_URL: "http://clickhouse:8123/langwatch",
+      CLICKHOUSE_URL__acme__org_1: "http://acme:8123/langwatch",
+      CLICKHOUSE_URL__globex__org_2: "http://globex:8123/langwatch",
+    };
+    expect(configuredClickHouseTargets({ environment })).toEqual([
+      "shared",
+      "private:org_1",
+      "private:org_2",
+    ]);
+  });
+
+  it("drops a private route that points at the shared ClickHouse", () => {
+    const url = "http://clickhouse:8123/langwatch";
+    const environment = { CLICKHOUSE_URL: url, CLICKHOUSE_URL__acme__org_1: url };
+    expect(configuredClickHouseTargets({ environment })).toEqual(["shared"]);
+  });
+
+  it("names nothing at build time or with no route at all", () => {
+    expect(configuredClickHouseTargets({ environment: {} })).toEqual([]);
+    expect(
+      configuredClickHouseTargets({
+        environment: { BUILD_TIME: "1", CLICKHOUSE_URL: "http://clickhouse:8123/langwatch" },
+      }),
+    ).toEqual([]);
   });
 });
 
