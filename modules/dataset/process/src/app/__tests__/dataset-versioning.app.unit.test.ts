@@ -977,13 +977,19 @@ describe("given datasets created before versioning", () => {
 
   /** @scenario "The first-version step retries a dataset whose rows it could not read" */
   it("fails and saves no checkpoint when a dataset's rows fail to read", async () => {
-    await app.upsertDataset({
+    // A dataset from before versioning keeps its rows in the Postgres records table.
+    const legacy = await repositories.content.create({
       projectId: "project-0",
       name: "unreadable-once",
+      slug: "unreadable-once",
       columnTypes: [{ name: "input", type: "string" }],
-      datasetRecords: [{ id: "a", input: "x" }],
     });
-    vi.spyOn(repositories.records, "findPage").mockRejectedValueOnce(new Error("connection reset"));
+    await repositories.records.createMany({
+      datasetId: legacy.id,
+      projectId: "project-0",
+      entries: [{ id: "a", input: "x" }],
+    });
+    vi.spyOn(repositories.chunks, "readChunk").mockRejectedValueOnce(new Error("connection reset"));
 
     const { saved, checkpoint } = checkpointOf(null);
     await expect(

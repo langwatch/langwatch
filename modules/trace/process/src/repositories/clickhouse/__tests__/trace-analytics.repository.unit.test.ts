@@ -17,6 +17,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { TraceAnalyticsRow } from "#eventing/trace-derived.projection";
 
 import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
+import { TRACE_ANALYTICS_MATERIALIZED_METADATA_COLUMNS } from "../../../rules/trace-widget-columns.rules.ts";
 import { TRACE_ID_INDEXES } from "../clickhouse.trace-id-indexes.database.ts";
 import type { TraceClickHouseWriteClient } from "../clickhouse.trace-member-client.repository.ts";
 import { TraceAnalyticsClickHouseRepository } from "../trace-metrics-analytics.repository.ts";
@@ -412,6 +413,42 @@ describe("TraceAnalyticsClickHouseRepository insert settings", () => {
         expect(inserts[0]?.clickhouse_settings).toMatchObject({
           input_format_skip_unknown_fields: 0,
         });
+      });
+    });
+
+    describe("when a trace carries the metadata keys the stock widgets read", () => {
+      /** @scenario "The fold never inserts a column the database computes" */
+      it("inserts the plain metadata columns and none of the MATERIALIZED ones", async () => {
+        const { client, inserts } = capturingInsertClient();
+        const repository = TraceAnalyticsClickHouseRepository.create({
+          resolveClient: async () => client,
+          clickhouse: readsOver(client),
+        });
+
+        await repository.upsert({
+          row: {
+            ...ROW,
+            attributes: {
+              "metadata.output_action": "approve",
+              "metadata.team": "platform",
+              "metadata.environment": "prod",
+            },
+          },
+          retentionDays: 30,
+        });
+
+        const inserted = Object.keys(inserts[0]?.values?.[0] ?? {});
+        const materialized = inserted.filter((c) =>
+          TRACE_ANALYTICS_MATERIALIZED_METADATA_COLUMNS.has(c),
+        );
+        expect(materialized).toEqual([]);
+        expect(inserted).toEqual(
+          expect.arrayContaining([
+            "MetadataOutcomeReason",
+            "MetadataPromptVersion",
+            "MetadataEnvironment",
+          ]),
+        );
       });
     });
 
