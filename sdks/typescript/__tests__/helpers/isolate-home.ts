@@ -3,12 +3,8 @@ import os from "node:os";
 import path from "node:path";
 
 /**
- * Variables that point an agent's or the CLI's config somewhere other than
- * under HOME. The CLI honours each of them, so a test that moves HOME to a
- * temp directory still writes the developer's real files while one is set.
- * Claude Code sessions run with CLAUDE_CONFIG_DIR set, and a config dir
- * whose settings.json is a symlink to ~/.claude/settings.json makes a write
- * there land in the real file.
+ * Config locations outside HOME that the CLI honours. Moving HOME alone still
+ * writes real files while one is set (Claude Code sessions set CLAUDE_CONFIG_DIR).
  */
 export const CONFIG_LOCATION_VARS = [
   "CLAUDE_CONFIG_DIR",
@@ -26,10 +22,8 @@ export const CONFIG_LOCATION_VARS = [
 export const TEST_HOME_PREFIX = "lw-home-";
 
 /**
- * Points HOME (and USERPROFILE) at a fresh temp directory and drops every
- * config location variable, so nothing a test writes can reach the real
- * home. Returns the temp home. It sits under /tmp rather than a long
- * TMPDIR, so the daemon's socket path under it stays within sockaddr_un.
+ * Points HOME at a fresh temp dir and drops every config location variable.
+ * Under /tmp, not a long TMPDIR, so the daemon socket path fits sockaddr_un.
  */
 export const isolateHome = (env: NodeJS.ProcessEnv): string => {
   const realHome = env.HOME;
