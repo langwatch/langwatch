@@ -78,7 +78,7 @@ const usageStatsSchemaDefinition = z
     maxMonthlyUsageLimit: z.number(),
     membersCount: z.number(),
     membersLiteCount: z.number(),
-    /** Developer seats (ADR-171): shown beside the metered seats, never capped. */
+    /** Developer seats (ADR-171), measured against the plan's `maxMembersDeveloper`. */
     membersDeveloperCount: z.number(),
     messageLimitInfo: messageLimitInfoSchema,
     seatLimitInfo: seatLimitInfoSchema,

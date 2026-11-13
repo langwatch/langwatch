@@ -13,6 +13,7 @@ const USAGE_BILLING_STEP = "billing:record-usage-billing-catch-up";
 const SPEND_STEP = "instant-eval:copy-judge-spend";
 const PROJECT_CREATED_STEP = "project:record-created-facts";
 const PROJECT_FACT_STEPS = [PROJECT_CREATED_STEP];
+const PROJECT_HISTORY_STEP = "project:list-personal-owner-and-first-message-facts";
 const ORGANIZATION_PRESENCE_STEP = "organization:record-presence-settings";
 const ANNOTATION_TRACE_STEP = "annotation:record-trace-annotations";
 const BACKGROUND_AFTER_OLD_WRITERS = {
@@ -74,6 +75,13 @@ describe("given the worker's installed modules", () => {
       for (const id of PROJECT_FACT_STEPS) {
         expect(steps.find((step) => step.id === id)).toMatchObject(BACKGROUND_AFTER_OLD_WRITERS);
       }
+    });
+
+    /** @scenario "The project history listing is a background step that waits for old writers to go" */
+    it("declares the project history listing as a background data step after old writers", () => {
+      expect(steps.find((step) => step.id === PROJECT_HISTORY_STEP)).toMatchObject(
+        BACKGROUND_AFTER_OLD_WRITERS,
+      );
     });
 
     /** @scenario "The organization presence step is a background step that waits for old writers to go" */

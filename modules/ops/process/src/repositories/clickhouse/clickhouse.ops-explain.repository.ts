@@ -1,4 +1,8 @@
 import { createClient, type ClickHouseClient, type ClickHouseSettings } from "@clickhouse/client";
+import {
+  authenticatedFromFile,
+  ClickHousePasswordFile,
+} from "@langwatch/process-stores/clickhouse-password-file";
 
 import { findOpsConnection } from "../../rules/ops-clickhouse-explain.rules.ts";
 import {
@@ -56,10 +60,26 @@ export class OpsExplainClickHouseRepository extends OpsExplainRepository {
   }
 }
 
+const PASSWORD_FILE_VARIABLE = "CLICKHOUSE_OPS_PASSWORD_FILE";
+
 /** Process-owned lazy client for the dedicated read-only ops account. */
 export class OpsClickHouseRuntime implements OpsExplainClients {
-  static create(options: { url?: string; buildTime: boolean }): OpsClickHouseRuntime {
-    return new OpsClickHouseRuntime(options.url, options.buildTime);
+  /** Reads `passwordFile` now, so a file that gives no password stops the boot. */
+  static create({
+    url,
+    passwordFile,
+    buildTime,
+  }: {
+    url?: string;
+    passwordFile?: string;
+    buildTime: boolean;
+  }): OpsClickHouseRuntime {
+    const configured = !buildTime && (url?.trim() ?? "") !== "";
+    const file =
+      configured && passwordFile
+        ? ClickHousePasswordFile.open({ path: passwordFile, variable: PASSWORD_FILE_VARIABLE })
+        : undefined;
+    return new OpsClickHouseRuntime(url, buildTime, file);
   }
 
   private client: ClickHouseClient | undefined;
@@ -69,6 +89,7 @@ export class OpsClickHouseRuntime implements OpsExplainClients {
   private constructor(
     private readonly url: string | undefined,
     private readonly buildTime: boolean,
+    private readonly passwordFile: ClickHousePasswordFile | undefined,
   ) {}
 
   findClient(): OpsExplainClientResolution | null {
@@ -83,14 +104,21 @@ export class OpsClickHouseRuntime implements OpsExplainClients {
     const parsed = findOpsConnection(url);
     // No client-side `clickhouse_settings` here: the readonly profile forbids
     // session-setting changes; its server-side profile enforces the limits.
-    this.client = createClient({
+    const client = createClient({
       url: parsed?.url ?? url,
       username: parsed?.username || undefined,
-      password: parsed?.password || undefined,
+      password: this.passwordFile ? undefined : parsed?.password || undefined,
       database: parsed?.database,
       max_open_connections: 5,
       keep_alive: { enabled: true, idle_socket_ttl: 1500 },
     });
+    this.client = this.passwordFile
+      ? authenticatedFromFile({
+          client,
+          username: parsed?.username || "default",
+          passwordFile: this.passwordFile,
+        })
+      : client;
     return this.client;
   }
 

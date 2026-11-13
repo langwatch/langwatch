@@ -5,7 +5,8 @@ import { ACTOR, ORG_ID, harness } from "./support/eventing.authz-ledger-fork.har
 
 describe("EventingAuthzLedgerAdapter instant revocation", () => {
   /** @scenario "A revocation holds before the revoke call returns, with Redis stopped" */
-  it("waits for append, marks only the named grant, and ignores epoch failure", async () => {
+  /** @scenario "A revoke that cannot move the organization's epoch reports failure" */
+  it("waits for append, marks only the named grant, and reports the epoch failure", async () => {
     const redis = {
       get: vi.fn().mockRejectedValue(new Error("redis stopped")),
       incr: vi.fn().mockRejectedValue(new Error("redis stopped")),
@@ -20,7 +21,7 @@ describe("EventingAuthzLedgerAdapter instant revocation", () => {
         actor: ACTOR,
         reason: "offboarded",
       }),
-    ).resolves.toBeUndefined();
+    ).rejects.toMatchObject({ code: "authz_epoch_bump_failed" });
 
     expect(sent).toEqual([
       expect.objectContaining({

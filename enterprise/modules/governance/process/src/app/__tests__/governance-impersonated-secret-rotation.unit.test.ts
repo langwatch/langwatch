@@ -2,7 +2,7 @@ import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
-import { PermissionDeniedError } from "@langwatch/authorization";
+import { ImpersonationCannotMintCredentialError } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
@@ -59,7 +59,7 @@ function buildApp() {
 
 describe("given an operator acting as a member", () => {
   /** @scenario "An ingestion source secret is not rotated while an operator acts as another member" */
-  it("refuses the rotation with permission_denied before the source is read", async () => {
+  it("refuses the rotation with impersonation_cannot_mint_credential before the source is read", async () => {
     const app = await buildApp();
 
     const rotating = app.ingestionSourceRotateSecret({
@@ -68,12 +68,12 @@ describe("given an operator acting as a member", () => {
       impersonatorId: "operator-1",
     });
 
-    await expect(rotating).rejects.toBeInstanceOf(PermissionDeniedError);
-    await expect(rotating).rejects.toMatchObject({ code: "permission_denied" });
+    await expect(rotating).rejects.toBeInstanceOf(ImpersonationCannotMintCredentialError);
+    await expect(rotating).rejects.toMatchObject({ code: "impersonation_cannot_mint_credential" });
   });
 
   /** @scenario "A personal ingestion key is not minted while an operator acts as another member" */
-  it("refuses installing or rotating a personal ingestion key with permission_denied", async () => {
+  it("refuses installing or rotating a personal ingestion key with impersonation_cannot_mint_credential", async () => {
     const app = await buildApp();
     const mint = {
       userId: "user-1",
@@ -83,8 +83,10 @@ describe("given an operator acting as a member", () => {
     };
 
     await expect(app.ingestionKeyInstall(mint)).rejects.toMatchObject({
-      code: "permission_denied",
+      code: "impersonation_cannot_mint_credential",
     });
-    await expect(app.ingestionKeyRotate(mint)).rejects.toBeInstanceOf(PermissionDeniedError);
+    await expect(app.ingestionKeyRotate(mint)).rejects.toBeInstanceOf(
+      ImpersonationCannotMintCredentialError,
+    );
   });
 });

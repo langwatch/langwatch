@@ -33,6 +33,10 @@ import {
   type LangyConversationUpdateChannel,
 } from "./langy-conversation.subscriber.ts";
 import {
+  createLangyFirstMessageSeenSubscriber,
+  type LangyFirstMessageSeenFacts,
+} from "./langy-first-message-seen.subscriber.ts";
+import {
   createGuidedOnboardingTurnFailedSubscriber,
   type GuidedOnboardingFacts,
   type GuidedOnboardingReader,
@@ -88,8 +92,11 @@ interface EventingLangyConversationAdapterOptions {
   sessionKeys: Pick<LangySessionKeyService, "mintForUser" | "revoke">;
   /** The folder's owed connect turn (ADR-129); presence is read at handle time. */
   localConnectTurn: { presence: () => LocalConnectTurnPresence; turns: ControlTurnStarter };
-  /** Onboarding's answer for a project, and where its failed turns are recorded as facts. */
-  guidedOnboarding: { reader: GuidedOnboardingReader; facts: GuidedOnboardingFacts };
+  /** Onboarding's answer for a project; where failed turns and first answers are recorded. */
+  guidedOnboarding: {
+    reader: GuidedOnboardingReader;
+    facts: GuidedOnboardingFacts & LangyFirstMessageSeenFacts;
+  };
   /** Who a notification goes to and whether they want it, and notification's Web Push. */
   webPush: Pick<LangyWebPushSubscriberDeps, "users" | "projects" | "notifications">;
 }
@@ -193,6 +200,10 @@ export class EventingLangyConversationAdapter {
       conversations: conversationReader,
       facts: options.guidedOnboarding.facts,
     });
+    const firstMessageSeenSubscriber = createLangyFirstMessageSeenSubscriber({
+      conversations: conversationReader,
+      facts: options.guidedOnboarding.facts,
+    });
     const localConnectTurnSubscriber = createLocalConnectTurnSubscriber({
       presence: options.localConnectTurn.presence,
       conversations: conversationReader,
@@ -219,6 +230,7 @@ export class EventingLangyConversationAdapter {
         broadcastSubscriber,
         admissionLifecycleSubscriber,
         guidedOnboardingTurnFailedSubscriber,
+        firstMessageSeenSubscriber,
         localConnectTurnSubscriber,
         webPushSubscriber,
       ],

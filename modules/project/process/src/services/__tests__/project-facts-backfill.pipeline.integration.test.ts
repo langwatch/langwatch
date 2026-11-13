@@ -35,6 +35,8 @@ const rows: ProjectBackfillRow[] = Object.entries(PROJECTS).map(([id, organizati
   presenceEnabled: true,
   isArchived: false,
   adminUserId: "admin-1",
+  ownerUserId: null,
+  firstMessage: false,
 }));
 
 /** The step over project's lifecycle pipeline; `loseNextCreated` drops one created fact. */

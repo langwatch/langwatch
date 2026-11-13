@@ -341,6 +341,7 @@ export class LangyModule implements LangyApiContract {
       events: commands,
       buffer,
       onAnswered: (wait) => confirmationAnswers.recordAnswer(wait),
+      users: setup.dependencies.users,
     });
     const built = LangyModule.#composeInfrastructure({
       setup,
@@ -390,6 +391,12 @@ export class LangyModule implements LangyApiContract {
           throw new Error("langy_guided_onboarding pipeline senders are not connected yet");
         }
         await guidedOnboardingSenders.commands.recordGuidedOnboardingTurnFailed.send(data);
+      },
+      recordFirstMessageSeen: async (data) => {
+        if (!guidedOnboardingSenders.commands) {
+          throw new Error("langy_guided_onboarding pipeline senders are not connected yet");
+        }
+        await guidedOnboardingSenders.commands.recordLangyFirstMessageSeen.send(data);
       },
     });
     const conversationProcessing = EventingLangyConversationAdapter.create({

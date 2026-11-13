@@ -214,6 +214,12 @@ const registry = {
       "Ask an administrator to enable the SQL workbench for this project",
     ],
   },
+  lwql_not_provisioned: {
+    tips: [
+      "This organisation's data is on a server LangWatchQL is not provisioned on; retrying will not help",
+      "On a self-hosted install, let the deploy provision the LangWatchQL access model, then retry",
+    ],
+  },
   custom_chart_playground_not_enabled: {
     tips: [
       "Dashboard widgets need both Dashboards and LangWatchQL enabled for this project; retrying will not help",
@@ -329,6 +335,11 @@ const registry = {
   api_key_permission_denied: {
     tips: ["Re-create the API key with the required scope, or ask an admin to raise your role"],
     docsPath: "/api-reference/api-keys/create-api-key",
+  },
+  impersonation_cannot_mint_credential: {
+    tips: [
+      "No role or grant changes this; leave impersonation, and ask the member to create or rotate the key themselves",
+    ],
   },
   legacy_project_key_ingestion_only: {
     tips: [

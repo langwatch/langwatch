@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createDatasetTestAttachments,
+  createDatasetTestContent,
   createDatasetTestInlineAttachments,
   createDatasetTestRequestBounds,
 } from "../../app/__tests__/dataset.fixture.ts";
@@ -23,6 +24,7 @@ function setup() {
   const service = DatasetService.create({
     repository,
     records: MemoryDatasetRecordRepository.create({ database }),
+    content: createDatasetTestContent({ database }),
     requestBounds: createDatasetTestRequestBounds(),
     attachments: createDatasetTestAttachments(),
     inlineAttachments: createDatasetTestInlineAttachments(),

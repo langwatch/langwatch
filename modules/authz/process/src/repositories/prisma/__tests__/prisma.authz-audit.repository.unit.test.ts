@@ -63,4 +63,26 @@ describe("PrismaAuthzAuditRepository", () => {
     ]);
     expect([...auditLog.rows.values()]).toEqual([WRITTEN]);
   });
+
+  describe("when the row names the project and target it is about", () => {
+    it("writes them to the AuditLog columns the audit log filters on", async () => {
+      const auditLog = new InMemoryAuditTable();
+      const repository = PrismaAuthzAuditRepository.create({
+        auditLog,
+      } satisfies AuthzAuditDatabase);
+
+      await repository.insert({
+        ...ROW,
+        projectId: "project_owner",
+        targetKind: "braid",
+        targetId: "grant_1",
+      });
+
+      expect(auditLog.writes[0]?.data[0]).toMatchObject({
+        projectId: "project_owner",
+        targetKind: "braid",
+        targetId: "grant_1",
+      });
+    });
+  });
 });

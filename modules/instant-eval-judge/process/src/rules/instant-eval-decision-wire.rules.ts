@@ -1,7 +1,7 @@
 /**
  * An own decision model's request and answer (ADR-182 decision 8). The Jev body is shared by
  * every System One host; OpenAI's Decisions API (also Azure and Fireworks) takes a list of named
- * questions, which is turned back into the Jev answer shape so one reader serves every wire.
+ * questions, turned back into the Jev answer shape; Gemini's answers in it natively.
  * @see specs/model-providers/instant-evals-decision-model.feature
  */
 
@@ -27,6 +27,9 @@ export function decisionRequestBodyOf({
   text: string;
   questions: readonly InstantEvalQuestion[];
 }): Record<string, unknown> {
+  if (wire === "gemini_decisions") {
+    return { model: providerModel, input: text, questions: toGeminiDecisionQuestions(questions) };
+  }
   if (wire !== "openai_decisions") {
     return { model: providerModel, state: text, questions: toClassifierQuestions(questions) };
   }
@@ -35,6 +38,23 @@ export function decisionRequestBodyOf({
     input: text,
     questions: questions.map(toOpenAiDecisionQuestion),
   };
+}
+
+/** The Jev questions, with a yes or no question's sides under Gemini's description keys. */
+function toGeminiDecisionQuestions(
+  questions: readonly InstantEvalQuestion[],
+): Record<string, unknown> {
+  const wire: Record<string, unknown> = toClassifierQuestions(questions);
+  for (const question of questions) {
+    if (question.kind !== "boolean" || !question.criteria) continue;
+    const [whenTrue, whenFalse] = question.criteria;
+    wire[question.id] = {
+      type: "noul",
+      instructions: question.instructions,
+      criteria: { true_description: whenTrue, false_description: whenFalse },
+    };
+  }
+  return wire;
 }
 
 function toOpenAiDecisionQuestion(question: InstantEvalQuestion): Record<string, unknown> {
@@ -86,6 +106,16 @@ const openAiDecisionResponseSchema = z.object({
     .optional(),
 });
 
+const geminiDecisionResponseSchema = z.object({
+  answers: z.record(z.string(), z.unknown()),
+  usage: z
+    .object({
+      total_input_tokens: z.number().optional(),
+      total_output_tokens: z.number().optional(),
+    })
+    .optional(),
+});
+
 /** The answer as the Jev reader takes it, or undefined when it is not the provider's shape. */
 export function parseDecisionResponse({
   wire,
@@ -95,10 +125,29 @@ export function parseDecisionResponse({
   body: unknown;
 }): ClassifierResponse | undefined {
   if (wire === "openai_decisions") return parseOpenAiDecision(body);
+  if (wire === "gemini_decisions") return parseGeminiDecision(body);
   const unwrapped =
     wire === "cloudflare_jev" && isRecord(body) && isRecord(body.result) ? body.result : body;
   const parsed = classifierResponseSchema.safeParse(unwrapped);
   return parsed.success ? parsed.data : undefined;
+}
+
+function parseGeminiDecision(body: unknown): ClassifierResponse | undefined {
+  const envelope = geminiDecisionResponseSchema.safeParse(body);
+  if (!envelope.success) return undefined;
+  const parsed = classifierResponseSchema.safeParse({ answers: envelope.data.answers });
+  if (!parsed.success) return undefined;
+  const usage = envelope.data.usage;
+  if (usage === undefined) return parsed.data;
+  return {
+    ...parsed.data,
+    usage: {
+      ...(usage.total_input_tokens === undefined ? {} : { input_tokens: usage.total_input_tokens }),
+      ...(usage.total_output_tokens === undefined
+        ? {}
+        : { output_tokens: usage.total_output_tokens }),
+    },
+  };
 }
 
 function parseOpenAiDecision(body: unknown): ClassifierResponse | undefined {

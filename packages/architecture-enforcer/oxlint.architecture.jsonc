@@ -78,6 +78,7 @@
     "langwatch/service-does-not-open-a-channel": "error",
     "langwatch/service-loads-its-own-config": "error",
     "langwatch/shared-setup-is-a-hook": "error",
+    "langwatch/span-braid-honour-owner": "error",
     "langwatch/stand-in-cast": "error",
     "langwatch/temporal-only": "error",
     "langwatch/test-description-is-an-action": "error",

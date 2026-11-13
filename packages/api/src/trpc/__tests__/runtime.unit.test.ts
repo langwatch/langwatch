@@ -1281,7 +1281,10 @@ describe("a procedure declared as minting a credential", () => {
       handle: () => (ran = true),
     }).createKey({ organizationId: "org-1" });
 
-    await expect(call).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(call).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      cause: { code: "impersonation_cannot_mint_credential" },
+    });
     expect(ran).toBe(false);
   });
 

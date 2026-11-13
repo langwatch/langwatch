@@ -26,6 +26,10 @@
     "./config": {
       "types": "./dist/config-owner.d.ts",
       "default": "./src/config-owner.ts"
+    },
+    "./clickhouse-password-file": {
+      "types": "./dist/clickhouse-password-file.d.ts",
+      "default": "./src/clickhouse-password-file.ts"
     }
   },
   "scripts": {

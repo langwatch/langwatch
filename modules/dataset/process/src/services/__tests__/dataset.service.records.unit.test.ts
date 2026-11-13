@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   createDatasetTestAttachments,
+  createDatasetTestContent,
   createDatasetTestInlineAttachments,
   createDatasetTestRequestBounds,
 } from "../../app/__tests__/dataset.fixture.ts";
@@ -102,6 +103,7 @@ function service(overrides: { columnTypes?: DatasetColumns } = {}) {
     service: DatasetService.create({
       repository,
       records,
+      content: createDatasetTestContent({ database }),
       generateId: () => "generated-id",
       requestBounds: createDatasetTestRequestBounds(),
       attachments: createDatasetTestAttachments(),

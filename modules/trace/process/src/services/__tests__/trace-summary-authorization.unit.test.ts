@@ -1,3 +1,4 @@
+import { projectIdsReadBy, sealAuthorization } from "@langwatch/authorization";
 import { describe, expect, it, vi } from "vitest";
 
 import { aggregateProof, ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
@@ -50,17 +51,32 @@ describe("given an aggregate whose member holds the trace", () => {
   });
 
   describe("when no member holds the trace", () => {
-    it("keeps the proof as it is, for the reads that follow to find nothing", async () => {
+    /** @scenario "A trace no member holds narrows to the reader's own project, never the whole proof" */
+    it("narrows to the aggregate's own project, holding no member's grant", async () => {
       const repository = repositoryHolding([]);
-      const authorization = aggregate();
 
       const result = await serviceOver(repository).getTraceAuthorization({
-        authorization,
+        authorization: aggregate(),
         traceId: "trace-1",
       });
 
-      expect(result).toBe(authorization);
+      expect(result.narrowedTo).toBe(AGGREGATE);
+      expect(projectIdsReadBy(result)).toEqual([AGGREGATE]);
       expect(repository.findByTraceId).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A trace no member holds narrows to the reader's own project, never the whole proof" */
+    it("answers trace not found for a proof with no own project", async () => {
+      const repository = repositoryHolding([]);
+      const membersOnly = aggregate();
+      const proof = sealAuthorization({
+        ...membersOnly,
+        grants: membersOnly.grants.filter((grant) => grant.kind !== "own"),
+      });
+
+      await expect(
+        serviceOver(repository).getTraceAuthorization({ authorization: proof, traceId: "trace-1" }),
+      ).rejects.toMatchObject({ code: "trace_not_found" });
     });
   });
 

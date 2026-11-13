@@ -39,6 +39,7 @@ function plan({ free = false, maxMembers }: { free?: boolean; maxMembers: number
     free,
     maxMembers,
     maxMembersLite: 0,
+    maxMembersDeveloper: 0,
     maxMessagesPerMonth: 0,
     canPublish: true,
     prices: { USD: 0, EUR: 0 },

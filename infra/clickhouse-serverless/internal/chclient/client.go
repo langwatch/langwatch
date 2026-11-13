@@ -62,6 +62,10 @@ func (e *Error) Error() string { return fmt.Sprintf("clickhouse code %d: %s", e.
 // CodeUnknownTable is UNKNOWN_TABLE: a system log table not created yet.
 const CodeUnknownTable = 60
 
+// CodeCannotExtractTableStructure is CANNOT_EXTRACT_TABLE_STRUCTURE: what
+// merge() raises when no table matches, such as a system log not created yet.
+const CodeCannotExtractTableStructure = 636
+
 // IsCode reports whether err is a ClickHouse exception with that code.
 func IsCode(err error, code int) bool {
 	var chErr *Error

@@ -350,10 +350,6 @@ function WebhookEndpointsPanel({
 
       <PageLayout.Container>
         <VStack gap={6} width="full" align="stretch">
-          <Text color="fg.muted">
-            Your systems that receive signed gateway events: billing, budgets and key lifecycle,
-            with retries and delivery history.
-          </Text>
           {isLoading && <ListSkeleton />}
 
           {endpoints && endpoints.length === 0 && <NoWebhookEndpointsState />}
