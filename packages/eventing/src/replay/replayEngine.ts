@@ -422,6 +422,7 @@ class FoldMapReplayRun {
       this.callbacks?.onProgress?.({ ...progress });
     };
 
+    const mapWrites: MapWrites = { started: false };
     let batchResult: { eventsReplayed: number };
     try {
       batchResult = await replayBatch({
@@ -433,13 +434,10 @@ class FoldMapReplayRun {
         batchNum,
         log: this.log,
         emit,
+        mapWrites,
       });
     } catch (error) {
-      if (
-        batchKeys.length > 1 &&
-        isQueryMemoryLimitExceeded(error) &&
-        !this.batchHasMapLane(batchKeys)
-      ) {
+      if (batchKeys.length > 1 && isQueryMemoryLimitExceeded(error) && !mapWrites.started) {
         return this.splitBatch({ error, batchKeys, batchNum });
       }
       await this.handleBatchFailure({ error, batchKeys, batchNum, progress });
@@ -467,8 +465,8 @@ class FoldMapReplayRun {
 
   /**
    * Over its own memory limit a statement fails on the batch's size: clear markers, rerun halves.
-   * Fold-only: fold writes follow the stream, so a half re-folds from init() (a failed flush only
-   * rewrote rows that replace each other). Map lanes write mid-stream, so they never split.
+   * Fold writes follow the stream, so a half re-folds from init() (a failed flush only rewrote
+   * rows that replace each other). Map rows land mid-stream: split only before any map write.
    */
   private async splitBatch({
     error,
@@ -499,17 +497,6 @@ class FoldMapReplayRun {
       if (!(await this.runOneBatch({ batchKeys: half, batchNum }))) return false;
     }
     return true;
-  }
-
-  /**
-   * Whether a map lane runs in this batch: its rows land mid-stream, so a rerun would append twice.
-   */
-  private batchHasMapLane(batchKeys: string[]): boolean {
-    return batchKeys.some((key) =>
-      this.aggregateProjectionMap
-        .get(key)!
-        .projections.some((name) => this.selected.mapProjectionByName.has(name)),
-    );
   }
 
   /**
@@ -866,6 +853,11 @@ interface BatchAccumulators {
   mapAccumulators: Map<string, MapReplayAccumulator>;
 }
 
+/** Whether a batch attempt's map lanes began writing rows: a rerun would append them twice. */
+interface MapWrites {
+  started: boolean;
+}
+
 /** The projection's own pipeline retention, else the runtime's (eventSourcing.ts, registration). */
 function accumulatorOptsFor({
   ctx,
@@ -922,10 +914,12 @@ function applyEventToProjections({
   entry,
   accumulators,
   event,
+  mapWrites,
 }: {
   entry: AggregateEntry;
   accumulators: BatchAccumulators;
   event: ReplayEvent;
+  mapWrites: MapWrites;
 }): Promise<void>[] | undefined {
   let pendingDrains: Promise<void>[] | undefined;
   for (const projName of entry.projections) {
@@ -934,7 +928,10 @@ function applyEventToProjections({
     if (mapAcc) {
       mapAcc.apply(event);
       const drain = mapAcc.drainIfNeeded();
-      if (drain) (pendingDrains ??= []).push(drain);
+      if (drain) {
+        mapWrites.started = true;
+        (pendingDrains ??= []).push(drain);
+      }
     }
   }
   return pendingDrains;
@@ -950,11 +947,13 @@ function makeOnEvent({
   accumulators,
   counter,
   emit,
+  mapWrites,
 }: {
   aggregateProjectionMap: AggregateProjectionMap;
   accumulators: BatchAccumulators;
   counter: { eventsProcessed: number };
   emit: EmitFn;
+  mapWrites: MapWrites;
 }): (event: ReplayEvent) => void | Promise<void> {
   return (event) => {
     const key = aggregateKey({
@@ -969,6 +968,7 @@ function makeOnEvent({
       entry,
       accumulators,
       event,
+      mapWrites,
     });
 
     counter.eventsProcessed++;
@@ -999,6 +999,7 @@ async function streamApplyAndWrite({
   boundsByTenant,
   concurrency,
   emit,
+  mapWrites,
 }: {
   ctx: ReplayContext;
   groups: BatchGroups;
@@ -1008,6 +1009,7 @@ async function streamApplyAndWrite({
   boundsByTenant: Map<string, OccurredAtBounds>;
   concurrency: number;
   emit: EmitFn;
+  mapWrites: MapWrites;
 }): Promise<{ eventsProcessed: number }> {
   emit("replay", 0);
   const accumulators = buildAccumulators({ ctx, groups, selected });
@@ -1017,6 +1019,7 @@ async function streamApplyAndWrite({
     accumulators,
     counter,
     emit,
+    mapWrites,
   });
 
   await pMapLimited({
@@ -1042,6 +1045,7 @@ async function streamApplyAndWrite({
     await acc.flush();
   }
   for (const [, acc] of accumulators.mapAccumulators) {
+    if (acc.processed > 0) mapWrites.started = true;
     await acc.flush();
   }
 
@@ -1102,6 +1106,7 @@ async function replayBatch({
   batchNum,
   log,
   emit,
+  mapWrites,
 }: {
   ctx: ReplayContext;
   batchKeys: string[];
@@ -1111,6 +1116,7 @@ async function replayBatch({
   batchNum: number;
   log: ReplayLogWriter;
   emit: EmitFn;
+  mapWrites: MapWrites;
 }): Promise<{ eventsReplayed: number }> {
   const groups = groupBatch({ batchKeys, aggregateProjectionMap });
 
@@ -1139,6 +1145,7 @@ async function replayBatch({
     boundsByTenant,
     concurrency,
     emit,
+    mapWrites,
   });
 
   log.write({

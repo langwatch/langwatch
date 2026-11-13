@@ -31,6 +31,8 @@ const PAUSE_KEY = `global/projection/${LANE}`;
 const MAP_LANE = "directoryMemberRows";
 const FROM_START = "1970-01-01T00:00:00Z";
 const BASE_MS = 1_700_000_000_000;
+/** Rows a map accumulator buffers before it drains mid-stream (replayExecutor's write batch size). */
+const MAP_DRAIN_ROWS = 5000;
 
 type Matching = { eventTypes: readonly string[]; sinceMs?: number; tenantId?: string };
 
@@ -772,10 +774,33 @@ describe("projectionLaneReplayer", () => {
   });
 
   describe("given a map lane whose event query outgrows the per-query memory limit", () => {
-    /** @scenario "A map lane over the query memory limit fails without splitting" */
-    it("fails the lane on that batch without replaying a half", async () => {
+    /** @scenario "A map lane over the query memory limit before writing a row is split until it fits" */
+    it("replays the batch as halves and writes each row once", async () => {
+      const clean = setUp();
+      await clean.replayer.replayLane({ lane: MAP_LANE, since: FROM_START, dryRun: false });
       const { log, mapRows, replayer } = setUp();
-      const { streamed } = failStreamsAbove({ log, maxAggregates: 1 });
+      const { streamed } = failStreamsAbove({ log, maxAggregates: 1, eventsFirst: 1 });
+
+      const result = await replayer.replayLane({
+        lane: MAP_LANE,
+        since: FROM_START,
+        dryRun: false,
+      });
+
+      expect(streamed).toEqual([2, 1, 1]);
+      expect(mapRows).toEqual(clean.mapRows);
+      expect(result).toMatchObject({ aggregatesReplayed: 2, totalEvents: 3 });
+    });
+
+    /** @scenario "A map lane over the query memory limit after writing rows fails without splitting" */
+    it("fails the lane on that batch without replaying a half once a drain wrote rows", async () => {
+      const { log, mapRows, replayer } = setUp();
+      log.events.push(
+        ...Array.from({ length: MAP_DRAIN_ROWS }, (_, i) =>
+          seededEvent({ n: 4 + i, aggregateId: "directory-a" }),
+        ),
+      );
+      const { streamed } = failStreamsAbove({ log, maxAggregates: 1, eventsFirst: MAP_DRAIN_ROWS });
 
       await expect(
         replayer.replayLane({ lane: MAP_LANE, since: FROM_START, dryRun: false }),
@@ -784,7 +809,7 @@ describe("projectionLaneReplayer", () => {
       );
 
       expect(streamed).toEqual([2]);
-      expect(mapRows).toEqual([]);
+      expect(mapRows).toHaveLength(MAP_DRAIN_ROWS);
     });
   });
 });
