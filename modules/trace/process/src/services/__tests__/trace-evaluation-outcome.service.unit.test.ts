@@ -1,4 +1,5 @@
 /** Spec: specs/trace/trace-evaluation-analytics.feature */
+import { ProjectNotFoundError } from "@langwatch/authorization";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import {
   EVALUATION_OUTCOME_TEXT_MAX_LENGTH,
@@ -25,7 +26,11 @@ import {
   EvaluatedTraceNotYetStoredError,
   TraceEvaluationOutcomeService,
 } from "../trace-evaluation-outcome.service.ts";
-import { TraceEvaluationOutcomesMigrationService } from "../trace-evaluation-outcomes-migration.service.ts";
+import {
+  type EvaluationOutcomesBackfillReport,
+  evaluationOutcomesBackfillReportSchema,
+  TraceEvaluationOutcomesMigrationService,
+} from "../trace-evaluation-outcomes-migration.service.ts";
 
 const TENANT = "tenant-outcomes";
 const TRACE_ID = "trace-outcomes";
@@ -289,6 +294,7 @@ describe("TraceEvaluationOutcomesMigrationService", () => {
         evaluations,
         anchors,
         commands: { recordEvaluationOutcomes: async (data) => void sent.push(...data) },
+        logger: { warn: () => {} },
         now: () => EVALUATED_AT + 60_000,
       });
 
@@ -318,6 +324,242 @@ describe("TraceEvaluationOutcomesMigrationService", () => {
         },
       ]);
       expect(report).toMatchObject({ projects: 1, outcomes: 2, skippedWithoutTrace: 0 });
+    });
+  });
+
+  describe("given a project archived since its evaluations", () => {
+    const archivedId = "p-archived";
+    const projects = {
+      listAllWithOrganization: async () => ({
+        projects: [
+          { id: archivedId, organizationId: "organization-1" },
+          { id: TENANT, organizationId: "organization-1" },
+        ],
+        orphanIds: [],
+        next: null,
+      }),
+    };
+
+    const projectGone = new ProjectNotFoundError("p-archived");
+
+    async function backfillWith({
+      failure,
+      resumeFrom = null,
+      abortWhenGone = false,
+    }: {
+      failure: Error;
+      abortWhenGone?: boolean;
+      resumeFrom?: EvaluationOutcomesBackfillReport | null;
+    }) {
+      const { evaluations, anchors } = await compose();
+      evaluations.outcomes.push({
+        tenantId: TENANT,
+        evaluationId: "evaluation-a",
+        traceId: TRACE_ID,
+        evaluatorName: "Faithfulness",
+        isGuardrail: false,
+        status: "processed",
+        passed: true,
+        label: null,
+        occurredAt: EVALUATED_AT,
+        lastEventId: "last-evaluation-a",
+      });
+      const sent: RecordEvaluationOutcomeCommandData[] = [];
+      const saved: EvaluationOutcomesBackfillReport[] = [];
+      const controller = new AbortController();
+      const warned: unknown[] = [];
+      const backfill = TraceEvaluationOutcomesMigrationService.create({
+        projects,
+        evaluations: {
+          listEvaluationOutcomes: async (input) => {
+            if (input.tenantId === archivedId) {
+              if (abortWhenGone) controller.abort();
+              throw failure;
+            }
+            return evaluations.listEvaluationOutcomes(input);
+          },
+        },
+        anchors,
+        commands: { recordEvaluationOutcomes: async (data) => void sent.push(...data) },
+        logger: { warn: (payload) => void warned.push(payload) },
+        now: () => EVALUATED_AT + 60_000,
+      });
+      const run = () =>
+        backfill.recordEvaluationOutcomes({
+          resumeFrom,
+          dryRun: false,
+          signal: controller.signal,
+          onPage: async (report) => void saved.push(report),
+        });
+      return { run, sent, saved, warned };
+    }
+
+    /** @scenario "The backfill skips a project archived since its evaluations" */
+    it("skips the project, counts it, and carries on with the next one", async () => {
+      const { run, sent, saved, warned } = await backfillWith({
+        failure: projectGone,
+      });
+
+      const report = await run();
+
+      expect(sent.map(({ evaluationId }) => evaluationId)).toEqual(["evaluation-a"]);
+      expect(report).toMatchObject({
+        projects: 1,
+        outcomes: 1,
+        skippedProjects: 1,
+        skippedProjectIds: [archivedId],
+      });
+      expect(saved[0]).toMatchObject({
+        afterProjectId: archivedId,
+        inProject: null,
+        skippedProjects: 1,
+        skippedProjectIds: [archivedId],
+      });
+      expect(report.afterProjectId).toBe(TENANT);
+      expect(warned).toEqual([{ projectId: archivedId }]);
+    });
+
+    /** @scenario "The backfill skips a project archived since its evaluations" */
+    it("saves the skip even when the run is aborted as the project is found gone", async () => {
+      const { run, saved } = await backfillWith({ failure: projectGone, abortWhenGone: true });
+
+      const report = await run();
+
+      expect(report).toMatchObject({
+        afterProjectId: archivedId,
+        inProject: null,
+        skippedProjects: 1,
+      });
+      expect(saved.at(-1)).toEqual(report);
+    });
+
+    /** @scenario "The backfill skips a project archived since its evaluations" */
+    it("skips a project archived after part of it was saved", async () => {
+      const { run, sent } = await backfillWith({
+        failure: projectGone,
+        resumeFrom: {
+          sinceMs: EVALUATED_AT - 1,
+          afterProjectId: null,
+          inProject: {
+            projectId: archivedId,
+            after: { occurredAt: EVALUATED_AT, evaluationId: "evaluation-0" },
+          },
+          projects: 1,
+          outcomes: 1,
+          skippedWithoutTrace: 0,
+          skippedProjects: 0,
+          skippedProjectIds: [],
+        },
+      });
+
+      const report = await run();
+
+      expect(sent.map(({ evaluationId }) => evaluationId)).toEqual(["evaluation-a"]);
+      // The archived project moves from `projects` to `skippedProjects`: counted once.
+      expect(report).toMatchObject({
+        projects: 1,
+        outcomes: 2,
+        skippedProjects: 1,
+        inProject: null,
+        afterProjectId: TENANT,
+      });
+    });
+
+    /** The archived project sends one page of outcomes, then is found gone. */
+    async function backfillArchivedAfterOnePage({ dryRun }: { dryRun: boolean }) {
+      const outcome = (index: number) => ({
+        evaluationId: `evaluation-${index}`,
+        traceId: TRACE_ID,
+        evaluatorName: "Faithfulness",
+        isGuardrail: false,
+        status: "processed" as const,
+        passed: true,
+        label: null,
+        occurredAt: EVALUATED_AT + index,
+        lastEventId: `last-evaluation-${index}`,
+      });
+      const anchors = { traceAnchors: async () => new Map([[TRACE_ID, EVALUATED_AT]]) };
+      let archivedCalls = 0;
+      const sent: RecordEvaluationOutcomeCommandData[] = [];
+      const backfill = TraceEvaluationOutcomesMigrationService.create({
+        projects,
+        evaluations: {
+          listEvaluationOutcomes: async ({ tenantId }) => {
+            if (tenantId !== archivedId) return { outcomes: [], next: null };
+            if (archivedCalls++ > 0) throw projectGone;
+            return {
+              outcomes: [outcome(1)],
+              next: { occurredAt: EVALUATED_AT + 1, evaluationId: "evaluation-1" },
+            };
+          },
+        },
+        anchors,
+        commands: { recordEvaluationOutcomes: async (data) => void sent.push(...data) },
+        logger: { warn: () => {} },
+        now: () => EVALUATED_AT + 60_000,
+      });
+
+      const saved: EvaluationOutcomesBackfillReport[] = [];
+      const report = await backfill.recordEvaluationOutcomes({
+        resumeFrom: null,
+        dryRun,
+        signal: new AbortController().signal,
+        onPage: async (checkpoint) => void saved.push(checkpoint),
+      });
+      return { report, sent, saved };
+    }
+
+    /** @scenario "The backfill skips a project archived since its evaluations" */
+    it("keeps the counts of pages sent before the project was archived", async () => {
+      const { report, sent, saved } = await backfillArchivedAfterOnePage({ dryRun: false });
+
+      expect(sent.map(({ evaluationId }) => evaluationId)).toEqual(["evaluation-1"]);
+      expect(report).toMatchObject({
+        projects: 0,
+        outcomes: 1,
+        skippedProjects: 1,
+        skippedProjectIds: [archivedId],
+      });
+      expect(saved.at(-1)).toMatchObject({ outcomes: 1, skippedProjects: 1, inProject: null });
+    });
+
+    /** @scenario "The backfill skips a project archived since its evaluations" */
+    it("reports the pages a dry run counted before the project was archived", async () => {
+      const { report, sent, saved } = await backfillArchivedAfterOnePage({ dryRun: true });
+
+      expect(sent).toEqual([]);
+      expect(saved).toEqual([]);
+      expect(report).toMatchObject({
+        projects: 0,
+        outcomes: 1,
+        skippedProjects: 1,
+        skippedProjectIds: [archivedId],
+      });
+    });
+
+    /** @scenario "The backfill still fails on any other error" */
+    it("still fails the run on any other error", async () => {
+      const failure = new Error("clickhouse down");
+      const { run } = await backfillWith({ failure });
+
+      await expect(run()).rejects.toBe(failure);
+    });
+  });
+
+  describe("given a report saved before projects could be skipped", () => {
+    /** @scenario "A checkpoint saved before projects could be skipped still resumes" */
+    it("reads it with no skipped projects", () => {
+      const report = evaluationOutcomesBackfillReportSchema.parse({
+        sinceMs: 1,
+        afterProjectId: null,
+        inProject: null,
+        projects: 3,
+        outcomes: 4,
+        skippedWithoutTrace: 2,
+      });
+
+      expect(report.skippedProjects).toBe(0);
+      expect(report.skippedProjectIds).toEqual([]);
     });
   });
 });
