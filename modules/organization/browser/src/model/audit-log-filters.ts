@@ -45,9 +45,8 @@ export function readAuditTarget(
 /** The chip naming the target filter: a braid by its projects, never by its grant id. */
 export function auditTargetChipText(target: NonNullable<AuditTargetFilter>): string {
   if (target.targetKind === BRAID_AUDIT_TARGET_KIND) {
-    return target.targetLabel ? `Braid: ${target.targetLabel}` : "Braid";
+    return target.targetLabel ? `Braid: ${target.targetLabel.slice(0, 80)}` : "Braid";
   }
-  if (target.targetLabel) return `${target.targetKind}: ${target.targetLabel}`;
   return `${target.targetKind} = ${target.targetId.slice(0, 24)}…`;
 }
 

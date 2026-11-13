@@ -238,6 +238,18 @@ describe("given a project filter picked in one organization", () => {
   });
 });
 
+describe("given a target label on a link that is not a braid's", () => {
+  /** @scenario A braid's target chip names its projects, never its grant id */
+  it("shows the target's id, not the label the link carries", () => {
+    const target = readAuditTarget({
+      targetKind: "virtual_key",
+      targetId: "vk_A",
+      targetLabel: "Prod key",
+    });
+    expect(target && auditTargetChipText(target)).toBe("virtual_key = vk_A…");
+  });
+});
+
 describe("given the audit log opened from a braid", () => {
   /** @scenario A braid's target chip names its projects, never its grant id */
   it("names the braid by its projects", () => {

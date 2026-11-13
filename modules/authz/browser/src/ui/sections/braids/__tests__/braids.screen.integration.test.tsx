@@ -139,6 +139,12 @@ describe("BraidsScreen", () => {
       expect(screen.queryByTestId("new-braid-header")).not.toBeInTheDocument();
     });
 
+    /** @scenario The header's main action follows the open tab */
+    it("offers New braid in the header on the Braids tab", async () => {
+      renderAs({});
+      expect(await screen.findByTestId("new-braid-header")).toBeInTheDocument();
+    });
+
     it("opens on Signing keys when the link names that tab, and writes a picked tab back", async () => {
       const { host } = renderAs({ query: { tab: "keys" } });
 
