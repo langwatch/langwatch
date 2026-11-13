@@ -207,7 +207,7 @@ describe("given the Data Privacy page", () => {
       expect(cards.getByText("Standard detection")).toBeInTheDocument();
       expect(cards.getByText("LangWatch PII Redaction Model")).toBeInTheDocument();
       expect(screen.getByTestId("pii-redaction-model-price").textContent).toContain(
-        "$0.50per 1M characters, pay as you go",
+        "$0.50per 1M characters excl. VAT, pay as you go",
       );
     });
 
@@ -341,7 +341,7 @@ describe("given the Data Privacy page", () => {
 
       const dialog = await screen.findByRole("dialog", { name: "Turn on Strict?" });
       expect(dialog.textContent).toContain(
-        "Strict uses the LangWatch PII Redaction Model at $0.50 per 1M characters, pay as you go. Turn it on?",
+        "Strict uses the LangWatch PII Redaction Model at $0.50 per 1M characters excl. VAT, pay as you go. Turn it on?",
       );
       expect(setForScope).not.toHaveBeenCalled();
 

@@ -24,7 +24,7 @@ describe("given the rate billing charges for the PII redaction model", () => {
     it("reads $0.50 per 1M characters", () => {
       expect(piiRedactionModelPrice({ nanoUsdPerCharacter: 500 })).toBe("$0.50");
       expect(`${PII_REDACTION_MODEL_PRICE} ${PII_REDACTION_MODEL_PRICE_UNIT}`).toBe(
-        "$0.50 per 1M characters, pay as you go",
+        "$0.50 per 1M characters excl. VAT, pay as you go",
       );
     });
   });
@@ -107,7 +107,7 @@ describe("given a change of the organization's level", () => {
       expect(levelChangeConfirmation({ from: "essential", to: "strict", free: false })).toEqual({
         title: "Turn on Strict?",
         description:
-          "Strict uses the LangWatch PII Redaction Model at $0.50 per 1M characters, pay as you go. Turn it on?",
+          "Strict uses the LangWatch PII Redaction Model at $0.50 per 1M characters excl. VAT, pay as you go. Turn it on?",
         confirmLabel: "Turn on Strict",
       });
     });
@@ -132,7 +132,7 @@ describe("given a change of the organization's level", () => {
       expect(
         levelChangeConfirmation({ from: "custom", to: "strict", free: false })?.description,
       ).toBe(
-        "This replaces your custom PII settings. Strict uses the LangWatch PII Redaction Model at $0.50 per 1M characters, pay as you go. Turn it on?",
+        "This replaces your custom PII settings. Strict uses the LangWatch PII Redaction Model at $0.50 per 1M characters excl. VAT, pay as you go. Turn it on?",
       );
     });
   });

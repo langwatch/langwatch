@@ -32,7 +32,7 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
     When an admin opens the Data Privacy page for project "web-app"
     Then the organization PII level picker shows Essential selected
     And Essential reads "Included" and "Standard detection"
-    And Strict reads "LangWatch PII Redaction Model" with "$0.50 per 1M characters, pay as you go"
+    And Strict reads "LangWatch PII Redaction Model" with "$0.50 per 1M characters excl. VAT, pay as you go"
 
   @integration
   Scenario: The example follows the selected level

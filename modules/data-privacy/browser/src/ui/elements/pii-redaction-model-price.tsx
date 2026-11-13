@@ -11,7 +11,7 @@ import {
 } from "../../model/pii-redaction-level-offer.ts";
 
 /**
- * "$0.50 per 1M characters, pay as you go", or "Included for your organization" when free, with
+ * "$0.50 per 1M characters excl. VAT, pay as you go", or "Included for your organization" when free, with
  * the billing and fallback notes behind an (i).
  */
 export function PiiRedactionModelPrice({ free }: { free: boolean }) {

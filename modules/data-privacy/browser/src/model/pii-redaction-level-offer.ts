@@ -36,7 +36,7 @@ export function piiRedactionModelPrice({
 export const PII_REDACTION_MODEL_PRICE = piiRedactionModelPrice({
   nanoUsdPerCharacter: PII_REDACTION_NANO_USD_PER_CHARACTER,
 });
-export const PII_REDACTION_MODEL_PRICE_UNIT = "per 1M characters, pay as you go";
+export const PII_REDACTION_MODEL_PRICE_UNIT = "per 1M characters excl. VAT, pay as you go";
 
 /**
  * The model's limit on one span's texts combined; longer spans fall back to the standard detector.
