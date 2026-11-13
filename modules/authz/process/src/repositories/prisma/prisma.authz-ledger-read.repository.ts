@@ -1,5 +1,11 @@
-import { grantConditionSchema } from "@langwatch/authorization";
-import { type AuthzSharedProjectGrant, OffboardIncompleteError } from "@langwatch/authz-contract";
+import { grantConditionSchema, OrganizationUserRole } from "@langwatch/authorization";
+import {
+  type AuthzSharedProjectGrant,
+  GRANT_SOURCE_BRAID,
+  OffboardIncompleteError,
+  PROJECT_READER_ROLE_KEY,
+} from "@langwatch/authz-contract";
+import { isFullMember } from "@langwatch/entitlement-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { type Instant, fromDate, toDate } from "@langwatch/time";
 import { z } from "zod";
@@ -8,11 +14,16 @@ import {
   AuthzLedgerReadRepository,
   type LedgerDirectoryGrantRow,
   type LedgerGrantIdentity,
+  type LedgerBraidRow,
   type LedgerRoleDefinition,
 } from "../authz-ledger-read.repository.ts";
 import type { AuthzReadRepository } from "../authz-read.repository.ts";
-import { liveGrants, liveRoles } from "../eventing/eventing.authz-live-rows.mapper.ts";
-import { sharedProjectReadsOf } from "../eventing/eventing.authz-read.mapper.ts";
+import {
+  findReplacedGrantIds,
+  liveGrants,
+  liveRoles,
+} from "../eventing/eventing.authz-live-rows.mapper.ts";
+import { NOT_A_BRAID, sharedProjectReadsOf } from "../eventing/eventing.authz-read.mapper.ts";
 import { EventingAuthzReadRepository } from "../eventing/eventing.authz-read.repository.ts";
 import {
   GRANT_ROW_COLUMNS,
@@ -20,6 +31,21 @@ import {
   grantRowFromStored,
 } from "./prisma.authz-grant.mapper.ts";
 import type { AuthzGrantFilter } from "./prisma.authz-ledger.mapper.ts";
+
+const braidRowsSchema = z.array(
+  z.object({
+    id: z.string(),
+    principalId: z.string().nullable(),
+    scopeId: z.string(),
+    condition: z.unknown().optional(),
+    expiresAt: z.date().nullable(),
+    createdByUserId: z.string().nullable(),
+    occurredAt: z.date(),
+    revokedAt: z.date().nullable(),
+    revokedReason: z.string().nullable(),
+    replacesGrantId: z.string().nullable(),
+  }),
+);
 
 const sharedProjectGrantRowsSchema = z.array(
   z.object({ id: z.string(), scopeId: z.string(), condition: z.unknown().optional() }),
@@ -157,7 +183,7 @@ export class PrismaAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
   }): Promise<AuthzSharedProjectGrant[]> {
     const rows = sharedProjectGrantRowsSchema.parse(
       await liveGrants(this.prisma).findMany({
-        where: sharedProjectReadsOf({ organizationId, readerProjectId }),
+        where: { ...sharedProjectReadsOf({ organizationId, readerProjectId }), ...NOT_A_BRAID },
         select: { id: true, scopeId: true, condition: true },
         orderBy: { scopeId: "asc" },
       }),
@@ -166,6 +192,64 @@ export class PrismaAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
       grantId: row.id,
       memberProjectId: row.scopeId,
       condition: grantConditionSchema.safeParse(row.condition).data ?? null,
+    }));
+  }
+
+  async findBraids({
+    organizationId,
+    projectId,
+    grantId,
+    includeRevoked = false,
+  }: {
+    organizationId: string;
+    projectId?: string;
+    grantId?: string;
+    includeRevoked?: boolean;
+  }): Promise<LedgerBraidRow[]> {
+    const where = {
+      organizationId,
+      source: GRANT_SOURCE_BRAID,
+      roleKey: PROJECT_READER_ROLE_KEY,
+      scopeType: "PROJECT" as const,
+      ...(grantId === undefined ? {} : { id: grantId }),
+      ...(projectId === undefined
+        ? {}
+        : { OR: [{ principalId: projectId }, { scopeId: projectId }] }),
+    };
+    const select = {
+      id: true,
+      principalId: true,
+      scopeId: true,
+      condition: true,
+      expiresAt: true,
+      createdByUserId: true,
+      occurredAt: true,
+      revokedAt: true,
+      revokedReason: true,
+      replacesGrantId: true,
+    };
+    const rows = braidRowsSchema.parse(
+      includeRevoked
+        ? await this.prisma.grant.findMany({ where, select, orderBy: { occurredAt: "asc" } })
+        : await liveGrants(this.prisma).findMany({ where, select, orderBy: { occurredAt: "asc" } }),
+    );
+    const replaced = await findReplacedGrantIds({
+      database: this.prisma,
+      organizationId,
+      grantIds: rows.map((row) => row.id),
+    });
+    return rows.map((row) => ({
+      grantId: row.id,
+      ownerProjectId: row.scopeId,
+      readerProjectId: row.principalId ?? "",
+      condition: grantConditionSchema.safeParse(row.condition).data ?? null,
+      expiresAt: row.expiresAt ? fromDate(row.expiresAt) : null,
+      createdByUserId: row.createdByUserId,
+      occurredAt: fromDate(row.occurredAt),
+      revokedReason: row.revokedReason,
+      isLive: row.revokedAt === null,
+      replacesGrantId: row.replacesGrantId,
+      isReplaced: replaced.has(row.id),
     }));
   }
 
@@ -312,8 +396,10 @@ export class PrismaAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
     legacyTeamMemberships: number;
     pendingInvites: number;
     organizationMembership: boolean;
+    heldFullSeat: boolean;
   }> {
     return this.prisma.$transaction(async (tx) => {
+      const heldFullSeat = await heldFullSeatIn({ tx, organizationId, userId });
       // The membership row goes first: its lock serializes the grant snapshot
       // below with a stamped attach, whose projection now fails its stamp check.
       const organizationMembership = await tx.organizationUser.deleteMany({
@@ -360,7 +446,49 @@ export class PrismaAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
         legacyTeamMemberships: legacyTeamMemberships.count,
         pendingInvites: pendingInvites.count,
         organizationMembership: organizationMembership.count > 0,
+        heldFullSeat,
       };
     }, OFFBOARD_MEMBERSHIP_TXN_OPTIONS);
   }
+}
+
+const permissionsSchema = z.array(z.string());
+
+/**
+ * Whether the person holds a FULL seat now, classified as organization's seat count does: an
+ * active member's role, and for an external member the custom roles of its team bindings.
+ */
+async function heldFullSeatIn({
+  tx,
+  organizationId,
+  userId,
+}: {
+  tx: Pick<PrismaClient, "organizationUser" | "roleBinding" | "customRole">;
+  organizationId: string;
+  userId: string;
+}): Promise<boolean> {
+  const membership = await tx.organizationUser.findFirst({
+    where: { organizationId, userId, disabledAt: null, user: { deactivatedAt: null } },
+    select: { role: true },
+  });
+  if (!membership) return false;
+  if (membership.role !== OrganizationUserRole.EXTERNAL) {
+    return isFullMember(membership.role, undefined);
+  }
+  const bindings = await tx.roleBinding.findMany({
+    where: { organizationId, userId, scopeType: "TEAM", customRoleId: { not: null } },
+    select: { customRoleId: true },
+  });
+  const customRoleIds = bindings.flatMap((binding) =>
+    binding.customRoleId ? [binding.customRoleId] : [],
+  );
+  if (customRoleIds.length === 0) return isFullMember(membership.role, undefined);
+  const roles = await tx.customRole.findMany({
+    where: { organizationId, id: { in: customRoleIds } },
+    select: { permissions: true },
+  });
+  const permissions = roles.flatMap(
+    (role) => permissionsSchema.safeParse(role.permissions).data ?? [],
+  );
+  return isFullMember(membership.role, permissions.length > 0 ? permissions : undefined);
 }

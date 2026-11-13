@@ -282,6 +282,21 @@ describe("MonitorModule", () => {
       });
     });
 
+    /** @scenario "Copying a monitor records the user who copied it as the replica's creator" */
+    it("records no creator when the copy names no writer, as for an API key", async () => {
+      const { app } = harness({
+        replication: new FakeMonitorReplication({ id: "evaluator-copied", workflowId: null }),
+        evaluators: new FakeMonitorEvaluators(["evaluator-1", "evaluator-copied"]),
+      });
+
+      const replica = await app.copy(copy);
+
+      expect(replica.createdById).toBeNull();
+      await expect(app.copy({ ...copy, actorId: "user-1" })).resolves.toMatchObject({
+        createdById: "user-1",
+      });
+    });
+
     it("rolls the copied evaluator and its workflow back when the replica cannot be written", async () => {
       const replication = new FakeMonitorReplication({
         id: "evaluator-copied",

@@ -3,7 +3,7 @@ Feature: Copying an organization's setup into another organization
   scripts. The copy runs on the server through each owner's API, copies an allowlist of kinds
   only, and needs one approval per organization, both live at once. Each approval names both
   organizations, and the target approval names what the copy may create there; the passkey
-  signs both. Neither side gets an organization key. Module ADR-002, ADR-193.
+  signs both. Neither side gets an organization key. Module ADR-002, ADR-202.
 
   Background:
     Given cloud ops is on and the system flag "ops_agent_access_enabled" is on

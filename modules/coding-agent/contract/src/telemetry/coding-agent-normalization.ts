@@ -326,6 +326,13 @@ export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
   "ttft_ms",
   "type",
   "request_id",
+
+  // pi names every attribute under its own prefix and this lookup is exact, so
+  // an unlisted pi key is dropped on arrival (ADR-188). The fold reads pi's
+  // model, usage and tool facts through the `gen_ai.*` mirrors above, and the
+  // session key off the raw span, so pi's reported cost is the only pi key
+  // read here. Add one when a reader needs it.
+  "pi.ai.usage.cost",
 ];
 
 /**
@@ -498,8 +505,13 @@ export function deriveToolName({
 
   const name = spanName ?? "";
   if (name.length === 0) return null;
-  // GenAI semconv names a tool run `execute_tool {tool}` and declares the tool by attribute.
-  if (name.split(" ", 1)[0] === GEN_AI_TOOL_RUN_OPERATION) {
+  // GenAI semconv names a tool run `execute_tool {tool}` and declares the tool by attribute, as
+  // does an agent's declared tool-run span (pi's `pi.harness.tool`, lifted by its canonicaliser).
+  const operation = name.split(" ", 1)[0];
+  const isToolRun =
+    operation === GEN_AI_TOOL_RUN_OPERATION ||
+    CODING_AGENT_REGISTRY.some((agent) => agent.genAiOperations?.toolRun === operation);
+  if (isToolRun) {
     const declared = pickFirstString(attrs, ["gen_ai.tool.name"]);
     if (declared !== null) return declared;
   }

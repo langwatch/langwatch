@@ -23,17 +23,6 @@ await it("keeps agent commands deliberate and setup prompts complete in both the
         try {
           await page.addInitScript((value) => localStorage.setItem("theme", value), theme);
           await page.goto(base + "introduction");
-          await page.waitForFunction(() => {
-            const launcher = document.querySelector(".docs-left-rail .docs-agent-launcher");
-            const select = launcher?.querySelector("select");
-            const centre = launcher?.querySelector('.docs-agent-name[data-distance="0"]');
-            return (
-              select?.value !== "claude" && centre?.getAttribute("data-agent") === select?.value
-            );
-          });
-          assert.ok(
-            await page.getByText("Trace any coding agent", { exact: false }).first().isVisible(),
-          );
           await assertAgentSetup({ page, base, prompt });
           assert.equal(
             await page.locator("html").evaluate((node) => node.classList.contains("dark")),
@@ -45,6 +34,13 @@ await it("keeps agent commands deliberate and setup prompts complete in both the
           assert.ok(
             await copy.evaluate((node) => node.parentElement.textContent.includes("Setup prompt")),
           );
+          await page.emulateMedia({ reducedMotion: "reduce" });
+          await setup.screenshot({ path: path.join(shots, `docs-agent-setup-${theme}.png`) });
+          await page.goto(base + "integration/quick-start");
+          await page.waitForFunction(() => document.querySelector(".docs-agent-pick[data-reel]"));
+          assert.ok(
+            await page.getByText("Trace any coding agent", { exact: false }).first().isVisible(),
+          );
           const launcher = page.locator(".docs-left-rail .docs-agent-launcher");
           const select = launcher.getByLabel("Coding agent");
           assert.equal(await select.evaluate((node) => getComputedStyle(node).opacity), "1");
@@ -53,14 +49,12 @@ await it("keeps agent commands deliberate and setup prompts complete in both the
           await page.waitForFunction(() =>
             navigator.clipboard.readText().then((text) => text === "npx langwatch opencode"),
           );
-          await page.locator('#content a[href="/integration/quick-start"]').first().click();
-          await page.waitForURL("**/integration/quick-start");
+          await page.locator('.docs-left-rail a[href="/integration/overview"]').first().click();
+          await page.waitForURL("**/integration/overview");
           assert.equal(await select.inputValue(), "opencode");
-          await page.emulateMedia({ reducedMotion: "reduce" });
+          await launcher.screenshot({ path: path.join(shots, `docs-agent-command-${theme}.png`) });
           await page.goto(base + "introduction");
           await page.getByRole("button", { name: "Copy setup prompt" }).waitFor();
-          await launcher.screenshot({ path: path.join(shots, `docs-agent-command-${theme}.png`) });
-          await setup.screenshot({ path: path.join(shots, `docs-agent-setup-${theme}.png`) });
           await page.setViewportSize({ width: 390, height: 844 });
           await setup.scrollIntoViewIfNeeded();
           assert.equal(
@@ -82,6 +76,7 @@ await it("keeps agent commands deliberate and setup prompts complete in both the
         await setup.locator("summary").click();
         assert.equal(await setup.getByLabel("Full setup prompt").textContent(), prompt);
         assert.ok(await setup.getByRole("button", { name: "Copy setup prompt" }).isDisabled());
+        await page.goto(base + "integration/quick-start");
         assert.ok(
           await page
             .locator(".docs-left-rail")
@@ -295,7 +290,7 @@ await it("turns the agent wheel by click, drag, flick and wheel, landing on a re
     run: async ({ browser, base }) => {
       const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
       try {
-        await page.goto(base + "introduction", { waitUntil: "load" });
+        await page.goto(base + "integration/quick-start", { waitUntil: "load" });
         const pick = page.locator(".docs-left-rail .docs-agent-pick");
         await page.waitForFunction(() => document.querySelector(".docs-agent-pick[data-reel]"));
         const select = pick.getByLabel("Coding agent");

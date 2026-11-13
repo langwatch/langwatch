@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
- * The membership-lifetime fence on the real Grant table: what a projected
- * USER fact does against a live, a rejoined and a disabled membership.
+ * The real Grant table: the membership-lifetime fence on a projected USER fact against a
+ * live, a rejoined and a disabled membership, and the columns a braid's row keeps.
  * @see specs/rbac/authz-grants.feature
  * @see specs/migration/authz-grants-rollout.feature
  */
@@ -16,6 +16,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { AuthzService } from "../../../services/authz.service.ts";
 import { EventingAuthzListingRepository } from "../../eventing/eventing.authz-listing.repository.ts";
 import { EventingAuthzReadRepository } from "../../eventing/eventing.authz-read.repository.ts";
+import { MemoryAuthzOrganizationPolicyRepository } from "../../memory/memory.authz-organization-policy.repository.ts";
 import { PrismaAuthzManagedGrantRepository } from "../prisma.authz-managed-grant.repository.ts";
 import { PrismaAuthzProjectionRepository } from "../prisma.authz-projection.repository.ts";
 
@@ -27,6 +28,7 @@ describe.skipIf(!DB_URL)("given the grants projection over a real database", () 
   });
   const projection = PrismaAuthzProjectionRepository.create(prisma);
   const authz = AuthzService.create({
+    policies: MemoryAuthzOrganizationPolicyRepository.create(),
     repository: EventingAuthzReadRepository.create(prisma),
     listing: EventingAuthzListingRepository.create(prisma),
     bindings: PrismaAuthzManagedGrantRepository.create({ database: prisma }),
@@ -178,6 +180,51 @@ describe.skipIf(!DB_URL)("given the grants projection over a real database", () 
       await expect(
         prisma.grant.findUnique({ where: { id: currentAttach.id } }),
       ).resolves.toMatchObject({ principalId: seeded.userId, revokedAt: null });
+    });
+  });
+
+  describe("when a braid's row is written and then written again", () => {
+    /** @scenario "A braid's row keeps the braid it replaces through a later write" */
+    it("reads back the braid it replaces, and the later write's in its place", async () => {
+      const seeded = await seedOrganization({ tag: "braid" });
+      const occurredAt = Temporal.Now.instant();
+      const braid = {
+        id: `grant-braid-${suffix}`,
+        organizationId: seeded.organizationId,
+        principalType: "PROJECT" as const,
+        principalId: `reader-${suffix}`,
+        roleKey: "project-reader",
+        legacyRole: null,
+        source: "braid",
+        scopeType: "PROJECT" as const,
+        scopeId: seeded.projectId,
+        token: null,
+        permission: null,
+        resourceKind: null,
+        projectId: null,
+        createdByUserId: seeded.userId,
+        expiresAt: null,
+        maxViews: null,
+        replacesGrantId: `grant-first-${suffix}`,
+        occurredAt,
+      };
+
+      await projection.append({ kind: "grant.upsert", row: braid });
+      await expect(prisma.grant.findUnique({ where: { id: braid.id } })).resolves.toMatchObject({
+        replacesGrantId: `grant-first-${suffix}`,
+      });
+
+      await projection.append({
+        kind: "grant.upsert",
+        row: {
+          ...braid,
+          replacesGrantId: `grant-second-${suffix}`,
+          occurredAt: occurredAt.add({ milliseconds: 1 }),
+        },
+      });
+      await expect(prisma.grant.findUnique({ where: { id: braid.id } })).resolves.toMatchObject({
+        replacesGrantId: `grant-second-${suffix}`,
+      });
     });
   });
 

@@ -13,6 +13,7 @@ import { ValidationError } from "@langwatch/handled-error";
 import {
   type CHTable,
   fieldMappings,
+  JOINED_SPAN_ATTRIBUTES,
   pickFieldMapping,
   qualifiedColumn,
   tableAliases,
@@ -693,7 +694,7 @@ function translatePerformanceMetric({
       requiredJoins.push("stored_spans");
       return {
         selectExpression: perfAgg(
-          `toFloat64OrNull(${ss}.SpanAttributes['gen_ai.usage.input_tokens'])`,
+          `toFloat64OrNull(${ss}.${JOINED_SPAN_ATTRIBUTES}['gen_ai.usage.input_tokens'])`,
         ),
         alias,
         requiredJoins,
@@ -706,7 +707,7 @@ function translatePerformanceMetric({
       requiredJoins.push("stored_spans");
       return {
         selectExpression: perfAgg(
-          `toFloat64OrNull(${ss}.SpanAttributes['gen_ai.usage.output_tokens'])`,
+          `toFloat64OrNull(${ss}.${JOINED_SPAN_ATTRIBUTES}['gen_ai.usage.output_tokens'])`,
         ),
         alias,
         requiredJoins,
@@ -974,7 +975,7 @@ function translateThreadsMetric({
         params: {},
         requiresSubquery: true,
         subquery: {
-          innerSelect: `${memberScopedTraceAttribute("gen_ai.conversation.id")} AS thread_id, least((max(${ts}.OccurredAt) - min(${ts}.OccurredAt)) * 1000, ${MAX_THREAD_SESSION_DURATION_MS}) AS thread_duration`,
+          innerSelect: `${memberScopedTraceAttribute("gen_ai.conversation.id")} AS thread_id, least((max(${ts}.LatestOccurredAt) - min(${ts}.LatestOccurredAt)) * 1000, ${MAX_THREAD_SESSION_DURATION_MS}) AS thread_duration`,
           innerGroupBy: "thread_id",
           outerAggregation: `avg(thread_duration) AS ${alias}`,
         },
@@ -1066,7 +1067,7 @@ export function translatePipelineAggregation({
           // Use trace_summaries.OccurredAt (= trace's execution start time)
           // DateTime64 subtraction returns seconds, multiply by 1000 for milliseconds
           // Filter out empty pipeline_key values via HAVING to match ES terms aggregation behavior
-          select: `${pipelineColumn} AS pipeline_key, ${threadIdCol} AS thread_id, least((max(${ts}.OccurredAt) - min(${ts}.OccurredAt)) * 1000, ${MAX_THREAD_SESSION_DURATION_MS}) AS thread_duration`,
+          select: `${pipelineColumn} AS pipeline_key, ${threadIdCol} AS thread_id, least((max(${ts}.LatestOccurredAt) - min(${ts}.LatestOccurredAt)) * 1000, ${MAX_THREAD_SESSION_DURATION_MS}) AS thread_duration`,
           groupBy: "pipeline_key, thread_id",
           having: `thread_id IS NOT NULL AND toString(thread_id) != '' AND pipeline_key IS NOT NULL AND toString(pipeline_key) != ''`,
         },

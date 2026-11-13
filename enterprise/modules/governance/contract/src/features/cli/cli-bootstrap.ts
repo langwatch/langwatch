@@ -13,6 +13,7 @@ const cliToolPolicyMapSchema = z
     copilot: platformToolPolicySchema,
     code: platformToolPolicySchema,
     grok: platformToolPolicySchema,
+    pi: platformToolPolicySchema,
   })
   .strict();
 

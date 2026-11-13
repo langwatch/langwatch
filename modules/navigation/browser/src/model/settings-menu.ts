@@ -13,6 +13,7 @@ import {
   Bug,
   Building2,
   Coins,
+  Combine,
   CreditCard,
   EyeOff,
   Server,
@@ -34,7 +35,9 @@ import {
   UserRound,
   Workflow,
   Vault,
+  Waypoints,
   UserStar,
+  UsersRound,
   ShieldUser,
   FolderSync,
   Receipt,
@@ -73,14 +76,51 @@ export interface SettingsMenuItem {
 export function isSettingsMenuItemActive({
   item,
   pathname,
+  search = "",
 }: {
   item: SettingsMenuItem;
   pathname: string;
+  search?: string;
 }): boolean {
   // By prefix, so a detail page (/settings/teams/:team) keeps its owner lit.
   if (item.alsoActiveAt?.some((base) => isPathUnder({ pathname, base }))) return true;
-  if (item.isExactMatch) return pathname === item.href;
-  return isPathUnder({ pathname, base: item.includePath ?? item.href });
+  const [hrefPath = item.href, hrefQuery] = item.href.split("?");
+  // An entry whose href opens a tab (?tab=teams) is lit only while the address shows that tab.
+  if (hrefQuery) {
+    const current = new URLSearchParams(search);
+    for (const [key, value] of new URLSearchParams(hrefQuery)) {
+      if (current.get(key) !== value) return false;
+    }
+  }
+  if (item.isExactMatch) return pathname === hrefPath;
+  return isPathUnder({ pathname, base: item.includePath ?? hrefPath });
+}
+
+/** An entry whose href opens one tab of a shared page. */
+function opensTab(item: SettingsMenuItem): boolean {
+  return item.href.includes("?");
+}
+
+/** As above, but an entry for a whole page yields to a lit sibling that opens one of its tabs. */
+export function isSettingsMenuItemActiveAmong({
+  item,
+  siblings,
+  pathname,
+  search = "",
+}: {
+  item: SettingsMenuItem;
+  siblings: readonly SettingsMenuItem[];
+  pathname: string;
+  search?: string;
+}): boolean {
+  if (!isSettingsMenuItemActive({ item, pathname, search })) return false;
+  if (opensTab(item)) return true;
+  return !siblings.some(
+    (sibling) =>
+      sibling !== item &&
+      opensTab(sibling) &&
+      isSettingsMenuItemActive({ item: sibling, pathname, search }),
+  );
 }
 
 export interface SettingsMenuGroup {
@@ -101,6 +141,11 @@ export interface SettingsMenuGroup {
  */
 export interface SettingsMenuGates {
   hasPermission: (permission: string) => boolean;
+  /**
+   * The same check across the whole organization, not just the open project: what an
+   * organization page asks, so an entry onto one is offered exactly when the page is.
+   */
+  hasOrganizationPermission: (permission: string) => boolean;
   isSaaS: boolean;
   hasCloudOps: boolean;
   hosting: Hosting;
@@ -161,6 +206,8 @@ function organizationGroup({
   enterprisePlan,
   isLiteMember,
 }: SettingsMenuGates): SettingsMenuGroup {
+  // Whoever pays sees what they pay for, Lite seat or not (the Billing role).
+  const seesBilling = !isLiteMember || hasPermission("subscription:manage");
   return {
     id: "settings-organization",
     label: "Organization",
@@ -188,21 +235,22 @@ function organizationGroup({
       ...(!isLiteMember && hasPermission("sso:view")
         ? [{ label: "Authentication", href: "/settings/authentication", icon: LogIn }]
         : []),
-      ...(!isLiteMember
-        ? [{ label: "Usage & billing", href: "/settings/usage", icon: Gauge }]
-        : []),
-      ...(!isLiteMember && isSaaS
+      ...(seesBilling ? [{ label: "Usage", href: "/settings/usage", icon: Gauge }] : []),
+      // Every member may upgrade, Lite included: whoever holds the card pays.
+      ...(isSaaS
         ? [
             {
-              label: "Subscription",
+              label: "Plan & billing",
               href: "/settings/subscription",
               icon: CreditCard,
             },
           ]
         : []),
+      ...(seesBilling && !isSaaS
+        ? [{ label: "License", href: "/settings/license", icon: BadgeCheck }]
+        : []),
       ...(!isLiteMember && !isSaaS
         ? [
-            { label: "License", href: "/settings/license", icon: BadgeCheck },
             { label: "Connect", href: "/settings/connect", icon: Cloud },
             { label: "Checkup", href: "/settings/checkup", icon: Stethoscope },
           ]
@@ -211,7 +259,11 @@ function organizationGroup({
   };
 }
 
-function accessGroup({ enterprisePlan, isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
+function accessGroup({
+  enterprisePlan,
+  isLiteMember,
+  hasOrganizationPermission,
+}: SettingsMenuGates): SettingsMenuGroup {
   return {
     id: "settings-access",
     label: "People & access",
@@ -219,7 +271,7 @@ function accessGroup({ enterprisePlan, isLiteMember }: SettingsMenuGates): Setti
       {
         // On every plan: members, teams and groups are tabs of this one page,
         // and each old address forwards onto its tab, as on main.
-        label: "Directory",
+        label: "Users",
         href: "/settings/directory",
         includePath: "/settings/directory",
         icon: BookUser,
@@ -231,15 +283,36 @@ function accessGroup({ enterprisePlan, isLiteMember }: SettingsMenuGates): Setti
           "/settings/access",
         ],
       },
-      ...(!isLiteMember
-        ? enterpriseEntry({
-            // Definitions and their assignments are two tabs of one page.
-            item: {
-              label: "Roles & access",
-              href: "/settings/roles",
-              icon: ShieldCheck,
-              alsoActiveAt: ["/settings/role-bindings"],
+      // A shortcut to the Users page's Teams tab, which readers could not find; the tab is
+      // offered to an organization manager only, so the entry is too, asked the way the tab
+      // asks it. Where both are offered, Users yields team pages to it; a reader without it
+      // still sees Users lit there.
+      ...(hasOrganizationPermission("organization:manage")
+        ? [
+            {
+              label: "Teams & projects",
+              href: "/settings/directory?tab=teams",
+              includePath: "/settings/directory",
+              icon: UsersRound,
+              alsoActiveAt: ["/settings/teams"],
             },
+          ]
+        : []),
+      // Every organization role reads it through `members:view`, Lite included; the page
+      // offers its edits to a manager only. Definitions and assignments are two tabs.
+      ...enterpriseEntry({
+        item: {
+          label: "Roles & access",
+          href: "/settings/roles",
+          icon: ShieldCheck,
+          alsoActiveAt: ["/settings/role-bindings"],
+        },
+        enterprisePlan,
+      }),
+      // Every braid in the organisation and who may braid; the project page is under Project.
+      ...(!isLiteMember && hasOrganizationPermission("organization:manage")
+        ? enterpriseEntry({
+            item: { label: "Braids", href: "/settings/organization-braids", icon: Combine },
             enterprisePlan,
           })
         : []),
@@ -287,7 +360,7 @@ function dataControlsGroup({ hasPermission }: SettingsMenuGates): SettingsMenuGr
   };
 }
 
-function projectGroup({ isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
+function projectGroup({ isLiteMember, enterprisePlan }: SettingsMenuGates): SettingsMenuGroup {
   return {
     id: "settings-project",
     label: "Project",
@@ -308,6 +381,12 @@ function projectGroup({ isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
           ]
         : []),
       { label: "Integrations", href: "/settings/integrations", icon: Blocks },
+      ...(!isLiteMember
+        ? enterpriseEntry({
+            item: { label: "Braids", href: "/settings/braids", icon: Waypoints },
+            enterprisePlan,
+          })
+        : []),
     ],
   };
 }
@@ -364,7 +443,7 @@ function toolsGroup({
       ...(hasCloudOps || hosting === "local"
         ? [{ label: "Feature flags", href: "/ops/feature-flags", icon: Flag }]
         : []),
-      // Operators approving their coding agents' access to customers: cloud only (ADR-193).
+      // Operators approving their coding agents' access to customers: cloud only (ADR-202).
       ...(hasCloudOps && isPlatformAdmin
         ? [{ label: "Agent access", href: "/ops/agents", icon: BotMessageSquare }]
         : []),
@@ -399,6 +478,7 @@ export function cloudAdminGroup(): SettingsMenuGroup {
       { label: "Licenses", href: "/ops/cloud/licenses", icon: Ticket },
       { label: "Self-hosted installs", href: "/ops/cloud/self-hosted-instances", icon: Server },
       { label: "Bug reports", href: "/ops/cloud/bug-reports", icon: Bug },
+      { label: "Seat use", href: "/ops/cloud/seat-use", icon: UsersRound },
     ],
   };
 }

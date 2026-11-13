@@ -1,5 +1,5 @@
 /**
- * Staff access's owned state (ADR-193): enrolled agents, passkey challenges, requests and the
+ * Staff access's owned state (ADR-202): enrolled agents, passkey challenges, requests and the
  * sessions they become, and the call trail. Every claim (`approve`, `redeem`, `claim...`) is one
  * conditional UPDATE, so of two racing callers exactly one wins.
  */

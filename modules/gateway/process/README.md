@@ -6,13 +6,13 @@ The server half of [gateway](../README.md). The AI Gateway: virtual keys, gatewa
 
 ## Installation
 
-`defineProcessModule("gateway").withRepositories(gatewayRepositories).withChannels(gatewayChannels).withApi(GatewayModule).withTransports(agentCacheRest, elevenLabsWebhookRest, gatewayInternalRest, gatewayBudgetTrpcTransport, gatewayCacheRuleTrpcTransport, gatewayGuardrailTrpcTransport, gatewayPlatformRest, gatewaySpendRest, gatewaySpendEventTrpcTransport, gatewayUsageTrpcTransport, virtualKeyTrpcTransport).withEventing(gatewayGovernanceEventsEventing).withEventing(gatewaySpendEventing).withEventing(gatewayRealtimeSessionEventing).withEventing(gatewayPulledUsageLedgerEventing).withEventing(gatewayInstantEvalJudgeSpendEventing).withEventing(gatewayConnectManagedKeyEventing).withTasks(…).provideMiddlewareBindings(…).provideMiddlewareContext(…).withIdIndexes(GATEWAY_ID_INDEXES, …)`, `src/gateway.module.ts:47`.
+`defineProcessModule("gateway").withRepositories(gatewayRepositories).withChannels(gatewayChannels).withApi(GatewayModule).withTransports(agentCacheRest, elevenLabsWebhookRest, gatewayInternalRest, gatewayBudgetTrpcTransport, gatewayCacheRuleTrpcTransport, gatewayGuardrailTrpcTransport, gatewayPlatformRest, gatewaySpendRest, gatewaySpendEventTrpcTransport, gatewayUsageTrpcTransport, virtualKeyTrpcTransport).withEventing(gatewayGovernanceEventsEventing).withEventing(gatewaySpendEventing).withEventing(gatewayRealtimeSessionEventing).withEventing(gatewayPulledUsageLedgerEventing).withEventing(gatewayInstantEvalJudgeSpendEventing).withEventing(gatewayPiiRedactionSpendEventing).withEventing(gatewayConnectManagedKeyEventing).withTasks(…).provideMiddlewareBindings(…).provideMiddlewareContext(…).withIdIndexes(GATEWAY_ID_INDEXES, …)`, `src/gateway.module.ts:48`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`GatewayApi`)
 
-Peers call these through the token, declared at `../contract/src/gateway.api.ts:570`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/gateway.api.ts:572`; nothing else in this package is public.
 It extends `GatewayInternalProtocol`.
 
 #### `internalDoor`
@@ -613,6 +613,14 @@ Appends one confirmed outcome the caller priced itself. The spine takes the pric
 
 ```typescript
 recordPricedSpend(input: GatewayPricedSpend): Promise<GatewayPricedSpendResult>;
+```
+
+#### `recordProviderUsage`
+
+Appends one call LangWatch made with stored provider credentials, rated against the model registry and debited from the project's, team's and organization's budgets (ADR-193).
+
+```typescript
+recordProviderUsage(input: GatewayProviderUsage): Promise<GatewayProviderUsageResult>;
 ```
 
 #### `sumSpendNanoUsdByRequestType`
@@ -1759,6 +1767,14 @@ Declared at `src/eventing/gateway-instant-eval-judge-spend.pipeline.ts:32`.
 | --------------- | --------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
 | peer subscriber | `gatewayInstantEvalJudgeSpendRow` | `lw.instant_eval_judge.spend_priced` from [instant-eval-judge](../../instant-eval-judge/README.md) | `src/eventing/gateway-instant-eval-judge-spend.pipeline.ts:39` |
 
+### Pipeline `gateway_pii_redaction_spend` (aggregate `global`)
+
+Declared at `src/eventing/gateway-pii-redaction-spend.pipeline.ts:32`.
+
+| Kind            | Name                          | Handles                                                                                        | Declared at                                               |
+| --------------- | ----------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| peer subscriber | `gatewayPiiRedactionSpendRow` | `lw.data_privacy.pii_redaction_spend_priced` from [data-privacy](../../data-privacy/README.md) | `src/eventing/gateway-pii-redaction-spend.pipeline.ts:39` |
+
 ### Pipeline `gateway_pulled_usage_ledger` (aggregate `global`)
 
 Declared at `src/eventing/gateway-pulled-usage-ledger.pipeline.ts:32`.
@@ -1801,9 +1817,9 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable                    | Declared at                            |
 | ------ | ----------------------------- | --------------------------------------- | -------------------------------------- |
-| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1151`          |
-| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1152`          |
-| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1153`          |
+| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1158`          |
+| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1159`          |
+| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1160`          |
 | config | `spendSettlementGraceMs`      | `LW_SPEND_SETTLEMENT_GRACE_MS`          | `../contract/src/gateway.config.ts:27` |
 | config | `internalUrl`                 | `LW_GATEWAY_INTERNAL_URL`               | `../contract/src/gateway.config.ts:29` |
 | config | `controlPlaneUrl`             | `GATEWAY_CONTROL_PLANE_URL`             | `../contract/src/gateway.config.ts:31` |

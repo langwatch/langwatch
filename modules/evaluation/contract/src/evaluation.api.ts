@@ -36,10 +36,12 @@ import type {
 } from "./evaluation.performance.ts";
 import type {
   EvaluationInputsQuery,
+  EvaluationOutcomesQuery,
   EvaluationRunLookup,
   EvaluationRunsByTraceQuery,
 } from "./evaluation.queries.ts";
 import type {
+  EvaluationOutcomePage,
   EvaluationRunOutcome,
   EvaluationWarmup,
   EvaluatorCatalogue,
@@ -67,6 +69,8 @@ export interface EvaluationApi {
   getRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData>;
   findRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | null>;
   findRunsByTraceId(input: EvaluationRunsByTraceQuery): Promise<EvaluationRunData[]>;
+  /** A page of one project's finished evaluations on a trace, oldest first; for backfills. */
+  listEvaluationOutcomes(input: EvaluationOutcomesQuery): Promise<EvaluationOutcomePage>;
   /** Read through the proof; null when none are stored or the viewer may not read content. */
   findInputs(
     input: EvaluationInputsQuery & { authorization: Authorization; userId: string | null },

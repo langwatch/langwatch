@@ -218,7 +218,7 @@ export class ConfirmationRequiredError extends HandledError {
 }
 
 /**
- * A staff agent's key (ADR-193) on a process with no staff access gate bound: nothing can record
+ * A staff agent's key (ADR-202) on a process with no staff access gate bound: nothing can record
  * the request, so it is refused rather than run unrecorded.
  */
 export class StaffAccessUnavailableError extends HandledError {

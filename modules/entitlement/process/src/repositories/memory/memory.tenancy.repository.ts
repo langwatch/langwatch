@@ -28,6 +28,17 @@ export class MemoryTenancyRepository implements TenancyRepository {
     return Object.keys(this.#database.find(organizationId)?.projectCosts ?? {});
   }
 
+  async findProjectNames({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<{ id: string; name: string }[]> {
+    const organization = this.#database.find(organizationId);
+    return Object.keys(organization?.projectCosts ?? {})
+      .map((id) => ({ id, name: organization?.projectNames?.[id] ?? id }))
+      .toSorted((a, b) => a.name.localeCompare(b.name));
+  }
+
   async findMeteredOrganizationIds(): Promise<string[]> {
     return this.#database
       .all()

@@ -226,5 +226,6 @@ function forwarded(app: ModelProviderModule): ModelProviderApi {
     applyCodexCodingDefaults: (...args) => app.applyCodexCodingDefaults(...args),
     resolveDecisionModel: (...args) => app.resolveDecisionModel(...args),
     listDecisionModelsForProject: (...args) => app.listDecisionModelsForProject(...args),
+    listDecisionModelsForScopes: (...args) => app.listDecisionModelsForScopes(...args),
   };
 }

@@ -37,7 +37,7 @@ type SessionDeps = Readonly<{
 }>;
 
 /**
- * Staff access sessions once they exist (ADR-193): how they are shown, ended by the agent or an
+ * Staff access sessions once they exist (ADR-202): how they are shown, ended by the agent or an
  * operator, killed all at once, and audited when their hour runs out.
  */
 export class StaffAccessSessionService {

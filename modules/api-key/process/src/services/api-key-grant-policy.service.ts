@@ -2,9 +2,11 @@ import {
   AggregateProjectHasNoCredentialError,
   ApiKeyScopeViolationError,
   apiKeyPermissionFormatSchema,
+  categorizablePermissions,
   type ApiKeyScope,
 } from "@langwatch/api-key-contract";
 import {
+  bindingScopeCanGrantPermission,
   permissionsConferred,
   type AuthzAccessBinding,
   type AuthzAttachOutcome,
@@ -250,6 +252,43 @@ export class ApiKeyGrantPolicyService {
         );
       }
     }
+  }
+
+  /**
+   * What a restricted key bound to every one of these scopes may carry, so the drawers offer
+   * exactly what `assertCeiling` lets through: each scope's grantable permissions less what
+   * the principal lacks there, intersected. Read by the same resolver, so group grants count.
+   */
+  async grantablePermissions({
+    principal,
+    organizationId,
+    scopes,
+  }: {
+    principal: AuthzPrincipalRef;
+    organizationId: string;
+    scopes: Pick<ApiKeyScope, "scopeType" | "scopeId">[];
+  }): Promise<string[]> {
+    let grantable: string[] | null = null;
+    for (const binding of scopes) {
+      const scope = await this.validateScope(
+        { ...binding, role: "CUSTOM", customRoleId: null },
+        organizationId,
+      );
+      const candidates: string[] = (grantable ?? categorizablePermissions()).filter((permission) =>
+        bindingScopeCanGrantPermission({ scopeType: binding.scopeType, permission }),
+      );
+      const missing = new Set(
+        await this.options.authz.findPermissionsBeyondCaller({
+          organizationId,
+          caller: principal,
+          scope: { type: scope.type, id: scope.id },
+          permissions: candidates,
+        }),
+      );
+      grantable = candidates.filter((permission) => !missing.has(permission));
+    }
+
+    return grantable ?? [];
   }
 
   private async customPermissions(

@@ -66,9 +66,9 @@ export function orderingClient(rows: Record<string, unknown>[]): {
 
 export function capturingInsertClient(): {
   client: TraceClickHouseWriteClient;
-  inserts: { clickhouse_settings?: Record<string, number> }[];
+  inserts: { clickhouse_settings?: Record<string, string | number> }[];
 } {
-  const inserts: { clickhouse_settings?: Record<string, number> }[] = [];
+  const inserts: { clickhouse_settings?: Record<string, string | number> }[] = [];
   return {
     client: {
       async insert(input): Promise<undefined> {

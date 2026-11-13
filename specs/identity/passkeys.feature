@@ -477,7 +477,7 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
 
   # ── A signature over one request ───────────────────────────────────────
   #
-  # Some acts are approved per request rather than per session (ADR-193):
+  # Some acts are approved per request rather than per session (ADR-202):
   # the caller picks the challenge, usually the hash of what is approved,
   # and the person signs it with one of their own passkeys. Verification
   # uses the same library and relying party as the plugin's ceremonies, but

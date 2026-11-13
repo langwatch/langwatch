@@ -79,7 +79,7 @@ const UNDOCUMENTED_CHECKUP =
   "Not yet documented in the API reference: the checkup routes back Settings, Checkup and langwatch doctor on a self-hosted install, and the CLI documentation covers that flow.";
 
 const UNDOCUMENTED_STAFF_ACCESS =
-  "Live surface, intentionally undocumented: LangWatch platform operators' agent access on LangWatch Cloud (ADR-193), used only by langwatch ops access, not an API for integrations.";
+  "Live surface, intentionally undocumented: LangWatch platform operators' agent access on LangWatch Cloud (ADR-202), used only by langwatch ops access, not an API for integrations.";
 
 const RETIRED_LEGACY_AGENTS =
   "Retired surface, intentionally undocumented: superseded by /api/v1/agents (see the Agents family below); this bare form answers every request with a deprecation notice naming the successor.";

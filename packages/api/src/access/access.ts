@@ -353,7 +353,7 @@ export async function decidePlatform({
 
 /**
  * A platform question a door answers for its own caller, who is no person: the `staff_access`
- * door's ops token (ADR-193), answered from its approved session. Same refusals as a person's.
+ * door's ops token (ADR-202), answered from its approved session. Same refusals as a person's.
  */
 export async function decideDoorPlatform({
   declaration,

@@ -13,6 +13,7 @@ import { Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { useDatasetSlugValidation } from "../../behavior/use-dataset-slug-validation.ts";
+import { columnRenamesOf, withSources } from "../../model/column-renames.ts";
 import { useDatasetHost } from "../../model/dataset-host.ts";
 import { DatasetSlugDisplay } from "../blocks/dataset-slug-display.tsx";
 
@@ -75,6 +76,13 @@ const COLUMN_TYPE_LABELS: readonly [DatasetColumnType, string][] = [
   ["chat_messages", "json chat messages (OpenAI format)"],
   ["spans", "json spans"],
 ];
+
+/** A column in the form, with the stored name it was loaded as (none for a new one). */
+type EditedColumn = DatasetColumns[number] & { source?: string };
+
+/** The form's columns for a dataset being edited, or the defaults for a new one. */
+const loadedColumns = (datasetToSave: DatasetToSave | undefined): EditedColumn[] =>
+  datasetToSave ? withSources(datasetToSave.columnTypes) : DATASET_DEFAULT_COLUMNS;
 
 export type DatasetToSave = {
   datasetId?: string;
@@ -140,8 +148,8 @@ export function AddOrEditDatasetDrawer({
   const utils = datasetClient.useUtils();
 
   const [name, setName] = useState(datasetToSave?.name ?? "");
-  const [columnTypes, setColumnTypes] = useState<DatasetColumns>(
-    datasetToSave?.columnTypes ?? DATASET_DEFAULT_COLUMNS,
+  const [columnTypes, setColumnTypes] = useState<EditedColumn[]>(() =>
+    loadedColumns(datasetToSave),
   );
   const [problems, setProblems] = useState<{ name?: string; columnTypes?: string }>({});
   const nameInput = useRef<HTMLInputElement>(null);
@@ -160,7 +168,7 @@ export function AddOrEditDatasetDrawer({
   // from the previous open would silently answer for the new one.
   useEffect(() => {
     setName(datasetToSave?.name ?? "");
-    setColumnTypes(datasetToSave?.columnTypes ?? DATASET_DEFAULT_COLUMNS);
+    setColumnTypes(loadedColumns(datasetToSave));
     setProblems({});
     resetSlugInfo();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- drawer open resets, not each prop
@@ -177,8 +185,9 @@ export function AddOrEditDatasetDrawer({
     if (found.name) return nameInput.current?.focus();
     if (found.columnTypes) return columnInputs.current[firstProblemColumn(columnTypes)]?.focus();
 
+    const plainColumns = columnTypes.map(({ name, type }) => ({ name, type }));
     if (localOnly) {
-      onSuccess({ datasetId: datasetToSave?.datasetId ?? "", name, columnTypes });
+      onSuccess({ datasetId: datasetToSave?.datasetId ?? "", name, columnTypes: plainColumns });
       onClose();
       return;
     }
@@ -188,7 +197,8 @@ export function AddOrEditDatasetDrawer({
         projectId: project?.id ?? "",
         datasetId: datasetToSave?.datasetId,
         name,
-        columnTypes,
+        columnTypes: plainColumns,
+        ...(datasetToSave?.datasetId ? { columnRenames: columnRenamesOf(columnTypes) } : {}),
       },
       {
         onSuccess: (saved) => {
@@ -224,7 +234,7 @@ export function AddOrEditDatasetDrawer({
     );
   };
 
-  const setColumn = (index: number, patch: Partial<DatasetColumns[number]>) =>
+  const setColumn = (index: number, patch: Partial<EditedColumn>) =>
     setColumnTypes((current) =>
       current.map((column, at) => (at === index ? { ...column, ...patch } : column)),
     );

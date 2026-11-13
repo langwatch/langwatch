@@ -13,6 +13,7 @@ import { withQuotedNameHint } from "./commands/agents/quoted-name-hint.js";
 import { TRACE_SOURCES } from "./commands/dashboards/definitionInput";
 import type { QuestionDraft } from "./commands/instant-evals/questionFlags";
 import { parsePromptSpec } from "./types";
+import { parseDatasetVersionFlag } from "./utils/datasetVersionFlag";
 import { SOURCE_TYPE_BY_TOOL } from "./utils/governance/otel-env-block";
 import { resolveControlPlaneUrl } from "./utils/governance/resolveEndpoint";
 import { sessionContextHookArguments } from "./utils/governance/session-context-agents";
@@ -49,6 +50,7 @@ export const TOOL_WRAPPER_COMMANDS = [
   "gemini",
   "opencode",
   "grok",
+  "pi",
 ] as const;
 
 /**
@@ -356,6 +358,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   registerGeminiCommands(program);
   registerOpencodeCommands(program);
   registerGrokCommands(program);
+  registerPiCommands(program);
   registerCodingAssistantHelp(program);
   registerReportCommands(program);
   registerLogoutCommands(program);
@@ -806,6 +809,27 @@ function registerGrokCommands(program: Command): void {
     });
 }
 
+function registerPiCommands(program: Command): void {
+  program
+    .command("pi", { hidden: true })
+    .description(
+      "Run `pi` with LangWatch telemetry (ingestion only: pi pins every model's address in its own build).",
+    )
+    .allowUnknownOption(true)
+    .allowExcessArguments(true)
+    .helpOption(false)
+    .action(async (_opts, cmd: { args?: string[] }) => {
+      try {
+        const { wrapPi } = await import("./commands/wrap.js");
+        await wrapPi(cmd.args ?? []);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    });
+}
+
 function registerCodingAssistantHelp(program: Command): void {
   // A wrapper renders no result of its own, in any format: it hands the
   // terminal to the tool it runs. Registered as such so the auto-detected
@@ -831,6 +855,7 @@ function registerCodingAssistantHelp(program: Command): void {
       "  gemini          Run `gemini` (Gemini CLI) routed through the gateway",
       "  opencode        Run `opencode` (multi-provider) routed through the gateway",
       "  grok            Run `grok` (Grok CLI) with LangWatch telemetry",
+      "  pi              Run `pi` with LangWatch telemetry",
       "  copilot-app     Set up capture for the standalone GitHub Copilot app",
       "  instrument      Write persistent telemetry wiring for a tool without launching it",
       "",
@@ -1531,17 +1556,55 @@ function registerEvaluatorCommands(program: Command): void {
   emitsResult(
     evaluatorCmd
       .command("get <idSlugOrName>")
-      .description("Get evaluator details by ID, slug or display name")
+      .description(
+        "Get evaluator details by ID, slug or display name, at the latest version unless --label or --version is given",
+      )
+      .option("--label <label>", "Read the version this deploy label points at, such as production")
+      .option("--version <number>", "Read a specific version instead of the latest")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (idSlugOrName: string) => {
+    async (idSlugOrName: string, options: { label?: string; version?: string }) => {
       try {
         const { getEvaluatorCommand: impl } = await import("./commands/evaluators/get.js");
-        return await impl(idSlugOrName);
+        return await impl(idSlugOrName, options);
       } catch (error) {
         const { reportCommandError } = await import("./utils/errorOutput.js");
         reportCommandError({ error });
         process.exit(1);
       }
+    },
+  );
+
+  emitsResult(
+    evaluatorCmd
+      .command("versions <idSlugOrName>")
+      .description("List an evaluator's versions, newest first, with their deploy labels")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (reference: string) => {
+      const { evaluatorVersionsCommand: impl } = await import("./commands/evaluators/versions.js");
+      return impl(reference);
+    },
+  );
+
+  emitsResult(
+    evaluatorCmd
+      .command("deploy <idSlugOrName> <label>")
+      .description("Point a deploy label, such as production, at one of the evaluator's versions")
+      .option("--version <number>", "Version to point the label at (defaults to the latest)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (reference: string, label: string, options: { version?: string }) => {
+      const { evaluatorDeployCommand: impl } = await import("./commands/evaluators/deploy.js");
+      return impl(reference, label, options);
+    },
+  );
+
+  emitsResult(
+    evaluatorCmd
+      .command("undeploy <idSlugOrName> <label>")
+      .description("Remove a deploy label from an evaluator")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (reference: string, label: string) => {
+      const { evaluatorUndeployCommand: impl } = await import("./commands/evaluators/undeploy.js");
+      return impl(reference, label);
     },
   );
 
@@ -1565,13 +1628,22 @@ function registerEvaluatorCommands(program: Command): void {
   emitsResult(
     evaluatorCmd
       .command("create <name>")
-      .description("Create a new evaluator")
-      .requiredOption(
+      .description("Create a new evaluator: a built-in one (--type) or a custom code one (--code)")
+      .option(
         "--type <evaluatorType>",
-        "Evaluator type (e.g. langevals/llm_boolean; see `langwatch evaluator types`)",
+        "Built-in evaluator type (e.g. langevals/llm_boolean; see `langwatch evaluator types`)",
+      )
+      .option(
+        "--code <file>",
+        "Python file for a custom code evaluator (a class Code with __call__)",
+      )
+      .option(
+        "--input <name[:type]>",
+        "An input of the code evaluator, type defaulting to str (repeatable)",
+        collectParam,
       )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (name: string, options: { type: string }) => {
+    async (name: string, options: { type?: string; code?: string; input?: string[] }) => {
       try {
         const { createEvaluatorCommand: impl } = await import("./commands/evaluators/create.js");
         return await impl(name, options);
@@ -1589,8 +1661,12 @@ function registerEvaluatorCommands(program: Command): void {
       .description("Update an evaluator by id or slug (find the id with `evaluator get <name>`)")
       .option("--name <name>", "New evaluator name")
       .option("--settings <json>", "Evaluator config settings as JSON")
+      .option("--commit-message <message>", "What changed, kept on the version this update creates")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (idOrSlug: string, options: { name?: string; settings?: string }) => {
+    async (
+      idOrSlug: string,
+      options: { name?: string; settings?: string; commitMessage?: string },
+    ) => {
       try {
         const { updateEvaluatorCommand: impl } = await import("./commands/evaluators/update.js");
         return await impl(idOrSlug, options);
@@ -1650,8 +1726,16 @@ function registerExperimentCommands(program: Command): void {
         "--concurrency <n>",
         "Cells (one row against one target) to run at once for this run only, 1 to 24 (default: the server's setting; 1 runs them in order)",
       )
+      .option(
+        "--dataset-version <n>",
+        "Version of the experiment's saved dataset to run, overriding the version the experiment pins",
+        parseDatasetVersionFlag,
+      )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (slug: string, options: { wait?: boolean; param?: string[]; concurrency?: string }) => {
+    async (
+      slug: string,
+      options: { wait?: boolean; param?: string[]; concurrency?: string; datasetVersion?: number },
+    ) => {
       const { runExperimentCommand: impl } = await import("./commands/experiment/run.js");
       return impl(slug, options);
     },
@@ -1885,21 +1969,27 @@ function registerLangyCommands(program: Command): void {
         "Share control of this folder with the Langy session that requested it (what a bare `langwatch langy` does today)",
       )
       .option(
+        "--as <email>",
+        "The email of the person who asked Langy, as the card's command names it; a login that is someone else's offers to sign in as them",
+      )
+      .option(
         "-o, --output <format>",
         "Not available: this command is an interactive session and prints as it goes",
       ),
-  ).action(async (options: { shareControl?: boolean; output?: string }, command: Command) => {
-    // `--json` and `--jq` are global, so they never reach the command's own
-    // options. They are read here and passed on, or the refusal below would
-    // miss them now that the format gate lets this command through.
-    const globals: { json?: unknown; jq?: unknown } = command.optsWithGlobals();
-    const { langyCommand: impl } = await import("./commands/langy/index.js");
-    return impl({
-      ...options,
-      ...(globals.json !== undefined ? { json: true } : {}),
-      ...(globals.jq !== undefined ? { jq: true } : {}),
-    });
-  });
+  ).action(
+    async (options: { shareControl?: boolean; as?: string; output?: string }, command: Command) => {
+      // `--json` and `--jq` are global, so they never reach the command's own
+      // options. They are read here and passed on, or the refusal below would
+      // miss them now that the format gate lets this command through.
+      const globals: { json?: unknown; jq?: unknown } = command.optsWithGlobals();
+      const { langyCommand: impl } = await import("./commands/langy/index.js");
+      return impl({
+        ...options,
+        ...(globals.json !== undefined ? { json: true } : {}),
+        ...(globals.jq !== undefined ? { jq: true } : {}),
+      });
+    },
+  );
 }
 
 function registerAgentCommands(program: Command): void {
@@ -1934,11 +2024,49 @@ function registerAgentCommands(program: Command): void {
   emitsResult(
     agentCmd
       .command("get <id>")
-      .description("Get agent details by ID")
+      .description(
+        "Get agent details by ID, at the latest version unless --label or --version is given",
+      )
+      .option("--label <label>", "Read the version this deploy label points at, such as production")
+      .option("--version <number>", "Read a specific version instead of the latest")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { label?: string; version?: string }) => {
+      const { getAgentCommand: impl } = await import("./commands/agents/get.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    agentCmd
+      .command("versions <id>")
+      .description("List an agent's versions, newest first, with their deploy labels")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string) => {
-      const { getAgentCommand: impl } = await import("./commands/agents/get.js");
+      const { agentVersionsCommand: impl } = await import("./commands/agents/versions.js");
       return impl(id);
+    },
+  );
+
+  emitsResult(
+    agentCmd
+      .command("deploy <id> <label>")
+      .description("Point a deploy label, such as production, at one of the agent's versions")
+      .option("--version <number>", "Version to point the label at (defaults to the latest)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, label: string, options: { version?: string }) => {
+      const { agentDeployCommand: impl } = await import("./commands/agents/deploy.js");
+      return impl(id, label, options);
+    },
+  );
+
+  emitsResult(
+    agentCmd
+      .command("undeploy <id> <label>")
+      .description("Remove a deploy label from an agent")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, label: string) => {
+      const { agentUndeployCommand: impl } = await import("./commands/agents/undeploy.js");
+      return impl(id, label);
     },
   );
 
@@ -2051,8 +2179,12 @@ function registerAgentCommands(program: Command): void {
       .option("--name <name>", "New agent name")
       .option("--type <type>", "New agent type: signature, code, workflow, or http")
       .option("--config <json>", "Updated configuration as JSON")
+      .option("--commit-message <message>", "What changed, kept on the version this update creates")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { name?: string; type?: string; config?: string }) => {
+    async (
+      id: string,
+      options: { name?: string; type?: string; config?: string; commitMessage?: string },
+    ) => {
       const { updateAgentCommand: impl } = await import("./commands/agents/update.js");
       return impl(id, options);
     },
@@ -6073,7 +6205,7 @@ function registerDaemonCommands(program: Command): void {
 const collectScope = (value: string, previous: string[] = []): string[] => [...previous, value];
 
 function registerOpsCommands(program: Command): void {
-  // `langwatch ops *`: the LangWatch ops agent's passkey-approved staff access (ADR-193).
+  // `langwatch ops *`: the LangWatch ops agent's passkey-approved staff access (ADR-202).
   // Hidden: only LangWatch operators hold a requester key.
   const opsCmd = program
     .command("ops", { hidden: true })

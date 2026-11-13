@@ -1,5 +1,5 @@
 /**
- * Staff access (ADR-193): an operator's coding agent asks for one hour of access, the operator
+ * Staff access (ADR-202): an operator's coding agent asks for one hour of access, the operator
  * approves each request with a passkey, the agent redeems once. These are the shapes the
  * operator's pages read. Spec: modules/staff-access/specs/staff-access-approval.feature
  */

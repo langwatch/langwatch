@@ -34,6 +34,7 @@ import {
 } from "../../../../model/coding-agent/assistant-presets.ts";
 import { Link } from "../../../../ui/elements/governance-link.tsx";
 import type { AiToolTileType } from "../../model/ai-tool-tile.ts";
+import { lockedToggles, togglesOnKindChange } from "../../model/coding-assistant-toggles.ts";
 import {
   isToolPresetAsset,
   TOOL_KINDS,
@@ -147,10 +148,9 @@ function formFromEntry(entry: AiToolEntry): FormState {
       setupCommand: baseStr("setupCommand"),
       helperText: baseStr("helperText"),
       setupDocsUrl: baseStr("setupDocsUrl"),
-      allowVk: boolOr("allowVk", true),
-      // Cursor is GUI-only - direct OTLP never applies, regardless of a
-      // stored value. Force it off so the toggle reads honestly.
-      allowOtelDirect: kind === "cursor" ? false : boolOr("allowOtelDirect", true),
+      // A locked toggle reads off regardless of a stored value, so it reads honestly.
+      allowVk: lockedToggles(kind).allowVk ?? boolOr("allowVk", true),
+      allowOtelDirect: lockedToggles(kind).allowOtelDirect ?? boolOr("allowOtelDirect", true),
       bundledPlan: boolOr("bundledPlan", true),
     };
   }
@@ -180,10 +180,10 @@ function configFromForm(form: FormState): Record<string, unknown> {
       setupCommand: form.setupCommand.trim(),
       ...(form.helperText.trim() ? { helperText: form.helperText.trim() } : {}),
       ...(form.setupDocsUrl.trim() ? { setupDocsUrl: form.setupDocsUrl.trim() } : {}),
-      // CLI path policy folded into the tile. Cursor is GUI-only, so its
-      // OTLP-direct path is always false regardless of the toggle state.
-      allowVk: form.allowVk,
-      allowOtelDirect: form.assistantKind === "cursor" ? false : form.allowOtelDirect,
+      // CLI path policy folded into the tile. A locked toggle saves off
+      // regardless of the toggle state.
+      allowVk: lockedToggles(form.assistantKind).allowVk ?? form.allowVk,
+      allowOtelDirect: lockedToggles(form.assistantKind).allowOtelDirect ?? form.allowOtelDirect,
       bundledPlan: form.bundledPlan,
     };
   }
@@ -416,9 +416,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
     setForm({
       ...form,
       assistantKind: kind,
-      // Cursor is GUI-only - direct OTLP never applies, so force the
-      // toggle off when the admin picks it.
-      ...(kind === "cursor" ? { allowOtelDirect: false } : {}),
+      ...togglesOnKindChange({ from: form.assistantKind, to: kind }),
     });
     setIconAsset(iconAfterKindChange({ kind, iconAsset }));
   };
@@ -817,10 +815,20 @@ function CostAttributionSection({
   );
 }
 
+/** Why a kind that locks the gateway off never uses it, shown under the disabled switch. */
+const NO_GATEWAY_REASONS: Partial<Record<AssistantKind, string>> = {
+  pi: "pi sets each model's address in its own build, so the gateway never applies.",
+  grok: "Grok routes no model traffic through its environment, so the gateway never applies.",
+};
+
+/** Why a kind that locks direct OTLP off never uses it, shown under the disabled switch. */
+const NO_OTEL_DIRECT_REASONS: Partial<Record<AssistantKind, string>> = {
+  cursor: "Cursor is GUI-only, so direct OTLP never applies.",
+};
+
 /**
- * CLI path policy for the `langwatch <tool>` wrapper, folded into the
- * coding-assistant tile. Cached at login (cliBootstrap's `toolPolicies`
- * map); Cursor is GUI-only, so its direct-OTLP toggle is forced off.
+ * CLI path policy for the `langwatch <tool>` wrapper, folded into the tile and cached at
+ * login (cliBootstrap's `toolPolicies`). A path the kind locks (`lockedToggles`) shows off.
  */
 function CliPathsSection({
   form,
@@ -829,7 +837,9 @@ function CliPathsSection({
   form: CodingAssistantForm;
   setForm: (f: FormState) => void;
 }) {
-  const cursorOnly = form.assistantKind === "cursor";
+  const locked = lockedToggles(form.assistantKind);
+  const noGateway = locked.allowVk !== undefined;
+  const noOtelDirect = locked.allowOtelDirect !== undefined;
   return (
     <FormSection
       label="CLI paths"
@@ -840,12 +850,15 @@ function CliPathsSection({
           <VStack align="start" gap={0}>
             <Text fontSize="sm">Allow gateway (virtual key)</Text>
             <Text fontSize="xs" color="fg.muted">
-              Route through the LangWatch gateway with a personal virtual key.
+              {noGateway
+                ? (NO_GATEWAY_REASONS[form.assistantKind] ?? "This tool never uses the gateway.")
+                : "Route through the LangWatch gateway with a personal virtual key."}
             </Text>
           </VStack>
           <Switch
             colorPalette="accent"
-            checked={form.allowVk}
+            checked={noGateway ? false : form.allowVk}
+            disabled={noGateway}
             onCheckedChange={({ checked }) => setForm({ ...form, allowVk: checked })}
           />
         </HStack>
@@ -853,15 +866,16 @@ function CliPathsSection({
           <VStack align="start" gap={0}>
             <Text fontSize="sm">Allow direct OTLP ingestion</Text>
             <Text fontSize="xs" color="fg.muted">
-              {cursorOnly
-                ? "Cursor is GUI-only, so direct OTLP never applies."
+              {noOtelDirect
+                ? (NO_OTEL_DIRECT_REASONS[form.assistantKind] ??
+                  "This tool never exports straight to the OTLP endpoint.")
                 : "Export telemetry straight to the personal OTLP endpoint."}
             </Text>
           </VStack>
           <Switch
             colorPalette="accent"
-            checked={cursorOnly ? false : form.allowOtelDirect}
-            disabled={cursorOnly}
+            checked={noOtelDirect ? false : form.allowOtelDirect}
+            disabled={noOtelDirect}
             onCheckedChange={({ checked }) => setForm({ ...form, allowOtelDirect: checked })}
           />
         </HStack>

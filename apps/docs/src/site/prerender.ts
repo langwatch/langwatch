@@ -13,9 +13,12 @@ import { extractPromptBodies, extractSkillPrompts } from "../features/content/co
 import {
   breadcrumbTrail,
   discoveryFiles,
+  exportSizes,
   FONT_SOURCE,
   llmsFull,
+  llmsSectionFiles,
   PAGE_EXPORT_EXTENSIONS,
+  type PageExport,
   pageHead,
   pageMarkdown,
   readAgentSkills,
@@ -32,6 +35,7 @@ import type { Nav } from "../features/navigation/model.ts";
 import { publishSearchIndex, searchEntry } from "../features/search/compile.ts";
 import { publicSlug, withBasePath } from "../lib/site-path.ts";
 import { appRoot, cacheRoot, docsRoot, readBuildOptions } from "../paths.ts";
+import { PAGE_TOKENS } from "./audit/budgets.ts";
 import { writeVersionedPages } from "./build-version.ts";
 import { compressedSearchIndex } from "./compressed-index.ts";
 import { inlinePageStyles } from "./css/page-styles.ts";
@@ -45,7 +49,7 @@ import {
 import { builtFontPaths, publishMedia } from "./hashed-assets.ts";
 import { optimisePageImages } from "./image-variants.ts";
 import { writeOutputFiles } from "./output-files.ts";
-import { authoredHeroPreload } from "./page-images.ts";
+import { authoredHeroPreload, deferBelowFoldPosters } from "./page-images.ts";
 import { renderCache, renderedPageSchema, type RenderedPage } from "./render-cache.ts";
 import { failOnSkippedPages } from "./render-failures.ts";
 import {
@@ -55,6 +59,7 @@ import {
   type PrerenderPlan,
 } from "./render-keys.ts";
 import { renderWorkerCount, runOnWorkers, type WorkerOutcome } from "./render-workers.ts";
+import { renderSocialCards } from "./social-card-images.ts";
 import { optimisePageVideos } from "./video-variants.ts";
 
 /* Runs as the SSR bundle (see build.ts) after the client build. The main thread reads one
@@ -232,7 +237,7 @@ function assemble({ slugs, outcomes }: { slugs: string[]; outcomes: Map<string, 
   const pages = new Map<string, string>();
   const files = new Map<string, string | Uint8Array>();
   const searchIndex: unknown[] = [];
-  const markdown: string[] = [];
+  const markdown: PageExport[] = [];
   const skipped: { slug: string; reason: string }[] = [];
   for (const slug of slugs) {
     const outcome = outcomes.get(slug) ?? { error: "not rendered" };
@@ -244,7 +249,8 @@ function assemble({ slugs, outcomes }: { slugs: string[]; outcomes: Map<string, 
     if (outcome.result.search) searchIndex.push(outcome.result.search);
     const exported = exportsOf({ slug });
     for (const [name, contents] of exported) files.set(name, contents);
-    if (exported.length > 0) markdown.push(pageMarkdown({ docsRoot, slug, instructions: "" }));
+    if (exported.length > 0)
+      markdown.push({ slug, markdown: pageMarkdown({ docsRoot, slug, instructions: "" }) });
     for (const target of slug === "404" ? ["404.html"] : pageTargets({ slug }))
       pages.set(target, outcome.result.page);
   }
@@ -254,7 +260,7 @@ function assemble({ slugs, outcomes }: { slugs: string[]; outcomes: Map<string, 
 /** A page's Markdown exports; the home page is also exported at the root. */
 function exportsOf({ slug }: { slug: string }): [string, string][] {
   if (slug === "404") return [];
-  const markdown = pageMarkdown({ docsRoot, slug });
+  const markdown = pageMarkdown({ docsRoot, slug, pageTokens: PAGE_TOKENS });
   const names =
     slug === "introduction" ? [slug, "index"] : [...new Set([slug, publicSlug({ slug })])];
   return names.flatMap((name) =>
@@ -353,8 +359,11 @@ async function publishPageMedia({
     console.warn(
       `[docs-site] no ffmpeg with libx264 and an AV1 or VP9 encoder: ${videos.unencoded.length} videos published as authored`,
     );
+  const deferred = new Map<string, string>();
+  for (const [target, html] of published.pages)
+    deferred.set(target, deferBelowFoldPosters({ html }));
   return {
-    pages: published.pages,
+    pages: deferred,
     files: output,
     copies: published.copies,
     images: images.sources,
@@ -388,10 +397,19 @@ async function generate() {
       nav: context.nav,
       lastModified: pageLastModified({ docsRoot }),
       skills: readAgentSkills(),
+      sizes: exportSizes({ exports: markdown }),
     }),
   ))
     files.set(name, contents);
   files.set("llms-full.txt", llmsFull({ nav: context.nav, exports: markdown }));
+  for (const [name, contents] of Object.entries(
+    llmsSectionFiles({ nav: context.nav, exports: markdown }),
+  ))
+    files.set(name, contents);
+  for (const [name, contents] of await renderSocialCards({
+    cacheDir: plan.cacheDir ? path.join(path.dirname(plan.cacheDir), "social") : null,
+  }))
+    files.set(name, contents);
   const searchJson = publishSearchIndex({ entries: searchIndex });
   files.set("search-index.json", searchJson);
   for (const [name, contents] of await compressedSearchIndex({

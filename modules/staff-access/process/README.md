@@ -1,6 +1,6 @@
 # @langwatch/staff-access-process
 
-The server half of [staff-access](../README.md). It enrols an operator's coding agent with a passkey, takes its access requests, verifies the passkey approval over a hash of what the approval page shows, redeems an approved request once into a one-hour key pinned to one address, and writes a trail row before every request that key makes. See [ADR-193](../../../dev/docs/adr/193-ops-agent-access.md).
+The server half of [staff-access](../README.md). It enrols an operator's coding agent with a passkey, takes its access requests, verifies the passkey approval over a hash of what the approval page shows, redeems an approved request once into a one-hour key pinned to one address, and writes a trail row before every request that key makes. See [ADR-202](../../../dev/docs/adr/202-ops-agent-access.md).
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 

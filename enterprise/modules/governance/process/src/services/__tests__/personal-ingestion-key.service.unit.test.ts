@@ -262,6 +262,14 @@ describe("PersonalIngestionKeyService", () => {
       expect(created).toMatchObject([{ name: "Ingestion key (grok_cli)" }]);
     });
 
+    /** @scenario "Ingestion mode mints a pi_cli ingest key and points pi at LangWatch" */
+    it("mints for pi, which the CLI wraps as pi_cli", async () => {
+      const { service, created } = await setup([login]);
+
+      await service.mint({ ...session, sourceType: "pi_cli", fromCliSession: true });
+      expect(created).toMatchObject([{ name: "Ingestion key (pi_cli)" }]);
+    });
+
     it("refuses a source no wrapped tool stamps", async () => {
       const { service } = await setup([]);
 

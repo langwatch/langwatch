@@ -11,6 +11,7 @@
 /agent-testing/linking-your-traces
 /agent-testing/other-ways-to-connect
 /agent-testing/overview
+/agent-testing/red-team-open-source
 /agent-testing/red-teaming
 /agent-testing/results
 /agent-testing/run-from-ci
@@ -19,6 +20,7 @@
 /agent-testing/scenarios
 /agent-testing/scenarios-in-code
 /agent-testing/setup-and-teardown-hooks
+/agent-testing/simulated-users
 /agent-testing/targets
 /agent-testing/test-from-the-platform
 /agent-testing/test-suites
@@ -42,6 +44,7 @@
 /ai-gateway/billing-events
 /ai-gateway/budgets
 /ai-gateway/cache-control
+/ai-gateway/cap-spend-per-team
 /ai-gateway/concepts
 /ai-gateway/cookbooks
 /ai-gateway/cookbooks/ci-smoke-test
@@ -160,9 +163,12 @@
 /api-reference/agents/delete-agents
 /api-reference/agents/get-agents
 /api-reference/agents/list-agents
+/api-reference/agents/list-an-agent-s-versions
 /api-reference/agents/list-poll
 /api-reference/agents/overview
+/api-reference/agents/point-a-deploy-label-at-an-agent-version
 /api-reference/agents/put-update-agents
+/api-reference/agents/remove-a-deploy-label-from-an-agent
 /api-reference/agents/update-agents
 /api-reference/analytics
 /api-reference/analytics/create-timeseries
@@ -219,13 +225,17 @@
 /api-reference/datasets/delete-dataset
 /api-reference/datasets/delete-records
 /api-reference/datasets/evaluate-a-dataset
+/api-reference/datasets/get-a-dataset-version
 /api-reference/datasets/get-dataset
 /api-reference/datasets/get-entries
 /api-reference/datasets/get-records
 /api-reference/datasets/import-an-uploaded-file-into-a-dataset
 /api-reference/datasets/list-dataset
+/api-reference/datasets/list-dataset-versions
 /api-reference/datasets/overview
 /api-reference/datasets/post-dataset-entries
+/api-reference/datasets/restore-a-dataset-version
+/api-reference/datasets/save-a-dataset-version
 /api-reference/datasets/update-dataset
 /api-reference/datasets/update-records
 /api-reference/evaluations
@@ -239,10 +249,13 @@
 /api-reference/evaluators-config
 /api-reference/evaluators-config/create-evaluators
 /api-reference/evaluators-config/delete-evaluators
+/api-reference/evaluators-config/delete-labels
 /api-reference/evaluators-config/get-evaluators
+/api-reference/evaluators-config/get-versions
 /api-reference/evaluators-config/list-evaluators
 /api-reference/evaluators-config/overview
 /api-reference/evaluators-config/update-evaluators
+/api-reference/evaluators-config/update-labels
 /api-reference/evaluators/azure-content-safety
 /api-reference/evaluators/azure-jailbreak-detection
 /api-reference/evaluators/azure-prompt-shield
@@ -595,6 +608,7 @@
 /changelog
 /coding-agents
 /coding-agents/claude-code
+/coding-agents/claude-code-team
 /coding-agents/claude-code-usage
 /coding-agents/codebase-experiment
 /coding-agents/compare-provider-costs
@@ -603,10 +617,12 @@
 /coding-agents/find-your-context-sweet-spot
 /coding-agents/gemini-cli
 /coding-agents/github-copilot-cli
+/coding-agents/grok-cli
 /coding-agents/headless-and-ci
 /coding-agents/openai-codex
 /coding-agents/opencode
 /coding-agents/overview
+/coding-agents/pi
 /coding-agents/privacy
 /coding-agents/pull-requests
 /coding-agents/quickstart
@@ -632,6 +648,7 @@
 /datasets/programmatic-access
 /dspy-visualization
 /dspy-visualization/custom-optimizer
+/dspy-visualization/follow-optimization-in-a-ui
 /dspy-visualization/quickstart
 /dspy-visualization/rag-visualization
 /evaluations
@@ -651,6 +668,7 @@
 /evaluations/experiments/ui/answer-correctness
 /evaluations/experiments/ui/llm-as-a-judge
 /evaluations/experiments/ui/pairwise-compare
+/evaluations/experiments/versions-and-deploy-labels
 /evaluations/guardrails
 /evaluations/guardrails/code-integration
 /evaluations/guardrails/overview
@@ -661,6 +679,7 @@
 /features
 /features/annotations
 /features/automations
+/features/braids
 /features/dashboards
 /features/datasets
 /features/embedded-analytics
@@ -668,6 +687,7 @@
 /features/instant-evals/cli
 /features/instant-evals/limits-and-cost
 /features/instant-evals/overview
+/features/instant-evals/own-model
 /features/instant-evals/questions
 /features/instant-evals/results
 /features/instant-evals/targets
@@ -711,8 +731,10 @@
 /integration/java/integrations
 /integration/java/integrations/spring-ai
 /integration/langflow
+/integration/langgraph-tracing
 /integration/litellm-proxy
 /integration/mcp
+/integration/mcp-debug-traces
 /integration/metadata-and-labels
 /integration/n8n
 /integration/openclaw
@@ -879,6 +901,7 @@
 /self-hosting/compliance
 /self-hosting/configuration
 /self-hosting/configuration/backups
+/self-hosting/configuration/clickhouse-access
 /self-hosting/configuration/email
 /self-hosting/configuration/environment-variables
 /self-hosting/configuration/object-storage-lifecycle

@@ -37,6 +37,25 @@ describe("when redirects have destination queries and fragments", () => {
   });
 });
 
+describe("when docs.json holds the release job's cache-bust redirect", () => {
+  /** @scenario "The release job's cache-bust redirect is not published" */
+  it("leaves it out of the site's redirects", () => {
+    const fixture = docsFixture({
+      config: {
+        redirects: [
+          { source: "/ci/cache/busted/1794341304", destination: "/" },
+          { source: "/old", destination: "/guide" },
+        ],
+      },
+    });
+    try {
+      expect(readRedirects({ docsRoot: fixture.docsRoot })).toEqual({ "/old": "/guide" });
+    } finally {
+      fixture.dispose();
+    }
+  });
+});
+
 describe("when the site is published to a host without redirect rules", () => {
   /** @scenario "Serve every configured redirect from a static page" */
   it("publishes a no-JavaScript redirect page for each exact source", () => {

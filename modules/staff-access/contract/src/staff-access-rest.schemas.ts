@@ -1,5 +1,5 @@
 /**
- * The agent's wire under `/api/staff-access` (ADR-193): request, status, redeem and end with
+ * The agent's wire under `/api/staff-access` (ADR-202): request, status, redeem and end with
  * a requester key; the `ops:read` allowlist with an ops token. Read by the `langwatch` CLI.
  */
 import { namesOrganization, STAFF_ACCESS_COPY_SCOPES } from "@langwatch/authz-contract";
@@ -246,7 +246,7 @@ export const staffAccessCopyKindSchema = z.enum(STAFF_ACCESS_COPY_KINDS);
 export type StaffAccessCopyKind = z.infer<typeof staffAccessCopyKindSchema>;
 
 /**
- * An organization copy (ADR-193, module ADR-002). The bearer is the target session's ops token;
+ * An organization copy (ADR-202, module ADR-002). The bearer is the target session's ops token;
  * the source session proves itself with its own ops token here, never by id alone.
  */
 const staffAccessCopyBodySchemaDefinition = z

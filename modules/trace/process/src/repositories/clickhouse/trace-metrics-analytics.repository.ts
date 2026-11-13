@@ -8,10 +8,20 @@ import {
 } from "@langwatch/clickhouse-client";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT } from "@langwatch/trace-contract";
+import {
+  evaluationOutcomeRecordedEventDataSchema,
+  TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
+} from "@langwatch/trace-contract";
 import { z } from "zod";
 
-import type { TraceAnalyticsRow } from "../../eventing/trace-derived.projection.ts";
+import type {
+  TraceAnalyticsRow,
+  TraceEvaluationOutcome,
+} from "../../eventing/trace-derived.projection.ts";
+import {
+  type TraceAnalyticsMetadataColumns,
+  traceAnalyticsMetadataColumns,
+} from "../../rules/trace-widget-columns.rules.ts";
 import {
   TraceAnalyticsProjectionRepository,
   type TraceAnalyticsProjectionRead,
@@ -19,6 +29,15 @@ import {
 import type { TraceClickHouseWriteResolver } from "./clickhouse.trace-member-client.repository.ts";
 
 const analyticsRecordRowsSchema = z.array(z.record(z.string(), z.unknown()));
+
+const occurredAtRowsSchema = z.array(
+  z.object({ TraceId: z.string(), OccurredAtMs: z.union([z.number(), z.string()]) }),
+);
+
+const evaluationOutcomesSchema = z.record(
+  z.string(),
+  evaluationOutcomeRecordedEventDataSchema.omit({ evaluationId: true }),
+);
 
 const asString = (value: unknown): string =>
   typeof value === "string" || typeof value === "number" || typeof value === "bigint"
@@ -33,6 +52,9 @@ const READ_BACK_FOLD_INSERT_SETTINGS = {
   async_insert: 1,
   wait_for_async_insert: 1,
   input_format_skip_unknown_fields: 0,
+  // Goose 00126's metadata columns stay MATERIALIZED for older writers until the contract step;
+  // the fold writes them itself, which takes this and a named column list (analytics ADR-006).
+  insert_allow_materialized_columns: 1,
 } as const;
 
 /**
@@ -40,7 +62,7 @@ const READ_BACK_FOLD_INSERT_SETTINGS = {
  * 00039). 64-bit-integer columns are serialised as strings in JSONEachRow
  * (JSON numbers can't round-trip past 2^53); other types stay unstringified.
  */
-interface ClickHouseTraceAnalyticsWriteRecord {
+type ClickHouseTraceAnalyticsWriteRecord = {
   TenantId: string;
   TraceId: string;
   Version: string;
@@ -77,26 +99,41 @@ interface ClickHouseTraceAnalyticsWriteRecord {
 
   Attributes: Record<string, string>;
 
-  // ── Read-back state (ADR-066, migration 00056) ─────────────────────────
-  SpanCount: number;
-  AnnotationIds: string[];
-  // UInt64 epoch-ms columns ride as strings, like TotalDurationMs — exact
-  // integer round-trip, TZ-immune (the fold compares these numerically).
-  RootSpanStartTimeMs: string;
-  TraceNameFromFallback: boolean;
-  RootMetadataFromFallback: boolean;
-  TraceNameUserOverridden: boolean;
-  LastEventOccurredAt: string;
+  // ── The stock widgets' metadata columns (migrations 00126, 00128) ──────
+} & TraceAnalyticsMetadataColumns & {
+    // ── Read-back state (ADR-066, migration 00056) ─────────────────────────
+    SpanCount: number;
+    AnnotationIds: string[];
+    // UInt64 epoch-ms columns ride as strings, like TotalDurationMs, exact
+    // integer round-trip, TZ-immune (the fold compares these numerically).
+    RootSpanStartTimeMs: string;
+    TraceNameFromFallback: boolean;
+    RootMetadataFromFallback: boolean;
+    TraceNameUserOverridden: boolean;
+    LastEventOccurredAt: string;
 
-  // ── Span timing baseline (ADR-071 step 3, migration 00061) ─────────────
-  // The earliest span start, split out of OccurredAt when that column became
-  // the frozen storage anchor. Same string-carried UInt64 treatment.
-  EarliestSpanStartMs: string;
+    // ── Span timing baseline (ADR-071 step 3, migration 00061) ─────────────
+    // The earliest span start, split out of OccurredAt when that column became
+    // the frozen storage anchor. Same string-carried UInt64 treatment.
+    EarliestSpanStartMs: string;
 
-  // ── Durable dedup watermark (ADR-066, migration 00056) ─────────────────
-  AppliedEventIds: string[];
+    // ── Durable dedup watermark (ADR-066, migration 00056) ─────────────────
+    AppliedEventIds: string[];
 
-  _retention_days: number;
+    // ── Evaluation outcomes and the rows they left (trace ADR-003, migration 00129) ──
+    EvaluationOutcomes: string;
+    EvaluationRowsDigest: string;
+
+    _retention_days: number;
+  };
+
+/** Every column the fold writes, named: ClickHouse takes a MATERIALIZED column only when listed. */
+function writeColumns(
+  records: readonly ClickHouseTraceAnalyticsWriteRecord[],
+): [string, ...string[]] {
+  const [first] = records;
+  if (!first) throw new Error("trace_analytics insert with no rows");
+  return Object.keys(first) as [string, ...string[]];
 }
 
 export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjectionRepository {
@@ -137,15 +174,13 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
 
     try {
       const client = await this.options.resolveClient(row.tenantId);
+      const values = [
+        TraceAnalyticsClickHouseRepository.toClickHouseRecord(row, retentionDays, appliedEventIds),
+      ];
       await client.insert({
         table: TABLE_NAME,
-        values: [
-          TraceAnalyticsClickHouseRepository.toClickHouseRecord(
-            row,
-            retentionDays,
-            appliedEventIds,
-          ),
-        ],
+        values,
+        columns: writeColumns(values),
         format: "JSONEachRow",
         clickhouse_settings: READ_BACK_FOLD_INSERT_SETTINGS,
       });
@@ -186,15 +221,13 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
 
     try {
       const client = await this.options.resolveClient(tenantId);
+      const values = entries.map(({ row, retentionDays, appliedEventIds }) =>
+        TraceAnalyticsClickHouseRepository.toClickHouseRecord(row, retentionDays, appliedEventIds),
+      );
       await client.insert({
         table: TABLE_NAME,
-        values: entries.map(({ row, retentionDays, appliedEventIds }) =>
-          TraceAnalyticsClickHouseRepository.toClickHouseRecord(
-            row,
-            retentionDays,
-            appliedEventIds,
-          ),
-        ),
+        values,
+        columns: writeColumns(values),
         format: "JSONEachRow",
         clickhouse_settings: READ_BACK_FOLD_INSERT_SETTINGS,
       });
@@ -231,10 +264,7 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
       if (window === undefined) {
         return await this.queryLatestVersionById({ authorization, traceId });
       }
-      return await queryWindowed<{
-        row: TraceAnalyticsRow;
-        appliedEventIds: string[];
-      } | null>({
+      return await queryWindowed<TraceAnalyticsProjectionRead | null>({
         table: TABLE_NAME,
         hintMs: window !== undefined ? (window.fromMs + window.toMs) / 2 : null,
         ...(window !== undefined ? { windowMs: (window.toMs - window.fromMs) / 2 } : {}),
@@ -259,6 +289,69 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
       );
       throw error;
     }
+  }
+
+  /**
+   * Many traces' anchors in one read, bounded by the caller's window on the partition key, or by
+   * the TraceId index when there is none.
+   */
+  override async findOccurredAtByTraceIds({
+    authorization,
+    traceIds,
+    window,
+  }: {
+    authorization: Authorization;
+    traceIds: readonly string[];
+    window?: { fromMs: number; toMs: number };
+  }): Promise<{ traceId: string; occurredAtMs: number }[]> {
+    if (traceIds.length === 0) return [];
+    if (window === undefined) return this.queryOccurredAtByTraceIds({ authorization, traceIds });
+    const result = await this.reader(authorization).query({
+      // ID_BOUND_SKIP: many ids at once, bounded by the caller's OccurredAt window instead.
+      query: `
+        SELECT TraceId, toUnixTimestamp64Milli(argMax(OccurredAt, UpdatedAt)) AS OccurredAtMs
+        FROM ${TABLE_NAME}
+        WHERE ${tenantScope("OccurredAt")}
+          AND TraceId IN {traceIds:Array(String)}
+          AND OccurredAt BETWEEN fromUnixTimestamp64Milli({from:Int64})
+            AND fromUnixTimestamp64Milli({to:Int64})
+        GROUP BY TenantId, TraceId
+      `,
+      query_params: { traceIds: [...new Set(traceIds)], from: window.fromMs, to: window.toMs },
+      format: "JSONEachRow",
+    });
+    return TraceAnalyticsClickHouseRepository.anchorsOf(await result.json());
+  }
+
+  private static anchorsOf(rows: unknown): { traceId: string; occurredAtMs: number }[] {
+    return occurredAtRowsSchema.parse(rows).map((row) => ({
+      traceId: row.TraceId,
+      occurredAtMs: Number(row.OccurredAtMs),
+    }));
+  }
+
+  /** {@link findOccurredAtByTraceIds} with no window: the index bounds it once ready. */
+  private async queryOccurredAtByTraceIds({
+    authorization,
+    traceIds,
+  }: {
+    authorization: Authorization;
+    traceIds: readonly string[];
+  }): Promise<{ traceId: string; occurredAtMs: number }[]> {
+    const result = await this.reader(authorization).query({
+      query: `
+        SELECT TraceId, toUnixTimestamp64Milli(argMax(OccurredAt, UpdatedAt)) AS OccurredAtMs
+        FROM ${TABLE_NAME}
+        WHERE ${tenantScope("OccurredAt")}
+          AND TraceId IN {traceIds:Array(String)}
+          {{idBound:trace_analytics.TraceId:traceIds}}
+        GROUP BY TenantId, TraceId
+      `,
+      query_params: { traceIds: [...new Set(traceIds)] },
+      format: "JSONEachRow",
+      idBound: { fallback: "unbounded" },
+    });
+    return TraceAnalyticsClickHouseRepository.anchorsOf(await result.json());
   }
 
   /**
@@ -326,7 +419,7 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
     authorization: Authorization;
     traceId: string;
     window?: { fromMs: number; toMs: number };
-  }): Promise<{ row: TraceAnalyticsRow; appliedEventIds: string[] } | null> {
+  }): Promise<TraceAnalyticsProjectionRead | null> {
     const client = this.reader(authorization);
 
     const partitionFilter =
@@ -366,12 +459,20 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
 
   private static latestOf(
     rows: readonly Record<string, unknown>[],
-  ): { row: TraceAnalyticsRow; appliedEventIds: string[] } | null {
+  ): TraceAnalyticsProjectionRead | null {
     const record = rows[0];
     if (!record) return null;
+    const outcomes = TraceAnalyticsClickHouseRepository.decodeOutcomes({
+      text: asString(record.EvaluationOutcomes),
+      traceId: asString(record.TraceId),
+    });
     return {
-      row: TraceAnalyticsClickHouseRepository.fromRecord(record),
+      row: {
+        ...TraceAnalyticsClickHouseRepository.fromRecord(record),
+        evaluationOutcomes: outcomes.readable ? outcomes.outcomes : {},
+      },
       appliedEventIds: TraceAnalyticsClickHouseRepository.asStringArray(record.AppliedEventIds),
+      ...(outcomes.readable ? {} : { undecodable: true as const }),
     };
   }
 
@@ -451,6 +552,7 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
       HasAnnotation: row.hasAnnotation,
 
       Attributes: row.attributes,
+      ...(row.metadataColumns ?? traceAnalyticsMetadataColumns(row.attributes)),
 
       SpanCount: Math.max(0, Math.round(row.spanCount)),
       AnnotationIds: row.annotationIds,
@@ -462,6 +564,11 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
       EarliestSpanStartMs: String(Math.max(0, Math.round(row.earliestSpanStartMs))),
 
       AppliedEventIds: [...appliedEventIds],
+
+      EvaluationOutcomes: TraceAnalyticsClickHouseRepository.encodeOutcomes(
+        row.evaluationOutcomes ?? {},
+      ),
+      EvaluationRowsDigest: row.evaluationRowsDigest ?? "",
 
       // NOTE: `row.hasSignal` is deliberately NOT serialised — there is no
       // HasSignal column. Readers derive the verdict from the columns above via
@@ -526,6 +633,10 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
           : Boolean(record.HasAnnotation),
 
       attributes: TraceAnalyticsClickHouseRepository.asStringMap(record.Attributes),
+      // Not read back: the fold re-derives them from the map on its next write.
+      metadataColumns: traceAnalyticsMetadataColumns(
+        TraceAnalyticsClickHouseRepository.asStringMap(record.Attributes),
+      ),
 
       // Derived, not read — there is no HasSignal column. Mirrors
       // analytics' has-signal predicate door for door, including the version
@@ -549,6 +660,37 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
       traceNameUserOverridden: Boolean(record.TraceNameUserOverridden),
       lastEventOccurredAt: TraceAnalyticsClickHouseRepository.asNumber(record.LastEventOccurredAt),
       earliestSpanStartMs: TraceAnalyticsClickHouseRepository.asNumber(record.EarliestSpanStartMs),
+      evaluationRowsDigest: asString(record.EvaluationRowsDigest),
     };
+  }
+
+  /** '' for none, so a trace without outcomes keeps the column's default. */
+  private static encodeOutcomes(
+    outcomes: Readonly<Record<string, TraceEvaluationOutcome>>,
+  ): string {
+    return Object.keys(outcomes).length === 0 ? "" : JSON.stringify(outcomes);
+  }
+
+  /**
+   * The column's JSON; '' (an older row) is none. Anything unparseable is unreadable, never none:
+   * folding onto none would store '' over the outcomes, so the read reports the row undecodable.
+   */
+  private static decodeOutcomes({
+    text,
+    traceId,
+  }: {
+    text: string;
+    traceId: string;
+  }): { readable: true; outcomes: Record<string, TraceEvaluationOutcome> } | { readable: false } {
+    if (text === "") return { readable: true, outcomes: {} };
+    try {
+      return { readable: true, outcomes: evaluationOutcomesSchema.parse(JSON.parse(text)) };
+    } catch (error) {
+      logger.warn(
+        { traceId, error },
+        "Unreadable trace_analytics EvaluationOutcomes; the fold rebuilds the trace from its events",
+      );
+      return { readable: false };
+    }
   }
 }

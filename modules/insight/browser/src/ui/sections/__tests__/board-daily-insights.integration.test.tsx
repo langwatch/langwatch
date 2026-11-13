@@ -1,6 +1,6 @@
 /**
  * @vitest-environment jsdom
- * "Daily insights" in a board's header over the real tRPC hooks: the offer, the three states,
+ * "Daily insights" in a board's header over the real tRPC hooks: the three states,
  * what each write sends and what the control says about the last run.
  * @see modules/insight/specs/insight-daily-run.feature
  */
@@ -31,11 +31,10 @@ const NOW = nowInstant().epochMilliseconds;
 const READ = "insights.getBoardDailyRun";
 const CONFIGURE = "insights.configureBoardDailyRun";
 const TURN_OFF = "insights.turnOffBoardDailyRun";
-const OFFER = "Turn on daily insights for Checkout health?";
 
 const NOTHING_YET = { settings: null, lastRun: null, offReason: null };
 const UNDECIDED: InsightDailyRunSetting = { state: "undecided", ...NOTHING_YET };
-const DECLINED: InsightDailyRunSetting = { state: "off", ...NOTHING_YET };
+const OFF_WITHOUT_CHOICES: InsightDailyRunSetting = { state: "off", ...NOTHING_YET };
 const ON: InsightDailyRunSetting = {
   state: "on",
   settings: { hour: 9, timezone: AMSTERDAM, maxInsights: 3 },
@@ -68,11 +67,14 @@ function Board({
   kind = "dashboard",
   id = "board-1",
   widgets,
+  witness = false,
 }: {
   kind?: "dashboard" | "template";
   id?: string;
   /** "loading" while a stored board's widgets have not answered. */
   widgets: number | "loading";
+  /** A second header for the same board with one widget: it draws once the shared read lands. */
+  witness?: boolean;
 }) {
   const [added, setAdded] = useState(0);
   return (
@@ -86,6 +88,16 @@ function Board({
         boardName="Checkout health"
         widgetCount={widgets === "loading" ? void 0 : widgets + added}
       />
+      {witness && (
+        <section aria-label="Witness">
+          <BoardDailyInsights
+            boardKind={kind}
+            boardId={id}
+            boardName="Checkout health"
+            widgetCount={1}
+          />
+        </section>
+      )}
     </>
   );
 }
@@ -106,6 +118,7 @@ function openBoard({
   host?: StubInsightHostOptions;
   kind?: "dashboard" | "template";
   id?: string;
+  witness?: boolean;
 } = {}) {
   const calls: UiProcedureCall[] = [];
   const { host } = renderWithInsightHost({
@@ -140,12 +153,13 @@ async function openDropdown(user: ReturnType<typeof userEvent.setup>) {
 
 describe("given a board with widgets and a member who never answered for it", () => {
   describe("when they open the board", () => {
-    /** @scenario "A board a member never answered offers daily insights" */
-    it("asks whether to turn on daily insights for that board, with the quiet control behind it", async () => {
+    /** @scenario "A board a member never answered does not ask by itself" */
+    it("opens no dialog, sends nothing, and shows the quiet control off", async () => {
       const board = openBoard();
 
-      expect(await screen.findByRole("dialog", { name: OFFER })).toBeInTheDocument();
+      await waitFor(() => expect(quietControl()).toBeInTheDocument());
       expect(quietControl()).not.toBeChecked();
+      expect(screen.queryByRole("dialog")).toBeNull();
       expect(board.reads()).toEqual([
         { projectId: "project-1", board: { kind: "dashboard", id: "board-1" } },
       ]);
@@ -153,50 +167,13 @@ describe("given a board with widgets and a member who never answered for it", ()
     });
   });
 
-  describe("when they close the offer without an answer", () => {
-    /** @scenario "Closing the offer decides nothing" */
-    it("sends nothing, and keeps the offer closed for the visit", async () => {
-      const board = openBoard();
-      const offer = await screen.findByRole("dialog", { name: OFFER });
-
-      await board.user.click(within(offer).getByRole("button", { name: "Close" }));
-
-      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-      expect(quietControl()).toBeInTheDocument();
-      expect(board.writes()).toEqual([]);
-      expect(board.host.successes).toEqual([]);
-    });
-  });
-
-  describe("when they say no thanks", () => {
-    /** @scenario "No thanks on the offer sends an off for the board" */
-    it("sends an off for that board and closes the offer", async () => {
-      const board = openBoard();
-      const offer = await screen.findByRole("dialog", { name: OFFER });
-
-      await board.user.click(within(offer).getByRole("button", { name: "No thanks" }));
-
-      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-      await waitFor(() =>
-        expect(board.sent(TURN_OFF)).toEqual([
-          {
-            projectId: "project-1",
-            board: { kind: "dashboard", id: "board-1", name: "Checkout health" },
-          },
-        ]),
-      );
-      expect(board.sent(CONFIGURE)).toEqual([]);
-      expect(quietControl()).toBeInTheDocument();
-    });
-  });
-
-  describe("when they turn it on as offered", () => {
-    /** @scenario "Turning on from the offer sends the hour, the zone and the maximum" */
+  describe("when they turn it on from the quiet control", () => {
+    /** @scenario "Turning on from the quiet control sends the hour, the zone and the maximum" */
     it("sets the run for hour 9, the browser's time zone and at most 3 insights", async () => {
       const board = openBoard();
-      const offer = await screen.findByRole("dialog", { name: OFFER });
+      await waitFor(() => expect(quietControl()).toBeInTheDocument());
 
-      await board.user.click(within(offer).getByRole("button", { name: "Turn on" }));
+      await board.user.click(quietControl()!);
 
       await waitFor(() =>
         expect(board.sent(CONFIGURE)).toEqual([
@@ -213,52 +190,32 @@ describe("given a board with widgets and a member who never answered for it", ()
       expect(screen.queryByRole("dialog")).toBeNull();
     });
   });
-
-  describe("when they choose another hour, zone and maximum first", () => {
-    /** @scenario "Turning on from the offer sends the hour, the zone and the maximum" */
-    it("sends what they chose", async () => {
-      const board = openBoard();
-      const offer = within(await screen.findByRole("dialog", { name: OFFER }));
-      expect(within(offer.getByLabelText("Run time")).getAllByRole("option")).toHaveLength(24);
-      expect(
-        within(offer.getByLabelText("Most insights per run"))
-          .getAllByRole("option")
-          .map((option) => option.textContent),
-      ).toEqual(["1", "3", "5", "10"]);
-
-      await board.user.selectOptions(offer.getByLabelText("Run time"), "23:00");
-      await board.user.selectOptions(offer.getByLabelText("Time zone"), "Asia/Tokyo");
-      await board.user.selectOptions(offer.getByLabelText("Most insights per run"), "10");
-      await board.user.click(offer.getByRole("button", { name: "Turn on" }));
-
-      await waitFor(() =>
-        expect(board.sent(CONFIGURE)).toMatchObject([
-          { hour: 23, timezone: "Asia/Tokyo", maxInsights: 10 },
-        ]),
-      );
-    });
-  });
 });
 
 describe("given a board with no widgets and a member who never answered for it", () => {
   describe("when they open the board", () => {
-    /** @scenario "A board with no widgets offers nothing" */
-    it("opens no offer and draws no control, also once its first widget lands", async () => {
-      const board = openBoard({ widgets: 0 });
-      await waitFor(() => expect(board.reads()).toHaveLength(1));
+    /** @scenario "A board with no widgets shows no control" */
+    it("opens no dialog and draws no control until its first widget lands", async () => {
+      const board = openBoard({ widgets: 0, witness: true });
+      const witness = within(screen.getByRole("region", { name: "Witness" }));
+      // Both headers draw from one read, so the witness's switch means the read has landed.
+      await witness.findByLabelText("Turn on daily insights");
+      expect(screen.getAllByLabelText("Turn on daily insights")).toHaveLength(1);
 
       // The control shows once the board has something to read; the board opened without.
       await board.user.click(screen.getByRole("button", { name: "Add a widget" }));
 
-      await waitFor(() => expect(quietControl()).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getAllByLabelText("Turn on daily insights")).toHaveLength(2),
+      );
       expect(screen.queryByRole("dialog")).toBeNull();
       expect(board.writes()).toEqual([]);
     });
   });
 
   describe("when its widgets have not loaded yet", () => {
-    /** @scenario "A board with no widgets offers nothing" */
-    it("draws no control and opens no offer", async () => {
+    /** @scenario "A board with no widgets shows no control" */
+    it("draws no control and opens no dialog", async () => {
       const board = openBoard({ widgets: "loading" });
       await waitFor(() => expect(board.reads()).toHaveLength(1));
 
@@ -268,11 +225,11 @@ describe("given a board with no widgets and a member who never answered for it",
   });
 });
 
-describe("given a member said no thanks to a board", () => {
+describe("given a member turned a board off before choosing a run", () => {
   describe("when they open the board", () => {
-    /** @scenario "A board that is off shows the quiet control and no offer" */
-    it("shows the quiet control, no offer, and turns on with the defaults", async () => {
-      const board = openBoard({ setting: DECLINED });
+    /** @scenario "A board that is off shows the quiet control" */
+    it("shows the quiet control, no dialog, and turns on with the defaults", async () => {
+      const board = openBoard({ setting: OFF_WITHOUT_CHOICES });
       await waitFor(() => expect(quietControl()).toBeInTheDocument());
       expect(screen.queryByRole("dialog")).toBeNull();
 
@@ -289,7 +246,7 @@ describe("given a member said no thanks to a board", () => {
 
 describe("given a member turned a board's daily run off", () => {
   describe("when they turn it on from the control", () => {
-    /** @scenario "A board that is off shows the quiet control and no offer" */
+    /** @scenario "A board that is off shows the quiet control" */
     it("sends what they last chose", async () => {
       const board = openBoard({
         setting: {
@@ -325,7 +282,10 @@ describe("given a member turned a board's daily run off", () => {
   describe("when the server has not answered the write yet", () => {
     /** @scenario "The control changes before the server answers" */
     it("already shows the dropdown of a board that is on", async () => {
-      const board = openBoard({ setting: DECLINED, write: () => new Promise(() => void 0) });
+      const board = openBoard({
+        setting: OFF_WITHOUT_CHOICES,
+        write: () => new Promise(() => void 0),
+      });
       await waitFor(() => expect(quietControl()).toBeInTheDocument());
 
       await board.user.click(quietControl()!);
@@ -341,7 +301,7 @@ describe("given a member turned a board's daily run off", () => {
     /** @scenario "A refused write puts the control back and says so" */
     it("goes back to off and tells the member it could not be turned on", async () => {
       const board = openBoard({
-        setting: DECLINED,
+        setting: OFF_WITHOUT_CHOICES,
         write: () => Promise.reject(new UiProcedureRefusal("dashboard_not_found", 404)),
       });
       await waitFor(() => expect(quietControl()).toBeInTheDocument());
@@ -396,7 +356,16 @@ describe("given a member turned a board's daily run on", () => {
       );
       expect(settings.getByLabelText("Run time")).toHaveValue("9");
       expect(settings.getByLabelText("Time zone")).toHaveValue(AMSTERDAM);
+      expect(within(settings.getByLabelText("Run time")).getAllByRole("option")).toHaveLength(24);
+      expect(
+        within(settings.getByLabelText("Most insights per run"))
+          .getAllByRole("option")
+          .map((option) => option.textContent),
+      ).toEqual(["1", "3", "5", "10"]);
+
       await board.user.selectOptions(settings.getByLabelText("Run time"), "07:00");
+      await board.user.selectOptions(settings.getByLabelText("Time zone"), "Asia/Tokyo");
+      await board.user.selectOptions(settings.getByLabelText("Most insights per run"), "10");
       await board.user.click(settings.getByRole("button", { name: "Save" }));
 
       await waitFor(() =>
@@ -405,8 +374,8 @@ describe("given a member turned a board's daily run on", () => {
             projectId: "project-1",
             board: { kind: "dashboard", id: "board-1", name: "Checkout health" },
             hour: 7,
-            timezone: AMSTERDAM,
-            maxInsights: 3,
+            timezone: "Asia/Tokyo",
+            maxInsights: 10,
           },
         ]),
       );
@@ -515,8 +484,6 @@ describe("given a board whose daily run the system turned off after 7 skipped da
       ).toBeInTheDocument();
       expect(dropdown.getByLabelText("Turn on daily insights")).not.toBeChecked();
       expect(dropdown.queryByText("Settings")).toBeNull();
-      // The reason is in the dropdown: no offer, and no second switch beside it.
-      expect(screen.queryByRole("dialog", { name: OFFER })).toBeNull();
       expect(board.writes()).toEqual([]);
     });
 
@@ -541,9 +508,9 @@ describe("given a From LangWatch board", () => {
     /** @scenario "A From LangWatch board takes the control and is named by its template id" */
     it("reads and sets it with the kind template and the template's id", async () => {
       const board = openBoard({ kind: "template", id: "release" });
-      const offer = await screen.findByRole("dialog", { name: OFFER });
+      await waitFor(() => expect(quietControl()).toBeInTheDocument());
 
-      await board.user.click(within(offer).getByRole("button", { name: "Turn on" }));
+      await board.user.click(quietControl()!);
 
       await waitFor(() =>
         expect(board.sent(CONFIGURE)).toMatchObject([
@@ -556,27 +523,65 @@ describe("given a From LangWatch board", () => {
     });
   });
 
-  describe("when a member is offered its daily run", () => {
-    /** @scenario "A From LangWatch board says before the answer that no run reads it yet" */
-    it("says in the offer that a run on this board files nothing for now", async () => {
-      openBoard({ kind: "template", id: "release" });
+  describe("when a member turns it on from the quiet control", () => {
+    /** @scenario "Turning on a From LangWatch board says no run reads it yet" */
+    it("says that a run on this board files nothing for now, and promises no daily read", async () => {
+      const board = openBoard({ kind: "template", id: "release" });
+      await waitFor(() => expect(quietControl()).toBeInTheDocument());
 
-      const offer = await screen.findByRole("dialog", { name: OFFER });
+      await board.user.click(quietControl()!);
+
+      await waitFor(() =>
+        expect(board.host.successes).toEqual([
+          {
+            title:
+              "Daily insights on. Langy cannot read From LangWatch boards yet. Until it can, a run on this board files nothing.",
+          },
+        ]),
+      );
+    });
+
+    /** @scenario "Turning on a From LangWatch board says no run reads it yet" */
+    it("promises the daily read on a stored board", async () => {
+      const board = openBoard();
+      await waitFor(() => expect(quietControl()).toBeInTheDocument());
+
+      await board.user.click(quietControl()!);
+
+      await waitFor(() => expect(board.host.successes).toHaveLength(1));
+      expect(board.host.successes[0]?.title).toMatch(
+        /^Daily insights on\. Langy reads this board every day /,
+      );
+    });
+  });
+
+  describe("when a member that turned it on opens Settings", () => {
+    async function openSettings(board: ReturnType<typeof openBoard>) {
+      const dropdown = await openDropdown(board.user);
+      await board.user.click(dropdown.getByRole("button", { name: "Settings" }));
+      return within(
+        await screen.findByRole("dialog", { name: "Daily insights for Checkout health" }),
+      );
+    }
+
+    /** @scenario "A From LangWatch board's settings say no run reads it yet" */
+    it("says that a run on this board files nothing for now", async () => {
+      const settings = await openSettings(
+        openBoard({ kind: "template", id: "release", setting: ON }),
+      );
 
       expect(
-        within(offer).getByText(
+        settings.getByText(
           "Langy cannot read From LangWatch boards yet. Until it can, a run on this board files nothing.",
         ),
       ).toBeInTheDocument();
     });
 
-    /** @scenario "A From LangWatch board says before the answer that no run reads it yet" */
+    /** @scenario "A From LangWatch board's settings say no run reads it yet" */
     it("says no such thing on a stored board", async () => {
-      openBoard();
+      const settings = await openSettings(openBoard({ setting: ON }));
 
-      const offer = await screen.findByRole("dialog", { name: OFFER });
-
-      expect(within(offer).queryByText(/cannot read From LangWatch boards/)).toBeNull();
+      expect(settings.queryByText(/cannot read From LangWatch boards/)).toBeNull();
     });
   });
 
@@ -610,7 +615,7 @@ describe("given a board whose header is drawn where insights are not available",
       { project: { id: "project-1", slug: "acme", kind: "aggregate" } },
     ],
     ["no project is in scope", { project: undefined }],
-  ])("shows no control, opens no offer and asks the server nothing when %s", async (_, host) => {
+  ])("shows no control, opens no dialog and asks the server nothing when %s", async (_, host) => {
     const board = openBoard({ host });
 
     // A control that were coming would have asked for its read by now.

@@ -1,7 +1,9 @@
+import { GatewayApi } from "@langwatch/gateway-contract";
 import {
   type InstantEvalJudgeServerConfig,
   isLangWatchJudgeHost,
 } from "@langwatch/instant-eval-judge-contract";
+import type { BoundApis } from "@langwatch/process";
 import type { ScopedSecrets } from "@langwatch/secrets";
 
 import { cloudClassifierKeyOf } from "../../rules/instant-eval-judge-cloud-key.rules.ts";
@@ -20,13 +22,16 @@ import { HttpInstantEvalLlmJudgeChannel } from "./http.instant-eval-llm-judge.ch
 /** Classify calls go to LangWatch's classifier with its key, where LangWatch runs the install. */
 export class HttpInstantEvalJudgeChannels {
   static readonly requires = [] as const;
+  static readonly binds = { spend: GatewayApi } as const;
 
   static async create({
     config,
     secrets,
+    bound,
   }: {
     config: InstantEvalJudgeServerConfig;
     secrets: ScopedSecrets;
+    bound: BoundApis<typeof HttpInstantEvalJudgeChannels.binds>;
   }): Promise<InstantEvalJudgeChannels> {
     const isCloud = isLangWatchJudgeHost(config);
     const cloudKey = (apiKey: string | undefined) => cloudClassifierKeyOf({ isCloud, apiKey });
@@ -54,6 +59,6 @@ export class HttpInstantEvalJudgeChannels {
         ...(openAi.available ? { openai_responses: openAi.apiKey } : {}),
       },
     });
-    return { classifier, decisionModels, hostedDecisions, llmJudge };
+    return { classifier, decisionModels, hostedDecisions, llmJudge, spend: bound.spend };
   }
 }

@@ -56,6 +56,11 @@ interface LangyLocalControlState {
      */
     source?: string;
   }) => void;
+  /**
+   * The stop of one turn was confirmed: its cards still waiting are cancelled, since the
+   * stream that would have said so is the one Stop aborted. Other turns' cards are left alone.
+   */
+  cancelTurnWaits: (a: { conversationId: string; turnId: string }) => void;
   /** Open another conversation: everything here belonged to the last one. */
   reset: (conversationId: string | null) => void;
 }
@@ -66,6 +71,33 @@ function isForeign(
   conversationId: string | null | undefined,
 ): boolean {
   return !!conversationId && state.conversationId !== conversationId;
+}
+
+/**
+ * One turn's still-waiting cards cancelled, every other entry as it was. A question with no
+ * `toolCallId` may be the platform's own confirmation, which the server leaves answerable
+ * after Stop; a permission is never one, so it closes with or without a `toolCallId`.
+ */
+function withTurnWaitsCancelled({
+  state,
+  conversationId,
+  turnId,
+}: {
+  state: LangyLocalControlState;
+  conversationId: string;
+  turnId: string;
+}): Record<string, LangyLiveWait> {
+  if (isForeign(state, conversationId)) return state.waits;
+  return Object.fromEntries(
+    Object.entries(state.waits).map(([waitId, wait]) => {
+      const endsWithStop = wait.kind === "permission" || Boolean(wait.toolCallId);
+      const isOpenInTurn = wait.turnId === turnId && wait.status === "pending";
+      return [
+        waitId,
+        endsWithStop && isOpenInTurn ? { ...wait, status: "cancelled" as const } : wait,
+      ];
+    }),
+  );
 }
 
 export const useLangyLocalControlStore = defineSlice<LangyLocalControlState>({
@@ -128,6 +160,9 @@ export const useLangyLocalControlStore = defineSlice<LangyLocalControlState>({
         },
       });
     },
+
+    cancelTurnWaits: ({ conversationId, turnId }) =>
+      set({ waits: withTurnWaitsCancelled({ state: get(), conversationId, turnId }) }),
 
     reset: (conversationId) =>
       set({

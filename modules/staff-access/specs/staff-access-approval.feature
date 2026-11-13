@@ -1,7 +1,7 @@
 Feature: Ops agent access approval
   An operator's coding agent asks for one hour of access to production. The operator approves
   each request with a passkey on a page that shows exactly what the signature approves. The
-  agent redeems once with its PKCE verifier and its requester key. ADR-193.
+  agent redeems once with its PKCE verifier and its requester key. ADR-202.
 
   Background:
     Given cloud ops is on and the system flag "ops_agent_access_enabled" is on

@@ -48,6 +48,7 @@
         "CAST",
         "ceil",
         "ceiling",
+        "cityHash64",
         "coalesce",
         "concat",
         "concatWithSeparator",
@@ -176,6 +177,7 @@
         "simpleJSONExtractString",
         "simpleJSONExtractUInt",
         "simpleJSONHas",
+        "sipHash128",
         "splitByChar",
         "splitByString",
         "sqrt",
@@ -796,6 +798,155 @@
           "exampleSql": "SELECT TraceId, SpanId, ParentSpanId\nFROM analytics.spans\nWHERE StartTime >= subtractDays(now(), 7)\nORDER BY StartTime DESC\nLIMIT 100"
         },
         {
+          "name": "analytics.span_metrics",
+          "description": "One row per span with its timing, status, cost and the LangWatch facts dashboards group by, and no attribute map. Holds spans from the span_analytics floor on.",
+          "grain": "one row per (TenantId, TraceId, SpanId)",
+          "joinKeys": [
+            "TenantId",
+            "TraceId",
+            "SpanId"
+          ],
+          "timeColumn": "StartTime",
+          "freshness": "seconds behind ingestion",
+          "columns": [
+            {
+              "name": "TenantId",
+              "type": "String",
+              "description": "Project the span belongs to.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TraceId",
+              "type": "String",
+              "description": "Trace the span belongs to.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "SpanId",
+              "type": "String",
+              "description": "Span identifier, unique within the trace.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ParentSpanId",
+              "type": "Nullable(String)",
+              "description": "Parent span, null for the root span.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "StartTime",
+              "type": "DateTime64(3)",
+              "description": "When the span started. Filter on this to prune partitions.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "EndTime",
+              "type": "DateTime64(3)",
+              "description": "When the span ended.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "DurationMs",
+              "type": "UInt64",
+              "description": "Span duration in milliseconds.",
+              "unit": "ms",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "SpanName",
+              "type": "LowCardinality(String)",
+              "description": "Operation name of the span.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "SpanKind",
+              "type": "UInt8",
+              "description": "OpenTelemetry span kind.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "StatusCode",
+              "type": "Nullable(UInt8)",
+              "description": "OpenTelemetry status code.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Cost",
+              "type": "Nullable(Float64)",
+              "description": "Billed cost attributed to the span, in USD.",
+              "unit": "USD",
+              "gates": [
+                "costs",
+                "cost:view"
+              ],
+              "available": true
+            },
+            {
+              "name": "NonBilledCost",
+              "type": "Nullable(Float64)",
+              "description": "Cost attributed to the span that is not billed, in USD.",
+              "unit": "USD",
+              "gates": [
+                "costs",
+                "cost:view"
+              ],
+              "available": true
+            },
+            {
+              "name": "SpanType",
+              "type": "LowCardinality(String)",
+              "description": "LangWatch's kind of span, such as llm, tool or rag, from langwatch.span.type. Empty when the span sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ErrorType",
+              "type": "String",
+              "description": "The type of error the span recorded, from exception.type, else error.type. Empty when it recorded neither.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "RagContextCount",
+              "type": "UInt32",
+              "description": "How many contexts a retrieval span returned, the length of langwatch.rag.contexts. 0 when it returned none or sent no list.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "DeploymentEnvironment",
+              "type": "String",
+              "description": "The environment the span's service ran in, from the resource's deployment.environment, else deployment.environment.name. Empty when it sent neither.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            }
+          ],
+          "exampleSql": "SELECT TraceId, SpanId, ParentSpanId\nFROM analytics.span_metrics\nWHERE StartTime >= subtractDays(now(), 7)\nORDER BY StartTime DESC\nLIMIT 100"
+        },
+        {
           "name": "analytics.evaluations",
           "description": "One row per evaluation run, with its score and outcome.",
           "grain": "one row per (TenantId, EvaluationId), latest version only",
@@ -1375,6 +1526,102 @@
               "unit": null,
               "gates": [],
               "available": true
+            },
+            {
+              "name": "MetadataOutputAction",
+              "type": "String",
+              "description": "What the user did with the output, such as accepted or edited, from the trace's metadata.output_action. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetadataOutcome",
+              "type": "String",
+              "description": "How the conversation ended, such as resolved or handover, from the trace's metadata.outcome. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetadataSentToReview",
+              "type": "String",
+              "description": "Whether the output went to a person for review, as the text 'true' or 'false', from the trace's metadata.sent_to_review. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetadataDocumentType",
+              "type": "String",
+              "description": "The kind of document the trace handled, from the trace's metadata.document_type. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetadataFlow",
+              "type": "String",
+              "description": "The flow of the application that ran the trace, from the trace's metadata.flow. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetadataLanguage",
+              "type": "String",
+              "description": "The language of the conversation, from the trace's metadata.language. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetadataSegment",
+              "type": "String",
+              "description": "The customer segment the trace counts under, from the trace's metadata.segment. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetadataTeam",
+              "type": "String",
+              "description": "The team the trace counts under, from the trace's metadata.team. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetadataTopic",
+              "type": "String",
+              "description": "The topic the application gave the trace, from the trace's metadata.topic. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetadataOutcomeReason",
+              "type": "String",
+              "description": "Why the conversation ended as it did, from the trace's metadata.outcome_reason. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetadataPromptVersion",
+              "type": "String",
+              "description": "The prompt or configuration version the application names, from the trace's metadata.prompt_version. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetadataEnvironment",
+              "type": "String",
+              "description": "The environment the application ran in, from the trace's metadata.environment, else metadata.env. Empty when the trace sent neither.",
+              "unit": null,
+              "gates": [],
+              "available": true
             }
           ],
           "exampleSql": "SELECT TraceId, OccurredAt, UpdatedAt\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
@@ -1950,6 +2197,305 @@
             }
           ],
           "exampleSql": "SELECT BucketStart, EvaluatorType, Status\nFROM analytics.evaluation_metrics_by_minute\nWHERE BucketStart >= subtractDays(now(), 7)\nORDER BY BucketStart DESC\nLIMIT 100"
+        },
+        {
+          "name": "analytics.trace_evaluation_metrics",
+          "description": "One row per evaluation of a trace, its live outcome, carrying the evaluated trace's time, source and dimensions, so a read by the trace's period needs no join.",
+          "grain": "one row per (TenantId, TraceId, EvaluationId): each revision grouped with its retractions, kept while its signs sum above zero",
+          "joinKeys": [
+            "TenantId",
+            "TraceId"
+          ],
+          "timeColumn": "OccurredAt",
+          "freshness": "seconds behind ingestion",
+          "columns": [
+            {
+              "name": "TenantId",
+              "type": "String",
+              "description": "Project the evaluation belongs to.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TraceId",
+              "type": "String",
+              "description": "Trace the evaluation ran against.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "EvaluationId",
+              "type": "String",
+              "description": "Evaluation run identifier.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "OccurredAt",
+              "type": "DateTime64(3)",
+              "description": "When the evaluation reached its latest state. Filter on this to prune partitions.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "UpdatedAt",
+              "type": "DateTime64(3)",
+              "description": "When this version of the row was written.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TraceOccurredAt",
+              "type": "DateTime64(3)",
+              "description": "When the evaluated trace was first observed, as trace_metrics.OccurredAt has it. Filter on this to keep the traces of a period.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "EvaluatorName",
+              "type": "Nullable(String)",
+              "description": "Display name of the evaluator.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Status",
+              "type": "LowCardinality(String)",
+              "description": "Terminal state of the run: processed, skipped, or error.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "IsGuardrail",
+              "type": "Bool",
+              "description": "Whether the evaluator ran as a guardrail.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Passed",
+              "type": "Nullable(Bool)",
+              "description": "Pass/fail outcome, when the evaluator produced one.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Label",
+              "type": "Nullable(String)",
+              "description": "Categorical outcome, when the evaluator produced one.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Source",
+              "type": "String",
+              "description": "The source the evaluation counts under, as evaluation_metrics.Source has it: its Origin when LangWatch lists it, application when the origin is missing or empty, other for any origin LangWatch does not list.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TraceSource",
+              "type": "String",
+              "description": "The source the evaluated trace counts under, as trace_metrics.Source has it: its origin when LangWatch lists it, application when the origin is missing or empty, other for any origin LangWatch does not list. Filter it with {dashboard_context_sources:Array(String)}.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CustomerId",
+              "type": "Nullable(String)",
+              "description": "Customer account the evaluated trace was recorded for.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TopicId",
+              "type": "Nullable(String)",
+              "description": "Topic the evaluated trace was clustered into.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Labels",
+              "type": "Array(String)",
+              "description": "Labels the SDK attached to the evaluated trace.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetadataTopic",
+              "type": "String",
+              "description": "The topic the application gave the trace, from the trace's metadata.topic. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetadataDocumentType",
+              "type": "String",
+              "description": "The kind of document the trace handled, from the trace's metadata.document_type. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetadataLanguage",
+              "type": "String",
+              "description": "The language of the conversation, from the trace's metadata.language. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetadataTeam",
+              "type": "String",
+              "description": "The team the trace counts under, from the trace's metadata.team. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetadataFlow",
+              "type": "String",
+              "description": "The flow of the application that ran the trace, from the trace's metadata.flow. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetadataSegment",
+              "type": "String",
+              "description": "The customer segment the trace counts under, from the trace's metadata.segment. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetadataPromptVersion",
+              "type": "String",
+              "description": "The prompt or configuration version the application names, from the trace's metadata.prompt_version. Empty when the trace sent none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            }
+          ],
+          "exampleSql": "SELECT TraceId, EvaluationId, OccurredAt\nFROM analytics.trace_evaluation_metrics\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
+        },
+        {
+          "name": "analytics.trace_evaluation_checks",
+          "description": "Live evaluations of traces counted per trace, evaluator and outcome, carrying the evaluated trace's time and source. Sum Evaluations to count evaluations.",
+          "grain": "one row per (TenantId, TraceId, OccurredAt, TraceOccurredAt, EvaluatorName, Passed, IsGuardrail, Source, TraceSource), Evaluations summed",
+          "joinKeys": [
+            "TenantId",
+            "TraceId",
+            "OccurredAt",
+            "TraceOccurredAt",
+            "EvaluatorName",
+            "Passed",
+            "IsGuardrail",
+            "Source",
+            "TraceSource"
+          ],
+          "timeColumn": "OccurredAt",
+          "freshness": "seconds behind ingestion",
+          "columns": [
+            {
+              "name": "TenantId",
+              "type": "String",
+              "description": "Project the evaluation belongs to.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TraceId",
+              "type": "String",
+              "description": "Trace the evaluation ran against.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "OccurredAt",
+              "type": "DateTime64(3)",
+              "description": "When the evaluation reached its latest state. Filter on this to prune partitions.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TraceOccurredAt",
+              "type": "DateTime64(3)",
+              "description": "When the evaluated trace was first observed, as trace_metrics.OccurredAt has it. Filter on this to keep the traces of a period.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "EvaluatorName",
+              "type": "Nullable(String)",
+              "description": "Display name of the evaluator.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Passed",
+              "type": "Nullable(Bool)",
+              "description": "Pass/fail outcome, when the evaluator produced one.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "IsGuardrail",
+              "type": "Bool",
+              "description": "Whether the evaluator ran as a guardrail.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Source",
+              "type": "String",
+              "description": "The source the evaluation counts under, as evaluation_metrics.Source has it: its Origin when LangWatch lists it, application when the origin is missing or empty, other for any origin LangWatch does not list.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TraceSource",
+              "type": "String",
+              "description": "The source the evaluated trace counts under, as trace_metrics.Source has it: its origin when LangWatch lists it, application when the origin is missing or empty, other for any origin LangWatch does not list. Filter it with {dashboard_context_sources:Array(String)}.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Evaluations",
+              "type": "Int64",
+              "description": "Live evaluations in the row. Sum it to count evaluations; a row never holds zero.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            }
+          ],
+          "exampleSql": "SELECT TraceId, OccurredAt, TraceOccurredAt\nFROM analytics.trace_evaluation_checks\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
         },
         {
           "name": "analytics.coding_sessions",
@@ -4159,6 +4705,14 @@
               "unit": null,
               "gates": [],
               "available": true
+            },
+            {
+              "name": "Concurrency",
+              "type": "Nullable(UInt16)",
+              "description": "Concurrency",
+              "unit": null,
+              "gates": [],
+              "available": true
             }
           ],
           "exampleSql": "SELECT ProjectionId, RunId, ExperimentId\nFROM analytics.experiment_run_results\nWHERE StartedAt >= subtractDays(now(), 7)\nORDER BY StartedAt DESC\nLIMIT 100"
@@ -4843,6 +5397,14 @@
               "name": "ImageCount",
               "type": "UInt64",
               "description": "ImageCount",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "WebSearchRequests",
+              "type": "UInt64",
+              "description": "WebSearchRequests",
               "unit": null,
               "gates": [],
               "available": true
@@ -8186,7 +8748,9 @@
             "AgentId",
             "WorkflowId",
             "CopiedFromAgentId",
-            "OwnerUserId"
+            "OwnerUserId",
+            "CreatedById",
+            "UpdatedById"
           ],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
@@ -8277,6 +8841,22 @@
               "name": "ArchivedAt",
               "type": "Nullable(DateTime64(3))",
               "description": "ArchivedAt",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CreatedById",
+              "type": "Nullable(String)",
+              "description": "CreatedById",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "UpdatedById",
+              "type": "Nullable(String)",
+              "description": "UpdatedById",
               "unit": null,
               "gates": [],
               "available": true
@@ -10908,7 +11488,9 @@
             "TenantId",
             "EvaluatorId",
             "WorkflowId",
-            "CopiedFromEvaluatorId"
+            "CopiedFromEvaluatorId",
+            "CreatedById",
+            "UpdatedById"
           ],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
@@ -10983,6 +11565,22 @@
               "name": "ArchivedAt",
               "type": "Nullable(DateTime64(3))",
               "description": "ArchivedAt",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CreatedById",
+              "type": "Nullable(String)",
+              "description": "CreatedById",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "UpdatedById",
+              "type": "Nullable(String)",
+              "description": "UpdatedById",
               "unit": null,
               "gates": [],
               "available": true
@@ -14544,7 +15142,9 @@
             "TenantId",
             "MonitorId",
             "ExperimentId",
-            "EvaluatorId"
+            "EvaluatorId",
+            "CreatedById",
+            "UpdatedById"
           ],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
@@ -14709,6 +15309,30 @@
               "gates": [
                 "output"
               ],
+              "available": true
+            },
+            {
+              "name": "EvaluatorLabel",
+              "type": "Nullable(String)",
+              "description": "EvaluatorLabel",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CreatedById",
+              "type": "Nullable(String)",
+              "description": "CreatedById",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "UpdatedById",
+              "type": "Nullable(String)",
+              "description": "UpdatedById",
+              "unit": null,
+              "gates": [],
               "available": true
             }
           ],
@@ -18664,7 +19288,7 @@
       "maxStatementLength": 50000,
       "maxRowsReturned": 10000,
       "maxResultBytes": 8000000,
-      "maxExecutionTimeSeconds": 10,
+      "maxExecutionTimeSeconds": 60,
       "pagination": "The endpoint has no cursor. Page by writing a keyset predicate into the statement and rebinding its parameters; see the example tagged `paging`."
     },
     "endpoints": [

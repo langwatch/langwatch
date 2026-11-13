@@ -22,14 +22,7 @@ import {
   type RequestCredential,
 } from "@langwatch/observability/credential-census";
 import { nowInstant } from "@langwatch/time";
-import {
-  context as otContext,
-  propagation,
-  type Span,
-  SpanKind,
-  SpanStatusCode,
-  trace,
-} from "@opentelemetry/api";
+import { context as otContext, propagation, type Span, SpanKind, trace } from "@opentelemetry/api";
 import type { Context, HonoRequest, MiddlewareHandler, Next, ValidationTargets } from "hono";
 import { validator as openApiValidator } from "hono-openapi";
 import { HTTPException } from "hono/http-exception";
@@ -47,6 +40,7 @@ import type { RestIdentity } from "../hosting/api-door.ts";
 import { ClientAddress } from "../policy/client-address.ts";
 import type { ResponseCache } from "../ports.ts";
 import { parseApiSchema, type ApiSchema, type ApiSchemaOutput } from "../schema.ts";
+import { recordRequestSpanFailure, sampleClientFaultLog } from "./client-fault-telemetry.ts";
 import type { RestDoorCredential } from "./declaration.ts";
 import {
   REQUEST_PRINCIPAL,
@@ -775,8 +769,13 @@ function closeRequestSpan({ c, span, error }: { c: Context; span: Span; error: u
     if (value) span.setAttribute(key, value);
   }
   if (error) {
-    span.recordException(error as Error);
-    span.setStatus({ code: SpanStatusCode.ERROR });
+    // The handler's resolved error wins: the raw throw may be a wrapper that hides its fault.
+    const resolved = c.get(RESOLVED_ERROR) as ResolvedError | undefined;
+    recordRequestSpanFailure({
+      span,
+      error: resolved?.error ?? error,
+      answeredStatus: resolved?.status ?? c.res.status,
+    });
   }
   span.end();
 }
@@ -851,6 +850,8 @@ function logRequestOutcome({
     },
   };
 
+  sampleClientFault({ record, family });
+
   // A status the route DECLARED is an answer, not a fault.
   if (!requestError && c.get(DECLARED_ANSWER) === true) {
     logDeclaredAnswer(logger, record);
@@ -865,6 +866,25 @@ function logRequestOutcome({
   }
 
   logHttpRequest(logger, record);
+}
+
+/** A caller's fault is counted by reason and logged once per window; its repeats go to debug. */
+function sampleClientFault({
+  record,
+  family,
+}: {
+  record: RequestLogData;
+  family: string | undefined;
+}): void {
+  const clientFault = sampleClientFaultLog({
+    error: record.error,
+    family,
+    statusCode: record.statusCode,
+  });
+  if (clientFault?.isRepeat) record.level = "debug";
+  if (clientFault && clientFault.suppressedRequests > 0) {
+    record.extra = { ...record.extra, suppressedRequests: clientFault.suppressedRequests };
+  }
 }
 
 /** Counts the request into the credential census and tags its span; never fails the request. */

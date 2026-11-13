@@ -136,6 +136,10 @@ export class TestModelProviderService implements ModelProviderApi {
     return Promise.resolve([]);
   }
 
+  listDecisionModelsForScopes(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+
   findAlternateModel(): Promise<never> {
     throw new Error("Not used by Trace tests.");
   }

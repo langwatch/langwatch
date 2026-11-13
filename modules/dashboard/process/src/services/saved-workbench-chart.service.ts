@@ -225,6 +225,7 @@ export class SavedWorkbenchChartService {
       ...input.execution,
       sql: chart.definition.sql,
       parameters: chart.definition.parameters,
+      telemetry: { caller: "saved_chart" },
     });
   }
 }

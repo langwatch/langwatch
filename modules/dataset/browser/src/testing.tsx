@@ -23,6 +23,7 @@ export type StubDatasetHostOptions = {
   copyTargets?: readonly DatasetCopyTarget[];
   route?: DatasetRouteReading;
   reportedGlobally?: boolean;
+  currentUserId?: string;
 };
 
 /** A host that answers from fixtures and records everything it is told. */
@@ -40,6 +41,10 @@ export class StubDatasetHost extends DatasetHostApi {
     return "project" in this.options
       ? this.options.project
       : { id: "proj-1", slug: "test-project", name: "Test Project" };
+  }
+
+  currentUserId(): string | undefined {
+    return this.options.currentUserId ?? "user-1";
   }
 
   hasPermission(permission: string): boolean {

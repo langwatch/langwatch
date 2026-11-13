@@ -743,7 +743,8 @@ describe("CodingAgentSessionFoldProjection", () => {
 
     /** @scenario A session context event from Codex folds its git identity */
     /** @scenario A session context event from opencode folds its git identity */
-    it.each(["codex", "opencode"])(
+    /** @scenario A session context event from pi folds its git identity */
+    it.each(["codex", "opencode", "pi"])(
       "folds the same identity for %s, because nothing in the fold is per-agent",
       (agent) => {
         const projection = makeProjection();

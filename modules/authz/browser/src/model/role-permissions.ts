@@ -231,15 +231,51 @@ const RESOURCE_COPY = {
     blurb: "The in-product assistant and its conversations.",
     area: "Building",
   },
+  braids: {
+    label: "Braids",
+    blurb: "Create, change and remove braids, and manage signing keys.",
+    area: "Data and analysis",
+  },
   sso: {
     label: "Single sign-on and directory",
     blurb: "How people sign in, and the directory that provisions them.",
+    area: "Organization",
+  },
+  agents: {
+    label: "Agent deploys",
+    blurb: "Which version of an agent each deploy label, such as production, points at.",
+    area: "Building",
+  },
+  evaluators: {
+    label: "Evaluator deploys",
+    blurb: "Which version of an evaluator each deploy label, such as production, points at.",
+    area: "Building",
+  },
+  subscription: {
+    label: "Subscription",
+    blurb: "The organization's paid plan, its seats and its invoices.",
+    area: "Organization",
+  },
+  seatRequests: {
+    label: "Seat requests",
+    blurb: "Requests to give a seat to someone the seat limit held back.",
+    area: "Organization",
+  },
+  members: {
+    label: "Members",
+    blurb: "Who is in the organization and which roles they hold.",
     area: "Organization",
   },
   featureFlags: {
     label: "Feature flag experiments",
     blurb: "Which experiments a project or organization is enrolled in.",
     area: "Organization",
+  },
+  // Never offered or held: a braid's own grant carries it when a trace is read (ADR-201 §3).
+  spans: {
+    label: "Braided spans",
+    blurb: "What a braid shows in a trace. Nobody is granted this; braids carry it themselves.",
+    area: "Data and analysis",
   },
 } as const satisfies Record<AuthzResource, ResourceCopy>;
 
@@ -279,6 +315,11 @@ const ACTION_COPY = {
   },
   attach: { label: "Attach", blurb: "Put one in place." },
   detach: { label: "Detach", blurb: "Take one out of place." },
+  deploy: {
+    label: "Deploy",
+    blurb: "Move a deploy label to another version, and archive one that carries a label.",
+  },
+  upgrade: { label: "Upgrade", blurb: "Start a paid plan and pay for it." },
   viewOtherPersonal: {
     label: "View everyone's personal keys",
     blurb: "See the personal keys other people own.",
@@ -390,6 +431,11 @@ export function levelOf({
 export function isReadOnlyResource(resource: OfferedResource): boolean {
   const actions = offeredActions(resource);
   return actions.length === 1 && actions[0] === "view";
+}
+
+/** False for a resource with no `view` to hold, so the picker offers no "Read" level for it. */
+export function offersReadLevel(resource: OfferedResource): boolean {
+  return readLevelPermissions(resource).length > 0;
 }
 
 /** Full access covers every action on its resource; changing what you cannot see is incoherent. */

@@ -4,6 +4,8 @@ import { SessionCallbackEvidenceChannel } from "../http.session-callback-evidenc
 
 const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
+const ISSUER = "https://idp.acme.test";
+
 describe("SessionCallbackEvidenceChannel", () => {
   /** @scenario Simultaneous provider callbacks cannot exchange evidence */
   it("keeps each overlapping request's accepted account to itself", async () => {
@@ -16,7 +18,7 @@ describe("SessionCallbackEvidenceChannel", () => {
       providerAccountId: string;
     }) =>
       channel.runWithScope(async () => {
-        channel.recordAuthenticatedSsoAccount({ providerId, providerAccountId });
+        channel.recordAuthenticatedSsoAccount({ providerId, providerAccountId, issuer: ISSUER });
         await tick();
         return channel.findAcceptedAccounts({ providerId });
       });
@@ -38,6 +40,7 @@ describe("SessionCallbackEvidenceChannel", () => {
       channel.recordAuthenticatedSsoAccount({
         providerId: "auth0",
         providerAccountId: "auth0|sam",
+        issuer: ISSUER,
       });
 
       expect(channel.findAcceptedAccounts({ providerId: "auth0" })).toEqual([
@@ -52,9 +55,38 @@ describe("SessionCallbackEvidenceChannel", () => {
     });
   });
 
+  /** @scenario "A single sign-on account keeps the issuer the connection verified" */
+  it("answers the verified issuer only for the account the plugin admitted", () => {
+    const channel = SessionCallbackEvidenceChannel.create();
+    return channel.runWithScope(async () => {
+      channel.recordAuthenticatedSsoAccount({
+        providerId: "acme-oidc",
+        providerAccountId: "sam-subject",
+        issuer: ISSUER,
+      });
+
+      expect(
+        channel.findSsoAccountIssuers({
+          providerId: "acme-oidc",
+          providerAccountId: "sam-subject",
+        }),
+      ).toEqual([ISSUER]);
+      expect(
+        channel.findSsoAccountIssuers({ providerId: "acme-oidc", providerAccountId: "other" }),
+      ).toEqual([]);
+      expect(
+        channel.findSsoAccountIssuers({ providerId: "google", providerAccountId: "sam-subject" }),
+      ).toEqual([]);
+    });
+  });
+
   it("finds nothing outside a request scope", () => {
     const channel = SessionCallbackEvidenceChannel.create();
-    channel.recordAuthenticatedSsoAccount({ providerId: "auth0", providerAccountId: "auth0|sam" });
+    channel.recordAuthenticatedSsoAccount({
+      providerId: "auth0",
+      providerAccountId: "auth0|sam",
+      issuer: ISSUER,
+    });
 
     expect(channel.findAcceptedAccounts({ providerId: "auth0" })).toEqual([]);
   });

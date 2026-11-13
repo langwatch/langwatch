@@ -183,7 +183,7 @@ export type RestAuditRow = Readonly<{
   errorCode?: string;
   /** The operator behind an impersonated call. */
   impersonatorId?: string;
-  /** The approved staff access a staff key's call ran under (ADR-193). */
+  /** The approved staff access a staff key's call ran under (ADR-202). */
   staffAccess?: RestStaffAccessIdentity;
   /** The API key the call presented, whether it acts as its person or as nobody (E11). */
   apiKeyId?: string;

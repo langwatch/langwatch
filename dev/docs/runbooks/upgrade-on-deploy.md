@@ -212,6 +212,9 @@ provisioning failed creating PostgreSQL objects". The check runs
 every 5 minutes and logs each failed statement at warn as "lwql reconvergence statement failed",
 which this alert filter does not match.
 
+During a rolling deploy that adds the PostgreSQL schema to the credential digest, old and new workers may
+rebuild each other's engine tables on each check until the last old worker stops; the old form reads `public`.
+
 ## One runner at a time
 
 Only one process runs the upgrade at once, because of the runner lease: a row lease in the

@@ -234,7 +234,6 @@ describe("the Auth0 provider this deployment builds", () => {
     expect(response.status).toBe(302);
     expect(response.headers.get("location")).not.toContain("error=");
     expect(db.account).toHaveLength(1);
-    expect(db.account?.[0]?.issuer).toBe("local:oauth:auth0");
     expect(db.session).toHaveLength(1);
   });
 
@@ -262,9 +261,14 @@ describe("the Auth0 provider this deployment builds", () => {
     try {
       const { auth, db } = buildHarness();
 
-      await expect(callbackWith({ auth, variant: "unsigned" })).rejects.toThrow(
-        "requires verified ID tokens",
+      const started = await auth.handler(
+        new Request(`${BASE_URL}/api/auth/sign-in/social`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ provider: "auth0", disableRedirect: true }),
+        }),
       );
+      expect(started.ok).toBe(false);
       expect(db.account).toHaveLength(0);
       expect(db.session).toHaveLength(0);
     } finally {

@@ -64,6 +64,7 @@ export function SavedDashboardRow({
   href,
   isActive,
   mark,
+  icon,
   actions,
 }: {
   name: string;
@@ -71,12 +72,14 @@ export function SavedDashboardRow({
   isActive: boolean;
   /** The scope mark after the name: a lock or a building, none on a Project board. */
   mark?: ReactNode;
+  /** Stands in for the pin button where the list is already the pinned ones. */
+  icon?: ReactNode;
   actions: SavedDashboardRowActions;
 }) {
   if (actions.isRenaming) return <RenameField name={name} actions={actions} />;
   const { scope, rename, duplicate, remove } = actions;
   return (
-    <SidebarRow name={name} href={href} isActive={isActive} star={actions} mark={mark}>
+    <SidebarRow name={name} href={href} isActive={isActive} star={actions} mark={mark} icon={icon}>
       <StarItems name={name} actions={actions} />
       {scope && (
         <>
@@ -173,6 +176,7 @@ function SidebarRow({
   isActive,
   star,
   mark,
+  icon,
   children,
 }: {
   name: string;
@@ -180,6 +184,7 @@ function SidebarRow({
   isActive: boolean;
   star: StarActions;
   mark?: ReactNode;
+  icon?: ReactNode;
   /** The menu's items. */
   children: ReactNode;
 }) {
@@ -216,7 +221,7 @@ function SidebarRow({
         }}
       >
         <Box as="span" display="flex" flexShrink={0}>
-          <BoardStar isStarred={star.isStarred} onToggle={star.onToggleStar} size={14} />
+          {icon ?? <BoardStar isStarred={star.isStarred} onToggle={star.onToggleStar} size={14} />}
         </Box>
         <Text as="span" truncate minWidth={0}>
           {name}

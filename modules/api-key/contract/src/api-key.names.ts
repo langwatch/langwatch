@@ -32,10 +32,10 @@ export const CHECKUP_CANARY_API_KEY_NAME = "Checkup canary";
  */
 export const DOCS_SESSION_API_KEY_NAME = "Docs session";
 
-/** Name of the ownerless one-hour key an approved staff agent writes with (ADR-193). */
+/** Name of the ownerless one-hour key an approved staff agent writes with (ADR-202). */
 export const STAFF_SUPPORT_KEY_NAME = "LangWatch Support";
 
-/** Name of the ownerless one-hour key an approved staff agent reads with (ADR-193). */
+/** Name of the ownerless one-hour key an approved staff agent reads with (ADR-202). */
 export const STAFF_READ_KEY_NAME = "LangWatch Staff Read";
 
 /** The names a staff access key is minted under; only a system-managed key under one is one. */

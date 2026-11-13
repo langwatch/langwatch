@@ -1,5 +1,5 @@
 /**
- * Every request an approved staff agent's key makes (ADR-193) passes one gate: after its
+ * Every request an approved staff agent's key makes (ADR-202) passes one gate: after its
  * authorization and before its handler, the gate writes the trail row or refuses. The
  * `staff-access` module binds it; a process with none bound refuses every staff key.
  */

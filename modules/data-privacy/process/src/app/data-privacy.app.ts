@@ -1,4 +1,5 @@
 import { AuthzApi } from "@langwatch/authz-contract";
+import { ConfigParseError } from "@langwatch/config";
 import {
   DATA_PRIVACY_PRESIDIO_TIMEOUT_MS,
   DataPrivacyApi,
@@ -18,14 +19,27 @@ import {
   type ResolvedDataPrivacy,
   type SpanContentDropResult,
 } from "@langwatch/data-privacy-contract";
-import { createTenantId } from "@langwatch/eventing";
+import { createTenantId, type EventingCommands } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OtlpResource, OtlpSpan } from "@langwatch/otlp/trace-request";
 import type { FeatureSetup } from "@langwatch/process";
+import {
+  apiKeyPepper,
+  credentialsSecret,
+  intoKeyPepper,
+  type ScopedSecrets,
+  sessionSecret,
+} from "@langwatch/secrets";
 
 import type { DataPrivacyChannels } from "../channels/data-privacy.channels.ts";
 import { googleApplicationCredentials } from "../channels/google-dlp.channel.ts";
+import {
+  buildPiiRedactionSpendPipeline,
+  type PiiRedactionSpendPipeline,
+} from "../eventing/pii-redaction-spend.pipeline.ts";
 import type { DataPrivacyRepositories } from "../repositories/data-privacy.repositories.ts";
+import { PII_REDACTION_MODEL_TIMEOUT_MS } from "../rules/pii-redaction-model.rules.ts";
+import { piiRedactionRequestIdKey } from "../rules/pii-redaction-spend.rules.ts";
 import { ContentDropPolicyService } from "../services/content-drop-policy.service.ts";
 import { DataPrivacyPermissionsService } from "../services/data-privacy-permissions.service.ts";
 import { DataPrivacyProjectScopeService } from "../services/data-privacy-project-scope.service.ts";
@@ -37,7 +51,9 @@ import { OtlpSpanContentDropService } from "../services/otlp-span-content-drop.s
 import { OtlpSpanPiiRedactionService } from "../services/otlp-span-pii-redaction.service.ts";
 import { PiiAnalysisMetricsOtelService } from "../services/pii-analysis-metrics-otel.service.ts";
 import { PiiAnalysisService } from "../services/pii-analysis.service.ts";
+import { PiiRedactionModelService } from "../services/pii-redaction-model.service.ts";
 import { DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH } from "../services/pii-redaction-policy.service.ts";
+import { PiiRedactionSpendService } from "../services/pii-redaction-spend.service.ts";
 import { PresidioRedactionService } from "../services/presidio-redaction.service.ts";
 
 /** A project's place in the organization chain, plus the name it renders under. */
@@ -89,6 +105,28 @@ type DataPrivacySetup = FeatureSetup<
 /** Applies a closure to the resolved credential without handing the value out. */
 type GoogleCredentialsUse = <Out>(build: (credential: string | undefined) => Out) => Out;
 
+/** The request-id key, or why none is needed: a deployment naming no model prices no call. */
+type RequestIdKey = { kind: "keyed"; key: Uint8Array } | { kind: "no-model" };
+
+/** Refuses the boot when the model is named and no key pepper is set (ADR-201). */
+async function getRequestIdKey({
+  secrets,
+  config,
+}: {
+  secrets: ScopedSecrets;
+  config: DataPrivacyServerConfig;
+}): Promise<RequestIdKey> {
+  // The key is built inside the closure; the pepper itself never leaves it.
+  const key = await intoKeyPepper(secrets, (pepper) =>
+    pepper === void 0 ? void 0 : piiRedactionRequestIdKey(pepper),
+  );
+  if (key !== void 0) return { kind: "keyed", key };
+  if (!config.piiRedactionModelEndpoint) return { kind: "no-model" };
+  throw new ConfigParseError([
+    "data-privacy.requestIdKey ← API_KEY_PEPPER, CREDENTIALS_SECRET or NEXTAUTH_SECRET: none is set, and PII_REDACTION_MODEL_ENDPOINT is",
+  ]);
+}
+
 /** The one public object of the scoped privacy rules. */
 export class DataPrivacyModule implements DataPrivacyApi {
   static readonly contract = DataPrivacyApi;
@@ -97,9 +135,13 @@ export class DataPrivacyModule implements DataPrivacyApi {
     permissions: AuthzApi,
   };
   static readonly config = dataPrivacyConfig;
-  /** The DLP service account's key; model-provider's Vertex dispatch borrows it. */
   static readonly secrets = {
+    /** The DLP service account's key; model-provider's Vertex dispatch borrows it. */
     googleApplicationCredentials,
+    /** The request-id key's pepper, first set wins, as api-key's chain (ADR-201). */
+    requestIdKey: apiKeyPepper,
+    requestIdKeyFallback: credentialsSecret,
+    requestIdKeyLastFallback: sessionSecret,
   } as const;
 
   #privacy: DataPrivacyService;
@@ -109,6 +151,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
   #contentDrop: ContentDropPolicyService;
   #spanContentDrop: OtlpSpanContentDropService;
   #googleCredentials: GoogleCredentialsUse;
+  readonly #spendCommands: { current: EventingCommands<PiiRedactionSpendPipeline> | undefined };
 
   private constructor(services: {
     privacy: DataPrivacyService;
@@ -118,6 +161,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
     contentDrop: ContentDropPolicyService;
     spanContentDrop: OtlpSpanContentDropService;
     googleCredentials: GoogleCredentialsUse;
+    spendCommands: { current: EventingCommands<PiiRedactionSpendPipeline> | undefined };
   }) {
     this.#privacy = services.privacy;
     this.#redaction = services.redaction;
@@ -126,6 +170,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
     this.#contentDrop = services.contentDrop;
     this.#spanContentDrop = services.spanContentDrop;
     this.#googleCredentials = services.googleCredentials;
+    this.#spendCommands = services.spendCommands;
   }
 
   static async create({
@@ -147,16 +192,45 @@ export class DataPrivacyModule implements DataPrivacyApi {
       metrics,
       timeoutMs: DATA_PRIVACY_PRESIDIO_TIMEOUT_MS,
     });
+    const projectScopes = DataPrivacyProjectScopeService.create({
+      repository: repositories.projectScopes,
+    });
+    // Bound by the eventing connect, which runs after construction and before any redaction.
+    const spendCommands: { current: EventingCommands<PiiRedactionSpendPipeline> | undefined } = {
+      current: void 0,
+    };
+    const requestIdKey = await getRequestIdKey({ secrets, config });
+    const spend = PiiRedactionSpendService.create({
+      requestIdKey: requestIdKey.kind === "keyed" ? requestIdKey.key : void 0,
+      featureFlags: dependencies.featureFlags,
+      recordSpendPriced: async (fact) => {
+        if (!spendCommands.current) {
+          throw new Error("the PII redaction spend pipeline is not connected");
+        }
+        await spendCommands.current.recordSpendPriced.send(fact);
+      },
+    });
     const analysis = PiiAnalysisService.create({
       presidio,
+      model: PiiRedactionModelService.create({
+        model: PresidioRedactionService.create({
+          presidio: channels.piiRedactionModel,
+          // Its calls, durations and outcomes carry its own method and evaluator labels, so
+          // Presidio's series stay Presidio's.
+          metrics,
+          timeoutMs: PII_REDACTION_MODEL_TIMEOUT_MS,
+          method: "pii_redaction_model",
+        }),
+        featureFlags: dependencies.featureFlags,
+        scopes: projectScopes,
+        spend,
+        metrics,
+      }),
       dlp: GoogleDlpRedactionService.create({
         dlp: channels.dlp,
         disabled: isGoogleDlpDisabled({ config }),
         metrics,
       }),
-    });
-    const projectScopes = DataPrivacyProjectScopeService.create({
-      repository: repositories.projectScopes,
     });
     const privacy = DataPrivacyService.create({
       repository: repositories.policies,
@@ -192,7 +266,17 @@ export class DataPrivacyModule implements DataPrivacyApi {
         nativePolicyEnforced: config.enforcement !== "off",
       }),
       googleCredentials,
+      spendCommands,
     });
+  }
+
+  spendPipeline(): PiiRedactionSpendPipeline {
+    return buildPiiRedactionSpendPipeline();
+  }
+
+  /** Binds the spend pipeline's own senders; every priced model call goes through them. */
+  connectSpendCommands(commands: EventingCommands<PiiRedactionSpendPipeline>): void {
+    this.#spendCommands.current = commands;
   }
 
   intoGoogleApplicationCredentials<Out>(build: (credential: string | undefined) => Out): Out {

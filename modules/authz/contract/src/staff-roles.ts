@@ -1,5 +1,5 @@
 /**
- * The permission bags an approved staff agent's key carries in one organization (ADR-193). They
+ * The permission bags an approved staff agent's key carries in one organization (ADR-202). They
  * are applied as a CUSTOM binding at organization scope on an ownerless, restricted key, so these
  * lists are the whole reach: no member, credential, billing, delete or manage permission.
  */

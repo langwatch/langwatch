@@ -82,6 +82,7 @@ export function SettingRow({
       gap={6}
       width="full"
       paddingY={2.5}
+      data-setting-row=""
       data-testid={testId}
     >
       <Box minWidth={0}>
@@ -93,7 +94,7 @@ export function SettingRow({
         )}
       </Box>
       {children && (
-        <HStack gap={2} minWidth={0} align="center">
+        <HStack gap={2} minWidth={0} align="center" data-setting-value="">
           {children}
         </HStack>
       )}
@@ -101,11 +102,31 @@ export function SettingRow({
   );
 }
 
-/** A group of rows, hairline-separated so the group reads as one object. */
+const BOXED_LIST = {
+  borderWidth: "1px",
+  borderColor: "border",
+  borderRadius: "lg",
+  overflow: "hidden",
+  css: {
+    "& > [data-setting-row]": {
+      gridTemplateColumns: "minmax(0, 1fr) auto",
+      minHeight: "12",
+      paddingX: "3",
+    },
+    "& > [data-setting-row] > [data-setting-value]": { justifyContent: "flex-end" },
+  },
+} as const;
+
+/**
+ * A group of rows, hairline-separated so the group reads as one object. boxed: a small bordered
+ * table, values at the right end, like the lines of a bill.
+ */
 export function SettingList({
+  variant = "plain",
   children,
   "data-testid": testId,
 }: {
+  variant?: "plain" | "boxed";
   children?: ReactNode;
   "data-testid"?: string;
 }) {
@@ -114,7 +135,9 @@ export function SettingList({
       align="stretch"
       gap={0}
       width="full"
-      separator={<Box height="1px" background="border.nested" />}
+      separator={<Box height="1px" background={variant === "boxed" ? "border" : "border.nested"} />}
+      {...(variant === "boxed" ? BOXED_LIST : {})}
+      data-setting-list={variant}
       data-testid={testId}
     >
       {children}
@@ -178,6 +201,7 @@ export function StatusChip({
       colorPalette={palette}
       title={title}
       className={shimmer ? "lw-chip-shimmer" : undefined}
+      data-tone={tone}
       data-testid={testId}
     >
       {label}

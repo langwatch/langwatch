@@ -100,7 +100,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .withDocs({
     summary: "Run an experiment",
     description:
-      "Start a run of a saved experiment, addressed by slug. Returns a runId to poll straight away. Send `Accept: text/event-stream` instead to stream progress events until the run finishes.",
+      "Start a run of a saved experiment, addressed by slug. Returns a runId to poll straight away. Send `Accept: text/event-stream` instead to stream progress events until the run finishes. The run reads a version of its saved dataset: `dataset_version` when given, else the version the experiment pins, else the current content saved as a new version.",
     tags: ["Experiments"],
     requestBody: { schema: runInputsBodySchema, required: false },
     responses: {
@@ -118,10 +118,13 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
       },
       400: {
         description:
-          "The body was not valid JSON, failed input validation, or the experiment has no dataset configured",
+          "The body was not valid JSON, failed input validation, the experiment has no dataset configured, or `dataset_version` was sent while the run reads no saved dataset (no `dataset_id` and an inline active dataset)",
       },
       401: { description: "Missing or invalid API key, or the key lacks the permission" },
-      404: { description: "No such experiment or run in this project" },
+      404: {
+        description:
+          "No such experiment in this project, or its dataset has no version `dataset_version` names (`dataset_version_not_found`)",
+      },
     },
   })
   .withMiddlewareContext(projectRequestContext, experimentWorkbenchCredential)

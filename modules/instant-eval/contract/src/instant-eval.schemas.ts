@@ -573,6 +573,8 @@ export type InstantEvalOptInOffer = z.infer<typeof instantEvalOptInOfferSchema>;
  */
 const instantEvalOptInAccessSchemaDefinition = z.object({
   released: z.boolean(),
+  /** LangWatch's own model may judge; `released` alone can mean an own decision model only. */
+  hostedReleased: z.boolean(),
   offer: instantEvalOptInOfferSchema,
   viaConnect: z.boolean(),
 });

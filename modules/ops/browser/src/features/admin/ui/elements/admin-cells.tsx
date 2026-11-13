@@ -1,6 +1,6 @@
 import { EmptyValue } from "@langwatch/design-system/empty-value";
 import { FormattedDate } from "@langwatch/design-system/formatted-date";
-import { Text } from "@langwatch/design-system/primitives";
+import { Heading, Text } from "@langwatch/design-system/primitives";
 import {
   currentTimeZone,
   Temporal,
@@ -9,7 +9,7 @@ import {
   type Instant,
   type TimeInput,
 } from "@langwatch/time";
-import type { PropsWithChildren } from "react";
+import type { PropsWithChildren, ReactNode } from "react";
 
 export interface PaginationState {
   page: number;
@@ -56,6 +56,19 @@ export function formatDate(value: TimeInput | null | undefined): string {
   return toDate(moment).toLocaleDateString();
 }
 
+/** A plan's seat cap; null is an unlimited plan. */
+export function formatSeatCap(cap: number | null): string {
+  return cap === null ? "unlimited" : cap.toLocaleString();
+}
+
+/** Calendar date in UTC as `YYYY-MM-DD`, for instants that are UTC by definition (seat peaks). */
+export function formatDateUtc(value: TimeInput | null | undefined): string {
+  if (!value) return "—";
+  const moment = readableMoment(value);
+  if (moment === null) return "—";
+  return toDate(moment).toISOString().slice(0, 10);
+}
+
 export function formatDateTime(value: TimeInput | null | undefined): string {
   if (!value) return "—";
   const moment = readableMoment(value);
@@ -81,4 +94,13 @@ export function dateInputToISO(value: string): string | null {
     hour: 12,
   }).toZonedDateTime(currentTimeZone());
   return toDate(noonLocally).toISOString();
+}
+
+/** A drawer section's title, shared so every section looks the same. */
+export function SectionHeading({ children }: { children: ReactNode }) {
+  return (
+    <Heading as="h3" size="xs" color="fg.muted" textTransform="none" letterSpacing="wider" pt={2}>
+      {children}
+    </Heading>
+  );
 }

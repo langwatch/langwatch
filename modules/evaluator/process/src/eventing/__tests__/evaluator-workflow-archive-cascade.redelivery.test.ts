@@ -59,7 +59,10 @@ function deduplicationIdOf(definition: EventSubscriberDefinition, event: Event):
 async function setup() {
   const { app, repository } = createEvaluatorTestApp();
   const sent: unknown[] = [];
-  app.connectLifecycle({ recordEvaluatorDeleted: { send: async (data) => void sent.push(data) } });
+  app.connectLifecycle({
+    recordEvaluatorCreated: { send: async () => undefined },
+    recordEvaluatorDeleted: { send: async (data) => void sent.push(data) },
+  });
   await repository.create({
     id: "evaluator-1",
     projectId: "project-1",

@@ -39,6 +39,7 @@ export { LegacyOtelCanonicaliserService } from "./legacyOtelCanonicaliser.ts";
 export { LogfireCanonicaliserService } from "./logfireCanonicaliser.ts";
 export { MastraCanonicaliserService } from "./mastraCanonicaliser.ts";
 export { OpenInferenceCanonicaliserService } from "./openinferenceCanonicaliser.ts";
+export { PiCanonicaliserService } from "./piCanonicaliser.ts";
 export { SPRING_AI_SCOPE_NAMES, SpringAICanonicaliserService } from "./springAiCanonicaliser.ts";
 export { StrandsCanonicaliserService } from "./strandsCanonicaliser.ts";
 export { TraceloopCanonicaliserService } from "./traceloopCanonicaliser.ts";

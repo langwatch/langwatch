@@ -1,5 +1,5 @@
 /**
- * Staff access's pure decisions (ADR-193): lifetimes, the token shape, the canonical hash a
+ * Staff access's pure decisions (ADR-202): lifetimes, the token shape, the canonical hash a
  * passkey approves, which approvals need the organization name typed, and the shown status.
  */
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";

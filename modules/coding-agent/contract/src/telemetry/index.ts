@@ -4,6 +4,7 @@ import type { CodingAgentDefinition } from "./coding-agent-definition.ts";
 import { geminiCliAgent } from "./gemini-cli.ts";
 import { grokAgent } from "./grok.ts";
 import { opencodeAgent } from "./opencode.ts";
+import { piAgent } from "./pi.ts";
 
 export type {
   CodingAgent,
@@ -14,9 +15,17 @@ export type {
   GenAiOperationRole,
   TokenType,
 } from "./coding-agent-definition.ts";
-export { codingAgentSchema } from "./coding-agent-definition.ts";
+export {
+  codingAgentSchema,
+  type CodingTerminal,
+  codingTerminalSchema,
+} from "./coding-agent-definition.ts";
 export { isModelCallSpan, pickString } from "./coding-agent-span.ts";
-export { type ToolDecisionOutcome, toolDecisionOutcome } from "./tool-decision.ts";
+export {
+  type ToolDecisionOutcome,
+  toolDecisionByUser,
+  toolDecisionOutcome,
+} from "./tool-decision.ts";
 
 // Agent registry ordered first-match-wins; claude_cowork before claude_code
 // because only service identity distinguishes them.
@@ -28,6 +37,7 @@ export const CODING_AGENT_REGISTRY = [
   geminiCliAgent,
   copilotAgent,
   grokAgent,
+  piAgent,
 ] as const satisfies readonly CodingAgentDefinition[];
 
 // Module-load failure on a duplicate id: `satisfies` checks each entry's

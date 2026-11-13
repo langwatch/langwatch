@@ -186,7 +186,7 @@ export class OrganizationService {
 
   /** Every organization this person belongs to, for a caller with no list of
    *  candidates to filter. */
-  organizationIdsForMember(input: { userId: string }): Promise<string[]> {
+  organizationIdsForMember(input: { userId: string; activeOnly?: boolean }): Promise<string[]> {
     return this.teams.organizationIdsForMember(input);
   }
 

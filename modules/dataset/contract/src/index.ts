@@ -7,6 +7,7 @@ export * from "./dataset-attachment-ref.ts";
 export * from "./dataset-record-count.ts";
 export * from "./dataset-chunks.ts";
 export * from "./dataset.errors.ts";
+export * from "./dataset-version.ts";
 export * from "./dataset.schemas.ts";
 export * from "./dataset-rest.schemas.ts";
 export * from "./dataset.api.ts";

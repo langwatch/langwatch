@@ -11,6 +11,8 @@ export interface TenancyRepository {
   getProjectPlacement(input: { projectId: string }): Promise<ProjectPlacement>;
   /** Every project the organisation owns, archived ones included. */
   findProjectIds(input: { organizationId: string }): Promise<string[]>;
+  /** The organisation's destination projects by name, as the usage limit email lists them. */
+  findProjectNames(input: { organizationId: string }): Promise<{ id: string; name: string }[]>;
   /** The organisations owning at least one project: an organisation without one counts zero. */
   findMeteredOrganizationIds(): Promise<string[]>;
   /** The currency an organisation is priced in; an unknown one has the schema's default. */

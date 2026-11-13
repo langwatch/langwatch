@@ -54,7 +54,8 @@ page into `apps/docs/dist`. It emits:
 - Hashed JavaScript and CSS under `assets/`, fonts, posters and docs media.
 - `search-index.json` with each article word written once with the pages it appears on, navigation trails and headings, plus
   lossless `.br` and `.gz` variants for hosts supporting precompressed delivery.
-- `llms.txt`, a directory of configured pages linking to their Markdown, and
+- `llms.txt`, a directory of configured pages linking to their Markdown (the API reference once
+  per resource), `llms-full/<section>.txt`, each top-level section's Markdown in one file, and
   `llms-full.txt`, every page's Markdown in reading order.
 - `sitemap.xml` dated by each page's last commit (no dates from a shallow clone,
   so the deploy checkout needs full history), plus `robots.txt` and `agents.txt`.
@@ -253,7 +254,7 @@ pnpm --filter @langwatch/docs-site test:performance --out-dir "$TMPDIR/docs-perf
 pnpm --filter @langwatch/docs-site test:layout --out-dir "$TMPDIR/docs-performance" --screenshots "$TMPDIR/docs-layout"
 ```
 
-`size` fails above 3 KB gzipped for initial reading and above 15 KB for the bootstrap, inline theme setup, idle
+`size` fails above 3,200 bytes gzipped for initial reading and above 15 KB for the bootstrap, inline theme setup, idle
 controls combined. It separately reports the full search and
 playground interaction costs, including shared React/Zod. `test:performance`
 checks static reading, navigation, prefetch and credential isolation. `test:layout` checks 1280, 1440, 1670 and 390 pixel widths
@@ -290,6 +291,27 @@ Every configured page exports identical Markdown at `.md`, `.claude` and `.agent
 Alt+Shift+C copies the current page outside editable controls. The sidebar command selector copies the five supported CLI launchers; Cursor and Aider use the gateway guide rather than an invented wrapper command. Page feedback links open a GitHub issue draft containing the page URL.
 
 The coding-agent hero uses checked-in 640/1024/1560px WebP derivatives of the existing session-detail PNG, with responsive preload only on its overview page. Other imagery remains lazy. Run `test:refinement --out-dir <build> --screenshots <scratch-directory>` for the exports, clipboard, tab-panel mapping, responsive image, and footer checks.
+
+## Web fonts
+
+The four Latin faces in `src/app/fonts` are cut down from the upstream files: Inter to the
+weights the site draws (400 to 700), every face to the `unicode-range` its `@font-face` declares
+in `src/app/docs.css`, without hinting, and with only the OpenType features the pages use.
+JetBrains Mono keeps no code ligatures, so `->` and `!=` read as typed. The extended-Latin files
+are untouched. `src/app/__tests__/fonts.unit.test.ts` fails when a file stops covering common
+text or its weight axis drifts from its face. To recut one, start from the upstream file:
+
+```sh
+LATIN="U+0000-00FF,U+0131,U+0152-0153,U+2000-201F,U+2021-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD"
+FT="uvx --from fonttools[woff] fonttools"
+$FT varLib.instancer -q Inter-Variable-latin.woff2 wght=400:700 -o inter.ttf
+$FT subset inter.ttf --unicodes="$LATIN" --layout-features=kern,liga,calt,ccmp,locl,tnum,case \
+  --flavor=woff2 --no-hinting --desubroutinize --name-IDs=1,2,4,6 \
+  --output-file=Inter-Variable-latin.woff2
+```
+
+Sentient takes the same `subset` step without the instancer; JetBrains Mono is instanced to
+`wght=400:600` and keeps only `kern,ccmp,locl`.
 
 ## Binary assets
 

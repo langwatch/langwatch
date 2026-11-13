@@ -145,9 +145,13 @@ const addressActions: TraceDrawerAddressActions = {
   },
   clearPinnedSpans: () => writeAddress({ pinnedSpans: undefined }),
   backfillOccurredAtMs: (occurredAtMs) => {
-    if (addressNow().occurredAtMs !== null) return;
+    const { isOpen, traceId, occurredAtMs: addressed } = addressNow();
+    if (!isOpen || traceId === null || addressed !== null) return;
     if (!Number.isFinite(occurredAtMs) || occurredAtMs <= 0) return;
-    writeAddress({ t: String(Math.trunc(occurredAtMs)) });
+    const t = Math.trunc(occurredAtMs);
+    // Noted before the address changes, so no reader ever sees the time without the note.
+    useDrawerChrome.getState().noteBackfilledOccurredAt({ traceId, occurredAtMs: t });
+    writeAddress({ t: String(t) });
   },
   backfillTenantId: (tenantId) => {
     if (addressNow().tenantId !== null || tenantId === "") return;

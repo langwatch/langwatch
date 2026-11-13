@@ -1,12 +1,10 @@
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { docsFixture } from "../../../testing/docs-fixture.ts";
 import { docsNavPlugin } from "../compile/nav-plugin.ts";
-
-vi.mock("../compile/github-stars.ts", () => ({ readStars: async () => null }));
 
 let fixture: ReturnType<typeof docsFixture>;
 
@@ -26,7 +24,10 @@ beforeEach(() => {
 afterEach(() => fixture.dispose());
 
 async function loadNav() {
-  const plugin = docsNavPlugin({ docsRoot: fixture.docsRoot });
+  const plugin = docsNavPlugin({
+    docsRoot: fixture.docsRoot,
+    readStars: async () => ({ count: null, at: null }),
+  });
   const load = plugin.load;
   if (!load || typeof load === "function") throw new Error("docs-nav has no filtered load hook");
   const watched: string[] = [];

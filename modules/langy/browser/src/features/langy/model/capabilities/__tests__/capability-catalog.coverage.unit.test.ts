@@ -55,7 +55,8 @@ const EXCLUDED_COMMANDS = new Set([
   // machine the CLI runs on, not a platform resource a card could deep-link.
   "skills",
   // Gateway tool wrappers: they exec another AI tool (claude/codex/cursor/
-  // gemini/grok/opencode/copilot) rather than returning a LangWatch result.
+  // gemini/grok/opencode/copilot/pi) rather than returning a LangWatch result.
+  "pi",
   "claude",
   "codex",
   "cursor",

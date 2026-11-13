@@ -8,7 +8,7 @@ import {
 
 /**
  * Whether staff access exists on this deployment: cloud ops and the system flag, both. Every
- * surface answers the same hidden `not_found` while either is off (ADR-193).
+ * surface answers the same hidden `not_found` while either is off (ADR-202).
  */
 export class StaffAccessAvailabilityService {
   private constructor(

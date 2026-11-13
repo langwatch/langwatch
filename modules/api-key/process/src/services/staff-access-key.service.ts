@@ -35,7 +35,7 @@ const READ_BAG: ReadonlySet<string> = new Set([
 const SUPPORT_BAG: ReadonlySet<string> = new Set([...READ_BAG, ...STAFF_SUPPORT_WRITE_PERMISSIONS]);
 
 /**
- * Staff access keys (ADR-193): ownerless, system-managed and restricted to the staff bags at
+ * Staff access keys (ADR-202): ownerless, system-managed and restricted to the staff bags at
  * organization scope, for at most an hour. Nobody stands behind them, so the bag is the ceiling.
  */
 export class StaffAccessKeyService {

@@ -1,0 +1,194 @@
+/**
+ * The owners the trace header names (ADR-201 §5). Spec: modules/trace/specs/braided-spans.feature
+ */
+import { sealAuthorization } from "@langwatch/authorization";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { describe, expect, it } from "vitest";
+
+import { TraceBraidDetailService } from "../trace-braid-detail.service.ts";
+
+const projects = createApiFixture<ProjectApi>({
+  findSummaryById: async (projectId) =>
+    projectId === "proj_specialists" ? { name: "Specialists", slug: "specialists" } : null,
+});
+
+function detailFor({ readable }: { readable: string[] }) {
+  const authz = createApiFixture<AuthzApi>({
+    hasPermission: async (check) =>
+      "projectId" in check && typeof check.projectId === "string"
+        ? readable.includes(check.projectId)
+        : false,
+  });
+  return TraceBraidDetailService.create({ directory: { authz, projects } });
+}
+
+describe("TraceBraidDetailService.describeOwners", () => {
+  describe("given a viewer with no role on the owner", () => {
+    /** @scenario "A braided span carries a badge naming its owning project" */
+    it("names the owner without offering to open it", async () => {
+      const owners = await detailFor({ readable: [] }).describeOwners({
+        ownerProjectIds: ["proj_specialists"],
+        viewerUserId: "sam",
+      });
+
+      expect(owners).toEqual([
+        { projectId: "proj_specialists", name: "Specialists", canOpen: false, slug: null },
+      ]);
+    });
+  });
+
+  describe("given a viewer who can read the owner", () => {
+    it("offers the owner's slug, keeping the order given", async () => {
+      const owners = await detailFor({ readable: ["proj_specialists"] }).describeOwners({
+        ownerProjectIds: ["proj_specialists", "proj_gone"],
+        viewerUserId: "sam",
+      });
+
+      expect(owners).toEqual([
+        { projectId: "proj_specialists", name: "Specialists", canOpen: true, slug: "specialists" },
+        { projectId: "proj_gone", name: "proj_gone", canOpen: false, slug: null },
+      ]);
+    });
+  });
+});
+
+describe("TraceBraidDetailService.describeSpans", () => {
+  describe("given the reader's spans and a braided span", () => {
+    it("describes the braided span only, aligned with the spans given", async () => {
+      const detail = TraceBraidDetailService.create({
+        directory: {
+          authz: createApiFixture<AuthzApi>({
+            hasPermission: async () => false,
+            listBraids: async () => ({ intoOtherProjects: [], fromOtherProjects: [] }),
+          }),
+          projects,
+        },
+      });
+      const described = await detail.describeSpans({
+        readerProjectId: "proj_orchestrator",
+        viewerUserId: "sam",
+        spans: [
+          { startedAtMs: 1 },
+          { ownerProjectId: "proj_specialists", startedAtMs: 2 },
+          { startedAtMs: 3 },
+        ],
+      });
+
+      expect(described).toEqual([
+        null,
+        {
+          ownerProjectId: "proj_specialists",
+          ownerName: "Specialists",
+          ownerProjectSlug: null,
+          canOpenOwner: false,
+          matchedConditions: [],
+          signedBy: null,
+        },
+        null,
+      ]);
+    });
+  });
+});
+
+describe("TraceBraidDetailService.recordView", () => {
+  const authorization = sealAuthorization({
+    actor: { type: "user", id: "user_sam" },
+    principal: { type: "user", id: "user_sam" },
+    scope: { organizationId: "org_acme" },
+    grants: [
+      { projectId: "proj_orchestrator", permissions: ["traces:view"], via: [], kind: "own" },
+    ],
+    expiresAt: Date.now() + 30_000,
+    purpose: { kind: "route", route: "traces.spanTree" },
+  });
+
+  describe("given an audit that cannot be written", () => {
+    it("fails the read rather than show the owner's spans unaudited", async () => {
+      const detail = TraceBraidDetailService.create({
+        directory: {
+          authz: createApiFixture<AuthzApi>({
+            recordBraidedSpansView: () => Promise.reject(new Error("audit store unreachable")),
+          }),
+          projects,
+        },
+      });
+
+      await expect(
+        detail.recordView({ authorization, ownerProjectIds: ["proj_specialists"] }),
+      ).rejects.toThrow("audit store unreachable");
+    });
+  });
+
+  describe("given a read of the reader's own spans only", () => {
+    it("records nothing and lets the read through", async () => {
+      const detail = TraceBraidDetailService.create({
+        directory: { authz: createApiFixture<AuthzApi>({}), projects },
+      });
+
+      await expect(
+        detail.recordView({
+          authorization,
+          ownerProjectIds: [null, undefined],
+        }),
+      ).resolves.toBeUndefined();
+    });
+  });
+});
+
+describe("TraceBraidDetailService signing", () => {
+  const signing = TraceBraidDetailService.create({
+    directory: {
+      authz: createApiFixture<AuthzApi>({
+        hasPermission: async () => false,
+        listBraids: async () => ({ intoOtherProjects: [], fromOtherProjects: [] }),
+      }),
+      projects: createApiFixture<ProjectApi>({
+        findSummaryById: async (projectId) =>
+          projectId === "proj_orchestrator" ? { name: "Orchestrator", slug: "orchestrator" } : null,
+      }),
+    },
+  });
+  const mark = (projectId: string) => [{ key: "orchestrator", projectId }];
+  const span = (verifiedMarks?: { key: string; projectId: string }[]) => ({
+    readerProjectId: "proj_orchestrator",
+    ownerProjectId: "proj_specialists",
+    viewerUserId: "sam",
+    spanStartedAtMs: 1,
+    ...(verifiedMarks === undefined ? {} : { verifiedMarks }),
+  });
+
+  describe("given a braided span whose verified mark names the reader", () => {
+    /** @scenario "A braided span from a signed call says who signed it" */
+    it("says the reader signed it, by name", async () => {
+      const braid = await signing.describe(span(mark("proj_orchestrator")));
+
+      expect(braid.signedBy).toEqual({ projectId: "proj_orchestrator", name: "Orchestrator" });
+    });
+
+    it("says so on the same span in a list read", async () => {
+      const [braid] = await signing.describeSpans({
+        readerProjectId: "proj_orchestrator",
+        viewerUserId: "sam",
+        spans: [
+          {
+            ownerProjectId: "proj_specialists",
+            startedAtMs: 1,
+            verifiedMarks: mark("proj_orchestrator"),
+          },
+        ],
+      });
+
+      expect(braid?.signedBy).toEqual({ projectId: "proj_orchestrator", name: "Orchestrator" });
+    });
+  });
+
+  describe("given a braided span with no mark, or a mark naming another project", () => {
+    /** @scenario "A braided span from a signed call says who signed it" */
+    it("says nothing about signing", async () => {
+      expect((await signing.describe(span())).signedBy).toBeNull();
+      expect((await signing.describe(span(mark("proj_elsewhere")))).signedBy).toBeNull();
+    });
+  });
+});

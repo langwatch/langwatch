@@ -4,7 +4,7 @@
 
 **Behaviour:** [Organization copy](../specs/staff-access-org-copy.feature).
 Builds on [ADR-001](./001-package-boundary.md) and
-[ADR-193](../../../dev/docs/adr/193-ops-agent-access.md).
+[ADR-202](../../../dev/docs/adr/202-ops-agent-access.md).
 
 ## Context
 

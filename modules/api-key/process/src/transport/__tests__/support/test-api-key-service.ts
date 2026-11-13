@@ -40,8 +40,15 @@ export class TestApiKeyService implements ApiKeyApi {
   listAll = unsupported<ApiKeyApi["listAll"]>();
   listForCaller = unsupported<ApiKeyApi["listForCaller"]>();
   listCallerBindings = unsupported<ApiKeyApi["listCallerBindings"]>();
+  listGrantablePermissions = unsupported<ApiKeyApi["listGrantablePermissions"]>();
   findIngestionKeysForUser = unsupported<ApiKeyApi["findIngestionKeysForUser"]>();
   listIngestionKeysForProject = unsupported<ApiKeyApi["listIngestionKeysForProject"]>();
+  findSigningKeys = unsupported<ApiKeyApi["findSigningKeys"]>();
+  findProjectSigning = unsupported<ApiKeyApi["findProjectSigning"]>();
+  createSigningKey = unsupported<ApiKeyApi["createSigningKey"]>();
+  rotateSigningKey = unsupported<ApiKeyApi["rotateSigningKey"]>();
+  revokeSigningKey = unsupported<ApiKeyApi["revokeSigningKey"]>();
+  verifyBraidSignature = unsupported<ApiKeyApi["verifyBraidSignature"]>();
   listKeys = unsupported<ApiKeyApi["listKeys"]>();
   listOrganizationMembers = unsupported<ApiKeyApi["listOrganizationMembers"]>();
   listOrganizationProjects = unsupported<ApiKeyApi["listOrganizationProjects"]>();
@@ -55,6 +62,7 @@ export class TestApiKeyService implements ApiKeyApi {
   revokeCliSessionKey = unsupported<ApiKeyApi["revokeCliSessionKey"]>();
   revokeCliLoginKeysForDevice = unsupported<ApiKeyApi["revokeCliLoginKeysForDevice"]>();
   revokeKey = unsupported<ApiKeyApi["revokeKey"]>();
+  rotateKey = unsupported<ApiKeyApi["rotateKey"]>();
   update = unsupported<ApiKeyApi["update"]>();
   updateAsCaller = unsupported<ApiKeyApi["updateAsCaller"]>();
   updateKey = unsupported<ApiKeyApi["updateKey"]>();

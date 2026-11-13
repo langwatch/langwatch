@@ -1,6 +1,6 @@
 Feature: Using ops agent access
   A redeemed key reaches one organization for one hour, through the normal REST API and CLI.
-  Every request leaves a trail row before its handler runs. ADR-193.
+  Every request leaves a trail row before its handler runs. ADR-202.
 
   Background:
     Given cloud ops is on and the system flag "ops_agent_access_enabled" is on

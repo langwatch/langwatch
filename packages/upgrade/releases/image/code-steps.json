@@ -8,6 +8,14 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "agent:backfill-versions",
+    "kind": "data",
+    "mode": "background",
+    "owner": "agent",
+    "description": "Records version 1 of every agent written before versions existed, with its creator from the audit log.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "analytics:fill-lwql-project-keys",
     "kind": "data",
     "mode": "background",
@@ -125,6 +133,20 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "dataset:fill-empty-slugs",
+    "kind": "data",
+    "mode": "background",
+    "owner": "dataset",
+    "description": "Gives each dataset stored without a slug one made from its name."
+  },
+  {
+    "id": "dataset:create-first-versions",
+    "kind": "data",
+    "mode": "background",
+    "owner": "dataset",
+    "description": "Saves version 1 of every dataset that has rows and no version history yet."
+  },
+  {
     "id": "evaluation:fill-id-indexes",
     "kind": "data",
     "mode": "background",
@@ -139,6 +161,14 @@
     "owner": "evaluation",
     "description": "Fills the second id index of evaluation runs (by trace id) from older rows, then marks it ready on each ClickHouse target.",
     "needsOldWritersGone": false
+  },
+  {
+    "id": "evaluator:backfill-versions",
+    "kind": "data",
+    "mode": "background",
+    "owner": "evaluator",
+    "description": "Records version 1 of every evaluator written before versions existed, with its creator from the audit log.",
+    "needsOldWritersGone": true
   },
   {
     "id": "experiment:fill-id-indexes",
@@ -170,6 +200,14 @@
     "mode": "background",
     "owner": "governance",
     "description": "Records each organisation's coding-assistant billed facts, which trace folds at ingest.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "governance:record-coding-assistant-ingest-source-billing",
+    "kind": "data",
+    "mode": "background",
+    "owner": "governance",
+    "description": "Records each organisation's billed facts again, so every ingest source type has one.",
     "needsOldWritersGone": true
   },
   {
@@ -313,11 +351,27 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "organization:record-seat-peak-opening-snapshots",
+    "kind": "data",
+    "mode": "background",
+    "owner": "organization",
+    "description": "Records every organization's seat holders as they stand, to open its seat peak.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "project:record-created-facts",
     "kind": "data",
     "mode": "background",
     "owner": "project",
     "description": "Records every existing project as created, and each live project's department and presence setting.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "project:list-personal-owner-and-first-message-facts",
+    "kind": "data",
+    "mode": "background",
+    "owner": "project",
+    "description": "Lists every personal project's owner and every project that already received its first message, archived ones included.",
     "needsOldWritersGone": true
   },
   {
@@ -408,11 +462,51 @@
     "needsOldWritersGone": false
   },
   {
+    "id": "trace:track-analytics-metadata-columns-materialisation",
+    "kind": "data",
+    "mode": "background",
+    "owner": "trace",
+    "description": "Waits for ClickHouse to store the trace analytics metadata columns in existing rows.",
+    "needsOldWritersGone": false
+  },
+  {
+    "id": "trace:replay-trace-analytics-widget-columns",
+    "kind": "data",
+    "mode": "background",
+    "owner": "trace",
+    "description": "Refolds the last 62 days of trace analytics rows so they carry the stock widgets' metadata columns.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "trace:replay-span-analytics",
+    "kind": "data",
+    "mode": "background",
+    "owner": "trace",
+    "description": "Fills span_analytics with the last 62 days of spans, the history the stock span widgets read.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "trace:send-month-trace-ids",
     "kind": "data",
     "mode": "background",
     "owner": "trace",
     "description": "Sends each project's trace ids seen so far this month, so plan trace limits count from a complete month.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "trace:record-evaluation-outcomes",
+    "kind": "data",
+    "mode": "background",
+    "owner": "trace",
+    "description": "Records each evaluation of the last 62 days on its trace, so the trace's evaluation rows can be written.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "trace:replay-trace-evaluation-analytics",
+    "kind": "data",
+    "mode": "background",
+    "owner": "trace",
+    "description": "Refolds the last 62 days of traces so each carries its evaluation rows for the stock widgets.",
     "needsOldWritersGone": true
   },
   {

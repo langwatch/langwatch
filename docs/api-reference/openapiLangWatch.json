@@ -5625,6 +5625,95 @@
                             ],
                             "description": "Why the agent cannot be run by this credential. Null when it can."
                           },
+                          "version": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "The version this response shows: the latest, unless a label or a version was asked for. Null for connected agents, which are versioned by their code."
+                          },
+                          "labels": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "label": {
+                                  "type": "string"
+                                },
+                                "version": {
+                                  "type": "integer",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "label",
+                                "version"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "description": "The deploy labels the agent carries, such as production, and the version each points at."
+                          },
+                          "createdBy": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "The user who created the agent. Null when an API key created it, or it predates creators being recorded."
+                          },
+                          "updatedBy": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "The user who changed the agent last. Null when an API key changed it."
+                          },
                           "createdAt": {
                             "type": "string",
                             "format": "date-time"
@@ -5653,6 +5742,10 @@
                           "instances",
                           "selectable",
                           "notSelectableReason",
+                          "version",
+                          "labels",
+                          "createdBy",
+                          "updatedBy",
                           "createdAt",
                           "updatedAt",
                           "platformUrl"
@@ -5989,6 +6082,95 @@
                       ],
                       "description": "Why the agent cannot be run by this credential. Null when it can."
                     },
+                    "version": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The version this response shows: the latest, unless a label or a version was asked for. Null for connected agents, which are versioned by their code."
+                    },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "version"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "The deploy labels the agent carries, such as production, and the version each points at."
+                    },
+                    "createdBy": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user who created the agent. Null when an API key created it, or it predates creators being recorded."
+                    },
+                    "updatedBy": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user who changed the agent last. Null when an API key changed it."
+                    },
                     "createdAt": {
                       "type": "string",
                       "format": "date-time"
@@ -6017,6 +6199,10 @@
                     "instances",
                     "selectable",
                     "notSelectableReason",
+                    "version",
+                    "labels",
+                    "createdBy",
+                    "updatedBy",
                     "createdAt",
                     "updatedAt",
                     "platformUrl"
@@ -6055,6 +6241,11 @@
                         "type": "string",
                         "minLength": 1,
                         "maxLength": 255
+                      },
+                      "commitMessage": {
+                        "description": "What changed, kept on the version this write creates.",
+                        "type": "string",
+                        "maxLength": 500
                       },
                       "workflowId": {
                         "type": "string"
@@ -6391,6 +6582,11 @@
                         "minLength": 1,
                         "maxLength": 255
                       },
+                      "commitMessage": {
+                        "description": "What changed, kept on the version this write creates.",
+                        "type": "string",
+                        "maxLength": 500
+                      },
                       "workflowId": {
                         "type": "string"
                       },
@@ -6707,6 +6903,11 @@
                         "type": "string",
                         "minLength": 1,
                         "maxLength": 255
+                      },
+                      "commitMessage": {
+                        "description": "What changed, kept on the version this write creates.",
+                        "type": "string",
+                        "maxLength": 500
                       },
                       "workflowId": {
                         "type": "string"
@@ -7129,6 +7330,11 @@
                         "minLength": 1,
                         "maxLength": 255
                       },
+                      "commitMessage": {
+                        "description": "What changed, kept on the version this write creates.",
+                        "type": "string",
+                        "maxLength": 500
+                      },
                       "workflowId": {
                         "type": "string"
                       },
@@ -7533,6 +7739,11 @@
                         "minLength": 1,
                         "maxLength": 255
                       },
+                      "commitMessage": {
+                        "description": "What changed, kept on the version this write creates.",
+                        "type": "string",
+                        "maxLength": 500
+                      },
                       "workflowId": {
                         "type": "string"
                       },
@@ -7564,6 +7775,11 @@
                         "type": "string",
                         "minLength": 1,
                         "maxLength": 255
+                      },
+                      "commitMessage": {
+                        "description": "What changed, kept on the version this write creates.",
+                        "type": "string",
+                        "maxLength": 500
                       },
                       "workflowId": {
                         "type": "string"
@@ -7885,6 +8101,95 @@
                       ],
                       "description": "Why the agent cannot be run by this credential. Null when it can."
                     },
+                    "version": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The version this response shows: the latest, unless a label or a version was asked for. Null for connected agents, which are versioned by their code."
+                    },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "version"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "The deploy labels the agent carries, such as production, and the version each points at."
+                    },
+                    "createdBy": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user who created the agent. Null when an API key created it, or it predates creators being recorded."
+                    },
+                    "updatedBy": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user who changed the agent last. Null when an API key changed it."
+                    },
                     "createdAt": {
                       "type": "string",
                       "format": "date-time"
@@ -7913,6 +8218,10 @@
                     "instances",
                     "selectable",
                     "notSelectableReason",
+                    "version",
+                    "labels",
+                    "createdBy",
+                    "updatedBy",
                     "createdAt",
                     "updatedAt",
                     "platformUrl"
@@ -7923,6 +8232,7 @@
             }
           }
         },
+        "description": "Reads the latest version unless `label` or `version` is given. The id also takes a suffix: `agent_1:production`, `agent_1:3` or `agent_1:latest`.",
         "summary": "Get an agent in the caller's project",
         "security": [
           {
@@ -7948,6 +8258,26 @@
             },
             "required": true,
             "description": "The agent id."
+          },
+          {
+            "in": "query",
+            "name": "label",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "description": "A deploy label, for example production. Omit both to read the latest version."
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "description": "A version number."
           }
         ]
       },
@@ -8199,6 +8529,95 @@
                       ],
                       "description": "Why the agent cannot be run by this credential. Null when it can."
                     },
+                    "version": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The version this response shows: the latest, unless a label or a version was asked for. Null for connected agents, which are versioned by their code."
+                    },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "version"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "The deploy labels the agent carries, such as production, and the version each points at."
+                    },
+                    "createdBy": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user who created the agent. Null when an API key created it, or it predates creators being recorded."
+                    },
+                    "updatedBy": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user who changed the agent last. Null when an API key changed it."
+                    },
                     "createdAt": {
                       "type": "string",
                       "format": "date-time"
@@ -8227,6 +8646,10 @@
                     "instances",
                     "selectable",
                     "notSelectableReason",
+                    "version",
+                    "labels",
+                    "createdBy",
+                    "updatedBy",
                     "createdAt",
                     "updatedAt",
                     "platformUrl"
@@ -8273,6 +8696,11 @@
                       "string",
                       "null"
                     ]
+                  },
+                  "commitMessage": {
+                    "description": "What changed, kept on the version this write creates.",
+                    "type": "string",
+                    "maxLength": 500
                   }
                 }
               }
@@ -8554,6 +8982,95 @@
                       ],
                       "description": "Why the agent cannot be run by this credential. Null when it can."
                     },
+                    "version": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The version this response shows: the latest, unless a label or a version was asked for. Null for connected agents, which are versioned by their code."
+                    },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "version"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "The deploy labels the agent carries, such as production, and the version each points at."
+                    },
+                    "createdBy": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user who created the agent. Null when an API key created it, or it predates creators being recorded."
+                    },
+                    "updatedBy": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user who changed the agent last. Null when an API key changed it."
+                    },
                     "createdAt": {
                       "type": "string",
                       "format": "date-time"
@@ -8582,6 +9099,10 @@
                     "instances",
                     "selectable",
                     "notSelectableReason",
+                    "version",
+                    "labels",
+                    "createdBy",
+                    "updatedBy",
                     "createdAt",
                     "updatedAt",
                     "platformUrl"
@@ -8628,6 +9149,11 @@
                       "string",
                       "null"
                     ]
+                  },
+                  "commitMessage": {
+                    "description": "What changed, kept on the version this write creates.",
+                    "type": "string",
+                    "maxLength": 500
                   }
                 }
               }
@@ -8737,6 +9263,378 @@
             },
             "required": true,
             "description": "The agent id."
+          }
+        ]
+      }
+    },
+    "/api/v1/agents/{agentId}/versions": {
+      "get": {
+        "operationId": "listAgentVersions",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "agentId": {
+                            "type": "string"
+                          },
+                          "projectId": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "signature",
+                              "code",
+                              "workflow",
+                              "http",
+                              "connected",
+                              "voice"
+                            ]
+                          },
+                          "config": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          },
+                          "workflowId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "commitMessage": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "authorId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "authorKind": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "user",
+                                  "api_key",
+                                  "system"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "author": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "email": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name",
+                                  "email"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "labels": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "agentId",
+                          "projectId",
+                          "version",
+                          "name",
+                          "type",
+                          "config",
+                          "workflowId",
+                          "commitMessage",
+                          "authorId",
+                          "authorKind",
+                          "author",
+                          "createdAt",
+                          "labels"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "version"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "labels"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "description": "Every version of the agent, newest first, with the labels on each.",
+        "summary": "List an agent's versions",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "project:view"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agentId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The agent id."
+          }
+        ]
+      }
+    },
+    "/api/v1/agents/{agentId}/labels/{label}": {
+      "put": {
+        "operationId": "assignAgentLabel",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "versionId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "label",
+                    "version",
+                    "versionId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "description": "Points a deploy label, such as production, at one of the agent's versions.",
+        "summary": "Point a deploy label at an agent version",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "agents:deploy"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agentId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The agent id."
+          },
+          {
+            "in": "path",
+            "name": "label",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "required": true,
+            "description": "The deploy label, for example production."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "The version number the label points at."
+                  }
+                },
+                "required": [
+                  "version"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "removeAgentLabel",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string"
+                    },
+                    "removed": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "label",
+                    "removed"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "summary": "Remove a deploy label from an agent",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "agents:deploy"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agentId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The agent id."
+          },
+          {
+            "in": "path",
+            "name": "label",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "required": true,
+            "description": "The deploy label, for example production."
           }
         ]
       }
@@ -16184,6 +17082,15 @@
                                           "governanceCost:view",
                                           "sso:view",
                                           "sso:manage",
+                                          "agents:deploy",
+                                          "evaluators:deploy",
+                                          "subscription:upgrade",
+                                          "subscription:manage",
+                                          "seatRequests:view",
+                                          "seatRequests:manage",
+                                          "members:view",
+                                          "braids:manage",
+                                          "spans:braided",
                                           "opsRead:view",
                                           "opsCopy:create"
                                         ]
@@ -16407,6 +17314,15 @@
                                     "governanceCost:view",
                                     "sso:view",
                                     "sso:manage",
+                                    "agents:deploy",
+                                    "evaluators:deploy",
+                                    "subscription:upgrade",
+                                    "subscription:manage",
+                                    "seatRequests:view",
+                                    "seatRequests:manage",
+                                    "members:view",
+                                    "braids:manage",
+                                    "spans:braided",
                                     "opsRead:view",
                                     "opsCopy:create"
                                   ]
@@ -17030,6 +17946,15 @@
                                                   "governanceCost:view",
                                                   "sso:view",
                                                   "sso:manage",
+                                                  "agents:deploy",
+                                                  "evaluators:deploy",
+                                                  "subscription:upgrade",
+                                                  "subscription:manage",
+                                                  "seatRequests:view",
+                                                  "seatRequests:manage",
+                                                  "members:view",
+                                                  "braids:manage",
+                                                  "spans:braided",
                                                   "opsRead:view",
                                                   "opsCopy:create"
                                                 ]
@@ -17253,6 +18178,15 @@
                                             "governanceCost:view",
                                             "sso:view",
                                             "sso:manage",
+                                            "agents:deploy",
+                                            "evaluators:deploy",
+                                            "subscription:upgrade",
+                                            "subscription:manage",
+                                            "seatRequests:view",
+                                            "seatRequests:manage",
+                                            "members:view",
+                                            "braids:manage",
+                                            "spans:braided",
                                             "opsRead:view",
                                             "opsCopy:create"
                                           ]
@@ -17697,6 +18631,15 @@
                                         "governanceCost:view",
                                         "sso:view",
                                         "sso:manage",
+                                        "agents:deploy",
+                                        "evaluators:deploy",
+                                        "subscription:upgrade",
+                                        "subscription:manage",
+                                        "seatRequests:view",
+                                        "seatRequests:manage",
+                                        "members:view",
+                                        "braids:manage",
+                                        "spans:braided",
                                         "opsRead:view",
                                         "opsCopy:create"
                                       ]
@@ -48391,7 +49334,7 @@
             }
           }
         },
-        "description": "Update a dataset by its slug or id",
+        "description": "Update a dataset by its slug or id. New `columnTypes` re-key every record; send `columnRenames` to say which existing column each renamed column came from, so a save that deletes one column and renames another moves the right values.",
         "requestBody": {
           "required": false,
           "content": {
@@ -48434,6 +49377,28 @@
                         "name",
                         "type"
                       ]
+                    }
+                  },
+                  "columnRenames": {
+                    "description": "Which existing column each renamed column came from, as `{ from, to }` names. Sent, values move by these renames and by unchanged names only. Omitted, columns left over after matching names pair by position.",
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "from": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "to": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "from",
+                        "to"
+                      ],
+                      "additionalProperties": false
                     }
                   }
                 }
@@ -48677,6 +49642,954 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/dataset/{slugOrId}/versions": {
+      "get": {
+        "operationId": "getApiDatasetBySlugOrIdVersions",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "projectId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "datasetId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "version": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "name": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "trigger": {
+                            "type": "string",
+                            "enum": [
+                              "autosave",
+                              "manual",
+                              "experiment_run",
+                              "restore",
+                              "initial"
+                            ]
+                          },
+                          "contentHash": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "columnTypes": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "string",
+                                    "boolean",
+                                    "number",
+                                    "date",
+                                    "list",
+                                    "json",
+                                    "spans",
+                                    "rag_contexts",
+                                    "chat_messages",
+                                    "annotations",
+                                    "evaluations",
+                                    "image",
+                                    "file"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "type"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "rowCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "sizeBytes": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "chunkCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "restoredFromVersion": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "authorId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "authorKind": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "user",
+                                  "api_key",
+                                  "system"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "pinned": {
+                            "type": "boolean"
+                          },
+                          "runCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "authorName": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "projectId",
+                          "datasetId",
+                          "version",
+                          "name",
+                          "trigger",
+                          "contentHash",
+                          "columnTypes",
+                          "rowCount",
+                          "sizeBytes",
+                          "chunkCount",
+                          "restoredFromVersion",
+                          "authorId",
+                          "authorKind",
+                          "pinned",
+                          "runCount",
+                          "createdAt",
+                          "authorName"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "restorable": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "restorable"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "description": "List a dataset's versions, newest first. A version is an immutable snapshot of the dataset's columns and rows, saved after edits go quiet, when an experiment run starts, by hand, or by a restore.",
+        "summary": "List dataset versions",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "datasets:view"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slugOrId",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ]
+      },
+      "post": {
+        "operationId": "postApiDatasetBySlugOrIdVersions",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "projectId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "datasetId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "version": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "trigger": {
+                      "type": "string",
+                      "enum": [
+                        "autosave",
+                        "manual",
+                        "experiment_run",
+                        "restore",
+                        "initial"
+                      ]
+                    },
+                    "contentHash": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "columnTypes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "string",
+                              "boolean",
+                              "number",
+                              "date",
+                              "list",
+                              "json",
+                              "spans",
+                              "rag_contexts",
+                              "chat_messages",
+                              "annotations",
+                              "evaluations",
+                              "image",
+                              "file"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "type"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "rowCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "sizeBytes": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "chunkCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "restoredFromVersion": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "authorId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "authorKind": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "user",
+                            "api_key",
+                            "system"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "pinned": {
+                      "type": "boolean"
+                    },
+                    "runCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "projectId",
+                    "datasetId",
+                    "version",
+                    "name",
+                    "trigger",
+                    "contentHash",
+                    "columnTypes",
+                    "rowCount",
+                    "sizeBytes",
+                    "chunkCount",
+                    "restoredFromVersion",
+                    "authorId",
+                    "authorKind",
+                    "pinned",
+                    "runCount",
+                    "createdAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "description": "Save the dataset's current content as a version, with an optional name. When the content equals the latest version, no version is created and the latest one is answered (named, when a name is given).",
+        "summary": "Save a dataset version",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "datasets:update"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slugOrId",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/v1/dataset/{slugOrId}/versions/{version}": {
+      "get": {
+        "operationId": "getApiDatasetBySlugOrIdVersionsByVersion",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "projectId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "datasetId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "version": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "name": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "trigger": {
+                          "type": "string",
+                          "enum": [
+                            "autosave",
+                            "manual",
+                            "experiment_run",
+                            "restore",
+                            "initial"
+                          ]
+                        },
+                        "contentHash": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "columnTypes": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "string",
+                                  "boolean",
+                                  "number",
+                                  "date",
+                                  "list",
+                                  "json",
+                                  "spans",
+                                  "rag_contexts",
+                                  "chat_messages",
+                                  "annotations",
+                                  "evaluations",
+                                  "image",
+                                  "file"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "type"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "rowCount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "sizeBytes": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "chunkCount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "restoredFromVersion": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "authorId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "authorKind": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "user",
+                                "api_key",
+                                "system"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "pinned": {
+                          "type": "boolean"
+                        },
+                        "runCount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "projectId",
+                        "datasetId",
+                        "version",
+                        "name",
+                        "trigger",
+                        "contentHash",
+                        "columnTypes",
+                        "rowCount",
+                        "sizeBytes",
+                        "chunkCount",
+                        "restoredFromVersion",
+                        "authorId",
+                        "authorKind",
+                        "pinned",
+                        "runCount",
+                        "createdAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "entry": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "entry"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "properties": {
+                        "page": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "total": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "page",
+                        "limit",
+                        "total"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "version",
+                    "rows",
+                    "pagination"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The dataset has no version with that number.",
+            "content": {}
+          }
+        },
+        "description": "Read one version of a dataset: its metadata and a page of the rows it held. A version the dataset does not have is refused with `dataset_version_not_found`.",
+        "summary": "Get a dataset version",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "datasets:view"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slugOrId",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 500
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/dataset/{slugOrId}/versions/{version}/restore": {
+      "post": {
+        "operationId": "postApiDatasetBySlugOrIdVersionsByVersionRestore",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "projectId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "datasetId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "version": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "name": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "trigger": {
+                          "type": "string",
+                          "enum": [
+                            "autosave",
+                            "manual",
+                            "experiment_run",
+                            "restore",
+                            "initial"
+                          ]
+                        },
+                        "contentHash": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "columnTypes": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "string",
+                                  "boolean",
+                                  "number",
+                                  "date",
+                                  "list",
+                                  "json",
+                                  "spans",
+                                  "rag_contexts",
+                                  "chat_messages",
+                                  "annotations",
+                                  "evaluations",
+                                  "image",
+                                  "file"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "type"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "rowCount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "sizeBytes": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "chunkCount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "restoredFromVersion": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "authorId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "authorKind": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "user",
+                                "api_key",
+                                "system"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "pinned": {
+                          "type": "boolean"
+                        },
+                        "runCount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "projectId",
+                        "datasetId",
+                        "version",
+                        "name",
+                        "trigger",
+                        "contentHash",
+                        "columnTypes",
+                        "rowCount",
+                        "sizeBytes",
+                        "chunkCount",
+                        "restoredFromVersion",
+                        "authorId",
+                        "authorKind",
+                        "pinned",
+                        "runCount",
+                        "createdAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "changed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "version",
+                    "changed"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The dataset has no version with that number.",
+            "content": {}
+          }
+        },
+        "description": "Restore a version: the dataset's columns and rows become the version's, and the result is saved as a new version. Earlier versions are never changed.",
+        "summary": "Restore a dataset version",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "datasets:manage"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slugOrId",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "required": true
+          }
+        ]
       }
     },
     "/api/v1/evaluations/list": {
@@ -49960,6 +51873,95 @@
                       "workflowIcon": {
                         "type": "string"
                       },
+                      "version": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The version this response shows: the latest, unless a label or a version was asked for."
+                      },
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "label": {
+                              "type": "string"
+                            },
+                            "version": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "required": [
+                            "label",
+                            "version"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "description": "The deploy labels the evaluator carries, such as production, and the version each points at."
+                      },
+                      "createdBy": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The user who created the evaluator. Null when an API key created it, or it predates creators being recorded."
+                      },
+                      "updatedBy": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The user who changed the evaluator last. Null when an API key changed it."
+                      },
                       "platformUrl": {
                         "type": "string",
                         "format": "uri"
@@ -49978,6 +51980,10 @@
                       "updatedAt",
                       "fields",
                       "outputFields",
+                      "version",
+                      "labels",
+                      "createdBy",
+                      "updatedBy",
                       "platformUrl"
                     ],
                     "additionalProperties": false
@@ -50115,6 +52121,95 @@
                     "workflowIcon": {
                       "type": "string"
                     },
+                    "version": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The version this response shows: the latest, unless a label or a version was asked for."
+                    },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "version"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "The deploy labels the evaluator carries, such as production, and the version each points at."
+                    },
+                    "createdBy": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user who created the evaluator. Null when an API key created it, or it predates creators being recorded."
+                    },
+                    "updatedBy": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user who changed the evaluator last. Null when an API key changed it."
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -50133,6 +52228,10 @@
                     "updatedAt",
                     "fields",
                     "outputFields",
+                    "version",
+                    "labels",
+                    "createdBy",
+                    "updatedBy",
                     "platformUrl"
                   ],
                   "additionalProperties": false
@@ -50141,7 +52240,7 @@
             }
           }
         },
-        "description": "Create a new evaluator",
+        "description": "Create a new evaluator: a built-in one, a custom code evaluator (`type: \"code\"`) or one that wraps a workflow (`type: \"workflow\"`)",
         "security": [
           {
             "project_api_key": []
@@ -50168,12 +52267,28 @@
                     "minLength": 1,
                     "maxLength": 255
                   },
+                  "type": {
+                    "default": "evaluator",
+                    "description": "The kind of evaluator. \"evaluator\" (the default) is a built-in type named by config.evaluatorType; \"code\" is a custom Python evaluator whose config carries code and inputs; \"workflow\" wraps the workflow named by workflowId.",
+                    "type": "string",
+                    "enum": [
+                      "evaluator",
+                      "code",
+                      "workflow"
+                    ]
+                  },
                   "config": {
                     "type": "object",
                     "propertyNames": {
                       "type": "string"
                     },
-                    "additionalProperties": {}
+                    "additionalProperties": {},
+                    "description": "For a built-in evaluator: { evaluatorType, settings }. For a code evaluator: { code, inputs: [{ identifier, type }] }; outputs are the fixed passed, score, label and details. For a workflow evaluator: {}."
+                  },
+                  "workflowId": {
+                    "description": "The workflow a \"workflow\" evaluator wraps. Only for type \"workflow\".",
+                    "type": "string",
+                    "minLength": 1
                   }
                 },
                 "required": [
@@ -50299,6 +52414,95 @@
                     "workflowIcon": {
                       "type": "string"
                     },
+                    "version": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The version this response shows: the latest, unless a label or a version was asked for."
+                    },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "version"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "The deploy labels the evaluator carries, such as production, and the version each points at."
+                    },
+                    "createdBy": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user who created the evaluator. Null when an API key created it, or it predates creators being recorded."
+                    },
+                    "updatedBy": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user who changed the evaluator last. Null when an API key changed it."
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -50317,6 +52521,10 @@
                     "updatedAt",
                     "fields",
                     "outputFields",
+                    "version",
+                    "labels",
+                    "createdBy",
+                    "updatedBy",
                     "platformUrl"
                   ],
                   "additionalProperties": false
@@ -50347,7 +52555,7 @@
             }
           }
         },
-        "description": "Get a specific evaluator by ID or slug",
+        "description": "Get a specific evaluator by ID or slug, at the latest version unless `label` or `version` is given. The address also takes a suffix: `toxicity:production`, `toxicity:2` or `toxicity:latest`.",
         "security": [
           {
             "project_api_key": []
@@ -50372,6 +52580,26 @@
             },
             "required": true,
             "description": "The evaluator id or its project-unique slug."
+          },
+          {
+            "in": "query",
+            "name": "label",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "description": "A deploy label, for example production. Omit both to read the latest version."
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "description": "A version number."
           }
         ]
       }
@@ -50489,6 +52717,95 @@
                     "workflowIcon": {
                       "type": "string"
                     },
+                    "version": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The version this response shows: the latest, unless a label or a version was asked for."
+                    },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "version"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "The deploy labels the evaluator carries, such as production, and the version each points at."
+                    },
+                    "createdBy": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user who created the evaluator. Null when an API key created it, or it predates creators being recorded."
+                    },
+                    "updatedBy": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user who changed the evaluator last. Null when an API key changed it."
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -50507,6 +52824,10 @@
                     "updatedAt",
                     "fields",
                     "outputFields",
+                    "version",
+                    "labels",
+                    "createdBy",
+                    "updatedBy",
                     "platformUrl"
                   ],
                   "additionalProperties": false
@@ -50578,6 +52899,11 @@
                       "type": "string"
                     },
                     "additionalProperties": {}
+                  },
+                  "commitMessage": {
+                    "description": "A note kept on the version this update appends.",
+                    "type": "string",
+                    "maxLength": 500
                   }
                 }
               }
@@ -50685,6 +53011,461 @@
         ]
       }
     },
+    "/api/v1/evaluators/{evaluatorId}/versions": {
+      "get": {
+        "operationId": "getApiEvaluatorsVersions",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "evaluatorId": {
+                            "type": "string"
+                          },
+                          "projectId": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "evaluator",
+                              "code",
+                              "workflow"
+                            ]
+                          },
+                          "config": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          },
+                          "workflowId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "commitMessage": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "authorId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "authorKind": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "user",
+                                  "api_key",
+                                  "system"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "author": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "email": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name",
+                                  "email"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "labels": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "evaluatorId",
+                          "projectId",
+                          "version",
+                          "name",
+                          "type",
+                          "config",
+                          "workflowId",
+                          "commitMessage",
+                          "authorId",
+                          "authorKind",
+                          "author",
+                          "createdAt",
+                          "labels"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "version"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "labels"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "description": "List an evaluator's versions, newest first, with the labels on each",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "evaluations:view"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "evaluatorId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The evaluator id."
+          }
+        ]
+      }
+    },
+    "/api/v1/evaluators/{evaluatorId}/labels/{label}": {
+      "put": {
+        "operationId": "putApiEvaluatorsLabel",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "versionId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "label",
+                    "version",
+                    "versionId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "description": "Point a deploy label, such as production, at one of the evaluator's versions",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "evaluators:deploy"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "evaluatorId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The evaluator id."
+          },
+          {
+            "in": "path",
+            "name": "label",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "required": true,
+            "description": "The deploy label, for example production."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "The version number the label points at."
+                  }
+                },
+                "required": [
+                  "version"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteApiEvaluatorsLabel",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string"
+                    },
+                    "removed": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "label",
+                    "removed"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "description": "Remove a deploy label from an evaluator",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "evaluators:deploy"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "evaluatorId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The evaluator id."
+          },
+          {
+            "in": "path",
+            "name": "label",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "required": true,
+            "description": "The deploy label, for example production."
+          }
+        ]
+      }
+    },
     "/api/v1/experiments/{slug}/run": {
       "post": {
         "operationId": "postApiExperimentsBySlugRun",
@@ -50708,6 +53489,12 @@
                       "type": "number",
                       "description": "Number of cells this run will execute"
                     },
+                    "concurrency": {
+                      "description": "Cells this run executes at once: the request's `concurrency`, else the server default",
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
                     "runUrl": {
                       "description": "Link to the run in the LangWatch app",
                       "type": "string"
@@ -50730,7 +53517,7 @@
             }
           },
           "400": {
-            "description": "The body was not valid JSON, failed input validation, or the experiment has no dataset configured",
+            "description": "The body was not valid JSON, failed input validation, the experiment has no dataset configured, or `dataset_version` was sent while the run reads no saved dataset (no `dataset_id` and an inline active dataset)",
             "content": {}
           },
           "401": {
@@ -50738,11 +53525,11 @@
             "content": {}
           },
           "404": {
-            "description": "No such experiment or run in this project",
+            "description": "No such experiment in this project, or its dataset has no version `dataset_version` names (`dataset_version_not_found`)",
             "content": {}
           }
         },
-        "description": "Start a run of a saved experiment, addressed by slug. Returns a runId to poll straight away. Send `Accept: text/event-stream` instead to stream progress events until the run finishes.",
+        "description": "Start a run of a saved experiment, addressed by slug. Returns a runId to poll straight away. Send `Accept: text/event-stream` instead to stream progress events until the run finishes. The run reads a version of its saved dataset: `dataset_version` when given, else the version the experiment pins, else the current content saved as a new version.",
         "summary": "Run an experiment",
         "tags": [
           "Experiments"
@@ -50766,7 +53553,13 @@
                     }
                   },
                   "dataset_id": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "dataset_version": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
                   },
                   "parameters": {
                     "type": "object",
@@ -50950,6 +53743,19 @@
                             "type": [
                               "number",
                               "null"
+                            ]
+                          },
+                          "concurrency": {
+                            "description": "Cells the run executed at once. Null for a run that recorded none.",
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
                             ]
                           },
                           "summary": {
@@ -51165,6 +53971,12 @@
                     "total": {
                       "type": "number",
                       "description": "Cells in the run"
+                    },
+                    "concurrency": {
+                      "description": "Cells the run executes at once, as it was fixed when the run started",
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
                     },
                     "startedAt": {
                       "description": "Unix milliseconds",
@@ -51474,6 +54286,19 @@
                         "null"
                       ]
                     },
+                    "concurrency": {
+                      "description": "Cells the run executed at once. Null for a run that recorded none.",
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "targets": {
                       "description": "Resolves the targetId each dataset row and evaluation carries",
                       "anyOf": [
@@ -51507,6 +54332,26 @@
                                 "type": [
                                   "string",
                                   "null"
+                                ]
+                              },
+                              "agentLabel": {
+                                "description": "The deploy label an agent target ran at, such as production",
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "agentVersion": {
+                                "description": "The agent version the label pointed at when the run started",
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
                                 ]
                               },
                               "evaluatorId": {
@@ -54039,7 +56884,7 @@
             }
           },
           "400": {
-            "description": "The workflow has no committed version, or the run could not start",
+            "description": "The workflow has no committed version, the run could not start, or `dataset_version` was sent with no saved dataset to read it from",
             "content": {}
           },
           "403": {
@@ -54047,7 +56892,7 @@
             "content": {}
           },
           "404": {
-            "description": "The project holds no such workflow or dataset",
+            "description": "The project holds no such workflow or dataset, or the dataset has no version `dataset_version` names (`dataset_version_not_found`)",
             "content": {}
           },
           "422": {
@@ -54055,7 +56900,7 @@
             "content": {}
           }
         },
-        "description": "Trigger an evaluation run of a workflow's committed version through the evaluations pipeline. Evaluate the workflow's attached dataset, inline data, or a platform dataset id; parameters bind as constant entry inputs on every row. Returns a run id and a results URL to poll or open in the browser.",
+        "description": "Trigger an evaluation run of a workflow's committed version through the evaluations pipeline. Evaluate the workflow's attached dataset, inline data, or a platform dataset id; parameters bind as constant entry inputs on every row. A saved dataset is read at `dataset_version` when given, else its current content is saved as a new version. Returns a run id and a results URL to poll or open in the browser.",
         "requestBody": {
           "required": false,
           "content": {
@@ -54081,6 +56926,12 @@
                   "dataset_id": {
                     "description": "Platform dataset id to evaluate; mutually exclusive with data",
                     "type": "string"
+                  },
+                  "dataset_version": {
+                    "description": "Version of the saved dataset to evaluate (dataset_id, else the workflow's attached dataset); defaults to its current content",
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
                   },
                   "parameters": {
                     "description": "Constant entry inputs applied to every row, e.g. a feature flag or PR number",
@@ -74030,6 +76881,22 @@
                             "allowOtelDirect"
                           ],
                           "additionalProperties": false
+                        },
+                        "pi": {
+                          "type": "object",
+                          "properties": {
+                            "allowVk": {
+                              "type": "boolean"
+                            },
+                            "allowOtelDirect": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "allowVk",
+                            "allowOtelDirect"
+                          ],
+                          "additionalProperties": false
                         }
                       },
                       "required": [
@@ -74040,7 +76907,8 @@
                         "cursor",
                         "copilot",
                         "code",
-                        "grok"
+                        "grok",
+                        "pi"
                       ],
                       "additionalProperties": false
                     }
@@ -84976,6 +87844,27 @@
                           "null"
                         ]
                       },
+                      "evaluatorLabel": {
+                        "description": "The evaluator deploy label the monitor runs; null runs the latest version.",
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "createdById": {
+                        "description": "The user who created the monitor, when recorded.",
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "updatedById": {
+                        "description": "The user who changed the monitor last.",
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
                       "platformUrl": {
                         "type": "string",
                         "format": "uri"
@@ -84999,6 +87888,9 @@
                       "updatedAt",
                       "autoPausedAt",
                       "autoPausedReason",
+                      "evaluatorLabel",
+                      "createdById",
+                      "updatedById",
                       "platformUrl"
                     ],
                     "additionalProperties": false
@@ -85108,6 +88000,27 @@
                         "null"
                       ]
                     },
+                    "evaluatorLabel": {
+                      "description": "The evaluator deploy label the monitor runs; null runs the latest version.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "createdById": {
+                      "description": "The user who created the monitor, when recorded.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "updatedById": {
+                      "description": "The user who changed the monitor last.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -85131,6 +88044,9 @@
                     "updatedAt",
                     "autoPausedAt",
                     "autoPausedReason",
+                    "evaluatorLabel",
+                    "createdById",
+                    "updatedById",
                     "platformUrl"
                   ],
                   "additionalProperties": false
@@ -85254,6 +88170,19 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "evaluatorLabel": {
+                    "description": "Run the evaluator at this deploy label, such as production; null runs the latest.",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 },
                 "required": [
@@ -85348,6 +88277,27 @@
                         "null"
                       ]
                     },
+                    "evaluatorLabel": {
+                      "description": "The evaluator deploy label the monitor runs; null runs the latest version.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "createdById": {
+                      "description": "The user who created the monitor, when recorded.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "updatedById": {
+                      "description": "The user who changed the monitor last.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -85371,6 +88321,9 @@
                     "updatedAt",
                     "autoPausedAt",
                     "autoPausedReason",
+                    "evaluatorLabel",
+                    "createdById",
+                    "updatedById",
                     "platformUrl"
                   ],
                   "additionalProperties": false
@@ -85513,6 +88466,27 @@
                         "null"
                       ]
                     },
+                    "evaluatorLabel": {
+                      "description": "The evaluator deploy label the monitor runs; null runs the latest version.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "createdById": {
+                      "description": "The user who created the monitor, when recorded.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "updatedById": {
+                      "description": "The user who changed the monitor last.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -85536,6 +88510,9 @@
                     "updatedAt",
                     "autoPausedAt",
                     "autoPausedReason",
+                    "evaluatorLabel",
+                    "createdById",
+                    "updatedById",
                     "platformUrl"
                   ],
                   "additionalProperties": false
@@ -85666,6 +88643,19 @@
                         "type": "integer",
                         "exclusiveMinimum": 0,
                         "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "evaluatorLabel": {
+                    "description": "Run the evaluator at this deploy label, such as production; null runs the latest.",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
                       },
                       {
                         "type": "null"
@@ -108436,6 +111426,8 @@
                         "agentCache:view",
                         "governanceCost:view",
                         "sso:view",
+                        "seatRequests:view",
+                        "members:view",
                         "opsRead:view"
                       ]
                     }
@@ -108607,6 +111599,8 @@
                               "agentCache:view",
                               "governanceCost:view",
                               "sso:view",
+                              "seatRequests:view",
+                              "members:view",
                               "opsRead:view"
                             ]
                           }
@@ -108738,6 +111732,8 @@
                             "agentCache:view",
                             "governanceCost:view",
                             "sso:view",
+                            "seatRequests:view",
+                            "members:view",
                             "opsRead:view"
                           ]
                         },
@@ -108852,6 +111848,8 @@
                 "agentCache:view",
                 "governanceCost:view",
                 "sso:view",
+                "seatRequests:view",
+                "members:view",
                 "opsRead:view"
               ]
             },

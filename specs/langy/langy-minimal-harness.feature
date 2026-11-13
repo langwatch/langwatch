@@ -88,3 +88,5 @@ Feature: Langy minimal worker
     And it forbids telling the user to sign in or claiming Langy has no CLI
     And it names a forbidden or permission_denied refusal as a permission
       refusal, not an internal error
+    And on a denial reason of owner-ceiling, no-membership or membership-disabled it tells
+      Langy the access was removed or reduced, with no retry

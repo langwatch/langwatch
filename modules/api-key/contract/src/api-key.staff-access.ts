@@ -5,7 +5,7 @@ import { z } from "zod";
 export const STAFF_ACCESS_KEY_MAX_LIFETIME_MS = 61 * 60 * 1000;
 
 /**
- * `ApiKeyApi.mintStaffAccessKey` (ADR-193): an ownerless, restricted key in one organization,
+ * `ApiKeyApi.mintStaffAccessKey` (ADR-202): an ownerless, restricted key in one organization,
  * holding only staff bag permissions. `support` writes as "LangWatch Support", `read` reads as
  * "LangWatch Staff Read".
  */

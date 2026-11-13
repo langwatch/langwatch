@@ -8,7 +8,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useTraceQueryArgs } from "../use-trace-query-args.ts";
 
-let storeState: { traceId: string | null; occurredAtMs: number | null };
+let storeState: {
+  traceId: string | null;
+  occurredAtMs: number | null;
+  backfilledOccurredAt: { traceId: string; occurredAtMs: number } | null;
+};
 
 vi.mock("../../use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "p1" } }),
@@ -27,7 +31,7 @@ describe("useTraceQueryArgs", () => {
   let nextTrace = 0;
   beforeEach(() => {
     nextTrace += 1;
-    storeState = { traceId: `t${nextTrace}`, occurredAtMs: null };
+    storeState = { traceId: `t${nextTrace}`, occurredAtMs: null, backfilledOccurredAt: null };
   });
 
   describe("when the drawer opened from a link with no partition hint", () => {
@@ -46,7 +50,7 @@ describe("useTraceQueryArgs", () => {
   describe("when the hint is already known, from the URL or a list row", () => {
     /** @scenario "The browser opens a trace by id alone" */
     it("forwards it as occurredAtMs", () => {
-      storeState = { traceId: storeState.traceId, occurredAtMs: 1714476000000 };
+      storeState = { ...storeState, occurredAtMs: 1714476000000 };
 
       const { result } = renderHook(() => useTraceQueryArgs());
 
@@ -65,12 +69,34 @@ describe("useTraceQueryArgs", () => {
       const before = result.current.queryArgs;
       expect(result.current.isLive).toBe(false);
 
-      storeState = { ...storeState, occurredAtMs: Date.now() - 1000 };
+      const filledIn = Date.now() - 1000;
+      storeState = {
+        ...storeState,
+        occurredAtMs: filledIn,
+        backfilledOccurredAt: { traceId: storeState.traceId ?? "", occurredAtMs: filledIn },
+      };
       rerender();
 
       expect(result.current.queryArgs).toEqual(before);
       expect(result.current.queryArgs).not.toHaveProperty("occurredAtMs");
       expect(result.current.isLive).toBe(true);
+    });
+
+    /** @scenario "A braided span selected in the tree opens from its owner" */
+    it("gives a reader mounted after the back-fill the same read args", () => {
+      const opening = renderHook(() => useTraceQueryArgs());
+      const filledIn = 1714476000000;
+      storeState = {
+        ...storeState,
+        occurredAtMs: filledIn,
+        backfilledOccurredAt: { traceId: storeState.traceId ?? "", occurredAtMs: filledIn },
+      };
+      opening.rerender();
+
+      const later = renderHook(() => useTraceQueryArgs());
+
+      expect(later.result.current.queryArgs).toEqual(opening.result.current.queryArgs);
+      expect(later.result.current.queryArgs).not.toHaveProperty("occurredAtMs");
     });
   });
 });

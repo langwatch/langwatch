@@ -32,6 +32,7 @@
     "@langwatch/auth-contract": "workspace:*",
     "@langwatch/authz-browser": "workspace:*",
     "@langwatch/automation-browser": "workspace:*",
+    "@langwatch/automation-contract": "workspace:*",
     "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/coding-agent-browser": "workspace:*",

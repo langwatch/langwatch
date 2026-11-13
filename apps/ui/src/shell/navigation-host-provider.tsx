@@ -366,6 +366,7 @@ function useNavigationHostReading({
           waiting: <LoadingScreen />,
           notFound: <UiPageNotFound />,
           hasPermission: (permission) => session.hasPermission(permission),
+          hasOrganizationPermission: (permission) => session.hasOrganizationPermission(permission),
           featureFlag: (flag) => flags.flag(flag),
         },
         {

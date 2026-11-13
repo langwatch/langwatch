@@ -38,7 +38,7 @@ export type RestKeyCredential = Readonly<{
   kind: RestKeyKind;
   apiKeyId: string | null;
   ownerUserId: string | null;
-  /** Set on an approved staff agent's key (ADR-193): the runtime asks the staff gate first. */
+  /** Set on an approved staff agent's key (ADR-202): the runtime asks the staff gate first. */
   isStaffAccessKey?: true;
 }>;
 

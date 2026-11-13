@@ -19,6 +19,7 @@ import { describe, expect, it } from "vitest";
 import { MemoryAnalyticsRepositories } from "../../repositories/memory/memory.analytics.repositories.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import { AnalyticsModule } from "../analytics.app.ts";
+import { analyticsTestSecrets } from "./analytics-secrets.fixture.ts";
 
 const TIER_PLAN_TYPE: Record<string, string> = {
   "org-free": "FREE",
@@ -65,7 +66,7 @@ async function harness() {
       publicBaseUrl: "https://app.langwatch.test",
     },
     resources: { own: () => void 0, ownService: () => void 0 },
-    secrets: {} as never,
+    secrets: analyticsTestSecrets(),
   });
 
   const execute = (projectId: string) =>
