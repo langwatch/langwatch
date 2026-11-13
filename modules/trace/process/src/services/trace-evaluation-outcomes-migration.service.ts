@@ -49,6 +49,7 @@ type TraceEvaluationOutcomesMigrationDependencies = Readonly<{
   evaluations: Pick<TraceEvaluationRuns, "listEvaluationOutcomes">;
   anchors: Pick<TraceAnchorService, "traceAnchors">;
   commands: Pick<TraceProcessingCommandsService, "recordEvaluationOutcomes">;
+  logger: Readonly<{ warn(payload: Readonly<Record<string, unknown>>, message: string): void }>;
   now?: () => number;
 }>;
 
@@ -87,7 +88,13 @@ export class TraceEvaluationOutcomesMigrationService {
         try {
           report = await this.recordProject({ projectId, report, dryRun, signal, onPage });
         } catch (error) {
+          // Counts from pages of this project already sent in this run are dropped from the
+          // totals here; the checkpoints saved after each page keep them.
           if (!isProjectGone(error)) throw error;
+          this.deps.logger.warn(
+            { projectId },
+            "the evaluation outcomes step skipped a project that is archived or gone",
+          );
           report = { ...report, skippedProjects: report.skippedProjects + 1 };
         }
         if (signal.aborted) return report;
