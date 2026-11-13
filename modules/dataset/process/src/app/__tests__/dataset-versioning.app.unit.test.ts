@@ -983,7 +983,7 @@ describe("given datasets created before versioning", () => {
       columnTypes: [{ name: "input", type: "string" }],
       datasetRecords: [{ id: "a", input: "x" }],
     });
-    vi.spyOn(repositories.records, "findPage").mockRejectedValueOnce(new Error("connection reset"));
+    vi.spyOn(repositories.chunks, "readChunk").mockRejectedValueOnce(new Error("connection reset"));
 
     const { saved, checkpoint } = checkpointOf(null);
     await expect(
