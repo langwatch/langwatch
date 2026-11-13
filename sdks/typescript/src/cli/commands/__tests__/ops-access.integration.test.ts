@@ -1,7 +1,7 @@
 /**
  * The ops agent's staff access, end to end against the REAL built CLI and a local HTTP server
- * faking the staff-access routes: request, wait, redeem, a private session file, normal commands
- * on the session key, expiry and early end.
+ * faking the staff-access routes: setup from stdin, request, wait, redeem, a private session file,
+ * normal commands on the session key only with --ops-session, expiry and early end.
  * @see modules/staff-access/specs/staff-access-cli.feature
  */
 import { spawn } from "node:child_process";
@@ -36,10 +36,15 @@ let requestBody: Record<string, unknown> = {};
 let redeemCalls = 0;
 let endCalls = 0;
 let searchAuth: string | null = null;
+const OPS_TOKEN = "lwsa_opsread01_secret";
 
 const sessionFile = () => path.join(stateDir, "ops-session.json");
 
-const run = (args: string[], env: Record<string, string> = {}): Promise<RunResult> =>
+const run = (
+  args: string[],
+  env: Record<string, string> = {},
+  { input }: { input?: string } = {},
+): Promise<RunResult> =>
   new Promise((resolve) => {
     const baseEnv: Record<string, string | undefined> = { ...process.env };
     for (const name of [
@@ -59,7 +64,7 @@ const run = (args: string[], env: Record<string, string> = {}): Promise<RunResul
     }
     const child = spawn(process.execPath, [CLI_PATH, ...args], {
       cwd: workDir,
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["pipe", "pipe", "pipe"],
       env: {
         ...baseEnv,
         LANGWATCH_ENDPOINT: endpoint,
@@ -73,6 +78,7 @@ const run = (args: string[], env: Record<string, string> = {}): Promise<RunResul
     let stderr = "";
     child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString()));
     child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString()));
+    child.stdin.end(input ?? "");
     child.on("close", (exitCode) => resolve({ stdout, stderr, exitCode }));
   });
 
@@ -143,6 +149,13 @@ const staffRoutes: Record<string, (body: string) => Reply> = {
 const route = ({ req, body }: { req: http.IncomingMessage; body: string }): Reply => {
   const url = req.url ?? "";
   const auth = req.headers.authorization ?? "";
+  if (url.startsWith("/api/staff-access/ops/organizations")) {
+    if (auth !== `Bearer ${OPS_TOKEN}`) return { status: 401, payload: { error: "unauthorized" } };
+    return {
+      status: 200,
+      payload: { organizations: [{ id: "org_acme", slug: "acme", name: "ACME" }] },
+    };
+  }
   if (url.startsWith("/api/v1/traces/search")) {
     searchAuth = auth;
     return { status: 200, payload: { traces: [], pagination: { totalHits: 0 } } };
@@ -195,8 +208,9 @@ const basicFor = (projectId: string) =>
 describe("langwatch ops access", () => {
   /** @scenario "The CLI requests, waits for approval and stores the key in a private session file" */
   it("requests, waits for approval and stores the key in a private session file", async () => {
-    const setup = await run(["ops", "setup", "--requester-key", REQUESTER_KEY]);
+    const setup = await run(["ops", "setup"], {}, { input: `${REQUESTER_KEY}\n` });
     expect(setup.exitCode).toBe(0);
+    expect(setup.stdout + setup.stderr).not.toContain(REQUESTER_KEY);
     expect(fs.statSync(path.join(stateDir, "ops-agent.json")).mode & 0o777).toBe(0o600);
 
     const result = await run([
@@ -240,28 +254,78 @@ describe("langwatch ops access", () => {
     expect(fs.existsSync(path.join(stateDir, "ops-pending.json"))).toBe(false);
   }, 30_000);
 
-  /** @scenario "Normal commands use a live ops session" */
-  it("sends the session's key on a normal command", async () => {
+  /** @scenario "Setup reads the requester key from stdin" */
+  it("stores the key piped on stdin and refuses an empty stdin", async () => {
+    const empty = await run(["ops", "setup"], {}, { input: "" });
+    expect(empty.exitCode).not.toBe(0);
+    expect(empty.stderr).toContain("pbpaste | langwatch ops setup");
+    expect(fs.existsSync(path.join(stateDir, "ops-agent.json"))).toBe(false);
+
+    const piped = await run(["ops", "setup"], {}, { input: `  ${REQUESTER_KEY}\n` });
+    expect(piped.exitCode).toBe(0);
+    const stored = JSON.parse(
+      fs.readFileSync(path.join(stateDir, "ops-agent.json"), "utf8"),
+    ) as Record<string, unknown>;
+    expect(stored.requesterKey).toBe(REQUESTER_KEY);
+  }, 30_000);
+
+  /** @scenario "The requester key is never taken as an argument" */
+  it("refuses the old --requester-key flag", async () => {
+    const result = await run(["ops", "setup", "--requester-key", REQUESTER_KEY]);
+    expect(result.exitCode).not.toBe(0);
+    expect(result.stderr).toContain("unknown option '--requester-key'");
+    expect(fs.existsSync(path.join(stateDir, "ops-agent.json"))).toBe(false);
+  }, 30_000);
+
+  /** @scenario "A normal command ignores a live ops session" */
+  it("keeps the folder's own key on a normal command while a session lives", async () => {
     writeSession();
     fs.writeFileSync(path.join(workDir, ".env"), "LANGWATCH_API_KEY=sk-lw-folderkey\n");
 
     const result = await run(["trace", "search", "-o", "json"]);
 
     expect(result.exitCode).toBe(0);
-    expect(searchAuth).toBe(basicFor(PROJECT.id));
+    expect(searchAuth).toContain("sk-lw-folderkey");
+    expect(searchAuth).not.toContain(STAFF_KEY);
+    expect(result.stderr).toContain("--ops-session");
   }, 30_000);
 
-  /** @scenario "An expired ops session is ignored" */
-  it("ignores an expired session and says so", async () => {
+  /** @scenario "A command run with --ops-session uses the session and says so" */
+  it("sends the session's key with --ops-session and prints the identity notice", async () => {
+    writeSession();
+    fs.writeFileSync(path.join(workDir, ".env"), "LANGWATCH_API_KEY=sk-lw-folderkey\n");
+
+    const result = await run(["trace", "search", "--ops-session", "-o", "json"]);
+
+    expect(result.exitCode).toBe(0);
+    expect(searchAuth).toBe(basicFor(PROJECT.id));
+    expect(result.stderr).toContain("Using ops session req_live on organization org_acme");
+  }, 30_000);
+
+  /** @scenario "An ops command uses the session and says so" */
+  it("runs ops orgs on the session's ops token with the notice and the contract's columns", async () => {
+    writeSession({ apiKey: undefined, opsToken: OPS_TOKEN, scopes: ["ops:read"] });
+
+    const result = await run(["ops", "orgs"]);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toContain("Using ops session req_live");
+    const header = result.stdout.split("\n").find((line) => line.includes("Slug")) ?? "";
+    expect(header.trim().split(/\s+/)).toEqual(["ID", "Slug", "Name"]);
+    expect(result.stdout).toContain("ACME");
+  }, 30_000);
+
+  /** @scenario "An expired ops session is refused, never replaced by other credentials" */
+  it("refuses an expired session asked for with --ops-session and says so", async () => {
     writeSession({ expiresAt: new Date(Date.now() - 60_000).toISOString() });
 
-    const result = await run(["trace", "search", "-o", "json"], {
+    const result = await run(["trace", "search", "--ops-session", "-o", "json"], {
       LANGWATCH_API_KEY: "sk-lw-envkey",
     });
 
-    expect(result.exitCode).toBe(0);
+    expect(result.exitCode).not.toBe(0);
     expect(result.stderr).toContain("expired");
-    expect(searchAuth).toContain("sk-lw-envkey");
+    expect(searchAuth).toBeNull();
     expect(fs.existsSync(sessionFile())).toBe(false);
   }, 30_000);
 

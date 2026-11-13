@@ -4,7 +4,11 @@
 
 import { Command, Option } from "commander";
 
-import { setRequestedProject, setRunsOutsideProject } from "../internal/credentialContext";
+import {
+  setRequestedProject,
+  setRunsOutsideProject,
+  setUsesOpsSession,
+} from "../internal/credentialContext";
 import {
   REDACTION_AUDIT_URL,
   SESSION_REDACTION_SUMMARY,
@@ -18,6 +22,7 @@ import { SOURCE_TYPE_BY_TOOL } from "./utils/governance/otel-env-block";
 import { resolveControlPlaneUrl } from "./utils/governance/resolveEndpoint";
 import { sessionContextHookArguments } from "./utils/governance/session-context-agents";
 import { trustLocalDevCa } from "./utils/localDevCa";
+import { applyOpsSessionOption, commandUsesOpsSession } from "./utils/opsSession";
 import {
   applyOutputContext,
   assertFormatIsSupported,
@@ -336,6 +341,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     setRequestedProject(projectSelectorOf(actionCommand));
     const path = commandPath(actionCommand);
     setRunsOutsideProject(path in COMMANDS_WITHOUT_PROJECT || path in COMMANDS_ACROSS_PROJECTS);
+    setUsesOpsSession(commandUsesOpsSession(actionCommand));
     const endpointFlag: unknown = actionCommand.opts().endpoint;
     trustLocalDevCa({
       endpoint: resolveControlPlaneUrl({
@@ -434,6 +440,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   // with no way to name a project. The two exemption lists live with the
   // helper (utils/projectOption.ts).
   applyProjectOption(program);
+
+  // `--ops-session` on every command outside `ops`: the ops session acts on a customer
+  // organization, so a normal command uses it only when asked (ADR-202).
+  applyOpsSessionOption(program);
 
   return program;
 }
@@ -6230,15 +6240,11 @@ function registerOpsCommands(program: Command): void {
     opsCmd
       .command("setup")
       .description(
-        "Store the requester key (from the Ops agents page) in a 0600 file beside the CLI config",
-      )
-      .option(
-        "--requester-key <key>",
-        "The lwsr_ requester key; defaults to LANGWATCH_OPS_REQUESTER_KEY",
+        "Store the requester key (from the Ops agents page) in a 0600 file beside the CLI config. Reads it from stdin (pbpaste | langwatch ops setup), or asks for it with hidden input in a terminal",
       ),
     run(async () => {
       const { opsSetupCommand } = await import("./commands/ops/setup.js");
-      return (options: { requesterKey?: string }) => opsSetupCommand(options);
+      return () => opsSetupCommand();
     }),
   );
 
@@ -6260,7 +6266,10 @@ function registerOpsCommands(program: Command): void {
       )
       .option("--org <idOrSlug>", "The organization an org:* scope applies to")
       .option("--reason <text>", "Why the access is needed; shown to the approver and the customer")
-      .option("--project <idOrSlug>", "Default project for normal commands while the session lives")
+      .option(
+        "--project <idOrSlug>",
+        "Default project for commands run with --ops-session while the session lives",
+      )
       .option("--no-wait", "Print the approval URL and exit; finish with `ops access redeem <id>`"),
     run(async () => {
       const { opsAccessRequestCommand } = await import("./commands/ops/access.js");
@@ -6280,7 +6289,7 @@ function registerOpsCommands(program: Command): void {
       .description("Finish a request made with --no-wait once it is approved")
       .option(
         "--project <idOrSlug>",
-        "Default project for normal commands while the session lives",
+        "Default project for commands run with --ops-session while the session lives",
       ),
     run(async () => {
       const { opsAccessRedeemCommand } = await import("./commands/ops/access.js");

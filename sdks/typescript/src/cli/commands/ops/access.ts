@@ -127,7 +127,10 @@ const redeemInto = async ({
   return {
     data: { status: "redeemed", ...summary },
     table: () => {
-      console.log(chalk.green("Access granted. Normal commands now use this session."));
+      console.log(
+        chalk.green("Access granted. Run a normal command on it with --ops-session, e.g.:"),
+      );
+      console.log(chalk.cyan("  langwatch trace search --ops-session"));
       sessionTable(summary);
     },
   };

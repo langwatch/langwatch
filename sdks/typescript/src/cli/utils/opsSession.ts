@@ -9,14 +9,48 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
+import { type Command, Option } from "commander";
 import { z } from "zod";
 
 import { normalizeEndpoint } from "@/internal/endpoint";
 
+import { commandPath, leafCommands } from "./projectOption";
+
 /** Environment variable that relocates the session file. */
 export const OPS_SESSION_ENV = "LANGWATCH_OPS_SESSION";
-/** Environment variable `ops setup` reads the requester key from. */
+/** Environment variable the ops commands read the requester key from when setup stored none. */
 export const OPS_REQUESTER_KEY_ENV = "LANGWATCH_OPS_REQUESTER_KEY";
+
+/** The flag a non-ops command takes to run on the ops session instead of the caller's own key. */
+export const OPS_SESSION_FLAG = "--ops-session";
+
+/** Whether a command path is one of `langwatch ops *`, which always works on the ops session. */
+export const isOpsCommandPath = (path: string): boolean =>
+  path === "ops" || path.startsWith("ops ");
+
+/**
+ * Declare the hidden `--ops-session` on every leaf outside `ops` (and outside the pass-through
+ * wrappers, which forward unknown flags); called once at the end of `buildProgram`.
+ */
+export const applyOpsSessionOption = (program: Command): void => {
+  for (const leaf of leafCommands(program)) {
+    if (isOpsCommandPath(commandPath(leaf))) continue;
+    const allowsUnknown =
+      (leaf as unknown as { _allowUnknownOption?: boolean })._allowUnknownOption === true;
+    if (allowsUnknown) continue;
+    leaf.addOption(
+      new Option(
+        OPS_SESSION_FLAG,
+        "Run on the live ops session (staff access) instead of your own credentials",
+      ).hideHelp(),
+    );
+  }
+};
+
+/** Whether the command about to run may act on the ops session: an `ops` command, or the flag. */
+export const commandUsesOpsSession = (command: Command): boolean =>
+  isOpsCommandPath(commandPath(command)) ||
+  command.opts<{ opsSession?: unknown }>().opsSession === true;
 
 /** The CLI config's directory, resolved like `configPath` (and the daemon's eligibility check). */
 const configDir = (): string =>
