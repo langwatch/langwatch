@@ -13,7 +13,6 @@ import { nowInstant } from "@langwatch/time";
 import { defineMigrationStep, defineProjectionReplayStep } from "@langwatch/upgrade/step";
 
 import { GovernanceModule } from "./app/governance.app.ts";
-import { agentRegistryEventing } from "./eventing/agent-registry.pipeline.ts";
 import { codingAssistantBillingEventing } from "./eventing/coding-assistant-billing.pipeline.ts";
 import { governanceActivityMonitorEventing } from "./eventing/governance-activity-monitor.pipeline.ts";
 import { GOVERNANCE_COST_CHARGE_PROJECTION_NAME } from "./eventing/governance-cost-charge.projection.ts";
@@ -21,6 +20,7 @@ import { ingestionPullReconcileEventing } from "./eventing/ingestion-pull-reconc
 import { ingestionPullEventing } from "./eventing/ingestion-pull.pipeline.ts";
 import { pulledUsageEventing } from "./eventing/pulled-usage.pipeline.ts";
 import { GOVERNANCE_SETTLING_WINDOW_DAYS } from "./features/cost/rules/governance-cost-summary.rules.ts";
+import { agentRegistryEventing } from "./features/registry/eventing/agent-registry.pipeline.ts";
 import { governanceRepositories } from "./repositories/governance-repositories.registry.ts";
 import { activityMonitorTrpcTransport } from "./transport/activity-monitor.trpc.ts";
 import { agentRegistryRest } from "./transport/agent-registry.rest.ts";

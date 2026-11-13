@@ -9,7 +9,7 @@ import type { TraceApi, TraceAgentSeen } from "@langwatch/trace-contract";
 import type { WebhookApi, WebhookEndpointView } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
 
-import type { AgentRegistryDeliveryIntent } from "../../eventing/agent-registry-delivery.process.ts";
+import type { AgentRegistryDeliveryIntent } from "../../features/registry/eventing/agent-registry-delivery.process.ts";
 import {
   type AgentRegistryDeliveryOutbox,
   AgentRegistryService,

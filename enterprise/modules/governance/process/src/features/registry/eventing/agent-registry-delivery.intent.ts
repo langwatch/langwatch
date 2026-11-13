@@ -4,7 +4,7 @@ import { nowInstant } from "@langwatch/time";
 import type { WebhookApi } from "@langwatch/webhook-contract";
 import { z } from "zod";
 
-import type { AgentRegistryDeliveryOutbox } from "../features/registry/services/agent-registry.service.ts";
+import type { AgentRegistryDeliveryOutbox } from "../services/agent-registry.service.ts";
 import {
   AGENT_REGISTRY_DELIVERY_PROCESS_KEY,
   AGENT_REGISTRY_DELIVERY_PROCESS_NAME,

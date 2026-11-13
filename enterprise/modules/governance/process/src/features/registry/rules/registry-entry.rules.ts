@@ -10,7 +10,7 @@ import type {
 import { Temporal, toEpochMs, type Instant, type TimeInput } from "@langwatch/time";
 
 /** A tool as a source defines it; the registry adds its lifecycle (status, deprecation). */
-export type RegistryDraftTool = Pick<
+type RegistryDraftTool = Pick<
   AgentRegistryTool,
   "name" | "description" | "input_schema" | "output_schema"
 >;
@@ -68,7 +68,7 @@ function fieldSchemaOf(field: AgentField): JsonSchema {
 }
 
 /** An agent's input or output fields as one JSON Schema object; hidden fields stay out. */
-export function fieldsToJsonSchema(fields: readonly AgentField[] | undefined): JsonSchema {
+function fieldsToJsonSchema(fields: readonly AgentField[] | undefined): JsonSchema {
   const visible = (fields ?? []).filter((field) => !field.hidden);
   return {
     type: "object",
@@ -82,9 +82,7 @@ export function fieldsToJsonSchema(fields: readonly AgentField[] | undefined): J
 type ConnectedConfig = Extract<Agent, { type: "connected" }>["config"];
 
 /** A connected function's declared parameters; a secret parameter never carries its default. */
-export function connectedParametersToJsonSchema(
-  parameters: ConnectedConfig["parameters"],
-): JsonSchema {
+function connectedParametersToJsonSchema(parameters: ConnectedConfig["parameters"]): JsonSchema {
   const properties = Object.fromEntries(
     parameters.map((parameter) => {
       const schema: JsonSchema = { type: parameter.type ?? "string" };
@@ -124,7 +122,7 @@ function modelParameters(
  * What a prompt-based agent says about its model, system prompt and prompt version.
  * `openai/gpt-5-mini` names its provider; a bare model name does not.
  */
-export function signatureFields(config: SignatureConfig): SignatureFields {
+function signatureFields(config: SignatureConfig): SignatureFields {
   const llm = config.llm;
   const slash = llm?.model ? llm.model.indexOf("/") : -1;
   const system = config.messages?.find((message) => message.role === "system")?.content;
@@ -245,7 +243,7 @@ export function langwatchAgentDraft({
   };
 }
 
-export type DiscoveredRegistryRecord = {
+type DiscoveredRegistryRecord = {
   id: string;
   source: Extract<AgentRegistrySource, "databricks" | "copilot_studio">;
   rawAgentId: string;

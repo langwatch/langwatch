@@ -20,8 +20,8 @@ import {
 import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
-import type { GovernanceModule } from "../app/governance.app.ts";
-import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
+import type { GovernanceModule } from "../../../app/governance.app.ts";
+import type { GovernanceRepositories } from "../../../repositories/governance.repositories.ts";
 import { pruneAgentRegistryDeliveries } from "./agent-registry-delivery.intent.ts";
 import {
   AGENT_REGISTRY_DELIVERY_INITIAL_STATE,
@@ -45,7 +45,7 @@ import {
   runAgentRegistryTraffic,
 } from "./agent-registry-traffic.process.ts";
 
-export const AGENT_REGISTRY_PIPELINE_NAME = "governance_agent_registry";
+const AGENT_REGISTRY_PIPELINE_NAME = "governance_agent_registry";
 
 /** A burst of writes to one project's agents settles into one reconcile. */
 const AGENT_REGISTRY_SETTLE_MS = 5_000;
@@ -73,7 +73,7 @@ type AgentRegistryApp = Pick<
   | "reconcileAgentRegistryTraffic"
 >;
 
-export function buildAgentRegistryPipeline({
+function buildAgentRegistryPipeline({
   app,
   processStore,
 }: EventingSetup<unknown, AgentRegistryApp>): StaticPipelineDefinition<never> {

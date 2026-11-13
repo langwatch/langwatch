@@ -25,7 +25,7 @@ function urnSegment(value: string): string {
 }
 
 /** `urn:air:<publisher>:<organization id>:agent:<registry id>`, per ARD v0.91 identifiers. */
-export function ardIdentifier({
+function ardIdentifier({
   publisher,
   organizationId,
   entryId,
@@ -38,7 +38,7 @@ export function ardIdentifier({
 }
 
 /** One registry entry as an ARD entry with the entry inline as its agent card. */
-export function ardEntryOf({
+function ardEntryOf({
   entry,
   publisher,
   organizationId,
@@ -127,7 +127,7 @@ function haystackOf(entry: ArdEntry): { strong: string; weak: string } {
 }
 
 /** Share of query words found, name and capabilities weighing double; 0 to 100. */
-export function ardScore(entry: ArdEntry, text: string): number {
+function ardScore(entry: ArdEntry, text: string): number {
   const words = text.toLowerCase().split(/\s+/).filter(Boolean);
   if (words.length === 0) return 0;
   const { strong, weak } = haystackOf(entry);

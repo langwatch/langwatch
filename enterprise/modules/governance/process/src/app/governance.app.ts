@@ -200,11 +200,6 @@ import { HttpOttlTransformChannel } from "../channels/http/http.ottl-transform.c
 import { HttpPollingPullerAdapter } from "../channels/http/http.polling.channel.ts";
 import { HttpProviderAccountChannel } from "../channels/http/http.provider-account.channel.ts";
 import {
-  OutboxAgentRegistryDelivery,
-  requestAgentRegistryDelivery,
-} from "../eventing/agent-registry-delivery.intent.ts";
-import type { AgentRegistryDeliveryIntent } from "../eventing/agent-registry-delivery.process.ts";
-import {
   OutboxAnomalyAlertDelivery,
   requestAnomalyAlertDelivery,
 } from "../eventing/anomaly-alert-delivery.intent.ts";
@@ -302,6 +297,11 @@ import { PersonalIngestionKeyService } from "../features/personal/services/perso
 import { PersonalUsageDashboardService } from "../features/personal/services/personal-usage-dashboard.service.ts";
 import { PersonalUsageKeyService } from "../features/personal/services/personal-usage-key.service.ts";
 import { DefaultGovernancePersonalUsageService } from "../features/personal/services/personal-usage.service.ts";
+import {
+  OutboxAgentRegistryDelivery,
+  requestAgentRegistryDelivery,
+} from "../features/registry/eventing/agent-registry-delivery.intent.ts";
+import type { AgentRegistryDeliveryIntent } from "../features/registry/eventing/agent-registry-delivery.process.ts";
 import { AgentRegistryService } from "../features/registry/services/agent-registry.service.ts";
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
 import { governanceOperatorReads } from "../repositories/prisma/prisma.suppression-snapshot.repository.ts";

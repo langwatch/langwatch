@@ -20,7 +20,7 @@ export type StoredRegistryEntry = {
 };
 
 /** A row to write: the entry as it now stands. */
-export type RegistryEntryWrite = {
+type RegistryEntryWrite = {
   id: string;
   sourceKey: string;
   fingerprint: string;
@@ -29,7 +29,7 @@ export type RegistryEntryWrite = {
 };
 
 /** A change fact to append; the repository gives it its feed sequence. */
-export type RegistryEventDraft = {
+type RegistryEventDraft = {
   id: string;
   type: AgentRegistryEventType;
   entryId: string;
@@ -62,7 +62,7 @@ function canonical(value: unknown): unknown {
 }
 
 /** What makes a version: everything but the registry's own dates and counters. */
-export function registryFingerprint(entry: AgentRegistryEntry): string {
+function registryFingerprint(entry: AgentRegistryEntry): string {
   const {
     id: _id,
     version: _version,
@@ -78,7 +78,7 @@ export function registryFingerprint(entry: AgentRegistryEntry): string {
 }
 
 /** The draft's tools active; a tool the last version had and this one lacks stays, deprecated. */
-export function mergeTools({
+function mergeTools({
   previous,
   current,
   version,

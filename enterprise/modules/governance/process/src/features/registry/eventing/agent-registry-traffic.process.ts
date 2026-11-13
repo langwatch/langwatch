@@ -10,7 +10,7 @@ import { z } from "zod";
 export const AGENT_REGISTRY_TRAFFIC_PROCESS_NAME = "agentRegistryTraffic" as const;
 export const AGENT_REGISTRY_TRAFFIC_INTERVAL_MS = 15 * 60 * 1000;
 /** Outbox rows are bookkeeping, one per pass, pruned like every recurring process's. */
-export const AGENT_REGISTRY_TRAFFIC_ROW_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+const AGENT_REGISTRY_TRAFFIC_ROW_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 export const agentRegistryTrafficPassSchema = z.object({ scheduledFor: z.number().int() });
 export const agentRegistryTrafficStateSchema = z.object({ lastPassAt: z.number().nullable() });

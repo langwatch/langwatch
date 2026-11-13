@@ -2272,17 +2272,6 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
 
-### Pipeline `governance_agent_registry` (aggregate `global`)
-
-Declared at `src/eventing/agent-registry.pipeline.ts:83`.
-
-| Kind            | Name                                    | Handles                                                                                                                             | Declared at                                   |
-| --------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| process manager | `agentRegistryDelivery`                 | every 1 d (`AGENT_REGISTRY_DELIVERY_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneDelivered`, `requestDelivery` (outbox) | `src/eventing/agent-registry.pipeline.ts:101` |
-| process manager | `agentRegistryTraffic`                  | every 15 min (`AGENT_REGISTRY_TRAFFIC_INTERVAL_MS = 15 * 60 * 1000`); intents `pass` (outbox)                                       | `src/eventing/agent-registry.pipeline.ts:118` |
-| peer subscriber | `reconcileAgentRegistryOnAgentChanged`  | `lw.agent.changed` from [agent](../../../../modules/agent/README.md)                                                                | `src/eventing/agent-registry.pipeline.ts:89`  |
-| peer subscriber | `reconcileAgentRegistryOnAgentArchived` | `lw.agent.archived` from [agent](../../../../modules/agent/README.md)                                                               | `src/eventing/agent-registry.pipeline.ts:95`  |
-
 ### Pipeline `coding_assistant_billing` (aggregate `coding_assistant_billing`)
 
 Declared at `src/eventing/coding-assistant-billing.pipeline.ts:52`. Events: `codingAssistantBillingRecordedEventSchema`.
@@ -2357,6 +2346,17 @@ Declared at `src/eventing/pulled-usage.pipeline.ts:167`. Events: `pulledUsageObs
 | retention                  | `≈ this.retention`        | –                                                 | `src/eventing/pulled-usage.pipeline.ts:181` |
 | ClickHouse fold projection | `≈ this.costRollup`       | –                                                 | `src/eventing/pulled-usage.pipeline.ts:183` |
 | ClickHouse map projection  | `≈ this.costCharges`      | –                                                 | `src/eventing/pulled-usage.pipeline.ts:186` |
+
+### Pipeline `governance_agent_registry` (aggregate `global`)
+
+Declared at `src/features/registry/eventing/agent-registry.pipeline.ts:83`.
+
+| Kind            | Name                                    | Handles                                                                                                                             | Declared at                                                     |
+| --------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| process manager | `agentRegistryDelivery`                 | every 1 d (`AGENT_REGISTRY_DELIVERY_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneDelivered`, `requestDelivery` (outbox) | `src/features/registry/eventing/agent-registry.pipeline.ts:101` |
+| process manager | `agentRegistryTraffic`                  | every 15 min (`AGENT_REGISTRY_TRAFFIC_INTERVAL_MS = 15 * 60 * 1000`); intents `pass` (outbox)                                       | `src/features/registry/eventing/agent-registry.pipeline.ts:118` |
+| peer subscriber | `reconcileAgentRegistryOnAgentChanged`  | `lw.agent.changed` from [agent](../../../../modules/agent/README.md)                                                                | `src/features/registry/eventing/agent-registry.pipeline.ts:89`  |
+| peer subscriber | `reconcileAgentRegistryOnAgentArchived` | `lw.agent.archived` from [agent](../../../../modules/agent/README.md)                                                               | `src/features/registry/eventing/agent-registry.pipeline.ts:95`  |
 
 ## Configuration
 

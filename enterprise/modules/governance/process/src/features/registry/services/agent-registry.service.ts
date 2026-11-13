@@ -20,7 +20,6 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import { eventMatches, type WebhookApi } from "@langwatch/webhook-contract";
 import { z } from "zod";
 
-import type { AgentRegistryDeliveryIntent } from "../../../eventing/agent-registry-delivery.process.ts";
 import type {
   AgentRegistryRepository,
   RegistryEntryPosition,
@@ -28,6 +27,7 @@ import type {
 import type { DiscoveredAgentRepository } from "../../../repositories/discovered-agent.repository.ts";
 import { AGENT_SOURCE_BY_PROVIDER } from "../../agents/rules/agent-inventory.rules.ts";
 import { memberNames } from "../../identity/rules/member-names.rules.ts";
+import type { AgentRegistryDeliveryIntent } from "../eventing/agent-registry-delivery.process.ts";
 import { ardManifestOf, ardPublisherOf, ardSearch } from "../rules/registry-ard.rules.ts";
 import {
   discoveredAgentDraft,
