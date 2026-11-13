@@ -74,12 +74,11 @@ Feature: Settings shell
     And the old page addresses forward to the corresponding consolidated tabs
 
   @integration
-  Scenario: A plan with Enterprise sees its entries marked Enterprise, not locked
+  Scenario: A plan with Enterprise sees its entries as plain entries
     Given my plan includes Enterprise
     When the settings sidebar renders
-    Then the Enterprise entries carry the compact grey Enterprise badge, a lock in a hairline chip
-    And that badge is named "Enterprise" by its tooltip and accessible label, so the entry's label keeps its width
-    And no entry carries the bare "Included in Enterprise" lock
+    Then the Enterprise entries carry no badge and no lock, like any entry the plan includes
+    And no entry carries the "Included in Enterprise" lock
 
   @integration
   Scenario: A plan without Enterprise sees its entries locked

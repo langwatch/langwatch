@@ -278,13 +278,13 @@ describe("the settings shell in a new navigation mode", () => {
       expect(screen.getByRole("link", { name: /^Roles/ })).toHaveAttribute("aria-current", "page");
     });
 
-    /** @scenario "A plan with Enterprise sees its entries marked Enterprise, not locked" */
-    it("marks the enterprise entries Enterprise on a plan that includes them", () => {
+    /** @scenario "A plan with Enterprise sees its entries as plain entries" */
+    it("draws the enterprise entries plainly on a plan that includes them", () => {
       renderSettingsSidebar();
 
       const roles = screen.getByRole("link", { name: /^Roles/ });
-      expect(within(roles).getByLabelText("Enterprise")).toBeInTheDocument();
-      expect(within(roles).queryByText("Enterprise")).not.toBeInTheDocument();
+      expect(within(roles).queryByLabelText("Enterprise")).not.toBeInTheDocument();
+      expect(roles.querySelector(".lucide-lock")).toBeNull();
       expect(screen.queryByLabelText("Included in Enterprise")).not.toBeInTheDocument();
     });
 
@@ -318,7 +318,7 @@ describe("the settings shell in a new navigation mode", () => {
 
       const braids = screen.getByRole("link", { name: /^Braids/ });
       expect(braids.querySelector('[data-feature="braids"]')).not.toBeNull();
-      expect(braids.querySelector('.lucide:not([aria-label="Enterprise"])')).toBeNull();
+      expect(braids.querySelector(".lucide")).toBeNull();
     });
 
     /** @scenario "Settings groups read in sentence case" */

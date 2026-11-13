@@ -1,6 +1,5 @@
 /** Sidebar column: product pages and utilities. Host and search palette integration. */
 
-import { EnterpriseBadge } from "@langwatch/design-system/enterprise-badge";
 import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
 import { Box, VStack } from "@langwatch/design-system/primitives";
 import { ScrollEdgeFade, useScrollEdges } from "@langwatch/design-system/scroll-fade";
@@ -213,7 +212,6 @@ function DetourMenuBody({
               showLabel={showExpanded}
               badgeNumber={badgeFor?.(item.href)}
               isLocked={item.isLocked}
-              rightElement={item.isEnterprise ? <EnterpriseChip /> : undefined}
             />
           ))}
         </SidebarSection>
@@ -535,9 +533,4 @@ export function ProductSidebar({
 /** Marks an entry that leaves the current section. */
 function OutboundArrow() {
   return <ArrowUpRight size={12} aria-hidden color="var(--chakra-colors-fg-muted)" />;
-}
-
-/** The compact Enterprise badge on an entry the plan includes, so the label keeps its width. */
-function EnterpriseChip() {
-  return <EnterpriseBadge compact />;
 }
