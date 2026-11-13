@@ -36,6 +36,18 @@ import {
 
 const SIGNED_UPLOAD_HEADERS = new Set(["content-type", "content-length"]);
 
+/**
+ * Every call ends: connect within 5 s, an answer's headers within 60 s (a wait for a free
+ * socket included), and no socket idles past 120 s, so a stalled body is cut and its socket
+ * freed. A long download or upload that keeps moving is never cut (tasks#1173).
+ */
+const S3_REQUEST_HANDLER = {
+  connectionTimeout: 5_000,
+  requestTimeout: 60_000,
+  throwOnRequestTimeout: true,
+  socketTimeout: 120_000,
+} as const;
+
 interface S3Place {
   readonly client: S3Client;
   readonly bucket: string;
@@ -60,6 +72,7 @@ export function s3Client(account: ObjectStorageAccount): S3Client {
     ...(endpoint === undefined ? {} : { endpoint }),
     ...(credentials === undefined ? {} : { credentials }),
     forcePathStyle: account.forcePathStyle ?? true,
+    requestHandler: S3_REQUEST_HANDLER,
     requestChecksumCalculation: "WHEN_REQUIRED",
     responseChecksumValidation: "WHEN_REQUIRED",
   });
@@ -102,6 +115,8 @@ async function writeObject(options: {
         ContentLength: facts.byteLength,
         ContentType: facts.contentType,
       }),
+      // The answer comes once the whole body is sent, so a wall clock would cap the upload's size.
+      { requestTimeout: 0 },
     );
   } catch (error) {
     throw measured.failure() ?? error;
@@ -118,6 +133,16 @@ async function readObject(place: S3Place, at: StoredObjectAddress): Promise<Read
     throw new Error(`S3 answered "${at.key}" without a readable body.`);
   } catch (error) {
     if (isMissing(error)) throw new StoredObjectNotFoundError(at.projectId, at.key);
+    throw error;
+  }
+}
+
+async function objectExists(place: S3Place, at: StoredObjectAddress): Promise<boolean> {
+  try {
+    await place.client.send(new HeadObjectCommand({ Bucket: place.bucket, Key: at.key }));
+    return true;
+  } catch (error) {
+    if (isMissing(error)) return false;
     throw error;
   }
 }
@@ -182,6 +207,7 @@ export function s3Backend(options: {
     destination: { kind: "s3", bucket: place.bucket },
     write: (at, body, facts) => writeObject({ place, at, body, facts }),
     read: (at) => readObject(place, at),
+    exists: (at) => objectExists(place, at),
     digest: async (at) => (await heldDigest(place, at)) ?? digestOf(await readObject(place, at)),
     async remove(at) {
       await place.client.send(new DeleteObjectCommand({ Bucket: place.bucket, Key: at.key }));
