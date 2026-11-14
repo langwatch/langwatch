@@ -50,6 +50,7 @@ import { noInlineDynamicImportRule } from "./rules/no-inline-dynamic-import.rule
 import { noLoggerSpyRule } from "./rules/no-logger-spy.rule.mjs";
 import { noPortVocabularyRule } from "./rules/no-port-vocabulary.rule.mjs";
 import { noPrototypeStubRule } from "./rules/no-prototype-stub.rule.mjs";
+import { noRawClickhouseSqlRule } from "./rules/no-raw-clickhouse-sql.rule.mjs";
 import { noRawFontSizeRule } from "./rules/no-raw-font-size.rule.mjs";
 import { noReduxRule } from "./rules/no-redux.rule.mjs";
 import { noRuntimeReflectionRule } from "./rules/no-runtime-reflection.rule.mjs";
@@ -100,6 +101,7 @@ const HOUSE_RULES = [
   clickhouseTenantIdRule,
   skipTenantCheckReasonRule,
   noFormWatchInChildRule,
+  noRawClickhouseSqlRule,
   noRawFontSizeRule,
   noTautologicalAssertionRule,
   requireFetchTimeoutRule,
@@ -244,6 +246,7 @@ export {
   noLoggerSpyRule,
   noPortVocabularyRule,
   noPrototypeStubRule,
+  noRawClickhouseSqlRule,
   noRuntimeReflectionRule,
   overloadByLiteralRule,
   boundaryRule,
