@@ -16,13 +16,11 @@ import { isLoggedIn, loadConfig } from "@/cli/utils/governance/config";
  * `langwatch governance ingestion-templates <verb>`
  */
 
-function requireLogin() {
-  const cfg = loadConfig();
-  if (!isLoggedIn(cfg)) {
+function requireLogin(): void {
+  if (!isLoggedIn(loadConfig())) {
     process.stderr.write("Not logged in. Run `langwatch login --device` first.\n");
     process.exit(1);
   }
-  return cfg;
 }
 
 function handleError({ error, json }: { error: unknown; json?: boolean }): never {
@@ -58,10 +56,10 @@ function printTemplateList(rows: IngestionTemplateRow[]): void {
 }
 
 export async function adminListCommand(options: { json?: boolean }): Promise<void> {
-  const cfg = requireLogin();
+  requireLogin();
   let rows: IngestionTemplateRow[];
   try {
-    rows = await adminListIngestionTemplates(cfg);
+    rows = await adminListIngestionTemplates();
   } catch (err) {
     handleError({ error: err, json: options.json });
   }
@@ -73,10 +71,10 @@ export async function adminListCommand(options: { json?: boolean }): Promise<voi
 }
 
 export async function getCommand(id: string, options: { json?: boolean }): Promise<void> {
-  const cfg = requireLogin();
+  requireLogin();
   let row: IngestionTemplateRow;
   try {
-    row = await getIngestionTemplate(cfg, id);
+    row = await getIngestionTemplate(id);
   } catch (err) {
     handleError({ error: err, json: options.json });
   }
@@ -96,7 +94,7 @@ export async function createCommand(options: {
   ottlRules?: string;
   json?: boolean;
 }): Promise<void> {
-  const cfg = requireLogin();
+  requireLogin();
   if (
     options.credentialSchema &&
     !["otlp_token", "static_api_key", "agent_id"].includes(options.credentialSchema)
@@ -111,7 +109,7 @@ export async function createCommand(options: {
   }
   let row: IngestionTemplateRow;
   try {
-    row = await createIngestionTemplate(cfg, {
+    row = await createIngestionTemplate({
       source_type: options.sourceType,
       display_name: options.displayName,
       description: options.description,
@@ -138,10 +136,10 @@ export async function updateOttlRulesCommand(
   id: string,
   options: { ottlRules: string; json?: boolean },
 ): Promise<void> {
-  const cfg = requireLogin();
+  requireLogin();
   let row: IngestionTemplateRow;
   try {
-    row = await updateIngestionTemplateOttlRules(cfg, id, options.ottlRules);
+    row = await updateIngestionTemplateOttlRules(id, options.ottlRules);
   } catch (err) {
     handleError({ error: err, json: options.json });
   }
@@ -153,9 +151,9 @@ export async function updateOttlRulesCommand(
 }
 
 export async function archiveCommand(id: string, options: { json?: boolean }): Promise<void> {
-  const cfg = requireLogin();
+  requireLogin();
   try {
-    await archiveIngestionTemplate(cfg, id);
+    await archiveIngestionTemplate(id);
   } catch (err) {
     handleError({ error: err, json: options.json });
   }
@@ -170,10 +168,10 @@ export async function cloneFromPlatformCommand(
   sourceTemplateId: string,
   options: { json?: boolean },
 ): Promise<void> {
-  const cfg = requireLogin();
+  requireLogin();
   let row: IngestionTemplateRow;
   try {
-    row = await cloneIngestionTemplateFromPlatform(cfg, sourceTemplateId);
+    row = await cloneIngestionTemplateFromPlatform(sourceTemplateId);
   } catch (err) {
     handleError({ error: err, json: options.json });
   }

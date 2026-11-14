@@ -153,6 +153,17 @@ export type OrganizationUpdatedMember = OrganizationRestMemberSummary &
     teams: OrganizationRestMemberTeamBinding[];
     teamsLeftWithoutAdmin: { id: string; name: string }[];
   }>;
+/** One organization as an operator tells it apart from others with the same name. */
+export type OrganizationOperatorSummary = Readonly<{
+  id: string;
+  name: string;
+  slug: string;
+  createdAt: Instant;
+  memberCount: number;
+  /** The addresses of the administrators who can still sign in. */
+  administratorEmails: string[];
+}>;
+
 export type OrganizationProvisioningSummary = Readonly<{
   id: string;
   name: string;
@@ -958,6 +969,14 @@ export interface OrganizationApi {
    * fleet-wide scans. No limit reads them all; `next` is null on the last page.
    */
   listAllIds(input?: OrganizationIdPageInput): Promise<OrganizationIdPage>;
+  /** Organizations whose name, slug or id holds the query; system organizations left out. */
+  searchForOperators(
+    input: Readonly<{ query: string; limit: number }>,
+  ): Promise<OrganizationOperatorSummary[]>;
+  /** The same summaries for these ids; an id with no organization is left out. */
+  findForOperators(
+    input: Readonly<{ organizationIds: readonly string[] }>,
+  ): Promise<OrganizationOperatorSummary[]>;
 }
 
 export const OrganizationApi = moduleApi<OrganizationApi>()("organization");
