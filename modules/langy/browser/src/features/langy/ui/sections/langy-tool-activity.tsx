@@ -48,6 +48,7 @@ import {
 import { isSayToolPart } from "../../../tools/model/langy-say-tool.ts";
 import { isSecretSnippetToolPart } from "../../../tools/model/langy-secret-snippet-tool.ts";
 import {
+  isSandboxCredentialFault,
   type LangyToolErrorPresentation,
   presentLangyToolError,
   readerMustAct,
@@ -1039,6 +1040,8 @@ function FailedActivityRow({ failure, devMode }: { failure: FailedToolCall; devM
   const { call, presentation } = failure;
   const described = describeToolCall({ name: call.name, input: call.input });
   const { message, detail } = presentation;
+  // Langy's own key failing prints CLI login steps; dev mode's raw data still has them.
+  const hidesOutput = isSandboxCredentialFault({ presentation, toolName: failure.sourceToolName });
   // Copy the raw block already carries (a plain error's own text) is not said twice. The block
   // shows the failure without colour codes, so it agrees with the presentation's raw.
   const raw = presentation.raw ?? toolResultText(call) ?? "";
@@ -1061,13 +1064,13 @@ function FailedActivityRow({ failure, devMode }: { failure: FailedToolCall; devM
       detail={described.detail}
       opened={
         <>
-          {explainsBeyondRaw ? (
+          {explainsBeyondRaw || hidesOutput ? (
             <Text textStyle="2xs" color="fg.muted">
               {presentation.message}
               {presentation.detail ? ` ${presentation.detail}` : ""}
             </Text>
           ) : null}
-          <OpenedToolCall call={call} />
+          <OpenedToolCall call={call} showResult={!hidesOutput} />
           {presentation.code ? <LangyFailureReference code={presentation.code} /> : null}
           {hasToolErrorActions(presentation) ? (
             <LangyToolErrorActions presentation={presentation} />
@@ -1294,7 +1297,7 @@ function parseWholeJson(text: string): { value: unknown } | undefined {
 /**
  * One finished call, opened: what ran, and then what came back.
  */
-function OpenedToolCall({ call }: { call: ToolCall }) {
+function OpenedToolCall({ call, showResult = true }: { call: ToolCall; showResult?: boolean }) {
   const command = commandOf(call.input);
   return (
     <VStack align="stretch" gap={1}>
@@ -1303,7 +1306,7 @@ function OpenedToolCall({ call }: { call: ToolCall }) {
           $ {command}
         </Text>
       ) : null}
-      <ToolResultBlock call={call} />
+      {showResult ? <ToolResultBlock call={call} /> : null}
     </VStack>
   );
 }

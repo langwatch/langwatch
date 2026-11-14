@@ -261,7 +261,7 @@ func TestPool_Acquire_AtCapacityEvictsIdleWorkerForATurn(t *testing.T) {
 	// One IDLE worker (a pre-warm nobody messaged, or a leftover between turns)
 	// occupies the single slot.
 	p.workers["existing"] = &Worker{conversationID: "existing"}
-	_, err := p.Acquire(context.Background(), "new-conv", domain.Credentials{
+	_, err := p.Acquire(context.Background(), "new-conv", "", domain.Credentials{
 		LangwatchAPIKey: "k", LLMVirtualKey: "vk", GatewayBaseURL: "g", LangwatchEndpoint: "e",
 	})
 	// The spawn itself fails in this environment (no sessions root); what the
@@ -286,7 +286,7 @@ func TestPool_Acquire_AtCapacityAllBusyReturnsErrMaxWorkers(t *testing.T) {
 		t.Fatalf("claiming the seeded worker's turn should be granted")
 	}
 	p.workers["existing"] = busy
-	_, err := p.Acquire(context.Background(), "new-conv", domain.Credentials{
+	_, err := p.Acquire(context.Background(), "new-conv", "", domain.Credentials{
 		LangwatchAPIKey: "k", LLMVirtualKey: "vk", GatewayBaseURL: "g", LangwatchEndpoint: "e",
 	})
 	if err == nil {
@@ -390,7 +390,7 @@ func TestPool_Acquire_ReusesWorkerWithMatchingSignature(t *testing.T) {
 	existing := &Worker{conversationID: "c", credSig: sigOf(creds)}
 	p.workers["c"] = existing
 
-	got, err := p.Acquire(context.Background(), "c", creds)
+	got, err := p.Acquire(context.Background(), "c", "", creds)
 	if err != nil {
 		t.Fatalf("Acquire on a matching existing worker should not error, got %v", err)
 	}

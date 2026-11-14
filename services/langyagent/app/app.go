@@ -243,7 +243,7 @@ func (a *App) StartTurn(ctx context.Context, req ChatRequest) (func(context.Cont
 		)
 		return func(context.Context) {}, nil
 	}
-	worker, err := a.pool.Acquire(ctx, req.ConversationID, req.Credentials)
+	worker, err := a.pool.Acquire(ctx, req.ConversationID, req.TurnID, req.Credentials)
 	if err != nil {
 		if errors.Is(err, domain.ErrMaxWorkers) {
 			a.atCapacity(ctx)

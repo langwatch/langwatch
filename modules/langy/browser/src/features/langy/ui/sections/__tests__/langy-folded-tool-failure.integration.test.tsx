@@ -583,6 +583,54 @@ describe("a failed step", () => {
       expect(screen.getByText(/on our side/)).toBeTruthy();
     });
 
+    /** @scenario "Langy's own missing key printed as plain text reads as an internal error" */
+    it("says the same when the CLI printed only its not-logged-in text", async () => {
+      const user = userEvent.setup();
+      const textOnly = failedStep({
+        id: "missing-key-text-1",
+        command: "langwatch trace list",
+        errorText: [
+          "\u001b[31mError: you're not logged in, and LANGWATCH_API_KEY is not set.\u001b[39m",
+          "",
+          "Sign in with your browser, interactively:",
+          "  langwatch login",
+        ].join("\n"),
+      });
+      const { container } = renderActivity({ parts: [textOnly, reply], live: false });
+
+      expect(screen.queryByRole("alert")).toBeNull();
+      await user.click(receiptSteps().getByRole("button", { name: /failed/ }));
+
+      expect(screen.getByText(/on our side/)).toBeTruthy();
+      expect(container.textContent).toContain("$ langwatch trace list");
+      expect(container.textContent).not.toMatch(/log ?in|sign in|LANGWATCH_API_KEY/i);
+    });
+
+    /** @scenario "Langy's own refused credential reads as an internal error" */
+    it("shows Langy's copy, never the CLI's sign-in steps, once opened", async () => {
+      const user = userEvent.setup();
+      const missingKey = failedStep({
+        id: "missing-key-json-1",
+        command: "langwatch trace list",
+        errorText: JSON.stringify({
+          ok: false,
+          error: {
+            code: "missing_api_key",
+            message:
+              "Not logged in and LANGWATCH_API_KEY is not set. Sign in with `langwatch login`.",
+            httpStatus: 0,
+            isHandled: true,
+          },
+        }),
+      });
+      const { container } = renderActivity({ parts: [missingKey, reply], live: false });
+
+      await user.click(receiptSteps().getByRole("button", { name: /failed/ }));
+
+      expect(screen.getByText(/on our side/)).toBeTruthy();
+      expect(container.textContent).not.toMatch(/log ?in|sign in|LANGWATCH_API_KEY/i);
+    });
+
     /** @scenario "A failure no retry can fix keeps its card" */
     it("keeps its card when a local tool failed on the reader's own login", () => {
       const localUnauthorized = {

@@ -529,7 +529,6 @@ const LEGACY_INERT: string[] = [
   "specs/langy/langy-empty-state-suggestions.feature",
   "specs/langy/langy-panel-fold-motion.feature",
   "specs/langy/langy-selfhost-install.feature",
-  "specs/langy/langy-session-key-lifecycle.feature",
   "specs/langy/langy-shutdown-handoff.feature",
   "specs/langy/langy-workbench-sidebar.feature",
   "specs/langy/langy-worker-isolation.feature",
@@ -700,6 +699,10 @@ const LEGACY_PARTIAL: string[] = [
   // the "Cost formatting" rule is enforced. The pills, duration, token and
   // span tab rules are described here and stay untagged.
   "specs/traces-v2/metrics.feature",
+  // Reason: left LEGACY_INERT when the blank-key refusal and the worker age
+  // cap were bound to Go tests. The older mint and revoke scenarios describe
+  // control-plane behaviour and stay untagged.
+  "specs/langy/langy-session-key-lifecycle.feature",
   // Reason: left LEGACY_INERT when the CLI gained the traces.count alias
   // and the unknown-metric refusal, which its three new scenarios enforce.
   // The six older scenarios describe the query presets and stay untagged.

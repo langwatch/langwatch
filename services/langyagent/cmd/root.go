@@ -65,6 +65,7 @@ func Root(ctx context.Context, _ []string) error {
 	pool, err := workerpool.New(ctx, workerpool.Options{
 		MaxWorkers:       cfg.MaxWorkers,
 		WorkerIdle:       cfg.WorkerIdle(),
+		WorkerMaxAge:     cfg.WorkerMaxAge(),
 		ReadinessTimeout: cfg.ReadinessTimeout(),
 		ReaperInterval:   cfg.ReaperInterval(),
 		SessionsRoot:     cfg.SessionsRoot,

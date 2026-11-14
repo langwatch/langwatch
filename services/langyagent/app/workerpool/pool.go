@@ -37,8 +37,12 @@ const revokeTimeout = 5 * time.Second
 
 // Options configure a Pool. Constructed from the service Config in deps.go.
 type Options struct {
-	MaxWorkers       int
-	WorkerIdle       time.Duration
+	MaxWorkers int
+	WorkerIdle time.Duration
+	// WorkerMaxAge retires a worker between turns once it is this old, so the
+	// session key injected at spawn is never used past its lifetime. Zero
+	// disables it (tests and partial wiring).
+	WorkerMaxAge     time.Duration
 	ReadinessTimeout time.Duration
 	ReaperInterval   time.Duration
 	SessionsRoot     string
@@ -125,6 +129,7 @@ type CredentialRevoker interface {
 type Pool struct {
 	maxWorkers       int
 	workerIdle       time.Duration
+	workerMaxAge     time.Duration
 	readinessTimeout time.Duration
 	reaperInterval   time.Duration
 	sessionsRoot     string
@@ -219,6 +224,7 @@ func New(ctx context.Context, opts Options) (*Pool, error) {
 	return &Pool{
 		maxWorkers:       opts.MaxWorkers,
 		workerIdle:       opts.WorkerIdle,
+		workerMaxAge:     opts.WorkerMaxAge,
 		readinessTimeout: opts.ReadinessTimeout,
 		reaperInterval:   opts.ReaperInterval,
 		sessionsRoot:     opts.SessionsRoot,
@@ -395,11 +401,14 @@ func (p *Pool) countInFlight(workers []*Worker) int {
 // The control plane does not have to get this right, because Acquire refuses a
 // keyless spawn with ErrCredentialsRequired and the caller mints and retries. A
 // stale `true` costs one round trip; it can never boot a broken worker.
+//
+// An over-age worker answers false: its key is near expiry, so the control
+// plane mints a fresh one and Acquire replaces the worker between turns.
 func (p *Pool) HasLiveWorker(conversationID string, sig domain.CredentialSignature) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	w, ok := p.workers[conversationID]
-	return ok && w.credSig == sig
+	return ok && w.credSig == sig && !w.overAge(p.workerMaxAge)
 }
 
 // revokeKeyOf asks the control plane to revoke a dead worker's session key.
@@ -415,10 +424,18 @@ func (p *Pool) HasLiveWorker(conversationID string, sig domain.CredentialSignatu
 // this way: a manager that is SIGKILLed (OOM, eviction, force-delete) runs no
 // cleanup at all, so revocation can never be the guarantee — only the fast path.
 func (p *Pool) revokeKeyOf(w *Worker, reason string) {
-	if p.revoker == nil || w == nil || w.apiKeyID == "" {
+	if w == nil {
 		return
 	}
-	apiKeyID, projectID, endpoint, conversationID := w.apiKeyID, w.projectID, w.langwatchEndpoint, w.conversationID
+	p.revokeKey(w.apiKeyID, w.projectID, w.langwatchEndpoint, w.conversationID, reason)
+}
+
+// revokeKey is revokeKeyOf for a key that is not yet on a worker, such as the
+// one a warm minted and then left unused.
+func (p *Pool) revokeKey(apiKeyID, projectID, endpoint, conversationID, reason string) {
+	if p.revoker == nil || apiKeyID == "" {
+		return
+	}
 	go func() {
 		defer clog.HandlePanic(p.baseCtx, false)
 		ctx, cancel := context.WithTimeout(p.baseCtx, revokeTimeout)
@@ -456,12 +473,16 @@ func (p *Pool) capabilitiesFor(creds domain.Credentials) []app.Capability {
 // changed, GitHub token added/removed) the existing worker is killed and a
 // fresh one is spawned with the new capability set.
 //
+// An over-age worker (WorkerMaxAge) is replaced the same way when the turn
+// carries a fresh session key, no turn is in flight on it, and turnID is not one
+// it already ran; see acquire.
+//
 // A turn's spawn at capacity evicts the least-recently-active IDLE worker
 // instead of failing: pre-warm fills the pool with workers that may never see
 // a message, and a real turn must never queue behind one of those (a two-slot
 // local pool wedged exactly that way). Warm spawns go through AcquireWarm.
-func (p *Pool) Acquire(ctx context.Context, conversationID string, creds domain.Credentials) (app.Worker, error) {
-	return p.acquire(ctx, conversationID, creds, true)
+func (p *Pool) Acquire(ctx context.Context, conversationID, turnID string, creds domain.Credentials) (app.Worker, error) {
+	return p.acquire(ctx, conversationID, turnID, creds, true)
 }
 
 // AcquireWarm is Acquire for a pre-warm, with two softenings that keep a
@@ -475,17 +496,37 @@ func (p *Pool) Acquire(ctx context.Context, conversationID string, creds domain.
 // replacing it (see acquire): a warm must never kill a worker, least of all
 // one running a turn.
 func (p *Pool) AcquireWarm(ctx context.Context, conversationID string, creds domain.Credentials) (app.Worker, error) {
-	return p.acquire(ctx, conversationID, creds, false)
+	return p.acquire(ctx, conversationID, "", creds, false)
 }
 
-func (p *Pool) acquire(ctx context.Context, conversationID string, creds domain.Credentials, forTurn bool) (app.Worker, error) {
+// revokeUnusedWarmKey revokes the key a warm carried when it reuses a live worker instead of spawning: that key is never run.
+func (p *Pool) revokeUnusedWarmKey(w *Worker, creds domain.Credentials, conversationID string) {
+	if creds.LangwatchAPIKeyID != "" && creds.LangwatchAPIKeyID != w.apiKeyID {
+		p.revokeKey(creds.LangwatchAPIKeyID, creds.ProjectID, creds.LangwatchEndpoint, conversationID, "warm reused an existing worker")
+	}
+}
+
+func (p *Pool) acquire(ctx context.Context, conversationID, turnID string, creds domain.Credentials, forTurn bool) (app.Worker, error) {
 	wantedSig := domain.SignatureOf(creds.ProjectID, creds.ActorUserID, creds.Model, creds.EgressAllowlist, app.SignatureKeys(p.capabilitiesFor(creds)), creds.DisabledSkillIds, creds.MirrorTier)
 
 	p.mu.Lock()
 	if w, ok := p.workers[conversationID]; ok {
 		if w.credSig == wantedSig {
+			// Only a keyed turn this worker never ran replaces it when over age. A
+			// keyless one is a probe race; a re-dispatch of a turn it ran (keyed
+			// or not) must reach it so ClaimTurn answers ClaimAlreadyHandled. A
+			// replacement would start with no memory of that turn and run it twice.
+			if !forTurn || !creds.Spawnable() || !w.retireIfOverAge(p.workerMaxAge, turnID) {
+				if !forTurn {
+					p.revokeUnusedWarmKey(w, creds, conversationID)
+				}
+				p.mu.Unlock()
+				return w, nil
+			}
+			delete(p.workers, conversationID)
 			p.mu.Unlock()
-			return w, nil
+			p.teardown(w, "max worker age reached")
+			return p.acquire(ctx, conversationID, turnID, creds, forTurn)
 		}
 		// A warm is a speculative hint, so a signature mismatch returns the
 		// live worker untouched: killing here would tear down a worker that
@@ -494,6 +535,7 @@ func (p *Pool) acquire(ctx context.Context, conversationID string, creds domain.
 		// next real turn carries the authoritative credentials and does the
 		// replacement below.
 		if !forTurn {
+			p.revokeUnusedWarmKey(w, creds, conversationID)
 			p.mu.Unlock()
 			return w, nil
 		}
@@ -938,6 +980,7 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		apiKeyID:          creds.LangwatchAPIKeyID,
 		projectID:         creds.ProjectID,
 		langwatchEndpoint: creds.LangwatchEndpoint,
+		spawnedAt:         time.Now(),
 		lastSeen:          time.Now(),
 	}, nil
 }
@@ -1059,12 +1102,20 @@ func (p *Pool) kill(conversationID, reason string) {
 	if !ok {
 		return
 	}
+	p.teardown(w, reason)
+}
+
+// teardown is kill for a worker the caller has already removed from the
+// registry. Removing it under the same lock as the retire decision is what
+// keeps a replacement for the conversation from being torn down instead.
+func (p *Pool) teardown(w *Worker, reason string) {
+	conversationID := w.conversationID
 	p.telemetry.WorkerKilled(p.baseCtx, reason)
 	closeAgentOf(w)
-	// The key's lifetime is the worker's. kill() is the funnel for EVERY
-	// deliberate death — capability change, idle reap, shutdown — so revoking here
-	// covers all three at once. Self-exit and crash are the other path, handled in
-	// the exit goroutine below.
+	// The key's lifetime is the worker's. teardown is the funnel for EVERY
+	// deliberate death (capability change, idle reap, max-age retirement,
+	// shutdown), so revoking here covers them all. Self-exit and crash are the
+	// other path, handled in the exit goroutine below.
 	p.revokeKeyOf(w, reason)
 	// Same lifetime rule for the telemetry-relay registration: the routing token
 	// and the relay's retained credentials die with the worker. Idempotent, so
@@ -1102,19 +1153,30 @@ func (p *Pool) kill(conversationID, reason string) {
 	go w.egress.Close()
 }
 
-// reapIdle scans the registry and kills workers idle longer than WorkerIdle.
+// reapIdle retires workers idle longer than WorkerIdle, and quiet workers older
+// than WorkerMaxAge, never one with a turn in flight. Retire and registry
+// delete share one critical section, so no turn can claim a worker in between.
 func (p *Pool) reapIdle() {
-	cutoff := p.workerIdle
+	type retiree struct {
+		w      *Worker
+		reason string
+	}
 	p.mu.Lock()
-	candidates := make([]string, 0)
+	retirees := make([]retiree, 0)
 	for id, w := range p.workers {
-		if w.shouldReap(cutoff) {
-			candidates = append(candidates, id)
+		if !w.retireIfStale(p.workerIdle, p.workerMaxAge) {
+			continue
 		}
+		reason := "idle timeout"
+		if w.overAge(p.workerMaxAge) {
+			reason = "max worker age reached"
+		}
+		delete(p.workers, id)
+		retirees = append(retirees, retiree{w: w, reason: reason})
 	}
 	p.mu.Unlock()
-	for _, id := range candidates {
-		p.kill(id, "idle timeout")
+	for _, r := range retirees {
+		p.teardown(r.w, r.reason)
 	}
 	p.sweepSessionStashes()
 }
