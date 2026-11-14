@@ -1,25 +1,32 @@
+/**
+ * @see ./catalog/lwql-views.ts: the catalog these statements are built from
+ * @see ./provisioning.ts: the access model applied over them
+ * @see specs/lwql/api.feature
+ */
+
+import { flooredViewName, LWQL_FLOOR_PARAMETER } from "../../../rules/lwql-dedup-floor.rules.ts";
 import { TENANT_COLUMN } from "../../../rules/lwql-view-catalog.rules.ts";
+import {
+  FLOORED_DEDUP_STRATEGIES,
+  type LangWatchQLDedupStrategy,
+} from "../../../rules/lwql-view-dedup-shape.rules.ts";
 import {
   KEY_MAP_COLUMNS,
   type LangWatchQLNames,
 } from "../../../services/langwatch-ql-access-model.service.ts";
 import {
   LangWatchQLCatalogShapesService,
-  type LangWatchQLDedupStrategy,
   type LangWatchQLViewColumn,
   type LangWatchQLViewDefinition,
 } from "../../../services/langwatch-ql-catalog-shapes.service.ts";
 import { LangWatchQLSqlTextService } from "../../../services/langwatch-ql-sql-text.service.ts";
-/**
- * @see ./catalog/lwql-views.ts — the catalog these statements are built from
- * @see ./provisioning.ts — the access model applied over them
- * @see specs/lwql/api.feature
- */
 import { LWQL_SOURCE_ALIAS } from "../../lwql-catalogue/rules/lwql-source-alias.rules.ts";
 import { postgresEngineColumnType } from "../rules/lwql-postgres-engine-type.rules.ts";
+import { LangWatchQLViewDedupService } from "./langwatch-ql-view-dedup.service.ts";
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 const sqlText = LangWatchQLSqlTextService.create();
+const viewDedup = LangWatchQLViewDedupService.create();
 
 /**
  * The strategy the shipped views use where a catalog entry pins none of its own
@@ -103,55 +110,32 @@ function postgresTenantPredicate({
 }
 
 /**
- * The strategy one view is rendered with: its own where it pins one, and the caller's default
- * otherwise. The entry wins because the reason an entry pins a strategy is a property of its
- * source table that no default can be right about — see {@link SHIPPED_LWQL_DEDUP}.
+ * One grain column as a `GROUP BY` key: a derived column groups by its expression, so the view
+ * holds one row per published value rather than one per source value it maps from.
  */
-function dedupStrategyFor({
-  view,
-  dedup,
-}: {
-  view: LangWatchQLViewDefinition;
-  dedup: LangWatchQLDedupStrategy;
-}): LangWatchQLDedupStrategy {
-  return view.dedup.strategy ?? dedup;
+function groupKey(view: LangWatchQLViewDefinition, name: string): string {
+  const column = view.columns.find((candidate) => candidate.name === name);
+  return column?.expression
+    ? catalogShapes.columnExpression({ column, source: sourceColumn })
+    : sourceColumn(catalogShapes.physicalColumn(view, name));
 }
 
-/**
- * The `WHERE` clause that keeps one version per logical row.
- */
-function dedupPredicate(view: LangWatchQLViewDefinition, relation: string): string {
-  const { versionColumn } = view.dedup;
-  if (!versionColumn) {
-    // Refuse at provisioning time rather than emit a view that collapses
-    // nothing: this strategy exists to keep one version per key, and a source
-    // with no version column has no survivor to pick. Reachable only if a
-    // dataset is given this strategy without declaring the column — the
-    // PostgreSQL-resident ones take the tenant-predicate branch instead.
-    throw new Error(
-      view.dedup.aggregating
-        ? `LangWatchQL view ${view.name} reads an aggregating source, whose rows for one key are summed ` +
-            `rather than superseded, so there is no version for this strategy to pick`
-        : `LangWatchQL view ${view.name} deduplicates on a version column it does not declare`,
-    );
-  }
-
-  // Grain is exposed names; the subquery runs against the source table, so map
-  // each to the physical column its view column reads (an alias renames it).
-  const grain = catalogShapes
-    .grainColumns(view)
-    .map((column) => catalogShapes.physicalColumn(view, column));
-  const outerKeys = grain.map(sourceColumn);
-  const innerKeys = grain.map((column) => sqlText.quotedColumn(column));
-  const version = sqlText.quotedColumn(versionColumn);
-
-  return (
-    `WHERE (${[...outerKeys, sourceColumn(versionColumn)].join(", ")}) IN (\n` +
-    `    SELECT ${innerKeys.join(", ")}, max(${version})\n` +
-    `    FROM ${relation}\n` +
-    `    GROUP BY ${innerKeys.join(", ")}\n` +
-    `  )`
-  );
+/** The `GROUP BY` closing a grouped or settled view, with a settled view's `HAVING`; else "". */
+function groupingClause({
+  view,
+  grouped,
+  settled,
+}: {
+  view: LangWatchQLViewDefinition;
+  grouped: boolean;
+  settled: boolean;
+}): string {
+  if (!grouped && !settled) return "";
+  const keys = grouped
+    ? catalogShapes.grainColumns(view).map((name) => groupKey(view, name))
+    : viewDedup.settledGroupKeys(view);
+  const having = settled ? `\nHAVING ${viewDedup.settledHaving(view)}` : "";
+  return `\nGROUP BY ${keys.join(", ")}${having}`;
 }
 
 /**
@@ -330,11 +314,14 @@ export class LangWatchQLViewStatementsService {
     sourceDatabase,
     view,
     dedup,
+    floor,
   }: {
     names: LangWatchQLNames;
     sourceDatabase: string;
     view: LangWatchQLViewDefinition;
     dedup: LangWatchQLDedupStrategy;
+    /** Renders the floored twin, whose dedup reads only versions from this bound. */
+    floor?: string;
   }): string {
     const relation = sourceRelation({ names, sourceDatabase, view });
     // A PostgreSQL-resident source keeps one row per key, so there is no version
@@ -352,14 +339,14 @@ export class LangWatchQLViewStatementsService {
 
     assertPredicateColumnsDeclared(view);
     const joinedColumn = deriveJoinedColumnQualifier(view);
-    const strategy = dedupStrategyFor({ view, dedup });
-    const grain = catalogShapes.grainColumns(view);
+    const strategy = viewDedup.strategyFor({ view, dedup });
     // Any aggregating source renders as a `GROUP BY`, whether its published grain
     // is narrower than the engine key (a rollup that groups away a breakdown
     // column) or equal to it (a per-key rollup whose measures are aggregate
     // states only a merge combinator can read). `FINAL` is not an option for the
     // latter: after a merge the state column is still binary.
     const grouped = !postgres && view.dedup.aggregating === true;
+    const settled = !postgres && strategy === "settled";
     const projection = view.columns
       .map((column) => {
         const expression = projectedExpression({ view, column, postgres, grouped, joinedColumn });
@@ -367,24 +354,57 @@ export class LangWatchQLViewStatementsService {
         return `  ${expression} AS ${sqlText.quotedColumn(column.name)}`;
       })
       .join(",\n");
-    const aliased = `${relation} AS ${SOURCE_ALIAS}`;
-    const from = strategy === "final" && !postgres && !grouped ? `${aliased} FINAL` : aliased;
+    const floored = floor === undefined ? {} : { floor };
+    const from = settled
+      ? viewDedup.settledRelation({ view, relation, ...floored })
+      : viewDedup.relation({ view, relation, strategy, engineDedup: !postgres && !grouped });
     const joinClause = joinRelationClause(view, sourceDatabase);
-    const enginePredicate = strategy === "in-tuple" ? `\n${dedupPredicate(view, relation)}` : "";
+    const enginePredicate =
+      strategy === "in-tuple" ? `\n${viewDedup.predicate({ view, relation, ...floored })}` : "";
     const where = postgres
       ? `\n${postgresTenantPredicate({ names, sourceDatabase })}`
       : enginePredicate;
     const preFilter = preFilterClause(view, where);
-    const groupBy = grouped
-      ? `\nGROUP BY ${grain.map((column) => sourceColumn(catalogShapes.physicalColumn(view, column))).join(", ")}`
-      : "";
+    const grouping = groupingClause({ view, grouped, settled });
 
+    const viewName = floor === undefined ? view.name : flooredViewName(view.name);
     return (
       `CREATE OR REPLACE VIEW ` +
-      `${sqlText.assertIdentifier(names.database, "database")}.${sqlText.assertIdentifier(view.name, "view")}\n` +
+      `${sqlText.assertIdentifier(names.database, "database")}.${sqlText.assertIdentifier(viewName, "view")}\n` +
       `SQL SECURITY INVOKER\n` +
       `AS SELECT\n${projection}\n` +
-      `FROM ${from}${joinClause}${where}${preFilter}${groupBy}`
+      `FROM ${from}${joinClause}${where}${preFilter}${grouping}`
+    );
+  }
+
+  /**
+   * `CREATE OR REPLACE VIEW` for a view's floored twin (analytics ADR-005): a parameterised view
+   * the executor reads in place of the view when the statement bounds the floor column below.
+   * None for a view whose dedup declares no floor column.
+   */
+  flooredViewStatements({
+    names,
+    sourceDatabase,
+    view,
+    dedup,
+  }: {
+    names: LangWatchQLNames;
+    sourceDatabase: string;
+    view: LangWatchQLViewDefinition;
+    dedup: LangWatchQLDedupStrategy;
+  }): string[] {
+    const { floorColumn } = view.dedup;
+    const columns = view.columns.filter((column) => column.name === floorColumn);
+    if (!FLOORED_DEDUP_STRATEGIES.has(viewDedup.strategyFor({ view, dedup }))) return [];
+    // The twin reads its bound from a parameter typed like the floor column.
+    return columns.map((column) =>
+      this.viewStatement({
+        names,
+        sourceDatabase,
+        view,
+        dedup,
+        floor: `{${LWQL_FLOOR_PARAMETER}:${column.type}}`,
+      }),
     );
   }
 

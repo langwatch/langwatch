@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { isProxyBypassed, resolveProxyForHost } from "../outbound-proxy.ts";
+import {
+  globalFetchUsesEnvProxy,
+  isProxyBypassed,
+  resolveProxyForHost,
+} from "../outbound-proxy.ts";
 
 describe("resolveProxyForHost", () => {
   describe("given an outbound proxy", () => {
@@ -63,5 +67,23 @@ describe("isProxyBypassed", () => {
 
   it("reports no bypass when NO_PROXY is unset", () => {
     expect(isProxyBypassed({}, "any.host")).toBe(false);
+  });
+});
+
+describe("globalFetchUsesEnvProxy", () => {
+  it("answers yes when NODE_USE_ENV_PROXY is set", () => {
+    expect(globalFetchUsesEnvProxy({ NODE_USE_ENV_PROXY: true })).toBe(true);
+  });
+
+  it("answers yes when NODE_OPTIONS carries --use-env-proxy", () => {
+    expect(
+      globalFetchUsesEnvProxy({ NODE_OPTIONS: "--max-old-space-size=4096 --use-env-proxy" }),
+    ).toBe(true);
+  });
+
+  it("answers no when neither is set", () => {
+    expect(globalFetchUsesEnvProxy({ NODE_USE_ENV_PROXY: false, NODE_OPTIONS: "--inspect" })).toBe(
+      false,
+    );
   });
 });

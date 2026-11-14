@@ -62,11 +62,13 @@ export function grantedMessage({
   };
 }
 
-export function deniedMessage({ state }: { state: string }): DocsSessionMessage {
-  return {
-    type: DOCS_SESSION_MESSAGE_TYPE,
-    version: DOCS_SESSION_MESSAGE_VERSION,
-    state,
-    outcome: "denied",
-  };
+/** The answer carrying no key: the member declined, or their organisation turned this off. */
+export function refusedMessage({
+  state,
+  outcome,
+}: {
+  state: string;
+  outcome: "denied" | "disabled";
+}): DocsSessionMessage {
+  return { type: DOCS_SESSION_MESSAGE_TYPE, version: DOCS_SESSION_MESSAGE_VERSION, state, outcome };
 }

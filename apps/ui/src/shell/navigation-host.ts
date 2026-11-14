@@ -56,6 +56,7 @@ export type BrowserNavigationReading = {
   waiting: ReactNode;
   notFound: ReactNode;
   hasPermission: (permission: string) => boolean;
+  hasOrganizationPermission: (permission: string) => boolean;
   /** Tri-state at the source: `undefined` is "not answered yet". */
   featureFlag: (flag: ReleaseFlagToken) => boolean | undefined;
 };
@@ -132,6 +133,10 @@ export function browserNavigationHosts(port: NavigationHostClass): BrowserNaviga
 
     hasPermission(permission: string): boolean {
       return this.reading.hasPermission(permission);
+    }
+
+    hasOrganizationPermission(permission: string): boolean {
+      return this.reading.hasOrganizationPermission(permission);
     }
 
     /** The port's own tri-state: unanswered is neither on nor off. */

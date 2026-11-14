@@ -36,6 +36,10 @@ export type NurturingOrganizationRow = NurturingOrganizationCounts &
  * read by the service through `NurturingProjectDirectoryRepository`, never here (R40).
  */
 export interface NurturingMilestonesRepository {
+  /** The organization's row; empty when nurturing never learned it. */
+  findOrganization(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<NurturingOrganizationRow[]>;
   /** Learns the project's organization; idempotent, `seeded` is set only when first learned. */
   recordOrganization(
     input: Readonly<{
@@ -54,6 +58,12 @@ export interface NurturingMilestonesRepository {
   ): Promise<NurturingOrganizationCounts[]>;
 }
 
+/** The admin an organization's row names, which an account's erasure takes back. */
+export interface NurturingOrganizationAdminRepository {
+  /** Clears the user as admin of every organization naming them; none named is a no-op. */
+  forgetAdmin(input: Readonly<{ adminUserId: string }>): Promise<void>;
+}
+
 /** The organization's latest trace, the one fact of it a person joining later must be told. */
 export interface NurturingTraceMilestonesRepository {
   /** Moves the time forward only; a late trace or an organization never learned changes nothing. */
@@ -64,10 +74,6 @@ export interface NurturingTraceMilestonesRepository {
 
 /** The coding-agent signals of the same organizations table, written one conditional update each. */
 export interface NurturingCodingMilestonesRepository {
-  /** The organization's row; empty when nurturing never learned it. */
-  findOrganization(
-    input: Readonly<{ organizationId: string }>,
-  ): Promise<NurturingOrganizationRow[]>;
   /**
    * Sets the first coding session once; `first` is true for the setter and a retry of its
    * `occurredAt`.

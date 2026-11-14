@@ -133,6 +133,7 @@ export class ExperimentRunProgressFoldProjection
         experimentSlug: plan?.experimentSlug ?? state.experimentSlug,
         status: "running",
         total: event.data.total,
+        ...(plan ? { concurrency: plan.concurrency } : {}),
         startedAt: event.occurredAt,
         ...(plan?.runUrl ? { runUrl: plan.runUrl } : {}),
         persistResults: Boolean(plan?.persistResults) && event.data.experimentId !== "",

@@ -1,7 +1,9 @@
 /** How the audit feed reads its rows: a verb phrase per action, an actor per row, runs grouped. */
 
+import { BRAID_AUDIT_TARGET_KIND } from "@langwatch/authz-contract";
+import { formatInstant } from "@langwatch/design-system/describe-instant";
 import type { EnrichedAuditLog } from "@langwatch/organization-contract";
-import { format, isSameCalendarDay, subDays, type TimeInput } from "@langwatch/time";
+import { format, isSameCalendarDay, subDays, type TimeInput, toEpochMs } from "@langwatch/time";
 
 const PAST: Readonly<Record<string, string>> = {
   accept: "Accepted",
@@ -95,6 +97,45 @@ export function auditActionPhrase(action: string): string {
   }
   if (verbWords.length === 1 && last.endsWith("ed")) return sentence([last, ...noun]);
   return sentence([...noun, ...verbWords]);
+}
+
+/** The two verbs a braid's grant records (`authz.grants.attach`, `.revoke`), as the braid's own. */
+const BRAID_PHRASES: Readonly<Record<string, string>> = {
+  attach: "Created braid",
+  revoke: "Removed braid",
+};
+
+/** An entry's phrase: braid wording when its target is a braid, `auditActionPhrase` otherwise. */
+export function auditEntryPhrase({
+  action,
+  targetKind,
+}: {
+  action: string;
+  targetKind: string | null | undefined;
+}): string {
+  if (targetKind === BRAID_AUDIT_TARGET_KIND) {
+    const phrase = BRAID_PHRASES[action.split(".").at(-1) ?? ""];
+    if (phrase) return phrase;
+  }
+  return auditActionPhrase(action);
+}
+
+/** The line under an entry's phrase: a braid by its owner project, never its grant id. */
+export type AuditTargetLine = { kind: "words"; text: string } | { kind: "id"; id: string } | null;
+
+export function auditTargetLine({
+  targetKind,
+  targetId,
+  projectName,
+}: {
+  targetKind: string | null | undefined;
+  targetId: string | null | undefined;
+  projectName: string | null;
+}): AuditTargetLine {
+  if (targetKind === BRAID_AUDIT_TARGET_KIND) {
+    return { kind: "words", text: projectName ? `Braid owned by ${projectName}` : "Braid" };
+  }
+  return targetId ? { kind: "id", id: targetId } : null;
 }
 
 type ActorFields = Pick<
@@ -266,10 +307,19 @@ export function auditChangeSummary({
 
 export type AuditFeedDay<T> = { label: string; heading: string; runs: AuditRun<T>[] };
 
-/** "Today · Oct 10, 2026" for the two relative days; else the full date alone. */
-export function auditDayHeading({ at, now }: { at: TimeInput; now: TimeInput }): string {
+/** "Today · 10 Oct 2026" for the two relative days, else the date alone; in the reader's locale. */
+export function auditDayHeading({
+  at,
+  now,
+  locale,
+}: {
+  at: TimeInput;
+  now: TimeInput;
+  /** The reader's by default. */
+  locale?: string;
+}): string {
   const label = auditDayLabel({ at, now });
-  const full = format(at, "MMM d, yyyy");
+  const full = formatInstant({ epochMs: toEpochMs(at), display: "date", locale });
   return label === "Today" || label === "Yesterday" ? `${label} · ${full}` : full;
 }
 

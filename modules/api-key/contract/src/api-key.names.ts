@@ -27,7 +27,7 @@ export const TRACE_EXPORT_API_KEY_NAME = "Gateway trace export";
 export const CHECKUP_CANARY_API_KEY_NAME = "Checkup canary";
 
 /**
- * Name of the five-minute key the documentation playground holds for one member in one project
+ * Name of the short-lived key the documentation playground holds for one member in one project
  * (ADR-185). Always system-managed, so the stored mark, not the name, hides it.
  */
 export const DOCS_SESSION_API_KEY_NAME = "Docs session";

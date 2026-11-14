@@ -58,6 +58,9 @@ export abstract class SsoHostApi {
    */
   abstract canManage(): boolean;
 
+  /** Whether this reader holds `organization:manage`, so may activate a license. */
+  abstract canManageOrganization(): boolean;
+
   /** Whether this reader may read single sign-on at all (`sso:view`). */
   abstract canView(): boolean;
 

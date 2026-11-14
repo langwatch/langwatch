@@ -11,6 +11,7 @@ import {
   licensePurchaseNotice,
   planLimitReachedNotice,
   resourceLimitReachedNotice,
+  seatRequestedNotice,
   selfHostedSignalNotice,
   subscriptionActivatedNotice,
   subscriptionCancelledNotice,
@@ -239,6 +240,31 @@ export class NotificationService {
   /**
    * Sends a Slack notification for subscription events (prospective, confirmed or cancelled).
    */
+  /** Sales hear that a person waits for a seat only they can sell. */
+  async sendSlackSeatRequest(payload: {
+    organizationId: string;
+    organizationName: string;
+    plan: string;
+    seats: number;
+    requestedSeats: number;
+  }): Promise<void> {
+    await this.sendSlackMessage({
+      channelUrl: this.config.slackSubscriptionsChannel,
+      message: (origin) =>
+        seatRequestedNotice.render({
+          props: {
+            organizationName: payload.organizationName,
+            plan: payload.plan,
+            seats: payload.seats,
+            requestedSeats: payload.requestedSeats,
+            adminUrl: this.getAdminLink(payload.organizationId),
+          },
+          origin,
+        }),
+      errorLog: "Failed to send Slack seat request notification",
+    });
+  }
+
   async sendSlackSubscriptionEvent(payload: SubscriptionNotificationPayload): Promise<void> {
     const adminUrl = this.getAdminLink(payload.organizationId);
 

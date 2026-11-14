@@ -177,6 +177,25 @@ Feature: Unified Audit Log
     Given a row recorded as "authz.grants.attach"
     Then the entry reads "attached grant" after its actor, with the recorded action small and muted beside it
 
+  @unit
+  Scenario: A braid's entries read as braid changes
+    Given rows recorded as "authz.grants.attach" and "authz.grants.revoke" whose target is a braid
+    Then they read "Created braid" and "Removed braid"
+    And the same actions on any other target keep their grant wording
+
+  @unit
+  Scenario: A braid's target chip names its projects, never its grant id
+    Given the audit log opened from a braid with the label "payments-agent → checkout-web"
+    Then the target chip reads "Braid: payments-agent → checkout-web"
+    And a braid link without a label reads "Braid" alone
+
+  @unit
+  Scenario: A braid's entry row names its owner project, never its grant id
+    Given a row whose target is a braid, recorded on the project that owns it
+    Then the line under its phrase reads "Braid owned by <project>", with no rolebinding id
+    And a braid row with no project reads "Braid" alone
+    And any other target keeps its id on that line
+
   @integration
   Scenario: The feed reads by day
     Then entries sit under "Today", "Yesterday" or their date ("Oct 8"), newest first

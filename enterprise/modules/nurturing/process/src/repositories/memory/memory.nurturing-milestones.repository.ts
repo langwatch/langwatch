@@ -3,6 +3,7 @@ import {
   MAX_CODING_REPOSITORY_KEYS,
   type NurturingCodingMilestonesRepository,
   type NurturingMilestonesRepository,
+  type NurturingOrganizationAdminRepository,
   type NurturingOrganizationCounts,
   type NurturingOrganizationRow,
   type NurturingTraceMilestonesRepository,
@@ -21,7 +22,8 @@ export class MemoryNurturingMilestonesRepository
   implements
     NurturingMilestonesRepository,
     NurturingCodingMilestonesRepository,
-    NurturingTraceMilestonesRepository
+    NurturingTraceMilestonesRepository,
+    NurturingOrganizationAdminRepository
 {
   readonly #organizations = new Map<string, MemoryOrganization>();
   readonly #lastTraceAt = new Map<string, number>();
@@ -72,6 +74,14 @@ export class MemoryNurturingMilestonesRepository
             codingFirstDays: [],
           },
     );
+  }
+
+  async forgetAdmin({ adminUserId }: Readonly<{ adminUserId: string }>): Promise<void> {
+    for (const [organizationId, organization] of this.#organizations) {
+      if (organization.adminUserId === adminUserId) {
+        this.#organizations.set(organizationId, { ...organization, adminUserId: null });
+      }
+    }
   }
 
   async countEvaluation({

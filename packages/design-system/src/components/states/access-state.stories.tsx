@@ -1,4 +1,4 @@
-import { Button } from "@chakra-ui/react";
+import { Button, Card } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { AccessState } from "./access-state.tsx";
@@ -25,6 +25,19 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 export const Default: Story = {};
 export const Compact: Story = { args: { compact: true } };
+/** Inside a card that already draws the surface: no nested box, icon beside the words. */
+export const Inset: Story = {
+  args: { inset: true },
+  decorators: [
+    (Story) => (
+      <Card.Root maxWidth="560px">
+        <Card.Body>
+          <Story />
+        </Card.Body>
+      </Card.Root>
+    ),
+  ],
+};
 export const Permission: Story = {
   args: {
     kind: "permission",

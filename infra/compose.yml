@@ -5,7 +5,7 @@ services:
     image: langwatch/langwatch:latest
     environment:
       DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
-      CLICKHOUSE_URL: http://default:langwatch@clickhouse:8123/langwatch
+      CLICKHOUSE_URL: http://default:${CLICKHOUSE_PASSWORD:-langwatch}@clickhouse:8123/langwatch
       # This compose stack runs a plain ClickHouse with no backups, so
       # system.backup_log does not exist here. Backup-status collection is on by
       # default (an unset flag must not disarm the alerts that read those gauges
@@ -41,7 +41,7 @@ services:
     working_dir: /app/apps/worker
     environment:
       DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
-      CLICKHOUSE_URL: http://default:langwatch@clickhouse:8123/langwatch
+      CLICKHOUSE_URL: http://default:${CLICKHOUSE_PASSWORD:-langwatch}@clickhouse:8123/langwatch
       # This compose stack runs a plain ClickHouse with no backups, so
       # system.backup_log does not exist here. Backup-status collection is on by
       # default (an unset flag must not disarm the alerts that read those gauges
@@ -68,11 +68,12 @@ services:
         condition: service_healthy
     restart: always
 
-  # nlpgo — the Go NLP engine. langwatch/langwatch_nlp is now a static Go
-  # binary (Dockerfile.langwatch_nlp); it still binds :5561 and reads
+  # nlpgo — the Go NLP engine, the `nlpgo` command of langwatch/langwatch_nlp
+  # (the nlp target of Dockerfile.go-services). It binds SERVER_ADDR, :5561, and reads
   # LANGWATCH_ENDPOINT for evaluator + agent-workflow callbacks.
   langwatch_nlp:
     image: langwatch/langwatch_nlp:latest
+    command: [nlpgo]
     env_file:
       - path: .env
         required: false
@@ -86,6 +87,7 @@ services:
     pull_policy: always
     environment:
       - LANGWATCH_ENDPOINT=http://app:5560
+      - SERVER_ADDR=:5561
 
   langevals:
     image: langwatch/langevals:latest
@@ -126,7 +128,10 @@ services:
   clickhouse:
     image: langwatch/clickhouse-serverless:0.4.0
     environment:
-      CLICKHOUSE_PASSWORD: langwatch
+      # Set CLICKHOUSE_PASSWORD in .env (openssl rand -hex 24; URL-safe, it is
+      # part of CLICKHOUSE_URL above). The `langwatch` fallback keeps existing
+      # installs starting; the server warns at boot and the next major drops it.
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-langwatch}
     ports:
       - "8123:8123"
     volumes:

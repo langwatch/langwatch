@@ -4,6 +4,7 @@ import type { AuthzApi, AuthzGrantsService } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 
+import type { ScimMembers } from "../channels/scim-channels.registry.ts";
 import { assertRemovalKeepsAnAdministrator } from "../rules/scim-last-administrator.rules.ts";
 import type { ScimRemovalOperation, ScimSyncLifecycle } from "./scim-sync-lifecycle.service.ts";
 
@@ -18,20 +19,38 @@ type ScimRemovalManifest = {
 /** Who can still administer the organisation, asked of authz before any removal. */
 export type ScimOrganizationAdministration = Pick<AuthzApi, "findActiveOrganizationAdministrators">;
 
+/** Organization's seat hold, kept before the offboarding deletes the membership row. */
+export type ScimSeatHolds = Pick<ScimMembers, "holdSeatOfDepartingMember">;
+
+type ScimDeprovisionDependencies = {
+  grants: AuthzGrantsService;
+  lifecycle: ScimSyncLifecycle;
+  organization: ScimOrganizationAdministration;
+  seats: ScimSeatHolds;
+};
+
 /** Removes all authority through authz's transactional offboarding proof. */
 export class ScimDeprovisionService {
-  private constructor(
-    private readonly grants: AuthzGrantsService,
-    private readonly lifecycle: ScimSyncLifecycle,
-    private readonly organization: ScimOrganizationAdministration,
-  ) {}
+  private constructor(private readonly options: ScimDeprovisionDependencies) {}
 
-  static create(options: {
-    grants: AuthzGrantsService;
-    lifecycle: ScimSyncLifecycle;
-    organization: ScimOrganizationAdministration;
-  }): ScimDeprovisionService {
-    return new ScimDeprovisionService(options.grants, options.lifecycle, options.organization);
+  static create(options: ScimDeprovisionDependencies): ScimDeprovisionService {
+    return new ScimDeprovisionService(options);
+  }
+
+  private get grants(): AuthzGrantsService {
+    return this.options.grants;
+  }
+
+  private get lifecycle(): ScimSyncLifecycle {
+    return this.options.lifecycle;
+  }
+
+  private get organization(): ScimOrganizationAdministration {
+    return this.options.organization;
+  }
+
+  private get seats(): ScimSeatHolds {
+    return this.options.seats;
   }
 
   async removeAccess(input: {
@@ -48,6 +67,12 @@ export class ScimDeprovisionService {
         organizationId: input.organizationId,
       });
       assertRemovalKeepsAnAdministrator({ administrators, userId: input.userId });
+      // The seat is kept as a manual removal keeps it, so an unassign and reassign in the
+      // directory cannot hand it to someone else (seat-rotation.feature).
+      await this.seats.holdSeatOfDepartingMember({
+        organizationId: input.organizationId,
+        userId: input.userId,
+      });
       const result = await this.grants.offboard({
         actor: SCIM_ACTOR,
         userId: input.userId,
