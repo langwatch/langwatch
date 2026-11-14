@@ -136,6 +136,7 @@ export const SYSTEM_IDENTITY_TABLES = [
   "system.disks",
   "system.mutations",
   "system.parts",
+  "system.parts_columns",
   "system.tables",
 ] as const;
 export type SystemIdentityTableName = (typeof SYSTEM_IDENTITY_TABLES)[number];

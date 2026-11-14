@@ -94,3 +94,15 @@ export const systemMutations = systemIdentityTable({
     create_time: column.dateTime(),
   },
 });
+
+/** Each active part's columns; lists parts of every table, so only the system identity reads it. */
+export const systemPartsColumns = systemIdentityTable({
+  name: "system.parts_columns",
+  columns: {
+    database: column.string(),
+    table: column.string(),
+    name: column.string(),
+    column: column.string(),
+    active: column.uint8(),
+  },
+});

@@ -41,6 +41,7 @@ export {
   systemDisks,
   systemMutations,
   systemParts,
+  systemPartsColumns,
   systemReplicas,
   systemServerSettings,
   systemTables,
