@@ -199,7 +199,7 @@ export function JoinPolicyCard({
       {planLocked && (
         <AccessState
           kind="upgrade"
-          compact
+          inset
           title="Joining without an invitation requires Enterprise"
           description={explanation}
           data-testid="join-policy-notice"

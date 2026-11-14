@@ -340,12 +340,19 @@ html[data-docs-pointer] :focus-visible,
 .docs-heading + .docs-heading {
   margin-top: 12px;
 }
+/* The link icon follows the last word at every level. Its 30px (6px gap, 24px box) are reserved at
+   the heading's end and cancelled by its end margin, so lines break as if it had no width: it can
+   never wrap onto a line of its own, which a web font a hair wider than its fallback would
+   otherwise trigger, moving everything below. */
+.docs-heading:has(> .docs-anchor) {
+  padding-inline-end: 30px;
+}
 .docs-anchor {
-  position: absolute;
-  inset-inline-start: -24px;
-  top: 50%;
-  transform: translateY(-50%);
+  position: relative;
   display: inline-flex;
+  vertical-align: middle;
+  margin-inline-start: 6px;
+  margin-inline-end: -30px;
   padding: 4px;
   color: var(--chakra-colors-fg-subtle);
   opacity: 0;
@@ -358,20 +365,10 @@ html[data-docs-pointer] :focus-visible,
 .docs-anchor:hover {
   color: var(--chakra-colors-accent-fg);
 }
-/* On touch the link icon follows the last word. Its 30px (6px gap, 24px box) are reserved at the
-   heading's end and cancelled by its end margin, so lines break as if it had no width: it can
-   never wrap onto a line of its own, which a web font a hair wider than its fallback would
-   otherwise trigger, moving everything below. */
+/* Touch has no hover to reveal it, so the icon always shows. */
 @media (hover: none) {
-  .docs-heading:has(> .docs-anchor) {
-    padding-inline-end: 30px;
-  }
   .docs-anchor {
     opacity: 1;
-    position: static;
-    transform: none;
-    margin-inline-start: 6px;
-    margin-inline-end: -30px;
   }
 }
 .docs-prose table {
@@ -1165,20 +1162,24 @@ figure > .docs-shot {
 .docs-card {
   transition: transform 160ms ease;
 }
-.docs-card:has([data-card-opener]):hover {
-  transform: translateY(-2px);
-}
-.docs-card:has([data-card-opener]):hover .docs-card-arrow {
-  transform: translateX(3px);
-  color: var(--chakra-colors-accent-fg);
-}
-.docs-card:has([data-card-opener]):hover [data-card-variant] {
-  border-color: color-mix(
-    in srgb,
-    var(--chakra-colors-docs-primary) 55%,
-    var(--chakra-colors-border)
-  );
-  box-shadow: 0 6px 18px -8px var(--chakra-colors-docs-shadow-strong);
+/* Pointer hover only: a tap leaves touch screens' :hover stuck, and the lifted layer redrew the
+   card's top hairline unevenly on phones. */
+@media (hover: hover) {
+  .docs-card:has([data-card-opener]):hover {
+    transform: translateY(-2px);
+  }
+  .docs-card:has([data-card-opener]):hover .docs-card-arrow {
+    transform: translateX(3px);
+    color: var(--chakra-colors-accent-fg);
+  }
+  .docs-card:has([data-card-opener]):hover [data-card-variant] {
+    border-color: color-mix(
+      in srgb,
+      var(--chakra-colors-docs-primary) 55%,
+      var(--chakra-colors-border)
+    );
+    box-shadow: 0 6px 18px -8px var(--chakra-colors-docs-shadow-strong);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .docs-shell .docs-card,
@@ -2124,6 +2125,25 @@ body {
   height: var(--docs-input-height);
   font-size: 13px;
 }
+#try-it-form input:is([type="checkbox"], [type="radio"]) {
+  height: 18px;
+}
+#try-it-form legend {
+  color: var(--chakra-colors-blue-fg);
+}
+/* A date and time picker, or Omit, true and false, needs the whole row on a phone. */
+@container (max-width: 440px) {
+  .docs-request-field:has(input[type="datetime-local"], .docs-boolean-switch) {
+    grid-column: 1 / -1;
+  }
+}
+/* An optional boolean's Omit, true and false read as one segmented control, not as labels. */
+#try-it-form .docs-boolean-switch label {
+  color: var(--chakra-colors-fg-muted);
+}
+#try-it-form .docs-boolean-switch label:has(input:checked) {
+  color: var(--chakra-colors-fg);
+}
 #try-it-form label {
   color: var(--chakra-colors-blue-fg);
 }
@@ -2555,7 +2575,6 @@ html[data-docs-theme-change]::view-transition-new(root) {
   }
   :is(
     .docs-theme-toggle,
-    .docs-anchor,
     .docs-site-footer a,
     .docs-release-strip a,
     [data-docs-copy],
@@ -3446,24 +3465,40 @@ html[data-docs-theme-change]::view-transition-new(root) {
   color: var(--chakra-colors-fg-muted);
 }
 
+/* The playground's JSON body grows with its text, so it and its coloured copy never scroll apart. */
+.docs-body-editor :is(textarea, pre) {
+  tab-size: 2;
+}
+.docs-body-editor textarea {
+  field-sizing: content;
+}
+/* The agent prompt is prose: it wraps instead of scrolling sideways. */
+[data-docs-example="agent"] pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.docs-body-editor:has(textarea[aria-invalid="true"]) {
+  border-color: var(--chakra-colors-border-error);
+}
+
 /* The pasted key field toggles with `hidden`, over Chakra's display classes. */
 [data-docs-manual-key] [hidden],
 [data-docs-manual-key][hidden] {
   display: none !important;
 }
 
-/* The app's session frame sizes itself; this is its room from its first word until it says how tall. */
+/* The app's session frame sizes itself; this is its room from its first word until it says how tall.
+   It takes the page's colour scheme: a frame whose scheme differs from its embedder's is painted on
+   an opaque canvas by the browser, the black band light pages showed under a dark system theme. */
 .docs-session-frame {
   display: block;
-  width: 100%;
   height: 40px;
-  margin: 8px 0;
   border: 0;
-  color-scheme: normal;
+  background: transparent;
+  color-scheme: inherit;
 }
 /* Until the frame first speaks it takes no room: a refused frame shows nothing at all. */
 .docs-session-frame:not([data-docs-frame-ready]) {
   height: 0 !important;
-  margin: 0;
   visibility: hidden;
 }

@@ -187,3 +187,61 @@ holds it. What fixes it is that the token never enters the docs page.
   accepted cookies.
 - Supersedes steps 4 to 6 of the Flow, and the XSS consequence above for the docs' origin. An
   XSS on the app's origin still takes the key.
+
+## Amendment, 2026-11-13: access level, chosen lifetime, an organisation switch, navigation
+
+### Decision
+
+- **Read-only or full.** The consent page offers **Read only** beside **Everything you can do
+  in this project**. A read-only key passes only operations whose permission is a read
+  (`*:view`), still capped by the member's live grants; anything else answers 403. The
+  choice is stored on the key, so it holds for its whole life.
+- **The member picks the lifetime.** 5, 15, 30 or 60 minutes, default 5. The key still ends at
+  the earliest of the choice, the browser session's expiry and the organisation's session
+  ceiling. Nothing longer than one hour can be minted, whatever the request says.
+- **An organisation may turn the playground session off.** An admin setting on the
+  organisation's security policies, on by default. When off, the consent page refuses and
+  says the organisation turned it off, no key is minted, and live docs session keys of that
+  organisation stop authenticating at once. Turning it off also revokes them, with every key
+  minted under one: organization records `lw.organization.docs_playground_sessions_disabled`
+  and api-key revokes from its own side (api-key depends on organization, so a call back would
+  be a peer cycle). Turning it on again revives none. The pasted-key path is untouched.
+  The revoke takes only keys created at or before the event's `occurredAt`, so a late delivery
+  leaves keys minted after the switch came back on.
+- **The key survives page changes, not a reload.** The docs swap pages in place
+  (`docs:navigated`), so the session frame is mounted once in the persistent shell, outside the
+  swapped content, and every playground on every page talks to that one frame. A reload, a
+  full page load or closing the tab unloads it and the key with it. The key still never
+  enters storage. Supersedes "the frame unloading clears the key" only in that a page change
+  no longer unloads the frame. Leaving a page cancels every request it left waiting in the
+  frame, and a confirmation the frame shows again restarts its press delay.
+
+### Consequences
+
+- A script on the docs origin still cannot read the key. The frame lives as long as the tab
+  stays on the docs without a reload, bounded by the key's own expiry, at most one hour.
+- A one-hour full-access key is a longer window for an XSS on the app's origin than five
+  minutes; read-only and shorter lifetimes are the member's way to narrow it.
+
+## Amendment, 2026-11-14: turning it off is a durable cut-off
+
+### Decision
+
+- **Turning the playground session off records when.** The organisation row stores
+  `docsPlaygroundSessionsDisabledAt` in the same write as the switch. Turning it on again keeps
+  that time.
+- **The cut-off decides at authentication, not the revoke.** A docs session key minted at or
+  before the cut-off never authenticates again, and neither does any key minted under one (a
+  run key): api-key checks the governing docs key's creation time against the live policy on
+  every request, held answer or not. The time is recorded in the held answer, so a cached run
+  key is checked too.
+- **The revoke becomes cleanup.** api-key still revokes on
+  `lw.organization.docs_playground_sessions_disabled`, but nothing depends on it running, on
+  time or at all. This closes three gaps the 2026-11-13 decision left open: turning it on again
+  before the worker revoked, a lost record of the turn-off, and a run key whose cascade failed.
+
+### Consequences
+
+- Every request with a docs session key, or a key minted under one, reads the organisation's
+  policy, as docs keys already did. Other keys pay nothing.
+- A key minted in the same millisecond as the turn-off is refused, which errs on the safe side.

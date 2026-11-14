@@ -1,28 +1,29 @@
 import { InputGroup } from "@langwatch/design-system/input-group";
 import {
-  Badge,
   Box,
   Button,
   chakra,
   Flex,
   IconButton,
   Input,
-  NativeSelect,
   Text,
-  Textarea,
 } from "@langwatch/design-system/primitives";
 import { Eye, EyeOff } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import { docsAppOrigin } from "../../../config.ts";
+import { isScalar, paramFieldOf, type ScalarField } from "../model/body-form.ts";
+import type { PlaygroundBody } from "../model/body-value.ts";
 import type { RequestState } from "../model/codegen.ts";
 import { paramKey } from "../model/codegen.ts";
 import { sessionCovers } from "../model/docs-session.ts";
 import { JsonCode } from "../model/json-code.tsx";
 import type { Operation, Parameter, Scheme } from "../model/operation.ts";
+import { BodyForm } from "./body-form.tsx";
 import { useEndpointState } from "./endpoint-state.tsx";
 import { Panel } from "./panel.tsx";
+import { FieldHint, FieldLabel, labelsByFor, ScalarControl } from "./request-fields.tsx";
 
 function ParamInput({
   param,
@@ -34,92 +35,31 @@ function ParamInput({
   onChange: (value: string) => void;
 }) {
   const id = `pg-${param.in}-${param.name}`;
+  const field = paramFieldOf({
+    name: param.name,
+    schema: param.schema,
+    required: param.required,
+    description: param.description,
+  });
+  const scalar: ScalarField = isScalar(field)
+    ? field
+    : { ...field, kind: "text", options: [], numeric: false };
+  const utc = scalar.kind === "date-time" || scalar.kind === "epoch-ms";
+  const hint = param.description || utc ? `${id}-hint` : undefined;
   return (
-    <Box className="docs-request-field" title={param.description}>
-      <chakra.label
-        htmlFor={id}
-        display="flex"
-        alignItems="center"
-        gap="2"
-        fontSize="13px"
-        lineHeight="20px"
-        fontWeight="600"
-        marginBottom="1.5"
-      >
-        <Box as="span" fontFamily="mono">
-          {param.name}
-        </Box>
-        <Text as="span" fontWeight="400" color="fg.muted" fontSize="12px">
-          {param.schema.type === "array" ? "array" : (param.schema.type ?? "string")}
-          {param.required ? " · Required" : ""}
-        </Text>
-        {param.deprecated ? (
-          <Badge size="sm" variant="subtle" colorPalette="yellow">
-            Deprecated
-          </Badge>
-        ) : null}
-      </chakra.label>
-      <ParamControl param={param} value={value} onChange={onChange} />
+    <Box className="docs-request-field" minWidth="0">
+      <FieldLabel
+        htmlFor={labelsByFor({ field: scalar }) ? id : undefined}
+        id={`${id}-label`}
+        as={labelsByFor({ field: scalar }) ? "label" : "span"}
+        name={param.name}
+        typeLabel={scalar.typeLabel}
+        required={param.required}
+        deprecated={param.deprecated}
+      />
+      <ScalarControl field={scalar} id={id} value={value} describedBy={hint} onChange={onChange} />
+      {hint ? <FieldHint id={hint} text={param.description} utc={utc} /> : null}
     </Box>
-  );
-}
-
-function ParamControl({
-  param,
-  value,
-  onChange,
-}: {
-  param: Parameter;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  const id = `pg-${param.in}-${param.name}`;
-  const options = param.schema.enum;
-  const numeric = param.schema.type === "integer" || param.schema.type === "number";
-  if (options)
-    return (
-      <NativeSelect.Root size="sm">
-        <NativeSelect.Field
-          id={id}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-        >
-          <option value="">{param.required ? "Select a value" : "Omit"}</option>
-          {options.map((option) => (
-            <option key={String(option)} value={String(option)}>
-              {String(option)}
-            </option>
-          ))}
-        </NativeSelect.Field>
-        <NativeSelect.Indicator />
-      </NativeSelect.Root>
-    );
-  if (param.schema.type === "boolean")
-    return (
-      <NativeSelect.Root size="sm">
-        <NativeSelect.Field
-          id={id}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-        >
-          <option value="">Omit</option>
-          <option value="true">true</option>
-          <option value="false">false</option>
-        </NativeSelect.Field>
-        <NativeSelect.Indicator />
-      </NativeSelect.Root>
-    );
-  return (
-    <Input
-      id={id}
-      size="sm"
-      value={value}
-      inputMode={numeric ? "numeric" : undefined}
-      placeholder={param.name}
-      onChange={(event) => onChange(event.target.value)}
-      autoComplete="off"
-      spellCheck={false}
-    />
   );
 }
 function AuthField({
@@ -151,7 +91,7 @@ function AuthField({
       <summary>API key · {scheme.type === "apiKey" ? scheme.name : "Authorization"}</summary>
       {docsAppOrigin && sessionCovers({ scheme }) ? <SessionControls /> : null}
       <Box data-docs-manual-key="">
-        <Flex gap="2" marginTop="1" align="center">
+        <Flex gap="2" marginTop="1" align="center" data-docs-error-after="">
           <InputGroup
             flex="1"
             endElement={
@@ -217,103 +157,182 @@ function SendActions({
   jsonOnly: boolean;
   host: string;
 }) {
+  if (!jsonOnly)
+    return (
+      <Text margin="0" fontSize="13px" color="fg.muted">
+        This request cannot be sent from the browser. Run this request in your terminal.
+      </Text>
+    );
   return (
-    <Box marginTop="1">
-      {mutating ? (
-        <Text margin="0" marginBottom="2" fontSize="12px" color="fg.muted">
-          This sends a live request to {host}.
-        </Text>
-      ) : null}
-      {jsonOnly ? (
-        <Flex gap="2">
-          <Button
-            type="button"
-            variant="solid"
-            colorPalette="gray"
-            flex="1"
-            height="44px"
-            borderRadius="lg"
-            bg="fg"
-            color="fg.inverted"
-            _hover={{ bg: "docs.body" }}
-            id="pg-send"
-          >
-            Send request
-          </Button>
-        </Flex>
-      ) : (
-        <Text margin="0" fontSize="13px" color="fg.muted">
-          This request cannot be sent from the browser. Run this request in your terminal.
-        </Text>
-      )}
-    </Box>
+    <Flex
+      marginTop="1"
+      gap="3"
+      alignItems={{ base: "stretch", sm: "center" }}
+      direction={{ base: "column", sm: "row" }}
+    >
+      <Text margin="0" flex="1" fontSize="12px" lineHeight="18px" color="fg.muted">
+        {mutating ? `This sends a live request to ${host}.` : "The response appears below."}
+      </Text>
+      <Button
+        type="button"
+        size="sm"
+        minHeight={{ base: "44px", sm: "40px" }}
+        paddingX="5"
+        borderRadius="md"
+        fontWeight="600"
+        bg="docs.primaryFill"
+        color="docs.onPrimary"
+        _hover={{ bg: "docs.primaryFillHover" }}
+        _disabled={{ opacity: 0.6, cursor: "progress" }}
+        id="pg-send"
+      >
+        Send request
+      </Button>
+    </Flex>
   );
 }
-/* The editor and its coloured copy behind it must lay text out identically. */
+/* The editor and its coloured copy behind it must lay text out identically: same font, padding
+   and wrapping, no border on either and no inner scroll, so the field grows with its text. */
 const BODY_TEXT = {
   fontFamily: "mono",
-  fontSize: "12px",
+  fontSize: "13px",
   lineHeight: "20px",
-  paddingX: "10px",
-  paddingY: "8px",
-  borderWidth: "1px",
-  borderRadius: "md",
+  padding: "12px",
+  margin: "0",
+  border: "0",
   letterSpacing: "normal",
+  whiteSpace: "pre-wrap",
+  overflowWrap: "anywhere",
 } as const;
 
-function BodyEditor({ body, onChange }: { body: string; onChange: (value: string) => void }) {
-  const mirror = useRef<HTMLPreElement>(null);
+const MODES = [
+  { mode: "form", label: "Form" },
+  { mode: "json", label: "JSON" },
+] as const;
+
+/** Form or JSON: both edit the one body in `#pg-body`; the island switches and converts. */
+function BodyModeSwitch({ mode }: { mode: PlaygroundBody["mode"] }) {
   return (
-    <Box>
-      <chakra.label
-        htmlFor="pg-body"
-        display="block"
-        fontSize="13px"
-        fontWeight="600"
-        marginBottom="1"
-      >
-        Body{" "}
-        <Text as="span" fontWeight="400" color="fg.muted">
-          (application/json)
-        </Text>
-      </chakra.label>
-      <Box position="relative">
-        <chakra.pre
-          ref={mirror}
-          aria-hidden="true"
-          className="docs-json"
-          {...BODY_TEXT}
-          position="absolute"
-          inset="0"
-          margin="0"
-          overflow="hidden"
-          pointerEvents="none"
-          borderColor="transparent"
-          whiteSpace="pre-wrap"
-          overflowWrap="anywhere"
+    <chakra.fieldset
+      display="flex"
+      margin="0"
+      padding="0"
+      minWidth="0"
+      aria-label="Edit the body as"
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="md"
+      overflow="hidden"
+      flexShrink={0}
+    >
+      {MODES.map((entry) => (
+        <Button
+          key={entry.mode}
+          type="button"
+          size="xs"
+          variant="ghost"
+          colorPalette="gray"
+          borderRadius="0"
+          minHeight="32px"
+          paddingX="3"
+          fontWeight="500"
+          data-body-mode-button={entry.mode}
+          aria-pressed={mode === entry.mode}
+          css={{ '&[aria-pressed="true"]': { background: "var(--chakra-colors-bg-emphasized)" } }}
         >
-          <JsonCode text={body} />
-          {/* A trailing newline needs a character after it to take up its line. */}
-          {"\u200b"}
-        </chakra.pre>
-        <Textarea
-          id="pg-body"
-          {...BODY_TEXT}
-          rows={Math.min(14, Math.max(4, body.split("\n").length))}
+          {entry.label}
+        </Button>
+      ))}
+    </chakra.fieldset>
+  );
+}
+
+function BodyEditor({
+  body,
+  seed,
+  onChange,
+}: {
+  body: string;
+  seed: PlaygroundBody;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <Box data-body-mode={seed.form ? seed.mode : "json"}>
+      <Flex alignItems="center" justifyContent="space-between" gap="3" marginBottom="1.5">
+        <Text
+          id="pg-body-title"
+          as="span"
+          margin="0"
+          fontSize="13px"
+          fontWeight="600"
+          color="blue.fg"
+        >
+          Body{" "}
+          <Text as="span" fontWeight="400" color="fg.muted">
+            (application/json)
+          </Text>
+        </Text>
+        {seed.form ? <BodyModeSwitch mode={seed.mode} /> : null}
+      </Flex>
+      {seed.form ? (
+        <div data-body-panel="form" hidden={seed.mode !== "form"}>
+          <BodyForm form={seed.form} entries={seed.entries} extra={seed.extra} />
+        </div>
+      ) : null}
+      <div data-body-panel="json" hidden={Boolean(seed.form) && seed.mode !== "json"}>
+        <Box
+          className="docs-body-editor"
+          data-docs-error-after=""
           position="relative"
-          background="transparent"
-          color="transparent"
-          css={{ caretColor: "var(--chakra-colors-fg)" }}
-          value={body}
-          spellCheck={false}
-          onScroll={(event) => {
-            if (mirror.current) mirror.current.scrollTop = event.currentTarget.scrollTop;
+          bg="bg.nested"
+          borderWidth="1px"
+          borderColor="border"
+          borderRadius="md"
+          overflow="hidden"
+          _focusWithin={{
+            borderColor: "accent.fg",
+            boxShadow: "0 0 0 1px var(--chakra-colors-accent-fg)",
           }}
-          onChange={(event) => {
-            onChange(event.target.value);
-          }}
-        />
-      </Box>
+        >
+          <chakra.pre
+            aria-hidden="true"
+            className="docs-json"
+            data-docs-body-mirror=""
+            {...BODY_TEXT}
+            position="absolute"
+            inset="0"
+            overflow="hidden"
+            pointerEvents="none"
+          >
+            <JsonCode text={body} />
+            {/* A trailing newline needs a character after it to take up its line. */}
+            {"\u200b"}
+          </chakra.pre>
+          <chakra.textarea
+            id="pg-body"
+            aria-labelledby="pg-body-title"
+            {...BODY_TEXT}
+            rows={Math.max(4, body.split("\n").length + 1)}
+            display="block"
+            width="100%"
+            minHeight="120px"
+            position="relative"
+            background="transparent"
+            color="transparent"
+            resize="none"
+            overflow="hidden"
+            outline="none"
+            css={{ caretColor: "var(--chakra-colors-fg)" }}
+            value={body}
+            spellCheck={false}
+            autoCapitalize="off"
+            autoComplete="off"
+            onChange={(event) => {
+              onChange(event.target.value);
+            }}
+          />
+        </Box>
+      </div>
     </Box>
   );
 }
@@ -377,12 +396,14 @@ function ParameterFields({
 
 export function PlaygroundRequest({
   operation,
+  seed,
   state,
   children,
   onChange,
   onTouched,
 }: {
   operation: Operation;
+  seed: PlaygroundBody;
   state: RequestState;
   children: ReactNode;
   onChange: (state: RequestState) => void;
@@ -452,6 +473,7 @@ export function PlaygroundRequest({
             {operation.body && bodyContent ? (
               <BodyEditor
                 body={body}
+                seed={seed}
                 onChange={(value) => {
                   onTouched();
                   onChange({ ...state, body: value });
@@ -460,6 +482,8 @@ export function PlaygroundRequest({
             ) : null}
 
             <SendActions mutating={mutating} jsonOnly={jsonOnly} host={host} />
+            {/* The live response lands here, under Send, where the reader is looking. */}
+            <div data-docs-response-slot="" />
           </Flex>
         </Panel>
       </div>

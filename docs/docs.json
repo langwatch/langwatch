@@ -848,6 +848,12 @@
             ]
           },
           {
+            "group": "Agent Registry",
+            "pages": [
+              "governance/agent-registry"
+            ]
+          },
+          {
             "group": "Privacy",
             "pages": [
               "ai-governance/no-spy-mode"
@@ -1440,6 +1446,19 @@
             ]
           },
           {
+            "group": "Agent Registry",
+            "pages": [
+              "api-reference/governance-agent-registry/overview",
+              "api-reference/governance-agent-registry/list-the-organisation-s-agent-registry",
+              "api-reference/governance-agent-registry/get-the-registry-as-an-ard-manifest",
+              "api-reference/governance-agent-registry/read-the-registry-change-feed",
+              "api-reference/governance-agent-registry/get-the-registry-s-json-schemas",
+              "api-reference/governance-agent-registry/search-the-registry-ard-search",
+              "api-reference/governance-agent-registry/get-one-registry-agent",
+              "api-reference/governance-agent-registry/list-one-registry-agent-s-versions"
+            ]
+          },
+          {
             "group": "Coding Agents",
             "pages": [
               "api-reference/coding-agents/overview",
@@ -1854,7 +1873,7 @@
       "destination": "/api-reference/projects/get-a-dashboard"
     },
     {
-      "source": "/ci/cache/busted/1794561160",
+      "source": "/ci/cache/busted/1794655975",
       "destination": "/introduction"
     },
     {

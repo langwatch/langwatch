@@ -8,7 +8,7 @@ import { languageScript, themeScript } from "../document.ts";
    langwatch-saas infrastructure/docs-site.tf). Change a script, change the hash there too. */
 const ALLOWED = {
   theme: "sha256-b+QUjVcfcnwj2dIQAasZQazvYI0d64Cf9ezdWaXBNhs=",
-  language: "sha256-Oc/eUJOWymRN8U5yoi3WrEK4LvWdCaksXPVB5tlijGY=",
+  language: "sha256-esoJdv6L2BfUrE+Fn9rCKiG++si2A1LznocOZXyeCSc=",
 };
 
 function scriptHash({ script }: { script: string }) {

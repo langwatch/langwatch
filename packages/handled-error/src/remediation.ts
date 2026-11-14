@@ -336,6 +336,11 @@ const registry = {
     tips: ["Re-create the API key with the required scope, or ask an admin to raise your role"],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
+  impersonation_cannot_mint_credential: {
+    tips: [
+      "No role or grant changes this; leave impersonation, and ask the member to create or rotate the key themselves",
+    ],
+  },
   legacy_project_key_ingestion_only: {
     tips: [
       "A legacy project key is limited to ingestion and the scopes enabled for its project; create an API key with the permissions this call needs and send it instead",
@@ -364,6 +369,12 @@ const registry = {
       "A self-hosted installation registers more documentation sites in its configuration",
     ],
   },
+  docs_playground_sessions_disabled: {
+    tips: [
+      "Paste an API key into the playground instead",
+      "An organisation admin can turn docs playground sessions back on under Settings, Authentication",
+    ],
+  },
   api_key_reserved_name: {
     tips: [
       "This name is reserved for keys LangWatch manages on your behalf; pick a different name",
@@ -371,6 +382,14 @@ const registry = {
     docsPath: "/api-reference/api-keys/create-api-key",
   },
 
+  // ---- ingestion sources ----
+  ingestion_source_disabled: {
+    tips: [
+      "Stop the exporter, or ask an organization admin to set the source back to active",
+      "Events refused while the source was disabled are not kept; resend them after re-enabling if you need them",
+    ],
+    docsPath: "/ai-governance/ingestion-sources/index",
+  },
   // ---- ingestion keys ----
   ingestion_key_not_found: {
     tips: [
@@ -529,6 +548,13 @@ const registry = {
       "An archived agent is not found; a connected agent that registers again restores its row",
     ],
     docsPath: "/agent-testing/connect-your-agent",
+  },
+  agent_registry_entry_not_found: {
+    tips: [
+      "List the registry with GET /api/governance/registry/agents and use an `id` from that list",
+      "Registry ids start with agentreg_; a LangWatch agent id is a different id",
+    ],
+    docsPath: "/governance/agent-registry",
   },
   agent_offline: {
     tips: [

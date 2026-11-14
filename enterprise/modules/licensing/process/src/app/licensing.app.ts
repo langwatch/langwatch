@@ -561,6 +561,7 @@ export class LicensingModule implements LicensingApiContract {
     id: string;
     maxMembers?: number;
     maxMembersLite?: number;
+    maxMembersDeveloper?: number;
     maxMessagesPerMonth?: number;
     expiresAt: string;
     operatorId: string;

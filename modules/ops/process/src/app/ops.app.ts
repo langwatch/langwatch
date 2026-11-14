@@ -2506,6 +2506,7 @@ function buildOpsInfrastructure(input: {
 
   const explainRuntime = OpsClickHouseRuntime.create({
     url: config.clickhouseOpsUrl,
+    passwordFile: config.clickhouseOpsPasswordFile,
     buildTime: false,
   });
   resources.own("api ops explain client", () => explainRuntime.close());

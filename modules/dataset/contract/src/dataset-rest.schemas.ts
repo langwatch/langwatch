@@ -36,6 +36,25 @@ const columnTypeSchema = z.object({ name: z.string(), type: datasetColumnTypeSch
 const datasetRestCreateSchemaDefinition = z.object({
   name: z.string().min(1, "name is required"),
   columnTypes: z.array(columnTypeSchema).optional().default([]),
+  entries: z
+    .array(
+      z
+        .object({
+          id: z
+            .string()
+            .min(1)
+            .optional()
+            .describe(
+              "Leave it out: record ids are unique across projects, so the platform picks them.",
+            ),
+        })
+        .catchall(z.any()),
+    )
+    .max(DATASET_BATCH_MAX, `Maximum batch size is ${DATASET_BATCH_MAX} entries`)
+    .optional()
+    .describe(
+      "The dataset's first rows, written with it in one call. Each key must be a column in `columnTypes`.",
+    ),
 });
 export interface DatasetRestCreateSchema extends Named<typeof datasetRestCreateSchemaDefinition> {}
 export const datasetRestCreateSchema: DatasetRestCreateSchema = datasetRestCreateSchemaDefinition;

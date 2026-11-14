@@ -9,7 +9,7 @@ import {
   approveRequestSchema,
   logoutRequestSchema,
 } from "@langwatch/auth-contract";
-import { PermissionDeniedError } from "@langwatch/authorization";
+import { ImpersonationCannotMintCredentialError } from "@langwatch/authorization";
 import type { FeatureFlagKey, FeatureFlagTarget } from "@langwatch/feature-flag-contract";
 import { createLogger } from "@langwatch/observability";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
@@ -127,13 +127,7 @@ async function approve({
   const { user_code, organization_id, project_id } = parsed.data;
 
   // An operator acting as a member holds no grant to issue credentials as them (F05).
-  if (person.impersonator) {
-    throw new PermissionDeniedError({
-      permission: "apiKeys:create",
-      scope: { type: "organization", id: organization_id },
-      denialReason: "no-grant",
-    });
-  }
+  if (person.impersonator) throw new ImpersonationCannotMintCredentialError();
 
   // Verify the caller is an ACTIVE member of the organization they are issuing
   // a credential for: a membership an admin disabled to reclaim its seat must

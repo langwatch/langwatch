@@ -97,6 +97,8 @@ document.addEventListener("click", (event) => {
     break;
   }
 });
+/* Find-in-page opened a collapsed accordion: its island marks the trigger open to match. */
+document.addEventListener("beforematch", () => loadIsland({ name: "disclosures" }), { once: true });
 /* The page's inline key listener marks a search shortcut, even one pressed before this ran. */
 const searchRequested = () => {
   if ((window as { docsSearchKey?: number }).docsSearchKey) loadIsland({ name: "search" });

@@ -83,7 +83,7 @@ export function TwoStepRequirementCard({
       {planLocked && (
         <AccessState
           kind="upgrade"
-          compact
+          inset
           title="Requiring two-step verification needs Enterprise"
           description={explanation}
           data-testid="two-step-requirement-plan-notice"

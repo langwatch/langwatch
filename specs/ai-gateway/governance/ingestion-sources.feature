@@ -816,12 +816,48 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
     And after 24h the old secret is auto-invalidated
     And the upstream operator gets a clear paste-this-in instruction for the new value
 
-  Scenario: Disabled source stops ingesting but preserves history
-    When the admin clicks "Disable" on a source
-    Then no new events are ingested from that source
-    And historical events are NOT deleted
-    And re-enabling resumes ingestion seamlessly
-    And the source can be permanently deleted via a separate destroy action
+  # A source is live while it is neither archived nor disabled. That one rule
+  # (`ingestionSourceIsLive`, contract `source-health.ts`) is what the push
+  # receivers, the pull scheduler and the pull worker all ask. The
+  # `ingestion-source-status-literal` lint rule keeps it from being re-spelled.
+  # Disabling only writes the status, so the source's history stays.
+  @unit
+  Scenario: A disabled push source refuses new batches
+    Given a push source the admin has disabled
+    When its sender posts a batch with the source's own secret to its own endpoint
+    Then the receiver answers 403 "ingestion_source_disabled"
+    And nothing is handed to a pipeline and the source is not stamped
+
+  @unit
+  Scenario: A disabled source answers a wrong endpoint as unknown
+    Given a push source the admin has disabled
+    When its secret is posted to another source's endpoint
+    Then the receiver answers the same bare 401 "ingestion_source_unauthorized"
+
+  @unit
+  Scenario: A batch in flight when the source is disabled does not re-enable it
+    Given a batch was let in just before the admin disabled its source
+    When the batch is stamped as received
+    Then the source stays disabled
+
+  @unit
+  Scenario: A pull run completing after the source is disabled does not re-enable it
+    Given a pull run that delivered events was still being recorded when the admin disabled its source
+    When the run's outcome is mirrored onto the source
+    Then the source stays disabled
+    And its cursor, error count and last success still reflect the run
+
+  @unit
+  Scenario: The first batch a source receives makes it active
+    Given a source still awaiting its first event
+    When a batch is stamped as received
+    Then the source is active and its last event time is now
+
+  @unit
+  Scenario: Re-enabling a disabled source resumes ingestion
+    Given a push source the admin disabled and then set back to active
+    When its sender posts a batch with the same secret
+    Then the receiver accepts it
 
   Scenario: Tenant isolation — sources are scoped to one org
     Given two orgs (acme-corp, beta-co) both have configured sources

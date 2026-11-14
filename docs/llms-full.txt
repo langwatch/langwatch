@@ -14988,7 +14988,9 @@ For source types where the puller worker is not yet wired (the three "setup-cont
 
 ## Auth contract: same shape across every receiver
 
-All push-mode + webhook receivers use `Authorization: Bearer lw_is_<secret>` (the same shape the gateway uses for its `vk-lw-` virtual keys, just a different prefix). Mismatched `:sourceId` path vs. resolved-secret source ID returns `401 unauthorized` without leaking which one exists. The 24-hour rotation grace window is documented in the IngestionSource lifecycle architecture.
+All push-mode + webhook receivers use `Authorization: Bearer lw_is_<secret>` (the same shape the gateway uses for its `vk-lw-` virtual keys, just a different prefix). Mismatched `:sourceId` path vs. resolved-secret source ID returns `401 unauthorized` without leaking which one exists.
+
+A disabled source answers its own secret with `403 ingestion_source_disabled` and keeps no part of the batch; set it back to active and the same secret works again. Disabling never deletes the source's history. The 24-hour rotation grace window is documented in the IngestionSource lifecycle architecture.
 
 ## Verification: same loop for every active source
 
@@ -15136,7 +15138,7 @@ sidebarTitle: Generic OTel
 - **Body:** OTLP/HTTP JSON envelope (`resource_spans`, `scope_spans`, `spans`). `snake_case` and `camelCase` both accepted.
 - **OTLP shape:** Spans (parent-child + duration). Lands in `recorded_spans`.
 - **Pipeline:** Receiver lazy-ensures the hidden Governance Project, stamps `langwatch.origin.*` on every span, hands off to the existing trace pipeline (same `traces.collection.handleOtlpTraceRequest` that powers `/api/otel/v1/traces`). No parallel write path.
-- **Status flip:** receiver calls `recordEventReceived(sourceId)` after any successful 202; source flips from `awaiting_first_event` → `active`.
+- **Status flip:** receiver calls `recordEventReceived(sourceId)` after any successful 202; source flips from `awaiting_first_event` → `active`. A disabled source is never flipped back, and its batches are refused with `403 ingestion_source_disabled`.
 
 ## What the admin configures upstream
 
@@ -41329,6 +41331,19 @@ info = langwatch.dataset.create_dataset(
 )
 print(f"Created: {info.name} (slug: {info.slug})")
 
+# Create with columns and its first rows in one call
+info = langwatch.dataset.create_dataset(
+    "QA Cases",
+    columns=[
+        {"name": "case_id", "type": "string"},
+        {"name": "input", "type": "string"},
+        {"name": "expected_output", "type": "string"},
+    ],
+    entries=[
+        {"case_id": "c-1", "input": "What is LangWatch?", "expected_output": "An LLM ops platform."},
+    ],
+)
+
 # Create with just a name (columns can be added later)
 info = langwatch.dataset.create_dataset("Simple Dataset")
 ```
@@ -41349,6 +41364,19 @@ const info = await langwatch.datasets.create({
   ],
 });
 console.log(`Created: ${info.name} (slug: ${info.slug})`);
+
+// Create with columns and its first rows in one call
+const qa = await langwatch.datasets.create({
+  name: "QA Cases",
+  columnTypes: [
+    { name: "case_id", type: "string" },
+    { name: "input", type: "string" },
+    { name: "expected_output", type: "string" },
+  ],
+  entries: [
+    { case_id: "c-1", input: "What is LangWatch?", expected_output: "An LLM ops platform." },
+  ],
+});
 
 // Create with just a name
 const simple = await langwatch.datasets.create({ name: "Simple Dataset" });
@@ -41582,6 +41610,57 @@ console.log(`Updated: ${record.id}`);
 ```
 
 
+
+## Sync Records by a Key Column
+
+Keep a dataset in step with rows held elsewhere, such as files in a Git repository. Name the column
+that identifies a row. A row that already holds an entry's key is updated in place, and the columns
+the entry leaves out keep their values. An entry with a new key is added. A row the entry would not
+change is not written, so a second run with the same rows changes no row.
+
+An upsert never deletes: a row whose key is gone from the source stays in the dataset until you
+delete it.
+
+The SDK refuses, before writing anything, an entry without the key, two entries with the same key,
+or a key that more than one existing row holds.
+
+
+  ### Python
+
+```python
+import langwatch
+
+rows = [
+    {"case_id": "c-1", "input": "What is LangWatch?", "expected_output": "An LLM ops platform."},
+    {"case_id": "c-2", "input": "How do I start?", "expected_output": "Install the SDK."},
+]
+
+result = langwatch.dataset.upsert_records("qa-cases", entries=rows, key="case_id")
+print(f"{len(result.created)} created, {len(result.updated)} updated, {result.unchanged} unchanged")
+```
+
+  ### TypeScript
+
+```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
+const rows = [
+  { case_id: "c-1", input: "What is LangWatch?", expected_output: "An LLM ops platform." },
+  { case_id: "c-2", input: "How do I start?", expected_output: "Install the SDK." },
+];
+
+const result = await langwatch.datasets.upsertRecords("qa-cases", rows, { key: "case_id" });
+console.log(`${result.created.length} created, ${result.updated.length} updated`);
+```
+
+
+
+Over the REST API, the same sync reads the rows with `GET /api/v1/dataset/{slugOrId}/records`, sends
+changed rows to `PATCH /api/v1/dataset/{slugOrId}/records/{recordId}` with the id it read, and adds
+new rows with `POST /api/v1/dataset/{slugOrId}/records`. Leave `id` out of new rows: record ids are
+unique across every project, so the platform picks them.
 
 ## Delete Records
 
@@ -67496,6 +67575,7 @@ When `S3_BUCKET_NAME` is set, all consumers use that bucket. When it is not set,
 | ---------------------- | --------------------------------------------------------------------------------------------------------------- | ------- |
 | `S3_BUCKET_NAME`       | Dataplane bucket shared by datasets + stored-objects                                                            | -       |
 | `S3_ENDPOINT`          | Custom S3 endpoint (for MinIO, etc.)                                                                            | -       |
+| `S3_REGION`            | S3 region. Unset, a regional AWS endpoint names its own, other custom endpoints use `auto`, and AWS uses `AWS_REGION` | -       |
 | `S3_ACCESS_KEY_ID`     | S3 access key ID                                                                                                | -       |
 | `S3_SECRET_ACCESS_KEY` | S3 secret access key                                                                                            | -       |
 | `S3_KEY_SALT`          | Salt for the per-project cache key the optimization studio sends to the NLP engine. Unset, no cache key is sent | -       |
@@ -73957,6 +74037,11 @@ app:
     bucket: "your-dataset-bucket"
     providers:
       awsS3:
+        # Your bucket's region (rendered as S3_REGION). Required for AWS. For MinIO
+        # or other S3-compatible services, set the region the service expects, or
+        # remove the whole region block (both lines) to sign as "auto".
+        region:
+          value: "<your-bucket-region>"
         accessKeyId:
           secretKeyRef: { name: "your-secret", key: "accessKeyId" }
         secretAccessKey:
@@ -77242,6 +77327,82 @@ openapi: "POST /api/gateway/v1/virtual-keys/{id}/rotate"
 ---
 title: "Update virtual key"
 openapi: "PATCH /api/gateway/v1/virtual-keys/{id}"
+---
+
+---
+
+# FILE: ./api-reference/governance-agent-registry/get-one-registry-agent.mdx
+
+---
+title: "Get one registry agent"
+openapi: "GET /api/v1/governance/registry/agents/{agentId}"
+---
+
+---
+
+# FILE: ./api-reference/governance-agent-registry/get-the-registry-as-an-ard-manifest.mdx
+
+---
+title: "Get the registry as an ARD manifest"
+openapi: "GET /api/v1/governance/registry/ard.json"
+---
+
+---
+
+# FILE: ./api-reference/governance-agent-registry/get-the-registry-s-json-schemas.mdx
+
+---
+title: "Get the registry's JSON Schemas"
+openapi: "GET /api/v1/governance/registry/schema"
+---
+
+---
+
+# FILE: ./api-reference/governance-agent-registry/list-one-registry-agent-s-versions.mdx
+
+---
+title: "List one registry agent's versions"
+openapi: "GET /api/v1/governance/registry/agents/{agentId}/versions"
+---
+
+---
+
+# FILE: ./api-reference/governance-agent-registry/list-the-organisation-s-agent-registry.mdx
+
+---
+title: "List the organisation's agent registry"
+openapi: "GET /api/v1/governance/registry/agents"
+---
+
+---
+
+# FILE: ./api-reference/governance-agent-registry/overview.mdx
+
+---
+title: "Overview"
+description: "Read every AI agent in your organization with its endpoints, model, instructions, tools and owner, as JSON or as an ARD v0.91 manifest, and follow its changes through the change feed. Needs an organization API key."
+---
+
+## Intro
+
+Read every AI agent in your organization with its endpoints, model, instructions, tools and owner, as JSON or as an ARD v0.91 manifest, and follow its changes through the change feed. Needs an organization API key.
+
+---
+
+# FILE: ./api-reference/governance-agent-registry/read-the-registry-change-feed.mdx
+
+---
+title: "Read the registry change feed"
+openapi: "GET /api/v1/governance/registry/events"
+---
+
+---
+
+# FILE: ./api-reference/governance-agent-registry/search-the-registry-ard-search.mdx
+
+---
+title: "Search the registry (ARD search)"
+openapi: "POST /api/v1/governance/registry/ard/search"
 ---
 
 ---

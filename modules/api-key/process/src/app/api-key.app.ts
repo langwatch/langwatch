@@ -42,6 +42,7 @@ import {
   apiKeyServerConfig,
   docsOriginsOf,
   type ApiKeyServerConfig,
+  type DocsSessionAvailability,
   type DocsSessionKeyMinted,
   type DocsSessionRevoked,
   type MintDocsSessionKeyInput,
@@ -56,7 +57,7 @@ import {
   type SigningKey,
   type VerifyBraidSignatureInput,
 } from "@langwatch/api-key-contract";
-import { PermissionDeniedError } from "@langwatch/authorization";
+import { ImpersonationCannotMintCredentialError } from "@langwatch/authorization";
 import { AuthzApi, newAuthzGrantId } from "@langwatch/authz-contract";
 import { ConfigParseError } from "@langwatch/config";
 import { createLogger } from "@langwatch/observability";
@@ -72,6 +73,10 @@ import {
 } from "@langwatch/secrets";
 import type { Instant } from "@langwatch/time";
 
+import {
+  buildDocsPlaygroundRevocationPipeline,
+  type DocsPlaygroundRevocationPipeline,
+} from "../eventing/docs-playground-revocation.pipeline.ts";
 import type { ApiKeyRepositories } from "../repositories/api-key.repositories.ts";
 import { AgentSandboxKeyService } from "../services/agent-sandbox-key.service.ts";
 import { ApiKeyTokenService } from "../services/api-key-token.service.ts";
@@ -343,8 +348,15 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
   mintDocsSessionKey(input: MintDocsSessionKeyInput): Promise<DocsSessionKeyMinted> {
     return this.#docsSessionKeys.mint(input);
   }
+  getDocsSessionAvailability(input: { projectId: string }): Promise<DocsSessionAvailability> {
+    return this.#docsSessionKeys.availability(input);
+  }
   revokeDocsSessionKeys(input: RevokeDocsSessionKeysInput): Promise<DocsSessionRevoked> {
     return this.#docsSessionKeys.revoke(input);
+  }
+  /** Revokes an organisation's docs session keys once it turns the playground session off. */
+  docsPlaygroundRevocationPipeline(): DocsPlaygroundRevocationPipeline {
+    return buildDocsPlaygroundRevocationPipeline({ docsSessionKeys: this.#docsSessionKeys });
   }
   async resolveOrganizationToken(
     input: OrganizationApiKeyResolutionInput,
@@ -701,11 +713,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
   ): Promise<{ token: string; apiKey: ApiKey; assignedToUserId: string | null }> {
     // An operator acting as a member holds no grant to issue credentials as them.
     if (by.impersonatorId) {
-      throw new PermissionDeniedError({
-        permission: "organization:view",
-        scope: { type: "organization", id: input.organizationId },
-        denialReason: "no-grant",
-      });
+      throw new ImpersonationCannotMintCredentialError();
     }
     await this.#ensureMember(input.organizationId, by);
     const isService = input.keyType === "service";
@@ -777,11 +785,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
     by: ApiKeyCaller,
   ): Promise<{ token: string; apiKey: ApiKey }> {
     if (by.impersonatorId) {
-      throw new PermissionDeniedError({
-        permission: "organization:view",
-        scope: { type: "organization", id: input.organizationId },
-        denialReason: "no-grant",
-      });
+      throw new ImpersonationCannotMintCredentialError();
     }
     await this.#ensureMember(input.organizationId, by);
     const callerIsAdmin = await this.#isOrganizationAdmin(input.organizationId, by);
