@@ -270,9 +270,9 @@ function startsBeforeCheckpoint({
 
 export class FoldProjectionExecutor {
   /**
-   * Events per page for the streaming store-miss re-fold. Bounds the working set —
-   * 1000 keeps per-page memory small while amortising the round-trip. Injected so
-   * tests can force multi-page runs.
+   * Events per page for both paged history reads: the streaming store-miss re-fold
+   * and the paged hand-off rebuild. 1000 keeps per-page memory small while amortising
+   * the round-trip. Injected so tests can force multi-page runs.
    */
   private readonly refoldPageSize: number;
 
@@ -1001,8 +1001,9 @@ export class FoldProjectionExecutor {
     stateFrontierOccurredAtMs: number;
     redeliversAppliedKey: boolean;
   }): Promise<RebuildPass<State> & { hasGap: boolean }> {
-    // Upper bound past every event: the rebuild folds events accepted after the missed
-    // one too, and their queued live jobs then skip themselves on the applied set.
+    // Upper bound past every event, so queued live jobs skip themselves on the applied
+    // set. `occurredAt` stays the missed event's: it is the only predicate that prunes
+    // partitions on the paged read, and zeroing it makes every page a full cold scan.
     const logHead: E = { ...missed, createdAt: Number.MAX_SAFE_INTEGER };
     const consumes = projectionConsumes<E, Event>(projection);
     const pass: RebuildPass<State> = {
@@ -1013,34 +1014,57 @@ export class FoldProjectionExecutor {
       seen: new Set(),
       unaccounted: new Set(loadedAppliedIds),
     };
-    // Same safety net as streamRefoldUpToDelivered: bounds a non-advancing cursor.
+    for await (const page of this.historyPages({
+      projection,
+      context,
+      upToEvent: logHead,
+      reader: "streamRebuild",
+    })) {
+      foldRebuildPage({ projection, consumes, pass, page });
+    }
+    return finishRebuildPass({
+      projection,
+      consumes,
+      pass,
+      missed,
+      redeliversAppliedKey,
+      stateFrontierOccurredAtMs,
+    });
+  }
+
+  /**
+   * The aggregate's history up to `upToEvent`, one `refoldPageSize` page at a time.
+   * The page bound is a safety net for a non-advancing cursor: 100k pages of the
+   * default 1000 covers a 100M-event aggregate. Callers guard `eventLoaderUpToPaged`.
+   */
+  private async *historyPages<State, E extends Event>({
+    projection,
+    context,
+    upToEvent,
+    reader,
+  }: {
+    projection: FoldProjectionDefinition<State, E>;
+    context: ProjectionStoreContext;
+    upToEvent: E;
+    reader: string;
+  }): AsyncGenerator<readonly Event[]> {
     const MAX_PAGES = 100_000;
     let after: { timestamp: number; eventId: string } | undefined;
     for (let pageCount = 1; pageCount <= MAX_PAGES; pageCount++) {
-      // Caller guards eventLoaderUpToPaged is set.
       const page = await projection.eventLoaderUpToPaged!({
         tenantId: context.tenantId,
         aggregateId: context.aggregateId,
-        upToEvent: logHead,
+        upToEvent,
         after,
         limit: this.refoldPageSize,
       });
-      foldRebuildPage({ projection, consumes, pass, page });
+      if (page.length > 0) yield page;
       const last = page.at(-1);
-      if (!last || page.length < this.refoldPageSize) {
-        return finishRebuildPass({
-          projection,
-          consumes,
-          pass,
-          missed,
-          redeliversAppliedKey,
-          stateFrontierOccurredAtMs,
-        });
-      }
+      if (!last || page.length < this.refoldPageSize) return;
       after = { timestamp: last.createdAt, eventId: last.id };
     }
     throw new Error(
-      `streamRebuild exceeded ${MAX_PAGES} pages for aggregate ${context.aggregateId} — possible non-advancing cursor`,
+      `${reader} exceeded ${MAX_PAGES} pages for aggregate ${context.aggregateId} — possible non-advancing cursor`,
     );
   }
 
@@ -1362,42 +1386,19 @@ export class FoldProjectionExecutor {
     context: ProjectionStoreContext;
     upToEvent: E;
   }): Promise<State | null> {
-    const PAGE_SIZE = this.refoldPageSize;
-    // Safety net only: the paged loader's cursor is expected to strictly
-    // advance every call. If that contract is ever violated (e.g. a
-    // non-advancing cursor from a repository bug), this bounds the loop
-    // instead of hanging the fold worker for the aggregate indefinitely.
-    // 100k pages * 1000/page default covers a 100M-event aggregate.
-    const MAX_PAGES = 100_000;
     const seen = new Set<string>();
     let state = projection.init();
-    let after: { timestamp: number; eventId: string } | undefined;
     let refoldEventCount = 0;
-    let pageCount = 0;
 
-    for (;;) {
-      if (++pageCount > MAX_PAGES) {
-        throw new Error(
-          `streamRefoldUpToDelivered exceeded ${MAX_PAGES} pages for aggregate ${context.aggregateId} — possible non-advancing cursor`,
-        );
-      }
-      // Caller guards eventLoaderUpToPaged is set.
-      const page = await projection.eventLoaderUpToPaged!({
-        tenantId: context.tenantId,
-        aggregateId: context.aggregateId,
-        upToEvent,
-        after,
-        limit: PAGE_SIZE,
-      });
-      if (page.length === 0) break;
-
+    for await (const page of this.historyPages({
+      projection,
+      context,
+      upToEvent,
+      reader: "streamRefoldUpToDelivered",
+    })) {
       const applied = applyUnseenEvents({ projection, events: page, seen, state });
       state = applied.state;
       refoldEventCount += applied.appliedCount;
-
-      const last = page[page.length - 1]!;
-      after = { timestamp: last.createdAt, eventId: last.id };
-      if (page.length < PAGE_SIZE) break;
     }
 
     if (refoldEventCount === 0) return null;

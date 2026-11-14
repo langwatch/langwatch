@@ -207,8 +207,65 @@ describe("rebuilding a fold's aggregate for a missed hand-off", () => {
       });
     });
 
-    describe("when the fold already applied an event the log does not return yet", () => {
-      /** @scenario "A paged rebuild refuses a history that lags behind what the fold applied" */
+    describe("when the fold already applied an event the first read does not return", () => {
+      /** @scenario "A paged rebuild retries a history that lags behind what the fold applied" */
+      it("re-reads from the first page and ends equal to a full replay, folding nothing twice", async () => {
+        const log = Array.from({ length: 5 }, (_, i) => at(1_000 * (i + 1)));
+        const [applied, missed] = [log[0]!, log[2]!];
+        let lagging = true;
+        const { fold, current, paged } = pagedCountingFold({
+          log: () => (lagging ? log.slice(1) : log),
+        });
+        const retrying = new FoldProjectionExecutor({
+          refoldPageSize: 2,
+          refoldHistoryRetryDelaysMs: [0, 0],
+        });
+        await retrying.execute(fold, applied, context);
+        paged.mockClear();
+        paged.mockImplementationOnce(async (request) => {
+          const page = await pagedReader({ log: () => log.slice(1) })(request);
+          lagging = false;
+          return page;
+        });
+
+        await retrying.rebuild(fold, missed, context);
+
+        const passStarts = paged.mock.calls.filter(([request]) => request.after === undefined);
+        expect(passStarts).toHaveLength(2);
+        expect(current()?.state.seen).toEqual(log.map((e) => e.id));
+      });
+    });
+
+    describe("when the missed event redelivers a key the fold applied and the first read lags", () => {
+      const keyed = (createdAt: number, id: string) => ({
+        ...at(createdAt),
+        id,
+        idempotencyKey: "span-key",
+      });
+
+      /** @scenario "A rebuild for a redelivered key folds the event log's copy, not the redelivery" */
+      it("retries until the log returns its copy and folds that copy, not the redelivery", async () => {
+        const original = keyed(1_000, "evt-original");
+        const redelivery = keyed(2_000, "evt-redelivery");
+        const reads: Event[][] = [[], [original]];
+        let read = 0;
+        const { fold, current, paged } = pagedCountingFold({ log: () => [original] });
+        const retrying = new FoldProjectionExecutor({ refoldHistoryRetryDelaysMs: [0] });
+        await retrying.execute(fold, original, context);
+        paged.mockClear();
+        paged.mockImplementation(async (request) =>
+          pagedReader({ log: () => reads[Math.min(read++, reads.length - 1)]! })(request),
+        );
+
+        await retrying.rebuild(fold, redelivery, context);
+
+        expect(read).toBeGreaterThan(1);
+        expect(current()?.state.seen).toEqual([original.id]);
+      });
+    });
+
+    describe("when the fold already applied an event the log never returns", () => {
+      /** @scenario "A paged rebuild retries a history that lags behind what the fold applied" */
       it("refuses the incomplete history and leaves the job to retry", async () => {
         const [applied, missed] = [at(1_000), at(2_000)];
         const log: Event[] = [applied];
