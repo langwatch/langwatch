@@ -2,7 +2,10 @@ import { INGESTION_PULL_EVENT_TYPES } from "@langwatch/enterprise-governance-con
 import { describe, expect, it } from "vitest";
 
 import { INGESTION_PULL_MAX_COOLDOWN_MS } from "../../features/ingestion-pull/rules/ingestion-pull-cooldown.rules.ts";
-import { INGESTION_PULL_STALE_RUN_MS } from "../ingestion-pull.process.ts";
+import {
+  INGESTION_PULL_STALE_RUN_MS,
+  ingestionPullProcessStateSchema,
+} from "../ingestion-pull.process.ts";
 import { CADENCE_MS, configuredState, onEvent, onWake } from "./ingestion-pull.fixtures.ts";
 
 const HOUR = 60 * 60_000;
@@ -154,5 +157,40 @@ describe("given a run that outlived its allowance", () => {
     expect(result.intents).toMatchObject([
       { intentType: "run", payload: { runId: String(scheduledFor), abandonedRunId: "run-1" } },
     ]);
+  });
+});
+
+describe("given a refused run that kept side-read progress", () => {
+  /** @scenario "A refused transcript sign-in keeps side reads but records a failed run" */
+  it("uses the kept cursor on the next scheduled run", () => {
+    const result = onEvent({
+      state: configuredState({ currentRun: running }),
+      eventType: INGESTION_PULL_EVENT_TYPES.RUN_FAILED,
+      data: { ...refused({}), nextCursor: "side-progress", eventCount: 1, errorCount: 1 },
+    });
+    expect(result.state).toMatchObject({ cursor: "side-progress", currentRun: null });
+    const next = onWake({
+      state: ingestionPullProcessStateSchema.parse(result.state),
+      scheduledFor: 1_000 + CADENCE_MS,
+    });
+    expect(next.intents).toMatchObject([{ payload: { cursor: "side-progress" } }]);
+  });
+
+  it("honours an explicit null cursor only for the current failed run", () => {
+    const result = onEvent({
+      state: configuredState({ currentRun: running }),
+      eventType: INGESTION_PULL_EVENT_TYPES.RUN_FAILED,
+      data: { ...refused({}), nextCursor: null },
+    });
+    expect(result.state).toMatchObject({ cursor: null, currentRun: null });
+  });
+
+  it("does not bank a replaced run's cursor", () => {
+    const result = onEvent({
+      state: configuredState({ currentRun: running }),
+      eventType: INGESTION_PULL_EVENT_TYPES.RUN_FAILED,
+      data: { ...refused({ runId: "replaced" }), nextCursor: "stale-side-progress" },
+    });
+    expect(result.state).toMatchObject({ cursor: "cursor-1", currentRun: running });
   });
 });
