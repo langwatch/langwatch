@@ -14282,8 +14282,8 @@ importers:
   modules/scenario/contract:
     dependencies:
       '@ag-ui/core':
-        specifier: ~0.0.57
-        version: 0.0.58
+        specifier: ~1.0.2
+        version: 1.0.2(zod@4.6.7)
       '@langwatch/agent-contract':
         specifier: workspace:*
         version: link:../../agent/contract
@@ -19060,6 +19060,14 @@ packages:
 
   '@ag-ui/core@0.0.58':
     resolution: {integrity: sha512-XgGb7YmhV+yMBaEmlrpsd5S+nUxq0JgSegss2t4gIFR1j7w3w0ibtKfRgcQHWeMvwZxcT5S28VEEarqtgxYYHw==}
+
+  '@ag-ui/core@1.0.2':
+    resolution: {integrity: sha512-lb0YfvHY4eTHcXthTWzXjsElLqycGWDhaXGTejwMkUV5TtJVZircRS12/tMpqzd32sL+WZ2PWQ4m0+ThKrGF8A==}
+    peerDependencies:
+      zod: ^3.25.18 || ^4.0.0
+    peerDependenciesMeta:
+      zod:
+        optional: true
 
   '@ai-sdk/anthropic@3.0.69':
     resolution: {integrity: sha512-LshR7X3pFugY0o41G2VKTmg1XoGpSl7uoYWfzk6zjVZLhCfeFiwgpOga+eTV4XY1VVpZwKVqRnkDbIL7K2eH5g==}
@@ -30440,6 +30448,10 @@ snapshots:
   '@ag-ui/core@0.0.58':
     dependencies:
       zod: 3.25.76
+
+  '@ag-ui/core@1.0.2(zod@4.6.7)':
+    optionalDependencies:
+      zod: 4.6.7
 
   '@ai-sdk/anthropic@3.0.69(zod@4.6.7)':
     dependencies:
