@@ -9,6 +9,7 @@ import type {
   GovernanceRestApi,
   RecordIngestedCostCommand,
 } from "@langwatch/enterprise-governance-contract";
+import { ingestedCostRecordedEventDataSchema } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -93,6 +94,7 @@ function mountIngest(world: World = {}) {
   const recorded: RecordIngestedCostCommand[] = [];
   const costs: GovernanceIngestCostRecorder = world.costs ?? {
     record: async (commands) => {
+      for (const { data } of commands) ingestedCostRecordedEventDataSchema.parse(data);
       recorded.push(...commands);
     },
   };
@@ -201,15 +203,23 @@ const costRecord = ({
   requestId = "req_1",
   costUsd = "1.25",
   timeUnixNano = String(BigInt(COST_OCCURRED_AT_MS) * 1_000_000n),
-}: { requestId?: string; costUsd?: string; timeUnixNano?: string } = {}) => ({
+  inputTokens = "100",
+  outputTokens = "50",
+}: {
+  requestId?: string;
+  costUsd?: string;
+  timeUnixNano?: string;
+  inputTokens?: string;
+  outputTokens?: string;
+} = {}) => ({
   timeUnixNano,
   body: { stringValue: "request" },
   attributes: [
     attribute("langwatch.request_id", requestId),
     attribute("langwatch.cost.usd", costUsd),
     attribute("langwatch.model", "claude-sonnet"),
-    attribute("langwatch.input_tokens", "100"),
-    attribute("langwatch.output_tokens", "50"),
+    attribute("langwatch.input_tokens", inputTokens),
+    attribute("langwatch.output_tokens", outputTokens),
     attribute("langwatch.principal.email", "member@example.com"),
   ],
 });
@@ -549,6 +559,22 @@ describe("the ingestion-source receivers", () => {
 
       expect(response.status).toBe(202);
       expect(api.recorded.map(({ data }) => data.requestId)).toEqual(["req_1"]);
+    });
+  });
+
+  describe("when a cost carries a negative or fractional token count", () => {
+    it("records the cost with whole, non-negative counts instead of refusing the batch", async () => {
+      const api = mountIngest({ source: COSTED_SOURCE });
+
+      const response = await api.post(
+        `/api/ingest/otel/${SOURCE_ID}/v1/logs`,
+        costedLogs(costRecord({ inputTokens: "-5", outputTokens: "12.7" })),
+      );
+
+      expect(response.status).toBe(202);
+      expect(api.recorded.map(({ data }) => [data.tokensInput, data.tokensOutput])).toEqual([
+        [0, 12],
+      ]);
     });
   });
 

@@ -5,11 +5,12 @@
  * the batch under the organization's hidden governance project, and the cost
  * events inside a log batch recorded as the facts the spend ledger debits.
  */
-import type {
-  CanonicalCostEvent,
-  GovernanceIngestionSource,
-  IngestedCostRecordedEventData,
-  RecordIngestedCostCommand,
+import {
+  ingestedCostRecordedEventDataSchema,
+  type CanonicalCostEvent,
+  type GovernanceIngestionSource,
+  type IngestedCostRecordedEventData,
+  type RecordIngestedCostCommand,
 } from "@langwatch/enterprise-governance-contract";
 import { usdToNanoUsd } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
@@ -159,7 +160,7 @@ export class GovernanceIngestCostService {
     } catch (error) {
       logger.error(
         { costUsd: event.costUsd, requestId: event.requestId, error },
-        "budget: cost is not a decimal amount, skipping debit row",
+        "budget: cost is not a decimal amount, skipping the cost fact",
       );
       return null;
     }
@@ -168,27 +169,34 @@ export class GovernanceIngestCostService {
     if (!Number.isSafeInteger(amountNanoUsd)) {
       logger.error(
         { costUsd: event.costUsd, nanoUsd: nano.toString(), requestId: event.requestId },
-        "budget: amountNanoUsd exceeds Number.MAX_SAFE_INTEGER, skipping debit row to avoid silent rounding",
+        "budget: amountNanoUsd exceeds Number.MAX_SAFE_INTEGER, skipping the cost fact to avoid silent rounding",
       );
       return null;
     }
 
-    return {
+    const fact = ingestedCostRecordedEventDataSchema.safeParse({
       ingestionSourceId: source.id,
       sourceType: source.sourceType,
       organizationId: source.organizationId,
       teamId: source.teamId ?? null,
       requestId: event.requestId,
       model: event.model,
-      tokensInput: event.inputTokens,
-      tokensOutput: event.outputTokens,
-      tokensCacheRead: event.cacheReadTokens,
-      tokensCacheWrite: event.cacheCreationTokens,
+      tokensInput: tokenCount(event.inputTokens),
+      tokensOutput: tokenCount(event.outputTokens),
+      tokensCacheRead: tokenCount(event.cacheReadTokens),
+      tokensCacheWrite: tokenCount(event.cacheCreationTokens),
       amountNanoUsd,
       principalUserId: await this.findPrincipal({ event, source }),
       occurredAtMs: this.occurredAtMs({ event, observedAtMs }),
       observedAtMs,
-    };
+    });
+    if (fact.success) return fact.data;
+
+    logger.error(
+      { requestId: event.requestId, issues: fact.error.issues },
+      "budget: cost fact does not fit the recorded event, skipping it",
+    );
+    return null;
   }
 
   /** A record stamped at or before the epoch counts at receive time, as an absent stamp does. */
@@ -236,4 +244,10 @@ export class GovernanceIngestCostService {
 
     return principalUserId;
   }
+}
+
+/** A token count as the fact holds it: a whole, non-negative number; anything else counts as none. */
+function tokenCount(value: number): number {
+  const whole = Math.floor(value);
+  return Number.isSafeInteger(whole) && whole > 0 ? whole : 0;
 }
