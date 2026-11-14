@@ -27,7 +27,7 @@
   },
   "scripts": {
     "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
-    "test": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "test": "vitest run --fsModuleCache --exclude \"**/*.integration.test.ts\"",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "generate:lwql-columns-manifest": "node --experimental-transform-types scripts/generate-lwql-columns-manifest.ts",
     "generate:lwql-prisma-manifest": "node --experimental-transform-types scripts/generate-lwql-prisma-manifest.ts",

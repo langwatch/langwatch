@@ -32,6 +32,7 @@ interface SessionModelTotalsRow {
   cacheReadTokens: number;
   cacheCreationTokens: number;
   costUsd: number;
+  aiUnits: number;
 }
 
 /** The event kind that carries a model, its tokens and its cost. */
@@ -92,6 +93,7 @@ interface ClickHouseWriteRecord {
   ToolResultBytes: number;
   PromptChars: number;
   TotalTokens: number;
+  AiUnits: number;
   RepositoryHost: string;
   RepositoryOwner: string;
   RepositoryName: string;
@@ -377,7 +379,8 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
           sum(OutputTokens) AS OutputTokens,
           sum(CacheReadTokens) AS CacheReadTokens,
           sum(CacheCreationTokens) AS CacheCreationTokens,
-          sum(CostUsd) AS CostUsd
+          sum(CostUsd) AS CostUsd,
+          sum(AiUnits) AS AiUnits
         FROM (
           SELECT
             TenantId,
@@ -391,7 +394,8 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
             OutputTokens,
             CacheReadTokens,
             CacheCreationTokens,
-            CostUsd
+            CostUsd,
+            AiUnits
           FROM ${TABLE_NAME}
           WHERE TenantId IN ({tenantIds:Array(String)})
             AND TimeUnixMs >= fromUnixTimestamp64Milli({fromMs:Int64})
@@ -423,6 +427,7 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
       cacheReadTokens: Number(row.CacheReadTokens),
       cacheCreationTokens: Number(row.CacheCreationTokens),
       costUsd: Number(row.CostUsd),
+      aiUnits: Number(row.AiUnits),
     }));
   }
 
@@ -474,6 +479,7 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
       ToolResultBytes: record.toolResultBytes,
       PromptChars: record.promptChars,
       TotalTokens: record.totalTokens,
+      AiUnits: record.aiUnits,
       RepositoryHost: record.repositoryHost,
       RepositoryOwner: record.repositoryOwner,
       RepositoryName: record.repositoryName,
@@ -605,4 +611,5 @@ interface ClickHouseModelTotalsRow {
   CacheReadTokens: string;
   CacheCreationTokens: string;
   CostUsd: number;
+  AiUnits: number;
 }

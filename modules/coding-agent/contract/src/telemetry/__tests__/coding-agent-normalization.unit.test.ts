@@ -496,6 +496,17 @@ describe("deriveSessionTitleFromPrompt", () => {
     });
   });
 
+  describe("given the user's words behind a context block the agent put before them", () => {
+    /** @scenario "A Copilot session is named by its first prompt" */
+    it("names the session by the user's words, not the block", () => {
+      expect(
+        deriveSessionTitleFromPrompt(
+          "<current_datetime>2026-10-21T15:36:06+02:00</current_datetime>\n\nCount the files",
+        ),
+      ).toBe("Count the files");
+    });
+  });
+
   describe("given text that is not the user's own words", () => {
     /** @scenario A machine-injected first prompt does not name the session */
     it("answers null for machine-injected turns, withheld text, and nothing", () => {

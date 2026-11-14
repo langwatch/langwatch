@@ -29,6 +29,10 @@
       "types": "./dist/context/index.d.ts",
       "default": "./src/context/index.ts"
     },
+    "./credential-census": {
+      "types": "./dist/request/credentialCensus.d.ts",
+      "default": "./src/request/credentialCensus.ts"
+    },
     "./node": {
       "types": "./dist/node/index.d.ts",
       "default": "./src/node/index.ts"

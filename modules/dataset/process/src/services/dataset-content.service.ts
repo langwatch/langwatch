@@ -16,6 +16,7 @@ import {
   DatasetChunkCountMissingError,
   DatasetNotReadyError,
   DatasetTooLargeToSearchError,
+  type DatasetColumnRenames,
 } from "@langwatch/dataset-contract";
 import { generate } from "@langwatch/ksuid";
 import { z } from "zod";
@@ -33,7 +34,7 @@ const RECORD_KSUID_RESOURCE = "record";
 const storedDatasetSchema = z.object(datasetSchema.shape);
 import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
 import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
-import type { ChunkOffset } from "../rules/dataset-chunking.rules.ts";
+import { readChunkOffsets, readSearchOffsets } from "../rules/dataset-chunk-offsets.rules.ts";
 import { assertStoredRowWithinLimit } from "../rules/dataset-row-limits.rules.ts";
 import {
   matchesDatasetSearch,
@@ -45,6 +46,7 @@ import {
   limitDatasetRecordsByBytes,
   selectDatasetRecords,
 } from "../rules/dataset-selection.rules.ts";
+import { DatasetBirthService } from "../services/dataset-birth.service.ts";
 import { DatasetChunkReadService } from "../services/dataset-chunk-read.service.ts";
 import { StreamingChunkWriterService } from "../services/dataset-chunk-writer.service.ts";
 import { DatasetChunkService } from "../services/dataset-chunk.service.ts";
@@ -55,11 +57,14 @@ export class DatasetContentService implements DatasetContent {
 
   private readonly reads = DatasetChunkReadService.create();
 
+  private readonly births: DatasetBirthService;
+
   private constructor(
     private readonly datasets: DatasetContentRepository,
     private readonly storage: DatasetChunkRepository,
   ) {
     this.chunks = DatasetChunkService.create({ datasets });
+    this.births = DatasetBirthService.create({ datasets, storage, chunks: this.chunks });
   }
 
   static create(options: {
@@ -296,6 +301,7 @@ export class DatasetContentService implements DatasetContent {
       recordId: input.recordId,
       entry: input.updatedRecord,
       storage,
+      columns: input.columns,
     });
     return {
       record: toDatasetRecord({ id: input.recordId, entry: input.updatedRecord }, dataset),
@@ -310,7 +316,10 @@ export class DatasetContentService implements DatasetContent {
     dataset: Dataset;
     input: CreateDatasetRecordsInput;
   }): Promise<DatasetRecord[]> {
-    const forcedIds = input.entries.map((entry) => entry.id);
+    // Minted here, not in the chunk write, so each answered row carries the id it was stored under.
+    const forcedIds = input.entries.map(
+      (entry) => entry.id ?? generate(RECORD_KSUID_RESOURCE).toString(),
+    );
     const entries = input.entries.map(({ id: _id, ...entry }) => entry);
     entries.forEach((entry) => assertStoredRowWithinLimit(entry));
     const storage = this.storage;
@@ -338,6 +347,11 @@ export class DatasetContentService implements DatasetContent {
       storage: this.storage,
     });
     return { count: result.deleted };
+  }
+
+  /** A new dataset born in object storage: chunks first, then its row (ADR-032 v13). */
+  async createDataset(input: Parameters<DatasetContent["createDataset"]>[0]): Promise<Dataset> {
+    return storedDatasetSchema.parse(await this.births.createDataset(input));
   }
 
   async copyDataset({
@@ -390,18 +404,21 @@ export class DatasetContentService implements DatasetContent {
     name,
     slug,
     columnTypes,
+    columnRenames,
   }: {
     dataset: Dataset;
     projectId: string;
     name: string;
     slug: string;
     columnTypes: Dataset["columnTypes"];
+    columnRenames?: DatasetColumnRenames;
   }): Promise<Dataset> {
     const updated = await this.chunks.migrateColumns({
       dataset,
       projectId,
       oldColumnTypes: dataset.columnTypes,
       newColumnTypes: columnTypes,
+      ...(columnRenames ? { columnRenames } : {}),
       name,
       slug,
       storage: this.storage,
@@ -417,62 +434,6 @@ export class DatasetContentService implements DatasetContent {
       });
     }
   }
-}
-
-function readChunkOffsets(value: unknown): ChunkOffset[] {
-  if (!Array.isArray(value)) return [];
-  if (!value.every(isChunkOffset)) return [];
-  return value.map((offset) => ({ ...offset, byteSize: offset.byteSize ?? 0 }));
-}
-
-function readSearchOffsets(dataset: Dataset): { index: number; byteSize: number | null }[] {
-  const value = dataset.chunkOffsets;
-  if (Array.isArray(value) && value.length > 0 && value.every(isSearchOffset)) {
-    return value
-      .map((offset) => ({
-        index: offset.index,
-        byteSize:
-          typeof offset.byteSize === "number" &&
-          Number.isFinite(offset.byteSize) &&
-          offset.byteSize >= 0
-            ? offset.byteSize
-            : null,
-      }))
-      .toSorted((left, right) => left.index - right.index);
-  }
-  if (dataset.chunkCount === null) throw new DatasetChunkCountMissingError(dataset.id);
-  return Array.from({ length: dataset.chunkCount }, (_, index) => ({
-    index,
-    byteSize: null,
-  }));
-}
-
-function isSearchOffset(value: unknown): value is {
-  index: number;
-  startRow: number;
-  endRow: number;
-  byteSize?: number;
-} {
-  if (typeof value !== "object" || value === null) return false;
-  const offset = value as Record<string, unknown>;
-  return (
-    typeof offset.index === "number" &&
-    typeof offset.startRow === "number" &&
-    typeof offset.endRow === "number"
-  );
-}
-
-function isChunkOffset(value: unknown): value is Omit<ChunkOffset, "byteSize"> & {
-  byteSize?: number;
-} {
-  if (typeof value !== "object" || value === null) return false;
-  const offset = value as Record<string, unknown>;
-  return (
-    typeof offset.index === "number" &&
-    typeof offset.startRow === "number" &&
-    typeof offset.endRow === "number" &&
-    (offset.byteSize === undefined || typeof offset.byteSize === "number")
-  );
 }
 
 function toStoredEntry(line: unknown): unknown {

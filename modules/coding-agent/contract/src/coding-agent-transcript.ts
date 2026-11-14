@@ -67,6 +67,10 @@ const transcriptEntrySchemaDefinition = z.discriminatedUnion("kind", [
     atMs: z.number(),
     name: z.string().nullable(),
     reason: z.string().nullable(),
+    // A user who cancels or answers instead did not refuse the call; the line says which.
+    outcome: z.enum(["denied", "redirected", "aborted"]),
+    // True only when the decision's source names the user; a policy denial is not theirs.
+    byUser: z.boolean(),
   }),
   z.object({
     kind: z.literal("note"),
@@ -118,7 +122,10 @@ export function buildCodingAgentTranscript({
     spanEntries: fromSpans.entries,
     logEntries: fromLogs.entries,
   });
-  const entries = [...fromSpans.entries, ...logEntries];
+  // A log event is the richer record of a prompt; the span's copy fills in when none arrived.
+  const logsReportPrompts = fromLogs.entries.some(isUserPromptEntry);
+  const spanPrompts = logsReportPrompts ? [] : fromSpans.spanPrompts;
+  const entries = [...fromSpans.entries, ...spanPrompts, ...logEntries];
 
   addUnduplicatedSpanReplies(entries, fromSpans.spanReplies, fromLogs.entries);
   entries.sort((left, right) => left.atMs - right.atMs);

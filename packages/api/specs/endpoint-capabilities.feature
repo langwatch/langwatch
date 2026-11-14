@@ -72,6 +72,14 @@ Feature: Endpoint capabilities - rate limiting, response caching, deprecation
     And the first call of each deprecated route is reported once per process
 
   @integration
+  Scenario: A deprecated route's successor link fills in the caller's path parameters
+    Given an endpoint at /projects/:projectId/boards/:id declaring withDeprecated with successor
+      "/projects/{projectId}/dashboards/{id}"
+    When a caller reads /projects/p1/boards/b1
+    Then the Link header names </projects/p1/dashboards/b1> as the successor version
+    And the published document keeps the successor as written
+
+  @integration
   Scenario: Deprecation headers ride errors too
     Given the same deprecated endpoint
     When a call fails validation
@@ -170,7 +178,7 @@ Feature: Endpoint capabilities - rate limiting, response caching, deprecation
   Scenario: An endpoint declared as minting a credential refuses an impersonating actor
     Given a REST route or tRPC procedure declares that it mints a credential
     When an operator acting as a user reaches it
-    Then it is refused with permission_denied (403) naming the declared permission
+    Then it is refused with impersonation_cannot_mint_credential (403), naming no permission, since no grant unlocks it
     And the handler never runs
     And the same caller acting as themselves reaches the handler
     And an endpoint that answers without a credential may not declare it, because it has no caller to refuse

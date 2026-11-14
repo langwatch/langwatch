@@ -50,7 +50,7 @@ import { HumanMessage } from "@langchain/core/messages";
 setupObservability({ serviceName: "<project_name>" });
 
 async function main(message: string): Promise<string> {
-  const chatModel = new ChatOpenAI({ model: "gpt-5" }).withConfig({
+  const chatModel = new ChatOpenAI({ model: "gpt-6-luna" }).withConfig({
     callbacks: [new LangWatchCallbackHandler()],
   });
 
@@ -62,6 +62,12 @@ console.log(await main("Hey, tell me a joke"));
 ```
 
 The `LangWatchCallbackHandler` captures Langchain events and converts them into detailed LangWatch spans. Pass the callback handler to your Langchain components via the `callbacks` option in `withConfig()`.
+
+## Check it worked
+
+Run the example. The SDK flushes pending spans when the process exits. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the LangChain steps and the LLM call.
+
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the process runs in.
 
 ## Related
 

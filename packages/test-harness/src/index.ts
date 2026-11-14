@@ -10,6 +10,7 @@ export {
 export {
   assertSerialWorkerSlot,
   integrationFilesRunInParallel,
+  raiseWorkerCountInCI,
   withdrawWorkerCountOverride,
 } from "./integration-file-concurrency.ts";
 export {

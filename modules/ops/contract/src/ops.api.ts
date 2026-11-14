@@ -149,6 +149,7 @@ import type {
   OpsOperatorPermission,
   OpsPipelineRegistrations,
   OpsScope,
+  SeatSharingCheck,
 } from "./ops.responses.ts";
 
 export type DiscoverAggregatesInput = {
@@ -598,7 +599,8 @@ export interface OpsApi {
   /** One report as the intake door received it, answered in the bodies released builds read. */
   receiveBugReport(input: {
     report: SubmitBugReport;
-    forwardedFor: string | null;
+    /** The address the door resolved for the caller; null shares the one unknown bucket. */
+    callerAddress: string | null;
     linkedProjectId: string | null;
   }): Promise<OpsDoorAnswer>;
   findDashboardData(): DashboardData | null;
@@ -628,6 +630,10 @@ export interface OpsApi {
   /** Revokes one holder; authz refuses the last holder. */
   revokePlatformOperator(input: { grantId: string; operator: OpsOperator | null }): Promise<void>;
   featureFlagCatalogue(): Promise<OperatorFeatureFlagCatalogue>;
+  /** The last seat sharing check, empty before the first; not found without Cloud admin. */
+  findSeatSharingChecks(): Promise<SeatSharingCheck[]>;
+  /** Runs the seat sharing check over every organization on a paid plan and keeps the result. */
+  runSeatSharingCheck(): Promise<void>;
   setFeatureFlagEnabled(input: {
     key: string;
     enabled: boolean;

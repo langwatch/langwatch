@@ -17,10 +17,10 @@ import { defaultStateDir } from "../utils/governance/hook-state";
 import { installSessionContextHooks } from "../utils/governance/session-context-hooks";
 import { SESSION_CONTEXT_GUIDANCE } from "../utils/governance/session-guidance";
 
-const { hookCommandMock } = vi.hoisted(() => ({ hookCommandMock: vi.fn() }));
+const { runHookProcessMock } = vi.hoisted(() => ({ runHookProcessMock: vi.fn() }));
 
 vi.mock("../commands/ingestion/hook.js", () => ({
-  hookCommand: hookCommandMock,
+  runHookProcess: runHookProcessMock,
 }));
 
 // buildProgram() reads the tsup-injected __CLI_VERSION__ build constant, which
@@ -122,7 +122,7 @@ let exited: number[] = [];
 const parse = async (argv: string[]): Promise<void> => {
   stdout = [];
   exited = [];
-  hookCommandMock.mockReset();
+  runHookProcessMock.mockReset();
   vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
     stdout.push(String(chunk));
     return true;
@@ -145,8 +145,8 @@ describe("the cross-version contract of the hook commands", () => {
     it("runs the session context hook for the named agent and says nothing", async () => {
       await parse([...commands["session-context"]!, "--from-the-future", "extra", "--and=more"]);
 
-      expect(hookCommandMock).toHaveBeenCalledTimes(1);
-      expect(hookCommandMock).toHaveBeenCalledWith({ tool: "claude-code" });
+      expect(runHookProcessMock).toHaveBeenCalledTimes(1);
+      expect(runHookProcessMock).toHaveBeenCalledWith({ tool: "claude-code" });
       expect(stdout).toEqual([]);
       expect(exited).toEqual([]);
     });

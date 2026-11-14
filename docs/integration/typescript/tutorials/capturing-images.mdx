@@ -27,7 +27,7 @@ setupObservability({ serviceName: "image-service" });
 const data = readFileSync("shapes.png").toString("base64");
 
 const { text } = await generateText({
-  model: openai.chat("gpt-5-mini"),
+  model: openai.chat("gpt-6-luna"),
   messages: [
     {
       role: "user",
@@ -64,7 +64,7 @@ const describe = async (prompt: string, path: string): Promise<string> => {
 
     const encoded = readFileSync(path).toString("base64");
     const completion = await client.chat.completions.create({
-      model: "gpt-5-mini",
+      model: "gpt-6-luna",
       messages: [
         {
           role: "user",

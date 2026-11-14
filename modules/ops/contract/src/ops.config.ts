@@ -30,6 +30,14 @@ export const opsConfig = Config.define((c) => ({
   apiKey: c.env("LANGWATCH_OPS_API_KEY", z.string().optional()),
   /** A third ClickHouse identity; never falls back to the tenant-keyed client. */
   clickhouseOpsUrl: c.env("CLICKHOUSE_OPS_URL", z.string().optional()),
+  /** A file holding the ops user's password, re-read per statement; blank means unset. */
+  clickhouseOpsPasswordFile: c.env(
+    "CLICKHOUSE_OPS_PASSWORD_FILE",
+    z.preprocess(
+      (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+      z.string().optional(),
+    ),
+  ),
   usageStats: {
     disabled: c.env("DISABLE_USAGE_STATS", environmentOneOrTrueSchema),
     installMethod: c.env("INSTALL_METHOD", z.string().optional()),

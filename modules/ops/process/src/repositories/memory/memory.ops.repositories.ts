@@ -43,6 +43,7 @@ import { MemoryProcessFleetReadingsRepository } from "./memory.process-fleet-rea
 import { MemoryProcessManagerPurgeRepository } from "./memory.process-manager-purge.repository.ts";
 import { MemoryProcessOpsRepository } from "./memory.process-ops.repository.ts";
 import { MemoryReplayRepository } from "./memory.replay.repository.ts";
+import { MemorySeatSharingCheckRepository } from "./memory.seat-sharing-check.repository.ts";
 import { MemoryStorageFootprintRepository } from "./memory.storage-footprint.repository.ts";
 import { MemoryStorageStatsReadingsRepository } from "./memory.storage-stats-readings.repository.ts";
 import { MemorySystemMigrationEnrollmentRepository } from "./memory.system-migration-enrollment.repository.ts";
@@ -194,6 +195,7 @@ export class MemoryOpsRepositories {
       processFleetReadings: MemoryProcessFleetReadingsRepository.create({ store }),
       cloudLatestRelease: MemoryCloudLatestReleaseRepository.create({ store }),
       cloudNotices: MemoryCloudNoticeRepository.create({ store }),
+      seatSharingChecks: MemorySeatSharingCheckRepository.create({ store }),
       redisHealth: MemoryRedisHealthRepository.create(),
       clickhouseHealth: MemoryClickHouseHealthRepository.create(),
       events: MemoryEventExplorerRepository.create({ store }),

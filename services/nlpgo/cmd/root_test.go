@@ -5,9 +5,23 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
+
 	nlpgo "github.com/langwatch/langwatch/services/nlpgo"
+	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/codeblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
 )
+
+// newCodeExecutorForTest builds the code executor the way Run does, minus the
+// logger: these tests are about which operator knob reaches which option, and
+// the logger only ever reports a teardown that did not finish.
+func newCodeExecutorForTest(engineCfg nlpgo.EngineConfig, getenv func(string) string) (*codeblock.Executor, error) {
+	return newCodeExecutor(engineCfg, getenv, zap.NewNop())
+}
 
 // TestResolveLangWatchBaseURL_FallsBackToLangwatchEndpoint pins the
 // fix for the prod regression on 2026-04-29: every evaluator dispatch
@@ -141,7 +155,7 @@ func TestResolveSandboxPython_HonorsTheUnprefixedImageSetting(t *testing.T) {
 func TestNewCodeExecutor_AppliesConfiguredCodeBlockTimeout(t *testing.T) {
 	getenv := func(string) string { return "" }
 
-	exec, err := newCodeExecutor(nlpgo.EngineConfig{
+	exec, err := newCodeExecutorForTest(nlpgo.EngineConfig{
 		SandboxPython:           nlpgo.DefaultSandboxPython,
 		CodeBlockTimeoutSeconds: 300,
 	}, getenv)
@@ -159,7 +173,7 @@ func TestNewCodeExecutor_AppliesConfiguredCodeBlockTimeout(t *testing.T) {
 func TestNewCodeExecutor_UnsetTimeoutKeepsTheTenMinuteDefault(t *testing.T) {
 	getenv := func(string) string { return "" }
 
-	exec, err := newCodeExecutor(nlpgo.EngineConfig{
+	exec, err := newCodeExecutorForTest(nlpgo.EngineConfig{
 		SandboxPython: nlpgo.DefaultSandboxPython,
 	}, getenv)
 	if err != nil {
@@ -202,7 +216,7 @@ func TestResolveCodeBlockTimeout(t *testing.T) {
 func TestNewCodeExecutor_NegativeTimeoutDoesNotExpireImmediately(t *testing.T) {
 	getenv := func(string) string { return "" }
 
-	exec, err := newCodeExecutor(nlpgo.EngineConfig{
+	exec, err := newCodeExecutorForTest(nlpgo.EngineConfig{
 		SandboxPython:           nlpgo.DefaultSandboxPython,
 		CodeBlockTimeoutSeconds: -30,
 	}, getenv)
@@ -303,7 +317,7 @@ func TestCodeBlockTimeout_ReachesTheExecutorFromTheEnvironment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}
-	exec, err := newCodeExecutor(cfg.Engine, os.Getenv)
+	exec, err := newCodeExecutorForTest(cfg.Engine, os.Getenv)
 	if err != nil {
 		t.Fatalf("newCodeExecutor: %v", err)
 	}
@@ -311,4 +325,62 @@ func TestCodeBlockTimeout_ReachesTheExecutorFromTheEnvironment(t *testing.T) {
 	if got, want := exec.DefaultTimeout(), 7*time.Second; got != want {
 		t.Errorf("DefaultTimeout() = %v; want %v (NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS=7)", got, want)
 	}
+}
+
+// The table test below owns the rule and its warning; this proves the options
+// are built from it, so passing the raw setting through would turn this red.
+// @scenario "the engine warns when the visible-process setting is ignored off Lambda"
+func TestCodeExecutorOptions_IgnoreVisibleProcessSettingOffLambda(t *testing.T) {
+	t.Setenv("NLPGO_ENGINE_CODE_BLOCK_ALLOW_VISIBLE_PROCESS", "true")
+	cfg, err := nlpgo.LoadConfig(t.Context())
+	require.NoError(t, err)
+	require.True(t, cfg.Engine.CodeBlockAllowVisibleProcess, "the variable must reach the config")
+	core, logs := observer.New(zapcore.DebugLevel)
+
+	opts := codeExecutorOptions(cfg.Engine, func(string) string { return "" }, zap.New(core))
+
+	assert.False(t, opts.AllowVisibleProcess)
+	assert.NotEmpty(t, logs.FilterMessage("nlpgo_code_block_allow_visible_process_ignored").All())
+}
+
+// @scenario "the engine warns when the visible-process setting is ignored off Lambda"
+func TestAllowVisibleProcess_HonoredOnlyOnLambdaAndWarnsWhenIgnored(t *testing.T) {
+	lambdaEnv := map[string]string{"AWS_LAMBDA_FUNCTION_NAME": "fn", "AWS_LAMBDA_RUNTIME_API": "127.0.0.1:9001"}
+	cases := []struct {
+		name    string
+		setting bool
+		env     map[string]string
+		honored bool
+		warned  bool
+	}{
+		{"on, off Lambda", true, nil, false, true},
+		{"on, only the function name", true, map[string]string{"AWS_LAMBDA_FUNCTION_NAME": "fn"}, false, true},
+		{"on, only the runtime API", true, map[string]string{"AWS_LAMBDA_RUNTIME_API": "127.0.0.1:9001"}, false, true},
+		{"on, on Lambda", true, lambdaEnv, true, false},
+		{"off, on Lambda", false, lambdaEnv, false, false},
+		{"off, off Lambda", false, nil, false, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			core, logs := observer.New(zapcore.DebugLevel)
+
+			got := allowVisibleProcess(tc.setting, func(k string) string { return tc.env[k] }, zap.New(core))
+
+			assert.Equal(t, tc.honored, got)
+			entries := logs.FilterMessage("nlpgo_code_block_allow_visible_process_ignored").All()
+			if !tc.warned {
+				assert.Empty(t, entries)
+				return
+			}
+			require.Len(t, entries, 1)
+			assert.Equal(t, zapcore.WarnLevel, entries[0].Level)
+			assert.Equal(t, codeblock.AllowVisibleProcessSetting, entries[0].ContextMap()["setting"])
+		})
+	}
+}
+
+func TestAllowVisibleProcess_NilLoggerIgnoresSettingOffLambda(t *testing.T) {
+	assert.NotPanics(t, func() {
+		assert.False(t, allowVisibleProcess(true, func(string) string { return "" }, nil))
+	})
 }

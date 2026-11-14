@@ -56,6 +56,8 @@ export class BrowserSessionVerificationService {
       caller: {
         authSessionId: verified.session.id,
         sessionId: session.sessionId,
+        sessionExpiresAt: session.expires,
+        ...(session.startedAt ? { sessionStartedAt: session.startedAt } : {}),
         userId: session.user.id,
         name: session.user.name ?? null,
         image: session.user.image ?? null,

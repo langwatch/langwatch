@@ -5,7 +5,11 @@ import type {
   GraphTriggerSweepCandidate,
 } from "@langwatch/automation-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { EventSubscriberDefinition, ProcessManagerDefinition } from "@langwatch/eventing";
+import type {
+  CommandHandlerOptions,
+  EventSubscriberDefinition,
+  ProcessManagerDefinition,
+} from "@langwatch/eventing";
 
 import { AutomationScheduledIntent } from "../../eventing/graph-alert-sweep.intent.ts";
 import { AutomationSettlementExecutor } from "../../eventing/trigger-settlement.intent.ts";
@@ -97,8 +101,10 @@ export function automationPeerSubscribers(
     settlement: new InertSettlementExecutor(),
     scheduledIntents: new InertScheduledIntents(),
     retention: new InertIntentRetention(),
-    reports: { dispatch: async () => {} },
-    reportRuns: { settleRun: async () => {} },
+    reports: createApiFixture<AutomationsPipelineDeps["reports"]>({ dispatch: async () => {} }),
+    reportRuns: createApiFixture<AutomationsPipelineDeps["reportRuns"]>({
+      settleRun: async () => {},
+    }),
     peerReactions,
   });
   const subscribers = new Map<string, EventSubscriberDefinition>();
@@ -109,4 +115,20 @@ export function automationPeerSubscribers(
   });
   for (const projection of pipeline.globalProjections ?? []) projection.register(registry);
   return subscribers;
+}
+
+/** The options a command of the real automations pipeline registers with. */
+export function automationCommandOptions(name: string): CommandHandlerOptions<never> | undefined {
+  const pipeline = createAutomationsPipeline({
+    auditLog: createApiFixture<AuditLogApi>(),
+    settlement: new InertSettlementExecutor(),
+    scheduledIntents: new InertScheduledIntents(),
+    retention: new InertIntentRetention(),
+    reports: createApiFixture<AutomationsPipelineDeps["reports"]>({ dispatch: async () => {} }),
+    reportRuns: createApiFixture<AutomationsPipelineDeps["reportRuns"]>({
+      settleRun: async () => {},
+    }),
+    peerReactions: inertPeerReactions,
+  });
+  return pipeline.commands.find((command) => command.definition.name === name)?.definition.options;
 }

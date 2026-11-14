@@ -4,9 +4,11 @@ Auto-tuning ClickHouse Docker image. Pass CPU + RAM, get a fully configured serv
 
 ```bash
 docker run -d \
-  -e CLICKHOUSE_PASSWORD=mysecret \
+  -e CLICKHOUSE_PASSWORD="$(openssl rand -hex 24)" \
   langwatch/clickhouse-serverless
 ```
+
+There is no default password: without `CLICKHOUSE_PASSWORD` or `CLICKHOUSE_PASSWORD_FILE` the container exits at startup. A published one (`langwatch`, `clickhouse`, `password`, `default`) or a blank-looking one starts with a warning at every boot.
 
 CPU and RAM are auto-detected from cgroups. Override with `CH_CPU` and `CH_RAM` if needed.
 
@@ -18,10 +20,79 @@ CPU and RAM are auto-detected from cgroups. Override with `CH_CPU` and `CH_RAM` 
 | `CH_CPU`                          | auto-detect  | CPU cores                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `CH_RAM`                          | auto-detect  | Memory (`4Gi`, `16G`, or bytes)                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `COLD_STORAGE_ENABLED`            | `false`      | Enable hot→cold tiering to S3                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `BACKUP_ENABLED`                  | `false`      | Enable S3 disk for native `BACKUP`/`RESTORE` SQL                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `BACKUP_ENABLED`                  | `false`      | Enable S3 disk for native `BACKUP`/`RESTORE` SQL; see [Backups](#backups)                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `S3_ENDPOINT`                     | —            | S3-compatible endpoint (e.g. `https://s3.us-east-1.amazonaws.com/bucket/`)                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `S3_ACCESS_KEY` / `S3_SECRET_KEY` | —            | Static credentials (or use `USE_ENVIRONMENT_CREDENTIALS=true` for IRSA)                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `CH_REPLICATED`                   | `false`      | Enable Keeper-coordinated ReplicatedMergeTree replication (requires keeper + data node env vars). Keeper replicates table data only — the LangWatchQL access model (users, profiles, row policies) is never stored in Keeper: on chart-managed ClickHouse it is delivered to every pod as rendered `users.d`/`config.d` files, and on bring-your-own ClickHouse the app provisions it via SQL; see [ADR-159](../../dev/docs/adr/159-the-app-owns-the-lwql-access-model.md) |
+
+Settings with a fixed default rather than one computed from CPU + RAM:
+
+| Variable                                       | Default                  | Description                                                                                                                                                                                                                 |
+| ---------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CLICKHOUSE_CLUSTER_SECRET_FILE`               | —                        | File holding the `remote_servers` cluster secret (replicated mode). Read by `ch-config` only with `CLICKHOUSE_CLUSTER_SECRET_ENABLED`                                                                                       |
+| `CLICKHOUSE_CLUSTER_SECRET_ENABLED`            | `false`                  | Recommended. Applies the cluster secret; see [Cluster secret](#cluster-secret) before turning it on                                                                                                                         |
+| `CLICKHOUSE_INTERSERVER_PASSWORD_FILE`         | —                        | File holding the interserver HTTP password. When set, `interserver_http_credentials` is rendered                                                                                                                            |
+| `CLICKHOUSE_INTERSERVER_USER`                  | `interserver`            | Interserver HTTP user, used only with `CLICKHOUSE_INTERSERVER_PASSWORD_FILE`                                                                                                                                                |
+| `DEFAULT_USER_ACCESS_MANAGEMENT`               | unset                    | Unset: the flags in `sql` mode, only `lwql_postgres*` use with `LWQL_ACCESS_DIR`. `true`: the flags in both modes. `false`: both 0                                                                                          |
+| `CLICKHOUSE_AUDIT_QUERY_LOG`                   | `false`                  | `true` pins the six settings deciding what reaches `system.query_log` on the `default` profile, as `const`. `log_query_settings` stays per user, so the LangWatchQL user can keep its capability out of the Settings column |
+| `CLICKHOUSE_MAX_CONCURRENT_QUERIES_FOR_USER`   | —                        | Each user's share of the server's admission limit, so one client cannot take every slot. A session may lower it, never raise it or set 0                                                                                    |
+| `CLICKHOUSE_MASKED_SETTINGS`                   | `custom_api_key_hash`    | Comma-separated settings whose values `query_masking_rules` hide in the server log, `system.text_log` and `system.query_log.query`. The default is the LangWatchQL capability. Set but empty masks nothing                  |
+| `CLICKHOUSE_MASK_SHA256_HEX`                   | `true`                   | Hide every 64-hex-character run (a sha256, the LangWatchQL capability's shape) in logged statements and log lines, wherever ClickHouse folds the value in. `false` turns it off                                             |
+| `CLICKHOUSE_DEFAULT_NETWORKS`                  | —                        | Comma-separated networks `default` may log in from; loopback is always added. Set but empty refuses to start. Include the pod network on a replicated cluster: replicas log in to each other as `default`                   |
+| `CLICKHOUSE_ACCESS_FILE`                       | —                        | Access file declaring users, tiers and logins; see [Access](#access-tiers-rolling-passwords-and-token-logins)                                                                                                               |
+| `CLICKHOUSE_ACCESS_LISTEN`                     | `127.0.0.1:8124`         | Loopback address of the access sidecar's token check; anything else is refused                                                                                                                                              |
+| `CLICKHOUSE_ACCESS_SIDECAR`                    | `embedded`               | `embedded` runs the sidecar inside this container; `external` when it runs in its own (the chart does)                                                                                                                      |
+| `CLICKHOUSE_ACCESS_BOOTSTRAP_DIR`              | `/run/clickhouse-access` | Dynamic-only mode: where the local admin's per-boot password is written; mount a tmpfs there                                                                                                                                |
+| `CLICKHOUSE_ACCESS_TIERS`                      | `false`                  | Render the tier roles and profiles without an access file, for users you write yourself                                                                                                                                     |
+| `READ_TIER_MAX_EXECUTION_TIME`                 | `300`                    | Execution-time cap, in seconds, of the inspect and read tiers                                                                                                                                                               |
+| `LOG_TO_FILE`                                  | `true`                   | `false` removes the server's file loggers, so it logs to the console only                                                                                                                                                   |
+| `MERGE_MAX_BLOCK_SIZE_BYTES`                   | `0`                      | `merge_tree.merge_max_block_size_bytes`; `0` leaves the ClickHouse default                                                                                                                                                  |
+| `MAX_CONCURRENT_SELECT_QUERIES`                | `0`                      | SELECTs' own admission cap inside `max_concurrent_queries`; `0` means none                                                                                                                                                  |
+| `NETWORK_COMPRESSION_METHOD`                   | —                        | Default profile `network_compression_method`; unset leaves the ClickHouse default. `zstd` suits replicated clusters                                                                                                         |
+| `NETWORK_ZSTD_COMPRESSION_LEVEL`               | —                        | Default profile `network_zstd_compression_level`; unset leaves the ClickHouse default                                                                                                                                       |
+| `CANCEL_HTTP_READONLY_QUERIES_ON_CLIENT_CLOSE` | —                        | Default profile; `1` stops a read whose HTTP client has gone (recommended), unset leaves the ClickHouse default (`0`)                                                                                                       |
+
+The `NUMBER_OF_FREE_ENTRIES_IN_POOL_TO_*` thresholds are derived from the
+effective `background_pool_size`, including a `BACKGROUND_POOL_SIZE` override;
+each one set explicitly wins.
+
+### Cluster secret
+
+Without `CLICKHOUSE_CLUSTER_SECRET_ENABLED`, `remote_servers` renders exactly as
+earlier images did: a `from_file` attribute ClickHouse does not substitute, so
+the cluster runs with no secret, and an empty or missing secret file fails
+nothing. A replicated server logs a warning at every boot until it is on.
+
+With it on, `ch-config` reads `CLICKHOUSE_CLUSTER_SECRET_FILE` (empty or missing
+refuses to start) and renders the value, so distributed queries carry the
+initiating user instead of logging in as `default` with no password. A pod
+with the secret and one without cannot run distributed queries against each
+other, so turn it on in one of two ways:
+
+- restart every replica at once: set it (Helm: `auth.clusterSecretEnabled=true`),
+  let the rollout start, then delete the remaining old pods together
+  (`kubectl delete pod -l app.kubernetes.io/name=<release fullname>`, which spares
+  the Keeper pods), or
+- roll as usual and accept that cross-replica queries fail until the last pod
+  has restarted. Replicated inserts and part fetches are unaffected.
+
+### Initialisation scripts and `CLICKHOUSE_DB`
+
+`ch-config` owns the `default` user, so the entrypoint sets
+`CLICKHOUSE_SKIP_USER_SETUP=1` and the official entrypoint never rewrites it.
+An install that sets `CLICKHOUSE_USER` to another name (and is not
+dynamic-only) keeps the official user setup, which creates that user as before.
+When the official entrypoint initialises (container args are server flags such
+as `--listen_host=...`, not the default `clickhouse-server` command) and
+`/docker-entrypoint-initdb.d` holds files or `CLICKHOUSE_DB` is set, it receives
+the password so its client can log in: as `CLICKHOUSE_PASSWORD_FILE`, which it
+reads without exporting, or in `CLICKHOUSE_PASSWORD` when it was given that way
+or the file is padded with whitespace (`ch-config` trims it, the official
+entrypoint does not).
+
+`ch-config` only writes, and removes when disabled, the files it renders itself.
+Any other file in `config.d/` or `users.d/` (for example a Kubernetes `subPath`
+mount) is left alone, so a deployment can layer its own settings on top.
 
 All other parameters (memory limits, pool sizes, merge settings, logging, network) are computed from CPU + RAM. See `internal/config/config.go` for the full list of overridable env vars.
 
@@ -48,11 +119,180 @@ needs: `custom-settings-prefixes.yaml` declares the `custom_` settings prefix th
 per-query tenant capability rides on, and `access-control.yaml` sets
 `access_control_improvements.settings_constraints_replace_previous` to `true`
 (without it, ClickHouse rejects the `<database>_profile` settings profile's
-`CHANGEABLE_IN_READONLY` constraint on `custom_api_key_hash`). The image also
-grants its `default` user `access_management` + `named_collection_control` — the
-right to create users, profiles, row policies and named collections through SQL,
-which **only `sql` mode uses**; rendered delivery runs no access DDL. See
+`CHANGEABLE_IN_READONLY` constraint on `custom_api_key_hash`). In `sql` mode the image
+grants its `default` user `access_management` + `named_collection_control`
+(unless `DEFAULT_USER_ACCESS_MANAGEMENT=false`): the
+right to create users, profiles, row policies and named collections through SQL.
+In rendered mode (`LWQL_ACCESS_DIR` set) no access DDL runs, so `default` gets
+neither; it keeps every other right plus use of the `lwql_postgres*` collections
+the mounted model delivers, which its PostgreSQL engine tables need. See
 `internal/render/access.go`.
+
+## Access: tiers, rolling passwords and token logins
+
+Design and limits: [ADR-198](../../dev/docs/adr/198-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md).
+
+**Tiers.** With `CLICKHOUSE_ACCESS_FILE` set, or `CLICKHOUSE_ACCESS_TIERS=true`
+for users you write yourself, the server renders `users.d/access-tiers.yaml` with
+four roles and settings profiles of the same names (without either, none exists):
+
+| Tier           | Can                                                                                    | Profile                                        |
+| -------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `tier_inspect` | see database, table and column names; no rows                                          | `readonly=2`, capped execution time and memory |
+| `tier_read`    | inspect, plus `SELECT` on its databases                                                | as inspect                                     |
+| `tier_write`   | read, plus `INSERT`, `ALTER UPDATE`, `ALTER DELETE` (and lightweight `DELETE`); no DDL | capped memory                                  |
+| `tier_admin`   | everything, including DDL and access management                                        | `default`                                      |
+
+`system.query_log` and the other system tables holding query text stay closed to
+every tier but admin (`select_from_system_db_requires_grant` is on in 26.8). Your
+own `users.d` users are not changed; to move one onto a tier, render the tiers and give it
+`profile: tier_read` and `grants: {query: ["GRANT tier_read", "GRANT SELECT ON db.*"]}`.
+
+**Access file.** Set `CLICKHOUSE_ACCESS_FILE` to declare users. The file is
+checked strictly at startup, and any error (an unknown key, tier or issuer, a
+missing password directory) stops the container.
+
+```yaml
+issuers:
+  - name: staff
+    url: https://idp.example.com # exact `iss`; discovery at /.well-known/openid-configuration
+    audience: clickhouse # default
+    username_claim: email # default: sub
+    required_claims: { email_verified: true }
+users:
+  - name: alice
+    tier: read
+    databases: [analytics]
+    networks: [10.0.0.0/8] # default: anywhere
+    login:
+      token: { issuer: staff, subject: alice@example.com } # subject defaults to the user name
+  - name: dashboards
+    tier: read
+    databases: [analytics]
+    login:
+      rolling: { dir: /run/access/dashboards }
+```
+
+Issuer keys: `name`, `url`, `audience`, `username_claim`, `required_claims`,
+`jwks_url` (skip discovery), `ca_file` (a private CA), `allow_admin` (token users
+of this issuer may hold `tier_admin`). User keys: `name`, `tier`, `databases`
+(read and write only), `networks`, `login` with exactly one of `rolling` or
+`token`, and optionally `settings`, `quota` (`duration_seconds`, `limits`),
+`grants` (extra read grants) and `caps` (maxima the user cannot raise, such as
+`{max_execution_time: 30, max_rows_to_read: 1000000}`; a cap above its tier's
+limit refuses the file). A top-level `policy` block adds to or replaces the
+rules those are checked against (`grant_privileges`, `quota_limits`,
+`protected_settings`, `restricted_databases`), each with `add` or `replace`.
+
+**Rolling passwords.** Every regular, non-hidden file in a `rolling` directory is
+a valid password of at least 16 characters, at most 8 per directory. A file
+`<name>.valid_until` holding an RFC 3339 instant ends `<name>` then. Give each
+user a directory of its own. To rotate:
+
+1. Add a file with the new password. Both now work.
+2. Move the client to the new password.
+3. Delete the old file, or give it a `.valid_until`.
+
+**Token logins.** A token user logs in with an OIDC JWT as its password, over
+HTTP or the native protocol. ClickHouse asks the sidecar, which accepts only a
+token signed by the user's issuer, with `aud` containing the audience, a live
+`exp`, the `username_claim` equal to the user's `subject` and every
+`required_claims` entry. Tokens up to 16 KiB are accepted.
+
+**The sidecar.** `ch-config sidecar` re-reads the access file and the password
+directories every 10 seconds (and at the next `valid_until`), rewrites
+`users.d/access-users.yaml` only when it changes, and keeps the last good file
+when the access file cannot be read. Each password directory loads on its own:
+one that cannot be read keeps its user's last good passwords from the running
+sidecar, or else leaves that user without file passwords. Other users render
+as usual. ClickHouse reloads `users.d` within seconds. A
+plain `docker run` starts it inside the container; the Helm chart runs it as its
+own container. While it is down, token logins fail and an expired password
+stays valid until it returns.
+
+```bash
+docker run -d \
+  -e CLICKHOUSE_PASSWORD="$(openssl rand -hex 24)" \
+  -e CLICKHOUSE_ACCESS_FILE=/run/access/access.yaml \
+  -v "$PWD/access:/run/access:ro" \
+  langwatch/clickhouse-serverless
+```
+
+### Dynamic-only mode
+
+`mode: dynamic-only` at the top of the access file leaves ClickHouse with no
+long-lived password. Every person and workload logs in with an OIDC token
+([ADR-198](../../dev/docs/adr/198-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md), section 7).
+
+- Leave `CLICKHOUSE_PASSWORD` and `CLICKHOUSE_PASSWORD_FILE` unset. `default`
+  is locked: no network may log in as it.
+- Declare token users only. A `rolling` user, or a `users.d`, `conf.d` or
+  `users.xml` user with a password, `no_password` or `ssh_keys`, stops the
+  start with a message naming it.
+- With replicas, set `CLICKHOUSE_CLUSTER_SECRET_ENABLED=true`.
+- `CREATE USER ... IDENTIFIED BY` is refused. The sidecar checks
+  `system.users` every minute and logs any password login left.
+
+The only password is `local_admin`'s. The image generates it at every start
+into `CLICKHOUSE_ACCESS_BOOTSTRAP_DIR` (mode 0440), valid from `127.0.0.1` and
+`::1` only. initdb scripts run as `local_admin`. In-pod tools read the file for
+every connection, because a restart replaces it.
+
+```bash
+docker run -d \
+  --tmpfs /run/clickhouse-access:uid=101,gid=101,mode=0750 \
+  -e CLICKHOUSE_ACCESS_FILE=/run/access/access.yaml \
+  -v "$PWD/access:/run/access:ro" \
+  langwatch/clickhouse-serverless
+```
+
+Clients must read their token file for each connection or request, and never
+use a token after its `exp`: the sidecar refuses it at that second. Every
+login now depends on the sidecar; its `GET /readyz` answers 200 once it has the
+access file and every issuer's keys. Changing mode needs a restart.
+
+The remaining shared secret is the cluster secret (and the interserver HTTP
+password, when set). Rotate it by replacing the file on every replica and
+restarting them together (see [Cluster secret](#cluster-secret)).
+
+## Backups
+
+With `BACKUP_ENABLED=true` the image renders a `backups` disk (`s3_plain`, under `clickhouse-backup/` on the object store). One Go implementation takes native `BACKUP`s to it, full and incremental, from three places: `ch-config backup run` once, `ch-config sidecar` on a schedule, and `/scripts/backup-data.sh` and `/scripts/restore-data.sh`, which now exec `ch-config backup` with the same env as before. Design and limits: [ADR-199](../../dev/docs/adr/199-clickhouse-serverless-backups-run-in-the-ch-config-sidecar.md).
+
+```bash
+ch-config backup run --mode full                      # or BACKUP_MODE
+ch-config backup list                                 # names, newest first
+ch-config backup restore --name <name> --confirm      # or BACKUP_NAME, CONFIRM_RESTORE=yes
+```
+
+A run exits 0 only when it wrote a backup, or when an incremental stands down: for a full in flight, or because no full exists yet. Each incremental chains on the newest backup since the newest full from the last two full intervals plus 2 hours (26 hours on the default schedule). Restore needs an exact name; `latest` is refused.
+
+| Variable                      | Default                    | Meaning                                                                                                          |
+| ----------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `CLICKHOUSE_HOST`             | `localhost`                | Server to back up                                                                                                |
+| `CLICKHOUSE_HTTP_PORT`        | `8123`                     | Its HTTP port                                                                                                    |
+| `BACKUP_USER`                 | `CLICKHOUSE_USER`          | Login; required unless the dynamic-only local admin is present (the shims default `default`)                     |
+| `BACKUP_PASSWORD_FILE`        | `CLICKHOUSE_PASSWORD_FILE` | Password file. One-shot commands also take `CLICKHOUSE_PASSWORD`; the sidecar never does                         |
+| `BACKUP_DATABASE`             | `langwatch`                | Database to back up and restore                                                                                  |
+| `BACKUP_RETENTION_DAYS`       | `7`                        | The lifecycle rule on the backups prefix; a chain's full is at most two full intervals + 2h old (26h by default) |
+| `STALE_BACKUP_HOURS`          | `12`                       | A backup in flight longer than this is overrunning: warned and flagged, still never doubled                      |
+| `BACKUP_CLUSTER`              | unset                      | Look up bases and in-flight backups on every replica of this cluster                                             |
+| `BACKUP_MAX_BANDWIDTH`        | `0`                        | `max_backup_bandwidth`, bytes per second (0: unlimited)                                                          |
+| `BACKUP_SIDECAR`              | `off`                      | `run`: the sidecar schedules backups. `observe`: it decides and reports, never backs up                          |
+| `BACKUP_FULL_SCHEDULE`        | `0 */12 * * *`             | Cron, UTC                                                                                                        |
+| `BACKUP_INCREMENTAL_SCHEDULE` | `0 * * * *`                | Cron, UTC                                                                                                        |
+| `BACKUP_RUNNER_ORDINAL`       | `0`                        | Replica that runs backups while it answers; else the next that does                                              |
+| `BACKUP_METRICS_LISTEN`       | `127.0.0.1:8125`           | `/metrics`, `/status`, `/healthz`                                                                                |
+
+Example cadence, a full every third day at 05:00 UTC and an hourly incremental at :30:
+
+```bash
+BACKUP_SIDECAR=run BACKUP_FULL_SCHEDULE='0 5 */3 * *' BACKUP_INCREMENTAL_SCHEDULE='30 * * * *'
+```
+
+The sidecar runs in the ClickHouse pod (embedded in the container when there is no sidecar container). A firing is owed until a backup of its mode completes after it, whoever wrote it: a restart across a firing catches up, and a backup a CronJob finished counts. A restarted sidecar adopts a backup still in flight, at any age: `system.backups` is cleared by a server restart, so every entry there is live. One running past `STALE_BACKUP_HOURS` is logged and flagged as `clickhouse_backup_overrunning`, and the sidecar keeps waiting for it. Backup failures never end the process. Retention is the object store's lifecycle rule; nothing here deletes backups.
+
+To run it beside existing CronJobs without double backups, set `BACKUP_SIDECAR=observe`: it logs what it would do, exports the same metrics and counts the CronJobs' backups as successes. In dynamic-only mode the sidecar and one-shot commands inside the pod log in as the per-boot local admin. A sidecar without `BACKUP_USER` waits for that password only when `CLICKHOUSE_ACCESS_BOOTSTRAP_DIR` is set explicitly; otherwise it reports a configuration error. Restore there with `kubectl exec <pod> -c access -- ch-config backup restore --name <name> --confirm`.
 
 ## What Gets Computed
 
@@ -65,7 +305,6 @@ From 3 inputs (CPU, RAM, replicated), the Go binary derives ~40 parameters:
 | Background pool    | max(2, CPU/2)            |
 | Concurrent queries | min(CPU*25, 200)         |
 | Merge parts limit  | 5 / 8 / 15 (by CPU tier) |
-| S3 cache           | RAM * 25%                |
 
 Pods with 4 GiB of RAM or less also get an explicit memory budget, because
 ClickHouse otherwise lets each cache grow to half of RAM. Larger pods keep the
@@ -95,13 +334,15 @@ make test            # Go unit tests
 make e2e             # Basic: settings verification
 make e2e-cold        # Cold storage config check
 make e2e-cold-move   # Data moves from hot to cold S3 disk
-make e2e-backup      # Full backup → restore → incremental → restore
+make e2e-backup      # Scripts: full, chained incrementals, restores; sidecar restart mid-backup
+make e2e-access      # Tiers, rolling passwords and token logins (Linux, host network)
 ```
 
 ## Architecture
 
 ```text
 tini → entrypoint-wrapper.sh → ch-config generate → official entrypoint
+                             └→ ch-config sidecar (CLICKHOUSE_ACCESS_FILE or BACKUP_SIDECAR, unless external)
 ```
 
 `ch-config` reads env vars, auto-detects from cgroups, computes parameters, writes native ClickHouse YAML config to `config.d/` and `users.d/`, then execs the official ClickHouse entrypoint.

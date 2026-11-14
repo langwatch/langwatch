@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable capability exposed by the composed Workflow application.
 
-Peers call these through the token, declared at `../contract/src/workflow.api.ts:171`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/workflow.api.ts:173`; nothing else in this package is public.
 
 #### `executeComponent`
 
@@ -322,8 +322,10 @@ getRelatedEntities(input: { workflowId: string; projectId: string; }): Promise<W
 
 #### `cascadeArchive`
 
+A deployed agent among those it archives needs `agents:deploy` of `by`.
+
 ```typescript
-cascadeArchive(input: { projectId: string; workflowId: string; unarchive?: boolean; }): Promise<WorkflowCascadeArchive>;
+cascadeArchive(input: { projectId: string; workflowId: string; unarchive?: boolean }, by: WorkflowCaller): Promise<WorkflowCascadeArchive>;
 ```
 
 #### `runPublished`
@@ -832,7 +834,7 @@ interface Input {
   sourceProjectId: string;
   newAgentId?: string;
 }
-// Output: agentCopyCreatedSchema, ../../agent/contract/src/agent.queries.ts:202
+// Output: agentCopyCreatedSchema, ../../agent/contract/src/agent.queries.ts:211
 interface Output {
   id: string;
   projectId: string;
@@ -875,16 +877,16 @@ Declared at `src/eventing/workflow-nlp-lambda-cleanup.pipeline.ts:31`.
 
 ## Configuration
 
-| Kind   | Leaf                         | Environment variable                      | Declared at                             |
-| ------ | ---------------------------- | ----------------------------------------- | --------------------------------------- |
-| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:501`           |
-| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:502`           |
-| secret | `s3KeySalt`                  | `S3_KEY_SALT`                             | `src/app/workflow.app.ts:503`           |
-| config | `nlpServiceUrl`              | `LANGWATCH_NLP_SERVICE`                   | `../contract/src/workflow.config.ts:82` |
-| config | `stagingThresholdBytes`      | `LANGEVALS_STAGING_THRESHOLD_BYTES`       | `../contract/src/workflow.config.ts:84` |
-| config | `stagingTtlSeconds`          | `LANGEVALS_STAGING_TTL_SECONDS`           | `../contract/src/workflow.config.ts:85` |
-| config | `relayTurnCeilingMs`         | `NLP_FETCH_MAX_TIMEOUT_MS`                | `../contract/src/workflow.config.ts:87` |
-| config | `publicBaseUrl`              | `BASE_HOST`                               | `../contract/src/workflow.config.ts:89` |
-| config | `nlpCodeBlockTimeoutSeconds` | `NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS` | `../contract/src/workflow.config.ts:91` |
+| Kind   | Leaf                         | Environment variable                      | Declared at                              |
+| ------ | ---------------------------- | ----------------------------------------- | ---------------------------------------- |
+| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:504`            |
+| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:505`            |
+| secret | `s3KeySalt`                  | `S3_KEY_SALT`                             | `src/app/workflow.app.ts:506`            |
+| config | `nlpServiceUrl`              | `LANGWATCH_NLP_SERVICE`                   | `../contract/src/workflow.config.ts:123` |
+| config | `stagingThresholdBytes`      | `LANGEVALS_STAGING_THRESHOLD_BYTES`       | `../contract/src/workflow.config.ts:125` |
+| config | `stagingTtlSeconds`          | `LANGEVALS_STAGING_TTL_SECONDS`           | `../contract/src/workflow.config.ts:126` |
+| config | `relayTurnCeilingMs`         | `NLP_FETCH_MAX_TIMEOUT_MS`                | `../contract/src/workflow.config.ts:128` |
+| config | `publicBaseUrl`              | `BASE_HOST`                               | `../contract/src/workflow.config.ts:130` |
+| config | `nlpCodeBlockTimeoutSeconds` | `NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS` | `../contract/src/workflow.config.ts:132` |
 
 <!-- readme:generated:end -->

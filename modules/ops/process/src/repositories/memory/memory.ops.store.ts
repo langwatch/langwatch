@@ -7,6 +7,7 @@ import {
   type LiveSnapshot,
   type ReplayHistoryEntry,
   type ReplayStatus,
+  type SeatSharingCheck,
   type SelfHostedNotice,
 } from "@langwatch/ops-contract";
 
@@ -78,6 +79,8 @@ export class MemoryOpsStore {
   readonly cloudNotices: SelfHostedNotice[] = [];
   /** The last fleet measurement; at most one entry, replaced in place on save. */
   readonly processFleetSnapshots: ProcessFleetSnapshot[] = [];
+  /** The last seat sharing check, at most one. */
+  readonly seatSharingChecks: SeatSharingCheck[] = [];
   readonly storageReadings = new Map<string, Omit<StorageStatsReading, "lastBackup">>();
   readonly storageLastBackups = new Map<string, NonNullable<StorageStatsReading["lastBackup"]>>();
   /** The published snapshots and the writer lease over them; a lease here never lapses. */

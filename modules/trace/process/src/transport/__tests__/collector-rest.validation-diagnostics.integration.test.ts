@@ -59,7 +59,11 @@ const runtime = createRestRuntime({
 
 const collector = runtime.mount(collectorRest.router(), {
   app: () => ({
-    collectorCredential: async () => ({ project, markUsed: () => undefined }),
+    collectorCredential: async () => ({
+      project,
+      markUsed: () => undefined,
+      key: { kind: "api_key", apiKeyId: "key_collector", ownerUserId: null },
+    }),
     collectorUsageLimit: async () => undefined,
     collectorIngest: (input: CollectorIngestInput) =>
       TraceCollectorDispatchService.create({

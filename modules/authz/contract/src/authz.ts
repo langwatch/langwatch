@@ -8,7 +8,7 @@ import {
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-import { PROJECT_READER_ROLE_KEY } from "./roles.ts";
+import { BILLING_ROLE_KEY, PROJECT_READER_ROLE_KEY } from "./roles.ts";
 
 /** Portable AuthZ vocabulary. Persisted and transport values validate here. */
 export const teamUserRoleSchema = z.enum(["ADMIN", "MEMBER", "VIEWER", "CUSTOM"]);
@@ -158,15 +158,22 @@ export const bindingRoleKeySchema = z.custom<BindingRoleKey>(
 export type SharedRoleKey = typeof PROJECT_READER_ROLE_KEY;
 const sharedRoleKeySchema = z.custom<SharedRoleKey>((value) => value === PROJECT_READER_ROLE_KEY);
 
+/** The Billing role's key (specs/licensing/billing-role.feature); no legacy role carries it. */
+export type BillingRoleKey = typeof BILLING_ROLE_KEY;
+const billingRoleKeySchema = z.custom<BillingRoleKey>((value) => value === BILLING_ROLE_KEY);
+
 const collectedBindingSchemaDefinition = z
   .object({
-    roleKey: bindingRoleKeySchema.or(sharedRoleKeySchema),
+    roleKey: bindingRoleKeySchema.or(sharedRoleKeySchema).or(billingRoleKeySchema),
     scopeType: grantScopeTierSchema,
     scopeId: z.string(),
     viaGroupId: z.string().nullable().optional(),
     /** Reported, never filtered, by the reader: whether an elapsed one still grants is
      *  the collector's call. */
     expiresAtMs: z.number().int().nullable().optional(),
+    /** The stored grant carries a condition: only the proof narrows by one, so no yes/no
+     *  decision counts it (ADR-201 v1.10). */
+    conditioned: z.boolean().optional(),
   })
   .strict();
 export interface CollectedBindingSchema extends Named<typeof collectedBindingSchemaDefinition> {}
@@ -198,6 +205,8 @@ const collectedGrantsSchemaDefinition = z
     organizationRole: organizationRoleSchema.nullable(),
     isOrgMember: z.boolean(),
     membershipDisabled: z.boolean().default(false),
+    /** ADR-201 §2: absent is off; while on, only organisation-wide bindings confer it. */
+    braidsOrganizationAdminsOnly: z.boolean().optional(),
     bindings: z.array(collectedBindingSchema),
     customRolePermissions: customRolePermissionsSchema,
   })

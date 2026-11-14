@@ -28,6 +28,7 @@ import {
   LicensingApi,
   licensingSecrets,
 } from "@langwatch/enterprise-licensing-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type {
   Event,
   RegisteredFoldProjection,
@@ -63,6 +64,7 @@ import {
   AdminSessionExpiredError,
   AdminSurfaceHiddenError,
   OpsApi,
+  type SeatSharingCheck,
   adminResourceNameSchema,
   type CheckupAnswer,
   CheckupNotSelfHostedError,
@@ -369,6 +371,7 @@ import { QueueAuditService } from "../services/queue-audit.service.ts";
 import { QueueService } from "../services/queue.service.ts";
 import { SchedulerAuditService } from "../services/scheduler-audit.service.ts";
 import { SchedulerOpsService } from "../services/scheduler-ops.service.ts";
+import { SeatSharingCheckService } from "../services/seat-sharing-check.service.ts";
 import { SignUpHealthService } from "../services/sign-up-health.service.ts";
 import {
   StorageStatsCollectionService,
@@ -737,6 +740,8 @@ type OpsRuntimeDependencies = Readonly<{
   /** The measurement `ops_storage_stats` runs; absent where a composition built none. */
   storageStats: StorageStatsCollectionService | undefined;
   processFleet: ProcessFleetCollectionService | undefined;
+  /** The daily check `ops_seat_sharing` runs; absent where a composition built none. */
+  seatSharing: SeatSharingCheckService | undefined;
   /** The stranded-group reap `ops_group_queue_reaper` and the operator action run. */
   groupQueueReaper: GroupQueueReaperService;
   /** The orphaned-organization rate; absent where a composition built none. */
@@ -799,6 +804,7 @@ export class OpsModule implements OpsApi {
     // The checkup and the usage report ask each owner for its own facts.
     organizations: OrganizationApi,
     licensing: LicensingApi,
+    entitlement: EntitlementApi,
     modelProviders: ModelProviderApi,
     datasets: DatasetApi,
     annotations: AnnotationApi,
@@ -924,6 +930,18 @@ export class OpsModule implements OpsApi {
       logger,
     });
 
+    const seatSharing = SeatSharingCheckService.create({
+      organizationIds: repositories.organizationTenants,
+      peers: {
+        plans: dependencies.entitlement,
+        organizations: dependencies.organizations,
+        sessions: dependencies.auth,
+        users: dependencies.users,
+      },
+      checks: repositories.seatSharingChecks,
+      now: () => nowInstant().epochMilliseconds,
+    });
+
     const isCloud = config.isSaas || cloudOps;
     const upgradeDiagnostics = UpgradeDiagnosticsService.create({
       ledger: repositories.upgradeLedger,
@@ -939,6 +957,7 @@ export class OpsModule implements OpsApi {
       authz: dependencies.authz,
       users: dependencies.users,
       organizations: dependencies.organizations,
+      mail: dependencies.notifications,
       deployment: {
         cloud: config.isSaas || cloudOps,
         isLocalDevelopment: config.nodeEnvironment === "development",
@@ -952,6 +971,7 @@ export class OpsModule implements OpsApi {
       anomalies,
       storageStats,
       processFleet,
+      seatSharing,
       signUpHealth: SignUpHealthService.create({
         organizations: dependencies.organizations,
         identity: dependencies.identity,
@@ -983,6 +1003,7 @@ export class OpsModule implements OpsApi {
     anomalies?: AnomalyDetectorService;
     storageStats?: StorageStatsCollectionService;
     processFleet?: ProcessFleetCollectionService;
+    seatSharing?: SeatSharingCheckService;
     signUpHealth?: SignUpHealthService;
     platformOperators?: PlatformOperatorsService;
     upgradeAlerts?: UpgradeAlertsService;
@@ -1034,6 +1055,7 @@ export class OpsModule implements OpsApi {
       anomalies: setup.anomalies,
       storageStats: setup.storageStats,
       processFleet: setup.processFleet,
+      seatSharing: setup.seatSharing,
       groupQueueReaper: GroupQueueReaperService.create({
         repository: repositories.groupQueueReaper,
         audit: QueueAuditService.create({ auditLog: dependencies.auditLog }),
@@ -1910,13 +1932,13 @@ export class OpsModule implements OpsApi {
   /** The intake door's whole answer, in the bodies released CLI and MCP builds read. */
   async receiveBugReport(input: {
     report: SubmitBugReport;
-    forwardedFor: string | null;
+    callerAddress: string | null;
     linkedProjectId: string | null;
   }): Promise<OpsDoorAnswer> {
     try {
       const { id } = await this.submitBugReport({
         report: input.report,
-        callerKey: toCallerKey(input.forwardedFor),
+        callerKey: toCallerKey(input.callerAddress),
         linkedProjectId: input.linkedProjectId,
       });
 
@@ -2162,7 +2184,10 @@ export class OpsModule implements OpsApi {
     return this.#platformOperators().seedOnce(operatorSeed);
   }
 
-  /** Step `ops:seed-platform-operators`: ADMIN_EMAILS's verified users, while nobody holds it. */
+  /**
+   * Step `ops:seed-platform-operators`: ADMIN_EMAILS's verified users, while nobody holds it; with
+   * no email configured an unverified one only as the install's first-created account.
+   */
   seedPlatformOperatorsFromAdminEmails({ dryRun }: { dryRun: boolean }): Promise<number> {
     const { operatorSeed } = this.#dependencies;
     if (!operatorSeed) throw new OpsCapabilityUnavailableError("the platform-operator seed");
@@ -2241,6 +2266,24 @@ export class OpsModule implements OpsApi {
     if (!storageStats) throw new OpsCapabilityUnavailableError("storage stats");
     await storageStats.collect();
     await processFleet?.collect();
+  }
+
+  /** The last seat sharing check, Cloud admin only; empty before the first one. */
+  async findSeatSharingChecks(): Promise<SeatSharingCheck[]> {
+    this.#refuseWithoutCloudOps();
+    return this.#seatSharing.findLast();
+  }
+
+  /** One pass of `ops_seat_sharing`; a deployment without Cloud admin checks nothing. */
+  async runSeatSharingCheck(): Promise<void> {
+    if (!this.#dependencies.cloudOps) return;
+    await this.#seatSharing.run();
+  }
+
+  get #seatSharing(): SeatSharingCheckService {
+    const { seatSharing } = this.#dependencies;
+    if (!seatSharing) throw new OpsCapabilityUnavailableError("the seat sharing check");
+    return seatSharing;
   }
 
   /** Deletes the queue groups stranded long enough that no dispatch still holds them. */
@@ -2498,6 +2541,7 @@ function buildOpsInfrastructure(input: {
 
   const explainRuntime = OpsClickHouseRuntime.create({
     url: config.clickhouseOpsUrl,
+    passwordFile: config.clickhouseOpsPasswordFile,
     buildTime: false,
   });
   resources.own("api ops explain client", () => explainRuntime.close());

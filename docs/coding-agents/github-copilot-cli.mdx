@@ -22,6 +22,8 @@ Each one has two ways to set it up:
 - `langwatch copilot` or `langwatch code` starts the tool and sets up the connection on the first run. Use it on a machine you work on.
 - `langwatch instrument copilot` or `langwatch instrument code` writes the same setup and exits. Use it on a server, or when the telemetry must go to a team project.
 
+`langwatch instrument` always installs the hook file that links each session to its repository and pull request. The wrapper installs it only when you keep the plain command reporting, and a run that takes the gateway route writes no hook file. See [Link sessions to their pull requests](#link-sessions-to-their-pull-requests).
+
 ## Before you start
 
 - Install the GitHub Copilot command-line tool, Visual Studio Code, or both.
@@ -76,6 +78,8 @@ Each command writes a function of the same name in your shell start file, which 
 
 For `code`, LangWatch also removes the same settings from the Visual Studio Code integrated terminal configuration. The editor keeps the key, and the terminals inside it do not.
 
+Both commands also write the LangWatch hook file in your Copilot hooks folder, which reports the repository and branch of each session. See [Link sessions to their pull requests](#link-sessions-to-their-pull-requests).
+
 ### Choose where the telemetry goes
 
 Pass one scope flag, and one only:
@@ -97,7 +101,7 @@ The wrapper accepts the same flags: `langwatch copilot --project acme-app` pins 
 langwatch logout
 ```
 
-This deletes every connection the command-line tool wrote, for every tool.
+This deletes every connection the command-line tool wrote, for every tool, the Copilot hook file included.
 
 ## The GitHub Copilot app
 
@@ -109,18 +113,44 @@ langwatch copilot-app connect
 
 This mints an ingest key and installs a small agent that starts with your session, so every app session is captured without a wrapper. Add `--tokens-only` to collect the usage numbers and no content.
 
+<Note>
+  Not yet available: session rows and pull request cost for the GitHub Copilot app. Its turns
+  arrive as traces.
+</Note>
+
 ## What you get in LangWatch
 
 Open your personal page at `/me`, or open the project you pinned Copilot to.
 
-- **[Sessions](/coding-agents/sessions)**: one row per Copilot session, with the context it carried and how long it worked.
+- **[Sessions](/coding-agents/sessions)**: one row per Copilot conversation, from the command-line tool and from Copilot Chat in Visual Studio Code alike, with the models it used, its tokens, its token cost and the tools it ran.
+- **Repository and branch**: with the [hook file](#link-sessions-to-their-pull-requests) installed, each row shows the repository and branch the session worked on, and the pull requests that branch maps to.
+- **[Pull requests](/coding-agents/pull-requests)**: what each pull request cost across every session that drove it, with the tokens of each model.
 - **Traces**: one trace per turn, with the model, the tokens and the timing of each step.
-- **[Pull requests](/coding-agents/pull-requests)**: what each pull request cost across every session that drove it.
 - **Content**: the prompt of each turn and the response of the model.
 
-Copilot reports the number of premium requests a turn used, not an amount of money, so a Copilot trace carries a request count where a pay-per-token trace carries a cost.
+Microsoft Copilot Studio agents are a separate product and never appear as coding sessions. See [Copilot Studio](/ai-governance/ingestion-sources/copilot-studio) for those.
+
+### How Copilot cost is counted
+
+LangWatch prices each model call from its tokens at the model's list price, because Copilot reports no amount of money. That token cost is the dollar figure on sessions and pull requests, and it is not a figure from your Copilot bill.
+
+Copilot also reports AI units on each model call, its own usage count. On a pull request, AI units appear as their own count and never enter the dollar total. A model with no price shows its tokens and an unknown cost, not zero.
 
 Your agent can read all of this back. See [Explore your usage with your own agent](/coding-agents/explore-your-usage-with-your-own-agent).
+
+## Link sessions to their pull requests
+
+LangWatch reads the repository and branch of a Copilot session from a hook file, not from Copilot's telemetry. `langwatch instrument copilot` and `langwatch instrument code` write it to `~/.copilot/hooks/langwatch.json`, or to `$COPILOT_HOME/hooks/langwatch.json` when you set `COPILOT_HOME`. `langwatch ingest install copilot_cli` writes the same file.
+
+`langwatch copilot` and `langwatch code` write it on the run where you answer yes to keeping the plain command reporting, and later runs put it back if it is missing. A run that takes the gateway route asks no such question, so it writes no hook file.
+
+The file runs `langwatch ingest hook copilot` on two Copilot events: `sessionStart`, and `agentStop` at the end of every turn. The command reads the `origin` remote, the current branch and the worktree of the session's directory, and sends them to the same destination as the session's telemetry. With GitHub connected, LangWatch maps that branch to its pull requests. See [Repository and PR attribution](/coding-agents/repository-and-pr-attribution).
+
+LangWatch writes only `langwatch.json` and never opens your other hook files in that folder. A `langwatch.json` that LangWatch did not write is left as it is. `langwatch logout` deletes the file.
+
+Each entry in the file holds the same command for `bash` and for `powershell`, so the hook runs on macOS, Linux and Windows.
+
+The hook needs `langwatch` on your PATH. Copilot runs the command by name, so install the command-line tool with `npm install -g langwatch`, not through `npx` alone.
 
 ## Content and privacy
 
@@ -161,6 +191,15 @@ Set `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=false` in your own envir
   `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT` is `false` in your environment. Remove it, or
   set it to `true`, and start the tool again.
 </Accordion>
+
+  <Accordion title="Copilot sessions show no repository or pull request">
+    Check that `~/.copilot/hooks/langwatch.json` exists, or the same file under `$COPILOT_HOME/hooks/`. If it does not, run `langwatch instrument copilot` or `langwatch instrument code`. Then check that `langwatch --version` works in a new terminal, since the hook runs the command by name.
+
+    For Copilot Chat, check which harness the chat session runs on. A Copilot session loads the hook file from the folder above whatever the editor settings say. A Local session runs hook files only while the `chat.useHooks` setting is on. To see whether the hook ran, open the agent debug logs from the chat view.
+
+    A session that worked outside any git checkout, or on a branch with no pull request, has no pull request to show.
+
+  </Accordion>
 
   <Accordion title="The telemetry goes to the wrong workspace">
     Run `langwatch instrument copilot --project <id-or-slug>` to move it to a team project, or `langwatch instrument copilot --personal` to move it back to your own.

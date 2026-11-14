@@ -41,3 +41,9 @@ Feature: Standardized search input with search icon
     Given the target picker is rendered
     When I look at the search field
     Then a search icon is visible inside the input
+
+  @integration
+  Scenario: Scope filter project search field displays a search icon
+    Given the scope filter's project submenu is open
+    When I look at the search field
+    Then a search icon is visible inside the input

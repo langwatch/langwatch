@@ -14,6 +14,7 @@ import type {
 import { OrganizationMembershipService } from "../organization-membership.service.ts";
 import type { OrganizationCreationNotice } from "../organization-provisioning.service.ts";
 import type { OrganizationSeatLicense } from "../organization-seat-license.service.ts";
+import { withSeatHolds } from "./support/seat-holds.ts";
 
 const refuse = (what: string) => () => Promise.reject(new Error(`${what} is not asked here`));
 
@@ -29,6 +30,8 @@ function installed() {
   const seats: OrganizationSeatLicense = {
     checkLimit: refuse("a seat limit"),
     assertRoleChangeAllowed: refuse("a role change"),
+    holdsFullSeat: refuse("a seat type"),
+    withSeat: ({ work }) => work({ assertHeld: async () => {} }),
   };
   const seatNotices: OrganizationSeatRevocationNotice = {
     memberDisabled: refuse("a seat revocation record"),
@@ -38,7 +41,10 @@ function installed() {
   const service = OrganizationMembershipService.create({
     workspaceNotices: { personalWorkspaceArchived: () => Promise.resolve() },
     memberNotices: { memberRemoved: async () => {}, memberDepartmentChanged: async () => {} },
-    repository: MemoryOrganizationMembershipRepository.create({ memory }),
+    ...withSeatHolds({
+      repository: MemoryOrganizationMembershipRepository.create({ memory }),
+      memory,
+    }),
     creations,
     seats,
     seatNotices,

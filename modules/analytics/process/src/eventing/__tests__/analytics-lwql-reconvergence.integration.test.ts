@@ -14,6 +14,7 @@ import {
 } from "@langwatch/prisma-client";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { LangWatchQLCollectionBindingService } from "../../features/provisioning/services/langwatch-ql-collection-binding.service.ts";
 import { LWQL_POSTGRES_READER_ROLE } from "../../features/provisioning/services/langwatch-ql-production-provisioning.service.ts";
 import {
   type LwqlAppOwnedDrift,
@@ -27,6 +28,7 @@ import {
 } from "../../langwatch-ql/__tests__/lwql-clickhouse-harness.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
 import type { LwqlProvisioningDatabase } from "../../repositories/langwatch-ql-postgres.repository.ts";
+import { MemoryLwqlUnconfirmedSinceRepository } from "../../repositories/memory/memory.langwatch-ql-unconfirmed-since.repository.ts";
 import { PrismaLangWatchQLPostgresRepository } from "../../repositories/prisma/prisma.langwatch-ql-postgres.repository.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import type { LangWatchQLNames } from "../../services/langwatch-ql-access-model.service.ts";
@@ -45,6 +47,8 @@ class AllowTestQueries extends PrismaQueryGuard {
 }
 
 const selfProvisioning = LangWatchQLSelfProvisioningService.create();
+
+const collectionBinding = LangWatchQLCollectionBindingService.create();
 const ENGINE_TABLES = LangWatchQLCatalogShapesService.create()
   .postgresViews(LWQL_VIEW_CATALOG)
   .map((view) => view.sourceTable);
@@ -94,7 +98,12 @@ describe("given a rendered install whose config store has not mounted the named 
         tenantSetting: names.tenantSetting,
       },
       postgresReaderPassword: READER_PASSWORD,
-      endpoint: { host: "unused-in-rendered-mode", port: 5432, database: "unused" },
+      // What the config store renders, so the check can show ClickHouse holds the app's values.
+      endpoint: {
+        host: postgres.container.getIpAddress("bridge"),
+        port: 5432,
+        database: postgres.container.getDatabase(),
+      },
     },
     names,
     sourceDatabase: () => names.database,
@@ -112,6 +121,7 @@ describe("given a rendered install whose config store has not mounted the named 
       findDrift: () => findLwqlAppOwnedDrift({ database: database(), plan: plan() }),
       convergeAppOwned,
       fillKeyMap: () => Promise.resolve(),
+      unconfirmedSince: MemoryLwqlUnconfirmedSinceRepository.create(),
     }),
   });
 
@@ -153,17 +163,23 @@ describe("given a rendered install whose config store has not mounted the named 
     );
     // Production provisions into the application's own database, which holds the fact tables.
     names = { ...harness.names, database: harness.factDatabase };
-    collection = selfProvisioning.namedCollection({ names });
+    // Per-suite name, never the server-global lwql_postgres: suites share one ClickHouse server,
+    // and the rendered binding takes the per-database name while no lwql_postgres exists.
+    collection = collectionBinding.namedCollection({ names, mode: "sql" });
     // A reused container keeps the facts database, so the app-owned objects go first.
+    await harness.dropNamedCollection(collection);
     await harness.applyAsAdmin([
-      `DROP NAMED COLLECTION IF EXISTS ${collection}`,
       ...LWQL_VIEW_CATALOG.map((view) => `DROP VIEW IF EXISTS ${names.database}.${view.name}`),
       ...ENGINE_TABLES.map((table) => `DROP TABLE IF EXISTS ${names.database}.${table}`),
     ]);
   }, 600_000);
 
   afterAll(async () => {
-    await harness?.applyAsAdmin([`DROP NAMED COLLECTION IF EXISTS ${collection}`]);
+    // A reused container reloads each table at restart; one whose collection is gone never loads.
+    await harness?.applyAsAdmin(
+      ENGINE_TABLES.map((table) => `DROP TABLE IF EXISTS ${names.database}.${table}`),
+    );
+    await harness?.dropNamedCollection(collection);
     await connection?.closeOnce();
     await Promise.all([harness?.stop(), postgres?.stop()]);
   });

@@ -2,6 +2,7 @@
  * @vitest-environment node
  * @see modules/hosted-mcp/specs/hosted-mcp.feature
  */
+import { initConfig, tryGetConfig } from "@langwatch/mcp-server/config";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { describe, expect, it, vi } from "vitest";
 
@@ -55,5 +56,17 @@ describe("given a session this replica holds", () => {
       expect(sessions.streamable.has("s-1")).toBe(false);
       expect(close).toHaveBeenCalled();
     });
+  });
+});
+
+describe("given a tool run for a session", () => {
+  /** @scenario "The hosted MCP's own API calls are counted with client hosted-mcp" */
+  it("runs it with the session's key, marked as the hosted MCP", async () => {
+    initConfig({ endpoint: "https://app.langwatch.ai" });
+    const { sessions } = heldSession({});
+
+    const config = await sessions.runAs("key-a", async () => tryGetConfig());
+
+    expect(config).toMatchObject({ apiKey: "key-a", hosted: true });
   });
 });

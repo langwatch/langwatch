@@ -1,8 +1,15 @@
 import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 import { LambdaClient } from "@aws-sdk/client-lambda";
+import { fromTokenFile } from "@aws-sdk/credential-providers";
+import { GatewayApi } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
+import type { BoundApis } from "@langwatch/process";
 import { nlpInternalSecret, type ScopedSecrets } from "@langwatch/secrets";
-import { nlpLambdaFleetFromSecret, type WorkflowServerConfig } from "@langwatch/workflow-contract";
+import {
+  nlpLambdaFleetFromSecret,
+  type NlpLambdaFleetCredentials,
+  type WorkflowServerConfig,
+} from "@langwatch/workflow-contract";
 
 import {
   buildStudioLambdaConfig,
@@ -31,6 +38,15 @@ const logger = createLogger("langwatch:workflows");
 /** Main's retry budget, enough to ride out a cold fleet's concurrency burst. */
 const NLP_LAMBDA_CLIENT_MAX_ATTEMPTS = 6;
 
+/** A web-identity role reads the pod's projected token (`AWS_WEB_IDENTITY_TOKEN_FILE`). */
+function fleetClientCredentials(credentials: NlpLambdaFleetCredentials) {
+  if (credentials.kind === "web-identity") {
+    return fromTokenFile({ roleArn: credentials.roleArn });
+  }
+
+  return { accessKeyId: credentials.accessKeyId, secretAccessKey: credentials.secretAccessKey };
+}
+
 /**
  * Main's precedence: a named fleet wins, and one that cannot be used refuses by
  * name rather than falling back; with none, the engine address; with neither,
@@ -38,13 +54,17 @@ const NLP_LAMBDA_CLIENT_MAX_ATTEMPTS = 6;
  */
 export class HttpWorkflowChannels {
   static readonly requires = [] as const;
+  /** Bound to gateway, not a peer, so gateway may keep depending on workflow (record §5). */
+  static readonly binds = { spend: GatewayApi } as const;
 
   static async create({
     config,
     secrets,
+    bound,
   }: {
     config: WorkflowServerConfig;
     secrets: ScopedSecrets;
+    bound: BoundApis<typeof HttpWorkflowChannels.binds>;
   }): Promise<WorkflowChannels> {
     const named = await secrets.into(nlpLambdaFleetSecret, (raw) =>
       nlpLambdaFleetFromSecret.safeParse(raw),
@@ -55,6 +75,7 @@ export class HttpWorkflowChannels {
       logger.error({ reason }, "the named NLP Lambda fleet is unusable; studio runs will refuse");
 
       return {
+        spend: bound.spend,
         engine: {
           kind: "single",
           stream: UnconfiguredWorkflowStudioStreamAdapter.create({ reason }),
@@ -72,10 +93,10 @@ export class HttpWorkflowChannels {
       const lambdaConfig = buildStudioLambdaConfig({
         fields: {
           region: fields.AWS_REGION,
-          accessKeyId: fields.AWS_ACCESS_KEY_ID,
-          secretAccessKey: fields.AWS_SECRET_ACCESS_KEY,
+          credentials: fields.credentials,
           roleArn: fields.role_arn,
           imageUri: fields.image_uri,
+          imageOrder: fields.image_order,
           cacheBucket: fields.cache_bucket,
           subnetIds: fields.subnet_ids,
           securityGroupIds: fields.security_group_ids,
@@ -85,10 +106,7 @@ export class HttpWorkflowChannels {
         stagingThresholdBytesRawValue: config.stagingThresholdBytes,
         stagingTtlSecondsRawValue: config.stagingTtlSeconds,
       });
-      const credentials = {
-        accessKeyId: lambdaConfig.accessKeyId,
-        secretAccessKey: lambdaConfig.secretAccessKey,
-      };
+      const credentials = fleetClientCredentials(lambdaConfig.credentials);
       const lambda = new LambdaClient({
         region: lambdaConfig.region,
         credentials,
@@ -103,6 +121,7 @@ export class HttpWorkflowChannels {
       const logs = new CloudWatchLogsClient({ region: lambdaConfig.region, credentials });
 
       return {
+        spend: bound.spend,
         engine: {
           kind: "lambda",
           resolver: AwsNlpLambdaArnResolverChannel.create({
@@ -115,6 +134,7 @@ export class HttpWorkflowChannels {
           invoke: AwsNlpLambdaInvokeChannel.create({ lambda: invokeLambda }),
           fleet: AwsNlpLambdaFleetChannel.create({ lambda, logs, logger }),
           imageUri: lambdaConfig.imageUri,
+          imageOrder: lambdaConfig.imageOrder,
           configFingerprint: studioLambdaConfigFingerprint(lambdaConfig),
           stagingThresholdBytes: lambdaConfig.stagingThresholdBytes,
           stagingTtlSeconds: lambdaConfig.stagingTtlSeconds,
@@ -132,6 +152,7 @@ export class HttpWorkflowChannels {
     const serviceUrl = config.nlpServiceUrl;
     if (!serviceUrl) {
       return {
+        spend: bound.spend,
         engine: {
           kind: "single",
           stream: UnconfiguredWorkflowStudioStreamAdapter.create(),
@@ -142,6 +163,7 @@ export class HttpWorkflowChannels {
     }
 
     return {
+      spend: bound.spend,
       engine: {
         kind: "single",
         stream: HttpWorkflowStudioStreamAdapter.create({

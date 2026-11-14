@@ -62,7 +62,7 @@ export type AuthzDatabase = Readonly<{
   customRole: FindManyDelegate;
   apiKey: FindUniqueDelegate & FindManyDelegate;
   shareLink: FindManyDelegate;
-  project: FindUniqueDelegate;
+  project: FindUniqueDelegate & FindManyDelegate;
   team: FindUniqueDelegate;
   groupMembership: FindManyDelegate;
   grant: FindManyDelegate & FindFirstDelegate;
@@ -72,12 +72,15 @@ export type AuthzDatabase = Readonly<{
   group: FindManyDelegate;
 }>;
 
-/** One shared read as the minter needs it: the grant, the member project and its window. */
+/** One shared read as the minter needs it: the grant, the member project and its window, and
+ *  the braid a change replaced, absent on every other grant (ADR-201 §2). An `unreadable`
+ *  condition reads nothing but still shuts out the grant it replaces. */
 export type SharedReadRow = {
   grantId: string;
   memberProjectId: string;
-  condition: GrantCondition;
+  condition: GrantCondition | "unreadable";
   expiresAt: Instant | null;
+  replacesGrantId?: string;
 };
 
 /**
@@ -105,8 +108,13 @@ export abstract class AuthzReadRepository extends ScopeLineageRepository {
   // Function-typed properties below, not method shorthand: test mocks are
   // asserted on directly, which trips `unbound-method` on shorthand members.
 
+  /** Many projects' lineage in one read, by project id; unknown and archived ones are absent. */
+  abstract findProjectLineages: (args: {
+    projectIds: readonly string[];
+  }) => Promise<Map<string, { teamId: string; organizationId: string; kind: string }>>;
+
   /** The live `project-reader` grants a reader project holds (ADR-177); a window that does
-   *  not parse is left out. */
+   *  not parse is left out, and so is a braid any row, live or revoked, replaced (ADR-201 §2). */
   abstract findLiveSharedReads: (args: {
     organizationId: string;
     readerProjectId: string;
@@ -123,6 +131,11 @@ export abstract class AuthzReadRepository extends ScopeLineageRepository {
   }) => Promise<OrganizationMembership | null>;
   /** User ids of the ADMIN memberships whose seat is not disabled; none for an unknown org. */
   abstract findActiveAdministratorIds: (args: { organizationId: string }) => Promise<string[]>;
+  /** User ids of every membership whose seat is not disabled, by id, at most `limit`. */
+  abstract findActiveMemberIds: (args: {
+    organizationId: string;
+    limit: number;
+  }) => Promise<string[]>;
   /** Direct user bindings - viaGroupId null. Fenced on an ACTIVE membership. */
   abstract findUserBindings: (args: {
     userId: string;

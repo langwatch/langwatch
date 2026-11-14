@@ -62,6 +62,46 @@ Feature: Agent tunnel
     Then the request is rejected as unauthorized
     And a request carrying the session secret reaches the local agent
 
+  # The tunnel runs a `cloudflared` binary the CLI downloads beside its own
+  # config. The CLI pins one reviewed release and its published SHA-256
+  # digests, and never runs a binary it has not matched against them.
+
+  Scenario: The tunnel binary is checked against the pinned release on every run
+    Given a cloudflared binary from the pinned release is already on disk
+    When a dev tunnel session starts
+    Then the binary is matched against the pinned digest before it runs
+    And nothing is downloaded
+
+  Scenario: A binary from another release is replaced with the pinned one
+    Given a cloudflared binary from an earlier release is on disk
+    When a dev tunnel session starts
+    Then the old binary is removed
+    And the pinned release is downloaded, verified and run
+
+  Scenario: On macOS the release archive is verified before it is unpacked
+    Given a macOS machine with no cloudflared binary on disk
+    When a dev tunnel session starts
+    Then the downloaded archive is matched against the pinned archive digest
+    And only then is the binary unpacked
+    And the unpacked binary is matched against the pinned binary digest
+
+  Scenario: A download that does not match the pinned release is refused
+    Given the downloaded cloudflared release does not match the pinned digest
+    When a dev tunnel session starts
+    Then the session fails and suggests bringing your own tunnel
+    And no binary is left on disk
+
+  Scenario: A platform with no pinned release refuses to run
+    Given a platform the pinned release has no digest for
+    When a dev tunnel session starts
+    Then the session fails without downloading or running anything
+
+  Scenario: The tunnel process never updates itself mid-session
+    Given a dev tunnel session running the verified binary
+    When the tunnel process starts
+    Then it is started with automatic updates turned off
+    And the public URL it reports is the one the session uses
+
   Scenario: A transport failure on a tunneled agent is named a dead dev tunnel
     Given a scenario run targeting an HTTP agent that carries the tunnel marker
     When the run fails because the connection to the agent fails

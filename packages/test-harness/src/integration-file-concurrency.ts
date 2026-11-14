@@ -33,3 +33,25 @@ export function assertSerialWorkerSlot(env: NodeJS.ProcessEnv): void {
       "it, or set VITEST_INTEGRATION_PARALLEL=1 to ask for concurrency deliberately.",
   );
 }
+
+/** What the vitest launcher exports when nobody set a count (patches/vitest@5.0.1.patch). */
+const LAUNCHER_DEFAULT_WORKERS = "2";
+
+/**
+ * Runs a suite's files `workers` at a time in CI and stands the serial guards above down.
+ * Only for a suite whose files share no state and that has its shard alone. Off CI, or
+ * when someone exported a count other than the launcher's default, the count stands.
+ */
+export function raiseWorkerCountInCI({
+  env,
+  workers,
+}: {
+  env: NodeJS.ProcessEnv;
+  workers: number;
+}): void {
+  if (!env.CI || env.CI === "false" || env.CI === "0") return;
+  const exported = env.VITEST_MAX_WORKERS;
+  if (exported !== undefined && exported !== LAUNCHER_DEFAULT_WORKERS) return;
+  env.VITEST_MAX_WORKERS = String(workers);
+  env.VITEST_INTEGRATION_PARALLEL = "1";
+}

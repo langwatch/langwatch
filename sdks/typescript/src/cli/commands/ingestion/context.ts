@@ -28,11 +28,13 @@ import {
   sessionContextFingerprint,
   sessionTitleFromPrompt,
 } from "@/cli/utils/governance/session-context";
+import { sessionContextAgentFor } from "@/cli/utils/governance/session-context-agents";
 import { writeSpooledDeclaration } from "@/cli/utils/governance/session-context-spool";
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 import { type ResolvedSession, resolveSession } from "./context-session.ts";
+import { endProcessWhenDone } from "./end-process.ts";
 import { type GitRunner, readSessionContext, runGitCommand } from "./git-context.ts";
 import { type CliTelemetryConfig, postSessionContext, resolveTarget } from "./hook.ts";
 
@@ -57,6 +59,17 @@ export interface ContextCommandOptions {
   readCliConfig?: () => CliTelemetryConfig;
   /** One line to whoever ran the command. Defaults to stdout. */
   writeLine?: (line: string) => void;
+}
+
+/**
+ * The declaration as the process the agent's shell runs: it ends itself after
+ * its one line, so a post given up at its deadline cannot hold the shell.
+ */
+export async function runContextProcess({
+  exit,
+  ...options
+}: ContextCommandOptions & { exit?: (code: number) => void } = {}): Promise<void> {
+  await endProcessWhenDone({ work: () => contextCommand(options), exit });
 }
 
 /**
@@ -143,9 +156,11 @@ async function declare({
     return;
   }
 
+  // The same key the agent's own hook posts with, read off the same table, so
+  // a declaration and the hook land in the same project.
   const target = resolveTarget({
     env,
-    agent: session.agent,
+    sourceType: sessionContextAgentFor(session.agent)?.keySourceType(env) ?? session.agent,
     readCliConfig,
   });
   if (!target) {

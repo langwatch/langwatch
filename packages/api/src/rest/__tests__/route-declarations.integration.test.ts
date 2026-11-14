@@ -220,7 +220,7 @@ describe("given a route that declares the trail it leaves", () => {
         method: "DELETE",
         headers: { "user-agent": "Mozilla/5.0 (audit test)" },
       });
-      ClientAddress.classifyByAddress().handle({ request, socketAddress: "203.0.113.7" });
+      ClientAddress.fromTrustedProxies({}).handle({ request, socketAddress: "203.0.113.7" });
 
       await mounted({ audit: sink }).request(request);
 

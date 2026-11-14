@@ -10,12 +10,26 @@ import { z } from "zod";
 import { DATAPLANE_S3_ENV_PREFIX } from "./config-owner.ts";
 import type { MalformedPrivateVariable, ObjectStoragePrivateAccount } from "./config.ts";
 
-const dataplaneS3Schema = z.object({
-  endpoint: z.string().min(1, "endpoint must not be empty"),
-  bucket: z.string().min(1, "bucket must not be empty"),
-  accessKeyId: z.string().min(1, "accessKeyId must not be empty"),
-  secretAccessKey: z.string().min(1, "secretAccessKey must not be empty"),
-});
+/**
+ * A `roleArn` is assumed through the pod's web-identity token and wins over a static key pair.
+ * A `region` overrides the shared S3_REGION for this organisation alone.
+ */
+const dataplaneS3Schema = z
+  .object({
+    endpoint: z.string().min(1, "endpoint must not be empty"),
+    bucket: z.string().min(1, "bucket must not be empty"),
+    region: z.string().trim().min(1, "region must not be empty").optional(),
+    accessKeyId: z.string().min(1, "accessKeyId must not be empty").optional(),
+    secretAccessKey: z.string().min(1, "secretAccessKey must not be empty").optional(),
+    roleArn: z.string().trim().min(1, "roleArn must not be empty").optional(),
+  })
+  .superRefine((config, ctx) => {
+    if (config.roleArn) return;
+    for (const key of ["accessKeyId", "secretAccessKey"] as const) {
+      if (config[key]) continue;
+      ctx.addIssue({ code: "custom", path: [key], message: `set roleArn, or ${key}` });
+    }
+  });
 
 const storesLogger = createLogger("langwatch:stores:dataplane-s3");
 
@@ -48,7 +62,7 @@ function parsedJson(value: string): unknown {
 /** Each organisation's own S3 account, keyed by the organisation its variable names. */
 export function objectStoragePrivateAccountsOf(options: {
   family: ReadonlyMap<string, string>;
-  /** The shared `S3_REGION`, which main applied to every private account too. */
+  /** The shared `S3_REGION`, for every private account that names no region of its own. */
   region?: string;
   logger?: Pick<Logger, "warn">;
 }): readonly ObjectStoragePrivateAccount[] {
@@ -81,6 +95,17 @@ function configOf({
   return result.data;
 }
 
+/** The role when one is named, else the key pair the schema guarantees is then complete. */
+function credentialsOf(
+  config: z.infer<typeof dataplaneS3Schema>,
+): Pick<ObjectStoragePrivateAccount, "roleArn" | "credentials"> {
+  const { roleArn, accessKeyId, secretAccessKey } = config;
+  if (roleArn) return { roleArn };
+  if (!accessKeyId || !secretAccessKey) return {};
+
+  return { credentials: { accessKeyId, secretAccessKey } };
+}
+
 /** The private accounts, and the variables present but unusable: those are refused. */
 export function objectStoragePrivateFamilyOf(options: {
   family: ReadonlyMap<string, string>;
@@ -111,16 +136,16 @@ export function objectStoragePrivateFamilyOf(options: {
       throw new DuplicatePrivateStorageAccountError(organizationId, envVar);
     }
 
-    const { endpoint, bucket, accessKeyId, secretAccessKey } = config;
     malformed.delete(organizationId);
+    const accountRegion = config.region ?? region;
     accounts.set(organizationId, {
       organizationId,
       label,
       variable: envVar,
-      bucket,
-      endpoint,
-      ...(region ? { region } : {}),
-      credentials: { accessKeyId, secretAccessKey },
+      bucket: config.bucket,
+      endpoint: config.endpoint,
+      ...(accountRegion ? { region: accountRegion } : {}),
+      ...credentialsOf(config),
       forcePathStyle: true,
     });
   }

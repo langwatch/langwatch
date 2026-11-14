@@ -10,8 +10,12 @@ export type BillingSubscriptionRecord = {
   endDate: Instant | null;
   maxMembers: number | null;
   maxMembersLite: number | null;
+  maxMembersDeveloper: number | null;
   maxMessagesPerMonth: number | null;
   lastPaymentFailedDate: Instant | null;
+  /** Seats a decrease leaves usable until `seatsKeptUntil`, the end of the period paid for. */
+  seatsKept: number | null;
+  seatsKeptUntil: Instant | null;
 };
 
 type BillingOrganizationRecord = {
@@ -54,6 +58,8 @@ export abstract class BillingSubscriptionRepository {
   abstract updateQuantities(input: {
     id: string;
     maxMembers: number | null;
+    /** Undefined leaves the stored cap alone: only a seat-priced subscription states it. */
+    maxMembersDeveloper?: number;
     maxMessagesPerMonth: number | null;
   }): Promise<BillingSubscriptionWithOrganization>;
 }

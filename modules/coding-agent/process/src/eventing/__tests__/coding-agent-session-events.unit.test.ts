@@ -1,10 +1,15 @@
 import {
+  AI_UNITS_SESSION_FACT,
   LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
   type LogFactsContributedEvent,
+  SPAN_FACTS_CONTRIBUTED_EVENT_TYPE,
+  type SpanFactsContributedEvent,
 } from "@langwatch/coding-agent-contract";
 import { type AppendStore, createTenantId, type Event, EventSchema } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
+import { TestModelProviderService } from "../../__tests__/fixtures/coding-agent-processing.fixture.ts";
+import { spanModelCallRecordId } from "../../rules/coding-agent-model-call-facts.rules.ts";
 import {
   type CodingAgentSessionEventRecord,
   CodingAgentSessionEventsMapProjection,
@@ -45,12 +50,58 @@ function logFactsEvent(
   };
 }
 
+function spanFactsEvent({
+  agent,
+  name,
+  facts,
+  context = {},
+}: {
+  agent: string;
+  name: string;
+  facts: Record<string, string | number | boolean>;
+  context?: Partial<
+    Record<"repositoryHost" | "repositoryOwner" | "repositoryName" | "branch", string>
+  >;
+}): SpanFactsContributedEvent {
+  const timeMs = 1_700_000_000_000;
+  return {
+    id: "evt-span-1",
+    aggregateId: "aggregate-1",
+    aggregateType: "coding_agent_session",
+    tenantId: createTenantId("tenant-1"),
+    createdAt: timeMs,
+    occurredAt: timeMs,
+    version: "2025-01-01",
+    type: SPAN_FACTS_CONTRIBUTED_EVENT_TYPE,
+    data: {
+      tenantId: "tenant-1",
+      sessionId: SESSION_ID,
+      sessionKeySource: "provider",
+      agent,
+      occurredAt: timeMs,
+      traceId: "trace-1",
+      spanId: "span-1",
+      name,
+      startTimeUnixMs: timeMs,
+      endTimeUnixMs: timeMs + 2_400,
+      statusCode: 0,
+      facts,
+      scopeName: null,
+      ...context,
+    },
+  };
+}
+
+/** Prices every call at a fixed figure, so a row's cost says it was priced, not reported. */
+const PRICE_PER_CALL_USD = 0.0025;
+
 function makeProjection(): CodingAgentSessionEventsMapProjection {
   return CodingAgentSessionEventsMapProjection.create({
     store: {
       append: async () => undefined,
       bulkAppend: async () => undefined,
     } satisfies AppendStore<CodingAgentSessionEventRecord>,
+    modelProviders: new TestModelProviderService(() => PRICE_PER_CALL_USD),
   });
 }
 
@@ -273,6 +324,110 @@ describe("CodingAgentSessionEventsMapProjection", () => {
 
       expect(row?.traceId).toBe("");
       expect(row?.eventKind).toBe("model_call");
+    });
+  });
+
+  describe("given a Copilot model-call span stamped with its working context", () => {
+    const event = spanFactsEvent({
+      agent: "copilot",
+      name: "chat gpt-6-luna",
+      facts: {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.model": "gpt-6-luna",
+        "gen_ai.usage.input_tokens": 13,
+        "gen_ai.usage.output_tokens": 50,
+        "gen_ai.usage.cache_read.input_tokens": 17_039,
+        "gen_ai.usage.cache_creation.input_tokens": 0,
+        [AI_UNITS_SESSION_FACT]: 0.038424,
+      },
+      context: {
+        repositoryHost: "github.com",
+        repositoryOwner: "acme",
+        repositoryName: "widgets",
+        branch: "feat/copilot",
+      },
+    });
+
+    /** @scenario "A Copilot model call writes one per-call row carrying its context, tokens and AI units" */
+    it("writes one model_call row carrying its context, tokens, computed cost and AI units", () => {
+      expect(CodingAgentSessionEventsMapProjection.accepts(event as Event)).toBe(true);
+      expect(makeProjection().mapCodingAgentSessionSpanFactsContributed(event)).toMatchObject({
+        eventKind: "model_call",
+        agent: "copilot",
+        sessionId: SESSION_ID,
+        recordId: spanModelCallRecordId({ traceId: "trace-1", spanId: "span-1" }),
+        traceId: "trace-1",
+        spanId: "span-1",
+        model: "gpt-6-luna",
+        inputTokens: 13,
+        outputTokens: 50,
+        cacheReadTokens: 17_039,
+        cacheCreationTokens: 0,
+        costUsd: PRICE_PER_CALL_USD,
+        durationMs: 2_400,
+        aiUnits: 0.038424,
+        repositoryHost: "github.com",
+        repositoryOwner: "acme",
+        repositoryName: "widgets",
+        branch: "feat/copilot",
+      });
+    });
+
+    /** @scenario "A Copilot model call writes one per-call row carrying its context, tokens and AI units" */
+    it("keys the row by 64 hex characters, the width the table's record id holds", () => {
+      const row = makeProjection().mapCodingAgentSessionSpanFactsContributed(event);
+      expect(row?.recordId).toMatch(/^[0-9a-f]{64}$/);
+    });
+
+    /** @scenario "A Copilot model call writes one per-call row carrying its context, tokens and AI units" */
+    it("writes nothing for the session root or a tool run of the same session", () => {
+      const projection = makeProjection();
+      for (const name of ["invoke_agent", "execute_tool rg"]) {
+        const other = spanFactsEvent({ agent: "copilot", name, facts: {} });
+        expect(CodingAgentSessionEventsMapProjection.accepts(other as Event)).toBe(false);
+        expect(projection.mapCodingAgentSessionSpanFactsContributed(other)).toBeNull();
+      }
+    });
+  });
+
+  describe("given a Claude Code session that sends both its logs and its spans", () => {
+    const facts = {
+      model: "claude-sonnet-4-5",
+      input_tokens: 4,
+      output_tokens: 120,
+      cache_read_tokens: 13_000,
+      cache_creation_tokens: 250,
+    };
+
+    /** @scenario "A model call that sends both a log event and a span is written once" */
+    it("writes its model call from the log event alone, never again from the span", () => {
+      const projection = makeProjection();
+      const log = logFactsEvent({
+        "event.name": "claude_code.api_request",
+        ...facts,
+        cost_usd: 0.04,
+      });
+      const span = spanFactsEvent({ agent: "claude_code", name: "claude_code.llm_request", facts });
+
+      const rows = [
+        projection.mapCodingAgentSessionLogFactsContributed(log),
+        projection.mapCodingAgentSessionSpanFactsContributed(span),
+      ].filter((row) => row !== null);
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ eventKind: "model_call", costUsd: 0.04, aiUnits: 0 });
+      expect(CodingAgentSessionEventsMapProjection.accepts(span as Event)).toBe(false);
+    });
+
+    /** @scenario "A model call that sends both a log event and a span is written once" */
+    it("writes no row for a codex turn span either, so codex rows stay as they were", () => {
+      const turn = spanFactsEvent({
+        agent: "codex",
+        name: "session_task.turn",
+        facts: { "gen_ai.usage.input_tokens": 40 },
+      });
+      expect(CodingAgentSessionEventsMapProjection.accepts(turn as Event)).toBe(false);
+      expect(makeProjection().mapCodingAgentSessionSpanFactsContributed(turn)).toBeNull();
     });
   });
 

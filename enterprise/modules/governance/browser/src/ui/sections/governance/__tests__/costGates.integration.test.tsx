@@ -13,6 +13,7 @@ import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../../testin
 
 const harness = vi.hoisted(() => ({ requested: [] as string[] }));
 
+vi.mock("@langwatch/auth-client", () => ({ useRecordPageOpened: () => undefined }));
 vi.mock("../../../../behavior/governance-api.ts", () => {
   const node = (path: string[]): unknown =>
     new Proxy(

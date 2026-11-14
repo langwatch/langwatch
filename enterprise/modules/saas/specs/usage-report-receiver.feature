@@ -56,8 +56,8 @@ Feature: LangWatch Cloud receives the daily usage report
 
   @unit
   Scenario: A sender's IPv6 address is limited like any other
-    Given a report whose proxy header names the sender by an IPv6 address, written short or in full
-    When the receiver reads the sender's address
+    Given a report whose sender the door resolved to an IPv6 address
+    When the receiver applies its per-address limit
     Then the report is counted against that address's limit
 
   @unit

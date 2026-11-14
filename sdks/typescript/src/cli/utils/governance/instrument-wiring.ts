@@ -12,8 +12,14 @@ import { readClaudePluginState } from "./claude-plugin";
 import { assertCodexAgentGuidance } from "./codex-agents-md";
 import type { GovernanceConfig } from "./config";
 import { buildOtelEnvBlock } from "./otel-env-block";
+import { installPiTelemetryExtension, piExtensionNotOursNotice } from "./pi-plugin";
 import { runningCodeRestartNotice } from "./running-code";
-import { installSessionContextHooks, removeSessionContextHooks } from "./session-context-hooks";
+import {
+  assertOwnedHookFileFor,
+  hookFileNotOursNotice,
+  installSessionContextHooks,
+  removeSessionContextHooks,
+} from "./session-context-hooks";
 import {
   type DetectedShell,
   assertCodexTurnHarvest,
@@ -91,6 +97,29 @@ function enableOpencodeTelemetryFlag(): string[] {
   return failures;
 }
 
+// pi ships no exporter, so the scoped function's env reaches nothing
+// until our extension sits in pi's extension directory (ADR-188
+// Decision 4). Without it a plain `pi` run sends no telemetry.
+function installPiExtension(labels: string[]): string[] {
+  try {
+    const result = installPiTelemetryExtension();
+    if (result.action === "not_ours") {
+      return [
+        piExtensionNotOursNotice({
+          displayPath: result.displayPath,
+          command: "langwatch instrument pi",
+        }),
+      ];
+    }
+    labels.push(result.displayPath);
+    return [];
+  } catch (err) {
+    return [
+      `could not write the pi telemetry extension, so pi sessions send no telemetry: ${(err as Error).message}`,
+    ];
+  }
+}
+
 function clearCodeTerminalEnv({
   shell,
   vars,
@@ -165,6 +194,8 @@ export function installTelemetryWiring({
     return { labels, warnings, requiredFailures };
   }
 
+  warnings.push(...assertOwnedHookFile(tool));
+
   // Every remaining tool persists as a scoped shell function so the OTel
   // env applies to `<tool>` runs only, never to other shell children.
   const shell = detectShell();
@@ -187,8 +218,39 @@ export function installTelemetryWiring({
   } catch (err) {
     warnings.push(`could not write ${tildify(rcPath(shell))}: ${(err as Error).message}`);
   }
+  applyToolExtras({
+    tool,
+    shell,
+    vars,
+    codeWiringChanged,
+    result: { labels, warnings, requiredFailures },
+  });
+  return { labels, warnings, requiredFailures };
+}
+
+/**
+ * The steps a tool needs beside its scoped function: opencode's telemetry
+ * flag, pi's extension, and the VS Code terminal clear plus restart notice.
+ * Writes into `result` in place, as `installTelemetryWiring` reports it.
+ */
+function applyToolExtras({
+  tool,
+  shell,
+  vars,
+  codeWiringChanged,
+  result: { labels, warnings, requiredFailures },
+}: {
+  tool: string;
+  shell: DetectedShell;
+  vars: Record<string, string>;
+  codeWiringChanged: boolean;
+  result: WiringInstallResult;
+}): void {
   if (tool === "opencode") {
     requiredFailures.push(...enableOpencodeTelemetryFlag());
+  }
+  if (tool === "pi") {
+    requiredFailures.push(...installPiExtension(labels));
   }
   if (tool === "code") {
     const failures = clearCodeTerminalEnv({ shell, vars });
@@ -201,5 +263,21 @@ export function installTelemetryWiring({
     const notice = runningCodeRestartNotice();
     if (notice) warnings.push(notice);
   }
-  return { labels, warnings, requiredFailures };
+}
+
+/**
+ * Both Copilot surfaces and Grok load a hook file LangWatch owns (ADR-039 S4,
+ * ADR-192), so wiring writes it, quietly and best-effort as claude's is. The
+ * warning is for a file of the user's at its path: then linking is off.
+ */
+function assertOwnedHookFile(tool: string): string[] {
+  const hookFile = assertOwnedHookFileFor({ command: tool });
+  if (hookFile?.action !== "not_ours") return [];
+  return [
+    hookFileNotOursNotice({
+      displayPath: hookFile.displayPath,
+      agentId: hookFile.tool,
+      command: tool,
+    }),
+  ];
 }

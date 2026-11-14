@@ -591,7 +591,7 @@ Answers at `/api/prompts/:id{.+}`, `/api/v1/prompts/:id{.+}`.
 
 ```typescript
 type Params = z.infer<typeof idParamsSchema>; // ../contract/src/prompt-rest.schemas.ts:185
-// Response: successSchema, ../../../packages/api/src/rest/response.ts:249
+// Response: successSchema, ../../../packages/api/src/rest/response.ts:252
 interface Response {
   success: boolean;
 }
@@ -829,12 +829,14 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `prompt_lifecycle` (aggregate `prompt`)
 
-Declared at `src/eventing/prompt-lifecycle.pipeline.ts:51`. Events: `promptCreatedEventSchema`.
+Declared at `src/eventing/prompt-lifecycle.pipeline.ts:59`. Events: `promptCreatedEventSchema`, `promptVersionSavedEventSchema`, `promptDeletedEventSchema`.
 
 | Kind            | Name                         | Handles                                                                     | Declared at                                    |
 | --------------- | ---------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------- |
-| command         | `recordPromptCreated`        | –                                                                           | `src/eventing/prompt-lifecycle.pipeline.ts:56` |
-| peer subscriber | `seedOrganizationPromptTags` | `lw.organization.created` from [organization](../../organization/README.md) | `src/eventing/prompt-lifecycle.pipeline.ts:57` |
+| command         | `recordPromptCreated`        | –                                                                           | `src/eventing/prompt-lifecycle.pipeline.ts:64` |
+| command         | `recordPromptVersionSaved`   | –                                                                           | `src/eventing/prompt-lifecycle.pipeline.ts:65` |
+| command         | `recordPromptDeleted`        | –                                                                           | `src/eventing/prompt-lifecycle.pipeline.ts:66` |
+| peer subscriber | `seedOrganizationPromptTags` | `lw.organization.created` from [organization](../../organization/README.md) | `src/eventing/prompt-lifecycle.pipeline.ts:67` |
 
 ## Configuration
 

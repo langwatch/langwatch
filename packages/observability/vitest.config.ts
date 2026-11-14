@@ -4,6 +4,8 @@ import { defineConfig } from "vitest/config";
 // this package cannot test through it (Alex, 2026-09-27).
 export default defineConfig({
   test: {
+    // Persist transforms between runs, as the shared config does (testing-speed.md).
+    fsModuleCache: true,
     environment: "node",
     pool: "forks",
     // Nine files vi.mock the logger and SDK modules; a shared graph lets one

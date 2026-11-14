@@ -17,6 +17,7 @@ import type { DashboardApi } from "@langwatch/dashboard-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -75,6 +76,7 @@ function process(
         apiKey: undefined,
         clickhouseOpsUrl: undefined,
         clickhouseCluster: undefined,
+        clickhouseOpsPasswordFile: undefined,
         usageStats: {
           disabled: false,
           installMethod: undefined,
@@ -120,6 +122,7 @@ function process(
       "feature-flag": createApiFixture<FeatureFlagApi>(),
       organization: createApiFixture<OrganizationApi>(),
       licensing: createApiFixture<LicensingApi>(),
+      entitlement: createApiFixture<EntitlementApi>(),
       "model-provider": createApiFixture<ModelProviderApi>(),
       dataset: createApiFixture<DatasetApi>(),
       annotation: createApiFixture<AnnotationApi>(),

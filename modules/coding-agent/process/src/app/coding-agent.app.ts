@@ -40,6 +40,7 @@ import { ValidationError } from "@langwatch/handled-error";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
+import { credentialsSecret, sessionSecret } from "@langwatch/secrets";
 import {
   TraceApi,
   type TraceSessionGroupsInput,
@@ -61,6 +62,7 @@ import {
   gateSessionListCost,
   gateSessionListTitles,
 } from "../rules/coding-agent-gates.rules.ts";
+import { repositoryKeyOfWith } from "../rules/coding-agent-repository-key.rules.ts";
 import {
   encodeSessionCursor,
   readSessionCursor,
@@ -149,6 +151,11 @@ export class CodingAgentModule implements CodingAgentApi {
   static readonly contract = CodingAgentApiToken;
   /** The shared fold-cache TTL the session fold cache keeps. */
   static readonly config = codingAgentConfig;
+  static readonly secrets = {
+    /** Keys the repo in a stored session's fact: CREDENTIALS_SECRET, else NEXTAUTH_SECRET. */
+    repositoryKey: credentialsSecret,
+    repositoryKeyFallback: sessionSecret,
+  } as const;
   static readonly dependencies: CodingAgentDependencies = {
     projects: ProjectApi,
     github: GithubApi,
@@ -167,7 +174,16 @@ export class CodingAgentModule implements CodingAgentApi {
     governance: GovernanceRestApi,
   };
 
-  static create({ dependencies, repositories }: CodingAgentSetup): CodingAgentModule {
+  static async create({
+    dependencies,
+    repositories,
+    secrets,
+  }: CodingAgentSetup): Promise<CodingAgentModule> {
+    const repositoryKeySecret =
+      (await secrets.into(CodingAgentModule.secrets.repositoryKey, (value) => value ?? "")) ||
+      (await secrets.into(CodingAgentModule.secrets.repositoryKeyFallback, (value) => value ?? ""));
+    // One price list for the fold, its per-call rows and the reads that ask what it covers.
+    const modelProviders = ModelCatalogCostEstimatorService.create();
     const service = CodingAgentFeatureService.create({
       sessions: repositories.sessions,
       traceSessions: repositories.traceSessions,
@@ -177,6 +193,7 @@ export class CodingAgentModule implements CodingAgentApi {
       projects: dependencies.projects,
       billing: GovernanceCodingAgentBillingService.create({ governance: dependencies.governance }),
       clock: SystemCodingAgentClockService.create(),
+      modelProviders,
     });
     const scopeService = CodingAgentCallerScopeService.create({
       directory: CodingAgentScopeDirectoryService.create({
@@ -204,7 +221,7 @@ export class CodingAgentModule implements CodingAgentApi {
     const milestones = CodingAgentProjectMilestonesService.create();
     const processing = EventingCodingAgentProcessingAdapter.create({
       traceCanonicalisation: dependencies.traces,
-      modelProviders: ModelCatalogCostEstimatorService.create(),
+      modelProviders,
       costMetrics: OtelCodingAgentCostMetricsService.create(),
       projections: CodingAgentProjectionPersistenceService.create(repositories),
       projects: dependencies.projects,
@@ -216,6 +233,10 @@ export class CodingAgentModule implements CodingAgentApi {
         sessions: repositories.sessions,
         recorder: milestones,
         clock: SystemCodingAgentClockService.create(),
+      }),
+      repositoryKeyOf: repositoryKeyOfWith({
+        secret: repositoryKeySecret,
+        normalizeHost: (host) => dependencies.github.normalizeRepositoryHost(host),
       }),
       sessionContextMemo: repositories.sessionContextMemo,
       sessionFoldCache: repositories.sessionFoldCache,

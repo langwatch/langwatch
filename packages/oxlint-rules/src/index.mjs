@@ -7,6 +7,7 @@ import {
 } from "./classify.mjs";
 import { defineRule, renderMessage, renderTemplate } from "./define-rule.mjs";
 import { accessEscapeKindRule } from "./rules/access-escape-kind.rule.mjs";
+import { appFeatureLayoutRule } from "./rules/app-feature-layout.rule.mjs";
 import { authzMembersRequiredRule } from "./rules/authz-members-required.rule.mjs";
 import { bannedTestModelNamesRule } from "./rules/banned-test-model-names.rule.mjs";
 import { bannedVerbPrefixRule } from "./rules/banned-verb-prefix.rule.mjs";
@@ -34,6 +35,7 @@ import { featureSourceSubjectRule } from "./rules/feature-source-subject.rule.mj
 import { handledErrorOutsideContractRule } from "./rules/handled-error-outside-contract.rule.mjs";
 import { idGenerationOriginRule } from "./rules/id-generation-origin.rule.mjs";
 import { idempotencyKeyIsStableRule } from "./rules/idempotency-key-is-stable.rule.mjs";
+import { ingestionSourceStatusLiteralRule } from "./rules/ingestion-source-status-literal.rule.mjs";
 import { jsxFromHookRule } from "./rules/jsx-from-hook.rule.mjs";
 import { legacyMonolithPathRule } from "./rules/legacy-monolith-path.rule.mjs";
 import { moduleClassesRule } from "./rules/module-classes.rule.mjs";
@@ -63,6 +65,7 @@ import { refusalIsAHandledErrorRule } from "./rules/refusal-is-a-handled-error.r
 import { requestDeliveryFromAnIntentRule } from "./rules/request-delivery-from-an-intent.rule.mjs";
 import { requireFetchTimeoutRule } from "./rules/require-fetch-timeout.rule.mjs";
 import { restRouteRule } from "./rules/rest-route.rule.mjs";
+import { s3ClientRegionRule } from "./rules/s3-client-region.rule.mjs";
 import { schemaOutsideContractRule } from "./rules/schema-outside-contract.rule.mjs";
 import { serviceDoesNotOpenAChannelRule } from "./rules/service-does-not-open-a-channel.rule.mjs";
 import { serviceLoadsItsOwnConfigRule } from "./rules/service-loads-its-own-config.rule.mjs";
@@ -70,6 +73,7 @@ import { sharedSetupIsAHookRule } from "./rules/shared-setup-is-a-hook.rule.mjs"
 import { signatureMirrorRule } from "./rules/signature-mirror.rule.mjs";
 import { skipTenantCheckReasonRule } from "./rules/skip-tenant-check-reason.rule.mjs";
 import { sliceReaderIsAHookRule } from "./rules/slice-reader-is-a-hook.rule.mjs";
+import { spanBraidHonourOwnerRule } from "./rules/span-braid-honour-owner.rule.mjs";
 import { standInCastRule } from "./rules/stand-in-cast.rule.mjs";
 import { storeContainmentRule } from "./rules/store-containment.rule.mjs";
 import { suppressionStatesWhyRuleFor } from "./rules/suppression-states-why.rule.mjs";
@@ -101,9 +105,11 @@ const HOUSE_RULES = [
   noRawFontSizeRule,
   noTautologicalAssertionRule,
   requireFetchTimeoutRule,
+  s3ClientRegionRule,
   bannedVerbPrefixRule,
   moduleClassesRule,
   moduleLayersRule,
+  appFeatureLayoutRule,
   passThroughClassRule,
   restRouteRule,
   storeContainmentRule,
@@ -128,6 +134,7 @@ const HOUSE_RULES = [
   namespaceClassRule,
   noAliasReexportRule,
   noBootHookOutsideGuardRule,
+  ingestionSourceStatusLiteralRule,
   noHandRolledPlanGateRule,
   noHonoHttpExceptionRule,
   sliceReaderIsAHookRule,
@@ -149,6 +156,7 @@ const HOUSE_RULES = [
   serviceDoesNotOpenAChannelRule,
   serviceLoadsItsOwnConfigRule,
   sharedSetupIsAHookRule,
+  spanBraidHonourOwnerRule,
   standInCastRule,
   temporalOnlyRule,
   testDescriptionIsAnActionRule,
@@ -189,10 +197,12 @@ export {
   noFormWatchInChildRule,
   noTautologicalAssertionRule,
   requireFetchTimeoutRule,
+  s3ClientRegionRule,
   resetUnresolvedImportCache,
   bannedVerbPrefixRule,
   moduleClassesRule,
   moduleLayersRule,
+  appFeatureLayoutRule,
   passThroughClassRule,
   restRouteRule,
   storeContainmentRule,
@@ -228,6 +238,7 @@ export {
   namespaceClassRule,
   noAliasReexportRule,
   noBootHookOutsideGuardRule,
+  ingestionSourceStatusLiteralRule,
   noHandRolledPlanGateRule,
   noHonoHttpExceptionRule,
   sliceReaderIsAHookRule,
@@ -249,6 +260,7 @@ export {
   serviceDoesNotOpenAChannelRule,
   serviceLoadsItsOwnConfigRule,
   sharedSetupIsAHookRule,
+  spanBraidHonourOwnerRule,
   standInCastRule,
   temporalOnlyRule,
   testDescriptionIsAnActionRule,

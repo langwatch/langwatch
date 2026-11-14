@@ -16,7 +16,7 @@ description: Send OpenTelemetry traces from your OpenClaw agent to LangWatch for
 
 <Steps>
 <Step title="Get your LangWatch API Key">
-Go to [app.langwatch.ai/authorize](https://app.langwatch.ai/authorize) to create your account and project, then grab your API key.
+Go to [app.langwatch.ai/authorize](https://app.langwatch.ai/authorize) to create your account and project, then grab your API key. It is the same key the LangWatch SDKs read from `LANGWATCH_API_KEY`; paste it in place of `sk-lw-YOUR_API_KEY_HERE` below.
 </Step>
 <Step title="Configure OpenClaw">
 Add the following to your `~/.openclaw/openclaw.json`:
@@ -59,7 +59,7 @@ openclaw gateway restart
 ```
 </Step>
 <Step title="Test the integration">
-Send a message to your agent and check the LangWatch dashboard. Each agent turn produces a trace with the full execution tree.
+Send a message to your agent, then open your project in LangWatch. Each agent turn produces a trace with the full execution tree; you should see a new one in the traces list within a few seconds.
 </Step>
 </Steps>
 
@@ -67,7 +67,7 @@ Send a message to your agent and check the LangWatch dashboard. Each agent turn 
 
 Each agent turn produces a span tree like this:
 
-```
+```text
 run (root span)
 ├── chat claude-opus-4-6        (LLM inference)
 │   ├── tool.Read               (tool execution)

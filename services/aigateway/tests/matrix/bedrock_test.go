@@ -14,11 +14,12 @@ import (
 // langwatch-dev-bedrock-user IAM policy + eu-central-1 region binding,
 // per the matrix-bedrock VK's customKeys).
 //
-// The gateway's bifrost adapter routes Bedrock requests through the AWS SDK
-// using credentials bound to the VK via the ModelProvider, not env-based
-// boto/SDK credentials — the TEST_VK_BEDROCK VK must have a Bedrock
-// credential bound with AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY /
-// AWS_DEFAULT_REGION in its encrypted customKeys blob.
+// TEST_VK_BEDROCK's bound ModelProvider carries only AWS_REGION_NAME: with
+// no access key on it, the gateway's bifrost adapter signs with the AWS
+// default credential chain, which in CI is the session the workflow's AWS
+// credentials step exported. A ModelProvider that does carry
+// AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY signs with those instead.
+// cmd/matrixseed mints the keyless key per run.
 func bedrockCell(t *testing.T, scenario string, body func(string) []byte, streaming bool) resolvedCell {
 	t.Helper()
 	vk := requireEnv(t, "TEST_VK_BEDROCK")

@@ -19,6 +19,7 @@ import type { Instant } from "@langwatch/time";
 
 import type { DeveloperAdmissionVia } from "../rules/admission-audit.rules.ts";
 import type { TeamRoleUpdateOrigin } from "../services/compute-effective-team-role-updates.service.ts";
+import type { SeatHold, SeatTransition } from "./seat-hold.repository.ts";
 
 export type OrganizationMemberWithUser = OrganizationWithMembersAndTheirTeams["members"][number];
 
@@ -145,6 +146,8 @@ export interface DeleteMemberInput {
    * organization service itself.
    */
   actingUserId?: string | null;
+  /** The full seat the removal leaves counted, written in the same transaction. */
+  seatHold?: SeatHold | null;
 }
 
 /**
@@ -156,6 +159,21 @@ export interface SetMemberDisabledInput {
   organizationId: string;
   userId: string;
   disabled: boolean;
+  /** What the change does to the person's full seat; absent leaves it as it stands. */
+  seat?: SeatTransition;
+  /** Who disabled or re-enabled them; null for a service credential. */
+  actorUserId?: string | null;
+}
+
+/** A waiting person given a full seat: their row becomes an enabled MEMBER awaiting its grant. */
+export interface AdmitWaitingMemberInput {
+  organizationId: string;
+  userId: string;
+  /** The grant the admission attaches next, so an unfinished one resumes (ADR-129). */
+  pendingAdmissionId: string;
+  seat: SeatTransition;
+  /** Who gave them the seat; null for a service credential or the system. */
+  actorUserId?: string | null;
 }
 
 /**
@@ -179,6 +197,36 @@ export interface UpdateMemberRoleInput {
   currentUserId: string | null;
   /** Whose holdings bound the grants this change writes (authz refuses anything beyond them). */
   caller: AuthzGrantCaller;
+  /** What the change does to the person's full seat; absent leaves it as it stands. */
+  seat?: SeatTransition;
+}
+
+/** A membership as the seat hold rule reads it (seat-rotation.feature). */
+export interface MemberSeatStanding {
+  role: OrganizationUserRole;
+  disabledAt: Instant | null;
+  createdAt: Instant;
+  /** When the full seat held now was taken; null reads as `createdAt`. */
+  fullSeatSince: Instant | null;
+  /** Set while admission keeps the person waiting for a seat. */
+  seatPendingSince: Instant | null;
+  email: string | null;
+  name: string | null;
+}
+
+/** A person admission left waiting for a seat. */
+/** A waiting person given a seat whose grant has not landed: the admission to finish. */
+export interface UnfinishedSeatAdmission {
+  organizationId: string;
+  userId: string;
+  grantId: string;
+}
+
+export interface WaitingMember {
+  userId: string;
+  name: string | null;
+  email: string | null;
+  waitingSince: Instant;
 }
 
 /**
@@ -386,13 +434,44 @@ export abstract class OrganizationMembershipRepository {
     pending: boolean;
     /** Where a join request was made, for the Developer admission audit row. */
     origin?: "web" | "cli";
+    /** A full seat taken back from the person's hold: its date, and the hold goes. */
+    seatTakenAt?: Instant;
+    /** The person who admitted them, when one did (an approved join request). */
+    actorUserId?: string | null;
   }) => Promise<OrganizationAdmission>;
 
-  /** The plain MEMBER row an SSO domain auto-join writes; an existing row is "already-present". */
-  abstract createSsoDomainMembership: (input: {
+  /** The person's seat standing: one entry, or none where they are not a member. */
+  abstract findSeatStandings: (input: {
     organizationId: string;
     userId: string;
-  }) => Promise<"created" | "already-present">;
+  }) => Promise<MemberSeatStanding[]>;
+
+  /** Writes or replaces the person's seat hold; the membership row is left as it stands. */
+  abstract writeSeatHold: (input: { hold: SeatHold }) => Promise<void>;
+
+  /**
+   * Takes a held seat back: the membership's full seat dates from `since`, and the holds of
+   * `holdUserIds` in the organization go.
+   */
+  abstract takeHeldSeat: (input: {
+    organizationId: string;
+    userId: string;
+    since: Instant;
+    holdUserIds: readonly string[];
+  }) => Promise<void>;
+
+  /** The people admission left waiting for a seat, longest waiting first. */
+  abstract findWaitingMembers: (input: { organizationId: string }) => Promise<WaitingMember[]>;
+
+  /** Every membership the person holds, with its organization's name and whether it is off. */
+  abstract findMembershipStates: (input: { userId: string }) => Promise<
+    {
+      organizationId: string;
+      organizationName: string;
+      role: OrganizationUserRole;
+      disabled: boolean;
+    }[]
+  >;
 
   /** Every membership row the person holds, disabled ones included. */
   abstract countMembershipsForUser: (input: { userId: string }) => Promise<number>;
@@ -401,6 +480,18 @@ export abstract class OrganizationMembershipRepository {
   abstract deleteMember: (input: DeleteMemberInput) => Promise<string[]>;
 
   abstract setMemberDisabled: (input: SetMemberDisabledInput) => Promise<void>;
+
+  /** Answers false, writing nothing, when the person no longer waits. */
+  abstract admitWaitingMember: (input: AdmitWaitingMemberInput) => Promise<boolean>;
+
+  /**
+   * Enabled full members, across organizations, still carrying the grant intent of an admission
+   * from waiting: their grant or its completion failed after the enable. Oldest first, at most
+   * `limit`.
+   */
+  abstract findUnfinishedSeatAdmissions: (input: {
+    limit: number;
+  }) => Promise<UnfinishedSeatAdmission[]>;
 
   /**
    * The personal teams a set of role-binding scopes reaches, by the name each

@@ -23,3 +23,10 @@ Feature: Consistent upgrade and access states
     Given a Lite member is refused an action
     When the access dialog opens
     Then it offers an access request and a way back without a purchase action
+
+  @integration
+  Scenario: A gate inside a card draws no box of its own
+    Given a card that already draws its own surface
+    When an access gate is shown inside it
+    Then the lock sits beside the title on the card's content edge
+    And the gate still names what is missing and offers its actions

@@ -20,6 +20,14 @@ Feature: Docs structure check
     And Mintlify serves every page file whether or not the navigation references it
 
   @unit
+  Scenario: Site implementation files are excluded from content scanning
+    Given apps/docs holds compiler sources and internal design notes outside the public docs directory
+    And public content includes docs/sub/site/page.mdx
+    When docscheck loads the documentation content
+    Then files under apps/docs are not counted as pages or release references
+    And public MDX under docs/ remains included
+
+  @unit
   Scenario: A page missing from the navigation is reported
     Given a page file exists on disk
     And no navigation group references it

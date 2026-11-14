@@ -16,7 +16,7 @@ afterEach(async () => {
 function urlOf(server: Server): string {
   const address = server.healthAddress;
   if (address === null || typeof address === "string") throw new Error("no port bound");
-  return `http://127.0.0.1:${address.port}/api/otel/v1/traces`;
+  return `http://localhost:${address.port}/api/otel/v1/traces`;
 }
 
 describe("given a component still starting ahead of the runtime", () => {

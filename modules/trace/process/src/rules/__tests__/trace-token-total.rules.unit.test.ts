@@ -5,7 +5,10 @@ import { describe, expect, it } from "vitest";
 import { createInitState } from "../../eventing/__tests__/trace-summary-test.fixtures.ts";
 import { FACET_REGISTRY } from "../../features/facet/repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
 import { LANGWATCH_QL_TRACE_FILTER_EXPRESSIONS } from "../../features/query/rules/trace-query-langwatch-ql.rules.ts";
-import { cursorForTraceRow, mapToTraceListItem } from "../trace-list-row.rules.ts";
+import {
+  cursorForTraceRow,
+  mapToTraceListItem,
+} from "../../features/read/rules/trace-list-row.rules.ts";
 import { mapTraceSummaryToHeader } from "../trace-read-mappers.rules.ts";
 import { TRACE_SUMMARY_TOTAL_TOKENS_FILTER_SQL } from "../trace-token-total.rules.ts";
 

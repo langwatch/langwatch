@@ -10,15 +10,19 @@ import { Cloudflare } from "../icons/provider/cloudflare.tsx";
 import { Codex } from "../icons/provider/codex.tsx";
 import { Custom } from "../icons/provider/custom.tsx";
 import { DeepSeek } from "../icons/provider/deep-seek.tsx";
+import { Doubleword } from "../icons/provider/doubleword.tsx";
 import { ElevenLabs } from "../icons/provider/eleven-labs.tsx";
+import { Fireworks } from "../icons/provider/fireworks.tsx";
 import { Gemini } from "../icons/provider/gemini.tsx";
 import { GoogleCloud } from "../icons/provider/google-cloud.tsx";
 import { Groq } from "../icons/provider/groq.tsx";
 import { Inception } from "../icons/provider/inception.tsx";
 import { LangWatch } from "../icons/provider/langwatch.tsx";
 import { OpenAI } from "../icons/provider/open-ai.tsx";
+import { OpenRouter } from "../icons/provider/openrouter.tsx";
 import { Perplexity } from "../icons/provider/perplexity.tsx";
 import { Twilio } from "../icons/provider/twilio.tsx";
+import { TypeSafe } from "../icons/provider/typesafe.tsx";
 import { Voyage } from "../icons/provider/voyage.tsx";
 import { Xai } from "../icons/provider/xai.tsx";
 
@@ -40,11 +44,15 @@ export const modelProviderIcons = {
   custom: <Custom />,
   xai: <Xai />,
   cerebras: <Cerebras />,
+  doubleword: <Doubleword />,
   voyage: <Voyage />,
   azure_safety: <Azure />,
   inception: <Inception />,
   perplexity: <Perplexity />,
   cloudflare: <Cloudflare />,
+  typesafe: <TypeSafe />,
+  openrouter: <OpenRouter />,
+  fireworks: <Fireworks />,
   // Not a configurable provider: the prefix of LangWatch's hosted models.
   langwatch: <LangWatch />,
 };
@@ -65,6 +73,9 @@ export const MONOCHROME_PROVIDER_ICONS = new Set<ProviderKey>([
   "anthropic",
   "voyage",
   "inception",
+  "typesafe",
+  "openrouter",
+  "fireworks",
 ]);
 
 /**

@@ -33,6 +33,7 @@ import type { ProcessOpsRepository } from "./process-ops.repository.ts";
 import type { QueueRepository } from "./queue.repository.ts";
 import type { ReplayRuntimeRepository } from "./replay-runtime.repository.ts";
 import type { ReplayRepository } from "./replay.repository.ts";
+import type { SeatSharingCheckRepository } from "./seat-sharing-check.repository.ts";
 import type { StorageFootprintRepository } from "./storage-footprint.repository.ts";
 import type { StorageStatsReadingsRepository } from "./storage-stats-readings.repository.ts";
 import type {
@@ -96,6 +97,8 @@ export interface OpsRepositories {
   readonly cloudLatestRelease: CloudLatestReleaseRepository;
   /** The notices cloud named in the last usage-report reply. */
   readonly cloudNotices: CloudNoticeRepository;
+  /** The last seat sharing check the worker ran. */
+  readonly seatSharingChecks: SeatSharingCheckRepository;
   readonly redisHealth: RedisHealthRepository;
   readonly clickhouseHealth: ClickHouseHealthRepository;
   readonly events: EventExplorerRepository;

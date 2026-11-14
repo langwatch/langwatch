@@ -35,12 +35,15 @@ function scopesOrUndefined(
 export function useModelProviderApiKeyValidation({
   provider,
   customKeys,
+  model,
   projectId,
   organizationId,
   scopes,
 }: {
   provider: string;
   customKeys: Record<string, string>;
+  /** The model about to run on the key; Azure's probe asks this deployment. */
+  model?: string;
   projectId: string | undefined;
   organizationId: string | undefined;
   scopes?: ProviderScopeSelection;
@@ -75,6 +78,7 @@ export function useModelProviderApiKeyValidation({
         organizationId,
         provider,
         customKeys,
+        ...(model ? { model } : {}),
         scopes: scopesOrUndefined(scopes),
       });
 
@@ -97,7 +101,7 @@ export function useModelProviderApiKeyValidation({
     } finally {
       setIsValidating(false);
     }
-  }, [projectId, organizationId, provider, customKeys, scopes, validateApiKey]);
+  }, [projectId, organizationId, provider, customKeys, model, scopes, validateApiKey]);
 
   /**
    * Validates stored or env var API key against a custom URL or default URL.

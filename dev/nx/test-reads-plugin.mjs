@@ -18,6 +18,9 @@ export const reads = {
     "docs/self-hosting/connect.mdx",
     "docs/features/instant-evals/limits-and-cost.mdx",
     "docs/self-hosting/data-and-telemetry.mdx",
+    "docs/workflows/overview.mdx",
+    "docs/governance/agent-registry.mdx",
+    "docs/ai-governance/ingestion-sources/index.mdx",
   ],
   "@langwatch/agent-process": [
     "modules/agent/**/*",
@@ -82,7 +85,11 @@ export const reads = {
   "@langwatch/webhook-process": ["specs/webhooks/**/*"],
   "@langwatch/egress": ["pkg/ssrf/testdata/**/*", "go.work"],
   "@langwatch/langy-browser": ["services/langyagent/**/*", "infra/docker/Dockerfile.langyagent"],
-  "@langwatch/langy-contract": ["services/langyagent/**/*", "pnpm-workspace.yaml"],
+  "@langwatch/langy-contract": [
+    "services/langyagent/**/*",
+    "pnpm-workspace.yaml",
+    "services/langyworker/src/tools/local-workspace.ts",
+  ],
   "@langwatch/insight-process": [
     "services/langyagent/internal/assets/skills/daily-insights/SKILL.md",
     "pnpm-workspace.yaml",
@@ -105,17 +112,23 @@ export const reads = {
   "@langwatch/automation-contract": ["modules/automation/**/*"],
   "@langwatch/config": ["packages/browser/src/wire/public-config.ts"],
   "@langwatch/mail": ["skills/tracing/SKILL.mdx"],
-  "@langwatch/mcp-server": ["feature-map.json"],
+  "@langwatch/mcp-server": ["feature-map.json", "docs/features/querying-your-data.mdx"],
   "@langwatch/plans": ["packages/prisma-client/prisma/schema.prisma"],
   "@langwatch/langy-process": [
     "specs/langy/langy-frame-auth.vectors.json",
     "apps/ui/src/shell/route-patterns.generated.json",
   ],
   "@langwatch/onboarding-browser": ["apps/ui/src/shell/route-patterns.generated.json"],
+  "@langwatch/ui": [
+    "modules/auth/browser/src/ui/elements/auth-front-door.css",
+    "packages/design-system/src/components/brand/langy-theme.css",
+  ],
   "@langwatch/analytics-browser": [
     "apps/ui/public/images/dashboards/templates/**/*",
     "pnpm-workspace.yaml",
+    "modules/analytics/process/src/langwatch-ql/__tests__/fixtures/stock-widget-queries.json",
   ],
+  "@langwatch/dashboard-process": ["docs/features/dashboards.mdx"],
   "@langwatch/webhook-verify": ["specs/webhooks/signature-vectors.json"],
   "@langwatch/oxlint-rules": [
     ".oxlintrc.jsonc",
@@ -206,9 +219,13 @@ export const reads = {
   ],
   "@langwatch/user-browser": ["docs/coding-agents/explore-your-usage-with-your-own-agent.mdx"],
   "@langwatch/gateway-contract": [".env.example"],
-  "@langwatch/analytics-contract": ["dev/scripts/build-charts-lib.mjs"],
+  "@langwatch/analytics-contract": [
+    "dev/scripts/build-charts-lib.mjs",
+    "docs/features/querying-your-data.mdx",
+  ],
   "@langwatch/clickhouse-migrations": ["packages/upgrade/releases/image/code-steps.json"],
   "@langwatch/seedgen-runner": ["tools/seedgen/**/*"],
+  "@langwatch/docs-site": ["docs/**/*", "skills/_compiled/**/*"],
 };
 
 const members = memberPatterns(new URL("../..", import.meta.url).pathname);

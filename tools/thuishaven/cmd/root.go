@@ -123,7 +123,7 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 	defer stop()
 
 	// Simulator children need no registry, git checkout or infrastructure setup.
-	if len(args) > 0 && (args[0] == "simulator" || args[0] == "static") {
+	if len(args) > 0 && (args[0] == "simulator" || args[0] == "static" || args[0] == "docs-mount") {
 		ctx = contexts.SetServiceInfo(ctx, contexts.ServiceInfo{
 			Version: version, Environment: "development",
 		})

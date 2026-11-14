@@ -1,48 +1,117 @@
 /**
  * The decision models the Instant Evals column may hold (ADR-182 decision 2): the hosted, metered
- * LangWatch Instant Preview, then own-key models behind the own-decision-model flag. Ids read
+ * LangWatch Evals Preview, then own-key models behind the own-decision-model flag. Ids read
  * `<provider>/decisions:<model>` so none collides with a chat model of the same name.
  */
 
+import type { ModelRole } from "./model-feature-registry.ts";
+
 /** Same id as `INSTANT_EVAL_JUDGE_MODEL_ID`; a contract never imports another module's contract. */
 export const LANGWATCH_DECISION_MODEL_ID = "langwatch/instant-evals";
+
+const EVALS_PREVIEW = { label: "Evals Preview", description: "Optimized for evals" } as const;
+
+/** One of LangWatch's own decision models, named for what it is optimized for. */
+export type LangWatchDecisionPreview = Readonly<{
+  id: string;
+  label: string;
+  description: string;
+  /** The Default models columns it can fill; empty while it is not hosted yet. */
+  fills: readonly ModelRole[];
+}>;
+
+/**
+ * LangWatch's decision models, first in the Instant Evals picker. Only Evals Preview is hosted;
+ * the others are listed as coming soon. Making one pickable is adding its column here.
+ */
+export const LANGWATCH_DECISION_PREVIEWS: readonly LangWatchDecisionPreview[] = [
+  { id: LANGWATCH_DECISION_MODEL_ID, ...EVALS_PREVIEW, fills: ["INSTANT_EVALS"] },
+  {
+    id: "langwatch/scenario-judge-preview",
+    label: "Scenario Judge Preview",
+    description: "Optimized for scenario judge",
+    fills: [],
+  },
+  {
+    id: "langwatch/search-preview",
+    label: "Search Preview",
+    description: "Optimized for search",
+    fills: [],
+  },
+];
 
 /** The one feature the `INSTANT_EVALS` role carries. */
 export const INSTANT_EVAL_DECISION_FEATURE_KEY = "instant_eval.judge";
 
 /**
  * The request shapes the Instant Evals judge speaks, one channel each (ADR-182 decision 8).
- * `jev` is the shared body Inception, Perplexity and Cloudflare accept; Cloudflare's REST
- * route wraps the answer in `result`, which `cloudflare_jev` unwraps.
+ * `jev` is the System One body (Jev, Inception, Perplexity, Microsoft-Decision-1, OpenRouter);
+ * `cloudflare_jev` unwraps Cloudflare's `result`; `gemini_decisions` sends `input`, not `state`.
  */
-export const DECISION_MODEL_WIRES = ["openai_decisions", "jev", "cloudflare_jev"] as const;
+export const DECISION_MODEL_WIRES = [
+  "openai_decisions",
+  "jev",
+  "cloudflare_jev",
+  "gemini_decisions",
+] as const;
 export type DecisionModelWire = (typeof DECISION_MODEL_WIRES)[number];
+
+/** How the key travels: `Authorization: Bearer`, Azure's `api-key` or Google's `x-goog-api-key`. */
+export const DECISION_MODEL_AUTH_HEADERS = ["bearer", "api_key", "goog_api_key"] as const;
+export type DecisionModelAuthHeader = (typeof DECISION_MODEL_AUTH_HEADERS)[number];
+
+/**
+ * One `{name}` in an endpoint, filled from a provider row field. `value` sends the field as it
+ * is, URL-encoded; `azure_resource` reads the resource name from an Azure endpoint URL and
+ * refuses any host that is not Azure's (ADR-182 decision 5, revised 2026-11-02).
+ */
+export type DecisionEndpointParam = Readonly<{ field: string; read: "value" | "azure_resource" }>;
 
 export type DecisionModelEntry = Readonly<{
   id: string;
   /** The registry provider whose row holds the key; `langwatch` is the hosted classifier. */
   provider: string;
+  /** The full name: provider, then model or API, so one model on two providers reads apart. */
   label: string;
+  /**
+   * A picker row's title when it differs from `label`; the row's provider icon names the
+   * provider.
+   */
+  pickerLabel?: string;
   description: string;
   /** Absent for the hosted classifier, which the judge reaches through its own client. */
   wire?: DecisionModelWire;
   /** The model name sent in the request body. */
   providerModel?: string;
-  /** The full URL; `{accountId}` is filled from the provider row. */
+  /** A row field that, when set, replaces `providerModel`: an Azure deployment name. */
+  providerModelField?: string;
+  /** The URL template; each `{name}` is one of `endpointParams`. */
   endpoint?: string;
+  endpointParams?: Readonly<Record<string, DecisionEndpointParam>>;
+  /** Bearer when absent. */
+  authHeader?: DecisionModelAuthHeader;
 }>;
+
+const CLOUDFLARE_ACCOUNT = {
+  accountId: { field: "CLOUDFLARE_ACCOUNT_ID", read: "value" },
+} as const;
+const AZURE_RESOURCE = {
+  resource: { field: "AZURE_OPENAI_ENDPOINT", read: "azure_resource" },
+} as const;
+/** OpenRouter's Decisions route takes the System One body; it is still under `/api/alpha`. */
+const OPENROUTER_DECISIONS = "https://openrouter.ai/api/alpha/decisions";
 
 export const DECISION_MODELS: readonly DecisionModelEntry[] = [
   {
     id: LANGWATCH_DECISION_MODEL_ID,
     provider: "langwatch",
-    label: "LangWatch Instant Preview",
-    description: "Hosted by LangWatch and billed with your plan.",
+    ...EVALS_PREVIEW,
   },
   {
     id: "openai/decisions:gpt-6-luna",
     provider: "openai",
-    label: "OpenAI Decisions (gpt-6-luna)",
+    label: "OpenAI Decisions",
+    pickerLabel: "Decisions API",
     description: "OpenAI's Decisions API, on your OpenAI key.",
     wire: "openai_decisions",
     providerModel: "gpt-6-luna",
@@ -84,6 +153,7 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
     providerModel: "clef",
     endpoint:
       "https://api.cloudflare.com/client/v4/accounts/{accountId}/ai/run/@cf/cloudflare/clef",
+    endpointParams: CLOUDFLARE_ACCOUNT,
   },
   {
     id: "cloudflare/decisions:clef-flash",
@@ -94,16 +164,114 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
     providerModel: "clef-flash",
     endpoint:
       "https://api.cloudflare.com/client/v4/accounts/{accountId}/ai/run/@cf/cloudflare/clef-flash",
+    endpointParams: CLOUDFLARE_ACCOUNT,
+  },
+  {
+    id: "typesafe/decisions:jev-1.14.0",
+    provider: "typesafe",
+    label: "TypeSafe Jev 1.14",
+    description: "TypeSafe's Jev, on your TypeSafe key.",
+    wire: "jev",
+    providerModel: "jev-1.14.0",
+    endpoint: "https://api.typesafe.ai/v1/systemone",
+  },
+  {
+    id: "azure/decisions:gpt-6-luna",
+    provider: "azure",
+    label: "Azure OpenAI Decisions",
+    pickerLabel: "Decisions API",
+    description: "Azure OpenAI Decisions API, on your own Azure OpenAI resource.",
+    wire: "openai_decisions",
+    providerModel: "gpt-6-luna",
+    providerModelField: "AZURE_OPENAI_DECISIONS_DEPLOYMENT",
+    endpoint: "https://{resource}.openai.azure.com/openai/v1/decisions",
+    endpointParams: AZURE_RESOURCE,
+    authHeader: "api_key",
+  },
+  {
+    id: "azure/decisions:microsoft-decision-1",
+    provider: "azure",
+    label: "Azure Microsoft Decision 1",
+    description: "Microsoft's decision model on your own Azure AI Foundry resource.",
+    wire: "jev",
+    providerModel: "Microsoft-Decision-1",
+    providerModelField: "AZURE_DECISION_1_DEPLOYMENT",
+    endpoint: "https://{resource}.services.ai.azure.com/providers/microsoft/v1/systemone",
+    endpointParams: AZURE_RESOURCE,
+    authHeader: "api_key",
+  },
+  {
+    id: "openrouter/decisions:typesafe/jev-1.14",
+    provider: "openrouter",
+    label: "OpenRouter Jev 1.14",
+    description: "TypeSafe's Jev through OpenRouter, on your OpenRouter key.",
+    wire: "jev",
+    providerModel: "typesafe/jev-1.14",
+    endpoint: OPENROUTER_DECISIONS,
+  },
+  {
+    id: "openrouter/decisions:microsoft/microsoft-decision-1",
+    provider: "openrouter",
+    label: "OpenRouter Microsoft Decision 1",
+    description: "Microsoft's decision model through OpenRouter, on your OpenRouter key.",
+    wire: "jev",
+    providerModel: "microsoft/microsoft-decision-1",
+    endpoint: OPENROUTER_DECISIONS,
+  },
+  {
+    id: "openrouter/decisions:liquid/d1.1",
+    provider: "openrouter",
+    label: "OpenRouter Liquid d1.1",
+    description: "Liquid AI's decision model through OpenRouter, on your OpenRouter key.",
+    wire: "jev",
+    providerModel: "liquid/d1.1",
+    endpoint: OPENROUTER_DECISIONS,
+  },
+  {
+    id: "gemini/decisions:gemini-decision-1",
+    provider: "gemini",
+    label: "Gemini Decision 1",
+    description: "Google's Gemini Decisions API, on your AI Studio key.",
+    wire: "gemini_decisions",
+    providerModel: "gemini-decision-1",
+    endpoint: "https://generativelanguage.googleapis.com/v1beta/decisions",
+    authHeader: "goog_api_key",
+  },
+  {
+    id: "fireworks/decisions:rune",
+    provider: "fireworks",
+    label: "Fireworks Rune",
+    description: "Fireworks' decision model, on your Fireworks key.",
+    wire: "openai_decisions",
+    providerModel: "accounts/fireworks/models/rune",
+    endpoint: "https://api.fireworks.ai/inference/v1/decisions",
   },
 ];
 
-/** The account field of a provider whose URL needs one; the key field is the registry's. */
-export const DECISION_PROVIDER_ACCOUNT_FIELDS: Readonly<Record<string, string>> = {
-  cloudflare: "CLOUDFLARE_ACCOUNT_ID",
-};
+/**
+ * An `https` Azure AI endpoint: the resource name, one of Azure's own AI domains, then only a
+ * path. A port, credentials or any other host never match.
+ */
+const AZURE_AI_ENDPOINT =
+  /^https:\/\/([a-z0-9][a-z0-9-]{0,62})\.(?:openai\.azure\.com|cognitiveservices\.azure\.com|services\.ai\.azure\.com)(?:[/?#].*)?$/i;
+
+/** An endpoint read as Azure: its resource name, or `not_azure` for any other URL. */
+export type AzureEndpointRead =
+  | Readonly<{ kind: "azure"; resource: string }>
+  | Readonly<{ kind: "not_azure" }>;
+
+export function azureResourceOf(endpoint: string): AzureEndpointRead {
+  const resource = AZURE_AI_ENDPOINT.exec(endpoint.trim())?.[1];
+  return resource ? { kind: "azure", resource: resource.toLowerCase() } : { kind: "not_azure" };
+}
 
 export function findDecisionModel(id: string): DecisionModelEntry | undefined {
   return DECISION_MODELS.find((entry) => entry.id === id);
+}
+
+/** A decision model's title in a picker row or chip, beside its provider icon. */
+export function decisionModelPickerTitle(entry: DecisionModelEntry): string {
+  return entry.pickerLabel ?? entry.label;
 }
 
 export function isDecisionModelId(id: string): boolean {
@@ -122,6 +290,8 @@ export const DECISION_MODEL_UNAVAILABLE_REASONS = [
   "provider_missing",
   "provider_disabled",
   "key_missing",
+  // A row field the endpoint is built from names a host the catalogue does not allow.
+  "endpoint_invalid",
 ] as const;
 export type DecisionModelUnavailableReason = (typeof DECISION_MODEL_UNAVAILABLE_REASONS)[number];
 
@@ -133,8 +303,9 @@ export type DecisionModelResolution =
       model: string;
       wire: DecisionModelWire;
       providerModel: string;
-      /** The provider URL with its account filled in. */
+      /** The provider URL with its account or resource filled in. */
       endpoint: string;
+      authHeader: DecisionModelAuthHeader;
       /** Decrypted, for the judge's call only; never logged or returned to a browser. */
       apiKey: string;
     }>

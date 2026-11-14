@@ -18,6 +18,7 @@ import {
   MAX_SESSION_EVENTS_PAGE_SIZE,
   CodingAgentFeatureService,
 } from "../coding-agent.service.ts";
+import { ModelCatalogCostEstimatorService } from "../model-catalog-cost-estimator.service.ts";
 
 const PROJECT = "project-1";
 const SESSION = "session-1";
@@ -38,6 +39,7 @@ function serviceWith(input: {
     projects: createTestProjects(),
     billing: new TestBillingPolicy(),
     clock: new TestClock(),
+    modelProviders: ModelCatalogCostEstimatorService.create(),
   });
 }
 

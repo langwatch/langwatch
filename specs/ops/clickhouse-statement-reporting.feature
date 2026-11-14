@@ -47,3 +47,11 @@ Feature: Every ClickHouse statement reports how it ended
     Given a process that built its ClickHouse member
     When a read reaches the server
     Then clickhouse_query_duration_seconds and clickhouse_query_total record it by query type
+
+  @unit
+  Scenario: A cold scan warns once per query shape per hour
+    Given the routed ClickHouse client reports its statements
+    When the same cold-scanning statement runs again with other literals inside the hour
+    Then only the first run is logged as a warning
+    And the next warning after the hour counts the runs it held back
+    And a statement of another shape warns on its own

@@ -6,6 +6,7 @@ import {
 import * as React from "react";
 
 import { firstGrapheme } from "../../first-grapheme.ts";
+import { getAvatarFillForString } from "../../rotating-colors.ts";
 
 /** Chakra v3 Avatar wrapper (import from here, not @chakra-ui/react); custom Fallback for
  * grapheme-aware initials (emoji-safe); see avatar-initials.feature */
@@ -89,14 +90,22 @@ function UserAvatarPhoto({ src }: { src: string | null }) {
   return <Avatar.Image src={src} onError={() => setBrokenUrl(src)} />;
 }
 
-/** A person: photo from `src`, else initials from `name`. Never fetches; caller resolves `src`. */
+/** A person: photo from `src`, else initials from `name`. Never fetches; caller resolves `src`.
+ * `colorFromName` fills the bubble with the hue hashed from the name, as projects are drawn. */
 export function UserAvatar({
   name,
   src,
+  colorFromName,
   ...rootProps
-}: Omit<AvatarRootProps, "children"> & { name?: string | null; src?: string | null }) {
+}: Omit<AvatarRootProps, "children"> & {
+  name?: string | null;
+  src?: string | null;
+  colorFromName?: boolean;
+}) {
+  const fill =
+    colorFromName && name ? { color: "fg.onColor", background: getAvatarFillForString(name) } : {};
   return (
-    <AvatarRoot lifted {...rootProps}>
+    <AvatarRoot lifted {...fill} {...rootProps}>
       <UserAvatarPhoto src={src ?? null} />
       <Avatar.Fallback name={name ?? void 0} />
     </AvatarRoot>

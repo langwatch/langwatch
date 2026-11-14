@@ -91,7 +91,7 @@ export class McpSessionService {
       { hasApiKey: !!apiKey, endpoint: baseConfig.endpoint },
       "Running with session config",
     );
-    return runWithConfig({ ...baseConfig, apiKey }, work);
+    return runWithConfig({ ...baseConfig, apiKey, hosted: true }, work);
   }
 
   /** A fresh MCP server for one session, with the composing process's extra tools installed. */

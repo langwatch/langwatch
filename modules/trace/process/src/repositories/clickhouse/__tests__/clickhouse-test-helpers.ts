@@ -66,13 +66,22 @@ export function orderingClient(rows: Record<string, unknown>[]): {
 
 export function capturingInsertClient(): {
   client: TraceClickHouseWriteClient;
-  inserts: { clickhouse_settings?: Record<string, number> }[];
+  inserts: {
+    clickhouse_settings?: Record<string, string | number>;
+    values?: readonly Record<string, unknown>[];
+  }[];
 } {
-  const inserts: { clickhouse_settings?: Record<string, number> }[] = [];
+  const inserts: {
+    clickhouse_settings?: Record<string, string | number>;
+    values?: readonly Record<string, unknown>[];
+  }[] = [];
   return {
     client: {
       async insert(input): Promise<undefined> {
-        inserts.push({ clickhouse_settings: input.clickhouse_settings });
+        inserts.push({
+          clickhouse_settings: input.clickhouse_settings,
+          values: input.values as readonly Record<string, unknown>[],
+        });
         return undefined;
       },
       async query() {

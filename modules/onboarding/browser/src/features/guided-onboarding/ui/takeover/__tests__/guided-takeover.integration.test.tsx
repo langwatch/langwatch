@@ -17,8 +17,8 @@ vi.mock("react-contextual-analytics", () => ({
 }));
 
 vi.mock("../hello-screen.tsx", () => ({
-  HelloScreen: ({ firstName, onNext }: { firstName: string; onNext: () => void }) => (
-    <div data-testid="hello-stub">
+  HelloScreen: ({ firstName, onNext }: { firstName?: string; onNext: () => void }) => (
+    <div data-testid="hello-stub" data-first-name={firstName}>
       hello {firstName}
       <button type="button" onClick={onNext}>
         hello-next
@@ -29,15 +29,21 @@ vi.mock("../hello-screen.tsx", () => ({
 
 vi.mock("../value-screen.tsx", () => ({
   ValueScreen: ({
+    firstName,
     target,
     initialPicks,
     onNext,
   }: {
+    firstName?: string;
     target: string;
     initialPicks?: string[];
     onNext: (paths: string[]) => void;
   }) => (
-    <div data-testid="value-stub" data-picks={(initialPicks ?? []).join(",")}>
+    <div
+      data-testid="value-stub"
+      data-first-name={firstName}
+      data-picks={(initialPicks ?? []).join(",")}
+    >
       value for {target}
       <button type="button" onClick={() => onNext(["gateway", "llmops"])}>
         value-next
@@ -145,10 +151,13 @@ function renderTakeover({
   initialPhase = "hello",
   initialPaths,
   returnTo = null,
+  userName = "Rogerio Chaves",
 }: {
   initialPhase?: TakeoverPhase;
   initialPaths?: GuidedPath[];
   returnTo?: string | null;
+  /** `null` stands for an account with no name. */
+  userName?: string | null;
 } = {}) {
   return render(
     <DesignSystemProvider forcedTheme="light">
@@ -158,7 +167,7 @@ function renderTakeover({
           organizationName="ACME"
           projectId="proj_1"
           projectSlug="acme-proj"
-          userName="Rogerio Chaves"
+          userName={userName}
           usageStyle="For my company"
           initialPhase={initialPhase}
           {...(initialPaths ? { initialPaths } : {})}
@@ -189,10 +198,27 @@ describe("GuidedTakeover", () => {
   describe("when the greeting is done", () => {
     it("fades into the value question addressed to the organization", () => {
       renderTakeover();
-      expect(screen.getByTestId("hello-stub")).toHaveTextContent("hello Rogerio");
+      expect(screen.getByTestId("hello-stub")).toHaveAttribute("data-first-name", "Rogerio");
       fireEvent.click(screen.getByText("hello-next"));
       fade();
       expect(screen.getByTestId("value-stub")).toHaveTextContent("value for ACME");
+      expect(screen.getByTestId("value-stub")).toHaveAttribute("data-first-name", "Rogerio");
+    });
+  });
+
+  describe("when the account has no real name", () => {
+    /** @scenario "A user without a name is greeted without a placeholder" */
+    it.each([
+      ["no name", null],
+      ["a blank name", "   "],
+      ["an email for a name", "ada@acme.com"],
+      ["an email after a first word", "Ada ada@acme.com"],
+    ])("hands both screens no name for %s", (_label, userName) => {
+      renderTakeover({ userName });
+      expect(screen.getByTestId("hello-stub")).not.toHaveAttribute("data-first-name");
+      fireEvent.click(screen.getByText("hello-next"));
+      fade();
+      expect(screen.getByTestId("value-stub")).not.toHaveAttribute("data-first-name");
     });
   });
 

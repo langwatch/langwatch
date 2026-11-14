@@ -2,6 +2,7 @@
 
 import {
   deriveSourceHealth,
+  ingestionSourceStatusIsOff,
   type RunCompleteness,
 } from "@langwatch/enterprise-governance-contract";
 import { CircleAlert, CircleCheck, CircleDashed, CircleDotDashed, CircleX } from "lucide-react";
@@ -32,7 +33,10 @@ export interface SourceBadge {
   color: string;
 }
 
-export const SOURCE_STATUS_META: Record<string, SourceBadge> = {
+export const SOURCE_STATUS_META: Record<
+  "active" | "awaiting_first_event" | "disabled",
+  SourceBadge
+> = {
   active: { icon: CircleCheck, label: "Active", color: "green.fg" },
   awaiting_first_event: {
     icon: CircleDashed,
@@ -45,6 +49,16 @@ export const SOURCE_STATUS_META: Record<string, SourceBadge> = {
 export const SOURCE_UNHEALTHY_META: SourceBadge = {
   icon: CircleAlert,
   label: "Pulls failing",
+  color: "red.fg",
+};
+
+/**
+ * A source holding a configuration its adapter refuses. Every pull fails the same way until an
+ * admin edits it, so this outranks "Pulls failing", which reads as something that may pass.
+ */
+export const SOURCE_MISCONFIGURED_META: SourceBadge = {
+  icon: CircleAlert,
+  label: "Connection needs fixing",
   color: "red.fg",
 };
 
@@ -78,15 +92,19 @@ export function sourceBadge({
   status,
   errorCount,
   completeness,
+  configComplaints = [],
 }: {
   status: string;
   errorCount: number;
   /** Whether the last run drained the period it was asked for, when known. */
   completeness?: RunCompleteness | null;
+  /** What the adapter refuses about the stored configuration. */
+  configComplaints?: readonly string[];
 }): SourceBadge {
   // Checked before health: a source nobody asked to run cannot be failing to
   // run, so its configured state is the honest badge.
-  if (status === "disabled") return SOURCE_STATUS_META.disabled!;
+  if (ingestionSourceStatusIsOff(status)) return SOURCE_STATUS_META.disabled;
+  if (configComplaints.length > 0) return SOURCE_MISCONFIGURED_META;
   // Failing outranks partly collected. A source doing both is one an admin
   // has to go and fix, and a run that stopped early is the milder half of
   // that news -- shown on its own it reads as a source that is working.
@@ -94,16 +112,9 @@ export function sourceBadge({
     return SOURCE_UNHEALTHY_META;
   }
   if (completeness === "truncated") return SOURCE_PARTIAL_META;
-  // Own-property test, not a bare lookup. `status` is a free-form column, and
-  // an object literal answers "toString" or "constructor" with an inherited
-  // Function, which `??` does not treat as missing -- the badge would come back
-  // as a Function, `.icon` would be undefined, and rendering an undefined
-  // component throws. Every genuinely unknown word already falls through here
-  // correctly; only the handful of inherited names misbehave, which is exactly
-  // why a test picking a well-behaved word cannot see it.
-  return Object.hasOwn(SOURCE_STATUS_META, status)
-    ? SOURCE_STATUS_META[status]!
-    : SOURCE_STATUS_META.awaiting_first_event!;
+  // Only the two live statuses get past the off check above, an unknown word
+  // included, so this is the whole of what is left.
+  return status === "active" ? SOURCE_STATUS_META.active : SOURCE_STATUS_META.awaiting_first_event;
 }
 
 /**

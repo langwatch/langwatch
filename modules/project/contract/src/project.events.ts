@@ -195,3 +195,42 @@ export interface ProjectRevivedEventDataSchema extends Named<
 export const projectRevivedEventDataSchema: ProjectRevivedEventDataSchema =
   projectRevivedEventDataSchemaDefinition;
 export type ProjectRevivedEventData = z.infer<typeof projectRevivedEventDataSchema>;
+
+export const PROJECT_PERSONAL_OWNER_LISTED_EVENT_TYPE = "lw.project.personal_owner_listed" as const;
+export const PROJECT_PERSONAL_OWNER_LISTED_EVENT_VERSION = "2026-11-11" as const;
+
+/** A stored personal project's owner, listed by project's upgrade step; ids only. */
+const projectPersonalOwnerListedEventDataSchemaDefinition = z.object({
+  tenantId: z.string().min(1),
+  projectId: z.string().min(1),
+  organizationId: z.string().min(1),
+  ownerUserId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+});
+export interface ProjectPersonalOwnerListedEventDataSchema extends Named<
+  typeof projectPersonalOwnerListedEventDataSchemaDefinition
+> {}
+export const projectPersonalOwnerListedEventDataSchema: ProjectPersonalOwnerListedEventDataSchema =
+  projectPersonalOwnerListedEventDataSchemaDefinition;
+export type ProjectPersonalOwnerListedEventData = z.infer<
+  typeof projectPersonalOwnerListedEventDataSchema
+>;
+
+export const PROJECT_FIRST_MESSAGE_LISTED_EVENT_TYPE = "lw.project.first_message_listed" as const;
+export const PROJECT_FIRST_MESSAGE_LISTED_EVENT_VERSION = "2026-11-11" as const;
+
+/** A stored project that already received its first message, listed by project's upgrade step. */
+const projectFirstMessageListedEventDataSchemaDefinition = z.object({
+  tenantId: z.string().min(1),
+  projectId: z.string().min(1),
+  organizationId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+});
+export interface ProjectFirstMessageListedEventDataSchema extends Named<
+  typeof projectFirstMessageListedEventDataSchemaDefinition
+> {}
+export const projectFirstMessageListedEventDataSchema: ProjectFirstMessageListedEventDataSchema =
+  projectFirstMessageListedEventDataSchemaDefinition;
+export type ProjectFirstMessageListedEventData = z.infer<
+  typeof projectFirstMessageListedEventDataSchema
+>;

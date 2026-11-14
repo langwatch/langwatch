@@ -4,14 +4,39 @@
  * @see specs/auth/auth-rest-family-mounted.feature
  */
 import { ProjectInvalidCredentialsError, ProjectMissingCredentialsError } from "@langwatch/api";
-import { BearerIdentity, RestHost } from "@langwatch/api/rest";
+import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
+import {
+  BearerIdentity,
+  bindMiddlewareContext,
+  callerAddressContext,
+  RestHost,
+} from "@langwatch/api/rest";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
 
 import type { AuthSessionPoll } from "../../rules/auth-session-poll.rules.ts";
+import { ProjectAuthTokenService } from "../../services/project-auth-token.service.ts";
 import { authRest, type AuthDoorApi } from "../auth.rest.ts";
 
 const BASE_URL = "https://app.test";
+
+/** The address the door resolved for every request in this file. */
+const RESOLVED_CALLER = "198.51.100.11";
+
+const ACME_CREDENTIAL: ResolvedApiKeyCredential = {
+  type: "legacyProjectKey",
+  project: {
+    id: "project-1",
+    name: "Acme",
+    slug: "acme",
+    teamId: "team-1",
+    organizationId: "org-1",
+    isPersonal: false,
+    ownerUserId: null,
+    kind: "application",
+  },
+};
 
 const SIGNED_IN: AuthSessionPoll = {
   document: {
@@ -50,6 +75,7 @@ function authWorld(overrides: Partial<AuthDoorApi> = {}) {
     },
     bearers: () => closed,
     audit: { record: async () => {} },
+    middlewareContext: [bindMiddlewareContext(callerAddressContext, () => RESOLVED_CALLER)],
   });
   host.mount(authRest.router(), () => door);
 
@@ -85,7 +111,7 @@ describe("given the /api/auth family mounted on a process's own doors", () => {
   });
 
   describe("when a legacy client presents a project token", () => {
-    it("names the project it belongs to, counted against the caller's nearest hop", async () => {
+    it("names the project it belongs to, counted against the resolved caller, not a claimed hop", async () => {
       const validateProjectAuthToken = vi.fn<AuthDoorApi["validateProjectAuthToken"]>(async () => ({
         projectSlug: "acme",
       }));
@@ -100,8 +126,35 @@ describe("given the /api/auth family mounted on a process's own doors", () => {
       await expect(response.json()).resolves.toEqual({ projectSlug: "acme" });
       expect(validateProjectAuthToken).toHaveBeenCalledWith({
         token: "tok",
-        forwardedFor: "1.1.1.1, 2.2.2.2",
+        callerAddress: RESOLVED_CALLER,
       });
+    });
+
+    /** @scenario "The legacy token check counts the resolved address" */
+    it("keys its rate limit on the resolved caller, never the forged forwarding header", async () => {
+      const counted: string[] = [];
+      const tokens = ProjectAuthTokenService.create({
+        apiKeys: createApiFixture<ApiKeyApi>({
+          findResolvedToken: async () => ACME_CREDENTIAL,
+        }),
+        rateLimiter: {
+          check: async (key) => {
+            counted.push(key);
+            return { allowed: true };
+          },
+        },
+      });
+      const world = authWorld({
+        validateProjectAuthToken: (input) => tokens.validateProjectAuthToken(input),
+      });
+
+      const response = await world.app.request(`${BASE_URL}/api/auth/validate`, {
+        method: "POST",
+        headers: { "x-auth-token": "tok", "x-forwarded-for": "203.0.113.66" },
+      });
+
+      expect(response.status).toBe(200);
+      expect(counted).toEqual([`auth-validate:ip:${RESOLVED_CALLER}`]);
     });
 
     it("takes the empty JSON body the Python SDK's login sends", async () => {

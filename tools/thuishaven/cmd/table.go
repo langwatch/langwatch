@@ -215,6 +215,13 @@ var baseTable = []commandSpec{
 		run:     runStatic,
 	},
 	{
+		name:    "docs-mount",
+		args:    "<dir> <port> <base-path> [<app-url> <app-host>]",
+		maxArgs: 5,
+		hidden:  true,
+		run:     runDocsMount,
+	},
+	{
 		name:    "go-watch",
 		args:    "<binary> <service>…",
 		maxArgs: -1,
@@ -248,8 +255,12 @@ var baseTable = []commandSpec{
 			{long: "--mode", takesValue: true, value: "<mode>", summary: "deployment mode from dev/tests/modes; sticks, none clears"},
 			{long: "--no-seed", summary: "skip the auto-seed of an empty stack (HAVEN_AUTO_SEED=0 does too)"},
 			{long: "--no-mail", summary: "the app sees no mail provider, even one .env names (HAVEN_NO_MAIL=1 does too); not sticky"},
+			{long: "--only", takesValue: true, value: "docs", summary: "run that lane alone in the foreground, with no stack: `--only docs` serves the docs at app.<slug>/docs and docs.<slug>, and nothing else"},
 		},
 		run: func(ctx context.Context, d deps, inv invocation) error {
+			if inv.value("--only") != "" {
+				return runUpOnly(ctx, d, inv)
+			}
 			if inv.has("--no-seed") {
 				disableAutoSeed()
 			}
@@ -328,6 +339,10 @@ var baseTable = []commandSpec{
 			}
 			if slug, err := d.orch.ResolveSlug(d.params); err == nil {
 				stopBrowser(slug)
+			}
+			if d.orch.StopDocsOnly(ctx, d.params) {
+				fmt.Println("stopped the docs running alone (haven up --only docs)")
+				return nil
 			}
 			return d.orch.Down(ctx, d.params, inv.has("--force"))
 		},

@@ -30,14 +30,21 @@ export type PIICheckOptions = {
   exceptPatterns?: readonly string[];
   /** The tenant the batch belongs to, when the path has one. */
   projectId?: string;
+  /**
+   * The PII level of the tenant's resolved policy, absent when none was resolved. Only a
+   * resolved strict level may reach the PII redaction model.
+   */
+  resolvedPiiLevel?: PiiLevel;
+  /** The record's trace and span, which the model's spend request id is derived from. */
+  recordKey?: string;
 };
 
 /**
- * Maximum attribute value length (in characters) for PII redaction.
- * Matches the Presidio truncation limit in piiCheck.ts — values beyond this
- * are only partially scanned anyway, so skip the expensive call entirely.
+ * Cumulative characters per span sent for PII analysis: the budget the app injects, and the one
+ * used when the injected value is not a finite non-negative number. The ceiling is the gateway
+ * timeout one analysis request must answer inside, not how much of a value gets scanned.
  */
-export const DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH = 250_000;
+export const DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH = 400_000;
 
 /** One text to analyse, and whether its name/place findings are dropped. */
 export type PiiAnalysisItem = { text: string; isNameExempt: boolean };
@@ -109,7 +116,15 @@ const batchClearPII = async ({
   options: PIICheckOptions;
   spareNamesAndPlaces: readonly boolean[];
 }): Promise<(string | null)[]> => {
-  const { piiRedactionLevel, mainMethod, entities, exceptPatterns, projectId } = options;
+  const {
+    piiRedactionLevel,
+    mainMethod,
+    entities,
+    exceptPatterns,
+    projectId,
+    resolvedPiiLevel,
+    recordKey,
+  } = options;
 
   if (mainMethod === "google_dlp") {
     return runGoogleDlpBatch({
@@ -127,7 +142,9 @@ const batchClearPII = async ({
       piiRedactionLevel,
       entities,
       projectId,
+      resolvedPiiLevel,
       spareNamesAndPlaces,
+      recordKey,
     });
   } catch {
     // The DLP fallback redacts by level, not by the custom entity subset; the
@@ -343,11 +360,13 @@ export class PiiRedactionPolicyService {
     entities,
     exceptPatterns,
     projectId,
+    resolvedPiiLevel,
   }: {
     piiRedactionLevel: PIIRedactionLevel;
     entities?: readonly string[] | undefined;
     exceptPatterns?: readonly string[] | undefined;
     projectId?: string | undefined;
+    resolvedPiiLevel?: PiiLevel | undefined;
   }): Promise<RedactionOptions> {
     const disabled = this.deps.featureFlags
       ? await this.deps.featureFlags.isEnabled("ops_pii_strict_presidio_redaction_disabled", {
@@ -381,6 +400,7 @@ export class PiiRedactionPolicyService {
         ...(entities && entities.length > 0 ? { entities } : {}),
         ...(exceptPatterns && exceptPatterns.length > 0 ? { exceptPatterns } : {}),
         ...(projectId ? { projectId } : {}),
+        ...(resolvedPiiLevel ? { resolvedPiiLevel } : {}),
       },
     };
   }

@@ -7,6 +7,7 @@ export {
   type DispatchableMessage,
   type DispatchReport,
   type IntentHandler,
+  isOutboxRetryRefused,
   OutboxDispatcherService,
   type OutboxDispatcherServiceOptions,
 } from "./outboxDispatcherService.ts";

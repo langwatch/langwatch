@@ -1,3 +1,4 @@
+import { LEGACY_PROJECT_KEY_SCOPE_FLAGS } from "@langwatch/api-key-contract";
 import type { Entitlements } from "@langwatch/api/access";
 import type { ApiDoor, RestCaller, RestIdentity } from "@langwatch/api/hosting";
 import {
@@ -6,10 +7,16 @@ import {
   recordKeyCredential,
   recordOrganizationCredential,
   recordProjectCredential,
+  routeTemplateOf,
 } from "@langwatch/api/rest";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
-import { PermissionDeniedError, type Actor, type Authorization } from "@langwatch/authorization";
+import {
+  PermissionDeniedError,
+  type Actor,
+  type Authorization,
+  type AuthzDeclaredScopeId,
+} from "@langwatch/authorization";
 import {
   AuthzScopeNotFoundError,
   type AuthzApi,
@@ -63,6 +70,8 @@ export type ApiDoorPeers = Readonly<{
   >;
   entitlements: Pick<EntitlementApi, "getActivePlan">;
   auditLog: Pick<AuditLogApi, "record">;
+  featureFlags: ApiRestCredentialPeers["featureFlags"];
+  legacyKeyLogger?: ApiRestCredentialPeers["legacyKeyLogger"];
 }>;
 
 /** The API door auth binds for the process: who is calling, and what they may do (record §8). */
@@ -77,6 +86,8 @@ export class ApiDoorService {
   readonly #audit: ApiDoorAuditService;
   readonly #callerCredentials = new WeakMap<RestCaller, ApiOrganizationCredential["resolved"]>();
   readonly #projectCredentials = new WeakMap<RestCaller, ApiProjectCredential>();
+  /** The route each project caller came in on, as `METHOD /path/:param`. */
+  readonly #projectRoutes = new WeakMap<RestCaller, string>();
   readonly #standings = new Map<string, Promise<OrganizationMfaStanding>>();
 
   private constructor(peers: ApiDoorPeers) {
@@ -86,6 +97,8 @@ export class ApiDoorService {
       authz: peers.authz,
       cliProjects: peers.cliProjects,
       organizations: peers.organizations,
+      featureFlags: peers.featureFlags,
+      ...(peers.legacyKeyLogger ? { legacyKeyLogger: peers.legacyKeyLogger } : {}),
     });
     this.#sessions = BrowserSessionVerificationService.create({ sessions: peers.sessions });
     this.#audit = ApiDoorAuditService.create({ authz: peers.authz, auditLog: peers.auditLog });
@@ -245,15 +258,17 @@ export class ApiDoorService {
 
   #projectDoor(): RestIdentity {
     return {
-      authenticate: async ({ request, permissions, keyKinds }) =>
+      authenticate: async ({ request, permissions, keyKinds, legacyKeyScopes }) =>
         this.#projectCaller(
           request,
           await this.#credentials.authenticate({
             request,
             permissions,
             ...(keyKinds ? { keyKinds } : {}),
+            ...(legacyKeyScopes ? { legacyKeyScopes } : {}),
           }),
         ),
+      legacyKeyScopes: LEGACY_PROJECT_KEY_SCOPE_FLAGS,
       identify: async ({ request }) =>
         this.#projectCaller(request, await this.#credentials.identify({ request })),
       authorize: ({ caller, permission, target }) => {
@@ -270,6 +285,7 @@ export class ApiDoorService {
           credential,
           permission,
           projectId: target.id,
+          route: this.#projectRoutes.get(caller) ?? "unknown route",
         });
       },
     };
@@ -278,6 +294,7 @@ export class ApiDoorService {
   #projectCaller(request: Request, credential: ApiProjectCredential): RestCaller {
     const caller = projectCaller(request, credential);
     this.#projectCredentials.set(caller, credential);
+    this.#projectRoutes.set(caller, routeTemplateOf(request));
 
     return caller;
   }
@@ -351,19 +368,24 @@ export class ApiDoorService {
     };
   }
 
+  /** ADR-201 §9: a project's plan is its organization's, read through the door's own resolver. */
+  async #planOrganizationOf(scope: AuthzDeclaredScopeId): Promise<string | undefined> {
+    if (scope.tier === "organization") return scope.id;
+    if (scope.tier === "team") {
+      return this.#peers.organizations.getOrganizationIdByTeamId({ teamId: scope.id });
+    }
+
+    return (await this.#audit.findOrganizationIds({ tier: "project", id: scope.id }))[0];
+  }
+
   /** Composed here because authz and organization cannot depend on entitlement without a cycle. */
   #planEntitlements(): Entitlements {
-    const { entitlements: plans, organizations } = this.#peers;
+    const { entitlements: plans } = this.#peers;
 
     return {
       holds: async ({ entitlement, scope }) => {
-        if (scope.tier === "project") {
-          throw new Error(`No plan gate reads a project's organization yet (${scope.id})`);
-        }
-        const organizationId =
-          scope.tier === "organization"
-            ? scope.id
-            : await organizations.getOrganizationIdByTeamId({ teamId: scope.id });
+        const organizationId = await this.#planOrganizationOf(scope);
+        if (organizationId === undefined) return false;
         const plan = await plans.getActivePlan({ organizationId });
 
         // ADR-072: billing events are sold under the webhook platform's own plan flag.

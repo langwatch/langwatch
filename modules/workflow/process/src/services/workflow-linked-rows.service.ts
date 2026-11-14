@@ -1,5 +1,5 @@
 import type { AgentApi } from "@langwatch/agent-contract";
-import type { WorkflowCascadeArchive } from "@langwatch/workflow-contract";
+import type { WorkflowCaller, WorkflowCascadeArchive } from "@langwatch/workflow-contract";
 
 import type { WorkflowLineageReads } from "../app/workflow.app.ts";
 import type { WorkflowService } from "./workflow.service.ts";
@@ -8,7 +8,7 @@ type WorkflowScope = Readonly<{ workflowId: string; projectId: string }>;
 
 type WorkflowLinkedRowsServiceOptions = {
   workflows: Pick<WorkflowService, "archive">;
-  agents: Pick<AgentApi, "listWorkflowConfigs" | "getNamesByIds" | "archive">;
+  agents: Pick<AgentApi, "listWorkflowConfigs" | "getNamesByIds" | "getById" | "archive">;
 };
 
 /**
@@ -38,11 +38,15 @@ export class WorkflowLinkedRowsService implements Pick<
     });
   }
 
-  /** Restoring brings back the workflow only; its evaluators and agents stay archived. */
+  /**
+   * Restoring brings back the workflow only; its evaluators and agents stay archived. A deployed
+   * agent goes first, so a refused deploy check leaves the workflow and every agent live.
+   */
   async cascadeArchive(input: {
     projectId: string;
     workflowId: string;
     unarchive?: boolean;
+    by: WorkflowCaller;
   }): Promise<WorkflowCascadeArchive> {
     if (input.unarchive) {
       const workflow = await this.options.workflows.archive({
@@ -54,8 +58,23 @@ export class WorkflowLinkedRowsService implements Pick<
     }
 
     const agents = await this.options.agents.listWorkflowConfigs(input);
+    const deployed = new Set<string>();
     for (const agent of agents) {
-      await this.options.agents.archive({ id: agent.id, projectId: input.projectId });
+      const { labels } = await this.options.agents.getById({
+        id: agent.id,
+        projectId: input.projectId,
+      });
+      if ((labels ?? []).length > 0) deployed.add(agent.id);
+    }
+    const ordered = agents.toSorted(
+      (left, right) => Number(deployed.has(right.id)) - Number(deployed.has(left.id)),
+    );
+    for (const agent of ordered) {
+      await this.options.agents.archive({
+        id: agent.id,
+        projectId: input.projectId,
+        caller: { type: "user", id: input.by.id },
+      });
     }
     const workflow = await this.options.workflows.archive({
       id: input.workflowId,

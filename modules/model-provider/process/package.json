@@ -36,6 +36,7 @@
     "@langwatch/egress": "workspace:*",
     "@langwatch/enterprise-managed-provider-contract": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",

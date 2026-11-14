@@ -1,7 +1,7 @@
 import {
   AUXILIARY_SESSION_FACT,
   type CodingAgentSessionContextUsage,
-  parseMcpToolName,
+  classifyToolCall,
   type SessionWorkingContext,
 } from "@langwatch/coding-agent-contract";
 
@@ -353,6 +353,11 @@ export class CodingAgentSessionStateProjection {
     return null;
   }
 
+  /** A false flag in any agent's spelling: Grok sends "False", the rest "false" or a boolean. */
+  isFalse(value: unknown): boolean {
+    return this.coerceScalarString(value)?.toLowerCase() === "false";
+  }
+
   number(value: unknown): number {
     const n = Number(value);
     return Number.isFinite(n) && n > 0 ? n : 0;
@@ -468,11 +473,18 @@ export class CodingAgentSessionStateProjection {
     };
   }
 
-  foldModelCall(
-    next: CodingAgentSessionData,
-    attrs: Record<string, unknown>,
-    fallbackDurationMs: number,
-  ): CodingAgentSessionData {
+  foldModelCall({
+    state: next,
+    attrs,
+    fallbackDurationMs,
+    countsFreshInput = false,
+  }: {
+    state: CodingAgentSessionData;
+    attrs: Record<string, unknown>;
+    fallbackDurationMs: number;
+    /** The call's context is its whole prompt, fresh input included, not its cache alone. */
+    countsFreshInput?: boolean;
+  }): CodingAgentSessionData {
     const agentId = this.coerceString(attrs.agent_id);
     if (agentId !== null) Object.assign(next, this.recordSubAgent(next, agentId));
     const stopReason = this.coerceString(attrs.stop_reason);
@@ -483,7 +495,10 @@ export class CodingAgentSessionStateProjection {
 
     const cacheReadTokens = this.number(attrs.cache_read_tokens);
     const cacheCreationTokens = this.number(attrs.cache_creation_tokens);
-    const contextTokens = cacheReadTokens + cacheCreationTokens;
+    const contextTokens =
+      cacheReadTokens +
+      cacheCreationTokens +
+      (countsFreshInput ? this.number(attrs.input_tokens) : 0);
     // The first call is never a "rebuild" — there is nothing to reuse yet,
     // so a cold cache isn't the session's fault. `previousCallContextTokens`
     // starts at 0, which doubles as that gate.
@@ -588,19 +603,19 @@ export class CodingAgentSessionStateProjection {
     // Reading only `mcp_server.name`/`mcp_tool.name` found nothing on real
     // sessions: a session that plainly called an MCP server reported none,
     // because the agent never emits those attributes on the tool span. Parse
-    // the name first; treat the attributes as a bonus for agents that do send them.
-    const fromName = parseMcpToolName(toolName);
-    // Codex spells the server as a bare `mcp_server` on its tool_result events
-    // (empty string for a builtin tool, which this.coerceString() already reads as absent).
-    const mcpServer =
-      this.coerceString(attrs["mcp_server.name"]) ??
-      this.coerceString(attrs.mcp_server) ??
-      fromName?.server ??
-      null;
-    if (mcpServer !== null) {
-      withTool.mcpServers = this.addToBoundedSet(next.mcpServers, mcpServer);
+    // the name first. Codex sends a bare `mcp_server` ("" for a builtin), Grok `mcp_server_name`.
+    const origin = classifyToolCall({
+      toolName,
+      server:
+        this.coerceString(attrs["mcp_server.name"]) ??
+        this.coerceString(attrs.mcp_server) ??
+        this.coerceString(attrs.mcp_server_name),
+    });
+    if (origin.kind === "mcp") {
+      withTool.mcpServers = this.addToBoundedSet(next.mcpServers, origin.server);
     }
-    const mcpTool = this.coerceString(attrs["mcp_tool.name"]) ?? fromName?.tool ?? null;
+    const mcpTool =
+      this.coerceString(attrs["mcp_tool.name"]) ?? (origin.kind === "mcp" ? origin.tool : null);
     if (mcpTool !== null) {
       withTool.mcpTools = this.addToBoundedSet(next.mcpTools, mcpTool);
     }

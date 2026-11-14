@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
+import { LegacyProjectKeyIngestionOnlyError } from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
   McpAuthorizationRequiredError,
@@ -13,7 +14,6 @@ import { nowInstant } from "@langwatch/time";
 
 import { extractBearerToken } from "../rules/mcp-routes.rules.ts";
 import type { AuthzMcpSessionGrantService } from "./authz-mcp-session-grant.service.ts";
-import type { HeaderMcpClientAddressService } from "./header-mcp-client-address.service.ts";
 import type { McpHttpService } from "./mcp-http.service.ts";
 import type { McpCliSessions } from "./mcp-oauth-token.service.ts";
 import { McpRateLimitService } from "./mcp-rate-limit.service.ts";
@@ -21,6 +21,7 @@ import type {
   McpLiveProjectLookup,
   ProjectMcpProjectLookupService,
 } from "./project-mcp-project-lookup.service.ts";
+import type { ResolvedMcpClientAddressService } from "./resolved-mcp-client-address.service.ts";
 
 const logger = createLogger("langwatch:mcp");
 
@@ -64,7 +65,7 @@ type McpCallerAuthCollaborators = Readonly<{
   cliSessions: Pick<McpCliSessions, "getCliAccessSession">;
   projects: Pick<ProjectMcpProjectLookupService, "resolveLiveProjectByApiKey">;
   grants: Pick<AuthzMcpSessionGrantService, "stillGranted">;
-  address: Pick<HeaderMcpClientAddressService, "clientIp">;
+  address: Pick<ResolvedMcpClientAddressService, "clientIp">;
   http: McpHttpService;
 }>;
 
@@ -85,6 +86,11 @@ export class McpCallerAuthService {
 
   extractBearer(req: IncomingMessage): string | undefined {
     return extractBearerToken(req.headers.authorization);
+  }
+
+  /** What the credential census counts a bearer as: an access token, else a project key. */
+  credentialTypeOf(token: string): "cli_token" | "legacy_project_key" {
+    return token.startsWith(ACCESS_TOKEN_PREFIX) ? "cli_token" : "legacy_project_key";
   }
 
   /** The rate-limit bucket: the address the rest of the deployment limits on. */
@@ -182,6 +188,10 @@ export class McpCallerAuthService {
     if (lookup.kind === "unknown") {
       this.#authFailures.track(this.clientIpOf(req));
       await http.sendHandled(res, new McpInvalidApiKeyError());
+      return { kind: "answered" };
+    }
+    if (lookup.kind === "ingestion_only") {
+      await http.sendHandled(res, new LegacyProjectKeyIngestionOnlyError());
       return { kind: "answered" };
     }
     const projectId = lookup.project.id;

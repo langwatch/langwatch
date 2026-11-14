@@ -315,6 +315,35 @@ describe("given a route that declares its permission target", () => {
   });
 });
 
+describe("given a procedure that asks a permission at two projects", () => {
+  const head = [
+    'import { defineTrpcRouter } from "@langwatch/api/trpc";',
+    "export const router = defineTrpcRouter(contract)",
+  ];
+  const twoProjects = [
+    '  .procedure("preview")',
+    '  .withPermission("traces:view", { via: "projectId" })',
+    '  .withPermission("traces:view", { via: "projectId", field: "readerProjectId" })',
+    "  .handle(({ app, authorizations }) => app.preview({ authorizations }))",
+  ];
+
+  it("accepts authorizations, each project's proof by field", () => {
+    expect(report([...head, ...twoProjects, ";"].join("\n"))).toEqual([]);
+  });
+
+  it("reports authorizations on a later procedure that asks at one project", () => {
+    const code = [
+      ...head,
+      ...twoProjects,
+      '  .procedure("keys")',
+      '  .withPermission("traces:view")',
+      "  .handle(({ app, authorizations }) => app.keys({ authorizations }));",
+    ].join("\n");
+
+    expect(found(code)).toEqual([["rawContextField", 9]]);
+  });
+});
+
 describe("given a door credential that declares a session", () => {
   it("accepts session from a router-level or a route-level withCredential", () => {
     expect(
@@ -361,6 +390,21 @@ describe("given a key door route that declares it reads the key", () => {
         "  .handle(async ({ app, key }) => app.ownWidget(key))",
       ),
     ).toEqual([["rawContextField", "key", 8, 24]]);
+  });
+});
+
+describe("given a public route whose handler resolves its own key", () => {
+  it("accepts recordKey from withAccess(publicRoute(...)) and reports it otherwise", () => {
+    expect(
+      located(
+        '  .post("/widgets/collect", "collectWidget")',
+        '  .withAccess(publicRoute({ reason: "key resolved in the handler" }))',
+        "  .handle(async ({ app, recordKey }) => app.collectWidget(recordKey))",
+        '  .post("/widgets/own", "ownWidget")',
+        '  .withPermission("widget:view")',
+        "  .handle(async ({ app, recordKey }) => app.ownWidget(recordKey))",
+      ),
+    ).toEqual([["rawContextField", "recordKey", 8, 24]]);
   });
 });
 

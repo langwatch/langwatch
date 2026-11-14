@@ -28,6 +28,7 @@ vi.mock("../../../../../features/instant-eval/behavior/use-instant-eval-access.t
 // provider, so stub the hook out — server search has its own dedicated suite.
 // These tests type `field:value` queries only, which never reach the router,
 // so the submit hook is stubbed rather than mounting a tRPC provider.
+vi.mock("../use-own-decision-models.ts", () => ({ useOwnDecisionModels: () => undefined }));
 vi.mock("../use-submit-search.ts", () => ({
   useSubmitSearch: () => ({
     submitSearch: (text: string) => useFilterStore.getState().applyQueryText(text.trim()),

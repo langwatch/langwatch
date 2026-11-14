@@ -296,7 +296,12 @@ function SessionModePane({ trace }: { trace: TraceHeader }) {
   return (
     <IsolatedErrorBoundary scope="Couldn't render session overview" resetKeys={[trace.traceId]}>
       <Box flex={1} minHeight={0}>
-        <SessionTab projectId={projectId} traceId={trace.traceId} occurredAtMs={trace.timestamp} />
+        <SessionTab
+          projectId={projectId}
+          traceId={trace.traceId}
+          occurredAtMs={trace.timestamp}
+          conversationId={trace.conversationId ?? null}
+        />
       </Box>
     </IsolatedErrorBoundary>
   );

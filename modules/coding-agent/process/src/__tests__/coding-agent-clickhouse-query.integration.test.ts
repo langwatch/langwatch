@@ -4,6 +4,7 @@ import { z } from "zod";
 import { ClickHouseCodingAgentRepositories } from "../repositories/clickhouse/clickhouse.coding-agent.repositories.ts";
 import { CodingAgentProjectionPersistenceService } from "../services/coding-agent-projection-persistence.service.ts";
 import { CodingAgentFeatureService } from "../services/coding-agent.service.ts";
+import { ModelCatalogCostEstimatorService } from "../services/model-catalog-cost-estimator.service.ts";
 import {
   TEST_NOW_MS,
   TestBillingPolicy,
@@ -38,6 +39,7 @@ async function runtime() {
       projects: createTestProjects(),
       billing: new TestBillingPolicy(),
       clock: new TestClock(),
+      modelProviders: ModelCatalogCostEstimatorService.create(),
     }),
   };
 }

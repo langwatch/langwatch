@@ -4,31 +4,16 @@
  * (cache key); no read below carries key material — see ADR-001.
  */
 
-import type { apiKeyTrpc } from "@langwatch/api-key-contract";
+import type { apiKeyTrpc, signingKeyTrpc } from "@langwatch/api-key-contract";
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type { AuthzOwnStanding, AuthzOwnStandingInput } from "@langwatch/authz-contract";
+import type { projectTrpc } from "@langwatch/project-contract";
 
 /**
  * Procedures other features own. Each belongs in that feature's own contract;
  * until it is split, this family states the shape it reads.
  */
 type BorrowedProcedures = {
-  project: {
-    /** Whether the project still has its legacy key; project admins only, others are refused. */
-    getLegacyKeyStatus: {
-      query: { input: { projectId: string }; output: { present: boolean } };
-    };
-
-    /**
-     * Whether the project has ever received a trace. The CLI onboarding watch
-     * polls it after an approval so a first-time reader lands on their own
-     * session rather than on an empty page.
-     */
-    getHasFirstMessage: {
-      query: { input: { projectId: string }; output: { firstMessage: boolean } };
-    };
-  };
-
   organization: {
     /**
      * The organization graph, asked with the shell's own input — same
@@ -46,8 +31,11 @@ type BorrowedProcedures = {
   };
 };
 
-/** Everything this family calls: the declared namespace plus the borrowed ones. */
-export type ApiKeyApiMap = ContractApiMap<typeof apiKeyTrpc> & BorrowedProcedures;
+/** Everything this family calls: its own namespace, the project contract, and the borrowed ones. */
+export type ApiKeyApiMap = ContractApiMap<typeof apiKeyTrpc> &
+  ContractApiMap<typeof projectTrpc> &
+  ContractApiMap<typeof signingKeyTrpc> &
+  BorrowedProcedures;
 
 /**
  * The API Key family's typed tRPC hooks, sharing machinery, transport and

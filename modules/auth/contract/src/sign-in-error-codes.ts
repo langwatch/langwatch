@@ -73,6 +73,13 @@ export const STABLE_AUTH_ERRORS = [
   // better-auth's state check: the attempt expired or began in another tab or browser. Starting
   // again is the remedy, and a bounce would start it from the same stale state.
   "state_mismatch",
+  // The OAuth 2.0 refusal (RFC 6749 4.1.2.1): the person's own identity provider turned them away,
+  // usually because its administrator has not assigned them to the LangWatch app. Their IT
+  // administrator has to grant access; a retry or a bounce gets the same answer.
+  "access_denied",
+  // The provider refused the person, and their organization is out of seats for them: the
+  // administrators were asked to approve one, so only their answer changes the outcome.
+  "seat_limit_reached",
 ] as const;
 
 export const isStableAuthError = (error: string | null | undefined): boolean =>

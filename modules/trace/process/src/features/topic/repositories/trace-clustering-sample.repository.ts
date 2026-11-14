@@ -25,6 +25,8 @@ export abstract class TraceClusteringSampleRepository {
   abstract findPageRows(input: {
     tenantId: string;
     windowStartMs: number;
+    /** Exclusive upper bound on OccurredAt; now when absent. */
+    windowEndMs?: number;
     unassignedFrom?: { topicIds: readonly string[]; subtopicIds: readonly string[] };
     searchAfter?: readonly [number, string];
   }): Promise<TraceClusteringSampleRow[]>;

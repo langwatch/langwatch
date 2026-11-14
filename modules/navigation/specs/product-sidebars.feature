@@ -181,21 +181,134 @@ Feature: Product sidebars
     Then the Support entry does not keep focus
     But a keyboard close keeps focus on the Support entry
 
-  # Owner list, 2026-10-08. Analytics lends the group and draws it only when the member has
-  # starred a dashboard in the project in scope; navigation places it.
+  # Owner list, 2026-10-08; reshaped by product owner feedback, 2026-10-27. Analytics lends
+  # the section and draws it; navigation places it in the LLM Ops sidebar only. A dashboard is
+  # pinned to a project for a member by their star in that project.
   @integration
-  Scenario: Starred dashboards show in the other products' sidebars
-    Given I can reach Dashboards and I have starred dashboards in this project
-    When I am in LLM Ops, Gateway, Governance or Me
-    Then the sidebar shows a small "Starred dashboards" group under the product's own pages
-    And each entry opens that dashboard
-    And the Dashboards sidebar keeps its own Starred group instead
-    And a member who cannot reach Dashboards, or has starred none, sees no such group
+  Scenario: The LLM Ops sidebar has a Dashboards section listing the pinned dashboards
+    Given I can reach Dashboards and I have pinned dashboards to this project
+    When I am in LLM Ops
+    Then the sidebar shows a "Dashboards" section under the product's own pages
+    And its title has the same style as the "Build" title
+    And it lists my pinned dashboards in my order, and each entry opens that dashboard
+    And a member who cannot reach Dashboards sees no such section
 
   @integration
-  Scenario: Starred dashboards in other products' sidebars stop at 7
-    Given I have starred more than 7 dashboards in this project
-    When I am in LLM Ops, Gateway, Governance or Me
-    Then the "Starred dashboards" group lists the first 7, in my order
-    And one more row reads "All starred (N)", with N the number starred, and opens Dashboards
-    And with 7 starred or fewer there is no such row
+  Scenario: Only the LLM Ops sidebar shows the Dashboards section
+    Given I can reach Dashboards and I have pinned dashboards to this project
+    When I am in Gateway, Governance or Me
+    Then the sidebar shows no Dashboards section
+    And the Dashboards sidebar keeps its own lists instead
+
+  @integration
+  Scenario: Pinned dashboards in the LLM Ops sidebar stop at 7
+    Given I have pinned more than 7 dashboards to this project
+    When I am in LLM Ops
+    Then the Dashboards section lists the first 7, in my order
+    And one more row reads "All pinned (N)", with N the number pinned, and opens Dashboards
+    And with 7 pinned or fewer there is no such row
+
+  @integration
+  Scenario: A pinned dashboard in the LLM Ops sidebar has the same menu as in Dashboards
+    Given I have pinned dashboards to this project
+    When I open the "⋮" menu on a pinned dashboard
+    Then it offers Unpin, and the Rename, Duplicate and Delete I may use on that dashboard
+    And Delete asks me to confirm before it deletes the dashboard
+    And a From LangWatch dashboard offers only Unpin
+    And My dashboard cannot be deleted
+
+  @integration
+  Scenario: The Dashboards section's plus button makes a dashboard pinned to this project
+    Given I may create dashboards in this project
+    When I press the "+" at the right of the "Dashboards" title
+    Then a new dashboard is made in this project and pinned to it for me
+    And it opens with "Add a widget" open
+    And a member who may not create dashboards sees no "+"
+
+  @integration
+  Scenario: With nothing pinned, the Dashboards section offers an Add dashboard item
+    Given I may create dashboards and I have pinned none to this project
+    When I am in LLM Ops
+    Then the Dashboards section's first item is a dotted-outline "Add dashboard" item
+    And it does what the "+" does
+    And with one dashboard pinned or more there is no such item
+    And a member who may not create dashboards and has pinned none sees no Dashboards section
+
+  @integration
+  Scenario: A double click leaves exactly one dashboard
+    Given I may create dashboards in this project
+    When I press the "+" or the "Add dashboard" item twice in quick succession
+    Then one dashboard is made, and the control ignores the second press while it is made
+
+  @integration
+  Scenario: A failed pin leaves exactly one dashboard
+    Given I may create dashboards in this project
+    When the pin fails after the dashboard is made
+    Then that one dashboard still exists, opens with "Add a widget" open, and I see "Couldn't pin the dashboard"
+
+  @integration
+  Scenario: With the pinned list unreadable, the Dashboards section keeps its title and plus and lists nothing
+    Given I may create dashboards in this project
+    And the list of my pinned dashboards cannot be read
+    When I am in LLM Ops
+    Then the Dashboards section still shows its title and the "+"
+    But it lists no dashboard and offers no "Add dashboard" item
+
+  @integration
+  Scenario: A member who may not create dashboards causes no dashboard list read
+    Given I may not create dashboards in this project
+    When I am in LLM Ops
+    Then the sidebar reads my pinned dashboards and nothing else about dashboards
+
+  A Dashboards page draws the sidebar of the place the reader clicked in from.
+  The tab keeps one hint for that (sessionStorage, so a refresh keeps it and a
+  new tab or a shared link starts without one). The address never changes.
+
+  @unit
+  Scenario: A dashboard opened from LLM Ops keeps the LLM Ops sidebar
+    Given I am on an LLM Ops page
+    When I open a dashboard from the sidebar or the Analytics entry
+    Then the page draws the LLM Ops sidebar
+
+  @unit
+  Scenario: A deep link to a dashboard draws the Dashboards sidebar
+    Given this tab has no sidebar hint
+    When I open a dashboard address directly
+    Then the page draws the Dashboards sidebar
+
+  @unit
+  Scenario: Refreshing a dashboard keeps the sidebar it was opened with
+    Given I opened a dashboard from LLM Ops
+    When I refresh the page
+    Then the page still draws the LLM Ops sidebar
+
+  @unit
+  Scenario: Choosing Dashboards in the product switcher or icon rail draws the Dashboards sidebar
+    Given I am on an LLM Ops page
+    When I choose Dashboards in the product switcher or the icon rail
+    Then the page draws the Dashboards sidebar
+
+  @unit
+  Scenario: Leaving for Gateway resets the hint
+    Given I opened a dashboard from LLM Ops
+    When I open a Gateway page and then open a dashboard address
+    Then the page draws the Dashboards sidebar
+
+  @unit
+  Scenario: A sidebar hint from another project is ignored
+    Given I opened a dashboard from LLM Ops in one project
+    When I open a dashboard address in another project or organization
+    Then the page draws the Dashboards sidebar
+    And the device remembers "dashboards" for that organization
+
+  @unit
+  Scenario: A sidebar hint for an unreachable LLM Ops is ignored
+    Given this tab holds an LLM Ops hint
+    And my seat does not reach LLM Ops
+    When I open a dashboard address
+    Then the page draws the Dashboards sidebar
+
+  @integration
+  Scenario: The remembered product is the sidebar drawn
+    Given I opened a dashboard from LLM Ops
+    Then the device remembers "llm-ops" for the organization, not "dashboards"

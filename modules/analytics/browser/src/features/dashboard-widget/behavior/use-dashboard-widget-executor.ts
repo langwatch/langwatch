@@ -8,6 +8,8 @@ import {
   findLangWatchQLMissingGates,
   type LangWatchQLAcceptedGranularityStep,
   type LangWatchQLGranularityStep,
+  type LangWatchQLQueryResult,
+  type LangWatchQLRunTelemetryRequest,
 } from "@langwatch/analytics-contract";
 import type {
   ChartFrameDashboardContext,
@@ -28,6 +30,13 @@ import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import type { ChartFrameExecuteQuery } from "../../../behavior/frame-bridge.ts";
 import { createLangWatchQLExecute } from "../../../behavior/lwql-execute.ts";
 import type { LangWatchQLParameterValue } from "../../../model/lwql-request-state.ts";
+
+/** The diagnostics that say the server limited a run, shown on the card as one (i) line. */
+const LIMIT_DIAGNOSTIC_CODES: readonly string[] = [
+  "SHARE_WINDOW_LIMITED",
+  "SOURCES_IGNORED",
+  "GRANULARITY_COARSENED",
+];
 
 /** Widgets run against the last 24 hours at an hourly step — no toolbar. */
 const DEFAULT_GRANULARITY: LangWatchQLGranularityStep = 3600;
@@ -62,8 +71,29 @@ export interface DashboardWidgetExecutorOverrides {
   readonly timeWindow?: { start: number; end: number };
   /** Replaces {@link DEFAULT_GRANULARITY} — the dashboard's own step. */
   readonly granularitySeconds?: LangWatchQLAcceptedGranularityStep;
-  /** Trace origins the dashboard leaves out; keep the reference stable, a new one re-runs. */
-  readonly excludeOrigins?: readonly string[];
+  /** The placed widget its runs are for, for their log line; absent in the editor's preview. */
+  readonly telemetry?: LangWatchQLRunTelemetryRequest;
+}
+
+/** The ids a widget's runs are logged under, apart, so a hook can depend on them by value. */
+function telemetryIdsOf(
+  overrides: DashboardWidgetExecutorOverrides | undefined,
+): Partial<LangWatchQLRunTelemetryRequest> {
+  return overrides?.telemetry ?? {};
+}
+
+/** The ids put back together for the request; none when the run is no placed widget's. */
+function runTelemetryOf({
+  dashboardId,
+  widgetId,
+  templateId,
+}: Partial<LangWatchQLRunTelemetryRequest>): LangWatchQLRunTelemetryRequest | undefined {
+  if (widgetId === void 0) return void 0;
+  return {
+    widgetId,
+    ...(dashboardId === void 0 ? {} : { dashboardId }),
+    ...(templateId === void 0 ? {} : { templateId }),
+  };
 }
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: splits would scatter closured state.
@@ -83,7 +113,8 @@ export function useDashboardWidgetExecutor(
   const pageWindow = overrides?.timeWindow ?? mountWindow;
   const granularitySeconds: LangWatchQLAcceptedGranularityStep =
     overrides?.granularitySeconds ?? DEFAULT_GRANULARITY;
-  const excludeOrigins = overrides?.excludeOrigins;
+  // By value, not by object: a caller that builds the ids afresh each render keeps one run.
+  const { dashboardId, widgetId, templateId } = telemetryIdsOf(overrides);
   const execute = useMemo(
     () =>
       createLangWatchQLExecute({
@@ -96,13 +127,28 @@ export function useDashboardWidgetExecutor(
   );
   const [lastRuns, setLastRuns] = useState<Record<string, QueryLastRun>>({});
 
+  // What the server limited, per statement: the (i) line a card shows (dashboards-v2 AC213).
+  const [limitsBySql, setLimitsBySql] = useState<Record<string, readonly string[]>>({});
+  const noteLimits = useCallback(
+    ({ query, result }: { query: string; result: LangWatchQLQueryResult }) => {
+      const messages = result.diagnostics
+        .filter(({ code }) => LIMIT_DIAGNOSTIC_CODES.includes(code))
+        .map(({ message }) => message);
+      setLimitsBySql((prev) =>
+        prev[query]?.join() === messages.join() ? prev : { ...prev, [query]: messages },
+      );
+    },
+    [],
+  );
+  const limits = useMemo(() => [...new Set(Object.values(limitsBySql).flat())], [limitsBySql]);
+
   const recordRun = useCallback((name: string, run: QueryLastRun) => {
     setLastRuns((prev) => ({ ...prev, [name]: run }));
   }, []);
 
   const runValidated = useCallback(
     async (
-      query: Pick<DashboardWidgetQuery, "sql">,
+      query: Pick<DashboardWidgetQuery, "sql" | "sources" | "projects">,
       params: Readonly<Record<string, LangWatchQLParameterValue>>,
       signal?: AbortSignal,
     ): Promise<ChartQueryResult> => {
@@ -112,15 +158,19 @@ export function useDashboardWidgetExecutor(
           parameters: params,
           timeWindow: pageWindow,
           granularitySeconds,
-          ...(excludeOrigins ? { excludeOrigins } : {}),
+          // What the query stores; null asks the server for the default (dashboards-v2 AC200f).
+          sources: query.sources ?? null,
+          ...(query.projects ? { projects: query.projects } : {}),
+          telemetry: runTelemetryOf({ dashboardId, widgetId, templateId }),
         },
         // `execute` requires a signal; callers without one (e.g. `runStandalone`)
         // get a fresh controller's signal, which simply never aborts.
         { signal: signal ?? new AbortController().signal },
       );
+      noteLimits({ query: query.sql, result });
       return toChartQueryResult(result);
     },
-    [execute, pageWindow, granularitySeconds, excludeOrigins],
+    [execute, pageWindow, granularitySeconds, noteLimits, dashboardId, widgetId, templateId],
   );
 
   const executeQuery: ChartFrameExecuteQuery = useCallback(
@@ -189,5 +239,5 @@ export function useDashboardWidgetExecutor(
     [pageWindow, granularitySeconds],
   );
 
-  return { executeQuery, runStandalone, params, lastRuns };
+  return { executeQuery, runStandalone, params, lastRuns, limits };
 }

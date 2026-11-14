@@ -18,6 +18,8 @@ const FLUENT_ENDPOINT_METHODS = new Set([
   "withoutResourceLimit",
 ]);
 const ROUTE_VERBS = new Set(["delete", "get", "patch", "post", "put", "register"]);
+/** Where one route's own chain begins: its REST verb, or the tRPC procedure it names. */
+const CHAIN_STARTS = new Set([...ROUTE_VERBS, "procedure"]);
 const PRODUCED_BY_DECLARATION = new Map([
   ["withRawBody", ["raw"]],
   ["withMultipart", ["files"]],
@@ -211,6 +213,7 @@ function fieldsProducedBy(link) {
   const name = propertyName(link.callee);
   if (name === "withPermission") return declaresPermissionTarget(link) ? ["target"] : [];
   if (name === "withCredential") return declaresKey(link) ? ["key"] : [];
+  if (name === "withAccess") return declaresPublicRoute(link) ? ["recordKey"] : [];
   if (name !== "withResponse") return PRODUCED_BY_DECLARATION.get(name) ?? [];
   const [kind] = link.arguments;
   const readsRequest = kind?.type === "Literal" && REQUEST_READING_KINDS.has(kind.value);
@@ -230,6 +233,13 @@ function declaresKey(link) {
         property.value.value === true,
     )
   );
+}
+
+/** `.withAccess(publicRoute(...))` hands the handler `recordKey`: no door names its key. */
+function declaresPublicRoute(link) {
+  const [access] = link.arguments;
+
+  return access?.type === "CallExpression" && access.callee?.name === "publicRoute";
 }
 
 /** `.withPermission(perm, { at })` hands the handler the target its door authorised. */
@@ -262,14 +272,18 @@ export function declaredProducerFields(call) {
   const fields = new Set();
   let link = call.callee.object;
   let routeCredential;
+  let permissions = 0;
   while (link?.type === "CallExpression") {
     for (const field of fieldsProducedBy(link)) fields.add(field);
     routeCredential ??= credentialSession(link);
     const name = propertyName(link.callee);
-    if (name === undefined || ROUTE_VERBS.has(name)) break;
+    if (name === "withPermission") permissions += 1;
+    if (name === undefined || CHAIN_STARTS.has(name)) break;
     link = link.callee.object;
   }
   if (routeCredential ?? routerSessionOf(link)) fields.add("session");
+  // A route asking at several projects is handed each one's proof by field (ADR-201 §2).
+  if (permissions > 1) fields.add("authorizations");
 
   return fields;
 }

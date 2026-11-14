@@ -6,7 +6,7 @@ The server half of [auth](../README.md). Signing in and staying signed in: the b
 
 ## Installation
 
-`defineProcessModule("auth").withRepositories(authRepositories).withChannels(authChannels).withApi(AuthModule).withTransports(authTrpcTransport, signInSecurityTrpcTransport, authCliDeviceFlowRest, authRest).withEventing(authEventing).withEventing(authLifecycleEventing).withTasks(…).provideMiddlewareBindings(…)`, `src/auth.module.ts:25`.
+`defineProcessModule("auth").withRepositories(authRepositories).withChannels(authChannels).withApi(AuthModule).withTransports(authTrpcTransport, signInSecurityTrpcTransport, authCliDeviceFlowRest, authRest).withEventing(authEventing).withEventing(authLifecycleEventing).provideMiddlewareContext(…).withTasks(…).provideMiddlewareBindings(…)`, `src/auth.module.ts:26`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -474,6 +474,14 @@ The same figure for one organization, counted over the members the caller names.
 countUsageForMembers(input: { memberUserIds: readonly string[]; at: number; }): Promise<AuthUsageCount>;
 ```
 
+#### `findSessionUsersSince`
+
+Which of these people used a browser session at or after `since` (epoch ms).
+
+```typescript
+findSessionUsersSince(input: { userIds: readonly string[]; since: number; }): Promise<readonly string[]>;
+```
+
 ## REST transport
 
 ### `authCliDeviceFlowRest`
@@ -591,20 +599,20 @@ type Response = unknown;
 
 |             |                                        |
 | ----------- | -------------------------------------- |
-| Declared at | `src/transport/auth.rest.ts:91`        |
+| Declared at | `src/transport/auth.rest.ts:89`        |
 | Base URL    | none: each route's path is its address |
 | Addressing  | literal                                |
 | Credential  | project                                |
 
 #### `POST /api/auth/validate` · `validateProjectAuthToken`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:96`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:94`.
 
 Answers at `/api/auth/validate`.
 
 ```typescript
-type Headers = z.infer<typeof VALIDATE_HEADERS>; // src/transport/auth.rest.ts:65
-// Response: inline, src/transport/auth.rest.ts:101
+type Headers = z.infer<typeof VALIDATE_HEADERS>; // src/transport/auth.rest.ts:66
+// Response: inline, src/transport/auth.rest.ts:99
 interface Response {
   projectSlug: string;
 }
@@ -612,46 +620,46 @@ interface Response {
 
 #### `GET /api/auth/session` · `readBrowserAuthSession`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:109`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:105`.
 
 Answers at `/api/auth/session`.
 
 ```typescript
-type Headers = z.infer<typeof COOKIE_HEADERS>; // src/transport/auth.rest.ts:70
-// Response: inline, src/transport/auth.rest.ts:112
+type Headers = z.infer<typeof COOKIE_HEADERS>; // src/transport/auth.rest.ts:68
+// Response: inline, src/transport/auth.rest.ts:108
 type Response = unknown;
 ```
 
 #### `GET /api/auth/logout` · `endBrowserSessionAndRedirect`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:117`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:113`.
 
 Answers at `/api/auth/logout`.
 
 ```typescript
-// Response: inline, src/transport/auth.rest.ts:119
+// Response: inline, src/transport/auth.rest.ts:115
 type Response = unknown;
 ```
 
 #### `POST /api/auth/logout` · `endBrowserSession`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:122`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:118`.
 
 Answers at `/api/auth/logout`.
 
 ```typescript
-// Response: inline, src/transport/auth.rest.ts:126
+// Response: inline, src/transport/auth.rest.ts:122
 type Response = unknown;
 ```
 
 #### `ALL /api/auth/*` · `betterAuthHandshake`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:134`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:130`.
 
 Answers at `/api/auth/*`.
 
 ```typescript
-// Response: inline, src/transport/auth.rest.ts:136
+// Response: inline, src/transport/auth.rest.ts:132
 type Response = unknown;
 ```
 
@@ -687,7 +695,7 @@ interface Input {
   email: string;
   addressProof: string;
 }
-type Output = z.infer<typeof signUpEnrollmentSchema>; // ../contract/src/front-door.responses.ts:106
+type Output = z.infer<typeof signUpEnrollmentSchema>; // ../contract/src/front-door.responses.ts:110
 
 // auth.route
 // Input: frontDoorRouteInputSchema, ../contract/src/front-door.schemas.ts:24
@@ -703,7 +711,7 @@ interface Input {
   email: string;
   callbackUrl?: string;
 }
-// Output: signUpVerificationRequestSchema, ../contract/src/front-door.responses.ts:21
+// Output: signUpVerificationRequestSchema, ../contract/src/front-door.responses.ts:25
 type Output =
   | {
       sent: true;
@@ -718,7 +726,7 @@ type Output =
 interface Input {
   inviteCode: string;
 }
-// Output: inviteLandingSchema, ../../organization/contract/src/organization.responses.ts:143
+// Output: inviteLandingSchema, ../../organization/contract/src/organization.responses.ts:144
 interface Output {
   organizationName: string;
   inviterName: string | null;
@@ -727,7 +735,7 @@ interface Output {
 
 // auth.requestFreshInvite
 type Input = z.infer<typeof frontDoorInviteCodeInputSchema>; // ../contract/src/front-door.schemas.ts:76
-// Output: frontDoorAskedSchema, ../contract/src/front-door.responses.ts:38
+// Output: frontDoorAskedSchema, ../contract/src/front-door.responses.ts:42
 interface Output {
   asked: boolean;
 }
@@ -735,7 +743,7 @@ interface Output {
 // auth.myAddressConfirmation
 // Input: inline, ../contract/src/auth.trpc.ts:70
 type Input = unknown;
-// Output: addressConfirmationSchema, ../contract/src/front-door.responses.ts:77
+// Output: addressConfirmationSchema, ../contract/src/front-door.responses.ts:81
 interface Output {
   email: string | null;
   confirmed: boolean;
@@ -747,7 +755,7 @@ interface Output {
 interface Input {
   codeChallenge: string;
 }
-// Output: frontDoorOwnAddressSentSchema, ../contract/src/front-door.responses.ts:32
+// Output: frontDoorOwnAddressSentSchema, ../contract/src/front-door.responses.ts:36
 interface Output {
   sent: true;
   identifierId: string;
@@ -756,7 +764,7 @@ interface Output {
 // auth.priorSession
 // Input: inline, ../contract/src/auth.trpc.ts:79
 type Input = unknown;
-// Output: priorSessionSchema, ../contract/src/front-door.responses.ts:86
+// Output: priorSessionSchema, ../contract/src/front-door.responses.ts:90
 type Output =
   | {
       kind: "expired";
@@ -782,11 +790,11 @@ type Input = Record<string, unknown>;
 // Output: browserSessionInventoryEntrySchema.array() (inline, ../contract/src/auth.trpc.ts:93)
 
 // auth.endBrowserSession
-// Input: endBrowserSessionInputSchema, ../contract/src/browser-session.ts:126
+// Input: endBrowserSessionInputSchema, ../contract/src/browser-session.ts:128
 interface Input {
   sessionId: string;
 }
-// Output: browserSessionsEndedSchema, ../contract/src/browser-session.ts:136
+// Output: browserSessionsEndedSchema, ../contract/src/browser-session.ts:138
 interface Output {
   ended: number;
 }
@@ -794,7 +802,13 @@ interface Output {
 // auth.recordPageOpened
 // Input: inline, ../contract/src/auth.trpc.ts:101
 interface Input {
-  page: "me_sessions";
+  page:
+    | "me_sessions"
+    | "me_overview"
+    | "settings_usage"
+    | "settings_plans"
+    | "settings_subscription"
+    | "governance_costs";
 }
 // Output: inline, ../contract/src/auth.trpc.ts:102
 type Output = unknown;
@@ -924,17 +938,17 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable                      | Declared at                                          |
 | ------ | ----------------------------- | ----------------------------------------- | ---------------------------------------------------- |
-| secret | `session`                     | `NEXTAUTH_SECRET`                         | `src/app/auth.app.ts:276`                            |
-| secret | `googleClientSecret`          | `GOOGLE_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:52` |
-| secret | `githubClientSecret`          | `GITHUB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:53` |
-| secret | `gitlabClientSecret`          | `GITLAB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:54` |
-| secret | `azureAdClientSecret`         | `AZURE_AD_CLIENT_SECRET`                  | `../../../packages/secrets/src/shared-secrets.ts:55` |
-| secret | `auth0ClientSecret`           | `AUTH0_CLIENT_SECRET`                     | `../../../packages/secrets/src/shared-secrets.ts:56` |
-| secret | `oktaClientSecret`            | `OKTA_CLIENT_SECRET`                      | `../../../packages/secrets/src/shared-secrets.ts:57` |
-| secret | `cognitoClientSecret`         | `COGNITO_CLIENT_SECRET`                   | `../../../packages/secrets/src/shared-secrets.ts:58` |
-| secret | `oneLoginClientSecret`        | `ONELOGIN_CLIENT_SECRET`                  | `../../../packages/secrets/src/shared-secrets.ts:59` |
-| secret | `oidcClientSecret`            | `OIDC_CLIENT_SECRET`                      | `../../../packages/secrets/src/shared-secrets.ts:60` |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`                   | `src/app/auth.app.ts:279`                            |
+| secret | `session`                     | `NEXTAUTH_SECRET`                         | `src/app/auth.app.ts:285`                            |
+| secret | `googleClientSecret`          | `GOOGLE_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:80` |
+| secret | `githubClientSecret`          | `GITHUB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:81` |
+| secret | `gitlabClientSecret`          | `GITLAB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:82` |
+| secret | `azureAdClientSecret`         | `AZURE_AD_CLIENT_SECRET`                  | `../../../packages/secrets/src/shared-secrets.ts:83` |
+| secret | `auth0ClientSecret`           | `AUTH0_CLIENT_SECRET`                     | `../../../packages/secrets/src/shared-secrets.ts:84` |
+| secret | `oktaClientSecret`            | `OKTA_CLIENT_SECRET`                      | `../../../packages/secrets/src/shared-secrets.ts:85` |
+| secret | `cognitoClientSecret`         | `COGNITO_CLIENT_SECRET`                   | `../../../packages/secrets/src/shared-secrets.ts:86` |
+| secret | `oneLoginClientSecret`        | `ONELOGIN_CLIENT_SECRET`                  | `../../../packages/secrets/src/shared-secrets.ts:87` |
+| secret | `oidcClientSecret`            | `OIDC_CLIENT_SECRET`                      | `../../../packages/secrets/src/shared-secrets.ts:88` |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`                   | `src/app/auth.app.ts:288`                            |
 | config | `sessionUrl`                  | `NEXTAUTH_URL`                            | `../contract/src/auth.config.ts:40`                  |
 | config | `mfaEnrollmentOpen`           | `MFA_ENROLLMENT_OPEN`                     | `../contract/src/auth.config.ts:42`                  |
 | config | `passkeysEnabled`             | `PASSKEYS_ENABLED`                        | `../contract/src/auth.config.ts:43`                  |

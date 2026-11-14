@@ -62,7 +62,7 @@ describe("buildFacts", () => {
     widget("elsewhere", "other-board"),
   ];
 
-  it("reports an untouched board as unchanged", () => {
+  it("reports an untouched dashboard as unchanged", () => {
     const facts = buildFacts({ items: initial, alerts: [], state: stateWith(initial) });
 
     expect(facts.board).toMatchObject({
@@ -92,7 +92,7 @@ describe("buildFacts", () => {
     expect(facts.other_widgets_unchanged).toBe(true);
   });
 
-  it("counts a widget added to the board and one created off it with the run tag", () => {
+  it("counts a widget added to the dashboard and one created off it with the run tag", () => {
     const state = stateWith(initial);
     const now = [
       ...initial,
@@ -150,7 +150,7 @@ describe("buildFacts", () => {
     expect(facts.new_alerts).toEqual([{ kind: "monitor", id: "ours", name: "mine" }]);
   });
 
-  it("keeps a new alert on a graph pinned to the run's board, which names the graph, not the tag", () => {
+  it("keeps a new alert on a graph pinned to the run's dashboard, which names the graph, not the tag", () => {
     const graph: Item = {
       kind: "graph",
       resource: { id: "graph-9", name: "Volume", dashboardId: "board-1" },

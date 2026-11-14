@@ -7,6 +7,7 @@ import { publicRoute } from "@langwatch/api/access";
 import { BrowserOriginGuard } from "@langwatch/api/policy";
 import {
   BrowserOriginRefusedError,
+  callerAddressContext,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   type RestAnswer,
@@ -27,10 +28,10 @@ export type AuthRestFederatedLogout = (input: { returnTo: string }) => Promise<s
 
 /** What the sign-in door calls, one operation per route; the process's own app answers it. */
 export interface AuthDoorApi {
-  /** The project a legacy `X-Auth-Token` names, counted against the caller's nearest hop. */
+  /** The project a legacy `X-Auth-Token` names, counted against the caller's resolved address. */
   validateProjectAuthToken(input: {
     token: string | undefined;
-    forwardedFor: string | undefined;
+    callerAddress: string | null;
   }): Promise<{ projectSlug: string }>;
   /** The browser's own session poll, read off its cookies. */
   getSessionByCookie(input: { cookie: string | undefined }): Promise<AuthSessionPoll>;
@@ -62,10 +63,7 @@ const BETTER_AUTH_FORWARDS =
 const SESSION_POLL_WIRE =
   "the browser's session poll answers the document it has always published, never cached, with null for an anonymous caller";
 
-const VALIDATE_HEADERS = z.object({
-  "x-auth-token": z.string().optional(),
-  "x-forwarded-for": z.string().optional(),
-});
+const VALIDATE_HEADERS = z.object({ "x-auth-token": z.string().optional() });
 
 const COOKIE_HEADERS = z.object({ cookie: z.string().optional() });
 
@@ -99,11 +97,9 @@ export const authRest = defineRestRouter(AuthDoorApi)
   .withAccess(AUTH_DOOR)
   .withHeaders(VALIDATE_HEADERS)
   .withOutput(z.object({ projectSlug: z.string() }))
-  .handle(({ app }, headers) =>
-    app.validateProjectAuthToken({
-      token: headers["x-auth-token"],
-      forwardedFor: headers["x-forwarded-for"],
-    }),
+  .withMiddlewareContext(callerAddressContext)
+  .handle(({ app }, headers, callerAddress) =>
+    app.validateProjectAuthToken({ token: headers["x-auth-token"], callerAddress }),
   )
 
   .get("/api/auth/session", "readBrowserAuthSession")

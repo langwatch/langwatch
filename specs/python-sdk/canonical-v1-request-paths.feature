@@ -28,5 +28,5 @@ Feature: The Python SDK addresses the canonical /api/v1 API
 
     @unit
     Scenario: A dashboard read goes out at the canonical address
-      When the SDK lists dashboards
-      Then the request path begins with "/api/v1/dashboards"
+      When the SDK lists the Analytics Reports dashboards
+      Then the request path begins with "/api/v1/analytics/reports"

@@ -13,9 +13,10 @@ import {
 import { resolveLiveCodexSession } from "@/cli/utils/governance/codex-live-session";
 import { type CodexRolloutMeta, parseCodexRollout } from "@/cli/utils/governance/codex-rollout";
 import { findRolloutForThread } from "@/cli/utils/governance/codex-rollout-otlp";
-
-/** The agents a declaration can name, keyed by their normalized spelling. */
-const AGENTS = new Set(["claude_code", "codex", "opencode"]);
+import {
+  isSessionContextAgentId,
+  sessionContextHookArguments,
+} from "@/cli/utils/governance/session-context-agents";
 
 /** Which session the declaration is for, and what titles its seams carry. */
 export interface ResolvedSession {
@@ -45,9 +46,9 @@ async function resolveExplicitSession({
 }: ResolutionInputs): Promise<ResolvedSession | null> {
   const normalized = agent?.trim().toLowerCase().replace(/-/g, "_") ?? "";
   const trimmedSessionId = sessionId?.trim() ?? "";
-  if (!trimmedSessionId || !AGENTS.has(normalized)) {
+  if (!trimmedSessionId || !isSessionContextAgentId(normalized)) {
     writeLine(
-      "Pass both --agent (claude-code, codex or opencode) and --session-id to declare for an explicit session.",
+      `Pass both --agent (${listOfAgents()}) and --session-id to declare for an explicit session.`,
     );
     return null;
   }
@@ -59,6 +60,12 @@ async function resolveExplicitSession({
         ? await readCodexMeta({ sessionId: trimmedSessionId, codexSessionsRoot })
         : null,
   };
+}
+
+/** The agents a declaration can name, as their hooks spell them: "a, b or c". */
+function listOfAgents(): string {
+  const names = sessionContextHookArguments();
+  return `${names.slice(0, -1).join(", ")} or ${names.at(-1)}`;
 }
 
 /**

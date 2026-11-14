@@ -386,3 +386,21 @@ describe("cache write TTL pricing through computeSpanCost", () => {
     });
   });
 });
+
+describe("computeSpanCost for a variable-price router", () => {
+  describe("given a span naming a router and its token usage", () => {
+    /** @scenario A router span on a trace is never costed below zero */
+    it.each(["nvidia/switchyard", "typesafe/jev-router", "openrouter/auto"])(
+      "never costs %s below zero",
+      (model) => {
+        const result = computeSpanCost({
+          attrs: {},
+          model,
+          promptTokens: 1000,
+          completionTokens: 500,
+        });
+        expect(result).toBeGreaterThanOrEqual(0);
+      },
+    );
+  });
+});

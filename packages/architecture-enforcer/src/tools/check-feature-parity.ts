@@ -93,6 +93,7 @@ const SPECS_ROOTS = [
   ...discoverPackageSpecRoots(resolve(REPO_ROOT, "packages")),
   ...discoverPackageSpecRoots(resolve(REPO_ROOT, "modules")),
   ...discoverPackageSpecRoots(resolve(REPO_ROOT, "enterprise")),
+  ...discoverPackageSpecRoots(resolve(REPO_ROOT, "apps")),
   resolve(REPO_ROOT, "sdks/typescript/specs"),
 ] as const;
 
@@ -260,13 +261,36 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // asserts it, so scenarios under specs/ci/ can only bind from this root.
   // Without it those feature files report "all bound" while binding nothing.
   "tools/ciguard",
+  "tools/deployimpact",
+  "tools/operatornotes",
+  "tools/cachesweep",
   "tools/migrationorder",
   // The README link checker, for the same reason: specs/ci/readme-link-check.feature
   // describes what CI asserts about the README, and only these Go tests assert it.
   "tools/linkcheck",
+  // The ECR chart push: which package it pushes and which digest it reports
+  // for the deploy to pin (specs/ci/publish-prerelease-charts-to-ecr.feature).
+  "tools/chartpush",
+  // The main-red Slack post (specs/ci/package-suite-integration-lane.feature).
+  "tools/slacknotify",
+  // Whether an immutable ECR tag may be skipped, and the Lambda re-tag
+  // (specs/ci/publish-ecr-images.feature).
+  "tools/ecrtag",
+  // The docs deploy's redirect store and its job (specs/ci/docs-deploy.feature).
+  "tools/docsdeploy",
+  "tools/chartheap",
+  "tools/charts3region",
+  // How the package-suites weights are measured from main's job logs
+  // (specs/ci/package-suites-weights.feature).
+  "tools/suiteweights",
+  // The gateway-matrix seed: which providers it seeds from which credentials,
+  // and that Bedrock stays keyless (specs/ci/gateway-matrix-seed.feature).
+  "tools/matrixseed",
   // The CLI half of the same tool: the verdict-to-exit-code step is the part
   // CI gates on, so the "check fails" / "check passes" scenarios bind here.
   "cmd/linkcheck",
+  // The docs structure check loads pages from disk; which files count as pages binds here.
+  "tools/docscheck",
   // The mono-binary's own dispatch, including the combined Go development
   // process (`service combined`). Which services it hosts, what telemetry
   // identity each keeps and which address variable each binds are asserted
@@ -396,7 +420,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/wrapper-e2e/gemini.feature",
   "specs/ai-gateway/wrapper-e2e/opencode.feature",
   "specs/ai-governance/cli-wrappers/request-increase.feature",
-  "specs/ai-governance/cli-wrappers/wrap-login-routing.feature",
   "specs/ai-governance/dogfood-seed/scope-runner.feature",
   "specs/ai-governance/ingestion-sources/claude-code-otlp.feature",
   "specs/ai-governance/ingestion-sources/native-receiver-lift.feature",
@@ -461,7 +484,7 @@ const LEGACY_INERT: string[] = [
   "specs/experiments-v3/undo-redo.feature",
   "specs/features/agent-cli.feature",
   "specs/features/annotation-cli.feature",
-  "specs/features/dashboard-cli.feature",
+  "specs/features/analytics-report-cli.feature",
   "specs/features/dataset-python-sdk.feature",
   "specs/features/devtools/issue-creation-skill.feature",
   "specs/features/devtools/orchestrator-bug-fix-workflow.feature",
@@ -538,7 +561,6 @@ const LEGACY_INERT: string[] = [
   "specs/monitors/workflow-evaluator-checktype.feature",
   "specs/monitors/workflow-evaluator-mappings.feature",
   "specs/nlp-go/dataset-block.feature",
-  "specs/nlp-go/http-block.feature",
   "specs/nlp-go/proxy.feature",
   "specs/nlp-go/python-removal.feature",
   "specs/nlp-go/remove-execute-evaluation.feature",
@@ -659,6 +681,10 @@ const LEGACY_INERT: string[] = [
 
 /** Feature files with mixed tagged/untagged scenarios (legacy tolerance; new files fail) */
 const LEGACY_PARTIAL: string[] = [
+  // Reason: left LEGACY_INERT when the not-found scenarios were bound: a tool
+  // that cannot start exits 127 with a docs link and no setup written. The
+  // login, env and routing scenarios stay untagged.
+  "specs/ai-governance/cli-wrappers/wrap-login-routing.feature",
   // Reason: left LEGACY_INERT when evaluator get gained name resolution; its
   // scenarios are enforced. The other CLI scenarios stay untagged.
   "specs/evaluators/evaluator-cli.feature",

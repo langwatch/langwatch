@@ -1,5 +1,5 @@
 import type { FeatureFlagRuleMatch, FeatureFlagRules } from "@langwatch/feature-flag-contract";
-import { emailDomainsOf } from "@langwatch/feature-flag-contract";
+import { emailDomainsOf, projectIdsOf } from "@langwatch/feature-flag-contract";
 import { toEpochMs, readableDate } from "@langwatch/time";
 
 /**
@@ -27,8 +27,8 @@ export interface UIRule {
   id: string;
   scopeKind: ScopeKind;
   /**
-   * An organization or project id, a date for `NEW_USERS`, a percent for
-   * `PERCENTAGE`, or comma-separated domains for `EMAIL_DOMAIN`.
+   * An organization id, comma-separated project ids for `PROJECT`, a date for
+   * `NEW_USERS`, a percent for `PERCENTAGE`, or comma-separated domains for `EMAIL_DOMAIN`.
    */
   target: string;
   enabled: boolean;
@@ -72,11 +72,11 @@ export function rulesToUI(rules: FeatureFlagRules): UIRule[] {
         otherConditions: without({ match: rule.match, key: "organizationId" }),
       };
     }
-    if (rule.match.projectId) {
+    if (projectIdsOf(rule.match.projectId).length > 0) {
       return {
         ...base,
         scopeKind: "PROJECT" as const,
-        target: rule.match.projectId,
+        target: projectIdsOf(rule.match.projectId).join(", "),
         otherConditions: without({ match: rule.match, key: "projectId" }),
       };
     }
@@ -119,7 +119,10 @@ export function uiToRules(rules: UIRule[]): FeatureFlagRules {
       return { match: { ...rest, organizationId: target }, enabled: rule.enabled };
     }
     if (rule.scopeKind === "PROJECT") {
-      return { match: { ...rest, projectId: target }, enabled: rule.enabled };
+      return {
+        match: { ...rest, projectId: singleOrList(parseProjectIds(target)) },
+        enabled: rule.enabled,
+      };
     }
     if (rule.scopeKind === "NEW_USERS") {
       return { match: { ...rest, organizationCreatedAfter: target }, enabled: rule.enabled };
@@ -146,10 +149,18 @@ export function parseEmailDomains(target: string): string[] {
     .filter((domain) => domain !== "");
 }
 
-/** One domain is stored as a string, several as a list. */
-function singleOrList(domains: string[]): string | string[] {
-  const [only] = domains;
-  return domains.length === 1 && only !== undefined ? only : domains;
+/** Project ids typed into the field: split on commas, unpadded, empties dropped. */
+export function parseProjectIds(target: string): string[] {
+  return target
+    .split(",")
+    .map((id) => id.trim())
+    .filter((id) => id !== "");
+}
+
+/** One domain or project id is stored as a string, several as a list. */
+function singleOrList(values: string[]): string | string[] {
+  const [only] = values;
+  return values.length === 1 && only !== undefined ? only : values;
 }
 
 /** The rule's other conditions: its match without the one the scope owns. */
@@ -203,6 +214,7 @@ export function findUnfillableRule(rules: UIRule[]): UIRule | undefined {
     if (target === "") return true;
     if (rule.scopeKind === "PERCENTAGE") return !isPercentage(target);
     if (rule.scopeKind === "EMAIL_DOMAIN") return !areEmailDomains(target);
+    if (rule.scopeKind === "PROJECT") return parseProjectIds(target).length === 0;
     return false;
   });
 }

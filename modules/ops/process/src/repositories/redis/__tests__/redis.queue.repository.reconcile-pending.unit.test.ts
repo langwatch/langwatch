@@ -1,4 +1,5 @@
 import { memoryRedisDouble, memoryRedisStore } from "@langwatch/test-harness/client-doubles/redis";
+import { Temporal } from "@langwatch/time";
 import type { Redis } from "ioredis";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -11,6 +12,22 @@ const MARKER_KEY = `${PREFIX}stats:pending-recon-ts`;
 const DRIFT_KEY = `${PREFIX}stats:pending-drift`;
 const SINGLE_FLIGHT_WINDOW_MS = 55_000;
 const LEASE_MS = 30_000;
+
+/**
+ * Fake timers mock `Date` but not a native `Temporal.Now`, which the repository
+ * reads through `nowInstant()`; tie the two so advancing the clock moves both.
+ */
+function useFakeClock(): void {
+  vi.useFakeTimers();
+  vi.spyOn(Temporal.Now, "instant").mockImplementation(() =>
+    Temporal.Instant.fromEpochMilliseconds(Date.now()),
+  );
+}
+
+function useRealClock(): void {
+  vi.restoreAllMocks();
+  vi.useRealTimers();
+}
 
 /**
  * The reconcile pass over a memory Redis, with the three cached scripts modelled and hooks
@@ -357,7 +374,7 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
 
   describe("given a pass that outlives the single-flight window", () => {
     beforeEach(() => {
-      vi.useFakeTimers();
+      useFakeClock();
       redis.seedGroup({
         groupId: "tenant-a/group",
         jobCount: 1,
@@ -370,7 +387,7 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
     });
 
     afterEach(() => {
-      vi.useRealTimers();
+      useRealClock();
     });
 
     describe("when reconcile completes", () => {
@@ -587,7 +604,7 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
     const BACKSTOP_MS = 60 * 60 * 1000;
 
     beforeEach(() => {
-      vi.useFakeTimers();
+      useFakeClock();
       redis.seedGroup({
         groupId: "tenant-a/known",
         jobCount: 1,
@@ -597,7 +614,7 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
     });
 
     afterEach(() => {
-      vi.useRealTimers();
+      useRealClock();
     });
 
     /** Passes between sweeps, none of which should touch the deadline. */
@@ -630,20 +647,50 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
     });
 
     describe("when a sweep finds a group the index does not list", () => {
-      /** @scenario "A sweep that adopts keeps sweeping on the next pass" */
-      it("sweeps again on the very next pass", async () => {
-        await repo.reconcileTotalPending(QUEUE_NAME, 0);
-        const afterFirstSweep = redis.scan.mock.calls.length;
+      const PAUSE_MS = 5 * 60 * 1000;
 
+      /** Sweeps until one adopts, returning the scan count right after it. */
+      const sweepAndAdopt = async () => {
+        await repo.reconcileTotalPending(QUEUE_NAME, 0);
         // Arrives after the first sweep, indexed nowhere: the state a pod on the
         // previous release leaves behind mid-rollout.
         redis.seedZset(`${PREFIX}group:tenant-a/late:jobs`, ["j1"]);
         vi.advanceTimersByTime(BACKSTOP_MS + 1);
+        const beforeAdoptingSweep = redis.scan.mock.calls.length;
         await repo.reconcileTotalPending(QUEUE_NAME, 0);
         const afterAdoptingSweep = redis.scan.mock.calls.length;
-        expect(afterAdoptingSweep).toBeGreaterThan(afterFirstSweep);
+        expect(afterAdoptingSweep).toBeGreaterThan(beforeAdoptingSweep);
+        return afterAdoptingSweep;
+      };
 
-        // That sweep adopted, so the next pass sweeps again without waiting.
+      /** @scenario "A sweep that adopts sweeps again after a short pause" */
+      it("does not walk the keyspace again inside the pause", async () => {
+        const afterAdoptingSweep = await sweepAndAdopt();
+
+        // Each pass inside the pause still reconciles, counting the known group
+        // and the adopted one from the indexes alone.
+        const results = [];
+        for (let i = 0; i < 4; i++) {
+          vi.advanceTimersByTime(60_000);
+          results.push(await repo.reconcileTotalPending(QUEUE_NAME, 0));
+        }
+
+        expect(results).toEqual(
+          Array(4).fill(
+            expect.objectContaining({
+              kind: "reconciled",
+              result: expect.objectContaining({ groundTruth: 2 }),
+            }),
+          ),
+        );
+        expect(redis.scan.mock.calls.length).toBe(afterAdoptingSweep);
+      });
+
+      /** @scenario "A sweep that adopts sweeps again after a short pause" */
+      it("sweeps again once the pause elapses, well before the backstop", async () => {
+        const afterAdoptingSweep = await sweepAndAdopt();
+
+        vi.advanceTimersByTime(PAUSE_MS + 1);
         await repo.reconcileTotalPending(QUEUE_NAME, 0);
 
         expect(redis.scan.mock.calls.length).toBeGreaterThan(afterAdoptingSweep);

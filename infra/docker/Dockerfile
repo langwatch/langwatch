@@ -3,7 +3,7 @@
 # stdlib only). Built here so the builder carries the binary and no Go
 # toolchain, and so this layer caches until those two directories change.
 # `go mod download` is skipped on purpose: the binary imports no module.
-FROM golang:1.27.3-alpine AS devscripts
+FROM golang:1.27.4-alpine AS devscripts
 WORKDIR /src
 COPY go.work go.work.sum ./
 COPY cmd/go.* cmd/
@@ -25,8 +25,8 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 # services/scenariorunner, the Go drop-in for the Node scenario child. Its own
 # binary, never a cmd/service subcommand: that refuses to boot with
 # LANGWATCH_API_KEY set, and a run's key arrives in exactly that variable.
-# Cross-compiled on the build host, like Dockerfile.go_service.
-FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS scenariorunner
+# Cross-compiled on the build host, like Dockerfile.go-services.
+FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine AS scenariorunner
 ARG TARGETOS
 ARG TARGETARCH
 WORKDIR /src
@@ -244,7 +244,7 @@ COPY --from=builder /usr/local/bin/goose /usr/local/bin/goose
 # The scenario SDK opens a voice worker's quick tunnel with a bare `cloudflared` spawn, so the
 # binary is on the image's PATH; the worker never writes its own environment (Alex, 2026-09-28).
 # Pinned to a release and its multi-arch index digest; bump both together.
-COPY --from=cloudflare/cloudflared:2026.9.3@sha256:072c067d25ccbe61d46e18f0d0723255f2bb5304f7317caa95b27031520ff92c /usr/local/bin/cloudflared /usr/local/bin/cloudflared
+COPY --from=cloudflare/cloudflared:2026.10.5@sha256:1b1d34d0a9c0bfca9de72db8460d328db3f19edd2b96169114e3e893a97bbe53 /usr/local/bin/cloudflared /usr/local/bin/cloudflared
 
 WORKDIR /app
 

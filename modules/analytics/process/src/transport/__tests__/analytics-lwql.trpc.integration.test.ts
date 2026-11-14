@@ -18,11 +18,11 @@ import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { analyticsTestSecrets } from "../../app/__tests__/analytics-secrets.fixture.ts";
 import { AnalyticsModule } from "../../app/analytics.app.ts";
 import { MemoryAnalyticsRepositories } from "../../repositories/memory/memory.analytics.repositories.ts";
 import { analyticsLwqlTrpcTransport } from "../analytics-lwql.trpc.ts";
 
-type Setup = Parameters<typeof AnalyticsModule.create>[0];
 type TestContext = { actor: { id: string } };
 
 const PROJECT = { projectId: "project-1" };
@@ -54,13 +54,14 @@ async function callerFor({ switchOn, held }: { switchOn: boolean; held: readonly
         postgresHost: void 0,
         accessModelMode: void 0,
         sqlSingleNode: void 0,
+        clickhouseCluster: void 0,
         aggregateMaxMembers: void 0,
       },
       tenantAnalyticsConcurrency: 4,
       publicBaseUrl: "https://app.langwatch.test",
     },
     resources: { own: () => void 0, ownService: () => void 0 },
-    secrets: createApiFixture<Setup["secrets"]>(),
+    secrets: analyticsTestSecrets(),
   });
   const trpc = TrpcRootDefinition.forContext<TestContext>().create();
 

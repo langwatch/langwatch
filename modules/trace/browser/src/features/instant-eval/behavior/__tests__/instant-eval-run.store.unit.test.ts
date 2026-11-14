@@ -83,6 +83,26 @@ describe("given a run the page is watching", () => {
     });
   });
 
+  describe("when it failed long before the page opened", () => {
+    /** @scenario "A failed run read after a reload still shows the failure" */
+    it("is failed rather than settled, so the page says why", () => {
+      const now = Date.now();
+      useInstantEvalRunStore.getState().setRun(
+        run({
+          status: "failed",
+          progress: 0,
+          matched: null,
+          priceUsd: 0,
+          error: "connect_unreachable",
+          finishedAtMs: now - INSTANT_EVAL_SETTLE_GRACE_MS - 1,
+        }),
+        now,
+      );
+
+      expect(selectInstantEvalRunPhase(useInstantEvalRunStore.getState(), "run-1")).toBe("failed");
+    });
+  });
+
   describe("when the query no longer names it", () => {
     it("is dropped with everything remembered about it", () => {
       useInstantEvalRunStore.getState().setRun(run());

@@ -3,7 +3,6 @@ import { formatCost } from "@langwatch/design-system/display-formatters";
 import { Box, Grid, HStack, Separator, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ReactNode } from "react";
-import { useMemo } from "react";
 
 import {
   contextHealthBand,
@@ -38,9 +37,9 @@ interface SessionViewProps {
 }
 
 export function SessionView({ session, entries }: SessionViewProps) {
-  const signals = useMemo(() => deriveSessionSignals(session), [session]);
-  const tokenTimeline = useMemo(() => (entries ? deriveTokenTimeline(entries) : []), [entries]);
-  const cacheRebuilds = useMemo(() => (entries ? findCacheRebuilds(entries) : []), [entries]);
+  const signals = deriveSessionSignals(session);
+  const tokenTimeline = entries ? deriveTokenTimeline(entries) : [];
+  const cacheRebuilds = entries ? findCacheRebuilds(entries) : [];
 
   return (
     <Box height="full" overflowY="auto">
@@ -68,6 +67,12 @@ export function SessionView({ session, entries }: SessionViewProps) {
 
         {tokenTimeline.length > 0 && (
           <Section title="Where the tokens went">
+            {/* A turn the chart could not read leaves it short of the cards' count. */}
+            {tokenTimeline.length < session.modelCalls && (
+              <Text textStyle="xs" color="fg.muted">
+                {`The chart draws ${tokenTimeline.length} of the session's ${session.modelCalls} model calls`}
+              </Text>
+            )}
             <TokenTimelineChart points={tokenTimeline} rebuilds={cacheRebuilds} />
           </Section>
         )}

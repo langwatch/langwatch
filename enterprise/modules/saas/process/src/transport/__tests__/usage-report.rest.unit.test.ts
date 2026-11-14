@@ -1,4 +1,9 @@
-import { createCanonicalFamilyErrorHandler, createRestRuntime } from "@langwatch/api/rest";
+import {
+  bindMiddlewareContext,
+  callerAddressContext,
+  createCanonicalFamilyErrorHandler,
+  createRestRuntime,
+} from "@langwatch/api/rest";
 import {
   LangWatchCloudOnlyError,
   type IncomingUsageReportRequest,
@@ -15,7 +20,7 @@ import { describe, expect, it } from "vitest";
 
 import { usageReportRest } from "../usage-report.rest.ts";
 
-function mount(app: Partial<SaasApi>) {
+function mount(app: Partial<SaasApi>, callerAddress: string | null = "203.0.113.7") {
   return createRestRuntime({
     audit: { record: () => {} },
     authorization: restTestAuthorization(),
@@ -31,6 +36,7 @@ function mount(app: Partial<SaasApi>) {
       loggerName: "langwatch:test:usage-report",
       label: "Usage report",
     }),
+    middlewareContext: [bindMiddlewareContext(callerAddressContext, () => callerAddress)],
   });
 }
 
@@ -48,7 +54,7 @@ describe("the usage-report receiver's doors", () => {
   /** @scenario "Both doors hand the report to the same operation" */
   /** @scenario "An install on an older version still reaches the old statistics route" */
   it.each(["/api/track_usage", "/api/connect/v1/stats"])(
-    "hands %s's body, unknown fields included, and the sender headers to the receiver",
+    "hands %s's body, unknown fields included, and the resolved sender address to the receiver",
     async (path) => {
       const received: IncomingUsageReportRequest[] = [];
       const hono = mount({
@@ -58,20 +64,43 @@ describe("the usage-report receiver's doors", () => {
         },
       });
 
-      const response = await hono.fetch(
-        post(path, { ...REPORT, from_the_future: 1 }, { "x-forwarded-for": "203.0.113.7" }),
-      );
+      const response = await hono.fetch(post(path, { ...REPORT, from_the_future: 1 }));
 
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({ message: "Event captured" });
       expect(received).toEqual([
         {
           report: { ...REPORT, from_the_future: 1 },
-          addressHeaders: expect.objectContaining({ "x-forwarded-for": "203.0.113.7" }),
+          callerAddress: "203.0.113.7",
         },
       ]);
     },
   );
+
+  /** @scenario "The usage-report receiver limits on the resolved address" */
+  it("hands the resolved address, not a forged forwarding header, to the per-address limit", async () => {
+    const received: IncomingUsageReportRequest[] = [];
+    const hono = mount(
+      {
+        receiveUsageReport: (input) => {
+          received.push(input);
+          return Promise.resolve({ message: "Event captured" });
+        },
+      },
+      "203.0.113.9",
+    );
+
+    await hono.fetch(
+      post("/api/track_usage", REPORT, {
+        "cf-connecting-ip": "198.51.100.1",
+        "true-client-ip": "198.51.100.2",
+        "x-forwarded-for": "198.51.100.3",
+        "x-real-ip": "198.51.100.4",
+      }),
+    );
+
+    expect(received.map((input) => input.callerAddress)).toEqual(["203.0.113.9"]);
+  });
 
   /** @scenario "A report without an install id is refused before the receiver runs" */
   it("refuses a body without an install id before the receiver runs", async () => {

@@ -8,7 +8,7 @@ export const TOPIC_WORLD = "T1";
 export const QUIET_WORLD = "W1";
 /** A coding-agent cost question that leads to `langwatch whoami` (login-world.ts). */
 export const LOGIN_WORLD = "C1";
-/** The board worlds (worlds.ts). */
+/** The dashboard worlds (worlds.ts). */
 export const MATRIX_WORLD_NAMES = ["D1", "D2", "A1", "D3", "X1", "D5", "B1"] as const;
 
 export type MatrixWorld = (typeof MATRIX_WORLD_NAMES)[number];

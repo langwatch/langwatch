@@ -16,6 +16,10 @@ import type { Trace } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import {
+  ADMIT_EVERY_PLACEMENT,
+  TEST_RUN_TELEMETRY,
+} from "../../app/__tests__/analytics.fixture.ts";
+import {
   LangWatchQLHydrationComputeService,
   type LangWatchQLTraceRenderer,
 } from "../../features/hydration/services/langwatch-ql-hydration-compute.service.ts";
@@ -191,6 +195,8 @@ function serviceOver({
     },
   });
   const service = LangWatchQLService.create({
+    runTelemetry: TEST_RUN_TELEMETRY,
+    placement: ADMIT_EVERY_PLACEMENT,
     executor: new ColumnAnsweringExecutor(column, values),
     database: "analytics",
     hydration,

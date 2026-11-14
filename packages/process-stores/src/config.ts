@@ -41,6 +41,11 @@ export interface MalformedPrivateVariable {
 export interface ClickHouseConfig {
   /** `CLICKHOUSE_URL` — the shared server. Absent where every tenant is private. */
   readonly url?: string;
+  /**
+   * `CLICKHOUSE_PASSWORD_FILE` — a file holding the shared server's password, re-read while
+   * running so a rotation needs no restart. The URL still names the user. Private routes ignore it.
+   */
+  readonly passwordFile?: string;
   /** `CLICKHOUSE_URL__<label>__<orgId>`, the stores' secret family parsed once at boot. */
   readonly privateRoutes?: readonly ClickHousePrivateRoute[];
   /** Route variables that did not parse: those organizations are refused, never shared. */
@@ -129,6 +134,8 @@ export interface ObjectStorageAccount {
     secretAccessKey: string;
     sessionToken?: string;
   }>;
+  /** Assumed through the pod's web-identity token; when present it wins over `credentials`. */
+  readonly roleArn?: string;
   /** Absent keeps the bucket in the path, which every S3-compatible endpoint accepts. */
   readonly forcePathStyle?: boolean;
 }

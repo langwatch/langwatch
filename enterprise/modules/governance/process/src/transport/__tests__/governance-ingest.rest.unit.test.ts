@@ -1,4 +1,9 @@
-import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import {
+  bindMiddlewareContext,
+  callerAddressContext,
+  canonicalErrorResponse,
+  createRestRuntime,
+} from "@langwatch/api/rest";
 import type {
   GovernanceIngestionSource,
   GovernanceRestApi,
@@ -64,6 +69,7 @@ type World = {
   source?: GovernanceIngestionSource | null;
   rateLimits?: GovernanceRateLimitRepository;
   rateLimitDisabled?: boolean;
+  callerAddress?: string | null;
   traceCollection?: GovernanceIngestTraceCollection;
   logCollection?: GovernanceIngestLogCollectionChannel;
   metricCollection?: GovernanceIngestMetricCollectionChannel;
@@ -78,6 +84,12 @@ function mountIngest(world: World = {}) {
     .mockResolvedValue(void 0);
   const traceCollectionMock = vi.fn<GovernanceIngestTraceCollection>().mockResolvedValue({
     rejectedSpans: 0,
+  });
+  const logCollectionMock = vi.fn<GovernanceIngestLogCollectionChannel>().mockResolvedValue(void 0);
+  const metricCollectionMock = vi.fn<GovernanceIngestMetricCollectionChannel>().mockResolvedValue({
+    outcome: "collected",
+    acceptedDataPoints: 0,
+    rejectedDataPoints: 0,
   });
 
   const ingest = GovernanceIngestService.create({
@@ -102,16 +114,8 @@ function mountIngest(world: World = {}) {
         }),
       }),
       traceCollection: world.traceCollection ?? traceCollectionMock,
-      logCollection:
-        world.logCollection ??
-        vi.fn<GovernanceIngestLogCollectionChannel>().mockResolvedValue(void 0),
-      metricCollection:
-        world.metricCollection ??
-        vi.fn<GovernanceIngestMetricCollectionChannel>().mockResolvedValue({
-          outcome: "collected",
-          acceptedDataPoints: 0,
-          rejectedDataPoints: 0,
-        }),
+      logCollection: world.logCollection ?? logCollectionMock,
+      metricCollection: world.metricCollection ?? metricCollectionMock,
       spend: createApiFixture<GatewayApi>(),
       directory: GovernanceIngestPrincipalService.create({
         organizations: createApiFixture<OrganizationApi>(),
@@ -138,10 +142,15 @@ function mountIngest(world: World = {}) {
     app: () => app,
     credential: "public",
     onError: canonicalErrorResponse,
+    middlewareContext: [
+      bindMiddlewareContext(callerAddressContext, () => world.callerAddress ?? null),
+    ],
   });
 
   return {
     traceCollection: traceCollectionMock,
+    logCollection: logCollectionMock,
+    metricCollection: metricCollectionMock,
     ingestionSourceRecordEventReceived: recordEventReceived,
     findIngestionSourceByIngestSecret: findByIngestSecret,
     post: (path: string, body: string, headers: Record<string, string> = {}) =>
@@ -202,6 +211,84 @@ describe("the ingestion-source receivers", () => {
     });
   });
 
+  describe("given a source the admin has disabled", () => {
+    /** @scenario "A disabled push source refuses new batches" */
+    it.each([
+      ["OTLP traces", `/api/ingest/otel/${SOURCE_ID}`, traceBody, "traceCollection"],
+      ["OTLP logs", `/api/ingest/otel/${SOURCE_ID}/v1/logs`, logBody, "logCollection"],
+      ["OTLP metrics", `/api/ingest/otel/${SOURCE_ID}/v1/metrics`, metricBody, "metricCollection"],
+      [
+        "webhook",
+        `/api/ingest/webhook/${SOURCE_ID}`,
+        JSON.stringify({ event: "one" }),
+        "logCollection",
+      ],
+    ] as const)(
+      "refuses %s with 403 and neither collects nor stamps",
+      async (_door, path, body, channel) => {
+        const api = mountIngest({ source: { ...SOURCE, status: "disabled" } });
+
+        const response = await api.post(path, body);
+
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toMatchObject({
+          code: "ingestion_source_disabled",
+        });
+        expect(api[channel]).not.toHaveBeenCalled();
+        expect(api.ingestionSourceRecordEventReceived).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each([
+      ["OTLP traces", `/api/ingest/otel/${SOURCE_ID}`, traceBody, "traceCollection"],
+      ["OTLP logs", `/api/ingest/otel/${SOURCE_ID}/v1/logs`, logBody, "logCollection"],
+      ["OTLP metrics", `/api/ingest/otel/${SOURCE_ID}/v1/metrics`, metricBody, "metricCollection"],
+      [
+        "webhook",
+        `/api/ingest/webhook/${SOURCE_ID}`,
+        JSON.stringify({ event: "one" }),
+        "logCollection",
+      ],
+    ] as const)(
+      "hands %s to its own channel once the source is live",
+      async (_door, path, body, channel) => {
+        const api = mountIngest();
+
+        const response = await api.post(path, body);
+
+        expect(response.status).toBeLessThan(300);
+        expect(api[channel]).toHaveBeenCalled();
+      },
+    );
+
+    /** @scenario "A disabled source answers a wrong endpoint as unknown" */
+    it("answers its secret on another source's endpoint with the bare 401", async () => {
+      const api = mountIngest({ source: { ...SOURCE, status: "disabled" } });
+
+      const response = await api.post("/api/ingest/otel/src_other", traceBody);
+
+      expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "ingestion_source_unauthorized",
+      });
+    });
+  });
+
+  describe("given a disabled source the admin set back to active", () => {
+    /** @scenario "Re-enabling a disabled source resumes ingestion" */
+    it("accepts the next batch sent with the same secret", async () => {
+      const api = mountIngest({ source: { ...SOURCE, status: "disabled" } });
+      const refused = await api.post(`/api/ingest/otel/${SOURCE_ID}`, traceBody);
+      api.findIngestionSourceByIngestSecret.mockResolvedValue({ ...SOURCE, status: "active" });
+
+      const response = await api.post(`/api/ingest/otel/${SOURCE_ID}`, traceBody);
+
+      expect(refused.status).toBe(403);
+      expect(response.status).toBe(202);
+      expect(api.ingestionSourceRecordEventReceived).toHaveBeenCalledWith(SOURCE_ID);
+    });
+  });
+
   describe("when the per-caller throttle refuses", () => {
     it("sheds at the edge with Retry-After, before the secret lookup", async () => {
       const api = mountIngest({
@@ -213,6 +300,32 @@ describe("the ingestion-source receivers", () => {
       expect(response.status).toBe(429);
       expect(response.headers.get("Retry-After")).toBe("30");
       expect(api.findIngestionSourceByIngestSecret).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a caller forges its forwarding headers", () => {
+    /** @scenario "Governance ingest throttles on the resolved address" */
+    it("keys the throttle on the address the door resolved", async () => {
+      const keys: string[] = [];
+      const api = mountIngest({
+        callerAddress: "203.0.113.9",
+        rateLimits: {
+          check: async (key) => {
+            keys.push(key);
+            return { allowed: true };
+          },
+        },
+      });
+
+      await api.post(`/api/ingest/otel/${SOURCE_ID}`, traceBody, {
+        "x-forwarded-for": "198.51.100.1, 198.51.100.2",
+        "x-real-ip": "198.51.100.3",
+      });
+      await api.post(`/api/ingest/otel/${SOURCE_ID}`, traceBody, {
+        "x-forwarded-for": "192.0.2.77",
+      });
+
+      expect(keys).toEqual(["ingest:203.0.113.9", "ingest:203.0.113.9"]);
     });
   });
 

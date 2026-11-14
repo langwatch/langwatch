@@ -7,6 +7,8 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { Avatar, UserAvatar } from "../src/components/display/avatar.tsx";
+import { getAvatarFillForString } from "../src/rotating-colors.ts";
+import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 afterEach(cleanup);
 
@@ -124,5 +126,16 @@ describe("avatar depth", () => {
     const [person, project] = Array.from(container.querySelectorAll(".chakra-avatar__root"));
     expect(person?.hasAttribute("data-lifted")).toBe(true);
     expect(project?.hasAttribute("data-lifted")).toBe(false);
+  });
+});
+
+describe("UserAvatar asked to colour itself from the name", () => {
+  /** @scenario "A person with no photo can take the hue hashed from their name" */
+  it("fills the bubble with the avatar hue for that name", () => {
+    const { container } = renderWithDesignSystem(<UserAvatar name="Ada Lovelace" colorFromName />);
+    const root = container.querySelector(".chakra-avatar__root") as HTMLElement;
+    const hue = getAvatarFillForString("Ada Lovelace").replace(".", "-");
+
+    expect(getComputedStyle(root).background).toContain(`--chakra-colors-${hue}`);
   });
 });

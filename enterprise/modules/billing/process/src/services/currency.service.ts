@@ -64,38 +64,6 @@ export class CurrencyService {
     return EUR_COUNTRIES.has(countryCode.toUpperCase()) ? Currency.EUR : Currency.USD;
   }
 
-  /**
-   * Extract client IP from request headers.
-   * Tries CDN/proxy headers in order of preference: CF, real-ip, forwarded-for.
-   */
-  private static clientIp(req: CurrencyRequest | undefined): string | null {
-    if (!req?.headers) {
-      return null;
-    }
-
-    const cfIp = req.headers["cf-connecting-ip"];
-    if (cfIp) {
-      return Array.isArray(cfIp) ? (cfIp[0] ?? null) : cfIp;
-    }
-
-    const realIp = req.headers["x-real-ip"];
-    if (realIp) {
-      return Array.isArray(realIp) ? (realIp[0] ?? null) : realIp;
-    }
-
-    const forwarded = req.headers["x-forwarded-for"];
-    if (forwarded) {
-      const first = Array.isArray(forwarded) ? (forwarded[0] ?? null) : forwarded;
-      if (!first) {
-        return null;
-      }
-
-      return first.split(",")[0]?.trim() ?? null;
-    }
-
-    return null;
-  }
-
   private static is172Private(ip: string): boolean {
     const parts = ip.split(".");
     if (parts[0] !== "172") {
@@ -143,8 +111,8 @@ export class CurrencyService {
       };
     }
 
-    // 2. Try geoip lookup from client IP
-    const ip = CurrencyService.clientIp(req);
+    // 2. Geoip lookup on the address the door resolved; no address header is read here
+    const ip = req?.callerAddress ?? null;
 
     if (!ip || CurrencyService.isLocalIp(ip)) {
       return { currency: DEFAULT_CURRENCY, country: null };

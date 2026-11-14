@@ -119,3 +119,31 @@ describe("given the custom graph address naming a graph", () => {
     });
   });
 });
+
+describe("given a stored graph the chart builder cannot open", () => {
+  describe("when the browser opens it with Dashboards reachable", () => {
+    /** @scenario "AC3o A custom graph that cannot be opened still carries the legacy banner" */
+    it("says so and still carries the legacy banner", async () => {
+      stored.current = { name: "Odd", graph: { graphType: "not-a-graph-type" } };
+      const EditGraphScreen = await loadScreen("pages/[project]/analytics/custom/[id]");
+
+      render(
+        <AnalyticsTestHarness
+          host={
+            new StubAnalyticsHost({
+              route: { params: { id: "graph_1" }, query: {} },
+              flags: { release_dashboards: true },
+            })
+          }
+        >
+          <EditGraphScreen />
+        </AnalyticsTestHarness>,
+      );
+
+      expect(
+        await screen.findByText(/saved in a shape the chart builder cannot open/),
+      ).toBeInTheDocument();
+      expect(screen.getByTestId("legacy-analytics-banner")).toBeInTheDocument();
+    });
+  });
+});

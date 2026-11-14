@@ -1,4 +1,5 @@
 import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
+import { ClientAddress } from "@langwatch/api/policy";
 /**
  * @vitest-environment node
  * `POST /api/otel/v1/{...}` against the COMPOSITION-built app and
@@ -15,6 +16,7 @@ import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type * as Observability from "@langwatch/observability";
+import { resetIngestDoorRefusalLog } from "@langwatch/otlp";
 import { LocalFeatureApis, type FeatureTransportDescriptor } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { ShareApi } from "@langwatch/share-contract";
@@ -23,9 +25,10 @@ import type * as TestHarness from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { TraceApi, type RecordSpanCommandData } from "@langwatch/trace-contract";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fakeTraceProcessingCommands } from "../../__tests__/support/trace-processing-commands.fake.ts";
+import { braidTwins } from "../../app/__tests__/support/trace-app.harness.ts";
 import { TraceModule } from "../../app/trace.app.ts";
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
@@ -163,6 +166,7 @@ function deployment(
   const canonicalisation = TraceCanonicalisationService.create();
   const app = TraceModule.fromDependencies(
     TraceModule.composeDependencies({
+      ...braidTwins(),
       repositories: MemoryTraceRepositories.create(),
       storedObjects: createApiFixture<StoredObjectApi>(),
       canonicalisation,
@@ -246,7 +250,17 @@ function deployment(
       for (const [name, value] of Object.entries({ "X-Auth-Token": TOKEN, ...headers })) {
         if (value !== null) sent[name] = value;
       }
-      return family.request(path, { method: "POST", headers: sent, body: JSON.stringify(body) });
+      const request = new Request(`http://localhost${path}`, {
+        method: "POST",
+        headers: sent,
+        body: JSON.stringify(body),
+      });
+      // As the process's mux does, behind a declared ingress at 10.0.0.1.
+      ClientAddress.fromTrustedProxies({ addresses: ["10.0.0.0/8"] }).handle({
+        request,
+        socketAddress: "10.0.0.1",
+      });
+      return family.request(request);
     }
 
     // Nothing mounted: the same 404 an exporter met while this family was
@@ -307,6 +321,9 @@ function otlpTraceBody(count = 1) {
 }
 
 describe("given the trace module as a process composes it", () => {
+  // Refusal lines are sampled per caller; each scenario starts with a quiet throttle.
+  beforeEach(() => resetIngestDoorRefusalLog());
+
   describe("when an OTLP exporter posts a trace batch to /api/otel/v1/traces", () => {
     /** @scenario "The OTLP receiver accepts an exported trace batch" */
     it("accepts the batch", async () => {
@@ -340,12 +357,13 @@ describe("given the trace module as a process composes it", () => {
 
   describe("when the pipeline handoff fails for every span of the batch", () => {
     /** @scenario "A failed pipeline handoff answers the OTLP export as retryable" */
-    it("answers 503 without a partial success, so the exporter retries", async () => {
+    it("answers 503 with Retry-After and no partial success, so the exporter retries", async () => {
       const { post, recordedSpans } = deployment({}, { fails: true });
 
       const response = await post("/api/otel/v1/traces", otlpTraceBody());
 
       expect(response.status).toBe(503);
+      expect(response.headers.get("retry-after")).toBe("5");
       expect(await response.json()).not.toHaveProperty("partialSuccess");
       expect(recordedSpans).toHaveLength(0);
     });
@@ -455,6 +473,7 @@ describe("given the trace module as a process composes it", () => {
       doorLog.lines.filter((line) => line.msg?.startsWith("Authentication failed"));
 
     /** @scenario A request with no credential header is logged with its fingerprint */
+    /** @scenario "Authentication diagnostics record the resolved address" */
     it("carries the request's fingerprint and says no empty token was sent", async () => {
       const { post } = deployment();
       doorLog.lines.length = 0;
@@ -474,7 +493,7 @@ describe("given the trace module as a process composes it", () => {
         method: "POST",
         userAgent: "otel-exporter/1.2",
         traceparent: "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
-        forwardedFor: "203.0.113.9",
+        clientAddress: "203.0.113.9",
         hasEmptyAuthToken: false,
       });
     });
@@ -489,6 +508,7 @@ describe("given the trace module as a process composes it", () => {
       expect(refusals()).toHaveLength(1);
       expect(refusals()[0]).toMatchObject({
         msg: "Authentication failed: X-Auth-Token sent but empty",
+        level: 40,
         hasEmptyAuthToken: true,
       });
     });

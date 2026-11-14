@@ -11,6 +11,8 @@ export const BOARD_LWQL_VIEWS = [
   "simulations",
   "spans",
   "topics",
+  "trace_evaluation_checks",
+  "trace_evaluation_metrics",
   "trace_metrics",
   "trace_metrics_by_minute",
   "traces",

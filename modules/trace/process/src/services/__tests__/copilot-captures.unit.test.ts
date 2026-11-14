@@ -5,6 +5,7 @@ import cliChatSpan from "./fixtures/copilot-cli-b.chat.json";
 import cliToolSpan from "./fixtures/copilot-cli-b.execute-tool.json";
 import cliAgentWithGitSpan from "./fixtures/copilot-cli-b.invoke-agent.git-context.json";
 import cliAgentSpan from "./fixtures/copilot-cli-b.invoke-agent.json";
+import vscodeChatSpan from "./fixtures/copilot-vscode-b.chat.json";
 import vscodeToolSpan from "./fixtures/copilot-vscode-b.execute-tool.json";
 import vscodeAgentSpan from "./fixtures/copilot-vscode-b.invoke-agent.json";
 
@@ -81,6 +82,25 @@ describe("Copilot canonicalisation over real captures", () => {
       it("carries the repository and organization as metadata", () => {
         expect(attributes["metadata.copilot_repository"]).toBe("example-org/repo-a");
         expect(attributes["metadata.copilot_organization"]).toBe("example-org");
+      });
+    });
+  });
+
+  describe("given a chat span captured from VS Code Copilot Chat 0.67", () => {
+    describe("when the canonicalisation chain runs", () => {
+      const attributes = canonicalizeCaptured(vscodeChatSpan);
+
+      /** @scenario A VS Code turn is recorded without a fabricated dollar cost */
+      it("carries the token counts", () => {
+        expect(attributes["gen_ai.usage.input_tokens"]).toBe(24441);
+        expect(attributes["gen_ai.usage.output_tokens"]).toBe(87);
+      });
+
+      /** @scenario A VS Code turn is recorded without a fabricated dollar cost */
+      it("records the AI-unit count under the CLI's key, never as a dollar cost", () => {
+        expect(attributes["metadata.copilot_nano_aiu"]).toBe("309855000");
+        expect(attributes["copilot_chat.copilot_usage_nano_aiu"]).toBeUndefined();
+        expect(attributes["langwatch.span.cost"]).toBeUndefined();
       });
     });
   });

@@ -1,3 +1,4 @@
+import { callerAddressOfRequest } from "@langwatch/api/rest";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import type { RumApi, RumConfig } from "@langwatch/rum-contract";
 
@@ -11,4 +12,5 @@ export const rumProcessModule: PublishedProcessModule<"rum", RumApi, RumConfig> 
     .withRepositories(rumRepositories)
     .withChannels(rumChannels)
     .withApi(RumModule)
-    .withTransports(rumRest);
+    .withTransports(rumRest)
+    .provideMiddlewareContext({ callerAddress: callerAddressOfRequest });

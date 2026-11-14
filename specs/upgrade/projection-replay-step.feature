@@ -165,3 +165,80 @@ Feature: A module fills a new read model at deploy by replaying a projection lan
     Given a projection replay step declared with a trailing pass
     When it runs as a dry run, or its signal aborts during the first pass
     Then the lane is replayed only once
+
+  # A reader that shows where a replayed lane's history starts reads it from the step (analytics ADR-006).
+
+  @unit
+  Scenario: A replay step's report keeps the instant its lane was first replayed from
+    Given a projection replay step that completed and runs again from its cursor
+    When the worker runs it
+    Then every report it saves and returns names the instant its first run replayed from
+
+  # A heavy tenant's batch can outgrow ClickHouse's per-query memory limit on its event query.
+  # That is a size failure: a fold lane splits its batch in halves down to one aggregate.
+  # Unlike the group queue's bisection (LANGWATCH_GQ_BISECTION_SPLIT_BUDGET), it has no budget;
+  # its depth is bounded by log2 of the batch size. A map lane writes rows mid-stream, so it splits
+  # only before its first write (a rerun half would append twice). Other failures stop as before.
+
+  @unit
+  Scenario: A batch over the query memory limit is split until it fits
+    Given a fold lane's batch whose event query outgrows ClickHouse's per-query memory limit
+    When the step replays the lane
+    Then the batch's markers are cleared and it is replayed as two halves, each split again until it fits
+    And every aggregate's read model equals a replay that never hit the limit
+
+  @unit
+  Scenario: A batch that hits the query memory limit mid-stream is not applied twice
+    Given a fold lane's batch whose event query hits the memory limit after some of its events were read
+    When the step replays the lane
+    Then nothing of the failed attempt is written
+    And every aggregate's read model equals a replay that never hit the limit
+
+  @unit
+  Scenario: A single aggregate still over the query memory limit fails the lane by name
+    Given an aggregate whose own event query outgrows the per-query memory limit
+    When the step replays the lane
+    Then the lane fails with the original error, naming the aggregate's type and id
+    And the message names no tenant
+
+  @unit
+  Scenario: A worker stop between the halves of a split batch ends the replay
+    Given a fold lane's batch split for the query memory limit whose first half completed
+    When the worker stops before the second half starts
+    Then the replay ends with the stop and the second half is not replayed
+    And the lane's live delivery is resumed
+
+  @unit
+  Scenario: A batch failing for any other reason fails the lane without splitting
+    Given a batch whose event query fails with an error other than the per-query memory limit
+    When the step replays the lane
+    Then the lane fails on that batch with its error and no half is replayed
+
+  @unit
+  Scenario: A map lane over the query memory limit before writing a row is split until it fits
+    Given a map lane's batch whose event query outgrows ClickHouse's per-query memory limit
+    And the batch has written none of its rows when the limit is hit
+    When the step replays the lane
+    Then the batch's markers are cleared and it is replayed as two halves, each split again until it fits
+    And every row is written once, as a replay that never hit the limit writes them
+
+  @unit
+  Scenario: A map lane over the query memory limit after writing rows fails without splitting
+    Given a map lane's batch whose event query outgrows ClickHouse's per-query memory limit
+    And the batch has already written some of its rows when the limit is hit
+    When the step replays the lane
+    Then the lane fails on that batch with its error and no half is replayed
+
+  @unit
+  Scenario: A map lane over the query memory limit while flushing its rows fails without splitting
+    Given a map lane's batch whose rows are buffered when the final flush hits the per-query memory limit
+    When the step replays the lane
+    Then the lane fails on that batch with its error and no half is replayed
+
+  @unit
+  Scenario: A tenant stream still running when another hits the query memory limit writes no row of its own
+    Given a map lane's batch spanning two tenants whose event streams run side by side
+    And one tenant's stream hits the memory limit while the other is still reading more rows than a drain holds
+    When the step replays the lane
+    Then the other tenant's stream stops before the batch is split
+    And every row is written once, as a replay that never hit the limit writes them

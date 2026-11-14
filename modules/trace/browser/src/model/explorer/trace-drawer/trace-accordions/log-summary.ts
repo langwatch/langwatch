@@ -1,4 +1,8 @@
-import { type CodingAgentEvent, normalizeEventName } from "@langwatch/coding-agent-contract";
+import {
+  type CodingAgentEvent,
+  normalizeEventName,
+  toolDecisionOutcome,
+} from "@langwatch/coding-agent-contract";
 import type { TraceLogRecordDto } from "@langwatch/trace-contract";
 
 /**
@@ -88,10 +92,20 @@ function describeToolEvent({
     case "tool_result":
       return `Tool ran${attrs.tool_name ? `: ${attrs.tool_name}` : ""}`;
     case "tool_decision": {
-      const decision = attrs.decision ?? "unknown";
       const tool = attrs.tool_name ?? "a tool";
-      if (decision === "accept") return `Approved ${tool}`;
-      return `Denied ${tool}${attrs.source ? ` (${attrs.source})` : ""}`;
+      const source = attrs.source ? ` (${attrs.source})` : "";
+      switch (decisionOutcome(attrs)) {
+        case "allowed":
+          return `Approved ${tool}`;
+        case "redirected":
+          return `Answered instead of approving ${tool}`;
+        case "aborted":
+          return `Aborted ${tool}${source}`;
+        case "denied":
+          return `Denied ${tool}${source}`;
+        case "unknown":
+          return `Decided on ${tool}${attrs.decision ? ` (${attrs.decision})` : ""}`;
+      }
     }
     case "permission_mode_changed":
       return `Approval mode changed to ${attrs.to_mode ?? "unknown"}`;
@@ -210,7 +224,7 @@ export function logEventTone(log: TraceLogRecordDto): LogEventTone {
   if (event === null) return "neutral";
   switch (event) {
     case "tool_decision":
-      return log.attributes.decision === "accept" ? "neutral" : "danger";
+      return decisionOutcome(log.attributes) === "denied" ? "danger" : "neutral";
     case "tool_result":
       return log.attributes.error_type || log.attributes.success === "false" ? "danger" : "neutral";
     case "api_error":
@@ -224,4 +238,9 @@ export function logEventTone(log: TraceLogRecordDto): LogEventTone {
     default:
       return "neutral";
   }
+}
+
+/** Each agent spells its decisions differently; the contract reads them all. */
+function decisionOutcome(attrs: Record<string, string>) {
+  return toolDecisionOutcome({ decision: attrs.decision ?? null, source: attrs.source ?? null });
 }

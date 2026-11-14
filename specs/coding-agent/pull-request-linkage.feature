@@ -425,6 +425,16 @@ Rule: A session's cost splits across the pull requests it drove, by the work sta
     When each pull request's usage is read
     Then each reports the share the row recorded under its branch
 
+  # Each counter and the cost take their ratio from the record's own figure for
+  # that counter, so a pull request priced at another rate than the session's
+  # other work reports what was recorded, as its model breakdown does.
+  @unit
+  Scenario: A session that worked on two repositories at different rates reports the recorded figures
+    Given a session whose row records work on another repository at one rate and on the pull request's branch at another
+    When the pull request's usage is read
+    Then its cost and each token count are exactly what the row recorded under that branch
+    And the pull request totals match its model breakdown
+
   @unit
   Scenario: Usage from before the session declared anything follows its first declared branch
     Given a session that spent most of its tokens before its first declaration
@@ -687,6 +697,14 @@ Rule: Each pull request reports what every model consumed
     Given a pull request whose sessions both recorded their models and logged model calls
     When the pull request usage is read
     Then the row reports each model's tokens rather than names alone
+
+  @unit
+  Scenario: A session without per-call data still names its models beside one that has them
+    Given a pull request with one session that logged model calls and one that only recorded its models
+    When the pull request usage is read
+    Then the second session's models are listed by name with unknown tokens
+    And the pull request totals are unchanged
+    And the model with per-call data stays first
 
   @integration
   Scenario: The detail names the models even without per-call data

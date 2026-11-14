@@ -41,11 +41,16 @@ import { isIsolatedConfig, type GovernanceConfig } from "./config";
 import { buildOtelEnvBlock, SOURCE_TYPE_BY_TOOL, telemetryEnvVarNames } from "./otel-env-block";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
 import { runningCodeRestartNotice } from "./running-code";
-import { installSessionContextHooks, removeSessionContextHooks } from "./session-context-hooks";
+import {
+  installSessionContextHooks,
+  ownedHookFileTargetFor,
+  removeSessionContextHooks,
+} from "./session-context-hooks";
 import {
   buildScopedToolFunction,
   type DetectedShell,
   assertCodexTurnHarvest,
+  assertOwnedSessionHookFile,
   persistBlockToRc,
   rcHasLangwatchBlock,
   rcLangwatchBlockUrls,
@@ -497,6 +502,14 @@ function ensureCodexHooks(): void {
   assertCodexAgentGuidance();
 }
 
+/** Re-asserts a tool's own hook file (Copilot) where its scoped function is persisted. */
+function ensureOwnedSessionHookFile(tool: string): void {
+  if (!ownedHookFileTargetFor({ command: tool })) return;
+  const markers = toolMarkers(tool);
+  if (!REFRESH_SHELLS.some((shell) => rcHasLangwatchBlock({ shell, markers }))) return;
+  assertOwnedSessionHookFile({ tool });
+}
+
 function rewriteToolWiring({
   cfg,
   tool,
@@ -569,6 +582,8 @@ async function refreshToolForLogin({
   // A config already pointing at this login skips the refresh below, so a device whose
   // [otel] block predates either would never be given one; both calls are idempotent.
   if (tool === "codex") ensureCodexHooks();
+  // Copilot's own hook file is the same kind of companion, so it stands here too.
+  ensureOwnedSessionHookFile(tool);
   if (cfg.tool_project_keys?.[tool]?.secret) {
     // Project-pinned wiring is deliberate scope, not stale personal
     // wiring; a new login never re-points it at the personal path.

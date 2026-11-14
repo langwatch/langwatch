@@ -44,6 +44,10 @@ export const storedObjectTestAddress: StoredObjectStorageAddress = {
 
 export class MemoryStoredObjectStorage extends StoredObjectBytesRepository {
   bytes = new Uint8Array([1, 2, 3]);
+  held = true;
+  opened = 0;
+  /** A stream to hand over instead of `bytes`, as the object-storage member does. */
+  stream: AsyncIterable<Uint8Array> | null = null;
   deleted = false;
   deleteFailuresRemaining = 0;
 
@@ -69,7 +73,13 @@ export class MemoryStoredObjectStorage extends StoredObjectBytesRepository {
     return { byteLength: 3, sha256: STORED_OBJECT_TEST_SHA256 };
   }
 
+  async exists() {
+    return this.held;
+  }
+
   async getBytes() {
+    this.opened += 1;
+    if (this.stream) return this.stream;
     const bytes = this.bytes;
 
     return (async function* () {

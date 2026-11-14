@@ -27,6 +27,7 @@ import { RedisOpsMetricsRepository } from "../redis/redis.ops-metrics.repository
 import { RedisOpsSnapshotRepository } from "../redis/redis.ops-snapshot.repository.ts";
 import { RedisProcessFleetReadingsRepository } from "../redis/redis.process-fleet-readings.repository.ts";
 import { ReplayRedisRepository } from "../redis/redis.replay.repository.ts";
+import { RedisSeatSharingCheckRepository } from "../redis/redis.seat-sharing-check.repository.ts";
 import { RedisStorageStatsReadingsRepository } from "../redis/redis.storage-stats-readings.repository.ts";
 import { LiveReplayRuntimeRepository } from "./live.replay-runtime.repository.ts";
 
@@ -78,6 +79,7 @@ export const LiveOpsRepositories = {
       processFleetReadings: RedisProcessFleetReadingsRepository.create({ redis }),
       cloudLatestRelease: RedisCloudLatestReleaseRepository.create({ redis }),
       cloudNotices: RedisCloudNoticeRepository.create({ redis }),
+      seatSharingChecks: RedisSeatSharingCheckRepository.create({ redis }),
       redisHealth: RedisRedisHealthRepository.create(redis),
       clickhouseHealth: ClickHouseClickHouseHealthRepository.create({ clickhouse }),
       events: EventingClickHouseEventExplorer.create({ clickhouse }),

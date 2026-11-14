@@ -4,6 +4,8 @@ export interface McpConfig {
   apiKey: string | undefined;
   endpoint: string;
   projectId?: string;
+  /** Set by the hosted MCP server, so the platform tells its calls from a local server's. */
+  hosted?: boolean;
 }
 
 // Store on globalThis to share config between CJS and ESM module instances.

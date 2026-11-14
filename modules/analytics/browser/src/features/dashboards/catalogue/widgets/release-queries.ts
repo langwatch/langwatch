@@ -158,7 +158,7 @@ const JUDGED_ROWS = `SELECT e.RunId AS run_id, ifNull(m.TopicId, '') AS topic,
 /** Production's share of traces per topic; LangWatch's own runs are left out. */
 const PRODUCTION_MIX = `SELECT ifNull(TopicId, '') AS topic, count() / sum(count()) OVER () AS share
   FROM trace_metrics
-  WHERE ${inPeriod("OccurredAt")} AND Origin IN ('', 'application')
+  WHERE ${inPeriod("OccurredAt")}
   GROUP BY topic`;
 
 /**

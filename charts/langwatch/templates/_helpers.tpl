@@ -1110,6 +1110,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 - name: S3_BUCKET_NAME
   value: {{ .Values.app.dataplane.bucket | quote }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_ENDPOINT" "fieldValues" .Values.app.dataplane.providers.awsS3.endpoint) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "S3_REGION" "fieldValues" .Values.app.dataplane.providers.awsS3.region) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_ACCESS_KEY_ID" "fieldValues" .Values.app.dataplane.providers.awsS3.accessKeyId) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_SECRET_ACCESS_KEY" "fieldValues" .Values.app.dataplane.providers.awsS3.secretAccessKey) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_KEY_SALT" "fieldValues" .Values.app.dataplane.providers.awsS3.keySalt) }}
@@ -1156,6 +1157,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 - name: S3_BUCKET_NAME
   value: {{ .Values.app.dataplane.legacyS3ReadBucket | quote }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_ENDPOINT" "fieldValues" .Values.app.dataplane.providers.awsS3.endpoint) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "S3_REGION" "fieldValues" .Values.app.dataplane.providers.awsS3.region) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_ACCESS_KEY_ID" "fieldValues" .Values.app.dataplane.providers.awsS3.accessKeyId) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_SECRET_ACCESS_KEY" "fieldValues" .Values.app.dataplane.providers.awsS3.secretAccessKey) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_KEY_SALT" "fieldValues" .Values.app.dataplane.providers.awsS3.keySalt) }}
@@ -1638,6 +1640,23 @@ containers:
 {{- printf "%s|%s|%s" .Chart.Version (.Chart.AppVersion | default "") (toJson .Values) | sha256sum -}}
 {{- end -}}
 
+{{- /* Node sizes its heap at about half the memory it sees, so a 4Gi process
+       died of heap exhaustion with 2 GiB of its container free. Three quarters
+       leaves a quarter outside the heap. Only with a limit (without one the
+       percentage is of the node), never beside an operator's NODE_OPTIONS, and
+       not when global.nodeHeapCeiling.enabled is false. specs/setup/helm-heap-ceiling.feature */}}
+{{- define "langwatch.heapCeilingEnv" -}}
+{{- $operatorNodeOptions := false }}
+{{- range .extraEnvs }}
+{{- if eq (toString .name) "NODE_OPTIONS" }}{{- $operatorNodeOptions = true }}{{- end }}
+{{- end }}
+{{- $enabled := dig "nodeHeapCeiling" "enabled" true (.global | default dict) }}
+{{- if and $enabled (dig "limits" "memory" "" (.resources | default dict)) (not $operatorNodeOptions) }}
+- name: NODE_OPTIONS
+  value: "--max-old-space-size-percentage=75"
+{{- end }}
+{{- end }}
+
 {{/* The worker container: the workers Deployment, or a sidecar in each app pod when workers.enabled is false. */}}
 {{- define "langwatch.workersContainer" -}}
 - name: {{ .Release.Name }}-workers
@@ -1657,19 +1676,27 @@ containers:
       value: {{ .Values.workers.otel.serviceName | default "langwatch-workers" | quote }}
     - name: LANGWATCH_ENDPOINT
       value: {{ .Values.workers.upstreams.langwatch.scheme | default "http" }}://{{ .Values.workers.upstreams.langwatch.name | default (printf "%s-app" .Release.Name) }}:{{ .Values.workers.upstreams.langwatch.port | default 5560 }}
+    {{- include "langwatch.heapCeilingEnv" (dict "global" .Values.global "resources" .Values.workers.resources "extraEnvs" (concat (default (list) .Values.app.extraEnvs) (default (list) .Values.workers.extraEnvs))) | nindent 4 }}
     {{- /* Everything the app is given beyond its port and its own address:
            the worker parses the same config over the same modules (Alex,
            2026-09-30), including the Langy pair its turns are dispatched
-           with. app.extraEnvs reaches it too; workers.extraEnvs renders
-           after and so wins a duplicate. */}}
+           with. app.extraEnvs reaches it too, minus any name workers.extraEnvs
+           also sets: a duplicate env name breaks `helm upgrade` (strategic
+           merge patch refuses it), so the workers value is the only one. */}}
     {{- include "langwatch.processEnv" . | nindent 4 }}
     {{- if and (not .Values.workers.enabled) .Values.app.telemetry.metrics.enabled }}
     # Sidecar: the api in this pod holds 9464, so the worker scrapes on 9465 (SIDECAR-METRICS-9465).
     - name: OTEL_EXPORTER_PROMETHEUS_PORT
       value: "9465"
     {{- end }}
-    {{- with .Values.app.extraEnvs}}
-    {{- toYaml . | nindent 4 }}
+    {{- $workerEnvNames := list }}
+    {{- range (default (list) .Values.workers.extraEnvs) }}
+    {{- $workerEnvNames = append $workerEnvNames .name }}
+    {{- end }}
+    {{- range (default (list) .Values.app.extraEnvs) }}
+    {{- if not (has .name $workerEnvNames) }}
+    {{- toYaml (list .) | nindent 4 }}
+    {{- end }}
     {{- end }}
     {{- with .Values.workers.extraEnvs}}
     {{- include "langwatch.assertNoReservedTimeoutEnvs" (dict "envs" . "path" "workers.extraEnvs") }}
@@ -2016,6 +2043,10 @@ here, once, by name, so both consuming templates agree.
 {{- with .Values.app.trustedProxyAddresses }}
 - name: TRUSTED_PROXY_ADDRESSES
   value: {{ . | quote }}
+{{- end }}
+{{- if .Values.app.trustCloudflareClientIp }}
+- name: TRUST_CLOUDFLARE_CLIENT_IP
+  value: "true"
 {{- end }}
 
 # Content-hashed asset base (ADR-086). Empty by default → assets are

@@ -11,10 +11,37 @@ export const codingAgentSchema = z.enum([
   "codex",
   "gemini_cli",
   "copilot",
+  "grok",
+  "pi",
   "unknown",
 ]);
 
 export type CodingAgent = z.infer<typeof codingAgentSchema>;
+
+/**
+ * The terminals a session can name to peers. `terminal.type` is a client string, so a peer only
+ * ever sees one of these; `other` is an honest answer, and the set caps any list built from it.
+ */
+export const codingTerminalSchema = z.enum([
+  "vscode",
+  "cursor",
+  "windsurf",
+  "zed",
+  "jetbrains",
+  "iterm",
+  "apple_terminal",
+  "ghostty",
+  "kitty",
+  "alacritty",
+  "wezterm",
+  "warp",
+  "tmux",
+  "windows_terminal",
+  "xterm",
+  "other",
+]);
+
+export type CodingTerminal = z.infer<typeof codingTerminalSchema>;
 
 /**
  * The canonical event kinds. Every agent's event name maps onto one of these, or
@@ -163,7 +190,42 @@ export interface CodingAgentDefinition {
 
   /** Events-only telemetry: session fold gets model calls and tool runs from LOG events. */
   logsOnly?: boolean;
+
+  /**
+   * The log event's `input_tokens` already includes `cache_read_tokens`. The log-facts rule
+   * restates it as fresh input, since the fold sums the buckets as disjoint (Claude's shape).
+   */
+  logInputIncludesCacheRead?: boolean;
+
+  /** The log attribute carrying cost in micro-dollars; restated as `cost_usd` before the fold. */
+  logCostUsdMicrosAttribute?: string;
+
+  /**
+   * For agents naming spans `{gen_ai.operation.name} {target}`: the operation behind each session
+   * role. A span joins when its name's first word is declared here and its scope detects this
+   * agent.
+   */
+  genAiOperations?: Readonly<Record<GenAiOperationRole, string>>;
+
+  /** A span without the provider session key is not session activity: no trace-id fallback. */
+  spansRequireSessionKey?: boolean;
+
+  /**
+   * Model calls arrive on spans only, never as log events: the per-call fact table takes this
+   * agent's rows from its declared model-call spans. Agents that log their calls never set it, so
+   * no call is written twice.
+   */
+  modelCallsOnSpansOnly?: boolean;
+
+  /** Per-model-call attributes carrying the agent's AI units in nano units; first present wins. */
+  nanoAiUnitAttributes?: readonly string[];
+
+  /** The row's entrypoint (its surface) per source type the ingest-key receiver stamps. */
+  surfaceBySourceType?: Readonly<Record<string, string>>;
 }
+
+/** The part a span plays in its session: the root, one model call, or one tool run. */
+export type GenAiOperationRole = "session" | "modelCall" | "toolRun";
 
 /**
  * Claude Code (CLI): namespaces under `claude_code.`, scope
@@ -202,4 +264,12 @@ export const copilotAgent: CodingAgentDefinition = {
     session_compaction_complete: "compaction",
     skill_invoked: "skill_activated",
   },
+
+  // ADR-039 §Extension: the root's usage is the rollup of its chat calls, so only chat counts.
+  genAiOperations: { session: "invoke_agent", modelCall: "chat", toolRun: "execute_tool" },
+  spansRequireSessionKey: true,
+  modelCallsOnSpansOnly: true,
+  // The canonicaliser lifts both surfaces' raw counts onto this one key.
+  nanoAiUnitAttributes: ["metadata.copilot_nano_aiu"],
+  surfaceBySourceType: { copilot_cli: "cli", copilot_vscode: "vscode" },
 };

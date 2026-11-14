@@ -67,14 +67,15 @@ import {
 import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
+import type { AuthzAggregateReadAuditService } from "../features/read-audit/services/authz-aggregate-read-audit.service.ts";
 import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
 import type { AuthzLineageEpochRepository } from "../repositories/authz-lineage-epoch.repository.ts";
 import type { AuthzListingRepository } from "../repositories/authz-listing.repository.ts";
 import type { AuthzManagedGrantRepository } from "../repositories/authz-managed-grant.repository.ts";
+import type { AuthzOrganizationPolicyRepository } from "../repositories/authz-organization-policy.repository.ts";
 import type { AuthzReadRepository } from "../repositories/authz-read.repository.ts";
 import { findPermissionsBeyondHeld } from "../rules/grant-escalation.rules.ts";
 import { AuthorizationService } from "./authorization.service.ts";
-import type { AuthzAggregateReadAuditService } from "./authz-aggregate-read-audit.service.ts";
 import { AuthzCollectorService } from "./authz-collector.service.ts";
 import { AuthzDecisionService } from "./authz-decision.service.ts";
 import { AuthzGrantReaderService } from "./authz-grant-reader.service.ts";
@@ -99,6 +100,9 @@ type CheckArgs = {
 
 export type AuthzServiceOptions = {
   repository: AuthzReadRepository;
+  /** The organisation's settings read into each snapshot (ADR-201 §2); required, never off by
+   *  omission. */
+  policies: Pick<AuthzOrganizationPolicyRepository, "getPolicy">;
   listing: AuthzListingRepository;
   bindings: AuthzManagedGrantRepository;
   /** Omitted = never cache. */
@@ -142,6 +146,7 @@ export class AuthzService {
     const collector = AuthzCollectorService.create({
       reader: options.repository,
       lineage: scopeLineage,
+      policies: options.policies,
     });
 
     return new AuthzService({
@@ -275,6 +280,14 @@ export class AuthzService {
     scope: AuthzScopeRef;
   }): Promise<AuthzPermission[]> {
     return this.decisionCore.effectivePermissions(args);
+  }
+
+  /** The set at a scope and at its organization, from one snapshot; see AuthzDecisionService. */
+  effectivePermissionsWithOrganization(args: {
+    principal: AuthzPrincipalRef;
+    scope: AuthzScopeRef;
+  }): Promise<{ permissions: AuthzPermission[]; organizationPermissions: AuthzPermission[] }> {
+    return this.decisionCore.effectivePermissionsWithOrganization(args);
   }
 
   /**

@@ -8,16 +8,14 @@ export const RUM_GLOBAL_PER_MINUTE = 6_000;
 export const RUM_RATE_LIMIT_WINDOW_SECONDS = 60;
 export const RUM_GLOBAL_RATE_LIMIT_KEY = "rum:global";
 
-/** The session the browser sent, else the nearest hop's address: the last entry is ours. */
+/** The session the browser sent, else the address the door resolved; no header is read here. */
 export function rumCallerKey({
   session,
-  forwardedFor,
-}: Readonly<{ session: string | undefined; forwardedFor: string | undefined }>): string {
+  callerAddress,
+}: Readonly<{ session: string | undefined; callerAddress: string | null }>): string {
   if (session) return `session:${session.slice(0, 64)}`;
 
-  const hops = forwardedFor?.split(",") ?? [];
-  const nearest = hops[hops.length - 1]?.trim();
-  return `ip:${nearest ?? "unknown"}`;
+  return `ip:${callerAddress ?? "unknown"}`;
 }
 
 export function rumCallerRateLimitKey(callerKey: string): string {

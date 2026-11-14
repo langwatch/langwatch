@@ -29,6 +29,7 @@ import {
   projectMetadataGroupKey,
 } from "./project-metadata.subscriber.ts";
 import { SPAN_STORAGE_BROADCAST_DEDUP_TTL_MS } from "./span-storage-broadcast.subscriber.ts";
+import { isNewlyFailedTrace, TRACE_FAILED_DEDUP } from "./trace-failed.subscriber.ts";
 import type {
   TraceProcessingPipelineDefinition,
   EventingTracePipelineAdapter,
@@ -56,6 +57,7 @@ interface TraceProcessingReactions {
   trackedEventSync: SummaryHandler;
   traceUpdateBroadcast: SummaryHandler;
   projectMetadata: SummaryHandler;
+  traceFailed: SummaryHandler;
   spanStorageBroadcast: (
     event: TraceProcessingEvent,
     context: TriggerContext<unknown>,
@@ -148,6 +150,15 @@ export function buildTraceProcessingConsumer(
         windowMs: PROJECT_METADATA_WINDOW_MS,
       }),
       handler: (event, context) => reactions.projectMetadata(event, context),
+    })
+    .withProjectionSubscriber("traceFailed", {
+      fold: "traceSummary",
+      events: [SPAN_RECEIVED_EVENT_TYPE],
+      runIn: ["worker"],
+      when: (event, context) =>
+        isNewlyFailedTrace({ event, state: context.state, now: nowInstant().epochMilliseconds }),
+      dedup: TRACE_FAILED_DEDUP,
+      handler: (event, context) => reactions.traceFailed(event, context),
     })
     .withProjectionSubscriber("spanStorageBroadcast", {
       map: "spanStorage",

@@ -68,7 +68,7 @@ Feature: TypeScript 7 is the compiler
   @unit
   Scenario: The superseded preview compiler is gone
     Given TypeScript 7 is released
-    Then no workspace package declares `@typescript/native-preview`; the root keeps it for tslsp-cli (round 41)
+    Then no workspace package declares `@typescript/native-preview`; the root keeps it as the language server tsrs falls back to (round 41)
 
   # Gap: main's tsAst helper (parseSourceText) was deleted in 0affb6cbab; no helper parses source text that has no file.
   @unit @unimplemented
