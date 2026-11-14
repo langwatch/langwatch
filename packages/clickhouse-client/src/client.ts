@@ -438,7 +438,7 @@ export class ClickHouseQueryClient {
     const result = await this.boundedOrPlain<Row>({
       request: {
         ...sent,
-        tenantId: statement.routeTenantId,
+        tenantId: statement.tenantId,
         tenantIds: statement.tenantIds,
         builtTenantColumns: statement.tenantColumns,
         settings: settingsWithinExpiry({
