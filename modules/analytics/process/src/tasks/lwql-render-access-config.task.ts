@@ -22,6 +22,11 @@ import {
   type LwqlAccessModelDefinition,
   type RenderedConfigFile,
 } from "../services/langwatch-ql-access-model-definition.service.ts";
+import {
+  appReaderInputOf,
+  planAppReaderWalk,
+  SHARED_APP_READER_TARGET,
+} from "./lwql-provision.task.ts";
 
 const logger = createLogger("langwatch:tasks:lwql-render-access-config");
 const accessModelDefinition = LangWatchQLAccessModelDefinitionService.create();
@@ -55,7 +60,24 @@ export function lwqlAccessModelDefinitionFromSource(
     },
     namedCollectionAliases: collectionBinding.renderedCollectionAliases({ names }),
     sourceDatabase: names.database,
+    ...appReaderFromSource(source),
   });
+}
+
+/**
+ * The shared server's readers once `CLICKHOUSE_READER_URL` is set, read as the upgrade walk reads
+ * them, with its enforce switch (ADR-202 slice 4). A reader it cannot render is refused by name.
+ */
+export function appReaderFromSource(source: Record<string, string | undefined>): {
+  appReader?: ReturnType<typeof appReaderInputOf>;
+} {
+  const walk = planAppReaderWalk({ source });
+  const refused = walk.unprovisioned.find(({ target }) => target === SHARED_APP_READER_TARGET);
+  if (refused) {
+    throw new Error(`lwql-render-access-config: the app reader needs a valid ${refused.variable}`);
+  }
+  const shared = walk.targets.find(({ target }) => target === SHARED_APP_READER_TARGET);
+  return shared ? { appReader: appReaderInputOf(shared) } : {};
 }
 
 /** Writes both files under `outDir`, owner-read-only: they carry the reader password. */

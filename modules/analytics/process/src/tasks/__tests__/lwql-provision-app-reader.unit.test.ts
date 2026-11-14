@@ -114,6 +114,49 @@ describe("planAppReaderWalk", () => {
       ]);
     });
   });
+  describe("given an enforce switch neither true nor false", () => {
+    /** @scenario "An enforce switch the upgrade cannot read is named, and its server is not provisioned" */
+    it("names the shared switch and the route's switch, provisioning neither", () => {
+      const walk = planAppReaderWalk({
+        source: {
+          CLICKHOUSE_URL: SHARED_ADMIN,
+          CLICKHOUSE_READER_URL: SHARED_READER,
+          CLICKHOUSE_TENANCY_ENFORCE: "maybe",
+          CLICKHOUSE_URL__acme__org_1: ONE_ADMIN,
+          CLICKHOUSE_READER_URL__acme__org_1: ONE_READER,
+          CLICKHOUSE_TENANCY_ENFORCE__acme__org_1: "yes",
+        },
+      });
+
+      expect(walk.targets).toEqual([]);
+      expect(walk.unprovisioned).toEqual([
+        { target: "shared", variable: "CLICKHOUSE_TENANCY_ENFORCE" },
+        { target: "org_1", variable: "CLICKHOUSE_TENANCY_ENFORCE__acme__org_1" },
+      ]);
+    });
+  });
+
+  describe("given two organisations on one server with different enforce switches", () => {
+    /** @scenario "An enforce switch the upgrade cannot read is named, and its server is not provisioned" */
+    it("provisions the first and names the second's switch, never replacing its profile", () => {
+      const walk = planAppReaderWalk({
+        source: {
+          CLICKHOUSE_URL__acme__org_1: ONE_ADMIN,
+          CLICKHOUSE_READER_URL__acme__org_1: ONE_READER,
+          CLICKHOUSE_URL__beta__org_2: ONE_ADMIN,
+          CLICKHOUSE_READER_URL__beta__org_2: ONE_READER,
+          CLICKHOUSE_TENANCY_ENFORCE__beta__org_2: "true",
+        },
+      });
+
+      expect(walk.targets.map((target) => [target.target, target.enforce])).toEqual([
+        ["org_1", false],
+      ]);
+      expect(walk.unprovisioned).toEqual([
+        { target: "org_2", variable: "CLICKHOUSE_TENANCY_ENFORCE__beta__org_2" },
+      ]);
+    });
+  });
 });
 
 describe("convergeAppReaders", () => {
@@ -189,6 +232,53 @@ describe("convergeAppReaders", () => {
       expect(ran).toContain(`IDENTIFIED WITH sha256_hash BY '${sha256("one")}'`);
       expect(ran).toContain("ON tenantdb.stored_spans");
       expect(ran).not.toContain("langwatch_app_reader_enforcing");
+    });
+  });
+
+  describe("given the shared server's enforce switch on", () => {
+    /** @scenario "The upgrade enforces the reader's tenant set where its server's switch is on" */
+    it("pins the reader's enforce setting to 1", async () => {
+      const { open, commands } = fakeServers();
+
+      await convergeAppReaders({
+        source: {
+          CLICKHOUSE_URL: SHARED_ADMIN,
+          CLICKHOUSE_READER_URL: SHARED_READER,
+          CLICKHOUSE_TENANCY_ENFORCE: "true",
+          LWQL_ACCESS_MODEL_MODE: "sql",
+        },
+        open,
+      });
+
+      const ran = (commands.get(SHARED_ADMIN) ?? []).join("\n");
+      expect(ran).toContain("SQL_langwatch_tenancy_enforce = '1' CONST");
+      expect(ran).not.toContain("SQL_langwatch_tenancy_enforce = '0' CONST");
+    });
+  });
+
+  describe("given one route's enforce switch on and the shared server's unset", () => {
+    /** @scenario "The upgrade enforces the reader's tenant set where its server's switch is on" */
+    it("enforces on that route's server only", async () => {
+      const { open, commands } = fakeServers();
+
+      await convergeAppReaders({
+        source: {
+          CLICKHOUSE_URL: SHARED_ADMIN,
+          CLICKHOUSE_READER_URL: SHARED_READER,
+          LWQL_ACCESS_MODEL_MODE: "sql",
+          CLICKHOUSE_URL__acme__org_1: ONE_ADMIN,
+          CLICKHOUSE_READER_URL__acme__org_1: ONE_READER,
+          CLICKHOUSE_TENANCY_ENFORCE__acme__org_1: "1",
+        },
+        open,
+      });
+
+      expect((commands.get(ONE_ADMIN) ?? []).join("\n")).toContain(
+        "SQL_langwatch_tenancy_enforce = '1' CONST",
+      );
+      expect((commands.get(SHARED_ADMIN) ?? []).join("\n")).toContain(
+        "SQL_langwatch_tenancy_enforce = '0' CONST",
+      );
     });
   });
 

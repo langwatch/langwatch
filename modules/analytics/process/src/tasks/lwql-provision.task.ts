@@ -734,7 +734,10 @@ export async function findLwqlAppOwnedDrift({
 /** The stores' route families: `PRIVATE_ROUTE_ENV_PREFIX` and `READER_ROUTE_ENV_PREFIX`. */
 const SYSTEM_ROUTE_PREFIX = "CLICKHOUSE_URL__";
 const READER_ROUTE_PREFIX = "CLICKHOUSE_READER_URL__";
-const SHARED_TARGET = "shared";
+/** The enforce switch (ADR-202 Rollout 4): the shared server's, and each route's by its suffix. */
+const TENANCY_ENFORCE_VARIABLE = "CLICKHOUSE_TENANCY_ENFORCE";
+const TENANCY_ENFORCE_ROUTE_PREFIX = `${TENANCY_ENFORCE_VARIABLE}__`;
+export const SHARED_APP_READER_TARGET = "shared";
 
 /** The reader identities a config store may already define, for the statements to yield to. */
 const APP_READER_IDENTITY_NAMES = [APP_READER_NAMES, APP_READER_ENFORCING_NAMES].map((names) => ({
@@ -750,6 +753,8 @@ export interface AppReaderTarget {
   readonly readerPassword: string;
   /** The shadow sampler's reader: the shared server only. */
   readonly enforcingPassword?: string;
+  /** Its enforce switch; off keeps the reader in shadow (ADR-202 Decided 4). */
+  readonly enforce: boolean;
   /** The shared server follows `LWQL_ACCESS_MODEL_MODE`; a private route is always `sql`. */
   readonly mode: LwqlAccessModelMode;
 }
@@ -768,6 +773,41 @@ export interface AppReaderWalk {
 interface AppReaderCandidate {
   readonly target: AppReaderTarget;
   readonly variable: string;
+  readonly enforceVariable: string;
+}
+
+type TenancySwitch = "enforce" | "shadow" | "unreadable";
+
+/** `true` or `1` enforces; `false`, `0` or unset keeps shadow; anything else is unreadable. */
+function tenancySwitchOf(value: string | undefined): TenancySwitch {
+  const normalised = (value ?? "").trim().toLowerCase();
+  if (normalised === "true" || normalised === "1") return "enforce";
+  if (normalised === "" || normalised === "false" || normalised === "0") return "shadow";
+  return "unreadable";
+}
+
+/** The organization a route variable names: the suffix after its last `__`, as the router reads. */
+function routeOrganizationOf({ prefix, variable }: { prefix: string; variable: string }): string {
+  const suffix = variable.slice(prefix.length);
+  const separator = suffix.lastIndexOf("__");
+  return separator >= 0 ? suffix.slice(separator + 2) : suffix;
+}
+
+/** Each route's `CLICKHOUSE_TENANCY_ENFORCE__<label>__<orgId>`: the enforced and the unreadable. */
+function routeEnforceOf({ source }: { source: Readonly<Record<string, string | undefined>> }): {
+  enforced: ReadonlySet<string>;
+  unreadable: ReadonlyMap<string, string>;
+} {
+  const enforced = new Set<string>();
+  const unreadable = new Map<string, string>();
+  for (const [variable, value] of Object.entries(source)) {
+    if (!variable.startsWith(TENANCY_ENFORCE_ROUTE_PREFIX)) continue;
+    const organizationId = routeOrganizationOf({ prefix: TENANCY_ENFORCE_ROUTE_PREFIX, variable });
+    const tenancySwitch = tenancySwitchOf(value);
+    if (tenancySwitch === "unreadable") unreadable.set(organizationId, variable);
+    else if (tenancySwitch === "enforce") enforced.add(organizationId);
+  }
+  return { enforced, unreadable };
 }
 
 function passwordOf(url: string | undefined): string {
@@ -816,40 +856,62 @@ function sharedReader({ source }: { source: Readonly<Record<string, string | und
   const readerPassword = passwordOf(source.CLICKHOUSE_READER_URL);
   if (!source.CLICKHOUSE_URL || !readerPassword) {
     const variable = source.CLICKHOUSE_URL ? "CLICKHOUSE_READER_URL" : "CLICKHOUSE_URL";
-    return { candidates: [], unprovisioned: [{ target: SHARED_TARGET, variable }] };
+    return { candidates: [], unprovisioned: [{ target: SHARED_APP_READER_TARGET, variable }] };
+  }
+  const tenancySwitch = tenancySwitchOf(source[TENANCY_ENFORCE_VARIABLE]);
+  if (tenancySwitch === "unreadable") {
+    return {
+      candidates: [],
+      unprovisioned: [{ target: SHARED_APP_READER_TARGET, variable: TENANCY_ENFORCE_VARIABLE }],
+    };
   }
   const enforcingPassword = passwordOf(source.CLICKHOUSE_ENFORCING_READER_URL);
   const target: AppReaderTarget = {
-    target: SHARED_TARGET,
+    target: SHARED_APP_READER_TARGET,
     adminUrl: source.CLICKHOUSE_URL,
     readerPassword,
     ...(enforcingPassword ? { enforcingPassword } : {}),
+    enforce: tenancySwitch === "enforce",
     mode: selfProvisioning.accessModelMode({ source: { ...source } }),
   };
-  return { candidates: [{ target, variable: "CLICKHOUSE_READER_URL" }], unprovisioned: [] };
+  const variable = "CLICKHOUSE_READER_URL";
+  return {
+    candidates: [{ target, variable, enforceVariable: TENANCY_ENFORCE_VARIABLE }],
+    unprovisioned: [],
+  };
 }
 
 function routedReaders({
   system,
   reader,
+  enforce,
 }: {
   system: ReturnType<typeof routesOf>;
   reader: ReturnType<typeof routesOf>;
+  enforce: ReturnType<typeof routeEnforceOf>;
 }): { candidates: AppReaderCandidate[]; unprovisioned: UnprovisionedAppReader[] } {
   const candidates: AppReaderCandidate[] = [];
   const unprovisioned: UnprovisionedAppReader[] = [];
   for (const [organizationId, { url, label }] of system) {
     const variable = variableOf({ prefix: READER_ROUTE_PREFIX, organizationId, label });
     const readerPassword = passwordOf(reader.get(organizationId)?.url);
+    const unreadable = enforce.unreadable.get(organizationId);
     if (!readerPassword) unprovisioned.push({ target: organizationId, variable });
+    else if (unreadable) unprovisioned.push({ target: organizationId, variable: unreadable });
     else {
       const target: AppReaderTarget = {
         target: organizationId,
         adminUrl: url,
         readerPassword,
+        enforce: enforce.enforced.has(organizationId),
         mode: "sql",
       };
-      candidates.push({ target, variable });
+      const enforceVariable = variableOf({
+        prefix: TENANCY_ENFORCE_ROUTE_PREFIX,
+        organizationId,
+        label,
+      });
+      candidates.push({ target, variable, enforceVariable });
     }
   }
   for (const [organizationId, { label }] of reader) {
@@ -860,15 +922,17 @@ function routedReaders({
   return { candidates, unprovisioned };
 }
 
-/** One server holds one reader password: a second would replace the first one's login. */
+/** One server holds one reader and one profile: a second password or switch would replace them. */
 function onePerServer(candidates: readonly AppReaderCandidate[]): AppReaderWalk {
   const targets: AppReaderTarget[] = [];
   const unprovisioned: UnprovisionedAppReader[] = [];
-  for (const { target, variable } of candidates) {
+  for (const { target, variable, enforceVariable } of candidates) {
     const held = targets.find((other) => other.adminUrl === target.adminUrl);
     if (!held) targets.push(target);
     else if (held.readerPassword !== target.readerPassword) {
       unprovisioned.push({ target: target.target, variable });
+    } else if (held.enforce !== target.enforce) {
+      unprovisioned.push({ target: target.target, variable: enforceVariable });
     }
   }
   return { targets, unprovisioned };
@@ -889,6 +953,7 @@ export function planAppReaderWalk({
   const routed = routedReaders({
     system: routesOf({ source, prefix: SYSTEM_ROUTE_PREFIX }),
     reader,
+    enforce: routeEnforceOf({ source }),
   });
   const walk = onePerServer([...shared.candidates, ...routed.candidates]);
   return {
@@ -901,7 +966,22 @@ function sha256Hex(password: string): string {
   return createHash("sha256").update(password).digest("hex");
 }
 
-/** The reader's DDL on one server, in shadow (ADR-202 Decided 4); rendered files own it there. */
+/** The definition service's reader input for one target: the hashes and the enforce switch. */
+export function appReaderInputOf(target: AppReaderTarget): {
+  passwordSha256Hex: string;
+  enforce: boolean;
+  enforcing?: { passwordSha256Hex: string };
+} {
+  return {
+    passwordSha256Hex: sha256Hex(target.readerPassword),
+    enforce: target.enforce,
+    ...(target.enforcingPassword
+      ? { enforcing: { passwordSha256Hex: sha256Hex(target.enforcingPassword) } }
+      : {}),
+  };
+}
+
+/** The reader's DDL on one server, in shadow unless its switch is on (ADR-202 Decided 4). */
 async function convergeAppReaderTarget({
   target,
   source,
@@ -915,19 +995,14 @@ async function convergeAppReaderTarget({
     logger.info({ target: target.target }, "app reader is delivered by the rendered access config");
     return;
   }
-  const shared = target.target === SHARED_TARGET;
+  const shared = target.target === SHARED_APP_READER_TARGET;
   const { database: sourceDatabase } = parseConnectionUrl({
     connectionUrl: target.adminUrl,
     clusterName: shared ? source.CLICKHOUSE_CLUSTER : undefined,
   });
   const statements = accessModelDefinition.renderAppReaderDdl({
     sourceDatabase,
-    appReader: {
-      passwordSha256Hex: sha256Hex(target.readerPassword),
-      ...(target.enforcingPassword
-        ? { enforcing: { passwordSha256Hex: sha256Hex(target.enforcingPassword) } }
-        : {}),
-    },
+    appReader: appReaderInputOf(target),
   });
   await withProvisioningRepository({
     open: () => open(target.adminUrl),
@@ -945,7 +1020,10 @@ async function convergeAppReaderTarget({
       await repository.runStatements({ configStoreEntities, failureLevel: "error", statements });
     },
   });
-  logger.info({ target: target.target, sourceDatabase }, "app reader provisioned in shadow");
+  logger.info(
+    { target: target.target, sourceDatabase, enforce: target.enforce },
+    target.enforce ? "app reader provisioned, enforcing" : "app reader provisioned in shadow",
+  );
 }
 
 /**

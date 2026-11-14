@@ -1,5 +1,6 @@
 /** The render task writes the two per-pod config files and never prints a secret (ADR-159). */
 
+import { createHash } from "node:crypto";
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -155,6 +156,61 @@ describe("renderLwqlAccessConfig", () => {
       expect(message).toContain("LWQL_CLICKHOUSE_PASSWORD and LWQL_POSTGRES_READER_PASSWORD");
       expect(message).not.toContain(CLICKHOUSE_PASSWORD);
       expect(message).not.toContain(READER_PASSWORD);
+    });
+  });
+
+  describe("when the app reader is configured beside LangWatchQL", () => {
+    const READER_SECRET = "app-reader-secret-value";
+    const WITH_READER = {
+      ...FULL_ENV,
+      CLICKHOUSE_READER_URL: `http://langwatch_app_reader:${READER_SECRET}@clickhouse:8123/langwatch`,
+    };
+    const enforceOf = (env: Record<string, string | undefined>) =>
+      lwqlAccessModelDefinitionFromSource(env).appReader?.profile.settings.find(
+        (setting) => setting.name === "SQL_langwatch_tenancy_enforce",
+      )?.value;
+
+    /** @scenario "The rendered access config carries the app reader beside LangWatchQL" */
+    it("renders the reader with its password's hash and never the password", async () => {
+      await writeLwqlAccessConfig({ outDir, source: WITH_READER });
+
+      const contents = await readFile(join(outDir, "users.d", "lwql-access.yaml"), "utf8");
+      expect(contents).toContain("langwatch_app_reader:");
+      expect(contents).toContain(createHash("sha256").update(READER_SECRET).digest("hex"));
+      expect(contents).not.toContain(READER_SECRET);
+      expect(contents).not.toContain("langwatch_app_reader_enforcing");
+    });
+
+    /** @scenario "The rendered access config carries the app reader beside LangWatchQL" */
+    it("pins enforce to 0 unless CLICKHOUSE_TENANCY_ENFORCE turns it on", () => {
+      expect(enforceOf(WITH_READER)).toBe("0");
+      expect(enforceOf({ ...WITH_READER, CLICKHOUSE_TENANCY_ENFORCE: "true" })).toBe("1");
+    });
+
+    /** @scenario "The rendered access config carries the app reader beside LangWatchQL" */
+    it("renders the shadow sampler's reader when its URL is set", () => {
+      const definition = lwqlAccessModelDefinitionFromSource({
+        ...WITH_READER,
+        CLICKHOUSE_ENFORCING_READER_URL:
+          "http://langwatch_app_reader_enforcing:enf@clickhouse:8123/langwatch",
+      });
+
+      expect(definition.appReaderEnforcing?.user.name).toBe("langwatch_app_reader_enforcing");
+    });
+
+    /** @scenario "The rendered access config refuses an unreadable enforce switch by name" */
+    it("refuses an enforce switch neither true nor false, writing no file", async () => {
+      const env = { ...WITH_READER, CLICKHOUSE_TENANCY_ENFORCE: "maybe" };
+
+      await expect(writeLwqlAccessConfig({ outDir, source: env })).rejects.toThrow(
+        /CLICKHOUSE_TENANCY_ENFORCE/,
+      );
+      expect(await readdir(outDir)).toEqual([]);
+    });
+
+    /** @scenario "An install that sets no reader credential provisions no reader and upgrades as before" */
+    it("renders no reader while no reader URL is set", () => {
+      expect(lwqlAccessModelDefinitionFromSource(FULL_ENV).appReader).toBeUndefined();
     });
   });
 

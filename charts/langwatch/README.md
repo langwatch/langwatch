@@ -328,8 +328,24 @@ that sets no reader URL upgrades exactly as before. In `sql` mode,
 `pnpm task upgrade lwql-provision` creates the readers on the server `CLICKHOUSE_URL`
 names and on every `CLICKHOUSE_URL__<label>__<orgId>` whose
 `CLICKHOUSE_READER_URL__<label>__<orgId>` is set, always in `sql` mode there, with
-the password each reader URL carries. The rendered access config does not carry the
-readers yet, so leave `CLICKHOUSE_READER_URL` unset on chart-managed ClickHouse.
+the password each reader URL carries. In `rendered` mode the access-render Job
+writes the readers into the access config beside LangWatchQL's identity.
+
+On chart-managed ClickHouse, `clickhouse.appReader.enabled` (default `false`)
+generates the reader's password into a hook Secret, `<release>-clickhouse-app-reader`,
+and points the app, the workers and the render Job at it through `CLICKHOUSE_READER_URL`.
+It needs `lwql.enabled`, whose render Job delivers the reader. With
+`secrets.existingSecret`, or autogen off, that Secret carries `CLICKHOUSE_READER_URL`
+(and `CLICKHOUSE_ENFORCING_READER_URL`) itself. Turn it on only once `clickhouse.image.tag`
+is the clickhouse-serverless release that declares `SQL_`. A values-only change does not
+roll ClickHouse, so run `kubectl rollout restart statefulset` on it afterwards.
+`clickhouse.appReader.shadowSampleRate` above `0` adds the enforcing reader.
+
+The enforce switch is `CLICKHOUSE_TENANCY_ENFORCE` for the shared server and
+`CLICKHOUSE_TENANCY_ENFORCE__<label>__<orgId>` for each route: `true` or `false`, default
+`false` (shadow); the chart value is `clickhouse.appReader.enforce`. The upgrade and the
+render read it when they write each reader's profile. A value that is neither is refused
+by name, and the reader is not provisioned on that server.
 
 | Prerequisite                                                                                       | Why                                                                                                                                                                                                                                                                      |
 | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

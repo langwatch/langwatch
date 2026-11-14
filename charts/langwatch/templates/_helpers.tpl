@@ -463,6 +463,9 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- if and (not .Values.autogen.enabled) (eq $chSecretName $chDefaultName) }}
     {{- $errors = append $errors (printf "clickhouse.chartManaged=true with autogen.enabled=false requires clickhouse.auth.existingSecret to be set to an operator-owned Secret name different from the default %q. The deployment composes CLICKHOUSE_URL at runtime from the password key when a custom name is used; with the default name the deployment expects the chart-rendered url key, which is gated off when autogen.enabled=false. Either set autogen.enabled=true OR override clickhouse.auth.existingSecret." $chDefaultName) }}
   {{- end }}
+  {{- if and ($chValues.appReader).enabled (not .Values.lwql.enabled) }}
+    {{- $errors = append $errors "clickhouse.appReader.enabled=true needs lwql.enabled=true on chart-managed ClickHouse: the access-render Job delivers the app reader with the LangWatchQL access model" }}
+  {{- end }}
   {{- if or $chValues.cold.enabled $chValues.backup.enabled }}
     {{- if empty $chValues.objectStorage.bucket }}
       {{- $errors = append $errors "clickhouse.objectStorage.bucket is required when cold.enabled or backup.enabled" }}
@@ -934,6 +937,28 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 - name: CLICKHOUSE_CLUSTER
   value: {{ .Values.clickhouse.external.cluster | quote }}
 {{- end }}
+{{- end }}
+{{- /* The app reader (ADR-202 slice 4): its URLs come from the hook Secret, or the operator's. */}}
+{{- if and .Values.clickhouse.chartManaged .Values.clickhouse.appReader.enabled }}
+{{- $readerSecret := include "langwatch.clickhouse.appReaderSecret" . }}
+- name: CLICKHOUSE_READER_URL
+  valueFrom:
+    secretKeyRef:
+      name: {{ $readerSecret }}
+      key: CLICKHOUSE_READER_URL
+{{- if gt (float64 .Values.clickhouse.appReader.shadowSampleRate) 0.0 }}
+- name: CLICKHOUSE_ENFORCING_READER_URL
+  valueFrom:
+    secretKeyRef:
+      name: {{ $readerSecret }}
+      key: CLICKHOUSE_ENFORCING_READER_URL
+- name: CLICKHOUSE_SHADOW_SAMPLE_RATE
+  value: {{ .Values.clickhouse.appReader.shadowSampleRate | quote }}
+{{- end }}
+{{- end }}
+{{- if .Values.clickhouse.appReader.enforce }}
+- name: CLICKHOUSE_TENANCY_ENFORCE
+  value: "true"
 {{- end }}
 {{- $workerReplicas := 0 }}
 {{- if .Values.workers.enabled }}
@@ -1437,6 +1462,20 @@ LWQL_POSTGRES_READER_PASSWORD
 */}}
 {{- define "langwatch.lwql.passwordSecretName" -}}
   {{- printf "%s-lwql-passwords" (include "langwatch.fullname" .) -}}
+{{- end -}}
+
+{{/* The chart-owned app reader Secret (templates/clickhouse/app-reader-secret.yaml). */}}
+{{- define "langwatch.clickhouse.appReaderSecretName" -}}
+  {{- printf "%s-clickhouse-app-reader" (include "langwatch.fullname" .) -}}
+{{- end -}}
+
+{{/* The Secret the reader URLs are read from: the chart's hook Secret, or the operator's. */}}
+{{- define "langwatch.clickhouse.appReaderSecret" -}}
+{{- if include "langwatch.lwql.passwordsChartOwned" . -}}
+{{- include "langwatch.clickhouse.appReaderSecretName" . -}}
+{{- else -}}
+{{- include "langwatch.lwql.passwordSecret" . -}}
+{{- end -}}
 {{- end -}}
 
 {{/* ClickHouse: Password secret key */}}
