@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-13
 
-**Status:** Proposed (draft, not decided)
+**Status:** Accepted (Alex, 2026-11-13 and 2026-11-14); one open question remains
 
 **Builds on:** ADR-084 (tenant isolation lives in ClickHouse), ADR-159 (the app owns the LangWatchQL access model), ADR-177 (aggregate project reads through grants), ADR-198 (access tiers), ADR-200 (LangWatchQL isolation), ADR-201 (braids)
 
@@ -56,7 +56,7 @@ Why not in the policy:
 
 What this buys: after step 1, a fence bug can at worst show rows of a tenant the proof already names (a window too wide, a braid condition not applied), never a tenant outside the proof. The cross-organisation leak class closes; the within-proof class stays the fence's job and the builder's.
 
-Open option, not decided: windows only (no conditions) could move into the policy as parallel array settings, the shape the fence already binds with `transform`. See open questions.
+Windows stay in the builder (Decided 7): moving them into the policy as parallel array settings was considered and rejected.
 
 ## What needs a policy-exempt identity
 
@@ -147,13 +147,17 @@ Migration path: about 139 non-test TypeScript files under ClickHouse repository 
 5. The LangWatchQL user gets the same `USING 0` policy on `system.user_query_log` through the same code path, so both emitters render it. Its name carries the user (`user_query_log_hidden_<user>`), so it never replaces the app reader's `user_query_log_app_hidden` or another install's on a shared server. Alex, 2026-11-13: fixed in #9549.
 6. Routed and BYOC targets get the access model the way migrations reach them: provisioning walks every target the router knows. A target without the model refuses reader traffic for its organisations by name; it never keeps the text checks alone.
 
+## Decided (Alex, 2026-11-14)
+
+7. Shared and braid windows, braid conditions and the held-trace semi-join stay in the builder for good; the policy bounds only the tenant set.
+8. Inserts and the materialised views they trigger stay on the system identity. The reader holds `SELECT` only.
+9. The builder is hand-written in `packages/clickhouse-client`; no query-builder library.
+10. The reader requires ClickHouse 26.8 and leaves `use_query_condition_cache` on, once an isolation test on 26.8 proves the cache does not cross tenants under the setting-keyed policy. Until that test passes the pin stays.
+11. Every slice lands in one PR (#9549).
+
 ## Open questions for Alex
 
-1. Whether shared and braid windows move into the policy later, or stay in the fence and builder for good.
-2. Whether inserts move to the reader identity once MV behaviour is proven, or stay on the system identity.
-3. Whether the builder is hand-written in `packages/clickhouse-client` or adopts an existing library.
-4. Whether `use_query_condition_cache = 0` on the reader is acceptable for performance, or the app's ClickHouse must reach 26.8 first.
-5. Whether the reader's names (`langwatch_app_reader`, its profile and policies) become configurable per install. They are fixed today, so two installs sharing one server would replace each other's reader and grants. That fails closed, not open, but it rules out sharing a server until decided.
+1. Whether the reader's names (`langwatch_app_reader`, its profile and policies) become configurable per install. They are fixed today, so two installs sharing one server would replace each other's reader and grants. That fails closed, not open, but it rules out sharing a server until decided.
 
 ## References
 
