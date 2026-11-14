@@ -151,7 +151,7 @@ revokeIssuedLicense(input: { id: string; operatorId: string; reason: string; }):
 Signs a replacement for a license, held until the install presents it.
 
 ```typescript
-reissueLicense(input: { id: string; maxMembers?: number; maxMembersLite?: number; maxMessagesPerMonth?: number; /** ISO 8601. The instant the new term ends. */ expiresAt: string; operatorId: string; }): Promise<SignedIssuedLicense>;
+reissueLicense(input: { id: string; maxMembers?: number; maxMembersLite?: number; maxMembersDeveloper?: number; maxMessagesPerMonth?: number; /** ISO 8601. The instant the new term ends. */ expiresAt: string; operatorId: string; }): Promise<SignedIssuedLicense>;
 ```
 
 #### `changeLicenseSeats`

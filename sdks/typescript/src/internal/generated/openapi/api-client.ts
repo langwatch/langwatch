@@ -580,7 +580,7 @@ export interface paths {
         /** @description List all non-archived datasets for the project (paginated) */
         get: operations["getApiDataset"];
         put?: never;
-        /** @description Create a new dataset */
+        /** @description Create a new dataset, optionally with its first rows in `entries`, written in the same call. */
         post: operations["postApiDataset"];
         delete?: never;
         options?: never;
@@ -2857,7 +2857,9 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
+                    /** @description Epoch milliseconds, or an ISO 8601 date string. */
                     startDate: number | string;
+                    /** @description Epoch milliseconds, or an ISO 8601 date string. */
                     endDate: number | string;
                     query?: string;
                     /** @default {} */
@@ -8917,6 +8919,13 @@ export interface operations {
                         /** @enum {string} */
                         type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                     }[];
+                    /** @description The dataset's first rows, written with it in one call. Each key must be a column in `columnTypes`. */
+                    entries?: ({
+                        /** @description Leave it out: record ids are unique across projects, so the platform picks them. */
+                        id?: string;
+                    } & {
+                        [key: string]: unknown;
+                    })[];
                 };
             };
         };
@@ -15983,7 +15992,9 @@ export interface operations {
                     sortDirection?: string;
                     updatedAt?: number;
                     scrollId?: string | null;
+                    /** @description Epoch milliseconds, or an ISO 8601 date string. */
                     startDate: number | string;
+                    /** @description Epoch milliseconds, or an ISO 8601 date string. */
                     endDate: number | string;
                     /** @description A trace filter string in the same language the Trace Explorer's search bar speaks — `status:error AND model:gpt-*`, `trace.attribute.langwatch.user_id:alice`, a quoted phrase for free text. Combined with `filters`/`query`/`traceIds` rather than replacing them, so every condition sent must hold. A malformed filter, or one naming a field the language does not have, is a 422 that names the `filter` field. */
                     filter?: string;
@@ -16098,7 +16109,9 @@ export interface operations {
                 prefix?: string;
                 limit?: number;
                 offset?: number;
+                /** @description Epoch milliseconds, or an ISO 8601 date string. */
                 startDate?: string;
+                /** @description Epoch milliseconds, or an ISO 8601 date string. */
                 endDate?: string;
             };
             header?: never;

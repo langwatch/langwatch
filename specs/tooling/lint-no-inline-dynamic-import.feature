@@ -6,7 +6,8 @@ Feature: The no-inline-dynamic-import lint rule
   a web package's top-level entry files, the
   UI application's routes and drawers, a component code-split through
   `lazy(() => import(...))`, and test files, where an import that follows
-  `vi.mock` is what makes the mock apply.
+  `vi.mock` is what makes the mock apply. A docs island's browser code may load a heavy
+  part late, to stay inside the docs size budgets (docs islands only).
 
   @unit
   Scenario: An inline dynamic import in governed source is a failure
@@ -43,6 +44,12 @@ Feature: The no-inline-dynamic-import lint rule
     Given packages/browser-host/src/chunk-refetch.ts with an inline import()
     When the no-inline-dynamic-import rule runs over it
     Then it reports nothing, while a sibling browser-host file is still reported
+
+  @unit
+  Scenario: A docs island may load a heavy part late
+    Given a file under apps/docs/src/features/<name>/browser/ with an inline import()
+    When the no-inline-dynamic-import rule runs over it
+    Then it reports nothing, while the docs app's model code and shared browser entry are still reported
 
   @unit
   Scenario: The dev runtime's entries are exempt

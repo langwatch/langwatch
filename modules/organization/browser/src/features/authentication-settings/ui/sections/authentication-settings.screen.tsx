@@ -4,14 +4,7 @@ import { PageLayout, type PageTab } from "@langwatch/design-system/page-layout";
  * accounts arrive (the cards sso and scim declare), then the organization's own policies.
  * Spec: specs/identity/organization-authentication-settings.feature
  */
-import {
-  Box,
-  Heading,
-  SimpleGrid,
-  Skeleton,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Heading, SimpleGrid, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { Suspense } from "react";
 
 import {
@@ -50,9 +43,7 @@ export default function AuthenticationSettingsScreen() {
           onNavigate={(href) => host.navigate(href)}
         />
       </PageLayout.Header>
-      <Box paddingTop={4}>
-        <AuthenticationSettings host={host} organizationId={organizationId} />
-      </Box>
+      <AuthenticationSettings host={host} organizationId={organizationId} />
     </>
   );
 }
@@ -69,7 +60,7 @@ export function AuthenticationSettings({
   const organizationName = host.organization()?.name;
 
   return (
-    <VStack align="stretch" gap={6} width="full" paddingTop={4}>
+    <VStack align="stretch" gap={8} width="full" paddingTop={4}>
       <Text color="fg.muted">
         {organizationName
           ? `Manage sign-in, provisioning, and security policies for ${organizationName}.`
@@ -79,7 +70,7 @@ export function AuthenticationSettings({
       {cards.length > 0 && (
         <VStack align="stretch" gap={4} width="full">
           <VStack align="stretch" gap={1}>
-            <Heading textStyle="cardTitle">Sign-in and provisioning</Heading>
+            <Heading size="sm">Sign-in and provisioning</Heading>
             <Text color="fg.muted" fontSize="sm">
               Connect your identity provider for single sign-on and directory sync.
             </Text>
@@ -94,7 +85,7 @@ export function AuthenticationSettings({
         </VStack>
       )}
 
-      <VStack align="stretch" gap={4} width="full" paddingTop={2}>
+      <VStack align="stretch" gap={4} width="full">
         <VStack align="stretch" gap={1}>
           <Heading size="sm">Organization policies</Heading>
           <Text color="fg.muted" fontSize="sm">

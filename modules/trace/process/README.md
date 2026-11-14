@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`TraceApi`)
 
-Peers call these through the token, declared at `../contract/src/trace.api.ts:199`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/trace.api.ts:200`; nothing else in this package is public.
 It extends `TraceOtlpIngestApi`.
 
 #### `extractInlineMediaFromEvent`
@@ -1137,6 +1137,14 @@ Rows carrying `attribute` since `sinceMs`, counted per `groupByKey` value, most 
 findTraceCountsByAttribute(input: { projectId: string; sinceMs: number; attribute: TraceAttributeMatch; groupByKey: string; }): Promise<{ value: string; count: number }[]>;
 ```
 
+#### `findAgentsSeen`
+
+Distinct `gen_ai.agent.name` values in the project's spans since `sinceMs`, busiest first.
+
+```typescript
+findAgentsSeen(input: { projectId: string; sinceMs: number; limit: number; }): Promise<TraceAgentSeen[]>;
+```
+
 ## REST transport
 
 ### `collectorRest`
@@ -1325,7 +1333,7 @@ Permission `traces:view`. Declared at `src/transport/traces.rest.ts:338`.
 Answers at `/api/traces/facets`, `/api/v1/traces/facets`; also, undocumented, `/api/traces/2026-08-07/facets`, `/api/v1/traces/2026-08-07/facets`, `/api/traces/latest/facets`, `/api/v1/traces/latest/facets`.
 
 ```typescript
-// Query: traceFacetsQuerySchema, ../contract/src/trace-rest.schemas.ts:422
+// Query: traceFacetsQuerySchema, ../contract/src/trace-rest.schemas.ts:423
 interface Query {
   field?: string;
   prefix?: string;
@@ -1334,7 +1342,7 @@ interface Query {
   startDate?: string;
   endDate?: string;
 }
-// Response: traceFacetsResponseSchema, ../contract/src/trace-rest.schemas.ts:447
+// Response: traceFacetsResponseSchema, ../contract/src/trace-rest.schemas.ts:448
 type Response = Record<string, unknown>;
 ```
 

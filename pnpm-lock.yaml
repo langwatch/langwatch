@@ -18221,6 +18221,9 @@ importers:
       '@clickhouse/client':
         specifier: 'catalog:'
         version: 1.23.0
+      '@langwatch/aws-client':
+        specifier: workspace:*
+        version: link:../aws-client
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../clickhouse-client

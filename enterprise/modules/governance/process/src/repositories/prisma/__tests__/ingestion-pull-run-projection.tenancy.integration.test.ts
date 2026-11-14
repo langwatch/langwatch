@@ -238,6 +238,40 @@ describe("given a run-status projection whose source belongs to this organizatio
       expect(mirrored.pollerCursor).toBe("cursor-from-the-wrong-tenant");
       expect(mirrored.errorCount).toBe(4);
       expect(mirrored.lastSuccessAt).toEqual(new Date(2_000));
+      expect(mirrored.status).toBe("active");
+    });
+  });
+});
+
+describe("given a pull source the admin disabled while its run's completion was still queued", () => {
+  describe("when the completed run, which delivered events, is stored", () => {
+    /** @scenario "A pull run completing after the source is disabled does not re-enable it" */
+    it("keeps the source disabled and still mirrors the run outcome", async () => {
+      const source = await prisma.ingestionSource.create({
+        data: {
+          organizationId: organization.id,
+          teamId: team.id,
+          sourceType: "anthropic_admin",
+          name: `Disabled ${ns}`,
+          ingestSecretHash: `hash-disabled-${ns}`,
+          errorCount: 0,
+          status: "disabled",
+        },
+      });
+      const repository = PrismaIngestionPullRunProjectionRepository.create(prisma);
+
+      await repository.store(projectionFor(source.id), {
+        aggregateId: source.id,
+        tenantId: createTenantId(homeProjectId),
+      });
+
+      const mirrored = await prisma.ingestionSource.findUniqueOrThrow({
+        where: { id: source.id },
+      });
+      expect(mirrored.status).toBe("disabled");
+      expect(mirrored.pollerCursor).toBe("cursor-from-the-wrong-tenant");
+      expect(mirrored.errorCount).toBe(4);
+      expect(mirrored.lastSuccessAt).toEqual(new Date(2_000));
     });
   });
 });

@@ -22,8 +22,8 @@ T = TypeVar("T", bound="PostApiTracesSearchBody")
 class PostApiTracesSearchBody:
     """
     Attributes:
-        start_date (float | str):
-        end_date (float | str):
+        start_date (float | str): Epoch milliseconds, or an ISO 8601 date string.
+        end_date (float | str): Epoch milliseconds, or an ISO 8601 date string.
         query (str | Unset):
         filters (PostApiTracesSearchBodyFilters | Unset):
         trace_ids (list[str] | Unset):

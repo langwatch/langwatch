@@ -240,6 +240,23 @@ describe("the docs session frame", () => {
       expect(byId("status").textContent).toMatch(/did not allow access/);
     });
 
+    /** @scenario "The frame says when the organisation turned the session off" */
+    it("says the organisation turned this off, not that the reader declined", () => {
+      const { byId, fromPopup, state, states } = mountFrame();
+      byId("connect").click();
+      fromPopup({
+        type: "langwatch:docs-session",
+        version: 1,
+        state: state(),
+        outcome: "disabled",
+      });
+
+      expect(byId("status").textContent).toMatch(/Your organisation turned this off/);
+      expect(byId("status").textContent).not.toMatch(/did not allow access/);
+      expect(states().at(-1)).toMatchObject({ connected: false });
+      expect(byId("connect").hasAttribute("disabled")).toBe(false);
+    });
+
     /** @scenario "The frame reports why connecting did not work" */
     it("says the window closed before answering", async () => {
       const { byId, popup } = mountFrame();
@@ -363,6 +380,32 @@ describe("the docs session frame", () => {
 
       expect(sent).toEqual([]);
       expect(byId("confirm").hidden).toBe(false);
+    });
+
+    /** @scenario "A confirmation hidden and shown again waits its delay again" */
+    it("restarts the press delay when the docs show the frame again", async () => {
+      const { connect, fromDocs, sent, byId, answers, press } = mountFrame({
+        timings: { confirmDelayMs: 40 },
+      });
+      connect();
+      fromDocs({
+        kind: "send",
+        id: "w5",
+        method: "POST",
+        path: "/api/v1/dataset",
+        headers: {},
+        body: "{}",
+      });
+      await new Promise((resolve) => setTimeout(resolve, 60));
+
+      fromDocs({ kind: "shown" });
+      press(byId("confirm-send"));
+      expect(sent).toEqual([]);
+      expect(byId("confirm").hidden).toBe(false);
+
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      press(byId("confirm-send"));
+      await vi.waitFor(() => expect(answers("w5")).toHaveLength(1));
     });
 
     /** @scenario "A request that changes data waits for the reader inside the frame" */
@@ -510,7 +553,7 @@ describe("the docs session frame", () => {
       byId("disconnect").click();
 
       await vi.waitFor(() =>
-        expect(byId("status").textContent).toMatch(/ends on its own within five minutes/),
+        expect(byId("status").textContent).toMatch(/still ends on its own when it expires/),
       );
     });
 
@@ -525,6 +568,21 @@ describe("the docs session frame", () => {
         url: "/api/docs-session",
         init: { method: "DELETE", keepalive: true },
       });
+    });
+
+    /** @scenario "The connection survives moving to another docs page but not a reload" */
+    it("keeps the key in memory only, so a reload's fresh frame starts disconnected", () => {
+      const first = mountFrame();
+      first.connect();
+      expect(first.states().at(-1)).toMatchObject({ connected: true, project: "Checkout" });
+      expect(first.frame.localStorage.length + first.frame.sessionStorage.length).toBe(0);
+      expect(first.frame.document.cookie).toBe("");
+
+      first.frame.dispatchEvent(new first.frame.Event("pagehide"));
+      const reloaded = mountFrame();
+
+      expect(reloaded.states().at(-1)).toMatchObject({ connected: false });
+      expect(reloaded.byId("connect").hidden).toBe(false);
     });
 
     /** @scenario "The frame ends the connection when access ends" */

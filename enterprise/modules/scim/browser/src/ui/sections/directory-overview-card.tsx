@@ -96,7 +96,7 @@ function DirectoryReadFailure({ error, canManage }: { error: unknown; canManage:
         feature="Directory sync"
         description="Sync people and groups from your identity provider, so joiners and leavers are handled for you."
         canManage={canManage}
-        compact
+        inset
         data-testid="directory-card-enterprise-gate"
       />
     );

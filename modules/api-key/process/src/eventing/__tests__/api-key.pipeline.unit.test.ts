@@ -60,7 +60,9 @@ describe("given the API-key module's eventing declaration", () => {
   describe("when the module is declared", () => {
     /** @scenario "A module declares its event sourcing beside its transports" */
     it("carries the declaration onto the installable module", () => {
-      expect(apiKeyProcessModule.eventing).toBe(apiKeyEventing);
+      expect(apiKeyProcessModule.eventing?.pipeline).toBe(
+        "agent_sandbox_maintenance, api_key_docs_playground_revocation",
+      );
       expect(apiKeyEventing.pipeline).toBe("agent_sandbox_maintenance");
     });
   });

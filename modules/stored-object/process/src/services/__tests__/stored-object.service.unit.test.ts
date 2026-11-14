@@ -1,4 +1,6 @@
 /** @vitest-environment node */
+import { Readable } from "node:stream";
+
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -109,5 +111,82 @@ describe("StoredObjectService", () => {
     await expect(
       records.findById({ tenantId: "project_1", id: stored.reference.id }),
     ).resolves.toMatchObject({ status: "deleted", storage: null });
+  });
+
+  describe("when a viewer probes an object or asks for its read URL", () => {
+    async function storedAttachment() {
+      const built = fixture();
+      const stored = await built.service.storeFromBytes({
+        projectId: "project_1",
+        filename: "input.bin",
+        mediaType: "application/octet-stream",
+        audience: "project:view",
+        purpose: "dataset_attachment",
+        ownerKind: "dataset",
+        ownerId: "dataset_1",
+        bytes: new Uint8Array([1, 2, 3]),
+      });
+      return { ...built, object: { projectId: "project_1", id: stored.reference.id } };
+    }
+
+    /** @scenario "Probing an object or minting its read URL opens none of its bytes" */
+    it("answers available from an existence check and opens no bytes", async () => {
+      const { service, storage, object } = await storedAttachment();
+
+      await expect(service.headById(object, { id: "user_1" })).resolves.toEqual({
+        status: "available",
+        mediaType: "application/octet-stream",
+      });
+      expect(storage.opened).toBe(0);
+    });
+
+    /** @scenario "Probing an object or minting its read URL opens none of its bytes" */
+    it("answers missing when storage no longer holds the bytes, opening none", async () => {
+      const { service, storage, object } = await storedAttachment();
+      storage.held = false;
+
+      await expect(service.headById(object, { id: "user_1" })).resolves.toEqual({
+        status: "missing",
+        mediaType: "application/octet-stream",
+      });
+      expect(storage.opened).toBe(0);
+    });
+
+    /** @scenario "Probing an object or minting its read URL opens none of its bytes" */
+    it("signs a read URL for the purpose without opening the bytes", async () => {
+      const { service, storage, object } = await storedAttachment();
+
+      await expect(
+        service.getReadUrlForPurpose({
+          ...object,
+          purpose: "dataset_attachment",
+          ownerKind: "dataset",
+        }),
+      ).resolves.toMatchObject({ url: expect.any(String) });
+      expect(storage.opened).toBe(0);
+    });
+  });
+
+  describe("when a reader reads an object whose bytes storage streams", () => {
+    /** @scenario "A byte read hands over storage's own stream" */
+    it("hands over that same stream, so stopping it early reaches the storage connection", async () => {
+      const { service, storage } = fixture();
+      const stored = await service.storeFromBytes({
+        projectId: "project_1",
+        filename: "input.bin",
+        mediaType: "application/octet-stream",
+        audience: "project:view",
+        purpose: "dataset_attachment",
+        ownerKind: "dataset",
+        ownerId: "dataset_1",
+        bytes: new Uint8Array([1, 2, 3]),
+      });
+      const body = Readable.from([Buffer.from([1, 2, 3])]);
+      storage.stream = body;
+
+      const read = await service.readById({ projectId: "project_1", id: stored.reference.id });
+
+      expect("stream" in read && read.stream).toBe(body);
+    });
   });
 });

@@ -1181,7 +1181,7 @@ describe("a route declared as minting a credential", () => {
       .post("/", "createKey")
       .keepsRecords()
       .withPermission("organization:view")
-      .mintsCredential("organization:view")
+      .mintsCredential()
       .withOutput(z.object({ ran: z.boolean() }))
       .withoutAudit("test route")
       .handle(() => {
@@ -1229,7 +1229,7 @@ describe("a route declared as minting a credential", () => {
         .post("/", "createKey")
         .keepsRecords()
         .withAccess(publicRoute({ reason: "no caller" }))
-        .mintsCredential("organization:view")
+        .mintsCredential()
         .withoutAudit("test route")
         .handle(() => {}),
     ).toThrow(/mints a credential, so it cannot answer with no caller/);
