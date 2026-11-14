@@ -3,8 +3,12 @@ import { describe, it, expect, vi } from "vitest";
 import {
   GovernanceCliError,
   SESSION_EXPIRED_MESSAGE,
+  adminListIngestionTemplates,
+  archiveIngestionTemplate,
   cloneIngestionTemplateFromPlatform,
   getBudgetOverview,
+  getIngestionTemplate,
+  managementCredentialsOrRefusal,
   getCliBootstrap,
   getEventsForSource,
   getGovernanceStatus,
@@ -18,6 +22,13 @@ const baseCfg = (token: string | undefined = "at_x"): GovernanceConfig => ({
   gateway_url: "http://gw.example",
   control_plane_url: "http://app.example",
   access_token: token,
+});
+
+/** A device login's key, acting in its personal project, as the management door takes it. */
+const loginKeyCredentials = async () => ({
+  apiKey: "sk-lw-lookup_secret",
+  endpoint: "http://app.example",
+  projectId: "project_personal",
 });
 
 const ok = (body: unknown): Response =>
@@ -501,12 +512,135 @@ describe("cli-api — request shape", () => {
     it("posts to the route the app actually serves", async () => {
       const { fetchImpl, seen } = onlyRealRoutes();
 
-      const out = await cloneIngestionTemplateFromPlatform(baseCfg(), "tpl_platform", {
+      const out = await cloneIngestionTemplateFromPlatform("tpl_platform", {
         fetchImpl,
+        managementCredentials: loginKeyCredentials,
       });
 
       expect(seen[0]!.url).toBe("http://app.example/api/v1/governance/ingestion-templates/clone");
       expect(out).toEqual({ id: "tpl_new" });
+    });
+  });
+});
+
+describe("cli-api — ingestion template answers", () => {
+  /** One row as the admin route answers it (`ingestionTemplateDtoSchema`). */
+  const templateRow = (id: string) => ({
+    id,
+    slug: `${id}-slug`,
+    source_type: "otel_generic",
+    display_name: `Template ${id}`,
+    description: null,
+    icon_asset: null,
+    credential_schema: null,
+    ottl_rules: 'set(attributes["x"], 1)',
+    platform_published: false,
+    enabled: true,
+    organization_id: "org_1",
+  });
+
+  /** The management door: an API key acting in a project, never the device access token. */
+  const managementDoor = (answer: unknown) => {
+    const seen: { url: string; authorization?: string }[] = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const headers = (init?.headers ?? {}) as Record<string, string>;
+      seen.push({ url: requestUrl(input), authorization: headers.authorization });
+      const isProjectScopedKey =
+        headers.authorization ===
+        `Basic ${Buffer.from("project_personal:sk-lw-lookup_secret").toString("base64")}`;
+      return isProjectScopedKey ? ok(answer) : status(401, { error: "invalid_credentials" });
+    };
+    return { fetchImpl, seen };
+  };
+
+  describe("when reading one template", () => {
+    /** @scenario "Template commands sign in with the login key in its project" */
+    it("sends the login key in its project, never the device access token", async () => {
+      const { fetchImpl, seen } = managementDoor({ ingestion_template: templateRow("tpl_a") });
+
+      const row = await getIngestionTemplate("tpl_a", {
+        fetchImpl,
+        managementCredentials: loginKeyCredentials,
+      });
+
+      expect(row.id).toBe("tpl_a");
+      expect(seen[0]!.authorization).toBe(
+        `Basic ${Buffer.from("project_personal:sk-lw-lookup_secret").toString("base64")}`,
+      );
+    });
+  });
+
+  describe("when the admin list route answers with two templates", () => {
+    /** @scenario "Listing templates as an admin returns every row the app answers with" */
+    it("returns both rows, asked with the login key in its project", async () => {
+      const { fetchImpl, seen } = managementDoor({
+        data: [templateRow("tpl_a"), templateRow("tpl_b")],
+      });
+
+      const rows = await adminListIngestionTemplates({
+        fetchImpl,
+        managementCredentials: loginKeyCredentials,
+      });
+
+      expect(seen[0]!.url).toBe("http://app.example/api/v1/governance/ingestion-templates/admin");
+      expect(rows.map((row) => row.id)).toEqual(["tpl_a", "tpl_b"]);
+    });
+  });
+
+  describe("when archiving an org-authored template", () => {
+    /** @scenario "Archiving a template reads the answer the app sends" */
+    it("returns the archived answer", async () => {
+      const { fetchImpl } = managementDoor({ archived: true });
+
+      const answer = await archiveIngestionTemplate("tpl_a", {
+        fetchImpl,
+        managementCredentials: loginKeyCredentials,
+      });
+
+      expect(answer).toEqual({ archived: true });
+    });
+  });
+
+  describe("when the login cannot act in a project", () => {
+    const credentials = {
+      apiKey: "sk-lw-lookup_secret",
+      endpoint: "http://app.example",
+      projectId: "project_personal",
+    };
+
+    it("names the other address when the login belongs to one", () => {
+      expect(() =>
+        managementCredentialsOrRefusal({
+          elsewhere: { loginEndpoint: "http://a.example", endpoint: "http://b.example" },
+          credentials,
+          isSignedIn: true,
+        }),
+      ).toThrow(
+        expect.objectContaining({
+          code: "login_endpoint_mismatch",
+          message: expect.stringContaining("http://a.example"),
+        }),
+      );
+    });
+
+    it("says a signed-in login holds no login key, rather than not logged in", () => {
+      expect(() =>
+        managementCredentialsOrRefusal({
+          elsewhere: undefined,
+          credentials: undefined,
+          isSignedIn: true,
+        }),
+      ).toThrow(expect.objectContaining({ message: expect.stringContaining("no login key") }));
+    });
+
+    it("refuses a login key with no project instead of reading LANGWATCH_PROJECT_ID", () => {
+      expect(() =>
+        managementCredentialsOrRefusal({
+          elsewhere: undefined,
+          credentials: { ...credentials, projectId: undefined },
+          isSignedIn: true,
+        }),
+      ).toThrow(expect.objectContaining({ code: "personal_project_unknown" }));
     });
   });
 });

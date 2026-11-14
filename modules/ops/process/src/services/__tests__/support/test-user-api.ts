@@ -80,6 +80,8 @@ export class TestUserApi implements UserApi {
   isOperator: UserApi["isOperator"] = (input) =>
     this.overrides.isOperator?.(input) ?? this.unimplemented("isOperator");
 
+  searchForOperators: UserApi["searchForOperators"] = (input) =>
+    this.overrides.searchForOperators?.(input) ?? this.unimplemented("searchForOperators");
   findByEmail: UserApi["findByEmail"] = (input) =>
     this.overrides.findByEmail?.(input) ?? this.unimplemented("findByEmail");
 
