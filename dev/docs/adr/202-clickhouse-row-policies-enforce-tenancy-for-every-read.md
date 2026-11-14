@@ -154,6 +154,7 @@ Migration path: about 139 non-test TypeScript files under ClickHouse repository 
 9. The builder is hand-written in `packages/clickhouse-client`; no query-builder library.
 10. The reader requires ClickHouse 26.8 and leaves `use_query_condition_cache` on, once an isolation test on 26.8 proves the cache does not cross tenants under the setting-keyed policy. Until that test passes the pin stays.
 11. Every slice lands in one PR (#9549).
+12. The api's three ClickHouse inserts move to the worker: the governance OTLP spend debit, `POST /api/dspy/log_steps` and instant-eval run create. The api becomes a pure reader with no write credential. DSPy step logging becomes asynchronous and spend debits reach the ledger through the queue (Alex, 2026-11-14).
 
 ## Open questions for Alex
 
