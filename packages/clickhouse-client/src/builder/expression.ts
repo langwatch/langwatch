@@ -256,6 +256,8 @@ export type ExpressionNode =
       readonly kind: "idBound";
       readonly keys: readonly { readonly column: ColumnNode; readonly value: ValueNode }[];
     }
+  /** A one-value subquery the read builder rendered under the enclosing read's scope. */
+  | { readonly kind: "scalar"; readonly render: (context: RenderContext) => string }
   | {
       readonly kind: "over";
       readonly call: ExpressionNode;
@@ -368,8 +370,11 @@ export type CteSet<Ctes, Value> = {
   readonly cte: { [Name in CteName<Ctes>]: Ctes[Name] extends Value ? Name : never }[CteName<Ctes>];
 };
 
-/** A declared column holding string ids, as an `{{idBound}}` marker names its key. */
-type IdColumn<Tables extends string> = ColumnRef<Tables, string, string>;
+/** A declared column holding string ids, Nullable included: a NULL id equals no bound one. */
+type IdColumn<Tables extends string> = ColumnRef<Tables, string, string | null>;
+
+/** One id, or a list read as `Key IN (…)`, as the raw marker's id parameter takes either. */
+type Ids = string | readonly string[];
 
 /** The operations a `where`, `prewhere`, `having`, selection or join condition is written with. */
 export type ConditionOps<Tables extends string, Ctes> = {
@@ -409,10 +414,10 @@ export type ConditionOps<Tables extends string, Ctes> = {
   ) => Condition;
   isNull: <T extends Tables>(term: Expression<unknown, T>) => Condition;
   isNotNull: <T extends Tables>(term: Expression<unknown, T>) => Condition;
-  /** `Key = id` with the id index's `{{idBound}}` marker, which the client expands at send. */
-  idBound: (column: IdColumn<Tables>, id: string) => Condition;
+  /** `Key = id`, or `Key IN (ids)`, with the `{{idBound}}` marker the client expands at send. */
+  idBound: (column: IdColumn<Tables>, id: Ids) => Condition;
   /** The composite form: each key column equal to its id, one marker naming them all. */
-  idBoundKeys: (...keys: readonly (readonly [IdColumn<Tables>, string])[]) => Condition;
+  idBoundKeys: (...keys: readonly (readonly [IdColumn<Tables>, Ids])[]) => Condition;
   and: (...terms: Condition<Tables>[]) => Condition;
   or: (...terms: Condition<Tables>[]) => Condition;
   not: (term: Condition<Tables>) => Condition;
@@ -460,12 +465,19 @@ function range(
   return logic("AND")(...terms);
 }
 
+/** An id list must be strings and not empty: an empty one would look the index up for nothing. */
+function idValueOf({ node, id }: { node: ExpressionNode; id: unknown }): ValueNode {
+  if (typeof id === "string") return { kind: "value", value: id, binding: { paramType: "String" } };
+  if (!Array.isArray(id) || !id.every((each) => typeof each === "string")) throw unsupported(node);
+  if (id.length === 0) throw new QueryBuilderError({ kind: "empty-id-list" });
+  return { kind: "value", value: [...id], binding: { paramType: "Array(String)" } };
+}
+
 function idBoundOf(keys: readonly (readonly [Expression<unknown, string>, unknown])[]): Condition {
   const pairs = keys.map(([key, id]) => {
     const { node } = key;
-    if (node.kind !== "column" || typeof id !== "string") throw unsupported(node);
-    const value: ValueNode = { kind: "value", value: id, binding: { paramType: "String" } };
-    return { column: node, value };
+    if (node.kind !== "column") throw unsupported(node);
+    return { column: node, value: idValueOf({ node, id }) };
   });
   const [first, ...rest] = pairs;
   if (first === undefined)
@@ -552,6 +564,10 @@ export type RenderContext = {
   readonly counter: { next: number };
   /** Each lambda parameter's name, given when its lambda is written. */
   readonly lambdas: Map<ExpressionNode, string>;
+  /** An id's parameter by its type and value, so every `{{idBound}}` marker names the same one. */
+  readonly ids: Map<string, string>;
+  /** The CTE names the text being rendered may read: earlier CTEs and the enclosing ones. */
+  readonly ctes: { visible: ReadonlySet<string> };
 };
 
 export const renderContext = (): RenderContext => ({
@@ -559,6 +575,8 @@ export const renderContext = (): RenderContext => ({
   slots: new Map(),
   counter: { next: 0 },
   lambdas: new Map(),
+  ids: new Map(),
+  ctes: { visible: new Set() },
 });
 
 /** Binds a value node and returns its parameter name. */
@@ -641,9 +659,7 @@ export function renderExpression({
     case "compare":
       return `${render(node.left)} ${node.operator} ${render(node.right)}`;
     case "in":
-      return node.set.kind === "cte"
-        ? `${render(node.left)} IN ${node.set.name}`
-        : `${render(node.left)} IN (${render(node.set)})`;
+      return inText({ node, context, render });
     case "cte":
       return node.name;
     case "logic":
@@ -660,12 +676,33 @@ export function renderExpression({
       return fragmentText({ node, qualify });
     case "idBound":
       return idBoundText({ node, context, render, qualify });
+    case "scalar":
+      return node.render(context);
     case "over":
       return overText({ node, render });
   }
 }
 
-/** `(Key = {id} … {{idBound:<table>.<Keys>:<params>[:<alias>]}})`, the alias when qualified. */
+/** `x IN (values)`, or `x IN cte`: a name no WITH in scope declares would read a stored table. */
+function inText({
+  node,
+  context,
+  render,
+}: {
+  node: ExpressionNode & { kind: "in" };
+  context: RenderContext;
+  render: (inner: ExpressionNode) => string;
+}): string {
+  if (node.set.kind !== "cte") return `${render(node.left)} IN (${render(node.set)})`;
+  if (!context.ctes.visible.has(node.set.name))
+    throw new QueryBuilderError({ kind: "unknown-cte", name: node.set.name });
+  return `${render(node.left)} IN ${node.set.name}`;
+}
+
+/**
+ * `(Key = {id} … {{idBound:<table>.<Keys>:<params>[:<alias>]}})`, `Key IN ({ids})` for a list, the
+ * alias when qualified. Equal ids share one parameter: the client refuses markers naming two.
+ */
 function idBoundText({
   node,
   context,
@@ -677,12 +714,22 @@ function idBoundText({
   render: (inner: ExpressionNode) => string;
   qualify: boolean;
 }): string {
-  const equalities = node.keys.map(({ column: key, value }) => `${render(key)} = ${render(value)}`);
+  const names = node.keys.map(({ value }) => {
+    const id = `${value.binding.paramType}:${JSON.stringify(value.value)}`;
+    const name = context.ids.get(id) ?? paramNameOf({ node: value, context });
+    context.ids.set(id, name);
+    context.slots.set(value, name);
+    return name;
+  });
+  const equalities = node.keys.map(({ column: key, value }) =>
+    Array.isArray(value.value)
+      ? `${render(key)} IN (${render(value)})`
+      : `${render(key)} = ${render(value)}`,
+  );
   const [first] = node.keys;
   const columns = node.keys.map(({ column: key }) => key.name).join(",");
-  const names = node.keys.map(({ value }) => paramNameOf({ node: value, context })).join(",");
   const alias = qualify ? `:${first?.column.table ?? ""}` : "";
-  const marker = `{{idBound:${first?.column.stored ?? ""}.${columns}:${names}${alias}}}`;
+  const marker = `{{idBound:${first?.column.stored ?? ""}.${columns}:${names.join(",")}${alias}}}`;
   return `(${equalities.join(" AND ")} ${marker})`;
 }
 
@@ -730,6 +777,8 @@ export function columnsOf(node: ExpressionNode): { table: string; name: string }
     case "constant":
     case "cte":
     case "lambdaParam":
+    // A scalar's own read checks its columns against its own tables.
+    case "scalar":
       return [];
     case "cast":
       return columnsOf(node.term);

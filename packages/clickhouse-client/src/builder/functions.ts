@@ -168,6 +168,11 @@ const unary =
   (name: string, binding?: Binding) =>
   <V, T extends string>(of: E<V, T>) =>
     call<V, T>({ name, args: [of.node], binding: binding ?? of.binding });
+/** A rounding of a time in an optional time zone, the zone a bound String. */
+const zoned =
+  (name: string) =>
+  <V, T extends string>(of: E<V, T>, { timeZone: zone }: { timeZone?: string } = {}) =>
+    call<V, T>({ name, args: [of.node, ...timeZone(zone)], binding: of.binding });
 const numeric =
   (name: string, binding: Binding = FLOAT64) =>
   <T extends string>(of: E<Num, T>) =>
@@ -368,8 +373,8 @@ export const fn = {
   toUnixTimestamp: numeric("toUnixTimestamp", INT64),
   toDate: <T extends string>(of: E<Num, T>) =>
     call<string, T>({ name: "toDate", args: [of.node], binding: { paramType: "Date" } }),
-  toStartOfDay: unary("toStartOfDay"),
-  toStartOfHour: unary("toStartOfHour"),
+  toStartOfDay: zoned("toStartOfDay"),
+  toStartOfHour: zoned("toStartOfHour"),
   /** `toStartOfInterval(of, toIntervalSecond(seconds))`, the width bound as a parameter. */
   toStartOfInterval: <T extends string>(of: E<Num, T>, { seconds }: { seconds: number }) =>
     call<number, T>({

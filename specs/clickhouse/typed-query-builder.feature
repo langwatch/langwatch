@@ -294,3 +294,44 @@ Feature: A typed ClickHouse read builder renders the tenant predicate and the te
     When the second census's shapes are built and sent
     Then each returns exactly its tenant's rows, also when the setting lists every tenant
     And a JSON type, a trim character set, a date unit and a time zone sent as bound values run as constants
+
+  @unit
+  Scenario: A read bounds a nullable id or a list of ids by the id index marker
+    Given a read bounding a Nullable(String) id column by one id, and another by a list of ids
+    When each is built
+    Then the one id renders as an equality and the list as an IN over an Array(String) parameter, each with the marker the client reads
+    And an empty list is refused by code, and a column that holds no string ids does not compile
+
+  @unit
+  Scenario: Equal ids share one parameter so every id bound marker names it
+    Given a read bounded by an id and a CTE or scalar subquery bounded by the same id
+    When it is built
+    Then both markers name one parameter, so the client looks the id up once instead of refusing mixed bounds
+
+  @unit
+  Scenario: A derived join side carries its own tenant predicate and joins on its tenant column
+    Given two derived reads under the read's scope, each selecting its tenant column
+    When one is joined to the other
+    Then each side renders its own read with the tenant predicate inside, joined on the tenant column
+    And a derived side that does not select its tenant column, one built under another scope and one the builder did not make are refused by code
+
+  @unit
+  Scenario: A CTE reads the CTEs declared before it, and no other name
+    Given a read with two CTEs, the second reading the first
+    When it is built
+    Then each CTE body carries the tenant predicate on its own table
+    And a CTE name not declared before the text that reads it is refused by code, since it would read a stored table of that name
+
+  @unit
+  Scenario: A scalar subquery reads one value under the read's own scope
+    Given a read comparing a column with a scalar subquery that selects one value
+    When it is built
+    Then the subquery renders with the tenant predicate on its own table, under the read's scope
+    And a subquery over a table of another scope, a table the scope may not read, or selecting more than one value is refused by code
+
+  @integration
+  Scenario: Nullable and listed ids, derived joins, chained CTEs and scalar subqueries run on 26.8
+    Given ClickHouse 26.8, the reader identity and an evaluation table whose other tenant reuses the same ids
+    When the third census's shapes are built, their id markers expanded as the client expands them, and sent
+    Then each returns exactly its tenant's rows, also when the setting lists every tenant
+    And a day start in a bound time zone runs as a constant

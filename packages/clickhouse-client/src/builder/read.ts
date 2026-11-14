@@ -26,6 +26,7 @@ import {
   renderExpression,
   type ValueNode,
   type ValueOfExpression,
+  expression,
 } from "./expression.ts";
 import { QueryBuilderError } from "./query-builder-error.ts";
 import type { AllTenantsScope, ReaderScope, ServerMetadataScope, TenantScope } from "./scope.ts";
@@ -208,13 +209,28 @@ function checkSource({ scope, table }: { scope: TenantScope; table: ClickHouseTa
   }
 }
 
-/** The start of a read: the scope is required, the table comes next. */
-export class ClickHouseReadStart<Scope extends TenantScope> {
+/** Whether a read selects its FROM side's tenant column as itself, under that column's name. */
+function selectsOwnTenant({ table, select }: ReadState): boolean {
+  return select.some(
+    ({ key, node }) =>
+      table.tenantColumn !== "" &&
+      key === table.tenantColumn &&
+      node.kind === "column" &&
+      node.table === table.name &&
+      node.name === table.tenantColumn,
+  );
+}
+
+/** The start of a read: the scope is required, the table comes next; a CTE body sees `Ctes`. */
+export class ClickHouseReadStart<
+  Scope extends TenantScope,
+  Ctes extends Record<string, unknown> = NoCtes,
+> {
   constructor(private readonly scope: Scope) {}
 
   from<Name extends string, Columns extends ColumnsSpec>(
     table: ClickHouseTable<Name, Columns, KindFor<Scope> | "derived">,
-  ): ClickHouseRead<Scope, Name, NoCtes, NoCtes> {
+  ): ClickHouseRead<Scope, Name, NoCtes, Ctes> {
     checkSource({ scope: this.scope, table: table.$table });
     return new ClickHouseRead(initialState({ scope: this.scope, table: table.$table }));
   }
@@ -278,6 +294,20 @@ function refuseSettingsInUnion(state: ReadState): void {
 
 type JoinOptions = { latestVersion?: boolean };
 
+/** A read's own clause operations: the condition operations and a scalar subquery. */
+export type ReadOps<
+  Scope extends TenantScope,
+  Tables extends string,
+  Ctes extends Record<string, unknown>,
+> = ConditionOps<Tables, Ctes> & {
+  /** `(SELECT <one value> …)` under this read's scope: its tables carry the tenant predicate. */
+  scalar: <SubRow extends Record<string, unknown>, SubTables extends string>(
+    build: (
+      sub: ClickHouseReadStart<Scope, Ctes>,
+    ) => ClickHouseRead<Scope, SubTables, SubRow, Ctes>,
+  ) => Expression<SubRow[keyof SubRow], never>;
+};
+
 export class ClickHouseRead<
   Scope extends TenantScope,
   Tables extends string,
@@ -298,17 +328,32 @@ export class ClickHouseRead<
     return new ClickHouseRead({ ...this.#state, ...patch });
   }
 
-  /** The selection, or a function of the condition operations for `countIf`, `if` and the like. */
+  /** The operations a clause is written with; a scalar reads its own table under this scope. */
+  #ops(): ReadOps<Scope, Tables, Ctes> {
+    const scope = this.#state.scope as Scope;
+    const scalar: ReadOps<Scope, Tables, Ctes>["scalar"] = (build) => {
+      const read = build(new ClickHouseReadStart<Scope, Ctes>(scope)).#state;
+      const [only, ...rest] = read.select;
+      if (only === undefined || rest.length > 0) {
+        throw new QueryBuilderError({ kind: "scalar-not-one-value", selected: read.select.length });
+      }
+      const render = (context: RenderContext) =>
+        `(${renderStatement({ state: read, context, nested: true, keys: undefined })})`;
+      return expression({ kind: "scalar", render }, only.binding);
+    };
+    return { ...conditionOpsFor<Tables, Ctes>(), scalar };
+  }
+
+  /** The selection, or a function of the clause operations for `countIf`, `if` and the like. */
   select<Selection extends Record<string, Expression<unknown, Tables>>>(
-    selection: Selection | ((ops: ConditionOps<Tables, Ctes>) => Selection),
+    selection: Selection | ((ops: ReadOps<Scope, Tables, Ctes>) => Selection),
   ): ClickHouseRead<
     Scope,
     Tables,
     { [Key in keyof Selection]: ValueOfExpression<Selection[Key]> },
     Ctes
   > {
-    const chosen =
-      typeof selection === "function" ? selection(conditionOpsFor<Tables, Ctes>()) : selection;
+    const chosen = typeof selection === "function" ? selection(this.#ops()) : selection;
     return this.#next({
       select: Object.entries(chosen).map(([key, value]) => ({
         key,
@@ -324,33 +369,36 @@ export class ClickHouseRead<
 
   /** PREWHERE conditions, on a one-table read; the tenant predicate stays in WHERE. */
   prewhere(
-    build: (ops: ConditionOps<Tables, Ctes>) => Condition<Tables>,
+    build: (ops: ReadOps<Scope, Tables, Ctes>) => Condition<Tables>,
   ): ClickHouseRead<Scope, Tables, Row, Ctes> {
     if (this.#state.joins.length > 0) throw new QueryBuilderError({ kind: "prewhere-in-join" });
     return this.#next({
-      prewhere: [...this.#state.prewhere, build(conditionOpsFor<Tables, Ctes>()).node],
+      prewhere: [...this.#state.prewhere, build(this.#ops()).node],
     });
   }
 
   where(
-    build: (ops: ConditionOps<Tables, Ctes>) => Condition<Tables>,
+    build: (ops: ReadOps<Scope, Tables, Ctes>) => Condition<Tables>,
   ): ClickHouseRead<Scope, Tables, Row, Ctes> {
     return this.#next({
-      where: [...this.#state.where, build(conditionOpsFor<Tables, Ctes>()).node],
+      where: [...this.#state.where, build(this.#ops()).node],
     });
   }
 
   having(
-    build: (ops: ConditionOps<Tables, Ctes>) => Condition<Tables>,
+    build: (ops: ReadOps<Scope, Tables, Ctes>) => Condition<Tables>,
   ): ClickHouseRead<Scope, Tables, Row, Ctes> {
     return this.#next({
-      having: [...this.#state.having, build(conditionOpsFor<Tables, Ctes>()).node],
+      having: [...this.#state.having, build(this.#ops()).node],
     });
   }
 
-  /** `latestVersion` elects the joined side's latest version inside its own subquery. */
+  /**
+   * `latestVersion` elects the joined side's latest version inside its own subquery. A derived
+   * side joins when it selects its tenant column: its own read carries the predicate.
+   */
   innerJoin<Name extends string, Columns extends ColumnsSpec>(
-    table: ClickHouseTable<Name, Columns>,
+    table: ClickHouseTable<Name, Columns, "tenant" | "derived">,
     on: (ops: ConditionOps<Tables | Name, Ctes>) => Condition<Tables | Name>,
     options: JoinOptions = {},
   ): ClickHouseRead<Scope, Tables | Name, Row, Ctes> {
@@ -358,7 +406,7 @@ export class ClickHouseRead<
   }
 
   leftJoin<Name extends string, Columns extends ColumnsSpec>(
-    table: ClickHouseTable<Name, Columns>,
+    table: ClickHouseTable<Name, Columns, "tenant" | "derived">,
     on: (ops: ConditionOps<Tables | Name, Ctes>) => Condition<Tables | Name>,
     options: JoinOptions = {},
   ): ClickHouseRead<Scope, Tables | Name, Row, Ctes> {
@@ -377,8 +425,9 @@ export class ClickHouseRead<
     options: JoinOptions;
   }): ClickHouseRead<Scope, NextTables, Row, Ctes> {
     for (const side of [this.#state.table, table]) {
-      if (side.kind !== "tenant")
-        throw new QueryBuilderError({ kind: "unjoinable", table: side.name });
+      const joinable =
+        side.kind === "tenant" || (side.kind === "derived" && side.tenantColumn !== "");
+      if (!joinable) throw new QueryBuilderError({ kind: "unjoinable", table: side.name });
     }
     checkSource({ scope: this.#state.scope, table });
     const taken = [this.#state.table, ...this.#state.joins.map((each) => each.table)];
@@ -496,10 +545,15 @@ export class ClickHouseRead<
     return this.#next({ tenancy: { kind: "braided", held } });
   }
 
-  /** A common table expression read under the same scope, named for `oneOf(column, { cte })`. */
+  /**
+   * A common table expression read under the same scope, named for `oneOf(column, { cte })`; its
+   * body may read the CTEs declared before it.
+   */
   with<Name extends string, CteRow extends Record<string, unknown>, SubTables extends string>(
     name: Name,
-    build: (sub: ClickHouseReadStart<Scope>) => ClickHouseRead<Scope, SubTables, CteRow, NoCtes>,
+    build: (
+      sub: ClickHouseReadStart<Scope, Ctes>,
+    ) => ClickHouseRead<Scope, SubTables, CteRow, Ctes>,
   ): ClickHouseRead<Scope, Tables, Row, Ctes & Record<Name, CteRow[keyof CteRow]>> {
     const tables = [this.#state.table, ...this.#state.joins.map((join) => join.table)];
     const taken = new Set([
@@ -509,7 +563,7 @@ export class ClickHouseRead<
     if (!IDENTIFIER.test(name) || taken.has(name)) {
       throw new QueryBuilderError({ kind: "bad-cte-name", name });
     }
-    const read = build(new ClickHouseReadStart(this.#state.scope as Scope)).#state;
+    const read = build(new ClickHouseReadStart<Scope, Ctes>(this.#state.scope as Scope)).#state;
     return this.#next({ ctes: [...this.#state.ctes, { name, read }] });
   }
 
@@ -524,18 +578,22 @@ export class ClickHouseRead<
     return this.#next({ arms: [...this.#state.arms, arm] });
   }
 
-  /** This read as a table another read under the same scope selects from: `FROM (…) AS alias`. */
+  /**
+   * This read as a table another read under the same scope selects from: `FROM (…) AS alias`. It
+   * keeps a tenant column, and so may be a join side, when it selects its source's as itself.
+   */
   as<const Alias extends string>(
     alias: Alias,
   ): ClickHouseTable<Alias, DerivedColumns<Row>, "derived"> {
     if (!IDENTIFIER.test(alias)) throw new QueryBuilderError({ kind: "bad-alias", name: alias });
-    const { select } = this.#state;
+    const { select, table } = this.#state;
     if (select.length === 0) throw new QueryBuilderError({ kind: "empty-select" });
+    const keepsTenant = [this.#state, ...this.#state.arms].every(selectsOwnTenant);
     const facts: ClickHouseTableFacts = {
       kind: "derived",
       name: alias,
       stored: alias,
-      tenantColumn: "",
+      tenantColumn: keepsTenant ? table.tenantColumn : "",
       timeColumn: undefined,
       versionColumn: undefined,
       sortKey: [],
@@ -620,14 +678,21 @@ function renderStatement({ state, context, nested, keys }: Render & { nested: bo
     throw new QueryBuilderError({ kind: "nested-with" });
   }
   const parts: string[] = [];
-  if (state.ctes.length > 0) {
-    const ctes = state.ctes.map((cte) => {
-      const body = renderStatement({ state: cte.read, context, nested: true, keys: undefined });
-      return `${cte.name} AS (${body})`;
-    });
-    parts.push(`WITH ${ctes.join(", ")}`);
+  const enclosing = context.ctes.visible;
+  try {
+    // Each CTE body reads the CTEs before it; the body reads them all; none outlives its WITH.
+    if (state.ctes.length > 0) {
+      const ctes = state.ctes.map((cte) => {
+        const body = renderStatement({ state: cte.read, context, nested: true, keys: undefined });
+        context.ctes.visible = new Set([...context.ctes.visible, cte.name]);
+        return `${cte.name} AS (${body})`;
+      });
+      parts.push(`WITH ${ctes.join(", ")}`);
+    }
+    parts.push(renderBody({ state, context, keys }));
+  } finally {
+    context.ctes.visible = enclosing;
   }
-  parts.push(renderBody({ state, context, keys }));
   return parts.join(" ");
 }
 
@@ -768,11 +833,8 @@ function sourceOf({ state, context }: { state: ReadState; context: RenderContext
   const { table } = state;
   if (table === NO_TABLE) return { from: undefined, predicate: undefined };
   if (state.joins.length === 0) {
-    const derived = DERIVED.get(table);
-    if (derived !== undefined) {
-      const body = renderStatement({ state: derived, context, nested: false, keys: undefined });
-      return { from: `(${body}) AS ${table.name}`, predicate: undefined };
-    }
+    const derived = derivedSide({ table, context });
+    if (derived !== undefined) return { from: derived, predicate: undefined };
     const alias = table.name === table.stored ? "" : ` AS ${table.name}`;
     return {
       from: `${table.stored}${alias}${state.final ? " FINAL" : ""}`,
@@ -780,23 +842,27 @@ function sourceOf({ state, context }: { state: ReadState; context: RenderContext
     };
   }
   // The FROM side binds its parameters before the joined sides, in text order.
-  const first = joinSide({
-    state,
-    table,
-    context,
-    final: state.final,
-    latestVersion: state.latestVersion !== undefined,
-  });
+  const first =
+    derivedSide({ table, context }) ??
+    joinSide({
+      state,
+      table,
+      context,
+      final: state.final,
+      latestVersion: state.latestVersion !== undefined,
+    });
   const joined = state.joins.map((join) => {
     const left = `${table.name}.${table.tenantColumn}`;
     const right = `${join.table.name}.${join.table.tenantColumn}`;
-    const side = joinSide({
-      state,
-      table: join.table,
-      context,
-      final: false,
-      latestVersion: join.latestVersion,
-    });
+    const side =
+      derivedSide({ table: join.table, context }) ??
+      joinSide({
+        state,
+        table: join.table,
+        context,
+        final: false,
+        latestVersion: join.latestVersion,
+      });
     const on = renderExpression({ node: join.on, context, qualify: true });
     return `${join.kind} JOIN ${side} ON ${left} = ${right} AND ${on}`;
   });
@@ -873,6 +939,22 @@ function selectionOf({
     });
   }
   return ordered;
+}
+
+/** A derived join side: its own read, whose text carries the scope's predicate on its tables. */
+function derivedSide({
+  table,
+  context,
+}: {
+  table: ClickHouseTableFacts;
+  context: RenderContext;
+}): string | undefined {
+  if (table.kind !== "derived") return undefined;
+  // Only `as` makes a derived table; one it did not make has no read to carry the predicate.
+  const derived = DERIVED.get(table);
+  if (derived === undefined) throw new QueryBuilderError({ kind: "foreign-scope" });
+  const body = renderStatement({ state: derived, context, nested: false, keys: undefined });
+  return `(${body}) AS ${table.name}`;
 }
 
 /** A join side: a scoped subquery projecting its tenant column and every column read of it. */

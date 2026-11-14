@@ -24,6 +24,7 @@ export type QueryBuilderViolation =
   | { kind: "ordered-union" }
   | { kind: "nested-with" }
   | { kind: "bad-cte-name"; name: string }
+  | { kind: "unknown-cte"; name: string }
   | { kind: "bad-alias"; name: string }
   | { kind: "bad-row-count"; value: number }
   | { kind: "unsupported-operand"; column: string }
@@ -33,6 +34,8 @@ export type QueryBuilderViolation =
   | { kind: "unjoinable"; table: string }
   | { kind: "prewhere-in-join" }
   | { kind: "id-bound-in-join" }
+  | { kind: "empty-id-list" }
+  | { kind: "scalar-not-one-value"; selected: number }
   | { kind: "bad-union-order" }
   | { kind: "refused-setting"; setting: string }
   | { kind: "settings-in-union" };
@@ -86,6 +89,8 @@ function describe(violation: QueryBuilderViolation): string {
       return "A common table expression carries no WITH or UNION ALL of its own.";
     case "bad-cte-name":
       return `"${violation.name}" is not a usable common table expression name.`;
+    case "unknown-cte":
+      return `"${violation.name}" is not a common table expression declared before this text, so it would read a stored table.`;
     case "bad-alias":
       return `"${violation.name}" is not a plain identifier naming a selected value.`;
     case "bad-row-count":
@@ -99,7 +104,7 @@ function describe(violation: QueryBuilderViolation): string {
     case "table-outside-scope":
       return `Table "${violation.table}" cannot be read under a ${violation.scope} scope.`;
     case "unjoinable":
-      return `"${violation.table}" is not a stored tenant table, so it cannot be a join side.`;
+      return `"${violation.table}" is neither a stored tenant table nor a derived read selecting its tenant column, so it cannot be a join side.`;
     case "prewhere-in-join":
       return "PREWHERE applies to a one-table read; a join side filters in its own subquery.";
     case "id-bound-in-join":
@@ -108,6 +113,10 @@ function describe(violation: QueryBuilderViolation): string {
       return "A UNION ALL read is ordered by the keys it selects, not by an expression.";
     case "refused-setting":
       return `"${violation.setting}" cannot be set by a read: SQL_ and pinned settings are the scope's, and a value is a finite number or a plain word.`;
+    case "scalar-not-one-value":
+      return `A scalar subquery selects one value; this one selects ${violation.selected}.`;
+    case "empty-id-list":
+      return "An id-bound read names at least one id; an empty list reads nothing, so skip the read.";
     case "settings-in-union":
       return "A SETTINGS clause binds one SELECT; set it on a read that selects from the union.";
   }

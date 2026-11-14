@@ -28,7 +28,10 @@ import {
   TEST_CLICKHOUSE_TUNING,
   testClickHouseProfilePins,
 } from "../clickhouse-test-endpoints.ts";
+import { idBoundOf } from "../idBound.ts";
 import { TENANT_IDS_SETTING } from "../identity/tenantSetting.ts";
+import { defineIdIndex } from "../idIndexFlags.ts";
+import { windowFragment } from "../windowedRead.ts";
 
 const DATABASE = `builder_reads_${process.pid}`;
 const READER = `builder_reader_${process.pid}`;
@@ -86,6 +89,24 @@ const runs = defineClickHouseTable({
     "Messages.Id": column.array(column.string()),
     "Messages.Role": column.array(column.string()),
     "Criteria.Status": column.array(column.lowCardinality(column.string())),
+  },
+});
+
+const evaluations = defineClickHouseTable({
+  name: "evaluation_runs",
+  tenantColumn: "TenantId",
+  timeColumn: "ScheduledAt",
+  versionColumn: "UpdatedAt",
+  sortKey: ["TenantId", "EvaluationId"],
+  columns: {
+    TenantId: column.string(),
+    EvaluationId: column.string(),
+    TraceId: column.nullable(column.string()),
+    EvaluatorId: column.string(),
+    Status: column.string(),
+    Score: column.nullable(column.float64()),
+    ScheduledAt: column.dateTime64({ precision: 3 }),
+    UpdatedAt: column.dateTime64({ precision: 3 }),
   },
 });
 
@@ -204,6 +225,32 @@ const RUNS = [
     "Criteria.Status": ["PASSED"],
   },
 ];
+const evaluation = (
+  TenantId: string,
+  EvaluationId: string,
+  TraceId: string | null,
+  Score: number | null,
+  updatedAgo = 100,
+) => ({
+  TenantId,
+  EvaluationId,
+  TraceId,
+  EvaluatorId: "ev_1",
+  Status: Score === null ? "scheduled" : "processed",
+  Score,
+  ScheduledAt: at(NOW - 300),
+  UpdatedAt: at(NOW - updatedAgo),
+});
+/** Tenant B reuses A's evaluation and trace ids, so a missing predicate or tenant join shows. */
+const EVALUATIONS = [
+  evaluation(A, "e1", "t0", 0.5, 200),
+  evaluation(A, "e1", "t0", 0.75),
+  evaluation(A, "e2", "t1", 1),
+  evaluation(A, "e3", null, null),
+  evaluation(B, "e1", "t0", 0.25, 50),
+  evaluation(B, "e9", "t1", 0.5),
+];
+
 /** One rollup part per row: AggregateFunction states are written by -State functions. */
 const ROLLUP_PARTS = [
   [A, "t0", 1.5, "map('agent', 1.0)", 10, 2, NOW - 200],
@@ -513,6 +560,121 @@ const SHAPES: Record<string, { statement: () => Sendable; rows: string[] }> = {
   },
 };
 
+/** The statement with its id markers expanded as the client expands them for one window. */
+function windowed({ statement, key }: { statement: Sendable; key: string }): Sendable {
+  const declaration = defineIdIndex({ source: "evaluation_runs", key: [key], time: "ScheduledAt" });
+  const registry = { declarationOf: () => declaration, declarations: () => [declaration] };
+  const bound = idBoundOf({ sql: statement.sql, params: { ...statement.params }, registry });
+  if (bound === null) throw new Error("the shape carries an idBound marker");
+  return { ...statement, ...bound.render(windowFragment({ fromMs: NOW - 60_000, toMs: NOW })) };
+}
+
+/** The third census's shapes: the reads the evaluation and scenario ports stopped on. */
+const GAPS_3_SHAPES: Record<string, { statement: () => Sendable; rows: string[] }> = {
+  "a list of ids bounding a nullable id column": {
+    statement: () =>
+      windowed({
+        key: "TraceId",
+        statement: clickhouseRead({ scope: single })
+          .from(evaluations)
+          .latestVersion()
+          .select({ EvaluationId: evaluations.EvaluationId, Score: evaluations.Score })
+          .where(({ idBound }) => idBound(evaluations.TraceId, ["t0", "t1"]))
+          .build(),
+      }),
+    rows: ["e1|0.75", "e2|1"],
+  },
+  "a join of two derived reads by day in a time zone": {
+    statement: () => {
+      const traces = clickhouseRead({ scope: single })
+        .from(summaries)
+        .select({
+          TenantId: summaries.TenantId,
+          TraceId: summaries.TraceId,
+          TraceOccurredAt: fn.argMax(summaries.OccurredAt, summaries.UpdatedAt),
+        })
+        .where(({ gte }) => gte(summaries.OccurredAt, NOW - 60_000))
+        .groupBy(summaries.TenantId, summaries.TraceId)
+        .as("traces");
+      const latest = clickhouseRead({ scope: single })
+        .from(evaluations)
+        .select({
+          TenantId: evaluations.TenantId,
+          Latest: fn.argMax(
+            fn.tuple(evaluations.TraceId, evaluations.Status, evaluations.Score),
+            evaluations.UpdatedAt,
+          ),
+        })
+        .where(({ oneOf }) => oneOf(evaluations.EvaluatorId, ["ev_1"]))
+        .groupBy(evaluations.TenantId, evaluations.EvaluationId)
+        .as("latest");
+      const scored = clickhouseRead({ scope: single })
+        .from(latest)
+        .select({
+          TenantId: latest.TenantId,
+          TraceId: fn.tupleElement(latest.Latest, "0"),
+          Status: fn.tupleElement(latest.Latest, "1"),
+          Score: fn.tupleElement(latest.Latest, "2"),
+        })
+        .as("scored");
+      const day = fn.toString(
+        fn.toStartOfDay(traces.TraceOccurredAt, { timeZone: "America/Los_Angeles" }),
+      );
+      return clickhouseRead({ scope: single })
+        .from(traces)
+        .innerJoin(scored, ({ eq }) => eq(scored.TraceId, traces.TraceId))
+        .select({ Day: day, ScoreSum: fn.sum(scored.Score), ScoreCount: fn.count() })
+        .where(({ eq }) => eq(scored.Status, param.string("processed")))
+        .groupBy(day)
+        .build();
+    },
+    rows: ["2027-01-14 00:00:00|1.75|2"],
+  },
+  "a CTE reading an earlier CTE": {
+    statement: () =>
+      clickhouseRead({ scope: single })
+        .from(evaluations)
+        .with("traced", (sub) => sub.from(summaries).select({ TraceId: summaries.TraceId }))
+        .with("scored", (sub) =>
+          sub
+            .from(evaluations)
+            .select({ EvaluationId: evaluations.EvaluationId })
+            .where(({ oneOf }) => oneOf(fn.ifNull(evaluations.TraceId, ""), { cte: "traced" })),
+        )
+        .distinct()
+        .select({ EvaluationId: evaluations.EvaluationId })
+        .where(({ oneOf }) => oneOf(evaluations.EvaluationId, { cte: "scored" }))
+        .build(),
+    rows: ["e1", "e2"],
+  },
+  "a scalar subquery electing the latest version by id": {
+    statement: () =>
+      windowed({
+        key: "EvaluationId",
+        statement: clickhouseRead({ scope: single })
+          .from(evaluations)
+          .select({ Score: evaluations.Score })
+          .where(({ and, eq, idBound, scalar }) =>
+            and(
+              idBound(evaluations.EvaluationId, "e1"),
+              eq(
+                evaluations.UpdatedAt,
+                scalar((sub) =>
+                  sub
+                    .from(evaluations)
+                    .select({ v: fn.max(evaluations.UpdatedAt) })
+                    .where(({ idBound: inner }) => inner(evaluations.EvaluationId, "e1")),
+                ),
+              ),
+            ),
+          )
+          .limit(1)
+          .build(),
+      }),
+    rows: ["0.75"],
+  },
+};
+
 describe("given builder statements sent as a reader under a row policy on ClickHouse 26.8", () => {
   beforeAll(async () => {
     const pins = testClickHouseProfilePins();
@@ -552,6 +714,11 @@ describe("given builder statements sent as a reader under a row policy on ClickH
          ENGINE = AggregatingMergeTree ORDER BY (TenantId, TraceId)`,
       `CREATE ROW POLICY ${READER}_runs ON ${DATABASE}.simulation_runs USING ${POLICY} TO ${READER}`,
       `CREATE ROW POLICY ${READER}_rollup ON ${DATABASE}.metrics_rollup USING ${POLICY} TO ${READER}`,
+      `CREATE TABLE ${DATABASE}.evaluation_runs (TenantId String, EvaluationId String,
+         TraceId Nullable(String), EvaluatorId String, Status String, Score Nullable(Float64),
+         ScheduledAt DateTime64(3), UpdatedAt DateTime64(3))
+         ENGINE = ReplacingMergeTree(UpdatedAt) ORDER BY (TenantId, EvaluationId)`,
+      `CREATE ROW POLICY ${READER}_evaluations ON ${DATABASE}.evaluation_runs USING ${POLICY} TO ${READER}`,
       ...ROLLUP_PARTS.map(
         ([tenant, trace, cost, roles, spend, count, ms]) =>
           `INSERT INTO ${DATABASE}.metrics_rollup SELECT '${tenant}', '${trace}',
@@ -575,6 +742,11 @@ describe("given builder statements sent as a reader under a row policy on ClickH
     await admin.insert({
       table: `${DATABASE}.simulation_runs`,
       values: RUNS,
+      format: "JSONEachRow",
+    });
+    await admin.insert({
+      table: `${DATABASE}.evaluation_runs`,
+      values: EVALUATIONS,
       format: "JSONEachRow",
     });
     reader = createClient({ url, username: READER, password: READER_PASSWORD, database: DATABASE });
@@ -610,6 +782,22 @@ describe("given builder statements sent as a reader under a row policy on ClickH
       });
 
       /** @scenario "Nested columns, AggregateFunction merges, lambdas and bound constants run on 26.8" */
+      it("keeps another tenant's rows out by its own text when the setting lists every tenant", async () => {
+        expect(await rowsOf({ statement: shape.statement(), tenants: EVERY_TENANT })).toEqual(
+          shape.rows,
+        );
+      });
+    });
+  }
+
+  for (const [name, shape] of Object.entries(GAPS_3_SHAPES)) {
+    describe(`when ${name} is built and sent`, () => {
+      /** @scenario "Nullable and listed ids, derived joins, chained CTEs and scalar subqueries run on 26.8" */
+      it("returns exactly its tenant's rows", async () => {
+        expect(await rowsOf({ statement: shape.statement() })).toEqual(shape.rows);
+      });
+
+      /** @scenario "Nullable and listed ids, derived joins, chained CTEs and scalar subqueries run on 26.8" */
       it("keeps another tenant's rows out by its own text when the setting lists every tenant", async () => {
         expect(await rowsOf({ statement: shape.statement(), tenants: EVERY_TENANT })).toEqual(
           shape.rows,

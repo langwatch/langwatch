@@ -7,6 +7,7 @@ export {
   type ClickHouseReadStatement,
   type DerivedColumns,
   type MetadataReadStatement,
+  type ReadOps,
   type ReaderReadStatement,
   type SystemReadStatement,
 } from "./read.ts";
