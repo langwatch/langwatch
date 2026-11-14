@@ -1,5 +1,21 @@
 # Changelog
 
+## [3.1.1](https://github.com/langwatch/langwatch/compare/langevals@v3.1.0...langevals@v3.1.1) (2026-11-14)
+
+
+### Bug Fixes
+
+* **deps:** raise authlib, litellm and dnspython for today's advisories ([#9120](https://github.com/langwatch/langwatch/issues/9120)) ([828259f](https://github.com/langwatch/langwatch/commit/828259f92eafec9a0d4e1c5ffecab87e4abd2257))
+* **gateway:** record platform provider-key spend in the ledger and stop topic clustering re-embedding ([#9302](https://github.com/langwatch/langwatch/issues/9302)) ([5dacb3f](https://github.com/langwatch/langwatch/commit/5dacb3f3dc85bb2a433a81ad04bbdbfb43a85a19))
+* **langevals:** detect person names written in capitals ([#9213](https://github.com/langwatch/langwatch/issues/9213)) ([4c46055](https://github.com/langwatch/langwatch/commit/4c4605564ca5a354745a6d90619020e73ec3fff8))
+* **langevals:** embed a clustering page's batches concurrently and keep unpriced names ([#9563](https://github.com/langwatch/langwatch/issues/9563)) ([73570b2](https://github.com/langwatch/langwatch/commit/73570b289faa9f55dfb6eb3dcd41b6e4ec9e9d40))
+* **langevals:** judges reach a verdict on gpt-6 reasoning models ([#9102](https://github.com/langwatch/langwatch/issues/9102)) ([d7b6238](https://github.com/langwatch/langwatch/commit/d7b623874e55e0b6af4d81ce9671114d54dfb2cc))
+* **langevals:** restore the ragas evaluators and close 84 of 90 alerts ([#6777](https://github.com/langwatch/langwatch/issues/6777)) ([9383116](https://github.com/langwatch/langwatch/commit/93831164b0a0a1bd867d8c1a8361a29d6c203efb))
+* **langevals:** skip the capitalised-name second pass for lone capital words ([#9256](https://github.com/langwatch/langwatch/issues/9256)) ([749e9f3](https://github.com/langwatch/langwatch/commit/749e9f3bfb1506e43a7998abcb029db83912e51b))
+* **model-provider:** hold an evaluator's max tokens to the model's limit on Vertex AI ([#8824](https://github.com/langwatch/langwatch/issues/8824)) ([e34afda](https://github.com/langwatch/langwatch/commit/e34afda1f608f9a113079517136da47a322efc11))
+* production error findings since the strict-layout deploy ([#8817](https://github.com/langwatch/langwatch/issues/8817)) ([42f3364](https://github.com/langwatch/langwatch/commit/42f3364c8eec7e6aa9a6dcc29fcb7b899bcd7c82))
+* **security:** close the nine alerts raised on 2026-10-22 ([#8982](https://github.com/langwatch/langwatch/issues/8982)) ([7eca2c2](https://github.com/langwatch/langwatch/commit/7eca2c24ccba4b38a1636048ea18801a2fd1d2b1))
+
 ## [3.1.0](https://github.com/langwatch/langwatch/compare/langevals@v3.0.0...langevals@v3.1.0) (2026-09-12)
 
 ### Features
