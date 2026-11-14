@@ -52,6 +52,13 @@ Feature: Dataset editor
       When I press Tab until the last column is selected
       Then the selected cell is scrolled into view
 
+    @integration
+    Scenario: Moving with the keyboard to a row that is not rendered brings it into view
+      Given the dataset has more rows than the grid renders at once
+      And a cell in the first row is selected
+      When I press the down arrow until the selection passes the rendered rows
+      Then the grid scrolls to the selected row
+
   @integration @unimplemented
   Scenario: Large datasets stay responsive
     Given the dataset has thousands of records

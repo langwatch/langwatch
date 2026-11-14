@@ -5,9 +5,9 @@
  */
 import type { Row } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect } from "react";
 
-import type { DatasetTableRowData } from "../../model/dataset-table-context.tsx";
+import { type DatasetTableRowData, useDatasetTable } from "../../model/dataset-table-context.tsx";
 import { TableCell } from "../elements/table-cell.tsx";
 
 // Fixed row height for compact mode
@@ -57,6 +57,7 @@ function VirtualizedTableBodyImpl<TData extends DatasetTableRowData>({
     overscan: 5, // Render 5 extra rows above/below viewport for smooth scrolling
     enabled: shouldVirtualize && !!scrollContainer,
   });
+  useScrollToSelectedRow({ rowVirtualizer, enabled: shouldVirtualize && !disableVirtualization });
 
   // Render all rows without virtualization when:
   // - Test mode (disableVirtualization prop)
@@ -161,6 +162,25 @@ function VirtualizedTableBodyImpl<TData extends DatasetTableRowData>({
       )}
     </>
   );
+}
+
+/**
+ * A selected row outside the rendered window has no cell to scroll into view,
+ * so the keyboard would move the selection out of sight; scroll the grid to it.
+ */
+function useScrollToSelectedRow({
+  rowVirtualizer,
+  enabled,
+}: {
+  rowVirtualizer: ReturnType<typeof useVirtualizer<HTMLElement, Element>>;
+  enabled: boolean;
+}) {
+  const selectedRow = useDatasetTable().selectedCell?.row;
+  useEffect(() => {
+    if (!enabled || selectedRow === undefined) return;
+    const isRendered = rowVirtualizer.getVirtualItems().some((item) => item.index === selectedRow);
+    if (!isRendered) rowVirtualizer.scrollToIndex(selectedRow, { align: "auto" });
+  }, [enabled, selectedRow, rowVirtualizer]);
 }
 
 /**

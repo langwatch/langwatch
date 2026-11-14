@@ -146,17 +146,14 @@ describe("given an in-memory dataset", () => {
       const grid = screen.getByTestId("dataset-editor-grid");
       const columns = grid.querySelectorAll("colgroup col");
       expect(columns).toHaveLength(31);
+      const checkboxColumnPx = 36;
       const floor = Number.parseInt(grid.style.minWidth, 10);
-      expect(floor).toBeGreaterThanOrEqual(30 * 160);
+      expect(floor).toBeGreaterThanOrEqual(checkboxColumnPx + 30 * 160);
       expect(getComputedStyle(grid.parentElement!).overflowX).toBe("auto");
     });
 
     /** @scenario Moving with the keyboard to a column off screen scrolls it into view */
     it("scrolls each cell the keyboard selects into view", async () => {
-      // jsdom has no scrollIntoView to spy on until one is defined.
-      if (!(Element.prototype as { scrollIntoView?: unknown }).scrollIntoView) {
-        Element.prototype.scrollIntoView = () => {};
-      }
       const scrollIntoView = vi
         .spyOn(Element.prototype, "scrollIntoView")
         .mockImplementation(() => {});
@@ -173,6 +170,41 @@ describe("given an in-memory dataset", () => {
         expect(scrollIntoView.mock.contexts.at(-1)).toBe(lastCell);
       } finally {
         scrollIntoView.mockRestore();
+      }
+    });
+  });
+
+  describe("when the dataset has more rows than the grid renders at once", () => {
+    /** @scenario Moving with the keyboard to a row that is not rendered brings it into view */
+    it("scrolls the grid to the selected row once it leaves the rendered rows", async () => {
+      const scrollTo = vi.spyOn(Element.prototype, "scrollTo").mockImplementation(() => {});
+      // jsdom lays nothing out; the virtualizer needs a viewport to render rows into.
+      const height = vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(800);
+      const width = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(1000);
+      try {
+        const user = userEvent.setup();
+        renderInMemory({
+          inMemoryDataset: {
+            name: "Long",
+            columnTypes,
+            datasetRecords: Array.from({ length: 150 }, (_, i) => ({
+              id: `r${i}`,
+              input: `value ${i}`,
+              expected_output: "",
+            })),
+          },
+        });
+
+        await user.click(await screen.findByText("value 0"));
+        scrollTo.mockClear();
+        for (let i = 0; i < 40; i++) await user.keyboard("{ArrowDown}");
+
+        const grid = screen.getByTestId("dataset-editor-grid").parentElement!;
+        expect(scrollTo.mock.contexts).toContain(grid);
+      } finally {
+        scrollTo.mockRestore();
+        height.mockRestore();
+        width.mockRestore();
       }
     });
   });

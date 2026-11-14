@@ -12,7 +12,7 @@ const columnsNamed = (names: string[]): DatasetColumns =>
 
 describe("given a dataset preview", () => {
   describe("when the dataset has more columns than fit", () => {
-    /** @scenario "A dataset preview with more columns than fit scrolls sideways instead of squeezing them" */
+    /** @scenario "Every dataset preview keeps its columns at a readable width" */
     it("floors the table at a minimum width per visible column and scrolls sideways", () => {
       const names = Array.from({ length: 30 }, (_, i) => `column_${i}`);
       renderWithDesignSystem(
@@ -20,7 +20,11 @@ describe("given a dataset preview", () => {
       );
 
       const table = screen.getByTestId("dataset-preview-table");
-      expect(Number.parseInt(table.style.minWidth, 10)).toBeGreaterThanOrEqual(8 * 160);
+      const rowNumberColumnPx = 48;
+      const visibleColumns = 8;
+      expect(Number.parseInt(table.style.minWidth, 10)).toBeGreaterThanOrEqual(
+        rowNumberColumnPx + visibleColumns * 160,
+      );
       expect(getComputedStyle(table.parentElement!).overflowX).toBe("auto");
     });
   });
