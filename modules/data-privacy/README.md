@@ -54,17 +54,18 @@ organization.
   ([ADR-201](../../dev/docs/adr/201-pii-redaction-model-call-is-metered.md),
   `specs/pii-redaction-billing.feature`).
 
-- **Strict only.** Only a batch whose project's resolved privacy policy is `strict` can reach the
-  model. A custom level, even one that selects every analysis-service entity, and a batch whose
-  policy could not be loaded stay on Presidio exactly as today, without reading the flag. The
-  request's own level is not enough: both of those send `STRICT` batches too.
+- **Strict only.** Only a batch whose effective PII level is `strict` can reach the model: the
+  project's policy is `strict`, or it is `essential` and the request asks for `STRICT`. A custom
+  level, even one that selects every analysis-service entity, and a batch whose policy could not
+  be loaded stay on Presidio exactly as today, without reading the flag. The request's own level
+  is not enough on its own: both of those send `STRICT` batches too.
 
 - **Time cap.** A model call is aborted after 50 s (`PII_REDACTION_MODEL_TIMEOUT_MS`) and the batch
   goes to Presidio. Presidio then gets its own 60 s timeout: the two timers are separate, so a
   batch can wait up to 110 s (50 + 60) before it reaches Google DLP.
   The abort cancels the invoke request; the function itself may run on until its own timeout.
 - **Usage log.** Each batch routed to the model leaves one `PII redaction model call` log line
-  with `organizationId`, `projectId`, `texts`, `characters`, `spansFound`, `outcome` (`ok`, or the
+  with `organizationId`, `projectId`, `texts`, `characters`, `findings`, `outcome` (`ok`, or the
   fallback reason) and `durationMs`; an error adds its class name only. It never holds a text, a
   finding's value or an error message. Fallbacks are also counted by `reason` on
   `pii_redaction_model_fallbacks` (`too_long`, `timeout`, `throttled`, `error`, `breaker_open`,
