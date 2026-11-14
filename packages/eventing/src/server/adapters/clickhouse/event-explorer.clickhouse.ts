@@ -139,8 +139,8 @@ export class EventingClickHouseEventExplorer {
       aggregateId: string;
       aggregateType: string;
       tenantId: string;
-      eventCount: string;
-      lastEventTime: string;
+      eventCount: string | number;
+      lastEventTime: string | number;
     }>({
       tenantId: ACROSS_TENANTS,
       sql: `
@@ -165,12 +165,13 @@ export class EventingClickHouseEventExplorer {
       SKIP_TENANT_CHECK: true,
     });
 
+    // UInt64 columns arrive as a JSON string or a number, by server version and settings.
     return rows.map((row) => ({
       aggregateId: row.aggregateId,
       aggregateType: row.aggregateType,
       tenantId: row.tenantId,
-      eventCount: parseInt(row.eventCount, 10),
-      lastEventTime: row.lastEventTime,
+      eventCount: Number(row.eventCount),
+      lastEventTime: String(row.lastEventTime),
     }));
   }
 
@@ -184,7 +185,9 @@ export class EventingClickHouseEventExplorer {
     // one aggregate you want its full event history, including projection replays where the
     // fold depends on every event. The partition fan-out is acceptable here because the
     // aggregate-id seek is narrow per partition.
-    const { rows } = await this.clickhouse.query<RawEventRow>({
+    const { rows } = await this.clickhouse.query<
+      Omit<RawEventRow, "eventTimestamp"> & { eventTimestamp: string | number }
+    >({
       tenantId: params.tenantId,
       sql: `
         SELECT
@@ -205,6 +208,6 @@ export class EventingClickHouseEventExplorer {
       },
     });
 
-    return rows;
+    return rows.map((row) => ({ ...row, eventTimestamp: String(row.eventTimestamp) }));
   }
 }

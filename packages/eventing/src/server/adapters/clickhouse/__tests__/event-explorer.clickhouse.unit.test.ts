@@ -219,3 +219,55 @@ describe("EventingClickHouseEventExplorer.findEventsByAggregate", () => {
     });
   });
 });
+
+describe("EventingClickHouseEventExplorer timestamps", () => {
+  /** `EventTimestamp` is a UInt64: ClickHouse may answer it as a JSON number, not a string. */
+  const repoAnswering = (rows: Record<string, unknown>[]) =>
+    EventingClickHouseEventExplorer.create({
+      clickhouse: clickHouseQueryClientDouble({ query: async () => ({ rows }) }),
+    });
+
+  describe("given ClickHouse answers the last event time as a number", () => {
+    describe("when searchAggregates is called", () => {
+      it("returns it as the string the ops contract declares", async () => {
+        const repo = repoAnswering([
+          {
+            aggregateId: "trace-1",
+            aggregateType: "trace",
+            tenantId: "project_test",
+            eventCount: 3,
+            lastEventTime: 1_760_000_000_000,
+          },
+        ]);
+
+        const [found] = await repo.searchAggregates({ query: "trace-1" });
+
+        expect(found?.lastEventTime).toBe("1760000000000");
+        expect(found?.eventCount).toBe(3);
+      });
+    });
+  });
+
+  describe("given ClickHouse answers an event timestamp as a number", () => {
+    describe("when findEventsByAggregate is called", () => {
+      it("returns it as the string the ops contract declares", async () => {
+        const repo = repoAnswering([
+          {
+            eventId: "event-1",
+            eventType: "lw.trace.span_received",
+            eventTimestamp: 1_760_000_000_000,
+            payload: "{}",
+          },
+        ]);
+
+        const [event] = await repo.findEventsByAggregate({
+          aggregateId: "agg-1",
+          tenantId: "project_test",
+          limit: 10,
+        });
+
+        expect(event?.eventTimestamp).toBe("1760000000000");
+      });
+    });
+  });
+});
