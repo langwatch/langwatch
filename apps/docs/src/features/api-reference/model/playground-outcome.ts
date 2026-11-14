@@ -1,5 +1,6 @@
 export type Outcome =
   | { kind: "idle" }
+  | { kind: "confirming" }
   | { kind: "sending" }
   | {
       kind: "response";

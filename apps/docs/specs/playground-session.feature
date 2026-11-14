@@ -50,6 +50,16 @@ Feature: Use my LangWatch account in the API playground
     And a request is sent with the pasted key
 
   @integration
+  Scenario: Lead the reader to the frame's confirmation and back to the response
+    Given the frame is connected
+    When I send a request that changes data
+    Then the playground brings the frame's confirmation into view
+    And says, where the response will appear, to confirm it in the LangWatch box above
+    When the reader presses Send in the frame
+    Then the playground brings the waiting response into view
+    And shows the response once the frame answers
+
+  @integration
   Scenario: Say so when the reader declines a request in the frame
     Given the frame is connected
     When I send a request that the reader then cancels in the frame

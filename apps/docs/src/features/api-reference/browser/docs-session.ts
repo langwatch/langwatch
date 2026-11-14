@@ -26,6 +26,7 @@ let frame: HTMLIFrameElement | null = null;
 let connected: { project: string } | null = null;
 let nextId = 0;
 const waiting = new Map<string, (answer: FrameAnswer) => void>();
+const confirmed = new Map<string, () => void>();
 const listeners = new Set<Listener>();
 
 export function appOrigin(): string {
@@ -61,9 +62,13 @@ function onMessage(event: MessageEvent) {
       message.connected && message.project !== null ? { project: message.project } : null,
     );
   else if (message.kind === "height") setFrameHeight({ px: Math.ceil(message.height) });
-  else {
+  else if (message.kind === "confirmed") {
+    confirmed.get(message.id)?.();
+    confirmed.delete(message.id);
+  } else {
     waiting.get(message.id)?.(message);
     waiting.delete(message.id);
+    confirmed.delete(message.id);
   }
 }
 
@@ -98,6 +103,7 @@ function cancelWaiting() {
     resolve({ kind: "failed", reason: "cancelled" });
   }
   waiting.clear();
+  confirmed.clear();
 }
 
 function toFrame(message: Record<string, unknown>) {
@@ -107,13 +113,18 @@ function toFrame(message: Record<string, unknown>) {
   );
 }
 
-/** Asks the frame to send `request` as the reader; an abort asks it to cancel. */
+/**
+ * Asks the frame to send `request` as the reader; an abort asks it to cancel. `onConfirmed` runs
+ * when the reader presses Send on the frame's confirmation, which only a write shows.
+ */
 export function sendThroughFrame({
   request,
   signal,
+  onConfirmed,
 }: {
   request: { method: string; path: string; headers: Record<string, string>; body: string | null };
   signal: AbortSignal;
+  onConfirmed?: () => void;
 }): Promise<FrameAnswer> {
   // A frame the page swapped out without leaving would never answer.
   if (!frame?.isConnected) {
@@ -124,11 +135,13 @@ export function sendThroughFrame({
   const id = `request-${nextId}`;
   return new Promise((resolve) => {
     waiting.set(id, resolve);
+    if (onConfirmed) confirmed.set(id, onConfirmed);
     signal.addEventListener(
       "abort",
       () => {
         toFrame({ kind: "cancel", id });
         waiting.delete(id);
+        confirmed.delete(id);
         resolve({ kind: "failed", reason: signal.reason === "timeout" ? "timeout" : "cancelled" });
       },
       { once: true },
