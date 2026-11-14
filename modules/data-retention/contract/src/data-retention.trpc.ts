@@ -22,6 +22,7 @@ import {
   retroactiveMutationProjectInputSchema,
   retroactiveRetentionUpdateResultSchema,
 } from "./data-retention.ts";
+import { RETROACTIVE_RETENTION_EVENT_TYPES } from "./retroactive-retention.events.ts";
 
 /** The project every retention procedure is opened from. */
 const retentionProjectScopeSchemaDefinition = z.object({ projectId: z.string() });
@@ -121,7 +122,8 @@ export const dataRetentionTrpc = defineTrpcContract("dataRetention")
   .withInput(retentionTriggerRetroactiveInputSchema)
   .withOutput(retroactiveRetentionUpdateResultSchema)
 
-  .query("getMutationProgress")
+  /** The worker's progress status for the project; refreshed by read hints on its facts. */
+  .query("getMutationProgress", { invalidatedBy: [...RETROACTIVE_RETENTION_EVENT_TYPES] })
   .withInput(retroactiveMutationProjectInputSchema)
   .withOutput(retroactiveMutationProgressSchema.array())
 

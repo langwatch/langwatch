@@ -19,6 +19,11 @@ import { z } from "zod";
 import { EVENT_LOG_RETENTION_CLASSIFICATION } from "../../rules/event-log-retention.rules.ts";
 import { idIndexCategories } from "../../rules/id-index-categories.rules.ts";
 import {
+  EVENTING_APPLY_TARGET,
+  retroactiveApplyPlan,
+  type RetroactiveApplyPlan,
+} from "../../rules/retroactive-apply-targets.rules.ts";
+import {
   keepForeverRewriteSchema,
   type ClickHouseTarget,
   type KeepForeverRewrite,
@@ -105,71 +110,69 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
     return this.eventLogRetention.tables.includes(table);
   }
 
+  #plan(category: RetentionCategory): RetroactiveApplyPlan {
+    return retroactiveApplyPlan({
+      category,
+      idIndexCategories: this.idIndexCategories(),
+      eventingTables: this.eventLogRetention.tables,
+    });
+  }
+
   async triggerUpdate(input: {
     projectId: string;
     category: RetentionCategory;
     newRetentionDays: number;
   }): Promise<{ tables: string[] }> {
-    const categoryTables = Object.entries(RETENTION_TABLE_CATEGORY_MAP)
-      .filter(([, category]) => category === input.category)
-      .map(([table]) => table);
-    const categoryIndexes = [...this.idIndexCategories()]
-      .filter(([, category]) => category === input.category)
-      .map(([index]) => index);
-    // Eventing's tables are classified per row, so every category visits them.
-    const tables = [
-      ...new Set([...categoryTables, ...categoryIndexes, ...this.eventLogRetention.tables]),
-    ];
-
-    const activeMutations = await this.getActiveMutations({
-      projectId: input.projectId,
-      tables,
-      category: input.category,
-    });
-
+    const activeMutations = await this.findActiveMutations(input);
     if (activeMutations.length > 0) {
       throw new RetroactiveMutationInProgressError(activeMutations);
     }
+    const plan = this.#plan(input.category);
+    const rewritten: string[] = [];
+    for (const target of plan.targets) {
+      rewritten.push(...(await this.rewriteTarget({ ...input, target })));
+    }
+    const eventingTables = rewritten.filter((table) => this.isEventingTable(table));
+    const heldIndexes = rewritten.filter((table) => plan.categoryIndexes.includes(table));
+    return { tables: [...new Set([...plan.mappedTables, ...heldIndexes, ...eventingTables])] };
+  }
 
-    // Once for both of eventing's tables: it raises its own index where the target holds it.
-    const eventingTables = await this.eventLogRetention.retainCategory({
-      tenantId: input.projectId,
-      category: input.category,
-      retentionDays: input.newRetentionDays,
-    });
-    // A later migration creates each index, so a target without one yet skips it.
-    const heldIndexes = await this.findHeldTables({
-      tenantId: input.projectId,
-      tables: categoryIndexes,
-    });
+  plannedTables(input: { category: RetentionCategory }): string[] {
+    return this.#plan(input.category).tables;
+  }
 
-    for (const table of categoryTables) {
-      if (this.isEventingTable(table)) continue;
+  applyTargets(input: { category: RetentionCategory }): string[] {
+    return this.#plan(input.category).targets;
+  }
 
-      await this.clickhouse.command({
+  async rewriteTarget(input: {
+    projectId: string;
+    category: RetentionCategory;
+    newRetentionDays: number;
+    target: string;
+  }): Promise<string[]> {
+    if (input.target === EVENTING_APPLY_TARGET) {
+      // Once for both of eventing's tables: it raises its own index where the target holds it.
+      return this.eventLogRetention.retainCategory({
         tenantId: input.projectId,
-        table,
-        kind: "write",
-        sql:
-          `ALTER TABLE ${table} ` +
-          "UPDATE _retention_days = {retentionDays:UInt16} " +
-          "WHERE TenantId = {tenantId:String} " +
-          "AND _retention_days != {retentionDays:UInt16}",
-        params: {
-          tenantId: input.projectId,
-          retentionDays: input.newRetentionDays,
-        },
+        category: input.category,
+        retentionDays: input.newRetentionDays,
       });
     }
-
-    // An index row spans rows of differing retention, so a rewrite only ever raises it.
-    for (const index of heldIndexes) {
+    if (this.#plan(input.category).categoryIndexes.includes(input.target)) {
+      // A later migration creates each index, so a target without one yet skips it.
+      const held = await this.findHeldTables({
+        tenantId: input.projectId,
+        tables: [input.target],
+      });
+      if (held.length === 0) return [];
+      // An index row spans rows of differing retention, so a rewrite only ever raises it.
       await this.clickhouse.command({
         tenantId: input.projectId,
-        table: index,
+        table: input.target,
         kind: "write",
         sql:
-          `ALTER TABLE ${index} ` +
+          `ALTER TABLE ${input.target} ` +
           "UPDATE _retention_days = {retentionDays:UInt16} " +
           "WHERE TenantId = {tenantId:String} " +
           "AND _retention_days < {retentionDays:UInt16}",
@@ -178,9 +181,34 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
           retentionDays: idIndexRetentionDays(input.newRetentionDays),
         },
       });
+      return [input.target];
     }
+    await this.clickhouse.command({
+      tenantId: input.projectId,
+      table: input.target,
+      kind: "write",
+      sql:
+        `ALTER TABLE ${input.target} ` +
+        "UPDATE _retention_days = {retentionDays:UInt16} " +
+        "WHERE TenantId = {tenantId:String} " +
+        "AND _retention_days != {retentionDays:UInt16}",
+      params: {
+        tenantId: input.projectId,
+        retentionDays: input.newRetentionDays,
+      },
+    });
+    return [input.target];
+  }
 
-    return { tables: [...new Set([...categoryTables, ...heldIndexes, ...eventingTables])] };
+  findActiveMutations(input: {
+    projectId: string;
+    category: RetentionCategory;
+  }): Promise<RetroactiveMutationProgress[]> {
+    return this.getActiveMutations({
+      projectId: input.projectId,
+      tables: this.#plan(input.category).tables,
+      category: input.category,
+    });
   }
 
   async findMutationProgress(input: { projectId: string }): Promise<RetroactiveMutationProgress[]> {

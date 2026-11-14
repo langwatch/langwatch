@@ -121,7 +121,7 @@ interface Input {
   traceId: string;
   reason?: string;
 }
-// Output: pinnedTraceSchema, ../../data-retention/contract/src/data-retention.ts:75
+// Output: pinnedTraceSchema, ../../data-retention/contract/src/data-retention.ts:79
 interface Output {
   id: string;
   projectId: string;

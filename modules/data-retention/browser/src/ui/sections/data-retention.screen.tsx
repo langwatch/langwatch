@@ -219,10 +219,8 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
     rulesQuery.data?.available.projects.some((project) => project.id === projectId) ?? false;
   const progressQuery = dataRetentionApi.dataRetention.getMutationProgress.useQuery(
     { projectId },
-    {
-      enabled: projectIsWritable,
-      // needs a read hint: retroactive retention mutation finished (system.mutations)
-    },
+    // Refreshed by read hints on data-retention's retroactive facts (ADR-202 Decided 13).
+    { enabled: projectIsWritable },
   );
   const activeMutations = progressQuery.data ?? [];
 

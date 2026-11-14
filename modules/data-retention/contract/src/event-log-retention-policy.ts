@@ -67,6 +67,8 @@ export const RETENTION_CLASS_BY_AGGREGATE_TYPE: Record<string, EventLogRetention
   // Everything else: lifecycle, configuration, billing, authz, identity, governance, meters.
   agent: "indefinite",
   annotation: "indefinite",
+  // Who applied a retention change to stored rows, and its progress (ADR-202 Decided 13).
+  retroactive_retention: "indefinite",
   authz_aggregate_read: "indefinite",
   authz_grant: "indefinite",
   authz_member_offboarded: "indefinite",

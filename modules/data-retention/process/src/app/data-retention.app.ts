@@ -22,8 +22,12 @@ import {
   type StorageMeterTenantInput,
   type StorageMeterTenantsInput,
   type UnpinTraceInput,
+  type RetroactiveApplyRequestedData,
+  type RetroactiveCancelRequestedData,
+  type RetroactiveProgressRecordedData,
 } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { EventingCommandSender } from "@langwatch/eventing";
 import type { FeatureSetup } from "@langwatch/process";
 import { UserApi } from "@langwatch/user-contract";
 
@@ -31,6 +35,11 @@ import {
   buildDataRetentionSeatPolicyPipeline,
   type DataRetentionSeatPolicyPipeline,
 } from "../eventing/data-retention-seat-policy.pipeline.ts";
+import {
+  type RetroactiveRetentionPipeline,
+  retroactiveRetentionPipeline,
+} from "../eventing/retroactive-retention.pipeline.ts";
+import { RETROACTIVE_APPLY_MAX_ATTEMPTS } from "../eventing/retroactive-retention.process.ts";
 import type { DataRetentionRepositories } from "../repositories/data-retention.repositories.ts";
 import {
   DataRetentionPolicyService,
@@ -40,6 +49,10 @@ import { DataRetentionSnapshotService } from "../services/data-retention-snapsho
 import { DataRetentionService } from "../services/data-retention.service.ts";
 import { RetentionPermissionsService } from "../services/retention-permissions.service.ts";
 import { RetentionPlanService } from "../services/retention-plan.service.ts";
+import {
+  type RetroactiveCommandPayload,
+  RetroactiveRetentionService,
+} from "../services/retroactive-retention.service.ts";
 import { SeatRetentionPolicyService } from "../services/seat-retention-policy.service.ts";
 import { StorageMeterScopeService } from "../services/storage-meter-scope.service.ts";
 import { StorageMeterService } from "../services/storage-meter.service.ts";
@@ -108,6 +121,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
   readonly #snapshots: DataRetentionSnapshotService;
   readonly #scopeMeter: StorageMeterScopeService;
   readonly #seatPolicies: SeatRetentionPolicyService;
+  readonly #retroactive: RetroactiveRetentionService;
   readonly #users: UserApi;
 
   private constructor(services: {
@@ -116,6 +130,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
     snapshots: DataRetentionSnapshotService;
     scopeMeter: StorageMeterScopeService;
     seatPolicies: SeatRetentionPolicyService;
+    retroactive: RetroactiveRetentionService;
     users: UserApi;
   }) {
     this.#retention = services.retention;
@@ -123,6 +138,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
     this.#snapshots = services.snapshots;
     this.#scopeMeter = services.scopeMeter;
     this.#seatPolicies = services.seatPolicies;
+    this.#retroactive = services.retroactive;
     this.#users = services.users;
   }
 
@@ -168,6 +184,11 @@ export class DataRetentionModule implements DataRetentionApiContract {
         permissions,
       }),
       seatPolicies: SeatRetentionPolicyService.create({ rules: retention }),
+      retroactive: RetroactiveRetentionService.create({
+        retroactive: repositories.retroactive,
+        status: repositories.retroactiveStatus,
+        applyMaxAttempts: RETROACTIVE_APPLY_MAX_ATTEMPTS,
+      }),
       users: dependencies.users,
     });
   }
@@ -175,6 +196,32 @@ export class DataRetentionModule implements DataRetentionApiContract {
   /** The pipeline `data_retention_seat_policy` registers, over billing's activation fact. */
   seatPolicyPipeline(): DataRetentionSeatPolicyPipeline {
     return buildDataRetentionSeatPolicyPipeline({ seatPolicies: this.#seatPolicies });
+  }
+
+  /** The pipeline `data_retention_retroactive`: apply, cancel and progress (ADR-202 D13). */
+  retroactivePipeline(): RetroactiveRetentionPipeline {
+    return retroactiveRetentionPipeline({
+      retroactive: this.#retroactive,
+      tenantRetention: {
+        resolve: (tenantId) => this.#retention.getResolvedForProject({ projectId: tenantId }),
+      },
+    });
+  }
+
+  connectRetroactive(
+    commands: Readonly<{
+      requestRetroactiveApply: EventingCommandSender<
+        RetroactiveCommandPayload<RetroactiveApplyRequestedData>
+      >;
+      requestRetroactiveCancel: EventingCommandSender<
+        RetroactiveCommandPayload<RetroactiveCancelRequestedData>
+      >;
+      recordRetroactiveProgress: EventingCommandSender<
+        RetroactiveCommandPayload<RetroactiveProgressRecordedData>
+      >;
+    }>,
+  ): void {
+    this.#retroactive.connect(commands);
   }
 
   getResolvedForProject(input: { projectId: string }): Promise<ResolvedRetention> {
@@ -237,7 +284,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
   getRetroactiveMutationProgress(
     input: RetroactiveMutationProjectInput,
   ): Promise<RetroactiveMutationProgress[]> {
-    return this.#retention.getRetroactiveMutationProgress(input);
+    return this.#retroactive.getProgress(input);
   }
 
   raiseIdIndexRetention(input: IdIndexRetentionRaiseInput): Promise<{ tables: string[] }> {
@@ -345,13 +392,14 @@ export class DataRetentionModule implements DataRetentionApiContract {
     await this.#policy.assertPlanForProject({ actor, projectId: input.projectId });
     const effective = await this.#retention.getResolvedForProject({ projectId: input.projectId });
     const appliedRetentionDays = effective[input.category];
-    const result = await this.#retention.triggerRetroactiveUpdate({
+    const { tables } = await this.#retroactive.requestApply({
       projectId: input.projectId,
       category: input.category,
-      newRetentionDays: appliedRetentionDays,
+      retentionDays: appliedRetentionDays,
+      userId: input.userId,
     });
 
-    return { ...result, appliedRetentionDays };
+    return { tables, appliedRetentionDays };
   }
 
   async killRetroactiveMutation(
@@ -359,9 +407,10 @@ export class DataRetentionModule implements DataRetentionApiContract {
   ): Promise<void> {
     const actor = await this.#actor(input.userId);
     await this.#policy.assertPlanForProject({ actor, projectId: input.projectId });
-    await this.#retention.killRetroactiveMutation({
+    await this.#retroactive.requestCancel({
       projectId: input.projectId,
       mutationId: input.mutationId,
+      userId: input.userId,
     });
   }
 

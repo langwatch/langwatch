@@ -4,6 +4,7 @@ import type { DataRetentionProjectScopeRepository } from "./data-retention-proje
 import type { DataRetentionRepository } from "./data-retention.repository.ts";
 import type { PinnedTraceRepository } from "./pinned-trace.repository.ts";
 import type { RetroactiveRetentionRepository } from "./retroactive-retention.repository.ts";
+import type { RetroactiveStatusRepository } from "./retroactive-status.repository.ts";
 import type { StorageMeterCacheRepository } from "./storage-meter-cache.repository.ts";
 import type { StorageMeterRepository } from "./storage-meter.repository.ts";
 
@@ -16,6 +17,8 @@ export interface DataRetentionRepositories {
   readonly projectScopes: DataRetentionProjectScopeRepository;
   /** The rewrite of rows already captured, when a retention change applies to them. */
   readonly retroactive: RetroactiveRetentionRepository;
+  /** Each project's retroactive retention progress, as the worker folded it. */
+  readonly retroactiveStatus: RetroactiveStatusRepository;
   /** The bytes a tenant holds, as the storage card and the plan meter read them. */
   readonly storageMeter: StorageMeterRepository;
   /** Resolved retention per project, shared across processes. */

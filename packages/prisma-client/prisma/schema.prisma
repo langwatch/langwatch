@@ -4065,6 +4065,19 @@ model DataRetentionProjectScope {
   @@ignore
 }
 
+/// One project's retroactive retention progress (ADR-202 Decided 13): data-retention's worker folds
+/// its own facts into every column but `issued`, which only the apply intent writes. No relation.
+model RetroactiveRetentionStatus {
+  projectId          String   @id
+  pending            Json     @default("[]")
+  mutations          Json     @default("[]")
+  failed             Json     @default("[]")
+  closedRequestIds   Json     @default("[]")
+  issued             Json     @default("[]")
+  lastAppliedEventId String   @default("")
+  updatedAt          DateTime @default(now()) @updatedAt
+}
+
 // The Instant Evals judge's copy of each project's organization, folded from project's
 // lw.project.created (ADR-174 decision 13). No relation to Project.
 model InstantEvalJudgeProject {

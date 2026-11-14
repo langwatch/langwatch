@@ -12,7 +12,16 @@ export type RetentionMutationProgress = {
   table: string;
   category: RetentionCategory | null;
   partsToDo: number;
+  /** Parts rewritten so far, 0-100; absent while the worker has not measured it. */
+  progressPercent?: number;
+  /** Set on an apply the worker gave up on; Dismiss clears it. */
+  failure?: string;
 };
+
+function statusOf(m: RetentionMutationProgress): string {
+  if (m.failure !== undefined) return "Failed";
+  return m.progressPercent === undefined ? "Applying…" : `Applying… ${m.progressPercent}%`;
+}
 
 function sentenceCase(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
@@ -54,25 +63,31 @@ export function RetroactiveProgressCard({
                   )}
                 </HStack>
                 <HStack gap={3}>
-                  <Text fontSize="sm" color="fg.muted">
-                    In progress
+                  <Text fontSize="sm" color={m.failure === undefined ? "fg.muted" : "fg.error"}>
+                    {statusOf(m)}
                   </Text>
                   <Button
                     size="xs"
                     variant="ghost"
-                    colorPalette="red"
+                    colorPalette={m.failure === undefined ? "red" : "gray"}
                     loading={isCancelling}
                     onClick={() => onCancel(m.mutationId)}
                   >
-                    Cancel
+                    {m.failure === undefined ? "Cancel" : "Dismiss"}
                   </Button>
                 </HStack>
               </HStack>
-              <Progress.Root value={null} size="xs" colorPalette="blue">
-                <Progress.Track>
-                  <Progress.Range />
-                </Progress.Track>
-              </Progress.Root>
+              {m.failure === undefined ? (
+                <Progress.Root value={m.progressPercent ?? null} size="xs" colorPalette="blue">
+                  <Progress.Track>
+                    <Progress.Range />
+                  </Progress.Track>
+                </Progress.Root>
+              ) : (
+                <Text fontSize="sm" color="fg.muted">
+                  {m.failure}
+                </Text>
+              )}
             </VStack>
           );
         })}

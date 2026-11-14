@@ -6,12 +6,16 @@ import {
   type RetentionCategory,
   type RetroactiveMutationProgress,
 } from "@langwatch/data-retention-contract";
-import { RETENTION_TABLE_CATEGORY_MAP } from "@langwatch/data-retention-contract/retention-tables";
 import { EventLogRetention } from "@langwatch/eventing/server";
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 import { EVENT_LOG_RETENTION_CLASSIFICATION } from "../../rules/event-log-retention.rules.ts";
 import { idIndexCategories } from "../../rules/id-index-categories.rules.ts";
+import {
+  EVENTING_APPLY_TARGET,
+  retroactiveApplyPlan,
+  type RetroactiveApplyPlan,
+} from "../../rules/retroactive-apply-targets.rules.ts";
 import type {
   ClickHouseTarget,
   KeepForeverRewrite,
@@ -64,65 +68,145 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
 
   private constructor(private readonly now: () => Instant) {}
 
-  async triggerUpdate(input: {
+  /** Each rewrite issued, as `<projectId>/<target>`, and each project's progress read: levers. */
+  readonly rewrites: string[] = [];
+  readonly progressReads: string[] = [];
+  /** Set to make every rewrite refuse, as an unreachable ClickHouse would. */
+  refuseRewrites: Error | undefined;
+  /** Set to make only this target's rewrite refuse, as a crash mid-apply would. */
+  refuseTarget: string | undefined;
+  /** The parts each new mutation starts with. */
+  partsPerRewrite = 1;
+
+  #plan(category: RetentionCategory): RetroactiveApplyPlan {
+    return retroactiveApplyPlan({
+      category,
+      idIndexCategories: this.#idIndexCategories(),
+      eventingTables: this.#eventLogRetention.tables,
+    });
+  }
+
+  plannedTables(input: { category: RetentionCategory }): string[] {
+    return this.#plan(input.category).tables;
+  }
+
+  applyTargets(input: { category: RetentionCategory }): string[] {
+    return this.#plan(input.category).targets;
+  }
+
+  /** Marks one mutation finished, as ClickHouse does when its parts are rewritten. */
+  finishMutation(input: { projectId: string; mutationId: string }): void {
+    this.setPartsToDo({ ...input, partsToDo: 0 });
+  }
+
+  /** Moves one mutation on, as ClickHouse does part by part; zero finishes it. */
+  setPartsToDo(input: { projectId: string; mutationId: string; partsToDo: number }): void {
+    for (const mutation of this.#mutations.get(input.projectId) ?? []) {
+      if (mutation.mutationId !== input.mutationId) continue;
+      mutation.partsToDo = input.partsToDo;
+      mutation.isDone = input.partsToDo === 0;
+    }
+  }
+
+  async findActiveMutations(input: {
     projectId: string;
     category: RetentionCategory;
-    newRetentionDays: number;
-  }): Promise<{ tables: string[] }> {
-    const categoryTables = Object.entries(RETENTION_TABLE_CATEGORY_MAP)
-      .filter(([, category]) => category === input.category)
-      .map(([table]) => table);
-    const categoryIndexes = [...this.#idIndexCategories()]
-      .filter(([, category]) => category === input.category)
-      .map(([index]) => index);
+  }): Promise<RetroactiveMutationProgress[]> {
+    const tables = this.#plan(input.category).tables;
     const eventingTables: readonly string[] = this.#eventLogRetention.tables;
-    const tables = [...new Set([...categoryTables, ...categoryIndexes, ...eventingTables])];
-
     // Another category's eventing rewrite touches disjoint rows, so only this category's blocks.
-    const active = (this.#mutations.get(input.projectId) ?? []).filter(
+    return (this.#mutations.get(input.projectId) ?? []).filter(
       (mutation) =>
         !mutation.isDone &&
         tables.includes(mutation.table) &&
         (!eventingTables.includes(mutation.table) || mutation.category === input.category),
     );
-    if (active.length > 0) throw new RetroactiveMutationInProgressError(active);
-    const eventingRewritten = await this.#eventLogRetention.retainCategory({
-      tenantId: input.projectId,
-      category: input.category,
-      retentionDays: input.newRetentionDays,
-    });
-    const heldIndexes = [
-      ...categoryIndexes.filter((index) => this.idIndexTenants.has(index)),
-      ...eventingRewritten.filter((table) => table === this.#eventLogRetention.idIndexTable),
-    ];
-    for (const index of heldIndexes) {
-      this.#raise({
-        index,
-        tenantId: input.projectId,
-        category: input.category,
-        retentionDays: input.newRetentionDays,
-      });
-    }
+  }
 
-    const rewritten = [...new Set([...categoryTables, ...heldIndexes, ...eventingRewritten])];
+  async triggerUpdate(input: {
+    projectId: string;
+    category: RetentionCategory;
+    newRetentionDays: number;
+  }): Promise<{ tables: string[] }> {
+    if (this.refuseRewrites) throw this.refuseRewrites;
+    const active = await this.findActiveMutations(input);
+    if (active.length > 0) throw new RetroactiveMutationInProgressError(active);
+    const plan = this.#plan(input.category);
+    const rewritten: string[] = [];
+    for (const target of plan.targets) {
+      rewritten.push(...(await this.rewriteTarget({ ...input, target })));
+    }
+    const eventingTables: readonly string[] = this.#eventLogRetention.tables;
+    const heldIndexes = rewritten.filter(
+      (table) =>
+        plan.categoryIndexes.includes(table) || table === this.#eventLogRetention.idIndexTable,
+    );
+    const eventingRewritten = rewritten.filter((table) => eventingTables.includes(table));
+    return { tables: [...new Set([...plan.mappedTables, ...heldIndexes, ...eventingRewritten])] };
+  }
+
+  async rewriteTarget(input: {
+    projectId: string;
+    category: RetentionCategory;
+    newRetentionDays: number;
+    target: string;
+  }): Promise<string[]> {
+    if (this.refuseRewrites) throw this.refuseRewrites;
+    if (this.refuseTarget === input.target) {
+      throw new Error(`rewrite of ${input.target} refused`);
+    }
+    const rewritten = await this.#rewrite(input);
+    this.rewrites.push(`${input.projectId}/${input.target}`);
     const started = this.#mutations.get(input.projectId) ?? [];
     started.push(
       ...rewritten.map((table) => ({
         mutationId: `mutation_${this.#nextId++}`,
         table,
         isDone: false,
-        partsToDo: 1,
+        partsToDo: this.partsPerRewrite,
         createTime: toDate(this.now()).toISOString().slice(0, 19),
         category: input.category,
       })),
     );
     this.#mutations.set(input.projectId, started);
+    return rewritten;
+  }
 
-    return { tables: rewritten };
+  async #rewrite(input: {
+    projectId: string;
+    category: RetentionCategory;
+    newRetentionDays: number;
+    target: string;
+  }): Promise<string[]> {
+    const raise = (index: string) =>
+      this.#raise({
+        index,
+        tenantId: input.projectId,
+        category: input.category,
+        retentionDays: input.newRetentionDays,
+      });
+    if (input.target === EVENTING_APPLY_TARGET) {
+      const eventingRewritten = await this.#eventLogRetention.retainCategory({
+        tenantId: input.projectId,
+        category: input.category,
+        retentionDays: input.newRetentionDays,
+      });
+      for (const table of eventingRewritten) {
+        if (table === this.#eventLogRetention.idIndexTable) raise(table);
+      }
+      return eventingRewritten;
+    }
+    if (this.#plan(input.category).categoryIndexes.includes(input.target)) {
+      if (!this.idIndexTenants.has(input.target)) return [];
+      raise(input.target);
+      return [input.target];
+    }
+    return [input.target];
   }
 
   /** The unfinished mutations of one project, newest first. */
   async findMutationProgress(input: { projectId: string }): Promise<RetroactiveMutationProgress[]> {
+    this.progressReads.push(input.projectId);
     return (this.#mutations.get(input.projectId) ?? [])
       .filter((mutation) => !mutation.isDone)
       .reverse();

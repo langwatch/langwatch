@@ -5,6 +5,7 @@ import { MemoryDataRetentionProjectScopeRepository } from "./memory.data-retenti
 import { MemoryDataRetentionRepository } from "./memory.data-retention.repository.ts";
 import { MemoryPinnedTraceRepository } from "./memory.pinned-trace.repository.ts";
 import { MemoryRetroactiveRetentionRepository } from "./memory.retroactive-retention.repository.ts";
+import { MemoryRetroactiveStatusRepository } from "./memory.retroactive-status.repository.ts";
 import { MemoryStorageMeterCacheRepository } from "./memory.storage-meter-cache.repository.ts";
 import { MemoryStorageMeterRepository } from "./memory.storage-meter.repository.ts";
 
@@ -18,6 +19,7 @@ export class MemoryDataRetentionRepositories {
       directory: MemoryDataRetentionDirectoryRepository.create(),
       projectScopes: MemoryDataRetentionProjectScopeRepository.create(),
       retroactive: MemoryRetroactiveRetentionRepository.create(),
+      retroactiveStatus: MemoryRetroactiveStatusRepository.create(),
       storageMeter: MemoryStorageMeterRepository.create(),
       cache: MemoryDataRetentionCacheRepository.create(),
       storageMeterCache: MemoryStorageMeterCacheRepository.create(),

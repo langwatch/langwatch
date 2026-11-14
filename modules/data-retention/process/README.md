@@ -6,7 +6,7 @@ The server half of [data-retention](../README.md). Data retention: the retention
 
 ## Installation
 
-`defineProcessModule("data-retention").withRepositories(dataRetentionRepositories).withApi(DataRetentionModule).withTransports(dataRetentionTrpcTransport).withEventing(dataRetentionSeatPolicyEventing).withMigrations(…)`, `src/data-retention.module.ts:18`.
+`defineProcessModule("data-retention").withRepositories(dataRetentionRepositories).withApi(DataRetentionModule).withTransports(dataRetentionTrpcTransport).withEventing(dataRetentionSeatPolicyEventing).withEventing(retroactiveRetentionEventing).withMigrations(…)`, `src/data-retention.module.ts:19`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -178,7 +178,7 @@ None: this module declares no REST family.
 
 ### `dataRetention`
 
-Contract `../contract/src/data-retention.trpc.ts:79`, router `src/transport/data-retention.trpc.ts:28`.
+Contract `../contract/src/data-retention.trpc.ts:80`, router `src/transport/data-retention.trpc.ts:28`.
 
 | Procedure                                | Kind     | Gate                        | Input                                    | Output                                   |
 | ---------------------------------------- | -------- | --------------------------- | ---------------------------------------- | ---------------------------------------- |
@@ -193,14 +193,14 @@ Contract `../contract/src/data-retention.trpc.ts:79`, router `src/transport/data
 
 ```typescript
 // dataRetention.getRules
-// Input: retentionProjectScopeSchema, ../contract/src/data-retention.trpc.ts:32
+// Input: retentionProjectScopeSchema, ../contract/src/data-retention.trpc.ts:33
 interface Input {
   projectId: string;
 }
 type Output = z.infer<typeof retentionPolicySnapshotSchema>; // ../contract/src/data-retention.snapshot.ts:75
 
 // dataRetention.setForScope
-// Input: inline, ../contract/src/data-retention.trpc.ts:96
+// Input: inline, ../contract/src/data-retention.trpc.ts:97
 interface Input {
   projectId: string;
   scope: {
@@ -211,7 +211,7 @@ interface Input {
   category: "traces" | "scenarios" | "experiments";
   retentionDays: 0 | number;
 }
-// Output: retentionPolicySchema, ../contract/src/data-retention.ts:237
+// Output: retentionPolicySchema, ../contract/src/data-retention.ts:241
 interface Output {
   id: string;
   organizationId: string;
@@ -224,7 +224,7 @@ interface Output {
 }
 
 // dataRetention.previewScopeRemoval
-// Input: retentionScopeWriteInputSchema, ../contract/src/data-retention.trpc.ts:67
+// Input: retentionScopeWriteInputSchema, ../contract/src/data-retention.trpc.ts:68
 interface Input {
   projectId: string;
   scope: {
@@ -233,7 +233,7 @@ interface Input {
   };
   organizationId?: string;
 }
-// Output: resolvedRetentionSchema, ../contract/src/data-retention.ts:260
+// Output: resolvedRetentionSchema, ../contract/src/data-retention.ts:264
 interface Output {
   traces: number;
   scenarios: number;
@@ -241,7 +241,7 @@ interface Output {
 }
 
 // dataRetention.removeForScope
-// Input: inline, ../contract/src/data-retention.trpc.ts:116
+// Input: inline, ../contract/src/data-retention.trpc.ts:117
 interface Input {
   projectId: string;
   scope: {
@@ -253,23 +253,23 @@ interface Input {
 }
 
 // dataRetention.triggerRetroactiveUpdate
-// Input: retentionTriggerRetroactiveInputSchema, ../contract/src/data-retention.trpc.ts:77
+// Input: retentionTriggerRetroactiveInputSchema, ../contract/src/data-retention.trpc.ts:78
 interface Input {
   projectId: string;
   category: "traces" | "scenarios" | "experiments";
 }
-// Output: retroactiveRetentionUpdateResultSchema, ../contract/src/data-retention.ts:329
+// Output: retroactiveRetentionUpdateResultSchema, ../contract/src/data-retention.ts:333
 interface Output {
   tables: string[];
   appliedRetentionDays: number;
 }
 
 // dataRetention.getMutationProgress
-// Input: retroactiveMutationProjectInputSchema, ../contract/src/data-retention.ts:175
+// Input: retroactiveMutationProjectInputSchema, ../contract/src/data-retention.ts:179
 interface Input {
   projectId: string;
 }
-// Output: inline, ../contract/src/data-retention.trpc.ts:126
+// Output: inline, ../contract/src/data-retention.trpc.ts:128
 type Output = {
   mutationId: string;
   table: string;
@@ -277,17 +277,19 @@ type Output = {
   partsToDo: number;
   createTime: string;
   category: "traces" | "scenarios" | "experiments" | null;
+  progressPercent?: number;
+  failure?: string;
 }[];
 
 // dataRetention.killMutation
-// Input: killRetroactiveMutationInputSchema, ../contract/src/data-retention.ts:206
+// Input: killRetroactiveMutationInputSchema, ../contract/src/data-retention.ts:210
 interface Input {
   projectId: string;
   mutationId: string;
 }
 
 // dataRetention.getScopeStorageUsage
-// Input: retentionScopeTargetInputSchema, ../contract/src/data-retention.trpc.ts:53
+// Input: retentionScopeTargetInputSchema, ../contract/src/data-retention.trpc.ts:54
 interface Input {
   projectId: string;
   scope: {
@@ -315,6 +317,19 @@ Declared at `src/eventing/data-retention-seat-policy.pipeline.ts:32`.
 | Kind            | Name                          | Handles                                                                                         | Declared at                                              |
 | --------------- | ----------------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
 | peer subscriber | `dataRetentionSeatActivation` | `lw.billing.subscription_started` from [billing](../../../enterprise/modules/billing/README.md) | `src/eventing/data-retention-seat-policy.pipeline.ts:38` |
+
+### Pipeline `data_retention_retroactive` (aggregate `retroactive_retention`)
+
+Declared at `src/eventing/retroactive-retention.pipeline.ts:122`. Events: `applyRequestedEventSchema`, `cancelRequestedEventSchema`, `progressRecordedEventSchema`.
+
+| Kind            | Name                        | Handles                                                                | Declared at                                          |
+| --------------- | --------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------- |
+| command         | `requestRetroactiveApply`   | –                                                                      | `src/eventing/retroactive-retention.pipeline.ts:131` |
+| command         | `requestRetroactiveCancel`  | –                                                                      | `src/eventing/retroactive-retention.pipeline.ts:132` |
+| command         | `recordRetroactiveProgress` | –                                                                      | `src/eventing/retroactive-retention.pipeline.ts:133` |
+| process manager | `retroactiveRetention`      | intents `refreshProgress`, `cancelMutation`, `applyRetention` (outbox) | `src/eventing/retroactive-retention.pipeline.ts:147` |
+| subscriber      | `retroactiveStatusFold`     | –                                                                      | `src/eventing/retroactive-retention.pipeline.ts:134` |
+| retention       | `≈ deps.tenantRetention`    | –                                                                      | `src/eventing/retroactive-retention.pipeline.ts:165` |
 
 ## Configuration
 

@@ -36,4 +36,62 @@ describe("RetroactiveProgressCard", () => {
       });
     });
   });
+
+  describe("given an apply in flight at 40 percent", () => {
+    /** @scenario "The panel shows an apply in flight with its percentage and Cancel" */
+    it("shows the percentage with a Cancel action", () => {
+      const onCancel = vi.fn();
+      render(
+        <DesignSystemProvider forcedTheme="light">
+          <RetroactiveProgressCard
+            isCancelling={false}
+            onCancel={onCancel}
+            mutations={[
+              {
+                mutationId: "m1",
+                table: "stored_spans",
+                category: "traces",
+                partsToDo: 3,
+                progressPercent: 40,
+              },
+            ]}
+          />
+        </DesignSystemProvider>,
+      );
+      expect(screen.getByText("Applying… 40%")).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(onCancel).toHaveBeenCalledWith("m1");
+    });
+  });
+
+  describe("given an apply the worker gave up on", () => {
+    /** @scenario "The panel shows a failed apply with its message and Dismiss" */
+    it("shows the failure message with a Dismiss action", () => {
+      const onCancel = vi.fn();
+      render(
+        <DesignSystemProvider forcedTheme="light">
+          <RetroactiveProgressCard
+            isCancelling={false}
+            onCancel={onCancel}
+            mutations={[
+              {
+                mutationId: "failed:r1",
+                table: "",
+                category: "traces",
+                partsToDo: 0,
+                failure: "Applying this retention change to existing data failed.",
+              },
+            ]}
+          />
+        </DesignSystemProvider>,
+      );
+      expect(screen.getByText("Failed")).toBeTruthy();
+      expect(
+        screen.getByText("Applying this retention change to existing data failed."),
+      ).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+      expect(onCancel).toHaveBeenCalledWith("failed:r1");
+    });
+  });
 });

@@ -109,40 +109,6 @@ function createService(
 }
 
 describe("DataRetentionService", () => {
-  describe("given a rewrite was asked for", () => {
-    /**
-     * The store is never absent: a deployment with no ClickHouse refuses at
-     * boot naming this module. So a rewrite asked for reports as in progress
-     * until killed, rather than "nothing is running" for lack of a store.
-     */
-    it("reports it as in progress until it is killed", async () => {
-      const service = createService();
-
-      await expect(
-        service.triggerRetroactiveUpdate({
-          projectId: PROJECT,
-          category: "traces",
-          newRetentionDays: DEFAULT_DAYS,
-        }),
-      ).resolves.toMatchObject({ tables: expect.any(Array) });
-
-      const progress = await service.getRetroactiveMutationProgress({ projectId: PROJECT });
-      expect(progress.length).toBeGreaterThan(0);
-      expect(progress.every((mutation) => mutation.category === "traces")).toBe(true);
-
-      for (const mutation of progress) {
-        await service.killRetroactiveMutation({
-          projectId: PROJECT,
-          mutationId: mutation.mutationId,
-        });
-      }
-
-      await expect(service.getRetroactiveMutationProgress({ projectId: PROJECT })).resolves.toEqual(
-        [],
-      );
-    });
-  });
-
   describe("when a rule is set above the project", () => {
     /** @scenario "Resolve retention through the scope cascade" */
     it("resolves policy through the project/team/organization cascade", async () => {

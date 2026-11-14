@@ -29,6 +29,22 @@ export interface RetroactiveRetentionRepository {
     category: RetentionCategory;
     newRetentionDays: number;
   }): Promise<{ tables: string[] }>;
+  /** The tables an apply of `category` targets, from declarations alone: it runs no statement. */
+  plannedTables(input: { category: RetentionCategory }): string[];
+  /** Each rewrite an apply of `category` issues, in order, from declarations alone. */
+  applyTargets(input: { category: RetentionCategory }): string[];
+  /** Issues one of `applyTargets`' rewrites; answers the tables it rewrote (none: not held). */
+  rewriteTarget(input: {
+    projectId: string;
+    category: RetentionCategory;
+    newRetentionDays: number;
+    target: string;
+  }): Promise<string[]>;
+  /** The rewrites of `category` still running for the project, on any of its planned tables. */
+  findActiveMutations(input: {
+    projectId: string;
+    category: RetentionCategory;
+  }): Promise<RetroactiveMutationProgress[]>;
   findMutationProgress(input: { projectId: string }): Promise<RetroactiveMutationProgress[]>;
   killMutation(input: { projectId: string; mutationId: string }): Promise<void>;
   /** The shared target, then each private dataplane this process routes to. */

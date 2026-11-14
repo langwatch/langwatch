@@ -27,6 +27,10 @@ const retroactiveMutationProgressSchemaDefinition = z
     partsToDo: z.number(),
     createTime: z.string(),
     category: retentionCategorySchema.nullable(),
+    /** Parts rewritten out of the parts the rewrite started with, 0-100 (ADR-202 Decided 13). */
+    progressPercent: z.number().int().min(0).max(100).optional(),
+    /** Set on an apply the worker gave up on; shown until dismissed or applied again. */
+    failure: z.string().optional(),
   })
   .strict();
 export interface RetroactiveMutationProgressSchema extends Named<

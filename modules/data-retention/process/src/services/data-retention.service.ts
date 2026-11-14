@@ -5,18 +5,13 @@ import {
   resolveRetention,
   resolveScopeChain,
   retentionDaysInputSchema,
-  retroactiveRetentionUpdateInputSchema,
   type IdIndexRetentionRaiseInput,
-  type KillRetroactiveMutationInput,
   type ResolvedRetention,
   type RetentionCategory,
   type RetentionPolicy,
   type ScopeAssignment,
   type PinnedTrace,
   type PinTraceInput,
-  type RetroactiveMutationProgress,
-  type RetroactiveMutationProjectInput,
-  type RetroactiveRetentionUpdateInput,
   pinTraceInputSchema,
   type UnpinTraceInput,
   unpinTraceInputSchema,
@@ -237,23 +232,6 @@ export class DataRetentionService {
 
   getPinnedTraceIds(input: { projectId: string }): Promise<string[]> {
     return this.options.pins.findAllTraceIds(input);
-  }
-
-  async triggerRetroactiveUpdate(
-    input: RetroactiveRetentionUpdateInput,
-  ): Promise<{ tables: string[] }> {
-    const parsed = retroactiveRetentionUpdateInputSchema.parse(input);
-    return this.options.retroactive.triggerUpdate(parsed);
-  }
-
-  async getRetroactiveMutationProgress(
-    input: RetroactiveMutationProjectInput,
-  ): Promise<RetroactiveMutationProgress[]> {
-    return this.options.retroactive.findMutationProgress(input);
-  }
-
-  async killRetroactiveMutation(input: KillRetroactiveMutationInput): Promise<void> {
-    await this.options.retroactive.killMutation(input);
   }
 
   /**
