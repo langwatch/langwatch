@@ -44,7 +44,12 @@ async function openScratch(): Promise<Scratch> {
     options: `-c search_path=${name},${name}_upgrade_ledger`,
   });
   await createLedgerTables({ postgres });
-  for (const table of [LEDGER_TABLE.target, LEDGER_TABLE.lease, LEDGER_TABLE.roster]) {
+  for (const table of [
+    LEDGER_TABLE.target,
+    LEDGER_TABLE.lease,
+    LEDGER_TABLE.roster,
+    LEDGER_TABLE.tenantState,
+  ]) {
     await postgres.query(`DROP TABLE IF EXISTS "${name}_upgrade_ledger"."${table}"`);
   }
   const ledgerSchema = `${name}_upgrade_ledger`;

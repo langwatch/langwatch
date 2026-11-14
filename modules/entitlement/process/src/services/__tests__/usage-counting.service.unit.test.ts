@@ -70,6 +70,10 @@ class UnreachableMeter extends BillableEventsMeterRepository {
   async countByProjects(): Promise<never> {
     throw new Error("ClickHouse is unreachable");
   }
+
+  async countByDay(): Promise<never> {
+    throw new Error("ClickHouse is unreachable");
+  }
 }
 
 function compose({

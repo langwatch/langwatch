@@ -13,6 +13,11 @@ import { useAnchoredAnnotations } from "../../../../../features/annotation/behav
 import { useSpanLangwatchSignals } from "../../../../../features/span/behavior/use-span-langwatch-signals.ts";
 import { useSpanLogs } from "../../../../../features/span/behavior/use-span-logs.ts";
 import { useSpanPulseStore } from "../../../../../features/trace-drawer/behavior/span-pulse.store.ts";
+import {
+  braidBadgeIsCompact,
+  braidStrandFor,
+  spanNodeKey,
+} from "../../../../../model/braids/braided-span.ts";
 import { GroupRow } from "./group-row.tsx";
 import { GroupTimelineBar, TimelineBar } from "./timeline-bar.tsx";
 import { TreeRow } from "./tree-row.tsx";
@@ -93,6 +98,7 @@ export const WaterfallView = memo(function WaterfallView({
   promptSpanIds,
   onSelectSpan,
   onClearSpan,
+  braidedOwners,
 }: WaterfallViewProps) {
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -184,6 +190,11 @@ export const WaterfallView = memo(function WaterfallView({
 
   // Horizontal-scroll floor for the tree pane.
   const treeContentMinWidthPx = useMemo(() => treeMinWidthPx(flatRows), [flatRows]);
+  // The width a row lays out in: the tree pane, or its scroll floor when that is wider.
+  const treeWidthPx = Math.max(
+    showTimeline ? Math.max(MIN_TREE_WIDTH, treePct * containerWidth) : containerWidth,
+    treeContentMinWidthPx,
+  );
 
   // Detect multi-root (forest)
   const rootCount = useMemo(() => tree.length, [tree]);
@@ -338,6 +349,7 @@ export const WaterfallView = memo(function WaterfallView({
             {virtualizer.getVirtualItems().map((virtualRow) => (
               <WaterfallVirtualRow
                 key={virtualRowKey(flatRows[virtualRow.index]!)}
+                braidedOwners={braidedOwners}
                 collapsedIds={collapsedIds}
                 commentsFor={commentsFor}
                 correctedSpanIds={correctedSpanIds}
@@ -362,6 +374,7 @@ export const WaterfallView = memo(function WaterfallView({
                 signalsBySpanId={signalsBySpanId}
                 size={virtualRow.size}
                 start={virtualRow.start}
+                treeWidthPx={treeWidthPx}
               />
             ))}
           </Box>
@@ -574,7 +587,7 @@ function parentSpanIdsByDepth(tree: ReturnType<typeof buildTree>): Map<number, s
     for (const node of nodes) {
       if (node.children.length === 0) continue;
       const list = map.get(node.depth) ?? [];
-      list.push(node.span.spanId);
+      list.push(spanNodeKey(node.span));
       map.set(node.depth, list);
       walk(node.children);
     }
@@ -640,11 +653,12 @@ function listenForDividerDrag({
 
 /** A virtual row's React key: group rows key by their sibling group, spans by id. */
 function virtualRowKey(row: ReturnType<typeof flattenTree>[number]): string {
-  return row.kind === "group" ? `group-${siblingGroupKey(row)}` : row.node.span.spanId;
+  return row.kind === "group" ? `group-${siblingGroupKey(row)}` : spanNodeKey(row.node.span);
 }
 
 /** One virtualized waterfall row: a sibling group header, or a span. */
 function WaterfallVirtualRow({
+  braidedOwners,
   collapsedIds,
   commentsFor,
   correctedSpanIds,
@@ -669,7 +683,9 @@ function WaterfallVirtualRow({
   signalsBySpanId,
   size,
   start,
+  treeWidthPx,
 }: {
+  braidedOwners: WaterfallViewProps["braidedOwners"];
   collapsedIds: Set<string>;
   commentsFor: (spanId: string) => AnnotationByTrace[];
   correctedSpanIds: Set<string>;
@@ -694,6 +710,7 @@ function WaterfallVirtualRow({
   signalsBySpanId: ReturnType<typeof useSpanLangwatchSignals>["signalsBySpanId"];
   size: number;
   start: number;
+  treeWidthPx: number;
 }) {
   if (row.kind === "group") {
     return (
@@ -708,11 +725,12 @@ function WaterfallVirtualRow({
     );
   }
   const { node } = row;
+  const braid = braidStrandFor({ ownerProjectId: node.span.ownerProjectId, owners: braidedOwners });
   const isRoot = node.depth === 0;
   const showSeparator = isRoot && rootCount > 1 && index > 0;
   return (
     <Box
-      key={node.span.spanId}
+      key={spanNodeKey(node.span)}
       position="absolute"
       top={0}
       left={0}
@@ -744,9 +762,21 @@ function WaterfallVirtualRow({
         isSelected={node.span.spanId === selectedSpanId}
         isPrompt={promptSpanIds?.has(node.span.spanId) ?? false}
         logCount={logsBySpanId.get(node.span.spanId)?.length ?? 0}
-        isCollapsed={collapsedIds.has(node.span.spanId)}
+        isCollapsed={collapsedIds.has(spanNodeKey(node.span))}
         hasChildren={node.children.length > 0}
-        hiddenDescendantCount={collapsedIds.has(node.span.spanId) ? countDescendants(node) : 0}
+        hiddenDescendantCount={
+          collapsedIds.has(spanNodeKey(node.span)) ? countDescendants(node) : 0
+        }
+        braid={braid}
+        compactBraidBadge={
+          braid !== null &&
+          braidBadgeIsCompact({
+            treeWidthPx,
+            depth: node.depth,
+            spanName: draftNames.get(node.span.spanId) ?? node.span.name,
+            ownerName: braid.ownerName,
+          })
+        }
         isDimmed={selectedSpanId !== null && node.span.spanId !== selectedSpanId}
         signals={signalsBySpanId.get(node.span.spanId) ?? EMPTY_SIGNALS}
         traceId={rowTraceId}
@@ -936,7 +966,7 @@ function TimelinePanel({
               const { node } = row;
               return (
                 <Box
-                  key={node.span.spanId}
+                  key={spanNodeKey(node.span)}
                   position="absolute"
                   top={0}
                   left={0}

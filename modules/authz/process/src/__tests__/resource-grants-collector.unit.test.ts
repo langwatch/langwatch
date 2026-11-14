@@ -2,6 +2,7 @@ import { type Instant, Temporal, nowInstant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { makeReader } from "../repositories/__tests__/support/authz-read.stub.ts";
+import { MemoryAuthzOrganizationPolicyRepository } from "../repositories/memory/memory.authz-organization-policy.repository.ts";
 import { AuthzCollectorService } from "../services/authz-collector.service.ts";
 import { liveShareLinkRow, ORG, PROJECT, TEAM, traceScope } from "./support/resource-fixtures.ts";
 
@@ -19,6 +20,7 @@ describe("collector at the resource tier", () => {
     it("returns the empty snapshot without touching storage", async () => {
       const reader = makeReader();
       const grants = await AuthzCollectorService.create({
+        policies: MemoryAuthzOrganizationPolicyRepository.create(),
         reader,
       }).collectGrants({
         principal: { type: "anonymous" },
@@ -41,6 +43,7 @@ describe("collector at the resource tier", () => {
       });
 
       const grants = await AuthzCollectorService.create({
+        policies: MemoryAuthzOrganizationPolicyRepository.create(),
         reader,
       }).collectGrants({
         principal: { type: "apiKey", id: "key-1" },
@@ -66,6 +69,7 @@ describe("collector at the resource tier", () => {
         findCustomRolePermissions: vi.fn().mockResolvedValue([{ id: "cr-1", permissions }]),
       });
       const grants = await AuthzCollectorService.create({
+        policies: MemoryAuthzOrganizationPolicyRepository.create(),
         reader,
       }).collectGrants({
         principal: { type: "user", id: "alice" },
@@ -91,6 +95,7 @@ describe("collector at the resource tier", () => {
     it("returns nothing for non-resource scopes without querying", async () => {
       const reader = makeReader();
       const grants = await AuthzCollectorService.create({
+        policies: MemoryAuthzOrganizationPolicyRepository.create(),
         reader,
       }).collectResourceGrants({
         scope: {
@@ -108,6 +113,7 @@ describe("collector at the resource tier", () => {
     it("returns nothing when no token was presented — possession is the gate", async () => {
       const reader = makeReader();
       const grants = await AuthzCollectorService.create({
+        policies: MemoryAuthzOrganizationPolicyRepository.create(),
         reader,
       }).collectResourceGrants({
         scope: traceScope(),
@@ -128,6 +134,7 @@ describe("collector at the resource tier", () => {
       });
 
       const grants = await AuthzCollectorService.create({
+        policies: MemoryAuthzOrganizationPolicyRepository.create(),
         reader,
       }).collectResourceGrants({
         scope: traceScope({
@@ -163,6 +170,7 @@ describe("collector at the resource tier", () => {
         ]),
       });
       const grants = await AuthzCollectorService.create({
+        policies: MemoryAuthzOrganizationPolicyRepository.create(),
         reader,
       }).collectResourceGrants({
         scope: traceScope({ shareTokens: ["tok-1"] }),
@@ -187,6 +195,7 @@ describe("collector at the resource tier", () => {
         ]),
       });
       const grants = await AuthzCollectorService.create({
+        policies: MemoryAuthzOrganizationPolicyRepository.create(),
         reader,
       }).collectResourceGrants({
         scope: traceScope({ shareTokens: ["tok-1"] }),
@@ -212,6 +221,7 @@ describe("collector at the resource tier", () => {
       const reader = Object.assign(rootReader, { beginPass: vi.fn(() => passReader) });
 
       const grants = await AuthzCollectorService.create({
+        policies: MemoryAuthzOrganizationPolicyRepository.create(),
         reader,
       }).collectResourceGrants({
         scope: traceScope({ shareTokens: ["tok-1"] }),
@@ -235,6 +245,7 @@ describe("collector at the resource tier", () => {
           ]),
       });
       const grants = await AuthzCollectorService.create({
+        policies: MemoryAuthzOrganizationPolicyRepository.create(),
         reader,
       }).collectResourceGrants({
         scope: traceScope({ shareTokens: ["tok-1"] }),
@@ -251,6 +262,7 @@ describe("collector at the resource tier", () => {
         findShareLinks: vi.fn().mockResolvedValue([{ ...liveShareLinkRow, expiresAt }]),
       });
       return AuthzCollectorService.create({
+        policies: MemoryAuthzOrganizationPolicyRepository.create(),
         reader,
         now: () => now,
       }).collectResourceGrants({
@@ -274,6 +286,7 @@ describe("findResourceScopeRef", () => {
       findProjectLineage: vi.fn().mockResolvedValue({ teamId: TEAM, organizationId: ORG }),
     });
     const scope = await AuthzCollectorService.create({
+      policies: MemoryAuthzOrganizationPolicyRepository.create(),
       reader,
     }).findResourceScopeRef({
       projectId: PROJECT,
@@ -300,7 +313,10 @@ describe("findResourceScopeRef", () => {
   it("returns null for an unknown project", async () => {
     const reader = makeReader();
     expect(
-      await AuthzCollectorService.create({ reader }).findResourceScopeRef({
+      await AuthzCollectorService.create({
+        policies: MemoryAuthzOrganizationPolicyRepository.create(),
+        reader,
+      }).findResourceScopeRef({
         projectId: "proj-ghost",
         kind: "trace",
         id: "trace-1",
@@ -313,6 +329,7 @@ describe("findResourceScopeRef", () => {
       findProjectLineage: vi.fn().mockResolvedValue({ teamId: TEAM, organizationId: ORG }),
     });
     const scope = await AuthzCollectorService.create({
+      policies: MemoryAuthzOrganizationPolicyRepository.create(),
       reader,
     }).findResourceScopeRef({
       projectId: PROJECT,

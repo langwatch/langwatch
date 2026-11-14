@@ -2,9 +2,30 @@
 import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { bindProcessFleetMetricsSource } from "../metrics.ts";
+import { bindProcessFleetMetricsSource, unbindProcessFleetMetricsSource } from "../metrics.ts";
 
 const metrics = createRecordingMeterProvider();
+
+/** A fleet read that resolves only when the test says so. */
+function lateRead() {
+  let finish: (rows: ReturnType<typeof fleetRow>[]) => void = () => {};
+  const late = new Promise<ReturnType<typeof fleetRow>[]>((resolve) => {
+    finish = resolve;
+  });
+  return { late, finish };
+}
+
+function fleetRow({ processName }: { processName: string }) {
+  return {
+    processName,
+    instances: 1,
+    overdueWakes: 0,
+    pendingMessages: 0,
+    overduePending: 0,
+    lapsedLeases: 0,
+    deadMessages: 1,
+  };
+}
 
 /** What one collection cycle observed, ignoring everything before it. */
 async function collectOnce() {
@@ -58,6 +79,57 @@ describe("process-manager fleet gauges", () => {
       expect(metrics.descriptionOf("pm_outbox_dead")).toMatch(
         /aggregate with max\(\), not sum\(\)/,
       );
+    });
+  });
+
+  describe("given the source is unbound at shutdown", () => {
+    /** @scenario "Unbinding at shutdown silences the gauges" */
+    it("reports nothing, including collection success", async () => {
+      bindProcessFleetMetricsSource(async () => [
+        {
+          processName: "p",
+          instances: 1,
+          overdueWakes: 0,
+          pendingMessages: 0,
+          overduePending: 0,
+          lapsedLeases: 0,
+          deadMessages: 0,
+        },
+      ]);
+      unbindProcessFleetMetricsSource();
+
+      expect(await collectOnce()).toEqual([]);
+    });
+  });
+
+  describe("given a read is still in flight when the source is unbound", () => {
+    /** @scenario "Unbinding at shutdown silences the gauges" */
+    it("discards the late result instead of repopulating the cache", async () => {
+      const { late, finish } = lateRead();
+      bindProcessFleetMetricsSource(() => late);
+      const pending = metrics.collect();
+      unbindProcessFleetMetricsSource();
+      finish([fleetRow({ processName: "stopped" })]);
+      await pending;
+
+      expect(await collectOnce()).toEqual([]);
+    });
+  });
+
+  describe("given a read is still in flight when another source is bound", () => {
+    /** @scenario "Unbinding at shutdown silences the gauges" */
+    it("reports the new source and drops the old source's late result", async () => {
+      const { late, finish } = lateRead();
+      bindProcessFleetMetricsSource(() => late);
+      const pending = metrics.collect();
+      bindProcessFleetMetricsSource(async () => [fleetRow({ processName: "current" })]);
+      const processNames = (observed: Awaited<ReturnType<typeof collectOnce>>) =>
+        new Set(observed.map((r) => r.attributes.process_name).filter(Boolean));
+
+      expect(processNames(await collectOnce())).toEqual(new Set(["current"]));
+      finish([fleetRow({ processName: "stale" })]);
+      await pending;
+      expect(processNames(await collectOnce())).toEqual(new Set(["current"]));
     });
   });
 

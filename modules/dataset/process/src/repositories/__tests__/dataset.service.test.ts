@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createDatasetTestAttachments,
+  createDatasetTestContent,
   createDatasetTestInlineAttachments,
   createDatasetTestRequestBounds,
 } from "../../app/__tests__/dataset.fixture.ts";
@@ -94,6 +95,7 @@ describe("DatasetService", () => {
     const service = DatasetService.create({
       repository: new Repo(),
       records: new Records(),
+      content: createDatasetTestContent(),
       requestBounds: createDatasetTestRequestBounds(),
       attachments: createDatasetTestAttachments(),
       inlineAttachments: createDatasetTestInlineAttachments(),

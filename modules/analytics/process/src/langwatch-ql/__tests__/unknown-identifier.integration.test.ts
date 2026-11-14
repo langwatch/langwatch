@@ -25,6 +25,7 @@ describe("given SQL that names a column no dataset has", () => {
       await executor.execute({
         sql,
         tenantCapability: harness.tenantA.keyHash,
+        projectIds: [harness.tenantA.tenantId],
       });
     } catch (error) {
       return error;
@@ -60,6 +61,7 @@ describe("given SQL that names a column no dataset has", () => {
       const result = await executor.execute({
         sql: `SELECT TraceId FROM ${database}.traces LIMIT 1`,
         tenantCapability: harness.tenantA.keyHash,
+        projectIds: [harness.tenantA.tenantId],
       });
 
       expect(result.columns.map((column) => column.name)).toEqual(["TraceId"]);

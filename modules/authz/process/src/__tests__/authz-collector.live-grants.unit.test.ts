@@ -2,6 +2,7 @@ import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import { EventingAuthzReadRepository } from "../repositories/eventing/eventing.authz-read.repository.ts";
+import { MemoryAuthzOrganizationPolicyRepository } from "../repositories/memory/memory.authz-organization-policy.repository.ts";
 import { AuthzCollectorService } from "../services/authz-collector.service.ts";
 
 const ORG = "org-acme";
@@ -17,6 +18,7 @@ describe("AuthzCollectorService over the grants head", () => {
         ]);
       const legacyBindingRead = vi.fn().mockResolvedValue([]);
       const collector = AuthzCollectorService.create({
+        policies: MemoryAuthzOrganizationPolicyRepository.create(),
         reader: EventingAuthzReadRepository.create(
           prismaDouble({
             organizationUser: {

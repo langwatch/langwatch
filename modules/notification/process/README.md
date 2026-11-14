@@ -90,7 +90,7 @@ None: this module declares no REST family.
 
 ### `notification`
 
-Contract `../contract/src/notification.ts:126`, router `src/transport/notification.trpc.ts:26`.
+Contract `../contract/src/notification.ts:139`, router `src/transport/notification.trpc.ts:26`.
 
 | Procedure                         | Kind     | Gate                                                                                              | Input  | Output                   |
 | --------------------------------- | -------- | ------------------------------------------------------------------------------------------------- | ------ | ------------------------ |
@@ -100,7 +100,7 @@ Contract `../contract/src/notification.ts:126`, router `src/transport/notificati
 
 ```typescript
 // notification.webPushPublicKey
-// Input: inline, ../contract/src/notification.ts:128
+// Input: inline, ../contract/src/notification.ts:141
 interface Input {}
 // Output: webPushPublicKeySchema, ../contract/src/web-push.ts:141
 interface Output {
@@ -108,7 +108,7 @@ interface Output {
 }
 
 // notification.subscribeWebPush
-// Input: inline, ../contract/src/notification.ts:133
+// Input: inline, ../contract/src/notification.ts:146
 interface Input {
   endpoint: string;
   keys: {
@@ -119,7 +119,7 @@ interface Input {
 }
 
 // notification.unsubscribeWebPush
-// Input: inline, ../contract/src/notification.ts:137
+// Input: inline, ../contract/src/notification.ts:150
 interface Input {
   endpoint: string;
 }

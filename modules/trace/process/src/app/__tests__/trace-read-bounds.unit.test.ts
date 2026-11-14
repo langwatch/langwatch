@@ -3,6 +3,7 @@
  * The tier-effective request bounds: page sizes clamp to the plan's bound unless
  * the caller names a bound to refuse above; id arrays above it refuse.
  */
+import type { RequestBoundKey } from "@langwatch/plans";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -11,6 +12,7 @@ import { TraceIdsTooManyError } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
+import { MemoryNullTraceBraidReadsRepository } from "../../features/braid/repositories/memory/memory.null-trace-braid-reads.repository.ts";
 import type { TraceSpanCostSuggestion } from "../../features/span/services/span-cost-suggestion.service.ts";
 import { MemoryTraceEvaluationRunsRepository } from "../../repositories/memory/memory.trace-evaluation-runs.repository.ts";
 import type { TraceLegacyRead } from "../../services/trace-viewer.service.ts";
@@ -23,6 +25,7 @@ import {
   type TracesSessionGroupsReader,
   type TracesSpanReader,
 } from "../trace.app.ts";
+import { braidTwins } from "./support/trace-app.harness.ts";
 import { createTraceTestRequestBounds } from "./trace-bounds.fixture.ts";
 
 const PROTECTIONS = { canSeeCosts: true };
@@ -32,7 +35,10 @@ function tracePage(): TracesForProjectResult {
   return { groups: [], totalHits: 0, traceChecks: {} };
 }
 
-function harness(tier: "free" | "paid" | "enterprise") {
+function harness(
+  tier: "free" | "paid" | "enterprise",
+  overrides: Partial<Record<RequestBoundKey, number>> = {},
+) {
   const getAllTracesForProject = vi.fn<TraceLegacyRead["getAllTracesForProject"]>(async () =>
     tracePage(),
   );
@@ -52,10 +58,12 @@ function harness(tier: "free" | "paid" | "enterprise") {
   const summary: TraceSummaryReader = { getByTraceId: async () => ({}) as never };
 
   const app = TraceModule.fromDependencies({
+    ...braidTwins(),
     authorizeRead: async ({ projectId }) => ownProof({ projectId }),
     storedObjects: createApiFixture<StoredObjectApi>(),
     spanCostSuggestions: createApiFixture<TraceSpanCostSuggestion>(),
     traces: {
+      braidReads: MemoryNullTraceBraidReadsRepository.create(),
       existence: {
         findExistingTraceIds: async ({ traceIds }) => [...traceIds],
         countUsage: async () => ({ traces: 0, spans: 0 }),
@@ -83,7 +91,7 @@ function harness(tier: "free" | "paid" | "enterprise") {
     projects: {
       getOrganizationId: async (projectId: string) => `organization-of-${projectId}`,
     } as ProjectApi,
-    requestBounds: createTraceTestRequestBounds(tier),
+    requestBounds: createTraceTestRequestBounds(tier, overrides),
     exportBounds: null,
   });
 
@@ -203,6 +211,74 @@ describe("trace read bounds", () => {
       });
 
       expect(getAllTracesForProject.mock.calls[0]?.[0]).not.toHaveProperty("pageSize");
+    });
+  });
+
+  describe("when a spans search names its page against the spans bound", () => {
+    const refused = (meta: Record<string, unknown>) => ({
+      code: "trace_page_size_too_large",
+      meta: expect.objectContaining(meta),
+    });
+    const search = (app: ReturnType<typeof harness>["app"], pageSize?: number) =>
+      app.listTraces({
+        query: { ...QUERY, ...(pageSize === undefined ? {} : { pageSize }) },
+        protections: PROTECTIONS,
+        options: { includeSpans: true },
+      });
+
+    /** @scenario "Public trace search with spans refuses a page above 100 traces" */
+    it("refuses 4000 naming the bound 100, and reads 100 as asked", async () => {
+      const { app, getAllTracesForProject } = harness("enterprise");
+
+      await expect(search(app, 4000)).rejects.toMatchObject(
+        refused({ maxPageSize: 100, bound: "tracesWithSpansPageSizeMax" }),
+      );
+      await search(app, 100);
+
+      expect(getAllTracesForProject.mock.calls[0]?.[0]).toMatchObject({ pageSize: 100 });
+    });
+
+    /** @scenario "Public trace search with spans refuses a page above 100 traces" */
+    it("answers pages of the bound when no pageSize is named", async () => {
+      const { app, getAllTracesForProject } = harness("free");
+
+      await search(app);
+
+      expect(getAllTracesForProject.mock.calls[0]?.[0]).toMatchObject({ pageSize: 100 });
+    });
+
+    /** @scenario "Every trace read with spans is held to the spans page bound" */
+    it("refuses a spans download above the spans bound, whatever bound it names", async () => {
+      const { app, getAllTracesForProject } = harness("free");
+      const download = (pageSize?: number) =>
+        app.listTraces({
+          query: { ...QUERY, ...(pageSize === undefined ? {} : { pageSize }) },
+          protections: PROTECTIONS,
+          options: {
+            downloadMode: true,
+            includeSpans: true,
+            refuseAbove: "tracesDownloadPageSizeMax",
+          },
+        });
+
+      await expect(download(10_000)).rejects.toMatchObject(
+        refused({ maxPageSize: 100, bound: "tracesWithSpansPageSizeMax" }),
+      );
+      await download();
+
+      expect(getAllTracesForProject.mock.calls[0]?.[0]).toMatchObject({ pageSize: 100 });
+    });
+
+    /** @scenario "An operator's spans page bound is the one a spans search answers by" */
+    it("refuses and defaults by the operator's configured bound", async () => {
+      const { app, getAllTracesForProject } = harness("free", { tracesWithSpansPageSizeMax: 10 });
+
+      await expect(search(app, 11)).rejects.toMatchObject(
+        refused({ maxPageSize: 10, bound: "tracesWithSpansPageSizeMax" }),
+      );
+      await search(app);
+
+      expect(getAllTracesForProject.mock.calls[0]?.[0]).toMatchObject({ pageSize: 10 });
     });
   });
 

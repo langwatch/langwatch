@@ -24,7 +24,7 @@ A project's conversation topics, and what the last topic-clustering run did.
 | Postgres table                 | `TopicClusteringRunHistoryProjection`                               | `process/src/repositories/prisma/prisma.topic.repository.ts:27`            |
 | Postgres, accessed not claimed | `Cost`, `ProcessManagerInstance`, `Project`, `TopicModelProjection` | `process/src/repositories/prisma/prisma.topic-clustering.repository.ts:17` |
 | Stores required                | prisma, redis                                                       | `process/src/repositories/live/live.topic.repositories.ts:12`              |
-| Stores required                | prisma                                                              | `process/src/repositories/prisma/prisma.topic.repositories.ts:29`          |
+| Stores required                | prisma                                                              | `process/src/repositories/prisma/prisma.topic.repositories.ts:33`          |
 
 Anything else topic needs belongs to another module and is reached through its `*Api`.
 

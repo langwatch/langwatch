@@ -52,7 +52,7 @@ describe("buildTargetMetadata given an evaluator target", () => {
 
     expect(target?.model).toBe("anthropic/claude-sonnet-5");
     expect(target?.name).toBe("Comparison");
-    expect(target?.evaluator_id).toBe("evaluator-1");
+    expect(target?.evaluatorId).toBe("evaluator-1");
   });
 });
 

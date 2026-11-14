@@ -97,6 +97,7 @@ const emptyRunState: ExperimentRunStateData = {
   StoppedAt: null,
   ExpectedTargetResults: null,
   ExpectedEvaluatorResults: null,
+  Concurrency: null,
   TotalScoreSum: 0,
   ScoreCount: 0,
   PassedCount: 0,

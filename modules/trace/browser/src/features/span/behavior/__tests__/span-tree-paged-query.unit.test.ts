@@ -1,5 +1,5 @@
 import type { RouterFromMap } from "@langwatch/api/web";
-import type { SpanTreeNode } from "@langwatch/trace-contract";
+import type { SpanTreeCursor, SpanTreeNode } from "@langwatch/trace-contract";
 import { QueryClient } from "@tanstack/react-query";
 import { createTRPCClient, TRPCClientError, type TRPCLink } from "@trpc/client";
 import { observable } from "@trpc/server/observable";
@@ -39,7 +39,7 @@ const node = (spanId: string, startTimeMs = 0, updatedAtMs = startTimeMs): SpanT
 
 type Page = {
   nodes: SpanTreeNode[];
-  nextCursor: { startTimeMs: number; spanId: string } | null;
+  nextCursor: SpanTreeCursor | null;
 };
 
 const input = { projectId: "p1", traceId: "t1" };
@@ -166,6 +166,31 @@ describe("fetchSpanTreePages", () => {
 
       expect(nodes.map((n) => n.spanId)).toEqual(["b", "a"]);
       expect(nodes.find((n) => n.spanId === "a")?.startTimeMs).toBe(3);
+    });
+  });
+
+  describe("when a page boundary falls between two owners holding one span id", () => {
+    const boundary = { startTimeMs: 5, spanId: "shared", ownerProjectId: null };
+
+    /** @scenario "Two projects holding the same span id show both spans" */
+    it("threads the owner in the cursor and keeps both spans", async () => {
+      const { utils, query } = makeUtils([
+        { nodes: [node("shared", 5)], nextCursor: boundary },
+        { nodes: [{ ...node("shared", 5), ownerProjectId: "owner" }], nextCursor: null },
+      ]);
+
+      const nodes = await fetchSpanTreePages({ utils, input });
+
+      expect(nodes.map((n) => [n.spanId, n.ownerProjectId ?? null])).toEqual([
+        ["shared", null],
+        ["shared", "owner"],
+      ]);
+      expect(query).toHaveBeenNthCalledWith(
+        2,
+        PAGED_PATH,
+        { ...input, limit: SPAN_TREE_PAGE_SIZE, cursor: boundary },
+        { signal: undefined },
+      );
     });
   });
 
@@ -340,6 +365,22 @@ describe("mergeSpanTreeDelta", () => {
       expect(merged.map((n) => n.spanId)).toEqual(["a", "b"]);
       expect(merged.find((n) => n.spanId === "b")?.durationMs).toBe(42);
       expect(merged).not.toBe(existing);
+    });
+  });
+
+  describe("when the delta carries an owner's span holding a span id the reader holds", () => {
+    /** @scenario "Two projects holding the same span id show both spans" */
+    it("keeps both spans instead of replacing the reader's", () => {
+      const existing = [node("shared", 1)];
+
+      const merged = mergeSpanTreeDelta(existing, [
+        { ...node("shared", 1), ownerProjectId: "owner" },
+      ]);
+
+      expect(merged.map((n) => [n.spanId, n.ownerProjectId ?? null])).toEqual([
+        ["shared", null],
+        ["shared", "owner"],
+      ]);
     });
   });
 });

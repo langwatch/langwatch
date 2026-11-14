@@ -69,6 +69,9 @@ jobs:
           config-file: .github/release-please-config.json
           manifest-file: .github/.release-please-manifest.json
 
+  # Every rewrite of the release branch drops this commit until the job pushes it again;
+  # release-manifest-check.yml keeps the release PR red meanwhile, and the image publish refuses
+  # a tag without it.
   stamp-release-manifest:
     name: Stamp the app release manifest
     needs: release-please

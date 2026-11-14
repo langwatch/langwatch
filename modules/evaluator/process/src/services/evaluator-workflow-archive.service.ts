@@ -1,7 +1,7 @@
 import { EvaluatorDeployedLabelProtectedError } from "@langwatch/evaluator-contract";
 import { createLogger } from "@langwatch/observability";
 
-import type { EvaluatorDeletionFactsService } from "./evaluator-deletion-facts.service.ts";
+import type { EvaluatorLifecycleFactsService } from "./evaluator-lifecycle-facts.service.ts";
 import type { EvaluatorVersionService } from "./evaluator-version.service.ts";
 import type { EvaluatorService } from "./evaluator.service.ts";
 
@@ -16,7 +16,7 @@ export class EvaluatorWorkflowArchiveService {
   static create(deps: {
     evaluators: Pick<EvaluatorService, "findByWorkflow" | "archive">;
     versions: Pick<EvaluatorVersionService, "assertDeletable">;
-    deletionFacts: Pick<EvaluatorDeletionFactsService, "recordEvaluatorDeleted">;
+    lifecycleFacts: Pick<EvaluatorLifecycleFactsService, "recordEvaluatorDeleted">;
   }): EvaluatorWorkflowArchiveService {
     return new EvaluatorWorkflowArchiveService(deps);
   }
@@ -31,7 +31,7 @@ export class EvaluatorWorkflowArchiveService {
       if (!(await this.#mayArchive({ ...input, evaluatorId: evaluator.id }))) {
         continue;
       }
-      await this.deps.deletionFacts.recordEvaluatorDeleted({
+      await this.deps.lifecycleFacts.recordEvaluatorDeleted({
         projectId: input.projectId,
         evaluatorId: evaluator.id,
       });

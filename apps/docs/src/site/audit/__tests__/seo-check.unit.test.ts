@@ -95,6 +95,18 @@ describe("checkSeo", () => {
     });
   });
 
+  describe("when llms.txt reaches a page only through its section file", () => {
+    /** @scenario "Split the documentation into one file per section" */
+    it("counts the page as listed", () => {
+      site({
+        pages: { guide: page({ slug: "guide" }), "api/op": page({ slug: "api/op" }) },
+        llms: `- [guide](${DOCS}/guide.md)\n- [API](${DOCS}/llms-full/api.txt): 1 pages in one file`,
+      });
+      write({ file: "llms-full/api.txt", contents: `# api/op\n\n> Page: ${DOCS}/api/op\n` });
+      expect(checkSeo({ outDir, basePath: "/docs", seo }).issues).toEqual([]);
+    });
+  });
+
   describe("when pages have search and agent-readiness gaps", () => {
     /** @scenario "Report every search and agent-readiness gap across all pages" */
     it("names each page and the exact gap", () => {
