@@ -3,12 +3,14 @@ import { describe, expect, it } from "vitest";
 import { StubAuthzListingRepository } from "../repositories/__tests__/support/authz-listing.stub.ts";
 import { StubAuthzManagedGrantRepository } from "../repositories/__tests__/support/authz-managed-grant.stub.ts";
 import { makeReader } from "../repositories/__tests__/support/authz-read.stub.ts";
+import { MemoryAuthzOrganizationPolicyRepository } from "../repositories/memory/memory.authz-organization-policy.repository.ts";
 import { AuthzService } from "../services/authz.service.ts";
 
 const ORG = "org-123";
 
 function makeService({ listing = new StubAuthzListingRepository() } = {}) {
   return AuthzService.create({
+    policies: MemoryAuthzOrganizationPolicyRepository.create(),
     isOnEngine: async () => true,
     repository: makeReader(),
     listing,

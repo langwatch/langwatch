@@ -1,5 +1,6 @@
 import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
 
+import type { DashboardsSidebarHint } from "./dashboards-sidebar-hint.ts";
 import {
   isOrganizationScopedProduct,
   isPathUnder,
@@ -69,18 +70,22 @@ function seatRefusalAt({
 /**
  * The product the chrome draws. Dashboards wins over the personal plane: its
  * sidebar is the saved-dashboards list, which the Me sidebar does not carry.
+ * A reader who clicked in from LLM Ops stays in that sidebar (the hint); no hint, no change.
  */
 function activeProductFor({
   isSettingsRoute,
   isPersonalScopeRoute,
   addressedProductId,
+  sidebarHint,
 }: {
   isSettingsRoute: boolean;
   isPersonalScopeRoute: boolean;
   addressedProductId: ProductId | null;
+  sidebarHint: DashboardsSidebarHint | null;
 }): ProductId | null {
   if (isSettingsRoute) return null;
-  if (addressedProductId === "dashboards") return "dashboards";
+  if (addressedProductId === "dashboards")
+    return sidebarHint === "llm-ops" ? "llm-ops" : "dashboards";
   if (isPersonalScopeRoute) return "me";
   return addressedProductId ?? "llm-ops";
 }
@@ -110,6 +115,7 @@ export function resolveShellRoute({
   isOrgScope,
   isOnOwnPersonalProject,
   organizationRole,
+  sidebarHint = null,
 }: {
   pathname: string;
   isPersonalScope: boolean;
@@ -117,6 +123,8 @@ export function resolveShellRoute({
   isOnOwnPersonalProject: boolean;
   /** The viewer's seat; the seat gate refuses a product it does not reach. */
   organizationRole: string | null | undefined;
+  /** The sidebar this tab last came from; only a Dashboards address reads it. */
+  sidebarHint?: DashboardsSidebarHint | null;
 }): ShellRoute {
   const isSettingsRoute = isSettingsShellRoute(pathname);
   // The product the ADDRESS names, before any sticky scope is applied.
@@ -131,6 +139,7 @@ export function resolveShellRoute({
     isSettingsRoute,
     isPersonalScopeRoute,
     addressedProductId,
+    sidebarHint,
   });
   const isOrgScopeRoute =
     isOrgScope || isSettingsRoute || isOrganizationScopedProduct(activeProductId);

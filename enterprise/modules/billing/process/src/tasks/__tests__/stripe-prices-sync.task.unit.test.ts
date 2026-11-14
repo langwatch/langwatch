@@ -331,7 +331,11 @@ describe("syncStripePrices", () => {
       const existing = createStripePricesFile();
       const existingWithoutMeters: StripePricesFile = {
         ...existing,
-        meters: { BILLABLE_EVENTS: undefined, INSTANT_EVAL_USD: undefined },
+        meters: {
+          BILLABLE_EVENTS: undefined,
+          INSTANT_EVAL_USD: undefined,
+          PII_REDACTION_USD: undefined,
+        },
       };
 
       const resolvedMapping = createPriceMapForEnvironment(existing.mapping, "test");

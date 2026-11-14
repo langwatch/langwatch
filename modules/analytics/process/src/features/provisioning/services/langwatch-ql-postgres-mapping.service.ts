@@ -173,28 +173,6 @@ export class LangWatchQLPostgresMappingService {
   private constructor() {}
 
   /**
-   * Creates the named collection holding the PostgreSQL credentials server-side.
-   */
-  namedCollectionStatements({ connection }: { connection: PostgresNamedCollection }): string[] {
-    sqlText.assertIdentifier(connection.collection, "named collection");
-    if (!Number.isInteger(connection.port)) {
-      throw new Error(
-        `lwql provisioning: named collection port must be an integer, got ${connection.port}`,
-      );
-    }
-
-    return [
-      `DROP NAMED COLLECTION IF EXISTS ${connection.collection}`,
-      `CREATE NAMED COLLECTION ${connection.collection} AS ` +
-        `host=${clickHouseLiteral(connection.host)}, ` +
-        `port=${connection.port}, ` +
-        `database=${clickHouseLiteral(connection.database)}, ` +
-        `user=${clickHouseLiteral(connection.user)}, ` +
-        `password=${clickHouseLiteral(connection.password)}`,
-    ];
-  }
-
-  /**
    * A short, one-way digest of every value the named collection holds plus the schema the
    * engine tables read, never the password itself. An engine table's pool keeps the values it
    * was built with, so a changed digest means rebuild.

@@ -13,6 +13,7 @@ import {
 } from "./scim-sync-summary-notice.ts";
 import { selfHostedSignalNotice } from "./self-hosted-signal-notice.ts";
 import {
+  seatRequestedNotice,
   subscriptionActivatedNotice,
   subscriptionCancelledNotice,
   subscriptionProspectiveNotice,
@@ -27,6 +28,7 @@ export const slackNotices: readonly RegisteredNotice[] = [
   subscriptionProspectiveNotice,
   subscriptionActivatedNotice,
   subscriptionCancelledNotice,
+  seatRequestedNotice,
   licensePurchaseNotice,
   billingThresholdFailureNotice,
   planLimitReachedNotice,
@@ -45,6 +47,7 @@ export {
   planLimitReachedNotice,
   resourceLimitReachedNotice,
   scimSyncSummaryNotice,
+  seatRequestedNotice,
   selfHostedSignalNotice,
   subscriptionActivatedNotice,
   subscriptionCancelledNotice,

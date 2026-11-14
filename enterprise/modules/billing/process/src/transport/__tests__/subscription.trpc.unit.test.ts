@@ -28,6 +28,9 @@ const findLastNonCancelledSubscription =
 const previewProration = vi.fn<BillingSubscriptionApi["previewProration"]>();
 const notifyProspective = vi.fn<BillingSubscriptionApi["notifyProspective"]>();
 const listInvoices = vi.fn<BillingSubscriptionApi["listInvoices"]>();
+const developerSeats = vi.fn<BillingSubscriptionApi["developerSeats"]>();
+const previewDeveloperSeats = vi.fn<BillingSubscriptionApi["previewDeveloperSeats"]>();
+const setDeveloperSeats = vi.fn<BillingSubscriptionApi["setDeveloperSeats"]>();
 
 const billing: BillingSubscriptionApi = {
   getOrCreateCustomerId,
@@ -38,6 +41,9 @@ const billing: BillingSubscriptionApi = {
   previewProration,
   notifyProspective,
   listInvoices,
+  developerSeats,
+  previewDeveloperSeats,
+  setDeveloperSeats,
 };
 
 const trpc = initTRPC.context<BillingTrpcTestContext>().create();
@@ -75,11 +81,14 @@ describe("given the mounted subscription router", () => {
       expect(Object.keys(router._def.procedures).toSorted()).toEqual([
         "addTeamMemberOrEvents",
         "create",
+        "developerSeats",
         "getLastSubscription",
         "listInvoices",
         "manage",
+        "previewDeveloperSeats",
         "previewProration",
         "prospective",
+        "setDeveloperSeats",
       ]);
     });
 
@@ -94,30 +103,39 @@ describe("given the mounted subscription router", () => {
       expect(kinds).toEqual({
         addTeamMemberOrEvents: "mutation",
         create: "mutation",
+        developerSeats: "query",
         getLastSubscription: "query",
         listInvoices: "query",
         manage: "mutation",
+        previewDeveloperSeats: "query",
         previewProration: "query",
         prospective: "mutation",
+        setDeveloperSeats: "mutation",
       });
     });
   });
 });
 
-describe("given a caller who may read the organization but not upgrade it", () => {
-  describe("when a checkout is asked for", () => {
-    it("refuses the checkout and still answers the read", async () => {
+describe("given a caller who may read the organization but not manage it", () => {
+  describe("when a change to what the organization pays is asked for", () => {
+    /** @scenario "A Billing member approves seat requests but cannot invite" */
+    it("refuses the change and the invoices, and still answers the read", async () => {
       const viewer = routerFor((permission) => permission === "organization:view").createCaller({
         actor: { id: "user_ana" },
         email: "ana@acme.com",
       });
 
-      listInvoices.mockResolvedValue([]);
+      findLastNonCancelledSubscription.mockResolvedValue(null);
 
       await expect(
         viewer.create({ organizationId: ORGANIZATION, baseUrl: "https://app", plan: "PRO" }),
       ).rejects.toMatchObject({ cause: { code: "permission_denied" } });
-      await expect(viewer.listInvoices({ organizationId: ORGANIZATION })).resolves.toEqual([]);
+      await expect(viewer.listInvoices({ organizationId: ORGANIZATION })).rejects.toMatchObject({
+        cause: { code: "permission_denied" },
+      });
+      await expect(
+        viewer.getLastSubscription({ organizationId: ORGANIZATION }),
+      ).resolves.toBeNull();
       expect(createOrUpdateSubscription).not.toHaveBeenCalled();
     });
   });
@@ -164,6 +182,13 @@ describe("given a member who may upgrade but not manage the organization", () =>
     ).rejects.toMatchObject({ cause: { code: "permission_denied" } });
     expect(updateSubscriptionItems).not.toHaveBeenCalled();
   });
+
+  it("is refused a Developer seat change", async () => {
+    await expect(
+      member.setDeveloperSeats({ organizationId: ORGANIZATION, quantity: 2 }),
+    ).rejects.toMatchObject({ cause: { code: "permission_denied" } });
+    expect(setDeveloperSeats).not.toHaveBeenCalled();
+  });
 });
 
 describe("when a first checkout is started", () => {
@@ -186,6 +211,7 @@ describe("when a first checkout is started", () => {
       organizationId: ORGANIZATION,
     });
     expect(createOrUpdateSubscription).toHaveBeenCalledWith({
+      startedByUserId: "user_ana",
       organizationId: ORGANIZATION,
       baseUrl: "https://app",
       plan: "PRO",

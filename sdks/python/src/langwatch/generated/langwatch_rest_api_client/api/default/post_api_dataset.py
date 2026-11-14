@@ -61,7 +61,7 @@ def sync_detailed(
     client: AuthenticatedClient,
     body: PostApiDatasetBody,
 ) -> Response[PostApiDatasetResponse201]:
-    """Create a new dataset
+    """Create a new dataset, optionally with its first rows in `entries`, written in the same call.
 
     Args:
         body (PostApiDatasetBody):
@@ -90,7 +90,7 @@ def sync(
     client: AuthenticatedClient,
     body: PostApiDatasetBody,
 ) -> PostApiDatasetResponse201 | None:
-    """Create a new dataset
+    """Create a new dataset, optionally with its first rows in `entries`, written in the same call.
 
     Args:
         body (PostApiDatasetBody):
@@ -114,7 +114,7 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     body: PostApiDatasetBody,
 ) -> Response[PostApiDatasetResponse201]:
-    """Create a new dataset
+    """Create a new dataset, optionally with its first rows in `entries`, written in the same call.
 
     Args:
         body (PostApiDatasetBody):
@@ -141,7 +141,7 @@ async def asyncio(
     client: AuthenticatedClient,
     body: PostApiDatasetBody,
 ) -> PostApiDatasetResponse201 | None:
-    """Create a new dataset
+    """Create a new dataset, optionally with its first rows in `entries`, written in the same call.
 
     Args:
         body (PostApiDatasetBody):

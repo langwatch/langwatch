@@ -65,6 +65,7 @@ export class SourcePresenceService {
       const result = await this.#analytics.executeLangWatchQL({
         ...input.caller,
         sql: SOURCE_EXISTENCE_SQL[input.source],
+        telemetry: { caller: "source_presence" },
       });
       return result.rows.length > 0 ? "present" : "absent";
     } catch (error) {

@@ -83,7 +83,11 @@ export class LicenseRegistryService {
       organizationName: organization.name,
       email: input.email,
       planType: input.planType,
-      ...licenseSeats({ members: input.maxMembers, membersLite: input.maxMembersLite }),
+      ...licenseSeats({
+        members: input.maxMembers,
+        membersLite: input.maxMembersLite,
+        membersDeveloper: input.maxMembersDeveloper,
+      }),
       maxMessagesPerMonth: input.maxMessagesPerMonth,
       expiresAt: toDate(input.expiresAt),
       // Signed into the license so the install reads its own entitlement
@@ -190,6 +194,7 @@ export class LicenseRegistryService {
     id: string;
     maxMembers?: number;
     maxMembersLite?: number;
+    maxMembersDeveloper?: number;
     maxMessagesPerMonth?: number;
     expiresAt: Instant;
     operatorId: string;

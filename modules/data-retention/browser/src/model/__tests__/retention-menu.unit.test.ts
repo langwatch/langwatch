@@ -18,17 +18,17 @@ describe("buildRetentionMenuItems", () => {
       legacyDays: null,
     });
 
-    /** @scenario "A paid organization sees only the two fixed options" */
-    it("offers exactly the two fixed presets, in order", () => {
-      expect(labels(items)).toEqual(["1 month", "2 months"]);
+    /** @scenario "A paid organization sees only the three fixed options" */
+    it("offers exactly the three fixed presets, in order", () => {
+      expect(labels(items)).toEqual(["1 month", "2 months", "3 months"]);
     });
 
-    /** @scenario "A paid organization sees only the two fixed options" */
+    /** @scenario "A paid organization sees only the three fixed options" */
     it("offers no custom option", () => {
       expect(values(items)).not.toContain(CUSTOM_PRESET_VALUE);
     });
 
-    /** @scenario "A paid organization sees only the two fixed options" */
+    /** @scenario "A paid organization sees only the three fixed options" */
     it("offers no keep-forever option", () => {
       expect(values(items)).not.toContain(INDEFINITE_PRESET_VALUE);
     });
@@ -88,7 +88,7 @@ describe("buildRetentionMenuItems", () => {
         label: "Current: 371 days (legacy)",
       });
       // The real plan options still follow.
-      expect(labels(items).slice(1)).toEqual(["1 month", "2 months"]);
+      expect(labels(items).slice(1)).toEqual(["1 month", "2 months", "3 months"]);
     });
 
     it("labels an indefinite legacy value as keep-forever", () => {

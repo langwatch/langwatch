@@ -26,6 +26,21 @@ Feature: An SSO connection reaches the endpoints its issuer's discovery document
     When a sign-in request names that issuer
     Then neither origin is trusted
 
+  # Registration keeps the proxy (ADR-195); the per-sign-in lookup follows the
+  # route the SSO engine's own sign-in fetches take, so both read one document.
+  @unit
+  Scenario: Registering a connection reads the discovery document through the outbound proxy
+    Given the deployment names an outbound proxy
+    When an administrator registers a connection
+    Then its issuer's discovery document is fetched through the proxy
+
+  @unit
+  Scenario: The sign-in trust lookup takes the route Node's fetch takes
+    Given the deployment names an outbound proxy
+    When a sign-in request names a registered issuer
+    Then its discovery document is fetched directly while Node does not proxy fetch
+    And through the proxy once Node is told to proxy fetch
+
   # Sign-in goes through better-auth's use of Node's global fetch, which the
   # egress fence does not carry yet (ADR-195).
   @integration @unimplemented

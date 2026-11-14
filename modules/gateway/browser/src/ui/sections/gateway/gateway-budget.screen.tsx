@@ -238,9 +238,6 @@ function BudgetDetailPage() {
         </PageLayout.Header>
 
         <PageLayout.Container>
-          <Text color="fg.muted" marginBottom={6}>
-            How much this budget has spent, what it covers, and what happens when it runs out.
-          </Text>
           {isLoadingBudget && <BudgetDetailSkeleton />}
           {budgetMissing && (
             <NoDataInfoBlock

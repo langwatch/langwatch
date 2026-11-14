@@ -149,6 +149,32 @@ exporter, err := langwatch.NewExporter(ctx,
 - `StartsWith(prefix)` / `StartsWithIgnoreCase(prefix)`
 - `MatchRegex(re)` / `MustMatchRegex(pattern)`
 
+## Braids: Signed Calls
+
+A braid can require that the calling project really made a call. The calling service signs the
+baggage entries it names with one of its project's signing keys; the called service copies those
+entries and the signature onto its spans, and LangWatch checks the signature at ingest.
+
+```go
+// Calling side, inside an active span: the signature covers the current trace.
+ctx, err := langwatch.SignBaggage(ctx, os.Getenv("LANGWATCH_SIGNING_KEY"), map[string]string{
+	"orchestrator": "web",
+})
+
+// Called side: add the copy processor to your tracer provider.
+braids, err := langwatch.NewBraidBaggageSpanProcessor("orchestrator")
+tp := sdktrace.NewTracerProvider(
+	sdktrace.WithSpanProcessor(braids),
+	sdktrace.WithBatcher(exporter),
+)
+```
+
+Your propagator must carry W3C baggage, for example
+`propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{})`.
+Signing returns a `*langwatch.BraidSigningError` whose `Code` is `malformed_signing_key`,
+`empty_entries`, `invalid_entry_key` (keys match `[A-Za-z0-9._-]{1,128}`), `invalid_entry_value`
+or `no_active_trace`.
+
 ## OpenAI + Multi-Provider Support
 
 ### Automatic OpenAI Instrumentation

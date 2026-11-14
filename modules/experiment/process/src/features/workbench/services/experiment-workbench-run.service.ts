@@ -128,7 +128,14 @@ export class ExperimentWorkbenchRunService {
     const run = savedRun({ persistResults: runsSavedDataset(saved.runInputs), runUrl });
     await this.#runsOn().startRun(run);
 
-    return { kind: "started", runId, status: "running", total: run.start.total, runUrl };
+    return {
+      kind: "started",
+      runId,
+      status: "running",
+      total: run.start.total,
+      ...(run.start.plan ? { concurrency: run.start.plan.concurrency } : {}),
+      runUrl,
+    };
   }
 
   /** `POST /execute`: the browser's run, planned here and executed by the worker's run pipeline. */
@@ -260,15 +267,24 @@ export class ExperimentWorkbenchRunService {
     }
 
     // Started, not yet folded by the worker: main's just-registered run (spec section 7).
+    // The concurrency the run's plan fixed; a run started without a plan answers none.
+    const concurrency = run.concurrency !== undefined ? { concurrency: run.concurrency } : {};
     if (!runState) {
-      return { runId, status: "running", progress: 0, total: run.total, startedAt: run.startedAt };
+      return {
+        runId,
+        status: "running",
+        progress: 0,
+        total: run.total,
+        ...concurrency,
+        startedAt: run.startedAt,
+      };
     }
 
     logger.debug({ runId, status: runState.status }, "Run status queried");
 
     const { status, progress, total, startedAt } = runState;
     if (status === "running" || status === "pending") {
-      return { runId: runState.runId, status, progress, total, startedAt };
+      return { runId: runState.runId, status, progress, total, ...concurrency, startedAt };
     }
 
     const { finishedAt } = runState;
@@ -278,6 +294,7 @@ export class ExperimentWorkbenchRunService {
         status,
         progress,
         total,
+        ...concurrency,
         startedAt,
         finishedAt,
         summary: runState.summary,
@@ -290,6 +307,7 @@ export class ExperimentWorkbenchRunService {
         status,
         progress,
         total,
+        ...concurrency,
         startedAt,
         finishedAt,
         // The code, never the thrown message (ADR-045).
@@ -299,7 +317,15 @@ export class ExperimentWorkbenchRunService {
       };
     }
 
-    return { runId: runState.runId, status, progress, total, startedAt, finishedAt };
+    return {
+      runId: runState.runId,
+      status,
+      progress,
+      total,
+      ...concurrency,
+      startedAt,
+      finishedAt,
+    };
   }
 
   /** `GET /runs/:runId/results`: every row of a run, found through the cache or the slug. */

@@ -4,47 +4,63 @@
  * top-level span with nothing below it.
  */
 
+import { unfoldedRows } from "../../templates/model/lwql-gathered.ts";
 import { bucketOf, END, inPeriod, MIDPOINT, START } from "../../templates/model/lwql-period.ts";
 
-const SPAN_TYPE = "SpanAttributes['langwatch.span.type']";
+// Typed span columns, never the SpanAttributes map, which runs out of memory on large projects.
+const SPAN_TYPE = "SpanType";
 
 /** The evaluator that fails a task whose first tool was the wrong one. */
 export const WRONG_TOOL_JUDGE = "Tool choice";
 
 /**
- * Calls, failures and recovered failures per step. A failure is recovered when the span above
- * it still ended without an error. A top-level span with nothing below it (a trace of one span,
- * or of flat spans) is a step too, and its failure always reached the user.
+ * Calls, failures and failures recovered by the span above; a lone top-level span is a step whose
+ * failure reached the user. An unstored parent's call counts, not recovered (analytics ADR-004).
+ * A top-level span is lone when no span names it as parent: one grouping by parent finds them.
  */
 function stepFailuresSql({ toolsOnly, limit }: { toolsOnly: boolean; limit: number }): string {
-  const tools = (column: string) => (toolsOnly ? `\n    AND ${column} = 'tool'` : "");
-  return `SELECT step,
-  count() AS calls,
-  countIf(failed) AS failures,
-  countIf(recovered) AS recovered
-FROM (
-  SELECT c.SpanName AS step,
-    c.StatusCode = 2 AS failed,
-    c.StatusCode = 2 AND p.StatusCode != 2 AS recovered
-  FROM spans AS c
-  INNER JOIN (
-    SELECT TraceId, SpanId, StatusCode
-    FROM spans
-    WHERE StartTime >= subtractDays(${START}, 1) AND StartTime < ${END}
-  ) AS p ON p.TraceId = c.TraceId AND p.SpanId = c.ParentSpanId
-  WHERE ${inPeriod("c.StartTime")}
-    AND c.ParentSpanId IS NOT NULL${tools(`c.${SPAN_TYPE}`)}
-  UNION ALL
-  SELECT r.SpanName AS step, r.StatusCode = 2 AS failed, false AS recovered
-  FROM spans AS r
-  LEFT ANTI JOIN (
-    SELECT DISTINCT TraceId, ParentSpanId
-    FROM spans
+  const tools = toolsOnly ? `\n      AND ${SPAN_TYPE} = 'tool'` : "";
+  const toolRoot = toolsOnly ? ` AND ${SPAN_TYPE} = 'tool'` : "";
+  const childCalls = `SELECT SpanName AS step, count() AS calls, countIf(StatusCode = 2) AS failures,
+    0 AS recovered
+  FROM span_metrics
+  WHERE ${inPeriod("StartTime")}${tools}
+    AND ifNull(ParentSpanId, '') != ''
+  GROUP BY step`;
+  const topLevel = `ParentSpanId IS NULL${toolRoot}`;
+  const loneTopLevel = `SELECT step, sum(top_level) AS calls, sum(failed) AS failures, 0 AS recovered
+  FROM (
+    SELECT anyIf(SpanName, ${topLevel}) AS step,
+      countIf(${topLevel}) AS top_level,
+      countIf(${topLevel} AND StatusCode = 2) AS failed
+    FROM span_metrics
     WHERE ${inPeriod("StartTime")}
-      AND ParentSpanId IS NOT NULL
-  ) AS k ON k.TraceId = r.TraceId AND k.ParentSpanId = r.SpanId
-  WHERE ${inPeriod("r.StartTime")}
-    AND r.ParentSpanId IS NULL${tools(`r.${SPAN_TYPE}`)}
+    GROUP BY sipHash128(TraceId, ifNull(ParentSpanId, SpanId))
+    HAVING top_level > 0 AND countIf(ParentSpanId IS NOT NULL) = 0
+  )
+  GROUP BY step`;
+  const recovered = `SELECT c.step AS step, 0 AS calls, 0 AS failures, count() AS recovered
+  FROM span_metrics AS p
+  INNER JOIN (
+    SELECT TraceId, ifNull(ParentSpanId, '') AS parent, SpanName AS step
+    FROM span_metrics
+    WHERE ${inPeriod("StartTime")}${tools}
+      AND ifNull(ParentSpanId, '') != ''
+      AND StatusCode = 2
+  ) AS c ON c.TraceId = p.TraceId AND c.parent = p.SpanId
+  WHERE p.StartTime >= subtractDays(${START}, 1) AND p.StartTime < ${END}
+    AND p.StatusCode != 2
+  GROUP BY step`;
+  return `SELECT step,
+  sum(calls) AS calls,
+  sum(failures) AS failures,
+  sum(recovered) AS recovered
+FROM (
+  ${childCalls}
+  UNION ALL
+  ${loneTopLevel}
+  UNION ALL
+  ${recovered}
 )
 GROUP BY step
 ORDER BY failures - recovered DESC, failures DESC, calls DESC
@@ -57,8 +73,7 @@ export const FAILING_STEPS_SQL = stepFailuresSql({ toolsOnly: false, limit: 3 })
 /** Every tool, so the widget's totals cover all of them. */
 export const TOOL_FAILURES_SQL = stepFailuresSql({ toolsOnly: true, limit: 50 });
 
-const ERROR_CATEGORY = `coalesce(nullIf(SpanAttributes['exception.type'], ''),
-    nullIf(SpanAttributes['error.type'], ''), SpanName)`;
+const ERROR_CATEGORY = "coalesce(nullIf(ErrorType, ''), SpanName)";
 
 /** Traces with an error per bucket, named by the first step below the root that failed. */
 export const ERRORS_BY_TYPE_SQL = `SELECT bucket, category, count() AS traces
@@ -66,7 +81,7 @@ FROM (
   SELECT TraceId,
     ${bucketOf("min(StartTime)")} AS bucket,
     argMin(${ERROR_CATEGORY}, tuple(ParentSpanId IS NULL, StartTime)) AS category
-  FROM spans
+  FROM span_metrics
   WHERE ${inPeriod("StartTime")}
     AND StatusCode = 2
   GROUP BY TraceId
@@ -78,26 +93,81 @@ ORDER BY bucket`;
 // a failed call followed by another under the same parent, of the same step, or of
 // any model call. A trace that does both counts once for each. `uncosted` counts the spans
 // with no cost, which make the summed cost a lower bound.
-const REPEATS = `SELECT TraceId, min(StartTime) AS at, SpanName AS step, 1 AS looped,
-    sum(ifNull(Cost, 0)) - argMin(ifNull(Cost, 0), StartTime) AS cost,
-    countIf(Cost IS NULL) AS uncosted
-  FROM spans
-  WHERE ${inPeriod("StartTime")}
-    AND ${SPAN_TYPE} = 'tool'
-  GROUP BY TraceId, SpanName, CapturedInput
-  HAVING count() >= 3
-  LIMIT 10000
+
+// Only a tool name called 3 times in a trace can loop: the set holds just those calls.
+const LOOP_CANDIDATES = `SELECT sipHash128(TraceId, SpanId)
+      FROM span_metrics
+      WHERE ${inPeriod("StartTime")}
+        AND ${SPAN_TYPE} = 'tool'
+        AND sipHash128(TraceId, SpanName) IN (
+          SELECT sipHash128(TraceId, SpanName) AS call
+          FROM span_metrics
+          WHERE ${inPeriod("StartTime")}
+            AND ${SPAN_TYPE} = 'tool'
+          GROUP BY call
+          HAVING count() >= 3
+        )`;
+
+// Loops compare CapturedInput on the gated spans view: no analytics view holds input (#6856).
+// The candidate calls are gathered, input hashed, before any is grouped: grouped while the spans
+// view was still being read, the grouping spilled every block and ran out of memory.
+const LOOP_CALLS = unfoldedRows({
+  gather: `SELECT groupArray(tuple(TraceId, SpanName, sipHash128(CapturedInput), StartTime,
+        ifNull(Cost, 0), Cost IS NULL))
+      FROM spans
+      WHERE ${inPeriod("StartTime")}
+        AND sipHash128(TraceId, SpanId) IN (
+          ${LOOP_CANDIDATES}
+        )`,
+  columns: ["TraceId", "SpanName", "input", "StartTime", "price", "unpriced"],
+});
+
+const LOOPS = `SELECT TraceId, min(StartTime) AS at, SpanName AS step, 1 AS looped,
+    sum(price) - argMin(price, StartTime) AS cost,
+    countIf(unpriced) AS uncosted
+  FROM (${LOOP_CALLS})
+  GROUP BY TraceId, SpanName, input
+  HAVING count() >= 3`;
+
+/** A retry's group: the calls of one step, or of any model, under one parent; only one holding a
+ * failed call can retry. The set holds those groups by a cheap 64-bit hash: a group let in by a
+ * collision holds no failed call, so the HAVING drops it and the rows stay exact. */
+const RETRY_PARTS = `TraceId, ifNull(ParentSpanId, ''), if(${SPAN_TYPE} = 'llm', 'llm', SpanName)`;
+const RETRY_GROUP = `sipHash128(${RETRY_PARTS})`;
+const RETRY_FILTER = `cityHash64(${RETRY_PARTS})`;
+
+const RETRIES = `SELECT trace AS TraceId, at, step, 0 AS looped, cost, uncosted
+  FROM (
+    SELECT any(TraceId) AS trace, minIf(StartTime, StatusCode = 2) AS at,
+      anyIf(SpanName, StatusCode = 2) AS step,
+      sumIf(ifNull(Cost, 0), StatusCode = 2) AS cost,
+      countIf(Cost IS NULL AND StatusCode = 2) AS uncosted
+    FROM span_metrics
+    WHERE ${inPeriod("StartTime")}
+      AND ParentSpanId IS NOT NULL
+      AND ${RETRY_FILTER} IN (
+        SELECT ${RETRY_FILTER}
+        FROM span_metrics
+        WHERE ${inPeriod("StartTime")}
+          AND ParentSpanId IS NOT NULL
+          AND StatusCode = 2
+      )
+    GROUP BY ${RETRY_GROUP}
+    HAVING countIf(StatusCode = 2) > 0 AND max(StartTime) > minIf(StartTime, StatusCode = 2)
+  )`;
+
+const REPEAT_COLUMNS = ["TraceId", "at", "step", "looped", "cost", "uncosted"];
+
+const gatheredRepeats = (sql: string) =>
+  unfoldedRows({
+    gather: `SELECT groupArray(tuple(${REPEAT_COLUMNS.join(", ")})) FROM (${sql})`,
+    columns: REPEAT_COLUMNS,
+  });
+
+// Loops and retries are each gathered whole in turn, so their memory never adds up.
+const REPEATS = `${gatheredRepeats(LOOPS)}
   UNION ALL
-  SELECT TraceId, minIf(StartTime, StatusCode = 2) AS at,
-    anyIf(SpanName, StatusCode = 2) AS step, 0 AS looped,
-    sumIf(ifNull(Cost, 0), StatusCode = 2) AS cost,
-    countIf(Cost IS NULL AND StatusCode = 2) AS uncosted
-  FROM spans
-  WHERE ${inPeriod("StartTime")}
-    AND ParentSpanId IS NOT NULL
-  GROUP BY TraceId, ParentSpanId, if(${SPAN_TYPE} = 'llm', 'llm', SpanName)
-  HAVING countIf(StatusCode = 2) > 0 AND max(StartTime) > minIf(StartTime, StatusCode = 2)
-  LIMIT 10000`;
+  ${gatheredRepeats(RETRIES)}`;
 
 /** Looped and retried traces per bucket, and what the repeated calls cost. */
 export const REPEATS_BY_BUCKET_SQL = `SELECT ${bucketOf("at")} AS bucket,
