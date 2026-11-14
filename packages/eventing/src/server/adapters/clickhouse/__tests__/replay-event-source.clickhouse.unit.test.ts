@@ -177,7 +177,6 @@ describe("streamSliceOrHalves", () => {
   ) {
     const applied: string[] = [];
     const client = clickHouseQueryClientDouble({
-      query: async () => ({ rows: [] }),
       stream: async function* (request) {
         yield* stream(request);
       },
