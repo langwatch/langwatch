@@ -34,7 +34,7 @@ function door() {
       project: { id: "project-1", lwqlKey: "key-1" },
       protections: PROTECTIONS,
     }),
-    executeLangWatchQL: async (input) => {
+    executeWorkbenchQuery: async (input) => {
       runs.push(input);
       return {
         columns: [],

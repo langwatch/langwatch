@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   ADMIT_EVERY_PLACEMENT,
+  TEST_ACCESS_REFUSALS,
   TEST_RUN_TELEMETRY,
 } from "../../app/__tests__/analytics.fixture.ts";
 import { LWQL_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
@@ -30,6 +31,7 @@ import {
 
 const PROJECT_ID = "project-1";
 const lwql = LangWatchQLService.create({
+  accessRefusals: TEST_ACCESS_REFUSALS,
   runTelemetry: TEST_RUN_TELEMETRY,
   placement: ADMIT_EVERY_PLACEMENT,
   executor: null,
@@ -117,6 +119,7 @@ describe("given one table of allOf access and another of anyOf", () => {
       "virtualKeys:view",
     ];
     const service = LangWatchQLService.create({
+      accessRefusals: TEST_ACCESS_REFUSALS,
       runTelemetry: TEST_RUN_TELEMETRY,
       placement: ADMIT_EVERY_PLACEMENT,
       executor: null,

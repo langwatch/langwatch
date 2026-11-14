@@ -89,7 +89,16 @@ type ViolationExtra = Partial<
   >
 >;
 
-function report({
+/** `capped` means the violation limit was already reached, so nothing was recorded. */
+type ReportResult =
+  | { readonly outcome: "reported"; readonly violation: LangWatchQLViolation }
+  | { readonly outcome: "capped" };
+
+/**
+ * The walk can reach the cap mid-node: `walkFields` reports once per field after `walkNode`'s
+ * entry check. Exported for the cap test.
+ */
+export function report({
   ctx,
   frame,
   code,
@@ -103,10 +112,10 @@ function report({
   message: string;
   node?: SqlAstNode;
   extra?: ViolationExtra;
-}): void {
-  if (ctx.violations.length >= MAX_VIOLATIONS) return;
+}): ReportResult {
+  if (ctx.violations.length >= MAX_VIOLATIONS) return { outcome: "capped" };
   const at = node ? extractPosition(node) : undefined;
-  ctx.violations.push({
+  const violation: LangWatchQLViolation = {
     code,
     clause: frame.isInSubquery ? "subquery" : frame.clause,
     message,
@@ -115,7 +124,9 @@ function report({
     // Derived from the code, so the allowlist can ride on no other refusal nor miss this one.
     ...(code === "FUNCTION_NOT_ALLOWED" ? { allowedFunctions: LWQL_ALLOWED_FUNCTION_NAMES } : {}),
     ...extra,
-  });
+  };
+  ctx.violations.push(violation);
+  return { outcome: "reported", violation };
 }
 
 const UNSUPPORTED_SYNTAX_MESSAGE =
@@ -203,13 +214,14 @@ function applyFieldRule({ rule, value, node, frame, ctx }: FieldArgs & { rule: F
     case "enum":
       return checkEnumValue({ values: rule.values, value, node, frame, ctx });
     case "refuse":
-      return report({
+      report({
         ctx,
         frame,
         code: rule.code,
         message: rule.message,
         node,
       });
+      return;
     case "identifierRef":
       return checkIdentifierRef({ value, node, frame, ctx });
     case "node":
@@ -1075,8 +1087,11 @@ function parseTableReference(node: SqlAstNode): LiteralTableReference | null {
   };
 }
 
-/** Checks a table reference against the reserved schemas, then the catalog. */
-function visitTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
+/**
+ * Checks a table reference against the reserved schemas, then the catalog. Exported for the cap
+ * test: `walkNode` stops before the capped branch.
+ */
+export function visitTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
   const reference = parseTableReference(node);
   if (!reference) {
     report({
@@ -1118,7 +1133,7 @@ function visitTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
   const isAllowedTable = ctx.policy.allowedTables.has(qualified);
   if (!isAllowedTable) {
     const written = reference.database ? `${reference.database}.${reference.name}` : reference.name;
-    report({
+    const result = report({
       ctx,
       frame,
       code: "TABLE_NOT_ALLOWED",
@@ -1126,6 +1141,9 @@ function visitTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
       node,
       extra: { availableViews: ctx.policy.availableViews },
     });
+    if (result.outcome === "reported") {
+      ctx.refusedViews.push({ violation: result.violation, table: qualified });
+    }
     return null;
   }
   addOnce(ctx.tables, qualified);

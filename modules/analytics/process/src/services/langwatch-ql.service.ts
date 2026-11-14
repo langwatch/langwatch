@@ -32,10 +32,8 @@ import { langWatchQLPassSql } from "../rules/langwatch-ql-pass-sql.rules.ts";
 import { assertNoUnsupportedTableModifiers } from "../rules/langwatch-ql-query-scope.rules.ts";
 import { assertNoReservedNameAssigned } from "../rules/langwatch-ql-reserved-names.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
-import { runNotes } from "../rules/langwatch-ql-run-notes.rules.ts";
-import { buildRunParams, resolveRunSources } from "../rules/langwatch-ql-run-params.rules.ts";
+import { resolveRunSources, withRunNotes } from "../rules/langwatch-ql-run-params.rules.ts";
 import {
-  langWatchQLExecutionParameters,
   langWatchQLMissingParameters,
   type ValidatedLangWatchQL,
 } from "../rules/langwatch-ql-validation-shape.rules.ts";
@@ -45,6 +43,7 @@ import {
   LangWatchQLCatalogShapesService,
   type LangWatchQLViewDefinition,
 } from "../services/langwatch-ql-catalog-shapes.service.ts";
+import type { LangWatchQLAccessRefusalService } from "./langwatch-ql-access-refusal.service.ts";
 import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service.ts";
 import { LangWatchQLCompletenessService } from "./langwatch-ql-completeness.service.ts";
 import { LangWatchQLExecutionService } from "./langwatch-ql-execution.service.ts";
@@ -97,6 +96,8 @@ export interface LangWatchQLServiceDependencies {
   readonly stopwatch?: () => number;
   /** Counts each answered run: the instance the app's doors count refused runs on. */
   readonly runTelemetry: Pick<LangWatchQLRunTelemetryService, "recordAnswered" | "fieldsFor">;
+  /** Marks the caller's own access refusals: the ledger the failure report reads. */
+  readonly accessRefusals: Pick<LangWatchQLAccessRefusalService, "markIfCallerAccess">;
 }
 
 export class LangWatchQLService {
@@ -277,44 +278,19 @@ export class LangWatchQLService {
         "LangWatchQL refused by policy",
       );
 
-      throw lwqlValidationErrors.forRejection(validation);
+      const error = lwqlValidationErrors.forRejection(validation);
+      this.deps.accessRefusals.markIfCallerAccess({
+        error,
+        rejection: validation,
+        database: this.deps.database,
+        protections,
+        views: this.views,
+        catalog: this.catalog,
+      });
+      throw error;
     }
 
     return validation;
-  }
-
-  /** The result with what the run was bound to, and the notes on what limited or ignored it. */
-  private withRunNotes({
-    result,
-    validation,
-    granularity,
-    followedWindow,
-    memberWindows,
-    sources,
-  }: {
-    result: LangWatchQLQueryResult;
-    validation: ValidatedLangWatchQL;
-    granularity: Parameters<typeof langWatchQLExecutionParameters>[0]["granularity"];
-    followedWindow: LangWatchQLTimeWindow | undefined;
-    memberWindows: Parameters<typeof runNotes>[0]["memberWindows"];
-    sources: Parameters<typeof runNotes>[0]["sources"];
-  }): LangWatchQLQueryResult {
-    return {
-      ...result,
-      params: buildRunParams({
-        bound: langWatchQLExecutionParameters({ validation, granularity }),
-        followedWindow,
-      }),
-      diagnostics: [
-        ...result.diagnostics,
-        ...runNotes({
-          memberWindows,
-          sources,
-          followsSources: validation.followsSources,
-          granularity,
-        }),
-      ],
-    };
   }
 
   /**
@@ -472,7 +448,7 @@ export class LangWatchQLService {
       granularitySeconds: granularity.followsGranularity ? granularity.granularitySeconds : void 0,
     });
 
-    const limited = this.withRunNotes({
+    const limited = withRunNotes({
       result,
       validation,
       granularity,

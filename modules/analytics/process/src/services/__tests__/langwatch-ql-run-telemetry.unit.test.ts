@@ -55,6 +55,7 @@ import {
   langWatchQLQueryHash,
   langWatchQLQueryHashKey,
 } from "../../rules/langwatch-ql-run-telemetry.rules.ts";
+import { LangWatchQLAccessRefusalService } from "../langwatch-ql-access-refusal.service.ts";
 import { LangWatchQLRunTelemetryService } from "../langwatch-ql-run-telemetry.service.ts";
 import { LangWatchQLService } from "../langwatch-ql.service.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "./lwql-catalogue-access.fixture.ts";
@@ -97,6 +98,7 @@ async function run({
   telemetry?: LangWatchQLRunTelemetry;
 }) {
   const service = LangWatchQLService.create({
+    accessRefusals: LangWatchQLAccessRefusalService.create(),
     placement: ADMIT_EVERY_PLACEMENT,
     executor: new AnsweringExecutor(rows),
     database: "analytics",
@@ -319,6 +321,7 @@ describe("LangWatchQL run telemetry", () => {
         fieldsFor: () => ({ caller: "dashboard_widget" }),
       };
       const service = LangWatchQLService.create({
+        accessRefusals: LangWatchQLAccessRefusalService.create(),
         placement: ADMIT_EVERY_PLACEMENT,
         executor: new AnsweringExecutor([{ n: 1 }]),
         database: "analytics",
