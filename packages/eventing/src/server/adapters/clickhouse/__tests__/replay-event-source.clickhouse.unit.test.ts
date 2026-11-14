@@ -7,6 +7,8 @@ import {
 } from "@langwatch/eventing/server";
 import { describe, expect, it, vi } from "vitest";
 
+import { sliceByBudget } from "../replay-event-source.clickhouse.ts";
+
 const row = (eventId: string, timestamp: number): ClickHouseEventRow => ({
   TenantId: "project_a",
   AggregateType: "trace",
@@ -59,7 +61,9 @@ describe("EventingClickHouseReplayEventSource", () => {
       expect(client.stream).toHaveBeenCalledWith(
         expect.objectContaining({ tenantId: "project_a" }),
       );
-      expect(client.query).not.toHaveBeenCalled();
+      // Only the batch's sizes are read whole; its events arrive streamed.
+      const wholeReads = client.query.mock.calls.map(([request]) => String(request.sql));
+      expect(wholeReads.every((sql) => sql.includes("sum(length(EventPayload))"))).toBe(true);
     });
   });
 
@@ -121,6 +125,42 @@ describe("EventingClickHouseReplayEventSource", () => {
       expect(client.command).toHaveBeenCalledWith(
         expect.objectContaining({ tenantId: "project_a", params: { table: "stored_spans" } }),
       );
+    });
+  });
+});
+
+describe("sliceByBudget", () => {
+  const budget = { maxEvents: 10, maxPayloadBytes: 1_000 };
+  const sizes = new Map([
+    ["a", { events: 4, payloadBytes: 100 }],
+    ["b", { events: 4, payloadBytes: 100 }],
+    ["c", { events: 4, payloadBytes: 100 }],
+    ["huge", { events: 50, payloadBytes: 5_000 }],
+    ["heavy", { events: 1, payloadBytes: 950 }],
+    ["d", { events: 1, payloadBytes: 200 }],
+  ]);
+
+  describe("when the batch's aggregates outgrow the budget together", () => {
+    it("cuts them in order into slices within it, by events and by payload bytes", () => {
+      const slices = sliceByBudget({ aggregateIds: ["a", "b", "c", "heavy", "d"], sizes, budget });
+
+      expect(slices).toEqual([["a", "b"], ["c"], ["heavy"], ["d"]]);
+    });
+  });
+
+  describe("when one aggregate alone is over the budget", () => {
+    it("reads it in a slice of its own, never split", () => {
+      const slices = sliceByBudget({ aggregateIds: ["a", "huge", "b"], sizes, budget });
+
+      expect(slices).toEqual([["a"], ["huge"], ["b"]]);
+    });
+  });
+
+  describe("when an aggregate has no sized row", () => {
+    it("reads it with the slice it falls in", () => {
+      const slices = sliceByBudget({ aggregateIds: ["a", "unsized", "b"], sizes, budget });
+
+      expect(slices).toEqual([["a", "unsized", "b"]]);
     });
   });
 });

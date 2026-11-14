@@ -42,6 +42,8 @@ export interface EventingClickHouseReplayStatement {
   SKIP_TENANT_CHECK?: true | undefined;
   /** Set when the read must walk every partition; see the member's cold-scan warning. */
   SKIP_COLD_SCAN_CHECK?: true | undefined;
+  /** Per-statement ClickHouse settings, such as where a sort spills to disk. */
+  settings?: Readonly<Record<string, string | number>> | undefined;
 }
 
 /**
