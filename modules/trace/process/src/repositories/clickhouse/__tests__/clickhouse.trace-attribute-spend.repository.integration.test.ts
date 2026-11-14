@@ -138,7 +138,7 @@ describe.skipIf(!clickHouseConfigured)(
     it("counts a trace on the window start and not on the window end", async () => {
       const read = (startMs: number, endMs: number) =>
         repository.findAttributeUsageBuckets({
-          tenantId,
+          tenantIds: [tenantId],
           attributeKey: KEY,
           values: ["vk-window"],
           window: { startMs, endMs },
@@ -165,7 +165,7 @@ describe.skipIf(!clickHouseConfigured)(
     /** @scenario "Spend from minutes ago is inside the window the page asks for" */
     it("reads a request made moments ago from this tenant only", async () => {
       const traces = await repository.findAttributedTraces({
-        tenantId,
+        tenantIds: [tenantId],
         attributeKey: KEY,
         window: { startMs: Date.now() - 30 * DAY_MS, endMs: Date.now() },
         model: "claude-sonnet-4",
@@ -175,6 +175,45 @@ describe.skipIf(!clickHouseConfigured)(
       expect(traces.map((t) => [t.traceId, t.value, Number(t.costUsd)])).toEqual([
         ["t-recent", "vk-recent", 0.4],
       ]);
+    });
+    /** @scenario "Usage is read across an organization's projects in one statement" */
+    it("reads every declared tenant's traces in one statement and none outside the set", async () => {
+      const window = { startMs: Date.now() - 30 * DAY_MS, endMs: Date.now() };
+      const outsideTenantId = `test-attrspend-outside-${nanoid()}`;
+
+      const buckets = await repository.findAttributeUsageBuckets({
+        tenantIds: [tenantId, otherTenantId, outsideTenantId],
+        attributeKey: KEY,
+        window,
+        values: ["vk-recent"],
+      });
+      const traces = await repository.findAttributedTraces({
+        tenantIds: [tenantId, otherTenantId],
+        attributeKey: KEY,
+        window,
+        values: ["vk-recent"],
+        limit: 20,
+      });
+      const ownOnly = await repository.findAttributeUsageBuckets({
+        tenantIds: [tenantId],
+        attributeKey: KEY,
+        window,
+        values: ["vk-recent"],
+      });
+
+      expect(
+        buckets
+          .toSorted((a, b) => a.model.localeCompare(b.model))
+          .map((b) => [b.model, Number(b.totalUsd), b.requests]),
+      ).toEqual([
+        ["claude-sonnet-4", 0.4, 1],
+        ["gpt-5-mini", 8, 1],
+      ]);
+      expect(traces.map((t) => t.traceId).toSorted((a, b) => a.localeCompare(b))).toEqual([
+        "t-other",
+        "t-recent",
+      ]);
+      expect(ownOnly.map((b) => [Number(b.totalUsd), b.requests])).toEqual([[0.4, 1]]);
     });
   },
 );

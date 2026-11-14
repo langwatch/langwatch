@@ -4,10 +4,12 @@ export { REDACTED, secretLogRedactPaths } from "./redact.ts";
 export { ScopedSecrets, SecretsResolver } from "./resolver.ts";
 export { Secret, SecretFamilyHandle, SecretHandle, type SecretSchema } from "./secret.ts";
 export {
+  apiKeyPepper,
   credentialsSecret,
   credentialsSecretPrevious,
   gatewayInternalSecret,
   internalSlackSignupsWebhook,
+  intoKeyPepper,
   nlpInternalSecret,
   openAiApiKey,
   sessionSecret,

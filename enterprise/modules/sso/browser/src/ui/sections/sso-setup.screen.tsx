@@ -33,8 +33,8 @@ import { LegacyDomainToMoveNotice } from "../elements/legacy-domain-to-move-noti
 import { LegacyRouteNotice } from "../elements/legacy-route-notice.tsx";
 import {
   AvailabilityRefusalNotice,
-  EnterprisePlanRequiredNotice,
   LoadFailure,
+  SsoEnterpriseLock,
 } from "../elements/refusals.tsx";
 import { SetupStep, SetupSteps, SetupStepsSkeleton } from "../elements/setup-step.tsx";
 import { ArrivalsSection } from "./arrivals.section.tsx";
@@ -78,7 +78,7 @@ export default function SsoSetupScreen() {
           onNavigate={(href) => navigation?.navigate(href)}
         />
       </PageLayout.Header>
-      <Box paddingTop={4}>
+      <Box>
         <VStack align="stretch" gap={6} width="full">
           <Text color="fg.muted">
             Where your people sign in, and everything it takes to put it in front of them.
@@ -92,6 +92,7 @@ export default function SsoSetupScreen() {
 
 function SsoSetupPage({ organizationId }: { organizationId: string }) {
   const setup = ssoApi.ssoSetup.getSetup.useQuery({ organizationId });
+  const canManageOrganization = useSsoHost().canManageOrganization();
 
   if (setup.isLoading) return <SetupStepsSkeleton />;
 
@@ -110,10 +111,15 @@ function SsoSetupPage({ organizationId }: { organizationId: string }) {
   const view = setup.data;
 
   if (!view.availability.available) {
-    return <AvailabilityRefusalNotice refusal={view.availability.refusal} />;
+    return (
+      <AvailabilityRefusalNotice
+        refusal={view.availability.refusal}
+        canManageOrganization={canManageOrganization}
+      />
+    );
   }
 
-  if (view.enterpriseRequired) return <EnterprisePlanRequiredNotice />;
+  if (view.enterpriseRequired) return <SsoEnterpriseLock canManage={canManageOrganization} />;
 
   if (view.connection === null) {
     return view.legacyRoute ? (

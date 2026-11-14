@@ -6,6 +6,7 @@
 
 import type { AbortSignalLike, QueryRequest } from "./query.ts";
 import {
+  isServerTimeout,
   isTransientClickHouseError,
   jitteredBackoffMs,
   quietly,
@@ -150,6 +151,11 @@ export async function runWithRetry<T>(
   throw lastError;
 }
 
+/** Carries a failure past the retry loop: not an Error, so never classified transient. */
+class FinalFailure {
+  constructor(readonly failure: unknown) {}
+}
+
 /**
  * A configured retry policy, reusable across statements. Holds its options
  * once instead of threading them through every call, so the client holds
@@ -169,7 +175,7 @@ export class RetryPolicy {
    * `request` is optional and only decorates the retry notice — a caller
    * retrying something that isn't a statement still gets the same backoff.
    */
-  run<T>(
+  async run<T>(
     task: () => Promise<T>,
     {
       signal,
@@ -182,14 +188,29 @@ export class RetryPolicy {
     // reading only the explicit one would silently retry work nobody is
     // waiting for, which is the exact failure this option exists to prevent.
     const abortSignal = signal ?? request?.signal;
-    return runWithRetry(task, {
-      ...this.options,
-      isAborted: () => abortSignal?.aborted === true,
-      ...(onRetry === undefined
-        ? {}
-        : {
-            onRetry: (notice: Omit<RetryNotice, "request">) => onRetry({ ...notice, request }),
-          }),
-    });
+    // A statement that opted out of retrying its timeout answers with it at once.
+    const attempt =
+      request?.retryOnTimeout === false
+        ? async () => {
+            try {
+              return await task();
+            } catch (error) {
+              throw isServerTimeout(error) ? new FinalFailure(error) : error;
+            }
+          }
+        : task;
+    try {
+      return await runWithRetry(attempt, {
+        ...this.options,
+        isAborted: () => abortSignal?.aborted === true,
+        ...(onRetry === undefined
+          ? {}
+          : {
+              onRetry: (notice: Omit<RetryNotice, "request">) => onRetry({ ...notice, request }),
+            }),
+      });
+    } catch (error) {
+      throw error instanceof FinalFailure ? error.failure : error;
+    }
   }
 }

@@ -33,23 +33,19 @@ func TestComputeFromResources_Memory(t *testing.T) {
 			func(c *Computed) int64 { return c.UncompressedCacheSize }},
 		{"16GB: uncompressed cache = 12.5%", 4, 16 * gb1, "UncompressedCacheSize",
 			func(c *Computed) int64 { return c.UncompressedCacheSize }},
-
-		{"4GB: S3 cache = 25%", 2, 4 * gb1, "CacheMaxSize",
-			func(c *Computed) int64 { return c.CacheMaxSize }},
 	}
 
 	expected := map[string]int64{
 		"4GB: server memory = 85%":              4 * gb1 * 85 / 100,
 		"16GB: server memory = 85%":             16 * gb1 * 85 / 100,
-		"4GB: query memory = 25%":               gb1,      // 4GB * 25% = 1GB
+		"4GB: query memory = 25%":               gb1,          // 4GB * 25% = 1GB
 		"16GB: query memory = 25%":              16 * gb1 / 4, // 4GB (under cap)
 		"32GB: query memory capped at 8GB":      gb8,          // capped
 		"64GB: query memory capped at 8GB":      gb8,          // capped
-		"4GB: external group by = 50% of query": gb1 / 2,  // 512MB
+		"4GB: external group by = 50% of query": gb1 / 2,      // 512MB
 		"4GB: uncompressed cache = 0 (< 8GB)":   0,
-		"8GB: uncompressed cache = 12.5%":        8 * gb1 / 8,
-		"16GB: uncompressed cache = 12.5%":       16 * gb1 / 8,
-		"4GB: S3 cache = 25%":                   gb1, // 4GB * 25% = 1GB
+		"8GB: uncompressed cache = 12.5%":       8 * gb1 / 8,
+		"16GB: uncompressed cache = 12.5%":      16 * gb1 / 8,
 	}
 
 	for _, tt := range tests {

@@ -256,7 +256,13 @@ describe("given the event read seat member", () => {
   describe("when the role's eventing reads the event log", () => {
     /** @scenario "A registry is handed the role's event read seat like any store" */
     it("hands eventing's own seat", () => {
-      const eventReadSeat: EventReadSeat = { getEvent: vi.fn(), findAggregateEvents: vi.fn() };
+      const unexpected = (operation: string) => () =>
+        Promise.reject(new Error(`eventReadSeat.${operation} was not expected`));
+      const eventReadSeat: EventReadSeat = {
+        getEvent: unexpected("getEvent"),
+        findAggregateEvents: unexpected("findAggregateEvents"),
+        findEventsOfAggregates: unexpected("findEventsOfAggregates"),
+      };
       const eventing = new EventSourcing({ enabled: false, eventReadSeat });
 
       const members = buildProcessStores({ config: config(), members: { eventing } }).members;
@@ -283,6 +289,9 @@ describe("given the event read seat member", () => {
         name: "MemberNotConfiguredError",
         member: "eventReadSeat",
       });
+      await expect(
+        seat.findEventsOfAggregates({ aggregates: [seatRead], aggregateType: "trace" }),
+      ).rejects.toMatchObject({ name: "MemberNotConfiguredError", member: "eventReadSeat" });
     });
   });
 });

@@ -59,7 +59,7 @@ Feature: License Enforcement
     Given a user is logged in
     When the user navigates to any settings page
     Then the settings sidebar should display "License" link
-    And "License" should appear after "Subscription" in the menu
+    And "License" should appear after "Plan & billing" in the menu
 
   @integration @unimplemented
   Scenario: License settings page is accessible

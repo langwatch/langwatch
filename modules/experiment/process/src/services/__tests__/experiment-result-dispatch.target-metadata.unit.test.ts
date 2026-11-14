@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { promptLoadKey } from "../../rules/experiment-execution-data.rules.ts";
+import { agentLoadKey, promptLoadKey } from "../../rules/experiment-execution-data.rules.ts";
 import { ExperimentResultDispatchService } from "../experiment-result-dispatch.service.ts";
 
 const dispatches = ExperimentResultDispatchService.create();
@@ -123,9 +123,69 @@ describe("buildTargetMetadata — the judge model recorded on a run", () => {
       } as any);
 
       expect(metadata[0]?.model).toBe("openai/gpt-5-mini");
-      expect(metadata[0]?.prompt_version).toBe(1);
+      expect(metadata[0]?.promptVersion).toBe(1);
       expect(metadata[1]?.model).toBe("anthropic/claude-sonnet-5");
-      expect(metadata[1]?.prompt_version).toBe(2);
+      expect(metadata[1]?.promptVersion).toBe(2);
+    });
+  });
+});
+
+describe("buildTargetMetadata — the versions a run records at start", () => {
+  /** @see modules/experiment/specs/experiment-run-recorded-settings.feature */
+  describe("given an agent target pinned to a deploy label", () => {
+    /** @scenario "A run records the version an agent label resolved to when it started" */
+    it("records the label and the version it resolved to", () => {
+      const target = { id: "t1", type: "agent", dbAgentId: "agent-1", agentLabel: "production" };
+      const [meta] = buildTargetMetadata({
+        targets: [target] as any,
+        loadedPrompts: new Map(),
+        loadedAgents: new Map([
+          [agentLoadKey(target), { id: "agent-1", name: "refund-bot", version: 3 } as any],
+        ]),
+      } as any);
+
+      expect(meta).toMatchObject({
+        name: "refund-bot",
+        agentId: "agent-1",
+        agentLabel: "production",
+        agentVersion: 3,
+      });
+    });
+  });
+
+  describe("given an agent target with no deploy label", () => {
+    /** @scenario "A target running the latest agent records no label" */
+    it("records no label and no version", () => {
+      const target = { id: "t1", type: "agent", dbAgentId: "agent-1" };
+      const [meta] = buildTargetMetadata({
+        targets: [target] as any,
+        loadedPrompts: new Map(),
+        loadedAgents: new Map([
+          [agentLoadKey(target), { id: "agent-1", name: "refund-bot", version: 5 } as any],
+        ]),
+      } as any);
+
+      expect(meta).not.toHaveProperty("agentLabel");
+      expect(meta).not.toHaveProperty("agentVersion");
+    });
+  });
+
+  describe("given a prompt target following the latest version", () => {
+    /** @scenario "A prompt target following the latest records the version it loaded" */
+    it("records the version the run loaded", () => {
+      const target = { id: "t1", type: "prompt", promptId: "prompt-1" };
+      const [meta] = buildTargetMetadata({
+        targets: [target] as any,
+        loadedPrompts: new Map([
+          [
+            promptLoadKey(target),
+            { name: "greeter", model: "openai/gpt-5-mini", version: 4 } as any,
+          ],
+        ]),
+        loadedAgents: new Map(),
+      } as any);
+
+      expect(meta?.promptVersion).toBe(4);
     });
   });
 });

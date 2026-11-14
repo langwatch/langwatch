@@ -24,7 +24,7 @@ import {
   opsSetFeatureFlagInputSchema,
   opsSetFeatureFlagRulesInputSchema,
 } from "./ops-feature-flag.ts";
-import { opsQueueNameListSchema } from "./ops.responses.ts";
+import { opsQueueNameListSchema, seatSharingCheckSchema } from "./ops.responses.ts";
 
 export const opsPlatformTrpc = defineTrpcContract("ops")
   /**
@@ -71,4 +71,9 @@ export const opsPlatformTrpc = defineTrpcContract("ops")
   .mutation("deleteBlob")
   .withInput(deleteBlobOperatorInputSchema)
   .withOutput(deleteBlobResultSchema)
+
+  /** The last seat sharing check, empty before the first one. Cloud admin only. */
+  .query("findSeatSharingChecks")
+  .withInput(z.void())
+  .withOutput(z.array(seatSharingCheckSchema))
   .build();

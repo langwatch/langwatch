@@ -40,7 +40,7 @@ export const SHARED_PRISMA_TABLES: readonly SharedPrismaTable[] = [
       "authz",
     ],
     reason:
-      "entitlement reads a project's organisation and an organisation's projects, never a fold (C1, R40); billing reads an organisation's project ids and names for spend and usage warnings (round 37 D5, R40); data retention and data privacy read where a project sits to resolve its policy, never a fold (round 46 E1, R40); the Instant Evals judge and nurturing read a project's team to place it, and nurturing an organisation's earliest project creation for its cutover (DATA-NURTURING-GUARD), never a fold (round 46 E1, R40); presence reads a project's and its organisation's presence flags in one joined read for each heartbeat, never a copy (R40); organization reads its projects' ids for a trace-sharing revocation, its project grants' names, and its teams' projects for the team screens, never a copy (O1, R40); user reads the project an API key belongs to for /api/me/project, never ProjectApi (U1, R40); authz's legacy-import tenant step reads an organisation's project ids to bound its share-link read, and each project's apiKey presence and createdAt, per tenant the upgrade runner hands it, never a peer (PO-2, R40); user reads the caller's personal-workspace project to store an avatar (U1-AVATAR a)",
+      "entitlement reads a project's organisation and an organisation's projects, named for the usage page's per-project breakdown, never a fold (C1, R40); billing reads an organisation's project ids and names for spend and usage warnings (round 37 D5, R40); data retention and data privacy read where a project sits to resolve its policy, never a fold (round 46 E1, R40); the Instant Evals judge and nurturing read a project's team to place it, and nurturing an organisation's earliest project creation for its cutover (DATA-NURTURING-GUARD), never a fold (round 46 E1, R40); presence reads a project's and its organisation's presence flags in one joined read for each heartbeat, never a copy (R40); organization reads its projects' ids for a trace-sharing revocation, its project grants' names, and its teams' projects for the team screens, never a copy (O1, R40); user reads the project an API key belongs to for /api/me/project, never ProjectApi (U1, R40); authz's legacy-import tenant step reads an organisation's project ids to bound its share-link read, and each project's apiKey presence and createdAt, per tenant the upgrade runner hands it, never a peer (PO-2, R40); user reads the caller's personal-workspace project to store an avatar (U1-AVATAR a)",
     writes: [
       {
         reader: "user",
@@ -94,6 +94,13 @@ export const SHARED_PRISMA_TABLES: readonly SharedPrismaTable[] = [
           "offboarding deletes the membership first, its lock serialising the grant snapshot (R42)",
       },
     ],
+  },
+  {
+    table: "SeatHold",
+    owner: "organization",
+    readers: ["entitlement", "licensing", "scim"],
+    reason:
+      "a removed, disabled or demoted full member's seat stays counted until 30 days after they took it (seat-rotation.feature): entitlement counts held seats for usage stats, licensing for a licence's seat limits and scim to place a provisioned person, through the same count as OrganizationUser, never OrganizationApi (R-C1f, R40)",
   },
   {
     table: "Organization",

@@ -26,6 +26,7 @@ import {
   type Currency,
   currencySymbol,
   ENTERPRISE_PLAN_FEATURES,
+  EXCLUDING_VAT,
   formatPrice,
   FREE_PLAN_FEATURES,
   getGrowthPlanFeatures,
@@ -194,6 +195,11 @@ function PlanCard({
           </HStack>
           <Text color="fg" fontSize="md" fontWeight="medium">
             {getPlanPrice({ planId: plan.id, currency, billingPeriod, growthSeatPriceCents })}
+            {plan.id === "growth" && (
+              <Text as="span" fontSize="sm" fontWeight="normal" color="fg.muted">
+                {` ${EXCLUDING_VAT}`}
+              </Text>
+            )}
           </Text>
           <Text color="fg.muted" fontSize="sm">
             {plan.subtitle}
@@ -248,11 +254,11 @@ export function PlansComparisonPage({
         <Spacer />
         <Link unstyled href="/settings/subscription">
           <HStack gap={1} color="fg.muted" textStyle="bodySm">
-            <ArrowLeft size={14} aria-hidden /> Subscription
+            <ArrowLeft size={14} aria-hidden /> Plan & billing
           </HStack>
         </Link>
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="stretch" paddingTop={4}>
+      <VStack gap={6} width="full" align="stretch">
         <VStack align="start" gap={1}>
           <Text color="fg.muted">
             Compare plans and choose the right tier for your organization.
