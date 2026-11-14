@@ -39,6 +39,10 @@ import { GripVertical, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import {
+  type FeatureFlagTargetDirectory,
+  useFeatureFlagTargetDirectory,
+} from "../../behavior/use-feature-flag-targets.ts";
+import {
   findUnfillableRule,
   newRule,
   rulesToUI,
@@ -48,12 +52,15 @@ import {
   type ScopeKind,
   type UIRule,
 } from "../../model/rule-editing.ts";
+import { PICKED_TARGET_SCOPES } from "../../model/rule-targets.ts";
+import { FeatureFlagTargetPicker } from "./feature-flag-target-picker.tsx";
 
 const SCOPE_COLLECTION = createListCollection<{ value: ScopeKind; label: string }>({
   items: [
     { value: "EVERYONE", label: "Everyone (default)" },
     { value: "ORGANIZATION", label: "Organization" },
     { value: "PROJECT", label: "Project" },
+    { value: "USER", label: "User" },
     { value: "NEW_USERS", label: "New users" },
     { value: "PERCENTAGE", label: "Percentage of users" },
     { value: "EMAIL_DOMAIN", label: "Email domain" },
@@ -62,8 +69,9 @@ const SCOPE_COLLECTION = createListCollection<{ value: ScopeKind; label: string 
 
 const SCOPE_FIELD_LABEL: Record<ScopeKind, string> = {
   EVERYONE: "Applies to every context",
-  ORGANIZATION: "Organization id",
-  PROJECT: "Project ids",
+  ORGANIZATION: "Organization",
+  PROJECT: "Projects",
+  USER: "Users",
   NEW_USERS: "Organization created on or after",
   PERCENTAGE: "Percentage of users",
   EMAIL_DOMAIN: "Email domains",
@@ -73,6 +81,7 @@ const SCOPE_FIELD_PLACEHOLDER: Record<ScopeKind, string> = {
   EVERYONE: "",
   ORGANIZATION: "organization_xxxx",
   PROJECT: "project_xxxx, project_yyyy",
+  USER: "",
   NEW_USERS: "",
   PERCENTAGE: "50",
   EMAIL_DOMAIN: "acme.com, acme.io",
@@ -80,8 +89,9 @@ const SCOPE_FIELD_PLACEHOLDER: Record<ScopeKind, string> = {
 
 const MISSING_TARGET_MESSAGE: Record<ScopeKind, string> = {
   EVERYONE: "",
-  ORGANIZATION: "Every organization rule needs an organization id.",
-  PROJECT: "Every project rule needs one or more project ids.",
+  ORGANIZATION: "Every organization rule needs an organization.",
+  PROJECT: "Every project rule needs one or more projects.",
+  USER: "Every user rule needs one or more users.",
   NEW_USERS: "Every new users rule needs a date.",
   PERCENTAGE: "Every percentage rule needs a number between 0 and 100.",
   EMAIL_DOMAIN: "Every email domain rule needs one or more domains, without the @.",
@@ -92,6 +102,7 @@ const SCOPE_FIELD_INPUT_TYPE: Record<ScopeKind, "date" | "number" | "text"> = {
   EVERYONE: "text",
   ORGANIZATION: "text",
   PROJECT: "text",
+  USER: "text",
   NEW_USERS: "date",
   PERCENTAGE: "number",
   EMAIL_DOMAIN: "text",
@@ -114,6 +125,7 @@ export function FeatureFlagRulesDialog({
   const [saving, setSaving] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const wasOpen = useRef(false);
+  const directory = useFeatureFlagTargetDirectory({ rules: initialRules, open });
 
   // A small distance threshold on the pointer, so the grip still accepts an
   // ordinary click without the row starting to drag under it. The keyboard
@@ -186,6 +198,7 @@ export function FeatureFlagRulesDialog({
                 <RuleEditorRow
                   key={rule.id}
                   rule={rule}
+                  directory={directory}
                   onChange={(patch) =>
                     setDraft((current) =>
                       current.map((candidate) =>
@@ -217,10 +230,12 @@ export function FeatureFlagRulesDialog({
 
 function RuleEditorRow({
   rule,
+  directory,
   onChange,
   onRemove,
 }: {
   rule: UIRule;
+  directory: FeatureFlagTargetDirectory;
   onChange: (patch: Partial<UIRule>) => void;
   onRemove: () => void;
 }) {
@@ -239,9 +254,10 @@ function RuleEditorRow({
       zIndex={isDragging ? 1 : void 0}
     >
       <Card variant="nested" padding="sm">
-        <HStack align="flex-end" gap={2}>
+        <HStack align="flex-start" gap={2}>
           <IconButton
             aria-label="Reorder rule"
+            marginTop={5}
             size="sm"
             variant="ghost"
             color="fg.subtle"
@@ -281,7 +297,7 @@ function RuleEditorRow({
               </Select.Content>
             </Select.Root>
           </Field.Root>
-          <RuleTargetField rule={rule} onChange={onChange} />
+          <RuleTargetField rule={rule} directory={directory} onChange={onChange} />
           <Field.Root flexBasis="120px" flexShrink={0}>
             <Field.Label fontSize="xs">Enabled</Field.Label>
             <HStack height="32px" alignItems="center">
@@ -293,7 +309,13 @@ function RuleEditorRow({
               <Text fontSize="xs">{rule.enabled ? "on" : "off"}</Text>
             </HStack>
           </Field.Root>
-          <IconButton aria-label="Remove rule" size="sm" variant="ghost" onClick={onRemove}>
+          <IconButton
+            aria-label="Remove rule"
+            size="sm"
+            variant="ghost"
+            marginTop={5}
+            onClick={onRemove}
+          >
             <Trash2 size={14} />
           </IconButton>
         </HStack>
@@ -302,15 +324,33 @@ function RuleEditorRow({
   );
 }
 
-/** What the chosen scope needs beside it: an id, a date, or nothing. */
+/** What the chosen scope needs beside it: picked targets, a date, a number, domains or nothing. */
 function RuleTargetField({
   rule,
+  directory,
   onChange,
 }: {
   rule: UIRule;
+  directory: FeatureFlagTargetDirectory;
   onChange: (patch: Partial<UIRule>) => void;
 }) {
   const isNewUsers = rule.scopeKind === "NEW_USERS";
+  const picked = PICKED_TARGET_SCOPES[rule.scopeKind];
+
+  if (picked) {
+    return (
+      <Field.Root flex={1} minWidth={0}>
+        <Field.Label fontSize="xs">{SCOPE_FIELD_LABEL[rule.scopeKind]}</Field.Label>
+        <FeatureFlagTargetPicker
+          kind={picked.kind}
+          multiple={picked.multiple}
+          target={rule.target}
+          directory={directory}
+          onChange={(target) => onChange({ target })}
+        />
+      </Field.Root>
+    );
+  }
 
   return (
     <Field.Root flex={1}>

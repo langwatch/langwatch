@@ -304,6 +304,21 @@ export class PrismaUserRepository
     return row ? userProfileSchema.parse(row) : null;
   }
 
+  async searchProfiles({ query, limit }: { query: string; limit: number }): Promise<UserProfile[]> {
+    const rows = await this.prisma.user.findMany({
+      where: {
+        OR: (["id", "name", "email"] as const).map((field) => ({
+          [field]: { contains: query, mode: "insensitive" as const },
+        })),
+      },
+      select: userProfileSelect,
+      orderBy: [{ email: "asc" }, { id: "asc" }],
+      take: limit,
+    });
+
+    return rows.map((row) => userProfileSchema.parse(row));
+  }
+
   async findByEmailAnyCase(email: string): Promise<UserProfile[]> {
     const rows = await this.prisma.user.findMany({
       where: { email: { equals: email, mode: "insensitive" } },

@@ -263,6 +263,9 @@ import {
   type OpsUpgradeStepPage,
   type OpsUpgradeTenantPage,
   type OpsUpgradeTargetSummary,
+  type OpsFeatureFlagTarget,
+  type OpsFindFeatureFlagTargetsInput,
+  type OpsSearchFeatureFlagTargetsInput,
 } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup, ResourceOwnership, ServerRole } from "@langwatch/process";
@@ -345,6 +348,7 @@ import { AnomalyDetectorService } from "../services/anomaly-detector.service.ts"
 import { BlobStoreService } from "../services/blob-store.service.ts";
 import { EventExplorerService } from "../services/event-explorer.service.ts";
 import { EventingIntrospectionService } from "../services/eventing-introspection.service.ts";
+import { FeatureFlagTargetDirectoryService } from "../services/feature-flag-target-directory.service.ts";
 import { GroupQueueReaperService } from "../services/group-queue-reaper.service.ts";
 import {
   type AdminAuditSink,
@@ -735,6 +739,8 @@ type OpsRuntimeDependencies = Readonly<{
   inbox: BugReportInboxService;
   intake: BugReportIntakeService;
   explain: OpsExplainService;
+  /** The rules dialog's target search; absent where a composition built none. */
+  featureFlagTargets: FeatureFlagTargetDirectoryService | undefined;
   /** Settings, Checkup and the usage report; absent where a composition built none. */
   checkup: OpsCheckupService | undefined;
   /** The detector `ops_anomaly_detection` ticks; absent where a composition built none. */
@@ -932,6 +938,12 @@ export class OpsModule implements OpsApi {
       logger,
     });
 
+    const featureFlagTargets = FeatureFlagTargetDirectoryService.create({
+      organizations: dependencies.organizations,
+      projects: dependencies.projects,
+      users: dependencies.users,
+      plans: dependencies.entitlement,
+    });
     const seatSharing = SeatSharingCheckService.create({
       organizationIds: repositories.organizationTenants,
       peers: {
@@ -999,6 +1011,7 @@ export class OpsModule implements OpsApi {
         ...(isCloud ? {} : { diagnostics: upgradeDiagnostics }),
       }),
       upgradeDiagnostics,
+      featureFlagTargets,
     });
     return app;
   }
@@ -1020,6 +1033,7 @@ export class OpsModule implements OpsApi {
     platformOperators?: PlatformOperatorsService;
     upgradeAlerts?: UpgradeAlertsService;
     upgradeDiagnostics?: UpgradeDiagnosticsService;
+    featureFlagTargets?: FeatureFlagTargetDirectoryService;
   }): OpsModule {
     const { infrastructure: members, dependencies, repositories } = setup;
 
@@ -1076,6 +1090,7 @@ export class OpsModule implements OpsApi {
       platformOperators: setup.platformOperators,
       upgradeAlerts: setup.upgradeAlerts,
       upgradeDiagnostics: setup.upgradeDiagnostics,
+      featureFlagTargets: setup.featureFlagTargets,
       operatorSeed: members.operatorSeed,
       findOpsApiKey: () => members.findOpsApiKey(),
       findProductAnalyticsTargets: () => members.findProductAnalyticsTargets(),
@@ -1189,6 +1204,22 @@ export class OpsModule implements OpsApi {
 
   async featureFlagCatalogue(): Promise<OperatorFeatureFlagCatalogue> {
     return this.#dependencies.featureFlags.listOperatorCatalogue();
+  }
+
+  searchFeatureFlagTargets(
+    input: OpsSearchFeatureFlagTargetsInput,
+  ): Promise<OpsFeatureFlagTarget[]> {
+    return this.#featureFlagTargets().search(input);
+  }
+
+  findFeatureFlagTargets(input: OpsFindFeatureFlagTargetsInput): Promise<OpsFeatureFlagTarget[]> {
+    return this.#featureFlagTargets().find(input);
+  }
+
+  #featureFlagTargets(): FeatureFlagTargetDirectoryService {
+    const service = this.#dependencies.featureFlagTargets;
+    if (!service) throw new Error("This process composes no feature flag target directory");
+    return service;
   }
 
   /** Turns one registered flag on or off. */

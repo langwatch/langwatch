@@ -91,6 +91,10 @@ vi.mock("../../../behavior/ops-api.ts", () => ({
       setFeatureFlagRules: {
         useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
       },
+      findFeatureFlagTargets: { useQuery: () => ({ data: undefined, isLoading: false }) },
+      searchFeatureFlagTargets: {
+        useQuery: () => ({ data: undefined, isFetching: false, isError: false, isSuccess: false }),
+      },
     },
   },
 }));

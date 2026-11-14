@@ -38,6 +38,8 @@ import {
   type StoredOrganizationSettings,
   type OrganizationTeamProject,
   type OrganizationPresenceSettingRow,
+  type OrganizationOperatorQuery,
+  type OrganizationOperatorRow,
 } from "../organization.repository.ts";
 import { PrismaOrganizationAuditStore } from "./prisma.organization-audit.store.ts";
 
@@ -89,6 +91,37 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     if (limit === undefined || ids.length <= limit) return { ids, next: null };
     const page = ids.slice(0, limit);
     return { ids: page, next: page[page.length - 1] ?? null };
+  }
+
+  async findOperatorRows(input: OrganizationOperatorQuery): Promise<OrganizationOperatorRow[]> {
+    const matching =
+      "organizationIds" in input
+        ? { id: { in: [...input.organizationIds] } }
+        : {
+            OR: (["id", "name", "slug"] as const).map((field) => ({
+              [field]: { contains: input.query, mode: "insensitive" as const },
+            })),
+          };
+    const rows = await this.database.organization.findMany({
+      where: { kind: { not: ORGANIZATION_KIND.SYSTEM }, ...matching },
+      select: { id: true, name: true, slug: true, createdAt: true },
+      orderBy: [{ name: "asc" }, { createdAt: "asc" }],
+      ...("limit" in input ? { take: input.limit } : {}),
+    });
+    if (rows.length === 0) return [];
+    const counts = await this.database.organizationUser.groupBy({
+      by: ["organizationId"],
+      where: { organizationId: { in: rows.map((row) => row.id) } },
+      _count: { _all: true },
+    });
+    const members = new Map(counts.map((count) => [count.organizationId, count._count._all]));
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      createdAt: fromDate(row.createdAt),
+      memberCount: members.get(row.id) ?? 0,
+    }));
   }
 
   async findPresenceSettingPage({
