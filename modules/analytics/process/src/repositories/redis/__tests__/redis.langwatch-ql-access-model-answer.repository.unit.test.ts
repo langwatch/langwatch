@@ -24,7 +24,7 @@ describe("RedisLangWatchQLAccessModelAnswerRepository", () => {
   });
 
   describe("given an answer recorded for one server", () => {
-    it("finds it under that server's key, kept for five minutes so Redis expires it", async () => {
+    it("finds it under that server's key, kept for fifteen minutes so Redis expires it", async () => {
       const { store, repository } = answers();
 
       await repository.recordAnswer({ origin: ORIGIN, answer: "not_provisioned" });
