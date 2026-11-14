@@ -51,7 +51,6 @@ function matches(target: OpsFeatureFlagTarget, query: string): boolean {
   return fields.some((field) => field.toLowerCase().includes(needle));
 }
 
-/** The two target reads the rules dialog makes, answered from {@link TARGETS} at once. */
 /** Switches every stored-target read to failing, for the case where the lookup errors. */
 export const directoryState = { failing: false };
 
@@ -78,6 +77,7 @@ function storedTargets({
   };
 }
 
+/** The two target reads the rules dialog makes, answered from {@link TARGETS} at once. */
 export function directoryApi() {
   return {
     useQueries: (
