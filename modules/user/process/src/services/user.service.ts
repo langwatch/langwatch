@@ -165,6 +165,13 @@ export class UserService {
     return this.repository.findProfiles([...new Set(parsed.userIds)]);
   }
 
+  searchForOperators(input: { query: string; limit: number }): Promise<UserProfile[]> {
+    const query = input.query.trim();
+    if (query === "") return Promise.resolve([]);
+
+    return this.repository.searchProfiles({ query, limit: input.limit });
+  }
+
   findById(input: UserIdInput): Promise<UserProfile | null> {
     const parsed = userIdInputSchema.parse(input);
 
