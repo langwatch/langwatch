@@ -7,21 +7,21 @@ import { describe, expect, it } from "vitest";
 import { ClickHouseScenarioSession } from "../clickhouse.scenario-session.store.ts";
 import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
 
-type SentRead = { sql: string; SKIP_COLD_SCAN_CHECK?: true | undefined };
+type SentRead = { sql: string; kind: string; declaresFullScan?: true | undefined };
 
-/** The repository over the real session adapter, keeping what reaches the routed member. */
+/** The repository over the real session adapter, keeping each built read that reaches it. */
 function compose() {
   const sent: SentRead[] = [];
   const repository = SimulationClickHouseRepository.create(
     ClickHouseScenarioSession.resolverOver({
-      query: async <Row>(request: SentRead) => {
-        sent.push(request);
-        return { rows: [] as Row[] };
-      },
+      query: () => Promise.reject(new Error("the set list is a built read")),
       columns: () => {
         throw new Error("the set list names its columns");
       },
-      read: () => Promise.reject(new Error("the set list sends no built read")),
+      read: async ({ statement, declaresFullScan }) => {
+        sent.push({ sql: statement.sql, kind: statement.kind, declaresFullScan });
+        return { rows: [] };
+      },
     }),
   );
   return { repository, sent };
@@ -36,8 +36,9 @@ describe("SimulationClickHouseRepository.findScenarioSetsData()", () => {
       await repository.findScenarioSetsData({ projectId: "project-1" });
 
       expect(sent).toHaveLength(1);
-      expect(sent[0]?.SKIP_COLD_SCAN_CHECK).toBe(true);
-      expect(sent[0]?.sql).not.toContain("startDateMs");
+      expect(sent[0]?.kind).toBe("tenant");
+      expect(sent[0]?.declaresFullScan).toBe(true);
+      expect(sent[0]?.sql).not.toContain("StartedAt >=");
     });
   });
 
@@ -51,8 +52,8 @@ describe("SimulationClickHouseRepository.findScenarioSetsData()", () => {
         startDate: 1_700_000_000_000,
       });
 
-      expect(sent[0]?.sql).toContain("startDateMs");
-      expect(sent[0]?.SKIP_COLD_SCAN_CHECK).toBeUndefined();
+      expect(sent[0]?.sql).toContain("StartedAt >=");
+      expect(sent[0]?.declaresFullScan).toBeUndefined();
     });
   });
 });
