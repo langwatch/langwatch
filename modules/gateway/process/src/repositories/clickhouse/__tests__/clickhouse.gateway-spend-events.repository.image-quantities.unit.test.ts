@@ -12,10 +12,14 @@ type Query = { query: string; query_params?: Record<string, unknown> };
 function repositoryOver(rows: unknown[] = []) {
   const queries: Query[] = [];
   const client = {
-    query: async (q: Query) => {
-      queries.push(q);
+    read: async ({
+      statement,
+    }: {
+      statement: { sql: string; params: Record<string, unknown> };
+    }) => {
+      queries.push({ query: statement.sql, query_params: statement.params });
 
-      return { json: async () => rows };
+      return { rows };
     },
   };
 
@@ -50,15 +54,15 @@ describe("ClickHouseGatewaySpendEventsRepository image quantities", () => {
           GroupKey0: "gpt-image-1",
           EventCount: 3,
           SettledCount: 0,
-          TokensInput: 100,
-          TokensOutput: 50,
-          TokensCacheRead: 0,
-          TokensCacheWrite: 0,
-          TokensReasoning: 0,
-          TokensInputImage: 1600,
-          TokensOutputImage: 3200,
-          ImageCount: 2,
-          CostNanoUSD: 5_000_000,
+          SumTokensInput: 100,
+          SumTokensOutput: 50,
+          SumTokensCacheRead: 0,
+          SumTokensCacheWrite: 0,
+          SumTokensReasoning: 0,
+          SumTokensInputImage: 1600,
+          SumTokensOutputImage: 3200,
+          SumImageCount: 2,
+          SumCostNanoUSD: 5_000_000,
         },
       ]);
 
@@ -82,12 +86,12 @@ describe("ClickHouseGatewaySpendEventsRepository image quantities", () => {
           GroupKey0: "gpt-5-mini",
           EventCount: 1,
           SettledCount: 0,
-          TokensInput: 10,
-          TokensOutput: 5,
-          TokensCacheRead: 0,
-          TokensCacheWrite: 0,
-          TokensReasoning: 0,
-          CostNanoUSD: 100,
+          SumTokensInput: 10,
+          SumTokensOutput: 5,
+          SumTokensCacheRead: 0,
+          SumTokensCacheWrite: 0,
+          SumTokensReasoning: 0,
+          SumCostNanoUSD: 100,
         },
       ]);
 
@@ -109,14 +113,14 @@ describe("ClickHouseGatewaySpendEventsRepository image quantities", () => {
         {
           SpendNanoUSD: 8_000_000,
           RequestCount: 4,
-          TokensInput: 200,
-          TokensOutput: 100,
-          TokensCacheRead: 0,
-          TokensCacheWrite: 0,
-          TokensReasoning: 0,
-          TokensInputImage: 800,
-          TokensOutputImage: 1600,
-          ImageCount: 1,
+          SumTokensInput: 200,
+          SumTokensOutput: 100,
+          SumTokensCacheRead: 0,
+          SumTokensCacheWrite: 0,
+          SumTokensReasoning: 0,
+          SumTokensInputImage: 800,
+          SumTokensOutputImage: 1600,
+          SumImageCount: 1,
         },
       ]);
 

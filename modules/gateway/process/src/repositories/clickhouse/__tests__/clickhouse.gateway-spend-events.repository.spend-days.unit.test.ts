@@ -2,23 +2,23 @@
  * Main's governance metered-lane read, now served by the ledger's owner
  * (`governanceGatewaySpend.clickhouse.repository.ts`).
  */
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { ReaderReadStatement } from "@langwatch/clickhouse-client/builder";
 import { describe, expect, it } from "vitest";
 
 import type { GatewayClickHouseClient } from "../clickhouse.gateway-session.store.ts";
 import { ClickHouseGatewaySpendEventsRepository } from "../clickhouse.gateway-spend-events.repository.ts";
 
-type SentQuery = Parameters<GatewayClickHouseClient["query"]>[0];
-
 function repositoryOver(rows: readonly Record<string, unknown>[]) {
-  const queries: SentQuery[] = [];
+  const queries: ReaderReadStatement[] = [];
   const resolvedFor: string[] = [];
-  const client = createApiFixture<GatewayClickHouseClient>({
-    query: async (input) => {
-      queries.push(input);
-      return { json: <T>(): Promise<T[]> => Promise.resolve(JSON.parse(JSON.stringify(rows))) };
+  const client: GatewayClickHouseClient = {
+    read: async ({ statement }) => {
+      queries.push(statement as ReaderReadStatement);
+      return { rows: JSON.parse(JSON.stringify(rows)) };
     },
-  });
+    query: () => Promise.reject(new Error("spend reads are built statements")),
+    insert: async () => undefined,
+  };
   const repository = ClickHouseGatewaySpendEventsRepository.create(async (tenantId) => {
     resolvedFor.push(tenantId);
     return client;
@@ -45,16 +45,22 @@ describe("the metered lane per day across an organization's projects", () => {
         toDay: "2026-09-02",
       });
 
-      const sql = queries[0]?.query ?? "";
-      expect(sql).toContain("WHERE TenantId IN ({tenant0:String}, {tenant1:String})");
+      const sql = queries[0]?.sql ?? "";
+      expect(sql).toContain("FROM gateway_spend WHERE TenantId IN ({tenantIds:Array(String)})");
       expect(sql).toContain("argMax(Status, EventTimestamp)");
-      expect(sql).toContain("GROUP BY Day");
-      expect(queries[0]?.query_params).toEqual({
-        tenant0: "project-1",
-        tenant1: "project-2",
-        fromMs: Date.UTC(2026, 8, 1),
-        toMs: Date.UTC(2026, 8, 3),
+      expect(sql).toContain("GROUP BY TenantId, GatewayRequestId HAVING");
+      expect(sql).toContain("GROUP BY toDate(toStartOfDay(RequestOccurredAt, {v0:String}))");
+      expect(sql).toContain("ORDER BY Day ASC SETTINGS max_execution_time = 20");
+      expect(queries[0]?.settings).toMatchObject({
+        SQL_langwatch_tenant_ids: "project-1,project-2",
       });
+      expect(queries[0]?.params).toMatchObject({
+        v0: "UTC",
+        tenantIds: ["project-1", "project-2"],
+      });
+      expect(Object.values(queries[0]?.params ?? {})).toEqual(
+        expect.arrayContaining([Date.UTC(2026, 8, 1), Date.UTC(2026, 8, 3)]),
+      );
       expect(resolvedFor).toEqual(["project-1"]);
       expect(days).toEqual([
         {

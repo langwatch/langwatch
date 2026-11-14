@@ -123,61 +123,7 @@ describe("given the shared spend filter vocabulary", () => {
     });
   });
 
-  describe("when filters are rendered to SQL", () => {
-    it("binds a placeholder only for the filters present", () => {
-      const { clauses, params } = spendFilters.buildSpendFilterClauses({
-        filters: { models: ["gpt-5-mini"] },
-      });
-      expect(clauses).toEqual(["Model IN {models:Array(String)}"]);
-      expect(params).toEqual({ models: ["gpt-5-mini"] });
-    });
-
-    it("still emits the predicate when a present filter is empty", () => {
-      // The whole point: a team with no projects or an external id nobody
-      // minted must answer nothing, not collapse into an absent predicate and
-      // hand back the organization's entire spend.
-      const { clauses, params } = spendFilters.buildSpendFilterClauses({
-        filters: { virtualKeyIds: [] },
-      });
-      expect(clauses).toEqual(["VirtualKeyId IN {virtualKeyIds:Array(String)}"]);
-      expect(params).toEqual({ virtualKeyIds: [] });
-    });
-
-    it("matches a label against any of the values named", () => {
-      const { clauses } = spendFilters.buildSpendFilterClauses({
-        filters: { labels: ["tier:gold"] },
-      });
-      expect(clauses).toEqual(["hasAny(Labels, {labels:Array(String)})"]);
-    });
-
-    it("gives each metadata pair its own numbered placeholders", () => {
-      const { clauses, params } = spendFilters.buildSpendFilterClauses({
-        filters: {
-          metadata: [
-            { key: "tier", values: ["gold"] },
-            { key: "region", values: ["eu", "us"] },
-          ],
-        },
-      });
-      expect(clauses).toEqual([
-        "MetadataMap[{metadataKey0:String}] IN {metadataValues0:Array(String)}",
-        "MetadataMap[{metadataKey1:String}] IN {metadataValues1:Array(String)}",
-      ]);
-      expect(params).toEqual({
-        metadataKey0: "tier",
-        metadataValues0: ["gold"],
-        metadataKey1: "region",
-        metadataValues1: ["eu", "us"],
-      });
-    });
-
-    it("maps the legacy status vocabulary onto lifecycle statuses", () => {
-      const { params } = spendFilters.buildSpendFilterClauses({
-        filters: { status: "success" },
-      });
-      expect(params.status).toBe("confirmed");
-    });
-
+  describe("when a status filter is resolved", () => {
     /** @scenario "Every status the surface publishes can be narrowed on" */
     it("resolves every published status rather than a hand-copied subset", () => {
       // The boundary validates against SPEND_STATUS_FILTERS and the SQL

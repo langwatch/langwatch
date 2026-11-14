@@ -22,15 +22,6 @@ const LEGACY_STATUS_ALIASES = new Map<string, SpendEventStatus>([
   ["error", "failed"],
 ]);
 
-const IN_COLUMNS: readonly (readonly [keyof SpendFilters, string])[] = [
-  ["virtualKeyIds", "VirtualKeyId"],
-  ["endUserIds", "EndUserId"],
-  ["principalUserIds", "PrincipalUserId"],
-  ["models", "Model"],
-  ["providerKeys", "ProviderKey"],
-  ["requestTypes", "RequestType"],
-];
-
 /**
  * Status a filter token names, DERIVED from {@link SPEND_STATUS_FILTERS}
  * rather than restated — restating risks a new tuple entry passing
@@ -116,45 +107,4 @@ export function spendFiltersFromQuery({
     metadata: query.metadata === undefined ? undefined : parseMetadataFilters(query.metadata),
     status: query.status,
   };
-}
-
-/**
- * Bare ClickHouse predicates, one per filter actually present (callers join
- * differently). A present-but-empty filter still emits its predicate — otherwise
- * it hands back the org's entire spend under a narrowing the caller asked for.
- */
-export function buildSpendFilterClauses({ filters }: { filters: SpendFilters }): {
-  clauses: string[];
-  params: Record<string, unknown>;
-} {
-  const clauses: string[] = [];
-  const params: Record<string, unknown> = {};
-
-  for (const [field, column] of IN_COLUMNS) {
-    const values = filters[field] as string[] | undefined;
-    if (values === undefined) continue;
-    clauses.push(`${column} IN {${field}:Array(String)}`);
-    params[field] = values;
-  }
-
-  if (filters.labels !== undefined) {
-    clauses.push("hasAny(Labels, {labels:Array(String)})");
-    params.labels = filters.labels;
-  }
-
-  filters.metadata?.forEach((filter, index) => {
-    clauses.push(
-      `MetadataMap[{metadataKey${index}:String}] IN {metadataValues${index}:Array(String)}`,
-    );
-    params[`metadataKey${index}`] = filter.key;
-    params[`metadataValues${index}`] = filter.values;
-  });
-
-  const status = filters.status !== undefined ? normalizeStatusFilter(filters.status) : undefined;
-  if (status !== undefined) {
-    clauses.push("Status = {status:String}");
-    params.status = status;
-  }
-
-  return { clauses, params };
 }

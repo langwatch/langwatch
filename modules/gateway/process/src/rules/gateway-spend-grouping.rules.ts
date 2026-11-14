@@ -16,7 +16,7 @@ import {
  */
 export const MOVABLE_GROUP_BY_KEYS: readonly SpendGroupByKey[] = ["model", "provider"];
 
-const COLUMN_BY_KEY: Record<SpendGroupByKey, string> = {
+const COLUMN_BY_KEY = {
   virtual_key: "VirtualKeyId",
   end_user: "EndUserId",
   project: "TenantId",
@@ -24,30 +24,11 @@ const COLUMN_BY_KEY: Record<SpendGroupByKey, string> = {
   provider: "ProviderKey",
   principal: "PrincipalUserId",
   request_type: "RequestType",
-};
+} as const satisfies Record<SpendGroupByKey, string>;
 
-/**
- * How a spend rollup is grouped and bucketed.
- */
-export function groupByColumn(key: SpendGroupByKey): string {
+/** The `gateway_spend` column a rollup groups on for one key. */
+export function groupByColumn(key: SpendGroupByKey): (typeof COLUMN_BY_KEY)[SpendGroupByKey] {
   return COLUMN_BY_KEY[key];
-}
-
-/**
- * A time bucket as a sortable string, so one cursor comparison covers every
- * grouping dimension. The offset applies inside ClickHouse, not after — a
- * client-side re-bucket of UTC days can't recover requests on the far side.
- */
-export function bucketExpression({
-  bucket,
-  timezoneParam,
-}: {
-  bucket: Exclude<SpendBucket, "none">;
-  timezoneParam: string;
-}): string {
-  const start = bucket === "hour" ? "toStartOfHour" : "toStartOfDay";
-  const format = bucket === "hour" ? "%Y-%m-%dT%H:00:00" : "%Y-%m-%d";
-  return `formatDateTime(${start}(OccurredAt, {${timezoneParam}:String}), '${format}', {${timezoneParam}:String})`;
 }
 
 /** True when a late outcome can still move a row between groups on this key. */

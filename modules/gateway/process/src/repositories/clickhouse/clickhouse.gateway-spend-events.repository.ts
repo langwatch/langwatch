@@ -1,5 +1,14 @@
 import type { IdBoundOptions } from "@langwatch/clickhouse-client";
 import {
+  clickhouseRead,
+  type ConditionOps,
+  type Expression,
+  fn,
+  param,
+  type ReaderScope,
+  tenantScope,
+} from "@langwatch/clickhouse-client/builder";
+import {
   type GatewaySpendDay,
   type GatewayUsageCount,
   type SpendUsage,
@@ -38,6 +47,12 @@ import {
   GATEWAY_SPEND_PROJECTION_VERSION_LATEST,
 } from "../../rules/gateway-spend-projection.rules.ts";
 import type { GatewayClickHouseResolver } from "./clickhouse.gateway-session.store.ts";
+import {
+  spendBucketExpression,
+  type SpendCondition,
+  spendFilterConditions,
+} from "./clickhouse.gateway-spend-query.mapper.ts";
+import { gatewaySpend as spend } from "./clickhouse.gateway-spend.table.ts";
 
 const asString = (value: unknown): string =>
   typeof value === "string" || typeof value === "number" || typeof value === "bigint"
@@ -45,9 +60,8 @@ const asString = (value: unknown): string =>
     : "";
 
 const NANO_PER_USD = 1_000_000_000;
-const usageRowsSchema = z.array(
-  z.object({ Total: z.string(), SpendNanoUsd: z.string(), FirstMs: z.string() }),
-);
+const countedRowsSchema = z.array(z.object({ Total: z.string(), SpendNanoUsd: z.string() }));
+const earliestRowsSchema = z.array(z.object({ Total: z.string(), FirstMs: z.string() }));
 const TABLE = "gateway_spend" as const;
 
 /**
@@ -59,22 +73,61 @@ const SUMMARIES_MAX_EXECUTION_SECONDS = 60;
 
 const logger = createLogger("langwatch:gateway:spend-repository");
 
-const SPEND_ROW_COLUMNS = `TenantId, GatewayRequestId, OrganizationId, VirtualKeyId,
-          PrincipalUserId, EndUserId, TraceId, Model, ProviderKey, RequestType,
-          TokensInput, TokensOutput, TokensCacheRead, TokensCacheWrite,
-          TokensReasoning, TokensInputImage, TokensOutputImage, ImageCount,
-          CostNanoUSD, RateVersion, Status, ErrorClass,
-          HttpStatus, NeedsReconciliation, SettleReason, Labels, Metadata,
-          DurationMS, toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs`;
-
-/** One grouping dimension: the expression to group on and the alias it is
- *  selected as, so the walk can name it in ORDER BY and read it back. */
+/** One grouping dimension: the expression grouped on, and the alias it is selected as. */
 interface SummaryDimension {
   alias: string;
-  expression: string;
+  expression: Expression<string, "gateway_spend">;
 }
 
-const CHARGED_STATUSES = "('confirmed', 'failed')";
+/** The columns a spend row maps from (`mapSpendEventRow`). */
+const SPEND_ROW = {
+  TenantId: spend.TenantId,
+  GatewayRequestId: spend.GatewayRequestId,
+  OrganizationId: spend.OrganizationId,
+  VirtualKeyId: spend.VirtualKeyId,
+  PrincipalUserId: spend.PrincipalUserId,
+  EndUserId: spend.EndUserId,
+  TraceId: spend.TraceId,
+  Model: spend.Model,
+  ProviderKey: spend.ProviderKey,
+  RequestType: spend.RequestType,
+  TokensInput: spend.TokensInput,
+  TokensOutput: spend.TokensOutput,
+  TokensCacheRead: spend.TokensCacheRead,
+  TokensCacheWrite: spend.TokensCacheWrite,
+  TokensReasoning: spend.TokensReasoning,
+  TokensInputImage: spend.TokensInputImage,
+  TokensOutputImage: spend.TokensOutputImage,
+  ImageCount: spend.ImageCount,
+  CostNanoUSD: spend.CostNanoUSD,
+  RateVersion: spend.RateVersion,
+  Status: spend.Status,
+  ErrorClass: spend.ErrorClass,
+  HttpStatus: spend.HttpStatus,
+  NeedsReconciliation: spend.NeedsReconciliation,
+  SettleReason: spend.SettleReason,
+  Labels: spend.Labels,
+  Metadata: spend.Metadata,
+  DurationMS: spend.DurationMS,
+  OccurredAtMs: fn.toUnixTimestamp64Milli(spend.OccurredAt),
+};
+
+/** Each request's latest stored row (FINAL), selecting what a spend row maps from. */
+function spendRowsOf(scope: ReaderScope) {
+  return clickhouseRead({ scope }).from(spend).final().select(SPEND_ROW);
+}
+
+type SpendRowsRead = ReturnType<typeof spendRowsOf>;
+
+/** `OccurredAt` bounded at each end a caller gives, so the month partitions prune. */
+function occurredWithin({ fromMs, toMs }: { fromMs?: number; toMs?: number }): SpendCondition[] {
+  const conditions: SpendCondition[] = [];
+  if (fromMs !== undefined) conditions.push(({ gte }) => gte(spend.OccurredAt, fromMs));
+  if (toMs !== undefined) conditions.push(({ lt }) => lt(spend.OccurredAt, toMs));
+  return conditions;
+}
+
+const CHARGED_STATUSES = ["confirmed", "failed"];
 const METERED_READ_MAX_EXECUTION_SECONDS = 20;
 const DAY_MS = 86_400_000;
 
@@ -86,67 +139,74 @@ function newestFirst(left: SpendEventRow, right: SpendEventRow): number {
   return left.gatewayRequestId < right.gatewayRequestId ? 1 : -1;
 }
 
-/** The `TenantId IN (...)` list and its params: the guard wants one bound String per tenant. */
-function tenantSet({ tenantIds }: { tenantIds: readonly string[] }) {
-  return {
-    placeholders: tenantIds.map((_, index) => `{tenant${index}:String}`).join(", "),
-    params: Object.fromEntries(tenantIds.map((id, index) => [`tenant${index}`, id])),
-  };
-}
-
 /**
- * Main's governance metered-lane read: each request at its latest version, summed per one
+ * Main's governance metered-lane read: each request at its latest version, then summed per one
  * dimension (`governanceGatewaySpend.clickhouse.repository.ts`). Never grouped by person.
  */
-const meteredSpendQuery = ({
-  placeholders,
-  dimension,
-  grouping,
-  ordering,
+function meteredRequests({
+  tenantIds,
+  fromMs,
+  toMs,
 }: {
-  placeholders: string;
-  dimension: string;
-  grouping: string;
-  ordering: string;
-}) => `
-  SELECT
-    ${dimension},
-    toString(sumIf(RequestCostNanoUSD, RequestStatus IN ${CHARGED_STATUSES})) AS AmountNanoUsd,
-    countIf(RequestStatus IN ${CHARGED_STATUSES}) AS RequestCount,
-    countIf(RequestStatus IN ${CHARGED_STATUSES} AND RequestCostNanoUSD > 0) AS PricedRequestCount,
-    countIf(
-      RequestStatus IN ${CHARGED_STATUSES}
-      AND RequestCostNanoUSD = 0
-      AND (
-        RequestTokensInput + RequestTokensOutput + RequestTokensCacheRead
-        + RequestTokensCacheWrite + RequestTokensReasoning
-      ) > 0
-    ) + countIf(RequestStatus = 'settled') AS RequestsWithoutAmount
-  FROM (
-    SELECT
-      GatewayRequestId,
-      argMax(Status, EventTimestamp)           AS RequestStatus,
-      argMax(CostNanoUSD, EventTimestamp)      AS RequestCostNanoUSD,
-      argMax(OccurredAt, EventTimestamp)       AS RequestOccurredAt,
-      argMax(Model, EventTimestamp)            AS RequestModel,
-      argMax(VirtualKeyId, EventTimestamp)     AS RequestVirtualKeyId,
-      argMax(TokensInput, EventTimestamp)      AS RequestTokensInput,
-      argMax(TokensOutput, EventTimestamp)     AS RequestTokensOutput,
-      argMax(TokensCacheRead, EventTimestamp)  AS RequestTokensCacheRead,
-      argMax(TokensCacheWrite, EventTimestamp) AS RequestTokensCacheWrite,
-      argMax(TokensReasoning, EventTimestamp)  AS RequestTokensReasoning
-    FROM ${TABLE}
-    WHERE TenantId IN (${placeholders})
-    GROUP BY TenantId, GatewayRequestId
-    HAVING RequestOccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
-      AND RequestOccurredAt < fromUnixTimestamp64Milli({toMs:Int64})
-  )
-  GROUP BY ${grouping}
-  ORDER BY ${ordering}
-`;
-
-/** `AmountNanoUsd` is a string alias and would sort as text; rank on the number. */
-const AMOUNT_DESC = "toInt64(AmountNanoUsd) DESC";
+  tenantIds: readonly string[];
+  fromMs: number;
+  toMs: number;
+}) {
+  const scope = tenantScope.set({ tenantIds });
+  const latest = <V, T extends string>(value: Expression<V, T>) =>
+    fn.argMax(value, spend.EventTimestamp);
+  const requests = clickhouseRead({ scope })
+    .from(spend)
+    .select({
+      GatewayRequestId: spend.GatewayRequestId,
+      RequestStatus: latest(spend.Status),
+      RequestCostNanoUSD: latest(spend.CostNanoUSD),
+      RequestOccurredAt: latest(spend.OccurredAt),
+      RequestModel: latest(spend.Model),
+      RequestVirtualKeyId: latest(spend.VirtualKeyId),
+      RequestTokensInput: latest(spend.TokensInput),
+      RequestTokensOutput: latest(spend.TokensOutput),
+      RequestTokensCacheRead: latest(spend.TokensCacheRead),
+      RequestTokensCacheWrite: latest(spend.TokensCacheWrite),
+      RequestTokensReasoning: latest(spend.TokensReasoning),
+    })
+    .groupBy(spend.TenantId, spend.GatewayRequestId)
+    .having(({ and, gte, lt }) =>
+      and(gte(latest(spend.OccurredAt), fromMs), lt(latest(spend.OccurredAt), toMs)),
+    )
+    .as("requests");
+  const tokens = [
+    requests.RequestTokensOutput,
+    requests.RequestTokensCacheRead,
+    requests.RequestTokensCacheWrite,
+    requests.RequestTokensReasoning,
+  ].reduce<Expression<number, "requests">>(
+    (total, each) => fn.plus(total, each),
+    requests.RequestTokensInput,
+  );
+  /** The four figures every metered row carries, and the summed amount a ranking orders by. */
+  const figuresOf = <C>({ and, eq, gt, oneOf }: ConditionOps<"requests", C>) => {
+    const charged = oneOf(requests.RequestStatus, CHARGED_STATUSES);
+    const amount = fn.sumIf(requests.RequestCostNanoUSD, charged);
+    const figures = {
+      AmountNanoUsd: fn.toString(amount),
+      RequestCount: fn.countIf(charged),
+      PricedRequestCount: fn.countIf(and(charged, gt(requests.RequestCostNanoUSD, 0))),
+      RequestsWithoutAmount: fn.plus(
+        fn.countIf(and(charged, eq(requests.RequestCostNanoUSD, 0), gt(tokens, 0))),
+        fn.countIf(eq(requests.RequestStatus, "settled")),
+      ),
+    };
+    return { figures, amount };
+  };
+  /** The figures, plus the amount as a number to rank by: `AmountNanoUsd` is text. */
+  const ranked = <C>(ops: ConditionOps<"requests", C>) => {
+    const { figures, amount } = figuresOf(ops);
+    return { ...figures, AmountRank: amount };
+  };
+  const figures = <C>(ops: ConditionOps<"requests", C>) => figuresOf(ops).figures;
+  return { requests, figures, ranked, start: clickhouseRead({ scope }).from(requests) };
+}
 
 const meteredFiguresSchema = z.object({
   AmountNanoUsd: z.union([z.string(), z.number()]),
@@ -172,6 +232,15 @@ const spendVirtualKeyRowsSchema = z.array(
 
 const utcDayStartMs = (day: string): number =>
   Temporal.Instant.from(`${day}T00:00:00.000Z`).epochMilliseconds;
+
+/** A window of whole UTC days, `toDay` included. */
+const meteredWindow = ({ tenantIds, fromDay, toDay }: GatewaySpendWindow) => ({
+  tenantIds,
+  fromMs: utcDayStartMs(fromDay),
+  toMs: utcDayStartMs(toDay) + DAY_MS,
+});
+
+const METERED_SETTINGS = { max_execution_time: METERED_READ_MAX_EXECUTION_SECONDS };
 
 export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRepository {
   static create(resolveClient: GatewayClickHouseResolver): ClickHouseGatewaySpendEventsRepository {
@@ -263,23 +332,28 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
     gatewayRequestId: string;
   }): Promise<GatewaySpendState | null> {
     const client = await this.resolveClient(tenantId);
-    const result = await client.query({
-      query: `
-        SELECT ${SPEND_ROW_COLUMNS}, SettleReason, PodId, PodSeq,
-               TokensCacheWrite1h, TokensInputAudio, TokensOutputAudio,
-               CharsInput, AudioMS, WebSearchRequests,
-               Version, CreatedAt, LastEventOccurredAt, EventTimestamp
-        FROM ${TABLE} FINAL
-        WHERE TenantId = {tenantId:String}
-          AND GatewayRequestId = {gatewayRequestId:String}
-          {{idBound:gateway_spend.GatewayRequestId:gatewayRequestId}}
-        LIMIT 1
-      `,
-      query_params: { tenantId, gatewayRequestId },
-      format: "JSONEachRow",
-      idBound: { fallback: "unbounded" },
-    });
-    const raw = await result.json<Record<string, unknown>>();
+    const statement = clickhouseRead({ scope: tenantScope.single({ tenantId }) })
+      .from(spend)
+      .final()
+      .select({
+        ...SPEND_ROW,
+        PodId: spend.PodId,
+        PodSeq: spend.PodSeq,
+        TokensCacheWrite1h: spend.TokensCacheWrite1h,
+        TokensInputAudio: spend.TokensInputAudio,
+        TokensOutputAudio: spend.TokensOutputAudio,
+        CharsInput: spend.CharsInput,
+        AudioMS: spend.AudioMS,
+        WebSearchRequests: spend.WebSearchRequests,
+        Version: spend.Version,
+        CreatedAt: spend.CreatedAt,
+        LastEventOccurredAt: spend.LastEventOccurredAt,
+        EventTimestamp: spend.EventTimestamp,
+      })
+      .where(({ idBound }) => idBound(spend.GatewayRequestId, gatewayRequestId))
+      .limit(1)
+      .build();
+    const { rows: raw } = await client.read({ statement, idBound: { fallback: "unbounded" } });
     const r = raw[0];
     if (!r) return null;
     if (String(r.Version) !== GATEWAY_SPEND_PROJECTION_VERSION_LATEST) {
@@ -340,35 +414,23 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
     nextCursor: SpendEventsPageCursor | null;
   }> {
     const client = await this.resolveClient(tenantId);
-    const conditions: string[] = [
-      "TenantId = {tenantId:String}",
-      "OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})",
-      "OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})",
-    ];
-    const params: Record<string, unknown> = { tenantId, fromMs, toMs, limit };
-    const filterSql = spendFilters.buildSpendFilterClauses({ filters });
-    conditions.push(...filterSql.clauses);
-    Object.assign(params, filterSql.params);
+    let read = spendRowsOf(tenantScope.single({ tenantId }));
+    const conditions = [...occurredWithin({ fromMs, toMs }), ...spendFilterConditions({ filters })];
+    for (const condition of conditions) read = read.where(condition);
     if (cursor) {
-      conditions.push(
-        "(OccurredAt, GatewayRequestId) < (fromUnixTimestamp64Milli({cursorOccurredAtMs:Int64}), {cursorRequestId:String})",
+      read = read.where(({ lt }) =>
+        lt(
+          fn.tuple(spend.OccurredAt, spend.GatewayRequestId),
+          fn.tuple(param.epochMs(cursor.occurredAtMs), param.string(cursor.gatewayRequestId)),
+        ),
       );
-      params.cursorOccurredAtMs = cursor.occurredAtMs;
-      params.cursorRequestId = cursor.gatewayRequestId;
     }
-
-    const result = await client.query({
-      query: `
-        SELECT ${SPEND_ROW_COLUMNS}
-        FROM ${TABLE} FINAL
-        WHERE ${conditions.join(" AND ")}
-        ORDER BY OccurredAt DESC, GatewayRequestId DESC
-        LIMIT {limit:UInt32}
-      `,
-      query_params: params,
-      format: "JSONEachRow",
-    });
-    const raw = (await result.json()) as Record<string, unknown>[];
+    const statement = read
+      .orderBy(spend.OccurredAt, "DESC")
+      .orderBy(spend.GatewayRequestId, "DESC")
+      .limit(limit)
+      .build();
+    const { rows: raw } = await client.read({ statement });
     const rows = raw.map((row) => ClickHouseGatewaySpendEventsRepository.mapSpendEventRow(row));
     const last = rows[rows.length - 1];
     return {
@@ -398,20 +460,13 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
     limit?: number;
   }): Promise<SpendEventRow[]> {
     const client = await this.resolveClient(tenantId);
-    const result = await client.query({
-      query: `
-        SELECT ${SPEND_ROW_COLUMNS}
-        FROM ${TABLE} FINAL
-        WHERE TenantId = {tenantId:String}
-          AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
-          AND OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})
-        ORDER BY OccurredAt ASC, GatewayRequestId ASC
-        LIMIT {limit:UInt32}
-      `,
-      query_params: { tenantId, fromMs, toMs, limit },
-      format: "JSONEachRow",
-    });
-    const raw = (await result.json()) as Record<string, unknown>[];
+    const statement = spendRowsOf(tenantScope.single({ tenantId }))
+      .where(({ range }) => range(spend.OccurredAt, { from: fromMs, until: toMs }))
+      .orderBy(spend.OccurredAt, "ASC")
+      .orderBy(spend.GatewayRequestId, "ASC")
+      .limit(limit)
+      .build();
+    const { rows: raw } = await client.read({ statement });
     return raw.map((row) => ClickHouseGatewaySpendEventsRepository.mapSpendEventRow(row));
   }
 
@@ -431,33 +486,26 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
     if (input.tenantIds.length === 0 || input.statuses.length === 0) {
       return { rows: [], nextCursor: null };
     }
-    const clauses: string[] = [];
-    const params: Record<string, unknown> = { statuses: input.statuses, limit: input.limit };
-    if (input.fromMs !== undefined) {
-      clauses.push("AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})");
-      params.fromMs = input.fromMs;
-    }
-    if (input.toMs !== undefined) {
-      clauses.push("AND OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})");
-      params.toMs = input.toMs;
-    }
+    const { statuses, limit } = input;
     const cursor = input.cursor ? spendCursors.decodeSpendEventsCursor(input.cursor) : null;
-    if (cursor) {
-      clauses.push(
-        "AND (OccurredAt, GatewayRequestId) < (fromUnixTimestamp64Milli({cursorOccurredAtMs:Int64}), {cursorRequestId:String})",
-      );
-      params.cursorOccurredAtMs = cursor.eventTimestampMs;
-      params.cursorRequestId = cursor.gatewayRequestId;
-    }
-    const query = `SELECT ${SPEND_ROW_COLUMNS}
-        FROM ${TABLE} FINAL
-        WHERE TenantId = {tenantId:String}
-          AND Status IN {statuses:Array(String)}
-          ${clauses.join("\n          ")}
-        ORDER BY OccurredAt DESC, GatewayRequestId DESC
-        LIMIT {limit:UInt32}`;
+    const narrow = (base: SpendRowsRead): SpendRowsRead => {
+      let read = base.where(({ oneOf }) => oneOf(spend.Status, statuses));
+      for (const condition of occurredWithin(input)) read = read.where(condition);
+      if (cursor) {
+        read = read.where(({ lt }) =>
+          lt(
+            fn.tuple(spend.OccurredAt, spend.GatewayRequestId),
+            fn.tuple(param.epochMs(cursor.eventTimestampMs), param.string(cursor.gatewayRequestId)),
+          ),
+        );
+      }
+      return read
+        .orderBy(spend.OccurredAt, "DESC")
+        .orderBy(spend.GatewayRequestId, "DESC")
+        .limit(limit);
+    };
     const perTenant = await Promise.all(
-      input.tenantIds.map((tenantId) => this.readTenantSpendRows({ tenantId, query, params })),
+      input.tenantIds.map((tenantId) => this.readTenantSpendRows({ tenantId, narrow })),
     );
     const rows = perTenant.flat().toSorted(newestFirst).slice(0, input.limit);
     const last = rows.at(-1);
@@ -483,14 +531,11 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
       input.tenantIds.map((tenantId) =>
         this.readTenantSpendRows({
           tenantId,
-          query: `SELECT ${SPEND_ROW_COLUMNS}
-        FROM ${TABLE} FINAL
-        WHERE TenantId = {tenantId:String}
-          AND GatewayRequestId = {gatewayRequestId:String}
-          AND Status IN {statuses:Array(String)}
-          {{idBound:gateway_spend.GatewayRequestId:gatewayRequestId}}
-        LIMIT 1`,
-          params: { gatewayRequestId: input.gatewayRequestId, statuses: input.statuses },
+          narrow: (read) =>
+            read
+              .where(({ idBound }) => idBound(spend.GatewayRequestId, input.gatewayRequestId))
+              .where(({ oneOf }) => oneOf(spend.Status, input.statuses))
+              .limit(1),
           idBound: { fallback: "unbounded" },
         }),
       ),
@@ -501,24 +546,20 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
   /** One statement per project tenant: the tenant guard admits exactly one tenant per read. */
   private async readTenantSpendRows({
     tenantId,
-    query,
-    params,
+    narrow,
     idBound,
   }: {
     tenantId: string;
-    query: string;
-    params: Record<string, unknown>;
+    narrow: (read: SpendRowsRead) => SpendRowsRead;
     idBound?: IdBoundOptions;
   }): Promise<SpendEventRow[]> {
     const client = await this.resolveClient(tenantId);
-    const result = await client.query({
-      query,
-      query_params: { ...params, tenantId },
-      format: "JSONEachRow",
+    const statement = narrow(spendRowsOf(tenantScope.single({ tenantId }))).build();
+    const { rows } = await client.read({
+      statement,
       ...(idBound === undefined ? {} : { idBound }),
     });
-    const raw = await result.json<Record<string, unknown>>();
-    return raw.map((row) => ClickHouseGatewaySpendEventsRepository.mapSpendEventRow(row));
+    return rows.map((row) => ClickHouseGatewaySpendEventsRepository.mapSpendEventRow(row));
   }
 
   async walkSpendEvents({
@@ -540,37 +581,31 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
   }): Promise<{ rows: SpendEventRow[]; nextCursor: string | null }> {
     if (tenantIds.length === 0) return { rows: [], nextCursor: null };
     const client = await this.resolveClient(tenantIds[0]!);
-    const tenant = tenantSet({ tenantIds });
     const decoded = cursor ? spendCursors.decodeSpendEventsCursor(cursor) : null;
 
-    const { clauses, params: filterParams } =
-      ClickHouseGatewaySpendEventsRepository.spendEventsWalkFilter({
-        decoded,
-        fromMs,
-        toMs,
-        filters,
-      });
-    const params: Record<string, unknown> = {
-      ...tenant.params,
-      limit,
-      ...filterParams,
-    };
-
-    const result = await client.query({
-      query: `
-        SELECT ${SPEND_ROW_COLUMNS}, EventTimestamp
-        FROM ${TABLE} FINAL
-        WHERE TenantId IN (${tenant.placeholders})
-          ${clauses.join("\n          ")}
-        ORDER BY EventTimestamp ASC, GatewayRequestId ASC
-        LIMIT {limit:UInt32}
-      `,
-      query_params: params,
-      format: "JSONEachRow",
-      tenantIds,
-      ...(SKIP_COLD_SCAN_CHECK === true ? { SKIP_COLD_SCAN_CHECK } : {}),
+    let read = clickhouseRead({ scope: tenantScope.set({ tenantIds }) })
+      .from(spend)
+      .final()
+      .select({ ...SPEND_ROW, EventTimestamp: spend.EventTimestamp });
+    if (decoded) {
+      read = read.where(({ gt }) =>
+        gt(
+          fn.tuple(spend.EventTimestamp, spend.GatewayRequestId),
+          fn.tuple(param.uint64(decoded.eventTimestampMs), param.string(decoded.gatewayRequestId)),
+        ),
+      );
+    }
+    const conditions = [...occurredWithin({ fromMs, toMs }), ...spendFilterConditions({ filters })];
+    for (const condition of conditions) read = read.where(condition);
+    const statement = read
+      .orderBy(spend.EventTimestamp, "ASC")
+      .orderBy(spend.GatewayRequestId, "ASC")
+      .limit(limit)
+      .build();
+    const { rows: raw } = await client.read({
+      statement,
+      ...(SKIP_COLD_SCAN_CHECK === true ? { declaresFullScan: true as const } : {}),
     });
-    const raw = (await result.json()) as Record<string, unknown>[];
     const rows = raw.map((row) => ClickHouseGatewaySpendEventsRepository.mapSpendEventRow(row));
     const last = raw[raw.length - 1];
     return {
@@ -625,75 +660,70 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
     }
     if (tenantIds.length === 0) return { rows: [], nextCursor: null };
     const client = await this.resolveClient(tenantIds[0]!);
-    const tenant = tenantSet({ tenantIds });
-
-    const params: Record<string, unknown> = { ...tenant.params, fromMs, toMs, limit };
     const dimensions = ClickHouseGatewaySpendEventsRepository.summaryDimensions({
       groupBy,
       bucket,
+      timezone,
     });
-    if (bucket !== "none") params.timezone = timezone;
+    const keys = dimensions.map((dimension) => dimension.alias);
 
-    const clauses: string[] = [];
-    const walk = ClickHouseGatewaySpendEventsRepository.summariesWalkClause({
+    let read = clickhouseRead({ scope: tenantScope.set({ tenantIds }) })
+      .from(spend)
+      .final()
+      .select((ops) => {
+        const charged = ops.oneOf(spend.Status, CHARGED_STATUSES);
+        const sumCharged = (column: Expression<number, "gateway_spend">) =>
+          fn.sumIf(column, charged);
+        return {
+          ...Object.fromEntries(
+            dimensions.map((dimension) => [dimension.alias, dimension.expression]),
+          ),
+          EventCount: fn.countIf(charged),
+          SettledCount: fn.countIf(ops.eq(spend.Status, "settled")),
+          SumTokensInput: sumCharged(spend.TokensInput),
+          SumTokensOutput: sumCharged(spend.TokensOutput),
+          SumTokensCacheRead: sumCharged(spend.TokensCacheRead),
+          SumTokensCacheWrite: sumCharged(spend.TokensCacheWrite),
+          SumTokensReasoning: sumCharged(spend.TokensReasoning),
+          SumTokensInputImage: sumCharged(spend.TokensInputImage),
+          SumTokensOutputImage: sumCharged(spend.TokensOutputImage),
+          SumImageCount: sumCharged(spend.ImageCount),
+          SumCostNanoUSD: sumCharged(spend.CostNanoUSD),
+        };
+      })
+      .where(({ and, ne, range }) =>
+        and(
+          ne(spend.Status, SPEND_STATUS_IN_FLIGHT),
+          range(spend.OccurredAt, { from: fromMs, until: toMs }),
+        ),
+      );
+    const walk = ClickHouseGatewaySpendEventsRepository.summariesWalkCondition({
       cursor: cursor ? spendCursors.decodeSpendSummariesCursor(cursor) : null,
       dimensions,
     });
-    if (walk) {
-      clauses.push(walk.clause);
-      Object.assign(params, walk.params);
+    if (walk) read = read.where(walk);
+    for (const condition of spendFilterConditions({ filters })) {
+      read = read.where(condition);
     }
+    read = read.groupBy(...dimensions.map((dimension) => dimension.expression));
+    for (const dimension of dimensions) read = read.orderBy(dimension.expression, "ASC");
 
-    const filterSql = spendFilters.buildSpendFilterClauses({ filters });
-    clauses.push(...filterSql.clauses.map((clause) => `AND ${clause}`));
-    Object.assign(params, filterSql.params);
-
-    const selection = dimensions.map((d) => `${d.expression} AS ${d.alias}`).join(",\n          ");
-    const grouping = dimensions.map((d) => d.alias).join(", ");
-    const ordering = dimensions.map((d) => `${d.alias} ASC`).join(", ");
-
-    const result = await client.query({
-      query: `
-        SELECT
-          ${selection},
-          countIf(Status IN ('confirmed', 'failed')) AS EventCount,
-          countIf(Status = 'settled') AS SettledCount,
-          sumIf(TokensInput, Status IN ('confirmed', 'failed')) AS TokensInput,
-          sumIf(TokensOutput, Status IN ('confirmed', 'failed')) AS TokensOutput,
-          sumIf(TokensCacheRead, Status IN ('confirmed', 'failed')) AS TokensCacheRead,
-          sumIf(TokensCacheWrite, Status IN ('confirmed', 'failed')) AS TokensCacheWrite,
-          sumIf(TokensReasoning, Status IN ('confirmed', 'failed')) AS TokensReasoning,
-          sumIf(TokensInputImage, Status IN ('confirmed', 'failed')) AS TokensInputImage,
-          sumIf(TokensOutputImage, Status IN ('confirmed', 'failed')) AS TokensOutputImage,
-          sumIf(ImageCount, Status IN ('confirmed', 'failed')) AS ImageCount,
-          sumIf(CostNanoUSD, Status IN ('confirmed', 'failed')) AS CostNanoUSD
-        FROM ${TABLE} FINAL
-        WHERE TenantId IN (${tenant.placeholders})
-          AND Status != '${SPEND_STATUS_IN_FLIGHT}'
-          AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
-          AND OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})
-          ${clauses.join("\n          ")}
-        GROUP BY ${grouping}
-        ORDER BY ${ordering}
-        LIMIT {limit:UInt32}
-      `,
-      query_params: params,
-      format: "JSONEachRow",
-      tenantIds,
+    const { rows: raw } = await client.read({
       // LIMIT bounds rows returned, not rows aggregated: every page rebuilds
       // the whole group set under FINAL before discarding all but one page,
       // so the walk gets a deadline instead of running as long as the group
-      // set takes. Memory is deliberately uncapped here — the server profile
-      // already enforces a per-query ceiling (server/clickhouse/queryDefaults.ts).
-      clickhouse_settings: {
-        max_execution_time: SUMMARIES_MAX_EXECUTION_SECONDS,
-      },
+      // set takes. Memory is uncapped: the server profile caps each query.
+      statement: read
+        .limit(limit)
+        .settings({ max_execution_time: SUMMARIES_MAX_EXECUTION_SECONDS })
+        .build(),
     });
-    const raw = (await result.json()) as Record<string, unknown>[];
     const last = raw[raw.length - 1];
     const nextCursor =
       raw.length === limit && last
-        ? spendCursors.encodeSpendSummariesCursor(dimensions.map((d) => asString(last[d.alias])))
+        ? spendCursors.encodeSpendSummariesCursor(
+            keys.map((key) => asString((last as Record<string, unknown>)[key])),
+          )
         : null;
     const rows = raw.map((r) =>
       ClickHouseGatewaySpendEventsRepository.mapSummaryRow({ raw: r, groupBy, bucket }),
@@ -719,104 +749,68 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
   }): Promise<number> {
     if (tenantIds.length === 0) return 0;
     const client = await this.resolveClient(tenantIds[0]!);
-    const tenant = tenantSet({ tenantIds });
-    const clauses: string[] = [];
-    if (fromMs !== undefined) {
-      clauses.push("AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})");
-    }
-    if (toMs !== undefined) {
-      clauses.push("AND OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})");
-    }
-    const result = await client.query({
-      query: `
-        SELECT sum(CostNanoUSD) AS CostNanoUSD
-        FROM ${TABLE} FINAL
-        WHERE TenantId IN (${tenant.placeholders})
-          AND RequestType = {requestType:String}
-          AND Status = 'confirmed'
-          ${clauses.join("\n          ")}
-      `,
-      query_params: {
-        ...tenant.params,
-        requestType,
-        ...(fromMs === undefined ? {} : { fromMs }),
-        ...(toMs === undefined ? {} : { toMs }),
-      },
-      format: "JSONEachRow",
-      tenantIds,
-    });
-    const rows = (await result.json()) as Record<string, unknown>[];
-    return parseSummedNanoUsd(rows[0]?.CostNanoUSD ?? 0);
+    let read = clickhouseRead({ scope: tenantScope.set({ tenantIds }) })
+      .from(spend)
+      .final()
+      .select({ SumCostNanoUSD: fn.sum(spend.CostNanoUSD) })
+      .where(({ and, eq }) =>
+        and(eq(spend.RequestType, requestType), eq(spend.Status, "confirmed")),
+      );
+    for (const condition of occurredWithin({ fromMs, toMs })) read = read.where(condition);
+    const { rows } = await client.read({ statement: read.build() });
+    return parseSummedNanoUsd(rows[0]?.SumCostNanoUSD ?? 0);
   }
 
   async sumDaysForOrganizationProjects(input: GatewaySpendWindow): Promise<GatewaySpendDay[]> {
-    const rows = await this.#readMetered({
-      window: input,
-      dimension: "toDate(RequestOccurredAt, 'UTC') AS Day",
-      grouping: "Day",
-      ordering: "Day",
-    });
+    if (input.tenantIds.length === 0) return [];
+    const client = await this.resolveClient(input.tenantIds[0]!);
+    const metered = meteredRequests(meteredWindow(input));
+    const day = fn.toDate(fn.toStartOfDay(metered.requests.RequestOccurredAt, { timeZone: "UTC" }));
+    const statement = metered.start
+      .select((ops) => ({ Day: day, ...metered.figures(ops) }))
+      .groupBy(day)
+      .orderBy("Day")
+      .settings(METERED_SETTINGS)
+      .build();
+    const { rows } = await client.read({ statement });
     return spendDayRowsSchema.parse(rows).map((row) => ({ day: row.Day, ...meteredFigures(row) }));
   }
 
   async sumWindowByModel(input: GatewaySpendWindow): Promise<GatewaySpendModelTotal[]> {
-    const rows = await this.#readMetered({
-      window: input,
-      dimension: "RequestModel AS Model",
-      grouping: "RequestModel",
-      ordering: `${AMOUNT_DESC}, Model`,
-    });
+    if (input.tenantIds.length === 0) return [];
+    const client = await this.resolveClient(input.tenantIds[0]!);
+    const metered = meteredRequests(meteredWindow(input));
+    const statement = metered.start
+      .select((ops) => ({ Model: metered.requests.RequestModel, ...metered.ranked(ops) }))
+      .groupBy(metered.requests.RequestModel)
+      .orderBy("AmountRank", "DESC")
+      .orderBy("Model")
+      .settings(METERED_SETTINGS)
+      .build();
+    const { rows } = await client.read({ statement });
     return spendModelRowsSchema
       .parse(rows)
       .map((row) => ({ model: row.Model, ...meteredFigures(row) }));
   }
 
   async sumWindowByVirtualKey(input: GatewaySpendWindow): Promise<GatewaySpendVirtualKeyTotal[]> {
-    const rows = await this.#readMetered({
-      window: input,
-      dimension: "RequestVirtualKeyId AS VirtualKeyId",
-      grouping: "RequestVirtualKeyId",
-      ordering: `${AMOUNT_DESC}, VirtualKeyId`,
-    });
+    if (input.tenantIds.length === 0) return [];
+    const client = await this.resolveClient(input.tenantIds[0]!);
+    const metered = meteredRequests(meteredWindow(input));
+    const statement = metered.start
+      .select((ops) => ({
+        VirtualKeyId: metered.requests.RequestVirtualKeyId,
+        ...metered.ranked(ops),
+      }))
+      .groupBy(metered.requests.RequestVirtualKeyId)
+      .orderBy("AmountRank", "DESC")
+      .orderBy("VirtualKeyId")
+      .settings(METERED_SETTINGS)
+      .build();
+    const { rows } = await client.read({ statement });
     return spendVirtualKeyRowsSchema
       .parse(rows)
       .map((row) => ({ virtualKeyId: row.VirtualKeyId, ...meteredFigures(row) }));
-  }
-
-  /** One grouped read over the deduped requests; the client is resolved by the first tenant. */
-  async #readMetered({
-    window,
-    dimension,
-    grouping,
-    ordering,
-  }: {
-    window: GatewaySpendWindow;
-    dimension: string;
-    grouping: string;
-    ordering: string;
-  }): Promise<unknown[]> {
-    const { tenantIds, fromDay, toDay } = window;
-    const [firstTenantId] = tenantIds;
-    if (firstTenantId === undefined) return [];
-    const client = await this.resolveClient(firstTenantId);
-    const tenant = tenantSet({ tenantIds });
-    const result = await client.query({
-      query: meteredSpendQuery({
-        placeholders: tenant.placeholders,
-        dimension,
-        grouping,
-        ordering,
-      }),
-      tenantIds,
-      query_params: {
-        ...tenant.params,
-        fromMs: utcDayStartMs(fromDay),
-        toMs: utcDayStartMs(toDay) + DAY_MS,
-      },
-      format: "JSONEachRow",
-      clickhouse_settings: { max_execution_time: METERED_READ_MAX_EXECUTION_SECONDS },
-    });
-    return result.json();
   }
 
   async readEndUserSpend({
@@ -859,39 +853,28 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
     };
     if (tenantIds.length === 0) return empty;
     const client = await this.resolveClient(tenantIds[0]!);
-    const tenant = tenantSet({ tenantIds });
-    const vkClause = virtualKeyId !== undefined ? "AND VirtualKeyId = {virtualKeyId:String}" : "";
-    const result = await client.query({
-      query: `
-        SELECT
-          sum(CostNanoUSD) AS SpendNanoUSD,
-          count() AS RequestCount,
-          sum(TokensInput) AS TokensInput,
-          sum(TokensOutput) AS TokensOutput,
-          sum(TokensCacheRead) AS TokensCacheRead,
-          sum(TokensCacheWrite) AS TokensCacheWrite,
-          sum(TokensReasoning) AS TokensReasoning,
-          sum(TokensInputImage) AS TokensInputImage,
-          sum(TokensOutputImage) AS TokensOutputImage,
-          sum(ImageCount) AS ImageCount
-        FROM ${TABLE} FINAL
-        WHERE TenantId IN (${tenant.placeholders})
-          AND EndUserId = {endUserId:String}
-          AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
-          AND OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})
-          ${vkClause}
-      `,
-      query_params: {
-        ...tenant.params,
-        endUserId,
-        fromMs,
-        toMs,
-        ...(virtualKeyId !== undefined ? { virtualKeyId } : {}),
-      },
-      format: "JSONEachRow",
-      tenantIds,
-    });
-    const raw = (await result.json()) as Record<string, unknown>[];
+    let read = clickhouseRead({ scope: tenantScope.set({ tenantIds }) })
+      .from(spend)
+      .final()
+      .select({
+        SpendNanoUSD: fn.sum(spend.CostNanoUSD),
+        RequestCount: fn.count(),
+        SumTokensInput: fn.sum(spend.TokensInput),
+        SumTokensOutput: fn.sum(spend.TokensOutput),
+        SumTokensCacheRead: fn.sum(spend.TokensCacheRead),
+        SumTokensCacheWrite: fn.sum(spend.TokensCacheWrite),
+        SumTokensReasoning: fn.sum(spend.TokensReasoning),
+        SumTokensInputImage: fn.sum(spend.TokensInputImage),
+        SumTokensOutputImage: fn.sum(spend.TokensOutputImage),
+        SumImageCount: fn.sum(spend.ImageCount),
+      })
+      .where(({ and, eq, range }) =>
+        and(eq(spend.EndUserId, endUserId), range(spend.OccurredAt, { from: fromMs, until: toMs })),
+      );
+    if (virtualKeyId !== undefined) {
+      read = read.where(({ eq }) => eq(spend.VirtualKeyId, virtualKeyId));
+    }
+    const { rows: raw } = await client.read({ statement: read.build() });
     const row = raw[0];
     if (!row) return empty;
     const nano = parseSummedNanoUsd(row.SpendNanoUSD);
@@ -899,14 +882,14 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
       spendUsd: nanoUsdToDecimalString(nano),
       spendNanoUsd: nano,
       requestCount: Number(row.RequestCount ?? 0),
-      tokensInput: Number(row.TokensInput ?? 0),
-      tokensOutput: Number(row.TokensOutput ?? 0),
-      tokensCacheRead: Number(row.TokensCacheRead ?? 0),
-      tokensCacheWrite: Number(row.TokensCacheWrite ?? 0),
-      tokensReasoning: Number(row.TokensReasoning ?? 0),
-      tokensInputImage: Number(row.TokensInputImage ?? 0),
-      tokensOutputImage: Number(row.TokensOutputImage ?? 0),
-      imageCount: Number(row.ImageCount ?? 0),
+      tokensInput: Number(row.SumTokensInput ?? 0),
+      tokensOutput: Number(row.SumTokensOutput ?? 0),
+      tokensCacheRead: Number(row.SumTokensCacheRead ?? 0),
+      tokensCacheWrite: Number(row.SumTokensCacheWrite ?? 0),
+      tokensReasoning: Number(row.SumTokensReasoning ?? 0),
+      tokensInputImage: Number(row.SumTokensInputImage ?? 0),
+      tokensOutputImage: Number(row.SumTokensOutputImage ?? 0),
+      imageCount: Number(row.SumImageCount ?? 0),
     };
   }
 
@@ -949,66 +932,29 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
   }
 
   /**
-   * Cursor and filter predicates of a spend-events walk, as clause fragments already carrying
-   * their leading AND plus bound parameters. Each is optional; an absent filter contributes
-   * neither clause nor parameter, so the query never binds a placeholder it doesn't reference.
-   */
-  private static spendEventsWalkFilter({
-    decoded,
-    fromMs,
-    toMs,
-    filters,
-  }: {
-    decoded: spendCursors.GatewaySpendEventsCursor | null;
-    fromMs?: number;
-    toMs?: number;
-    filters: SpendFilters;
-  }): { clauses: string[]; params: Record<string, unknown> } {
-    const clauses: string[] = [];
-    const params: Record<string, unknown> = {};
-    if (decoded) {
-      clauses.push(
-        "AND (EventTimestamp, GatewayRequestId) > ({cursorEventTs:UInt64}, {cursorRequestId:String})",
-      );
-      params.cursorEventTs = decoded.eventTimestampMs;
-      params.cursorRequestId = decoded.gatewayRequestId;
-    }
-    if (fromMs !== undefined) {
-      clauses.push("AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})");
-      params.fromMs = fromMs;
-    }
-    if (toMs !== undefined) {
-      clauses.push("AND OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})");
-      params.toMs = toMs;
-    }
-    const filterSql = spendFilters.buildSpendFilterClauses({ filters });
-    clauses.push(...filterSql.clauses.map((clause) => `AND ${clause}`));
-    Object.assign(params, filterSql.params);
-    return { clauses, params };
-  }
-
-  /**
    * The bucket leads the grouping so a walk reads the window in time order,
    * which is the shape a caller charting spend expects a page to arrive in.
    */
   private static summaryDimensions({
     groupBy,
     bucket,
+    timezone,
   }: {
     groupBy: SpendGroupByKey[];
     bucket: SpendBucket;
+    timezone: string;
   }): SummaryDimension[] {
     const dimensions: SummaryDimension[] = [];
     if (bucket !== "none") {
       dimensions.push({
         alias: "GroupBucket",
-        expression: spendGrouping.bucketExpression({ bucket, timezoneParam: "timezone" }),
+        expression: spendBucketExpression({ bucket, timezone }),
       });
     }
     for (const [index, key] of groupBy.entries()) {
       dimensions.push({
         alias: `GroupKey${index}`,
-        expression: spendGrouping.groupByColumn(key),
+        expression: spend[spendGrouping.groupByColumn(key)],
       });
     }
     return dimensions;
@@ -1019,29 +965,28 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
    * walk without serving a boundary group twice. Arity mismatch is refused,
    * not dropped — dropping it would silently reset to page one.
    */
-  private static summariesWalkClause({
+  private static summariesWalkCondition({
     cursor,
     dimensions,
   }: {
     cursor: string[] | null;
     dimensions: SummaryDimension[];
-  }): { clause: string; params: Record<string, unknown> } | null {
+  }): SpendCondition | null {
     if (cursor === null) return null;
     if (cursor.length !== dimensions.length) {
       throw new Error(
         `cursor names a walk over ${cursor.length} dimension(s); this request groups by ${dimensions.length}`,
       );
     }
-    const left = dimensions.map((d) => d.expression).join(", ");
-    const right = cursor.map((_, index) => `{cursor${index}:String}`).join(", ");
-    const params: Record<string, unknown> = {};
-    cursor.forEach((part, index) => {
-      params[`cursor${index}`] = part;
-    });
-    return {
-      clause: dimensions.length === 1 ? `AND ${left} > ${right}` : `AND (${left}) > (${right})`,
-      params,
-    };
+    const [only] = dimensions;
+    if (dimensions.length === 1 && only !== undefined) {
+      return ({ gt }) => gt(only.expression, param.string(cursor[0]!));
+    }
+    return ({ gt }) =>
+      gt(
+        fn.tuple(...dimensions.map((dimension) => dimension.expression)),
+        fn.tuple(...cursor.map((part) => param.string(part))),
+      );
   }
 
   /**
@@ -1067,7 +1012,7 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
     groupBy: SpendGroupByKey[];
     bucket: SpendBucket;
   }): SpendSummaryRow {
-    const nano = parseSummedNanoUsd(raw.CostNanoUSD);
+    const nano = parseSummedNanoUsd(raw.SumCostNanoUSD);
     const group: Record<string, string> = {};
     for (const [index, key] of groupBy.entries()) {
       group[key] = ClickHouseGatewaySpendEventsRepository.grouped(raw, `GroupKey${index}`);
@@ -1081,14 +1026,14 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
           : ClickHouseGatewaySpendEventsRepository.grouped(raw, "GroupBucket"),
       eventCount: ClickHouseGatewaySpendEventsRepository.summed(raw, "EventCount"),
       settledCount: ClickHouseGatewaySpendEventsRepository.summed(raw, "SettledCount"),
-      tokensInput: ClickHouseGatewaySpendEventsRepository.summed(raw, "TokensInput"),
-      tokensOutput: ClickHouseGatewaySpendEventsRepository.summed(raw, "TokensOutput"),
-      tokensCacheRead: ClickHouseGatewaySpendEventsRepository.summed(raw, "TokensCacheRead"),
-      tokensCacheWrite: ClickHouseGatewaySpendEventsRepository.summed(raw, "TokensCacheWrite"),
-      tokensReasoning: ClickHouseGatewaySpendEventsRepository.summed(raw, "TokensReasoning"),
-      tokensInputImage: ClickHouseGatewaySpendEventsRepository.summed(raw, "TokensInputImage"),
-      tokensOutputImage: ClickHouseGatewaySpendEventsRepository.summed(raw, "TokensOutputImage"),
-      imageCount: ClickHouseGatewaySpendEventsRepository.summed(raw, "ImageCount"),
+      tokensInput: ClickHouseGatewaySpendEventsRepository.summed(raw, "SumTokensInput"),
+      tokensOutput: ClickHouseGatewaySpendEventsRepository.summed(raw, "SumTokensOutput"),
+      tokensCacheRead: ClickHouseGatewaySpendEventsRepository.summed(raw, "SumTokensCacheRead"),
+      tokensCacheWrite: ClickHouseGatewaySpendEventsRepository.summed(raw, "SumTokensCacheWrite"),
+      tokensReasoning: ClickHouseGatewaySpendEventsRepository.summed(raw, "SumTokensReasoning"),
+      tokensInputImage: ClickHouseGatewaySpendEventsRepository.summed(raw, "SumTokensInputImage"),
+      tokensOutputImage: ClickHouseGatewaySpendEventsRepository.summed(raw, "SumTokensOutputImage"),
+      imageCount: ClickHouseGatewaySpendEventsRepository.summed(raw, "SumImageCount"),
       costNanoUsd: nano,
       costUsd: nanoUsdToDecimalString(nano),
     };
@@ -1165,34 +1110,31 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
     projectIds: readonly string[];
     since?: number;
   }): Promise<GatewayUsageCount> {
-    const window =
-      since === undefined ? "" : "AND OccurredAt >= fromUnixTimestamp64Milli({since:Int64})";
     const perProject = await Promise.all(
       [...new Set(projectIds)].map(async (tenantId) => {
         const client = await this.resolveClient(tenantId);
-        const read = async (query: string) => {
-          const result = await client.query({
-            query,
-            query_params: since === undefined ? { tenantId } : { tenantId, since },
-            format: "JSONEachRow",
+        const scope = tenantScope.single({ tenantId });
+        let counting = clickhouseRead({ scope })
+          .from(spend)
+          .final()
+          .select({
+            Total: fn.toString(fn.count()),
+            SpendNanoUsd: fn.toString(fn.sum(spend.CostNanoUSD)),
           });
-          return usageRowsSchema.parse(await result.json())[0];
-        };
-        const [counted, earliest] = await Promise.all([
-          read(`
-            SELECT toString(count()) AS Total,
-                   toString(sum(CostNanoUSD)) AS SpendNanoUsd,
-                   '0' AS FirstMs
-            FROM ${TABLE} FINAL
-            WHERE TenantId = {tenantId:String}
-              ${window}`),
-          read(`
-            SELECT toString(count()) AS Total,
-                   '0' AS SpendNanoUsd,
-                   toString(toUnixTimestamp64Milli(min(OccurredAt))) AS FirstMs
-            FROM ${TABLE}
-            WHERE TenantId = {tenantId:String}`),
+        if (since !== undefined)
+          counting = counting.where(({ gte }) => gte(spend.OccurredAt, since));
+        const first = clickhouseRead({ scope })
+          .from(spend)
+          .select({
+            Total: fn.toString(fn.count()),
+            FirstMs: fn.toString(fn.toUnixTimestamp64Milli(fn.min(spend.OccurredAt))),
+          });
+        const [countedRows, earliestRows] = await Promise.all([
+          client.read({ statement: counting.build() }),
+          client.read({ statement: first.build() }),
         ]);
+        const [counted] = countedRowsSchema.parse(countedRows.rows);
+        const [earliest] = earliestRowsSchema.parse(earliestRows.rows);
         return {
           requests: Number.parseInt(counted?.Total ?? "0", 10),
           spendUsd: Number(counted?.SpendNanoUsd ?? "0") / NANO_PER_USD,

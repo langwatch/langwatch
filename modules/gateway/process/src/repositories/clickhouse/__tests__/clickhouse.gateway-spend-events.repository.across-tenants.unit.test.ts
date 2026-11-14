@@ -2,6 +2,7 @@
  * Spec: modules/webhook/specs/webhook-spend-events-read.feature,
  * specs/webhooks/webhook-endpoints.feature
  */
+import type { ReaderReadStatement } from "@langwatch/clickhouse-client/builder";
 import { describe, expect, it } from "vitest";
 
 import * as spendCursors from "../../../rules/gateway-spend-cursor.rules.ts";
@@ -35,20 +36,30 @@ function spendRow({
 function routedRepository(rowsByTenant: Record<string, ReturnType<typeof spendRow>[]>) {
   const statements: Statement[] = [];
   const repository = ClickHouseGatewaySpendEventsRepository.create(async (tenantId) => ({
-    read: () => Promise.reject(new Error("this fake answers raw statements only")),
-    async query({ query, query_params = {} }) {
-      statements.push({ tenantId, sql: query, params: query_params });
-      if (!/TenantId = \{tenantId:String\}/.test(query) || query_params.tenantId !== tenantId) {
-        throw new Error(`statement is not scoped to its routed tenant ${tenantId}`);
-      }
-      const statuses = query_params.statuses as string[];
-      const rows = (rowsByTenant[tenantId] ?? []).filter((row) => statuses.includes(row.Status));
-      return { json: async <T>() => rows as T[] };
+    async read({ statement }) {
+      const built = statement as ReaderReadStatement;
+      statements.push({ tenantId, sql: built.sql, params: { ...built.params } });
+      const scoped =
+        built.identity === "reader" &&
+        built.tenantId === tenantId &&
+        built.tenantIds === undefined &&
+        built.settings.SQL_langwatch_tenant_ids === tenantId &&
+        built.sql.includes("TenantId = {tenantId:String}");
+      if (!scoped) throw new Error(`statement is not scoped to its routed tenant ${tenantId}`);
+      const statuses = Object.values(built.params).find(
+        (value): value is string[] =>
+          Array.isArray(value) && value.every((each) => SPEND_STATUSES.has(each)),
+      );
+      const rows = (rowsByTenant[tenantId] ?? []).filter((row) => statuses?.includes(row.Status));
+      return { rows: rows as never[] };
     },
+    query: () => Promise.reject(new Error("spend reads are built statements")),
     insert: async () => undefined,
   }));
   return { repository, statements };
 }
+
+const SPEND_STATUSES = new Set(["admitted", "confirmed", "failed", "settled"]);
 
 describe("the spend-event reads across tenants", () => {
   /** @scenario "Every emitted-events statement names exactly one tenant" */
