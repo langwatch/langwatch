@@ -64,7 +64,8 @@ export class AiCallFailureService {
         featureDisplayName: feature.displayName,
         originalErrorMessage: firstLine,
         retryable,
-        ...(err instanceof Error ? { reasons: [err] } : {}),
+        // Only a handled cause carries a code worth keeping; a raw one is already logged above.
+        ...(HandledError.isHandled(err) ? { reasons: [err] } : {}),
       });
     }
   }
