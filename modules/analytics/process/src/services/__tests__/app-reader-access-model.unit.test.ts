@@ -28,7 +28,11 @@ const NAMED_COLLECTION: PostgresNamedCollection = {
 
 const READER_HASH = "b".repeat(64);
 
-function built(appReader?: { passwordSha256Hex: string; enforce?: boolean }) {
+function built(appReader?: {
+  passwordSha256Hex: string;
+  enforce?: boolean;
+  enforcing?: { passwordSha256Hex: string };
+}) {
   return accessModelDefinition.build({
     names: NAMES,
     passwordSha256Hex: "a".repeat(64),
@@ -76,7 +80,7 @@ describe("given the access-model definition built with the app reader's credenti
   });
 
   /** @scenario "The app reader's profile starts with an empty tenant set and pins the rest" */
-  it("starts the tenant set empty and pins enforce, caches and introspection CONST", () => {
+  it("starts the tenant set empty, pins enforce, the query cache and introspection CONST", () => {
     expect(reader.profile.settings).toEqual([
       {
         name: "SQL_langwatch_tenant_ids",
@@ -86,7 +90,6 @@ describe("given the access-model definition built with the app reader's credenti
       },
       { name: "SQL_langwatch_tenancy_enforce", value: "0", quoted: true, constraint: "const" },
       { name: "use_query_cache", value: 0, constraint: "const" },
-      { name: "use_query_condition_cache", value: 0, constraint: "const" },
       { name: "allow_introspection_functions", value: 0, constraint: "const" },
     ]);
     const enforcing = built({ passwordSha256Hex: READER_HASH, enforce: true }).appReader;
@@ -221,5 +224,64 @@ describe("given the access-model definition built with the app reader's credenti
     expect(yamlPolicyHolders.toSorted()).toEqual(
       [NAMES.restrictedUser, APP_READER_NAMES.user].toSorted(),
     );
+  });
+});
+
+describe("given the access-model definition built with the enforcing reader's credential", () => {
+  const ENFORCING_HASH = "c".repeat(64);
+  const definition = built({
+    passwordSha256Hex: READER_HASH,
+    enforcing: { passwordSha256Hex: ENFORCING_HASH },
+  });
+  const { appReader: reader, appReaderEnforcing: enforcing } = definition;
+  if (!reader || !enforcing) throw new Error("the definition carries no enforcing reader");
+  const ddl = accessModelDefinition.renderDdl(definition);
+  const usersD = load(accessModelDefinition.renderUsersD(definition)) as UsersD;
+  const enforceOf = (identity: typeof reader) =>
+    identity.profile.settings.find(({ name }) => name === APP_READER_NAMES.enforceSetting);
+
+  /** @scenario "The access model defines the shadow sampler's enforcing reader beside the app reader" */
+  it("defines the enforcing reader with enforce pinned on, leaving the app reader in shadow", () => {
+    expect(enforcing.user).toEqual({
+      name: "langwatch_app_reader_enforcing",
+      passwordSha256Hex: ENFORCING_HASH,
+    });
+    expect(enforcing.profile.name).toBe("langwatch_app_reader_enforcing_profile");
+    expect(enforceOf(enforcing)).toMatchObject({ value: "1", constraint: "const" });
+    expect(enforceOf(reader)).toMatchObject({ value: "0", constraint: "const" });
+    expect(enforcing.grants).toEqual(reader.grants);
+    expect(enforcing.rowPolicies.map(({ predicate }) => predicate)).toEqual(
+      reader.rowPolicies.map(({ predicate }) => predicate),
+    );
+    const withoutEnforcing = accessModelDefinition.renderDdl(
+      built({ passwordSha256Hex: READER_HASH }),
+    );
+    expect(ddl.slice(0, withoutEnforcing.length)).toEqual(withoutEnforcing);
+  });
+
+  /** @scenario "The access model defines the shadow sampler's enforcing reader beside the app reader" */
+  it("renders it from both emitters under policy names that never replace the app reader's", () => {
+    const readerNames = new Set(reader.rowPolicies.map(({ name }) => name));
+    for (const policy of enforcing.rowPolicies) {
+      expect(readerNames.has(policy.name)).toBe(false);
+      expect(ddl).toContain(
+        `CREATE ROW POLICY OR REPLACE ${policy.name} ON ${policy.database}.${policy.table}\n` +
+          `  USING ${policy.predicate}\n  TO langwatch_app_reader_enforcing`,
+      );
+    }
+    expect(ddl).toContain(
+      "CREATE USER OR REPLACE langwatch_app_reader_enforcing IDENTIFIED WITH sha256_hash BY " +
+        `'${ENFORCING_HASH}' SETTINGS PROFILE langwatch_app_reader_enforcing_profile`,
+    );
+    const yamlUser = usersD.users["langwatch_app_reader_enforcing"];
+    expect(yamlUser?.profile).toBe("langwatch_app_reader_enforcing_profile");
+    expect(yamlUser?.databases).toEqual(usersD.users[APP_READER_NAMES.user]?.databases);
+    expect(
+      String(
+        usersD.profiles["langwatch_app_reader_enforcing_profile"]?.[
+          APP_READER_NAMES.enforceSetting
+        ],
+      ),
+    ).toBe("'1'");
   });
 });

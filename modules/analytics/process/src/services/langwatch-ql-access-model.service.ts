@@ -180,6 +180,16 @@ export class LangWatchQLAccessModelService {
     return `${sqlText.assertIdentifier(table, "table")}_app_hidden`;
   }
 
+  /** The enforcing reader's own tenant policy, so it never replaces the app reader's. */
+  appReaderEnforcingPolicyName(table: string): string {
+    return `${sqlText.assertIdentifier(table, "table")}_app_enforcing_tenant`;
+  }
+
+  /** The policy hiding one system table from the enforcing reader. */
+  appReaderEnforcingHiddenPolicyName(table: string): string {
+    return `${sqlText.assertIdentifier(table, "table")}_app_enforcing_hidden`;
+  }
+
   /**
    * The LangWatchQL user's policy hiding one system table. Named per user, since the table is
    * server-wide: two installs sharing a server never replace each other's.

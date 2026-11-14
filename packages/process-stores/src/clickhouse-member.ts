@@ -21,7 +21,9 @@ import {
   routingDriver,
   setIdIndexMissLogger,
   setWindowedReadMetrics,
+  ShadowSampler,
   StatementReporter,
+  SystemIdentityAbsentErrorFactory,
   TenantGuard,
   vendorLoggerClassFor,
   type StatementMetrics,
@@ -39,7 +41,7 @@ import type { LimiterStats } from "@langwatch/limiter";
 import { createLogger } from "@langwatch/observability";
 import { counter, histogram, observableGauge } from "@langwatch/observability/metrics";
 
-import { clickhouseIdentitiesOf } from "./clickhouse-identities.ts";
+import { clickhouseIdentitiesOf, enforcingReaderIdentityOf } from "./clickhouse-identities.ts";
 import {
   authenticatedFromFile,
   ClickHousePasswordFile,
@@ -217,16 +219,57 @@ class ClickHouseSystemIdentityAbsentError extends HandledError {
     super("clickhouse_system_identity_absent", "This process cannot write analytics data", {
       httpStatus: 500,
       fault: "platform",
+      ...remediation("clickhouse_system_identity_absent"),
     });
     this.name = "ClickHouseSystemIdentityAbsentError";
   }
 }
 
-/** Satisfies `SystemIdentityAbsentErrorFactory` by shape until the index exports it. */
-export class SystemIdentityAbsentRefusal {
-  create({ operation, table }: { operation: IdentityOperation; table: string | undefined }) {
+export class SystemIdentityAbsentRefusal extends SystemIdentityAbsentErrorFactory {
+  create({
+    operation,
+    table,
+  }: {
+    operation: IdentityOperation;
+    table: string | undefined;
+  }): unknown {
     return new ClickHouseSystemIdentityAbsentError(operation, table);
   }
+}
+
+/**
+ * ADR-202 Rollout 3: sampled reader reads re-run on the enforcing identity, counted by table when
+ * the policy would hide rows. A private organisation is never sampled: its refusal is no failure.
+ */
+function shadowSamplerOf({
+  driver,
+  rate,
+}: {
+  driver: ReturnType<typeof routingDriver>;
+  rate: number;
+}): ShadowSampler {
+  const diverged = counter({
+    name: "clickhouse_shadow_divergence_total",
+    description: "Sampled ClickHouse reads whose enforced count differs from the rows returned",
+  });
+  const failed = counter({
+    name: "clickhouse_shadow_rerun_failed_total",
+    description: "Sampled ClickHouse reads whose enforcing re-run failed",
+  });
+  const logger = createLogger("langwatch:clickhouse:shadow");
+  return new ShadowSampler({
+    driver,
+    rate,
+    onDivergence: ({ table, returned, enforced }) => {
+      diverged.inc({ table });
+      logger.warn({ table, returned, enforced }, "the reader's policy would hide rows");
+    },
+    onFailure: ({ table, error }) => {
+      if (HandledError.isHandled(error) && error.code === "private_dataplane_unavailable") return;
+      failed.inc({ table });
+      logger.warn({ table, error }, "the enforcing re-run failed");
+    },
+  });
 }
 
 /** One entry per lane, so a saturated insert lane cannot hide behind an idle read lane. */
@@ -338,13 +381,15 @@ function connectIdentities({
   // The password file is the system user's; the reader's credential is in its URL.
   const system = identities.system && connect(identities.system, sharedPasswordFile);
   const reader = identities.reader && connect(identities.reader, undefined);
-  const connections = [system, reader].filter((each) => each !== undefined);
+  const enforcingIdentity = enforcingReaderIdentityOf({ config });
+  const enforcing = enforcingIdentity && connect(enforcingIdentity, undefined);
+  const connections = [system, reader, enforcing].filter((each) => each !== undefined);
   const [connection] = connections;
   const configuration = identities.system ?? identities.reader;
   if (connection === undefined || configuration === undefined) {
     throw new Error("ClickHouse names no endpoint for the system or the reader identity.");
   }
-  return { system, reader, connections, connection, configuration };
+  return { system, reader, enforcing, connections, connection, configuration };
 }
 
 /**
@@ -357,7 +402,8 @@ export function buildClickHouse(options: {
   directory: TenantDirectory;
 }): BuiltMember<ClickHouseQueryClient> {
   const { config } = options;
-  const { system, reader, connections, connection, configuration } = connectIdentities(options);
+  const { system, reader, enforcing, connections, connection, configuration } =
+    connectIdentities(options);
   const routes = system === undefined ? config.readerPrivateRoutes : config.privateRoutes;
   const malformedRoutes =
     system === undefined ? config.malformedReaderRoutes : config.malformedRoutes;
@@ -407,6 +453,14 @@ export function buildClickHouse(options: {
     unavailableErrorFactory: new UnavailableRefusal(),
     overloadErrorFactory: new OverloadedRefusal(),
     systemIdentityAbsentErrorFactory: new SystemIdentityAbsentRefusal(),
+    ...(enforcing === undefined || reader === undefined
+      ? {}
+      : {
+          shadowSampler: shadowSamplerOf({
+            driver: routingDriver(enforcing),
+            rate: config.shadowSampleRate ?? 0,
+          }),
+        }),
     privateRoutes: new Map((routes ?? []).map((route) => [route.organizationId, route.url])),
     privateRouteVariables: [
       ...(routes ?? []).flatMap(({ organizationId, label, variable }) =>

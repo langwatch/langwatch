@@ -53,6 +53,40 @@ export function clickhouseIdentitiesOf({
   return { system: resolve(system, reader), reader: resolve(reader, system) };
 }
 
+/** One socket: the shadow sampler re-runs one read at a time. */
+const ENFORCING_READER_POOL = { override: 1 };
+
+/**
+ * The shadow sampler's enforcing reader (ADR-202 Rollout 3): the shared server only, and only
+ * when sampling is on. Every private organisation is refused, never re-run on the shared server.
+ */
+export function enforcingReaderIdentityOf({
+  config,
+}: {
+  config: ClickHouseConfig;
+}): ClickHouseConfiguration | undefined {
+  const url = config.enforcingReaderUrl?.trim();
+  if (!url || !((config.shadowSampleRate ?? 0) > 0)) return undefined;
+  const privateOrganizations = [
+    ...(config.privateRoutes ?? []),
+    ...(config.malformedRoutes ?? []),
+    ...(config.readerPrivateRoutes ?? []),
+    ...(config.malformedReaderRoutes ?? []),
+  ];
+  return ClickHouseConfigService.create().resolve({
+    shared: { url, cluster: "shared" },
+    privateRoutes: [],
+    missingPrivateRoutes: privateOrganizations.map(({ organizationId }) => ({
+      organizationId,
+      variable: ENFORCING_READER_SHARED_ONLY,
+    })),
+    poolSizing: ENFORCING_READER_POOL,
+  });
+}
+
+/** What a private organisation's refusal names: the enforcing reader has no route family. */
+const ENFORCING_READER_SHARED_ONLY = "CLICKHOUSE_ENFORCING_READER_URL (shared server only)";
+
 function holdsEndpoint(identity: IdentityEndpoints): boolean {
   return identity.url !== undefined || identity.routes.length > 0;
 }

@@ -78,6 +78,11 @@ export const storesOwner = {
       serverNodes: c.env("CLICKHOUSE_SERVER_NODES", z.coerce.number().optional()),
       clientsPerProcess: c.env("CLICKHOUSE_CLIENTS_PER_PROCESS", z.coerce.number().optional()),
     },
+    /** Share of app reader reads re-run on the enforcing reader (ADR-202 Rollout 3); 0 is off. */
+    clickhouseShadowSampleRate: c.env(
+      "CLICKHOUSE_SHADOW_SAMPLE_RATE",
+      z.coerce.number().min(0).max(1).default(0),
+    ),
     /** Each of reads and inserts keeps this share of the statement slots for itself. */
     clickhouseStatementLaneReserveShare: c.env(
       "CLICKHOUSE_STATEMENT_LANE_RESERVE_SHARE",
@@ -127,6 +132,8 @@ export const storesOwner = {
     clickhouseReader: Secret.load("CLICKHOUSE_READER_URL", { optional: true }),
     /** `CLICKHOUSE_READER_URL__<label>__<orgId>`: the app reader on each organization's server. */
     clickhouseReaderRoutes: Secret.family(READER_ROUTE_ENV_PREFIX),
+    /** The shadow sampler's reader, enforcement pinned on; read only while sampling is on. */
+    clickhouseEnforcingReader: Secret.load("CLICKHOUSE_ENFORCING_READER_URL", { optional: true }),
     redis: Secret.load("REDIS_URL", { optional: true }),
     /** The previous release's cluster Redis: endpoints read instead of REDIS_URL when set. */
     redisClusterEndpoints: Secret.load("REDIS_CLUSTER_ENDPOINTS", { optional: true }),

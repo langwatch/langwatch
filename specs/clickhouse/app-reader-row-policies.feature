@@ -20,11 +20,20 @@ Feature: ClickHouse row policies bound the application's reads to the request's 
     And the LangWatchQL user, profile, grants and policies are the ones it renders without the reader
 
   @unit
+  Scenario: The access model defines the shadow sampler's enforcing reader beside the app reader
+    Given the access-model definition built with the app reader's and the enforcing reader's credentials
+    Then it defines the user "langwatch_app_reader_enforcing" carrying the profile "langwatch_app_reader_enforcing_profile"
+    And that profile pins "SQL_langwatch_tenancy_enforce" to 1 CONST while the app reader's stays as asked
+    And it holds the app reader's grants and predicates under policy names of its own, from both emitters
+    And everything rendered without it is unchanged
+
+  @unit
   Scenario: The app reader's profile starts with an empty tenant set and pins the rest
     Given the app reader's settings profile
     Then "SQL_langwatch_tenant_ids" defaults to empty and stays changeable per query
     And "SQL_langwatch_tenancy_enforce" is pinned CONST at 0 unless the target enforces
-    And "use_query_cache", "use_query_condition_cache" and "allow_introspection_functions" are pinned CONST at 0
+    And "use_query_cache" and "allow_introspection_functions" are pinned CONST at 0
+    And "use_query_condition_cache" is not pinned, so the server's default leaves it on
 
   @unit
   Scenario: Every app reader row policy admits only the request's tenants once enforced
@@ -126,9 +135,9 @@ Feature: ClickHouse row policies bound the application's reads to the request's 
     Then it reads every tenant's rows
 
   @integration
-  Scenario: The reader cannot change the enforce switch or the cache pins
+  Scenario: The reader cannot change the enforce switch or the query cache pin
     Given the app reader provisioned from the rendered DDL
-    When the reader sets "SQL_langwatch_tenancy_enforce" or "use_query_condition_cache" to another value, per request or in a SETTINGS clause
+    When the reader sets "SQL_langwatch_tenancy_enforce" or "use_query_cache" to another value, per request or in a SETTINGS clause
     Then ClickHouse refuses the query with a setting constraint violation
 
   @integration
@@ -142,3 +151,27 @@ Feature: ClickHouse row policies bound the application's reads to the request's 
     Given the app reader provisioned from the rendered DDL with enforce pinned to 1
     When the reader's read of a table ordered by its tenant column is explained with its indexes
     Then the primary key selects fewer granules than the table holds
+
+  # ---------------------------------------------------------------------------
+  # Slice 3 on ClickHouse 26.8 (ADR-202 Decided 8, 10)
+  # ---------------------------------------------------------------------------
+
+  @integration
+  Scenario: Every materialised view fires on a system-identity insert once the readers' policies exist
+    Given the shipped migrations on ClickHouse 26.8
+    When the system identity inserts one row into each view's source, before and after both readers' policies are provisioned
+    Then every view writes the same rows after as before
+    And every view writes at least one row
+
+  @integration
+  Scenario: Neither reader holds an INSERT grant
+    Given the app reader and the enforcing reader provisioned
+    When either inserts into a tenant table naming its tenant
+    Then it is refused with access denied, code 497
+
+  @integration
+  Scenario: The query condition cache never crosses tenants under the setting-keyed policy
+    Given the app reader enforcing with "use_query_condition_cache" on
+    When tenants A and B interleave the same statement with a WHERE, a PREWHERE or only the policy filtering
+    Then each answer is exactly that tenant's rows
+    And the reader's statements consulted the condition cache, which a control statement hits

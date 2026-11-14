@@ -103,11 +103,14 @@ function objectStorageConfig(options: {
 interface ClickHouseReaderSecrets {
   readonly url: string | undefined;
   readonly routes: ReturnType<typeof clickhouseRouteFamilyOf>;
+  /** The shadow sampler's enforcing reader on the shared server. */
+  readonly enforcingUrl: string | undefined;
 }
 
 function readerConfigOf(reader: ClickHouseReaderSecrets) {
   return {
     ...(reader.url ? { readerUrl: reader.url } : {}),
+    ...(reader.enforcingUrl ? { enforcingReaderUrl: reader.enforcingUrl } : {}),
     ...(reader.routes.routes.length > 0 ? { readerPrivateRoutes: reader.routes.routes } : {}),
     ...(reader.routes.malformed.length > 0
       ? { malformedReaderRoutes: reader.routes.malformed }
@@ -138,6 +141,7 @@ function clickhouseConfigOf({
             ? { malformedRoutes: clickhouseRoutes.malformed }
             : {}),
           poolSizing: config.clickhousePool,
+          shadowSampleRate: config.clickhouseShadowSampleRate,
           ...(config.clickhouseStatementLaneReserveShare === undefined
             ? {}
             : { statementLaneReserveShare: config.clickhouseStatementLaneReserveShare }),
@@ -218,31 +222,34 @@ export function openStores(options: {
       secrets.into(storesOwner.secrets.clickhouseRoutes, (routes) =>
         secrets.into(storesOwner.secrets.clickhouseReader, (readerUrl) =>
           secrets.into(storesOwner.secrets.clickhouseReaderRoutes, (readerRoutes) =>
-            secrets.into(storesOwner.secrets.redis, (redis) =>
-              secrets.into(storesOwner.secrets.redisClusterEndpoints, (redisClusterEndpoints) =>
-                secrets.into(storesOwner.secrets.encryption, (credentials) =>
-                  secrets.into(storesOwner.secrets.encryptionFallback, (session) =>
-                    secrets.into(storesOwner.secrets.encryptionPrevious, (previous) =>
-                      withStorageSecrets(secrets, (storage) =>
-                        buildProcessStores({
-                          config: processConfigOf({
-                            name,
-                            config,
-                            pipelines,
-                            urls: { database, clickhouse, redis, redisClusterEndpoints },
-                            clickhouseRoutes: clickhouseRouteFamilyOf(routes),
-                            clickhouseReader: {
-                              url: readerUrl,
-                              routes: clickhouseRouteFamilyOf(readerRoutes, {
-                                prefix: READER_ROUTE_ENV_PREFIX,
-                              }),
-                            },
-                            encryption: credentials ?? session,
-                            previousEncryption: previous,
-                            storage,
-                            production,
+            secrets.into(storesOwner.secrets.clickhouseEnforcingReader, (enforcingUrl) =>
+              secrets.into(storesOwner.secrets.redis, (redis) =>
+                secrets.into(storesOwner.secrets.redisClusterEndpoints, (redisClusterEndpoints) =>
+                  secrets.into(storesOwner.secrets.encryption, (credentials) =>
+                    secrets.into(storesOwner.secrets.encryptionFallback, (session) =>
+                      secrets.into(storesOwner.secrets.encryptionPrevious, (previous) =>
+                        withStorageSecrets(secrets, (storage) =>
+                          buildProcessStores({
+                            config: processConfigOf({
+                              name,
+                              config,
+                              pipelines,
+                              urls: { database, clickhouse, redis, redisClusterEndpoints },
+                              clickhouseRoutes: clickhouseRouteFamilyOf(routes),
+                              clickhouseReader: {
+                                url: readerUrl,
+                                routes: clickhouseRouteFamilyOf(readerRoutes, {
+                                  prefix: READER_ROUTE_ENV_PREFIX,
+                                }),
+                                enforcingUrl,
+                              },
+                              encryption: credentials ?? session,
+                              previousEncryption: previous,
+                              storage,
+                              production,
+                            }),
                           }),
-                        }),
+                        ),
                       ),
                     ),
                   ),

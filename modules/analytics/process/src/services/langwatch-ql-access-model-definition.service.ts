@@ -80,7 +80,15 @@ export interface LwqlAccessModelDefinition extends LwqlAccessIdentity {
   readonly namedCollectionAliases: readonly string[];
   /** The application's restricted reader (ADR-202), once its credential is supplied. */
   readonly appReader?: LwqlAccessIdentity;
+  /** The shadow sampler's reader: the app reader's policies with enforce pinned on. */
+  readonly appReaderEnforcing?: LwqlAccessIdentity;
 }
+
+/** The shadow sampler's identity (ADR-202 Rollout 3), named after the app reader it checks. */
+const APP_READER_ENFORCING_NAMES = {
+  user: `${APP_READER_NAMES.user}_enforcing`,
+  settingsProfile: `${APP_READER_NAMES.user}_enforcing_profile`,
+} as const;
 
 export interface RenderedConfigFile {
   readonly relativePath: string;
@@ -194,9 +202,9 @@ export class LangWatchQLAccessModelDefinitionService {
   }
 
   /**
-   * The app reader's tenant set starts empty and stays the client's to set; the enforce switch
-   * and the cache and introspection pins are `CONST` (ADR-200: the condition cache crossed
-   * tenants).
+   * The app reader's tenant set starts empty and stays the client's to set; the enforce switch,
+   * the query cache and introspection are `CONST`. The condition cache stays on (ADR-202 Decided
+   * 10): app-reader-identity.integration.test.ts proves it keeps tenants apart on 26.8.
    */
   appReaderProfileSettings({ enforce }: { enforce: boolean }): LwqlProfileSetting[] {
     return [
@@ -213,7 +221,6 @@ export class LangWatchQLAccessModelDefinitionService {
         constraint: "const",
       },
       { name: "use_query_cache", value: 0, constraint: "const" },
-      { name: "use_query_condition_cache", value: 0, constraint: "const" },
       { name: "allow_introspection_functions", value: 0, constraint: "const" },
     ];
   }
@@ -235,8 +242,15 @@ export class LangWatchQLAccessModelDefinitionService {
     sourceDatabase: string;
     limits?: LangWatchQLResourceLimits;
     views?: readonly LangWatchQLViewDefinition[];
-    /** The app reader's credential hash; `enforce` defaults to shadow (ADR-202 Rollout). */
-    appReader?: { passwordSha256Hex: string; enforce?: boolean };
+    /**
+     * The app reader's credential hash; `enforce` defaults to shadow (ADR-202 Rollout). With
+     * `enforcing`, the shadow sampler's reader too, its profile pinning enforce on.
+     */
+    appReader?: {
+      passwordSha256Hex: string;
+      enforce?: boolean;
+      enforcing?: { passwordSha256Hex: string };
+    };
   }): LwqlAccessModelDefinition {
     return {
       customSettingsPrefix: LWQL_CUSTOM_SETTINGS_PREFIX,
@@ -247,15 +261,20 @@ export class LangWatchQLAccessModelDefinitionService {
       namedCollection,
       namedCollectionAliases,
       ...(appReader ? { appReader: this.#appReader({ ...appReader, sourceDatabase }) } : {}),
+      ...(appReader?.enforcing
+        ? {
+            appReaderEnforcing: this.#appReaderEnforcing({
+              ...appReader.enforcing,
+              sourceDatabase,
+            }),
+          }
+        : {}),
     };
   }
 
   /** Per identity, LangWatchQL's first: profile, user, row policies, then grants. */
   renderDdl(definition: LwqlAccessModelDefinition): string[] {
-    return [
-      ...this.#identityDdl(definition),
-      ...(definition.appReader ? this.#identityDdl(definition.appReader) : []),
-    ];
+    return identitiesOf(definition).flatMap((identity) => this.#identityDdl(identity));
   }
 
   /** Profile, user, row policies, then grants — the order a SQL access store needs. */
@@ -319,7 +338,7 @@ export class LangWatchQLAccessModelDefinitionService {
   renderUsersD(definition: LwqlAccessModelDefinition): string {
     const profiles: Record<string, YamlValue> = {};
     const users: Record<string, YamlValue> = {};
-    for (const identity of [definition, ...(definition.appReader ? [definition.appReader] : [])]) {
+    for (const identity of identitiesOf(definition)) {
       const settings: Record<string, YamlValue> = {};
       const constraints: Record<string, YamlValue> = {};
       for (const setting of identity.profile.settings) {
@@ -466,24 +485,72 @@ export class LangWatchQLAccessModelDefinitionService {
     enforce?: boolean;
     sourceDatabase: string;
   }): LwqlAccessIdentity {
+    return this.#tenantReader({
+      names: APP_READER_NAMES,
+      passwordSha256Hex,
+      enforce,
+      sourceDatabase,
+      policyName: (table) => accessModel.appReaderPolicyName(table),
+      hiddenPolicyName: (table) => accessModel.appReaderHiddenPolicyName(table),
+    });
+  }
+
+  /** The app reader's grants and policies under its own names, enforce pinned on. */
+  #appReaderEnforcing({
+    passwordSha256Hex,
+    sourceDatabase,
+  }: {
+    passwordSha256Hex: string;
+    sourceDatabase: string;
+  }): LwqlAccessIdentity {
+    return this.#tenantReader({
+      names: APP_READER_ENFORCING_NAMES,
+      passwordSha256Hex,
+      enforce: true,
+      sourceDatabase,
+      policyName: (table) => accessModel.appReaderEnforcingPolicyName(table),
+      hiddenPolicyName: (table) => accessModel.appReaderEnforcingHiddenPolicyName(table),
+    });
+  }
+
+  #tenantReader({
+    names,
+    passwordSha256Hex,
+    enforce,
+    sourceDatabase,
+    policyName,
+    hiddenPolicyName,
+  }: {
+    names: { readonly user: string; readonly settingsProfile: string };
+    passwordSha256Hex: string;
+    enforce: boolean;
+    sourceDatabase: string;
+    policyName: (table: string) => string;
+    hiddenPolicyName: (table: string) => string;
+  }): LwqlAccessIdentity {
     return {
-      user: { name: APP_READER_NAMES.user, passwordSha256Hex },
+      user: { name: names.user, passwordSha256Hex },
       profile: {
-        name: APP_READER_NAMES.settingsProfile,
+        name: names.settingsProfile,
         settings: this.appReaderProfileSettings({ enforce }),
       },
       grants: APP_READER_TENANT_TABLES.map(({ table }) => ({ database: sourceDatabase, table })),
       rowPolicies: [
         ...APP_READER_TENANT_TABLES.map(({ table, tenantColumn }) => ({
-          name: accessModel.appReaderPolicyName(table),
+          name: policyName(table),
           database: sourceDatabase,
           table,
           predicate: accessModel.appReaderTenantPredicate({ tenantColumn }),
         })),
-        ...this.#hiddenSystemTablePolicies({
-          policyName: (table) => accessModel.appReaderHiddenPolicyName(table),
-        }),
+        ...this.#hiddenSystemTablePolicies({ policyName: hiddenPolicyName }),
       ],
     };
   }
+}
+
+/** LangWatchQL's identity first, then each reader the definition carries. */
+function identitiesOf(definition: LwqlAccessModelDefinition): LwqlAccessIdentity[] {
+  return [definition, definition.appReader, definition.appReaderEnforcing].filter(
+    (identity) => identity !== undefined,
+  );
 }

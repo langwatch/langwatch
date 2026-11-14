@@ -59,6 +59,10 @@ export interface ClickHouseConfig {
   readonly readerPrivateRoutes?: readonly ClickHousePrivateRoute[];
   /** Reader route variables that did not parse: refused, never shared. */
   readonly malformedReaderRoutes?: readonly MalformedPrivateVariable[];
+  /** `CLICKHOUSE_ENFORCING_READER_URL`: the shared server as the shadow sampler's reader. */
+  readonly enforcingReaderUrl?: string;
+  /** `CLICKHOUSE_SHADOW_SAMPLE_RATE`: share of reader reads re-run enforced; 0 samples none. */
+  readonly shadowSampleRate?: number;
   /** What sizes the per-endpoint pool, as main's `CLICKHOUSE_*` pool variables state it. */
   readonly poolSizing?: PoolSizingInput;
   /** How long one statement may take before the driver abandons it. */

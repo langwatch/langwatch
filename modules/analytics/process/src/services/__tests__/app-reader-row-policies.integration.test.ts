@@ -339,11 +339,9 @@ describe("given the app reader provisioned from the rendered DDL", () => {
         {},
         ` SETTINGS ${APP_READER_NAMES.enforceSetting} = 0`,
       ],
-      ["the condition cache per request", { use_query_condition_cache: "1" }, ""],
-      ["the condition cache in a SETTINGS clause", {}, " SETTINGS use_query_condition_cache = 1"],
       ["the query cache in a SETTINGS clause", {}, " SETTINGS use_query_cache = 1"],
     ];
-    /** @scenario "The reader cannot change the enforce switch or the cache pins" */
+    /** @scenario "The reader cannot change the enforce switch or the query cache pin" */
     it.each(overrides)("refuses %s", async (_name, settings, clause) => {
       await expect(
         reader.query({

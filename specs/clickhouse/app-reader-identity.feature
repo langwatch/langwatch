@@ -143,6 +143,33 @@ Feature: The ClickHouse client sends reads as the app reader and everything else
     When the sampler is constructed
     Then it is refused with a range error
 
+  @unit
+  Scenario: The stores re-run sampled reads on the enforcing reader and count a divergence by table
+    Given "CLICKHOUSE_SHADOW_SAMPLE_RATE" above 0 and "CLICKHOUSE_ENFORCING_READER_URL" set
+    When a tenant read answers on the reader with more rows than the enforcing count
+    Then the count re-run is sent on the enforcing reader with the read's tenant setting
+    And "clickhouse_shadow_divergence_total" counts it by table
+    And the system identity receives nothing
+
+  @unit
+  Scenario: The shadow sampler is off unless a rate and the enforcing reader are configured
+    Given "CLICKHOUSE_SHADOW_SAMPLE_RATE" unset, which reads as 0, or no "CLICKHOUSE_ENFORCING_READER_URL"
+    When a tenant read answers on the reader
+    Then nothing is sent to the enforcing reader
+
+  @unit
+  Scenario: A shadow sample rate outside 0 to 1 is refused at boot
+    Given "CLICKHOUSE_SHADOW_SAMPLE_RATE" set to 5
+    When the stores' configuration is parsed
+    Then it is refused naming "CLICKHOUSE_SHADOW_SAMPLE_RATE"
+
+  @unit
+  Scenario: The shadow sampler never re-runs a private organisation's read on the shared server
+    Given the shadow sampler on and an organisation routed to its own server
+    When that organisation's read answers on its reader route
+    Then nothing is sent to the enforcing reader on the shared server
+    And no re-run failure is counted for it
+
   # ---------------------------------------------------------------------------
   # Configuration
   # ---------------------------------------------------------------------------

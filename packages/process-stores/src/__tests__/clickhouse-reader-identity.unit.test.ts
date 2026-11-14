@@ -20,6 +20,7 @@ const storesConfig: StoresConfig = {
   queueGlobalBudget: undefined,
   clickhouseStatementLaneReserveShare: undefined,
   clickhousePasswordFile: undefined,
+  clickhouseShadowSampleRate: 0,
   clickhousePool: {
     override: undefined,
     replicas: undefined,

@@ -90,7 +90,7 @@ Keeping the exempt identity narrow:
 
 1. **Allow the setting prefix.** `custom_settings_prefixes` must include `SQL_` on every target. ClickHouse Cloud accepts `SQL_` (to confirm per service); the rendered config adds it beside `custom_`; the BYO prerequisites in `charts/langwatch/README.md` gain a row.
 2. **Provision users and policies in shadow.** The policy predicate is `getSetting('SQL_langwatch_tenancy_enforce') = 0 OR <tenant predicate>`, with `SQL_langwatch_tenancy_enforce` pinned `CONST` in the reader profile (0 in shadow, 1 when enforcing). The client cannot flip it per query; the switch is a profile change per target.
-3. **Measure in shadow.** Three signals:
+3. **Measure in shadow.** Three signals (the sampler reports by table, `clickhouse_shadow_divergence_total{table}`, because the client carries no statement name):
    - every read the client sends without a tenant set (a counter by statement name; should already be zero because the client refuses it);
    - a sampled re-run of a fraction of reads as `SELECT count()` over the same statement on a second identity whose profile pins enforce to 1, logged with the statement name when the counts differ ("rows the policy would hide");
    - CI and integration suites run with enforce on from the first slice, so a missing tenant in a test fails at once.
@@ -152,7 +152,7 @@ Migration path: about 139 non-test TypeScript files under ClickHouse repository 
 7. Shared and braid windows, braid conditions and the held-trace semi-join stay in the builder for good; the policy bounds only the tenant set.
 8. Inserts and the materialised views they trigger stay on the system identity. The reader holds `SELECT` only.
 9. The builder is hand-written in `packages/clickhouse-client`; no query-builder library.
-10. The reader requires ClickHouse 26.8 and leaves `use_query_condition_cache` on, once an isolation test on 26.8 proves the cache does not cross tenants under the setting-keyed policy. Until that test passes the pin stays.
+10. The reader requires ClickHouse 26.8 and leaves `use_query_condition_cache` on, once an isolation test on 26.8 proves the cache does not cross tenants under the setting-keyed policy. Proven on 26.8.34.13 (`app-reader-identity.integration.test.ts`): the app reader's pin is removed; the LangWatchQL pin stays under ADR-200. The cache recorded no reader hits in that run, so its benefit is still unmeasured.
 11. Every slice lands in one PR (#9549).
 12. The api's three ClickHouse inserts move to the worker: the governance OTLP spend debit, `POST /api/dspy/log_steps` and instant-eval run create. The api becomes a pure reader with no write credential. DSPy step logging becomes asynchronous and spend debits reach the ledger through the queue (Alex, 2026-11-14).
 13. Data retention's api writes move to the worker too: applying a retention change to existing rows (`ALTER TABLE ... UPDATE`), cancelling it (`KILL MUTATION`) and reading its progress (`system.mutations`). Apply and cancel return once accepted; the worker keeps a progress status per project that the api reads. The governance workspace-view audit insert follows the same principle through its existing worker path (Alex, 2026-11-14).
