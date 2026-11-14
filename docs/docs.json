@@ -848,6 +848,12 @@
             ]
           },
           {
+            "group": "Agent Registry",
+            "pages": [
+              "governance/agent-registry"
+            ]
+          },
+          {
             "group": "Privacy",
             "pages": [
               "ai-governance/no-spy-mode"
@@ -1437,6 +1443,19 @@
               "api-reference/agents/action-test",
               "api-reference/agents/remove-a-deploy-label-from-an-agent",
               "api-reference/agents/delete-agents"
+            ]
+          },
+          {
+            "group": "Agent Registry",
+            "pages": [
+              "api-reference/governance-agent-registry/overview",
+              "api-reference/governance-agent-registry/list-the-organisation-s-agent-registry",
+              "api-reference/governance-agent-registry/get-the-registry-as-an-ard-manifest",
+              "api-reference/governance-agent-registry/read-the-registry-change-feed",
+              "api-reference/governance-agent-registry/get-the-registry-s-json-schemas",
+              "api-reference/governance-agent-registry/search-the-registry-ard-search",
+              "api-reference/governance-agent-registry/get-one-registry-agent",
+              "api-reference/governance-agent-registry/list-one-registry-agent-s-versions"
             ]
           },
           {

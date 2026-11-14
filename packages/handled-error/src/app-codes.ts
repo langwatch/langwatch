@@ -55,6 +55,7 @@ export const APP_ERROR_CODES = [
   "agent_payload_too_large",
   "agent_register_only",
   "agent_register_refused",
+  "agent_registry_entry_not_found",
   "agent_report_rate_limited",
   "agent_session_unknown",
   "agent_test_refused",

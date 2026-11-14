@@ -193,6 +193,9 @@ export const prismaTableCatalogue = {
   "StoredObject": "StoredObject",
   "DiscoveredPerson": "DiscoveredPerson",
   "DiscoveredAgent": "DiscoveredAgent",
+  "AgentRegistryEntry": "AgentRegistryEntry",
+  "AgentRegistryEvent": "AgentRegistryEvent",
+  "AgentRegistryBaseline": "AgentRegistryBaseline",
   "IdentityMatch": "IdentityMatch",
   "GovernanceTenantHistory": "GovernanceTenantHistory",
   "ErasedIdentifierSuppression": "ErasedIdentifierSuppression",
@@ -3159,6 +3162,37 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt"
   ],
+  "AgentRegistryEntry": [
+    "id",
+    "organizationId",
+    "sourceKey",
+    "source",
+    "status",
+    "version",
+    "fingerprint",
+    "entry",
+    "firstSeenAt",
+    "lastSeenAt",
+    "removedAt",
+    "createdAt",
+    "updatedAt"
+  ],
+  "AgentRegistryEvent": [
+    "id",
+    "organizationId",
+    "sequence",
+    "type",
+    "entryId",
+    "fromVersion",
+    "toVersion",
+    "payload",
+    "occurredAt",
+    "deliveryRecordedAt"
+  ],
+  "AgentRegistryBaseline": [
+    "organizationId",
+    "baselinedAt"
+  ],
   "IdentityMatch": [
     "id",
     "organizationId",
@@ -3926,6 +3960,9 @@ export const prismaRelationCatalogue = {
   "StoredObject": {},
   "DiscoveredPerson": {},
   "DiscoveredAgent": {},
+  "AgentRegistryEntry": {},
+  "AgentRegistryEvent": {},
+  "AgentRegistryBaseline": {},
   "IdentityMatch": {},
   "GovernanceTenantHistory": {},
   "ErasedIdentifierSuppression": {},

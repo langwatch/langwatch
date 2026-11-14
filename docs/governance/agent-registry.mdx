@@ -1,0 +1,202 @@
+---
+title: Agent registry
+description: A machine-readable registry of every AI agent in your organization, served as REST, as an ARD v0.91 manifest, as a change feed and as signed webhooks.
+sidebarTitle: Agent registry
+keywords: agent registry, ARD, agentic resource discovery, agent inventory, shadow AI, webhooks, governance
+---
+
+The agent registry lists every agent LangWatch can see in your organization, with its endpoints, model configuration, system instructions, tools and owner. It updates on its own as agents change, and it pushes each change to your webhook endpoints. You read it with an organization API key, as JSON over REST or as an [Agentic Resource Discovery (ARD) v0.91](https://github.com/ards-project/ard-spec) manifest.
+
+## Where entries come from
+
+| Source | `source` | `management` | What LangWatch knows about the agent |
+|---|---|---|---|
+| Agents defined in your projects | `langwatch` | `managed` | Name, type, project, environment, owner, endpoints, model and its parameters, system prompt, input and output schemas, version |
+| [Ingestion sources](/ai-governance/ingestion-sources/index) that list agents | `databricks`, `copilot_studio` | `discovered` | Name, provider id, the provider's workspace or environment URL, the provider's last modified time |
+| Your traces and gateway calls | `traffic` | `observed` | Any `gen_ai.agent.name` on a span in the last 30 days, with `gen_ai.agent.id` and `gen_ai.request.model` when present |
+
+A traced agent is matched to a listed one when its `gen_ai.agent.id` equals a LangWatch agent id or a provider's agent id (such as a Databricks Genie space id), or when its name equals, ignoring case, the name of a LangWatch agent in the same project or of an agent listed by an ingestion source. A traced agent with no match is registered with `shadow: true` and a `governance.agent.flagged_shadow` event. That is how agents running outside your inventory show up.
+
+A LangWatch agent that is archived or deleted, and a traced agent that has sent no traffic for 30 days, is kept with `status: "removed"`; entries are never deleted. Agents from ingestion sources stay active once listed. A traced agent that a listed agent now matches is also removed, and the listed entry takes its place. Each reconcile reads the 200 busiest agent names of each project; an agent past that count is registered once it is among them.
+
+## Authentication
+
+The agent registry is part of the Enterprise plan. On other plans every route answers `402` with code `enterprise_plan_required`, and the registry is not built.
+
+Every route takes an organization API key in `Authorization: Bearer <key>`. The key needs the `governance:view` permission, which organization admins hold. A key without it gets `403`.
+
+## Endpoints
+
+| Method and path | Returns |
+|---|---|
+| `GET /api/governance/registry/agents` | The registry, a page at a time |
+| `GET /api/governance/registry/agents/{id}` | One entry |
+| `GET /api/governance/registry/agents/{id}/versions` | The change events of one entry, oldest first, paged like the change feed |
+| `GET /api/governance/registry/events` | The change feed, in order; pass `cursor` to read after a sequence |
+| `GET /api/governance/registry/ard.json` | The registry as an ARD v0.91 manifest |
+| `POST /api/governance/registry/ard/search` | ARD search |
+| `GET /api/governance/registry/schema` | JSON Schema (draft 2020-12) of an entry and of an event |
+
+Each path also answers under `/api/v1/governance/registry/...`. The routes are in the OpenAPI document under the tag **Governance / Agent Registry**.
+
+### Listing entries
+
+Query parameters: `limit` (1 to 200, default 50), `cursor` (the `next_cursor` of the previous page), `updated_since` (an ISO-8601 instant; returns entries changed at or after it) and `status` (`active` or `removed`). Entries are ordered by their last change, oldest first, so a client that stores the last `updated_at` it saw can poll with `updated_since`.
+
+```bash
+curl -s "$LANGWATCH_ENDPOINT/api/governance/registry/agents?limit=50" \
+  -H "Authorization: Bearer $LANGWATCH_ORG_API_KEY"
+```
+
+```json
+{
+  "data": [
+    {
+      "id": "agentreg_2xK...",
+      "source": "langwatch",
+      "management": "managed",
+      "kind": "signature",
+      "name": "Billing assistant",
+      "description": "Answers invoice questions",
+      "status": "active",
+      "shadow": false,
+      "version": 3,
+      "source_version": "7",
+      "project_id": "project_...",
+      "environment": "production",
+      "owner": { "user_id": "user_...", "name": "Ada Lovelace" },
+      "endpoints": [
+        { "kind": "definition", "url": "https://app.langwatch.ai/api/v1/agents/agent_...", "protocol": "langwatch-rest" },
+        { "kind": "console", "url": "https://app.langwatch.ai/acme/agents/...", "protocol": "https" }
+      ],
+      "model": { "provider": "openai", "model": "gpt-5-mini", "parameters": { "temperature": 0.2 } },
+      "instructions": "You answer billing questions for ACME customers.",
+      "capabilities": ["signature", "invoke"],
+      "tools": [
+        {
+          "name": "invoke",
+          "description": "Run the agent with its declared inputs.",
+          "input_schema": { "type": "object", "properties": { "question": { "type": "string" } }, "required": ["question"] },
+          "output_schema": null,
+          "status": "active",
+          "deprecated_in_version": null,
+          "deprecated_at": null
+        }
+      ],
+      "first_seen_at": "2026-11-01T09:00:00.000Z",
+      "last_seen_at": null,
+      "updated_at": "2026-11-12T14:03:11.482Z",
+      "removed_at": null
+    }
+  ],
+  "next_cursor": null
+}
+```
+
+### What each field holds
+
+- `version` is the registry's own version of the entry. It starts at 1 and grows by one on every material change: name, description, endpoints, model, instructions, capabilities, tools, environment, owner, status or shadow flag. A change to `last_seen_at` alone does not create a version.
+- `source_version` is the version the source names, when it names one: the prompt version of a LangWatch prompt-based agent, the last modified time of a Copilot Studio agent.
+- `tools` lists what the agent can be called with, each with a JSON Schema of its arguments. A prompt-based, code, workflow or HTTP agent has one `invoke` tool built from its declared inputs and outputs. A connected agent has one `call` tool built from its declared parameters; a secret parameter is marked `writeOnly` and never carries its default.
+- `instructions` is the system prompt of a prompt-based agent, and `null` where LangWatch does not hold one.
+- Credentials an HTTP agent holds (auth, headers) never appear in an entry. Its URL is published as its origin only, such as `https://agent.example.com`: the path, user info, query string and fragment are left out, since webhook URLs and `?code=` keys put credentials there. A URL that is not `http` or `https` publishes no endpoint.
+
+## Change events
+
+Each material change appends one or more events to the organization's feed:
+
+| Type | When |
+|---|---|
+| `governance.agent.registered` | An agent enters the registry, at version 1 |
+| `governance.agent.versioned` | An entry's material fields change; carries `from_version` and `to_version` |
+| `governance.agent.tool_deprecated` | A tool left the agent's latest definition. The tool stays in `tools` with `status: "deprecated"` and `deprecated_in_version` |
+| `governance.agent.removed` | A LangWatch agent was archived or deleted, or a traced agent sent no traffic for 30 days |
+| `governance.agent.flagged_shadow` | A traced agent matches no listed source |
+
+Every event has the same shape:
+
+```json
+{
+  "id": "agentreg_2xL...",
+  "sequence": "1042",
+  "type": "governance.agent.versioned",
+  "organization_id": "org_...",
+  "agent_id": "agentreg_2xK...",
+  "from_version": 2,
+  "to_version": 3,
+  "tool": null,
+  "occurred_at": "2026-11-12T14:03:11.482Z",
+  "agent": { "id": "agentreg_2xK...", "version": 3, "...": "the entry as it stood at to_version" }
+}
+```
+
+### When the registry updates
+
+- A change to an agent in a LangWatch project updates the registry within seconds of the save or archive.
+- A listing from an ingestion source updates it right after the listing runs.
+- The first sync of an organization is a silent baseline: the events for agents it already has are written to the feed but not pushed to webhooks. That holds whatever starts the sync, including right after the organization moves to the Enterprise plan. Every change after the baseline is pushed.
+- A new organization's agents created before its first sync are part of that baseline, so they are not announced. Agents created after it are.
+- An organization that leaves the Enterprise plan and comes back is not baselined again. Every change made during the gap is announced together on its first sync after it returns.
+- Traffic is read every 15 minutes for organizations that already hold a registry, once a day for every organization, and on each of the two triggers above. A daily pass that is interrupted resumes where it stopped on the next 15-minute pass. A traced agent a read did not return stays as it is while its last sighting is inside the 30-day window.
+
+### Reading the feed by cursor
+
+`GET /api/governance/registry/events` returns events in `sequence` order. Pass the last `sequence` you processed as `cursor` to read what came after it; `next_cursor` is null when you have caught up. `limit` is 1 to 200, default 100; `/versions` takes the same `limit` and `cursor`. Sequences only grow, so a consumer that stores its cursor never misses or repeats an event.
+
+```bash
+curl -s "$LANGWATCH_ENDPOINT/api/governance/registry/events?cursor=1041" \
+  -H "Authorization: Bearer $LANGWATCH_ORG_API_KEY"
+```
+
+### Receiving events as webhooks
+
+Create a [webhook endpoint](/features/webhooks) subscribed to `governance.agent.*`, or to the single types you want:
+
+```bash
+curl -s "$LANGWATCH_ENDPOINT/api/webhooks/v1/endpoints" \
+  -H "Authorization: Bearer $LANGWATCH_ORG_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://governance.acme.com/hooks/langwatch", "enabled_events": ["governance.agent.*"]}'
+```
+
+Each event is delivered in the standard webhook envelope, with the event above as `data`. Deliveries are signed with `X-LangWatch-Signature: t=<unix seconds>,v1=<hmac-sha256>`, retried with backoff for about a day, and logged per endpoint; see [verifying signatures](/features/webhooks#verifying-signatures). Deduplicate on `data.id`: it is the same in the webhook, in the feed and in `/versions`.
+
+## ARD v0.91
+
+`GET /api/governance/registry/ard.json` returns the active entries as an ARD manifest: the 1,000 changed most recently, newest first. ARD search reads the same 1,000. Use the REST list to read a larger registry in full:
+
+```json
+{
+  "specVersion": "0.91",
+  "publisher": "app.langwatch.ai",
+  "updatedAt": "2026-11-12T14:03:11.482Z",
+  "entries": [
+    {
+      "@context": "https://agenticresourcediscovery.org/context/v1",
+      "identifier": "urn:air:app.langwatch.ai:org_...:agent:agentreg_2xK...",
+      "displayName": "Billing assistant",
+      "type": "application/agent-card+json",
+      "description": "Answers invoice questions",
+      "version": "3",
+      "updatedAt": "2026-11-12T14:03:11.482Z",
+      "tags": ["langwatch", "managed", "signature", "production"],
+      "capabilities": ["signature", "invoke"],
+      "data": { "...": "the registry entry" },
+      "metadata": { "langwatch:registryId": "agentreg_2xK...", "langwatch:source": "langwatch", "langwatch:management": "managed", "langwatch:status": "active" }
+    }
+  ]
+}
+```
+
+- `identifier` is `urn:air:<LangWatch host>:<organization id>:agent:<registry id>`.
+- `type` is `application/agent-card+json` and `data` holds the full registry entry inline, so the entry's tools, model and instructions are part of the ARD entry.
+- `representativeQueries` is not set: LangWatch has no sample queries per agent yet. ARD treats a missing value as a conformance warning.
+- Because the manifest lists one organization's agents and needs an API key, it is served under the registry path rather than at `/.well-known/ard.json`.
+
+`POST /api/governance/registry/ard/search` takes the ARD search body:
+
+```json
+{ "query": { "text": "billing", "filter": { "data.source": ["langwatch"], "data.shadow": ["true"] } }, "pageSize": 10 }
+```
+
+`query.text` is required. Filter keys are term paths on the ARD entry or on its `data`; values within a key are OR-ed and keys are AND-ed, and a single value may be sent without the array. Each result is an ARD entry with a `score` from 0 to 100, relevance only, and a `source` naming the manifest URL it came from. `pageToken` pages through results. Federation is not performed: `referrals` is never returned.

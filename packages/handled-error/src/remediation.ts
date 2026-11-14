@@ -543,6 +543,13 @@ const registry = {
     ],
     docsPath: "/agent-testing/connect-your-agent",
   },
+  agent_registry_entry_not_found: {
+    tips: [
+      "List the registry with GET /api/governance/registry/agents and use an `id` from that list",
+      "Registry ids start with agentreg_; a LangWatch agent id is a different id",
+    ],
+    docsPath: "/governance/agent-registry",
+  },
   agent_offline: {
     tips: [
       "Start the process that runs the decorated function; the agent shows Online in the agents list once it connects",

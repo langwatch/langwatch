@@ -28,6 +28,7 @@ export type CodeStepId =
   | "governance:record-coding-assistant-billing"
   | "governance:record-coding-assistant-ingest-source-billing"
   | "governance:migrate-anomaly-webhook-destinations"
+  | "governance:seed-agent-registry"
   | "governance:replay-cost-charges"
   | "identity:identifier-backfill"
   | "identity:secret-heal"

@@ -3,6 +3,7 @@ import type { InstantEvalRunReference } from "@langwatch/instant-eval-contract";
 import { moduleApi } from "@langwatch/module";
 
 import type { ConversationView } from "./conversation/conversation-steps.ts";
+import type { TraceAgentSeen } from "./features/analytics/trace-agent-traffic.ts";
 import type {
   TraceAttributedRecency,
   TraceAttributedSpendComparison,
@@ -1075,6 +1076,12 @@ export interface TraceApi extends TraceOtlpIngestApi {
     attribute: TraceAttributeMatch;
     groupByKey: string;
   }): Promise<{ value: string; count: number }[]>;
+  /** Distinct `gen_ai.agent.name` values in the project's spans since `sinceMs`, busiest first. */
+  findAgentsSeen(input: {
+    projectId: string;
+    sinceMs: number;
+    limit: number;
+  }): Promise<TraceAgentSeen[]>;
 }
 
 export type TracePreconditionSampleInput = {

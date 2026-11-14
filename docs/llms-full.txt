@@ -77325,6 +77325,82 @@ openapi: "PATCH /api/gateway/v1/virtual-keys/{id}"
 
 ---
 
+# FILE: ./api-reference/governance-agent-registry/get-one-registry-agent.mdx
+
+---
+title: "Get one registry agent"
+openapi: "GET /api/v1/governance/registry/agents/{agentId}"
+---
+
+---
+
+# FILE: ./api-reference/governance-agent-registry/get-the-registry-as-an-ard-manifest.mdx
+
+---
+title: "Get the registry as an ARD manifest"
+openapi: "GET /api/v1/governance/registry/ard.json"
+---
+
+---
+
+# FILE: ./api-reference/governance-agent-registry/get-the-registry-s-json-schemas.mdx
+
+---
+title: "Get the registry's JSON Schemas"
+openapi: "GET /api/v1/governance/registry/schema"
+---
+
+---
+
+# FILE: ./api-reference/governance-agent-registry/list-one-registry-agent-s-versions.mdx
+
+---
+title: "List one registry agent's versions"
+openapi: "GET /api/v1/governance/registry/agents/{agentId}/versions"
+---
+
+---
+
+# FILE: ./api-reference/governance-agent-registry/list-the-organisation-s-agent-registry.mdx
+
+---
+title: "List the organisation's agent registry"
+openapi: "GET /api/v1/governance/registry/agents"
+---
+
+---
+
+# FILE: ./api-reference/governance-agent-registry/overview.mdx
+
+---
+title: "Overview"
+description: "Read every AI agent in your organization with its endpoints, model, instructions, tools and owner, as JSON or as an ARD v0.91 manifest, and follow its changes through the change feed. Needs an organization API key."
+---
+
+## Intro
+
+Read every AI agent in your organization with its endpoints, model, instructions, tools and owner, as JSON or as an ARD v0.91 manifest, and follow its changes through the change feed. Needs an organization API key.
+
+---
+
+# FILE: ./api-reference/governance-agent-registry/read-the-registry-change-feed.mdx
+
+---
+title: "Read the registry change feed"
+openapi: "GET /api/v1/governance/registry/events"
+---
+
+---
+
+# FILE: ./api-reference/governance-agent-registry/search-the-registry-ard-search.mdx
+
+---
+title: "Search the registry (ARD search)"
+openapi: "POST /api/v1/governance/registry/ard/search"
+---
+
+---
+
 # FILE: ./api-reference/grants/change-a-grant-s-role.mdx
 
 ---

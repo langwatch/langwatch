@@ -15849,6 +15849,1626 @@ func (e DeleteApiGovernanceIngestionTemplatesById200JSONResponseBodyArchived) Va
 	}
 }
 
+// Defines values for GetApiGovernanceRegistryAgentsParamsStatus.
+const (
+	GetApiGovernanceRegistryAgentsParamsStatusActive  GetApiGovernanceRegistryAgentsParamsStatus = "active"
+	GetApiGovernanceRegistryAgentsParamsStatusRemoved GetApiGovernanceRegistryAgentsParamsStatus = "removed"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsParamsStatus enum.
+func (e GetApiGovernanceRegistryAgentsParamsStatus) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgentsParamsStatusActive:
+		return true
+	case GetApiGovernanceRegistryAgentsParamsStatusRemoved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgents200JSONResponseBodyDataEndpointsKind.
+const (
+	GetApiGovernanceRegistryAgents200JSONResponseBodyDataEndpointsKindConsole    GetApiGovernanceRegistryAgents200JSONResponseBodyDataEndpointsKind = "console"
+	GetApiGovernanceRegistryAgents200JSONResponseBodyDataEndpointsKindDefinition GetApiGovernanceRegistryAgents200JSONResponseBodyDataEndpointsKind = "definition"
+	GetApiGovernanceRegistryAgents200JSONResponseBodyDataEndpointsKindInvoke     GetApiGovernanceRegistryAgents200JSONResponseBodyDataEndpointsKind = "invoke"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgents200JSONResponseBodyDataEndpointsKind enum.
+func (e GetApiGovernanceRegistryAgents200JSONResponseBodyDataEndpointsKind) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgents200JSONResponseBodyDataEndpointsKindConsole:
+		return true
+	case GetApiGovernanceRegistryAgents200JSONResponseBodyDataEndpointsKindDefinition:
+		return true
+	case GetApiGovernanceRegistryAgents200JSONResponseBodyDataEndpointsKindInvoke:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgents200JSONResponseBodyDataManagement.
+const (
+	GetApiGovernanceRegistryAgents200JSONResponseBodyDataManagementDiscovered GetApiGovernanceRegistryAgents200JSONResponseBodyDataManagement = "discovered"
+	GetApiGovernanceRegistryAgents200JSONResponseBodyDataManagementManaged    GetApiGovernanceRegistryAgents200JSONResponseBodyDataManagement = "managed"
+	GetApiGovernanceRegistryAgents200JSONResponseBodyDataManagementObserved   GetApiGovernanceRegistryAgents200JSONResponseBodyDataManagement = "observed"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgents200JSONResponseBodyDataManagement enum.
+func (e GetApiGovernanceRegistryAgents200JSONResponseBodyDataManagement) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgents200JSONResponseBodyDataManagementDiscovered:
+		return true
+	case GetApiGovernanceRegistryAgents200JSONResponseBodyDataManagementManaged:
+		return true
+	case GetApiGovernanceRegistryAgents200JSONResponseBodyDataManagementObserved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgents200JSONResponseBodyDataSource.
+const (
+	GetApiGovernanceRegistryAgents200JSONResponseBodyDataSourceCopilotStudio GetApiGovernanceRegistryAgents200JSONResponseBodyDataSource = "copilot_studio"
+	GetApiGovernanceRegistryAgents200JSONResponseBodyDataSourceDatabricks    GetApiGovernanceRegistryAgents200JSONResponseBodyDataSource = "databricks"
+	GetApiGovernanceRegistryAgents200JSONResponseBodyDataSourceLangwatch     GetApiGovernanceRegistryAgents200JSONResponseBodyDataSource = "langwatch"
+	GetApiGovernanceRegistryAgents200JSONResponseBodyDataSourceTraffic       GetApiGovernanceRegistryAgents200JSONResponseBodyDataSource = "traffic"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgents200JSONResponseBodyDataSource enum.
+func (e GetApiGovernanceRegistryAgents200JSONResponseBodyDataSource) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgents200JSONResponseBodyDataSourceCopilotStudio:
+		return true
+	case GetApiGovernanceRegistryAgents200JSONResponseBodyDataSourceDatabricks:
+		return true
+	case GetApiGovernanceRegistryAgents200JSONResponseBodyDataSourceLangwatch:
+		return true
+	case GetApiGovernanceRegistryAgents200JSONResponseBodyDataSourceTraffic:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgents200JSONResponseBodyDataStatus.
+const (
+	GetApiGovernanceRegistryAgents200JSONResponseBodyDataStatusActive  GetApiGovernanceRegistryAgents200JSONResponseBodyDataStatus = "active"
+	GetApiGovernanceRegistryAgents200JSONResponseBodyDataStatusRemoved GetApiGovernanceRegistryAgents200JSONResponseBodyDataStatus = "removed"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgents200JSONResponseBodyDataStatus enum.
+func (e GetApiGovernanceRegistryAgents200JSONResponseBodyDataStatus) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgents200JSONResponseBodyDataStatusActive:
+		return true
+	case GetApiGovernanceRegistryAgents200JSONResponseBodyDataStatusRemoved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgents200JSONResponseBodyDataToolsStatus.
+const (
+	GetApiGovernanceRegistryAgents200JSONResponseBodyDataToolsStatusActive     GetApiGovernanceRegistryAgents200JSONResponseBodyDataToolsStatus = "active"
+	GetApiGovernanceRegistryAgents200JSONResponseBodyDataToolsStatusDeprecated GetApiGovernanceRegistryAgents200JSONResponseBodyDataToolsStatus = "deprecated"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgents200JSONResponseBodyDataToolsStatus enum.
+func (e GetApiGovernanceRegistryAgents200JSONResponseBodyDataToolsStatus) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgents200JSONResponseBodyDataToolsStatusActive:
+		return true
+	case GetApiGovernanceRegistryAgents200JSONResponseBodyDataToolsStatusDeprecated:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgents400JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistryAgents400JSONResponseBodyFaultCustomer         GetApiGovernanceRegistryAgents400JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistryAgents400JSONResponseBodyFaultPlatform         GetApiGovernanceRegistryAgents400JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistryAgents400JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistryAgents400JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistryAgents400JSONResponseBodyFaultProvider         GetApiGovernanceRegistryAgents400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgents400JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistryAgents400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgents400JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistryAgents400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistryAgents400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistryAgents400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgents401JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistryAgents401JSONResponseBodyFaultCustomer         GetApiGovernanceRegistryAgents401JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistryAgents401JSONResponseBodyFaultPlatform         GetApiGovernanceRegistryAgents401JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistryAgents401JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistryAgents401JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistryAgents401JSONResponseBodyFaultProvider         GetApiGovernanceRegistryAgents401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgents401JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistryAgents401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgents401JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistryAgents401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistryAgents401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistryAgents401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgents403JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistryAgents403JSONResponseBodyFaultCustomer         GetApiGovernanceRegistryAgents403JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistryAgents403JSONResponseBodyFaultPlatform         GetApiGovernanceRegistryAgents403JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistryAgents403JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistryAgents403JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistryAgents403JSONResponseBodyFaultProvider         GetApiGovernanceRegistryAgents403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgents403JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistryAgents403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgents403JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistryAgents403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistryAgents403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistryAgents403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgents422JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistryAgents422JSONResponseBodyFaultCustomer         GetApiGovernanceRegistryAgents422JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistryAgents422JSONResponseBodyFaultPlatform         GetApiGovernanceRegistryAgents422JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistryAgents422JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistryAgents422JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistryAgents422JSONResponseBodyFaultProvider         GetApiGovernanceRegistryAgents422JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgents422JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistryAgents422JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgents422JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistryAgents422JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistryAgents422JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistryAgents422JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgents500JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistryAgents500JSONResponseBodyFaultCustomer         GetApiGovernanceRegistryAgents500JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistryAgents500JSONResponseBodyFaultPlatform         GetApiGovernanceRegistryAgents500JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistryAgents500JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistryAgents500JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistryAgents500JSONResponseBodyFaultProvider         GetApiGovernanceRegistryAgents500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgents500JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistryAgents500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgents500JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistryAgents500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistryAgents500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistryAgents500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataEndpointsKind.
+const (
+	GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataEndpointsKindConsole    GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataEndpointsKind = "console"
+	GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataEndpointsKindDefinition GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataEndpointsKind = "definition"
+	GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataEndpointsKindInvoke     GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataEndpointsKind = "invoke"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataEndpointsKind enum.
+func (e GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataEndpointsKind) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataEndpointsKindConsole:
+		return true
+	case GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataEndpointsKindDefinition:
+		return true
+	case GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataEndpointsKindInvoke:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataManagement.
+const (
+	GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataManagementDiscovered GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataManagement = "discovered"
+	GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataManagementManaged    GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataManagement = "managed"
+	GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataManagementObserved   GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataManagement = "observed"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataManagement enum.
+func (e GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataManagement) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataManagementDiscovered:
+		return true
+	case GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataManagementManaged:
+		return true
+	case GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataManagementObserved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataSource.
+const (
+	GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataSourceCopilotStudio GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataSource = "copilot_studio"
+	GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataSourceDatabricks    GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataSource = "databricks"
+	GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataSourceLangwatch     GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataSource = "langwatch"
+	GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataSourceTraffic       GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataSource = "traffic"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataSource enum.
+func (e GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataSource) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataSourceCopilotStudio:
+		return true
+	case GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataSourceDatabricks:
+		return true
+	case GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataSourceLangwatch:
+		return true
+	case GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataSourceTraffic:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataStatus.
+const (
+	GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataStatusActive  GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataStatus = "active"
+	GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataStatusRemoved GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataStatus = "removed"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataStatus enum.
+func (e GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataStatus) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataStatusActive:
+		return true
+	case GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataStatusRemoved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataToolsStatus.
+const (
+	GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataToolsStatusActive     GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataToolsStatus = "active"
+	GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataToolsStatusDeprecated GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataToolsStatus = "deprecated"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataToolsStatus enum.
+func (e GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataToolsStatus) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataToolsStatusActive:
+		return true
+	case GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataToolsStatusDeprecated:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgentsById400JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistryAgentsById400JSONResponseBodyFaultCustomer         GetApiGovernanceRegistryAgentsById400JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistryAgentsById400JSONResponseBodyFaultPlatform         GetApiGovernanceRegistryAgentsById400JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistryAgentsById400JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistryAgentsById400JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistryAgentsById400JSONResponseBodyFaultProvider         GetApiGovernanceRegistryAgentsById400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsById400JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistryAgentsById400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgentsById400JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistryAgentsById400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistryAgentsById400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistryAgentsById400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgentsById401JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistryAgentsById401JSONResponseBodyFaultCustomer         GetApiGovernanceRegistryAgentsById401JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistryAgentsById401JSONResponseBodyFaultPlatform         GetApiGovernanceRegistryAgentsById401JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistryAgentsById401JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistryAgentsById401JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistryAgentsById401JSONResponseBodyFaultProvider         GetApiGovernanceRegistryAgentsById401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsById401JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistryAgentsById401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgentsById401JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistryAgentsById401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistryAgentsById401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistryAgentsById401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgentsById403JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistryAgentsById403JSONResponseBodyFaultCustomer         GetApiGovernanceRegistryAgentsById403JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistryAgentsById403JSONResponseBodyFaultPlatform         GetApiGovernanceRegistryAgentsById403JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistryAgentsById403JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistryAgentsById403JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistryAgentsById403JSONResponseBodyFaultProvider         GetApiGovernanceRegistryAgentsById403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsById403JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistryAgentsById403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgentsById403JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistryAgentsById403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistryAgentsById403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistryAgentsById403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgentsById404JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistryAgentsById404JSONResponseBodyFaultCustomer         GetApiGovernanceRegistryAgentsById404JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistryAgentsById404JSONResponseBodyFaultPlatform         GetApiGovernanceRegistryAgentsById404JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistryAgentsById404JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistryAgentsById404JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistryAgentsById404JSONResponseBodyFaultProvider         GetApiGovernanceRegistryAgentsById404JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsById404JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistryAgentsById404JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgentsById404JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistryAgentsById404JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistryAgentsById404JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistryAgentsById404JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgentsById422JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistryAgentsById422JSONResponseBodyFaultCustomer         GetApiGovernanceRegistryAgentsById422JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistryAgentsById422JSONResponseBodyFaultPlatform         GetApiGovernanceRegistryAgentsById422JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistryAgentsById422JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistryAgentsById422JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistryAgentsById422JSONResponseBodyFaultProvider         GetApiGovernanceRegistryAgentsById422JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsById422JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistryAgentsById422JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgentsById422JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistryAgentsById422JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistryAgentsById422JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistryAgentsById422JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgentsById500JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistryAgentsById500JSONResponseBodyFaultCustomer         GetApiGovernanceRegistryAgentsById500JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistryAgentsById500JSONResponseBodyFaultPlatform         GetApiGovernanceRegistryAgentsById500JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistryAgentsById500JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistryAgentsById500JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistryAgentsById500JSONResponseBodyFaultProvider         GetApiGovernanceRegistryAgentsById500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsById500JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistryAgentsById500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgentsById500JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistryAgentsById500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistryAgentsById500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistryAgentsById500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentEndpointsKind.
+const (
+	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentEndpointsKindConsole    GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentEndpointsKind = "console"
+	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentEndpointsKindDefinition GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentEndpointsKind = "definition"
+	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentEndpointsKindInvoke     GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentEndpointsKind = "invoke"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentEndpointsKind enum.
+func (e GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentEndpointsKind) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentEndpointsKindConsole:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentEndpointsKindDefinition:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentEndpointsKindInvoke:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentManagement.
+const (
+	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentManagementDiscovered GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentManagement = "discovered"
+	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentManagementManaged    GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentManagement = "managed"
+	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentManagementObserved   GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentManagement = "observed"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentManagement enum.
+func (e GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentManagement) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentManagementDiscovered:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentManagementManaged:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentManagementObserved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentSource.
+const (
+	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentSourceCopilotStudio GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentSource = "copilot_studio"
+	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentSourceDatabricks    GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentSource = "databricks"
+	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentSourceLangwatch     GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentSource = "langwatch"
+	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentSourceTraffic       GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentSource = "traffic"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentSource enum.
+func (e GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentSource) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentSourceCopilotStudio:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentSourceDatabricks:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentSourceLangwatch:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentSourceTraffic:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentStatus.
+const (
+	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentStatusActive  GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentStatus = "active"
+	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentStatusRemoved GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentStatus = "removed"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentStatus enum.
+func (e GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentStatus) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentStatusActive:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentStatusRemoved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentToolsStatus.
+const (
+	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentToolsStatusActive     GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentToolsStatus = "active"
+	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentToolsStatusDeprecated GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentToolsStatus = "deprecated"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentToolsStatus enum.
+func (e GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentToolsStatus) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentToolsStatusActive:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentToolsStatusDeprecated:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType.
+const (
+	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataTypeGovernanceAgentFlaggedShadow  GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType = "governance.agent.flagged_shadow"
+	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataTypeGovernanceAgentRegistered     GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType = "governance.agent.registered"
+	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataTypeGovernanceAgentRemoved        GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType = "governance.agent.removed"
+	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataTypeGovernanceAgentToolDeprecated GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType = "governance.agent.tool_deprecated"
+	GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataTypeGovernanceAgentVersioned      GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType = "governance.agent.versioned"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType enum.
+func (e GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataTypeGovernanceAgentFlaggedShadow:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataTypeGovernanceAgentRegistered:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataTypeGovernanceAgentRemoved:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataTypeGovernanceAgentToolDeprecated:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataTypeGovernanceAgentVersioned:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgentsByIdVersions400JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistryAgentsByIdVersions400JSONResponseBodyFaultCustomer         GetApiGovernanceRegistryAgentsByIdVersions400JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistryAgentsByIdVersions400JSONResponseBodyFaultPlatform         GetApiGovernanceRegistryAgentsByIdVersions400JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistryAgentsByIdVersions400JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistryAgentsByIdVersions400JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistryAgentsByIdVersions400JSONResponseBodyFaultProvider         GetApiGovernanceRegistryAgentsByIdVersions400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsByIdVersions400JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistryAgentsByIdVersions400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgentsByIdVersions400JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgentsByIdVersions401JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistryAgentsByIdVersions401JSONResponseBodyFaultCustomer         GetApiGovernanceRegistryAgentsByIdVersions401JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistryAgentsByIdVersions401JSONResponseBodyFaultPlatform         GetApiGovernanceRegistryAgentsByIdVersions401JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistryAgentsByIdVersions401JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistryAgentsByIdVersions401JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistryAgentsByIdVersions401JSONResponseBodyFaultProvider         GetApiGovernanceRegistryAgentsByIdVersions401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsByIdVersions401JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistryAgentsByIdVersions401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgentsByIdVersions401JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgentsByIdVersions403JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistryAgentsByIdVersions403JSONResponseBodyFaultCustomer         GetApiGovernanceRegistryAgentsByIdVersions403JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistryAgentsByIdVersions403JSONResponseBodyFaultPlatform         GetApiGovernanceRegistryAgentsByIdVersions403JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistryAgentsByIdVersions403JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistryAgentsByIdVersions403JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistryAgentsByIdVersions403JSONResponseBodyFaultProvider         GetApiGovernanceRegistryAgentsByIdVersions403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsByIdVersions403JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistryAgentsByIdVersions403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgentsByIdVersions403JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgentsByIdVersions404JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistryAgentsByIdVersions404JSONResponseBodyFaultCustomer         GetApiGovernanceRegistryAgentsByIdVersions404JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistryAgentsByIdVersions404JSONResponseBodyFaultPlatform         GetApiGovernanceRegistryAgentsByIdVersions404JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistryAgentsByIdVersions404JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistryAgentsByIdVersions404JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistryAgentsByIdVersions404JSONResponseBodyFaultProvider         GetApiGovernanceRegistryAgentsByIdVersions404JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsByIdVersions404JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistryAgentsByIdVersions404JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgentsByIdVersions404JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions404JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions404JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions404JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgentsByIdVersions422JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistryAgentsByIdVersions422JSONResponseBodyFaultCustomer         GetApiGovernanceRegistryAgentsByIdVersions422JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistryAgentsByIdVersions422JSONResponseBodyFaultPlatform         GetApiGovernanceRegistryAgentsByIdVersions422JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistryAgentsByIdVersions422JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistryAgentsByIdVersions422JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistryAgentsByIdVersions422JSONResponseBodyFaultProvider         GetApiGovernanceRegistryAgentsByIdVersions422JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsByIdVersions422JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistryAgentsByIdVersions422JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgentsByIdVersions422JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions422JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions422JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions422JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryAgentsByIdVersions500JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistryAgentsByIdVersions500JSONResponseBodyFaultCustomer         GetApiGovernanceRegistryAgentsByIdVersions500JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistryAgentsByIdVersions500JSONResponseBodyFaultPlatform         GetApiGovernanceRegistryAgentsByIdVersions500JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistryAgentsByIdVersions500JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistryAgentsByIdVersions500JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistryAgentsByIdVersions500JSONResponseBodyFaultProvider         GetApiGovernanceRegistryAgentsByIdVersions500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryAgentsByIdVersions500JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistryAgentsByIdVersions500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryAgentsByIdVersions500JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistryAgentsByIdVersions500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesContext.
+const (
+	GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesContextHttpsagenticresourcediscoveryOrgcontextv1 GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesContext = "https://agenticresourcediscovery.org/context/v1"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesContext enum.
+func (e GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesContext) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesContextHttpsagenticresourcediscoveryOrgcontextv1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataEndpointsKind.
+const (
+	GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataEndpointsKindConsole    GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataEndpointsKind = "console"
+	GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataEndpointsKindDefinition GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataEndpointsKind = "definition"
+	GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataEndpointsKindInvoke     GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataEndpointsKind = "invoke"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataEndpointsKind enum.
+func (e GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataEndpointsKind) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataEndpointsKindConsole:
+		return true
+	case GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataEndpointsKindDefinition:
+		return true
+	case GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataEndpointsKindInvoke:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataManagement.
+const (
+	GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataManagementDiscovered GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataManagement = "discovered"
+	GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataManagementManaged    GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataManagement = "managed"
+	GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataManagementObserved   GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataManagement = "observed"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataManagement enum.
+func (e GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataManagement) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataManagementDiscovered:
+		return true
+	case GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataManagementManaged:
+		return true
+	case GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataManagementObserved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataSource.
+const (
+	GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataSourceCopilotStudio GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataSource = "copilot_studio"
+	GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataSourceDatabricks    GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataSource = "databricks"
+	GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataSourceLangwatch     GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataSource = "langwatch"
+	GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataSourceTraffic       GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataSource = "traffic"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataSource enum.
+func (e GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataSource) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataSourceCopilotStudio:
+		return true
+	case GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataSourceDatabricks:
+		return true
+	case GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataSourceLangwatch:
+		return true
+	case GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataSourceTraffic:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataStatus.
+const (
+	GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataStatusActive  GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataStatus = "active"
+	GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataStatusRemoved GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataStatus = "removed"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataStatus enum.
+func (e GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataStatus) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataStatusActive:
+		return true
+	case GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataStatusRemoved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataToolsStatus.
+const (
+	GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataToolsStatusActive     GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataToolsStatus = "active"
+	GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataToolsStatusDeprecated GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataToolsStatus = "deprecated"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataToolsStatus enum.
+func (e GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataToolsStatus) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataToolsStatusActive:
+		return true
+	case GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataToolsStatusDeprecated:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesType.
+const (
+	GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesTypeApplicationagentCardJson GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesType = "application/agent-card+json"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesType enum.
+func (e GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesType) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesTypeApplicationagentCardJson:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryArdManifest200JSONResponseBodySpecVersion.
+const (
+	N091 GetApiGovernanceRegistryArdManifest200JSONResponseBodySpecVersion = "0.91"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryArdManifest200JSONResponseBodySpecVersion enum.
+func (e GetApiGovernanceRegistryArdManifest200JSONResponseBodySpecVersion) Valid() bool {
+	switch e {
+	case N091:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryArdManifest400JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistryArdManifest400JSONResponseBodyFaultCustomer         GetApiGovernanceRegistryArdManifest400JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistryArdManifest400JSONResponseBodyFaultPlatform         GetApiGovernanceRegistryArdManifest400JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistryArdManifest400JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistryArdManifest400JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistryArdManifest400JSONResponseBodyFaultProvider         GetApiGovernanceRegistryArdManifest400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryArdManifest400JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistryArdManifest400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryArdManifest400JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistryArdManifest400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistryArdManifest400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistryArdManifest400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryArdManifest401JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistryArdManifest401JSONResponseBodyFaultCustomer         GetApiGovernanceRegistryArdManifest401JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistryArdManifest401JSONResponseBodyFaultPlatform         GetApiGovernanceRegistryArdManifest401JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistryArdManifest401JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistryArdManifest401JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistryArdManifest401JSONResponseBodyFaultProvider         GetApiGovernanceRegistryArdManifest401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryArdManifest401JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistryArdManifest401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryArdManifest401JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistryArdManifest401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistryArdManifest401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistryArdManifest401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryArdManifest403JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistryArdManifest403JSONResponseBodyFaultCustomer         GetApiGovernanceRegistryArdManifest403JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistryArdManifest403JSONResponseBodyFaultPlatform         GetApiGovernanceRegistryArdManifest403JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistryArdManifest403JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistryArdManifest403JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistryArdManifest403JSONResponseBodyFaultProvider         GetApiGovernanceRegistryArdManifest403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryArdManifest403JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistryArdManifest403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryArdManifest403JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistryArdManifest403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistryArdManifest403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistryArdManifest403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryArdManifest500JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistryArdManifest500JSONResponseBodyFaultCustomer         GetApiGovernanceRegistryArdManifest500JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistryArdManifest500JSONResponseBodyFaultPlatform         GetApiGovernanceRegistryArdManifest500JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistryArdManifest500JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistryArdManifest500JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistryArdManifest500JSONResponseBodyFaultProvider         GetApiGovernanceRegistryArdManifest500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryArdManifest500JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistryArdManifest500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryArdManifest500JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistryArdManifest500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistryArdManifest500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistryArdManifest500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceRegistryArdSearchJSONBodyFederation.
+const (
+	PostApiGovernanceRegistryArdSearchJSONBodyFederationAuto      PostApiGovernanceRegistryArdSearchJSONBodyFederation = "auto"
+	PostApiGovernanceRegistryArdSearchJSONBodyFederationNone      PostApiGovernanceRegistryArdSearchJSONBodyFederation = "none"
+	PostApiGovernanceRegistryArdSearchJSONBodyFederationReferrals PostApiGovernanceRegistryArdSearchJSONBodyFederation = "referrals"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceRegistryArdSearchJSONBodyFederation enum.
+func (e PostApiGovernanceRegistryArdSearchJSONBodyFederation) Valid() bool {
+	switch e {
+	case PostApiGovernanceRegistryArdSearchJSONBodyFederationAuto:
+		return true
+	case PostApiGovernanceRegistryArdSearchJSONBodyFederationNone:
+		return true
+	case PostApiGovernanceRegistryArdSearchJSONBodyFederationReferrals:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsContext.
+const (
+	PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsContextHttpsagenticresourcediscoveryOrgcontextv1 PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsContext = "https://agenticresourcediscovery.org/context/v1"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsContext enum.
+func (e PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsContext) Valid() bool {
+	switch e {
+	case PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsContextHttpsagenticresourcediscoveryOrgcontextv1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataEndpointsKind.
+const (
+	PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataEndpointsKindConsole    PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataEndpointsKind = "console"
+	PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataEndpointsKindDefinition PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataEndpointsKind = "definition"
+	PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataEndpointsKindInvoke     PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataEndpointsKind = "invoke"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataEndpointsKind enum.
+func (e PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataEndpointsKind) Valid() bool {
+	switch e {
+	case PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataEndpointsKindConsole:
+		return true
+	case PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataEndpointsKindDefinition:
+		return true
+	case PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataEndpointsKindInvoke:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataManagement.
+const (
+	PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataManagementDiscovered PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataManagement = "discovered"
+	PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataManagementManaged    PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataManagement = "managed"
+	PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataManagementObserved   PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataManagement = "observed"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataManagement enum.
+func (e PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataManagement) Valid() bool {
+	switch e {
+	case PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataManagementDiscovered:
+		return true
+	case PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataManagementManaged:
+		return true
+	case PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataManagementObserved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataSource.
+const (
+	PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataSourceCopilotStudio PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataSource = "copilot_studio"
+	PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataSourceDatabricks    PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataSource = "databricks"
+	PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataSourceLangwatch     PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataSource = "langwatch"
+	PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataSourceTraffic       PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataSource = "traffic"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataSource enum.
+func (e PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataSource) Valid() bool {
+	switch e {
+	case PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataSourceCopilotStudio:
+		return true
+	case PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataSourceDatabricks:
+		return true
+	case PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataSourceLangwatch:
+		return true
+	case PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataSourceTraffic:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataStatus.
+const (
+	PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataStatusActive  PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataStatus = "active"
+	PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataStatusRemoved PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataStatus = "removed"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataStatus enum.
+func (e PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataStatus) Valid() bool {
+	switch e {
+	case PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataStatusActive:
+		return true
+	case PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataStatusRemoved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataToolsStatus.
+const (
+	PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataToolsStatusActive     PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataToolsStatus = "active"
+	PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataToolsStatusDeprecated PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataToolsStatus = "deprecated"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataToolsStatus enum.
+func (e PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataToolsStatus) Valid() bool {
+	switch e {
+	case PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataToolsStatusActive:
+		return true
+	case PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataToolsStatusDeprecated:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsType.
+const (
+	PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsTypeApplicationagentCardJson PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsType = "application/agent-card+json"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsType enum.
+func (e PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsType) Valid() bool {
+	switch e {
+	case PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsTypeApplicationagentCardJson:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceRegistryArdSearch400JSONResponseBodyFault.
+const (
+	PostApiGovernanceRegistryArdSearch400JSONResponseBodyFaultCustomer         PostApiGovernanceRegistryArdSearch400JSONResponseBodyFault = "customer"
+	PostApiGovernanceRegistryArdSearch400JSONResponseBodyFaultPlatform         PostApiGovernanceRegistryArdSearch400JSONResponseBodyFault = "platform"
+	PostApiGovernanceRegistryArdSearch400JSONResponseBodyFaultPresumedPlatform PostApiGovernanceRegistryArdSearch400JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceRegistryArdSearch400JSONResponseBodyFaultProvider         PostApiGovernanceRegistryArdSearch400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceRegistryArdSearch400JSONResponseBodyFault enum.
+func (e PostApiGovernanceRegistryArdSearch400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceRegistryArdSearch400JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceRegistryArdSearch400JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceRegistryArdSearch400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceRegistryArdSearch400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceRegistryArdSearch401JSONResponseBodyFault.
+const (
+	PostApiGovernanceRegistryArdSearch401JSONResponseBodyFaultCustomer         PostApiGovernanceRegistryArdSearch401JSONResponseBodyFault = "customer"
+	PostApiGovernanceRegistryArdSearch401JSONResponseBodyFaultPlatform         PostApiGovernanceRegistryArdSearch401JSONResponseBodyFault = "platform"
+	PostApiGovernanceRegistryArdSearch401JSONResponseBodyFaultPresumedPlatform PostApiGovernanceRegistryArdSearch401JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceRegistryArdSearch401JSONResponseBodyFaultProvider         PostApiGovernanceRegistryArdSearch401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceRegistryArdSearch401JSONResponseBodyFault enum.
+func (e PostApiGovernanceRegistryArdSearch401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceRegistryArdSearch401JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceRegistryArdSearch401JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceRegistryArdSearch401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceRegistryArdSearch401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceRegistryArdSearch403JSONResponseBodyFault.
+const (
+	PostApiGovernanceRegistryArdSearch403JSONResponseBodyFaultCustomer         PostApiGovernanceRegistryArdSearch403JSONResponseBodyFault = "customer"
+	PostApiGovernanceRegistryArdSearch403JSONResponseBodyFaultPlatform         PostApiGovernanceRegistryArdSearch403JSONResponseBodyFault = "platform"
+	PostApiGovernanceRegistryArdSearch403JSONResponseBodyFaultPresumedPlatform PostApiGovernanceRegistryArdSearch403JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceRegistryArdSearch403JSONResponseBodyFaultProvider         PostApiGovernanceRegistryArdSearch403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceRegistryArdSearch403JSONResponseBodyFault enum.
+func (e PostApiGovernanceRegistryArdSearch403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceRegistryArdSearch403JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceRegistryArdSearch403JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceRegistryArdSearch403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceRegistryArdSearch403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceRegistryArdSearch422JSONResponseBodyFault.
+const (
+	PostApiGovernanceRegistryArdSearch422JSONResponseBodyFaultCustomer         PostApiGovernanceRegistryArdSearch422JSONResponseBodyFault = "customer"
+	PostApiGovernanceRegistryArdSearch422JSONResponseBodyFaultPlatform         PostApiGovernanceRegistryArdSearch422JSONResponseBodyFault = "platform"
+	PostApiGovernanceRegistryArdSearch422JSONResponseBodyFaultPresumedPlatform PostApiGovernanceRegistryArdSearch422JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceRegistryArdSearch422JSONResponseBodyFaultProvider         PostApiGovernanceRegistryArdSearch422JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceRegistryArdSearch422JSONResponseBodyFault enum.
+func (e PostApiGovernanceRegistryArdSearch422JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceRegistryArdSearch422JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceRegistryArdSearch422JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceRegistryArdSearch422JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceRegistryArdSearch422JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceRegistryArdSearch500JSONResponseBodyFault.
+const (
+	PostApiGovernanceRegistryArdSearch500JSONResponseBodyFaultCustomer         PostApiGovernanceRegistryArdSearch500JSONResponseBodyFault = "customer"
+	PostApiGovernanceRegistryArdSearch500JSONResponseBodyFaultPlatform         PostApiGovernanceRegistryArdSearch500JSONResponseBodyFault = "platform"
+	PostApiGovernanceRegistryArdSearch500JSONResponseBodyFaultPresumedPlatform PostApiGovernanceRegistryArdSearch500JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceRegistryArdSearch500JSONResponseBodyFaultProvider         PostApiGovernanceRegistryArdSearch500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceRegistryArdSearch500JSONResponseBodyFault enum.
+func (e PostApiGovernanceRegistryArdSearch500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceRegistryArdSearch500JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceRegistryArdSearch500JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceRegistryArdSearch500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceRegistryArdSearch500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentEndpointsKind.
+const (
+	GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentEndpointsKindConsole    GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentEndpointsKind = "console"
+	GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentEndpointsKindDefinition GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentEndpointsKind = "definition"
+	GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentEndpointsKindInvoke     GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentEndpointsKind = "invoke"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentEndpointsKind enum.
+func (e GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentEndpointsKind) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentEndpointsKindConsole:
+		return true
+	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentEndpointsKindDefinition:
+		return true
+	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentEndpointsKindInvoke:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentManagement.
+const (
+	GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentManagementDiscovered GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentManagement = "discovered"
+	GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentManagementManaged    GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentManagement = "managed"
+	GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentManagementObserved   GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentManagement = "observed"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentManagement enum.
+func (e GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentManagement) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentManagementDiscovered:
+		return true
+	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentManagementManaged:
+		return true
+	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentManagementObserved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentSource.
+const (
+	GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentSourceCopilotStudio GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentSource = "copilot_studio"
+	GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentSourceDatabricks    GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentSource = "databricks"
+	GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentSourceLangwatch     GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentSource = "langwatch"
+	GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentSourceTraffic       GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentSource = "traffic"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentSource enum.
+func (e GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentSource) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentSourceCopilotStudio:
+		return true
+	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentSourceDatabricks:
+		return true
+	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentSourceLangwatch:
+		return true
+	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentSourceTraffic:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentStatus.
+const (
+	GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentStatusActive  GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentStatus = "active"
+	GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentStatusRemoved GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentStatus = "removed"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentStatus enum.
+func (e GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentStatus) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentStatusActive:
+		return true
+	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentStatusRemoved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentToolsStatus.
+const (
+	GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentToolsStatusActive     GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentToolsStatus = "active"
+	GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentToolsStatusDeprecated GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentToolsStatus = "deprecated"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentToolsStatus enum.
+func (e GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentToolsStatus) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentToolsStatusActive:
+		return true
+	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentToolsStatusDeprecated:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryEvents200JSONResponseBodyDataType.
+const (
+	GetApiGovernanceRegistryEvents200JSONResponseBodyDataTypeGovernanceAgentFlaggedShadow  GetApiGovernanceRegistryEvents200JSONResponseBodyDataType = "governance.agent.flagged_shadow"
+	GetApiGovernanceRegistryEvents200JSONResponseBodyDataTypeGovernanceAgentRegistered     GetApiGovernanceRegistryEvents200JSONResponseBodyDataType = "governance.agent.registered"
+	GetApiGovernanceRegistryEvents200JSONResponseBodyDataTypeGovernanceAgentRemoved        GetApiGovernanceRegistryEvents200JSONResponseBodyDataType = "governance.agent.removed"
+	GetApiGovernanceRegistryEvents200JSONResponseBodyDataTypeGovernanceAgentToolDeprecated GetApiGovernanceRegistryEvents200JSONResponseBodyDataType = "governance.agent.tool_deprecated"
+	GetApiGovernanceRegistryEvents200JSONResponseBodyDataTypeGovernanceAgentVersioned      GetApiGovernanceRegistryEvents200JSONResponseBodyDataType = "governance.agent.versioned"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryEvents200JSONResponseBodyDataType enum.
+func (e GetApiGovernanceRegistryEvents200JSONResponseBodyDataType) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataTypeGovernanceAgentFlaggedShadow:
+		return true
+	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataTypeGovernanceAgentRegistered:
+		return true
+	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataTypeGovernanceAgentRemoved:
+		return true
+	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataTypeGovernanceAgentToolDeprecated:
+		return true
+	case GetApiGovernanceRegistryEvents200JSONResponseBodyDataTypeGovernanceAgentVersioned:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryEvents400JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistryEvents400JSONResponseBodyFaultCustomer         GetApiGovernanceRegistryEvents400JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistryEvents400JSONResponseBodyFaultPlatform         GetApiGovernanceRegistryEvents400JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistryEvents400JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistryEvents400JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistryEvents400JSONResponseBodyFaultProvider         GetApiGovernanceRegistryEvents400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryEvents400JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistryEvents400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryEvents400JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistryEvents400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistryEvents400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistryEvents400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryEvents401JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistryEvents401JSONResponseBodyFaultCustomer         GetApiGovernanceRegistryEvents401JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistryEvents401JSONResponseBodyFaultPlatform         GetApiGovernanceRegistryEvents401JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistryEvents401JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistryEvents401JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistryEvents401JSONResponseBodyFaultProvider         GetApiGovernanceRegistryEvents401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryEvents401JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistryEvents401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryEvents401JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistryEvents401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistryEvents401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistryEvents401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryEvents403JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistryEvents403JSONResponseBodyFaultCustomer         GetApiGovernanceRegistryEvents403JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistryEvents403JSONResponseBodyFaultPlatform         GetApiGovernanceRegistryEvents403JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistryEvents403JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistryEvents403JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistryEvents403JSONResponseBodyFaultProvider         GetApiGovernanceRegistryEvents403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryEvents403JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistryEvents403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryEvents403JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistryEvents403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistryEvents403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistryEvents403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryEvents422JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistryEvents422JSONResponseBodyFaultCustomer         GetApiGovernanceRegistryEvents422JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistryEvents422JSONResponseBodyFaultPlatform         GetApiGovernanceRegistryEvents422JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistryEvents422JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistryEvents422JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistryEvents422JSONResponseBodyFaultProvider         GetApiGovernanceRegistryEvents422JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryEvents422JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistryEvents422JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryEvents422JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistryEvents422JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistryEvents422JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistryEvents422JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistryEvents500JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistryEvents500JSONResponseBodyFaultCustomer         GetApiGovernanceRegistryEvents500JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistryEvents500JSONResponseBodyFaultPlatform         GetApiGovernanceRegistryEvents500JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistryEvents500JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistryEvents500JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistryEvents500JSONResponseBodyFaultProvider         GetApiGovernanceRegistryEvents500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistryEvents500JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistryEvents500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistryEvents500JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistryEvents500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistryEvents500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistryEvents500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistrySchema400JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistrySchema400JSONResponseBodyFaultCustomer         GetApiGovernanceRegistrySchema400JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistrySchema400JSONResponseBodyFaultPlatform         GetApiGovernanceRegistrySchema400JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistrySchema400JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistrySchema400JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistrySchema400JSONResponseBodyFaultProvider         GetApiGovernanceRegistrySchema400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistrySchema400JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistrySchema400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistrySchema400JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistrySchema400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistrySchema400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistrySchema400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistrySchema401JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistrySchema401JSONResponseBodyFaultCustomer         GetApiGovernanceRegistrySchema401JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistrySchema401JSONResponseBodyFaultPlatform         GetApiGovernanceRegistrySchema401JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistrySchema401JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistrySchema401JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistrySchema401JSONResponseBodyFaultProvider         GetApiGovernanceRegistrySchema401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistrySchema401JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistrySchema401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistrySchema401JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistrySchema401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistrySchema401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistrySchema401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistrySchema403JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistrySchema403JSONResponseBodyFaultCustomer         GetApiGovernanceRegistrySchema403JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistrySchema403JSONResponseBodyFaultPlatform         GetApiGovernanceRegistrySchema403JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistrySchema403JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistrySchema403JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistrySchema403JSONResponseBodyFaultProvider         GetApiGovernanceRegistrySchema403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistrySchema403JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistrySchema403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistrySchema403JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistrySchema403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistrySchema403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistrySchema403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceRegistrySchema500JSONResponseBodyFault.
+const (
+	GetApiGovernanceRegistrySchema500JSONResponseBodyFaultCustomer         GetApiGovernanceRegistrySchema500JSONResponseBodyFault = "customer"
+	GetApiGovernanceRegistrySchema500JSONResponseBodyFaultPlatform         GetApiGovernanceRegistrySchema500JSONResponseBodyFault = "platform"
+	GetApiGovernanceRegistrySchema500JSONResponseBodyFaultPresumedPlatform GetApiGovernanceRegistrySchema500JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceRegistrySchema500JSONResponseBodyFaultProvider         GetApiGovernanceRegistrySchema500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceRegistrySchema500JSONResponseBodyFault enum.
+func (e GetApiGovernanceRegistrySchema500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceRegistrySchema500JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceRegistrySchema500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceRegistrySchema500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceRegistrySchema500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListGrantsParamsPrincipalType.
 const (
 	ListGrantsParamsPrincipalTypeApiKey ListGrantsParamsPrincipalType = "apiKey"
@@ -17120,19 +18740,19 @@ func (e PostLangyControlFramesJSONBodyFrames3Type) Valid() bool {
 
 // Defines values for PostLangyControlFramesJSONBodyFrames4Decision.
 const (
-	AllowOnce    PostLangyControlFramesJSONBodyFrames4Decision = "allow_once"
-	AllowPattern PostLangyControlFramesJSONBodyFrames4Decision = "allow_pattern"
-	Deny         PostLangyControlFramesJSONBodyFrames4Decision = "deny"
+	PostLangyControlFramesJSONBodyFrames4DecisionAllowOnce    PostLangyControlFramesJSONBodyFrames4Decision = "allow_once"
+	PostLangyControlFramesJSONBodyFrames4DecisionAllowPattern PostLangyControlFramesJSONBodyFrames4Decision = "allow_pattern"
+	PostLangyControlFramesJSONBodyFrames4DecisionDeny         PostLangyControlFramesJSONBodyFrames4Decision = "deny"
 )
 
 // Valid indicates whether the value is a known member of the PostLangyControlFramesJSONBodyFrames4Decision enum.
 func (e PostLangyControlFramesJSONBodyFrames4Decision) Valid() bool {
 	switch e {
-	case AllowOnce:
+	case PostLangyControlFramesJSONBodyFrames4DecisionAllowOnce:
 		return true
-	case AllowPattern:
+	case PostLangyControlFramesJSONBodyFrames4DecisionAllowPattern:
 		return true
-	case Deny:
+	case PostLangyControlFramesJSONBodyFrames4DecisionDeny:
 		return true
 	default:
 		return false
@@ -27653,22 +29273,22 @@ func (e GetApiV1QuerySchema403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiV1QuerySchema500JSONResponseBodyFault.
 const (
-	Customer         GetApiV1QuerySchema500JSONResponseBodyFault = "customer"
-	Platform         GetApiV1QuerySchema500JSONResponseBodyFault = "platform"
-	PresumedPlatform GetApiV1QuerySchema500JSONResponseBodyFault = "presumed_platform"
-	Provider         GetApiV1QuerySchema500JSONResponseBodyFault = "provider"
+	GetApiV1QuerySchema500JSONResponseBodyFaultCustomer         GetApiV1QuerySchema500JSONResponseBodyFault = "customer"
+	GetApiV1QuerySchema500JSONResponseBodyFaultPlatform         GetApiV1QuerySchema500JSONResponseBodyFault = "platform"
+	GetApiV1QuerySchema500JSONResponseBodyFaultPresumedPlatform GetApiV1QuerySchema500JSONResponseBodyFault = "presumed_platform"
+	GetApiV1QuerySchema500JSONResponseBodyFaultProvider         GetApiV1QuerySchema500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1QuerySchema500JSONResponseBodyFault enum.
 func (e GetApiV1QuerySchema500JSONResponseBodyFault) Valid() bool {
 	switch e {
-	case Customer:
+	case GetApiV1QuerySchema500JSONResponseBodyFaultCustomer:
 		return true
-	case Platform:
+	case GetApiV1QuerySchema500JSONResponseBodyFaultPlatform:
 		return true
-	case PresumedPlatform:
+	case GetApiV1QuerySchema500JSONResponseBodyFaultPresumedPlatform:
 		return true
-	case Provider:
+	case GetApiV1QuerySchema500JSONResponseBodyFaultProvider:
 		return true
 	default:
 		return false
@@ -29240,13 +30860,13 @@ func (e PostApiScenarioEventsJSONBody2Messages2Parts0Type) Valid() bool {
 
 // Defines values for PostApiScenarioEventsJSONBody2Messages2Parts2ImageUrlDetail0.
 const (
-	PostApiScenarioEventsJSONBody2Messages2Parts2ImageUrlDetail0Auto PostApiScenarioEventsJSONBody2Messages2Parts2ImageUrlDetail0 = "auto"
+	Auto PostApiScenarioEventsJSONBody2Messages2Parts2ImageUrlDetail0 = "auto"
 )
 
 // Valid indicates whether the value is a known member of the PostApiScenarioEventsJSONBody2Messages2Parts2ImageUrlDetail0 enum.
 func (e PostApiScenarioEventsJSONBody2Messages2Parts2ImageUrlDetail0) Valid() bool {
 	switch e {
-	case PostApiScenarioEventsJSONBody2Messages2Parts2ImageUrlDetail0Auto:
+	case Auto:
 		return true
 	default:
 		return false
@@ -47365,6 +48985,354 @@ type PatchApiGovernanceIngestionTemplatesByIdOttlRulesJSONBody struct {
 	OttlRules string `json:"ottl_rules"`
 }
 
+// GetApiGovernanceRegistryAgentsParams defines parameters for GetApiGovernanceRegistryAgents.
+type GetApiGovernanceRegistryAgentsParams struct {
+	Limit        *int                                        `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor       *string                                     `form:"cursor,omitempty" json:"cursor,omitempty"`
+	UpdatedSince *time.Time                                  `form:"updated_since,omitempty" json:"updated_since,omitempty"`
+	Status       *GetApiGovernanceRegistryAgentsParamsStatus `form:"status,omitempty" json:"status,omitempty"`
+}
+
+// GetApiGovernanceRegistryAgentsParamsStatus defines parameters for GetApiGovernanceRegistryAgents.
+type GetApiGovernanceRegistryAgentsParamsStatus string
+
+// GetApiGovernanceRegistryAgents200JSONResponseBodyDataEndpointsKind defines parameters for GetApiGovernanceRegistryAgents.
+type GetApiGovernanceRegistryAgents200JSONResponseBodyDataEndpointsKind string
+
+// GetApiGovernanceRegistryAgents200JSONResponseBodyDataManagement defines parameters for GetApiGovernanceRegistryAgents.
+type GetApiGovernanceRegistryAgents200JSONResponseBodyDataManagement string
+
+// GetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters0 defines parameters for GetApiGovernanceRegistryAgents.
+type GetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters0 = string
+
+// GetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters1 defines parameters for GetApiGovernanceRegistryAgents.
+type GetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters1 = float32
+
+// GetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters2 defines parameters for GetApiGovernanceRegistryAgents.
+type GetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters2 = bool
+
+// GetApiGovernanceRegistryAgents200JSONResponseBody_Data_Model_Parameters_AdditionalProperties defines parameters for GetApiGovernanceRegistryAgents.
+type GetApiGovernanceRegistryAgents200JSONResponseBody_Data_Model_Parameters_AdditionalProperties struct {
+	union json.RawMessage
+}
+
+// GetApiGovernanceRegistryAgents200JSONResponseBodyDataSource defines parameters for GetApiGovernanceRegistryAgents.
+type GetApiGovernanceRegistryAgents200JSONResponseBodyDataSource string
+
+// GetApiGovernanceRegistryAgents200JSONResponseBodyDataStatus defines parameters for GetApiGovernanceRegistryAgents.
+type GetApiGovernanceRegistryAgents200JSONResponseBodyDataStatus string
+
+// GetApiGovernanceRegistryAgents200JSONResponseBodyDataToolsStatus defines parameters for GetApiGovernanceRegistryAgents.
+type GetApiGovernanceRegistryAgents200JSONResponseBodyDataToolsStatus string
+
+// GetApiGovernanceRegistryAgents400JSONResponseBodyFault defines parameters for GetApiGovernanceRegistryAgents.
+type GetApiGovernanceRegistryAgents400JSONResponseBodyFault string
+
+// GetApiGovernanceRegistryAgents401JSONResponseBodyFault defines parameters for GetApiGovernanceRegistryAgents.
+type GetApiGovernanceRegistryAgents401JSONResponseBodyFault string
+
+// GetApiGovernanceRegistryAgents403JSONResponseBodyFault defines parameters for GetApiGovernanceRegistryAgents.
+type GetApiGovernanceRegistryAgents403JSONResponseBodyFault string
+
+// GetApiGovernanceRegistryAgents422JSONResponseBodyFault defines parameters for GetApiGovernanceRegistryAgents.
+type GetApiGovernanceRegistryAgents422JSONResponseBodyFault string
+
+// GetApiGovernanceRegistryAgents500JSONResponseBodyFault defines parameters for GetApiGovernanceRegistryAgents.
+type GetApiGovernanceRegistryAgents500JSONResponseBodyFault string
+
+// GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataEndpointsKind defines parameters for GetApiGovernanceRegistryAgentsById.
+type GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataEndpointsKind string
+
+// GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataManagement defines parameters for GetApiGovernanceRegistryAgentsById.
+type GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataManagement string
+
+// GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters0 defines parameters for GetApiGovernanceRegistryAgentsById.
+type GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters0 = string
+
+// GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters1 defines parameters for GetApiGovernanceRegistryAgentsById.
+type GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters1 = float32
+
+// GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters2 defines parameters for GetApiGovernanceRegistryAgentsById.
+type GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters2 = bool
+
+// GetApiGovernanceRegistryAgentsById200JSONResponseBody_Data_Model_Parameters_AdditionalProperties defines parameters for GetApiGovernanceRegistryAgentsById.
+type GetApiGovernanceRegistryAgentsById200JSONResponseBody_Data_Model_Parameters_AdditionalProperties struct {
+	union json.RawMessage
+}
+
+// GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataSource defines parameters for GetApiGovernanceRegistryAgentsById.
+type GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataSource string
+
+// GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataStatus defines parameters for GetApiGovernanceRegistryAgentsById.
+type GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataStatus string
+
+// GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataToolsStatus defines parameters for GetApiGovernanceRegistryAgentsById.
+type GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataToolsStatus string
+
+// GetApiGovernanceRegistryAgentsById400JSONResponseBodyFault defines parameters for GetApiGovernanceRegistryAgentsById.
+type GetApiGovernanceRegistryAgentsById400JSONResponseBodyFault string
+
+// GetApiGovernanceRegistryAgentsById401JSONResponseBodyFault defines parameters for GetApiGovernanceRegistryAgentsById.
+type GetApiGovernanceRegistryAgentsById401JSONResponseBodyFault string
+
+// GetApiGovernanceRegistryAgentsById403JSONResponseBodyFault defines parameters for GetApiGovernanceRegistryAgentsById.
+type GetApiGovernanceRegistryAgentsById403JSONResponseBodyFault string
+
+// GetApiGovernanceRegistryAgentsById404JSONResponseBodyFault defines parameters for GetApiGovernanceRegistryAgentsById.
+type GetApiGovernanceRegistryAgentsById404JSONResponseBodyFault string
+
+// GetApiGovernanceRegistryAgentsById422JSONResponseBodyFault defines parameters for GetApiGovernanceRegistryAgentsById.
+type GetApiGovernanceRegistryAgentsById422JSONResponseBodyFault string
+
+// GetApiGovernanceRegistryAgentsById500JSONResponseBodyFault defines parameters for GetApiGovernanceRegistryAgentsById.
+type GetApiGovernanceRegistryAgentsById500JSONResponseBodyFault string
+
+// GetApiGovernanceRegistryAgentsByIdVersionsParams defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
+type GetApiGovernanceRegistryAgentsByIdVersionsParams struct {
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentEndpointsKind defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
+type GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentEndpointsKind string
+
+// GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentManagement defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
+type GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentManagement string
+
+// GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters0 defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
+type GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters0 = string
+
+// GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters1 defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
+type GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters1 = float32
+
+// GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters2 defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
+type GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters2 = bool
+
+// GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
+type GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties struct {
+	union json.RawMessage
+}
+
+// GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentSource defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
+type GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentSource string
+
+// GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentStatus defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
+type GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentStatus string
+
+// GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentToolsStatus defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
+type GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentToolsStatus string
+
+// GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
+type GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType string
+
+// GetApiGovernanceRegistryAgentsByIdVersions400JSONResponseBodyFault defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
+type GetApiGovernanceRegistryAgentsByIdVersions400JSONResponseBodyFault string
+
+// GetApiGovernanceRegistryAgentsByIdVersions401JSONResponseBodyFault defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
+type GetApiGovernanceRegistryAgentsByIdVersions401JSONResponseBodyFault string
+
+// GetApiGovernanceRegistryAgentsByIdVersions403JSONResponseBodyFault defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
+type GetApiGovernanceRegistryAgentsByIdVersions403JSONResponseBodyFault string
+
+// GetApiGovernanceRegistryAgentsByIdVersions404JSONResponseBodyFault defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
+type GetApiGovernanceRegistryAgentsByIdVersions404JSONResponseBodyFault string
+
+// GetApiGovernanceRegistryAgentsByIdVersions422JSONResponseBodyFault defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
+type GetApiGovernanceRegistryAgentsByIdVersions422JSONResponseBodyFault string
+
+// GetApiGovernanceRegistryAgentsByIdVersions500JSONResponseBodyFault defines parameters for GetApiGovernanceRegistryAgentsByIdVersions.
+type GetApiGovernanceRegistryAgentsByIdVersions500JSONResponseBodyFault string
+
+// GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesContext defines parameters for GetApiGovernanceRegistryArdManifest.
+type GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesContext string
+
+// GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataEndpointsKind defines parameters for GetApiGovernanceRegistryArdManifest.
+type GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataEndpointsKind string
+
+// GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataManagement defines parameters for GetApiGovernanceRegistryArdManifest.
+type GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataManagement string
+
+// GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters0 defines parameters for GetApiGovernanceRegistryArdManifest.
+type GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters0 = string
+
+// GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters1 defines parameters for GetApiGovernanceRegistryArdManifest.
+type GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters1 = float32
+
+// GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters2 defines parameters for GetApiGovernanceRegistryArdManifest.
+type GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters2 = bool
+
+// GetApiGovernanceRegistryArdManifest200JSONResponseBody_Entries_Data_Model_Parameters_AdditionalProperties defines parameters for GetApiGovernanceRegistryArdManifest.
+type GetApiGovernanceRegistryArdManifest200JSONResponseBody_Entries_Data_Model_Parameters_AdditionalProperties struct {
+	union json.RawMessage
+}
+
+// GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataSource defines parameters for GetApiGovernanceRegistryArdManifest.
+type GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataSource string
+
+// GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataStatus defines parameters for GetApiGovernanceRegistryArdManifest.
+type GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataStatus string
+
+// GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataToolsStatus defines parameters for GetApiGovernanceRegistryArdManifest.
+type GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataToolsStatus string
+
+// GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesType defines parameters for GetApiGovernanceRegistryArdManifest.
+type GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesType string
+
+// GetApiGovernanceRegistryArdManifest200JSONResponseBodySpecVersion defines parameters for GetApiGovernanceRegistryArdManifest.
+type GetApiGovernanceRegistryArdManifest200JSONResponseBodySpecVersion string
+
+// GetApiGovernanceRegistryArdManifest400JSONResponseBodyFault defines parameters for GetApiGovernanceRegistryArdManifest.
+type GetApiGovernanceRegistryArdManifest400JSONResponseBodyFault string
+
+// GetApiGovernanceRegistryArdManifest401JSONResponseBodyFault defines parameters for GetApiGovernanceRegistryArdManifest.
+type GetApiGovernanceRegistryArdManifest401JSONResponseBodyFault string
+
+// GetApiGovernanceRegistryArdManifest403JSONResponseBodyFault defines parameters for GetApiGovernanceRegistryArdManifest.
+type GetApiGovernanceRegistryArdManifest403JSONResponseBodyFault string
+
+// GetApiGovernanceRegistryArdManifest500JSONResponseBodyFault defines parameters for GetApiGovernanceRegistryArdManifest.
+type GetApiGovernanceRegistryArdManifest500JSONResponseBodyFault string
+
+// PostApiGovernanceRegistryArdSearchJSONBody defines parameters for PostApiGovernanceRegistryArdSearch.
+type PostApiGovernanceRegistryArdSearchJSONBody struct {
+	Federation *PostApiGovernanceRegistryArdSearchJSONBodyFederation `json:"federation,omitempty"`
+	PageSize   *int                                                  `json:"pageSize,omitempty"`
+	PageToken  *string                                               `json:"pageToken,omitempty"`
+	Query      struct {
+		Filter *map[string]PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties `json:"filter,omitempty"`
+		Text   string                                                                                   `json:"text"`
+	} `json:"query"`
+}
+
+// PostApiGovernanceRegistryArdSearchJSONBodyFederation defines parameters for PostApiGovernanceRegistryArdSearch.
+type PostApiGovernanceRegistryArdSearchJSONBodyFederation string
+
+// PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0 defines parameters for PostApiGovernanceRegistryArdSearch.
+type PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0 = string
+
+// PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1 defines parameters for PostApiGovernanceRegistryArdSearch.
+type PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1 = []string
+
+// PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties defines parameters for PostApiGovernanceRegistryArdSearch.
+type PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties struct {
+	union json.RawMessage
+}
+
+// PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsContext defines parameters for PostApiGovernanceRegistryArdSearch.
+type PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsContext string
+
+// PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataEndpointsKind defines parameters for PostApiGovernanceRegistryArdSearch.
+type PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataEndpointsKind string
+
+// PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataManagement defines parameters for PostApiGovernanceRegistryArdSearch.
+type PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataManagement string
+
+// PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters0 defines parameters for PostApiGovernanceRegistryArdSearch.
+type PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters0 = string
+
+// PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters1 defines parameters for PostApiGovernanceRegistryArdSearch.
+type PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters1 = float32
+
+// PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters2 defines parameters for PostApiGovernanceRegistryArdSearch.
+type PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters2 = bool
+
+// PostApiGovernanceRegistryArdSearch200JSONResponseBody_Results_Data_Model_Parameters_AdditionalProperties defines parameters for PostApiGovernanceRegistryArdSearch.
+type PostApiGovernanceRegistryArdSearch200JSONResponseBody_Results_Data_Model_Parameters_AdditionalProperties struct {
+	union json.RawMessage
+}
+
+// PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataSource defines parameters for PostApiGovernanceRegistryArdSearch.
+type PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataSource string
+
+// PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataStatus defines parameters for PostApiGovernanceRegistryArdSearch.
+type PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataStatus string
+
+// PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataToolsStatus defines parameters for PostApiGovernanceRegistryArdSearch.
+type PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataToolsStatus string
+
+// PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsType defines parameters for PostApiGovernanceRegistryArdSearch.
+type PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsType string
+
+// PostApiGovernanceRegistryArdSearch400JSONResponseBodyFault defines parameters for PostApiGovernanceRegistryArdSearch.
+type PostApiGovernanceRegistryArdSearch400JSONResponseBodyFault string
+
+// PostApiGovernanceRegistryArdSearch401JSONResponseBodyFault defines parameters for PostApiGovernanceRegistryArdSearch.
+type PostApiGovernanceRegistryArdSearch401JSONResponseBodyFault string
+
+// PostApiGovernanceRegistryArdSearch403JSONResponseBodyFault defines parameters for PostApiGovernanceRegistryArdSearch.
+type PostApiGovernanceRegistryArdSearch403JSONResponseBodyFault string
+
+// PostApiGovernanceRegistryArdSearch422JSONResponseBodyFault defines parameters for PostApiGovernanceRegistryArdSearch.
+type PostApiGovernanceRegistryArdSearch422JSONResponseBodyFault string
+
+// PostApiGovernanceRegistryArdSearch500JSONResponseBodyFault defines parameters for PostApiGovernanceRegistryArdSearch.
+type PostApiGovernanceRegistryArdSearch500JSONResponseBodyFault string
+
+// GetApiGovernanceRegistryEventsParams defines parameters for GetApiGovernanceRegistryEvents.
+type GetApiGovernanceRegistryEventsParams struct {
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentEndpointsKind defines parameters for GetApiGovernanceRegistryEvents.
+type GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentEndpointsKind string
+
+// GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentManagement defines parameters for GetApiGovernanceRegistryEvents.
+type GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentManagement string
+
+// GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters0 defines parameters for GetApiGovernanceRegistryEvents.
+type GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters0 = string
+
+// GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters1 defines parameters for GetApiGovernanceRegistryEvents.
+type GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters1 = float32
+
+// GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters2 defines parameters for GetApiGovernanceRegistryEvents.
+type GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters2 = bool
+
+// GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties defines parameters for GetApiGovernanceRegistryEvents.
+type GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties struct {
+	union json.RawMessage
+}
+
+// GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentSource defines parameters for GetApiGovernanceRegistryEvents.
+type GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentSource string
+
+// GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentStatus defines parameters for GetApiGovernanceRegistryEvents.
+type GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentStatus string
+
+// GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentToolsStatus defines parameters for GetApiGovernanceRegistryEvents.
+type GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentToolsStatus string
+
+// GetApiGovernanceRegistryEvents200JSONResponseBodyDataType defines parameters for GetApiGovernanceRegistryEvents.
+type GetApiGovernanceRegistryEvents200JSONResponseBodyDataType string
+
+// GetApiGovernanceRegistryEvents400JSONResponseBodyFault defines parameters for GetApiGovernanceRegistryEvents.
+type GetApiGovernanceRegistryEvents400JSONResponseBodyFault string
+
+// GetApiGovernanceRegistryEvents401JSONResponseBodyFault defines parameters for GetApiGovernanceRegistryEvents.
+type GetApiGovernanceRegistryEvents401JSONResponseBodyFault string
+
+// GetApiGovernanceRegistryEvents403JSONResponseBodyFault defines parameters for GetApiGovernanceRegistryEvents.
+type GetApiGovernanceRegistryEvents403JSONResponseBodyFault string
+
+// GetApiGovernanceRegistryEvents422JSONResponseBodyFault defines parameters for GetApiGovernanceRegistryEvents.
+type GetApiGovernanceRegistryEvents422JSONResponseBodyFault string
+
+// GetApiGovernanceRegistryEvents500JSONResponseBodyFault defines parameters for GetApiGovernanceRegistryEvents.
+type GetApiGovernanceRegistryEvents500JSONResponseBodyFault string
+
+// GetApiGovernanceRegistrySchema400JSONResponseBodyFault defines parameters for GetApiGovernanceRegistrySchema.
+type GetApiGovernanceRegistrySchema400JSONResponseBodyFault string
+
+// GetApiGovernanceRegistrySchema401JSONResponseBodyFault defines parameters for GetApiGovernanceRegistrySchema.
+type GetApiGovernanceRegistrySchema401JSONResponseBodyFault string
+
+// GetApiGovernanceRegistrySchema403JSONResponseBodyFault defines parameters for GetApiGovernanceRegistrySchema.
+type GetApiGovernanceRegistrySchema403JSONResponseBodyFault string
+
+// GetApiGovernanceRegistrySchema500JSONResponseBodyFault defines parameters for GetApiGovernanceRegistrySchema.
+type GetApiGovernanceRegistrySchema500JSONResponseBodyFault string
+
 // ListGrantsParams defines parameters for ListGrants.
 type ListGrantsParams struct {
 	PrincipalType *ListGrantsParamsPrincipalType `form:"principalType,omitempty" json:"principalType,omitempty"`
@@ -57423,6 +59391,9 @@ type PostApiGovernanceIngestionTemplatesCloneJSONRequestBody PostApiGovernanceIn
 
 // PatchApiGovernanceIngestionTemplatesByIdOttlRulesJSONRequestBody defines body for PatchApiGovernanceIngestionTemplatesByIdOttlRules for application/json ContentType.
 type PatchApiGovernanceIngestionTemplatesByIdOttlRulesJSONRequestBody PatchApiGovernanceIngestionTemplatesByIdOttlRulesJSONBody
+
+// PostApiGovernanceRegistryArdSearchJSONRequestBody defines body for PostApiGovernanceRegistryArdSearch for application/json ContentType.
+type PostApiGovernanceRegistryArdSearchJSONRequestBody PostApiGovernanceRegistryArdSearchJSONBody
 
 // CreateGrantJSONRequestBody defines body for CreateGrant for application/json ContentType.
 type CreateGrantJSONRequestBody CreateGrantJSONBody
@@ -102876,6 +104847,596 @@ func (t *GetApiExperimentsBySlugVersions200JSONResponseBody_NextCursor) Unmarsha
 	return err
 }
 
+// AsGetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters0 returns the union data inside the GetApiGovernanceRegistryAgents200JSONResponseBody_Data_Model_Parameters_AdditionalProperties as a GetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters0
+func (t GetApiGovernanceRegistryAgents200JSONResponseBody_Data_Model_Parameters_AdditionalProperties) AsGetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters0() (GetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters0, error) {
+	var body GetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters0 overwrites any union data inside the GetApiGovernanceRegistryAgents200JSONResponseBody_Data_Model_Parameters_AdditionalProperties as the provided GetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters0
+func (t *GetApiGovernanceRegistryAgents200JSONResponseBody_Data_Model_Parameters_AdditionalProperties) FromGetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters0(v GetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters0 performs a merge with any union data inside the GetApiGovernanceRegistryAgents200JSONResponseBody_Data_Model_Parameters_AdditionalProperties, using the provided GetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters0
+func (t *GetApiGovernanceRegistryAgents200JSONResponseBody_Data_Model_Parameters_AdditionalProperties) MergeGetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters0(v GetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters1 returns the union data inside the GetApiGovernanceRegistryAgents200JSONResponseBody_Data_Model_Parameters_AdditionalProperties as a GetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters1
+func (t GetApiGovernanceRegistryAgents200JSONResponseBody_Data_Model_Parameters_AdditionalProperties) AsGetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters1() (GetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters1, error) {
+	var body GetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters1 overwrites any union data inside the GetApiGovernanceRegistryAgents200JSONResponseBody_Data_Model_Parameters_AdditionalProperties as the provided GetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters1
+func (t *GetApiGovernanceRegistryAgents200JSONResponseBody_Data_Model_Parameters_AdditionalProperties) FromGetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters1(v GetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters1 performs a merge with any union data inside the GetApiGovernanceRegistryAgents200JSONResponseBody_Data_Model_Parameters_AdditionalProperties, using the provided GetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters1
+func (t *GetApiGovernanceRegistryAgents200JSONResponseBody_Data_Model_Parameters_AdditionalProperties) MergeGetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters1(v GetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters2 returns the union data inside the GetApiGovernanceRegistryAgents200JSONResponseBody_Data_Model_Parameters_AdditionalProperties as a GetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters2
+func (t GetApiGovernanceRegistryAgents200JSONResponseBody_Data_Model_Parameters_AdditionalProperties) AsGetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters2() (GetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters2, error) {
+	var body GetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters2 overwrites any union data inside the GetApiGovernanceRegistryAgents200JSONResponseBody_Data_Model_Parameters_AdditionalProperties as the provided GetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters2
+func (t *GetApiGovernanceRegistryAgents200JSONResponseBody_Data_Model_Parameters_AdditionalProperties) FromGetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters2(v GetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters2 performs a merge with any union data inside the GetApiGovernanceRegistryAgents200JSONResponseBody_Data_Model_Parameters_AdditionalProperties, using the provided GetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters2
+func (t *GetApiGovernanceRegistryAgents200JSONResponseBody_Data_Model_Parameters_AdditionalProperties) MergeGetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters2(v GetApiGovernanceRegistryAgents200JSONResponseBodyDataModelParameters2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiGovernanceRegistryAgents200JSONResponseBody_Data_Model_Parameters_AdditionalProperties) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiGovernanceRegistryAgents200JSONResponseBody_Data_Model_Parameters_AdditionalProperties) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters0 returns the union data inside the GetApiGovernanceRegistryAgentsById200JSONResponseBody_Data_Model_Parameters_AdditionalProperties as a GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters0
+func (t GetApiGovernanceRegistryAgentsById200JSONResponseBody_Data_Model_Parameters_AdditionalProperties) AsGetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters0() (GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters0, error) {
+	var body GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters0 overwrites any union data inside the GetApiGovernanceRegistryAgentsById200JSONResponseBody_Data_Model_Parameters_AdditionalProperties as the provided GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters0
+func (t *GetApiGovernanceRegistryAgentsById200JSONResponseBody_Data_Model_Parameters_AdditionalProperties) FromGetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters0(v GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters0 performs a merge with any union data inside the GetApiGovernanceRegistryAgentsById200JSONResponseBody_Data_Model_Parameters_AdditionalProperties, using the provided GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters0
+func (t *GetApiGovernanceRegistryAgentsById200JSONResponseBody_Data_Model_Parameters_AdditionalProperties) MergeGetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters0(v GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters1 returns the union data inside the GetApiGovernanceRegistryAgentsById200JSONResponseBody_Data_Model_Parameters_AdditionalProperties as a GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters1
+func (t GetApiGovernanceRegistryAgentsById200JSONResponseBody_Data_Model_Parameters_AdditionalProperties) AsGetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters1() (GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters1, error) {
+	var body GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters1 overwrites any union data inside the GetApiGovernanceRegistryAgentsById200JSONResponseBody_Data_Model_Parameters_AdditionalProperties as the provided GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters1
+func (t *GetApiGovernanceRegistryAgentsById200JSONResponseBody_Data_Model_Parameters_AdditionalProperties) FromGetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters1(v GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters1 performs a merge with any union data inside the GetApiGovernanceRegistryAgentsById200JSONResponseBody_Data_Model_Parameters_AdditionalProperties, using the provided GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters1
+func (t *GetApiGovernanceRegistryAgentsById200JSONResponseBody_Data_Model_Parameters_AdditionalProperties) MergeGetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters1(v GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters2 returns the union data inside the GetApiGovernanceRegistryAgentsById200JSONResponseBody_Data_Model_Parameters_AdditionalProperties as a GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters2
+func (t GetApiGovernanceRegistryAgentsById200JSONResponseBody_Data_Model_Parameters_AdditionalProperties) AsGetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters2() (GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters2, error) {
+	var body GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters2 overwrites any union data inside the GetApiGovernanceRegistryAgentsById200JSONResponseBody_Data_Model_Parameters_AdditionalProperties as the provided GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters2
+func (t *GetApiGovernanceRegistryAgentsById200JSONResponseBody_Data_Model_Parameters_AdditionalProperties) FromGetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters2(v GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters2 performs a merge with any union data inside the GetApiGovernanceRegistryAgentsById200JSONResponseBody_Data_Model_Parameters_AdditionalProperties, using the provided GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters2
+func (t *GetApiGovernanceRegistryAgentsById200JSONResponseBody_Data_Model_Parameters_AdditionalProperties) MergeGetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters2(v GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataModelParameters2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiGovernanceRegistryAgentsById200JSONResponseBody_Data_Model_Parameters_AdditionalProperties) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiGovernanceRegistryAgentsById200JSONResponseBody_Data_Model_Parameters_AdditionalProperties) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters0 returns the union data inside the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties as a GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters0
+func (t GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties) AsGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters0() (GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters0, error) {
+	var body GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters0 overwrites any union data inside the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties as the provided GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters0
+func (t *GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties) FromGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters0(v GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters0 performs a merge with any union data inside the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties, using the provided GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters0
+func (t *GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties) MergeGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters0(v GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters1 returns the union data inside the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties as a GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters1
+func (t GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties) AsGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters1() (GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters1, error) {
+	var body GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters1 overwrites any union data inside the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties as the provided GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters1
+func (t *GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties) FromGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters1(v GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters1 performs a merge with any union data inside the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties, using the provided GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters1
+func (t *GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties) MergeGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters1(v GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters2 returns the union data inside the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties as a GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters2
+func (t GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties) AsGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters2() (GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters2, error) {
+	var body GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters2 overwrites any union data inside the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties as the provided GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters2
+func (t *GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties) FromGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters2(v GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters2 performs a merge with any union data inside the GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties, using the provided GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters2
+func (t *GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties) MergeGetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters2(v GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentModelParameters2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters0 returns the union data inside the GetApiGovernanceRegistryArdManifest200JSONResponseBody_Entries_Data_Model_Parameters_AdditionalProperties as a GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters0
+func (t GetApiGovernanceRegistryArdManifest200JSONResponseBody_Entries_Data_Model_Parameters_AdditionalProperties) AsGetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters0() (GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters0, error) {
+	var body GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters0 overwrites any union data inside the GetApiGovernanceRegistryArdManifest200JSONResponseBody_Entries_Data_Model_Parameters_AdditionalProperties as the provided GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters0
+func (t *GetApiGovernanceRegistryArdManifest200JSONResponseBody_Entries_Data_Model_Parameters_AdditionalProperties) FromGetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters0(v GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters0 performs a merge with any union data inside the GetApiGovernanceRegistryArdManifest200JSONResponseBody_Entries_Data_Model_Parameters_AdditionalProperties, using the provided GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters0
+func (t *GetApiGovernanceRegistryArdManifest200JSONResponseBody_Entries_Data_Model_Parameters_AdditionalProperties) MergeGetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters0(v GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters1 returns the union data inside the GetApiGovernanceRegistryArdManifest200JSONResponseBody_Entries_Data_Model_Parameters_AdditionalProperties as a GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters1
+func (t GetApiGovernanceRegistryArdManifest200JSONResponseBody_Entries_Data_Model_Parameters_AdditionalProperties) AsGetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters1() (GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters1, error) {
+	var body GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters1 overwrites any union data inside the GetApiGovernanceRegistryArdManifest200JSONResponseBody_Entries_Data_Model_Parameters_AdditionalProperties as the provided GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters1
+func (t *GetApiGovernanceRegistryArdManifest200JSONResponseBody_Entries_Data_Model_Parameters_AdditionalProperties) FromGetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters1(v GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters1 performs a merge with any union data inside the GetApiGovernanceRegistryArdManifest200JSONResponseBody_Entries_Data_Model_Parameters_AdditionalProperties, using the provided GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters1
+func (t *GetApiGovernanceRegistryArdManifest200JSONResponseBody_Entries_Data_Model_Parameters_AdditionalProperties) MergeGetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters1(v GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters2 returns the union data inside the GetApiGovernanceRegistryArdManifest200JSONResponseBody_Entries_Data_Model_Parameters_AdditionalProperties as a GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters2
+func (t GetApiGovernanceRegistryArdManifest200JSONResponseBody_Entries_Data_Model_Parameters_AdditionalProperties) AsGetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters2() (GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters2, error) {
+	var body GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters2 overwrites any union data inside the GetApiGovernanceRegistryArdManifest200JSONResponseBody_Entries_Data_Model_Parameters_AdditionalProperties as the provided GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters2
+func (t *GetApiGovernanceRegistryArdManifest200JSONResponseBody_Entries_Data_Model_Parameters_AdditionalProperties) FromGetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters2(v GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters2 performs a merge with any union data inside the GetApiGovernanceRegistryArdManifest200JSONResponseBody_Entries_Data_Model_Parameters_AdditionalProperties, using the provided GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters2
+func (t *GetApiGovernanceRegistryArdManifest200JSONResponseBody_Entries_Data_Model_Parameters_AdditionalProperties) MergeGetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters2(v GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataModelParameters2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiGovernanceRegistryArdManifest200JSONResponseBody_Entries_Data_Model_Parameters_AdditionalProperties) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiGovernanceRegistryArdManifest200JSONResponseBody_Entries_Data_Model_Parameters_AdditionalProperties) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0 returns the union data inside the PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties as a PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0
+func (t PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties) AsPostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0() (PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0, error) {
+	var body PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0 overwrites any union data inside the PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties as the provided PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0
+func (t *PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties) FromPostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0(v PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0 performs a merge with any union data inside the PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties, using the provided PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0
+func (t *PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties) MergePostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0(v PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1 returns the union data inside the PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties as a PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1
+func (t PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties) AsPostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1() (PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1, error) {
+	var body PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1 overwrites any union data inside the PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties as the provided PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1
+func (t *PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties) FromPostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1(v PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1 performs a merge with any union data inside the PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties, using the provided PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1
+func (t *PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties) MergePostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1(v PostApiGovernanceRegistryArdSearchJSONBodyQueryFilter1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiGovernanceRegistryArdSearchJSONBody_Query_Filter_AdditionalProperties) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters0 returns the union data inside the PostApiGovernanceRegistryArdSearch200JSONResponseBody_Results_Data_Model_Parameters_AdditionalProperties as a PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters0
+func (t PostApiGovernanceRegistryArdSearch200JSONResponseBody_Results_Data_Model_Parameters_AdditionalProperties) AsPostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters0() (PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters0, error) {
+	var body PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters0 overwrites any union data inside the PostApiGovernanceRegistryArdSearch200JSONResponseBody_Results_Data_Model_Parameters_AdditionalProperties as the provided PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters0
+func (t *PostApiGovernanceRegistryArdSearch200JSONResponseBody_Results_Data_Model_Parameters_AdditionalProperties) FromPostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters0(v PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters0 performs a merge with any union data inside the PostApiGovernanceRegistryArdSearch200JSONResponseBody_Results_Data_Model_Parameters_AdditionalProperties, using the provided PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters0
+func (t *PostApiGovernanceRegistryArdSearch200JSONResponseBody_Results_Data_Model_Parameters_AdditionalProperties) MergePostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters0(v PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters1 returns the union data inside the PostApiGovernanceRegistryArdSearch200JSONResponseBody_Results_Data_Model_Parameters_AdditionalProperties as a PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters1
+func (t PostApiGovernanceRegistryArdSearch200JSONResponseBody_Results_Data_Model_Parameters_AdditionalProperties) AsPostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters1() (PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters1, error) {
+	var body PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters1 overwrites any union data inside the PostApiGovernanceRegistryArdSearch200JSONResponseBody_Results_Data_Model_Parameters_AdditionalProperties as the provided PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters1
+func (t *PostApiGovernanceRegistryArdSearch200JSONResponseBody_Results_Data_Model_Parameters_AdditionalProperties) FromPostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters1(v PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters1 performs a merge with any union data inside the PostApiGovernanceRegistryArdSearch200JSONResponseBody_Results_Data_Model_Parameters_AdditionalProperties, using the provided PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters1
+func (t *PostApiGovernanceRegistryArdSearch200JSONResponseBody_Results_Data_Model_Parameters_AdditionalProperties) MergePostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters1(v PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters2 returns the union data inside the PostApiGovernanceRegistryArdSearch200JSONResponseBody_Results_Data_Model_Parameters_AdditionalProperties as a PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters2
+func (t PostApiGovernanceRegistryArdSearch200JSONResponseBody_Results_Data_Model_Parameters_AdditionalProperties) AsPostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters2() (PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters2, error) {
+	var body PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters2 overwrites any union data inside the PostApiGovernanceRegistryArdSearch200JSONResponseBody_Results_Data_Model_Parameters_AdditionalProperties as the provided PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters2
+func (t *PostApiGovernanceRegistryArdSearch200JSONResponseBody_Results_Data_Model_Parameters_AdditionalProperties) FromPostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters2(v PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters2 performs a merge with any union data inside the PostApiGovernanceRegistryArdSearch200JSONResponseBody_Results_Data_Model_Parameters_AdditionalProperties, using the provided PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters2
+func (t *PostApiGovernanceRegistryArdSearch200JSONResponseBody_Results_Data_Model_Parameters_AdditionalProperties) MergePostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters2(v PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataModelParameters2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiGovernanceRegistryArdSearch200JSONResponseBody_Results_Data_Model_Parameters_AdditionalProperties) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiGovernanceRegistryArdSearch200JSONResponseBody_Results_Data_Model_Parameters_AdditionalProperties) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters0 returns the union data inside the GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties as a GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters0
+func (t GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties) AsGetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters0() (GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters0, error) {
+	var body GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters0 overwrites any union data inside the GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties as the provided GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters0
+func (t *GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties) FromGetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters0(v GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters0 performs a merge with any union data inside the GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties, using the provided GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters0
+func (t *GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties) MergeGetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters0(v GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters1 returns the union data inside the GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties as a GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters1
+func (t GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties) AsGetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters1() (GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters1, error) {
+	var body GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters1 overwrites any union data inside the GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties as the provided GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters1
+func (t *GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties) FromGetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters1(v GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters1 performs a merge with any union data inside the GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties, using the provided GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters1
+func (t *GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties) MergeGetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters1(v GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters2 returns the union data inside the GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties as a GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters2
+func (t GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties) AsGetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters2() (GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters2, error) {
+	var body GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters2 overwrites any union data inside the GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties as the provided GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters2
+func (t *GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties) FromGetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters2(v GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters2 performs a merge with any union data inside the GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties, using the provided GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters2
+func (t *GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties) MergeGetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters2(v GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentModelParameters2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsPostApiGuardrailsByEvaluatorEvaluateJSONBodySettings0 returns the union data inside the PostApiGuardrailsByEvaluatorEvaluateJSONBody_Settings as a PostApiGuardrailsByEvaluatorEvaluateJSONBodySettings0
 func (t PostApiGuardrailsByEvaluatorEvaluateJSONBody_Settings) AsPostApiGuardrailsByEvaluatorEvaluateJSONBodySettings0() (PostApiGuardrailsByEvaluatorEvaluateJSONBodySettings0, error) {
 	var body PostApiGuardrailsByEvaluatorEvaluateJSONBodySettings0
@@ -128069,6 +130630,29 @@ type ClientInterface interface {
 
 	PatchApiGovernanceIngestionTemplatesByIdOttlRules(ctx context.Context, ingestionTemplateId string, body PatchApiGovernanceIngestionTemplatesByIdOttlRulesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetApiGovernanceRegistryAgents request
+	GetApiGovernanceRegistryAgents(ctx context.Context, params *GetApiGovernanceRegistryAgentsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetApiGovernanceRegistryAgentsById request
+	GetApiGovernanceRegistryAgentsById(ctx context.Context, agentId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetApiGovernanceRegistryAgentsByIdVersions request
+	GetApiGovernanceRegistryAgentsByIdVersions(ctx context.Context, agentId string, params *GetApiGovernanceRegistryAgentsByIdVersionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetApiGovernanceRegistryArdManifest request
+	GetApiGovernanceRegistryArdManifest(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostApiGovernanceRegistryArdSearchWithBody request with any body
+	PostApiGovernanceRegistryArdSearchWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PostApiGovernanceRegistryArdSearch(ctx context.Context, body PostApiGovernanceRegistryArdSearchJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetApiGovernanceRegistryEvents request
+	GetApiGovernanceRegistryEvents(ctx context.Context, params *GetApiGovernanceRegistryEventsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetApiGovernanceRegistrySchema request
+	GetApiGovernanceRegistrySchema(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListGrants request
 	ListGrants(ctx context.Context, params *ListGrantsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -132252,6 +134836,102 @@ func (c *Client) PatchApiGovernanceIngestionTemplatesByIdOttlRulesWithBody(ctx c
 
 func (c *Client) PatchApiGovernanceIngestionTemplatesByIdOttlRules(ctx context.Context, ingestionTemplateId string, body PatchApiGovernanceIngestionTemplatesByIdOttlRulesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPatchApiGovernanceIngestionTemplatesByIdOttlRulesRequest(c.Server, ingestionTemplateId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiGovernanceRegistryAgents(ctx context.Context, params *GetApiGovernanceRegistryAgentsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiGovernanceRegistryAgentsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiGovernanceRegistryAgentsById(ctx context.Context, agentId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiGovernanceRegistryAgentsByIdRequest(c.Server, agentId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiGovernanceRegistryAgentsByIdVersions(ctx context.Context, agentId string, params *GetApiGovernanceRegistryAgentsByIdVersionsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiGovernanceRegistryAgentsByIdVersionsRequest(c.Server, agentId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiGovernanceRegistryArdManifest(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiGovernanceRegistryArdManifestRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiGovernanceRegistryArdSearchWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiGovernanceRegistryArdSearchRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiGovernanceRegistryArdSearch(ctx context.Context, body PostApiGovernanceRegistryArdSearchJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiGovernanceRegistryArdSearchRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiGovernanceRegistryEvents(ctx context.Context, params *GetApiGovernanceRegistryEventsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiGovernanceRegistryEventsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiGovernanceRegistrySchema(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiGovernanceRegistrySchemaRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -145014,6 +147694,363 @@ func NewPatchApiGovernanceIngestionTemplatesByIdOttlRulesRequestWithBody(server 
 	return req, nil
 }
 
+// NewGetApiGovernanceRegistryAgentsRequest generates requests for GetApiGovernanceRegistryAgents
+func NewGetApiGovernanceRegistryAgentsRequest(server string, params *GetApiGovernanceRegistryAgentsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/governance/registry/agents")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.UpdatedSince != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "updated_since", *params.UpdatedSince, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Status != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "status", *params.Status, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetApiGovernanceRegistryAgentsByIdRequest generates requests for GetApiGovernanceRegistryAgentsById
+func NewGetApiGovernanceRegistryAgentsByIdRequest(server string, agentId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "agentId", agentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/governance/registry/agents/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetApiGovernanceRegistryAgentsByIdVersionsRequest generates requests for GetApiGovernanceRegistryAgentsByIdVersions
+func NewGetApiGovernanceRegistryAgentsByIdVersionsRequest(server string, agentId string, params *GetApiGovernanceRegistryAgentsByIdVersionsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "agentId", agentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/governance/registry/agents/%s/versions", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetApiGovernanceRegistryArdManifestRequest generates requests for GetApiGovernanceRegistryArdManifest
+func NewGetApiGovernanceRegistryArdManifestRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/governance/registry/ard.json")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPostApiGovernanceRegistryArdSearchRequest calls the generic PostApiGovernanceRegistryArdSearch builder with application/json body
+func NewPostApiGovernanceRegistryArdSearchRequest(server string, body PostApiGovernanceRegistryArdSearchJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostApiGovernanceRegistryArdSearchRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewPostApiGovernanceRegistryArdSearchRequestWithBody generates requests for PostApiGovernanceRegistryArdSearch with any type of body
+func NewPostApiGovernanceRegistryArdSearchRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/governance/registry/ard/search")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetApiGovernanceRegistryEventsRequest generates requests for GetApiGovernanceRegistryEvents
+func NewGetApiGovernanceRegistryEventsRequest(server string, params *GetApiGovernanceRegistryEventsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/governance/registry/events")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetApiGovernanceRegistrySchemaRequest generates requests for GetApiGovernanceRegistrySchema
+func NewGetApiGovernanceRegistrySchemaRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/governance/registry/schema")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListGrantsRequest generates requests for ListGrants
 func NewListGrantsRequest(server string, params *ListGrantsParams) (*http.Request, error) {
 	var err error
@@ -155465,6 +158502,29 @@ type ClientWithResponsesInterface interface {
 	PatchApiGovernanceIngestionTemplatesByIdOttlRulesWithBodyWithResponse(ctx context.Context, ingestionTemplateId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse, error)
 
 	PatchApiGovernanceIngestionTemplatesByIdOttlRulesWithResponse(ctx context.Context, ingestionTemplateId string, body PatchApiGovernanceIngestionTemplatesByIdOttlRulesJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse, error)
+
+	// GetApiGovernanceRegistryAgentsWithResponse request
+	GetApiGovernanceRegistryAgentsWithResponse(ctx context.Context, params *GetApiGovernanceRegistryAgentsParams, reqEditors ...RequestEditorFn) (*GetApiGovernanceRegistryAgentsResponse, error)
+
+	// GetApiGovernanceRegistryAgentsByIdWithResponse request
+	GetApiGovernanceRegistryAgentsByIdWithResponse(ctx context.Context, agentId string, reqEditors ...RequestEditorFn) (*GetApiGovernanceRegistryAgentsByIdResponse, error)
+
+	// GetApiGovernanceRegistryAgentsByIdVersionsWithResponse request
+	GetApiGovernanceRegistryAgentsByIdVersionsWithResponse(ctx context.Context, agentId string, params *GetApiGovernanceRegistryAgentsByIdVersionsParams, reqEditors ...RequestEditorFn) (*GetApiGovernanceRegistryAgentsByIdVersionsResponse, error)
+
+	// GetApiGovernanceRegistryArdManifestWithResponse request
+	GetApiGovernanceRegistryArdManifestWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiGovernanceRegistryArdManifestResponse, error)
+
+	// PostApiGovernanceRegistryArdSearchWithBodyWithResponse request with any body
+	PostApiGovernanceRegistryArdSearchWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiGovernanceRegistryArdSearchResponse, error)
+
+	PostApiGovernanceRegistryArdSearchWithResponse(ctx context.Context, body PostApiGovernanceRegistryArdSearchJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiGovernanceRegistryArdSearchResponse, error)
+
+	// GetApiGovernanceRegistryEventsWithResponse request
+	GetApiGovernanceRegistryEventsWithResponse(ctx context.Context, params *GetApiGovernanceRegistryEventsParams, reqEditors ...RequestEditorFn) (*GetApiGovernanceRegistryEventsResponse, error)
+
+	// GetApiGovernanceRegistrySchemaWithResponse request
+	GetApiGovernanceRegistrySchemaWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiGovernanceRegistrySchemaResponse, error)
 
 	// ListGrantsWithResponse request
 	ListGrantsWithResponse(ctx context.Context, params *ListGrantsParams, reqEditors ...RequestEditorFn) (*ListGrantsResponse, error)
@@ -169875,6 +172935,1203 @@ func (r PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse) StatusCode() 
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetApiGovernanceRegistryAgentsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data []struct {
+			Capabilities []string `json:"capabilities"`
+			Description  *string  `json:"description"`
+			Endpoints    []struct {
+				Kind     GetApiGovernanceRegistryAgents200JSONResponseBodyDataEndpointsKind `json:"kind"`
+				Protocol string                                                             `json:"protocol"`
+				Url      string                                                             `json:"url"`
+			} `json:"endpoints"`
+			Environment  *string                                                         `json:"environment"`
+			FirstSeenAt  string                                                          `json:"first_seen_at"`
+			Id           string                                                          `json:"id"`
+			Instructions *string                                                         `json:"instructions"`
+			Kind         string                                                          `json:"kind"`
+			LastSeenAt   *string                                                         `json:"last_seen_at"`
+			Management   GetApiGovernanceRegistryAgents200JSONResponseBodyDataManagement `json:"management"`
+			Model        *struct {
+				Model      string                                                                                                  `json:"model"`
+				Parameters map[string]GetApiGovernanceRegistryAgents200JSONResponseBody_Data_Model_Parameters_AdditionalProperties `json:"parameters"`
+				Provider   *string                                                                                                 `json:"provider"`
+			} `json:"model"`
+			Name  string `json:"name"`
+			Owner *struct {
+				Name   *string `json:"name"`
+				UserId string  `json:"user_id"`
+			} `json:"owner"`
+			ProjectId     *string                                                     `json:"project_id"`
+			RemovedAt     *string                                                     `json:"removed_at"`
+			Shadow        bool                                                        `json:"shadow"`
+			Source        GetApiGovernanceRegistryAgents200JSONResponseBodyDataSource `json:"source"`
+			SourceVersion *string                                                     `json:"source_version"`
+			Status        GetApiGovernanceRegistryAgents200JSONResponseBodyDataStatus `json:"status"`
+			Tools         []struct {
+				DeprecatedAt        *string                                                          `json:"deprecated_at"`
+				DeprecatedInVersion *int                                                             `json:"deprecated_in_version"`
+				Description         *string                                                          `json:"description"`
+				InputSchema         map[string]interface{}                                           `json:"input_schema"`
+				Name                string                                                           `json:"name"`
+				OutputSchema        *map[string]interface{}                                          `json:"output_schema"`
+				Status              GetApiGovernanceRegistryAgents200JSONResponseBodyDataToolsStatus `json:"status"`
+			} `json:"tools"`
+			UpdatedAt string `json:"updated_at"`
+			Version   int    `json:"version"`
+		} `json:"data"`
+		NextCursor *string `json:"next_cursor"`
+	}
+	JSON400 *struct {
+		Code      string                                                  `json:"code"`
+		DocsUrl   *string                                                 `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistryAgents400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                  `json:"message"`
+		Meta      *map[string]interface{}                                 `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                          `json:"reasons,omitempty"`
+		Retryable bool                                                    `json:"retryable"`
+		SpanId    *string                                                 `json:"span_id,omitempty"`
+		Tips      *[]string                                               `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                                  `json:"code"`
+		DocsUrl   *string                                                 `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistryAgents401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                  `json:"message"`
+		Meta      *map[string]interface{}                                 `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                          `json:"reasons,omitempty"`
+		Retryable bool                                                    `json:"retryable"`
+		SpanId    *string                                                 `json:"span_id,omitempty"`
+		Tips      *[]string                                               `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                                  `json:"code"`
+		DocsUrl   *string                                                 `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistryAgents403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                  `json:"message"`
+		Meta      *map[string]interface{}                                 `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                          `json:"reasons,omitempty"`
+		Retryable bool                                                    `json:"retryable"`
+		SpanId    *string                                                 `json:"span_id,omitempty"`
+		Tips      *[]string                                               `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON422 *struct {
+		Code      string                                                  `json:"code"`
+		DocsUrl   *string                                                 `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistryAgents422JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                  `json:"message"`
+		Meta      *map[string]interface{}                                 `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                          `json:"reasons,omitempty"`
+		Retryable bool                                                    `json:"retryable"`
+		SpanId    *string                                                 `json:"span_id,omitempty"`
+		Tips      *[]string                                               `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                                  `json:"code"`
+		DocsUrl   *string                                                 `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistryAgents500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                  `json:"message"`
+		Meta      *map[string]interface{}                                 `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                          `json:"reasons,omitempty"`
+		Retryable bool                                                    `json:"retryable"`
+		SpanId    *string                                                 `json:"span_id,omitempty"`
+		Tips      *[]string                                               `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiGovernanceRegistryAgentsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiGovernanceRegistryAgentsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiGovernanceRegistryAgentsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetApiGovernanceRegistryAgentsByIdResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data struct {
+			Capabilities []string `json:"capabilities"`
+			Description  *string  `json:"description"`
+			Endpoints    []struct {
+				Kind     GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataEndpointsKind `json:"kind"`
+				Protocol string                                                                 `json:"protocol"`
+				Url      string                                                                 `json:"url"`
+			} `json:"endpoints"`
+			Environment  *string                                                             `json:"environment"`
+			FirstSeenAt  string                                                              `json:"first_seen_at"`
+			Id           string                                                              `json:"id"`
+			Instructions *string                                                             `json:"instructions"`
+			Kind         string                                                              `json:"kind"`
+			LastSeenAt   *string                                                             `json:"last_seen_at"`
+			Management   GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataManagement `json:"management"`
+			Model        *struct {
+				Model      string                                                                                                      `json:"model"`
+				Parameters map[string]GetApiGovernanceRegistryAgentsById200JSONResponseBody_Data_Model_Parameters_AdditionalProperties `json:"parameters"`
+				Provider   *string                                                                                                     `json:"provider"`
+			} `json:"model"`
+			Name  string `json:"name"`
+			Owner *struct {
+				Name   *string `json:"name"`
+				UserId string  `json:"user_id"`
+			} `json:"owner"`
+			ProjectId     *string                                                         `json:"project_id"`
+			RemovedAt     *string                                                         `json:"removed_at"`
+			Shadow        bool                                                            `json:"shadow"`
+			Source        GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataSource `json:"source"`
+			SourceVersion *string                                                         `json:"source_version"`
+			Status        GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataStatus `json:"status"`
+			Tools         []struct {
+				DeprecatedAt        *string                                                              `json:"deprecated_at"`
+				DeprecatedInVersion *int                                                                 `json:"deprecated_in_version"`
+				Description         *string                                                              `json:"description"`
+				InputSchema         map[string]interface{}                                               `json:"input_schema"`
+				Name                string                                                               `json:"name"`
+				OutputSchema        *map[string]interface{}                                              `json:"output_schema"`
+				Status              GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataToolsStatus `json:"status"`
+			} `json:"tools"`
+			UpdatedAt string `json:"updated_at"`
+			Version   int    `json:"version"`
+		} `json:"data"`
+	}
+	JSON400 *struct {
+		Code      string                                                      `json:"code"`
+		DocsUrl   *string                                                     `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistryAgentsById400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                      `json:"message"`
+		Meta      *map[string]interface{}                                     `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                              `json:"reasons,omitempty"`
+		Retryable bool                                                        `json:"retryable"`
+		SpanId    *string                                                     `json:"span_id,omitempty"`
+		Tips      *[]string                                                   `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                                      `json:"code"`
+		DocsUrl   *string                                                     `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistryAgentsById401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                      `json:"message"`
+		Meta      *map[string]interface{}                                     `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                              `json:"reasons,omitempty"`
+		Retryable bool                                                        `json:"retryable"`
+		SpanId    *string                                                     `json:"span_id,omitempty"`
+		Tips      *[]string                                                   `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                                      `json:"code"`
+		DocsUrl   *string                                                     `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistryAgentsById403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                      `json:"message"`
+		Meta      *map[string]interface{}                                     `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                              `json:"reasons,omitempty"`
+		Retryable bool                                                        `json:"retryable"`
+		SpanId    *string                                                     `json:"span_id,omitempty"`
+		Tips      *[]string                                                   `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON404 *struct {
+		Code      string                                                      `json:"code"`
+		DocsUrl   *string                                                     `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistryAgentsById404JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                      `json:"message"`
+		Meta      *map[string]interface{}                                     `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                              `json:"reasons,omitempty"`
+		Retryable bool                                                        `json:"retryable"`
+		SpanId    *string                                                     `json:"span_id,omitempty"`
+		Tips      *[]string                                                   `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON422 *struct {
+		Code      string                                                      `json:"code"`
+		DocsUrl   *string                                                     `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistryAgentsById422JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                      `json:"message"`
+		Meta      *map[string]interface{}                                     `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                              `json:"reasons,omitempty"`
+		Retryable bool                                                        `json:"retryable"`
+		SpanId    *string                                                     `json:"span_id,omitempty"`
+		Tips      *[]string                                                   `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                                      `json:"code"`
+		DocsUrl   *string                                                     `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistryAgentsById500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                      `json:"message"`
+		Meta      *map[string]interface{}                                     `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                              `json:"reasons,omitempty"`
+		Retryable bool                                                        `json:"retryable"`
+		SpanId    *string                                                     `json:"span_id,omitempty"`
+		Tips      *[]string                                                   `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiGovernanceRegistryAgentsByIdResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiGovernanceRegistryAgentsByIdResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiGovernanceRegistryAgentsByIdResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetApiGovernanceRegistryAgentsByIdVersionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data []struct {
+			Agent struct {
+				Capabilities []string `json:"capabilities"`
+				Description  *string  `json:"description"`
+				Endpoints    []struct {
+					Kind     GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentEndpointsKind `json:"kind"`
+					Protocol string                                                                              `json:"protocol"`
+					Url      string                                                                              `json:"url"`
+				} `json:"endpoints"`
+				Environment  *string                                                                          `json:"environment"`
+				FirstSeenAt  string                                                                           `json:"first_seen_at"`
+				Id           string                                                                           `json:"id"`
+				Instructions *string                                                                          `json:"instructions"`
+				Kind         string                                                                           `json:"kind"`
+				LastSeenAt   *string                                                                          `json:"last_seen_at"`
+				Management   GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentManagement `json:"management"`
+				Model        *struct {
+					Model      string                                                                                                                    `json:"model"`
+					Parameters map[string]GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties `json:"parameters"`
+					Provider   *string                                                                                                                   `json:"provider"`
+				} `json:"model"`
+				Name  string `json:"name"`
+				Owner *struct {
+					Name   *string `json:"name"`
+					UserId string  `json:"user_id"`
+				} `json:"owner"`
+				ProjectId     *string                                                                      `json:"project_id"`
+				RemovedAt     *string                                                                      `json:"removed_at"`
+				Shadow        bool                                                                         `json:"shadow"`
+				Source        GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentSource `json:"source"`
+				SourceVersion *string                                                                      `json:"source_version"`
+				Status        GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentStatus `json:"status"`
+				Tools         []struct {
+					DeprecatedAt        *string                                                                           `json:"deprecated_at"`
+					DeprecatedInVersion *int                                                                              `json:"deprecated_in_version"`
+					Description         *string                                                                           `json:"description"`
+					InputSchema         map[string]interface{}                                                            `json:"input_schema"`
+					Name                string                                                                            `json:"name"`
+					OutputSchema        *map[string]interface{}                                                           `json:"output_schema"`
+					Status              GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentToolsStatus `json:"status"`
+				} `json:"tools"`
+				UpdatedAt string `json:"updated_at"`
+				Version   int    `json:"version"`
+			} `json:"agent"`
+			AgentId        string                                                                `json:"agent_id"`
+			FromVersion    *int                                                                  `json:"from_version"`
+			Id             string                                                                `json:"id"`
+			OccurredAt     string                                                                `json:"occurred_at"`
+			OrganizationId string                                                                `json:"organization_id"`
+			Sequence       string                                                                `json:"sequence"`
+			ToVersion      *int                                                                  `json:"to_version"`
+			Tool           *string                                                               `json:"tool"`
+			Type           GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType `json:"type"`
+		} `json:"data"`
+		NextCursor *string `json:"next_cursor"`
+	}
+	JSON400 *struct {
+		Code      string                                                              `json:"code"`
+		DocsUrl   *string                                                             `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistryAgentsByIdVersions400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                              `json:"message"`
+		Meta      *map[string]interface{}                                             `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                      `json:"reasons,omitempty"`
+		Retryable bool                                                                `json:"retryable"`
+		SpanId    *string                                                             `json:"span_id,omitempty"`
+		Tips      *[]string                                                           `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                                              `json:"code"`
+		DocsUrl   *string                                                             `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistryAgentsByIdVersions401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                              `json:"message"`
+		Meta      *map[string]interface{}                                             `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                      `json:"reasons,omitempty"`
+		Retryable bool                                                                `json:"retryable"`
+		SpanId    *string                                                             `json:"span_id,omitempty"`
+		Tips      *[]string                                                           `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                                              `json:"code"`
+		DocsUrl   *string                                                             `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistryAgentsByIdVersions403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                              `json:"message"`
+		Meta      *map[string]interface{}                                             `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                      `json:"reasons,omitempty"`
+		Retryable bool                                                                `json:"retryable"`
+		SpanId    *string                                                             `json:"span_id,omitempty"`
+		Tips      *[]string                                                           `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON404 *struct {
+		Code      string                                                              `json:"code"`
+		DocsUrl   *string                                                             `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistryAgentsByIdVersions404JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                              `json:"message"`
+		Meta      *map[string]interface{}                                             `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                      `json:"reasons,omitempty"`
+		Retryable bool                                                                `json:"retryable"`
+		SpanId    *string                                                             `json:"span_id,omitempty"`
+		Tips      *[]string                                                           `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON422 *struct {
+		Code      string                                                              `json:"code"`
+		DocsUrl   *string                                                             `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistryAgentsByIdVersions422JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                              `json:"message"`
+		Meta      *map[string]interface{}                                             `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                      `json:"reasons,omitempty"`
+		Retryable bool                                                                `json:"retryable"`
+		SpanId    *string                                                             `json:"span_id,omitempty"`
+		Tips      *[]string                                                           `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                                              `json:"code"`
+		DocsUrl   *string                                                             `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistryAgentsByIdVersions500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                              `json:"message"`
+		Meta      *map[string]interface{}                                             `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                      `json:"reasons,omitempty"`
+		Retryable bool                                                                `json:"retryable"`
+		SpanId    *string                                                             `json:"span_id,omitempty"`
+		Tips      *[]string                                                           `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiGovernanceRegistryAgentsByIdVersionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiGovernanceRegistryAgentsByIdVersionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiGovernanceRegistryAgentsByIdVersionsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetApiGovernanceRegistryArdManifestResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Entries []struct {
+			Context      GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesContext `json:"@context"`
+			Capabilities []string                                                             `json:"capabilities"`
+			Data         struct {
+				Capabilities []string `json:"capabilities"`
+				Description  *string  `json:"description"`
+				Endpoints    []struct {
+					Kind     GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataEndpointsKind `json:"kind"`
+					Protocol string                                                                         `json:"protocol"`
+					Url      string                                                                         `json:"url"`
+				} `json:"endpoints"`
+				Environment  *string                                                                     `json:"environment"`
+				FirstSeenAt  string                                                                      `json:"first_seen_at"`
+				Id           string                                                                      `json:"id"`
+				Instructions *string                                                                     `json:"instructions"`
+				Kind         string                                                                      `json:"kind"`
+				LastSeenAt   *string                                                                     `json:"last_seen_at"`
+				Management   GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataManagement `json:"management"`
+				Model        *struct {
+					Model      string                                                                                                               `json:"model"`
+					Parameters map[string]GetApiGovernanceRegistryArdManifest200JSONResponseBody_Entries_Data_Model_Parameters_AdditionalProperties `json:"parameters"`
+					Provider   *string                                                                                                              `json:"provider"`
+				} `json:"model"`
+				Name  string `json:"name"`
+				Owner *struct {
+					Name   *string `json:"name"`
+					UserId string  `json:"user_id"`
+				} `json:"owner"`
+				ProjectId     *string                                                                 `json:"project_id"`
+				RemovedAt     *string                                                                 `json:"removed_at"`
+				Shadow        bool                                                                    `json:"shadow"`
+				Source        GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataSource `json:"source"`
+				SourceVersion *string                                                                 `json:"source_version"`
+				Status        GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataStatus `json:"status"`
+				Tools         []struct {
+					DeprecatedAt        *string                                                                      `json:"deprecated_at"`
+					DeprecatedInVersion *int                                                                         `json:"deprecated_in_version"`
+					Description         *string                                                                      `json:"description"`
+					InputSchema         map[string]interface{}                                                       `json:"input_schema"`
+					Name                string                                                                       `json:"name"`
+					OutputSchema        *map[string]interface{}                                                      `json:"output_schema"`
+					Status              GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataToolsStatus `json:"status"`
+				} `json:"tools"`
+				UpdatedAt string `json:"updated_at"`
+				Version   int    `json:"version"`
+			} `json:"data"`
+			Description *string                                                           `json:"description,omitempty"`
+			DisplayName string                                                            `json:"displayName"`
+			Identifier  string                                                            `json:"identifier"`
+			Metadata    map[string]string                                                 `json:"metadata"`
+			Tags        []string                                                          `json:"tags"`
+			Type        GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesType `json:"type"`
+			UpdatedAt   string                                                            `json:"updatedAt"`
+			Version     string                                                            `json:"version"`
+		} `json:"entries"`
+		Publisher   string                                                            `json:"publisher"`
+		SpecVersion GetApiGovernanceRegistryArdManifest200JSONResponseBodySpecVersion `json:"specVersion"`
+		UpdatedAt   string                                                            `json:"updatedAt"`
+	}
+	JSON400 *struct {
+		Code      string                                                       `json:"code"`
+		DocsUrl   *string                                                      `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistryArdManifest400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                       `json:"message"`
+		Meta      *map[string]interface{}                                      `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                               `json:"reasons,omitempty"`
+		Retryable bool                                                         `json:"retryable"`
+		SpanId    *string                                                      `json:"span_id,omitempty"`
+		Tips      *[]string                                                    `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                                       `json:"code"`
+		DocsUrl   *string                                                      `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistryArdManifest401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                       `json:"message"`
+		Meta      *map[string]interface{}                                      `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                               `json:"reasons,omitempty"`
+		Retryable bool                                                         `json:"retryable"`
+		SpanId    *string                                                      `json:"span_id,omitempty"`
+		Tips      *[]string                                                    `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                                       `json:"code"`
+		DocsUrl   *string                                                      `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistryArdManifest403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                       `json:"message"`
+		Meta      *map[string]interface{}                                      `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                               `json:"reasons,omitempty"`
+		Retryable bool                                                         `json:"retryable"`
+		SpanId    *string                                                      `json:"span_id,omitempty"`
+		Tips      *[]string                                                    `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                                       `json:"code"`
+		DocsUrl   *string                                                      `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistryArdManifest500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                       `json:"message"`
+		Meta      *map[string]interface{}                                      `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                               `json:"reasons,omitempty"`
+		Retryable bool                                                         `json:"retryable"`
+		SpanId    *string                                                      `json:"span_id,omitempty"`
+		Tips      *[]string                                                    `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiGovernanceRegistryArdManifestResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiGovernanceRegistryArdManifestResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiGovernanceRegistryArdManifestResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PostApiGovernanceRegistryArdSearchResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		PageToken *string `json:"pageToken,omitempty"`
+		Results   []struct {
+			Context      PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsContext `json:"@context"`
+			Capabilities []string                                                            `json:"capabilities"`
+			Data         struct {
+				Capabilities []string `json:"capabilities"`
+				Description  *string  `json:"description"`
+				Endpoints    []struct {
+					Kind     PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataEndpointsKind `json:"kind"`
+					Protocol string                                                                        `json:"protocol"`
+					Url      string                                                                        `json:"url"`
+				} `json:"endpoints"`
+				Environment  *string                                                                    `json:"environment"`
+				FirstSeenAt  string                                                                     `json:"first_seen_at"`
+				Id           string                                                                     `json:"id"`
+				Instructions *string                                                                    `json:"instructions"`
+				Kind         string                                                                     `json:"kind"`
+				LastSeenAt   *string                                                                    `json:"last_seen_at"`
+				Management   PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataManagement `json:"management"`
+				Model        *struct {
+					Model      string                                                                                                              `json:"model"`
+					Parameters map[string]PostApiGovernanceRegistryArdSearch200JSONResponseBody_Results_Data_Model_Parameters_AdditionalProperties `json:"parameters"`
+					Provider   *string                                                                                                             `json:"provider"`
+				} `json:"model"`
+				Name  string `json:"name"`
+				Owner *struct {
+					Name   *string `json:"name"`
+					UserId string  `json:"user_id"`
+				} `json:"owner"`
+				ProjectId     *string                                                                `json:"project_id"`
+				RemovedAt     *string                                                                `json:"removed_at"`
+				Shadow        bool                                                                   `json:"shadow"`
+				Source        PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataSource `json:"source"`
+				SourceVersion *string                                                                `json:"source_version"`
+				Status        PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataStatus `json:"status"`
+				Tools         []struct {
+					DeprecatedAt        *string                                                                     `json:"deprecated_at"`
+					DeprecatedInVersion *int                                                                        `json:"deprecated_in_version"`
+					Description         *string                                                                     `json:"description"`
+					InputSchema         map[string]interface{}                                                      `json:"input_schema"`
+					Name                string                                                                      `json:"name"`
+					OutputSchema        *map[string]interface{}                                                     `json:"output_schema"`
+					Status              PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataToolsStatus `json:"status"`
+				} `json:"tools"`
+				UpdatedAt string `json:"updated_at"`
+				Version   int    `json:"version"`
+			} `json:"data"`
+			Description *string                                                          `json:"description,omitempty"`
+			DisplayName string                                                           `json:"displayName"`
+			Identifier  string                                                           `json:"identifier"`
+			Metadata    map[string]string                                                `json:"metadata"`
+			Score       float32                                                          `json:"score"`
+			Source      string                                                           `json:"source"`
+			Tags        []string                                                         `json:"tags"`
+			Type        PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsType `json:"type"`
+			UpdatedAt   string                                                           `json:"updatedAt"`
+			Version     string                                                           `json:"version"`
+		} `json:"results"`
+	}
+	JSON400 *struct {
+		Code      string                                                      `json:"code"`
+		DocsUrl   *string                                                     `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceRegistryArdSearch400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                      `json:"message"`
+		Meta      *map[string]interface{}                                     `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                              `json:"reasons,omitempty"`
+		Retryable bool                                                        `json:"retryable"`
+		SpanId    *string                                                     `json:"span_id,omitempty"`
+		Tips      *[]string                                                   `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                                      `json:"code"`
+		DocsUrl   *string                                                     `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceRegistryArdSearch401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                      `json:"message"`
+		Meta      *map[string]interface{}                                     `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                              `json:"reasons,omitempty"`
+		Retryable bool                                                        `json:"retryable"`
+		SpanId    *string                                                     `json:"span_id,omitempty"`
+		Tips      *[]string                                                   `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                                      `json:"code"`
+		DocsUrl   *string                                                     `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceRegistryArdSearch403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                      `json:"message"`
+		Meta      *map[string]interface{}                                     `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                              `json:"reasons,omitempty"`
+		Retryable bool                                                        `json:"retryable"`
+		SpanId    *string                                                     `json:"span_id,omitempty"`
+		Tips      *[]string                                                   `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON422 *struct {
+		Code      string                                                      `json:"code"`
+		DocsUrl   *string                                                     `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceRegistryArdSearch422JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                      `json:"message"`
+		Meta      *map[string]interface{}                                     `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                              `json:"reasons,omitempty"`
+		Retryable bool                                                        `json:"retryable"`
+		SpanId    *string                                                     `json:"span_id,omitempty"`
+		Tips      *[]string                                                   `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                                      `json:"code"`
+		DocsUrl   *string                                                     `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceRegistryArdSearch500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                      `json:"message"`
+		Meta      *map[string]interface{}                                     `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                              `json:"reasons,omitempty"`
+		Retryable bool                                                        `json:"retryable"`
+		SpanId    *string                                                     `json:"span_id,omitempty"`
+		Tips      *[]string                                                   `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r PostApiGovernanceRegistryArdSearchResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostApiGovernanceRegistryArdSearchResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostApiGovernanceRegistryArdSearchResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetApiGovernanceRegistryEventsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data []struct {
+			Agent struct {
+				Capabilities []string `json:"capabilities"`
+				Description  *string  `json:"description"`
+				Endpoints    []struct {
+					Kind     GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentEndpointsKind `json:"kind"`
+					Protocol string                                                                  `json:"protocol"`
+					Url      string                                                                  `json:"url"`
+				} `json:"endpoints"`
+				Environment  *string                                                              `json:"environment"`
+				FirstSeenAt  string                                                               `json:"first_seen_at"`
+				Id           string                                                               `json:"id"`
+				Instructions *string                                                              `json:"instructions"`
+				Kind         string                                                               `json:"kind"`
+				LastSeenAt   *string                                                              `json:"last_seen_at"`
+				Management   GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentManagement `json:"management"`
+				Model        *struct {
+					Model      string                                                                                                        `json:"model"`
+					Parameters map[string]GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties `json:"parameters"`
+					Provider   *string                                                                                                       `json:"provider"`
+				} `json:"model"`
+				Name  string `json:"name"`
+				Owner *struct {
+					Name   *string `json:"name"`
+					UserId string  `json:"user_id"`
+				} `json:"owner"`
+				ProjectId     *string                                                          `json:"project_id"`
+				RemovedAt     *string                                                          `json:"removed_at"`
+				Shadow        bool                                                             `json:"shadow"`
+				Source        GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentSource `json:"source"`
+				SourceVersion *string                                                          `json:"source_version"`
+				Status        GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentStatus `json:"status"`
+				Tools         []struct {
+					DeprecatedAt        *string                                                               `json:"deprecated_at"`
+					DeprecatedInVersion *int                                                                  `json:"deprecated_in_version"`
+					Description         *string                                                               `json:"description"`
+					InputSchema         map[string]interface{}                                                `json:"input_schema"`
+					Name                string                                                                `json:"name"`
+					OutputSchema        *map[string]interface{}                                               `json:"output_schema"`
+					Status              GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentToolsStatus `json:"status"`
+				} `json:"tools"`
+				UpdatedAt string `json:"updated_at"`
+				Version   int    `json:"version"`
+			} `json:"agent"`
+			AgentId        string                                                    `json:"agent_id"`
+			FromVersion    *int                                                      `json:"from_version"`
+			Id             string                                                    `json:"id"`
+			OccurredAt     string                                                    `json:"occurred_at"`
+			OrganizationId string                                                    `json:"organization_id"`
+			Sequence       string                                                    `json:"sequence"`
+			ToVersion      *int                                                      `json:"to_version"`
+			Tool           *string                                                   `json:"tool"`
+			Type           GetApiGovernanceRegistryEvents200JSONResponseBodyDataType `json:"type"`
+		} `json:"data"`
+		NextCursor *string `json:"next_cursor"`
+	}
+	JSON400 *struct {
+		Code      string                                                  `json:"code"`
+		DocsUrl   *string                                                 `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistryEvents400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                  `json:"message"`
+		Meta      *map[string]interface{}                                 `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                          `json:"reasons,omitempty"`
+		Retryable bool                                                    `json:"retryable"`
+		SpanId    *string                                                 `json:"span_id,omitempty"`
+		Tips      *[]string                                               `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                                  `json:"code"`
+		DocsUrl   *string                                                 `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistryEvents401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                  `json:"message"`
+		Meta      *map[string]interface{}                                 `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                          `json:"reasons,omitempty"`
+		Retryable bool                                                    `json:"retryable"`
+		SpanId    *string                                                 `json:"span_id,omitempty"`
+		Tips      *[]string                                               `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                                  `json:"code"`
+		DocsUrl   *string                                                 `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistryEvents403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                  `json:"message"`
+		Meta      *map[string]interface{}                                 `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                          `json:"reasons,omitempty"`
+		Retryable bool                                                    `json:"retryable"`
+		SpanId    *string                                                 `json:"span_id,omitempty"`
+		Tips      *[]string                                               `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON422 *struct {
+		Code      string                                                  `json:"code"`
+		DocsUrl   *string                                                 `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistryEvents422JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                  `json:"message"`
+		Meta      *map[string]interface{}                                 `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                          `json:"reasons,omitempty"`
+		Retryable bool                                                    `json:"retryable"`
+		SpanId    *string                                                 `json:"span_id,omitempty"`
+		Tips      *[]string                                               `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                                  `json:"code"`
+		DocsUrl   *string                                                 `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistryEvents500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                  `json:"message"`
+		Meta      *map[string]interface{}                                 `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                          `json:"reasons,omitempty"`
+		Retryable bool                                                    `json:"retryable"`
+		SpanId    *string                                                 `json:"span_id,omitempty"`
+		Tips      *[]string                                               `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiGovernanceRegistryEventsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiGovernanceRegistryEventsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiGovernanceRegistryEventsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetApiGovernanceRegistrySchemaResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Entry map[string]interface{} `json:"entry"`
+		Event map[string]interface{} `json:"event"`
+	}
+	JSON400 *struct {
+		Code      string                                                  `json:"code"`
+		DocsUrl   *string                                                 `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistrySchema400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                  `json:"message"`
+		Meta      *map[string]interface{}                                 `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                          `json:"reasons,omitempty"`
+		Retryable bool                                                    `json:"retryable"`
+		SpanId    *string                                                 `json:"span_id,omitempty"`
+		Tips      *[]string                                               `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                                  `json:"code"`
+		DocsUrl   *string                                                 `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistrySchema401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                  `json:"message"`
+		Meta      *map[string]interface{}                                 `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                          `json:"reasons,omitempty"`
+		Retryable bool                                                    `json:"retryable"`
+		SpanId    *string                                                 `json:"span_id,omitempty"`
+		Tips      *[]string                                               `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                                  `json:"code"`
+		DocsUrl   *string                                                 `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistrySchema403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                  `json:"message"`
+		Meta      *map[string]interface{}                                 `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                          `json:"reasons,omitempty"`
+		Retryable bool                                                    `json:"retryable"`
+		SpanId    *string                                                 `json:"span_id,omitempty"`
+		Tips      *[]string                                               `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                                  `json:"code"`
+		DocsUrl   *string                                                 `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceRegistrySchema500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                  `json:"message"`
+		Meta      *map[string]interface{}                                 `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                          `json:"reasons,omitempty"`
+		Retryable bool                                                    `json:"retryable"`
+		SpanId    *string                                                 `json:"span_id,omitempty"`
+		Tips      *[]string                                               `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiGovernanceRegistrySchemaResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiGovernanceRegistrySchemaResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiGovernanceRegistrySchemaResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -185399,6 +189656,77 @@ func (c *ClientWithResponses) PatchApiGovernanceIngestionTemplatesByIdOttlRulesW
 		return nil, err
 	}
 	return ParsePatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse(rsp)
+}
+
+// GetApiGovernanceRegistryAgentsWithResponse request returning *GetApiGovernanceRegistryAgentsResponse
+func (c *ClientWithResponses) GetApiGovernanceRegistryAgentsWithResponse(ctx context.Context, params *GetApiGovernanceRegistryAgentsParams, reqEditors ...RequestEditorFn) (*GetApiGovernanceRegistryAgentsResponse, error) {
+	rsp, err := c.GetApiGovernanceRegistryAgents(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiGovernanceRegistryAgentsResponse(rsp)
+}
+
+// GetApiGovernanceRegistryAgentsByIdWithResponse request returning *GetApiGovernanceRegistryAgentsByIdResponse
+func (c *ClientWithResponses) GetApiGovernanceRegistryAgentsByIdWithResponse(ctx context.Context, agentId string, reqEditors ...RequestEditorFn) (*GetApiGovernanceRegistryAgentsByIdResponse, error) {
+	rsp, err := c.GetApiGovernanceRegistryAgentsById(ctx, agentId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiGovernanceRegistryAgentsByIdResponse(rsp)
+}
+
+// GetApiGovernanceRegistryAgentsByIdVersionsWithResponse request returning *GetApiGovernanceRegistryAgentsByIdVersionsResponse
+func (c *ClientWithResponses) GetApiGovernanceRegistryAgentsByIdVersionsWithResponse(ctx context.Context, agentId string, params *GetApiGovernanceRegistryAgentsByIdVersionsParams, reqEditors ...RequestEditorFn) (*GetApiGovernanceRegistryAgentsByIdVersionsResponse, error) {
+	rsp, err := c.GetApiGovernanceRegistryAgentsByIdVersions(ctx, agentId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiGovernanceRegistryAgentsByIdVersionsResponse(rsp)
+}
+
+// GetApiGovernanceRegistryArdManifestWithResponse request returning *GetApiGovernanceRegistryArdManifestResponse
+func (c *ClientWithResponses) GetApiGovernanceRegistryArdManifestWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiGovernanceRegistryArdManifestResponse, error) {
+	rsp, err := c.GetApiGovernanceRegistryArdManifest(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiGovernanceRegistryArdManifestResponse(rsp)
+}
+
+// PostApiGovernanceRegistryArdSearchWithBodyWithResponse request with arbitrary body returning *PostApiGovernanceRegistryArdSearchResponse
+func (c *ClientWithResponses) PostApiGovernanceRegistryArdSearchWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiGovernanceRegistryArdSearchResponse, error) {
+	rsp, err := c.PostApiGovernanceRegistryArdSearchWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiGovernanceRegistryArdSearchResponse(rsp)
+}
+
+func (c *ClientWithResponses) PostApiGovernanceRegistryArdSearchWithResponse(ctx context.Context, body PostApiGovernanceRegistryArdSearchJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiGovernanceRegistryArdSearchResponse, error) {
+	rsp, err := c.PostApiGovernanceRegistryArdSearch(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiGovernanceRegistryArdSearchResponse(rsp)
+}
+
+// GetApiGovernanceRegistryEventsWithResponse request returning *GetApiGovernanceRegistryEventsResponse
+func (c *ClientWithResponses) GetApiGovernanceRegistryEventsWithResponse(ctx context.Context, params *GetApiGovernanceRegistryEventsParams, reqEditors ...RequestEditorFn) (*GetApiGovernanceRegistryEventsResponse, error) {
+	rsp, err := c.GetApiGovernanceRegistryEvents(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiGovernanceRegistryEventsResponse(rsp)
+}
+
+// GetApiGovernanceRegistrySchemaWithResponse request returning *GetApiGovernanceRegistrySchemaResponse
+func (c *ClientWithResponses) GetApiGovernanceRegistrySchemaWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiGovernanceRegistrySchemaResponse, error) {
+	rsp, err := c.GetApiGovernanceRegistrySchema(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiGovernanceRegistrySchemaResponse(rsp)
 }
 
 // ListGrantsWithResponse request returning *ListGrantsResponse
@@ -203160,6 +207488,1385 @@ func ParsePatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse(rsp *http.Re
 		var dest struct {
 			Error   string  `json:"error"`
 			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetApiGovernanceRegistryAgentsResponse parses an HTTP response from a GetApiGovernanceRegistryAgentsWithResponse call
+func ParseGetApiGovernanceRegistryAgentsResponse(rsp *http.Response) (*GetApiGovernanceRegistryAgentsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiGovernanceRegistryAgentsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Data []struct {
+				Capabilities []string `json:"capabilities"`
+				Description  *string  `json:"description"`
+				Endpoints    []struct {
+					Kind     GetApiGovernanceRegistryAgents200JSONResponseBodyDataEndpointsKind `json:"kind"`
+					Protocol string                                                             `json:"protocol"`
+					Url      string                                                             `json:"url"`
+				} `json:"endpoints"`
+				Environment  *string                                                         `json:"environment"`
+				FirstSeenAt  string                                                          `json:"first_seen_at"`
+				Id           string                                                          `json:"id"`
+				Instructions *string                                                         `json:"instructions"`
+				Kind         string                                                          `json:"kind"`
+				LastSeenAt   *string                                                         `json:"last_seen_at"`
+				Management   GetApiGovernanceRegistryAgents200JSONResponseBodyDataManagement `json:"management"`
+				Model        *struct {
+					Model      string                                                                                                  `json:"model"`
+					Parameters map[string]GetApiGovernanceRegistryAgents200JSONResponseBody_Data_Model_Parameters_AdditionalProperties `json:"parameters"`
+					Provider   *string                                                                                                 `json:"provider"`
+				} `json:"model"`
+				Name  string `json:"name"`
+				Owner *struct {
+					Name   *string `json:"name"`
+					UserId string  `json:"user_id"`
+				} `json:"owner"`
+				ProjectId     *string                                                     `json:"project_id"`
+				RemovedAt     *string                                                     `json:"removed_at"`
+				Shadow        bool                                                        `json:"shadow"`
+				Source        GetApiGovernanceRegistryAgents200JSONResponseBodyDataSource `json:"source"`
+				SourceVersion *string                                                     `json:"source_version"`
+				Status        GetApiGovernanceRegistryAgents200JSONResponseBodyDataStatus `json:"status"`
+				Tools         []struct {
+					DeprecatedAt        *string                                                          `json:"deprecated_at"`
+					DeprecatedInVersion *int                                                             `json:"deprecated_in_version"`
+					Description         *string                                                          `json:"description"`
+					InputSchema         map[string]interface{}                                           `json:"input_schema"`
+					Name                string                                                           `json:"name"`
+					OutputSchema        *map[string]interface{}                                          `json:"output_schema"`
+					Status              GetApiGovernanceRegistryAgents200JSONResponseBodyDataToolsStatus `json:"status"`
+				} `json:"tools"`
+				UpdatedAt string `json:"updated_at"`
+				Version   int    `json:"version"`
+			} `json:"data"`
+			NextCursor *string `json:"next_cursor"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                                  `json:"code"`
+			DocsUrl   *string                                                 `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistryAgents400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                  `json:"message"`
+			Meta      *map[string]interface{}                                 `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                          `json:"reasons,omitempty"`
+			Retryable bool                                                    `json:"retryable"`
+			SpanId    *string                                                 `json:"span_id,omitempty"`
+			Tips      *[]string                                               `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                                  `json:"code"`
+			DocsUrl   *string                                                 `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistryAgents401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                  `json:"message"`
+			Meta      *map[string]interface{}                                 `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                          `json:"reasons,omitempty"`
+			Retryable bool                                                    `json:"retryable"`
+			SpanId    *string                                                 `json:"span_id,omitempty"`
+			Tips      *[]string                                               `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                                  `json:"code"`
+			DocsUrl   *string                                                 `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistryAgents403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                  `json:"message"`
+			Meta      *map[string]interface{}                                 `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                          `json:"reasons,omitempty"`
+			Retryable bool                                                    `json:"retryable"`
+			SpanId    *string                                                 `json:"span_id,omitempty"`
+			Tips      *[]string                                               `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest struct {
+			Code      string                                                  `json:"code"`
+			DocsUrl   *string                                                 `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistryAgents422JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                  `json:"message"`
+			Meta      *map[string]interface{}                                 `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                          `json:"reasons,omitempty"`
+			Retryable bool                                                    `json:"retryable"`
+			SpanId    *string                                                 `json:"span_id,omitempty"`
+			Tips      *[]string                                               `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                                  `json:"code"`
+			DocsUrl   *string                                                 `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistryAgents500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                  `json:"message"`
+			Meta      *map[string]interface{}                                 `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                          `json:"reasons,omitempty"`
+			Retryable bool                                                    `json:"retryable"`
+			SpanId    *string                                                 `json:"span_id,omitempty"`
+			Tips      *[]string                                               `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetApiGovernanceRegistryAgentsByIdResponse parses an HTTP response from a GetApiGovernanceRegistryAgentsByIdWithResponse call
+func ParseGetApiGovernanceRegistryAgentsByIdResponse(rsp *http.Response) (*GetApiGovernanceRegistryAgentsByIdResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiGovernanceRegistryAgentsByIdResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Data struct {
+				Capabilities []string `json:"capabilities"`
+				Description  *string  `json:"description"`
+				Endpoints    []struct {
+					Kind     GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataEndpointsKind `json:"kind"`
+					Protocol string                                                                 `json:"protocol"`
+					Url      string                                                                 `json:"url"`
+				} `json:"endpoints"`
+				Environment  *string                                                             `json:"environment"`
+				FirstSeenAt  string                                                              `json:"first_seen_at"`
+				Id           string                                                              `json:"id"`
+				Instructions *string                                                             `json:"instructions"`
+				Kind         string                                                              `json:"kind"`
+				LastSeenAt   *string                                                             `json:"last_seen_at"`
+				Management   GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataManagement `json:"management"`
+				Model        *struct {
+					Model      string                                                                                                      `json:"model"`
+					Parameters map[string]GetApiGovernanceRegistryAgentsById200JSONResponseBody_Data_Model_Parameters_AdditionalProperties `json:"parameters"`
+					Provider   *string                                                                                                     `json:"provider"`
+				} `json:"model"`
+				Name  string `json:"name"`
+				Owner *struct {
+					Name   *string `json:"name"`
+					UserId string  `json:"user_id"`
+				} `json:"owner"`
+				ProjectId     *string                                                         `json:"project_id"`
+				RemovedAt     *string                                                         `json:"removed_at"`
+				Shadow        bool                                                            `json:"shadow"`
+				Source        GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataSource `json:"source"`
+				SourceVersion *string                                                         `json:"source_version"`
+				Status        GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataStatus `json:"status"`
+				Tools         []struct {
+					DeprecatedAt        *string                                                              `json:"deprecated_at"`
+					DeprecatedInVersion *int                                                                 `json:"deprecated_in_version"`
+					Description         *string                                                              `json:"description"`
+					InputSchema         map[string]interface{}                                               `json:"input_schema"`
+					Name                string                                                               `json:"name"`
+					OutputSchema        *map[string]interface{}                                              `json:"output_schema"`
+					Status              GetApiGovernanceRegistryAgentsById200JSONResponseBodyDataToolsStatus `json:"status"`
+				} `json:"tools"`
+				UpdatedAt string `json:"updated_at"`
+				Version   int    `json:"version"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                                      `json:"code"`
+			DocsUrl   *string                                                     `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistryAgentsById400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                      `json:"message"`
+			Meta      *map[string]interface{}                                     `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                              `json:"reasons,omitempty"`
+			Retryable bool                                                        `json:"retryable"`
+			SpanId    *string                                                     `json:"span_id,omitempty"`
+			Tips      *[]string                                                   `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                                      `json:"code"`
+			DocsUrl   *string                                                     `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistryAgentsById401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                      `json:"message"`
+			Meta      *map[string]interface{}                                     `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                              `json:"reasons,omitempty"`
+			Retryable bool                                                        `json:"retryable"`
+			SpanId    *string                                                     `json:"span_id,omitempty"`
+			Tips      *[]string                                                   `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                                      `json:"code"`
+			DocsUrl   *string                                                     `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistryAgentsById403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                      `json:"message"`
+			Meta      *map[string]interface{}                                     `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                              `json:"reasons,omitempty"`
+			Retryable bool                                                        `json:"retryable"`
+			SpanId    *string                                                     `json:"span_id,omitempty"`
+			Tips      *[]string                                                   `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest struct {
+			Code      string                                                      `json:"code"`
+			DocsUrl   *string                                                     `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistryAgentsById404JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                      `json:"message"`
+			Meta      *map[string]interface{}                                     `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                              `json:"reasons,omitempty"`
+			Retryable bool                                                        `json:"retryable"`
+			SpanId    *string                                                     `json:"span_id,omitempty"`
+			Tips      *[]string                                                   `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest struct {
+			Code      string                                                      `json:"code"`
+			DocsUrl   *string                                                     `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistryAgentsById422JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                      `json:"message"`
+			Meta      *map[string]interface{}                                     `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                              `json:"reasons,omitempty"`
+			Retryable bool                                                        `json:"retryable"`
+			SpanId    *string                                                     `json:"span_id,omitempty"`
+			Tips      *[]string                                                   `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                                      `json:"code"`
+			DocsUrl   *string                                                     `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistryAgentsById500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                      `json:"message"`
+			Meta      *map[string]interface{}                                     `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                              `json:"reasons,omitempty"`
+			Retryable bool                                                        `json:"retryable"`
+			SpanId    *string                                                     `json:"span_id,omitempty"`
+			Tips      *[]string                                                   `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetApiGovernanceRegistryAgentsByIdVersionsResponse parses an HTTP response from a GetApiGovernanceRegistryAgentsByIdVersionsWithResponse call
+func ParseGetApiGovernanceRegistryAgentsByIdVersionsResponse(rsp *http.Response) (*GetApiGovernanceRegistryAgentsByIdVersionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiGovernanceRegistryAgentsByIdVersionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Data []struct {
+				Agent struct {
+					Capabilities []string `json:"capabilities"`
+					Description  *string  `json:"description"`
+					Endpoints    []struct {
+						Kind     GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentEndpointsKind `json:"kind"`
+						Protocol string                                                                              `json:"protocol"`
+						Url      string                                                                              `json:"url"`
+					} `json:"endpoints"`
+					Environment  *string                                                                          `json:"environment"`
+					FirstSeenAt  string                                                                           `json:"first_seen_at"`
+					Id           string                                                                           `json:"id"`
+					Instructions *string                                                                          `json:"instructions"`
+					Kind         string                                                                           `json:"kind"`
+					LastSeenAt   *string                                                                          `json:"last_seen_at"`
+					Management   GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentManagement `json:"management"`
+					Model        *struct {
+						Model      string                                                                                                                    `json:"model"`
+						Parameters map[string]GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties `json:"parameters"`
+						Provider   *string                                                                                                                   `json:"provider"`
+					} `json:"model"`
+					Name  string `json:"name"`
+					Owner *struct {
+						Name   *string `json:"name"`
+						UserId string  `json:"user_id"`
+					} `json:"owner"`
+					ProjectId     *string                                                                      `json:"project_id"`
+					RemovedAt     *string                                                                      `json:"removed_at"`
+					Shadow        bool                                                                         `json:"shadow"`
+					Source        GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentSource `json:"source"`
+					SourceVersion *string                                                                      `json:"source_version"`
+					Status        GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentStatus `json:"status"`
+					Tools         []struct {
+						DeprecatedAt        *string                                                                           `json:"deprecated_at"`
+						DeprecatedInVersion *int                                                                              `json:"deprecated_in_version"`
+						Description         *string                                                                           `json:"description"`
+						InputSchema         map[string]interface{}                                                            `json:"input_schema"`
+						Name                string                                                                            `json:"name"`
+						OutputSchema        *map[string]interface{}                                                           `json:"output_schema"`
+						Status              GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataAgentToolsStatus `json:"status"`
+					} `json:"tools"`
+					UpdatedAt string `json:"updated_at"`
+					Version   int    `json:"version"`
+				} `json:"agent"`
+				AgentId        string                                                                `json:"agent_id"`
+				FromVersion    *int                                                                  `json:"from_version"`
+				Id             string                                                                `json:"id"`
+				OccurredAt     string                                                                `json:"occurred_at"`
+				OrganizationId string                                                                `json:"organization_id"`
+				Sequence       string                                                                `json:"sequence"`
+				ToVersion      *int                                                                  `json:"to_version"`
+				Tool           *string                                                               `json:"tool"`
+				Type           GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataType `json:"type"`
+			} `json:"data"`
+			NextCursor *string `json:"next_cursor"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                                              `json:"code"`
+			DocsUrl   *string                                                             `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistryAgentsByIdVersions400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                              `json:"message"`
+			Meta      *map[string]interface{}                                             `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                      `json:"reasons,omitempty"`
+			Retryable bool                                                                `json:"retryable"`
+			SpanId    *string                                                             `json:"span_id,omitempty"`
+			Tips      *[]string                                                           `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                                              `json:"code"`
+			DocsUrl   *string                                                             `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistryAgentsByIdVersions401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                              `json:"message"`
+			Meta      *map[string]interface{}                                             `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                      `json:"reasons,omitempty"`
+			Retryable bool                                                                `json:"retryable"`
+			SpanId    *string                                                             `json:"span_id,omitempty"`
+			Tips      *[]string                                                           `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                                              `json:"code"`
+			DocsUrl   *string                                                             `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistryAgentsByIdVersions403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                              `json:"message"`
+			Meta      *map[string]interface{}                                             `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                      `json:"reasons,omitempty"`
+			Retryable bool                                                                `json:"retryable"`
+			SpanId    *string                                                             `json:"span_id,omitempty"`
+			Tips      *[]string                                                           `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest struct {
+			Code      string                                                              `json:"code"`
+			DocsUrl   *string                                                             `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistryAgentsByIdVersions404JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                              `json:"message"`
+			Meta      *map[string]interface{}                                             `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                      `json:"reasons,omitempty"`
+			Retryable bool                                                                `json:"retryable"`
+			SpanId    *string                                                             `json:"span_id,omitempty"`
+			Tips      *[]string                                                           `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest struct {
+			Code      string                                                              `json:"code"`
+			DocsUrl   *string                                                             `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistryAgentsByIdVersions422JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                              `json:"message"`
+			Meta      *map[string]interface{}                                             `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                      `json:"reasons,omitempty"`
+			Retryable bool                                                                `json:"retryable"`
+			SpanId    *string                                                             `json:"span_id,omitempty"`
+			Tips      *[]string                                                           `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                                              `json:"code"`
+			DocsUrl   *string                                                             `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistryAgentsByIdVersions500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                              `json:"message"`
+			Meta      *map[string]interface{}                                             `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                      `json:"reasons,omitempty"`
+			Retryable bool                                                                `json:"retryable"`
+			SpanId    *string                                                             `json:"span_id,omitempty"`
+			Tips      *[]string                                                           `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetApiGovernanceRegistryArdManifestResponse parses an HTTP response from a GetApiGovernanceRegistryArdManifestWithResponse call
+func ParseGetApiGovernanceRegistryArdManifestResponse(rsp *http.Response) (*GetApiGovernanceRegistryArdManifestResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiGovernanceRegistryArdManifestResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Entries []struct {
+				Context      GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesContext `json:"@context"`
+				Capabilities []string                                                             `json:"capabilities"`
+				Data         struct {
+					Capabilities []string `json:"capabilities"`
+					Description  *string  `json:"description"`
+					Endpoints    []struct {
+						Kind     GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataEndpointsKind `json:"kind"`
+						Protocol string                                                                         `json:"protocol"`
+						Url      string                                                                         `json:"url"`
+					} `json:"endpoints"`
+					Environment  *string                                                                     `json:"environment"`
+					FirstSeenAt  string                                                                      `json:"first_seen_at"`
+					Id           string                                                                      `json:"id"`
+					Instructions *string                                                                     `json:"instructions"`
+					Kind         string                                                                      `json:"kind"`
+					LastSeenAt   *string                                                                     `json:"last_seen_at"`
+					Management   GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataManagement `json:"management"`
+					Model        *struct {
+						Model      string                                                                                                               `json:"model"`
+						Parameters map[string]GetApiGovernanceRegistryArdManifest200JSONResponseBody_Entries_Data_Model_Parameters_AdditionalProperties `json:"parameters"`
+						Provider   *string                                                                                                              `json:"provider"`
+					} `json:"model"`
+					Name  string `json:"name"`
+					Owner *struct {
+						Name   *string `json:"name"`
+						UserId string  `json:"user_id"`
+					} `json:"owner"`
+					ProjectId     *string                                                                 `json:"project_id"`
+					RemovedAt     *string                                                                 `json:"removed_at"`
+					Shadow        bool                                                                    `json:"shadow"`
+					Source        GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataSource `json:"source"`
+					SourceVersion *string                                                                 `json:"source_version"`
+					Status        GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataStatus `json:"status"`
+					Tools         []struct {
+						DeprecatedAt        *string                                                                      `json:"deprecated_at"`
+						DeprecatedInVersion *int                                                                         `json:"deprecated_in_version"`
+						Description         *string                                                                      `json:"description"`
+						InputSchema         map[string]interface{}                                                       `json:"input_schema"`
+						Name                string                                                                       `json:"name"`
+						OutputSchema        *map[string]interface{}                                                      `json:"output_schema"`
+						Status              GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesDataToolsStatus `json:"status"`
+					} `json:"tools"`
+					UpdatedAt string `json:"updated_at"`
+					Version   int    `json:"version"`
+				} `json:"data"`
+				Description *string                                                           `json:"description,omitempty"`
+				DisplayName string                                                            `json:"displayName"`
+				Identifier  string                                                            `json:"identifier"`
+				Metadata    map[string]string                                                 `json:"metadata"`
+				Tags        []string                                                          `json:"tags"`
+				Type        GetApiGovernanceRegistryArdManifest200JSONResponseBodyEntriesType `json:"type"`
+				UpdatedAt   string                                                            `json:"updatedAt"`
+				Version     string                                                            `json:"version"`
+			} `json:"entries"`
+			Publisher   string                                                            `json:"publisher"`
+			SpecVersion GetApiGovernanceRegistryArdManifest200JSONResponseBodySpecVersion `json:"specVersion"`
+			UpdatedAt   string                                                            `json:"updatedAt"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                                       `json:"code"`
+			DocsUrl   *string                                                      `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistryArdManifest400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                       `json:"message"`
+			Meta      *map[string]interface{}                                      `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                               `json:"reasons,omitempty"`
+			Retryable bool                                                         `json:"retryable"`
+			SpanId    *string                                                      `json:"span_id,omitempty"`
+			Tips      *[]string                                                    `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                                       `json:"code"`
+			DocsUrl   *string                                                      `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistryArdManifest401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                       `json:"message"`
+			Meta      *map[string]interface{}                                      `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                               `json:"reasons,omitempty"`
+			Retryable bool                                                         `json:"retryable"`
+			SpanId    *string                                                      `json:"span_id,omitempty"`
+			Tips      *[]string                                                    `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                                       `json:"code"`
+			DocsUrl   *string                                                      `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistryArdManifest403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                       `json:"message"`
+			Meta      *map[string]interface{}                                      `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                               `json:"reasons,omitempty"`
+			Retryable bool                                                         `json:"retryable"`
+			SpanId    *string                                                      `json:"span_id,omitempty"`
+			Tips      *[]string                                                    `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                                       `json:"code"`
+			DocsUrl   *string                                                      `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistryArdManifest500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                       `json:"message"`
+			Meta      *map[string]interface{}                                      `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                               `json:"reasons,omitempty"`
+			Retryable bool                                                         `json:"retryable"`
+			SpanId    *string                                                      `json:"span_id,omitempty"`
+			Tips      *[]string                                                    `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostApiGovernanceRegistryArdSearchResponse parses an HTTP response from a PostApiGovernanceRegistryArdSearchWithResponse call
+func ParsePostApiGovernanceRegistryArdSearchResponse(rsp *http.Response) (*PostApiGovernanceRegistryArdSearchResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostApiGovernanceRegistryArdSearchResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			PageToken *string `json:"pageToken,omitempty"`
+			Results   []struct {
+				Context      PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsContext `json:"@context"`
+				Capabilities []string                                                            `json:"capabilities"`
+				Data         struct {
+					Capabilities []string `json:"capabilities"`
+					Description  *string  `json:"description"`
+					Endpoints    []struct {
+						Kind     PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataEndpointsKind `json:"kind"`
+						Protocol string                                                                        `json:"protocol"`
+						Url      string                                                                        `json:"url"`
+					} `json:"endpoints"`
+					Environment  *string                                                                    `json:"environment"`
+					FirstSeenAt  string                                                                     `json:"first_seen_at"`
+					Id           string                                                                     `json:"id"`
+					Instructions *string                                                                    `json:"instructions"`
+					Kind         string                                                                     `json:"kind"`
+					LastSeenAt   *string                                                                    `json:"last_seen_at"`
+					Management   PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataManagement `json:"management"`
+					Model        *struct {
+						Model      string                                                                                                              `json:"model"`
+						Parameters map[string]PostApiGovernanceRegistryArdSearch200JSONResponseBody_Results_Data_Model_Parameters_AdditionalProperties `json:"parameters"`
+						Provider   *string                                                                                                             `json:"provider"`
+					} `json:"model"`
+					Name  string `json:"name"`
+					Owner *struct {
+						Name   *string `json:"name"`
+						UserId string  `json:"user_id"`
+					} `json:"owner"`
+					ProjectId     *string                                                                `json:"project_id"`
+					RemovedAt     *string                                                                `json:"removed_at"`
+					Shadow        bool                                                                   `json:"shadow"`
+					Source        PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataSource `json:"source"`
+					SourceVersion *string                                                                `json:"source_version"`
+					Status        PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataStatus `json:"status"`
+					Tools         []struct {
+						DeprecatedAt        *string                                                                     `json:"deprecated_at"`
+						DeprecatedInVersion *int                                                                        `json:"deprecated_in_version"`
+						Description         *string                                                                     `json:"description"`
+						InputSchema         map[string]interface{}                                                      `json:"input_schema"`
+						Name                string                                                                      `json:"name"`
+						OutputSchema        *map[string]interface{}                                                     `json:"output_schema"`
+						Status              PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsDataToolsStatus `json:"status"`
+					} `json:"tools"`
+					UpdatedAt string `json:"updated_at"`
+					Version   int    `json:"version"`
+				} `json:"data"`
+				Description *string                                                          `json:"description,omitempty"`
+				DisplayName string                                                           `json:"displayName"`
+				Identifier  string                                                           `json:"identifier"`
+				Metadata    map[string]string                                                `json:"metadata"`
+				Score       float32                                                          `json:"score"`
+				Source      string                                                           `json:"source"`
+				Tags        []string                                                         `json:"tags"`
+				Type        PostApiGovernanceRegistryArdSearch200JSONResponseBodyResultsType `json:"type"`
+				UpdatedAt   string                                                           `json:"updatedAt"`
+				Version     string                                                           `json:"version"`
+			} `json:"results"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                                      `json:"code"`
+			DocsUrl   *string                                                     `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceRegistryArdSearch400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                      `json:"message"`
+			Meta      *map[string]interface{}                                     `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                              `json:"reasons,omitempty"`
+			Retryable bool                                                        `json:"retryable"`
+			SpanId    *string                                                     `json:"span_id,omitempty"`
+			Tips      *[]string                                                   `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                                      `json:"code"`
+			DocsUrl   *string                                                     `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceRegistryArdSearch401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                      `json:"message"`
+			Meta      *map[string]interface{}                                     `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                              `json:"reasons,omitempty"`
+			Retryable bool                                                        `json:"retryable"`
+			SpanId    *string                                                     `json:"span_id,omitempty"`
+			Tips      *[]string                                                   `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                                      `json:"code"`
+			DocsUrl   *string                                                     `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceRegistryArdSearch403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                      `json:"message"`
+			Meta      *map[string]interface{}                                     `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                              `json:"reasons,omitempty"`
+			Retryable bool                                                        `json:"retryable"`
+			SpanId    *string                                                     `json:"span_id,omitempty"`
+			Tips      *[]string                                                   `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest struct {
+			Code      string                                                      `json:"code"`
+			DocsUrl   *string                                                     `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceRegistryArdSearch422JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                      `json:"message"`
+			Meta      *map[string]interface{}                                     `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                              `json:"reasons,omitempty"`
+			Retryable bool                                                        `json:"retryable"`
+			SpanId    *string                                                     `json:"span_id,omitempty"`
+			Tips      *[]string                                                   `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                                      `json:"code"`
+			DocsUrl   *string                                                     `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceRegistryArdSearch500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                      `json:"message"`
+			Meta      *map[string]interface{}                                     `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                              `json:"reasons,omitempty"`
+			Retryable bool                                                        `json:"retryable"`
+			SpanId    *string                                                     `json:"span_id,omitempty"`
+			Tips      *[]string                                                   `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetApiGovernanceRegistryEventsResponse parses an HTTP response from a GetApiGovernanceRegistryEventsWithResponse call
+func ParseGetApiGovernanceRegistryEventsResponse(rsp *http.Response) (*GetApiGovernanceRegistryEventsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiGovernanceRegistryEventsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Data []struct {
+				Agent struct {
+					Capabilities []string `json:"capabilities"`
+					Description  *string  `json:"description"`
+					Endpoints    []struct {
+						Kind     GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentEndpointsKind `json:"kind"`
+						Protocol string                                                                  `json:"protocol"`
+						Url      string                                                                  `json:"url"`
+					} `json:"endpoints"`
+					Environment  *string                                                              `json:"environment"`
+					FirstSeenAt  string                                                               `json:"first_seen_at"`
+					Id           string                                                               `json:"id"`
+					Instructions *string                                                              `json:"instructions"`
+					Kind         string                                                               `json:"kind"`
+					LastSeenAt   *string                                                              `json:"last_seen_at"`
+					Management   GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentManagement `json:"management"`
+					Model        *struct {
+						Model      string                                                                                                        `json:"model"`
+						Parameters map[string]GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Agent_Model_Parameters_AdditionalProperties `json:"parameters"`
+						Provider   *string                                                                                                       `json:"provider"`
+					} `json:"model"`
+					Name  string `json:"name"`
+					Owner *struct {
+						Name   *string `json:"name"`
+						UserId string  `json:"user_id"`
+					} `json:"owner"`
+					ProjectId     *string                                                          `json:"project_id"`
+					RemovedAt     *string                                                          `json:"removed_at"`
+					Shadow        bool                                                             `json:"shadow"`
+					Source        GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentSource `json:"source"`
+					SourceVersion *string                                                          `json:"source_version"`
+					Status        GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentStatus `json:"status"`
+					Tools         []struct {
+						DeprecatedAt        *string                                                               `json:"deprecated_at"`
+						DeprecatedInVersion *int                                                                  `json:"deprecated_in_version"`
+						Description         *string                                                               `json:"description"`
+						InputSchema         map[string]interface{}                                                `json:"input_schema"`
+						Name                string                                                                `json:"name"`
+						OutputSchema        *map[string]interface{}                                               `json:"output_schema"`
+						Status              GetApiGovernanceRegistryEvents200JSONResponseBodyDataAgentToolsStatus `json:"status"`
+					} `json:"tools"`
+					UpdatedAt string `json:"updated_at"`
+					Version   int    `json:"version"`
+				} `json:"agent"`
+				AgentId        string                                                    `json:"agent_id"`
+				FromVersion    *int                                                      `json:"from_version"`
+				Id             string                                                    `json:"id"`
+				OccurredAt     string                                                    `json:"occurred_at"`
+				OrganizationId string                                                    `json:"organization_id"`
+				Sequence       string                                                    `json:"sequence"`
+				ToVersion      *int                                                      `json:"to_version"`
+				Tool           *string                                                   `json:"tool"`
+				Type           GetApiGovernanceRegistryEvents200JSONResponseBodyDataType `json:"type"`
+			} `json:"data"`
+			NextCursor *string `json:"next_cursor"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                                  `json:"code"`
+			DocsUrl   *string                                                 `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistryEvents400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                  `json:"message"`
+			Meta      *map[string]interface{}                                 `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                          `json:"reasons,omitempty"`
+			Retryable bool                                                    `json:"retryable"`
+			SpanId    *string                                                 `json:"span_id,omitempty"`
+			Tips      *[]string                                               `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                                  `json:"code"`
+			DocsUrl   *string                                                 `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistryEvents401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                  `json:"message"`
+			Meta      *map[string]interface{}                                 `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                          `json:"reasons,omitempty"`
+			Retryable bool                                                    `json:"retryable"`
+			SpanId    *string                                                 `json:"span_id,omitempty"`
+			Tips      *[]string                                               `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                                  `json:"code"`
+			DocsUrl   *string                                                 `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistryEvents403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                  `json:"message"`
+			Meta      *map[string]interface{}                                 `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                          `json:"reasons,omitempty"`
+			Retryable bool                                                    `json:"retryable"`
+			SpanId    *string                                                 `json:"span_id,omitempty"`
+			Tips      *[]string                                               `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest struct {
+			Code      string                                                  `json:"code"`
+			DocsUrl   *string                                                 `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistryEvents422JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                  `json:"message"`
+			Meta      *map[string]interface{}                                 `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                          `json:"reasons,omitempty"`
+			Retryable bool                                                    `json:"retryable"`
+			SpanId    *string                                                 `json:"span_id,omitempty"`
+			Tips      *[]string                                               `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                                  `json:"code"`
+			DocsUrl   *string                                                 `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistryEvents500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                  `json:"message"`
+			Meta      *map[string]interface{}                                 `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                          `json:"reasons,omitempty"`
+			Retryable bool                                                    `json:"retryable"`
+			SpanId    *string                                                 `json:"span_id,omitempty"`
+			Tips      *[]string                                               `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetApiGovernanceRegistrySchemaResponse parses an HTTP response from a GetApiGovernanceRegistrySchemaWithResponse call
+func ParseGetApiGovernanceRegistrySchemaResponse(rsp *http.Response) (*GetApiGovernanceRegistrySchemaResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiGovernanceRegistrySchemaResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Entry map[string]interface{} `json:"entry"`
+			Event map[string]interface{} `json:"event"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                                  `json:"code"`
+			DocsUrl   *string                                                 `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistrySchema400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                  `json:"message"`
+			Meta      *map[string]interface{}                                 `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                          `json:"reasons,omitempty"`
+			Retryable bool                                                    `json:"retryable"`
+			SpanId    *string                                                 `json:"span_id,omitempty"`
+			Tips      *[]string                                               `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                                  `json:"code"`
+			DocsUrl   *string                                                 `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistrySchema401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                  `json:"message"`
+			Meta      *map[string]interface{}                                 `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                          `json:"reasons,omitempty"`
+			Retryable bool                                                    `json:"retryable"`
+			SpanId    *string                                                 `json:"span_id,omitempty"`
+			Tips      *[]string                                               `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                                  `json:"code"`
+			DocsUrl   *string                                                 `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistrySchema403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                  `json:"message"`
+			Meta      *map[string]interface{}                                 `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                          `json:"reasons,omitempty"`
+			Retryable bool                                                    `json:"retryable"`
+			SpanId    *string                                                 `json:"span_id,omitempty"`
+			Tips      *[]string                                               `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                                  `json:"code"`
+			DocsUrl   *string                                                 `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceRegistrySchema500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                  `json:"message"`
+			Meta      *map[string]interface{}                                 `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                          `json:"reasons,omitempty"`
+			Retryable bool                                                    `json:"retryable"`
+			SpanId    *string                                                 `json:"span_id,omitempty"`
+			Tips      *[]string                                               `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err

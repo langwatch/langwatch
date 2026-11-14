@@ -35,6 +35,17 @@ export class IngestionSourceNotFoundError extends NotFoundError {
   }
 }
 
+export class AgentRegistryEntryNotFoundError extends NotFoundError {
+  constructor(entryId: string) {
+    super(
+      "agent_registry_entry_not_found",
+      { resource: "Agent registry entry", id: entryId },
+      remediation("agent_registry_entry_not_found"),
+    );
+    this.name = "AgentRegistryEntryNotFoundError";
+  }
+}
+
 export class IngestionSourceCapReachedError extends HandledError {
   declare readonly code: "ingestion_source_cap_reached";
 
