@@ -1,11 +1,5 @@
 import type { Authorization } from "@langwatch/authorization";
-import {
-  type AuthorizedClickHouse,
-  ClickHouseColumns,
-  type ClickHouseQueryClient,
-  ownProjectIdOf,
-  tenantScope,
-} from "@langwatch/clickhouse-client";
+import { type ClickHouseQueryClient, ownProjectIdOf } from "@langwatch/clickhouse-client";
 import {
   clickhouseRead,
   column,
@@ -32,58 +26,13 @@ import { z } from "zod";
 
 import { TraceEvaluationRunsReadRepository } from "../trace-evaluation-runs.repository.ts";
 import { evaluationRuns } from "./clickhouse.evaluation-runs.table.ts";
-import type {
-  TraceClickHouseClient,
-  TraceClickHouseResolver,
-} from "./clickhouse.trace-member-client.repository.ts";
 import { chNumber, chString } from "./stored-span-row.mapper.ts";
 
-const EVALUATION_RUNS_TABLE = "evaluation_runs" as const;
-const RUNS = "runs" as const;
-const TRACE_EVALUATION_COLUMNS_LIGHT = [
-  "EvaluationId",
-  "EvaluatorId",
-  "EvaluatorType",
-  "EvaluatorName",
-  "TraceId",
-  "IsGuardrail",
-  "Status",
-  "Score",
-  "Passed",
-  "Label",
-  "Details",
-  "Error",
-  `toUnixTimestamp64Milli(${RUNS}.ScheduledAt) AS ScheduledAtMs`,
-  `toUnixTimestamp64Milli(${RUNS}.StartedAt) AS StartedAtMs`,
-  `toUnixTimestamp64Milli(${RUNS}.CompletedAt) AS CompletedAt`,
-].join(", ");
-const TRACE_EVALUATION_COLUMNS_WITH_INPUTS = `${TRACE_EVALUATION_COLUMNS_LIGHT}, Inputs`;
 const logger = createLogger("langwatch:trace:clickhouse.trace-evaluation-runs");
-
-/** The attempt columns migration 00122 adds, each with the default it reads as until it lands. */
-const ATTEMPT_COLUMNS = {
-  Attempts: "toUInt16(0)",
-  LastAttemptAt: "CAST(NULL AS Nullable(DateTime64(3)))",
-  LastAttemptError: "CAST(NULL AS Nullable(String))",
-  NextAttemptAt: "CAST(NULL AS Nullable(DateTime64(3)))",
-} as const;
-
-/** The attempt moments in epoch ms, read off the attempt columns' aliases. */
-const ATTEMPT_MOMENTS = [
-  "toUnixTimestamp64Milli(LastAttemptAt) AS LastAttemptAtMs",
-  "toUnixTimestamp64Milli(NextAttemptAt) AS NextAttemptAtMs",
-].join(", ");
 
 const chFlag = z.union([z.boolean(), z.number(), z.string()]);
 const nullableString = z.string().nullable();
 const nullableNumber = chNumber.nullable();
-
-const attemptRowShape = {
-  Attempts: chNumber.optional(),
-  LastAttemptAtMs: nullableNumber.optional(),
-  LastAttemptError: nullableString.optional(),
-  NextAttemptAtMs: nullableNumber.optional(),
-};
 
 const summaryRowSchema = z.looseObject({
   EvaluationId: chString,
@@ -98,14 +47,18 @@ const summaryRowSchema = z.looseObject({
   Label: nullableString,
 });
 
+/** A row as `traceEvaluationsStatement` names it; `Inputs` only when the read selects it. */
 const traceEvaluationRowSchema = summaryRowSchema.safeExtend({
   Details: nullableString,
   Error: nullableString,
   Inputs: nullableString.optional(),
   ScheduledAtMs: nullableNumber,
   StartedAtMs: nullableNumber,
-  CompletedAt: nullableNumber,
-  ...attemptRowShape,
+  CompletedAtMs: nullableNumber,
+  AttemptCount: chNumber,
+  LastAttemptAtMs: nullableNumber,
+  LastAttemptErrorText: nullableString,
+  NextAttemptAtMs: nullableNumber,
 });
 
 /** A run row as `runsStatement` names it: each epoch-ms alias apart from its column's name. */
@@ -133,17 +86,6 @@ const traceEvaluationRowsSchema = z.array(traceEvaluationRowSchema);
 const runRowsSchema = z.array(runRowSchema);
 
 type SummaryRow = z.infer<typeof summaryRowSchema>;
-type AttemptRow = z.infer<z.ZodObject<typeof attemptRowShape>>;
-
-/** The attempt fields of a run row; a target without the columns reads as no attempts. */
-function attemptFields(row: AttemptRow) {
-  return {
-    attempts: row.Attempts ?? 0,
-    lastAttemptAt: row.LastAttemptAtMs ?? null,
-    lastAttemptError: row.LastAttemptError ?? null,
-    nextAttemptAt: row.NextAttemptAtMs ?? null,
-  };
-}
 
 function isSet(flag: SummaryRow["IsGuardrail"]): boolean {
   return flag === true || flag === 1 || flag === "1" || flag === "true";
@@ -220,6 +162,74 @@ function summariesStatement({
 
 const NULL_MOMENT = () => fn.nullAs(column.nullable(column.dateTime64({ precision: 3 })));
 
+/** The attempt columns migration 00122 adds; one the target lacks reads as its default. */
+function attemptSelect(holds: (name: string) => boolean) {
+  return {
+    AttemptCount: fn.heldOr(evaluationRuns.Attempts, {
+      holds,
+      otherwise: fn.toUInt16(param.uint16(0)),
+    }),
+    LastAttemptAtMs: fn.toUnixTimestamp64Milli(
+      fn.heldOr(evaluationRuns.LastAttemptAt, { holds, otherwise: NULL_MOMENT() }),
+    ),
+    LastAttemptErrorText: fn.heldOr(evaluationRuns.LastAttemptError, {
+      holds,
+      otherwise: fn.nullAs(column.nullable(column.string())),
+    }),
+    NextAttemptAtMs: fn.toUnixTimestamp64Milli(
+      fn.heldOr(evaluationRuns.NextAttemptAt, { holds, otherwise: NULL_MOMENT() }),
+    ),
+  };
+}
+
+/** The light columns of a trace's evaluations, as main's memory-limit retry reads them. */
+function traceEvaluationSelect(holds: (name: string) => boolean) {
+  return {
+    EvaluationId: evaluationRuns.EvaluationId,
+    EvaluatorId: evaluationRuns.EvaluatorId,
+    EvaluatorType: evaluationRuns.EvaluatorType,
+    EvaluatorName: evaluationRuns.EvaluatorName,
+    TraceId: evaluationRuns.TraceId,
+    IsGuardrail: evaluationRuns.IsGuardrail,
+    Status: evaluationRuns.Status,
+    Score: evaluationRuns.Score,
+    Passed: evaluationRuns.Passed,
+    Label: evaluationRuns.Label,
+    Details: evaluationRuns.Details,
+    Error: evaluationRuns.Error,
+    ScheduledAtMs: fn.toUnixTimestamp64Milli(evaluationRuns.ScheduledAt),
+    StartedAtMs: fn.toUnixTimestamp64Milli(evaluationRuns.StartedAt),
+    CompletedAtMs: fn.toUnixTimestamp64Milli(evaluationRuns.CompletedAt),
+    ...attemptSelect(holds),
+  };
+}
+
+/**
+ * Each run's latest version on the asked traces; the trace list repeats in the election, as in
+ * main's dedup. `withInputs: false` is main's retry once the read hits the memory limit.
+ */
+function traceEvaluationsStatement({
+  scope,
+  windows,
+  traceIds,
+  holds,
+  withInputs,
+}: {
+  scope: ReaderScope;
+  windows: boolean;
+  traceIds: readonly string[];
+  holds: (name: string) => boolean;
+  withInputs: boolean;
+}) {
+  const from = clickhouseRead({ scope }).from(evaluationRuns);
+  const select = traceEvaluationSelect(holds);
+  return (windows ? from.withinWindows() : from)
+    .select(withInputs ? { ...select, Inputs: evaluationRuns.Inputs } : select)
+    .where(({ oneOf }) => oneOf(evaluationRuns.TraceId, [...traceIds]))
+    .latestVersion({ repeat: [evaluationRuns.TraceId] })
+    .build();
+}
+
 /**
  * A trace's runs of the last 7 days, each at its latest version; the attempt columns the target
  * lacks read as their defaults. Window and trace are two conditions, so the election repeats both.
@@ -259,20 +269,7 @@ function runsStatement({
       StartedAtMs: fn.toUnixTimestamp64Milli(evaluationRuns.StartedAt),
       CompletedAtMs: fn.toUnixTimestamp64Milli(evaluationRuns.CompletedAt),
       CostId: evaluationRuns.CostId,
-      AttemptCount: fn.heldOr(evaluationRuns.Attempts, {
-        holds,
-        otherwise: fn.toUInt16(param.uint16(0)),
-      }),
-      LastAttemptAtMs: fn.toUnixTimestamp64Milli(
-        fn.heldOr(evaluationRuns.LastAttemptAt, { holds, otherwise: NULL_MOMENT() }),
-      ),
-      LastAttemptErrorText: fn.heldOr(evaluationRuns.LastAttemptError, {
-        holds,
-        otherwise: fn.nullAs(column.nullable(column.string())),
-      }),
-      NextAttemptAtMs: fn.toUnixTimestamp64Milli(
-        fn.heldOr(evaluationRuns.NextAttemptAt, { holds, otherwise: NULL_MOMENT() }),
-      ),
+      ...attemptSelect(holds),
       LastEventOccurredAtMs: fn.toUnixTimestamp64Milli(evaluationRuns.LastEventOccurredAt),
     })
     .where(({ gte }) => gte(evaluationRuns.ScheduledAt, fn.subtractDays(fn.now(), 7)))
@@ -284,22 +281,12 @@ function runsStatement({
 
 export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRunsReadRepository {
   static create(options: {
-    resolveClient: TraceClickHouseResolver;
-    clickhouse: AuthorizedClickHouse;
     reader: Pick<ClickHouseQueryClient, "read" | "columns">;
   }): ClickHouseTraceEvaluationRunsRepository {
-    return new ClickHouseTraceEvaluationRunsRepository(
-      options.resolveClient,
-      options.clickhouse,
-      options.reader,
-    );
+    return new ClickHouseTraceEvaluationRunsRepository(options.reader);
   }
 
-  private constructor(
-    private readonly resolveClient: TraceClickHouseResolver,
-    private readonly clickhouse: AuthorizedClickHouse,
-    private readonly reader: Pick<ClickHouseQueryClient, "read" | "columns">,
-  ) {
+  private constructor(private readonly reader: Pick<ClickHouseQueryClient, "read" | "columns">) {
     super();
   }
 
@@ -424,15 +411,14 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
       input,
       "ClickHouseTraceEvaluationRunsRepository.findTraceEvaluations",
     );
-    const own = await this.ownTenant(input.tenantId);
-    const attempts = await this.attemptColumns({ client: own.client });
+    const read = {
+      scope: builtTenantScope.single({ tenantId: input.tenantId }),
+      windows: false,
+      tenantId: input.tenantId,
+      traceIds: input.traceIds,
+    };
     try {
-      return await this.queryTraceEvaluations({
-        ...input,
-        ...own,
-        attempts,
-        columns: TRACE_EVALUATION_COLUMNS_WITH_INPUTS,
-      });
+      return await this.queryTraceEvaluations({ ...read, withInputs: true });
     } catch (error) {
       if (!isMemoryLimitError(error)) {
         logger.error(
@@ -445,12 +431,7 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
         { tenantId: input.tenantId, traceIdCount: input.traceIds.length },
         "Trace evaluation read hit the ClickHouse memory limit; retrying without inputs",
       );
-      return this.queryTraceEvaluations({
-        ...input,
-        ...own,
-        attempts,
-        columns: TRACE_EVALUATION_COLUMNS_LIGHT,
-      });
+      return this.queryTraceEvaluations({ ...read, withInputs: false });
     }
   }
 
@@ -461,77 +442,34 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
   }): Promise<Record<string, TraceEvaluationData[]>> {
     if (input.traceIds.length === 0) return {};
     return this.queryTraceEvaluations({
+      scope: builtTenantScope.fromProof({ authorization: input.authorization, reads: "traces" }),
+      windows: true,
+      tenantId: ownProjectIdOf({ authorization: input.authorization, reads: "traces" }),
       traceIds: input.traceIds,
-      client: this.clickhouse.as(input.authorization, { reads: "traces" }),
-      tenantPredicate: tenantScope("ScheduledAt"),
-      dedupTenantPredicate: tenantScope("ScheduledAt"),
-      params: {},
-      attempts: await this.attemptColumnsOf({ authorization: input.authorization }),
-      columns: TRACE_EVALUATION_COLUMNS_WITH_INPUTS,
+      withInputs: true,
     });
   }
 
-  /** The attempt columns the tenant's target answers, the missing ones as their defaults. */
-  private async attemptColumns({ client }: { client: TraceClickHouseClient }): Promise<string> {
-    const input = { table: EVALUATION_RUNS_TABLE, alias: RUNS, columns: ATTEMPT_COLUMNS };
-    return (await client.select?.(input)) ?? ClickHouseColumns.named(input);
-  }
-
-  /** As `attemptColumns`, for the proof's own project; an unreachable client names every column. */
-  private async attemptColumnsOf({
-    authorization,
-  }: {
-    authorization: Authorization;
-  }): Promise<string> {
-    const client = await this.resolveClient(
-      ownProjectIdOf({ authorization, reads: "traces" }),
-    ).catch(() => undefined);
-    if (!client) {
-      return ClickHouseColumns.named({ alias: RUNS, columns: ATTEMPT_COLUMNS });
-    }
-    return this.attemptColumns({ client });
-  }
-
-  private async ownTenant(tenantId: string) {
-    return {
-      client: await this.resolveClient(tenantId),
-      tenantPredicate: `${RUNS}.TenantId = {tenantId:String}`,
-      dedupTenantPredicate: "TenantId = {tenantId:String}",
-      params: { tenantId },
-    };
-  }
-
+  /** `tenantId` names the target whose attempt columns the read selects. */
   private async queryTraceEvaluations(input: {
-    client: TraceClickHouseClient;
-    tenantPredicate: string;
-    dedupTenantPredicate: string;
-    params: Record<string, string>;
+    scope: ReaderScope;
+    windows: boolean;
+    tenantId: string;
     traceIds: readonly string[];
-    columns: string;
-    attempts: string;
+    withInputs: boolean;
   }): Promise<Record<string, TraceEvaluationData[]>> {
-    // ID_BOUND_SKIP: evaluation's index, registered by evaluation; moves there with trace-review.
-    const result = await input.client.query({
-      query: `
-        SELECT ${input.columns}, ${input.attempts}, ${ATTEMPT_MOMENTS}
-        FROM ${EVALUATION_RUNS_TABLE} AS ${RUNS}
-        WHERE ${input.tenantPredicate}
-          AND ${RUNS}.TraceId IN ({traceIds:Array(String)})
-          AND (${RUNS}.TenantId, ${RUNS}.EvaluationId, ${RUNS}.UpdatedAt) IN (
-            SELECT TenantId, EvaluationId, max(UpdatedAt)
-            FROM ${EVALUATION_RUNS_TABLE}
-            WHERE ${input.dedupTenantPredicate}
-              AND TraceId IN ({traceIds:Array(String)})
-            GROUP BY TenantId, EvaluationId
-          )
-      `,
-      query_params: { ...input.params, traceIds: [...input.traceIds] },
-      format: "JSONEachRow",
+    const holds = await this.reader
+      .columns({ tenantId: input.tenantId })
+      .holds({ table: evaluationRuns.$table.name });
+    const result = await this.reader.read({
+      // ID_BOUND_SKIP: evaluation's index, registered by evaluation; moves there with trace-review.
+      statement: traceEvaluationsStatement({ ...input, holds }),
+      table: evaluationRuns.$table.name,
     });
     const output = Object.fromEntries(
       input.traceIds.map((traceId) => [traceId, [] as TraceEvaluationData[]]),
     );
-    for (const row of traceEvaluationRowsSchema.parse(await result.json())) {
+    for (const row of traceEvaluationRowsSchema.parse(result.rows)) {
       if (!row.TraceId) continue;
       const evaluation = traceEvaluationDataSchema.parse({
         ...summaryFields(row),
@@ -541,9 +479,12 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
         timestamps: {
           scheduledAt: row.ScheduledAtMs,
           startedAt: row.StartedAtMs,
-          completedAt: row.CompletedAt,
+          completedAt: row.CompletedAtMs,
         },
-        ...attemptFields(row),
+        attempts: row.AttemptCount,
+        lastAttemptAt: row.LastAttemptAtMs,
+        lastAttemptError: row.LastAttemptErrorText,
+        nextAttemptAt: row.NextAttemptAtMs,
       });
       (output[row.TraceId] ??= []).push(evaluation);
     }

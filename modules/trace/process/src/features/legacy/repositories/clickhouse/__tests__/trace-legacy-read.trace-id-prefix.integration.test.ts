@@ -6,6 +6,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { traceQueryClientFor } from "../../../../../repositories/clickhouse/__tests__/support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -79,6 +80,7 @@ describe.skipIf(!clickHouseConfigured)(
       ch = await startMigratedTraceClickHouse();
       service = TraceLegacyReadClickHouseRepository.create({
         resolveClickHouseClient: async () => ch,
+        reader: traceQueryClientFor(ch),
       });
     }, 60_000);
 

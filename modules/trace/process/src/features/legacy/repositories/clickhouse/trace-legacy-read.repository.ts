@@ -2,6 +2,7 @@ import { annotationSuggestedOutput } from "@langwatch/annotation-contract";
 import type { Authorization } from "@langwatch/authorization";
 import {
   type AuthorizedClickHouse,
+  type ClickHouseQueryClient,
   DEFAULT_PARTITION_WINDOW_MS,
   expandFragment,
   fenceFor,
@@ -11,6 +12,11 @@ import {
   type TenantScopedReader,
   tenantScope,
 } from "@langwatch/clickhouse-client";
+import {
+  clickhouseRead,
+  fn,
+  tenantScope as builtTenantScope,
+} from "@langwatch/clickhouse-client/builder";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "@langwatch/data-retention-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
@@ -40,6 +46,7 @@ import { getLangWatchTracer } from "langwatch";
 import { z } from "zod";
 
 import type { TraceClickHouseClient } from "../../../../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
+import { traceSummaries } from "../../../../repositories/clickhouse/clickhouse.trace-summaries.table.ts";
 import {
   chBoolean,
   chNumber,
@@ -329,6 +336,8 @@ export type ClickHouseTraceLegacyReadOptions = {
   resolveClickHouseClient?: ((tenantId: string) => Promise<TraceClickHouseClient>) | undefined;
   /** The proof-checked reader the fenced reads go through (ADR-177); absent, they refuse. */
   clickhouse?: AuthorizedClickHouse | undefined;
+  /** The reader the built reads go through (ADR-202); absent, they refuse. */
+  reader?: Pick<ClickHouseQueryClient, "read"> | undefined;
   /** Annotation's rows and score names via its shared tables (R40), for the projection join. */
   annotations?:
     | {
@@ -781,6 +790,113 @@ function summaryReadWindow({
 
 const retentionFloorLogger = createLogger("langwatch:clickhouse:retention-floor");
 
+const THREAD_ID = (summaries: typeof traceSummaries) =>
+  fn.mapGet(summaries.Attributes, "gen_ai.conversation.id");
+
+/** The distinct trace ids of a project's summaries whose id starts with `prefix`, in a window. */
+function traceIdsByPrefixStatement({
+  projectId,
+  prefix,
+  occurredAt,
+  limit,
+}: {
+  projectId: string;
+  prefix: string;
+  occurredAt: { from: number; to: number };
+  limit: number;
+}) {
+  return clickhouseRead({ scope: builtTenantScope.single({ tenantId: projectId }) })
+    .from(traceSummaries)
+    .select({ TraceId: traceSummaries.TraceId })
+    .distinct()
+    .where(({ and, gte, lte }) =>
+      and(
+        gte(traceSummaries.OccurredAt, occurredAt.from),
+        lte(traceSummaries.OccurredAt, occurredAt.to),
+        fn.startsWith(traceSummaries.TraceId, prefix),
+      ),
+    )
+    .limit(limit)
+    .build();
+}
+
+/**
+ * The distinct trace ids of the thread (`=`) or threads (`IN`) asked, oldest first, under the
+ * proof's OccurredAt fence, as main's two reads compared them.
+ */
+function threadTraceIdsStatement({
+  authorization,
+  threads,
+  limit,
+}: {
+  authorization: Authorization;
+  threads: string | readonly string[];
+  limit: number;
+}) {
+  return clickhouseRead({
+    scope: builtTenantScope.fromProof({ authorization, reads: "traces" }),
+  })
+    .from(traceSummaries)
+    .withinWindows()
+    .select({ TraceId: traceSummaries.TraceId })
+    .distinct()
+    .where(({ eq, oneOf }) =>
+      typeof threads === "string"
+        ? eq(THREAD_ID(traceSummaries), threads)
+        : oneOf(THREAD_ID(traceSummaries), [...threads]),
+    )
+    .orderBy(traceSummaries.CreatedAt, "ASC")
+    .limit(limit)
+    .build();
+}
+
+type AggregationWindow = { projectId: string; startDate?: number; endDate?: number };
+
+/** A project's summaries, created inside the bounds given; an unset bound does not filter. */
+function summariesCreatedWithin({ projectId, startDate, endDate }: AggregationWindow) {
+  let read = clickhouseRead({ scope: builtTenantScope.single({ tenantId: projectId }) }).from(
+    traceSummaries,
+  );
+  if (startDate) read = read.where(({ gte }) => gte(traceSummaries.CreatedAt, startDate));
+  if (endDate) read = read.where(({ lte }) => lte(traceSummaries.CreatedAt, endDate));
+  return read;
+}
+
+/** Each topic and subtopic pair's trace count in the window. */
+function topicCountsStatement(window: AggregationWindow) {
+  return summariesCreatedWithin(window)
+    .select({
+      TopicId: traceSummaries.TopicId,
+      SubTopicId: traceSummaries.SubTopicId,
+      count: fn.count(),
+    })
+    .where(({ isNotNull, or }) =>
+      or(isNotNull(traceSummaries.TopicId), isNotNull(traceSummaries.SubTopicId)),
+    )
+    .groupBy(traceSummaries.TopicId, traceSummaries.SubTopicId)
+    .limit(10_000)
+    .build();
+}
+
+/** The distinct non-empty values of one summary attribute in the window, as `alias`. */
+function distinctAttributeStatement<const Alias extends string>({
+  window,
+  attribute,
+  alias,
+}: {
+  window: AggregationWindow;
+  attribute: string;
+  alias: Alias;
+}) {
+  const value = fn.mapGet(traceSummaries.Attributes, attribute);
+  return summariesCreatedWithin(window)
+    .select({ [alias]: value } as Record<Alias, typeof value>)
+    .distinct()
+    .where(({ ne }) => ne(value, ""))
+    .limit(10_000)
+    .build();
+}
+
 export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadRepository {
   private readonly logger = createLogger("langwatch:traces:clickhouse-service");
   private readonly tracer = getLangWatchTracer("langwatch.traces.clickhouse-service");
@@ -791,8 +907,8 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
 
   constructor(options: ClickHouseTraceLegacyReadOptions) {
     super();
-    const { resolveClickHouseClient, clickhouse, annotations } = options;
-    this.store = { resolveClickHouseClient, clickhouse, annotations };
+    const { resolveClickHouseClient, clickhouse, reader, annotations } = options;
+    this.store = { resolveClickHouseClient, clickhouse, reader, annotations };
     this.resolveClickHouseClient = resolveClickHouseClient;
     this.annotations = annotations;
   }
@@ -830,6 +946,12 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   }) {
     if (!this.store.clickhouse) throw new ClickHouseClientUnavailableError(projectId);
     return this.store.clickhouse.as(authorization, { reads: "traces" });
+  }
+
+  /** The reader for built reads; refuses by name where no ClickHouse was composed. */
+  private builtReader(projectId: string): Pick<ClickHouseQueryClient, "read"> {
+    if (!this.store.reader) throw new ClickHouseClientUnavailableError(projectId);
+    return this.store.reader;
   }
 
   /** Translates the caller's filter selection into a ClickHouse predicate. */
@@ -943,30 +1065,15 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       "TraceLegacyReadClickHouseRepository.resolveTraceIdByPrefix",
       { attributes: { "tenant.id": projectId, "trace.id.prefix": prefix } },
       async () => {
-        const clickHouseClient = await this.resolveClient(projectId);
+        const reader = this.builtReader(projectId);
 
         try {
-          const result = await clickHouseClient.query({
-            query: `
-              SELECT DISTINCT TraceId
-              FROM trace_summaries
-              WHERE TenantId = {tenantId:String}
-                AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
-                AND OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})
-                AND startsWith(TraceId, {prefix:String})
-              LIMIT {limit:UInt32}
-            `,
-            query_params: {
-              tenantId: projectId,
-              fromMs: occurredAt.from,
-              toMs: occurredAt.to,
-              prefix,
-              limit,
-            },
-            format: "JSONEachRow",
+          const result = await reader.read({
+            statement: traceIdsByPrefixStatement({ projectId, prefix, occurredAt, limit }),
+            table: traceSummaries.$table.name,
           });
 
-          const rows = traceIdRowsSchema.parse(await result.json());
+          const rows = traceIdRowsSchema.parse(result.rows);
           return rows.map((r) => r.TraceId);
         } catch (error) {
           if (HandledError.isHandled(error)) throw error;
@@ -1001,29 +1108,23 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         attributes: { "tenant.id": projectId, "thread.id": threadId },
       },
       async () => {
-        const reader = this.reader({ authorization, projectId });
+        const reader = this.builtReader(projectId);
 
         this.logger.debug({ projectId, threadId }, "Fetching traces by thread ID from ClickHouse");
 
         try {
           // Query trace_summaries for traces with matching thread_id
           // Thread ID can be stored under different attribute keys
-          const result = await reader.query({
-            query: `
-              SELECT DISTINCT TraceId
-              FROM trace_summaries
-              WHERE ${tenantScope("OccurredAt")}
-                AND Attributes['gen_ai.conversation.id'] = {threadId:String}
-              ORDER BY CreatedAt ASC
-              LIMIT 1000
-            `,
-            query_params: {
-              threadId,
-            },
-            format: "JSONEachRow",
+          const result = await reader.read({
+            statement: threadTraceIdsStatement({
+              authorization,
+              threads: threadId,
+              limit: 1000,
+            }),
+            table: traceSummaries.$table.name,
           });
 
-          const rows = traceIdRowsSchema.parse(await result.json());
+          const rows = traceIdRowsSchema.parse(result.rows);
           const traceIds = rows.map((r) => r.TraceId);
 
           if (traceIds.length === 0) {
@@ -1078,7 +1179,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         },
       },
       async () => {
-        const reader = this.reader({ authorization, projectId });
+        const reader = this.builtReader(projectId);
 
         if (threadIds.length === 0) {
           return [];
@@ -1092,23 +1193,16 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         try {
           // Query trace_summaries for traces with matching thread_ids
           // Thread ID can be stored under different attribute keys
-          const result = await reader.query({
-            query: `
-              SELECT DISTINCT TraceId
-              FROM trace_summaries
-              WHERE ${tenantScope("OccurredAt")}
-                AND Attributes['gen_ai.conversation.id'] IN ({threadIds:Array(String)})
-              ORDER BY CreatedAt ASC
-              LIMIT {maxTraces:UInt32}
-            `,
-            query_params: {
-              threadIds,
-              maxTraces: maxTraces ?? DEFAULT_THREAD_TRACES_LIMIT,
-            },
-            format: "JSONEachRow",
+          const result = await reader.read({
+            statement: threadTraceIdsStatement({
+              authorization,
+              threads: threadIds,
+              limit: maxTraces ?? DEFAULT_THREAD_TRACES_LIMIT,
+            }),
+            table: traceSummaries.$table.name,
           });
 
-          const rows = traceIdRowsSchema.parse(await result.json());
+          const rows = traceIdRowsSchema.parse(result.rows);
           const traceIds = rows.map((r) => r.TraceId);
 
           if (traceIds.length === 0) {
@@ -1603,41 +1697,15 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       "TraceLegacyReadClickHouseRepository.getTopicCounts",
       { attributes: { "tenant.id": input.projectId } },
       async () => {
-        const clickHouseClient = await this.resolveClient(input.projectId);
+        const reader = this.builtReader(input.projectId);
 
         try {
-          // Build date filter conditions
-          const conditions: string[] = ["TenantId = {tenantId:String}"];
-          if (input.startDate) {
-            conditions.push("CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})");
-          }
-          if (input.endDate) {
-            conditions.push("CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})");
-          }
-
-          const whereClause = conditions.join(" AND ");
-
-          const result = await clickHouseClient.query({
-            query: `
-              SELECT
-                TopicId,
-                SubTopicId,
-                count() as count
-              FROM trace_summaries
-              WHERE ${whereClause}
-                AND (TopicId IS NOT NULL OR SubTopicId IS NOT NULL)
-              GROUP BY TopicId, SubTopicId
-              LIMIT 10000
-            `,
-            query_params: {
-              tenantId: input.projectId,
-              startDate: input.startDate ?? 0,
-              endDate: input.endDate ?? nowInstant().epochMilliseconds,
-            },
-            format: "JSONEachRow",
+          const result = await reader.read({
+            statement: topicCountsStatement(input),
+            table: traceSummaries.$table.name,
           });
 
-          const rows = topicCountRowsSchema.parse(await result.json());
+          const rows = topicCountRowsSchema.parse(result.rows);
 
           return aggregateTopicCounts(rows);
         } catch (error) {
@@ -1665,58 +1733,31 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       "TraceLegacyReadClickHouseRepository.getCustomersAndLabels",
       { attributes: { "tenant.id": input.projectId } },
       async () => {
-        const clickHouseClient = await this.resolveClient(input.projectId);
+        const reader = this.builtReader(input.projectId);
 
         try {
-          // Build date filter conditions
-          const conditions: string[] = ["TenantId = {tenantId:String}"];
-          if (input.startDate) {
-            conditions.push("CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})");
-          }
-          if (input.endDate) {
-            conditions.push("CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})");
-          }
-
-          const whereClause = conditions.join(" AND ");
-
-          // Query for unique customer IDs
-          const customerResult = await clickHouseClient.query({
-            query: `
-              SELECT DISTINCT Attributes['langwatch.customer_id'] as customer_id
-              FROM trace_summaries
-              WHERE ${whereClause}
-                AND Attributes['langwatch.customer_id'] != ''
-              LIMIT 10000
-            `,
-            query_params: {
-              tenantId: input.projectId,
-              startDate: input.startDate ?? 0,
-              endDate: input.endDate ?? nowInstant().epochMilliseconds,
-            },
-            format: "JSONEachRow",
+          const customerResult = await reader.read({
+            statement: distinctAttributeStatement({
+              window: input,
+              attribute: "langwatch.customer_id",
+              alias: "customer_id",
+            }),
+            table: traceSummaries.$table.name,
           });
 
-          const customerRows = customerRowsSchema.parse(await customerResult.json());
+          const customerRows = customerRowsSchema.parse(customerResult.rows);
 
-          // Query for unique labels
           // Labels are stored as JSON array in langwatch.labels attribute
-          const labelsResult = await clickHouseClient.query({
-            query: `
-              SELECT DISTINCT Attributes['langwatch.labels'] as labels_json
-              FROM trace_summaries
-              WHERE ${whereClause}
-                AND Attributes['langwatch.labels'] != ''
-              LIMIT 10000
-            `,
-            query_params: {
-              tenantId: input.projectId,
-              startDate: input.startDate ?? 0,
-              endDate: input.endDate ?? nowInstant().epochMilliseconds,
-            },
-            format: "JSONEachRow",
+          const labelsResult = await reader.read({
+            statement: distinctAttributeStatement({
+              window: input,
+              attribute: "langwatch.labels",
+              alias: "labels_json",
+            }),
+            table: traceSummaries.$table.name,
           });
 
-          const labelsRows = labelsRowsSchema.parse(await labelsResult.json());
+          const labelsRows = labelsRowsSchema.parse(labelsResult.rows);
 
           // Parse labels from JSON arrays
           const labelsSet = new Set<string>();

@@ -33,7 +33,10 @@ import { CLICKHOUSE_FACET_CATALOG } from "../../features/facet/repositories/clic
 import { TraceLegacyReadClickHouseRepository } from "../../features/legacy/repositories/clickhouse/trace-legacy-read.repository.ts";
 import { TraceLegacyReadService } from "../../features/legacy/services/trace-legacy-read.service.ts";
 import { TraceListService } from "../../features/read/services/trace-list-read.service.ts";
-import { authorizedClickHouseFor } from "../../repositories/clickhouse/__tests__/support/authorized-clickhouse.support.ts";
+import {
+  authorizedClickHouseFor,
+  traceQueryClientFor,
+} from "../../repositories/clickhouse/__tests__/support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -158,6 +161,7 @@ function composeApp(): TraceModule {
   const legacy = TraceLegacyReadClickHouseRepository.create({
     clickhouse,
     resolveClickHouseClient: async () => ch,
+    reader: traceQueryClientFor(ch),
   });
   const allowed = async () => true;
   return createTraceAppHarness({

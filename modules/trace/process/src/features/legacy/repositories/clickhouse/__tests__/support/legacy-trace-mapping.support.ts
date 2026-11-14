@@ -1,4 +1,4 @@
-import { AuthorizedClickHouse } from "@langwatch/clickhouse-client";
+import { AuthorizedClickHouse, type ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 
 import type { TraceClickHouseClient } from "../../../../../../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
@@ -35,6 +35,28 @@ export function fencedOver(
   });
 }
 
+/**
+ * The built-read client over the same member client, routed to the statement's tenant setting,
+ * so the built reads reach the test's `query` double as the fenced reads do.
+ */
+export function builtOver(
+  resolveClickHouseClient: (tenantId: string) => Promise<TraceClickHouseClient>,
+): Pick<ClickHouseQueryClient, "read"> {
+  return clickHouseQueryClientDouble({
+    read: async ({ statement }) => {
+      const settings: Record<string, unknown> = statement.settings ?? {};
+      const tenant = settings.SQL_langwatch_tenant_ids;
+      const member = await resolveClickHouseClient(typeof tenant === "string" ? tenant : "");
+      const result = await member.query({
+        query: statement.sql,
+        query_params: statement.params,
+        format: "JSONEachRow",
+      });
+      return { rows: await result.json() };
+    },
+  });
+}
+
 /** The ClickHouse store with the mapping service over it, as the app composes the legacy read. */
 export function mappedLegacyRead({
   traceCanonicalisation,
@@ -46,8 +68,11 @@ export function mappedLegacyRead({
   const clickhouse =
     store.clickhouse ??
     (store.resolveClickHouseClient ? fencedOver(store.resolveClickHouseClient) : undefined);
+  const reader =
+    store.reader ??
+    (store.resolveClickHouseClient ? builtOver(store.resolveClickHouseClient) : undefined);
   return LegacyTraceMappingService.create({
-    repository: TraceLegacyReadClickHouseRepository.create({ ...store, clickhouse }),
+    repository: TraceLegacyReadClickHouseRepository.create({ ...store, clickhouse, reader }),
     traceCanonicalisation,
     resolveTraceSpans,
     resolveTraceSpansBatch,

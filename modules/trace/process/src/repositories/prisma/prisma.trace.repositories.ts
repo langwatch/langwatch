@@ -62,7 +62,6 @@ export class PostgresTraceRepositories {
   > {
     const traceClickHouse = MemberTraceClickHouseClientRepository.resolverFor(members.clickhouse);
     const clickhouse = MemberTraceClickHouseClientRepository.authorizedFor(members.clickhouse);
-    const storage = { resolveClient: traceClickHouse, clickhouse };
     const summaries = { resolveClient: traceClickHouse, reader: members.clickhouse };
     const annotations = PrismaTraceAnnotationsRepository.create(members.prisma);
     const annotationScores = PrismaTraceAnnotationScoresRepository.create(members.prisma);
@@ -103,7 +102,6 @@ export class PostgresTraceRepositories {
         reader: members.clickhouse,
       }),
       evaluationRuns: ClickHouseTraceEvaluationRunsRepository.create({
-        ...storage,
         reader: members.clickhouse,
       }),
       annotations,
@@ -111,6 +109,7 @@ export class PostgresTraceRepositories {
       legacyRead: TraceLegacyReadClickHouseRepository.create({
         resolveClickHouseClient: traceClickHouse,
         clickhouse,
+        reader: members.clickhouse,
         annotations: { rows: annotations, scores: annotationScores },
       }),
       list: TraceListClickHouseRepository.create({ clickhouse }),

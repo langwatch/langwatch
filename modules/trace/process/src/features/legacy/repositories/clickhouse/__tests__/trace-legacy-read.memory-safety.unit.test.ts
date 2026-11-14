@@ -5,7 +5,32 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { beforeEach, describe, expect, it } from "vitest";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+
+import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
+
+type ReadRequest = Parameters<ClickHouseQueryClient["read"]>[0];
+
+/** The SQL findTopicCounts sends, built and recorded rather than read off the source. */
+async function topicCountsSql(): Promise<string> {
+  const reads: ReadRequest[] = [];
+  const repository = TraceLegacyReadClickHouseRepository.create({
+    reader: {
+      read: async (request) => {
+        reads.push(request);
+        return { rows: [] };
+      },
+    },
+  });
+  await repository.findTopicCounts({
+    projectId: "project-1",
+    filters: {},
+    startDate: 1,
+    endDate: 2,
+  });
+  return reads.map((request) => request.statement.sql).join("\n");
+}
 
 /**
  * The repository this reads, resolved once: the assertions are about the
@@ -33,9 +58,10 @@ describe("memory-safety", () => {
     const traceServicePath = traceReadSourcePath();
     const traceServiceSource = fs.readFileSync(traceServicePath, "utf-8");
 
-    const getTopicCountsBody = traceServiceSource.match(
-      /async findTopicCounts[\s\S]*?(?=\n {2}async |\n {2}\/\*\*|\n {2}private )/,
-    );
+    let topicCountsStatement = "";
+    beforeAll(async () => {
+      topicCountsStatement = await topicCountsSql();
+    });
 
     const getDistinctFieldNamesBody = traceServiceSource.match(
       /async findDistinctFieldNames[\s\S]*?(?=\n {2}async |\n {2}\/\*\*|\n {2}private )/,
@@ -44,14 +70,13 @@ describe("memory-safety", () => {
     describe("when the topic counting query SQL is inspected", () => {
       /** @scenario Topic and field-discovery queries access only specific attributes */
       it("does not select the full SpanAttributes Map column", () => {
-        expect(getTopicCountsBody).not.toBeNull();
-        expect(getTopicCountsBody![0]).not.toContain("SpanAttributes");
+        expect(topicCountsStatement).toContain("FROM trace_summaries");
+        expect(topicCountsStatement).not.toContain("SpanAttributes");
       });
 
       it("does not select the full Attributes Map column without key access", () => {
-        expect(getTopicCountsBody).not.toBeNull();
         // Attributes without ['key'] means reading the entire Map
-        expect(getTopicCountsBody![0]).not.toMatch(/\bAttributes\b(?!\[)/);
+        expect(topicCountsStatement).not.toMatch(/\bAttributes\b(?!\[)/);
       });
     });
 
@@ -74,18 +99,10 @@ describe("memory-safety", () => {
   // Scenario 3: Topic counting query includes a LIMIT clause
   // -------------------------------------------------------------------------
   describe("given the topic counting query's LIMIT clause", () => {
-    const traceServicePath = traceReadSourcePath();
-    const traceServiceSource = fs.readFileSync(traceServicePath, "utf-8");
-
-    const getTopicCountsBody = traceServiceSource.match(
-      /async findTopicCounts[\s\S]*?(?=\n {2}async |\n {2}\/\*\*|\n {2}private )/,
-    );
-
     describe("when the topic counting query SQL is inspected", () => {
       /** @scenario Topic counting query includes a LIMIT clause */
-      it("includes a LIMIT clause followed by a number", () => {
-        expect(getTopicCountsBody).not.toBeNull();
-        expect(getTopicCountsBody![0]).toMatch(/\bLIMIT\s+\d+/);
+      it("includes a LIMIT clause followed by a number", async () => {
+        expect(await topicCountsSql()).toMatch(/\bLIMIT\s+\d+/);
       });
     });
   });

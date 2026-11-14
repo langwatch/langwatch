@@ -2,12 +2,7 @@
  * Trace's read of evaluation's shared `evaluation_runs`.
  * @see modules/trace/specs/trace-evaluation-runs-read.feature
  */
-import {
-  AuthorizedClickHouse,
-  ClickHouseColumns,
-  type ClickHouseQueryClient,
-  type QueryRequest,
-} from "@langwatch/clickhouse-client";
+import { ClickHouseColumns, type ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it, vi } from "vitest";
 
@@ -57,16 +52,7 @@ function repositoryOver(
   reads: ReadRequest[] = [],
   { held = true }: { held?: boolean } = {},
 ) {
-  // The proof-checked reader hands its expanded statement to the same recording client.
-  const authorized = clickHouseQueryClientDouble({
-    query: async (request: QueryRequest) => {
-      const result = await ch.query({ query: request.sql, query_params: request.params });
-      return { rows: await result.json() };
-    },
-  });
   return ClickHouseTraceEvaluationRunsRepository.create({
-    resolveClient: async () => ch,
-    clickhouse: new AuthorizedClickHouse({ resolveClient: async () => authorized }),
     // A built read is recorded, then answered by the same recording client.
     reader: clickHouseQueryClientDouble({
       columns: () => targetColumns(held),
@@ -237,6 +223,19 @@ describe("given evaluation has recorded runs against the traces on one list page
   });
 });
 
+const EVALUATION_ROW = {
+  ...SUMMARY_ROW,
+  Details: null,
+  Error: null,
+  ScheduledAtMs: "1758189600000",
+  StartedAtMs: null,
+  CompletedAtMs: null,
+  AttemptCount: 0,
+  LastAttemptAtMs: null,
+  LastAttemptErrorText: null,
+  NextAttemptAtMs: null,
+};
+
 describe("given reading a trace's evaluations with their inputs exceeds ClickHouse's memory limit", () => {
   describe("when trace reads the evaluations of that trace", () => {
     /** @scenario "A trace's evaluations retry without their inputs when ClickHouse runs out of memory" */
@@ -244,24 +243,29 @@ describe("given reading a trace's evaluations with their inputs exceeds ClickHou
       const ch = client((request) =>
         request.query.includes("Inputs")
           ? new Error("Code: 241. DB::Exception: Memory limit (total) exceeded")
-          : [
-              {
-                ...SUMMARY_ROW,
-                Details: null,
-                Error: null,
-                ScheduledAtMs: "1758189600000",
-                StartedAtMs: null,
-                CompletedAt: null,
-              },
-            ],
+          : [EVALUATION_ROW],
       );
+      const reads: ReadRequest[] = [];
 
-      const evaluations = await repositoryOver(ch).findTraceEvaluations({
+      const evaluations = await repositoryOver(ch, reads).findTraceEvaluations({
         tenantId: TENANT,
         traceIds: ["trace-1", "trace-quiet"],
       });
 
       expect(ch.query).toHaveBeenCalledTimes(2);
+      for (const request of reads) {
+        expect(request.statement).toMatchObject({
+          kind: "tenant",
+          identity: "reader",
+          settings: { SQL_langwatch_tenant_ids: TENANT },
+        });
+      }
+      // The trace list repeats inside the election, as main's dedup repeats it.
+      const [, election = ""] = (reads[1]?.statement.sql ?? "").split("max(UpdatedAt)");
+      expect(election).toMatch(/TraceId IN \(?\{v\d+:Array\(String\)\}/);
+      expect(Object.values(reads[1]?.statement.params ?? {})).toEqual(
+        expect.arrayContaining([["trace-1", "trace-quiet"]]),
+      );
       expect(evaluations["trace-quiet"]).toEqual([]);
       expect(evaluations["trace-1"]?.[0]).toMatchObject({
         evaluationId: "eval-1",
@@ -270,41 +274,42 @@ describe("given reading a trace's evaluations with their inputs exceeds ClickHou
       expect(evaluations["trace-1"]?.[0]).not.toHaveProperty("inputs");
     });
   });
+
+  describe("when trace reads the evaluations through the reader's proof", () => {
+    it("fences the read by the proof's windows on ScheduledAt", async () => {
+      const ch = client(() => []);
+      const reads: ReadRequest[] = [];
+
+      await repositoryOver(ch, reads).findReadableTraceEvaluations({
+        authorization,
+        traceIds: ["trace-1"],
+      });
+
+      expect(reads[0]?.statement).toMatchObject({
+        kind: "tenant",
+        identity: "reader",
+        tenantIds: [TENANT],
+        settings: { SQL_langwatch_tenant_ids: TENANT },
+      });
+      expect(reads[0]?.statement.sql).toContain("Inputs");
+    });
+  });
 });
 
 describe("given the target's evaluation_runs does not have the attempt columns yet", () => {
   describe("when trace reads the evaluations of a trace", () => {
     /** @scenario "Attempt columns a target has not added yet read as no attempts" */
     it("names each missing attempt column as its default and reads no attempts", async () => {
-      const ch = client(() => [
-        {
-          ...SUMMARY_ROW,
-          Details: null,
-          Error: null,
-          ScheduledAtMs: "1000",
-          StartedAtMs: null,
-          CompletedAt: null,
-        },
-      ]);
-      const withoutColumns = {
-        ...ch,
-        select: async () =>
-          "toUInt16(0) AS `Attempts`, CAST(NULL AS Nullable(DateTime64(3))) AS `LastAttemptAt`, CAST(NULL AS Nullable(String)) AS `LastAttemptError`, CAST(NULL AS Nullable(DateTime64(3))) AS `NextAttemptAt`",
-      };
-      const repository = ClickHouseTraceEvaluationRunsRepository.create({
-        resolveClient: async () => withoutColumns,
-        clickhouse: new AuthorizedClickHouse({
-          resolveClient: async () => clickHouseQueryClientDouble({}),
-        }),
-        reader: clickHouseQueryClientDouble({}),
-      });
+      const ch = client(() => [EVALUATION_ROW]);
+      const reads: ReadRequest[] = [];
 
-      const read = await repository.findTraceEvaluations({
+      const read = await repositoryOver(ch, reads, { held: false }).findTraceEvaluations({
         tenantId: TENANT,
         traceIds: ["trace-1"],
       });
 
-      expect(ch.query.mock.calls[0]?.[0].query).toContain("toUInt16(0) AS `Attempts`");
+      expect(reads[0]?.statement.sql).toMatch(/toUInt16\(\{v\d+:UInt16\}\) AS AttemptCount/);
+      expect(reads[0]?.statement.sql).not.toMatch(/\bLastAttemptError\b(?!Text)/);
       expect(read["trace-1"]?.[0]).toMatchObject({ attempts: 0, lastAttemptError: null });
     });
   });
@@ -316,31 +321,20 @@ describe("given a run with failed attempts", () => {
     it("reads the attempt moments as epoch milliseconds, not as timezone-less text", async () => {
       const ch = client(() => [
         {
-          ...SUMMARY_ROW,
-          Details: null,
-          Error: null,
-          ScheduledAtMs: "1000",
-          StartedAtMs: null,
-          CompletedAt: null,
-          Attempts: 2,
+          ...EVALUATION_ROW,
+          AttemptCount: 2,
           LastAttemptAtMs: "1700000015000",
           NextAttemptAtMs: 1_700_000_025_000,
         },
       ]);
-      const repository = ClickHouseTraceEvaluationRunsRepository.create({
-        resolveClient: async () => ch,
-        clickhouse: new AuthorizedClickHouse({
-          resolveClient: async () => clickHouseQueryClientDouble({}),
-        }),
-        reader: clickHouseQueryClientDouble({}),
-      });
+      const reads: ReadRequest[] = [];
 
-      const read = await repository.findTraceEvaluations({
+      const read = await repositoryOver(ch, reads).findTraceEvaluations({
         tenantId: TENANT,
         traceIds: ["trace-1"],
       });
 
-      expect(ch.query.mock.calls[0]?.[0].query).toContain(
+      expect(reads[0]?.statement.sql).toContain(
         "toUnixTimestamp64Milli(LastAttemptAt) AS LastAttemptAtMs",
       );
       expect(read["trace-1"]?.[0]).toMatchObject({

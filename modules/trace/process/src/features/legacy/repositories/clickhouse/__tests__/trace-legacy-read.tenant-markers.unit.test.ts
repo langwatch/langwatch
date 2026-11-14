@@ -3,6 +3,7 @@
  * The by-id and thread reads go through the proof-checked client: every statement names
  * its tenant by marker, never by a `{tenantId:String}` of its own (ADR-177 block C).
  */
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
@@ -11,7 +12,9 @@ import { TraceCanonicalisationService } from "#features/derivation/services/trac
 import { ownProof } from "../../../../../__tests__/support/authorization-proofs.fixture.ts";
 import { traceSummaryRow } from "../../../../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
 import type { TraceClickHouseClient } from "../../../../../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
-import { mappedLegacyRead } from "./support/legacy-trace-mapping.support.ts";
+import { builtOver, mappedLegacyRead } from "./support/legacy-trace-mapping.support.ts";
+
+type ReadRequest = Parameters<ClickHouseQueryClient["read"]>[0];
 
 const PROJECT_ID = "project-1";
 const PROTECTIONS = { canSeeCosts: true, canSeeCapturedInput: true, canSeeCapturedOutput: true };
@@ -29,15 +32,27 @@ function harness() {
       return [];
     },
   }));
+  const resolveClickHouseClient = async (tenantId: string) => {
+    routedTo.push(tenantId);
+    return createApiFixture<TraceClickHouseClient>({ query });
+  };
+  const built: ReadRequest[] = [];
+  const builtReader = builtOver(resolveClickHouseClient);
   const read = mappedLegacyRead({
-    resolveClickHouseClient: async (tenantId) => {
-      routedTo.push(tenantId);
-      return createApiFixture<TraceClickHouseClient>({ query });
+    resolveClickHouseClient,
+    reader: {
+      read: async (request) => {
+        built.push(request);
+        return builtReader.read(request);
+      },
     },
     traceCanonicalisation: TraceCanonicalisationService.create(),
   });
-  const statements = () => query.mock.calls.map(([statement]) => statement);
-  return { read, statements, routedTo };
+  const statements = () =>
+    query.mock.calls
+      .map(([statement]) => statement)
+      .filter((statement) => !built.some((request) => request.statement.sql === statement.query));
+  return { read, statements, built, routedTo };
 }
 
 function expectFencedTo(statements: Statement[], projectId: string) {
@@ -68,7 +83,7 @@ describe("TraceLegacyReadClickHouseRepository tenant markers", () => {
 
   describe("when a thread's traces are read", () => {
     it("fences the thread lookup and the trace reads alike", async () => {
-      const { read, statements } = harness();
+      const { read, statements, built } = harness();
 
       await read.findTracesByThreadId({
         authorization: ownProof({ projectId: PROJECT_ID }),
@@ -83,9 +98,21 @@ describe("TraceLegacyReadClickHouseRepository tenant markers", () => {
         protections: PROTECTIONS,
       });
 
-      expect(statements().filter((s) => s.query.includes("SELECT DISTINCT TraceId"))).toHaveLength(
-        2,
-      );
+      // The thread lookups are built reads under the proof's scope (ADR-202).
+      expect(built).toHaveLength(2);
+      for (const request of built) {
+        expect(request.table).toBe("trace_summaries");
+        expect(request.statement).toMatchObject({
+          kind: "tenant",
+          identity: "reader",
+          tenantIds: [PROJECT_ID],
+          settings: { SQL_langwatch_tenant_ids: PROJECT_ID },
+        });
+        expect(request.statement.sql).toContain("SELECT DISTINCT TraceId");
+        expect(request.statement.sql).toContain("ORDER BY CreatedAt ASC");
+      }
+      expect(built[0]?.statement.sql).toMatch(/Attributes\[\{v\d+:String\}\] = /);
+      expect(built[1]?.statement.sql).toMatch(/Attributes\[\{v\d+:String\}\] IN /);
       expectFencedTo(statements(), PROJECT_ID);
     });
   });

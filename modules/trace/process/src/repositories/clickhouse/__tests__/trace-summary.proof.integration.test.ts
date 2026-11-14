@@ -16,10 +16,7 @@ import type { TraceAnalyticsRow } from "../../../eventing/trace-derived.projecti
 import { ClickHouseTraceEvaluationRunsRepository } from "../trace-evaluation-runs.repository.ts";
 import { TraceAnalyticsClickHouseRepository } from "../trace-metrics-analytics.repository.ts";
 import { TraceSummaryClickHouseRepository } from "../trace-summary.repository.ts";
-import {
-  authorizedClickHouseFor,
-  traceQueryClientFor,
-} from "./support/authorized-clickhouse.support.ts";
+import { traceQueryClientFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -210,7 +207,6 @@ beforeAll(async () => {
   ch = await startMigratedTraceClickHouse();
   takeClock();
   const resolveClient = async () => ch;
-  const clickhouse = authorizedClickHouseFor(ch);
   summaries = TraceSummaryClickHouseRepository.create({
     resolveClient,
     reader: traceQueryClientFor(ch),
@@ -220,8 +216,6 @@ beforeAll(async () => {
     reader: traceQueryClientFor(ch),
   });
   evaluations = ClickHouseTraceEvaluationRunsRepository.create({
-    resolveClient,
-    clickhouse,
     reader: traceQueryClientFor(ch),
   });
 

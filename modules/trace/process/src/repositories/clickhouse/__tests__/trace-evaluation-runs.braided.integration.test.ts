@@ -10,10 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { braidedProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { ClickHouseTraceEvaluationRunsRepository } from "../trace-evaluation-runs.repository.ts";
-import {
-  authorizedClickHouseFor,
-  traceQueryClientFor,
-} from "./support/authorized-clickhouse.support.ts";
+import { traceQueryClientFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -64,8 +61,6 @@ beforeAll(async () => {
   if (!clickHouseConfigured) return;
   ch = await startMigratedTraceClickHouse();
   repo = ClickHouseTraceEvaluationRunsRepository.create({
-    resolveClient: async () => ch,
-    clickhouse: authorizedClickHouseFor(ch),
     reader: traceQueryClientFor(ch),
   });
   await ch.insert({
@@ -115,6 +110,16 @@ describe.skipIf(!clickHouseConfigured)("evaluations of a trace holding braided s
       expect(runs[0]).toMatchObject({ attempts: 0, lastAttemptError: null });
       expect(typeof runs[0]?.createdAt).toBe("number");
       expect(typeof runs[0]?.scheduledAt).toBe("number");
+    });
+
+    it("reads that project's evaluations of the trace with their inputs", async () => {
+      const byTrace = await repo.findTraceEvaluations({ tenantId: reader, traceIds: [traceId] });
+
+      expect(byTrace[traceId]?.map((evaluation) => evaluation.evaluatorId)).toEqual([
+        `monitor-of-${reader}`,
+      ]);
+      expect(byTrace[traceId]?.[0]).toMatchObject({ attempts: 0, lastAttemptError: null });
+      expect(typeof byTrace[traceId]?.[0]?.timestamps.scheduledAt).toBe("number");
     });
   });
 });

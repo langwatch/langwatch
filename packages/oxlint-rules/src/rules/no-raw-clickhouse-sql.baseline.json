@@ -19,13 +19,12 @@
     "modules/trace/process/src/features/facet/repositories/clickhouse/clickhouse.trace-facet-metadata-keys.repository.ts": 1,
     "modules/trace/process/src/features/facet/repositories/clickhouse/clickhouse.trace-facet-scope.mapper.ts": 2,
     "modules/trace/process/src/features/facet/repositories/clickhouse/clickhouse.trace-facet-span-attribute-keys.repository.ts": 1,
-    "modules/trace/process/src/features/legacy/repositories/clickhouse/trace-legacy-read.repository.ts": 20,
+    "modules/trace/process/src/features/legacy/repositories/clickhouse/trace-legacy-read.repository.ts": 14,
     "modules/trace/process/src/features/legacy/rules/trace-legacy-filter-conditions.rules.ts": 1,
     "modules/trace/process/src/features/query/rules/trace-query-subquery.rules.ts": 1,
     "modules/trace/process/src/repositories/clickhouse/clickhouse.trace-index-materialisation.repository.ts": 2,
     "modules/trace/process/src/repositories/clickhouse/clickhouse.trace-member-client.repository.ts": 1,
     "modules/trace/process/src/repositories/clickhouse/session-groups.repository.ts": 5,
-    "modules/trace/process/src/repositories/clickhouse/trace-evaluation-runs.repository.ts": 1,
     "modules/trace/process/src/repositories/clickhouse/trace-list.repository.ts": 18
   }
 }
