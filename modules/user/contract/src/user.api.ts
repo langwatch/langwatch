@@ -81,6 +81,8 @@ export interface UserApi {
   ): Promise<UserNotificationPreference>;
   /** Whether the account behind an id holds the platform-operator grant. */
   isOperator(input: { userId: string }): Promise<boolean>;
+  /** Accounts whose id, name or address holds the query, for a platform operator's search. */
+  searchForOperators(input: { query: string; limit: number }): Promise<UserProfile[]>;
   /** The account holding an address, matched on its stored lower-cased form, however typed. */
   findByEmail(input: UserEmailInput): Promise<UserProfile | null>;
   /** Mints a directory account with no sign-in method of its own. */

@@ -81,6 +81,11 @@ Feature: The Braids screen
       And a supported condition gets no remark under the field
 
     @integration
+    Scenario: The focused condition field shows its whole focus ring
+      When ana focuses the condition and types a condition it refuses
+      Then the focus ring around the field shows on every side, inside the dialog, on a wide and a narrow screen
+
+    @integration
     Scenario: Autocomplete offers the owner's attribute keys
       When ana types attributes[" in the condition
       Then the editor offers the attributes "specialists" spans carry, most used first, each with its span count
