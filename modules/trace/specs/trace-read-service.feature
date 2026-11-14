@@ -169,3 +169,19 @@ Feature: Trace span-tree read service
     Then the statement is a reader statement over that project alone with the tenant setting
     And it elects each span's newest StartTime, the trace and the occurrence window repeated in the election
     And a summary with no occurrence reads the trace's spans unwindowed
+
+  @unit
+  Scenario: A trace's light span reads and event reads are fenced by the reader's proof
+    Given a reader whose proof covers its own project
+    When a trace's span resources, span tree, events or one span's events are read
+    Then each statement is a reader statement over the proof's tenants with the tenant setting
+    And it elects each span's latest version within the stored_spans id bound
+    And an events read unrolls the events only after the election, so no stale version's event is read
+
+  @unit
+  Scenario: A live span poll and the trace time lookup are read within the reader's proof
+    Given a reader whose proof covers its own project
+    When the spans started since a time are polled, or a trace's time is looked up while its index is not ready
+    Then each statement is a reader statement over the proof's tenants with the tenant setting
+    And the poll is bounded by its own since-time, repeated in the election, and not by the id index
+    And the time lookup reads the earliest occurrence of the trace's summary, recent window first

@@ -57,10 +57,18 @@ const MB = 1024 * 1024;
 
 let ch: ClickHouseClient;
 
-/** The eventing port over the test client, without the routing-only request fields. */
+/** The eventing port over the test client: a built read sends its own text, values and settings. */
 function eventingClient(client: ClickHouseClient): EventingClickHouseClient {
   return {
-    query: ({ query, query_params, format }) => client.query({ query, query_params, format }),
+    read: async ({ statement }) => {
+      const result = await client.query({
+        query: statement.sql,
+        query_params: { ...statement.params },
+        clickhouse_settings: { ...statement.settings },
+        format: "JSONEachRow",
+      });
+      return { rows: await result.json() };
+    },
     insert: ({ table, values, format, clickhouse_settings }) =>
       client.insert({ table, values: [...values], format, clickhouse_settings }),
   };

@@ -15,6 +15,7 @@ import {
 import {
   clickhouseRead,
   fn,
+  param,
   tenantScope as builtTenantScope,
 } from "@langwatch/clickhouse-client/builder";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
@@ -63,6 +64,7 @@ import { PLATFORM_DEFAULT_RETENTION_DAYS } from "@langwatch/data-retention-contr
 import { z } from "zod";
 
 import { storedSpans } from "./clickhouse.stored-spans.table.ts";
+import { traceSummaries } from "./clickhouse.trace-summaries.table.ts";
 import {
   chNumber,
   chString,
@@ -293,52 +295,219 @@ const SINGLE_SPAN_FETCH_SETTINGS = {
   query_plan_optimize_lazy_materialization: "0",
 } as const;
 
+const attribute = (key: string) => fn.mapGet(storedSpans.SpanAttributes, key);
+/** The first attribute when it is not empty, else the second. */
+const attributeOr = (key: string, fallback: string) =>
+  fn.coalesce(fn.nullIf(attribute(key), ""), attribute(fallback));
+
+/** A span's OTel resource and scope, and its start for ordering: no heavy attribute is read. */
+const RESOURCE_SPAN_SELECTION = {
+  SpanId: storedSpans.SpanId,
+  ParentSpanId: storedSpans.ParentSpanId,
+  StartTimeMs: fn.toUnixTimestamp64Milli(storedSpans.StartTime),
+  ResourceAttributes: storedSpans.ResourceAttributes,
+  ScopeName: storedSpans.ScopeName,
+  ScopeVersion: storedSpans.ScopeVersion,
+};
+
+/** Light projection for span tree shape, avoiding heavy nested columns. */
+const SUMMARY_SPAN_SELECTION = {
+  SpanId: storedSpans.SpanId,
+  ParentSpanId: storedSpans.ParentSpanId,
+  SpanName: storedSpans.SpanName,
+  DurationMs: storedSpans.DurationMs,
+  StatusCode: storedSpans.StatusCode,
+  SpanType: attributeOr("langwatch.span.type", "span.type"),
+  ToolName: attributeOr("gen_ai.tool.name", "tool_name"),
+  RequestId: attribute("request_id"),
+  QuerySource: attribute("query_source"),
+  ToolUseId: attributeOr("tool_use_id", "gen_ai.tool.call.id"),
+  Model: attribute("gen_ai.request.model"),
+  ResponseModel: attribute("gen_ai.response.model"),
+  UsageCost: attribute("gen_ai.usage.cost"),
+  InputTokens: attribute("gen_ai.usage.input_tokens"),
+  OutputTokens: attribute("gen_ai.usage.output_tokens"),
+  CacheReadTokens: attribute("gen_ai.usage.cache_read.input_tokens"),
+  CacheCreationTokens: attribute("gen_ai.usage.cache_creation.input_tokens"),
+  CacheCreation1hTokens: attribute("gen_ai.usage.cache_creation_1h.input_tokens"),
+  InputChars: attribute("gen_ai.usage.input_chars"),
+  AudioSeconds: attribute("gen_ai.usage.audio_seconds"),
+  InputAudioTokens: attribute("gen_ai.usage.input_audio_tokens"),
+  OutputAudioTokens: attribute("gen_ai.usage.output_audio_tokens"),
+  InputImageTokens: attribute("gen_ai.usage.input_image_tokens"),
+  OutputImageTokens: attribute("gen_ai.usage.output_image_tokens"),
+  CustomInputRate: attribute("langwatch.model.inputCostPerToken"),
+  CustomOutputRate: attribute("langwatch.model.outputCostPerToken"),
+  CustomCacheReadRate: attribute("langwatch.model.cacheReadCostPerToken"),
+  CustomCacheCreationRate: attribute("langwatch.model.cacheCreationCostPerToken"),
+  CustomCacheCreation1hRate: attribute("langwatch.model.cacheCreation1hCostPerToken"),
+  LwSpanCost: attribute("langwatch.span.cost"),
+  StartTimeMs: fn.toUnixTimestamp64Milli(storedSpans.StartTime),
+  UpdatedAtMs: fn.toUnixTimestamp64Milli(storedSpans.UpdatedAt),
+};
+
+/** The trace view's proof scope: a braided read asks for spans, any other for traces. */
+function traceScope({
+  authorization,
+  braided,
+}: {
+  authorization: Authorization;
+  braided: boolean;
+}) {
+  return builtTenantScope.fromProof({ authorization, reads: braided ? "spans" : "traces" });
+}
+
+/** A trace's spans under the proof: braided, the owners' under their conditions; else windows. */
+function traceSpansFrom({
+  scope,
+  braided,
+  traceId,
+}: {
+  scope: ReturnType<typeof traceScope>;
+  braided: boolean;
+  traceId: string;
+}) {
+  const read = clickhouseRead({ scope }).from(storedSpans);
+  return braided ? read.braided({ heldTrace: { traceId } }) : read.withinWindows();
+}
+
+/** One trace's latest spans in light columns; a braided read names each row's owner. */
+function lightSpansStatement({
+  authorization,
+  braided,
+  traceId,
+  selection,
+}: {
+  authorization: Authorization;
+  braided: boolean;
+  traceId: string;
+  selection: typeof RESOURCE_SPAN_SELECTION | typeof SUMMARY_SPAN_SELECTION;
+}) {
+  return traceSpansFrom({ scope: traceScope({ authorization, braided }), braided, traceId })
+    .select(braided ? { ...selection, TenantId: storedSpans.TenantId } : selection)
+    .where(({ idBound }) => idBound(storedSpans.TraceId, traceId))
+    .latestVersion()
+    .orderBy("StartTimeMs", "ASC")
+    .limit(MAX_LIGHT_SPAN_READ_ROWS)
+    .build();
+}
+
+/** A live poll's latest full spans: bounded from below by its own since-time, not the id index. */
+function spansSinceStatement({
+  authorization,
+  braided,
+  traceId,
+  sinceStartTimeMs,
+}: {
+  authorization: Authorization;
+  braided: boolean;
+  traceId: string;
+  sinceStartTimeMs: number;
+}) {
+  return traceSpansFrom({ scope: traceScope({ authorization, braided }), braided, traceId })
+    .select(FULL_SPAN_SELECTION)
+    .where(({ and, eq, gt }) =>
+      and(eq(storedSpans.TraceId, traceId), gt(storedSpans.StartTime, sinceStartTimeMs)),
+    )
+    .latestVersion()
+    .orderBy(storedSpans.StartTime, "ASC")
+    .limit(MAX_DERIVATION_SPANS)
+    .build();
+}
+
+/** The earliest OccurredAt of a trace's summary in the reader's windows, from `sinceMs` on. */
+function traceOccurredAtStatement({
+  authorization,
+  traceId,
+  sinceMs,
+}: {
+  authorization: Authorization;
+  traceId: string;
+  sinceMs?: number;
+}) {
+  return clickhouseRead({ scope: builtTenantScope.fromProof({ authorization, reads: "traces" }) })
+    .from(traceSummaries)
+    .withinWindows()
+    .select({ occurredAtMs: fn.toUnixTimestamp64Milli(fn.min(traceSummaries.OccurredAt)) })
+    .where(({ and, eq, gte }) =>
+      sinceMs === undefined
+        ? eq(traceSummaries.TraceId, traceId)
+        : and(eq(traceSummaries.TraceId, traceId), gte(traceSummaries.OccurredAt, sinceMs)),
+    )
+    .build();
+}
+
 /**
- * Light projection for span tree shape, avoiding heavy nested columns.
+ * One row per event of each span's latest version: the election runs before the events unroll,
+ * so no event of a stale version is read. With a span id and no braid, that span's newest version
+ * by UpdatedAt, as a single-span read takes it.
  */
-const SUMMARY_SPAN_SELECT = `
-  SpanId,
-  ParentSpanId,
-  SpanName,
-  DurationMs,
-  StatusCode,
-  coalesce(
-    nullIf(SpanAttributes['langwatch.span.type'], ''),
-    SpanAttributes['span.type']
-  ) AS SpanType,
-  coalesce(
-    nullIf(SpanAttributes['gen_ai.tool.name'], ''),
-    SpanAttributes['tool_name']
-  ) AS ToolName,
-  SpanAttributes['request_id'] AS RequestId,
-  SpanAttributes['query_source'] AS QuerySource,
-  coalesce(
-    nullIf(SpanAttributes['tool_use_id'], ''),
-    SpanAttributes['gen_ai.tool.call.id']
-  ) AS ToolUseId,
-  SpanAttributes['gen_ai.request.model'] AS Model,
-  SpanAttributes['gen_ai.response.model'] AS ResponseModel,
-  SpanAttributes['gen_ai.usage.cost'] AS Cost,
-  SpanAttributes['gen_ai.usage.input_tokens'] AS InputTokens,
-  SpanAttributes['gen_ai.usage.output_tokens'] AS OutputTokens,
-  SpanAttributes['gen_ai.usage.cache_read.input_tokens'] AS CacheReadTokens,
-  SpanAttributes['gen_ai.usage.cache_creation.input_tokens'] AS CacheCreationTokens,
-  SpanAttributes['gen_ai.usage.cache_creation_1h.input_tokens'] AS CacheCreation1hTokens,
-  SpanAttributes['gen_ai.usage.input_chars'] AS InputChars,
-  SpanAttributes['gen_ai.usage.audio_seconds'] AS AudioSeconds,
-  SpanAttributes['gen_ai.usage.input_audio_tokens'] AS InputAudioTokens,
-  SpanAttributes['gen_ai.usage.output_audio_tokens'] AS OutputAudioTokens,
-  SpanAttributes['gen_ai.usage.input_image_tokens'] AS InputImageTokens,
-  SpanAttributes['gen_ai.usage.output_image_tokens'] AS OutputImageTokens,
-  SpanAttributes['langwatch.model.inputCostPerToken'] AS CustomInputRate,
-  SpanAttributes['langwatch.model.outputCostPerToken'] AS CustomOutputRate,
-  SpanAttributes['langwatch.model.cacheReadCostPerToken'] AS CustomCacheReadRate,
-  SpanAttributes['langwatch.model.cacheCreationCostPerToken'] AS CustomCacheCreationRate,
-  SpanAttributes['langwatch.model.cacheCreation1hCostPerToken'] AS CustomCacheCreation1hRate,
-  SpanAttributes['langwatch.span.cost'] AS LwSpanCost,
-  toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
-  toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAtMs
-`;
+function spanEventsStatement({
+  authorization,
+  braided,
+  traceId,
+  spanId,
+  newestFirst,
+  withoutExceptions = false,
+  limit,
+  settings,
+}: {
+  authorization: Authorization;
+  braided: boolean;
+  traceId: string;
+  spanId?: string;
+  newestFirst: boolean;
+  withoutExceptions?: boolean;
+  limit?: number;
+  settings?: typeof SINGLE_SPAN_FETCH_SETTINGS;
+}) {
+  const scope = traceScope({ authorization, braided });
+  let spans = traceSpansFrom({ scope, braided, traceId })
+    .select({
+      TenantId: storedSpans.TenantId,
+      TraceId: storedSpans.TraceId,
+      SpanId: storedSpans.SpanId,
+      SpanEvents: fn.arrayZip(
+        storedSpans["Events.Timestamp"],
+        storedSpans["Events.Name"],
+        storedSpans["Events.Attributes"],
+      ),
+    })
+    .where(({ idBound }) => idBound(storedSpans.TraceId, traceId));
+  if (spanId !== undefined) spans = spans.where(({ eq }) => eq(storedSpans.SpanId, spanId));
+  const newestOnly = spanId !== undefined && !braided;
+  const latest = (
+    newestOnly ? spans.orderBy(storedSpans.UpdatedAt, "DESC").limit(1) : spans.latestVersion()
+  ).as("latest");
+  const events = clickhouseRead({ scope })
+    .from(latest)
+    .select({
+      TenantId: latest.TenantId,
+      TraceId: latest.TraceId,
+      SpanId: latest.SpanId,
+      Event: fn.arrayJoin(latest.SpanEvents),
+    })
+    .as("events");
+  const eventTimestamp = fn.tupleElement(events.Event, "0");
+  const eventName = fn.tupleElement(events.Event, "1");
+  let statement = clickhouseRead({ scope })
+    .from(events)
+    .select({
+      event_id: events.SpanId,
+      trace_id: events.TraceId,
+      project_id: events.TenantId,
+      started_at: fn.toUnixTimestamp64Milli(eventTimestamp),
+      event_type: eventName,
+      attributes: fn.tupleElement(events.Event, "2"),
+    });
+  if (withoutExceptions) {
+    statement = statement.where(({ ne }) => ne(eventName, param.string("exception")));
+  }
+  statement = statement.orderBy(eventTimestamp, newestFirst ? "DESC" : "ASC");
+  if (limit !== undefined) statement = statement.limit(limit);
+  if (settings !== undefined) statement = statement.settings(settings);
+  return statement.build();
+}
 
 /**
  * Canonical model-name expression: response model wins over request model.
@@ -417,43 +586,6 @@ function dedupInTuple(extraInnerWhere: string): string {
     GROUP BY TenantId, TraceId, SpanId
   )`;
 }
-
-/**
- * One span id's latest versions under braids (ADR-201 §3), one per project holding it: the
- * condition on the outer select, the election fenced by tenants and windows alone. The fence
- * alone names tenants, so the caller keeps the owner's row.
- */
-const BRAIDED_SINGLE_SPAN_WHERE = `${tenantScopeWithConditions("StartTime", { traceId: "traceId" })}
-  AND TraceId = {traceId:String}
-  AND SpanId = {spanId:String}
-  ${STORED_SPANS_ID_BOUND}
-  AND (TenantId, TraceId, SpanId, UpdatedAt) IN (
-    SELECT TenantId, TraceId, SpanId, max(UpdatedAt)
-    FROM ${TABLE_NAME}
-    WHERE ${tenantScopeForLatestVersion("StartTime")}
-      AND TraceId = {traceId:String}
-      AND SpanId = {spanId:String}
-      ${STORED_SPANS_ID_BOUND}
-    GROUP BY TenantId, TraceId, SpanId
-  )`;
-
-/** A braided span's events, unrolled on the select that carries the condition. */
-const BRAIDED_SPAN_EVENTS_QUERY = `
-  SELECT
-    SpanId AS event_id,
-    TraceId AS trace_id,
-    TenantId AS project_id,
-    toUnixTimestamp64Milli(event_timestamp) AS started_at,
-    event_name AS event_type,
-    event_attrs AS attributes
-  FROM ${TABLE_NAME}
-  ARRAY JOIN
-    "Events.Timestamp" AS event_timestamp,
-    "Events.Name" AS event_name,
-    "Events.Attributes" AS event_attrs
-  WHERE ${BRAIDED_SINGLE_SPAN_WHERE}
-  ORDER BY event_timestamp DESC
-`;
 
 /**
  * A braided page's count and range: each span's latest version under its braid's condition, one
@@ -635,7 +767,8 @@ const spanSummaryQueryRowSchema = z.looseObject({
   // `SpanAttributes[...]` materialises as the raw map value; ClickHouse
   // Map values are typed `String`, so each numeric attribute arrives as
   // a stringified number (or "" when absent). Parsed in the mapper.
-  Cost: chString,
+  // `gen_ai.usage.cost`; `Cost` is a stored column's name, which an alias may not reuse.
+  UsageCost: chString,
   InputTokens: chString,
   OutputTokens: chString,
   CacheReadTokens: chString,
@@ -736,16 +869,6 @@ const eventRowSchema = z.looseObject({
 const eventRowsSchema = z.array(eventRowSchema);
 
 type EventRow = z.infer<typeof eventRowSchema>;
-
-const traceEventRowSchema = z.looseObject({
-  TenantId: chString.optional(),
-  SpanId: chString,
-  timestampMs: numeric,
-  name: chString,
-  attributes: chStringMap,
-});
-
-const traceEventRowsSchema = z.array(traceEventRowSchema);
 
 const traceEventRollupRowSchema = z.looseObject({
   TenantId: chString,
@@ -1311,33 +1434,18 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     return this.readTraceSpans<SpanResourceInfo[]>(
       { authorization, traceId, occurredAtMs },
       async (idBound) => {
-        const client = this.readerOf(authorization, braided);
-        // Light projection: only the resource/scope columns plus the bits
-        // needed for ordering. SpanAttributes/Events/Links are heavy and
-        // unrelated to OTel resource info, so don't read them.
-        const result = await client.query({
-          query: `
-            SELECT
-              ${ownerColumn(braided, "              ")}SpanId,
-              ParentSpanId,
-              toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
-              ResourceAttributes,
-              ScopeName,
-              ScopeVersion
-            FROM ${TABLE_NAME}
-            WHERE ${outerScope(braided)}
-              AND TraceId = {traceId:String}
-              ${STORED_SPANS_ID_BOUND}
-              AND ${dedupInTuple(STORED_SPANS_ID_BOUND)}
-            ORDER BY StartTimeMs ASC
-            LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
-          `,
-          query_params: { traceId },
-          format: "JSONEachRow",
+        // Light projection: only the resource/scope columns plus the bits needed for ordering.
+        const result = await this.deps.reader.read({
+          statement: lightSpansStatement({
+            authorization,
+            braided,
+            traceId,
+            selection: RESOURCE_SPAN_SELECTION,
+          }),
+          table: storedSpans.$table.name,
           idBound,
         });
-
-        const rows = resourceInfoRowsSchema.parse(await result.json());
+        const rows = resourceInfoRowsSchema.parse(result.rows);
 
         return rows.map((row) => ({
           spanId: row.SpanId,
@@ -1380,22 +1488,12 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     traceId: string;
     sinceMs?: number;
   }): Promise<number | undefined> {
-    const client = this.reader(authorization);
-    const windowPredicate =
-      sinceMs !== undefined ? "AND OccurredAt >= fromUnixTimestamp64Milli({sinceMs:Int64})" : "";
-    const result = await client.query({
-      // ID_BOUND_SKIP: the not-ready hint resolver; the index path never runs it.
-      query: `
-        SELECT toUnixTimestamp64Milli(min(OccurredAt)) AS occurredAtMs
-        FROM trace_summaries
-        WHERE ${tenantScope("OccurredAt")}
-          AND TraceId = {traceId:String}
-          ${windowPredicate}
-      `,
-      query_params: sinceMs !== undefined ? { traceId, sinceMs } : { traceId },
-      format: "JSONEachRow",
+    // ID_BOUND_SKIP: the not-ready hint resolver; the index path never runs it.
+    const result = await this.deps.reader.read({
+      statement: traceOccurredAtStatement({ authorization, traceId, sinceMs }),
+      table: traceSummaries.$table.name,
     });
-    const rows = occurredAtRowsSchema.parse(await result.json());
+    const rows = occurredAtRowsSchema.parse(result.rows);
     const raw = rows[0]?.occurredAtMs;
     if (raw === null || raw === undefined) return undefined;
     // `min` over no matching rows yields the epoch default (0); treat that — and
@@ -1453,47 +1551,26 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       return await this.readTraceEvents<DerivedTraceEvent[]>(
         { authorization, traceId, occurredAtMs },
         async (idBound) => {
-          const client = this.readerOf(authorization, braided);
-          // Events-only ARRAY JOIN to avoid heavy attributes; row-level dedup pre-expansion.
-          const result = await client.query({
-            query: `
-              SELECT
-                ${ownerColumn(braided, "                ")}SpanId,
-                toUnixTimestamp64Milli(event_timestamp) AS timestampMs,
-                event_name AS name,
-                event_attrs AS attributes
-              FROM (
-                SELECT
-                  ${ownerColumn(braided, "                  ")}SpanId,
-                  "Events.Timestamp" AS Events_Timestamp,
-                  "Events.Name" AS Events_Name,
-                  "Events.Attributes" AS Events_Attributes
-                FROM ${TABLE_NAME}
-                WHERE ${outerScope(braided)}
-                  AND TraceId = {traceId:String}
-                  ${STORED_SPANS_ID_BOUND}
-                  AND ${dedupInTuple(STORED_SPANS_ID_BOUND)}
-              )
-              ARRAY JOIN
-                Events_Timestamp AS event_timestamp,
-                Events_Name AS event_name,
-                Events_Attributes AS event_attrs
-              ORDER BY event_timestamp ASC
-              LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
-            `,
-            query_params: { traceId },
-            format: "JSONEachRow",
+          // Events only, unrolled after the election, so no heavy attribute is read.
+          const result = await this.deps.reader.read({
+            statement: spanEventsStatement({
+              authorization,
+              braided,
+              traceId,
+              newestFirst: false,
+              limit: MAX_LIGHT_SPAN_READ_ROWS,
+            }),
+            table: storedSpans.$table.name,
             idBound,
           });
 
-          const rows = traceEventRowsSchema.parse(await result.json());
+          const rows = eventRowsSchema.parse(result.rows);
           return rows.map((r) => ({
-            spanId: r.SpanId,
-            timestamp:
-              typeof r.timestampMs === "string" ? parseInt(r.timestampMs, 10) : r.timestampMs,
-            name: r.name,
+            spanId: r.event_id,
+            timestamp: typeof r.started_at === "string" ? parseInt(r.started_at, 10) : r.started_at,
+            name: r.event_type,
             attributes: r.attributes ?? {},
-            ...(braided ? braidedOwnerOf({ authorization, tenantId: r.TenantId }) : {}),
+            ...(braided ? braidedOwnerOf({ authorization, tenantId: r.project_id }) : {}),
           }));
         },
       );
@@ -1559,45 +1636,20 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       return await this.readTraceEvents<ElasticSearchEvent[]>(
         { authorization, traceId, occurredAtMs },
         async (idBound) => {
-          const client = this.reader(authorization);
-          // Same shape as `getTraceEventsByTraceId`: dedup at row level inside
-          // the subquery, then ARRAY JOIN the Events.* arrays of the survivors,
-          // and finally drop exception events (which is a per-event filter).
-          const result = await client.query({
-            query: `
-              SELECT
-                SpanId AS event_id,
-                TraceId AS trace_id,
-                TenantId AS project_id,
-                toUnixTimestamp64Milli(event_timestamp) AS started_at,
-                event_name AS event_type,
-                event_attrs AS attributes
-              FROM (
-                SELECT
-                  TenantId, TraceId, SpanId,
-                  "Events.Timestamp" AS Events_Timestamp,
-                  "Events.Name" AS Events_Name,
-                  "Events.Attributes" AS Events_Attributes
-                FROM ${TABLE_NAME}
-                WHERE ${tenantScope("StartTime")}
-                  AND TraceId = {traceId:String}
-                  ${STORED_SPANS_ID_BOUND}
-                  AND ${dedupInTuple(STORED_SPANS_ID_BOUND)}
-              )
-              ARRAY JOIN
-                Events_Timestamp AS event_timestamp,
-                Events_Name AS event_name,
-                Events_Attributes AS event_attrs
-              WHERE event_name != 'exception'
-              ORDER BY event_timestamp DESC
-            `,
-            query_params: { traceId },
-            format: "JSONEachRow",
+          // The trace events' shape, with exception events dropped per event.
+          const result = await this.deps.reader.read({
+            statement: spanEventsStatement({
+              authorization,
+              braided: false,
+              traceId,
+              newestFirst: true,
+              withoutExceptions: true,
+            }),
+            table: storedSpans.$table.name,
             idBound,
           });
 
-          const rows = eventRowsSchema.parse(await result.json());
-          return rows.map(mapEventRow);
+          return eventRowsSchema.parse(result.rows).map(mapEventRow);
         },
       );
     } catch (error) {
@@ -1626,61 +1678,24 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       return await this.readTraceEvents<ElasticSearchEvent[]>(
         { authorization, traceId, occurredAtMs },
         async (idBound) => {
-          if (ownerRead.kind === "braided") {
-            const braided = await this.spanReader(authorization).query({
-              query: BRAIDED_SPAN_EVENTS_QUERY,
-              query_params: { traceId, spanId },
-              clickhouse_settings: SINGLE_SPAN_FETCH_SETTINGS,
-              format: "JSONEachRow",
-              idBound,
-            });
-            return eventRowsSchema
-              .parse(await braided.json())
-              .filter((row) => row.project_id === ownerRead.ownerProjectId)
-              .map(mapEventRow);
-          }
-          const client = this.reader(authorization);
-          const result = await client.query({
-            query: `
-              SELECT
-                SpanId AS event_id,
-                TraceId AS trace_id,
-                TenantId AS project_id,
-                toUnixTimestamp64Milli(event_timestamp) AS started_at,
-                event_name AS event_type,
-                event_attrs AS attributes
-              FROM (
-                -- Single-span fetch, read eagerly so the lazy reader that
-                -- raised ATTEMPT_TO_READ_AFTER_EOF is never entered (see
-                -- SINGLE_SPAN_FETCH_SETTINGS). ARRAY JOIN unrolls the events
-                -- from the latest version of the span.
-                SELECT
-                  TenantId, TraceId, SpanId,
-                  "Events.Timestamp" AS Events_Timestamp,
-                  "Events.Name" AS Events_Name,
-                  "Events.Attributes" AS Events_Attributes
-                FROM ${TABLE_NAME}
-                WHERE ${tenantScope("StartTime")}
-                  AND TraceId = {traceId:String}
-                  AND SpanId = {spanId:String}
-                  ${STORED_SPANS_ID_BOUND}
-                ORDER BY UpdatedAt DESC
-                LIMIT 1
-              )
-              ARRAY JOIN
-                Events_Timestamp AS event_timestamp,
-                Events_Name AS event_name,
-                Events_Attributes AS event_attrs
-              ORDER BY event_timestamp DESC
-            `,
-            query_params: { traceId, spanId },
-            clickhouse_settings: SINGLE_SPAN_FETCH_SETTINGS,
-            format: "JSONEachRow",
+          const braided = ownerRead.kind === "braided";
+          const result = await this.deps.reader.read({
+            statement: spanEventsStatement({
+              authorization,
+              braided,
+              traceId,
+              spanId,
+              newestFirst: true,
+              settings: SINGLE_SPAN_FETCH_SETTINGS,
+            }),
+            table: storedSpans.$table.name,
             idBound,
           });
-
-          const rows = eventRowsSchema.parse(await result.json());
-          return rows.map(mapEventRow);
+          const rows = eventRowsSchema.parse(result.rows);
+          // Under braids each project holding the span id has a version; the owner's is kept.
+          return (
+            braided ? rows.filter((row) => row.project_id === ownerRead.ownerProjectId) : rows
+          ).map(mapEventRow);
         },
       );
     } catch (error) {
@@ -1711,24 +1726,18 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     return this.readTraceSpans<SpanSummaryRow[]>(
       { authorization, traceId, occurredAtMs },
       async (idBound) => {
-        const client = this.readerOf(authorization, braided);
-        const result = await client.query({
-          query: `
-            SELECT ${braided ? `${SUMMARY_SPAN_SELECT},\n  TenantId` : SUMMARY_SPAN_SELECT}
-            FROM ${TABLE_NAME}
-            WHERE ${outerScope(braided)}
-              AND TraceId = {traceId:String}
-              ${STORED_SPANS_ID_BOUND}
-              AND ${dedupInTuple(STORED_SPANS_ID_BOUND)}
-            ORDER BY StartTimeMs ASC
-            LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
-          `,
-          query_params: { traceId },
-          format: "JSONEachRow",
+        const result = await this.deps.reader.read({
+          statement: lightSpansStatement({
+            authorization,
+            braided,
+            traceId,
+            selection: SUMMARY_SPAN_SELECTION,
+          }),
+          table: storedSpans.$table.name,
           idBound,
         });
 
-        const rows = spanSummaryQueryRowsSchema.parse(await result.json());
+        const rows = spanSummaryQueryRowsSchema.parse(result.rows);
         return rows.map((row) => ({
           ...SpanStorageClickHouseRepository.mapSpanSummaryRow(row),
           ...(braided ? braidedOwnerOf({ authorization, tenantId: row.TenantId }) : {}),
@@ -1907,25 +1916,12 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     // window. A `StartTime <= OccurredAt + 2d` upper bound would silently hide
     // new spans on a trace still active more than 2 days after its
     // trace_summaries.OccurredAt (the live delta view would just stop updating).
-    const sinceFilter = "AND StartTime > fromUnixTimestamp64Milli({sinceStartTimeMs:Int64})";
-    const client = this.readerOf(authorization, braided);
-    const result = await client.query({
-      // ID_BOUND_SKIP: a live poll, bounded from below by its own since-time.
-      query: `
-        SELECT ${FULL_SPAN_SELECT}
-        FROM ${TABLE_NAME}
-        WHERE ${outerScope(braided)}
-          AND TraceId = {traceId:String}
-          ${sinceFilter}
-          AND ${dedupInTuple(sinceFilter)}
-        ORDER BY StartTime ASC
-        LIMIT ${MAX_DERIVATION_SPANS}
-      `,
-      query_params: { traceId, sinceStartTimeMs },
-      format: "JSONEachRow",
+    const result = await this.deps.reader.read({
+      statement: spansSinceStatement({ authorization, braided, traceId, sinceStartTimeMs }),
+      table: storedSpans.$table.name,
     });
 
-    const rows = fullSpanRowsSchema.parse(await result.json());
+    const rows = fullSpanRowsSchema.parse(result.rows);
     return ownedSpansOf({ rows, authorization, braided });
   }
 
@@ -2081,7 +2077,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   }
 
   static mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
-    const explicitCost = parseAttrNumber(row.Cost);
+    const explicitCost = parseAttrNumber(row.UsageCost);
     const inputTokens = parseAttrNumber(row.InputTokens);
     const outputTokens = parseAttrNumber(row.OutputTokens);
     const cacheReadTokens = parseAttrNumber(row.CacheReadTokens);

@@ -138,7 +138,7 @@ function recomputedSummaryRowCost(extra: CallExtra): number | null {
     ToolUseId: "",
     Model: attribute("gen_ai.request.model"),
     ResponseModel: "",
-    Cost: "",
+    UsageCost: "",
     InputTokens: attribute("gen_ai.usage.input_tokens"),
     InputAudioTokens: attribute("gen_ai.usage.input_audio_tokens"),
     OutputAudioTokens: attribute("gen_ai.usage.output_audio_tokens"),

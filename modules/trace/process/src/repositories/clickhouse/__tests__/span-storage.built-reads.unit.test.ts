@@ -82,6 +82,188 @@ const singleSpanReads = {
     repository.findNormalizedSpanById({ authorization, ...at, spanId: SPAN }),
 };
 
+const lightReads = {
+  "span resources": (repository: SpanStorageClickHouseRepository) =>
+    repository.findSpanResourcesByTraceId({ authorization, ...at }),
+  "span tree": (repository: SpanStorageClickHouseRepository) =>
+    repository.findSpanSummaryByTraceId({ authorization, ...at }),
+};
+
+const eventReads = {
+  "trace events": (repository: SpanStorageClickHouseRepository) =>
+    repository.findTraceEventsByTraceId({ authorization, ...at }),
+  events: (repository: SpanStorageClickHouseRepository) =>
+    repository.findEventsByTraceId({ authorization, ...at }),
+  "span events": (repository: SpanStorageClickHouseRepository) =>
+    repository.findSpanEvents({ authorization, ...at, spanId: SPAN }),
+};
+
+/** A span-tree row as the light projection names its columns, every attribute absent. */
+const summaryRow = (overrides: Record<string, string>) => ({
+  ...Object.fromEntries(
+    [
+      "SpanName",
+      "SpanType",
+      "ToolName",
+      "RequestId",
+      "QuerySource",
+      "ToolUseId",
+      "Model",
+      "ResponseModel",
+      "UsageCost",
+      "InputTokens",
+      "OutputTokens",
+      "CacheReadTokens",
+      "CacheCreationTokens",
+      "CacheCreation1hTokens",
+      "InputChars",
+      "AudioSeconds",
+      "InputAudioTokens",
+      "OutputAudioTokens",
+      "InputImageTokens",
+      "OutputImageTokens",
+      "CustomInputRate",
+      "CustomOutputRate",
+      "CustomCacheReadRate",
+      "CustomCacheCreationRate",
+      "CustomCacheCreation1hRate",
+      "LwSpanCost",
+    ].map((key) => [key, ""]),
+  ),
+  SpanId: SPAN,
+  ParentSpanId: null,
+  DurationMs: 250,
+  StatusCode: 1,
+  StartTimeMs: at.occurredAtMs,
+  UpdatedAtMs: at.occurredAtMs,
+  ...overrides,
+});
+
+/** The fence every built read of a trace carries: the reader's own tenants and the setting. */
+function expectReaderFence(request: ReadRequest | undefined, table = "stored_spans") {
+  expect(request?.table).toBe(table);
+  expect(request?.statement).toMatchObject({
+    kind: "tenant",
+    identity: "reader",
+    tenantIds: [PROJECT],
+    settings: { SQL_langwatch_tenant_ids: PROJECT },
+  });
+  expect(request?.statement.sql).toContain("TenantId IN ({tenantScope_own:Array(String)})");
+}
+
+describe("SpanStorageClickHouseRepository light and event reads", () => {
+  describe.each(Object.entries(lightReads))("given the %s read", (_name, read) => {
+    /** @scenario "A trace's light span reads and event reads are fenced by the reader's proof" */
+    it("elects each span's latest light columns under the proof, in start order", async () => {
+      const { repository, requests } = reader();
+
+      await read(repository);
+
+      expect(requests).toHaveLength(1);
+      expectReaderFence(requests[0]);
+      const sql = requests[0]?.statement.sql ?? "";
+      expect(sql).toContain("max(UpdatedAt)");
+      expect(sql).toMatch(/ORDER BY StartTimeMs ASC\s+LIMIT 10000/);
+      expect(sql).not.toContain("Events.");
+      expect(requests[0]?.idBound).toMatchObject({
+        occurredAtHint: at.occurredAtMs,
+        fallback: "unbounded",
+      });
+    });
+  });
+
+  describe.each(Object.entries(eventReads))("given the %s read", (_name, read) => {
+    /** @scenario "A trace's light span reads and event reads are fenced by the reader's proof" */
+    it("unrolls the events only outside the stored_spans read", async () => {
+      const { repository, requests } = reader();
+
+      await read(repository);
+
+      expect(requests).toHaveLength(1);
+      expectReaderFence(requests[0]);
+      const [unroll = "", ...stored] = (requests[0]?.statement.sql ?? "").split(
+        "FROM stored_spans",
+      );
+      expect(unroll).toContain("arrayJoin(SpanEvents)");
+      expect(stored.join("")).not.toContain("arrayJoin");
+      expect(requests[0]?.idBound).toMatchObject({
+        occurredAtHint: at.occurredAtMs,
+        fallback: "none",
+      });
+    });
+  });
+
+  describe("given the events read", () => {
+    it("drops exception events by a bound value", async () => {
+      const { repository, requests } = reader();
+
+      await repository.findEventsByTraceId({ authorization, ...at });
+
+      const sql = requests[0]?.statement.sql ?? "";
+      expect(sql).toMatch(/tupleElement\(Event, 2\) != \{v\d+:String\}/);
+      expect(sql).not.toContain("'exception'");
+      expect(JSON.stringify(requests[0]?.statement)).toContain('"exception"');
+    });
+  });
+
+  describe("given one span's events read without a braid", () => {
+    it("unrolls the span's newest version, read eagerly", async () => {
+      const { repository, requests } = reader();
+
+      await repository.findSpanEvents({ authorization, ...at, spanId: SPAN });
+
+      const sql = requests[0]?.statement.sql ?? "";
+      expect(sql).toMatch(/SpanId = \{v\d+:String\} ORDER BY UpdatedAt DESC LIMIT 1/);
+      expect(sql).not.toContain("max(UpdatedAt)");
+      expect(sql).toContain("query_plan_optimize_lazy_materialization = '0'");
+    });
+  });
+
+  describe("given a span tree row whose span reports a usage cost", () => {
+    it("takes the reported cost from the renamed usage-cost column", async () => {
+      const { repository } = reader([summaryRow({ UsageCost: "0.5" })]);
+
+      const [span] = await repository.findSpanSummaryByTraceId({ authorization, ...at });
+
+      expect(span?.cost).toBe(0.5);
+    });
+  });
+
+  describe("given the live poll of the spans started since a time", () => {
+    /** @scenario "A live span poll and the trace time lookup are read within the reader's proof" */
+    it("bounds the read and its election by the since-time, not by the id index", async () => {
+      const { repository, requests } = reader();
+
+      await repository.findSpansSince({ authorization, ...at, sinceStartTimeMs: 5 });
+
+      expect(requests).toHaveLength(1);
+      expectReaderFence(requests[0]);
+      const sql = requests[0]?.statement.sql ?? "";
+      expect(sql.match(/StartTime > fromUnixTimestamp64Milli\(\{v\d+:Int64\}\)/g)).toHaveLength(2);
+      expect(sql).toContain("max(UpdatedAt)");
+      expect(sql).not.toContain("idBound");
+      expect(requests[0]?.idBound).toBeUndefined();
+    });
+  });
+
+  describe("given a trace read with no time while the index is not ready", () => {
+    /** @scenario "A live span poll and the trace time lookup are read within the reader's proof" */
+    it("looks the time up on the trace's summary, the recent window first", async () => {
+      const { repository, requests } = reader();
+      await repository.findSpansByTraceId({ authorization, traceId: at.traceId });
+
+      await requests[0]?.idBound?.resolveHint?.();
+
+      const [recent, whole] = requests.slice(1);
+      expectReaderFence(recent, "trace_summaries");
+      expectReaderFence(whole, "trace_summaries");
+      expect(recent?.statement.sql).toContain("min(OccurredAt)");
+      expect(recent?.statement.sql).toMatch(/OccurredAt >= fromUnixTimestamp64Milli/);
+      expect(whole?.statement.sql).not.toContain("OccurredAt >=");
+    });
+  });
+});
+
 describe("SpanStorageClickHouseRepository built reads", () => {
   describe.each(Object.entries(reads))("given the %s read", (_name, read) => {
     describe("when the reader's proof covers its own project", () => {

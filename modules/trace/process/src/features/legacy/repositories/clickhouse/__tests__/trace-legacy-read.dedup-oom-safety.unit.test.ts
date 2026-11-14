@@ -172,8 +172,11 @@ describe("trace dedup OOM safety", () => {
         expect(dedupHelper).not.toContain("LIMIT 1 BY");
       });
 
-      it("delegates dedup to the IN-tuple helper", () => {
-        expect(body).toContain("dedupInTuple");
+      it("delegates dedup to the builder's latest-version election", () => {
+        expect(body).toContain("spanEventsStatement");
+        expect(extractFunctionBody(spanStorageSource, "spanEventsStatement")).toContain(
+          ".latestVersion(",
+        );
       });
 
       it("uses max(UpdatedAt) GROUP BY for span dedup", () => {
@@ -199,8 +202,11 @@ describe("trace dedup OOM safety", () => {
         expect(body).not.toContain("LIMIT 1 BY");
       });
 
-      it("delegates dedup to the IN-tuple helper", () => {
-        expect(body).toContain("dedupInTuple");
+      it("delegates dedup to the builder's latest-version election", () => {
+        expect(body).toContain("spanEventsStatement");
+        expect(extractFunctionBody(spanStorageSource, "spanEventsStatement")).toContain(
+          ".latestVersion(",
+        );
       });
     });
   });

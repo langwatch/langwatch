@@ -581,11 +581,11 @@ describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
 
       expect(clickhouse.queries.length).toBeGreaterThan(0);
       for (const read of clickhouse.queries) {
-        expect(read.query).toContain('"Events.Attributes"');
-        expect(read.settings).toMatchObject({
-          query_plan_optimize_lazy_materialization: "0",
-          max_memory_usage: expect.any(String),
-        });
+        expect(read.query).toContain("`Events.Attributes`");
+        // A built read carries its own settings in the statement's SETTINGS clause.
+        const settings = read.query.split("SETTINGS").at(-1) ?? "";
+        expect(settings).toContain("query_plan_optimize_lazy_materialization = '0'");
+        expect(settings).toMatch(/max_memory_usage = '\d+'/);
       }
     });
 
@@ -713,13 +713,12 @@ describe("SpanStorageClickHouseRepository.listSpansPaginated", () => {
       }
       return { rows: reaches(params) ? [storedRow()] : [] };
     });
+    // One client sends both the built reads and the raw ones still on the authorized handle.
+    const client = idIndexedClientDouble({ indexes: TRACE_ID_INDEXES, driver: { execute } });
     const repo = SpanStorageClickHouseRepository.create({
       resolveClient: new RecordingClickHouse().resolve,
-      clickhouse: new AuthorizedClickHouse({
-        resolveClient: async () =>
-          idIndexedClientDouble({ indexes: TRACE_ID_INDEXES, driver: { execute } }),
-      }),
-      reader: { read: () => Promise.reject(new Error("this test sends no built read")) },
+      clickhouse: new AuthorizedClickHouse({ resolveClient: async () => client }),
+      reader: client,
     });
     return { repo, statements };
   }
