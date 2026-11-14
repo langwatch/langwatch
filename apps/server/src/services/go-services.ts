@@ -4,9 +4,11 @@ import { execa } from "execa";
 import { DEFAULT_LOG_LEVEL } from "../shared/log-level.ts";
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import { startAigateway } from "./aigateway.ts";
+import { appRoot } from "./app-dir.ts";
 import type { EventBus } from "./event-bus.ts";
 import { httpGetCheck, pollUntilHealthy } from "./health.ts";
 import { startNlpgo } from "./nlpgo.ts";
+import { nlpgoOfflineEnv } from "./offline-defaults.ts";
 import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
 
@@ -73,6 +75,8 @@ async function startCombined({
       command: binary,
       args: ["combined", "nlpgo", "aigateway"],
       env: {
+        // Defaults first so the user's shell and .env override them.
+        ...nlpgoOfflineEnv({ appRootDir: appRoot() }),
         ...process.env,
         ...envFromFile,
         // One process, two listeners: each service reads its own address (cmd/service/combined.go).
