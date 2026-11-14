@@ -15,7 +15,6 @@ import {
 import type {
   EvaluationClickHouseClient,
   EvaluationClickHouseInsert,
-  EvaluationClickHouseQuery,
 } from "../clickhouse.evaluation-session.store.ts";
 import { ClickHouseEvaluationRepository } from "../evaluation.repository.ts";
 
@@ -43,10 +42,6 @@ const run: EvaluationRunData = {
   completedAt: 1_700_000_001_000,
   costId: null,
 };
-
-function result(rows: Record<string, unknown>[]): { json<T>(): Promise<T[]> } {
-  return { json: async <T>() => rows.map((row) => row as T) };
-}
 
 function fixtureRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -118,11 +113,6 @@ function harness(rows: Record<string, unknown>[][] = []): {
     inserts: [],
     insert: vi.fn(async (input: EvaluationClickHouseInsert) => {
       client.inserts.push(input.values[0]);
-    }),
-    query: vi.fn(async (input: EvaluationClickHouseQuery) => {
-      client.queries.push(input.query);
-      client.queryParams.push(input.query_params);
-      return result(queue.shift() ?? []);
     }),
   };
   const floor = new TestRetention();

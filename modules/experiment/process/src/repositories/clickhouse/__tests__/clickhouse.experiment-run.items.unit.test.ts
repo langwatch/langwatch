@@ -1,3 +1,4 @@
+import type { ReaderReadStatement } from "@langwatch/clickhouse-client/builder";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
@@ -5,9 +6,29 @@ import { ClickHouseExperimentRunRepository } from "../clickhouse.experiment-run.
 
 type Options = Parameters<typeof ClickHouseExperimentRunRepository.create>[0];
 
-function rowsAnswering(query: string, items: Record<string, unknown>[]): unknown[] {
-  if (query.includes("experiment_run_items")) return items;
-  if (query.includes("FROM experiment_runs")) return [RUN];
+/** The built run lookup answers the run under its read keys; the items read answers the items. */
+function rowsAnswering(
+  statement: ReaderReadStatement,
+  items: Record<string, unknown>[],
+): unknown[] {
+  expect(statement).toMatchObject({ identity: "reader", kind: "tenant", tenantId: "project_1" });
+  expect(statement.settings).toMatchObject({ SQL_langwatch_tenant_ids: "project_1" });
+  if (statement.sql.includes("experiment_run_items")) return items;
+  if (statement.sql.includes("FROM experiment_runs")) {
+    const { CreatedAt, UpdatedAt, FinishedAt, StoppedAt, ...rest } = RUN;
+    return [
+      {
+        ...rest,
+        CreatedAtText: CreatedAt,
+        UpdatedAtText: UpdatedAt,
+        FinishedAtText: FinishedAt,
+        StoppedAtText: StoppedAt,
+        RecordedTargetResults: null,
+        RecordedEvaluatorResults: null,
+        RecordedConcurrency: null,
+      },
+    ];
+  }
   return [];
 }
 
@@ -54,12 +75,12 @@ const ITEM = {
 function runRepositoryOver(items: Record<string, unknown>[]): Options {
   return {
     workflowVersions: createApiFixture<Options["workflowVersions"]>(),
-    resolveClient: async () => ({
-      query: async ({ query }: { query: string }) => ({
-        json: async <Row>(): Promise<Row[]> =>
-          JSON.parse(JSON.stringify(rowsAnswering(query, items))),
-      }),
-    }),
+    resolveClient: async () =>
+      ({
+        read: async ({ statement }: { statement: ReaderReadStatement }) => ({
+          rows: JSON.parse(JSON.stringify(rowsAnswering(statement, items))),
+        }),
+      }) as never,
     tupleParam: (values: string[]) => values,
     telemetry: {
       trace: async <T>(_input: unknown, operation: () => Promise<T>) => operation(),

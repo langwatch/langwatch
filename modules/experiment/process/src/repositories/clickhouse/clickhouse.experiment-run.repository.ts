@@ -1,5 +1,5 @@
 import { TupleParam } from "@clickhouse/client";
-import type { IdBoundOptions } from "@langwatch/clickhouse-client";
+import type { ClickHouseQueryClient, IdBoundOptions } from "@langwatch/clickhouse-client";
 import type {
   ExperimentRun,
   ExperimentRunAggregate,
@@ -26,18 +26,29 @@ import { ExperimentRunRepository } from "../experiment-run.repository.ts";
 import type { ExperimentWorkflowVersionRepository } from "../experiment-workflow-version.repository.ts";
 import {
   buildDedupedRunItemsWhere,
+  type ColumnHolds,
   computeOccurredAtRangeForRuns,
+  runAggregatesRead,
+  runCountRead,
+  runItemsRead,
+  runRead,
+  runRowOf,
+  runsOfExperimentsRead,
+  runsPageRead,
   WARN_OLD_RUN_AGE_MS,
 } from "./clickhouse.experiment-run.mapper.ts";
 
 type QueryResult = { json<T>(): Promise<T[]> };
-type ExperimentClickHouseClient = {
+type ExperimentClickHouseClient = Pick<ClickHouseQueryClient, "read"> & {
+  /** The run-pair enrichment reads only, until the builder binds Array(Tuple) parameters. */
   query(input: {
     query: string;
     query_params: Record<string, unknown>;
     format: "JSONEachRow";
     idBound?: IdBoundOptions;
   }): Promise<QueryResult>;
+  /** Whether the tenant's target holds each column of `table`; absent, every column is held. */
+  holds?(input: { table: string }): Promise<ColumnHolds>;
 };
 
 type ClickHouseExperimentRunRepositoryOptions = {
@@ -94,7 +105,7 @@ type ItemRow = {
   ExperimentId: string;
   RowIndex: number;
   TargetId: string;
-  ResultType: "target" | "evaluator";
+  ResultType: string;
   DatasetEntry: string;
   Predicted: string | null;
   TargetCost: number | null;
@@ -229,37 +240,13 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
         if (input.experimentIds.length === 0) return {};
 
         const client = await this.requireClient(input.projectId);
-        const result = await client.query({
-          query: `
-            SELECT
-              ExperimentId,
-              count() AS runsCount,
-              max(toUnixTimestamp64Milli(CreatedAt)) AS lastRunAt
-            FROM (
-              SELECT
-                ExperimentId,
-                RunId,
-                argMax(CreatedAt, UpdatedAt) AS CreatedAt
-              FROM experiment_runs
-              WHERE TenantId = {tenantId:String}
-                AND ExperimentId IN ({experimentIds:Array(String)})
-                {{idBound:experiment_runs.ExperimentId:experimentIds}}
-              GROUP BY ExperimentId, RunId
-            )
-            GROUP BY ExperimentId
-          `,
-          query_params: {
-            tenantId: input.projectId,
+        const { rows } = await client.read({
+          statement: runAggregatesRead({
+            projectId: input.projectId,
             experimentIds: input.experimentIds,
-          },
-          format: "JSONEachRow",
+          }),
           idBound: { fallback: "unbounded" },
         });
-        const rows = await result.json<{
-          ExperimentId: string;
-          runsCount: number | string;
-          lastRunAt: number | string | null;
-        }>();
 
         return Object.fromEntries(
           rows.map((row) => [
@@ -291,55 +278,27 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
         const client = await this.requireClient(input.projectId);
         const offset = (input.page - 1) * input.pageSize;
         try {
-          const [countResult, runsResult] = await Promise.all([
-            client.query({
-              query: `
-              SELECT uniqExact(RunId) AS totalHits
-              FROM experiment_runs
-              WHERE TenantId = {tenantId:String}
-                AND ExperimentId = {experimentId:String}
-                {{idBound:experiment_runs.ExperimentId:experimentId}}
-            `,
-              query_params: {
-                tenantId: input.projectId,
+          const holds = await holdsOf(client);
+          const [{ rows: countRows }, { rows: pageRows }] = await Promise.all([
+            client.read({
+              statement: runCountRead({
+                projectId: input.projectId,
                 experimentId: input.experimentId,
-              },
-              format: "JSONEachRow",
+              }),
               idBound: { fallback: "unbounded" },
             }),
-            client.query({
-              query: `
-              SELECT *
-              FROM experiment_runs AS t
-              WHERE t.TenantId = {tenantId:String}
-                AND t.ExperimentId = {experimentId:String}
-                {{idBound:experiment_runs.ExperimentId:experimentId:t}}
-                AND (t.TenantId, t.RunId, t.ExperimentId, t.UpdatedAt) IN (
-                  SELECT TenantId, RunId, ExperimentId, max(UpdatedAt)
-                  FROM experiment_runs
-                  WHERE TenantId = {tenantId:String}
-                    AND ExperimentId = {experimentId:String}
-                    {{idBound:experiment_runs.ExperimentId:experimentId}}
-                  GROUP BY TenantId, RunId, ExperimentId
-                )
-              ORDER BY t.CreatedAt DESC, t.RunId DESC
-              LIMIT {pageSize:UInt32}
-              OFFSET {offset:UInt32}
-            `,
-              query_params: {
-                tenantId: input.projectId,
+            client.read({
+              statement: runsPageRead({
+                projectId: input.projectId,
                 experimentId: input.experimentId,
+                holds,
                 pageSize: input.pageSize,
                 offset,
-              },
-              format: "JSONEachRow",
+              }),
               idBound: { fallback: "unbounded" },
             }),
           ]);
-          const [countRows, runRows] = await Promise.all([
-            countResult.json<{ totalHits: number | string }>(),
-            runsResult.json<RunRow>(),
-          ]);
+          const runRows: RunRow[] = pageRows.map(runRowOf);
           if (runRows.length === 0) {
             return { runs: [], totalHits: Number(countRows[0]?.totalHits ?? 0) };
           }
@@ -369,77 +328,30 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
         if (!client) return null;
 
         try {
-          const result = await client.query({
-            query: `
-            SELECT *
-            FROM experiment_runs
-            WHERE TenantId = {tenantId:String}
-              AND ExperimentId = {experimentId:String}
-              AND RunId = {runId:String}
-              {{idBound:experiment_runs.RunId:runId}}
-              AND UpdatedAt = (
-                SELECT max(UpdatedAt)
-                FROM experiment_runs
-                WHERE TenantId = {tenantId:String}
-                  AND ExperimentId = {experimentId:String}
-                  AND RunId = {runId:String}
-                  {{idBound:experiment_runs.RunId:runId}}
-              )
-            LIMIT 1
-          `,
-            query_params: {
-              tenantId: input.projectId,
+          const { rows: runRows } = await client.read({
+            statement: runRead({
+              projectId: input.projectId,
               experimentId: input.experimentId,
               runId: input.runId,
-            },
-            format: "JSONEachRow",
+              holds: await holdsOf(client),
+            }),
             idBound: { fallback: "unbounded" },
           });
-          const runRows = await result.json<RunRow>();
-          const run = runRows[0];
+          const run = runRows[0] === undefined ? undefined : runRowOf(runRows[0]);
           if (!run) return null;
 
           const range = computeOccurredAtRangeForRuns([run]);
           this.warnIfRunsAreOld(input.projectId, range.minMs, 1);
-          const itemsResult = await client.query({
-            query: `
-            SELECT *
-            FROM experiment_run_items
-            WHERE TenantId = {tenantId:String}
-              AND ExperimentId = {experimentId:String}
-              AND RunId = {runId:String}
-              AND OccurredAt >= {minOccurredAt:DateTime64(3)}
-              AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
-              AND (TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, ''), OccurredAt) IN (
-                SELECT
-                  TenantId,
-                  ExperimentId,
-                  RunId,
-                  RowIndex,
-                  TargetId,
-                  ResultType,
-                  coalesce(EvaluatorId, ''),
-                  max(OccurredAt)
-                FROM experiment_run_items
-                WHERE TenantId = {tenantId:String}
-                  AND ExperimentId = {experimentId:String}
-                  AND RunId = {runId:String}
-                  AND OccurredAt >= {minOccurredAt:DateTime64(3)}
-                  AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
-                GROUP BY TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
-              )
-            ORDER BY RowIndex ASC, ResultType ASC
-          `,
-            query_params: {
-              tenantId: input.projectId,
+          const { rows: itemRows } = await client.read({
+            statement: runItemsRead({
+              projectId: input.projectId,
               experimentId: input.experimentId,
               runId: input.runId,
-              minOccurredAt: range.minOccurredAt,
-              maxOccurredAt: range.maxOccurredAt,
-            },
-            format: "JSONEachRow",
+              fromMs: range.fromMs,
+              untilMs: range.untilMs,
+            }),
           });
-          return mapRunWithItems(run, await itemsResult.json<ItemRow>(), input.projectId);
+          return mapRunWithItems(run, itemRows, input.projectId);
         } catch (error) {
           this.options.telemetry.error(
             { projectId: input.projectId, runId: input.runId, error },
@@ -461,32 +373,15 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
     client: ExperimentClickHouseClient,
     input: ExperimentRunListInput,
   ): Promise<RunRow[]> {
-    const result = await client.query({
-      query: `
-        SELECT *
-        FROM experiment_runs AS t
-        WHERE t.TenantId = {tenantId:String}
-          AND t.ExperimentId IN ({experimentIds:Array(String)})
-          {{idBound:experiment_runs.ExperimentId:experimentIds:t}}
-          AND (t.TenantId, t.RunId, t.ExperimentId, t.UpdatedAt) IN (
-            SELECT TenantId, RunId, ExperimentId, max(UpdatedAt)
-            FROM experiment_runs
-            WHERE TenantId = {tenantId:String}
-              AND ExperimentId IN ({experimentIds:Array(String)})
-              {{idBound:experiment_runs.ExperimentId:experimentIds}}
-            GROUP BY TenantId, RunId, ExperimentId
-          )
-        ORDER BY t.CreatedAt DESC
-        LIMIT 10000
-      `,
-      query_params: {
-        tenantId: input.projectId,
+    const { rows } = await client.read({
+      statement: runsOfExperimentsRead({
+        projectId: input.projectId,
         experimentIds: input.experimentIds,
-      },
-      format: "JSONEachRow",
+        holds: await holdsOf(client),
+      }),
       idBound: { fallback: "unbounded" },
     });
-    return result.json<RunRow>();
+    return rows.map(runRowOf);
   }
 
   private async enrichRuns(
@@ -773,4 +668,9 @@ function parseTargets(value: string): z.infer<typeof experimentRunTargetSchema>[
   } catch {
     return null;
   }
+}
+
+/** The target's column presence for `experiment_runs`; a client that cannot say holds them all. */
+async function holdsOf(client: ExperimentClickHouseClient): Promise<ColumnHolds> {
+  return (await client.holds?.({ table: "experiment_runs" })) ?? (() => true);
 }

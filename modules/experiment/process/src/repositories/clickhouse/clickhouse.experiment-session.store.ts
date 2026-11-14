@@ -1,14 +1,6 @@
-import {
-  type ClickHouseColumns,
-  type ClickHouseQueryClient,
-  type IdBoundOptions,
-} from "@langwatch/clickhouse-client";
+import { type ClickHouseQueryClient, type IdBoundOptions } from "@langwatch/clickhouse-client";
 
-import type {
-  ExperimentEventingClickHouseClient,
-  ExperimentEventingClickHouseResolver,
-  ExperimentEventingClickHouseResult,
-} from "../experiment-clickhouse.repository.ts";
+import type { ExperimentEventingClickHouseClient } from "../experiment-clickhouse.repository.ts";
 
 type ClickHouseRow = Readonly<Record<string, unknown>>;
 
@@ -18,25 +10,32 @@ function isRow(value: unknown): value is ClickHouseRow {
 
 /**
  * One tenant's view of the process's routing `clickhouse` member, in the
- * `.query()`/`.insert()` shape Experiment's repositories were written against.
+ * shape Experiment's repositories hold: built reads go straight to the member.
  */
 export class ClickHouseExperimentSession implements ExperimentEventingClickHouseClient {
+  readonly read: ClickHouseQueryClient["read"];
+
   private constructor(
     private readonly clickhouse: ClickHouseQueryClient,
     private readonly tenantId: string,
-  ) {}
+  ) {
+    this.read = (input) => clickhouse.read(input);
+  }
 
   /** Resolves each tenant's session over the one routing member. */
-  static resolverOver(clickhouse: ClickHouseQueryClient): ExperimentEventingClickHouseResolver {
+  static resolverOver(
+    clickhouse: ClickHouseQueryClient,
+  ): (tenantId: string) => Promise<ClickHouseExperimentSession> {
     return (tenantId) => Promise.resolve(new ClickHouseExperimentSession(clickhouse, tenantId));
   }
 
+  /** Raw, for the run-pair enrichment reads only, until the builder binds Array(Tuple). */
   async query(input: {
     query: string;
     query_params?: Record<string, unknown>;
     format: "JSONEachRow";
     idBound?: IdBoundOptions;
-  }): Promise<ExperimentEventingClickHouseResult> {
+  }): Promise<{ json<T>(): Promise<T[]> }> {
     const request = {
       tenantId: this.tenantId,
       sql: input.query,
@@ -46,9 +45,12 @@ export class ClickHouseExperimentSession implements ExperimentEventingClickHouse
     return { json: async <T>() => (await this.clickhouse.query<T>(request)).rows };
   }
 
-  /** A select list naming only the columns this tenant's target has, the rest as defaults. */
-  select(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string> {
-    return this.clickhouse.columns({ tenantId: this.tenantId }).select(input);
+  /** Whether this tenant's target holds each column of `table`; an unreadable list holds all. */
+  holds({ table }: { table: string }): Promise<(name: string) => boolean> {
+    return this.clickhouse
+      .columns({ tenantId: this.tenantId })
+      .holds({ table })
+      .catch(() => () => true);
   }
 
   async insert(input: {

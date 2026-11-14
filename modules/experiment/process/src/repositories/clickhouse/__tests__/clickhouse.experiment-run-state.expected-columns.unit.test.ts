@@ -2,7 +2,7 @@
  * @vitest-environment node
  * @see modules/experiment/specs/experiment-run-results-completeness.feature
  */
-import { ClickHouseColumns } from "@langwatch/clickhouse-client";
+import type { ReaderReadStatement } from "@langwatch/clickhouse-client/builder";
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
@@ -17,35 +17,44 @@ const AFTER_00105 = [
 ];
 
 async function readStateOver(columnList: readonly { table: string; name: string }[]) {
-  const statements: string[] = [];
-  const columns = ClickHouseColumns.over({ read: async () => columnList });
+  const statements: ReaderReadStatement[] = [];
   const repository = ClickHouseExperimentRunStateRepository.create({
     clickhouse: {
-      resolveClient: async () => ({
-        insert: async () => undefined,
-        query: async ({ query }) => {
-          statements.push(query);
-          return { json: async () => [] };
-        },
-        select: (input) => columns.select(input),
-      }),
+      resolveClient: async () =>
+        ({
+          insert: async () => undefined,
+          read: async ({ statement }: { statement: ReaderReadStatement }) => {
+            statements.push(statement);
+            return { rows: [] };
+          },
+          holds:
+            async ({ table }: { table: string }) =>
+            (name: string) =>
+              columnList.some((each) => each.table === table && each.name === name),
+        }) as never,
     },
     defaultRetentionDays: () => 30,
   });
   await repository.findProjection(makeExperimentRunKey("experiment_1", "run_1"), {
     tenantId: createTenantId("project_1"),
   });
-  return statements[0] ?? "";
+  const [statement] = statements;
+  expect(statement).toMatchObject({ identity: "reader", kind: "tenant", tenantId: "project_1" });
+  expect(statement?.settings).toMatchObject({ SQL_langwatch_tenant_ids: "project_1" });
+  return statement?.sql ?? "";
 }
 
 describe("ClickHouseExperimentRunStateRepository expected-results columns", () => {
   describe("given the target has no expected-results columns yet", () => {
     /** @scenario "A run's state read before the expected-results columns exist answers no counts" */
-    it("selects NULL counts under the column names", async () => {
+    it("selects NULL counts in place of the columns", async () => {
       const statement = await readStateOver(BEFORE_00105);
 
-      expect(statement).toContain("CAST(NULL AS Nullable(UInt32)) AS `ExpectedTargetResults`");
-      expect(statement).toContain("CAST(NULL AS Nullable(UInt32)) AS `ExpectedEvaluatorResults`");
+      expect(statement).toMatch(/CAST\(NULL AS Nullable\(UInt32\)\) AS `?RecordedTargetResults\b/);
+      expect(statement).toMatch(
+        /CAST\(NULL AS Nullable\(UInt32\)\) AS `?RecordedEvaluatorResults\b/,
+      );
+      expect(statement).not.toContain("ExpectedTargetResults");
     });
   });
 
@@ -54,8 +63,8 @@ describe("ClickHouseExperimentRunStateRepository expected-results columns", () =
     it("selects the stored columns", async () => {
       const statement = await readStateOver(AFTER_00105);
 
-      expect(statement).toContain("t.`ExpectedTargetResults` AS `ExpectedTargetResults`");
-      expect(statement).toContain("t.`ExpectedEvaluatorResults` AS `ExpectedEvaluatorResults`");
+      expect(statement).toMatch(/ExpectedTargetResults`? AS `?RecordedTargetResults\b/);
+      expect(statement).toMatch(/ExpectedEvaluatorResults`? AS `?RecordedEvaluatorResults\b/);
     });
   });
 });

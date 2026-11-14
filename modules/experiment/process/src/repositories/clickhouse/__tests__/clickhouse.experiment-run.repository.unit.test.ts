@@ -1,9 +1,36 @@
+import type { ReaderReadStatement } from "@langwatch/clickhouse-client/builder";
 import { describe, expect, it, vi } from "vitest";
 
 import {
   ClickHouseExperimentRunRepository,
   RUN_PAIRS_PER_ENRICHMENT_QUERY,
 } from "../clickhouse.experiment-run.repository.ts";
+
+/** A run row as the built read answers it: times as text under `…Text`, NO-HOLDS as `Recorded…`. */
+const readRowOf = (row: {
+  CreatedAt: string;
+  UpdatedAt: string;
+  FinishedAt: string | null;
+  StoppedAt: string | null;
+  [key: string]: unknown;
+}) => {
+  const { CreatedAt, UpdatedAt, FinishedAt, StoppedAt, ...rest } = row;
+  return {
+    ...rest,
+    CreatedAtText: CreatedAt,
+    UpdatedAtText: UpdatedAt,
+    FinishedAtText: FinishedAt,
+    StoppedAtText: StoppedAt,
+    RecordedTargetResults: null,
+    RecordedEvaluatorResults: null,
+    RecordedConcurrency: null,
+  };
+};
+
+const expectSingleTenantRead = (statement: ReaderReadStatement | undefined) => {
+  expect(statement).toMatchObject({ identity: "reader", kind: "tenant", tenantId: "project_1" });
+  expect(statement?.settings).toMatchObject({ SQL_langwatch_tenant_ids: "project_1" });
+};
 
 describe("ClickHouseExperimentRunRepository", () => {
   const options = {
@@ -33,9 +60,11 @@ describe("ClickHouseExperimentRunRepository", () => {
   it("returns null when a newly started run has not reached ClickHouse yet", async () => {
     const repository = ClickHouseExperimentRunRepository.create({
       ...options,
-      resolveClient: async () => ({
-        query: async () => ({ json: async () => [] }),
-      }),
+      resolveClient: async () =>
+        ({
+          read: async () => ({ rows: [] }),
+          query: async () => ({ json: async () => [] }),
+        }) as never,
     });
 
     await expect(
@@ -59,15 +88,16 @@ describe("ClickHouseExperimentRunRepository", () => {
   });
 
   it("keeps the aggregate query's scope inside its deduplicating subquery", async () => {
-    const queries: string[] = [];
+    const statements: ReaderReadStatement[] = [];
     const repository = ClickHouseExperimentRunRepository.create({
       ...options,
-      resolveClient: async () => ({
-        query: async ({ query }) => {
-          queries.push(query);
-          return { json: async () => [] };
-        },
-      }),
+      resolveClient: async () =>
+        ({
+          read: async ({ statement }: { statement: ReaderReadStatement }) => {
+            statements.push(statement);
+            return { rows: [] };
+          },
+        }) as never,
     });
 
     await repository.findAggregates({
@@ -75,58 +105,68 @@ describe("ClickHouseExperimentRunRepository", () => {
       experimentIds: ["experiment_1"],
     });
 
-    const [query] = queries;
-    expect(query).toBeDefined();
+    const [statement] = statements;
+    expectSingleTenantRead(statement);
+    const query = statement?.sql ?? "";
     expect(query).toMatch(/FROM \(\s*SELECT/s);
-    expect(query?.match(/WHERE TenantId/g)).toHaveLength(1);
-    expect(query).toMatch(/GROUP BY ExperimentId, RunId\s*\)\s*GROUP BY ExperimentId/s);
+    expect(query.match(/TenantId = \{tenantId:String\}/g)).toHaveLength(1);
+    expect(query).toMatch(/GROUP BY [^)]*RunId\s*\)[^(]*GROUP BY/s);
   });
 
   it("uses the injected tuple wrapper for exact experiment/run pairs", async () => {
     const tupleParam = vi.fn((values: string[]) => ({ tuple: values }));
     const queries: string[] = [];
     const queryParams: Record<string, unknown>[] = [];
-    const results = [
-      [
-        {
-          TenantId: "project_1",
-          ExperimentId: "experiment_1",
-          RunId: "run_1",
-          WorkflowVersionId: null,
-          Total: 1,
-          Progress: 1,
-          Targets: "[]",
-          CreatedAt: "2026-01-01 00:00:00.000",
-          UpdatedAt: "2026-01-01 00:00:00.000",
-          FinishedAt: null,
-          StoppedAt: null,
-        },
-      ],
-      [],
-      [],
+    const statements: ReaderReadStatement[] = [];
+    const runs = [
+      {
+        TenantId: "project_1",
+        ExperimentId: "experiment_1",
+        RunId: "run_1",
+        WorkflowVersionId: null,
+        Total: 1,
+        Progress: 1,
+        Targets: "[]",
+        CreatedAt: "2026-01-01 00:00:00.000",
+        UpdatedAt: "2026-01-01 00:00:00.000",
+        FinishedAt: null,
+        StoppedAt: null,
+      },
     ];
     const repository = ClickHouseExperimentRunRepository.create({
       ...options,
       tupleParam,
-      resolveClient: async () => ({
-        query: async ({ query, query_params }) => {
-          queries.push(query);
-          queryParams.push(query_params);
-          return { json: async <T>() => (results.shift() ?? []) as T[] };
-        },
-      }),
+      resolveClient: async () =>
+        ({
+          read: async ({ statement }: { statement: ReaderReadStatement }) => {
+            statements.push(statement);
+            return { rows: runs.map(readRowOf) };
+          },
+          query: async ({
+            query,
+            query_params,
+          }: {
+            query: string;
+            query_params: Record<string, unknown>;
+          }) => {
+            queries.push(query);
+            queryParams.push(query_params);
+            return { json: async () => [] };
+          },
+        }) as never,
     });
 
     await repository.findAll({ projectId: "project_1", experimentIds: ["experiment_1"] });
 
     expect(tupleParam).toHaveBeenCalledWith(["experiment_1", "run_1"]);
+    expect(queryParams[0]?.runPairs).toEqual([{ tuple: ["experiment_1", "run_1"] }]);
     expect(queryParams[1]?.runPairs).toEqual([{ tuple: ["experiment_1", "run_1"] }]);
-    expect(queryParams[2]?.runPairs).toEqual([{ tuple: ["experiment_1", "run_1"] }]);
-    expect(queries.join("\n")).not.toContain("LIMIT 1 BY");
-    expect(queries[0]).toMatch(/max\(UpdatedAt\)/);
-    expect(queries[1]).toMatch(/max\(OccurredAt\)/);
-    expect(queries[1]).toContain("(ExperimentId, RunId) IN {runPairs");
-    expect(queries[1]).toContain("OccurredAt >= {minOccurredAt:DateTime64(3)}");
+    expectSingleTenantRead(statements[0]);
+    expect([statements[0]?.sql, ...queries].join("\n")).not.toContain("LIMIT 1 BY");
+    expect(statements[0]?.sql).toMatch(/max\(UpdatedAt\)/);
+    expect(queries[0]).toMatch(/max\(OccurredAt\)/);
+    expect(queries[0]).toContain("(ExperimentId, RunId) IN {runPairs");
+    expect(queries[0]).toContain("OccurredAt >= {minOccurredAt:DateTime64(3)}");
   });
 
   describe("when the listed runs outnumber one enrichment lookup", () => {
@@ -149,39 +189,44 @@ describe("ClickHouseExperimentRunRepository", () => {
       const pairCounts: number[] = [];
       const repository = ClickHouseExperimentRunRepository.create({
         ...options,
-        resolveClient: async () => ({
-          query: async ({ query, query_params }) => {
-            if (query.includes("FROM experiment_runs")) {
-              return { json: async <T>() => runRows as T[] };
-            }
-            const pairs = query_params.runPairs as string[][];
-            pairCounts.push(pairs.length);
-            const isCostQuery = query.includes("datasetCost");
-            return {
-              json: async <T>() =>
-                (isCostQuery
-                  ? pairs.map(([experimentId, runId]) => ({
-                      ExperimentId: experimentId,
-                      RunId: runId,
-                      datasetCost: Number(runId!.slice("run_".length)),
-                      evaluationsCost: null,
-                      datasetAverageCost: null,
-                      datasetAverageDuration: null,
-                      evaluationsAverageCost: null,
-                      evaluationsAverageDuration: null,
-                    }))
-                  : pairs.map(([experimentId, runId]) => ({
-                      ExperimentId: experimentId,
-                      RunId: runId,
-                      EvaluatorId: "evaluator_1",
-                      EvaluatorName: "Faithfulness",
-                      avgScore: Number(runId!.slice("run_".length)) / runCount,
-                      passRate: null,
-                      hasPassedCount: 0,
-                    }))) as T[],
-            };
-          },
-        }),
+        resolveClient: async () =>
+          ({
+            read: async () => ({ rows: runRows.map(readRowOf) }),
+            query: async ({
+              query,
+              query_params,
+            }: {
+              query: string;
+              query_params: Record<string, unknown>;
+            }) => {
+              const pairs = query_params.runPairs as string[][];
+              pairCounts.push(pairs.length);
+              const isCostQuery = query.includes("datasetCost");
+              return {
+                json: async <T>() =>
+                  (isCostQuery
+                    ? pairs.map(([experimentId, runId]) => ({
+                        ExperimentId: experimentId,
+                        RunId: runId,
+                        datasetCost: Number(runId!.slice("run_".length)),
+                        evaluationsCost: null,
+                        datasetAverageCost: null,
+                        datasetAverageDuration: null,
+                        evaluationsAverageCost: null,
+                        evaluationsAverageDuration: null,
+                      }))
+                    : pairs.map(([experimentId, runId]) => ({
+                        ExperimentId: experimentId,
+                        RunId: runId,
+                        EvaluatorId: "evaluator_1",
+                        EvaluatorName: "Faithfulness",
+                        avgScore: Number(runId!.slice("run_".length)) / runCount,
+                        passRate: null,
+                        hasPassedCount: 0,
+                      }))) as T[],
+              };
+            },
+          }) as never,
       });
 
       const grouped = await repository.findAll({

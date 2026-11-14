@@ -1,4 +1,10 @@
-import { ClickHouseColumns } from "@langwatch/clickhouse-client";
+import {
+  clickhouseRead,
+  column,
+  fn,
+  type ReaderReadStatement,
+  tenantScope,
+} from "@langwatch/clickhouse-client/builder";
 import type {
   Projection,
   ProjectionStoreReadContext,
@@ -25,6 +31,8 @@ import {
 } from "../../rules/experiment-run-key.rules.ts";
 import type { ExperimentClickHouseRepository } from "../experiment-clickhouse.repository.ts";
 import type { ExperimentRunStateRepository } from "../experiment-run-state.repository.ts";
+import type { ColumnHolds } from "./clickhouse.experiment-run.mapper.ts";
+import { experimentRuns as runs } from "./clickhouse.experiment-runs.table.ts";
 
 /**
  * The `DateTime64(3)` columns. The ClickHouse client serialises a `Date`; an
@@ -39,16 +47,107 @@ function clickHouseDateTime(epochMs: number): ClickHouseDateTime {
 
 const TABLE_NAME = "experiment_runs" as const;
 
-/** Goose 00105's columns, with the default each reads as until it lands (NO-HOLDS). */
-const EXPECTED_RESULTS_COLUMNS = {
-  ExpectedTargetResults: "CAST(NULL AS Nullable(UInt32))",
-  ExpectedEvaluatorResults: "CAST(NULL AS Nullable(UInt32))",
-} as const;
+/** The projection row as the built read answers it: times as epoch millis under `…Ms` keys. */
+interface ExperimentRunStateReadRow {
+  ProjectionId: string;
+  TenantId: string;
+  RunId: string;
+  ExperimentId: string;
+  WorkflowVersionId: string | null;
+  Version: string;
+  Total: number;
+  Progress: number;
+  CompletedCount: number;
+  FailedCount: number;
+  TotalCost: number | null;
+  TotalDurationText: string | null;
+  AvgScoreBps: number | null;
+  PassRateBps: number | null;
+  Targets: string;
+  CreatedAtMs: number | string;
+  UpdatedAtMs: number | string;
+  StartedAtMs: number | string | null;
+  FinishedAtMs: number | string | null;
+  StoppedAtMs: number | string | null;
+  RecordedTargetResults: number | null;
+  RecordedEvaluatorResults: number | null;
+  RecordedConcurrency: number | null;
+  LastProcessedEventId: string;
+  TotalScoreSum: number;
+  ScoreCount: number;
+  PassedCount: number;
+  GradedCount: number;
+  LastEventOccurredAtMs: number | string;
+}
 
-/** Goose 00125's column, with the default it reads as until it lands (NO-HOLDS). */
-const CONCURRENCY_COLUMNS = {
-  Concurrency: "CAST(NULL AS Nullable(UInt16))",
-} as const;
+/**
+ * One run's latest version, by the IN-tuple election on `UpdatedAt`; goose 00105/00125's
+ * columns read as NULL where the target lacks them (NO-HOLDS).
+ */
+function runStateRead({
+  tenantId,
+  experimentId,
+  runId,
+  holds,
+}: {
+  tenantId: string;
+  experimentId: string;
+  runId: string;
+  holds: ColumnHolds;
+}): ReaderReadStatement<ExperimentRunStateReadRow> {
+  const millis = fn.toUnixTimestamp64Milli;
+  return clickhouseRead({ scope: tenantScope.single({ tenantId }) })
+    .from(runs)
+    .select({
+      ProjectionId: runs.ProjectionId,
+      TenantId: runs.TenantId,
+      RunId: runs.RunId,
+      ExperimentId: runs.ExperimentId,
+      WorkflowVersionId: runs.WorkflowVersionId,
+      Version: runs.Version,
+      Total: runs.Total,
+      Progress: runs.Progress,
+      CompletedCount: runs.CompletedCount,
+      FailedCount: runs.FailedCount,
+      TotalCost: runs.TotalCost,
+      TotalDurationText: fn.toString(runs.TotalDurationMs),
+      AvgScoreBps: runs.AvgScoreBps,
+      PassRateBps: runs.PassRateBps,
+      Targets: runs.Targets,
+      CreatedAtMs: millis(runs.CreatedAt),
+      UpdatedAtMs: millis(runs.UpdatedAt),
+      StartedAtMs: millis(runs.StartedAt),
+      FinishedAtMs: millis(runs.FinishedAt),
+      StoppedAtMs: millis(runs.StoppedAt),
+      RecordedTargetResults: fn.heldOr(runs.ExpectedTargetResults, {
+        holds,
+        otherwise: fn.nullAs(column.nullable(column.uint32())),
+      }),
+      RecordedEvaluatorResults: fn.heldOr(runs.ExpectedEvaluatorResults, {
+        holds,
+        otherwise: fn.nullAs(column.nullable(column.uint32())),
+      }),
+      RecordedConcurrency: fn.heldOr(runs.Concurrency, {
+        holds,
+        otherwise: fn.nullAs(column.nullable(column.uint16())),
+      }),
+      LastProcessedEventId: runs.LastProcessedEventId,
+      TotalScoreSum: runs.TotalScoreSum,
+      ScoreCount: runs.ScoreCount,
+      PassedCount: runs.PassedCount,
+      GradedCount: runs.GradedCount,
+      LastEventOccurredAtMs: millis(runs.LastEventOccurredAt),
+    })
+    .where(({ and, eq, idBound }) =>
+      and(eq(runs.ExperimentId, experimentId), idBound(runs.RunId, runId)),
+    )
+    .latestVersion()
+    .limit(1)
+    .build();
+}
+
+const asMillis = (value: number | string | null): number | null =>
+  value === null ? null : Number(value);
 
 const logger = createLogger("langwatch:experiment-run-processing:run-state-repository");
 
@@ -95,6 +194,9 @@ interface ClickHouseExperimentRunRecord {
   _retention_days: number;
 }
 
+/** The record as a read answers it: retention is written, never read back. */
+type ClickHouseExperimentRunReadRecord = Omit<ClickHouseExperimentRunRecord, "_retention_days">;
+
 type ClickHouseExperimentRunWriteRecord = WithDateWrites<
   ClickHouseExperimentRunRecord,
   "CreatedAt" | "UpdatedAt" | "StartedAt" | "FinishedAt" | "StoppedAt" | "LastEventOccurredAt"
@@ -119,7 +221,7 @@ export class ClickHouseExperimentRunStateRepository<
   }
 
   private mapClickHouseRecordToProjectionData(
-    record: ClickHouseExperimentRunRecord,
+    record: ClickHouseExperimentRunReadRecord,
   ): ExperimentRunStateData {
     return {
       RunId: record.RunId,
@@ -213,62 +315,14 @@ export class ClickHouseExperimentRunStateRepository<
 
     try {
       const client = await this.clickhouse.resolveClient(context.tenantId);
-      const input = { table: TABLE_NAME, alias: "t", columns: EXPECTED_RESULTS_COLUMNS };
-      const expected = (await client.select?.(input)) ?? ClickHouseColumns.named(input);
-      const concurrencyInput = { table: TABLE_NAME, alias: "t", columns: CONCURRENCY_COLUMNS };
-      const concurrency =
-        (await client.select?.(concurrencyInput)) ?? ClickHouseColumns.named(concurrencyInput);
-      // IN-tuple dedup over the ReplacingMergeTree (see
-      // dev/docs/best_practices/clickhouse-queries.md). UpdatedAt is referenced via
-      // table alias because it's also projected as `toUnixTimestamp64Milli(...) AS
-      // UpdatedAt` — without the alias the IN-tuple comparison resolves to the
-      // projected UInt64 instead of the raw DateTime64.
-      const result = await client.query({
-        query: `
-          SELECT
-            t.ProjectionId AS ProjectionId, t.TenantId AS TenantId,
-            t.RunId AS RunId, t.ExperimentId AS ExperimentId,
-            t.WorkflowVersionId AS WorkflowVersionId, t.Version AS Version,
-            t.Total AS Total, t.Progress AS Progress,
-            t.CompletedCount AS CompletedCount, t.FailedCount AS FailedCount,
-            t.TotalCost AS TotalCost,
-            toString(t.TotalDurationMs) AS TotalDurationMs,
-            t.AvgScoreBps AS AvgScoreBps, t.PassRateBps AS PassRateBps,
-            t.Targets AS Targets,
-            toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
-            toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
-            toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
-            toUnixTimestamp64Milli(t.FinishedAt) AS FinishedAt,
-            toUnixTimestamp64Milli(t.StoppedAt) AS StoppedAt,
-            ${expected},
-            ${concurrency},
-            t.LastProcessedEventId AS LastProcessedEventId,
-            t.TotalScoreSum AS TotalScoreSum, t.ScoreCount AS ScoreCount,
-            t.PassedCount AS PassedCount, t.GradedCount AS GradedCount,
-            toUnixTimestamp64Milli(t.LastEventOccurredAt) AS LastEventOccurredAt
-          FROM ${TABLE_NAME} AS t
-          WHERE t.TenantId = {tenantId:String}
-            AND t.RunId = {runId:String}
-            AND t.ExperimentId = {experimentId:String}
-            {{idBound:experiment_runs.RunId:runId:t}}
-            AND (t.TenantId, t.RunId, t.ExperimentId, t.UpdatedAt) IN (
-              SELECT TenantId, RunId, ExperimentId, max(UpdatedAt)
-              FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
-                AND RunId = {runId:String}
-                AND ExperimentId = {experimentId:String}
-                {{idBound:experiment_runs.RunId:runId}}
-              GROUP BY TenantId, RunId, ExperimentId
-            )
-          LIMIT 1
-        `,
-        query_params: { tenantId: context.tenantId, runId, experimentId },
-        format: "JSONEachRow",
+      const holds = (await client.holds?.({ table: TABLE_NAME })) ?? (() => true);
+      const { rows } = await client.read({
+        statement: runStateRead({ tenantId: context.tenantId, experimentId, runId, holds }),
         idBound: { fallback: "unbounded" },
       });
-      const rows = await result.json<ClickHouseExperimentRunRecord>();
-      const row = rows[0];
-      if (!row) return null;
+      const read = rows[0];
+      if (!read) return null;
+      const row = recordOf(read);
 
       const projection: ExperimentRunState = {
         id: row.ProjectionId,
@@ -434,4 +488,39 @@ export class ClickHouseExperimentRunStateRepository<
       });
     }
   }
+}
+
+/** The read row under the record's column names, as the projection mapping reads it. */
+function recordOf(row: ExperimentRunStateReadRow): ClickHouseExperimentRunReadRecord {
+  return {
+    ProjectionId: row.ProjectionId,
+    TenantId: row.TenantId,
+    RunId: row.RunId,
+    ExperimentId: row.ExperimentId,
+    WorkflowVersionId: row.WorkflowVersionId,
+    Version: row.Version,
+    Total: row.Total,
+    Progress: row.Progress,
+    CompletedCount: row.CompletedCount,
+    FailedCount: row.FailedCount,
+    TotalCost: row.TotalCost,
+    TotalDurationMs: row.TotalDurationText,
+    AvgScoreBps: row.AvgScoreBps,
+    PassRateBps: row.PassRateBps,
+    Targets: row.Targets,
+    CreatedAt: Number(row.CreatedAtMs),
+    UpdatedAt: Number(row.UpdatedAtMs),
+    StartedAt: asMillis(row.StartedAtMs),
+    FinishedAt: asMillis(row.FinishedAtMs),
+    StoppedAt: asMillis(row.StoppedAtMs),
+    ExpectedTargetResults: row.RecordedTargetResults,
+    ExpectedEvaluatorResults: row.RecordedEvaluatorResults,
+    Concurrency: row.RecordedConcurrency,
+    LastProcessedEventId: row.LastProcessedEventId,
+    TotalScoreSum: row.TotalScoreSum,
+    ScoreCount: row.ScoreCount,
+    PassedCount: row.PassedCount,
+    GradedCount: row.GradedCount,
+    LastEventOccurredAt: Number(row.LastEventOccurredAtMs),
+  };
 }

@@ -56,7 +56,10 @@ let repository: ClickHouseExperimentRunRepository;
 /** The one client every read and write in this suite resolves to. */
 class SuiteClickHouse extends ExperimentClickHouseRepository {
   resolveClient(): Promise<ExperimentEventingClickHouseClient> {
-    return Promise.resolve(client);
+    return Promise.resolve({
+      insert: (input) => client.insert({ ...input, values: [...input.values] }),
+      read: () => Promise.reject(new Error("this suite's item writes never read")),
+    });
   }
 }
 

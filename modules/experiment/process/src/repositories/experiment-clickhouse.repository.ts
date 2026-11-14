@@ -1,10 +1,6 @@
-import type { ClickHouseColumns, IdBoundOptions } from "@langwatch/clickhouse-client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 
-export type ExperimentEventingClickHouseResult = {
-  json<T>(): Promise<T[]>;
-};
-
-export type ExperimentEventingClickHouseClient = {
+export type ExperimentEventingClickHouseClient = Pick<ClickHouseQueryClient, "read"> & {
   insert(input: {
     table: string;
     /**
@@ -21,15 +17,8 @@ export type ExperimentEventingClickHouseClient = {
      */
     clickhouse_settings?: Record<string, number>;
   }): Promise<unknown>;
-  query(input: {
-    query: string;
-    query_params?: Record<string, unknown>;
-    format: "JSONEachRow";
-    /** For a statement carrying `{{idBound}}`: a time the caller has, and today's fallback. */
-    idBound?: IdBoundOptions;
-  }): Promise<ExperimentEventingClickHouseResult>;
-  /** Absent on a bare driver client (tests): every column is then named. */
-  select?(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string>;
+  /** Whether the tenant's target holds each column of `table`; absent, every column is held. */
+  holds?(input: { table: string }): Promise<(name: string) => boolean>;
 };
 
 /** How the application hands the feature a tenant-scoped ClickHouse client. */

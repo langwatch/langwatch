@@ -1,10 +1,10 @@
+import type { ReaderReadStatement } from "@langwatch/clickhouse-client/builder";
 import type { ExperimentDspyStep } from "@langwatch/experiment-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { ExperimentDspyRetentionRepository } from "../../experiment-dspy-retention.repository.ts";
 import {
   ClickHouseExperimentDspyRepository,
-  type ExperimentDspyClickHouseResult,
   type ExperimentDspyClickHouseClient,
 } from "../clickhouse.experiment-dspy.repository.ts";
 
@@ -32,9 +32,28 @@ class FixedRetention extends ExperimentDspyRetentionRepository {
 
 const telemetry = { warn: vi.fn() };
 
-const clickHouseResult = <T>(rows: T[]): ExperimentDspyClickHouseResult => ({
-  json: async () => rows,
-});
+/** A client answering every built read with `rows`, recording each statement it is sent. */
+function readingClient(rows: readonly Record<string, unknown>[]) {
+  const statements: ReaderReadStatement[] = [];
+  const insert = vi.fn<ExperimentDspyClickHouseClient["insert"]>(async () => undefined);
+  const client = {
+    insert,
+    read: async ({ statement }: { statement: ReaderReadStatement }) => {
+      statements.push(statement);
+      return { rows };
+    },
+  };
+  return { client: client as never, insert, statements };
+}
+
+function expectSingleTenantReads(statements: readonly ReaderReadStatement[]) {
+  expect(statements.length).toBeGreaterThan(0);
+  for (const statement of statements) {
+    expect(statement).toMatchObject({ identity: "reader", kind: "tenant", tenantId: "project_1" });
+    expect(statement.settings).toMatchObject({ SQL_langwatch_tenant_ids: "project_1" });
+    expect(statement.sql).toContain("WHERE TenantId = {tenantId:String}");
+  }
+}
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
@@ -70,7 +89,6 @@ describe("ClickHouseExperimentDspyRepository", () => {
   });
 
   it("merges examples and calls by hash while preserving first-write times", async () => {
-    const insert = vi.fn<ExperimentDspyClickHouseClient["insert"]>(async () => undefined);
     const existing = {
       TenantId: "project_1",
       ExperimentId: "experiment_1",
@@ -94,16 +112,13 @@ describe("ClickHouseExperimentDspyRepository", () => {
         },
       ]),
       LlmCallsTotal: 1,
-      LlmCallsTotalTokens: "5",
+      LlmCallsTotalTokensText: "5",
       LlmCallsTotalCost: 0.1,
-      CreatedAt: "1000",
-      InsertedAt: "1100",
-      UpdatedAt: "1200",
+      CreatedAtMs: "1000",
+      InsertedAtMs: "1100",
+      UpdatedAtMs: "1200",
     };
-    const client: ExperimentDspyClickHouseClient = {
-      insert,
-      query: vi.fn(async () => clickHouseResult([existing])),
-    };
+    const { client, insert, statements } = readingClient([existing]);
     const repository = ClickHouseExperimentDspyRepository.create({
       resolveClient: async () => client,
       telemetry,
@@ -142,30 +157,27 @@ describe("ClickHouseExperimentDspyRepository", () => {
     expect(written.InsertedAt).toEqual(new Date(1_100));
     expect(written.UpdatedAt).toEqual(new Date(2_000));
     expect(written._retention_days).toBe(49);
+    expectSingleTenantReads(statements);
+    expect(statements[0]?.sql).toContain("{{idBound:dspy_steps.ExperimentId,RunId:");
   });
 
   it("maps the existing summary response without changing its totals", async () => {
-    const client: ExperimentDspyClickHouseClient = {
-      insert: vi.fn(async () => undefined),
-      query: vi.fn(async () =>
-        clickHouseResult([
-          {
-            TenantId: "project_1",
-            ExperimentId: "experiment_1",
-            RunId: "run_1",
-            StepIndex: "0",
-            WorkflowVersionId: "version_1",
-            Score: 0.75,
-            Label: "best",
-            OptimizerName: "MIPROv2",
-            LlmCallsTotal: 4,
-            LlmCallsTotalTokens: "123",
-            LlmCallsTotalCost: 0.45,
-            CreatedAt: "1000",
-          },
-        ]),
-      ),
-    };
+    const { client, statements } = readingClient([
+      {
+        TenantId: "project_1",
+        ExperimentId: "experiment_1",
+        RunId: "run_1",
+        StepIndex: "0",
+        LatestWorkflowVersionId: "version_1",
+        LatestScore: 0.75,
+        LatestLabel: "best",
+        LatestOptimizerName: "MIPROv2",
+        LatestLlmCallsTotal: 4,
+        LatestLlmCallsTotalTokens: "123",
+        LatestLlmCallsTotalCost: 0.45,
+        FirstCreatedAtMs: "1000",
+      },
+    ]);
     const repository = ClickHouseExperimentDspyRepository.create({
       resolveClient: async () => client,
       telemetry,
@@ -189,5 +201,7 @@ describe("ClickHouseExperimentDspyRepository", () => {
         createdAt: 1_000,
       },
     ]);
+    expectSingleTenantReads(statements);
+    expect(statements[0]?.sql).toContain("{{idBound:dspy_steps.ExperimentId:");
   });
 });

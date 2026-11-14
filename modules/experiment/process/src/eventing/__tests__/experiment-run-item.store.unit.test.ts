@@ -29,7 +29,7 @@ class RecordingClickHouse extends ExperimentClickHouseRepository {
       insert: async (request: Insert) => {
         this.inserts.push(request);
       },
-      query: () => Promise.reject(new Error("the item store never reads")),
+      read: () => Promise.reject(new Error("the item store never reads")),
     });
   }
 }

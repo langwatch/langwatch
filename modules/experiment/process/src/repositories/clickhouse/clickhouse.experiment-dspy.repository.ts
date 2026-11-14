@@ -1,4 +1,10 @@
-import type { IdBoundOptions } from "@langwatch/clickhouse-client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import {
+  clickhouseRead,
+  type ColumnRef,
+  fn,
+  tenantScope,
+} from "@langwatch/clickhouse-client/builder";
 import {
   experimentDspyStepSchema,
   experimentDspyStepSummarySchema,
@@ -15,6 +21,7 @@ import { z } from "zod";
 import { llmSummary, mergeByHash } from "../../rules/experiment-dspy-step.rules.ts";
 import type { ExperimentDspyRetentionRepository } from "../experiment-dspy-retention.repository.ts";
 import { ExperimentDspyRepository } from "../experiment-dspy.repository.ts";
+import { dspySteps as steps } from "./clickhouse.dspy-steps.table.ts";
 
 /**
  * Epoch millis as the value the ClickHouse client binds to a `DateTime64(3)`.
@@ -28,11 +35,7 @@ function clickHouseDateTime(epochMs: number): ReturnType<typeof toDate> {
 const TABLE_NAME = "dspy_steps";
 const experimentDspyStepSummariesSchema = experimentDspyStepSummarySchema.array();
 
-export type ExperimentDspyClickHouseResult = {
-  json(): Promise<unknown[]>;
-};
-
-export type ExperimentDspyClickHouseClient = {
+export type ExperimentDspyClickHouseClient = Pick<ClickHouseQueryClient, "read"> & {
   insert(input: {
     table: string;
     values: unknown[];
@@ -42,12 +45,6 @@ export type ExperimentDspyClickHouseClient = {
       wait_for_async_insert?: 0 | 1;
     };
   }): Promise<unknown>;
-  query(input: {
-    query: string;
-    query_params: Record<string, unknown>;
-    format: "JSONEachRow";
-    idBound?: IdBoundOptions;
-  }): Promise<ExperimentDspyClickHouseResult>;
 };
 
 type ExperimentDspyClickHouseResolver = (
@@ -72,28 +69,29 @@ const dspyRowSchema = z.object({
   Examples: z.string(),
   LlmCalls: z.string(),
   LlmCallsTotal: z.number(),
-  LlmCallsTotalTokens: z.string(),
+  LlmCallsTotalTokensText: z.string(),
   LlmCallsTotalCost: z.number(),
-  CreatedAt: z.string(),
-  InsertedAt: z.string(),
-  UpdatedAt: z.string(),
+  CreatedAtMs: z.string(),
+  InsertedAtMs: z.string(),
+  UpdatedAtMs: z.string(),
 });
 const dspyRowsSchema = z.array(dspyRowSchema);
 
+/** A step's latest values per column, under `Latest…` keys: no alias takes a column's name. */
 const dspySummaryRowsSchema = z.array(
-  dspyRowSchema.pick({
-    TenantId: true,
-    ExperimentId: true,
-    RunId: true,
-    StepIndex: true,
-    WorkflowVersionId: true,
-    Score: true,
-    Label: true,
-    OptimizerName: true,
-    LlmCallsTotal: true,
-    LlmCallsTotalTokens: true,
-    LlmCallsTotalCost: true,
-    CreatedAt: true,
+  z.object({
+    TenantId: z.string(),
+    ExperimentId: z.string(),
+    RunId: z.string(),
+    StepIndex: z.string(),
+    LatestWorkflowVersionId: z.string().nullable(),
+    LatestScore: z.number(),
+    LatestLabel: z.string(),
+    LatestOptimizerName: z.string(),
+    LatestLlmCallsTotal: z.number(),
+    LatestLlmCallsTotalTokens: z.string(),
+    LatestLlmCallsTotalCost: z.number(),
+    FirstCreatedAtMs: z.string(),
   }),
 );
 
@@ -172,34 +170,32 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
     try {
       const client = await this.options.resolveClient(input.tenantId);
       if (!client) return [];
-      const result = await client.query({
-        query: `
-          SELECT
-            TenantId,
-            ExperimentId,
-            RunId,
-            StepIndex,
-            argMax(WorkflowVersionId, UpdatedAt) AS WorkflowVersionId,
-            argMax(Score, UpdatedAt) AS Score,
-            argMax(Label, UpdatedAt) AS Label,
-            argMax(OptimizerName, UpdatedAt) AS OptimizerName,
-            argMax(LlmCallsTotal, UpdatedAt) AS LlmCallsTotal,
-            toString(argMax(LlmCallsTotalTokens, UpdatedAt)) AS LlmCallsTotalTokens,
-            argMax(LlmCallsTotalCost, UpdatedAt) AS LlmCallsTotalCost,
-            toString(toUnixTimestamp64Milli(min(CreatedAt))) AS CreatedAt
-          FROM ${TABLE_NAME} AS t
-          WHERE t.TenantId = {tenantId:String}
-            AND t.ExperimentId = {experimentId:String}
-            {{idBound:dspy_steps.ExperimentId:experimentId:t}}
-          GROUP BY TenantId, ExperimentId, RunId, StepIndex
-          ORDER BY CreatedAt ASC
-          LIMIT 10000
-        `,
-        query_params: { ...input },
-        format: "JSONEachRow",
+      const latest = <V>(of: ColumnRef<"dspy_steps", string, V>) => fn.argMax(of, steps.UpdatedAt);
+      const statement = clickhouseRead({ scope: tenantScope.single({ tenantId: input.tenantId }) })
+        .from(steps)
+        .select({
+          TenantId: steps.TenantId,
+          ExperimentId: steps.ExperimentId,
+          RunId: steps.RunId,
+          StepIndex: steps.StepIndex,
+          LatestWorkflowVersionId: latest(steps.WorkflowVersionId),
+          LatestScore: latest(steps.Score),
+          LatestLabel: latest(steps.Label),
+          LatestOptimizerName: latest(steps.OptimizerName),
+          LatestLlmCallsTotal: latest(steps.LlmCallsTotal),
+          LatestLlmCallsTotalTokens: fn.toString(latest(steps.LlmCallsTotalTokens)),
+          LatestLlmCallsTotalCost: latest(steps.LlmCallsTotalCost),
+          FirstCreatedAtMs: fn.toString(fn.toUnixTimestamp64Milli(fn.min(steps.CreatedAt))),
+        })
+        .where(({ idBound }) => idBound(steps.ExperimentId, input.experimentId))
+        .groupBy(steps.TenantId, steps.ExperimentId, steps.RunId, steps.StepIndex)
+        .orderBy(fn.min(steps.CreatedAt), "ASC")
+        .limit(10_000)
+        .build();
+      const { rows: found } = await client.read({
+        statement,
         idBound: { fallback: "unbounded" },
       });
-      const found = await result.json();
       const rows = dspySummaryRowsSchema.parse(found);
       return experimentDspyStepSummariesSchema.parse(
         rows.map((row) => ({
@@ -207,14 +203,14 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
           experimentId: row.ExperimentId,
           runId: row.RunId,
           stepIndex: row.StepIndex,
-          workflowVersionId: row.WorkflowVersionId,
-          score: row.Score,
-          label: row.Label,
-          optimizerName: row.OptimizerName,
-          llmCallsTotal: row.LlmCallsTotal,
-          llmCallsTotalTokens: Number(row.LlmCallsTotalTokens),
-          llmCallsTotalCost: row.LlmCallsTotalCost,
-          createdAt: Number(row.CreatedAt),
+          workflowVersionId: row.LatestWorkflowVersionId,
+          score: row.LatestScore,
+          label: row.LatestLabel,
+          optimizerName: row.LatestOptimizerName,
+          llmCallsTotal: row.LatestLlmCallsTotal,
+          llmCallsTotalTokens: Number(row.LatestLlmCallsTotalTokens),
+          llmCallsTotalCost: row.LatestLlmCallsTotalCost,
+          createdAt: Number(row.FirstCreatedAtMs),
         })),
       );
     } catch (error) {
@@ -249,50 +245,40 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
     input: ExperimentDspyStepLookup;
   }): Promise<ExperimentDspyStep | null> {
     const { tenantId, experimentId, runId, stepIndex } = input;
-    const result = await client.query({
-      query: `
-        SELECT
-          t.TenantId AS TenantId,
-          t.ExperimentId AS ExperimentId,
-          t.RunId AS RunId,
-          t.StepIndex AS StepIndex,
-          t.WorkflowVersionId AS WorkflowVersionId,
-          t.Score AS Score,
-          t.Label AS Label,
-          t.OptimizerName AS OptimizerName,
-          t.OptimizerParameters AS OptimizerParameters,
-          t.Predictors AS Predictors,
-          t.Examples AS Examples,
-          t.LlmCalls AS LlmCalls,
-          t.LlmCallsTotal AS LlmCallsTotal,
-          toString(t.LlmCallsTotalTokens) AS LlmCallsTotalTokens,
-          t.LlmCallsTotalCost AS LlmCallsTotalCost,
-          toString(toUnixTimestamp64Milli(t.CreatedAt)) AS CreatedAt,
-          toString(toUnixTimestamp64Milli(t.InsertedAt)) AS InsertedAt,
-          toString(toUnixTimestamp64Milli(t.UpdatedAt)) AS UpdatedAt
-        FROM ${TABLE_NAME} AS t
-        WHERE t.TenantId = {tenantId:String}
-          AND t.ExperimentId = {experimentId:String}
-          AND t.RunId = {runId:String}
-          AND t.StepIndex = {stepIndex:String}
-          {{idBound:dspy_steps.ExperimentId,RunId:experimentId,runId:t}}
-          AND (t.TenantId, t.ExperimentId, t.RunId, t.StepIndex, t.UpdatedAt) IN (
-            SELECT TenantId, ExperimentId, RunId, StepIndex, max(UpdatedAt)
-            FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
-              AND ExperimentId = {experimentId:String}
-              AND RunId = {runId:String}
-              AND StepIndex = {stepIndex:String}
-              {{idBound:dspy_steps.ExperimentId,RunId:experimentId,runId}}
-            GROUP BY TenantId, ExperimentId, RunId, StepIndex
-          )
-        LIMIT 1
-      `,
-      query_params: { tenantId, experimentId, runId, stepIndex },
-      format: "JSONEachRow",
-      idBound: { fallback: "unbounded" },
-    });
-    const found = await result.json();
+    const millisText = (of: ColumnRef<"dspy_steps", string, number>) =>
+      fn.toString(fn.toUnixTimestamp64Milli(of));
+    const statement = clickhouseRead({ scope: tenantScope.single({ tenantId }) })
+      .from(steps)
+      .select({
+        TenantId: steps.TenantId,
+        ExperimentId: steps.ExperimentId,
+        RunId: steps.RunId,
+        StepIndex: steps.StepIndex,
+        WorkflowVersionId: steps.WorkflowVersionId,
+        Score: steps.Score,
+        Label: steps.Label,
+        OptimizerName: steps.OptimizerName,
+        OptimizerParameters: steps.OptimizerParameters,
+        Predictors: steps.Predictors,
+        Examples: steps.Examples,
+        LlmCalls: steps.LlmCalls,
+        LlmCallsTotal: steps.LlmCallsTotal,
+        LlmCallsTotalTokensText: fn.toString(steps.LlmCallsTotalTokens),
+        LlmCallsTotalCost: steps.LlmCallsTotalCost,
+        CreatedAtMs: millisText(steps.CreatedAt),
+        InsertedAtMs: millisText(steps.InsertedAt),
+        UpdatedAtMs: millisText(steps.UpdatedAt),
+      })
+      .where(({ and, eq, idBoundKeys }) =>
+        and(
+          idBoundKeys([steps.ExperimentId, experimentId], [steps.RunId, runId]),
+          eq(steps.StepIndex, stepIndex),
+        ),
+      )
+      .latestVersion()
+      .limit(1)
+      .build();
+    const { rows: found } = await client.read({ statement, idBound: { fallback: "unbounded" } });
     const row = dspyRowsSchema.parse(found)[0];
     if (!row) return null;
     return {
@@ -308,9 +294,9 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
       predictors: JSON.parse(row.Predictors),
       examples: JSON.parse(row.Examples),
       llmCalls: JSON.parse(row.LlmCalls),
-      createdAt: Number(row.CreatedAt),
-      insertedAt: Number(row.InsertedAt),
-      updatedAt: Number(row.UpdatedAt),
+      createdAt: Number(row.CreatedAtMs),
+      insertedAt: Number(row.InsertedAtMs),
+      updatedAt: Number(row.UpdatedAtMs),
     };
   }
 }

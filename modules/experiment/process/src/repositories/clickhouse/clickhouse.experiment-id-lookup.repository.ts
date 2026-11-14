@@ -1,7 +1,8 @@
+import { clickhouseRead, tenantScope } from "@langwatch/clickhouse-client/builder";
+
 import type { ExperimentClickHouseRepository } from "../experiment-clickhouse.repository.ts";
 import { ExperimentIdLookupRepository } from "../experiment-id-lookup.repository.ts";
-
-const TABLE_NAME = "experiment_runs" as const;
+import { experimentRuns as runs } from "./clickhouse.experiment-runs.table.ts";
 
 /**
  * Backs `experimentMetricsSync`'s late-bound lookup (see pipelineRegistry.ts,
@@ -27,22 +28,14 @@ export class ClickHouseExperimentIdLookupRepository extends ExperimentIdLookupRe
     runId: string;
   }): Promise<string | null> {
     const client = await this.clickhouse.resolveClient(tenantId);
-    const result = await client.query({
-      query: `
-        SELECT ExperimentId
-        FROM ${TABLE_NAME}
-        WHERE TenantId = {tenantId:String}
-          AND RunId = {runId:String}
-          {{idBound:experiment_runs.RunId:runId}}
-        ORDER BY UpdatedAt DESC
-        LIMIT 1
-      `,
-      query_params: { tenantId, runId },
-      format: "JSONEachRow",
-      idBound: { fallback: "unbounded" },
-    });
-
-    const rows = await result.json<{ ExperimentId: string }>();
+    const statement = clickhouseRead({ scope: tenantScope.single({ tenantId }) })
+      .from(runs)
+      .select({ ExperimentId: runs.ExperimentId })
+      .where(({ idBound }) => idBound(runs.RunId, runId))
+      .orderBy(runs.UpdatedAt, "DESC")
+      .limit(1)
+      .build();
+    const { rows } = await client.read({ statement, idBound: { fallback: "unbounded" } });
     return rows[0]?.ExperimentId ?? null;
   }
 }
