@@ -1173,20 +1173,20 @@ type Response = unknown;
 
 |             |                                         |
 | ----------- | --------------------------------------- |
-| Declared at | `src/transport/otlp-ingest.rest.ts:272` |
+| Declared at | `src/transport/otlp-ingest.rest.ts:278` |
 | Base URL    | none: each route's path is its address  |
 | Addressing  | literal                                 |
 | Credential  | otlp_ingest                             |
 
 #### `POST /api/otel/v1/traces` · `ingestOtlpTraces`
 
-Authenticated: the OTLP ingest door's resolved key is the whole gate, as on main. Credential `otlp_ingest`. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:278`.
+Authenticated: the OTLP ingest door's resolved key is the whole gate, as on main. Credential `otlp_ingest`. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:284`.
 
 Answers at `/api/otel/v1/traces`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:282)
-// Response: inline, src/transport/otlp-ingest.rest.ts:285
+// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:288)
+// Response: inline, src/transport/otlp-ingest.rest.ts:291
 type Response = unknown;
 ```
 

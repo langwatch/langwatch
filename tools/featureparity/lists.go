@@ -71,6 +71,7 @@ var (
 		"tools/charts3region",
 		"tools/suiteweights",
 		"tools/matrixseed",
+		"cmd/matrixseed",
 		"cmd/linkcheck",
 		"tools/docscheck",
 		"cmd/service",

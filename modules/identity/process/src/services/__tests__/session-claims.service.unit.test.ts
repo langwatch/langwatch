@@ -75,6 +75,7 @@ describe("SessionClaimsService.claimsForMint", () => {
           providerAccountId: "ada-subject",
           normalizedValue: "ada@acme.test",
           occurredAtMs: account.createdAtMs,
+          storedIdentifierIds: new Set(),
         }),
       );
     });
