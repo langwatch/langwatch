@@ -602,6 +602,7 @@ export const APP_ERROR_CODES = [
   "model_provider_scopes_required",
   "model_provider_skip_permissions_pattern_invalid",
   "model_provider_test_rate_limited",
+  "model_provider_unavailable",
   "model_restricted_for_execution",
   "model_restricted_for_feature",
   "monitor_check_settings_invalid",
