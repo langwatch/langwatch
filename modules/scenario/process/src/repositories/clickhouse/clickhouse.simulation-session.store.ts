@@ -1,20 +1,8 @@
 import type { ClickHouseSettings } from "@clickhouse/client";
-import {
-  type ClickHouseColumns,
-  type ClickHouseQueryClient,
-  type IdBoundOptions,
-} from "@langwatch/clickhouse-client";
+import { type ClickHouseColumns, type ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { SecurityError } from "@langwatch/eventing";
 
 type SimulationEventingClickHouseClient = {
-  query(input: {
-    query: string;
-    query_params: Record<string, unknown>;
-    format: "JSONEachRow";
-    clickhouse_settings?: ClickHouseSettings;
-    /** For a statement carrying `{{idBound}}`: a time the caller has, and today's fallback. */
-    idBound?: IdBoundOptions;
-  }): Promise<{ json<Row>(): Promise<Row[]> }>;
   insert(input: {
     table: string;
     values: readonly Readonly<Record<string, unknown>>[];
@@ -42,20 +30,6 @@ export class ClickHouseSimulationSession implements SimulationEventingClickHouse
 
   static resolver(clickhouse: ClickHouseQueryClient): SimulationEventingClickHouseResolver {
     return (tenantId) => Promise.resolve(new ClickHouseSimulationSession(clickhouse, tenantId));
-  }
-
-  async query(
-    input: Parameters<SimulationEventingClickHouseClient["query"]>[0],
-  ): Promise<{ json<Row>(): Promise<Row[]> }> {
-    const request = {
-      tenantId: this.tenantId,
-      sql: input.query,
-      params: input.query_params,
-      ...(input.clickhouse_settings ? { settings: settingsOf(input.clickhouse_settings) } : {}),
-      ...(input.idBound === undefined ? {} : { idBound: input.idBound }),
-    };
-
-    return { json: async <Row>() => (await this.clickhouse.query<Row>(request)).rows };
   }
 
   /** Sends a built statement only when it is this session's tenant's, else refuses by name. */
