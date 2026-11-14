@@ -169,11 +169,31 @@ describe("the Agents page reading the organization's agents", () => {
 
   describe("given the agents read fails", () => {
     /** @scenario "A failed agents read says so instead of claiming there are no agents" */
-    it("shows an alert saying the agents could not be loaded", () => {
+    it("shows only the alert, with no empty state and no register action in the pane", () => {
       harness.list = { data: undefined, isLoading: false, error: new Error("read failed") };
       renderPage();
 
       expect(screen.getByRole("alert")).toHaveTextContent("Couldn't load agents");
+      expect(screen.queryByTestId("agents-empty")).toBeNull();
+      expect(screen.queryByText("No agents registered yet")).toBeNull();
+      // The header's own Register agent stays; the pane must not add a second.
+      expect(screen.getAllByRole("button", { name: /Register agent/ })).toHaveLength(1);
+    });
+  });
+
+  describe("given agents were read and a later refresh fails", () => {
+    /** @scenario "A failed refresh keeps the agents already on screen beside the alert" */
+    it("keeps listing the agents it already had and shows the alert above them", () => {
+      harness.list = {
+        data: SAMPLE_AGENT_ROWS,
+        isLoading: false,
+        error: new Error("refresh failed"),
+      };
+      renderPage();
+
+      expect(screen.getByRole("alert")).toHaveTextContent("Couldn't load agents");
+      expect(rowNames()).toHaveLength(SAMPLE_AGENT_ROWS.length);
+      expect(screen.queryByTestId("agents-empty")).toBeNull();
     });
   });
 });

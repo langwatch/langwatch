@@ -1,0 +1,90 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+// @vitest-environment jsdom
+/**
+ * The all-teams page: what its panel says when the team activity read
+ * answers, answers with nothing, or fails.
+ *
+ * Only the tRPC client is doubled.
+ *
+ * Spec: specs/ai-governance/dashboard/teams-list-page.feature
+ */
+import "@testing-library/jest-dom/vitest";
+import { cleanup, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const harness = vi.hoisted(() => ({
+  teams: { data: undefined as unknown, isLoading: false, error: null as unknown },
+}));
+
+vi.mock("../../../../behavior/governance-api.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof governanceApiModule>()),
+  api: {
+    activityMonitor: {
+      spendByTeam: { useQuery: () => ({ ...harness.teams, refetch: vi.fn() }) },
+    },
+  },
+}));
+
+import type * as governanceApiModule from "../../../../behavior/governance-api.ts";
+import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../../testing.tsx";
+import TeamsListPage from "../governance-teams.screen.tsx";
+
+const TEAM = {
+  teamId: "team-1",
+  teamName: "Platform",
+  spendUsd: 12.5,
+  requestCount: 340,
+  lastActivityIso: new Date().toISOString(),
+  sourceCount: 2,
+  deltaPctVsPriorWindow: 0,
+  hasPriorBaseline: false,
+};
+
+const renderPage = () =>
+  renderWithGovernanceHost(<TeamsListPage />, {
+    host: fakeGovernanceHost({ permissions: ["governance:view", "activityMonitor:view"] }),
+  });
+
+beforeEach(() => {
+  harness.teams = { data: undefined, isLoading: false, error: null };
+});
+
+afterEach(() => cleanup());
+
+describe("the all-teams page reading team activity", () => {
+  describe("given the team activity read fails", () => {
+    /** @scenario "A failed team activity read shows only the failure" */
+    it("shows the alert and no empty state, no table and no team count", () => {
+      harness.teams = { data: undefined, isLoading: false, error: new Error("read failed") };
+      renderPage();
+
+      expect(screen.getByRole("alert")).toHaveTextContent("Couldn't load team activity");
+      expect(screen.queryByText("Team activity could not be read.")).toBeNull();
+      expect(screen.queryByText("No team activity this window.")).toBeNull();
+      expect(screen.queryByText(/teams? shown/)).toBeNull();
+    });
+  });
+
+  describe("given teams were read and a later refresh fails", () => {
+    /** @scenario "A failed refresh keeps the teams already shown beside the alert" */
+    it("keeps the teams it already had and shows the alert above them", () => {
+      harness.teams = { data: [TEAM], isLoading: false, error: new Error("refresh failed") };
+      renderPage();
+
+      expect(screen.getByRole("alert")).toHaveTextContent("Couldn't load team activity");
+      expect(screen.getByText("Platform")).toBeInTheDocument();
+      expect(screen.getByText("1 team shown.")).toBeInTheDocument();
+    });
+  });
+
+  describe("given the read answers with no teams", () => {
+    /** @scenario "A window with no team activity says so" */
+    it("says there was no team activity this window", () => {
+      harness.teams = { data: [], isLoading: false, error: null };
+      renderPage();
+
+      expect(screen.getByText("No team activity this window.")).toBeInTheDocument();
+      expect(screen.queryByRole("alert")).toBeNull();
+    });
+  });
+});

@@ -133,12 +133,22 @@ function TeamSpendPanel({
   const isLoading = teamsQuery.isLoading;
   const isEmpty = !isLoading && teams.length === 0;
   const hasRows = !isLoading && teams.length > 0;
+  const alert = teamsQuery.error ? (
+    <HandledErrorAlert
+      error={teamsQuery.error}
+      fallbackTitle="Couldn't load team activity"
+      onRetry={() => void teamsQuery.refetch()}
+    />
+  ) : null;
+
+  // A failed read with no rows already on screen is only the failure: an
+  // empty card and "0 teams shown" would claim an answer the read never gave.
+  // A failed refresh keeps the rows it had, under the alert.
+  if (teamsQuery.error && !hasRows) return alert;
 
   return (
     <>
-      {teamsQuery.error ? (
-        <HandledErrorAlert error={teamsQuery.error} fallbackTitle="Couldn't load team activity" />
-      ) : null}
+      {alert}
 
       <Card variant="showcase" padding="none" bodyLayout="stack">
         {isLoading && (
@@ -149,11 +159,7 @@ function TeamSpendPanel({
         {isEmpty && (
           <NoDataInfoBlock
             icon={<Users />}
-            title={
-              teamsQuery.error
-                ? "Team activity could not be read."
-                : "No team activity this window."
-            }
+            title="No team activity this window."
             description="Team spend and requests appear here once connected sources report activity."
           />
         )}
