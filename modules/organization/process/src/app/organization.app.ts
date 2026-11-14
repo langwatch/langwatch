@@ -124,6 +124,7 @@ import {
   type PendingInvitationsForCaller,
   type SignUpVerdict,
   type SignInSecurityPolicy,
+  type DocsPlaygroundPolicy,
   type OrganizationApiSeatCheckoutInput,
   type OrganizationSeatCheckoutRedirect,
   type OrganizationAdmission,
@@ -861,6 +862,34 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
 
   getSessionPolicy(input: { organizationId: string }): Promise<{ maxSessionDurationDays: number }> {
     return this.#dependencies.signInPolicies.getSessionPolicy(input);
+  }
+
+  getDocsPlaygroundPolicy(input: { organizationId: string }): Promise<DocsPlaygroundPolicy> {
+    return this.#dependencies.signInPolicies.getDocsPlaygroundPolicy(input);
+  }
+
+  /**
+   * Off records the fact api-key revokes every live docs session key on (ADR-185), so turning
+   * it on again revives none of them. The record is awaited: a lost one would leave keys live.
+   */
+  async saveDocsPlaygroundPolicy({
+    organizationId,
+    docsPlaygroundSessionsEnabled,
+    changedByUserId = null,
+  }: {
+    organizationId: string;
+    docsPlaygroundSessionsEnabled: boolean;
+    changedByUserId?: string | null;
+  }): Promise<void> {
+    await this.#dependencies.signInPolicies.saveDocsPlaygroundPolicy({
+      organizationId,
+      docsPlaygroundSessionsEnabled,
+    });
+    if (docsPlaygroundSessionsEnabled) return;
+    await this.#infrastructure.lifecycle.docsPlaygroundSessionsDisabled({
+      organizationId,
+      changedByUserId,
+    });
   }
 
   getSignInSecurityPolicy(input: { organizationId: string }): Promise<SignInSecurityPolicy> {

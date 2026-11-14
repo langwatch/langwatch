@@ -262,6 +262,7 @@ export const APP_ERROR_CODES = [
   "developer_seat_restricted",
   "developer_seats_unavailable",
   "docs_origin_not_registered",
+  "docs_playground_sessions_disabled",
   "dspy_step_not_found",
   "duplicate_invite",
   "email_already_registered",

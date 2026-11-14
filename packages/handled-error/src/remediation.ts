@@ -369,6 +369,12 @@ const registry = {
       "A self-hosted installation registers more documentation sites in its configuration",
     ],
   },
+  docs_playground_sessions_disabled: {
+    tips: [
+      "Paste an API key into the playground instead",
+      "An organisation admin can turn docs playground sessions back on under Settings, Authentication",
+    ],
+  },
   api_key_reserved_name: {
     tips: [
       "This name is reserved for keys LangWatch manages on your behalf; pick a different name",

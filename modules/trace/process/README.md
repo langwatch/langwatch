@@ -1333,7 +1333,7 @@ Permission `traces:view`. Declared at `src/transport/traces.rest.ts:339`.
 Answers at `/api/traces/facets`, `/api/v1/traces/facets`; also, undocumented, `/api/traces/2026-08-07/facets`, `/api/v1/traces/2026-08-07/facets`, `/api/traces/latest/facets`, `/api/v1/traces/latest/facets`.
 
 ```typescript
-// Query: traceFacetsQuerySchema, ../contract/src/trace-rest.schemas.ts:429
+// Query: traceFacetsQuerySchema, ../contract/src/trace-rest.schemas.ts:430
 interface Query {
   field?: string;
   prefix?: string;
@@ -1342,7 +1342,7 @@ interface Query {
   startDate?: string;
   endDate?: string;
 }
-// Response: traceFacetsResponseSchema, ../contract/src/trace-rest.schemas.ts:454
+// Response: traceFacetsResponseSchema, ../contract/src/trace-rest.schemas.ts:455
 type Response = Record<string, unknown>;
 ```
 

@@ -414,7 +414,8 @@ const facetWindowBoundSchema = z
     (value) =>
       EPOCH_MILLIS.test(value) || (namesARealDay(value) && Number.isFinite(toEpochMs(value))),
     { message: "Expected epoch milliseconds or a date string" },
-  );
+  )
+  .describe("Epoch milliseconds, or an ISO 8601 date string.");
 
 /** `GET /api/v1/traces/facets`: with `field`, one field's values, paged. */
 const traceFacetsQuerySchemaDefinition = z.object({

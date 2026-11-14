@@ -5,31 +5,51 @@ import { prepareReadingLayout } from "./reading-layout.ts";
 import { startTagManager } from "./tag-manager.ts";
 
 let scheduled = false;
+let lastCurrent: string | undefined;
+
+/** What a scroll frame needs, measured once per layout instead of on every frame. */
+type Rail = { path: SVGPathElement; spans: { start: number; end: number }[]; total: number };
+type Layout = {
+  links: HTMLAnchorElement[];
+  headings: HTMLElement[];
+  ticks: { tick: HTMLAnchorElement; heading: HTMLElement | null }[];
+  rails: Rail[];
+};
+let layout: Layout = { links: [], headings: [], ticks: [], rails: [] };
+
+function idOf({ link }: { link: HTMLAnchorElement }) {
+  return decodeURIComponent(link.hash.slice(1));
+}
+
+/** Reads every position first, then writes: one layout per frame, no writes when nothing moved. */
 function updateToc() {
   scheduled = false;
-  const links = [...document.querySelectorAll<HTMLAnchorElement>("[data-docs-toc] a")];
-  const headings = links
-    .map((link) => document.getElementById(decodeURIComponent(link.hash.slice(1))))
-    .filter((node) => node !== null);
-  let current = headings[0]?.id;
-  for (const heading of headings) {
-    if (heading.getBoundingClientRect().top <= innerHeight * 0.25) current = heading.id;
+  const line = innerHeight * 0.25;
+  let current = layout.headings[0]?.id;
+  for (const heading of layout.headings) {
+    if (heading.getBoundingClientRect().top <= line) current = heading.id;
   }
-  for (const link of links) {
-    if (decodeURIComponent(link.hash.slice(1)) === current)
-      link.setAttribute("aria-current", "location");
-    else link.removeAttribute("aria-current");
-  }
-  document.querySelectorAll<HTMLElement>(".docs-toc-rail").forEach(updateProgress);
+  const passed = layout.ticks.map(
+    ({ heading }) => heading !== null && heading.getBoundingClientRect().top <= line,
+  );
   const scrollable = document.documentElement.scrollHeight - innerHeight;
   const progress = scrollable > 0 ? Math.min(1, scrollY / scrollable) : 1;
   document.documentElement.style.setProperty("--docs-progress", progress.toFixed(4));
-  const title = headings.find((heading) => heading.id === current)?.textContent?.trim() ?? "";
+  if (current === lastCurrent) return;
+  lastCurrent = current;
+  for (const link of layout.links) {
+    if (idOf({ link }) === current) link.setAttribute("aria-current", "location");
+    else link.removeAttribute("aria-current");
+  }
+  const index = layout.links.findIndex((link) => idOf({ link }) === current);
+  for (const rail of layout.rails) paintProgress({ rail, index });
+  const title =
+    layout.headings.find((heading) => heading.id === current)?.textContent?.trim() ?? "";
   document.querySelectorAll(".docs-toc-current").forEach((label) => {
     if (label.textContent !== title) label.textContent = title;
   });
+  markTrack({ current, passed });
   revealActive();
-  markTrack({ current });
 }
 
 /** Keeps the pinned contents rail's current entry in view as the reader scrolls. */
@@ -55,7 +75,7 @@ function buildTrack() {
   track.setAttribute("aria-label", "Reading position");
   const total = document.documentElement.scrollHeight;
   for (const section of sections) {
-    const heading = document.getElementById(decodeURIComponent(section.hash.slice(1)));
+    const heading = document.getElementById(idOf({ link: section }));
     if (!heading) continue;
     const tick = document.createElement("a");
     tick.href = section.hash;
@@ -67,56 +87,82 @@ function buildTrack() {
   (document.querySelector(".docs-shell") ?? document.body).append(track);
 }
 
-function markTrack({ current }: { current?: string }) {
-  const ticks = document.querySelectorAll<HTMLAnchorElement>(".docs-progress-track a");
+function markTrack({ current, passed }: { current?: string; passed: boolean[] }) {
   let marked: HTMLAnchorElement | null = null;
-  for (const tick of ticks) {
-    tick.removeAttribute("aria-current");
-    const heading = document.getElementById(decodeURIComponent(tick.hash.slice(1)));
-    if (heading && heading.getBoundingClientRect().top <= innerHeight * 0.25) marked = tick;
-    if (decodeURIComponent(tick.hash.slice(1)) === current) marked = tick;
+  for (const [index, { tick }] of layout.ticks.entries()) {
+    if (passed[index]) marked = tick;
+    if (idOf({ link: tick }) === current) marked = tick;
   }
-  marked?.setAttribute("aria-current", "location");
+  for (const { tick } of layout.ticks) {
+    if (tick === marked) tick.setAttribute("aria-current", "location");
+    else tick.removeAttribute("aria-current");
+  }
 }
-function updateProgress(rail: HTMLElement) {
+
+/** Draws a rail's curve once and records where each entry starts and ends along it. */
+function measureRail(rail: HTMLElement): Rail | null {
   const track = rail.querySelector<HTMLElement>(".docs-toc-track");
   const svg = rail.querySelector<SVGSVGElement>(".docs-toc-progress");
   const path = svg?.querySelector<SVGPathElement>(".docs-toc-path");
   const guide = svg?.querySelector<SVGPathElement>(".docs-toc-guide");
-  if (!track || !svg || !path || !guide) return;
+  if (!track || !svg || !path || !guide) return null;
   const links = [...track.querySelectorAll<HTMLElement>("a")];
   const bounds = track.getBoundingClientRect();
-  if (bounds.height <= 0) return;
+  if (bounds.height <= 0) return null;
   const entries = links.map((link) => ({
     x: link.dataset.nested === "true" ? 16 : 4,
     y: link.getBoundingClientRect().top - bounds.top + 4,
     height: Math.max(0, link.offsetHeight - 8),
   }));
   let previous: { x: number; y: number } | null = null;
-  let activeStartShape = "";
-  let activeEndShape = "";
   const commands: string[] = [];
-  entries.forEach((entry, index) => {
+  const shapes: { start: string; end: string }[] = [];
+  for (const entry of entries) {
     if (previous) {
       const middle = (previous.y + entry.y) / 2;
       commands.push(`C ${previous.x} ${middle} ${entry.x} ${middle} ${entry.x} ${entry.y}`);
     } else commands.push(`M ${entry.x} ${entry.y}`);
-    const active = links[index]?.getAttribute("aria-current") === "location";
-    if (active) activeStartShape = commands.join(" ");
+    const start = commands.join(" ");
     commands.push(`L ${entry.x} ${entry.y + entry.height}`);
-    if (active) activeEndShape = commands.join(" ");
+    shapes.push({ start, end: commands.join(" ") });
     previous = { x: entry.x, y: entry.y + entry.height };
-  });
+  }
   svg.setAttribute("viewBox", `0 0 28 ${bounds.height}`);
+  const length = ({ d }: { d: string }) => {
+    guide.setAttribute("d", d);
+    return guide.getTotalLength();
+  };
+  const spans = shapes.map((shape) => ({
+    start: length({ d: shape.start }),
+    end: length({ d: shape.end }),
+  }));
   const shape = commands.join(" ");
-  guide.setAttribute("d", activeStartShape);
-  const activeStart = activeStartShape ? guide.getTotalLength() : 0;
-  guide.setAttribute("d", activeEndShape);
-  const activeEnd = activeEndShape ? guide.getTotalLength() : 0;
-  guide.setAttribute("d", shape);
+  const total = length({ d: shape });
   if (path.getAttribute("d") !== shape) path.setAttribute("d", shape);
-  path.style.strokeDasharray = `0 ${activeStart} ${activeEnd - activeStart} ${guide.getTotalLength()}`;
-  path.style.strokeDashoffset = "0";
+  return { path, spans, total };
+}
+
+function paintProgress({ rail, index }: { rail: Rail; index: number }) {
+  const span = rail.spans[index] ?? { start: 0, end: 0 };
+  rail.path.style.strokeDasharray = `0 ${span.start} ${span.end - span.start} ${rail.total}`;
+  rail.path.style.strokeDashoffset = "0";
+}
+
+/** Re-measures after anything that moves headings: a page swap, a resize, fonts arriving. */
+function measure() {
+  const links = [...document.querySelectorAll<HTMLAnchorElement>("[data-docs-toc] a")];
+  const headings = links
+    .map((link) => document.getElementById(idOf({ link })))
+    .filter((node) => node !== null);
+  buildTrack();
+  const ticks = [...document.querySelectorAll<HTMLAnchorElement>(".docs-progress-track a")].map(
+    (tick) => ({ tick, heading: document.getElementById(idOf({ link: tick })) }),
+  );
+  const rails = [...document.querySelectorAll<HTMLElement>(".docs-toc-rail")]
+    .map(measureRail)
+    .filter((rail) => rail !== null);
+  layout = { links, headings, ticks, rails };
+  lastCurrent = undefined;
 }
 
 /** After a # link's scroll settles, the heading it reached glints once so the eye finds it. */
@@ -156,7 +202,7 @@ export function installToc() {
     { passive: true },
   );
   const refresh = () => {
-    buildTrack();
+    measure();
     updateToc();
   };
   document.addEventListener("docs:navigated", refresh);

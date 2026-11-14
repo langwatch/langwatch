@@ -32,6 +32,8 @@ export type EnterpriseLockProps = {
   /** Shown after the lock's own buttons, such as a "Not now" in a popover. */
   extraActions?: ReactNode;
   compact?: boolean;
+  /** Inside a card that already draws the surface: the lock draws no box of its own. */
+  inset?: boolean;
   /** `line` is one quiet sentence on a page the feature only adds to, such as Users: the title
    * and the way forward or who to ask, without the description. */
   variant?: "card" | "line";
@@ -82,13 +84,14 @@ export function EnterpriseLock({
   canSeePlans,
   extraActions,
   compact = false,
+  inset = false,
   variant = "card",
   "data-testid": testId,
 }: EnterpriseLockProps) {
   const { isSaaS } = useUiDeployment();
   const copy = enterpriseLockCopy({ feature, description, isSaaS, canManage, canSeePlans });
   if (variant === "line") return <EnterpriseLockLine copy={copy} testId={testId} />;
-  const size = compact ? "xs" : "sm";
+  const size = compact || inset ? "xs" : "sm";
   const own = lockActions({ actions: copy.actions, size });
   const actions =
     own || extraActions ? (
@@ -101,13 +104,14 @@ export function EnterpriseLock({
     <AccessState
       kind="upgrade"
       compact={compact}
+      inset={inset}
       title={copy.title}
       description={copy.description}
       actions={actions}
       data-testid={testId}
     />
   );
-  return compact ? lock : <Box paddingTop={4}>{lock}</Box>;
+  return compact || inset ? lock : <Box paddingTop={4}>{lock}</Box>;
 }
 
 function lockActions({

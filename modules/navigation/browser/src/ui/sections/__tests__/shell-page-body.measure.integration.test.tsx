@@ -1,6 +1,6 @@
 /**
  * @vitest-environment jsdom
- * Settings page bodies read in one centred column under a full-width header, forms and
+ * Settings page bodies read in one column on the header's edge under a full-width header, forms and
  * tables alike.
  */
 
@@ -49,7 +49,7 @@ describe("given a settings page", () => {
       "/settings/api-keys",
       "/settings/audit-log",
       "/settings/model-providers",
-    ])("frames %s in the one centred settings column", (pathname) => {
+    ])("frames %s in the one settings column", (pathname) => {
       expect(measureAt({ pathname })).toBe("1248px");
     });
   });

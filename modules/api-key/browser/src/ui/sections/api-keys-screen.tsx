@@ -625,9 +625,10 @@ export default function ApiKeysScreen() {
           {/* Personal + service keys (ingestSourceType == null); the page heading titles them. */}
           {!isLoadingKeys && serviceApiKeys.length === 0 && legacyKeys.keys.length === 0 ? (
             <NoDataInfoBlock
+              size="inline"
               title="No API keys"
               description="Create one to get started."
-              icon={<Key size={24} />}
+              icon={<Key size={20} />}
               testId="api-keys-empty"
             />
           ) : (

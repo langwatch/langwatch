@@ -42,6 +42,7 @@ import {
   apiKeyServerConfig,
   docsOriginsOf,
   type ApiKeyServerConfig,
+  type DocsSessionAvailability,
   type DocsSessionKeyMinted,
   type DocsSessionRevoked,
   type MintDocsSessionKeyInput,
@@ -72,6 +73,10 @@ import {
 } from "@langwatch/secrets";
 import type { Instant } from "@langwatch/time";
 
+import {
+  buildDocsPlaygroundRevocationPipeline,
+  type DocsPlaygroundRevocationPipeline,
+} from "../eventing/docs-playground-revocation.pipeline.ts";
 import type { ApiKeyRepositories } from "../repositories/api-key.repositories.ts";
 import { AgentSandboxKeyService } from "../services/agent-sandbox-key.service.ts";
 import { ApiKeyTokenService } from "../services/api-key-token.service.ts";
@@ -343,8 +348,15 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
   mintDocsSessionKey(input: MintDocsSessionKeyInput): Promise<DocsSessionKeyMinted> {
     return this.#docsSessionKeys.mint(input);
   }
+  getDocsSessionAvailability(input: { projectId: string }): Promise<DocsSessionAvailability> {
+    return this.#docsSessionKeys.availability(input);
+  }
   revokeDocsSessionKeys(input: RevokeDocsSessionKeysInput): Promise<DocsSessionRevoked> {
     return this.#docsSessionKeys.revoke(input);
+  }
+  /** Revokes an organisation's docs session keys once it turns the playground session off. */
+  docsPlaygroundRevocationPipeline(): DocsPlaygroundRevocationPipeline {
+    return buildDocsPlaygroundRevocationPipeline({ docsSessionKeys: this.#docsSessionKeys });
   }
   async resolveOrganizationToken(
     input: OrganizationApiKeyResolutionInput,

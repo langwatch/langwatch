@@ -146,6 +146,7 @@ export function Tabs({ children }: { children?: ReactNode }) {
           paddingTop="4"
           paddingBottom={{ base: "4", sm: "5" }}
           data-docs-panel=""
+          data-docs-findable=""
         >
           {tab.content}
         </ChakraTabs.Content>
