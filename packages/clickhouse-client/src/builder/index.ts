@@ -25,14 +25,26 @@ export {
   aliasOf,
   defineClickHouseTable,
   SERVER_METADATA_TABLES,
+  SYSTEM_IDENTITY_TABLES,
+  systemIdentityTable,
   systemTable,
   type ClickHouseTable,
   type ClickHouseTableFacts,
   type ColumnsSpec,
   type ServerMetadataTableName,
+  type SystemIdentityTableName,
   type TableKind,
 } from "./table.ts";
-export { systemColumns, systemReplicas, systemServerSettings } from "./system-tables.ts";
+export {
+  systemBackupLog,
+  systemColumns,
+  systemDisks,
+  systemMutations,
+  systemParts,
+  systemReplicas,
+  systemServerSettings,
+  systemTables,
+} from "./system-tables.ts";
 export { boundRows, type BoundRowColumns } from "./bound-rows.ts";
 export {
   column,

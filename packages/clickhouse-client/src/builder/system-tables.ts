@@ -1,10 +1,10 @@
 /**
- * The server-metadata system tables (ADR-202): the only tables a `tenantScope.serverMetadata`
- * read names. None holds tenant rows; query_log, processes, mutations, query_views_log,
- * text_log, parts and disks are deliberately absent, and `from` refuses any table not listed.
+ * The system tables a typed read names (ADR-202): columns, replicas and server settings on the
+ * reader with no tenant setting; parts, disks, tables, backup_log and mutations only on the system
+ * identity. query_log, processes, query_views_log and text_log are on neither list.
  */
 import { column } from "./expression.ts";
-import { systemTable } from "./table.ts";
+import { systemIdentityTable, systemTable } from "./table.ts";
 
 export const systemColumns = systemTable({
   name: "system.columns",
@@ -37,5 +37,60 @@ export const systemServerSettings = systemTable({
     name: column.string(),
     value: column.string(),
     changed: column.uint8(),
+  },
+});
+
+/** Every table's parts on the server, the ones the reader is not granted included. */
+export const systemParts = systemIdentityTable({
+  name: "system.parts",
+  columns: {
+    database: column.string(),
+    table: column.string(),
+    active: column.uint8(),
+    rows: column.uint64(),
+    bytes_on_disk: column.uint64(),
+  },
+});
+
+export const systemDisks = systemIdentityTable({
+  name: "system.disks",
+  columns: {
+    name: column.string(),
+    total_space: column.uint64(),
+    free_space: column.uint64(),
+  },
+});
+
+/** `status` is an Enum8 the server compares with a bound String by its name. */
+export const systemBackupLog = systemIdentityTable({
+  name: "system.backup_log",
+  columns: {
+    status: column.string(),
+    end_time: column.dateTime64({ precision: 6 }),
+    total_size: column.uint64(),
+  },
+});
+
+/** Every table on the server; the reader's view lists only the tables it is granted. */
+export const systemTables = systemIdentityTable({
+  name: "system.tables",
+  columns: {
+    database: column.string(),
+    name: column.string(),
+  },
+});
+
+/** Each mutation's `command` names the tenants it rewrites, so no reader may list it. */
+export const systemMutations = systemIdentityTable({
+  name: "system.mutations",
+  columns: {
+    database: column.string(),
+    table: column.string(),
+    mutation_id: column.string(),
+    command: column.string(),
+    latest_fail_reason: column.string(),
+    is_done: column.uint8(),
+    parts_to_do: column.int64(),
+    create_time: column.dateTime(),
   },
 });

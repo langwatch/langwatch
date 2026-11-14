@@ -169,9 +169,9 @@ const guardedColumnsOf = ({
 type BuiltRead<Row> = {
   statement: ClickHouseReadStatement<Row> | MetadataReadStatement<Row>;
   table?: string | undefined;
-  /** Sends an all-tenants statement to this organisation's server rather than the shared one. */
+  /** Sends an all-tenants or server-metadata statement to this organisation's server. */
   organizationId?: string | undefined;
-  /** Sends a server-metadata statement to this tenant's server rather than the shared one. */
+  /** Sends an all-tenants or server-metadata statement to this tenant's server. */
   tenantId?: string | undefined;
   /** How the statement's `{{idBound}}` marker reads its window, as `query()` takes it. */
   idBound?: IdBoundOptions | undefined;
@@ -462,7 +462,12 @@ export class ClickHouseQueryClient {
     if (statement.kind === "metadata") {
       refuseMetadataOutsideAllowList({ sql: statement.sql });
       return {
-        request: { ...sent, tenantId: tenantId ?? "", settings: { ...statement.settings } },
+        request: {
+          ...sent,
+          tenantId: tenantId ?? "",
+          ...(organizationId === undefined ? {} : { organizationId }),
+          settings: { ...statement.settings },
+        },
         origin: "metadata",
         expiresAt: undefined,
       };
@@ -471,7 +476,8 @@ export class ClickHouseQueryClient {
       return {
         request: {
           ...sent,
-          tenantId: "",
+          // Only the route: an all-tenants statement is never checked against a tenant.
+          tenantId: tenantId ?? "",
           ...(organizationId === undefined ? {} : { organizationId }),
           settings: { ...statement.settings },
           // An all-tenants scope, built only with its reason (`tenantScope.allTenants`).

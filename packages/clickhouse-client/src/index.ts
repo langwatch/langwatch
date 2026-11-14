@@ -263,6 +263,7 @@ export {
   ID_INDEX_RETENTION_RAISE,
   idIndexRetentionDays,
   idIndexRetentionRaises,
+  idIndexTenantsStatement,
 } from "./idIndexRetention.ts";
 export type {
   FillIdIndexesOptions,

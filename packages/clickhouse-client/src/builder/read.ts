@@ -38,6 +38,7 @@ import {
   type ColumnsSpec,
   IDENTIFIER,
   SERVER_METADATA_TABLES,
+  SYSTEM_IDENTITY_TABLES,
 } from "./table.ts";
 
 declare const rowBrand: unique symbol;
@@ -150,10 +151,15 @@ type ReadState = {
 
 type NoCtes = Record<never, never>;
 
-/** The table kinds a scope reads: server metadata reads system tables, others tenants' and rows. */
+/**
+ * The table kinds a scope reads: server metadata its system tables, all tenants also the system
+ * identity's, every other scope tenant tables and rows.
+ */
 type KindFor<Scope extends TenantScope> = Scope extends ServerMetadataScope
   ? "system"
-  : "tenant" | "rows";
+  : Scope extends AllTenantsScope
+    ? "tenant" | "rows" | "systemIdentity"
+    : "tenant" | "rows";
 
 /** A read used as a table: its selected keys, typed by the values they hold. */
 export type DerivedColumns<Row> = { readonly [Key in keyof Row & string]: ColumnType<Row[Key]> };
@@ -216,7 +222,8 @@ function checkSource({ scope, table }: { scope: TenantScope; table: ClickHouseTa
     scope.kind === "serverMetadata"
       ? table.kind === "system" &&
         (SERVER_METADATA_TABLES as readonly string[]).includes(table.stored)
-      : table.kind === "tenant" && IDENTIFIER.test(table.stored);
+      : (table.kind === "tenant" && IDENTIFIER.test(table.stored)) ||
+        (scope.kind === "allTenants" && readsSystemIdentityTable(table));
   if (!allowed) {
     throw new QueryBuilderError({
       kind: "table-outside-scope",
@@ -224,6 +231,14 @@ function checkSource({ scope, table }: { scope: TenantScope; table: ClickHouseTa
       scope: scope.kind,
     });
   }
+}
+
+/** A system table on the system identity's allow-list, which only an all-tenants read names. */
+function readsSystemIdentityTable(table: ClickHouseTableFacts): boolean {
+  return (
+    table.kind === "systemIdentity" &&
+    (SYSTEM_IDENTITY_TABLES as readonly string[]).includes(table.stored)
+  );
 }
 
 /** The column an election takes the max of: the elected table's own, never its tenant column. */
@@ -670,8 +685,9 @@ export class ClickHouseRead<
     const context = renderContext();
     const sql = renderStatement({ state: this.#state, context, nested: false, keys: undefined });
     refuseOverBudget({ statement: sql, params: context.params });
-    const { scope } = this.#state;
-    if (scope.kind !== "serverMetadata" && context.tenantColumns.size === 0) {
+    const { scope, table } = this.#state;
+    const namesSystemTable = scope.kind === "allTenants" && readsSystemIdentityTable(table);
+    if (scope.kind !== "serverMetadata" && !namesSystemTable && context.tenantColumns.size === 0) {
       throw new QueryBuilderError({ kind: "no-tenant-table" });
     }
     const { params } = context;

@@ -238,6 +238,45 @@ Feature: A typed ClickHouse read builder renders the tenant predicate and the te
     When a server-metadata read of system.columns and a table-less read are built and sent
     Then both return their rows without a tenant setting
 
+  # ---------------------------------------------------------------------------
+  # System tables on the system identity (ADR-202, "What needs a policy-exempt identity")
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: An all-tenants read names the system tables only the system identity reads
+    Given an all-tenants scope stating its reason
+    When it reads system.parts, system.disks, system.backup_log, system.tables or system.mutations
+    Then the statement goes out on the system identity as an all-tenants statement
+    And it carries no tenant setting and no tenant predicate, and every compared value is bound
+
+  @unit
+  Scenario: A system table naming other tenants is refused on every reader scope
+    Given a server-metadata, single-tenant or tenant-set scope
+    When it names system.mutations, system.parts or system.tables
+    Then the read does not type-check
+    And it is refused at run time, even when the descriptor is relabelled as server metadata
+    And an all-tenants scope naming a server-metadata table or a system table on neither list is refused the same way
+
+  @unit
+  Scenario: An id index's tenant listing is an all-tenants read beside its raise
+    Given an id index's table name
+    When its tenant listing is built
+    Then it selects the index's distinct TenantId as a system statement, sent routed by target
+    And a name that is not an id index's table is refused, and the api's client refuses the listing by name
+
+  @integration
+  Scenario: On 26.8 the reader cannot list what the system-table reads need
+    Given ClickHouse 26.8 and a reader granted one tenant table and the three server-metadata tables, beside a table it is not granted
+    When the reader reads system.parts, system.disks, system.backup_log and system.mutations
+    Then each is refused as access denied
+    And system.tables, which every user may read, lists the granted table and not the other
+
+  @integration
+  Scenario: The system-table reads run on 26.8 as main's raw queries do
+    Given ClickHouse 26.8, two tenants' tables, a table the reader is not granted, and retention rewrites of each tenant
+    When the footprint, disk, backup, held-table, mutation and id-index tenant reads are built and sent as the system
+    Then each returns the rows main's raw query returns
+
   @unit
   Scenario: A read sets its own query-level settings but never the scope's
     Given a single-tenant read that sets max_execution_time, timeout_overflow_mode and max_threads

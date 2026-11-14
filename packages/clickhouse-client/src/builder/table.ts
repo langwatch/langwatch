@@ -10,8 +10,11 @@ import { type ColumnRef, type ColumnType, columnRef, isExpression, refOf } from 
 export type ColumnsSpec = Readonly<Record<string, ColumnType<unknown>>>;
 type ValueOfColumn<C> = C extends ColumnType<infer Value> ? Value : never;
 
-/** A stored tenant table, a server-metadata system table, a read used as a table, bound rows. */
-export type TableKind = "tenant" | "system" | "derived" | "rows";
+/**
+ * A stored tenant table, a server-metadata system table, a system table only the system identity
+ * reads, a read used as a table, bound rows.
+ */
+export type TableKind = "tenant" | "system" | "systemIdentity" | "derived" | "rows";
 
 /** The descriptor's facts the builder renders from, apart from its typed columns. */
 export type ClickHouseTableFacts = {
@@ -123,13 +126,31 @@ export const SERVER_METADATA_TABLES = [
 ] as const;
 export type ServerMetadataTableName = (typeof SERVER_METADATA_TABLES)[number];
 
-/** A system table on the allow-list; it holds no tenant rows, so no tenant column is declared. */
-export function systemTable<
-  const Name extends ServerMetadataTableName,
-  const Columns extends ColumnsSpec,
->({ name, columns }: { name: Name; columns: Columns }): ClickHouseTable<Name, Columns, "system"> {
-  const facts = {
-    kind: "system" as const,
+/**
+ * The system tables only an all-tenants read names, on the system identity (ADR-202, "What needs a
+ * policy-exempt identity": storage footprint, retention). On 26.8 the reader sees parts and tables
+ * of granted tables only, and a mutation's command text names its tenants.
+ */
+export const SYSTEM_IDENTITY_TABLES = [
+  "system.backup_log",
+  "system.disks",
+  "system.mutations",
+  "system.parts",
+  "system.tables",
+] as const;
+export type SystemIdentityTableName = (typeof SYSTEM_IDENTITY_TABLES)[number];
+
+function systemFacts<Kind extends "system" | "systemIdentity", Name extends string>({
+  kind,
+  name,
+  columns,
+}: {
+  kind: Kind;
+  name: Name;
+  columns: ColumnsSpec;
+}) {
+  return {
+    kind,
     name,
     stored: name,
     tenantColumn: "",
@@ -138,9 +159,36 @@ export function systemTable<
     sortKey: [],
     columns: Object.keys(columns),
   };
+}
+
+/** A system table on the allow-list; it holds no tenant rows, so no tenant column is declared. */
+export function systemTable<
+  const Name extends ServerMetadataTableName,
+  const Columns extends ColumnsSpec,
+>({ name, columns }: { name: Name; columns: Columns }): ClickHouseTable<Name, Columns, "system"> {
+  const facts = systemFacts({ kind: "system", name, columns });
   return { ...refsOf({ name, columns }), $table: facts } as ClickHouseTable<
     Name,
     Columns,
     "system"
+  >;
+}
+
+/** A system table only `tenantScope.allTenants` reads; never the reader, never server metadata. */
+export function systemIdentityTable<
+  const Name extends SystemIdentityTableName,
+  const Columns extends ColumnsSpec,
+>({
+  name,
+  columns,
+}: {
+  name: Name;
+  columns: Columns;
+}): ClickHouseTable<Name, Columns, "systemIdentity"> {
+  const facts = systemFacts({ kind: "systemIdentity", name, columns });
+  return { ...refsOf({ name, columns }), $table: facts } as ClickHouseTable<
+    Name,
+    Columns,
+    "systemIdentity"
   >;
 }

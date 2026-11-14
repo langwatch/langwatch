@@ -118,6 +118,25 @@ Feature: The ClickHouse client sends reads as the app reader and everything else
     Then it is sent on the system identity with its settings and no tenant setting
     But a reader-only process refuses it with "SystemIdentityAbsentError"
 
+  @unit
+  Scenario: A built system-table read is sent as the system, routed by tenant or organisation
+    Given an all-tenants read of system.mutations, whose commands name other tenants
+    When the worker's client reads it with a tenant route, or for an organisation's server
+    Then it is sent on the system identity with that route and no tenant setting
+    But the api's client, holding no system credential, refuses it with "clickhouse_system_identity_absent" and sends nothing
+
+  @unit
+  Scenario: A server-metadata statement naming system.mutations is refused before it is sent
+    Given a metadata statement whose text names system.mutations
+    When the client reads it
+    Then it is refused with "clickhouse_metadata_table_refused" and neither identity receives it
+
+  @unit
+  Scenario: A server-metadata read routes by organisation
+    Given a server-metadata read and an organisation id
+    When the client reads it
+    Then the reader receives it routed to that organisation, with no tenant setting
+
   # ---------------------------------------------------------------------------
   # Shadow sampling (ADR-202 rollout step 3)
   # ---------------------------------------------------------------------------

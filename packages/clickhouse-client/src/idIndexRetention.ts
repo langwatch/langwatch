@@ -3,6 +3,11 @@
  * raised to its own days through `transform`, never lowered. Shared by data-retention's raise and
  * eventing's event_log index, so both write the same statement.
  */
+import { column } from "./builder/expression.ts";
+import { QueryBuilderError } from "./builder/query-builder-error.ts";
+import { clickhouseRead, type SystemReadStatement } from "./builder/read.ts";
+import { tenantScope } from "./builder/scope.ts";
+import { defineClickHouseTable } from "./builder/table.ts";
 
 /** The id index writes "kept forever" (a source's 0) as the highest value, so `max` keeps it. */
 export const ID_INDEX_KEPT_FOREVER_DAYS = 65_535;
@@ -88,4 +93,34 @@ export function idIndexRetentionRaises({
   }
   if (current.tenantIds.length > 0) raises.push(current);
   return raises;
+}
+
+/** An id index's table ends `_index`, as `idIndexName` spells both its forms. */
+const ID_INDEX_TABLE = /^[A-Za-z_][A-Za-z0-9_]*_index$/;
+
+/**
+ * Every tenant an id index holds on the server it is sent to, which the raise above names: one
+ * pass over the index, on the system identity only. Send it with `client.read`, routed by target.
+ */
+export function idIndexTenantsStatement({
+  index,
+}: {
+  index: string;
+}): SystemReadStatement<{ TenantId: string }> {
+  if (!ID_INDEX_TABLE.test(index)) {
+    throw new QueryBuilderError({ kind: "not-an-id-index", table: index });
+  }
+  const table = defineClickHouseTable({
+    name: index,
+    tenantColumn: "TenantId",
+    sortKey: ["TenantId"],
+    columns: { TenantId: column.string() },
+  });
+  return clickhouseRead({
+    scope: tenantScope.allTenants({ reason: "an id index's retention raise names every tenant" }),
+  })
+    .from(table)
+    .select({ TenantId: table.TenantId })
+    .distinct()
+    .build();
 }

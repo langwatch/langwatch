@@ -45,6 +45,7 @@ export type QueryBuilderViolation =
   | { kind: "bound-rows-not-arrays"; column: string }
   | { kind: "bound-rows-uneven"; lengths: readonly number[] }
   | { kind: "no-tenant-table" }
+  | { kind: "not-an-id-index"; table: string }
   | { kind: "empty-array" }
   | { kind: "mixed-array"; types: readonly string[] };
 
@@ -139,6 +140,8 @@ function describe(violation: QueryBuilderViolation): string {
       return `Bound rows zip arrays of one length, not of lengths ${violation.lengths.join(", ")}.`;
     case "no-tenant-table":
       return "A read names at least one tenant table; bound rows alone carry no tenant predicate.";
+    case "not-an-id-index":
+      return `"${violation.table}" is not an id index's table name, so no tenant listing is built for it.`;
     case "empty-array":
       return "An array literal holds at least one element; an empty typed array is a cast of [].";
     case "mixed-array":
