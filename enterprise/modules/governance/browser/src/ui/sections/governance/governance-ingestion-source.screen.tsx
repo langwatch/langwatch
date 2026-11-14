@@ -18,6 +18,7 @@ import {
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { StatTile, StatTileFigure } from "@langwatch/design-system/stat-tile";
+import { ingestionSourceIsLive } from "@langwatch/enterprise-governance-contract";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { Temporal, toDate, toEpochMs, type TimeInput } from "@langwatch/time";
@@ -175,7 +176,7 @@ function SourcePullStatus({ source }: { source: Source }) {
   const complaints = source.configComplaints ?? [];
   if (!source.pullSchedule && complaints.length === 0) return null;
   const pull = source.pullStatus;
-  const isLive = source.status !== "disabled" && !source.archivedAt;
+  const isLive = ingestionSourceIsLive(source);
   // A configuration the adapter refuses fails every retry the same way, so
   // promising one would leave the admin waiting on a fix only they can make.
   const retrying = isLive && complaints.length === 0;
@@ -375,8 +376,8 @@ function SourceDetailShell({ pageTitle, children }: { pageTitle: string; childre
   return (
     <GovernanceLayout pageTitle={pageTitle}>
       <EnterpriseLockedSurface
-        featureName="Ingestion Source detail"
-        description="Source-level health metrics and event drill-downs are part of the Enterprise plan."
+        featureName="Ingestion source detail"
+        description="See health metrics and drill into the events of each ingestion source."
       >
         {children}
       </EnterpriseLockedSurface>

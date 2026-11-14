@@ -14,6 +14,8 @@ import { memberRoots } from "./workspace-members.mjs";
 const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const OXLINT = join(root, "node_modules/.bin/oxlint");
 const LINTABLE = /\.(?:[cm]?[jt]sx?)$/;
+// oxlint exits 1 with this line when every path it got is ignored: nothing to lint.
+const NO_FILES = "No files found to lint.";
 const UPSTREAM_FALLBACK = "origin/feat/strict-feature-layout-v0";
 const PLAIN = [".oxlintrc.native.jsonc", ".oxlintrc.plugin.jsonc"];
 const TYPES = [...PLAIN, ".oxlintrc.types.jsonc"];
@@ -118,7 +120,8 @@ function scopes({ types, files, base }) {
 }
 
 /** The diagnostics of a `-f json` run; undefined when oxlint printed an error instead. */
-function parseReport(out) {
+export function parseReport(out) {
+  if (out.startsWith(NO_FILES)) return [];
   try {
     return JSON.parse(out).diagnostics;
   } catch {

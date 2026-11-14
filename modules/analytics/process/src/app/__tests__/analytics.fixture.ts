@@ -2,6 +2,7 @@ import type { LangWatchQLCatalogueAccess } from "@langwatch/analytics-contract";
 
 import { cataloguePermissions } from "../../rules/lwql-catalogue.rules.ts";
 import { LWQL_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
+import { LangWatchQLRunTelemetryService } from "../../services/langwatch-ql-run-telemetry.service.ts";
 import {
   LangWatchQLService,
   type LangWatchQLServiceDependencies,
@@ -12,14 +13,29 @@ export const EVERY_CATALOGUE_PERMISSION: LangWatchQLCatalogueAccess = {
   permissions: cataloguePermissions({ catalog: LWQL_CATALOG }),
 };
 
+/** Run telemetry for a suite that builds the LangWatchQL service alone, its hash key fixed. */
+export const TEST_RUN_TELEMETRY = LangWatchQLRunTelemetryService.create({
+  queryHashKey: new Uint8Array(32).fill(7),
+});
+
+/** A placement gate that admits every run, for a suite that measures what happens past it. */
+export const ADMIT_EVERY_PLACEMENT: LangWatchQLServiceDependencies["placement"] = {
+  admit: () => Promise.resolve(),
+};
+
 /**
  * The real LangWatchQL service, for a suite that measures a real refusal —
  * built here so a consuming test never names the private service class.
  */
 export function createLangWatchQLService(
-  dependencies: LangWatchQLServiceDependencies,
+  dependencies: Omit<LangWatchQLServiceDependencies, "runTelemetry" | "placement"> &
+    Partial<Pick<LangWatchQLServiceDependencies, "placement">>,
 ): LangWatchQLService {
-  return LangWatchQLService.create(dependencies);
+  return LangWatchQLService.create({
+    runTelemetry: TEST_RUN_TELEMETRY,
+    placement: ADMIT_EVERY_PLACEMENT,
+    ...dependencies,
+  });
 }
 
 /**

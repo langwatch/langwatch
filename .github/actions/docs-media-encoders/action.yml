@@ -1,0 +1,48 @@
+# The docs build's media encoders and their cache, shared by every workflow that builds the docs,
+# so the Lighthouse build measures the same encoded site the deploy build ships.
+#
+# Usage:
+#   - uses: ./.github/actions/docs-media-encoders
+#     with:
+#       # optional: save the encoded media for later builds; "false" only restores.
+#       save: "true"
+name: docs-media-encoders
+description: Restore the encoded docs media and install ffmpeg for the docs build.
+inputs:
+  save:
+    description: Save the encoded media at the end of the job ("true") or only restore it.
+    required: false
+    default: "true"
+runs:
+  using: composite
+  steps:
+    # Encoded images and videos, keyed on the media and the encoders' settings alone, so a
+    # docs-only change never re-encodes; the build prunes entries it no longer uses.
+    - name: Restore and save the encoded docs media
+      if: inputs.save == 'true'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: apps/docs/node_modules/.cache/docs-media
+        key: docs-media-${{ runner.os }}-${{ hashFiles('docs/images/**', 'docs/media/**', 'apps/docs/src/site/image-variants.ts', 'apps/docs/src/site/video-variants.ts') }}
+        restore-keys: |
+          docs-media-${{ runner.os }}-
+    - name: Restore the encoded docs media
+      if: inputs.save != 'true'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: apps/docs/node_modules/.cache/docs-media
+        key: docs-media-${{ runner.os }}-${{ hashFiles('docs/images/**', 'docs/media/**', 'apps/docs/src/site/image-variants.ts', 'apps/docs/src/site/video-variants.ts') }}
+        restore-keys: |
+          docs-media-${{ runner.os }}-
+    # The build transcodes the docs videos to AV1 and H.264 (src/site/video-variants.ts). A
+    # stalled Ubuntu mirror once held this for 30 minutes: retry stalled connections, and give
+    # up after ten minutes so a rerun can try again.
+    - name: Install ffmpeg
+      shell: bash
+      env:
+        APT_OPTS: -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
+      run: |
+        command -v ffmpeg || timeout 600 bash -c '
+          sudo apt-get $APT_OPTS update
+          sudo apt-get $APT_OPTS install -y --no-install-recommends ffmpeg
+        '

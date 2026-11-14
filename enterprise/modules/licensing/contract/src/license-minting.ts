@@ -9,6 +9,7 @@ export interface BuildMintedPlanParams {
   name: string;
   maxMembers: number;
   maxMembersLite?: number;
+  maxMembersDeveloper?: number;
   maxMessagesPerMonth: number;
   canPublish: boolean;
   webhookEndpointsEnabled?: boolean;
@@ -35,6 +36,10 @@ export interface BuildMintedPlanParams {
  *    `DEFAULT_LIMIT`, so an older deployment reads them as uncapped, which is
  *    what the fields now mean everywhere.
  *
+ * `maxMembersDeveloper` is minted only when stated: an older deployment strips
+ * a key it does not know and then fails the signature, so a licence selling no
+ * Developer seats leaves it out and keeps verifying everywhere.
+ *
  * A field may only be dropped from here once no supported version requires it.
  *
  * `webhookEndpointsEnabled` is minted because it is an entitlement the license
@@ -48,6 +53,7 @@ export function buildMintedPlan({
   name,
   maxMembers,
   maxMembersLite,
+  maxMembersDeveloper,
   maxMessagesPerMonth,
   canPublish,
   webhookEndpointsEnabled,
@@ -56,7 +62,11 @@ export function buildMintedPlan({
   return {
     type,
     name,
-    ...licenseSeats({ members: maxMembers, membersLite: maxMembersLite }),
+    ...licenseSeats({
+      members: maxMembers,
+      membersLite: maxMembersLite,
+      membersDeveloper: maxMembersDeveloper,
+    }),
     maxProjects: DEFAULT_LIMIT,
     maxMessagesPerMonth,
     maxWorkflows: DEFAULT_LIMIT,

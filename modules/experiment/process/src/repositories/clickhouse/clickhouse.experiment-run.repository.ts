@@ -21,6 +21,7 @@ import type { z } from "zod";
 
 import { deriveRunCompleteness } from "../../rules/experiment-run-completeness.rules.ts";
 import { OCCURRED_AT_BUFFER_MS } from "../../rules/experiment-run-occurred-at.rules.ts";
+import { runTargetFromStored } from "../../rules/experiment-run-stored-target.rules.ts";
 import { ExperimentRunRepository } from "../experiment-run.repository.ts";
 import type { ExperimentWorkflowVersionRepository } from "../experiment-workflow-version.repository.ts";
 import {
@@ -84,6 +85,8 @@ type RunRow = {
   StoppedAt: string | null;
   ExpectedTargetResults?: number | string | null;
   ExpectedEvaluatorResults?: number | string | null;
+  /** Absent until goose 00125 lands on the target; SELECT * reads it once it has. */
+  Concurrency?: number | string | null;
 };
 type ItemRow = {
   TenantId: string;
@@ -668,6 +671,8 @@ function mapRun({
     timestamps: timestamps(row),
     progress: row.Progress,
     total: row.Total,
+    ...recordedConcurrencyOf(row),
+    targets: parseTargets(row.Targets),
     summary: {
       datasetCost: costs?.datasetCost ?? undefined,
       evaluationsCost: costs?.evaluationsCost ?? undefined,
@@ -692,6 +697,7 @@ function mapRunWithItems(run: RunRow, items: ItemRow[], projectId: string): Expe
     workflowVersionId: run.WorkflowVersionId,
     progress: run.Progress,
     total: run.Total,
+    ...recordedConcurrencyOf(run),
     targets,
     dataset,
     evaluations,
@@ -702,6 +708,14 @@ function mapRunWithItems(run: RunRow, items: ItemRow[], projectId: string): Expe
       expected: expectedCountsOf(run),
     }),
   });
+}
+
+/** The cells the run kept in flight, null when none was recorded; ClickHouse may send a string. */
+function recordedConcurrencyOf(run: RunRow): { concurrency: number | null } {
+  const { Concurrency: concurrency } = run;
+  return {
+    concurrency: concurrency === null || concurrency === undefined ? null : Number(concurrency),
+  };
 }
 
 /** The counts the run reported, unknown where it reported none; ClickHouse may answer a string. */
@@ -752,7 +766,9 @@ function evaluationOf(item: ItemRow): ExperimentRunWithItems["evaluations"][numb
 function parseTargets(value: string): z.infer<typeof experimentRunTargetSchema>[] | null {
   try {
     const parsed: unknown = JSON.parse(value);
-    const targets = experimentRunTargetSchema.array().safeParse(parsed);
+    const targets = experimentRunTargetSchema
+      .array()
+      .safeParse(Array.isArray(parsed) ? parsed.map(runTargetFromStored) : parsed);
     return targets.success && targets.data.length > 0 ? targets.data : null;
   } catch {
     return null;

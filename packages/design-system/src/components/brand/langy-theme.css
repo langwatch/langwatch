@@ -4,50 +4,14 @@
  * There is no colour in this file. Every value it composes comes from the Chakra
  * theme — see `langyTheme.ts`, which declares the `_langy` / `_langyDark`
  * conditions and hangs Langy's palette off the app's own semantic tokens. What
- * lives here is the handful of things Chakra has no token for: an @font-face, a
- * few @keyframes, and the painted textures (signal grid, wash, sheen) whose
- * gradients are built from `var(--chakra-colors-langy-*)`.
+ * lives here is the handful of things Chakra has no token for: a few @keyframes
+ * and the painted textures (signal grid, wash, sheen) whose gradients are built
+ * from `var(--chakra-colors-langy-*)`. The Sentient face is declared once, by the
+ * application's global stylesheet.
  *
  * The split is the point. Colours belong to the design system, where they are
  * typed, mergeable and shared. A masked fractal-noise overlay does not.
  */
-
-/* Sentient — the display/heading voice, self-hosted (from the LangWatch site). */
-@font-face {
-  font-family: "Sentient";
-  src: url("/fonts/Sentient-Extralight.woff2") format("woff2");
-  font-weight: 200;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Sentient";
-  src: url("/fonts/Sentient-Light.woff2") format("woff2");
-  font-weight: 300;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Sentient";
-  src: url("/fonts/Sentient-Regular.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Sentient";
-  src: url("/fonts/Sentient-Medium.woff2") format("woff2");
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Sentient";
-  src: url("/fonts/Sentient-Bold.woff2") format("woff2");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
 
 .langy-root {
   /* The display face. Body stays on the app's sans — Sentient is for the one

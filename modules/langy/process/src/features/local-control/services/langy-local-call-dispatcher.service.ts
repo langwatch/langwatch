@@ -36,6 +36,7 @@ import type {
   LocalCallBuffer,
   StoredLocalCall,
 } from "../../../rules/langy-local-call-record.rules.ts";
+import type { LangyActorUserReader } from "../../../services/langy-actor-session.service.ts";
 import { LocalCallKeepaliveService } from "./langy-local-call-keepalive.service.ts";
 
 const logger = createLogger("langwatch:langy:local-control:dispatcher");
@@ -49,6 +50,8 @@ interface LocalCallDispatcherOptions {
   workspace: LangyLocalWorkspaceChannel;
   presence: LangyLocalPresenceRepository;
   buffer?: LocalCallBuffer;
+  /** Names whose machine the activity line says a call runs on. */
+  users?: LangyActorUserReader;
   now?: () => number;
   /** Test knob: how long a first call waits for the folder to appear. */
   offlineWaitMs?: number;
@@ -81,6 +84,7 @@ export class LocalCallDispatcherService {
       calls: this.calls,
       presence: this.presence,
       buffer: this.buffer,
+      ...(options.users ? { users: options.users } : {}),
       now: this.now,
     });
   }

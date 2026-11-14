@@ -1,10 +1,13 @@
 /** Organization control (top bar). Uses NavigationOrganization; localStorage through host. */
 
+import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { Button, HStack, Portal, Text } from "@langwatch/design-system/primitives";
 import type { NavigationOrganization } from "@langwatch/navigation-contract";
+import { CreateTeamDrawerToken } from "@langwatch/organization-client";
 import { findLandingProjects } from "@langwatch/project-contract";
-import { Building2, Check, ChevronsUpDown } from "lucide-react";
+import { Building2, Check, ChevronsUpDown, Plus } from "lucide-react";
+import { useState } from "react";
 
 import { useProductFlagsByOrganization } from "../../behavior/use-product-flags-by-organization.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
@@ -16,6 +19,8 @@ import {
 import { resolveOrgSwitchDestination } from "../../model/resolve-org-switch-destination.ts";
 
 const ORG_NAME_MAX_WIDTH = "280px";
+/** Onboarding's welcome screen, told the member wants another organization (its flag). */
+const NEW_ORGANIZATION_ADDRESS = "/onboarding/welcome?new_organization=1";
 const NO_SHRINK = { flexShrink: 0 };
 
 function firstProjectSlug(organization: NavigationOrganization): string | null {
@@ -33,6 +38,8 @@ export function OrganizationSelect({ activeProductId }: { activeProductId: Produ
   const host = useNavigationHost();
   const organization = host.organization();
   const organizations = host.organizations();
+
+  const [isNewOrganizationOpen, setIsNewOrganizationOpen] = useState(false);
 
   const organizationIds = organizations.map((org) => org.id);
   const isMultiOrg = organizationIds.length > 1;
@@ -85,16 +92,68 @@ export function OrganizationSelect({ activeProductId }: { activeProductId: Produ
   };
 
   return (
-    <OrganizationMenu
-      organizations={organizations}
-      currentOrganizationId={organization.id}
-      currentOrganizationName={organization.name}
-      // Which products the next organization can reach decides where the
-      // switch lands, so until the gates answer the same click would mean two
-      // different pages. The switcher says it is not ready rather than guess.
-      isPreparing={isReachabilityLoading}
-      onSelect={switchToOrganization}
-    />
+    <>
+      <OrganizationMenu
+        organizations={organizations}
+        currentOrganizationId={organization.id}
+        currentOrganizationName={organization.name}
+        // Which products the next organization can reach decides where the
+        // switch lands, so until the gates answer the same click would mean two
+        // different pages. The switcher says it is not ready rather than guess.
+        isPreparing={isReachabilityLoading}
+        onSelect={switchToOrganization}
+        onNewOrganization={() => setIsNewOrganizationOpen(true)}
+      />
+      <NewOrganizationDialog
+        open={isNewOrganizationOpen}
+        onClose={() => setIsNewOrganizationOpen(false)}
+        canCreateTeam={host.hasOrganizationPermission("organization:manage")}
+        onCreateTeam={() => {
+          setIsNewOrganizationOpen(false);
+          host.openDrawerByToken(CreateTeamDrawerToken);
+        }}
+        onProceed={() => {
+          setIsNewOrganizationOpen(false);
+          host.navigate(NEW_ORGANIZATION_ADDRESS);
+        }}
+      />
+    </>
+  );
+}
+
+/** Spec: modules/navigation/specs/product-switcher-navigation.feature (New organization). */
+function NewOrganizationDialog({
+  open,
+  onClose,
+  canCreateTeam,
+  onCreateTeam,
+  onProceed,
+}: {
+  open: boolean;
+  onClose: () => void;
+  canCreateTeam: boolean;
+  onCreateTeam: () => void;
+  onProceed: () => void;
+}) {
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="New organization"
+      size="md"
+      primaryAction={{ label: "Proceed with New Organization", onClick: onProceed }}
+      secondaryAction={{
+        label: "Create New Team",
+        onClick: onCreateTeam,
+        disabledReason: canCreateTeam ? undefined : "Only organization admins can create teams",
+      }}
+    >
+      <Text textStyle="body">
+        A new organization is a completely separate LangWatch account, separate billing, separate
+        team members, separate access. If you want to create a different grouping for projects, you
+        can create a new team instead.
+      </Text>
+    </Dialog>
   );
 }
 
@@ -104,12 +163,14 @@ function OrganizationMenu({
   currentOrganizationName,
   isPreparing,
   onSelect,
+  onNewOrganization,
 }: {
   organizations: NavigationOrganization[];
   currentOrganizationId: string;
   currentOrganizationName: string;
   isPreparing: boolean;
   onSelect: (organization: NavigationOrganization) => void;
+  onNewOrganization: () => void;
 }) {
   return (
     <Menu.Root>
@@ -155,6 +216,11 @@ function OrganizationMenu({
               </Menu.Item>
             ))}
           </Menu.ItemGroup>
+          <Menu.Separator />
+          <Menu.Item value="new-organization" onClick={onNewOrganization} textStyle="bodySm">
+            <Plus size={13} aria-hidden style={NO_SHRINK} />
+            New organization
+          </Menu.Item>
         </Menu.Content>
       </Portal>
     </Menu.Root>

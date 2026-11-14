@@ -10,11 +10,15 @@ import { z } from "zod";
 import { DATAPLANE_S3_ENV_PREFIX } from "./config-owner.ts";
 import type { MalformedPrivateVariable, ObjectStoragePrivateAccount } from "./config.ts";
 
-/** A `roleArn` is assumed through the pod's web-identity token and wins over a static key pair. */
+/**
+ * A `roleArn` is assumed through the pod's web-identity token and wins over a static key pair.
+ * A `region` overrides the shared S3_REGION for this organisation alone.
+ */
 const dataplaneS3Schema = z
   .object({
     endpoint: z.string().min(1, "endpoint must not be empty"),
     bucket: z.string().min(1, "bucket must not be empty"),
+    region: z.string().trim().min(1, "region must not be empty").optional(),
     accessKeyId: z.string().min(1, "accessKeyId must not be empty").optional(),
     secretAccessKey: z.string().min(1, "secretAccessKey must not be empty").optional(),
     roleArn: z.string().trim().min(1, "roleArn must not be empty").optional(),
@@ -58,7 +62,7 @@ function parsedJson(value: string): unknown {
 /** Each organisation's own S3 account, keyed by the organisation its variable names. */
 export function objectStoragePrivateAccountsOf(options: {
   family: ReadonlyMap<string, string>;
-  /** The shared `S3_REGION`, which main applied to every private account too. */
+  /** The shared `S3_REGION`, for every private account that names no region of its own. */
   region?: string;
   logger?: Pick<Logger, "warn">;
 }): readonly ObjectStoragePrivateAccount[] {
@@ -133,13 +137,14 @@ export function objectStoragePrivateFamilyOf(options: {
     }
 
     malformed.delete(organizationId);
+    const accountRegion = config.region ?? region;
     accounts.set(organizationId, {
       organizationId,
       label,
       variable: envVar,
       bucket: config.bucket,
       endpoint: config.endpoint,
-      ...(region ? { region } : {}),
+      ...(accountRegion ? { region: accountRegion } : {}),
       ...credentialsOf(config),
       forcePathStyle: true,
     });

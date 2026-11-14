@@ -42,13 +42,14 @@ export const retentionUnitCollection = createListCollection({
 export type RetentionPreset = { value: string; label: string; days: number };
 
 // Presets round up to cover the full period plus buffer. Plan-gated by tier:
-// PAID → {35, 63}; ENTERPRISE → full list + custom. Server re-enforces at
+// PAID → {35, 63, 91}; ENTERPRISE → full list + custom. Server re-enforces at
 // the mutation boundary; these lists only shape the UI.
 
-/** Paid (non-enterprise) menu: "~1 month" / "~2 months" only. */
+/** Paid (non-enterprise) menu: "~1 month" / "~2 months" / "~3 months" only. */
 export const PAID_RETENTION_PRESETS: RetentionPreset[] = [
   { value: "35", label: "1 month", days: 35 },
   { value: "63", label: "2 months", days: 63 },
+  { value: "91", label: "3 months", days: 91 },
 ];
 
 /** Enterprise / self-hosted menu: the paid short options plus longer windows. */

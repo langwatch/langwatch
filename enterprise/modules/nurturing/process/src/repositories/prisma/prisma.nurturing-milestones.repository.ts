@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { PrismaRepository } from "@langwatch/prisma-client";
+import { PrismaRepository, skipTenantCheck } from "@langwatch/prisma-client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import {
   MAX_CODING_REPOSITORY_KEYS,
   type NurturingCodingMilestonesRepository,
   type NurturingMilestonesRepository,
+  type NurturingOrganizationAdminRepository,
   type NurturingOrganizationCounts,
   type NurturingOrganizationRow,
   type NurturingTraceMilestonesRepository,
@@ -26,27 +28,42 @@ const ORGANIZATION_ROW = {
   codingLastActiveDay: true,
 } as const;
 
+type NurturingOrganizationDatabase = Pick<PrismaClient, "nurturingOrganization" | "$executeRaw">;
+
 /** Nurturing's organizations, the one table it claims; the owners' rows are read elsewhere (R40). */
 export class PrismaNurturingMilestonesRepository
   extends PrismaRepository.for("NurturingOrganization")
   implements
     NurturingMilestonesRepository,
     NurturingCodingMilestonesRepository,
-    NurturingTraceMilestonesRepository
+    NurturingTraceMilestonesRepository,
+    NurturingOrganizationAdminRepository
 {
-  static readonly create = this.factory(
-    (prisma) => new PrismaNurturingMilestonesRepository(prisma),
-  );
+  static create({
+    prisma,
+  }: Readonly<{ prisma: NurturingOrganizationDatabase }>): PrismaNurturingMilestonesRepository {
+    return new PrismaNurturingMilestonesRepository(prisma);
+  }
+
+  readonly #database: NurturingOrganizationDatabase;
+
+  private constructor(prisma: NurturingOrganizationDatabase) {
+    super(prisma);
+    this.#database = prisma;
+  }
 
   async recordLastTrace({
     organizationId,
     occurredAt,
   }: Readonly<{ organizationId: string; occurredAt: number }>): Promise<void> {
     const at = new Date(occurredAt);
-    await this.prisma.nurturingOrganization.updateMany({
-      where: { organizationId, OR: [{ lastTraceAt: null }, { lastTraceAt: { lt: at } }] },
-      data: { lastTraceAt: at },
-    });
+    // SQL for the reason given above `recordCodingFirstSession`: the time only moves forward.
+    await this.#database.$executeRaw`
+      UPDATE "NurturingOrganization"
+         SET "lastTraceAt" = ${at}, "updatedAt" = now()
+       WHERE "organizationId" = ${organizationId}
+         AND ("lastTraceAt" IS NULL OR "lastTraceAt" < ${at})
+    `;
   }
 
   async findLastTraceAt({
@@ -74,6 +91,16 @@ export class PrismaNurturingMilestonesRepository
         where: { organizationId },
         data: { adminUserId },
       });
+  }
+
+  async forgetAdmin({ adminUserId }: Readonly<{ adminUserId: string }>): Promise<void> {
+    await this.#database.$executeRaw`${skipTenantCheck({
+      // An erased account is admin of no organization: every row naming it is cleared by user.
+      SKIP_TENANT_CHECK: true,
+    })}
+      UPDATE "NurturingOrganization"
+         SET "adminUserId" = NULL, "updatedAt" = now()
+       WHERE "adminUserId" = ${adminUserId}`;
   }
 
   countEvaluation({
@@ -106,18 +133,21 @@ export class PrismaNurturingMilestonesRepository
     ];
   }
 
-  // The coding writes are one conditional updateMany each: Postgres re-checks the WHERE
-  // under the row lock, so concurrent writers change the row once.
+  // Each coding write is one conditional UPDATE in SQL: Postgres re-checks its WHERE on the
+  // locked row, so concurrent writers change the row once. Not `updateMany`, which re-checks
+  // only its subquery on the statement's older snapshot and lets every writer through.
   async recordCodingFirstSession({
     organizationId,
     occurredAt,
   }: Parameters<NurturingCodingMilestonesRepository["recordCodingFirstSession"]>[0]): Promise<{
     first: boolean;
   }> {
-    const { count } = await this.prisma.nurturingOrganization.updateMany({
-      where: { organizationId, codingFirstSessionAt: null },
-      data: { codingFirstSessionAt: new Date(occurredAt) },
-    });
+    const count = await this.#database.$executeRaw`
+      UPDATE "NurturingOrganization"
+         SET "codingFirstSessionAt" = ${new Date(occurredAt)}, "updatedAt" = now()
+       WHERE "organizationId" = ${organizationId}
+         AND "codingFirstSessionAt" IS NULL
+    `;
     if (count === 1) return { first: true };
     // A retry of the fact that set it answers first again, so a failed delivery is not lost.
     const organization = await this.prisma.nurturingOrganization.findUnique({
@@ -131,10 +161,13 @@ export class PrismaNurturingMilestonesRepository
     organizationId,
     agentType,
   }: Parameters<NurturingCodingMilestonesRepository["addCodingAgentType"]>[0]): Promise<string[]> {
-    await this.prisma.nurturingOrganization.updateMany({
-      where: { organizationId, NOT: { codingAgentTypes: { has: agentType } } },
-      data: { codingAgentTypes: { push: agentType } },
-    });
+    await this.#database.$executeRaw`
+      UPDATE "NurturingOrganization"
+         SET "codingAgentTypes" = array_append("codingAgentTypes", ${agentType}::text),
+             "updatedAt" = now()
+       WHERE "organizationId" = ${organizationId}
+         AND NOT (${agentType}::text = ANY("codingAgentTypes"))
+    `;
     const organization = await this.prisma.nurturingOrganization.findUnique({
       where: { organizationId },
       select: { codingAgentTypes: true },
@@ -148,10 +181,13 @@ export class PrismaNurturingMilestonesRepository
   }: Parameters<NurturingCodingMilestonesRepository["addCodingTerminalType"]>[0]): Promise<
     string[]
   > {
-    await this.prisma.nurturingOrganization.updateMany({
-      where: { organizationId, NOT: { codingTerminalTypes: { has: terminalType } } },
-      data: { codingTerminalTypes: { push: terminalType } },
-    });
+    await this.#database.$executeRaw`
+      UPDATE "NurturingOrganization"
+         SET "codingTerminalTypes" = array_append("codingTerminalTypes", ${terminalType}::text),
+             "updatedAt" = now()
+       WHERE "organizationId" = ${organizationId}
+         AND NOT (${terminalType}::text = ANY("codingTerminalTypes"))
+    `;
     const organization = await this.prisma.nurturingOrganization.findUnique({
       where: { organizationId },
       select: { codingTerminalTypes: true },
@@ -163,25 +199,19 @@ export class PrismaNurturingMilestonesRepository
     organizationId,
     repositoryKey,
   }: Parameters<NurturingCodingMilestonesRepository["addCodingRepository"]>[0]): Promise<number> {
-    // Read first because Prisma cannot filter on an array's length: writers racing at the cap can
-    // pass it by one each, which costs a few bytes and no wrong count anyone segments on.
-    const held = await this.codingRepositoryKeysOf(organizationId);
-    if (held.includes(repositoryKey) || held.length >= MAX_CODING_REPOSITORY_KEYS) {
-      return held.length;
-    }
-    await this.prisma.nurturingOrganization.updateMany({
-      where: { organizationId, NOT: { codingRepositoryKeys: { has: repositoryKey } } },
-      data: { codingRepositoryKeys: { push: repositoryKey } },
-    });
-    return (await this.codingRepositoryKeysOf(organizationId)).length;
-  }
-
-  private async codingRepositoryKeysOf(organizationId: string): Promise<string[]> {
+    await this.#database.$executeRaw`
+      UPDATE "NurturingOrganization"
+         SET "codingRepositoryKeys" = array_append("codingRepositoryKeys", ${repositoryKey}::text),
+             "updatedAt" = now()
+       WHERE "organizationId" = ${organizationId}
+         AND NOT (${repositoryKey}::text = ANY("codingRepositoryKeys"))
+         AND cardinality("codingRepositoryKeys") < ${MAX_CODING_REPOSITORY_KEYS}::int
+    `;
     const organization = await this.prisma.nurturingOrganization.findUnique({
       where: { organizationId },
       select: { codingRepositoryKeys: true },
     });
-    return organization?.codingRepositoryKeys ?? [];
+    return organization?.codingRepositoryKeys.length ?? 0;
   }
 
   async addCodingSessionDayOffset({
@@ -190,10 +220,13 @@ export class PrismaNurturingMilestonesRepository
   }: Parameters<
     NurturingCodingMilestonesRepository["addCodingSessionDayOffset"]
   >[0]): Promise<number> {
-    await this.prisma.nurturingOrganization.updateMany({
-      where: { organizationId, NOT: { codingFirstDays: { has: dayOffset } } },
-      data: { codingFirstDays: { push: dayOffset } },
-    });
+    await this.#database.$executeRaw`
+      UPDATE "NurturingOrganization"
+         SET "codingFirstDays" = array_append("codingFirstDays", ${dayOffset}::int),
+             "updatedAt" = now()
+       WHERE "organizationId" = ${organizationId}
+         AND NOT (${dayOffset}::int = ANY("codingFirstDays"))
+    `;
     const organization = await this.prisma.nurturingOrganization.findUnique({
       where: { organizationId },
       select: { codingFirstDays: true },
@@ -208,13 +241,14 @@ export class PrismaNurturingMilestonesRepository
     changed: boolean;
     codingActiveDays: number;
   }> {
-    const { count } = await this.prisma.nurturingOrganization.updateMany({
-      where: {
-        organizationId,
-        OR: [{ codingLastActiveDay: null }, { codingLastActiveDay: { lt: day } }],
-      },
-      data: { codingActiveDays: { increment: 1 }, codingLastActiveDay: day },
-    });
+    const count = await this.#database.$executeRaw`
+      UPDATE "NurturingOrganization"
+         SET "codingActiveDays" = "codingActiveDays" + 1,
+             "codingLastActiveDay" = ${day},
+             "updatedAt" = now()
+       WHERE "organizationId" = ${organizationId}
+         AND ("codingLastActiveDay" IS NULL OR "codingLastActiveDay" < ${day})
+    `;
     const organization = await this.prisma.nurturingOrganization.findUnique({
       where: { organizationId },
       select: { codingActiveDays: true, codingLastActiveDay: true },

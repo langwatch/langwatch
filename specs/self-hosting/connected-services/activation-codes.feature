@@ -125,6 +125,26 @@ Feature: Activating a self-hosted install with a code
     And a code claimed first by another install is refused by the claim as activation_code_already_redeemed with status 403
     And nothing is minted
 
+  @unit
+  Scenario: A code this install already redeemed is refused as used here
+    Given a single-use code this install redeemed before
+    When the same install redeems it again, for example after removing its license
+    Then it is refused as activation_code_already_redeemed with sameInstall true
+    And nothing is minted
+
+  @unit
+  Scenario: A code another install redeemed is refused as used elsewhere
+    Given a single-use code another install redeemed
+    When this install redeems it
+    Then it is refused as activation_code_already_redeemed with sameInstall false
+
+  @unit
+  Scenario: A used code is explained in words that match where it was used
+    Given a refusal as activation_code_already_redeemed
+    Then with sameInstall true it reads "This code was already used on this install. Ask LangWatch for a new one."
+    And with sameInstall false it reads "This code was already used on another install. Ask LangWatch for a new one."
+    And from a host that does not say which, it reads "This code was already used. Ask LangWatch for a new one."
+
   # ============================================================================
   # Exactly once
   # ============================================================================

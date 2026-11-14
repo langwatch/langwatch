@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { planCatalogue } from "../catalogue.ts";
 import { PLAN_DISPUTE_IDS, PLAN_DISPUTES } from "../disputes.ts";
-import { LIMIT_NAMES, LIMIT_UNITS } from "../limits.ts";
+import { LIMIT_NAMES, LIMIT_UNITS, UNLIMITED } from "../limits.ts";
 import { PLAN_TYPES } from "../plan-type.ts";
 import { planSchema } from "../plan.ts";
 
@@ -103,16 +103,17 @@ describe("given the self-serve ladder", () => {
 describe("given the disputes the catalogue records", () => {
   describe("when they are listed", () => {
     /** @scenario "The catalogue lists exactly the disputes found in the census" */
-    it("lists exactly the four the census found", () => {
+    it("lists exactly the five recorded disputes", () => {
       const listed = planCatalogue.disputes().map((dispute) => dispute.id);
 
       expect(listed.toSorted()).toEqual([
         "automation-ceiling-three-ways",
         "free-plan-two-definitions",
         "growth-copy-volume",
+        "growth-seat-member-ceiling",
         "pro-volume-below-free",
       ]);
-      expect(PLAN_DISPUTE_IDS.length).toBe(4);
+      expect(PLAN_DISPUTE_IDS.length).toBe(5);
     });
   });
 
@@ -142,5 +143,18 @@ describe("given the disputes the catalogue records", () => {
         }
       }
     });
+  });
+});
+
+describe("given the Developer seat, which is paid per seat", () => {
+  /** @scenario Only the open source deployment leaves Developer seats uncapped */
+  it("includes none on any cloud plan and leaves them uncapped on open source", () => {
+    const cloudPlans = planCatalogue.all().filter((plan) => plan.type !== "OPEN_SOURCE");
+
+    expect(cloudPlans.length).toBeGreaterThan(0);
+    expect(cloudPlans.map((plan) => plan.limits.membersDeveloper.value)).toEqual(
+      cloudPlans.map(() => 0),
+    );
+    expect(planCatalogue.baseline("self-hosted").limits.membersDeveloper.value).toBe(UNLIMITED);
   });
 });

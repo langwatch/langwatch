@@ -109,6 +109,10 @@ export type BatchTargetColumn = {
   promptVersion?: number | null;
   /** For agents: the agent ID */
   agentId?: string | null;
+  /** For agents pinned to a deploy label: the label the run ran at */
+  agentLabel?: string | null;
+  /** For agents pinned to a deploy label: the version the label resolved to at run start */
+  agentVersion?: number | null;
   /** For evaluator targets: the evaluator ID */
   evaluatorId?: string | null;
   /** Model used */
@@ -315,6 +319,8 @@ const declaredTargetColumnsOf = ({
     promptId: target.promptId,
     promptVersion: target.promptVersion,
     agentId: target.agentId,
+    agentLabel: target.agentLabel,
+    agentVersion: target.agentVersion,
     evaluatorId: target.evaluatorId,
     model: target.model,
     metadata: target.metadata,

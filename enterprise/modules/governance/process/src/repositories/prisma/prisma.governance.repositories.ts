@@ -4,6 +4,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { Encryption } from "@langwatch/process-stores";
 
 import type { GovernanceRepositories } from "../governance.repositories.ts";
+import { PrismaAgentRegistryRepository } from "./prisma.agent-registry.repository.ts";
 import { PrismaAggregateReconcileLockRepository } from "./prisma.aggregate-reconcile-lock.repository.ts";
 import { PrismaAiToolCatalogRepository } from "./prisma.ai-tool-catalog.repository.ts";
 import { PrismaAnomalyRuleRepository } from "./prisma.anomaly-rule.repository.ts";
@@ -45,6 +46,7 @@ export class PostgresGovernanceRepositories {
     | "rateLimits"
   > {
     return {
+      agentRegistry: PrismaAgentRegistryRepository.create(prisma),
       aggregateReconcileLock: PrismaAggregateReconcileLockRepository.create(prisma),
       aiTools: PrismaAiToolCatalogRepository.create(prisma),
       anomalyRules: PrismaAnomalyRuleRepository.create(prisma),

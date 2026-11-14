@@ -178,7 +178,8 @@ await it("shows one diagram variant, explicit matrix values and clear navigation
             path: path.join(screenshots, `docs-overview-diagram-${mode}.png`),
           });
           const other = mode === "light" ? "Dark" : "Light";
-          await page.getByRole("button", { name: "Switch color theme" }).click();
+          await page.getByRole("button", { name: "Color theme" }).click();
+          await page.getByRole("menuitemradio", { name: other, exact: true }).click();
           await page.waitForFunction(
             (theme) => document.documentElement.classList.contains("dark") === (theme === "Dark"),
             other,
@@ -186,7 +187,10 @@ await it("shows one diagram variant, explicit matrix values and clear navigation
           await (other === "Dark" ? dark : light).waitFor({ state: "visible" });
           assert.equal(await dark.isVisible(), other === "Dark");
           assert.equal(await light.isVisible(), other === "Light");
-          await page.getByRole("button", { name: "Switch color theme" }).click();
+          await page.getByRole("button", { name: "Color theme" }).click();
+          await page
+            .getByRole("menuitemradio", { name: mode === "dark" ? "Dark" : "Light", exact: true })
+            .click();
           await page.waitForFunction(
             (theme) => document.documentElement.classList.contains("dark") === (theme === "dark"),
             mode,
