@@ -168,7 +168,7 @@ export function FeatureFlagRulesDialog({
     <Dialog
       open={open}
       onClose={() => onOpenChange(false)}
-      size="lg"
+      size="xl"
       title="Targeting rules"
       description="Rules are evaluated top-to-bottom; the first match wins, and you can drag a rule by its handle to change that order. When no rule matches, the row toggle decides."
       primaryAction={{ label: "Save rules", onClick: () => void save(), loading: saving }}
@@ -267,7 +267,7 @@ function RuleEditorRow({
           >
             <GripVertical size={14} />
           </IconButton>
-          <Field.Root flexBasis="180px" flexShrink={0}>
+          <Field.Root flexBasis="160px" flexShrink={0}>
             <Field.Label fontSize="xs">Scope</Field.Label>
             <Select.Root
               collection={SCOPE_COLLECTION}
@@ -298,7 +298,7 @@ function RuleEditorRow({
             </Select.Root>
           </Field.Root>
           <RuleTargetField rule={rule} directory={directory} onChange={onChange} />
-          <Field.Root flexBasis="120px" flexShrink={0}>
+          <Field.Root flexBasis="88px" flexShrink={0}>
             <Field.Label fontSize="xs">Enabled</Field.Label>
             <HStack height="32px" alignItems="center">
               <Switch

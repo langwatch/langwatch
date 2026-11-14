@@ -2,10 +2,10 @@ import { Card } from "@langwatch/design-system/card";
 import { IdText } from "@langwatch/design-system/id-text";
 import {
   Badge,
+  Box,
   HStack,
   IconButton,
   Skeleton,
-  Spacer,
   Text,
 } from "@langwatch/design-system/primitives";
 import type { OpsFeatureFlagTarget, OpsFeatureFlagTargetKind } from "@langwatch/ops-contract";
@@ -30,9 +30,10 @@ export function FeatureFlagTargetChip({
 }) {
   return (
     <Card variant="panel" padding="xs" data-testid="feature-flag-target-chip">
-      <HStack gap={2} align="flex-start">
-        <ChipBody kind={kind} id={id} target={target} resolving={resolving} />
-        <Spacer />
+      <HStack gap={2} align="flex-start" minWidth={0}>
+        <Box flex={1} minWidth={0}>
+          <ChipBody kind={kind} id={id} target={target} resolving={resolving} />
+        </Box>
         <IconButton
           aria-label={`Remove ${target ? targetTitle(target) : id}`}
           size="2xs"

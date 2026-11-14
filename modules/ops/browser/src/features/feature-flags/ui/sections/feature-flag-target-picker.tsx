@@ -48,7 +48,7 @@ export function FeatureFlagTargetPicker({
   const results = enabled ? (search.data ?? []) : [];
 
   return (
-    <VStack align="stretch" gap={1.5}>
+    <VStack align="stretch" gap={1.5} width="full" minWidth={0}>
       {ids.map((id) => (
         <FeatureFlagTargetChip
           key={id}
