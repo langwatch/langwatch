@@ -5,7 +5,6 @@ import {
   EventingClickHouseEventStore,
   PrismaProcessStore,
   type EventingClickHouseClient,
-  type EventingClickHouseQueryResult,
 } from "@langwatch/eventing/server";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
@@ -13,14 +12,8 @@ import { ZodError } from "zod";
 class ClickHouseClientFake implements EventingClickHouseClient {
   readonly inserts: Parameters<EventingClickHouseClient["insert"]>[0][] = [];
 
-  async query(
-    _request: Parameters<EventingClickHouseClient["query"]>[0],
-  ): Promise<EventingClickHouseQueryResult> {
-    return {
-      json<Row>(): Promise<Row[]> {
-        return Promise.resolve([]);
-      },
-    };
+  async read<Row>(): Promise<{ rows: Row[] }> {
+    return { rows: [] };
   }
 
   async insert(request: Parameters<EventingClickHouseClient["insert"]>[0]): Promise<void> {

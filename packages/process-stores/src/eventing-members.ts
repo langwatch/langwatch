@@ -329,28 +329,15 @@ function eventingReadSeat({
 }
 
 /**
- * Adapts the routed process member to Eventing's tenant-resolved client. The
- * read runs where the caller names its row type — the only point at which this
- * seam knows what it reads back, and where every caller awaits it, once.
+ * Adapts the routed process member to Eventing's tenant-resolved client. A built
+ * read names its own tenant and scope, so it goes straight to the member.
  */
 function eventingClickHouseResolver(
   clickhouse: ClickHouseQueryClient,
 ): EventingClickHouseClientResolver {
   return (tenantId) =>
     Promise.resolve({
-      query: (request) =>
-        Promise.resolve({
-          json: <Row>() =>
-            clickhouse
-              .query<Row>({
-                tenantId,
-                sql: request.query,
-                ...(request.query_params === undefined ? {} : { params: request.query_params }),
-                ...(request.SKIP_COLD_SCAN_CHECK === true ? { SKIP_COLD_SCAN_CHECK: true } : {}),
-                ...(request.tenantIds === undefined ? {} : { tenantIds: request.tenantIds }),
-              })
-              .then((result) => result.rows),
-        }),
+      read: (input) => clickhouse.read(input),
       insert: (request) =>
         clickhouse.insert({
           tenantId,

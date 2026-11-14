@@ -167,7 +167,7 @@ describe("a pipeline's declared retention", () => {
     /** @scenario "An event_log row takes the tenant's retention from its own pipeline's resolver" */
     it("stamps a trace event row with the tenant's 90-day traces policy", async () => {
       const insert = vi.fn<EventingClickHouseClient["insert"]>().mockResolvedValue(undefined);
-      const client: EventingClickHouseClient = { query: vi.fn(), insert };
+      const client: EventingClickHouseClient = { read: vi.fn(), insert };
       const retention = createEventingRetentionConfiguration({ defaultRetentionDays: 49 });
       const resolve = vi.fn(async () => ({ traces: 90, scenarios: 30, experiments: 30 }));
       const { definition } = pipelineWith({ resolve });

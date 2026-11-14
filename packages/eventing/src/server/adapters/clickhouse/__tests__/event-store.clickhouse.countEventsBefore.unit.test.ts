@@ -15,10 +15,17 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
   let mockClickHouseClient: EventingClickHouseClient;
   let store: EventingClickHouseEventStore;
 
+  /** The built statement the count sent on its first read. */
+  function sentStatement(): Parameters<EventingClickHouseClient["read"]>[0]["statement"] {
+    const [sent] = vi.mocked(mockClickHouseClient.read).mock.calls[0] ?? [];
+    if (sent === undefined) throw new Error("the count sent no read");
+    return sent.statement;
+  }
+
   beforeEach(() => {
     // Mock ClickHouse client
     mockClickHouseClient = {
-      query: vi.fn(),
+      read: vi.fn(),
       insert: vi.fn(),
     };
 
@@ -39,10 +46,8 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       const eventId = "event-1";
 
       // Mock ClickHouse response
-      const mockResult = {
-        json: vi.fn().mockResolvedValue([{ count: 0 }]),
-      };
-      (mockClickHouseClient.query as ReturnType<typeof vi.fn>).mockResolvedValue(mockResult);
+      const mockResult = { rows: [{ count: 0 }] };
+      (mockClickHouseClient.read as ReturnType<typeof vi.fn>).mockResolvedValue(mockResult);
 
       const count = await store.countEventsBefore({
         aggregateId,
@@ -53,18 +58,10 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       });
 
       expect(count).toBe(0);
-      expect(mockClickHouseClient.query).toHaveBeenCalledWith(
-        expect.objectContaining({
-          query: expect.stringContaining("COUNT(DISTINCT EventId)"),
-          query_params: expect.objectContaining({
-            tenantId,
-
-            aggregateType,
-            aggregateId,
-            beforeTimestamp: timestamp,
-            beforeEventId: eventId,
-          }),
-        }),
+      const statement = sentStatement();
+      expect(statement.sql).toContain("countDistinct(EventId)");
+      expect(Object.values(statement.params)).toEqual(
+        expect.arrayContaining([tenantId, aggregateType, aggregateId, timestamp, eventId]),
       );
     });
 
@@ -74,10 +71,8 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       const eventId = "event-2";
 
       // Mock ClickHouse response - 1 event before
-      const mockResult = {
-        json: vi.fn().mockResolvedValue([{ count: 1 }]),
-      };
-      (mockClickHouseClient.query as ReturnType<typeof vi.fn>).mockResolvedValue(mockResult);
+      const mockResult = { rows: [{ count: 1 }] };
+      (mockClickHouseClient.read as ReturnType<typeof vi.fn>).mockResolvedValue(mockResult);
 
       const count = await store.countEventsBefore({
         aggregateId,
@@ -88,15 +83,9 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       });
 
       expect(count).toBe(1);
-      expect(mockClickHouseClient.query).toHaveBeenCalledWith(
-        expect.objectContaining({
-          query: expect.stringContaining("EventTimestamp <"),
-          query_params: expect.objectContaining({
-            beforeTimestamp: timestamp,
-            beforeEventId: eventId,
-          }),
-        }),
-      );
+      const statement = sentStatement();
+      expect(statement.sql).toContain("EventTimestamp <");
+      expect(Object.values(statement.params)).toEqual(expect.arrayContaining([timestamp, eventId]));
     });
 
     it("counts events with same timestamp but earlier ID", async () => {
@@ -105,10 +94,8 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       const eventId = "event-b";
 
       // Mock ClickHouse response - 1 event with same timestamp but earlier ID
-      const mockResult = {
-        json: vi.fn().mockResolvedValue([{ count: 1 }]),
-      };
-      (mockClickHouseClient.query as ReturnType<typeof vi.fn>).mockResolvedValue(mockResult);
+      const mockResult = { rows: [{ count: 1 }] };
+      (mockClickHouseClient.read as ReturnType<typeof vi.fn>).mockResolvedValue(mockResult);
 
       const count = await store.countEventsBefore({
         aggregateId,
@@ -119,14 +106,10 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       });
 
       expect(count).toBe(1);
-      expect(mockClickHouseClient.query).toHaveBeenCalledWith(
-        expect.objectContaining({
-          query: expect.stringContaining("EventId <"),
-          query_params: expect.objectContaining({
-            beforeTimestamp: sameTimestamp,
-            beforeEventId: eventId,
-          }),
-        }),
+      const statement = sentStatement();
+      expect(statement.sql).toContain("EventId <");
+      expect(Object.values(statement.params)).toEqual(
+        expect.arrayContaining([sameTimestamp, eventId]),
       );
     });
 
@@ -136,10 +119,8 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       const eventId = "non-existent-event";
 
       // Mock ClickHouse response - no events
-      const mockResult = {
-        json: vi.fn().mockResolvedValue([{ count: 0 }]),
-      };
-      (mockClickHouseClient.query as ReturnType<typeof vi.fn>).mockResolvedValue(mockResult);
+      const mockResult = { rows: [{ count: 0 }] };
+      (mockClickHouseClient.read as ReturnType<typeof vi.fn>).mockResolvedValue(mockResult);
 
       const count = await store.countEventsBefore({
         aggregateId,
@@ -158,10 +139,8 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       const eventId = "event-1";
 
       // Mock ClickHouse response
-      const mockResult = {
-        json: vi.fn().mockResolvedValue([{ count: 0 }]),
-      };
-      (mockClickHouseClient.query as ReturnType<typeof vi.fn>).mockResolvedValue(mockResult);
+      const mockResult = { rows: [{ count: 0 }] };
+      (mockClickHouseClient.read as ReturnType<typeof vi.fn>).mockResolvedValue(mockResult);
 
       await store.countEventsBefore({
         aggregateId,
@@ -172,14 +151,15 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       });
 
       // Verify query includes tenantId filter
-      expect(mockClickHouseClient.query).toHaveBeenCalledWith(
-        expect.objectContaining({
-          query: expect.stringContaining("TenantId = {tenantId:String}"),
-          query_params: expect.objectContaining({
-            tenantId,
-          }),
-        }),
-      );
+      const statement = sentStatement();
+      expect(statement.sql).toContain("FROM event_log WHERE TenantId = {tenantId:String}");
+      expect(statement).toMatchObject({
+        identity: "reader",
+        kind: "tenant",
+        tenantId,
+        params: { tenantId },
+        settings: { SQL_langwatch_tenant_ids: tenantId },
+      });
     });
 
     it("validates tenant context before querying", async () => {
@@ -198,7 +178,7 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       ).rejects.toThrow("tenantId");
 
       // Verify query was not executed
-      expect(mockClickHouseClient.query).not.toHaveBeenCalled();
+      expect(mockClickHouseClient.read).not.toHaveBeenCalled();
     });
 
     it("handles events with identical timestamps and different IDs", async () => {
@@ -207,10 +187,8 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       const eventId = "event-c";
 
       // Mock ClickHouse response - 2 events with same timestamp but earlier IDs
-      const mockResult = {
-        json: vi.fn().mockResolvedValue([{ count: 2 }]),
-      };
-      (mockClickHouseClient.query as ReturnType<typeof vi.fn>).mockResolvedValue(mockResult);
+      const mockResult = { rows: [{ count: 2 }] };
+      (mockClickHouseClient.read as ReturnType<typeof vi.fn>).mockResolvedValue(mockResult);
 
       const count = await store.countEventsBefore({
         aggregateId,
@@ -221,16 +199,9 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       });
 
       expect(count).toBe(2);
-      // Verify query includes both timestamp and ID comparison
-      // The actual query is multiline with parameterized placeholders
-      const callArgs = vi.mocked(mockClickHouseClient.query).mock.calls[0]?.[0];
-      expect(callArgs).toHaveProperty("query");
-      const query = String((callArgs as { query: unknown }).query);
-      // Verify query contains both conditions
-      expect(query).toMatch(/EventTimestamp\s*<\s*\{beforeTimestamp:UInt64\}/s);
-      expect(query).toMatch(
-        /EventTimestamp\s*=\s*\{beforeTimestamp:UInt64\}\s*AND\s*EventId\s*<\s*\{beforeEventId:String\}/s,
-      );
+      const query = sentStatement().sql;
+      expect(query).toMatch(/EventTimestamp < \{v\d+:UInt64\}/);
+      expect(query).toMatch(/EventTimestamp = \{v\d+:UInt64\} AND EventId < \{v\d+:String\}/);
     });
 
     it("handles ClickHouse query errors gracefully", async () => {
@@ -239,7 +210,7 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       const eventId = "event-1";
 
       const queryError = new Error("ClickHouse connection failed");
-      (mockClickHouseClient.query as ReturnType<typeof vi.fn>).mockRejectedValue(queryError);
+      (mockClickHouseClient.read as ReturnType<typeof vi.fn>).mockRejectedValue(queryError);
 
       await expect(
         store.countEventsBefore({

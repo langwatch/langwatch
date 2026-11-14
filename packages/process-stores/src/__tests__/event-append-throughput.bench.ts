@@ -53,7 +53,7 @@ const clickhouse = buildClickHouse({ config: { url: CH_URL }, directory });
 let inserts = 0;
 const resolveClient: EventingClickHouseClientResolver = (tenantId) =>
   Promise.resolve({
-    query: () => Promise.reject(new Error("the bench reads nothing")),
+    read: () => Promise.reject(new Error("the bench reads nothing")),
     insert: async (request) => {
       inserts++;
       await clickhouse.value.insert({

@@ -12,6 +12,9 @@ import { readEventRecord } from "../../../../stores/eventReadSeat.ts";
 
 const retention = createEventingRetentionConfiguration({ defaultRetentionDays: 49 });
 
+type Read = EventingClickHouseClient["read"];
+type ReadInput = Parameters<Read>[0];
+
 function repositoryFor(client: EventingClickHouseClient): EventingClickHouseEventRepository {
   return EventingClickHouseEventRepository.create({
     resolveClient: async () => client,
@@ -20,7 +23,7 @@ function repositoryFor(client: EventingClickHouseClient): EventingClickHouseEven
 }
 
 /**
- * A client that answers with the stored row projected through the query's own
+ * A client that answers with the stored row projected through the statement's own
  * SELECT list, the way ClickHouse does — a mock returning every column
  * regardless can't catch a read that forgets to project one.
  */
@@ -36,16 +39,15 @@ function createMockClient(payload: unknown) {
     IdempotencyKey: "",
   };
 
-  return {
-    query: vi.fn(async ({ query }: { query: string }) => {
-      const selected = Object.keys(storedRow).filter((column) =>
-        new RegExp(`\\b${column}\\b`).test(selectListOf(query)),
-      );
-      const projected = Object.fromEntries(selected.map((column) => [column, storedRow[column]]));
-      return { json: vi.fn().mockResolvedValue([projected]) };
-    }),
-    insert: vi.fn(),
-  };
+  const sent = vi.fn(({ statement }: ReadInput) => {
+    const selected = Object.keys(storedRow).filter((column) =>
+      new RegExp(`\\b${column}\\b`).test(selectListOf(statement.sql)),
+    );
+    return [Object.fromEntries(selected.map((column) => [column, storedRow[column]]))];
+  });
+  // Rows arrive untyped, as the driver's JSON does, until the caller names its row.
+  const read: Read = async (input) => ({ rows: JSON.parse(JSON.stringify(sent(input))) });
+  return { read, insert: vi.fn(), sent };
 }
 
 /** Everything between `SELECT` and the `FROM` that closes it. */
@@ -53,15 +55,17 @@ function selectListOf(query: string): string {
   return /SELECT([\s\S]*?)FROM/.exec(query)?.[1] ?? "";
 }
 
-/** The query text the repository sent on its Nth call. */
-function queryOf({
+/** The built read the repository sent on its Nth call. */
+function sentOf({
   client,
   call = 0,
 }: {
-  client: EventingClickHouseClient;
+  client: ReturnType<typeof createMockClient>;
   call?: number;
-}): string {
-  return (client.query as ReturnType<typeof vi.fn>).mock.calls[call]![0].query;
+}) {
+  const sent = client.sent.mock.calls[call]?.[0];
+  if (sent === undefined) throw new Error(`the repository sent no read ${call}`);
+  return sent;
 }
 
 describe("EventRepositoryClickHouse.getEventRecords", () => {
@@ -117,13 +121,11 @@ describe("EventRepositoryClickHouse.getEventRecords", () => {
         occurredAtFromMs: 1700000000000,
       });
 
-      const call = (client.query as ReturnType<typeof vi.fn>).mock.calls[0]![0];
-      expect(call.query).toContain(
-        "EventOccurredAt = 0 OR EventOccurredAt >= {occurredAtFromMs:UInt64}",
+      const { statement } = sentOf({ client });
+      expect(statement.sql).toMatch(
+        /\(EventOccurredAt = \{v\d+:UInt64\} OR EventOccurredAt >= \{v\d+:UInt64\}\)/,
       );
-      expect(call.query_params).toMatchObject({
-        occurredAtFromMs: 1700000000000,
-      });
+      expect(Object.values(statement.params)).toEqual(expect.arrayContaining([0, 1700000000000]));
     });
   });
 
@@ -138,9 +140,9 @@ describe("EventRepositoryClickHouse.getEventRecords", () => {
         aggregateId: "id",
       });
 
-      const call = (client.query as ReturnType<typeof vi.fn>).mock.calls[0]![0];
-      expect(call.query).not.toContain("EventOccurredAt >=");
-      expect(call.query_params).not.toHaveProperty("occurredAtFromMs");
+      const { statement } = sentOf({ client });
+      expect(statement.sql).not.toContain("EventOccurredAt >=");
+      expect(Object.values(statement.params)).not.toContain(0);
     });
 
     it("treats a zero lower bound as unbounded", async () => {
@@ -154,9 +156,9 @@ describe("EventRepositoryClickHouse.getEventRecords", () => {
         occurredAtFromMs: 0,
       });
 
-      const call = (client.query as ReturnType<typeof vi.fn>).mock.calls[0]![0];
-      expect(call.query).not.toContain("EventOccurredAt >=");
-      expect(call.query_params).not.toHaveProperty("occurredAtFromMs");
+      const { statement } = sentOf({ client });
+      expect(statement.sql).not.toContain("EventOccurredAt >=");
+      expect(Object.values(statement.params)).not.toContain(0);
     });
   });
 });
@@ -173,17 +175,15 @@ describe("EventRepositoryClickHouse.getEventRecord", () => {
       eventId: "event-a",
     });
 
-    const call = (client.query as ReturnType<typeof vi.fn>).mock.calls[0]![0];
-    expect(call.query).toContain("TenantId = {tenantId:String}");
-    expect(call.query).toContain("AggregateType = {aggregateType:String}");
-    expect(call.query).toContain("AggregateId = {aggregateId:String}");
-    expect(call.query).toContain("EventId = {eventId:String}");
-    expect(call.query_params).toMatchObject({
-      tenantId: "tenant-a",
-      aggregateType: "trace",
-      aggregateId: "trace-a",
-      eventId: "event-a",
-    });
+    const { statement } = sentOf({ client });
+    expect(statement.sql).toContain("FROM event_log WHERE TenantId = {tenantId:String}");
+    expect(statement.sql).toMatch(/AggregateType = \{v\d+:String\}/);
+    expect(statement.sql).toMatch(/AggregateId = \{v\d+:String\}/);
+    expect(statement.sql).toMatch(/EventId = \{v\d+:String\}/);
+    expect(statement.params).toMatchObject({ tenantId: "tenant-a" });
+    expect(Object.values(statement.params)).toEqual(
+      expect.arrayContaining(["trace", "trace-a", "event-a"]),
+    );
   });
 });
 
@@ -219,8 +219,10 @@ describe("EventRepositoryClickHouse read projections", () => {
           limit: 10,
         });
 
+        const columns = EVENT_LOG_SELECT_COLUMNS.split(",").map((column) => column.trim());
         for (let call = 0; call < 3; call++) {
-          expect(queryOf({ client, call })).toContain(EVENT_LOG_SELECT_COLUMNS);
+          const selected = selectListOf(sentOf({ client, call }).statement.sql);
+          for (const column of columns) expect(selected).toMatch(new RegExp(`\\b${column}\\b`));
         }
       });
     });
@@ -253,7 +255,7 @@ describe("EventRepositoryClickHouse read projections", () => {
 describe("EventRepositoryClickHouse full-scan declarations", () => {
   const history = { tenantId: "tenant", aggregateType: "user", aggregateId: "id" };
   const upTo = { ...history, upToTimestamp: 1700000000001, upToEventId: "evt" };
-  const declared = expect.objectContaining({ SKIP_COLD_SCAN_CHECK: true });
+  const declared = expect.objectContaining({ declaresFullScan: true });
 
   /** Runs the three aggregate-history reads, each with or without a lower bound. */
   async function readAllThree({ occurredAtFromMs }: { occurredAtFromMs?: number }) {
@@ -263,7 +265,7 @@ describe("EventRepositoryClickHouse full-scan declarations", () => {
     await repository.getEventRecords({ ...history, ...bound });
     await repository.getEventRecordsUpTo({ ...upTo, ...bound });
     await repository.getEventRecordsUpToPaged({ ...upTo, ...bound, after: undefined, limit: 10 });
-    return client.query;
+    return client.sent;
   }
 
   describe("given a long-lived aggregate read with no lower bound", () => {
@@ -287,8 +289,9 @@ describe("EventRepositoryClickHouse full-scan declarations", () => {
 describe("EventRepositoryClickHouse over a ready event log index", () => {
   /** An index ready on every target, answering one range for every aggregate it is asked. */
   function indexedRepository({ rows }: { rows: unknown[] }) {
-    const query = vi.fn(async () => ({ json: vi.fn().mockResolvedValue(rows) }));
-    const client: EventingClickHouseClient = { query, insert: vi.fn() };
+    const query = vi.fn((_input: ReadInput) => rows);
+    const read: Read = async (input) => ({ rows: JSON.parse(JSON.stringify(query(input))) });
+    const client: EventingClickHouseClient = { read, insert: vi.fn() };
     const indexBounds = vi.fn(async () => ({
       n: 1,
       fromMs: 1_600_000_000_000,
@@ -318,10 +321,8 @@ describe("EventRepositoryClickHouse over a ready event log index", () => {
       });
 
       expect(indexBounds).not.toHaveBeenCalled();
-      expect(query).toHaveBeenCalledWith(
-        expect.objectContaining({
-          query_params: expect.objectContaining({ occurredAtFromMs: 1_650_000_000_000 }),
-        }),
+      expect(Object.values(query.mock.calls[0]?.[0].statement.params ?? {})).toContain(
+        1_650_000_000_000,
       );
     });
   });
@@ -343,6 +344,36 @@ describe("EventRepositoryClickHouse over a ready event log index", () => {
 
       expect(indexBounds).toHaveBeenCalledTimes(1);
       expect(query).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe("EventRepositoryClickHouse read scopes", () => {
+  const key = { tenantId: "tenant-a", aggregateType: "trace", aggregateId: "trace-a" };
+  const upTo = { ...key, upToTimestamp: 1700000000001, upToEventId: "evt" };
+
+  describe("given each read of one aggregate", () => {
+    it("sends a built statement on the reader identity, scoped to that tenant alone", async () => {
+      const client = createMockClient({});
+      const repository = repositoryFor(client);
+
+      await repository.getEventRecord({ ...key, eventId: "evt" });
+      await repository.getEventRecords(key);
+      await repository.getEventRecordsUpTo(upTo);
+      await repository.getEventRecordsUpToPaged({ ...upTo, after: undefined, limit: 10 });
+      await repository.countEventRecords({ ...key, beforeTimestamp: 1, beforeEventId: "evt" });
+
+      expect(client.sent).toHaveBeenCalledTimes(5);
+      for (let call = 0; call < 5; call++) {
+        const { statement } = sentOf({ client, call });
+        expect(statement).toMatchObject({
+          identity: "reader",
+          kind: "tenant",
+          tenantId: "tenant-a",
+          settings: { SQL_langwatch_tenant_ids: "tenant-a" },
+        });
+        expect(statement.sql).toContain("FROM event_log WHERE TenantId = {tenantId:String}");
+      }
     });
   });
 });

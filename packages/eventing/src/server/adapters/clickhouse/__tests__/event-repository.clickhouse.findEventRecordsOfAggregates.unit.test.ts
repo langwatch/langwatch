@@ -6,6 +6,7 @@
 import {
   createEventingRetentionConfiguration,
   EventingClickHouseEventRepository,
+  type EventingClickHouseClient,
 } from "@langwatch/eventing/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -27,11 +28,12 @@ function rowOf({ tenantId, aggregateId }: { tenantId: string; aggregateId: strin
 }
 
 function repositoryAnswering(rows: ReturnType<typeof rowOf>[]) {
-  const query = vi.fn(async (_request: Record<string, unknown>) => ({
-    json: async <Row>(): Promise<Row[]> =>
-      rows.flatMap((row): Row[] => [JSON.parse(JSON.stringify(row))]),
-  }));
-  const resolveClient = vi.fn(async (_tenantId: string) => ({ query, insert: vi.fn() }));
+  const query = vi.fn((_input: Parameters<EventingClickHouseClient["read"]>[0]) => rows);
+  // Rows arrive untyped, as the driver's JSON does, until the caller names its row.
+  const read: EventingClickHouseClient["read"] = async (input) => ({
+    rows: JSON.parse(JSON.stringify(query(input))),
+  });
+  const resolveClient = vi.fn(async (_tenantId: string) => ({ read, insert: vi.fn() }));
   const repository = EventingClickHouseEventRepository.create({ resolveClient, retention });
   return { repository, query, resolveClient };
 }
@@ -39,7 +41,7 @@ function repositoryAnswering(rows: ReturnType<typeof rowOf>[]) {
 describe("EventingClickHouseEventRepository.findEventRecordsOfAggregates", () => {
   describe("when many aggregates are read in one read", () => {
     /** @scenario "A read of many aggregates asks the event log by tenant set first" */
-    it("sends one query filtering the tenant set first and declares that set", async () => {
+    it("sends one read filtering the tenant set first and declares that set", async () => {
       const { repository, query, resolveClient } = repositoryAnswering([]);
 
       await repository.findEventRecordsOfAggregates({
@@ -52,18 +54,17 @@ describe("EventingClickHouseEventRepository.findEventRecordsOfAggregates", () =>
 
       expect(query).toHaveBeenCalledTimes(1);
       expect(resolveClient).toHaveBeenCalledWith("user-1");
-      const request = query.mock.calls[0]?.[0];
-      const where = String(request?.query).replace(/\s+/g, " ");
-      expect(where).toContain(
-        "WHERE TenantId IN ({tenantIds:Array(String)}) AND AggregateType = {aggregateType:String} AND AggregateId IN ({aggregateIds:Array(String)})",
+      const statement = query.mock.calls[0]?.[0].statement;
+      expect(statement?.sql).toContain(
+        "WHERE TenantId IN ({tenantIds:Array(String)}) AND (AggregateType = {v0:String} AND AggregateId IN ({v1:Array(String)}))",
       );
-      expect(request).toMatchObject({
-        query_params: {
-          tenantIds: ["user-1", "user-2"],
-          aggregateType: "user",
-          aggregateIds: ["user-1", "user-2"],
-        },
+      expect(statement).toMatchObject({
+        identity: "reader",
+        kind: "tenant",
+        tenantId: "user-1",
         tenantIds: ["user-1", "user-2"],
+        settings: { SQL_langwatch_tenant_ids: "user-1,user-2" },
+        params: { v0: "user", v1: ["user-1", "user-2"] },
       });
     });
 

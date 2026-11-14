@@ -1,17 +1,7 @@
-export interface EventingClickHouseQueryResult {
-  json<Row>(): Promise<Row[]>;
-}
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 
-export interface EventingClickHouseClient {
-  query: (request: {
-    query: string;
-    query_params?: Record<string, unknown>;
-    format: "JSONEachRow";
-    /** Set when the read must walk every partition; see the member's cold-scan warning. */
-    SKIP_COLD_SCAN_CHECK?: true | undefined;
-    /** The tenant set a `TenantId IN {...:Array(String)}` read binds, resolving tenant included. */
-    tenantIds?: readonly string[] | undefined;
-  }) => Promise<EventingClickHouseQueryResult>;
+/** Built reads go straight to the routed member; inserts keep Eventing's own request shape. */
+export type EventingClickHouseClient = Pick<ClickHouseQueryClient, "read"> & {
   insert(request: {
     table: string;
     values: readonly Record<string, unknown>[];
@@ -20,7 +10,7 @@ export interface EventingClickHouseClient {
     /** The tenant set a batch of several tenants' rows declares, resolving tenant included. */
     tenantIds?: readonly string[] | undefined;
   }): Promise<unknown>;
-}
+};
 
 /**
  * Tenant-aware ClickHouse resolution is composed by the process root. Eventing

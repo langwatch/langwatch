@@ -46,7 +46,6 @@ export {
 export type {
   EventingClickHouseClient,
   EventingClickHouseClientResolver,
-  EventingClickHouseQueryResult,
   EventingClickHouseReplayClient,
   EventingClickHouseReplayStatement,
 } from "./clickhouse-client-resolver.ts";

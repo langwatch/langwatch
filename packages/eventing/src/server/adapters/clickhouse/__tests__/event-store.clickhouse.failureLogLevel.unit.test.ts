@@ -41,7 +41,7 @@ const event = {
 
 const storeFailingWith = (failure: Error) => {
   const client: EventingClickHouseClient = {
-    query: vi.fn(),
+    read: vi.fn(),
     insert: vi.fn<EventingClickHouseClient["insert"]>().mockRejectedValue(failure),
   };
   const retention = createEventingRetentionConfiguration({ defaultRetentionDays: 49 });

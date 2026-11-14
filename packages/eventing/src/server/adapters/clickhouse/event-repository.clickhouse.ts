@@ -13,6 +13,13 @@ import type {
 import type { EventingRetentionConfiguration } from "../../eventing-server-runtime.ts";
 import { type EventLogIdIndex, eventLogOccurredRange } from "../../tables/event-log-id-index.ts";
 import { EventLogAppendFold, type EventLogInsert } from "./event-log-append-fold.ts";
+import {
+  aggregateEventsRead,
+  aggregateEventsUpToRead,
+  eventCountBeforeRead,
+  eventRecordRead,
+  eventsOfAggregatesRead,
+} from "./event-log-reads.clickhouse.ts";
 
 const NUMERIC_STRING_REGEX = /^-?\d+(\.\d+)?$/;
 
@@ -50,7 +57,7 @@ function normalizePayloadValue(value: unknown): unknown {
   return value;
 }
 
-/** All event_log columns the row mapper reads, shared across all three query paths. */
+/** The event_log columns the row mapper reads, for a raw reader outside this repository. */
 const EVENT_LOG_COLUMNS = [
   "EventId",
   "EventTimestamp",
@@ -106,24 +113,6 @@ export function mapEventLogRows({
     ProcessingTraceparent: row.ProcessingTraceparent || "",
     IdempotencyKey: row.IdempotencyKey || "",
   }));
-}
-
-/** The EventOccurredAt bound as SQL; `EventOccurredAt = 0` (unknown) rows are always kept. */
-function occurredAtPredicate(window: EventOccurredAtWindow | undefined): {
-  predicate: string;
-  params: Record<string, number>;
-} {
-  if (window === undefined) return { predicate: "", params: {} };
-  return {
-    predicate: `AND (
-            EventOccurredAt = 0
-            OR (
-              EventOccurredAt >= {occurredAtFromMs:UInt64}
-              AND EventOccurredAt <= {occurredAtToMs:UInt64}
-            )
-          )`,
-    params: { occurredAtFromMs: window.fromMs, occurredAtToMs: window.toMs },
-  };
 }
 
 /** Inserts one organisation's appends hold at once before the rest fold into the next. */
@@ -268,31 +257,16 @@ export class EventingClickHouseEventRepository implements EventRepository {
       aggregateTypes: [aggregateType],
       aggregateIds: [String(aggregateId)],
     });
-    const window = occurredAtPredicate(indexed ?? request.occurredAt);
     const client = await this.getClient(tenantId);
-    const result = await client.query({
-      query: `
-        SELECT
-          ${EVENT_LOG_SELECT_COLUMNS}
-        FROM event_log
-        WHERE TenantId = {tenantId:String}
-          AND AggregateType = {aggregateType:String}
-          AND AggregateId = {aggregateId:String}
-          AND EventId = {eventId:String}
-          ${window.predicate}
-        ORDER BY EventTimestamp DESC
-        LIMIT 1
-      `,
-      query_params: {
+    const { rows } = await client.read(
+      eventRecordRead({
         tenantId,
         aggregateType,
         aggregateId,
         eventId,
-        ...window.params,
-      },
-      format: "JSONEachRow",
-    });
-    const rows = await result.json<EventLogRow>();
+        window: indexed ?? request.occurredAt,
+      }),
+    );
     const records = mapEventLogRows({
       rows,
       tenantId,
@@ -333,38 +307,15 @@ export class EventingClickHouseEventRepository implements EventRepository {
         occurredAtFromMs: requestedFromMs,
       });
       const client = await this.getClient(tenantId);
-      // When a lower bound is supplied, add a predicate on EventOccurredAt so
-      // ClickHouse can prune weekly partitions older than the bound instead of
-      // cold-scanning S3. Rows with unknown occurred time (0) are always kept
-      // so the bound can never drop an event; the partition key is monotonic
-      // in EventOccurredAt so the predicate actually prunes.
-      const hasLowerBound = typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
-      const occurredAtFilter = hasLowerBound
-        ? "AND (EventOccurredAt = 0 OR EventOccurredAt >= {occurredAtFromMs:UInt64})"
-        : "";
-      const result = await client.query({
-        query: `
-          SELECT
-            ${EVENT_LOG_SELECT_COLUMNS}
-          FROM event_log
-          WHERE TenantId = {tenantId:String}
-            AND AggregateType = {aggregateType:String}
-            AND AggregateId = {aggregateId:String}
-            ${occurredAtFilter}
-          ORDER BY EventTimestamp ASC, EventId ASC
-        `,
-        query_params: {
+      // A positive bound prunes weekly partitions; unbounded, a fold reads the whole history.
+      const { rows } = await client.read(
+        aggregateEventsRead({
           tenantId,
           aggregateType,
           aggregateId: String(aggregateId),
-          ...(hasLowerBound ? { occurredAtFromMs } : {}),
-        },
-        format: "JSONEachRow",
-        // Unbounded, this is one aggregate's whole history by its key: a fold needs all of it.
-        ...(hasLowerBound ? {} : { SKIP_COLD_SCAN_CHECK: true as const }),
-      });
-
-      const rows = await result.json<EventLogRow>();
+          occurredAtFromMs,
+        }),
+      );
 
       return mapEventLogRows({ rows, tenantId, aggregateType, aggregateId });
     } catch (error) {
@@ -397,36 +348,10 @@ export class EventingClickHouseEventRepository implements EventRepository {
         aggregates,
         aggregateType,
       });
-      const hasLowerBound = typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
-      const occurredAtFilter = hasLowerBound
-        ? "AND (EventOccurredAt = 0 OR EventOccurredAt >= {occurredAtFromMs:UInt64})"
-        : "";
       const client = await this.getClient(resolvingTenantId);
-      const result = await client.query({
-        query: `
-          SELECT
-            TenantId,
-            AggregateId,
-            ${EVENT_LOG_SELECT_COLUMNS}
-          FROM event_log
-          WHERE TenantId IN ({tenantIds:Array(String)})
-            AND AggregateType = {aggregateType:String}
-            AND AggregateId IN ({aggregateIds:Array(String)})
-            ${occurredAtFilter}
-          ORDER BY TenantId ASC, AggregateId ASC, EventTimestamp ASC, EventId ASC
-        `,
-        query_params: {
-          tenantIds,
-          aggregateType,
-          aggregateIds,
-          ...(hasLowerBound ? { occurredAtFromMs } : {}),
-        },
-        format: "JSONEachRow",
-        tenantIds,
-        // Unbounded, each aggregate's whole history by its key, as in `getEventRecords`.
-        ...(hasLowerBound ? {} : { SKIP_COLD_SCAN_CHECK: true as const }),
-      });
-      const rows = await result.json<EventLogRow & { TenantId: string; AggregateId: string }>();
+      const { rows } = await client.read(
+        eventsOfAggregatesRead({ tenantIds, aggregateType, aggregateIds, occurredAtFromMs }),
+      );
       const asked = new Set(
         aggregates.map(({ tenantId, aggregateId }) => `${tenantId}\n${aggregateId}`),
       );
@@ -476,42 +401,16 @@ export class EventingClickHouseEventRepository implements EventRepository {
       // table is PARTITION BY toYearWeek(EventOccurredAt), so ONLY an
       // EventOccurredAt predicate prunes. Without one this walks every weekly
       // partition ever written, including the cold tier on S3.
-      const hasLowerBound = typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
-      const occurredAtFilter = hasLowerBound
-        ? "AND (EventOccurredAt = 0 OR EventOccurredAt >= {occurredAtFromMs:UInt64})"
-        : "";
-      const result = await client.query({
-        query: `
-          SELECT
-            ${EVENT_LOG_SELECT_COLUMNS}
-          FROM event_log
-          WHERE TenantId = {tenantId:String}
-            AND AggregateType = {aggregateType:String}
-            AND AggregateId = {aggregateId:String}
-            ${occurredAtFilter}
-            AND (
-              EventTimestamp < {upToTimestamp:UInt64}
-              OR (
-                EventTimestamp = {upToTimestamp:UInt64}
-                AND EventId <= {upToEventId:String}
-              )
-            )
-          ORDER BY EventTimestamp ASC, EventId ASC
-        `,
-        query_params: {
+      const { rows } = await client.read(
+        aggregateEventsUpToRead({
           tenantId,
           aggregateType,
           aggregateId: String(aggregateId),
           upToTimestamp,
           upToEventId,
-          ...(hasLowerBound ? { occurredAtFromMs } : {}),
-        },
-        format: "JSONEachRow",
-        // Unbounded, as in `getEventRecords`: a long-lived aggregate's history by its key.
-        ...(hasLowerBound ? {} : { SKIP_COLD_SCAN_CHECK: true as const }),
-      });
-
-      const rows = await result.json<EventLogRow>();
+          occurredAtFromMs,
+        }),
+      );
 
       return mapEventLogRows({ rows, tenantId, aggregateType, aggregateId });
     } catch (error) {
@@ -554,18 +453,18 @@ export class EventingClickHouseEventRepository implements EventRepository {
         occurredAtFromMs: request.occurredAtFromMs,
       });
       const client = await this.getClient(tenantId);
-      const { query, query_params, declaresFullScan } = this.buildPagedQuery({
-        ...request,
-        occurredAtFromMs,
-      });
-      const result = await client.query({
-        query,
-        query_params,
-        format: "JSONEachRow",
-        // Unbounded, as in `getEventRecords`: a long-lived aggregate's history by its key.
-        ...(declaresFullScan ? { SKIP_COLD_SCAN_CHECK: true as const } : {}),
-      });
-      const rows = await result.json<EventLogRow>();
+      // The cursor and upper bound are on EventTimestamp, not the partition key: neither prunes.
+      const { rows } = await client.read(
+        aggregateEventsUpToRead({
+          tenantId,
+          aggregateType,
+          aggregateId: String(aggregateId),
+          upToTimestamp: request.upToTimestamp,
+          upToEventId: request.upToEventId,
+          occurredAtFromMs,
+          page: { after: request.after, limit: request.limit },
+        }),
+      );
       return mapEventLogRows({ rows, tenantId, aggregateType, aggregateId });
     } catch (error) {
       this.logger.warn(
@@ -574,80 +473,6 @@ export class EventingClickHouseEventRepository implements EventRepository {
       );
       throw error;
     }
-  }
-
-  /** Query + params for {@link getEventRecordsUpToPaged}. */
-  private buildPagedQuery(request: {
-    tenantId: string;
-    aggregateType: string;
-    aggregateId: string;
-    upToTimestamp: number;
-    upToEventId: string;
-    after: { timestamp: number; eventId: string } | undefined;
-    limit: number;
-    occurredAtFromMs?: number;
-  }): {
-    query: string;
-    query_params: Record<string, unknown>;
-    declaresFullScan: boolean;
-  } {
-    const {
-      tenantId,
-      aggregateType,
-      aggregateId,
-      upToTimestamp,
-      upToEventId,
-      after,
-      limit,
-      occurredAtFromMs,
-    } = request;
-    const afterClause = after
-      ? `AND (
-            EventTimestamp > {afterTimestamp:UInt64}
-            OR (
-              EventTimestamp = {afterTimestamp:UInt64}
-              AND EventId > {afterEventId:String}
-            )
-          )`
-      : "";
-    // The cursor and the upper bound are both on EventTimestamp, which is NOT
-    // the partition key — so neither prunes. Only EventOccurredAt does.
-    const hasLowerBound = typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
-    const occurredAtFilter = hasLowerBound
-      ? "AND (EventOccurredAt = 0 OR EventOccurredAt >= {occurredAtFromMs:UInt64})"
-      : "";
-    return {
-      query: `
-        SELECT
-          ${EVENT_LOG_SELECT_COLUMNS}
-        FROM event_log
-        WHERE TenantId = {tenantId:String}
-          AND AggregateType = {aggregateType:String}
-          AND AggregateId = {aggregateId:String}
-          ${occurredAtFilter}
-          AND (
-            EventTimestamp < {upToTimestamp:UInt64}
-            OR (
-              EventTimestamp = {upToTimestamp:UInt64}
-              AND EventId <= {upToEventId:String}
-            )
-          )
-          ${afterClause}
-        ORDER BY EventTimestamp ASC, EventId ASC
-        LIMIT {limit:UInt32}
-      `,
-      query_params: {
-        tenantId,
-        aggregateType,
-        aggregateId: String(aggregateId),
-        upToTimestamp,
-        upToEventId,
-        ...(hasLowerBound ? { occurredAtFromMs } : {}),
-        ...(after ? { afterTimestamp: after.timestamp, afterEventId: after.eventId } : {}),
-        limit,
-      },
-      declaresFullScan: !hasLowerBound,
-    };
   }
 
   async countEventRecords({
@@ -670,34 +495,17 @@ export class EventingClickHouseEventRepository implements EventRepository {
         aggregateId,
         occurredAtFromMs: undefined,
       });
-      const hasLowerBound = occurredAtFromMs !== undefined;
       const client = await this.getClient(tenantId);
-      const result = await client.query({
-        query: `
-          SELECT COUNT(DISTINCT EventId) as count
-          FROM event_log
-          WHERE TenantId = {tenantId:String}
-            AND AggregateType = {aggregateType:String}
-            AND AggregateId = {aggregateId:String}
-            ${hasLowerBound ? "AND (EventOccurredAt = 0 OR EventOccurredAt >= {occurredAtFromMs:UInt64})" : ""}
-            AND (
-              EventTimestamp < {beforeTimestamp:UInt64}
-              OR (EventTimestamp = {beforeTimestamp:UInt64} AND EventId < {beforeEventId:String})
-            )
-            AND EventId != {beforeEventId:String}
-        `,
-        query_params: {
+      const { rows } = await client.read(
+        eventCountBeforeRead({
           tenantId,
           aggregateType,
           aggregateId: String(aggregateId),
           beforeTimestamp,
           beforeEventId,
-          ...(hasLowerBound ? { occurredAtFromMs } : {}),
-        },
-        format: "JSONEachRow",
-      });
-
-      const rows = await result.json<{ count: string }>();
+          occurredAtFromMs,
+        }),
+      );
       const count = Number(rows[0]?.count ?? 0);
 
       return count;

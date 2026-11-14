@@ -42,7 +42,7 @@ function heldServer({
     release = resolve;
   });
   const clientOf = (tenantId: string): EventingClickHouseClient => ({
-    query: async () => ({ json: async () => [] }),
+    read: async () => ({ rows: [] }),
     insert: async (request) => {
       const insert = {
         tenantId,

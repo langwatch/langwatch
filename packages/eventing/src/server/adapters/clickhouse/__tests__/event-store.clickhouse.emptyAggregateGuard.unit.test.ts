@@ -21,7 +21,7 @@ describe("EventStoreClickHouse - empty aggregateId guard", () => {
 
   beforeEach(() => {
     mockClickHouseClient = {
-      query: vi.fn(),
+      read: vi.fn(),
       insert: vi.fn(),
     };
 
@@ -56,7 +56,7 @@ describe("EventStoreClickHouse - empty aggregateId guard", () => {
         const events = await store.getEvents({ aggregateId, context: { tenantId }, aggregateType });
 
         expect(events).toEqual([]);
-        expect(mockClickHouseClient.query).not.toHaveBeenCalled();
+        expect(mockClickHouseClient.read).not.toHaveBeenCalled();
       });
     });
 
@@ -70,7 +70,7 @@ describe("EventStoreClickHouse - empty aggregateId guard", () => {
         });
 
         expect(events).toEqual([]);
-        expect(mockClickHouseClient.query).not.toHaveBeenCalled();
+        expect(mockClickHouseClient.read).not.toHaveBeenCalled();
       });
     });
 
@@ -85,7 +85,7 @@ describe("EventStoreClickHouse - empty aggregateId guard", () => {
         });
 
         expect(count).toBe(0);
-        expect(mockClickHouseClient.query).not.toHaveBeenCalled();
+        expect(mockClickHouseClient.read).not.toHaveBeenCalled();
       });
     });
   });
@@ -93,17 +93,12 @@ describe("EventStoreClickHouse - empty aggregateId guard", () => {
   describe("given a real aggregateId", () => {
     describe("when getEvents is called", () => {
       it("issues the event_log read", async () => {
-        (mockClickHouseClient.query as ReturnType<typeof vi.fn>).mockResolvedValue({
-          json: vi.fn().mockResolvedValue([]),
-        });
+        (mockClickHouseClient.read as ReturnType<typeof vi.fn>).mockResolvedValue({ rows: [] });
 
         await store.getEvents({ aggregateId: "trace-123", context: { tenantId }, aggregateType });
 
-        expect(mockClickHouseClient.query).toHaveBeenCalledWith(
-          expect.objectContaining({
-            query_params: expect.objectContaining({ aggregateId: "trace-123" }),
-          }),
-        );
+        const [sent] = (mockClickHouseClient.read as ReturnType<typeof vi.fn>).mock.calls[0] ?? [];
+        expect(Object.values(sent.statement.params)).toContain("trace-123");
       });
     });
   });

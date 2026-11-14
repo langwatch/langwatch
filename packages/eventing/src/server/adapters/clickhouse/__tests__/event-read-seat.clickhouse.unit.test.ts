@@ -9,30 +9,32 @@ import {
 import { generate, Ksuid } from "@langwatch/ksuid";
 import { describe, expect, it } from "vitest";
 
-/** Records each statement and answers with one stored row. */
+type Read = EventingClickHouseClient["read"];
+
+/** Records each built statement and answers with one stored row. */
 function recordingClient(eventId: string) {
-  const statements: { query: string; query_params?: Record<string, unknown> }[] = [];
-  const client: EventingClickHouseClient = {
-    query: async (request) => {
-      statements.push(request);
-      return {
-        json: async <Row>() =>
-          [
-            {
-              EventId: eventId,
-              EventTimestamp: 1,
-              EventOccurredAt: 1,
-              EventType: "lw.obs.trace.span_received",
-              EventPayload: "{}",
-              EventVersion: "2025-12-14",
-              ProcessingTraceparent: "",
-              IdempotencyKey: eventId,
-            },
-          ] as Row[],
-      };
-    },
-    insert: async () => undefined,
+  const statements: Parameters<Read>[0]["statement"][] = [];
+  const read: Read = async ({ statement }) => {
+    statements.push(statement);
+    // Rows arrive untyped, as the driver's JSON does, until the caller names its row.
+    return {
+      rows: JSON.parse(
+        JSON.stringify([
+          {
+            EventId: eventId,
+            EventTimestamp: 1,
+            EventOccurredAt: 1,
+            EventType: "lw.obs.trace.span_received",
+            EventPayload: "{}",
+            EventVersion: "2025-12-14",
+            ProcessingTraceparent: "",
+            IdempotencyKey: eventId,
+          },
+        ]),
+      ),
+    };
   };
+  const client: EventingClickHouseClient = { read, insert: async () => undefined };
   return { client, statements };
 }
 
@@ -57,21 +59,27 @@ describe("EventLogReadSeat over the ClickHouse event log", () => {
       });
 
       const [statement] = statements;
-      const where = statement!.query.replace(/\s+/g, " ");
-      expect(where).toMatch(/WHERE TenantId = \{tenantId:String\} AND AggregateType/);
-      expect(where).toContain(
-        "AND AggregateId = {aggregateId:String} AND EventId = {eventId:String}",
-      );
-      expect(where).toContain(
-        "EventOccurredAt = 0 OR ( EventOccurredAt >= {occurredAtFromMs:UInt64} AND EventOccurredAt <= {occurredAtToMs:UInt64} )",
-      );
-      expect(statement!.query_params).toEqual({
+      expect(statement).toMatchObject({
+        identity: "reader",
+        kind: "tenant",
         tenantId: "project-1",
-        aggregateType: "trace",
-        aggregateId: "trace-1",
-        eventId,
-        occurredAtFromMs: idTimeMs - EVENT_READ_WINDOW_MS,
-        occurredAtToMs: idTimeMs + EVENT_READ_WINDOW_MS,
+        settings: { SQL_langwatch_tenant_ids: "project-1" },
+      });
+      expect(statement?.sql).toContain(
+        "FROM event_log WHERE TenantId = {tenantId:String} AND (AggregateType = {v0:String}",
+      );
+      expect(statement?.sql).toContain("AggregateId = {v1:String} AND EventId = {v2:String}");
+      expect(statement?.sql).toContain(
+        "(EventOccurredAt = {v3:UInt64} OR (EventOccurredAt >= {v4:UInt64} AND EventOccurredAt <= {v5:UInt64}))",
+      );
+      expect(statement?.params).toEqual({
+        tenantId: "project-1",
+        v0: "trace",
+        v1: "trace-1",
+        v2: eventId,
+        v3: 0,
+        v4: idTimeMs - EVENT_READ_WINDOW_MS,
+        v5: idTimeMs + EVENT_READ_WINDOW_MS,
       });
     });
   });

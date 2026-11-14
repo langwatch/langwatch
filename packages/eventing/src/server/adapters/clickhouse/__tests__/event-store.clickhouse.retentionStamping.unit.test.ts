@@ -30,7 +30,7 @@ describe("EventStoreClickHouse retention stamping", () => {
   beforeEach(() => {
     insertSpy = vi.fn<EventingClickHouseClient["insert"]>().mockResolvedValue(undefined);
     mockClient = {
-      query: vi.fn(),
+      read: vi.fn(),
       insert: insertSpy,
     };
   });

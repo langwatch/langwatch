@@ -20,17 +20,20 @@ const tenantId = createTenantId("test-tenant");
 const OCCURRED_AT = 1_700_000_000_000;
 const TIME_LOCAL: AggregateType = "trace";
 
-let queryMock: Mock<EventingClickHouseClient["query"]>;
+type Read = EventingClickHouseClient["read"];
+
+let queryMock: Mock<(input: Parameters<Read>[0]) => unknown[]>;
 let store: EventingClickHouseEventStore;
 
 beforeEach(() => {
-  queryMock = vi
-    .fn<EventingClickHouseClient["query"]>()
-    .mockResolvedValue({ json: async () => [] });
+  queryMock = vi.fn(() => []);
   const retention = createEventingRetentionConfiguration({ defaultRetentionDays: 49 });
   store = EventingClickHouseEventStore.create({
     repository: EventingClickHouseEventRepository.create({
-      resolveClient: async () => ({ query: queryMock, insert: vi.fn() }),
+      resolveClient: async () => ({
+        read: async (input) => ({ rows: JSON.parse(JSON.stringify(queryMock(input))) }),
+        insert: vi.fn(),
+      }),
       retention,
     }),
     retention,
@@ -56,11 +59,11 @@ const upToEvent = eventOccurredAt(OCCURRED_AT);
 // Genuinely the LAST call, not `calls[0]`: today each test issues exactly one
 // query so the two coincide, but a helper named `lastCall` that silently
 // returns the first would start lying the moment a read takes two queries.
-const lastCall = () =>
-  queryMock.mock.calls.at(-1)![0] as {
-    query: string;
-    query_params: Record<string, unknown>;
-  };
+const lastCall = () => {
+  const { statement, declaresFullScan } = queryMock.mock.calls.at(-1)![0];
+  return { query: statement.sql, values: Object.values(statement.params), declaresFullScan };
+};
+const UNKNOWN_KEPT = /\(EventOccurredAt = \{v\d+:UInt64\} OR EventOccurredAt >= /;
 
 describe("re-fold reads prune partitions — unpaged, time-local aggregate", () => {
   it("filters on EventOccurredAt so ClickHouse can prune partitions", async () => {
@@ -82,7 +85,7 @@ describe("re-fold reads prune partitions — unpaged, time-local aggregate", () 
       upToEvent,
     });
 
-    expect(lastCall().query_params.occurredAtFromMs).toBe(OCCURRED_AT - REHYDRATION_WINDOW_MS);
+    expect(lastCall().values).toContain(OCCURRED_AT - REHYDRATION_WINDOW_MS);
   });
 
   it("keeps rows with an unknown occurred time, so the bound can never drop one", async () => {
@@ -93,7 +96,8 @@ describe("re-fold reads prune partitions — unpaged, time-local aggregate", () 
       upToEvent,
     });
 
-    expect(lastCall().query).toContain("EventOccurredAt = 0 OR");
+    expect(lastCall().query).toMatch(UNKNOWN_KEPT);
+    expect(lastCall().values).toContain(0);
   });
 });
 
@@ -113,7 +117,7 @@ describe("re-fold reads prune partitions — paged, time-local aggregate", () =>
     await store.getEventsUpToPaged?.(pagedRequest);
 
     expect(lastCall().query).toContain("EventOccurredAt >=");
-    expect(lastCall().query_params.occurredAtFromMs).toBe(OCCURRED_AT - REHYDRATION_WINDOW_MS);
+    expect(lastCall().values).toContain(OCCURRED_AT - REHYDRATION_WINDOW_MS);
   });
 
   it("keeps rows with an unknown occurred time on the paged path too", async () => {
@@ -122,7 +126,8 @@ describe("re-fold reads prune partitions — paged, time-local aggregate", () =>
     // dropping it from just this copy would otherwise pass every test.
     await store.getEventsUpToPaged?.(pagedRequest);
 
-    expect(lastCall().query).toContain("EventOccurredAt = 0 OR");
+    expect(lastCall().query).toMatch(UNKNOWN_KEPT);
+    expect(lastCall().values).toContain(0);
   });
 });
 
@@ -141,7 +146,7 @@ describe("re-fold reads prune partitions — long-lived aggregate type", () => {
     });
 
     expect(lastCall().query).not.toContain("EventOccurredAt >=");
-    expect(lastCall().query_params.occurredAtFromMs).toBeUndefined();
+    expect(lastCall().declaresFullScan).toBe(true);
   });
 
   it("leaves the paged scan unbounded too", async () => {
@@ -158,7 +163,7 @@ describe("re-fold reads prune partitions — long-lived aggregate type", () => {
     });
 
     expect(lastCall().query).not.toContain("EventOccurredAt >=");
-    expect(lastCall().query_params.occurredAtFromMs).toBeUndefined();
+    expect(lastCall().declaresFullScan).toBe(true);
   });
 });
 
@@ -174,6 +179,6 @@ describe("re-fold reads prune partitions — event with no usable occurred time"
     });
 
     expect(lastCall().query).not.toContain("EventOccurredAt >=");
-    expect(lastCall().query_params.occurredAtFromMs).toBeUndefined();
+    expect(lastCall().declaresFullScan).toBe(true);
   });
 });
