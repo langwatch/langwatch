@@ -6,20 +6,17 @@ import {
   comparePoints,
   type MetricRollupSourcePoint,
   type MetricSequencePoint,
-  METRIC_ROLLUP_INTERVAL_MS,
   type CanonicalMetricDataPoint,
   type MetricRollupRow,
 } from "@langwatch/metric-contract";
 import { createLogger } from "@langwatch/observability";
 
 import {
-  type BucketReadRange,
   type BucketSeek,
   bucketReadRanges,
   newestVersions,
   payloadWindows,
   pointsForBucketSeeks,
-  type SeriesWindow,
 } from "../../rules/metric-rollup-bucket-reads.rules.ts";
 import {
   MetricDataPointAppendRepository,
@@ -27,17 +24,22 @@ import {
   type MetricDataPointWrite,
 } from "../metric-data-point-append.repository.ts";
 import {
+  bucketRangeStatement,
+  farPredecessorStatement,
+  payloadStatement,
+  successorSeekStatement,
+} from "./clickhouse.metric-data-point-query.mapper.ts";
+import {
   metricPointFromSeekRow,
   metricRawRow,
   metricRollupRow,
   metricRollupSourceFromRow,
   metricSeriesRow,
   metricUsageEstimateRow,
-  validateMetricPoint,
-  ROLLUP_SELECT,
-  type RollupSourceRow,
-  SEEK_SELECT,
+  rollupSourceRowSchema,
   type SeekMetricRow,
+  seekMetricRowSchema,
+  validateMetricPoint,
 } from "./clickhouse.metric-data-point.mapper.ts";
 
 export interface MetricClickHouseClient {
@@ -52,15 +54,12 @@ export interface MetricClickHouseClient {
     format?: DataFormat;
     clickhouse_settings?: ClickHouseSettings;
   }): Promise<unknown>;
-  query(params: {
-    query: string;
-    query_params?: Record<string, unknown>;
-    format?: DataFormat;
-    clickhouse_settings?: ClickHouseSettings;
-    /** Set when the statement genuinely spans tenants; see the tenant-scope guard. */
-    SKIP_TENANT_CHECK?: true;
-  }): Promise<{ json<T = unknown>(): Promise<T[]> }>;
+  /** Built statements only (ADR-202): each names its own tenant, identity and setting. */
+  read: ClickHouseQueryClient["read"];
 }
+
+const seekRowsSchema = seekMetricRowSchema.array();
+const rollupSourceRowsSchema = rollupSourceRowSchema.array();
 
 export type MetricClickHouseClientResolver = (tenantId: string) => Promise<MetricClickHouseClient>;
 
@@ -81,15 +80,7 @@ function metricClickHouseResolver(
         });
         return undefined;
       },
-      async query(params) {
-        const result = await clickhouse.query<Record<string, unknown>>({
-          tenantId,
-          sql: params.query,
-          ...(params.query_params ? { params: params.query_params } : {}),
-          SKIP_TENANT_CHECK: params.SKIP_TENANT_CHECK,
-        });
-        return { json: async <T = unknown>() => result.rows as T[] };
-      },
+      read: (input) => clickhouse.read(input),
     });
 }
 
@@ -116,9 +107,6 @@ const SUCCESSOR_PARAM_BUDGET_CHARS = 3500;
  * so covers any series still being written to, however coarsely it is scraped.
  */
 const PREDECESSOR_LOOKBACK_MS = 60 * 60 * 1000;
-
-/** A payload row with the version FINAL would have kept the newest of. */
-type VersionedRollupSourceRow = RollupSourceRow & { DedupVersion: string };
 
 /**
  * The seeks whose predecessor the near pass failed to find.
@@ -333,28 +321,21 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
   }
 
   /**
-   * The stored points that can succeed any of `points` within their own series.
+   * The stored points that can succeed any of `points` within their own series. One fixed
+   * statement carries the spans as bound arrays, chunked below SUCCESSOR_PARAM_BUDGET_CHARS.
    */
   private async successorsOf(points: CanonicalMetricDataPoint[]): Promise<MetricSequencePoint[]> {
     const tenantId = points[0]!.tenantId;
     const client = await this.resolveClient(tenantId);
     const found: MetricSequencePoint[] = [];
 
-    for (const spans of ClickHouseMetricDataPointAppendRepository.successorSeekChunks({
-      tenantId,
-      spans: ClickHouseMetricDataPointAppendRepository.seriesSpans(points),
+    for (const { statement } of ClickHouseMetricDataPointAppendRepository.statementChunks({
+      items: ClickHouseMetricDataPointAppendRepository.seriesSpans(points),
+      cap: SEEKS_PER_QUERY,
+      statementOf: (spans) => successorSeekStatement({ tenantId, spans }),
     })) {
-      const result = await client.query({
-        query: ClickHouseMetricDataPointAppendRepository.SUCCESSOR_SEEK_QUERY,
-        query_params: ClickHouseMetricDataPointAppendRepository.successorSeekParams({
-          tenantId,
-          spans,
-        }),
-        format: "JSONEachRow",
-      });
-      for (const row of await result.json<SeekMetricRow>()) {
-        found.push(metricPointFromSeekRow(row));
-      }
+      const { rows } = await client.read({ statement });
+      for (const row of seekRowsSchema.parse(rows)) found.push(metricPointFromSeekRow(row));
     }
     return found;
   }
@@ -438,24 +419,15 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
     picked: Map<string, MetricSequencePoint>;
     lookbackMs: number;
   }): Promise<void> {
-    for (const ranges of ClickHouseMetricDataPointAppendRepository.rangeChunks({
-      ranges: bucketReadRanges({ seeks, lookbackMs }),
-      paramsOf: (candidate) =>
-        ClickHouseMetricDataPointAppendRepository.bucketRangeParams({
-          tenantId,
-          lookbackMs,
-          ranges: candidate,
-        }),
+    for (const {
+      items: ranges,
+      statement,
+    } of ClickHouseMetricDataPointAppendRepository.statementChunks({
+      items: bucketReadRanges({ seeks, lookbackMs }),
+      cap: Math.floor(SEEKS_PER_QUERY / 2),
+      statementOf: (candidate) => bucketRangeStatement({ tenantId, lookbackMs, ranges: candidate }),
     })) {
-      const result = await client.query({
-        query: ClickHouseMetricDataPointAppendRepository.bucketRangeQuery(ranges.length),
-        query_params: ClickHouseMetricDataPointAppendRepository.bucketRangeParams({
-          tenantId,
-          lookbackMs,
-          ranges,
-        }),
-        format: "JSONEachRow",
-      });
+      const { rows } = await client.read({ statement });
       for (const point of pointsForBucketSeeks({
         seeks: seeks.filter((seek) =>
           ranges.some(
@@ -465,9 +437,7 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
               seek.start <= range.to,
           ),
         ),
-        points: ClickHouseMetricDataPointAppendRepository.distinctKeys(
-          await result.json<SeekMetricRow>(),
-        ),
+        points: ClickHouseMetricDataPointAppendRepository.distinctKeys(seekRowsSchema.parse(rows)),
         lookbackMs,
       })) {
         picked.set(`${point.seriesId}\u0000${point.pointId}`, point);
@@ -475,66 +445,40 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
     }
   }
 
-  /** One OR'd key-range predicate per range, so the primary key prunes to exactly those ranges. */
-  private static bucketRangeQuery(rangeCount: number): string {
-    const ranges = Array.from(
-      { length: rangeCount },
-      (_, index) => `(SeriesId = {series${index}:String}
-          AND metric_data_points.TimeUnixMs >= fromUnixTimestamp64Milli({from${index}:Int64} - {lookbackMs:Int64})
-          AND metric_data_points.TimeUnixMs < fromUnixTimestamp64Milli({to${index}:Int64} + {bucketMs:Int64}))`,
-    );
-    return `SELECT ${SEEK_SELECT}
-      FROM metric_data_points
-      WHERE TenantId = {tenantId:String}
-        AND (${ranges.join("\n        OR ")})`;
-  }
-
-  private static bucketRangeParams({
-    tenantId,
-    lookbackMs,
-    ranges,
+  /**
+   * Where a read splits: the built statement's encoded parameter bytes first, `cap` items as the
+   * upper bound. Item count is the wrong quantity to bound a request by. Each chunk carries the
+   * statement it was measured as.
+   */
+  private static statementChunks<
+    T,
+    S extends { readonly params: Readonly<Record<string, unknown>> },
+  >({
+    items,
+    cap,
+    statementOf,
   }: {
-    tenantId: string;
-    lookbackMs: number;
-    ranges: readonly BucketReadRange[];
-  }): Record<string, unknown> {
-    const params: Record<string, unknown> = {
-      tenantId,
-      bucketMs: METRIC_ROLLUP_INTERVAL_MS,
-      lookbackMs,
-    };
-    ranges.forEach(({ seriesId, from, to }, index) => {
-      params[`series${index}`] = seriesId;
-      params[`from${index}`] = from;
-      params[`to${index}`] = to;
-    });
-    return params;
-  }
-
-  /** Splits ranges by encoded parameter bytes first, half of {@link SEEKS_PER_QUERY} as the cap. */
-  private static rangeChunks<T>({
-    ranges,
-    paramsOf,
-  }: {
-    ranges: readonly T[];
-    paramsOf: (candidate: readonly T[]) => Record<string, unknown>;
-  }): T[][] {
-    const chunks: T[][] = [];
-    let current: T[] = [];
-    for (const range of ranges) {
-      const candidate = [...current, range];
+    items: readonly T[];
+    cap: number;
+    statementOf: (candidate: readonly T[]) => S;
+  }): { items: T[]; statement: S }[] {
+    const chunks: { items: T[]; statement: S }[] = [];
+    let current: { items: T[]; statement: S } | undefined;
+    for (const item of items) {
+      const candidate = [...(current?.items ?? []), item];
+      const statement = statementOf(candidate);
       const outgrown =
-        candidate.length > Math.floor(SEEKS_PER_QUERY / 2) ||
-        ClickHouseMetricDataPointAppendRepository.encodedParamLength(paramsOf(candidate)) >
+        candidate.length > cap ||
+        ClickHouseMetricDataPointAppendRepository.encodedParamLength(statement.params) >
           SUCCESSOR_PARAM_BUDGET_CHARS;
-      if (outgrown && current.length > 0) {
+      if (outgrown && current !== undefined) {
         chunks.push(current);
-        current = [range];
+        current = { items: [item], statement: statementOf([item]) };
       } else {
-        current = candidate;
+        current = { items: candidate, statement };
       }
     }
-    if (current.length > 0) chunks.push(current);
+    if (current !== undefined) chunks.push(current);
     return chunks;
   }
 
@@ -564,31 +508,15 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
     picked: Map<string, MetricSequencePoint>;
     predecessor: { fromMs: number; toMs: number };
   }): Promise<void> {
-    for (const chunk of ClickHouseMetricDataPointAppendRepository.chunked(
+    for (const [first, ...rest] of ClickHouseMetricDataPointAppendRepository.chunked(
       seeks,
       Math.floor(SEEKS_PER_QUERY / 2),
     )) {
-      const params: Record<string, unknown> = {
-        tenantId,
-        lookbackFromMs: predecessor.fromMs,
-        lookbackToMs: predecessor.toMs,
-      };
-      const selects = chunk.map(({ seriesId, start }, index) => {
-        params[`series${index}`] = seriesId;
-        params[`from${index}`] = start;
-        return `(SELECT ${SEEK_SELECT}
-            FROM metric_data_points
-            WHERE TenantId = {tenantId:String} AND SeriesId = {series${index}:String}
-              AND metric_data_points.TimeUnixMs < fromUnixTimestamp64Milli({from${index}:Int64} - {lookbackToMs:Int64})
-              AND metric_data_points.TimeUnixMs >= fromUnixTimestamp64Milli({from${index}:Int64} - {lookbackFromMs:Int64})
-            ORDER BY metric_data_points.TimeUnixMs DESC, TimeUnixNano DESC, PointId DESC LIMIT 1)`;
+      if (first === undefined) continue;
+      const { rows } = await client.read({
+        statement: farPredecessorStatement({ tenantId, seeks: [first, ...rest], predecessor }),
       });
-      const result = await client.query({
-        query: selects.join("\n UNION ALL\n"),
-        query_params: params,
-        format: "JSONEachRow",
-      });
-      for (const row of await result.json<SeekMetricRow>()) {
+      for (const row of seekRowsSchema.parse(rows)) {
         picked.set(`${row.SeriesId}\u0000${row.PointId}`, metricPointFromSeekRow(row));
       }
     }
@@ -611,122 +539,18 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
     picked: ReadonlyMap<string, MetricSequencePoint>;
   }): Promise<MetricRollupSourcePoint[]> {
     const rows: { point: MetricRollupSourcePoint; version: bigint }[] = [];
-    for (const windows of ClickHouseMetricDataPointAppendRepository.rangeChunks({
-      ranges: payloadWindows({ seeks, picked: picked.values() }),
-      paramsOf: (candidate) =>
-        ClickHouseMetricDataPointAppendRepository.payloadParams({ tenantId, windows: candidate }),
+    for (const { statement } of ClickHouseMetricDataPointAppendRepository.statementChunks({
+      items: payloadWindows({ seeks, picked: picked.values() }),
+      cap: Math.floor(SEEKS_PER_QUERY / 2),
+      statementOf: (candidate) => payloadStatement({ tenantId, windows: candidate }),
     })) {
-      const result = await client.query({
-        query: ClickHouseMetricDataPointAppendRepository.payloadQuery(windows.length),
-        query_params: ClickHouseMetricDataPointAppendRepository.payloadParams({
-          tenantId,
-          windows,
-        }),
-        format: "JSONEachRow",
-      });
-      for (const row of await result.json<VersionedRollupSourceRow>()) {
+      const { rows: found } = await client.read({ statement });
+      for (const row of rollupSourceRowsSchema.parse(found)) {
         if (!picked.has(`${row.SeriesId}\u0000${row.PointId}`)) continue;
         rows.push({ point: metricRollupSourceFromRow(row), version: BigInt(row.DedupVersion) });
       }
     }
     return newestVersions({ rows });
-  }
-
-  /** Exact `[from, to)` windows; the key predicate prunes, and moves to PREWHERE without FINAL. */
-  private static payloadQuery(windowCount: number): string {
-    const windows = Array.from(
-      { length: windowCount },
-      (_, index) => `(SeriesId = {series${index}:String}
-          AND metric_data_points.TimeUnixMs >= fromUnixTimestamp64Milli({from${index}:Int64})
-          AND metric_data_points.TimeUnixMs < fromUnixTimestamp64Milli({to${index}:Int64}))`,
-    );
-    return `SELECT ${ROLLUP_SELECT}, DedupVersion
-      FROM metric_data_points
-      WHERE TenantId = {tenantId:String}
-        AND (${windows.join("\n        OR ")})`;
-  }
-
-  private static payloadParams({
-    tenantId,
-    windows,
-  }: {
-    tenantId: string;
-    windows: readonly SeriesWindow[];
-  }): Record<string, unknown> {
-    const params: Record<string, unknown> = { tenantId };
-    windows.forEach(({ seriesId, from, to }, index) => {
-      params[`series${index}`] = seriesId;
-      params[`from${index}`] = from;
-      params[`to${index}`] = to;
-    });
-    return params;
-  }
-
-  /**
-   * One fixed statement carries point spans as arrays; successorSeekChunks keeps their encoded
-   * URL parameters below SUCCESSOR_PARAM_BUDGET_CHARS. Stored points inside each span cover
-   * every successor except the newest one.
-   */
-  private static readonly SUCCESSOR_SEEK_QUERY = `
-    WITH spans AS (
-      SELECT
-        span.1 AS SpanSeriesId,
-        fromUnixTimestamp64Milli(span.2) AS SpanFromTime,
-        toUInt64(span.3) AS SpanFromNano,
-        span.4 AS SpanFromPoint,
-        fromUnixTimestamp64Milli(span.5) AS SpanToTime,
-        toUInt64(span.6) AS SpanToNano,
-        span.7 AS SpanToPoint
-      FROM (
-        SELECT arrayJoin(arrayZip(
-          {seriesIds:Array(String)},
-          {fromTimes:Array(Int64)}, {fromNanos:Array(String)}, {fromPoints:Array(String)},
-          {toTimes:Array(Int64)}, {toNanos:Array(String)}, {toPoints:Array(String)}
-        )) AS span
-      )
-    ),
-    series_points AS (
-      SELECT ${SEEK_SELECT}, metric_data_points.TimeUnixMs AS SeekTime
-      FROM metric_data_points
-      WHERE TenantId = {tenantId:String}
-        AND SeriesId IN {seriesIds:Array(String)}
-        AND metric_data_points.TimeUnixMs >= fromUnixTimestamp64Milli({scanFrom:Int64})
-    )
-    SELECT * FROM (
-      (SELECT series_points.*
-       FROM series_points INNER JOIN spans ON CAST(series_points.SeriesId AS String) = spans.SpanSeriesId
-       WHERE series_points.SeekTime <= fromUnixTimestamp64Milli({latestSpanEnd:Int64})
-         AND ${ClickHouseMetricDataPointAppendRepository.orderedAfter("From")} AND ${ClickHouseMetricDataPointAppendRepository.orderedBefore("To")})
-      UNION ALL
-      (SELECT series_points.*
-       FROM series_points INNER JOIN spans ON CAST(series_points.SeriesId AS String) = spans.SpanSeriesId
-       WHERE series_points.SeekTime >= fromUnixTimestamp64Milli({earliestSpanEnd:Int64})
-         AND ${ClickHouseMetricDataPointAppendRepository.orderedAfter("To")}
-       ORDER BY series_points.SeriesId ASC, series_points.SeekTime ASC,
-         series_points.TimeUnixNano ASC, series_points.PointId ASC
-       LIMIT 1 BY SeriesId)
-    )
-  `;
-
-  /**
-   * The table's own row order, (TimeUnixMs, TimeUnixNano, PointId), compared against one end of
-   * a joined span. Written out rather than as a tuple comparison so the emitted predicate is
-   * the one the per-branch seeks already proved in production.
-   */
-  private static orderedAfter(bound: "From" | "To"): string {
-    return `(series_points.SeekTime > spans.Span${bound}Time
-       OR (series_points.SeekTime = spans.Span${bound}Time
-         AND (series_points.TimeUnixNano > spans.Span${bound}Nano
-           OR (series_points.TimeUnixNano = spans.Span${bound}Nano
-             AND series_points.PointId > spans.Span${bound}Point))))`;
-  }
-
-  private static orderedBefore(bound: "From" | "To"): string {
-    return `(series_points.SeekTime < spans.Span${bound}Time
-       OR (series_points.SeekTime = spans.Span${bound}Time
-         AND (series_points.TimeUnixNano < spans.Span${bound}Nano
-           OR (series_points.TimeUnixNano = spans.Span${bound}Nano
-             AND series_points.PointId < spans.Span${bound}Point))))`;
   }
 
   private static chunked<T>(items: readonly T[], size: number): T[][] {
@@ -816,32 +640,6 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
   }
 
   /**
-   * Eleven parameters, whatever the chunk holds - seven of them arrays the server zips back
-   * into one row per series.
-   */
-  private static successorSeekParams({
-    tenantId,
-    spans,
-  }: {
-    tenantId: string;
-    spans: readonly SeriesSpan[];
-  }): Record<string, unknown> {
-    return {
-      tenantId,
-      seriesIds: spans.map((span) => span.seriesId),
-      fromTimes: spans.map((span) => span.first.timeUnixMs),
-      fromNanos: spans.map((span) => span.first.timeUnixNano),
-      fromPoints: spans.map((span) => span.first.pointId),
-      toTimes: spans.map((span) => span.last.timeUnixMs),
-      toNanos: spans.map((span) => span.last.timeUnixNano),
-      toPoints: spans.map((span) => span.last.pointId),
-      scanFrom: Math.min(...spans.map((span) => span.first.timeUnixMs)),
-      earliestSpanEnd: Math.min(...spans.map((span) => span.last.timeUnixMs)),
-      latestSpanEnd: Math.max(...spans.map((span) => span.last.timeUnixMs)),
-    };
-  }
-
-  /**
    * `@clickhouse/client`'s `formatQueryParams` for the value shapes this file binds - strings,
    * numbers, and arrays of either. Mirrored rather than imported because the client exports it
    * only from a path inside its `dist` tree.
@@ -886,40 +684,6 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
         ClickHouseMetricDataPointAppendRepository.formatParamValue({ value }),
       ]),
     ).toString().length;
-  }
-
-  /**
-   * Where the successor read splits: encoded parameter bytes first, {@link SEEKS_PER_QUERY}
-   * series as the upper cap. Series count is the wrong quantity to bound a request by.
-   */
-  private static successorSeekChunks({
-    tenantId,
-    spans,
-  }: {
-    tenantId: string;
-    spans: readonly SeriesSpan[];
-  }): SeriesSpan[][] {
-    const chunks: SeriesSpan[][] = [];
-    let current: SeriesSpan[] = [];
-    for (const span of spans) {
-      const candidate = [...current, span];
-      const outgrown =
-        candidate.length > SEEKS_PER_QUERY ||
-        ClickHouseMetricDataPointAppendRepository.encodedParamLength(
-          ClickHouseMetricDataPointAppendRepository.successorSeekParams({
-            tenantId,
-            spans: candidate,
-          }),
-        ) > SUCCESSOR_PARAM_BUDGET_CHARS;
-      if (outgrown && current.length > 0) {
-        chunks.push(current);
-        current = [span];
-      } else {
-        current = candidate;
-      }
-    }
-    if (current.length > 0) chunks.push(current);
-    return chunks;
   }
 
   /** The first point ordering strictly after `point`, from a sorted array. */

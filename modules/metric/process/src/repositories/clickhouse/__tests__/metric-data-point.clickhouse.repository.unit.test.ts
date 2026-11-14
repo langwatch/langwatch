@@ -8,7 +8,7 @@ import {
   ClickHouseMetricDataPointAppendRepository,
   type MetricClickHouseClient,
 } from "../clickhouse.metric-data-point-append.repository.ts";
-import { metricRawRow } from "../clickhouse.metric-data-point.mapper.ts";
+import type { ReaderReadStatement } from "@langwatch/clickhouse-client/builder";
 
 type InsertCall = { table: string; values: readonly unknown[] };
 
@@ -17,6 +17,15 @@ function response(rows: unknown[]): { json<T = unknown>(): Promise<T[]> } {
     json: async <T>() => rows.filter((_row): _row is T => true),
   };
 }
+
+/** A built read as these tests inspect it: its text and its bound values. */
+type Query = (request: {
+  query: string;
+  query_params: Record<string, unknown>;
+}) => Promise<{ json<T = unknown>(): Promise<T[]> }>;
+
+/** Every statement a read sent, so a test can assert its identity, scope and tenant setting. */
+const sentStatements: ReaderReadStatement[] = [];
 
 function client({
   insert = vi.fn<MetricClickHouseClient["insert"]>(async () => undefined),
@@ -27,12 +36,33 @@ function client({
   insert?: MetricClickHouseClient["insert"];
   rows?: unknown[];
   onQuery?: (query: string) => unknown[];
-  query?: MetricClickHouseClient["query"];
+  query?: Query;
 } = {}): MetricClickHouseClient {
-  if (queryOverride) return { insert, query: queryOverride };
-  const query: MetricClickHouseClient["query"] = async ({ query: sql }) =>
-    response(onQuery?.(sql) ?? rows);
-  return { insert, query };
+  const query: Query = queryOverride ?? (async ({ query: sql }) => response(onQuery?.(sql) ?? rows));
+  return {
+    insert,
+    read: async ({ statement }) => {
+      if (statement.kind === "tenant") sentStatements.push(statement);
+      const result = await query({ query: statement.sql, query_params: { ...statement.params } });
+      return { rows: await result.json() };
+    },
+  };
+}
+
+/** The successor read's seven zipped arrays, in arrayZip's order, by their bound names. */
+function zipped(request: { query: string; query_params: Record<string, unknown> }) {
+  const zip = request.query.slice(request.query.indexOf("arrayZip("));
+  const [seriesIds, fromTimes, fromNanos, fromPoints, toTimes, toNanos, toPoints] = [
+    ...zip.matchAll(/\{(\w+):Array\(\w+\)\}/g),
+  ]
+    .slice(0, 7)
+    .map((match) => request.query_params[match[1]!]);
+  return { seriesIds, fromTimes, fromNanos, fromPoints, toTimes, toNanos, toPoints };
+}
+
+/** How many of a statement's bound values equal `value`. */
+function boundCount(params: Record<string, unknown>, value: unknown): number {
+  return Object.values(params).filter((each) => each === value).length;
 }
 
 function repository(project: MetricClickHouseClient): ClickHouseMetricDataPointAppendRepository {
@@ -72,7 +102,7 @@ function pointAt(overrides: Partial<CanonicalMetricDataPoint> = {}): CanonicalMe
 }
 
 function isSuccessorRead(sql: string): boolean {
-  return sql.includes("{seriesIds:Array(String)}");
+  return sql.includes("arrayZip(");
 }
 
 /** A stored row as {@link ROLLUP_SELECT} returns it. */
@@ -88,7 +118,7 @@ function rollupSourceRow(from: CanonicalMetricDataPoint): Record<string, unknown
     IsMonotonic: from.isMonotonic,
     StartTimeUnixNano: from.startTimeUnixNano,
     TimeUnixNano: from.timeUnixNano,
-    TimeUnixMs: from.timeUnixMs,
+    TimeMs: from.timeUnixMs,
     ValueType: from.valueType,
     ValueInt: from.valueInt,
     ValueDouble: from.valueDouble,
@@ -127,7 +157,7 @@ function readerWithPredecessor(): {
     timeUnixNano: String(BigInt(base - METRIC_ROLLUP_INTERVAL_MS) * 1_000_000n),
   });
   const queries: string[] = [];
-  const query: MetricClickHouseClient["query"] = async ({ query: sql }) => {
+  const query: Query = async ({ query: sql }) => {
     queries.push(sql);
     return response(isSuccessorRead(sql) ? [] : [rollupSourceRow(predecessor)]);
   };
@@ -195,7 +225,7 @@ describe("ClickHouseMetricDataPointAppendRepository", () => {
   /** @scenario "A folded rollup read leaves the stored payload behind" */
   it("keeps rollup reads flat as a coalesced chunk grows", async () => {
     const queries: string[] = [];
-    const query: MetricClickHouseClient["query"] = async ({ query: sql }) => {
+    const query: Query = async ({ query: sql }) => {
       queries.push(sql);
       return response([]);
     };
@@ -210,7 +240,7 @@ describe("ClickHouseMetricDataPointAppendRepository", () => {
     // then — because this table is empty and so no near seek resolves — the
     // retention-wide seek for the buckets the near one left open.
     expect(queries).toHaveLength(3);
-    expect(queries[0]).toContain("LIMIT 1 BY SeriesId");
+    expect(queries[0]).toContain("LIMIT 1 BY series_points.SeriesId");
     expect(queries[0]).toContain("SeekTime > spans.SpanToTime");
     expect(queries[0]).not.toContain("CanonicalPayload");
     // The near pass reads keys only; nothing was picked, so no payload read.
@@ -221,7 +251,7 @@ describe("ClickHouseMetricDataPointAppendRepository", () => {
   /** @scenario "A folded rollup read keeps its encoded request inside a budget" */
   it("chunks successor parameters below the URL budget", async () => {
     const queryCalls: { query: string; query_params?: Record<string, unknown> }[] = [];
-    const query: MetricClickHouseClient["query"] = async (request) => {
+    const query: Query = async (request) => {
       queryCalls.push(request);
       return response([]);
     };
@@ -244,8 +274,8 @@ describe("ClickHouseMetricDataPointAppendRepository", () => {
     "keeps the successor statement and parameter count fixed for %i points",
     async (count) => {
       const requests: { query: string; params: Record<string, unknown> }[] = [];
-      const query: MetricClickHouseClient["query"] = async (request) => {
-        if (request.query.includes("{seriesIds:Array(String)}")) {
+      const query: Query = async (request) => {
+        if (isSuccessorRead(request.query)) {
           requests.push({ query: request.query, params: request.query_params ?? {} });
         }
         return response([]);
@@ -261,28 +291,17 @@ describe("ClickHouseMetricDataPointAppendRepository", () => {
       expect(
         new Set(requests.map((request) => Object.keys(request.params).toSorted().join(","))).size,
       ).toBe(1);
-      expect(Object.keys(requests[0]?.params ?? {}).toSorted()).toEqual([
-        "earliestSpanEnd",
-        "fromNanos",
-        "fromPoints",
-        "fromTimes",
-        "latestSpanEnd",
-        "scanFrom",
-        "seriesIds",
-        "tenantId",
-        "toNanos",
-        "toPoints",
-        "toTimes",
-      ]);
+      // Seven span arrays, the scan start, both span-end bounds and the tenant.
+      expect(Object.keys(requests[0]?.params ?? {})).toHaveLength(11);
     },
   );
 
   /** @scenario "A folded rollup read binds a fixed number of parameters" */
   it("splits successor reads by encoded parameter bytes without dropping series", async () => {
     const requests: Record<string, unknown>[] = [];
-    const query: MetricClickHouseClient["query"] = async (request) => {
-      if (request.query.includes("{seriesIds:Array(String)}")) {
-        requests.push(request.query_params ?? {});
+    const query: Query = async (request) => {
+      if (isSuccessorRead(request.query)) {
+        requests.push({ ...request.query_params, seriesIds: zipped(request).seriesIds });
       }
       return response([]);
     };
@@ -299,8 +318,10 @@ describe("ClickHouseMetricDataPointAppendRepository", () => {
     expect(requests.length).toBeGreaterThan(1);
     const asked = requests.flatMap((params) => stringArray(params.seriesIds));
     expect(new Set(asked).size).toBe(64);
-    for (const params of requests) {
+    for (const { seriesIds: _seriesIds, ...params } of requests) {
       expect(encodedParamLength(params)).toBeLessThanOrEqual(3_500);
+    }
+    for (const params of requests) {
       expect(stringArray(params.seriesIds).length).toBeLessThanOrEqual(64);
     }
   });
@@ -308,8 +329,8 @@ describe("ClickHouseMetricDataPointAppendRepository", () => {
   /** @scenario "A rollup bucket read sends the window size and retention span once" */
   it("derives affected bucket bounds from retention and rollup width", async () => {
     const bucketParams: Record<string, unknown>[] = [];
-    const query: MetricClickHouseClient["query"] = async (request) => {
-      if (!request.query.includes("{seriesIds:Array(String)}")) {
+    const query: Query = async (request) => {
+      if (!isSuccessorRead(request.query)) {
         bucketParams.push(request.query_params ?? {});
       }
       return response([]);
@@ -322,18 +343,17 @@ describe("ClickHouseMetricDataPointAppendRepository", () => {
     // The near pass, then the wide one: this table is empty, so no bucket
     // resolves a predecessor within the hour.
     expect(bucketParams).toHaveLength(2);
-    expect(Object.keys(bucketParams[0] ?? {}).toSorted()).toEqual(
-      ["bucketMs", "from0", "lookbackMs", "series0", "tenantId", "to0"].toSorted(),
-    );
+    // The tenant, then one series with its range ends, the bucket width and the lookback.
+    expect(Object.keys(bucketParams[0] ?? {})).toHaveLength(6);
     // The bucket end and the lookback are the same arithmetic on either side
     // of the wire, so they travel once as shared scalars.
-    expect(bucketParams[0]?.bucketMs).toBe(METRIC_ROLLUP_INTERVAL_MS);
-    expect(bucketParams[0]?.lookbackMs).toBe(60 * 60 * 1000);
+    expect(boundCount(bucketParams[0] ?? {}, METRIC_ROLLUP_INTERVAL_MS)).toBe(1);
+    expect(boundCount(bucketParams[0] ?? {}, 60 * 60 * 1000)).toBe(1);
   });
 
   it("reads a run of adjacent buckets as one key range in one statement", async () => {
     const reads: { sql: string; params: Record<string, unknown> }[] = [];
-    const query: MetricClickHouseClient["query"] = async (request) => {
+    const query: Query = async (request) => {
       if (!isSuccessorRead(request.query)) {
         reads.push({ sql: request.query, params: request.query_params ?? {} });
       }
@@ -352,9 +372,9 @@ describe("ClickHouseMetricDataPointAppendRepository", () => {
     const near = reads[0]!;
     expect(near.sql).not.toContain("UNION ALL");
     expect(near.sql).not.toContain("FINAL");
-    expect(near.params.from0).toBe(base);
-    expect(near.params.to0).toBe(base + 30 * METRIC_ROLLUP_INTERVAL_MS);
-    expect(near.params).not.toHaveProperty("series1");
+    expect(boundCount(near.params, base)).toBe(1);
+    expect(boundCount(near.params, base + 30 * METRIC_ROLLUP_INTERVAL_MS)).toBe(1);
+    expect(boundCount(near.params, "b".repeat(64))).toBe(1);
   });
 
   /** @scenario "A rollup bucket read asks only for the columns a rollup uses" */
@@ -419,7 +439,7 @@ describe("ClickHouseMetricDataPointAppendRepository", () => {
   /** @scenario "A rollup bucket read looks close before it looks far" */
   it("widens to the rest of retention only where the near seek found nothing", async () => {
     const reads: { sql: string; params: Record<string, unknown> }[] = [];
-    const query: MetricClickHouseClient["query"] = async (request) => {
+    const query: Query = async (request) => {
       if (!isSuccessorRead(request.query)) {
         reads.push({ sql: request.query, params: request.query_params ?? {} });
       }
@@ -436,9 +456,9 @@ describe("ClickHouseMetricDataPointAppendRepository", () => {
     // The two windows abut and do not overlap, so together they are the one
     // retention-wide window this replaced: no row is read twice and none is
     // missed.
-    expect(near!.params.lookbackMs).toBe(60 * 60 * 1000);
-    expect(far!.params.lookbackToMs).toBe(near!.params.lookbackMs);
-    expect(far!.params.lookbackFromMs).toBe(49 * 24 * 60 * 60 * 1000);
+    expect(boundCount(near!.params, 60 * 60 * 1000)).toBe(1);
+    expect(boundCount(far!.params, 60 * 60 * 1000)).toBe(1);
+    expect(boundCount(far!.params, 49 * 24 * 60 * 60 * 1000)).toBe(1);
     // The far pass is only ever looking for a predecessor: the bucket's own
     // rows came back in the near pass, and asking again would double the
     // statement to return what it just returned.
@@ -448,8 +468,8 @@ describe("ClickHouseMetricDataPointAppendRepository", () => {
 
   it("keeps bucket seek parameters under the client URL ceiling", async () => {
     const bucketParams: Record<string, unknown>[] = [];
-    const query: MetricClickHouseClient["query"] = async (request) => {
-      if (!request.query.includes("{seriesIds:Array(String)}")) {
+    const query: Query = async (request) => {
+      if (!isSuccessorRead(request.query)) {
         bucketParams.push(request.query_params ?? {});
       }
       return response([]);
@@ -476,14 +496,14 @@ describe("ClickHouseMetricDataPointAppendRepository", () => {
       timeUnixMs: base + 3_600_000 * 3 + 1_000,
     });
     const successorQueries: Record<string, unknown>[] = [];
-    const query: MetricClickHouseClient["query"] = async (request) => {
-      if (request.query.includes("{seriesIds:Array(String)}")) {
-        successorQueries.push(request.query_params ?? {});
+    const query: Query = async (request) => {
+      if (isSuccessorRead(request.query)) {
+        successorQueries.push(zipped(request));
         return response([
           {
             SeriesId: early.seriesId,
             PointId: "3".repeat(64),
-            TimeUnixMs: base + 2_000,
+            TimeMs: base + 2_000,
             TimeUnixNano: String(BigInt(base + 2_000) * 1_000_000n),
             MetricKind: early.metricKind,
             AggregationTemporality: early.aggregationTemporality,
@@ -491,7 +511,7 @@ describe("ClickHouseMetricDataPointAppendRepository", () => {
           {
             SeriesId: late.seriesId,
             PointId: "4".repeat(64),
-            TimeUnixMs: late.timeUnixMs + 1_000,
+            TimeMs: late.timeUnixMs + 1_000,
             TimeUnixNano: String(BigInt(late.timeUnixMs + 1_000) * 1_000_000n),
             MetricKind: late.metricKind,
             AggregationTemporality: late.aggregationTemporality,
@@ -517,12 +537,35 @@ describe("ClickHouseMetricDataPointAppendRepository", () => {
     );
   });
 
+  /** @scenario "Every rollup read is a built statement on one tenant" */
+  it("sends every rollup read as a single-tenant reader statement for the points' tenant", async () => {
+    sentStatements.length = 0;
+    const { client: reader } = readerWithPredecessor();
+    const pointToRead = pointAt({ timeUnixMs: base + 1 });
+
+    await repository(reader).recomputeAffectedRollupsMany({ points: [pointToRead] });
+    await repository(client()).recomputeAffectedRollupsMany({
+      points: [pointToRead],
+      retentionDays: 49,
+    });
+
+    // Successor, near, payload; then successor, near and the far pass.
+    expect(sentStatements).toHaveLength(6);
+    for (const statement of sentStatements) {
+      expect(statement.identity).toBe("reader");
+      expect(statement.tenantId).toBe(pointToRead.tenantId);
+      expect(statement.tenantIds).toBeUndefined();
+      expect(statement.settings.SQL_langwatch_tenant_ids).toBe(pointToRead.tenantId);
+      expect(statement.sql).toContain("TenantId = {tenantId:String}");
+    }
+  });
+
   it("reports the missing authoritative column and row identity", async () => {
     const pointToRead = pointAt({ timeUnixMs: base + 1_000 });
-    const stored = metricRawRow({ point: pointToRead, retentionDays: 30 });
+    const stored = rollupSourceRow(pointToRead);
     const { BucketCounts: _bucketCounts, ...missingBucketCounts } = stored;
-    const query: MetricClickHouseClient["query"] = async (request) => {
-      if (request.query.includes("{seriesIds:Array(String)}")) return response([]);
+    const query: Query = async (request) => {
+      if (isSuccessorRead(request.query)) return response([]);
       return response([missingBucketCounts]);
     };
 

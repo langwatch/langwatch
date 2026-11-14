@@ -2,12 +2,12 @@ import { EventUtils, SecurityError } from "@langwatch/eventing";
 import type {
   MetricRollupSourcePoint,
   MetricSequencePoint,
-  AggregationTemporality,
   CanonicalMetricDataPoint,
-  MetricKind,
   MetricRollupRow,
 } from "@langwatch/metric-contract";
+import { aggregationTemporalitySchema, metricKindSchema } from "@langwatch/metric-contract";
 import { Temporal, toDate } from "@langwatch/time";
+import { z } from "zod";
 
 /**
  * A DateTime64(3) column value. The ClickHouse client serialises a `Date`;
@@ -24,119 +24,60 @@ function clickHouseTimestamp(epochMs: number): Date {
  */
 const MAX_UINT64 = 18_446_744_073_709_551_615n;
 
-interface RawMetricRow {
-  TenantId: string;
-  PointId: string;
-  SeriesId: string;
-  ResourceSchemaUrl: string;
-  ResourceAttributesJson: string;
-  ResourceAttributeKeys: string[];
-  ScopeSchemaUrl: string;
-  ScopeName: string;
-  ScopeVersion: string;
-  ScopeAttributesJson: string;
-  ScopeAttributeKeys: string[];
-  MetricName: string;
-  MetricDescription: string;
-  MetricUnit: string;
-  MetricKind: MetricKind;
-  AggregationTemporality: AggregationTemporality;
-  IsMonotonic: number | boolean | null;
-  PointAttributesJson: string;
-  PointAttributeKeys: string[];
-  StartTimeUnixNano: string;
-  TimeUnixNano: string;
-  TimeUnixMs: string | number;
-  Flags: number;
-  ValueType: "none" | "int" | "double";
-  ValueInt: string | null;
-  ValueDouble: number | null;
-  Count: string | null;
-  Sum: number | null;
-  Min: number | null;
-  Max: number | null;
-  ExplicitBounds: number[];
-  BucketCounts: string[];
-  ExponentialScale: number | null;
-  ExponentialZeroThreshold: number | null;
-  ZeroCount: string | null;
-  PositiveOffset: number | null;
-  PositiveBucketCounts: string[];
-  NegativeOffset: number | null;
-  NegativeBucketCounts: string[];
-  SummaryQuantilesJson: string;
-  CanonicalPayload: string;
-  _size_bytes: number;
-  OccurredAt: string | number;
-  AcceptedAt: string | number;
-}
+/** A UInt64 or Int64 cell: JSON quotes 64-bit integers unless the server is told otherwise. */
+const wideInteger = z.union([z.string(), z.number()]);
 
 /**
- * Minimal columns for rollup reads (spelled as SQL). Dropping non-rollup columns
- * (attributes, identity, flags, quantiles, etc.) solved memory exhaustion when FINAL
- * materialized unused columns. Type constraint syncs with {@link MetricRollupSourcePoint}.
+ * A row of the seek selection (clickhouse.metric-data-point-query.mapper.ts): order, bucket and
+ * predecessor dependency only. `TimeMs` is TimeUnixMs as epoch milliseconds.
  */
-export const ROLLUP_SELECT = `
-  TenantId, PointId, SeriesId,
-  MetricName, MetricUnit, MetricKind, AggregationTemporality, IsMonotonic,
-  StartTimeUnixNano, TimeUnixNano, toUnixTimestamp64Milli(TimeUnixMs) AS TimeUnixMs,
-  ValueType, ValueInt, ValueDouble, Count, Sum, Min, Max,
-  ExplicitBounds, BucketCounts,
-  ExponentialScale, ExponentialZeroThreshold, ZeroCount,
-  PositiveOffset, PositiveBucketCounts, NegativeOffset, NegativeBucketCounts
-`;
-
-/** A row of {@link ROLLUP_SELECT}, which is a strict subset of the raw row. */
-export type RollupSourceRow = Pick<
-  RawMetricRow,
-  | "TenantId"
-  | "PointId"
-  | "SeriesId"
-  | "MetricName"
-  | "MetricUnit"
-  | "MetricKind"
-  | "AggregationTemporality"
-  | "IsMonotonic"
-  | "StartTimeUnixNano"
-  | "TimeUnixNano"
-  | "TimeUnixMs"
-  | "ValueType"
-  | "ValueInt"
-  | "ValueDouble"
-  | "Count"
-  | "Sum"
-  | "Min"
-  | "Max"
-  | "ExplicitBounds"
-  | "BucketCounts"
-  | "ExponentialScale"
-  | "ExponentialZeroThreshold"
-  | "ZeroCount"
-  | "PositiveOffset"
-  | "PositiveBucketCounts"
-  | "NegativeOffset"
-  | "NegativeBucketCounts"
->;
+export const seekMetricRowSchema = z.object({
+  SeriesId: z.string(),
+  PointId: z.string(),
+  TimeMs: wideInteger,
+  TimeUnixNano: wideInteger,
+  MetricKind: metricKindSchema,
+  AggregationTemporality: aggregationTemporalitySchema,
+});
+export type SeekMetricRow = z.infer<typeof seekMetricRowSchema>;
 
 /**
- * The columns a successor seek needs: order (TimeUnixNano, PointId), bucket
- * (TimeUnixMs), predecessor dependency (MetricKind, AggregationTemporality).
- * Everything else used to materialise through `FINAL` per folded branch.
+ * A row of the payload selection: what a rollup is made of, a strict subset of the raw row,
+ * with the version FINAL would have kept the newest of. The count columns are checked by
+ * {@link countsColumn}, which names the row it refuses.
  */
-export const SEEK_SELECT = `
-  SeriesId, PointId,
-  toUnixTimestamp64Milli(TimeUnixMs) AS TimeUnixMs, TimeUnixNano,
-  MetricKind, AggregationTemporality
-`;
+export const rollupSourceRowSchema = z.object({
+  TenantId: z.string(),
+  PointId: z.string(),
+  SeriesId: z.string(),
+  MetricName: z.string(),
+  MetricUnit: z.string(),
+  MetricKind: metricKindSchema,
+  AggregationTemporality: aggregationTemporalitySchema,
+  IsMonotonic: z.union([z.boolean(), z.number()]).nullable(),
+  StartTimeUnixNano: wideInteger,
+  TimeUnixNano: wideInteger,
+  TimeMs: wideInteger,
+  ValueType: z.enum(["none", "int", "double"]),
+  ValueInt: wideInteger.nullable(),
+  ValueDouble: z.number().nullable(),
+  Count: wideInteger.nullable(),
+  Sum: z.number().nullable(),
+  Min: z.number().nullable(),
+  Max: z.number().nullable(),
+  ExplicitBounds: z.array(z.number()),
+  BucketCounts: z.unknown().optional(),
+  ExponentialScale: z.number().nullable(),
+  ExponentialZeroThreshold: z.number().nullable(),
+  ZeroCount: wideInteger.nullable(),
+  PositiveOffset: z.number().nullable(),
+  PositiveBucketCounts: z.unknown().optional(),
+  NegativeOffset: z.number().nullable(),
+  NegativeBucketCounts: z.unknown().optional(),
+  DedupVersion: wideInteger,
+});
+export type RollupSourceRow = z.infer<typeof rollupSourceRowSchema>;
 
-export interface SeekMetricRow {
-  SeriesId: string;
-  PointId: string;
-  TimeUnixMs: string | number;
-  TimeUnixNano: string;
-  MetricKind: MetricKind;
-  AggregationTemporality: AggregationTemporality;
-}
 
 /**
  * One of the three Array(UInt64) count columns, refusing rows without it. Validates
@@ -150,9 +91,9 @@ function countsColumn({
   row: {
     SeriesId: string;
     PointId: string;
-    BucketCounts: string[];
-    PositiveBucketCounts: string[];
-    NegativeBucketCounts: string[];
+    BucketCounts?: unknown;
+    PositiveBucketCounts?: unknown;
+    NegativeBucketCounts?: unknown;
   };
   column: "BucketCounts" | "PositiveBucketCounts" | "NegativeBucketCounts";
 }): string[] {
@@ -434,7 +375,7 @@ export function metricPointFromSeekRow(row: SeekMetricRow): MetricSequencePoint 
   return {
     seriesId: row.SeriesId,
     pointId: row.PointId,
-    timeUnixMs: Number(row.TimeUnixMs),
+    timeUnixMs: Number(row.TimeMs),
     timeUnixNano: String(row.TimeUnixNano),
     metricKind: row.MetricKind,
     aggregationTemporality: row.AggregationTemporality,
@@ -453,7 +394,7 @@ export function metricRollupSourceFromRow(row: RollupSourceRow): MetricRollupSou
     isMonotonic: row.IsMonotonic === null ? null : Boolean(row.IsMonotonic),
     startTimeUnixNano: String(row.StartTimeUnixNano),
     timeUnixNano: String(row.TimeUnixNano),
-    timeUnixMs: Number(row.TimeUnixMs),
+    timeUnixMs: Number(row.TimeMs),
     valueType: row.ValueType,
     valueInt: row.ValueInt === null ? null : String(row.ValueInt),
     valueDouble: row.ValueDouble,

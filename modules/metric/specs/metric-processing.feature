@@ -31,6 +31,13 @@ Feature: Canonical OTLP metric processing
     And rollup buckets remain 30 seconds wide
 
   @unit
+  Scenario: Every rollup read is a built statement on one tenant
+    Given a batch of canonical points for one tenant
+    When the rollup projection looks up successors, bucket points, predecessors and payloads
+    Then each read is a typed-builder statement on the reader identity
+    And it names only that tenant, in its predicate and in its tenant setting
+
+  @unit
   Scenario: Canonical metric identity and retries are stable
     Given the same tenant submits the same canonical metric point twice
     When durable metric processing is retried after a persistence failure
