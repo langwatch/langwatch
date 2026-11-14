@@ -113,8 +113,8 @@ describe("coding-agent lookups by id with the id index", () => {
       });
 
       expect(endpoint.requests).toHaveLength(1);
-      expect(countOf(endpoint.requests[0]?.body ?? "", "StartedAt BETWEEN")).toBe(1);
-      expect(paramOf(endpoint.requests[0]!, "from")).toBe(String(FROM_MS));
+      expect(countOf(endpoint.requests[0]?.body ?? "", "StartedAt <=")).toBe(1);
+      expect(endpoint.requests[0]?.url).toContain(`=${FROM_MS}`);
     });
   });
 

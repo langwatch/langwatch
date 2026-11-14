@@ -6,6 +6,8 @@ import type { ClickHouseTableFacts } from "@langwatch/clickhouse-client/builder"
 import { describe, expect, it } from "vitest";
 
 import { codingAgentSessionEvents } from "../clickhouse.coding-agent-session-events.table.ts";
+import { codingAgentSessionsIdIndex } from "../clickhouse.coding-agent-sessions-id-index.table.ts";
+import { codingAgentSessions } from "../clickhouse.coding-agent-sessions.table.ts";
 import { codingAgentTraceSessions } from "../clickhouse.coding-agent-trace-sessions.table.ts";
 import { sessionMetricSeries } from "../clickhouse.session-metric-series.table.ts";
 import {
@@ -15,16 +17,20 @@ import {
 
 const DESCRIPTORS: readonly { readonly $table: ClickHouseTableFacts }[] = [
   codingAgentSessionEvents,
+  codingAgentSessions,
+  codingAgentSessionsIdIndex,
   codingAgentTraceSessions,
   sessionMetricSeries,
 ];
 
 /**
  * The parameter type a stored column binds as: storage wrappers that change no value go, a time
- * binds as epoch milliseconds, and a FixedString binds as String.
+ * binds as epoch milliseconds, a FixedString binds as String, and a SimpleAggregateFunction
+ * binds as the type it aggregates.
  */
 const bindingOf = (type: string): string =>
   type
+    .replace(/^SimpleAggregateFunction\(\w+, (.+)\)$/, "$1")
     .replaceAll(/LowCardinality\(([^()]*(?:\([^()]*\))?)\)/g, "$1")
     .replaceAll(/Nullable\(([^()]*(?:\([^()]*\))?)\)/g, "$1")
     .replaceAll(/DateTime64\(\d\)/g, "Int64")

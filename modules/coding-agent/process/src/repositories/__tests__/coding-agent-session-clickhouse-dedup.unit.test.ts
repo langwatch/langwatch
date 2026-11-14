@@ -48,8 +48,7 @@ function applyOrderBy(rows: Record<string, unknown>[], query: string): Record<st
   const clause = /ORDER BY([\s\S]*?)LIMIT/i.exec(query)?.[1];
   if (clause === undefined) return [...rows];
 
-  const keys = clause
-    .split(",")
+  const keys = topLevelTerms(clause)
     .map((key) => key.trim())
     .filter((key) => key.length > 0)
     .map((key) => ({
@@ -68,8 +67,28 @@ function applyOrderBy(rows: Record<string, unknown>[], query: string): Record<st
   });
 }
 
+/** The comma-separated terms of a clause, splitting only outside parentheses. */
+function topLevelTerms(clause: string): string[] {
+  const terms: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let index = 0; index < clause.length; index++) {
+    if (clause[index] === "(") depth++;
+    else if (clause[index] === ")") depth--;
+    else if (clause[index] === "," && depth === 0) {
+      terms.push(clause.slice(start, index));
+      start = index + 1;
+    }
+  }
+  return [...terms, clause.slice(start)];
+}
+
 /** UInt64 columns arrive as strings on the wire; DateTime64 sorts lexically. */
 function evaluate(row: Record<string, unknown>, expression: string): number | string {
+  if (/^plus\(/i.test(expression)) {
+    const columns = expression.replaceAll(/plus\(|\)/gi, "").split(",");
+    return columns.reduce((sum, column) => sum + Number(row[column.trim()] ?? 0), 0);
+  }
   const arrayLength = /^length\((.+)\)$/i.exec(expression);
   if (arrayLength) {
     const value = row[arrayLength[1]!.trim()];
@@ -92,8 +111,8 @@ function evaluate(row: Record<string, unknown>, expression: string): number | st
 function orderingClient(rows: Record<string, unknown>[]): ClickHouseQueryClient {
   return clickHouseQueryClientDouble({
     ...sessionIdIndexNotReady,
-    query: async (request: { sql: string }) => ({
-      rows: applyOrderBy(rows, request.sql).slice(0, 1),
+    read: async ({ statement }: { statement: { sql: string } }) => ({
+      rows: applyOrderBy(rows, statement.sql).slice(0, 1),
     }),
     insert: async () => undefined,
   });
@@ -226,11 +245,11 @@ describe("CodingAgentSessionClickHouseRepository point-read tiebreak", () => {
 });
 
 /**
- * Splits the emitted list query into its two scopes: the inner
- * `max(UpdatedAt)` dedup subquery, and everything outside it.
+ * Splits the emitted list query into its two scopes: the `latest` election
+ * (the `max(UpdatedAt)` dedup), and everything outside it.
  */
 function splitScopes(query: string): { inner: string; outer: string } {
-  const open = query.indexOf("(", query.indexOf("IN ("));
+  const open = query.indexOf("(", query.indexOf("WITH latest AS"));
   let depth = 0;
   let close = open;
   for (let index = open; index < query.length; index++) {
@@ -246,8 +265,13 @@ function splitScopes(query: string): { inner: string; outer: string } {
   };
 }
 
-const boundsStartedAt = (scope: string): boolean => /StartedAt\s+BETWEEN/i.test(scope);
+const boundsStartedAt = (scope: string): boolean => /StartedAt\s*>=/i.test(scope);
 const narrowsToUser = (scope: string): boolean => /UserId\s*=/i.test(scope);
+
+/** The parameter a scope compares `column` against with `operator`. */
+const paramIn = (scope: string, column: string, operator: string): string =>
+  new RegExp(`${column} ${operator} (?:fromUnixTimestamp64Milli\\()?\\{(\\w+):`).exec(scope)?.[1] ??
+  "";
 
 /** Applies whichever predicates the repository actually put in this scope. */
 function inScope(
@@ -256,10 +280,13 @@ function inScope(
   params: Record<string, unknown>,
 ): boolean {
   if (row.TenantId !== params.tenantId) return false;
-  if (narrowsToUser(scope) && row.UserId !== params.userId) return false;
+  if (narrowsToUser(scope) && row.UserId !== params[paramIn(scope, "UserId", "=")]) return false;
   if (!boundsStartedAt(scope)) return true;
   const startedAt = millis(row.StartedAt);
-  return startedAt >= Number(params.from) && startedAt <= Number(params.to);
+  return (
+    startedAt >= Number(params[paramIn(scope, "StartedAt", ">=")]) &&
+    startedAt <= Number(params[paramIn(scope, "StartedAt", "<=")])
+  );
 }
 
 /**
@@ -274,10 +301,14 @@ function listClient(rows: Record<string, unknown>[]): {
   let sent = "";
   const client = clickHouseQueryClientDouble({
     ...sessionIdIndexNotReady,
-    query: async (request: { sql: string; params?: Record<string, unknown> }) => {
-      sent = request.sql;
-      const params = request.params ?? {};
-      const { inner, outer } = splitScopes(request.sql);
+    read: async ({
+      statement,
+    }: {
+      statement: { sql: string; params?: Record<string, unknown> };
+    }) => {
+      sent = statement.sql;
+      const params = statement.params ?? {};
+      const { inner, outer } = splitScopes(statement.sql);
 
       const latest = new Map<string, number>();
       for (const row of rows) {
@@ -294,7 +325,7 @@ function listClient(rows: Record<string, unknown>[]): {
             millis(row.UpdatedAt),
         )
         .toSorted((left, right) => millis(right.StartedAt) - millis(left.StartedAt))
-        .slice(0, Number(params.limit));
+        .slice(0, Number(/LIMIT (\d+)/.exec(outer)?.[1]));
 
       return { rows: selected };
     },

@@ -69,8 +69,25 @@ const spanRow = (n: number) => [{ n, fromMs: SPAN_FROM_MS, toMs: SPAN_TO_MS }];
 const paramOf = (request: { url: string } | undefined, name: string) =>
   new URL(request?.url ?? "", "http://x").searchParams.get(`param_${name}`);
 
+/** The `latest` election: the dedup scope a read elects each session's newest version in. */
 const dedupScopeOf = (body: string | undefined) =>
-  body?.split("SELECT TenantId, SessionId, max(UpdatedAt)")[1] ?? "";
+  body?.split("WITH latest AS (")[1]?.split(") SELECT ")[0] ?? "";
+
+const ELECTION = "WITH latest AS (SELECT tuple(TenantId, SessionId, max(UpdatedAt))";
+
+/** Every parameter value a request binds. */
+const paramsOf = (request: { url: string } | undefined) =>
+  [...new URL(request?.url ?? "", "http://x").searchParams.entries()]
+    .filter(([name]) => name.startsWith("param_"))
+    .map(([, value]) => value);
+
+/** The epoch-millisecond values a request's election bounds `StartedAt` by. */
+const dedupTimesOf = (request: { url: string; body: string } | undefined) =>
+  [
+    ...dedupScopeOf(request?.body).matchAll(
+      /StartedAt [<>]= fromUnixTimestamp64Milli\(\{(\w+):Int64\}\)/g,
+    ),
+  ].map(([, name]) => paramOf(request, name ?? ""));
 
 describe("Coding Agent session ClickHouse repository", () => {
   it("writes the complete session row, retention, and durable watermark", async () => {
@@ -152,11 +169,11 @@ describe("Coding Agent session ClickHouse repository", () => {
     });
 
     const request = endpoint.requests[0];
-    expect(request?.body).toContain("StartedAt BETWEEN");
+    expect(request?.body).toContain("StartedAt >=");
     expect(request?.body).toContain("UserId =");
-    expect(request?.body).toContain("SELECT TenantId, SessionId, max(UpdatedAt)");
-    const dedup = request?.body.split("SELECT TenantId, SessionId, max(UpdatedAt)")[1] ?? "";
-    expect(dedup).not.toContain("StartedAt BETWEEN");
+    expect(request?.body).toContain(ELECTION);
+    const dedup = dedupScopeOf(request?.body);
+    expect(dedup).not.toContain("StartedAt >=");
     expect(dedup).not.toContain("UserId =");
   });
 
@@ -180,12 +197,12 @@ describe("Coding Agent session ClickHouse repository", () => {
 
     const request = endpoint.requests[0];
     expect(request?.body).not.toContain("{tenantId:String}");
-    expect(request?.body).toContain("StartedAt BETWEEN");
+    expect(request?.body).toContain("StartedAt >=");
     expect(request?.body).toContain("TenantId IN (");
     expect(request?.body).toMatch(/transform\(TenantId.*StartedAt/s);
-    const dedup = request?.body.split("SELECT TenantId, SessionId, max(UpdatedAt)")[1] ?? "";
+    const dedup = dedupScopeOf(request?.body);
     expect(dedup).toContain("TenantId IN (");
-    expect(dedup).not.toContain("StartedAt BETWEEN");
+    expect(dedupTimesOf(request)).toEqual([]);
   });
 
   describe("given two versions of one session inside the same millisecond", () => {
@@ -322,7 +339,7 @@ describe("Coding Agent session ClickHouse repository", () => {
 
         expect(endpoint.requests).toHaveLength(1);
         expect(endpoint.requests[0]?.body).toContain("FROM coding_agent_sessions_id_index");
-        expect(endpoint.requests[0]?.body).toContain("SessionId NOT IN {excludeSessionIds");
+        expect(endpoint.requests[0]?.body).toContain("NOT (SessionId IN (");
         expect(endpoint.requests[0]?.body).not.toMatch(/FROM coding_agent_sessions\s/);
       });
 
@@ -334,12 +351,10 @@ describe("Coding Agent session ClickHouse repository", () => {
 
         const [, probe] = endpoint.requests;
         expect(endpoint.requests).toHaveLength(2);
-        expect(probe?.body).toContain(
-          "StartedAt BETWEEN fromUnixTimestamp64Milli({spanFrom:Int64})",
-        );
-        expect(probe?.body).toContain("AND Auxiliary = 0");
-        expect(paramOf(probe, "spanFrom")).toBe(String(SPAN_FROM_MS - DAY_MS));
-        expect(paramOf(probe, "spanTo")).toBe(String(SPAN_TO_MS + DAY_MS));
+        expect(probe?.body).toContain("StartedAt >= fromUnixTimestamp64Milli(");
+        expect(probe?.body).toContain("AND Auxiliary = {");
+        expect(paramsOf(probe)).toContain(String(SPAN_FROM_MS - DAY_MS));
+        expect(paramsOf(probe)).toContain(String(SPAN_TO_MS + DAY_MS));
       });
 
       it("answers helpers_only when only a helper row sits inside the span", async () => {
@@ -349,8 +364,8 @@ describe("Coding Agent session ClickHouse repository", () => {
         await expect(kindOf(repository)).resolves.toBe("helpers_only");
 
         const [, , anyProbe] = endpoint.requests;
-        expect(anyProbe?.body).toContain("{spanFrom:Int64}");
-        expect(anyProbe?.body).not.toContain("Auxiliary = 0");
+        expect(anyProbe?.body).toContain("StartedAt >= fromUnixTimestamp64Milli(");
+        expect(anyProbe?.body).not.toContain("Auxiliary =");
       });
 
       it("answers none when the index names sessions whose rows have expired", async () => {
@@ -374,13 +389,13 @@ describe("Coding Agent session ClickHouse repository", () => {
         });
 
         const [span, list] = endpoint.requests;
-        expect(span?.body).toContain("HAVING SessionToAt >= fromUnixTimestamp64Milli({overlapFrom");
-        expect(span?.body).toContain("SessionFromAt <= fromUnixTimestamp64Milli({overlapTo");
-        expect(paramOf(span, "overlapFrom")).toBe("100");
-        expect(paramOf(span, "overlapTo")).toBe("200");
-        expect(dedupScopeOf(list?.body)).toContain("{spanFrom:Int64}");
-        expect(dedupScopeOf(list?.body)).not.toContain("{from:Int64}");
-        expect(paramOf(list, "spanFrom")).toBe(String(SPAN_FROM_MS - DAY_MS));
+        expect(span?.body).toContain("HAVING max(ToAt) >= fromUnixTimestamp64Milli(");
+        expect(span?.body).toContain("min(FromAt) <= fromUnixTimestamp64Milli(");
+        expect(paramsOf(span)).toEqual(expect.arrayContaining(["100", "200"]));
+        expect(dedupTimesOf(list)).toEqual([
+          String(SPAN_FROM_MS - DAY_MS),
+          String(SPAN_TO_MS + DAY_MS),
+        ]);
       });
 
       it("reads no session rows when the index names no session in the window", async () => {
@@ -427,7 +442,10 @@ describe("Coding Agent session ClickHouse repository", () => {
         const [span, page] = endpoint.requests;
         expect(span?.body).toContain("TenantId IN ({tenantIds:Array(String)})");
         expect(paramOf(span, "tenantIds")).toBe("['aggregate','member-a']");
-        expect(dedupScopeOf(page?.body)).toContain("{spanFrom:Int64}");
+        expect(dedupTimesOf(page)).toEqual([
+          String(SPAN_FROM_MS - DAY_MS),
+          String(SPAN_TO_MS + DAY_MS),
+        ]);
       });
     });
 
@@ -446,9 +464,9 @@ describe("Coding Agent session ClickHouse repository", () => {
         });
 
         const [span, list] = endpoint.requests;
-        expect(span?.body).toContain("HAVING SessionToAt >=");
-        expect(span?.body).not.toContain("SessionFromAt <=");
-        expect(dedupScopeOf(list?.body)).toContain("{spanFrom:Int64}");
+        expect(span?.body).toContain("HAVING max(ToAt) >=");
+        expect(span?.body).not.toContain("min(FromAt) <=");
+        expect(dedupScopeOf(list?.body)).toContain("StartedAt >= fromUnixTimestamp64Milli(");
       });
 
       it("reads no session rows when the index names no session since the caller's time", async () => {
@@ -483,7 +501,7 @@ describe("Coding Agent session ClickHouse repository", () => {
 
         const [, read] = endpoint.requests;
         expect(dedupScopeOf(read?.body)).toContain("StartedAt >= fromUnixTimestamp64Milli");
-        expect(dedupScopeOf(read?.body)).toContain("SessionId IN {sessionIds");
+        expect(dedupScopeOf(read?.body)).toContain("SessionId IN ({");
         expect(paramOf(read, "idBound_fromMs")).toBe(String(SPAN_FROM_MS - DAY_MS));
       });
     });
@@ -501,8 +519,7 @@ describe("Coding Agent session ClickHouse repository", () => {
 
         const [, read] = endpoint.requests;
         expect(dedupScopeOf(read?.body)).toContain("StartedAt >= fromUnixTimestamp64Milli");
-        expect(dedupScopeOf(read?.body)).not.toContain("{from:Int64}");
-        expect(paramOf(read, "from")).toBe("100");
+        expect(paramsOf(read)).toEqual(expect.arrayContaining(["100", "200"]));
       });
     });
 
@@ -511,8 +528,8 @@ describe("Coding Agent session ClickHouse repository", () => {
         const { endpoint, repository } = await createRepository({ idIndexReady: true });
         endpoint.queryRows.push(
           spanRow(2),
-          [{ Total: "2", FirstMs: "0" }],
-          [{ Total: "3", FirstMs: String(SPAN_FROM_MS) }],
+          [{ Sessions: "2" }],
+          [{ Versions: "3", FirstMs: String(SPAN_FROM_MS) }],
         );
 
         await expect(repository.countUsage({ projectIds: ["project-1"] })).resolves.toEqual({
@@ -523,7 +540,7 @@ describe("Coding Agent session ClickHouse repository", () => {
         const counts = endpoint.requests.slice(1);
         expect(counts).toHaveLength(2);
         for (const count of counts) {
-          expect(count.body).toContain("StartedAt BETWEEN fromUnixTimestamp64Milli({spanFrom");
+          expect(count.body).toContain("StartedAt >= fromUnixTimestamp64Milli(");
         }
       });
 
@@ -566,7 +583,7 @@ describe("Coding Agent session ClickHouse repository", () => {
       await repository.findManyRecent({ tenantId: "project-1", fromMs: 100, toMs: 200, limit: 5 });
 
       expect(endpoint.requests).toHaveLength(1);
-      expect(dedupScopeOf(endpoint.requests[0]?.body)).not.toContain("{spanFrom");
+      expect(dedupScopeOf(endpoint.requests[0]?.body)).not.toContain("StartedAt >=");
       expect(endpoint.requests[0]?.body).not.toContain("_id_index");
       expect(metrics.notReady).toEqual([{ read: "recent_list", target: SHARED_CLICKHOUSE_TARGET }]);
     });
@@ -586,7 +603,7 @@ describe("Coding Agent session ClickHouse repository", () => {
       });
 
       expect(endpoint.requests).toHaveLength(1);
-      expect(dedupScopeOf(endpoint.requests[0]?.body)).not.toContain("{spanFrom");
+      expect(dedupScopeOf(endpoint.requests[0]?.body)).not.toContain("StartedAt >=");
       expect(endpoint.requests[0]?.body).not.toContain("_id_index");
       expect(metrics.notReady).toEqual([{ read: "branch_list", target: SHARED_CLICKHOUSE_TARGET }]);
     });
@@ -607,7 +624,7 @@ describe("Coding Agent session ClickHouse repository", () => {
       });
 
       expect(endpoint.requests).toHaveLength(1);
-      expect(dedupScopeOf(endpoint.requests[0]?.body)).not.toContain("{spanFrom");
+      expect(dedupTimesOf(endpoint.requests[0])).toEqual([]);
       expect(endpoint.requests[0]?.body).not.toContain("_id_index");
       expect(metrics.notReady).toEqual([
         { read: "recent_list_fenced", target: SHARED_CLICKHOUSE_TARGET },
@@ -617,13 +634,13 @@ describe("Coding Agent session ClickHouse repository", () => {
     it("counts usage unbounded, and counts the read once", async () => {
       const metrics = new NotReadyCounter();
       const { endpoint, repository } = await createRepository({ metrics });
-      endpoint.queryRows.push([{ Total: "0", FirstMs: "0" }], [{ Total: "0", FirstMs: "0" }]);
+      endpoint.queryRows.push([{ Sessions: "0" }], [{ Versions: "0", FirstMs: "0" }]);
 
       await repository.countUsage({ projectIds: ["project-1"] });
 
       expect(endpoint.requests).toHaveLength(2);
       for (const request of endpoint.requests) {
-        expect(request.body).not.toContain("{spanFrom");
+        expect(request.body).not.toContain("StartedAt >=");
         expect(request.body).not.toContain("_id_index");
       }
       expect(metrics.notReady).toEqual([{ read: "usage_count", target: SHARED_CLICKHOUSE_TARGET }]);

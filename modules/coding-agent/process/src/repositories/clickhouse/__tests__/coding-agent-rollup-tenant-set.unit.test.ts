@@ -70,12 +70,8 @@ describe("coding-agent pull-request rollups", () => {
         startedAtFromMs: 0,
       });
 
-      expect(requests).toHaveLength(2);
-      for (const request of requests) {
-        expect(request.tenantIds).toEqual(TENANTS);
-        expect(request.SKIP_TENANT_CHECK).toBeUndefined();
-      }
-      expect(statements).toHaveLength(2);
+      expect(requests).toHaveLength(0);
+      expect(statements).toHaveLength(4);
       for (const statement of statements) {
         expect(statement).toMatchObject({ identity: "reader", kind: "tenant" });
         expect(statement.settings).toMatchObject({ SQL_langwatch_tenant_ids: TENANTS.join(",") });

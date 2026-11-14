@@ -43,9 +43,10 @@ function recordingClient(rows: Record<string, unknown>[]): {
   const scopedTo: string[][] = [];
   const client = clickHouseQueryClientDouble({
     ...sessionIdIndexNotReady,
-    query: async (request: { tenantId: string; params?: Record<string, unknown> }) => {
-      named.push(request.tenantId);
-      scopedTo.push((request.params?.tenantIds ?? []) as string[]);
+    read: async (request: { statement: unknown }) => {
+      const statement = request.statement as { tenantId: string; params?: Record<string, unknown> };
+      named.push(statement.tenantId);
+      scopedTo.push((statement.params?.tenantIds ?? []) as string[]);
       return { rows };
     },
   });
@@ -177,7 +178,7 @@ function version({
 function listClient(rows: Record<string, unknown>[]): ClickHouseQueryClient {
   return clickHouseQueryClientDouble({
     ...sessionIdIndexNotReady,
-    query: async () => ({ rows }),
+    read: async () => ({ rows }),
   });
 }
 

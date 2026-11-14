@@ -10,7 +10,6 @@
     "modules/analytics/process/src/repositories/clickhouse/clickhouse.filter-query-helpers.mapper.ts": 2,
     "modules/analytics/process/src/repositories/clickhouse/clickhouse.rollup-timeseries-query.mapper.ts": 1,
     "modules/analytics/process/src/repositories/clickhouse/clickhouse.slim-timeseries-query.mapper.ts": 1,
-    "modules/coding-agent/process/src/repositories/clickhouse/clickhouse.coding-agent-session.repository.ts": 13,
     "modules/data-retention/process/src/repositories/clickhouse/clickhouse.retroactive-retention.repository.ts": 10,
     "modules/data-retention/process/src/repositories/clickhouse/clickhouse.storage-meter.repository.ts": 2,
     "modules/ops/process/src/repositories/clickhouse/clickhouse.storage-footprint.repository.ts": 8,
@@ -32,7 +31,6 @@
     "modules/trace/process/src/repositories/clickhouse/session-groups.repository.ts": 6,
     "modules/trace/process/src/repositories/clickhouse/trace-evaluation-runs.repository.ts": 3,
     "modules/trace/process/src/repositories/clickhouse/trace-instant-eval-runs.repository.ts": 1,
-    "modules/trace/process/src/repositories/clickhouse/trace-list.repository.ts": 18,
-    "modules/trace/process/src/repositories/clickhouse/trace-metrics-analytics.repository.ts": 4
+    "modules/trace/process/src/repositories/clickhouse/trace-list.repository.ts": 18
   }
 }
