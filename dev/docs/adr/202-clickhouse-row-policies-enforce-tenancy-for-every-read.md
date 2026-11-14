@@ -159,6 +159,8 @@ Migration path: about 139 non-test TypeScript files under ClickHouse repository 
 
 14. Staff-only Ops reads across tenants run in the worker: the Ops event explorer's search and Ops EXPLAIN are sent as commands, the worker runs them on its own credential, and the screen receives the result through a read hint. The api holds no credential that reads every tenant, `CLICKHOUSE_OPS_URL` included (Alex, 2026-11-14). The EXPLAIN route answers `202 { requestId }` and a new `GET /api/ops/clickhouse/explain/:requestId` returns `pending` or the rows; the operator agent polls it (Alex, 2026-11-14).
 15. The builder gains a scalar-subquery comparison (`col = (SELECT max(..) ...)`), its inner read under the same tenant predicate, because the CTE form of scenario run-state's latest-version read measured 23% more memory and up to twice the rows on 26.8 (Alex, 2026-11-14).
+16. The three materialised views fed by the writer's tables (`gateway_budget_scope_totals_mv`, `gateway_budget_ledger_events_id_index_mv`, `dspy_steps_id_index_mv`) run as `SQL SECURITY DEFINER`, set by a migration, so an insert-only writer fills them; without it 26.8 refuses the push with 497 after storing the source row. An insert depends on the definer user existing (Alex, 2026-11-14).
+17. An organisation's usage totals are summed over its current projects, archived included; usage under a project that moved out or was deleted unpurged no longer counts for the old organisation (Alex, 2026-11-14).
 
 ## Open questions for Alex
 
