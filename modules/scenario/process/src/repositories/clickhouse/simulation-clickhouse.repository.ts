@@ -9,6 +9,7 @@ import {
 } from "@langwatch/clickhouse-client";
 import {
   clickhouseRead,
+  column,
   type ConditionOps,
   fn,
   type ReaderReadStatement,
@@ -56,8 +57,6 @@ export const RUN_ID_CAP = 10000;
  */
 const SET_BOUND = "{{idBound:simulation_runs.ScenarioSetId:scenarioSetIds}}";
 const SET_BOUND_T = "{{idBound:simulation_runs.ScenarioSetId:scenarioSetIds:t}}";
-const BATCH_BOUND = "{{idBound:simulation_runs.BatchRunId:batchRunId}}";
-const BATCH_BOUND_T = "{{idBound:simulation_runs.BatchRunId:batchRunId:t}}";
 const BATCHES_BOUND = "{{idBound:simulation_runs.BatchRunId:batchRunIds}}";
 const BATCHES_BOUND_T = "{{idBound:simulation_runs.BatchRunId:batchRunIds:t}}";
 const ID_BOUND_READ: { idBound: IdBoundOptions } = { idBound: { fallback: "unbounded" } };
@@ -117,7 +116,11 @@ const RUNNING_STATUS_LIST = ["IN_PROGRESS", "PENDING", "PENDING_EVALUATION", "QU
 const FAILED_STATUS_LIST = ["FAILED", "FAILURE", "ERROR", "CANCELLED"];
 const COMPLETED_STATUS_LIST = ["SUCCESS", ...FAILED_STATUS_LIST];
 
-/** A metadata string under `path`, `''` when absent, as {@link RUN_NOTE_EXPR} reads it. */
+/**
+ * A metadata string under `path`, `''` when absent, read server-side so only it crosses the wire.
+ * @see specs/suites/run-note-metadata-convention.feature (the note)
+ * @see specs/scenarios/run-actor-on-runs.feature (the actor id/label pair; empty id: no person)
+ */
 const metadataString = (...path: string[]) =>
   fn.JSONExtractString(fn.ifNull(simulationRuns.Metadata, "{}"), ...path);
 
@@ -199,21 +202,6 @@ const listColumns = (criteria: string) => `
   toString(toUnixTimestamp64Milli(ArchivedAt)) AS ArchivedAt`;
 
 /**
- * The run note, read server-side from run metadata so only the short
- * string crosses the wire — a top-level key an SDK/CI caller also writes;
- * @see specs/suites/run-note-metadata-convention.feature
- */
-export const RUN_NOTE_EXPR = "JSONExtractString(ifNull(Metadata, '{}'), 'note')";
-
-/**
- * Who started the run, read server-side from the reserved metadata
- * namespace; the id/label pair is written together — empty id means no
- * person (a project key, or a pre-stamp run). @see specs/scenarios/run-actor-on-runs.feature
- */
-const RUN_ACTOR_ID_EXPR = "JSONExtractString(ifNull(Metadata, '{}'), 'langwatch', 'actorId')";
-const RUN_ACTOR_LABEL_EXPR = "JSONExtractString(ifNull(Metadata, '{}'), 'langwatch', 'actorLabel')";
-
-/**
  * Page size ceilings for set-level list reads: the trimmed projection caps
  * at 100, a whole-conversation read caps far lower since it reads the full
  * message arrays the trim exists to avoid.
@@ -241,38 +229,9 @@ function deriveRunActor(params: {
   return label ? { id: params.id, label } : null;
 }
 
-/** Columns for a slim batch-history preview — no full message arrays. */
-const PREVIEW_COLUMNS = `
-  ScenarioRunId, BatchRunId, Name, Description, Status,
-  toString(DurationMs) AS DurationMs,
-  toString(toUnixTimestamp64Milli(UpdatedAt)) AS UpdatedAt,
-  toString(toUnixTimestamp64Milli(FinishedAt)) AS FinishedAt,
-  ${RUN_NOTE_EXPR} AS Note,
-  ${RUN_ACTOR_ID_EXPR} AS ActorId,
-  ${RUN_ACTOR_LABEL_EXPR} AS ActorLabel,
-  arraySlice(\`Messages.Role\`, 1, 4) AS MessagePreviewRoles,
-  arraySlice(\`Messages.Content\`, 1, 4) AS MessagePreviewContents` as const;
-
 interface CursorPayload {
   ts: string;
   batchRunId: string;
-}
-
-/** Slim per-run row shape for the batch-history preview (step-2 heavy read). */
-interface PreviewItemRow {
-  ScenarioRunId: string;
-  BatchRunId: string;
-  Name: string | null;
-  Description: string | null;
-  Status: string;
-  DurationMs: string | null;
-  UpdatedAt: string;
-  FinishedAt: string | null;
-  Note: string;
-  ActorId: string;
-  ActorLabel: string;
-  MessagePreviewRoles: string[];
-  MessagePreviewContents: string[];
 }
 
 export type SimulationClickHouseClient = {
@@ -291,6 +250,8 @@ export type SimulationClickHouseClient = {
   select?(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string>;
   /** A statement the typed builder built; it names its own tenant scope. */
   read: ClickHouseQueryClient["read"];
+  /** Which columns of a table this tenant's target holds, for `fn.heldOr`. */
+  holds(input: { table: string }): Promise<(name: string) => boolean>;
 };
 
 type SimulationClickHouseClientResolver = (tenantId: string) => Promise<SimulationClickHouseClient>;
@@ -355,22 +316,6 @@ export class SimulationClickHouseRepository extends SimulationRepository {
       return null;
     }
     return { minMs, maxMs };
-  }
-
-  static buildStartedAtWindowClause(window: WindowFragment | null): {
-    whereClause: string;
-    params: Record<string, string>;
-  } {
-    if (!window) return { whereClause: "", params: {} };
-    return {
-      whereClause:
-        "AND StartedAt >= fromUnixTimestamp64Milli(toUInt64({minStartedAtMs:String})) " +
-        "AND StartedAt <= fromUnixTimestamp64Milli(toUInt64({maxStartedAtMs:String}))",
-      params: {
-        minStartedAtMs: String(window.fromMs),
-        maxStartedAtMs: String(window.toMs),
-      },
-    };
   }
 
   private constructor(private readonly resolveClient: SimulationClickHouseClientResolver) {
@@ -497,8 +442,8 @@ export class SimulationClickHouseRepository extends SimulationRepository {
 
   private static mapPreviewItem(r: PreviewItemRow) {
     const baseStatus = mapStatus(r.Status);
-    const durationMs = r.DurationMs != null ? parseInt(r.DurationMs, 10) : 0;
-    const hasFinished = r.FinishedAt != null && Number(r.FinishedAt) > 0;
+    const durationMs = r.DurationMs != null ? Number(r.DurationMs) : 0;
+    const hasFinished = r.FinishedAtMs != null && Number(r.FinishedAtMs) > 0;
     // Stored status is the only truth: unfinished runs collapse to
     // IN_PROGRESS; stalled runs arrive as stored ERROR via the
     // process-manager stall watchdog.
@@ -601,26 +546,18 @@ export class SimulationClickHouseRepository extends SimulationRepository {
       windowMs: startedAtBounds ? (startedAtBounds.maxMs - startedAtBounds.minMs) / 2 : undefined,
       fallback: "none",
       isEmpty: (rows) => rows.length === 0,
-      run: (window) => {
-        const startedAtWindow = SimulationClickHouseRepository.buildStartedAtWindowClause(window);
-        // ID_BOUND_SKIP: bounded by its page's own StartedAt window from step 1.
-        return this.queryRows<PreviewItemRow>(
-          `SELECT ${PREVIEW_COLUMNS}
-       FROM ${TABLE_NAME}
-       WHERE TenantId = {tenantId:String}
-         AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
-         AND BatchRunId IN ({batchRunIds:Array(String)})
-         AND ArchivedAt IS NULL
-         ${startedAtWindow.whereClause}
-         ${SimulationClickHouseRepository.simulationRunDedupPredicate("TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) AND BatchRunId IN ({batchRunIds:Array(String)})")}
-       ORDER BY CreatedAt ASC`,
-          {
-            tenantId: projectId,
-            scenarioSetIds: SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId),
+      run: async (window) => {
+        const { rows } = await client.read({
+          statement: SimulationClickHouseRepository.batchPreviewItemsRead({
+            projectId,
+            scenarioSetId,
             batchRunIds,
-            ...startedAtWindow.params,
-          },
-        );
+            window,
+          }),
+          table: simulationRuns.$table.name,
+          ...ID_BOUND_READ,
+        });
+        return rows;
       },
     });
 
@@ -737,41 +674,20 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     // scenario set id narrows the scan when the caller sends one. The CLI's
     // --wait polls with just the batch id. An empty string is a real value
     // that selects the default set, so only an absent id drops the predicate.
-    const scenarioSetIds =
-      scenarioSetId === undefined
-        ? undefined
-        : SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId);
-    const setFilter = (alias: string) =>
-      scenarioSetIds ? `AND ${alias}ScenarioSetId IN ({scenarioSetIds:Array(String)})` : "";
-    const criteria = await this.criteriaColumns(projectId);
-    const rows = await this.queryRows<ClickHouseSimulationRunRow & { ExportSortKey: string }>(
-      `SELECT ${runColumns(criteria)},
-        toString(${EXPORT_SORT_KEY}) AS ExportSortKey
-       FROM ${TABLE_NAME} AS t
-       WHERE t.TenantId = {tenantId:String}
-         ${setFilter("t.")}
-         AND t.BatchRunId = {batchRunId:String}
-         ${BATCH_BOUND_T}
-         AND t.ArchivedAt IS NULL
-         AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
-           SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
-           FROM ${TABLE_NAME}
-           WHERE TenantId = {tenantId:String}
-             ${setFilter("")}
-             AND BatchRunId = {batchRunId:String}
-             ${BATCH_BOUND}
-           GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-         )
-       ORDER BY CreatedAt ASC`,
-      {
-        tenantId: projectId,
-        ...(scenarioSetIds ? { scenarioSetIds } : {}),
+    const client = await this.getClient(projectId);
+    const holds = await client.holds({ table: simulationRuns.$table.name });
+    const { rows } = await client.read({
+      statement: SimulationClickHouseRepository.batchRunsRead({
+        projectId,
+        scenarioSetId,
         batchRunId,
-      },
-      ID_BOUND_READ,
-    );
+        holds,
+      }),
+      table: simulationRuns.$table.name,
+      ...ID_BOUND_READ,
+    });
 
-    const runs = rows.map((row) => mapClickHouseRowToScenarioRunData(row));
+    const runs = rows.map((row) => mapClickHouseRowToScenarioRunData(runRowOf(row)));
     const lastUpdatedAt = runs.reduce((max, r) => Math.max(max, r.timestamp), 0);
     return { changed: true, lastUpdatedAt, runs };
   }
@@ -1862,6 +1778,44 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     });
   }
 
+  /**
+   * The slim preview runs of a page's batches, latest versions, oldest first; bounded by the
+   * batch id index (one id lookup per statement) and, when step 1 found one, the page's window.
+   */
+  static batchPreviewItemsRead(input: {
+    projectId: string;
+    scenarioSetId: string;
+    batchRunIds: string[];
+    window: Pick<WindowFragment, "fromMs" | "toMs"> | null;
+  }): ReaderReadStatement<PreviewItemRow> {
+    return batchPreviewItemsReadOf({
+      ...input,
+      setIds: SimulationClickHouseRepository.expandSetIdFilter(input.scenarioSetId),
+    });
+  }
+
+  /**
+   * A batch's whole runs, latest versions, oldest first, bounded by the batch id index; an
+   * absent set id reads the batch alone (the CLI's --wait), `""` selects the default set.
+   */
+  static batchRunsRead({
+    scenarioSetId,
+    ...input
+  }: {
+    projectId: string;
+    scenarioSetId: string | undefined;
+    batchRunId: string;
+    holds: (name: string) => boolean;
+  }): ReaderReadStatement<BuiltRunRow> {
+    return batchRunsReadOf({
+      ...input,
+      setIds:
+        scenarioSetId === undefined
+          ? undefined
+          : SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId),
+    });
+  }
+
   private static expandSetIdFilter(scenarioSetId: string): string[] {
     return scenarioSetId === DEFAULT_SET_ID || scenarioSetId === ""
       ? [DEFAULT_SET_ID, ""]
@@ -2024,4 +1978,198 @@ function batchHistoryPageReadOf({
   if (startDate !== undefined) page = page.having(({ gte }) => gte(lastRunAt, startDate));
   if (endDate !== undefined) page = page.having(({ lte }) => lte(lastRunAt, endDate));
   return page.orderBy(lastRunAt, "DESC").orderBy(t.BatchRunId, "ASC").limit(limit).build();
+}
+
+/** A row of {@link SimulationClickHouseRepository.batchPreviewItemsRead}. */
+type PreviewItemRow =
+  ReturnType<typeof batchPreviewItemsReadOf> extends ReaderReadStatement<infer Row> ? Row : never;
+
+function batchPreviewItemsReadOf({
+  projectId,
+  setIds,
+  batchRunIds,
+  window,
+}: {
+  projectId: string;
+  setIds: string[];
+  batchRunIds: string[];
+  window: Pick<WindowFragment, "fromMs" | "toMs"> | null;
+}) {
+  const t = simulationRuns;
+  // One conjunct per `where`: the election repeats the StartedAt ones for partition pruning.
+  let read = clickhouseRead({ scope: tenantScope.single({ tenantId: projectId }) })
+    .from(t)
+    .select({
+      ScenarioRunId: t.ScenarioRunId,
+      BatchRunId: t.BatchRunId,
+      Name: t.Name,
+      Description: t.Description,
+      Status: t.Status,
+      DurationMs: t.DurationMs,
+      FinishedAtMs: fn.toUnixTimestamp64Milli(t.FinishedAt),
+      Note: metadataString("note"),
+      ActorId: metadataString("langwatch", "actorId"),
+      ActorLabel: metadataString("langwatch", "actorLabel"),
+      MessagePreviewRoles: fn.arraySlice(t["Messages.Role"], 1, 4),
+      MessagePreviewContents: fn.arraySlice(t["Messages.Content"], 1, 4),
+    })
+    .where(({ idBound }) => idBound(t.BatchRunId, batchRunIds))
+    .where(({ oneOf }) => oneOf(t.ScenarioSetId, setIds));
+  if (window !== null) {
+    read = read
+      .where(({ gte }) => gte(t.StartedAt, window.fromMs))
+      .where(({ lte }) => lte(t.StartedAt, window.toMs));
+  }
+  return read
+    .where(({ isNull }) => isNull(t.ArchivedAt))
+    .latestVersion()
+    .orderBy(t.CreatedAt, "ASC")
+    .build();
+}
+
+/** A `Criteria.*` column, or its typed empty array on a target before goose 00101. */
+function heldCriteria(holds: (name: string) => boolean) {
+  const t = simulationRuns;
+  const strings = fn.emptyArrayAs(column.array(column.string()));
+  return {
+    criteriaCriterion: fn.heldOr(t["Criteria.Criterion"], { holds, otherwise: strings }),
+    criteriaRequirement: fn.heldOr(t["Criteria.Requirement"], { holds, otherwise: strings }),
+    criteriaStatus: fn.heldOr(t["Criteria.Status"], {
+      holds,
+      otherwise: fn.emptyArrayAs(column.array(column.lowCardinality(column.string()))),
+    }),
+    criteriaReasoning: fn.heldOr(t["Criteria.Reasoning"], { holds, otherwise: strings }),
+  };
+}
+
+/** A whole run's columns; dotted columns and timestamps (Unix milliseconds) under plain keys. */
+function runFieldsOf(holds: (name: string) => boolean) {
+  const t = simulationRuns;
+  const millis = fn.toUnixTimestamp64Milli;
+  return {
+    ScenarioRunId: t.ScenarioRunId,
+    ScenarioId: t.ScenarioId,
+    BatchRunId: t.BatchRunId,
+    ScenarioSetId: t.ScenarioSetId,
+    Status: t.Status,
+    Name: t.Name,
+    Description: t.Description,
+    Metadata: t.Metadata,
+    messageIds: t["Messages.Id"],
+    messageRoles: t["Messages.Role"],
+    messageContents: t["Messages.Content"],
+    messageTraceIds: t["Messages.TraceId"],
+    messageRests: t["Messages.Rest"],
+    TraceIds: t.TraceIds,
+    Verdict: t.Verdict,
+    Reasoning: t.Reasoning,
+    MetCriteria: t.MetCriteria,
+    UnmetCriteria: t.UnmetCriteria,
+    InconclusiveCriteria: t.InconclusiveCriteria,
+    Error: t.Error,
+    evaluationEvaluatorIds: t["Evaluations.EvaluatorId"],
+    evaluationNames: t["Evaluations.Name"],
+    evaluationStatuses: t["Evaluations.Status"],
+    evaluationRequired: t["Evaluations.Required"],
+    evaluationPassed: t["Evaluations.Passed"],
+    evaluationScores: t["Evaluations.Score"],
+    evaluationLabels: t["Evaluations.Label"],
+    evaluationDetails: t["Evaluations.Details"],
+    evaluationCostAmounts: t["Evaluations.CostAmount"],
+    evaluationCostCurrencies: t["Evaluations.CostCurrency"],
+    evaluationInputsJson: t["Evaluations.InputsJson"],
+    ...heldCriteria(holds),
+    DurationMs: t.DurationMs,
+    TotalCost: t.TotalCost,
+    RoleCosts: t.RoleCosts,
+    RoleLatencies: t.RoleLatencies,
+    startedAtMs: millis(t.StartedAt),
+    createdAtMs: millis(t.CreatedAt),
+    updatedAtMs: millis(t.UpdatedAt),
+    finishedAtMs: millis(t.FinishedAt),
+    archivedAtMs: millis(t.ArchivedAt),
+  };
+}
+
+/** A row of {@link runFieldsOf}, as a built read answers it. */
+type BuiltRunRow =
+  ReturnType<typeof batchRunsReadOf> extends ReaderReadStatement<infer Row> ? Row : never;
+
+const millisText = (value: string | number | null) => (value === null ? null : String(value));
+
+const perRole = (values: Readonly<Record<string, readonly number[]>>) =>
+  Object.fromEntries(Object.entries(values).map(([role, entries]) => [role, [...entries]]));
+
+/** A built run row in the shape the run mapper reads. */
+function runRowOf(row: BuiltRunRow): ClickHouseSimulationRunRow {
+  return {
+    ScenarioRunId: row.ScenarioRunId,
+    ScenarioId: row.ScenarioId,
+    BatchRunId: row.BatchRunId,
+    ScenarioSetId: row.ScenarioSetId,
+    Status: row.Status,
+    Name: row.Name,
+    Description: row.Description,
+    Metadata: row.Metadata,
+    "Messages.Id": [...row.messageIds],
+    "Messages.Role": [...row.messageRoles],
+    "Messages.Content": [...row.messageContents],
+    "Messages.TraceId": [...row.messageTraceIds],
+    "Messages.Rest": [...row.messageRests],
+    TraceIds: [...row.TraceIds],
+    Verdict: row.Verdict,
+    Reasoning: row.Reasoning,
+    MetCriteria: [...row.MetCriteria],
+    UnmetCriteria: [...row.UnmetCriteria],
+    InconclusiveCriteria: [...row.InconclusiveCriteria],
+    Error: row.Error,
+    "Evaluations.EvaluatorId": [...row.evaluationEvaluatorIds],
+    "Evaluations.Name": [...row.evaluationNames],
+    "Evaluations.Status": [...row.evaluationStatuses],
+    "Evaluations.Required": [...row.evaluationRequired],
+    "Evaluations.Passed": [...row.evaluationPassed],
+    "Evaluations.Score": [...row.evaluationScores],
+    "Evaluations.Label": [...row.evaluationLabels],
+    "Evaluations.Details": [...row.evaluationDetails],
+    "Evaluations.CostAmount": [...row.evaluationCostAmounts],
+    "Evaluations.CostCurrency": [...row.evaluationCostCurrencies],
+    "Evaluations.InputsJson": [...row.evaluationInputsJson],
+    "Criteria.Criterion": [...row.criteriaCriterion],
+    "Criteria.Requirement": [...row.criteriaRequirement],
+    "Criteria.Status": [...row.criteriaStatus],
+    "Criteria.Reasoning": [...row.criteriaReasoning],
+    DurationMs: millisText(row.DurationMs),
+    TotalCost: row.TotalCost,
+    RoleCosts: perRole(row.RoleCosts),
+    RoleLatencies: perRole(row.RoleLatencies),
+    StartedAt: millisText(row.startedAtMs),
+    CreatedAt: String(row.createdAtMs),
+    UpdatedAt: String(row.updatedAtMs),
+    FinishedAt: millisText(row.finishedAtMs),
+    ArchivedAt: millisText(row.archivedAtMs),
+  };
+}
+
+function batchRunsReadOf({
+  projectId,
+  batchRunId,
+  setIds,
+  holds,
+}: {
+  projectId: string;
+  batchRunId: string;
+  setIds: string[] | undefined;
+  holds: (name: string) => boolean;
+}) {
+  const t = simulationRuns;
+  let read = clickhouseRead({ scope: tenantScope.single({ tenantId: projectId }) })
+    .from(t)
+    .select(runFieldsOf(holds))
+    .where(({ idBound }) => idBound(t.BatchRunId, batchRunId));
+  if (setIds !== undefined) read = read.where(({ oneOf }) => oneOf(t.ScenarioSetId, setIds));
+  return read
+    .where(({ isNull }) => isNull(t.ArchivedAt))
+    .latestVersion()
+    .orderBy(t.CreatedAt, "ASC")
+    .build();
 }

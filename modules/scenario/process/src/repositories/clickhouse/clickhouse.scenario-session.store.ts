@@ -65,6 +65,11 @@ export class ClickHouseScenarioSession implements SimulationClickHouseClient {
     return this.clickhouse.read(input);
   };
 
+  /** Which columns of a table this tenant's target holds, for `fn.heldOr`. */
+  holds({ table }: { table: string }): Promise<(name: string) => boolean> {
+    return this.clickhouse.columns({ tenantId: this.tenantId }).holds({ table });
+  }
+
   /** A select list naming only the columns this tenant's target has, the rest as defaults. */
   select(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string> {
     return this.clickhouse.columns({ tenantId: this.tenantId }).select(input);

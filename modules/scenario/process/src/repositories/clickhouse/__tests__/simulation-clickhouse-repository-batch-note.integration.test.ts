@@ -302,7 +302,7 @@ describe.skipIf(databaseUrl === null)("the cost of reading the note", () => {
 
       const noteQueries = captured.filter((q) => q.includes("AS Note"));
       expect(noteQueries).toHaveLength(1);
-      expect(noteQueries[0]).toContain("BatchRunId IN ({batchRunIds:");
+      expect(noteQueries[0]).toMatch(/BatchRunId IN \(\{\w+:Array\(String\)\}\)/);
       expect(noteQueries[0]).toContain("StartedAt >=");
 
       const wholeSetQueries = captured.filter((q) => q.includes("countDistinct(BatchRunId)"));

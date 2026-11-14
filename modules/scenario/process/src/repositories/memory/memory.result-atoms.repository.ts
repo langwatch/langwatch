@@ -307,7 +307,7 @@ export class MemoryResultAtomsRepository extends ResultAtomsRepository {
     return new MemoryResultAtomsRepository(runs);
   }
 
-  /** The live `atomScopeSql`: the project's latest unarchived folds the filter keeps. */
+  /** The live `atomRunsOf` scope: the project's latest unarchived folds the filter keeps. */
   static atomsInScope({
     runs,
     filter,

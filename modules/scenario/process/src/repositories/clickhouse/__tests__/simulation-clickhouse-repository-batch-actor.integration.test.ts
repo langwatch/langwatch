@@ -218,7 +218,7 @@ describe.skipIf(databaseUrl === null)("the cost of reading who started a batch",
 
       const actorQueries = captured.filter((q) => q.includes("AS ActorId"));
       expect(actorQueries).toHaveLength(1);
-      expect(actorQueries[0]).toContain("BatchRunId IN ({batchRunIds:");
+      expect(actorQueries[0]).toMatch(/BatchRunId IN \(\{\w+:Array\(String\)\}\)/);
       expect(actorQueries[0]).toContain("StartedAt >=");
 
       const wholeSetQueries = captured.filter((q) => q.includes("countDistinct(BatchRunId)"));
