@@ -1,11 +1,21 @@
 import type { Authorization } from "@langwatch/authorization";
-import { type IdBoundOptions, ownProjectIdOf } from "@langwatch/clickhouse-client";
+import {
+  type ClickHouseQueryClient,
+  type IdBoundOptions,
+  ownProjectIdOf,
+} from "@langwatch/clickhouse-client";
+import {
+  clickhouseRead,
+  type Expression,
+  fn,
+  tenantScope,
+} from "@langwatch/clickhouse-client/builder";
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { DerivedTraceEvent, NormalizedSpan } from "@langwatch/trace-contract";
 import { z } from "zod";
 
-import type { TraceClickHouseWriteResolver } from "./clickhouse.trace-member-client.repository.ts";
+import { storedSpans as spans } from "./clickhouse.stored-spans.table.ts";
 import {
   chNumber,
   chString,
@@ -26,33 +36,6 @@ const traceEventRowSchema = z.looseObject({
 
 const traceEventRowsSchema = z.array(traceEventRowSchema);
 
-const TABLE_NAME = "stored_spans" as const;
-
-// Derivation reads narrow columns only: Events.* and Links.* excluded
-// (mapChRowToNormalized defaults them to [] — these spans must never render)
-const DERIVATION_TRACE_SPAN_SELECT = `
-  SpanId,
-  TraceId,
-  TenantId,
-  ParentSpanId,
-  ParentTraceId,
-  ParentIsRemote,
-  Sampled,
-  toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
-  toUnixTimestamp64Milli(EndTime) AS EndTimeMs,
-  DurationMs,
-  SpanName,
-  SpanKind,
-  ResourceAttributes,
-  SpanAttributes,
-  StatusCode,
-  StatusMessage,
-  ScopeName,
-  ScopeVersion,
-  Cost,
-  NonBilledCost
-`;
-
 // Derivation span limit caps memory per-role sum (matches projection path cap)
 const DERIVATION_SPAN_LIMIT = 10_000;
 
@@ -65,8 +48,8 @@ const DERIVATION_EVENT_LIMIT = 10_000;
  * in SQL so a re-exported span cannot be counted twice into a role total.
  */
 const DERIVATION_FETCH_SETTINGS = {
-  max_memory_usage: "2000000000",
-  max_execution_time: "30",
+  max_memory_usage: 2_000_000_000,
+  max_execution_time: 30,
 } as const;
 
 /**
@@ -81,12 +64,12 @@ function idBoundOf({ occurredAtMs }: { occurredAtMs?: number | undefined }): IdB
 // UpdatedAt (not LIMIT 1 BY which materializes columns for whole granules)
 export class TraceDerivationSpanClickHouseRepository {
   static create(options: {
-    resolveClient: TraceClickHouseWriteResolver;
+    clickhouse: Pick<ClickHouseQueryClient, "read">;
   }): TraceDerivationSpanClickHouseRepository {
-    return new TraceDerivationSpanClickHouseRepository(options);
+    return new TraceDerivationSpanClickHouseRepository(options.clickhouse);
   }
 
-  private constructor(private readonly options: { resolveClient: TraceClickHouseWriteResolver }) {}
+  private constructor(private readonly clickhouse: Pick<ClickHouseQueryClient, "read">) {}
 
   async findNormalizedSpansByTraceId(input: {
     tenantId: string;
@@ -152,44 +135,43 @@ export class TraceDerivationSpanClickHouseRepository {
     traceId: string;
     occurredAtMs?: number | undefined;
   }): Promise<DerivedTraceEvent[]> {
-    const client = await this.options.resolveClient(input.tenantId);
-    const result = await client.query({
-      query: `
-        SELECT
-          SpanId AS spanId,
-          toUnixTimestamp64Milli(event_timestamp) AS timestamp,
-          event_name AS name,
-          event_attrs AS attributes
-        FROM (
-          SELECT
-            SpanId,
-            argMax("Events.Timestamp", UpdatedAt) AS Events_Timestamp,
-            argMax("Events.Name", UpdatedAt) AS Events_Name,
-            argMax("Events.Attributes", UpdatedAt) AS Events_Attributes
-          FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String}
-            AND TraceId = {traceId:String}
-            {{idBound:stored_spans.TraceId:traceId}}
-          GROUP BY SpanId
-        )
-        ARRAY JOIN
-          Events_Timestamp AS event_timestamp,
-          Events_Name AS event_name,
-          Events_Attributes AS event_attrs
-        ORDER BY event_timestamp ASC
-        LIMIT {limit:UInt32}
-      `,
-      query_params: {
-        tenantId: input.tenantId,
-        traceId: input.traceId,
-        limit: DERIVATION_EVENT_LIMIT,
-      },
-      clickhouse_settings: DERIVATION_FETCH_SETTINGS,
-      format: "JSONEachRow",
+    const scope = tenantScope.single({ tenantId: input.tenantId });
+    const latest = clickhouseRead({ scope })
+      .from(spans)
+      .select({
+        SpanId: spans.SpanId,
+        LatestEvents: fn.arrayZip(
+          fn.argMax(spans["Events.Timestamp"], spans.UpdatedAt),
+          fn.argMax(spans["Events.Name"], spans.UpdatedAt),
+          fn.argMax(spans["Events.Attributes"], spans.UpdatedAt),
+        ),
+      })
+      .where(({ idBound }) => idBound(spans.TraceId, input.traceId))
+      .groupBy(spans.SpanId)
+      .as("latest");
+    const events = clickhouseRead({ scope })
+      .from(latest)
+      .select({ SpanId: latest.SpanId, Event: fn.arrayJoin(latest.LatestEvents) })
+      .as("events");
+    const statement = clickhouseRead({ scope })
+      .from(events)
+      .select({
+        spanId: events.SpanId,
+        timestamp: fn.toUnixTimestamp64Milli(fn.tupleElement(events.Event, "0")),
+        name: fn.tupleElement(events.Event, "1"),
+        attributes: fn.tupleElement(events.Event, "2"),
+      })
+      .orderBy("timestamp", "ASC")
+      .limit(DERIVATION_EVENT_LIMIT)
+      .settings(DERIVATION_FETCH_SETTINGS)
+      .build();
+    const result = await this.clickhouse.read({
+      statement,
+      table: spans.$table.name,
       idBound: idBoundOf(input),
     });
 
-    return traceEventRowsSchema.parse(await result.json()).map((row) => ({
+    return traceEventRowsSchema.parse(result.rows).map((row) => ({
       spanId: row.spanId,
       timestamp: row.timestamp,
       name: row.name,
@@ -203,51 +185,71 @@ export class TraceDerivationSpanClickHouseRepository {
     limit?: number;
     occurredAtMs?: number | undefined;
   }): Promise<NormalizedSpan[]> {
-    const client = await this.options.resolveClient(input.tenantId);
-    const result = await client.query({
-      query: `
-        SELECT ${DERIVATION_TRACE_SPAN_SELECT}
-        FROM (
-          SELECT
-            SpanId,
-            argMax(TraceId, UpdatedAt) AS TraceId,
-            argMax(TenantId, UpdatedAt) AS TenantId,
-            argMax(ParentSpanId, UpdatedAt) AS ParentSpanId,
-            argMax(ParentTraceId, UpdatedAt) AS ParentTraceId,
-            argMax(ParentIsRemote, UpdatedAt) AS ParentIsRemote,
-            argMax(Sampled, UpdatedAt) AS Sampled,
-            argMax(StartTime, UpdatedAt) AS StartTime,
-            argMax(EndTime, UpdatedAt) AS EndTime,
-            argMax(DurationMs, UpdatedAt) AS DurationMs,
-            argMax(SpanName, UpdatedAt) AS SpanName,
-            argMax(SpanKind, UpdatedAt) AS SpanKind,
-            argMax(ResourceAttributes, UpdatedAt) AS ResourceAttributes,
-            argMax(SpanAttributes, UpdatedAt) AS SpanAttributes,
-            argMax(StatusCode, UpdatedAt) AS StatusCode,
-            argMax(StatusMessage, UpdatedAt) AS StatusMessage,
-            argMax(ScopeName, UpdatedAt) AS ScopeName,
-            argMax(ScopeVersion, UpdatedAt) AS ScopeVersion,
-            argMax(Cost, UpdatedAt) AS Cost,
-            argMax(NonBilledCost, UpdatedAt) AS NonBilledCost
-          FROM ${TABLE_NAME} AS t
-          WHERE t.TenantId = {tenantId:String}
-            AND t.TraceId = {traceId:String}
-            {{idBound:stored_spans.TraceId:traceId:t}}
-          GROUP BY SpanId
-        )
-        ORDER BY StartTimeMs ASC
-        LIMIT {limit:UInt32}
-      `,
-      query_params: {
-        tenantId: input.tenantId,
-        traceId: input.traceId,
-        limit: input.limit ?? DERIVATION_SPAN_LIMIT,
-      },
-      clickhouse_settings: DERIVATION_FETCH_SETTINGS,
-      format: "JSONEachRow",
+    const scope = tenantScope.single({ tenantId: input.tenantId });
+    const latestOf = <V, T extends string>(of: Expression<V, T>) => fn.argMax(of, spans.UpdatedAt);
+    // Inner keys may not reuse a declared column's name; the outer read names them back.
+    const latest = clickhouseRead({ scope })
+      .from(spans)
+      .select({
+        SpanId: spans.SpanId,
+        LatestTraceId: latestOf(spans.TraceId),
+        LatestTenantId: latestOf(spans.TenantId),
+        LatestParentSpanId: latestOf(spans.ParentSpanId),
+        LatestParentTraceId: latestOf(spans.ParentTraceId),
+        LatestParentIsRemote: latestOf(spans.ParentIsRemote),
+        LatestSampled: latestOf(spans.Sampled),
+        LatestStartTime: latestOf(spans.StartTime),
+        LatestEndTime: latestOf(spans.EndTime),
+        LatestDurationMs: latestOf(spans.DurationMs),
+        LatestSpanName: latestOf(spans.SpanName),
+        LatestSpanKind: latestOf(spans.SpanKind),
+        LatestResourceAttributes: latestOf(spans.ResourceAttributes),
+        LatestSpanAttributes: latestOf(spans.SpanAttributes),
+        LatestStatusCode: latestOf(spans.StatusCode),
+        LatestStatusMessage: latestOf(spans.StatusMessage),
+        LatestScopeName: latestOf(spans.ScopeName),
+        LatestScopeVersion: latestOf(spans.ScopeVersion),
+        LatestCost: latestOf(spans.Cost),
+        LatestNonBilledCost: latestOf(spans.NonBilledCost),
+      })
+      .where(({ idBound }) => idBound(spans.TraceId, input.traceId))
+      .groupBy(spans.SpanId)
+      .as("latest");
+    // Narrow columns only: Events.* and Links.* stay out (mapChRowToNormalized defaults them).
+    const statement = clickhouseRead({ scope })
+      .from(latest)
+      .select({
+        SpanId: latest.SpanId,
+        TraceId: latest.LatestTraceId,
+        TenantId: latest.LatestTenantId,
+        ParentSpanId: latest.LatestParentSpanId,
+        ParentTraceId: latest.LatestParentTraceId,
+        ParentIsRemote: latest.LatestParentIsRemote,
+        Sampled: latest.LatestSampled,
+        StartTimeMs: fn.toUnixTimestamp64Milli(latest.LatestStartTime),
+        EndTimeMs: fn.toUnixTimestamp64Milli(latest.LatestEndTime),
+        DurationMs: latest.LatestDurationMs,
+        SpanName: latest.LatestSpanName,
+        SpanKind: latest.LatestSpanKind,
+        ResourceAttributes: latest.LatestResourceAttributes,
+        SpanAttributes: latest.LatestSpanAttributes,
+        StatusCode: latest.LatestStatusCode,
+        StatusMessage: latest.LatestStatusMessage,
+        ScopeName: latest.LatestScopeName,
+        ScopeVersion: latest.LatestScopeVersion,
+        Cost: latest.LatestCost,
+        NonBilledCost: latest.LatestNonBilledCost,
+      })
+      .orderBy("StartTimeMs", "ASC")
+      .limit(input.limit ?? DERIVATION_SPAN_LIMIT)
+      .settings(DERIVATION_FETCH_SETTINGS)
+      .build();
+    const result = await this.clickhouse.read({
+      statement,
+      table: spans.$table.name,
       idBound: idBoundOf(input),
     });
 
-    return fullSpanRowsSchema.parse(await result.json()).map((row) => mapChRowToNormalized(row));
+    return fullSpanRowsSchema.parse(result.rows).map((row) => mapChRowToNormalized(row));
   }
 }

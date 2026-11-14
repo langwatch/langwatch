@@ -30,15 +30,15 @@ const DESCRIPTORS: readonly { readonly $table: ClickHouseTableFacts }[] = [
 ];
 
 /**
- * The parameter type a stored column binds as: storage wrappers that change no value go, and a
- * FixedString binds as String.
+ * The parameter type a stored column binds as: storage wrappers that change no value go, a time
+ * (an array's members too) binds as epoch milliseconds, and a FixedString binds as String.
  */
 const bindingOf = (type: string): string =>
   type
     .replace(/^SimpleAggregateFunction\(\w+, (.+)\)$/, "$1")
     .replaceAll(/LowCardinality\(([^()]*(?:\([^()]*\))?)\)/g, "$1")
     .replaceAll(/Nullable\(([^()]*(?:\([^()]*\))?)\)/g, "$1")
-    .replace(/^DateTime64\(\d\)$/, "Int64")
+    .replaceAll(/DateTime64\(\d\)/g, "Int64")
     .replace(/^FixedString\(\d+\)$/, "String");
 
 describe("trace's descriptors against the migrated schema", () => {

@@ -6,8 +6,9 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { TraceDerivationSpanClickHouseRepository } from "../trace-derivation-span.repository.ts";
-import { traceResolverFor } from "./support/authorized-clickhouse.support.ts";
+import { traceQueryClientFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -45,9 +46,9 @@ function versionRow({ offsetMs, version }: { offsetMs: number; version: string }
     StatusMessage: null,
     ScopeName: "test",
     ScopeVersion: null,
-    "Events.Timestamp": [] as Date[],
-    "Events.Name": [] as string[],
-    "Events.Attributes": [] as Record<string, string>[],
+    "Events.Timestamp": [new Date(base + offsetMs + 10), new Date(base + offsetMs + 20)],
+    "Events.Name": [`${version}-start`, `${version}-end`],
+    "Events.Attributes": [{ version }, {}],
     "Links.TraceId": [] as string[],
     "Links.SpanId": [] as string[],
     "Links.Attributes": [] as Record<string, string>[],
@@ -62,7 +63,7 @@ function versionRow({ offsetMs, version }: { offsetMs: number; version: string }
 beforeAll(async () => {
   if (!clickHouseConfigured) return;
   ch = await startMigratedTraceClickHouse();
-  repo = TraceDerivationSpanClickHouseRepository.create({ resolveClient: traceResolverFor(ch) });
+  repo = TraceDerivationSpanClickHouseRepository.create({ clickhouse: traceQueryClientFor(ch) });
 
   // Separate inserts leave unmerged parts; the newest goes first so insertion
   // order cannot pick the winner, and it starts latest so a merge keeps it too.
@@ -127,6 +128,43 @@ describe.skipIf(!clickHouseConfigured)(
         });
 
         expect(spans).toEqual([]);
+      });
+    });
+  },
+);
+
+describe.skipIf(!clickHouseConfigured)(
+  "TraceDerivationSpanClickHouseRepository.findDerivedEventsByTraceId",
+  () => {
+    describe("given a trace whose span versions each carry their own events", () => {
+      /** @scenario "A trace's span events are read back for derivation from each span's latest version" */
+      it("reads the latest version's events, one row each, in time order", async () => {
+        const events = await repo.findDerivedEventsByTraceId({
+          authorization: ownProof({ projectId: tenantId }),
+          traceId,
+          occurredAtMs: base,
+        });
+
+        expect(events).toEqual([
+          {
+            spanId,
+            timestamp: base + 2_010,
+            name: "latest-start",
+            attributes: { version: "latest" },
+          },
+          { spanId, timestamp: base + 2_020, name: "latest-end", attributes: {} },
+        ]);
+      });
+
+      /** @scenario "A trace's span events are read back for derivation from each span's latest version" */
+      it("answers no events to another project's proof", async () => {
+        const events = await repo.findDerivedEventsByTraceId({
+          authorization: ownProof({ projectId: `${tenantId}-other` }),
+          traceId,
+          occurredAtMs: base,
+        });
+
+        expect(events).toEqual([]);
       });
     });
   },

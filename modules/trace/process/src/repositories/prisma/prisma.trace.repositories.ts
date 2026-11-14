@@ -87,7 +87,7 @@ export class PostgresTraceRepositories {
       braidReads: ClickHouseTraceBraidReadsRepository.create({ clickhouse }),
       existence: ClickHouseTraceExistenceRepository.create({ clickhouse: members.clickhouse }),
       derivationSpans: TraceDerivationSpanClickHouseRepository.create({
-        resolveClient: traceClickHouse,
+        clickhouse: members.clickhouse,
       }),
       summary: TraceSummaryClickHouseRepository.create(storage),
       logRecords: LogRecordStorageClickHouseRepository.create(traceClickHouse),

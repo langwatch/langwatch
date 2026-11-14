@@ -1,14 +1,15 @@
 import { column, defineClickHouseTable } from "@langwatch/clickhouse-client/builder";
 
 /**
- * Trace's spans (goose 00002 onward), one row per span version, deduplicated on `StartTime`.
- * The nested `Events.*` and `Links.*` arrays are not declared: the builder has no type for them.
+ * Trace's spans (goose 00002 onward), one row per span version. The engine merges on
+ * `StartTime`, but every read elects the latest `UpdatedAt`, as the fenced reader's election did.
+ * Of the nested groups only `Events.*` is declared: no read selects `Links.*`.
  */
 export const storedSpans = defineClickHouseTable({
   name: "stored_spans",
   tenantColumn: "TenantId",
   timeColumn: "StartTime",
-  versionColumn: "StartTime",
+  versionColumn: "UpdatedAt",
   sortKey: ["TenantId", "TraceId", "SpanId"],
   columns: {
     ProjectionId: column.string(),
@@ -36,6 +37,11 @@ export const storedSpans = defineClickHouseTable({
     DroppedLinksCount: column.uint32(),
     Cost: column.nullable(column.float64()),
     NonBilledCost: column.nullable(column.float64()),
+    "Events.Timestamp": column.array(column.dateTime64({ precision: 3 })),
+    "Events.Name": column.array(column.lowCardinality(column.string())),
+    "Events.Attributes": column.array(
+      column.map({ key: column.lowCardinality(column.string()), value: column.string() }),
+    ),
     CreatedAt: column.dateTime64({ precision: 3 }),
     UpdatedAt: column.dateTime64({ precision: 3 }),
   },

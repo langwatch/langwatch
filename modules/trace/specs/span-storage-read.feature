@@ -74,3 +74,10 @@ Feature: Reading one stored span back for a derivation consumer
     When the drawer reads its LangWatch signals with the trace's start time
     Then the answer is empty after that single bounded read
     And the read is never widened to every partition
+
+  @integration
+  Scenario: A trace's span events are read back for derivation from each span's latest version
+    Given a trace whose span is stored as several versions not yet merged, each with its own events
+    When the derivation consumer reads every span event of that trace
+    Then it receives the latest version's events, one row per event
+    And another project's proof reading the same trace receives none
