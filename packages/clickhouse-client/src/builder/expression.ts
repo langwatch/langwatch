@@ -258,6 +258,13 @@ export type ExpressionNode =
     }
   /** A one-value subquery the read builder rendered under the enclosing read's scope. */
   | { readonly kind: "scalar"; readonly render: (context: RenderContext) => string }
+  /** A braid's compiled condition over one table's columns, its keys and literals bound. */
+  | {
+      readonly kind: "braid";
+      readonly table: string;
+      readonly columns: readonly string[];
+      readonly render: (prefix: string) => { sql: string; params: Record<string, unknown> };
+    }
   | {
       readonly kind: "over";
       readonly call: ExpressionNode;
@@ -365,9 +372,21 @@ const compare =
 
 type CteName<Ctes> = Extract<keyof Ctes, string>;
 
-/** Names a common table expression of the read as the set an `oneOf` reads. */
+/** A tuple's element values, for a tuple looked up in a CTE of as many columns. */
+type ElementsOf<Value> = Value extends readonly unknown[] ? Value[number] : never;
+
+/**
+ * Names a common table expression of the read as the set an `oneOf` reads; a tuple reads a CTE
+ * whose columns hold its elements' values (ClickHouse refuses a column count that differs).
+ */
 export type CteSet<Ctes, Value> = {
-  readonly cte: { [Name in CteName<Ctes>]: Ctes[Name] extends Value ? Name : never }[CteName<Ctes>];
+  readonly cte: {
+    [Name in CteName<Ctes>]: Ctes[Name] extends Value
+      ? Name
+      : [Ctes[Name]] extends [ElementsOf<Value>]
+        ? Name
+        : never;
+  }[CteName<Ctes>];
 };
 
 /** A declared column holding string ids, Nullable included: a NULL id equals no bound one. */
@@ -748,6 +767,8 @@ export function renderExpression({
       return idBoundText({ node, context, render, qualify });
     case "scalar":
       return node.render(context);
+    case "braid":
+      return braidText({ node, context, qualify });
     case "over":
       return overText({ node, render });
   }
@@ -767,6 +788,28 @@ function inText({
   if (!context.ctes.visible.has(node.set.name))
     throw new QueryBuilderError({ kind: "unknown-cte", name: node.set.name });
   return `${render(node.left)} IN ${node.set.name}`;
+}
+
+/**
+ * A braid condition's text, unqualified: its terms name the span's columns bare. Rendered twice,
+ * it reuses its parameters, as a value node does.
+ */
+function braidText({
+  node,
+  context,
+  qualify,
+}: {
+  node: ExpressionNode & { kind: "braid" };
+  context: RenderContext;
+  qualify: boolean;
+}): string {
+  if (qualify) throw unsupported(node);
+  const known = context.slots.get(node);
+  const prefix = known ?? `b${context.counter.next++}`;
+  context.slots.set(node, prefix);
+  const { sql, params } = node.render(prefix);
+  if (known === undefined) Object.assign(context.params, params);
+  return sql;
 }
 
 /**
@@ -858,6 +901,8 @@ export function columnsOf(node: ExpressionNode): { table: string; name: string }
       return columnsOf(node.body);
     case "fragment":
       return REVIEWED_FRAGMENTS[node.id].columns.map((name) => ({ table: node.table, name }));
+    case "braid":
+      return node.columns.map((name) => ({ table: node.table, name }));
     case "call":
       return node.args.flatMap(columnsOf);
     case "compare":

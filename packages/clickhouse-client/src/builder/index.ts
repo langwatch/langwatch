@@ -46,6 +46,7 @@ export {
   systemTables,
 } from "./system-tables.ts";
 export { boundRows, type BoundRowColumns } from "./bound-rows.ts";
+export { braidCondition } from "./braid-condition.ts";
 export {
   column,
   cond,

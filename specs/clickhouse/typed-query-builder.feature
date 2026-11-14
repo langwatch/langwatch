@@ -518,3 +518,63 @@ Feature: A typed ClickHouse read builder renders the tenant predicate and the te
     When it selects uniq of both columns, and of one string or numeric column
     Then each renders uniq of every expression given, counted as a UInt64
     And a count over a column of a table the read does not read does not compile and is refused at build
+
+  @unit
+  Scenario: uniqExact counts distinct tuples of several arguments
+    Given session-groups' count of distinct tenant and conversation pairs over the latest trace versions
+    When it selects uniqExact of the tenant column and the conversation attribute
+    Then it renders one uniqExact call of both, under the reader's tenant setting
+    And the one-argument form renders as before, and a call with no argument does not compile
+
+  @unit
+  Scenario: A keyset over aggregates pages in HAVING
+    Given session-groups' rollup grouped by tenant and conversation, sorted by an aggregate
+    When a cursor holds the last sort value, conversation and tenant
+    Then HAVING compares the aggregate, and on a tie the tuple of the group keys with the bound cursor values
+    And without a cursor no HAVING renders
+
+  @unit
+  Scenario: A tuple is looked up in CTEs standing for a UNION DISTINCT
+    Given session-groups' membership of a trace branch and a log branch, which main reads as IN of a UNION DISTINCT
+    When each branch is a CTE of tenant and session and the tenant and conversation tuple is looked up in either
+    Then each CTE renders under the tenant predicate and the two lookups are ORed
+    And a tuple looked up in a CTE of other values does not compile
+
+  @unit
+  Scenario: A latest-version read elects on a tuple of its columns, one row per key
+    Given instant-eval's runs, whose latest version is the tuple of WrittenAt, AcceptedAt or the epoch, and LastEventId
+    When the read elects on that tuple and takes LIMIT 1 BY the run
+    Then the tuple renders in the key tuple and under max, its constant bound once, then LIMIT 1 BY RunId
+    And a tuple reading the tenant column, or no column, is refused
+
+  @unit
+  Scenario: A select reads the columns its target holds and a day window off now()
+    Given evaluation-runs' attempt columns, which a target may lack, and its seven-day window
+    When the read selects each through heldOr and filters ScheduledAt at subtractDays of now() by seven
+    Then a target holding them reads the columns, one lacking them reads each typed default
+    And the day window and trace repeat in the election, and a fractional or negative day count is refused
+
+  @integration
+  Scenario: Trace's remaining reads return main's rows on 26.8
+    Given ClickHouse 26.8, the reader identity, unmerged versions, another tenant's rows, and an evaluation-runs target without the attempt columns
+    When session-groups' count, page, and membership, instant-eval's run dating and evaluation-runs' attempts are built and sent
+    Then each returns the rows main's raw text returns, in main's order where main orders them
+
+  @unit
+  Scenario: A braid's compiled condition is a plain condition binding every key and literal
+    Given trace braid's activity, marked-span and owner-count reads, each a braid's window and compiled condition
+    When the condition is a term of argMax, countIf, AND, OR or NOT, or a selected value, not only through braided()
+    Then every key, literal and Verified() reader is a parameter under the condition's own prefix, and no literal is text
+    And a condition rendered twice reuses its parameters, a table lacking a column its terms read is refused, and a join refuses it
+
+  @unit
+  Scenario: An ARRAY JOIN over a sample is arrayJoin in a derived read
+    Given trace braid's attribute keys, which main reads with ARRAY JOIN mapKeys over a limited sample
+    When the sample is a derived read and arrayJoin of its keys a second
+    Then the key is joined once, filtered, grouped and ordered outside, and the sample limited inside
+
+  @integration
+  Scenario: Trace braid's reads return main's rows on 26.8
+    Given ClickHouse 26.8, the reader identity, a span whose latest version leaves the braid, a span outside a braid's window, and another tenant's spans
+    When the owner activity, the marked spans and the attribute keys are built and sent
+    Then each returns the rows main's raw text returns, in main's order where main orders them

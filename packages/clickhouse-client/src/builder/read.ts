@@ -139,8 +139,8 @@ type ReadState = {
   readonly latestVersion: "where" | "prewhere" | undefined;
   /** The elected table's columns the caller declared stable per key; the election repeats them. */
   readonly repeats: readonly string[];
-  /** The column the FROM side's election takes the max of, when not the descriptor's version. */
-  readonly version: string | undefined;
+  /** What the FROM side's election takes the max of, when not the descriptor's version. */
+  readonly version: ExpressionNode | undefined;
   /** The indices of `where` conditions that filter the elected rows only, never the election. */
   readonly outerOnly: readonly number[];
   readonly ctes: readonly { name: string; read: ReadState }[];
@@ -241,19 +241,24 @@ function readsSystemIdentityTable(table: ClickHouseTableFacts): boolean {
   );
 }
 
-/** The column an election takes the max of: the elected table's own, never its tenant column. */
+/**
+ * What an election takes the max of: a column of the elected table, or an expression such as a
+ * tuple reading only its columns; never its tenant column.
+ */
 function electedVersionOf({
   table,
   version,
 }: {
   table: ClickHouseTableFacts;
-  version: ColumnRef<string, string, unknown>;
-}): string {
+  version: Expression<unknown, string>;
+}): ExpressionNode {
   const { node } = version;
-  if (node.kind === "column" && node.table === table.name && node.name !== table.tenantColumn) {
-    return node.name;
-  }
-  const column = node.kind === "column" ? `${node.table}.${node.name}` : node.kind;
+  const read = columnsOf(node);
+  const outside = read.find(
+    (each) => each.table !== table.name || each.name === table.tenantColumn,
+  );
+  if (read.length > 0 && outside === undefined) return node;
+  const column = outside === undefined ? node.kind : `${outside.table}.${outside.name}`;
   throw new QueryBuilderError({ kind: "version-outside-election", table: table.name, column });
 }
 
@@ -550,7 +555,7 @@ export class ClickHouseRead<
   /**
    * The IN-tuple election of keys and version (clickhouse-queries.md), in WHERE or `prewhere`.
    * `repeat` names the FROM table's columns stable per key; `version` the column the engine
-   * replaces by, when it is not the descriptor's version column.
+   * replaces by, when it is not the descriptor's version column, or a tuple of its columns.
    */
   latestVersion({
     prewhere = false,
@@ -559,7 +564,7 @@ export class ClickHouseRead<
   }: {
     prewhere?: boolean;
     repeat?: readonly ColumnRef<Tables, string, unknown>[];
-    version?: ColumnRef<Tables, string, unknown>;
+    version?: Expression<unknown, Tables>;
   } = {}): ClickHouseRead<Scope, Tables, Row, Ctes> {
     const { table } = this.#state;
     const elected = version === undefined ? undefined : electedVersionOf({ table, version });
@@ -1205,7 +1210,11 @@ function electionOf({
   context: RenderContext;
 }): string {
   // A join side elects on its descriptor's version; the FROM side on the read's, when it names one.
-  const version = (table === state.table ? state.version : undefined) ?? table.versionColumn ?? "";
+  const named = table === state.table ? state.version : undefined;
+  const version =
+    named === undefined
+      ? (table.versionColumn ?? "")
+      : renderExpression({ node: named, context, qualify: false });
   const keys = table.sortKey;
   const where: string[] = [];
   const predicate = tenantPredicate({ state, table, context, election: true });

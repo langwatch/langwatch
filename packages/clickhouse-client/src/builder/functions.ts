@@ -180,6 +180,12 @@ function constant({ value, min, max }: { value: number; min: number; max: number
   return value;
 }
 
+/** A whole count of days, at most a century: anything else is a caller's mistake. */
+function wholeDays(days: number): number {
+  if (!Number.isInteger(days)) throw new QueryBuilderError({ kind: "bad-constant", value: days });
+  return constant({ value: days, min: 0, max: 36_500 });
+}
+
 const unary =
   (name: string, binding?: Binding) =>
   <V, T extends string>(of: E<V, T>) =>
@@ -273,8 +279,13 @@ export const fn = {
       args: nodesOf(of),
       binding: UINT64,
     }),
-  uniqExact: <T extends string>(of: E<unknown, T>) =>
-    call<number, T>({ name: "uniqExact", args: [of.node], binding: UINT64 }),
+  /** `uniqExact(a, b, …)`: the exact count of distinct values, or of distinct tuples of them. */
+  uniqExact: <const Of extends readonly [E<unknown, string>, ...E<unknown, string>[]]>(...of: Of) =>
+    call<number, TablesOfExpression<Of[number]>>({
+      name: "uniqExact",
+      args: nodesOf(of),
+      binding: UINT64,
+    }),
   uniqExactIf: <T extends string, U extends string>(of: E<unknown, T>, when: Condition<U>) =>
     call<number, T | U>({ name: "uniqExactIf", args: [of.node, when.node], binding: UINT64 }),
   countDistinct: <T extends string>(of: E<unknown, T>) =>
@@ -457,6 +468,13 @@ export const fn = {
       binding: INT64,
     }),
   now: () => call<number, never>({ name: "now", args: [], binding: EPOCH_MS }),
+  /** `subtractDays(of, days)`, as `of - INTERVAL days DAY`; the count is bound as a parameter. */
+  subtractDays: <T extends string>(of: E<Num, T>, days: number) =>
+    call<number, T>({
+      name: "subtractDays",
+      args: [of.node, bound(wholeDays(days), UINT32)],
+      binding: of.binding,
+    }),
   now64: (precision = 3) =>
     call<number, never>({
       name: "now64",
