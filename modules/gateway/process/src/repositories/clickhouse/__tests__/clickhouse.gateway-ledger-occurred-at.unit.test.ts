@@ -17,6 +17,7 @@ type Insert = Parameters<GatewayClickHouseClient["insert"]>[0];
 function recordingClient() {
   const inserts: Insert[] = [];
   const client = async () => ({
+    read: async () => ({ rows: [] }),
     query: async () => ({ json: async () => [] }),
     insert: async (input: Insert) => {
       inserts.push(input);

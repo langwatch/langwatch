@@ -1,36 +1,25 @@
 /**
- * The budget reads span every project of the budget's organisation. Each one runs through the real
- * tenant guard here, so a statement the guard would refuse on a live stack fails this test.
+ * The budget reads span every project of the budget's organisation. Each one is a built statement
+ * on the reader identity whose tenant setting is exactly that organisation's projects.
  */
-import { TenantGuard } from "@langwatch/clickhouse-client";
+import type { ReaderReadStatement } from "@langwatch/clickhouse-client/builder";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import type { GatewayBudgetSpendRecord } from "../../gateway-budget-spend.repository.ts";
 import { GatewayBudgetClickHouseRepository } from "../clickhouse.gateway-budget.repository.ts";
-import type { GatewayClickHouseClient } from "../clickhouse.gateway-session.store.ts";
 
 const PROJECTS = ["project-a", "project-b"];
 const NOW = Temporal.Instant.from("2026-09-15T12:00:00Z");
 
-type Statement = Parameters<GatewayClickHouseClient["query"]>[0];
-
 function guardedRepository() {
-  const guard = new TenantGuard();
-  const statements: Statement[] = [];
-  const repository = GatewayBudgetClickHouseRepository.create(async (tenantId) => ({
-    read: () => Promise.reject(new Error("this fake answers raw statements only")),
-    query: async (input) => {
-      guard.assert({
-        tenantId,
-        sql: input.query,
-        params: input.query_params,
-        ...(input.tenantIds ? { tenantIds: input.tenantIds } : {}),
-        SKIP_TENANT_CHECK: input.SKIP_TENANT_CHECK,
-      });
-      statements.push(input);
-      return { json: async () => [] };
+  const statements: ReaderReadStatement[] = [];
+  const repository = GatewayBudgetClickHouseRepository.create(async () => ({
+    read: async (input) => {
+      statements.push(input.statement as ReaderReadStatement);
+      return { rows: [] };
     },
+    query: () => Promise.reject(new Error("budget reads are built statements")),
     insert: async () => undefined,
   }));
   return { repository, statements };
@@ -77,9 +66,11 @@ describe("GatewayBudgetClickHouseRepository across an organisation's projects", 
 
       expect(statements).toHaveLength(4);
       for (const statement of statements) {
-        expect(statement.tenantIds).toEqual(PROJECTS);
-        expect(statement.query).toContain("TenantId IN (");
-        expect(statement.SKIP_TENANT_CHECK).toBeUndefined();
+        expect(statement).toMatchObject({ identity: "reader", tenantIds: PROJECTS });
+        expect(statement.settings).toMatchObject({
+          SQL_langwatch_tenant_ids: PROJECTS.join(","),
+        });
+        expect(statement.sql).toContain("TenantId IN");
       }
     });
   });

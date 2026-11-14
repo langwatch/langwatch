@@ -8,6 +8,7 @@ import type { ClickHouseTableFacts } from "@langwatch/clickhouse-client/builder"
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { gatewayBudgetLedgerEvents } from "../clickhouse.gateway-budget-ledger-events.table.ts";
+import { gatewayBudgetScopeTotals } from "../clickhouse.gateway-budget-scope-totals.table.ts";
 import { gatewaySpend } from "../clickhouse.gateway-spend.table.ts";
 import {
   type MigratedClickHouse,
@@ -17,6 +18,7 @@ import {
 const DESCRIPTORS: readonly { readonly $table: ClickHouseTableFacts }[] = [
   gatewaySpend,
   gatewayBudgetLedgerEvents,
+  gatewayBudgetScopeTotals,
 ];
 
 /** The parameter type a stored column binds as: storage wrappers that change no value go. */
@@ -24,6 +26,7 @@ const bindingOf = (type: string): string =>
   type
     .replaceAll(/LowCardinality\(([^()]*(?:\([^()]*\))?)\)/g, "$1")
     .replaceAll(/Nullable\(([^()]*(?:\([^()]*\))?)\)/g, "$1")
+    .replace(/^SimpleAggregateFunction\(\w+, (.*)\)$/, "$1")
     .replace(/^DateTime64\(\d\)$/, "Int64");
 
 describe("gateway's descriptors against the migrated schema", () => {
